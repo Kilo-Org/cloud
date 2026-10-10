@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  gitlabInstanceOrigin,
-  providerPrRefKey,
-  type ProviderPrInboxItem,
-  type ProviderPrRef,
-} from './contracts';
+import { gitlabInstanceOrigin, providerPrRefKey, type ProviderPrRef } from './contracts';
 
 const GITHUB: ProviderPrRef = { platform: 'github', owner: 'acme', repo: 'api', number: 7 };
 const GITLAB: ProviderPrRef = {
@@ -103,21 +98,5 @@ describe('gitlabInstanceOrigin', () => {
     );
     expect(gitlabInstanceOrigin('gitlab.example.com:8443')).toBe('gitlab.example.com:8443');
     expect(gitlabInstanceOrigin('gitlab.example.com/?x=1')).toBe('gitlab.example.com');
-  });
-});
-
-describe('contract shapes', () => {
-  // The inbox row must always carry its ref: the type below only compiles
-  // because `ref` is required on ProviderPrInboxItem.
-  it('carries the ref on every inbox item', () => {
-    const item: ProviderPrInboxItem = {
-      ref: GITLAB,
-      title: 'Add retry',
-      author: { login: 'octocat', avatarUrl: null },
-      state: 'open',
-      draft: false,
-      updatedAt: '2026-09-06T00:00:00Z',
-    };
-    expect(providerPrRefKey(item.ref)).toBe(providerPrRefKey(GITLAB));
   });
 });

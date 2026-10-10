@@ -21,7 +21,7 @@ jest.mock('@/lib/code-reviews/triggers/prepare-review-payload', () => ({
   prepareReviewPayload: (...args: unknown[]) => mockPrepareReviewPayload(...args),
 }));
 
-jest.mock('@/lib/email', () => ({
+jest.mock('@kilocode/web-shared/lib/email', () => ({
   sendCodeReviewDisabledEmail: (...args: unknown[]) => mockSendCodeReviewDisabledEmail(...args),
 }));
 
@@ -33,7 +33,7 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   updateCheckRun: (...args: unknown[]) => mockUpdateCheckRun(...args),
 }));
 
-jest.mock('@/lib/constants', () => ({
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
   APP_URL: 'https://test.kilo.ai',
 }));
 
@@ -41,8 +41,8 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   agent_configs,
   cloud_agent_code_review_attempts,

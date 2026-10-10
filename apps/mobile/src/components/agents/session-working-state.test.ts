@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  resolveSessionFooterRowItem,
   shouldShowAgentWorkingIndicator,
   shouldShowFooterWorkingIndicator,
-  shouldShowSessionFooterRow,
 } from '@/components/agents/session-working-state';
 
 describe('shouldShowAgentWorkingIndicator', () => {
@@ -64,116 +64,113 @@ describe('shouldShowFooterWorkingIndicator', () => {
   });
 });
 
-describe('shouldShowSessionFooterRow', () => {
+describe('resolveSessionFooterRowItem', () => {
   const base = {
+    cloudStatusType: 'ready' as const,
+    hasInProgressTranscriptPreparation: false,
     shouldShowFooterWorking: false,
-    hasStatusIndicator: true,
+    hasStatusIndicator: false,
+    hasSendReason: false,
     messageCount: 1,
   };
 
-  it('hides while preparing when the transcript shows an in-progress preparation', () => {
+  it('ranks the working spinner above the status indicator and the send reason', () => {
     expect(
-      shouldShowSessionFooterRow({
+      resolveSessionFooterRowItem({
+        ...base,
+        shouldShowFooterWorking: true,
+        hasStatusIndicator: true,
+        hasSendReason: true,
+      })
+    ).toBe('working');
+  });
+
+  it('ranks the status indicator above the send reason', () => {
+    expect(
+      resolveSessionFooterRowItem({ ...base, hasStatusIndicator: true, hasSendReason: true })
+    ).toBe('status');
+  });
+
+  it('shows the send reason when nothing above it applies', () => {
+    expect(resolveSessionFooterRowItem({ ...base, hasSendReason: true })).toBe('reason');
+  });
+
+  it('shows no item when no input applies', () => {
+    expect(resolveSessionFooterRowItem(base)).toBeNull();
+  });
+
+  it('suppresses progress items while preparing when the transcript shows an in-progress preparation', () => {
+    expect(
+      resolveSessionFooterRowItem({
         ...base,
         cloudStatusType: 'preparing',
         hasInProgressTranscriptPreparation: true,
+        shouldShowFooterWorking: true,
+        hasStatusIndicator: true,
       })
-    ).toBe(false);
+    ).toBeNull();
   });
 
-  it('shows while preparing when the transcript has no live preparation surface', () => {
+  it('keeps the send reason while preparing with a live preparation in the transcript', () => {
     expect(
-      shouldShowSessionFooterRow({
+      resolveSessionFooterRowItem({
         ...base,
         cloudStatusType: 'preparing',
-        hasInProgressTranscriptPreparation: false,
+        hasInProgressTranscriptPreparation: true,
+        shouldShowFooterWorking: true,
+        hasSendReason: true,
       })
-    ).toBe(true);
+    ).toBe('reason');
   });
 
-  it('shows while preparing when only a completed (stale) preparation is in the transcript', () => {
+  it('keeps progress while preparing when only a completed (stale) preparation is in the transcript', () => {
     // Recycle re-prepare: prior non-no-op completed group remains rendered, but
-    // the new running attempt is not merged yet — footer must stay visible.
+    // the new running attempt is not merged yet — the row must stay visible.
     expect(
-      shouldShowSessionFooterRow({
+      resolveSessionFooterRowItem({
         ...base,
         cloudStatusType: 'preparing',
         hasInProgressTranscriptPreparation: false,
+        hasStatusIndicator: true,
       })
-    ).toBe(true);
+    ).toBe('status');
   });
 
-  it('hides while preparing when a running non-no-op preparation is in the transcript', () => {
+  it('keeps the status indicator on a non-preparing transcript that carries a preparation', () => {
     expect(
-      shouldShowSessionFooterRow({
-        ...base,
-        cloudStatusType: 'preparing',
-        hasInProgressTranscriptPreparation: true,
-      })
-    ).toBe(false);
-  });
-
-  it('keeps non-preparing behavior: shows when status or footer working is set', () => {
-    expect(
-      shouldShowSessionFooterRow({
+      resolveSessionFooterRowItem({
         ...base,
         cloudStatusType: 'ready',
         hasInProgressTranscriptPreparation: true,
         hasStatusIndicator: true,
-        shouldShowFooterWorking: false,
       })
-    ).toBe(true);
-
-    expect(
-      shouldShowSessionFooterRow({
-        ...base,
-        cloudStatusType: null,
-        hasInProgressTranscriptPreparation: false,
-        hasStatusIndicator: false,
-        shouldShowFooterWorking: true,
-      })
-    ).toBe(true);
-
-    expect(
-      shouldShowSessionFooterRow({
-        ...base,
-        cloudStatusType: 'ready',
-        hasInProgressTranscriptPreparation: false,
-        hasStatusIndicator: false,
-        shouldShowFooterWorking: false,
-      })
-    ).toBe(false);
+    ).toBe('status');
   });
 
-  it('keeps footer-working rules and hides the row when there are no messages', () => {
+  it('suppresses progress items on an empty transcript, where the body states its own', () => {
     expect(
-      shouldShowSessionFooterRow({
-        cloudStatusType: null,
-        hasInProgressTranscriptPreparation: false,
+      resolveSessionFooterRowItem({
+        ...base,
+        messageCount: 0,
         shouldShowFooterWorking: true,
-        hasStatusIndicator: false,
-        messageCount: 3,
       })
-    ).toBe(true);
-
+    ).toBeNull();
     expect(
-      shouldShowSessionFooterRow({
-        cloudStatusType: 'preparing',
-        hasInProgressTranscriptPreparation: false,
-        shouldShowFooterWorking: false,
+      resolveSessionFooterRowItem({ ...base, messageCount: 0, hasStatusIndicator: true })
+    ).toBeNull();
+  });
+
+  it('keeps the send reason on an empty transcript, where it is the reader only line', () => {
+    // The failed load on an empty transcript is behind the full-screen Retry.
+    // Inheriting the has-messages gate would delete the reason exactly when the
+    // reader needs it.
+    expect(
+      resolveSessionFooterRowItem({
+        ...base,
+        messageCount: 0,
         hasStatusIndicator: true,
-        messageCount: 0,
+        hasSendReason: true,
       })
-    ).toBe(false);
-
-    expect(
-      shouldShowSessionFooterRow({
-        cloudStatusType: null,
-        hasInProgressTranscriptPreparation: false,
-        shouldShowFooterWorking: true,
-        hasStatusIndicator: false,
-        messageCount: 0,
-      })
-    ).toBe(false);
+    ).toBe('reason');
   });
 });

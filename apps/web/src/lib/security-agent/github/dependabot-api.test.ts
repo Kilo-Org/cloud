@@ -25,7 +25,7 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   generateGitHubInstallationToken: mockGenerateGitHubInstallationToken,
 }));
 
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: mockSentryLogger,
   warnExceptInTest: mockWarnExceptInTest,
   errorExceptInTest: mockErrorExceptInTest,

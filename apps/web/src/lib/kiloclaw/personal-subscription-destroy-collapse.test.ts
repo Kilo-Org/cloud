@@ -18,8 +18,8 @@ import { eq, inArray } from 'drizzle-orm';
 
 import { listCurrentPersonalSubscriptionRows } from '@/lib/kiloclaw/current-personal-subscription';
 import { enrollWithCredits as enrollWithCreditsImpl } from '@/lib/kiloclaw/credit-billing';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { bootstrapProvisionSubscriptionWithDb } from '../../../../../services/kiloclaw-billing/src/provision-bootstrap-shared';
 
 const TEST_ACTOR = {

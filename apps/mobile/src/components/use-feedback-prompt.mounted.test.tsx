@@ -24,12 +24,16 @@ const platform = vi.hoisted(() => ({ inApp: true }));
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
-  Modal: 'Modal',
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+// The dialog reached through `@/components/ui/dialog` reads the bottom inset;
+// the native module cannot load under this partial RN mock.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 24, left: 0, right: 0, top: 0 }),
+}));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
@@ -109,8 +113,9 @@ function requestButton(root: TestRenderer.ReactTestInstance) {
   );
 }
 
-function modals(root: TestRenderer.ReactTestInstance) {
-  return root.findAll(node => isType(node, 'Modal'));
+/** The in-app prompt card; `DialogCard` renders it only while open. */
+function dialogs(root: TestRenderer.ReactTestInstance) {
+  return root.findAll(node => isType(node, 'DialogContent'));
 }
 
 function answer(root: TestRenderer.ReactTestInstance, token: string) {
@@ -137,11 +142,11 @@ describe('useFeedbackPrompt', () => {
   it('opens the in-app dialog on Android instead of the native alert', () => {
     const root = mount();
 
-    expect(modals(root)).toHaveLength(0);
+    expect(dialogs(root)).toHaveLength(0);
     press(requestButton(root));
 
     expect(feedback.showFeedbackPrompt).not.toHaveBeenCalled();
-    expect(modals(root)).toHaveLength(1);
+    expect(dialogs(root)).toHaveLength(1);
     expect(
       root.findAll(node => isType(node, 'Text') && node.children.includes('feedback.neutralTitle'))
     ).toHaveLength(1);
@@ -154,7 +159,7 @@ describe('useFeedbackPrompt', () => {
     press(requestButton(root));
 
     expect(feedback.showFeedbackPrompt).toHaveBeenCalledWith('user-1');
-    expect(modals(root)).toHaveLength(0);
+    expect(dialogs(root)).toHaveLength(0);
   });
 
   it('records the positive answer through the in-app dialog and closes it', () => {
@@ -164,7 +169,7 @@ describe('useFeedbackPrompt', () => {
     answer(root, 'bg-primary');
 
     expect(feedback.requestAppRating).toHaveBeenCalledTimes(1);
-    expect(modals(root)).toHaveLength(0);
+    expect(dialogs(root)).toHaveLength(0);
   });
 
   it('records the negative answer through the in-app dialog and closes it', () => {
@@ -174,57 +179,36 @@ describe('useFeedbackPrompt', () => {
     answer(root, 'border-border');
 
     expect(feedback.sendAppFeedback).toHaveBeenCalledWith('user-1');
-    expect(modals(root)).toHaveLength(0);
+    expect(dialogs(root)).toHaveLength(0);
   });
 
-  // The queued dialog is not a presented dialog: the claim must not record the
-  // one-time prompt before the `Modal` confirms it is shown.
-  it('reports presented only after the dialog confirms it is shown', async () => {
+  // The in-app answer is deferred: the request hands back a promise that
+  // settles only once the dialog is shown (the native alert answers `true` at
+  // once). The dialog's `onShown` is a mount effect, so it has fired by the
+  // time the request's act block returns.
+  it('reports presented once the dialog has mounted and is shown', async () => {
     const root = mount();
 
     press(requestButton(root));
-    let presented: boolean | undefined = undefined;
-    void (async () => {
-      presented = await lastRequest;
-    })();
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(presented).toBeUndefined();
+    expect(dialogs(root)).toHaveLength(1);
+    expect(lastRequest).toBeInstanceOf(Promise);
 
-    const modal = modals(root)[0];
-    const onShow = modal?.props.onShow as (() => void) | undefined;
-    act(() => {
-      onShow?.();
-    });
-
-    await vi.waitFor(() => {
-      expect(presented).toBe(true);
-    });
+    await expect(Promise.resolve(lastRequest)).resolves.toBe(true);
   });
 
   // The other half of the same race: a host that unmounts while the dialog is
-  // queued never shows it, so the request must report that instead of promising
-  // a presentation the caller then records as asked.
+  // still queued never shows it, so the request must report that instead of
+  // promising a presentation the caller then records as asked.
   it('reports that it did not present when the host unmounts before the dialog is shown', async () => {
     const root = mount();
 
-    press(requestButton(root));
-    expect(modals(root)).toHaveLength(1);
-
-    let presented: boolean | undefined = undefined;
-    void (async () => {
-      presented = await lastRequest;
-    })();
-
     act(() => {
+      press(requestButton(root));
       renderer?.unmount();
     });
     renderer = undefined;
 
-    await vi.waitFor(() => {
-      expect(presented).toBe(false);
-    });
+    await expect(Promise.resolve(lastRequest)).resolves.toBe(false);
     expect(feedback.showFeedbackPrompt).not.toHaveBeenCalled();
   });
 
@@ -234,7 +218,7 @@ describe('useFeedbackPrompt', () => {
     press(requestButton(root));
     answer(root, 'active:opacity-60');
 
-    expect(modals(root)).toHaveLength(0);
+    expect(dialogs(root)).toHaveLength(0);
     expect(feedback.requestAppRating).not.toHaveBeenCalled();
     expect(feedback.sendAppFeedback).not.toHaveBeenCalled();
   });
@@ -297,7 +281,7 @@ describe('FeedbackPromptProvider', () => {
   // must present the prompt even when the surface that requested it is gone.
   it('presents the prompt after the requesting surface has unmounted', () => {
     const root = mountProvider();
-    expect(modals(root)).toHaveLength(0);
+    expect(dialogs(root)).toHaveLength(0);
 
     act(() => {
       unmountRequester?.();
@@ -308,7 +292,7 @@ describe('FeedbackPromptProvider', () => {
       void capturedRequest?.('user-1');
     });
 
-    expect(modals(root)).toHaveLength(1);
+    expect(dialogs(root)).toHaveLength(1);
     expect(
       root.findAll(node => isType(node, 'Text') && node.children.includes('feedback.neutralTitle'))
     ).toHaveLength(1);
@@ -316,7 +300,7 @@ describe('FeedbackPromptProvider', () => {
     // The hosted dialog still answers through the feedback module and closes.
     answer(root, 'bg-primary');
     expect(feedback.requestAppRating).toHaveBeenCalledTimes(1);
-    expect(modals(root)).toHaveLength(0);
+    expect(dialogs(root)).toHaveLength(0);
   });
 
   it('presents the dialog for a mounted requester too', () => {
@@ -325,7 +309,7 @@ describe('FeedbackPromptProvider', () => {
     press(root.find(node => isType(node, 'Pressable')));
 
     expect(feedback.showFeedbackPrompt).not.toHaveBeenCalled();
-    expect(modals(root)).toHaveLength(1);
+    expect(dialogs(root)).toHaveLength(1);
   });
 
   // The other half of the same race: when the host itself is gone, the request

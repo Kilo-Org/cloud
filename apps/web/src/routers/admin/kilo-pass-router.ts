@@ -1,10 +1,10 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { captureException } from '@sentry/nextjs';
-import { client as stripeClient } from '@/lib/stripe-client';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import {
   cancelAndRefundKiloPassForUser,
   type CancelAndRefundKiloPassStripeClient,

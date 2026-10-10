@@ -1,6 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
 import {
-  getDevcontainerEnabledStorageKey,
   getLastUsedModelStorageKey,
   getLastUsedRepoStorageKey,
   getLastUsedSandboxAllocationStorageKey,
@@ -8,7 +7,6 @@ import {
   getPreferredInitialModel,
   getPreferredInitialRepo,
   getPreferredInitialVariant,
-  parseDevcontainerEnabled,
   parseLastUsedRepo,
 } from './model-preferences';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
@@ -210,19 +208,6 @@ describe('repository preference', () => {
         isLoadingBitbucketRepos: true,
       })
     ).toBeUndefined();
-  });
-});
-
-describe('devcontainer preference helpers', () => {
-  it('uses a stable storage key for the devcontainer preference', () => {
-    expect(getDevcontainerEnabledStorageKey()).toBe('cloud-agent:devcontainer-enabled');
-  });
-
-  it('parses only true as enabled', () => {
-    expect(parseDevcontainerEnabled('true')).toBe(true);
-    expect(parseDevcontainerEnabled('false')).toBe(false);
-    expect(parseDevcontainerEnabled('1')).toBe(false);
-    expect(parseDevcontainerEnabled(null)).toBe(false);
   });
 });
 

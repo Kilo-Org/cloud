@@ -88,7 +88,7 @@ export async function discoverBackendModels(
     const models: BackendModel[] = [];
     for (const model of parsed.data) {
       if (!seen.has(model.id)) {
-        models.push({ id: model.id, name: model.name ?? model.id, tools: false });
+        models.push({ id: model.id, name: model.name ?? model.id, tools: false, images: false });
         seen.add(model.id);
       }
     }

@@ -1,5 +1,5 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
@@ -108,6 +108,8 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   assistant_rate_limited_byok: 'Rate Limited (customer key)',
   assistant_rate_limited_managed: 'Rate Limited (Kilo key)',
   assistant_unavailable: 'Assistant Unavailable',
+  assistant_provider_disconnect: 'Assistant Provider Disconnect',
+  assistant_gateway_unavailable: 'Assistant Gateway Unavailable',
   assistant_timeout: 'Assistant Timeout',
   assistant_unauthorized: 'Assistant Unauthorized',
   assistant_invalid_request: 'Assistant Invalid Request',

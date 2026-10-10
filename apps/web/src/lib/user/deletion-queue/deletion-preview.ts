@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { kilocode_users, user_deletion_requests, type User } from '@kilocode/db/schema';
 import { isSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { assertNoLiveSubscriptionsForSoftDelete, SoftDeletePreconditionError } from '@/lib/user';
 import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
 import {

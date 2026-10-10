@@ -29,9 +29,9 @@ const {
   generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
   generateSandboxRoutingTargetMock: vi
     .fn()
-    .mockResolvedValue({ kind: 'isolated', sandboxId: 'sb-test-123' }),
+    .mockResolvedValue({ kind: 'isolated', sandboxId: 'ses-0123456789abcdef' }),
   selectSandboxForNewSessionMock: vi.fn().mockResolvedValue({
-    sandboxId: 'sb-test-123',
+    sandboxId: 'ses-0123456789abcdef',
     provider: 'cloudflare',
   }),
   selectSandboxProviderMock: vi.fn(() => 'cloudflare'),
@@ -127,7 +127,7 @@ vi.mock('./session-service.js', () => ({
 }));
 
 import { appRouter } from './router.js';
-import { profileResolutionPolicyForSessionCreateOrigin } from './router/handlers/session-prepare.js';
+import { profileResolutionPolicyForSessionCreateOrigin } from './router/handlers/session-creation-preflight.js';
 import type { TRPCContext, SessionId } from './types.js';
 
 function createMockDOStub(
@@ -141,6 +141,7 @@ function createMockDOStub(
 ) {
   return {
     registerSession: overrides.registerSession ?? vi.fn().mockResolvedValue({ success: true }),
+    registerSessionFromMetadata: vi.fn().mockResolvedValue({ success: true }),
     createSessionWithInitialAdmission:
       overrides.createSessionWithInitialAdmission ??
       vi.fn().mockResolvedValue({
@@ -409,26 +410,26 @@ describe('sandbox selection Worker API', () => {
     }
   );
 
-  it('returns default destination metadata without allocating, including devcontainer context', async () => {
-    const ctx = createInternalApiContext({});
-    ctx.env.SANDBOX_SELECTION_IDS = orgId;
-    ctx.env.PER_SESSION_SANDBOX_ORG_IDS = orgId;
-    const caller = appRouter.createCaller(ctx);
-    const normal = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId });
-    expect(normal.defaultDestination).toEqual(getSandboxAllocationRequest('cloudflare-single'));
-    const devcontainer = await caller.getSandboxSelectionOptions({
-      kilocodeOrganizationId: orgId,
-      devcontainer: true,
-    });
-    expect(devcontainer.defaultDestination).toEqual({
-      provider: { id: 'cloudflare', account: 'kilo' },
-      instanceType: 'devcontainer',
-    });
-    expect(generateSessionIdMock).not.toHaveBeenCalled();
-    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
-    expect(createSessionReportMock).not.toHaveBeenCalled();
-    expect(createCliSessionMock).not.toHaveBeenCalled();
-  });
+  it.each([orgId, undefined])(
+    'ignores retired selection context for owner %s without allocating',
+    async kilocodeOrganizationId => {
+      const ctx = createInternalApiContext({});
+      ctx.env.SANDBOX_SELECTION_IDS = '*';
+      ctx.env.PER_SESSION_SANDBOX_ORG_IDS = '*';
+      const caller = appRouter.createCaller(ctx);
+      const normal = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId });
+      expect(normal.defaultDestination).toEqual(getSandboxAllocationRequest('cloudflare-single'));
+      for (const devcontainer of [false, true]) {
+        expect(
+          await caller.getSandboxSelectionOptions({ kilocodeOrganizationId, devcontainer })
+        ).toEqual(normal);
+      }
+      expect(generateSessionIdMock).not.toHaveBeenCalled();
+      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+      expect(createSessionReportMock).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+    }
+  );
 
   it.each(['small', 'large'] as const)(
     'rejects BYOC %s before allocation side effects',
@@ -517,8 +518,12 @@ describe('sandbox selection Worker API', () => {
       const metadata = expect.objectContaining({
         workspace: expect.objectContaining({ sandboxAllocation: 'cloudflare-single' }),
       });
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(metadata);
-      expect(doStub.registerSession).toHaveBeenCalledWith(metadata);
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({ metadata })
+      );
+      expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+        expect.objectContaining({ metadata })
+      );
     }
   );
 });
@@ -554,10 +559,10 @@ describe('prepareSession endpoint', () => {
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
     });
     selectSandboxForNewSessionMock.mockResolvedValue({
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
       provider: 'cloudflare',
     });
     selectSandboxProviderMock.mockReturnValue('cloudflare');
@@ -1160,51 +1165,24 @@ describe('prepareSession endpoint', () => {
     );
   });
 
-  it('creates auto-initiated devcontainer sessions with grouped DIND sandbox intent', async () => {
-    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
-      kind: 'isolated',
-      sandboxId: 'dind-abcdef',
-    });
+  it('rejects retired devcontainer sessions before allocation or registration', async () => {
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
-    await caller.prepareSession({
-      prompt: 'Prepare the devcontainer runtime',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      autoInitiate: true,
-      devcontainer: true,
-    });
-
-    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledWith(
-      undefined,
-      undefined,
-      'test-user-123',
-      'agent_12345678-1234-1234-1234-123456789abc',
-      undefined,
-      {
+    await expect(
+      caller.prepareSession({
+        prompt: 'Prepare the devcontainer runtime',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
         devcontainer: true,
-        createdOnPlatform: undefined,
-      }
-    );
-    expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
-      expect.objectContaining({
-        workspace: {
-          sandboxId: 'dind-abcdef',
-          sandboxProvider: 'cloudflare',
-          shallow: false,
-          credentialContainment: {
-            github: false,
-            gitlab: false,
-            bitbucket: false,
-            kilocode: false,
-          },
-          devcontainerRequested: true,
-        },
       })
-    );
+    ).rejects.toThrow('Devcontainer support has been retired');
+
+    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     expect(doStub.registerSession).not.toHaveBeenCalled();
   });
 
@@ -1241,6 +1219,44 @@ describe('prepareSession endpoint', () => {
       })
     );
   });
+
+  it.each([
+    ['ses-abcdef', undefined, undefined],
+    [`ses-${'a'.repeat(48)}`, 'cloudflare-single', undefined],
+    ['crv-abcdef', undefined, 'code-review'],
+  ] as const)(
+    'persists the generated %s identity unchanged with containment disabled',
+    async (sandboxId, sandboxAllocation, createdOnPlatform) => {
+      generateSandboxRoutingTargetMock.mockResolvedValueOnce({ kind: 'isolated', sandboxId });
+      const doStub = createMockDOStub();
+      const ctx = createInternalApiContext({ doStub, credentialContainmentEnabled: 'false' });
+      ctx.env.SANDBOX_SELECTION_IDS = '*';
+      await appRouter.createCaller(ctx).prepareSession({
+        prompt: 'Create a non-contained session',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        sandboxAllocation,
+        createdOnPlatform,
+      });
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspace: expect.objectContaining({
+            sandboxId,
+            sandboxProvider: 'cloudflare',
+            ...(sandboxAllocation ? { sandboxAllocation } : {}),
+            credentialContainment: {
+              github: false,
+              gitlab: false,
+              bitbucket: false,
+              kilocode: false,
+            },
+          }),
+        })
+      );
+    }
+  );
 
   it('disables all containment when the global flag is false', async () => {
     const doStub = createMockDOStub();
@@ -1325,9 +1341,10 @@ describe('prepareSession endpoint', () => {
         autoInitiate: false,
         devcontainer: true,
       })
-    ).rejects.toThrow('devcontainer sessions must use autoInitiate');
+    ).rejects.toThrow('Devcontainer support has been retired');
 
     expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
   it('auto-initiates command-valued initialPayload through grouped canonical admission', async () => {
@@ -1397,6 +1414,7 @@ describe('prepareSession endpoint', () => {
 
     expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
   it('returns a prepared session when post-registration fact persistence fails', async () => {
@@ -1568,10 +1586,10 @@ describe('start endpoint', () => {
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
     });
     selectSandboxForNewSessionMock.mockResolvedValue({
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
       provider: 'cloudflare',
     });
     selectSandboxProviderMock.mockReturnValue('cloudflare');
@@ -1813,6 +1831,38 @@ describe('start endpoint', () => {
     }
   );
 
+  it('passes resolved profile output into grouped start registration', async () => {
+    const runtimeAgent = {
+      slug: 'reviewer',
+      name: 'Reviewer',
+      config: { prompt: 'Review the diff', mode: 'subagent' as const },
+    };
+    mergeProfileConfigurationMock.mockResolvedValueOnce({
+      envVars: { PROFILE_VALUE: 'resolved' },
+      agents: [runtimeAgent],
+    });
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.start({
+      message: { prompt: 'Use the resolved profile' },
+      agent: { mode: 'reviewer', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+      profile: { id: '123e4567-e89b-12d3-a456-426614174011' },
+      options: { createdOnPlatform: 'cloud-agent-web' },
+    });
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agent: expect.objectContaining({ mode: 'reviewer' }),
+        profile: expect.objectContaining({
+          envVars: { PROFILE_VALUE: 'resolved' },
+          runtimeAgents: [runtimeAgent],
+        }),
+      })
+    );
+  });
+
   it('returns an admitted session without persisting setup success milestones', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));
 
@@ -1991,7 +2041,7 @@ describe('start endpoint', () => {
     });
     generateSandboxRoutingTargetMock.mockImplementationOnce(async () => {
       steps.push('sandbox');
-      return { kind: 'isolated', sandboxId: 'sb-test-123' };
+      return { kind: 'isolated', sandboxId: 'ses-0123456789abcdef' };
     });
     recordSandboxIdentityMock.mockImplementationOnce(async () => {
       steps.push('sandbox-report');
@@ -2031,7 +2081,7 @@ describe('start endpoint', () => {
     expect(recordSandboxIdentityMock).toHaveBeenCalledWith(
       {
         cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-        sandboxId: 'sb-test-123',
+        sandboxId: 'ses-0123456789abcdef',
       },
       expect.any(Object)
     );

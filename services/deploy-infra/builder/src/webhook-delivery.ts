@@ -1,8 +1,3 @@
-/**
- * WebhookDelivery - Manages webhook delivery with batching and retry logic.
- * Handles delivery state, exponential backoff, and batch scheduling.
- */
-
 import type { Env, Event, DeliveryState, WebhookPayload } from './types';
 import type { EventStore } from './event-store';
 import { logExceptInTest, errorExceptInTest } from './utils';
@@ -11,7 +6,6 @@ import * as Sentry from '@sentry/cloudflare';
 const DELIVERY_STATE_KEY = 'deliveryState';
 
 export class WebhookDelivery {
-  /** In-memory cache of delivery state */
   private deliveryState: DeliveryState | null = null;
   /** Reentrancy guard - only needs to be in-memory since requests are cancelled on sleep */
   private isFlushing = false;
@@ -27,25 +21,16 @@ export class WebhookDelivery {
     private eventStore: EventStore
   ) {}
 
-  /**
-   * Initialize the webhook delivery system by loading delivery state.
-   */
   async initialize(): Promise<void> {
     await this.loadDeliveryState();
   }
 
-  /**
-   * Load delivery state from durable storage.
-   * Returns a default DeliveryState if not found in storage.
-   * Caches the result in memory for subsequent access.
-   */
   private async loadDeliveryState(): Promise<DeliveryState> {
     const stored = await this.storage.get<DeliveryState>(DELIVERY_STATE_KEY);
 
     if (stored) {
       this.deliveryState = stored;
     } else {
-      // Initialize with default values
       this.deliveryState = {
         nextAttemptAt: 0,
         attempt: 0,
@@ -55,22 +40,14 @@ export class WebhookDelivery {
     return this.deliveryState;
   }
 
-  /**
-   * Save delivery state to durable storage.
-   * Persists the current in-memory delivery state.
-   */
   private async saveDeliveryState(): Promise<void> {
     await this.storage.put(DELIVERY_STATE_KEY, this.deliveryState);
   }
 
-  /**
-   * Get the current delivery state.
-   */
   getDeliveryState(): DeliveryState | null {
     return this.deliveryState;
   }
 
-  // Internal: centralized configuration values parsed from env
   private getConfig() {
     return {
       BATCH_MAX_EVENTS: Number(this.env.BACKEND_WEBHOOK_BATCH_MAX_EVENTS) || 100,
@@ -80,15 +57,11 @@ export class WebhookDelivery {
     };
   }
 
-  // Internal: compute backoff delay
   private computeBackoffDelay(attempt: number, baseMs: number): number {
     const pow = attempt > 0 ? attempt - 1 : 0;
     return baseMs * Math.pow(2, pow);
   }
 
-  /**
-   * Schedule a flush
-   */
   async scheduleFlush(): Promise<void> {
     if (!this.deliveryState) {
       return;
@@ -129,35 +102,26 @@ export class WebhookDelivery {
     await this.alarm.set(nextAlarm);
   }
 
-  /**
-   * Flush pending events to the backend webhook endpoint.
-   */
   async flush(): Promise<void> {
     if (!this.deliveryState) {
       return;
     }
 
-    // Guard against reentrancy
     if (this.isFlushing) {
       return;
     }
 
-    // Get webhook configuration
     const { BATCH_MAX_EVENTS, STOP_AFTER_ATTEMPTS } = this.getConfig();
 
-    // Check if delivery has been permanently stopped
     if (this.deliveryState.attempt > STOP_AFTER_ATTEMPTS) {
       return;
     }
 
     try {
-      // Set reentrancy guard
       this.isFlushing = true;
 
-      // Get batch of events to send
       const eventsToSend = this.eventStore.getUnprocessedEvents(BATCH_MAX_EVENTS);
 
-      // If no events to send, return early
       if (eventsToSend.length === 0) {
         return;
       }
@@ -165,10 +129,8 @@ export class WebhookDelivery {
       const lastDeliveredEventId = await this.sendEvents(eventsToSend);
 
       if (lastDeliveredEventId !== null) {
-        // Events were successfully delivered
         await this.eventStore.setLastProcessedId(lastDeliveredEventId);
 
-        // Reset backoff state
         this.deliveryState.attempt = 0;
         this.deliveryState.nextAttemptAt = 0;
       } else {
@@ -181,7 +143,6 @@ export class WebhookDelivery {
       await this.saveDeliveryState();
       await this.scheduleFlush();
     } finally {
-      // Always clear reentrancy guard
       this.isFlushing = false;
     }
   }
@@ -192,13 +153,11 @@ export class WebhookDelivery {
       return events[events.length - 1].id;
     }
 
-    // Build webhook payload
     const payload: WebhookPayload = {
       buildId: this.getBuildId(),
       events: events,
     };
 
-    // Send webhook to backend
     try {
       const response = await fetch(this.env.BACKEND_EVENTS_URL, {
         method: 'POST',

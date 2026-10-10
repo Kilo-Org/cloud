@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 
 import { collectReplicationHealth, type ReplicationHealthReport } from '@/lib/replication-health';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-secret',
 }));
 

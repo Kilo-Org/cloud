@@ -5,10 +5,10 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { selectNextTaskForRequest } from '@/lib/user/deletion-queue/deletion-task-selector';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('deletion task selector catalog compatibility', () => {
   beforeEach(async () => {

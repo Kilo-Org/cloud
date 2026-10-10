@@ -1,9 +1,9 @@
-import { USER_DEPLOYMENTS_GIT_TOKEN_ENCRYPTION_KEY } from '@/lib/config.server';
+import { USER_DEPLOYMENTS_GIT_TOKEN_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
   encryptWithSymmetricKey,
   decryptWithSymmetricKey,
   EncryptionConfigurationError,
-} from '@/lib/encryption';
+} from '@kilocode/web-shared/lib/encryption';
 
 /**
  * Encrypt an auth token for storage

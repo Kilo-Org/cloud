@@ -1,10 +1,10 @@
-import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
+import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
   KILO_PASS_TIER_CONFIG,
   KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
-} from '@/lib/kilo-pass/constants';
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 import { formatIsoDateLabel, getNextBonusCreditsDateInlineLabel } from './nextBonusCreditsLabels';
 import type { KiloPassSubscription } from './kiloPassSubscription';

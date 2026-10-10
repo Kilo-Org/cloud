@@ -4,7 +4,7 @@ import {
   setAgentEnabledForOwner,
 } from '@/lib/agent-config/db/agent-configs';
 import type { Owner } from '@/lib/code-reviews/core';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { createSecurityAgentCommand, type SecurityAgentCommandOwner } from '@kilocode/db';
 import { agent_configs } from '@kilocode/db/schema';
 import type { SecurityCommandType } from '@kilocode/app-shared/security-agent';

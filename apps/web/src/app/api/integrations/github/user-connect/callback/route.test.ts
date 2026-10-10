@@ -1,16 +1,20 @@
 import { createHash } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { getUserFromAuth } from '@/lib/user/server';
-import { redisClient } from '@/lib/redis';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { createGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
 import { exchangeAndStoreGitHubUserAuthorization } from '@/lib/integrations/platforms/github/user-authorization';
 import { GET } from './route';
 
-jest.mock('@/lib/config.server', () => ({ NEXTAUTH_SECRET: 'synthetic-oauth-signing-secret' }));
-jest.mock('@/lib/constants', () => ({ APP_URL: 'https://app.example.test' }));
-jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
-jest.mock('@/lib/redis', () => ({ redisClient: { set: jest.fn(), getdel: jest.fn() } }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  NEXTAUTH_SECRET: 'synthetic-oauth-signing-secret',
+}));
+jest.mock('@kilocode/web-shared/lib/constants', () => ({ APP_URL: 'https://app.example.test' }));
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { set: jest.fn(), getdel: jest.fn() },
+}));
 jest.mock('@/lib/integrations/platforms/github/user-authorization', () => ({
   exchangeAndStoreGitHubUserAuthorization: jest.fn(),
 }));

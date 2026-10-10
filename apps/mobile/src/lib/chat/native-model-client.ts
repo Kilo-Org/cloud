@@ -18,6 +18,8 @@ import {
   resultsOf,
 } from './native-request';
 
+export { IMAGE_NOT_SENT } from './native-request';
+
 /** What an on-device provider says about itself. Reasons are stable codes, never raw text. */
 export type NativeAvailability = {
   readonly status: 'available' | 'unavailable' | 'downloadable' | 'downloading';
@@ -27,6 +29,10 @@ export type NativeAvailability = {
   readonly maxOutputTokens: number;
   readonly systemInstructions: boolean;
   readonly tokenCounting?: boolean;
+  /** The model reads image parts. Absent means it reads none. */
+  readonly images?: boolean;
+  /** The most images one request can carry. Absent means no fixed limit. */
+  readonly maxImages?: number;
   /** True when the module runs the harness tool loop. Absent means text only. */
   readonly tools?: boolean;
 };
@@ -106,6 +112,7 @@ function failure(problem: LocalModelProblem, started: boolean): ModelError {
   });
 }
 
+
 /**
  * A deliberately high guess of about three characters per token. It is not a
  * count: it exists so a session on a small on-device window still compacts
@@ -148,6 +155,8 @@ function answer(
       id: `quick-chat-${sequence}`,
       ceiling: availability.maxOutputTokens,
       tools,
+      images: availability.images === true,
+      maxImages: availability.maxImages,
     });
     const results = tools ? resultsOf(request) : undefined;
     const { waiting } = loop;
@@ -247,6 +256,12 @@ function answer(
           return;
         }
         await bridge.generate(native);
+        // A bridge resolves only after it emitted its terminal event. A resolve
+        // with none is a bridge defect: failing is what releases the caller
+        // instead of leaving the answer streaming forever.
+        if (state === 'running') {
+          fail('missing_terminal_event');
+        }
       } catch (error) {
         // A rejection with no terminal event (Android reports busy this way).
         if (state === 'running') {

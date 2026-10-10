@@ -1,6 +1,6 @@
 'use client';
 
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { Shield, X } from 'lucide-react';
 import Link from 'next/link';
 

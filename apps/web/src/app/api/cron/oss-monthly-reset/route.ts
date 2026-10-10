@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { and, eq, isNull, lt, or, sql } from 'drizzle-orm';
 
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { CRON_SECRET } from '@/lib/config.server';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { organizations, organization_memberships, kilocode_users } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
-import type { OrganizationSettings } from '@/lib/organizations/organization-base-types';
-import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-base-types';
+import { grantEntityCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 
 if (!CRON_SECRET) {
   throw new Error('CRON_SECRET is not configured in environment variables');

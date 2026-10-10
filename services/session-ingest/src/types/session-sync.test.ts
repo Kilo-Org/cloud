@@ -99,6 +99,38 @@ describe('SessionItemSchema session_pr_link validation', () => {
     expect(result.success).toBe(true);
   });
 
+  it('parses optional headRef and headSha evidence', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_pr_link',
+      data: {
+        platform: 'github',
+        prUrl: 'https://github.com/acme/widgets/pull/42',
+        prNumber: 42,
+        headRef: 'fix/typo',
+        headSha: 'abc123',
+      },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({
+      type: 'session_pr_link',
+      data: {
+        platform: 'github',
+        prUrl: 'https://github.com/acme/widgets/pull/42',
+        prNumber: 42,
+        headRef: 'fix/typo',
+        headSha: 'abc123',
+      },
+    });
+  });
+
+  it('parses a set without head evidence for older CLIs', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_pr_link',
+      data: { platform: 'github', prUrl: 'https://github.com/acme/widgets/pull/42', prNumber: 42 },
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('rejects an empty platform', () => {
     expect(
       SessionItemSchema.safeParse({
@@ -142,6 +174,62 @@ describe('SessionItemSchema session_pr_link validation', () => {
         data: { platform: 'github', prUrl: 'https://x', prNumber: 2_147_483_648 },
       }).success
     ).toBe(false);
+  });
+});
+
+describe('SessionItemSchema session_status validation', () => {
+  it.each(['idle', 'busy', 'question', 'permission', 'retry'])(
+    'parses the known %s status',
+    status => {
+      expect(
+        SessionItemSchema.safeParse({ type: 'session_status', data: { status } }).success
+      ).toBe(true);
+    }
+  );
+
+  it('parses the scheduled status with its wake time', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_status',
+      data: { status: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({
+      type: 'session_status',
+      data: { status: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+    });
+  });
+
+  it('parses scheduled without a wake time', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_status',
+      data: { status: 'scheduled' },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ type: 'session_status', data: { status: 'scheduled' } });
+  });
+
+  it('parses an unrecognized status without dropping the item', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_status',
+      data: { status: 'some-future-status' },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({
+      type: 'session_status',
+      data: { status: 'some-future-status' },
+    });
+  });
+
+  it('parses scheduled with an explicit null wake time', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_status',
+      data: { status: 'scheduled', scheduledAt: null },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({
+      type: 'session_status',
+      data: { status: 'scheduled', scheduledAt: null },
+    });
   });
 });
 

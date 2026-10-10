@@ -23,7 +23,6 @@ import {
   setGlanceableActionNotice,
 } from './android-sink';
 import { _setPermissionReaderForTests, type NotificationPermissionStatus } from './permission';
-import { _resetAndroidPermissionAlertForTests } from './permission-alert';
 
 const mocks = vi.hoisted(() => {
   let notification: {
@@ -145,8 +144,8 @@ vi.mock('@/lib/notifications', () => ({
   ensureAndroidNotificationChannels: mocks.ensureAndroidNotificationChannels,
 }));
 
-// permission-alert statically imports react-native; stub it so the pure
-// node test graph never parses react-native's Flow sources.
+// Stub react-native so a foreground without permission can prove it raises no
+// alert, and the pure node test graph never parses react-native's Flow sources.
 vi.mock('react-native', () => ({
   Alert: { alert: (...args: unknown[]) => mocks.alert(...args) },
   Linking: { openSettings: (): void => undefined },
@@ -262,7 +261,6 @@ beforeEach(() => {
   mocks.native.setWidgetSnapshot('', 0);
   _resetAndroidSinkForTests();
   _resetWaitingAskForTests();
-  _resetAndroidPermissionAlertForTests();
   // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
   _setPermissionReaderForTests(() => Promise.resolve('granted'));
   setGlanceableDelivery(delivery);
@@ -1327,20 +1325,21 @@ describe('androidSink widget publish and end', () => {
   });
 });
 
-describe('handleAppStateActive permission alert', () => {
-  it('shows the permission alert once for denied work when the app foregrounds', async () => {
-    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
-    _setPermissionReaderForTests(() => Promise.resolve('denied'));
-    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
-    await flushAsync();
-    expect(mocks.native.start).not.toHaveBeenCalled();
+describe('handleAppStateActive', () => {
+  it.each<NotificationPermissionStatus>(['undetermined', 'denied'])(
+    'stays silent and starts nothing for live work while permission is %s',
+    async status => {
+      // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+      _setPermissionReaderForTests(() => Promise.resolve(status));
+      androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+      await flushAsync();
 
-    await handleAppStateActive();
-    expect(mocks.alert).toHaveBeenCalledTimes(1);
+      await handleAppStateActive();
 
-    await handleAppStateActive();
-    expect(mocks.alert).toHaveBeenCalledTimes(1);
-  });
+      expect(mocks.alert).not.toHaveBeenCalled();
+      expect(mocks.native.start).not.toHaveBeenCalled();
+    }
+  );
 
   it('forwards the pending compact number when permission is granted on foreground', async () => {
     // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules

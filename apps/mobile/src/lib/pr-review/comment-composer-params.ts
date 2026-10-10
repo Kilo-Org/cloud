@@ -1,4 +1,4 @@
-import { parseParam } from '@/lib/route-params';
+import { parseParam, parsePositiveIntParam } from '@/lib/route-params';
 
 type RawComposerParams = {
   owner?: string | string[] | undefined;
@@ -24,32 +24,23 @@ type ParsedComposerParams = {
   pendingId?: string;
 };
 
-function parsePositiveInt(value: string | string[] | undefined): number | null {
-  const text = parseParam(value);
-  if (!text) {
-    return null;
-  }
-  const parsed = Number.parseInt(text, 10);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    return null;
-  }
-  return parsed;
-}
-
 /**
  * Runtime-validates the comment-composer route params before the screen
  * queries or renders the composer. Returns `null` for any invalid
  * combination (missing owner/repo/number, empty path, invalid side,
- * non-positive line, or startLine greater than line).
+ * non-positive or partially numeric line or startLine, or startLine greater
+ * than line). The numeric params go through `parsePositiveIntParam` so a
+ * segment like `1.5` or `12abc` is rejected rather than silently truncated to
+ * a line the user never selected.
  */
 export function parseComposerParams(raw: RawComposerParams): ParsedComposerParams | null {
   const owner = parseParam(raw.owner);
   const repo = parseParam(raw.repo);
-  const number = parsePositiveInt(raw.number);
+  const number = parsePositiveIntParam(raw.number);
   const path = parseParam(raw.path);
   const side = parseParam(raw.side, ['LEFT', 'RIGHT'] as const);
-  const line = parsePositiveInt(raw.line);
-  const startLine = parsePositiveInt(raw.startLine);
+  const line = parsePositiveIntParam(raw.line);
+  const startLine = parsePositiveIntParam(raw.startLine);
   const hasStartLine = parseParam(raw.startLine) !== null;
   // Optional edit-mode id: absent → undefined; present non-empty string
   // passes through. Empty/array values are treated as absent (not a hard

@@ -8,10 +8,10 @@
 //     is pressable (collapse). The resolve toggle is its own nested
 //     pressable in both states.
 //   - The thread header shows the anchor label ("src/a.ts L10 (RIGHT)"
-//     or "File comment on src/a.ts" or "Outdated on ...") and the
-//     "Outdated" / "Resolved" badges when applicable. The "Resolved"
-//     badge is the sole Resolved text indicator; the resolve control
-//     is an icon-only circular button (a11y: "Resolve thread" /
+//     or "File comment on src/a.ts" or "Outdated on ..."). The anchor
+//     owns file-level and outdated metadata; the "Resolved" badge is
+//     the sole Resolved text indicator. The resolve control is an
+//     icon-only circular button (a11y: "Resolve thread" /
 //     "Unresolve thread").
 //   - Expanded LINE-anchored threads render a capped quoted diff
 //     snippet (from thread.diffHunk) above the comments list. File-
@@ -29,24 +29,24 @@
 //     thread just routes the events and lets the cache flow.
 
 import * as Haptics from 'expo-haptics';
-import { Check, CheckCheck, ChevronDown, ChevronUp } from '@/components/ui/icons';
+import { CheckCheck, ChevronDown, ChevronUp } from '@/components/ui/icons';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
+import { ResolveToggle } from '@/components/pr-review/discussion/discussion-thread-resolve-toggle';
 import { ReplyInput } from '@/components/pr-review/discussion/reply-input';
 import { ThreadDiffSnippet } from '@/components/pr-review/discussion/thread-diff-snippet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { COMPACT_H11_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import {
+  type PrCommentKind,
   type ReviewComment,
   type ReviewReactionContent,
   type ReviewThread,
   selectThreadAnchorLabel,
-  selectThreadBadges,
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { selectThreadDiffSnippet } from '@/lib/pr-review/discussion/thread-diff-snippet';
 import {
@@ -72,6 +72,13 @@ type DiscussionThreadProps = {
   readonly viewerLogin?: string | null;
   /** Invoked when the inline reply field gains focus (see useReplyFocusScroll). */
   readonly onReplyFocus?: () => void;
+  /**
+   * Own-comment actions (s4), bound per comment with `kind: 'review'` for
+   * every row this card renders. Absent on a read-only provider scope, where
+   * the rows keep today's affordances.
+   */
+  readonly onEditComment?: (comment: ReviewComment, kind: PrCommentKind) => void;
+  readonly onDeleteComment?: (comment: ReviewComment, kind: PrCommentKind) => void;
 };
 
 export function DiscussionThread({
@@ -83,6 +90,8 @@ export function DiscussionThread({
   onToggleExpand,
   viewerLogin = null,
   onReplyFocus,
+  onEditComment,
+  onDeleteComment,
 }: Readonly<DiscussionThreadProps>) {
   // s6: the reply and resolve writes route through the `providerReview` seam
   // on a GitLab MR / Bitbucket PR (the mutation hooks pick the arm from the
@@ -105,7 +114,6 @@ export function DiscussionThread({
   const { t } = useTranslation();
 
   const anchorLabel = selectThreadAnchorLabel(thread);
-  const badges = selectThreadBadges(thread);
   // Parse only when expanded; memoize so DiffLine's memo comparator sees a
   // stable `lines` identity across parent re-renders (e.g. reaction toggles).
   const { diffHunk, subjectType, path } = thread;
@@ -142,9 +150,7 @@ export function DiscussionThread({
   );
   const headerCommonProps = {
     anchorLabel,
-    resolved: badges.resolved,
-    outdated: badges.outdated,
-    fileLevel: badges.fileLevel,
+    resolved: thread.isResolved,
     commentCount: thread.comments.length,
     firstTimestamp: firstComment?.createdAt ?? null,
     expanded,
@@ -186,6 +192,20 @@ export function DiscussionThread({
                 readOnly={!isGithub}
                 reactionsSupported={capabilities.reactions.supported}
                 viewerLogin={viewerLogin}
+                onEditComment={
+                  onEditComment
+                    ? () => {
+                        onEditComment(comment, 'review');
+                      }
+                    : undefined
+                }
+                onDeleteComment={
+                  onDeleteComment
+                    ? () => {
+                        onDeleteComment(comment, 'review');
+                      }
+                    : undefined
+                }
                 onToggleReaction={content => {
                   onToggleReaction(comment, content);
                 }}
@@ -226,8 +246,6 @@ export function DiscussionThread({
 type ThreadHeaderProps = {
   readonly anchorLabel: string;
   readonly resolved: boolean;
-  readonly outdated: boolean;
-  readonly fileLevel: boolean;
   readonly commentCount: number;
   readonly firstTimestamp: string | null;
   readonly expanded: boolean;
@@ -241,8 +259,6 @@ type ThreadHeaderProps = {
 function ThreadHeader({
   anchorLabel,
   resolved,
-  outdated,
-  fileLevel,
   commentCount,
   firstTimestamp,
   expanded,
@@ -289,12 +305,13 @@ function ThreadHeader({
       </View>
       <View className="flex-row flex-wrap items-center gap-1.5">
         {resolved ? (
-          <Badge tone="good" icon={CheckCheck} label={t('prReview.discussion.resolved')} />
+          <View className="flex-row items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-good">
+            <CheckCheck size={10} color={colors.good} />
+            <Text className="text-[10px] font-medium uppercase tracking-wide">
+              {t('prReview.discussion.resolved')}
+            </Text>
+          </View>
         ) : null}
-        {outdated ? <Badge tone="muted" label={t('prReview.discussion.outdated')} /> : null}
-        {/* i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'), which
-            languages inflect by number; this key is the standalone noun label. */}
-        {fileLevel && !resolved ? <Badge tone="muted" label={t('common.file')} /> : null}
         <Text variant="muted" className="text-xs">
           {t('prReview.discussion.comment', {
             count: commentCount,
@@ -304,70 +321,5 @@ function ThreadHeader({
         </Text>
       </View>
     </View>
-  );
-}
-
-type BadgeProps = {
-  readonly tone: 'good' | 'muted' | 'warn' | 'destructive';
-  readonly icon?: typeof Check;
-  readonly label: string;
-};
-
-const BADGE_TONE_CLASS = {
-  good: 'bg-secondary text-good',
-  warn: 'bg-secondary text-warn',
-  destructive: 'bg-secondary text-destructive',
-  muted: 'bg-secondary text-muted-foreground',
-} satisfies Record<BadgeProps['tone'], string>;
-
-function Badge({ tone, icon: Icon, label }: Readonly<BadgeProps>) {
-  const colors = useThemeColors();
-  const toneClass = BADGE_TONE_CLASS[tone];
-  // Native Lucide icons don't resolve NativeWind text classes, so set the
-  // icon color explicitly per tone from the theme tokens.
-  const iconColor = {
-    good: colors.good,
-    warn: colors.warn,
-    destructive: colors.destructive,
-    muted: colors.mutedForeground,
-  } satisfies Record<BadgeProps['tone'], string>;
-  return (
-    <View className={cn('flex-row items-center gap-1 rounded-full px-2 py-0.5', toneClass)}>
-      {Icon ? <Icon size={10} color={iconColor[tone]} /> : null}
-      <Text className="text-[10px] font-medium uppercase tracking-wide">{label}</Text>
-    </View>
-  );
-}
-
-type ResolveToggleProps = {
-  readonly resolved: boolean;
-  readonly disabled: boolean;
-  readonly onPress: () => void;
-};
-
-function ResolveToggle({ resolved, disabled, onPress }: Readonly<ResolveToggleProps>) {
-  const colors = useThemeColors();
-  const { t } = useTranslation();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={
-        resolved ? t('prReview.discussion.unresolveThread') : t('prReview.discussion.resolveThread')
-      }
-      onPress={onPress}
-      disabled={disabled}
-      // The frame is the tap target the size audit measures (38.5pt on
-      // device) and the header row grows to hold it, so the whole frame is
-      // hittable; the 3pt slop reaches the 44pt minimum.
-      hitSlop={COMPACT_H11_HIT_SLOP_DP}
-      className="h-11 w-11 items-center justify-center active:opacity-70"
-    >
-      {/* The visible circle stays compact (explicit px, because NativeWind's
-          14pt rem renders `h-7` at 24.5pt): DESIGN.md keeps the target, not the
-          visual, at 44pt. */}
-      <View className="h-[28px] w-[28px] items-center justify-center rounded-full border border-border bg-card">
-        <Check size={14} color={resolved ? colors.good : colors.mutedForeground} />
-      </View>
-    </Pressable>
   );
 }

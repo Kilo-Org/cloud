@@ -22,6 +22,7 @@ import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
 import { chatFetch, remoteChatFetch } from './fetch';
 import { backendHeaders } from './backend-request';
+import { rememberKiloImageModels } from './backend-capabilities';
 import { listChatBackends } from './backend-store';
 import { routedModelClient, targetModelFacts } from './backend-routing';
 import { assertBackendTransport } from './backend-transport';
@@ -72,11 +73,16 @@ export function modelFactsFor(model: {
     : { ...RELAYED_SHAPE, contextWindow: model.context_length };
 }
 
-/** Takes the gateway's model list as the facts a session needs. */
+/** Takes the gateway's model list as the facts a session needs, and which models read images. */
 export function rememberModelFacts(
-  models: readonly { readonly id: string; readonly context_length?: number | null }[]
+  models: readonly {
+    readonly id: string;
+    readonly context_length?: number | null;
+    readonly supportsImages?: boolean;
+  }[]
 ): void {
   known = new Map(models.map(model => [model.id, modelFactsFor(model)]));
+  rememberKiloImageModels(models);
 }
 
 /**

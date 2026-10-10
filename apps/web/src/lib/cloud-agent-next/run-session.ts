@@ -1,5 +1,5 @@
 import 'server-only';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { signStreamTicket, type StreamTicketPayload } from '@/lib/cloud-agent/stream-ticket';
 import { createWebSocketManager } from './websocket-manager';
 import { createEventProcessor, type ProcessedMessage } from './processor';

@@ -33,15 +33,12 @@ describe('reconcileGUPP nudge fixes (#1412)', () => {
     });
   });
 
-  // ── Bug 2: Mayor agents should be excluded from GUPP ──────────────
-
   describe('mayor exclusion from GUPP', () => {
     it('should NOT nudge a mayor even when last_event_at is stale', async () => {
       // sendMayorMessage auto-creates a mayor agent, but we can also use
       // ensureMayor to get the mayor agent ID without needing a full container.
       const { agentId: mayorId } = await town.ensureMayor();
 
-      // Set the mayor to 'working' (simulating active chat session)
       await town.updateAgentStatus(mayorId, 'working');
 
       // Set last_event_at to 20 min ago (exceeds 15-min warn threshold)
@@ -55,14 +52,11 @@ describe('reconcileGUPP nudge fixes (#1412)', () => {
       // Run alarm — reconciler should skip the mayor in GUPP
       await runDurableObjectAlarm(town);
 
-      // No nudges should exist for the mayor
       const nudges = await town.getPendingNudges(mayorId);
       const guppNudges = nudges.filter(n => n.source.startsWith('reconciler:'));
       expect(guppNudges).toHaveLength(0);
     });
   });
-
-  // ── Bug 1: Timestamp format consistency (dedup works) ─────────────
 
   describe('nudge dedup after timestamp fix', () => {
     it('should nudge a stale polecat once, not on every alarm tick', async () => {
@@ -79,7 +73,6 @@ describe('reconcileGUPP nudge fixes (#1412)', () => {
         rig_id: 'rig-1',
       });
 
-      // Hook the agent to a bead and set to working
       await town.hookBead(agent.id, bead.bead_id);
       await town.updateAgentStatus(agent.id, 'working');
 

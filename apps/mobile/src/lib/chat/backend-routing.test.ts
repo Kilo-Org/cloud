@@ -2,8 +2,8 @@ import { type FetchLike, type ModelClientService, type ModelRequest } from '@kil
 import { Effect, Either, Schedule, Stream } from 'effect';
 import { beforeEach, expect, it, vi } from 'vitest';
 
-import { targetSupportsTools } from './backend-capabilities';
-import { routedModelClient, targetModelFacts } from './backend-routing';
+import { rememberKiloImageModels, targetSupportsTools } from './backend-capabilities';
+import { IMAGE_OMITTED, routedModelClient, targetModelFacts } from './backend-routing';
 import { type StoredChatBackend } from './backend-store';
 import { backendFailureKey, backendTargetId } from './backend-target';
 import { type NativeAvailability, type NativeModelEvent } from './native-model-client';
@@ -64,6 +64,7 @@ vi.mock('./gguf-models', () => ({
     client: { stream: () => undefined },
     facts: () => ({ apiKinds: [] }),
     supportsTools: () => false,
+    supportsImages: () => false,
   },
 }));
 
@@ -170,7 +171,7 @@ it.each(['max_completion_tokens', 'max_tokens'] as const)(
       completionTokenField,
       apiKey: 'custom-key',
       headers: {},
-      models: [{ id: 'upstream', name: 'Upstream', tools: false }],
+      models: [{ id: 'upstream', name: 'Upstream', tools: false, images: false }],
       allowLocalHttp: false,
     };
     const fetch = vi.fn<FetchLike>().mockResolvedValue({
@@ -220,3 +221,83 @@ it.each(['max_completion_tokens', 'max_tokens'] as const)(
     );
   }
 );
+
+/** A conversation that read an image on an earlier model, then asks again. */
+const afterImage = (model: string): ModelRequest => ({
+  model,
+  maxTokens: 64,
+  prompt: {
+    system: [],
+    messages: [
+      {
+        role: 'user',
+        cache: false,
+        parts: [
+          { kind: 'image', media: 'image/jpeg', data: 'AAAA' },
+          { kind: 'text', text: 'What is this?' },
+        ],
+      },
+      { role: 'assistant', cache: false, parts: [{ kind: 'text', text: 'A cat.' }] },
+      { role: 'user', cache: false, parts: [{ kind: 'text', text: 'And now?' }] },
+    ],
+  },
+});
+
+it('sends the image to a Kilo model the catalog lists as reading images', async () => {
+  rememberKiloImageModels([{ id: 'vendor/vision', supportsImages: true }]);
+  const { client, kilo } = localRouter();
+  await Effect.runPromise(Stream.runCollect(client.stream(afterImage('vendor/vision'))));
+  expect(kilo.mock.calls[0]?.[0]).toEqual(afterImage('vendor/vision'));
+});
+
+it('tells a text-only Kilo model an image was there instead of sending it', async () => {
+  rememberKiloImageModels([{ id: 'vendor/vision', supportsImages: true }]);
+  const { client, kilo } = localRouter();
+  await Effect.runPromise(Stream.runCollect(client.stream(afterImage('vendor/text'))));
+  const sent = kilo.mock.calls[0]?.[0];
+  expect(sent?.prompt.messages[0]?.parts).toEqual([
+    { kind: 'text', text: IMAGE_OMITTED },
+    { kind: 'text', text: 'What is this?' },
+  ]);
+  expect(sent?.prompt.messages.slice(1)).toEqual(
+    afterImage('vendor/text').prompt.messages.slice(1)
+  );
+});
+
+it.each([
+  [false, 'What is this?'],
+  [true, 'data:image/jpeg;base64,AAAA'],
+])('sends a custom model with images=%s what it can read', async (images, expected) => {
+  const backend: StoredChatBackend = {
+    id: 'server',
+    revision: 1,
+    name: 'Custom',
+    baseUrl: 'https://provider.example/v1',
+    apiKind: 'chat_completions',
+    apiKey: '',
+    headers: {},
+    models: [{ id: 'upstream', name: 'Upstream', tools: false, images }],
+    allowLocalHttp: false,
+  };
+  const fetch = vi.fn<FetchLike>().mockResolvedValue({
+    ok: true,
+    status: 200,
+    text: responseText,
+    stream: responseStream,
+  });
+  const client = routedModelClient({
+    kilo: { stream: () => Stream.empty },
+    retry: { schedule: Schedule.recurs(0) },
+    profiles: () => [backend],
+    fetch,
+    headers: () => ({}),
+    validateTransport: () => undefined,
+  });
+  await Effect.runPromise(
+    Stream.runCollect(client.stream(afterImage(backendTargetId(backend, 'upstream'))))
+  );
+  const body = fetch.mock.calls[0]?.[1].body ?? '';
+  expect(body).toContain(expected);
+  expect(body.includes('image_url')).toBe(images);
+  expect(body.includes(IMAGE_OMITTED)).toBe(!images);
+});

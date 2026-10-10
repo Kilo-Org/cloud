@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LANDING_URL } from '@/lib/constants';
+import { LANDING_URL } from '@kilocode/web-shared/lib/constants';
 
 const SUPPORT_URL = `${LANDING_URL}/support`;
 

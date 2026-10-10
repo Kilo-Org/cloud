@@ -10,14 +10,14 @@
 
 import 'server-only';
 import type OpenAI from 'openai';
-import { sendProxiedChatCompletion } from '@/lib/ai-gateway/llm-proxy-helpers';
+import { sendProxiedChatCompletion } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import type { SecurityFindingSandboxAnalysis, SandboxSuggestedAction } from '../core/types';
 import { addBreadcrumb, captureException, startSpan } from '@sentry/nextjs';
-import { sentryLogger } from '@/lib/utils.server';
-import { O11Y_KILO_GATEWAY_CLIENT_SECRET } from '@/lib/config.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { emitApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { O11Y_KILO_GATEWAY_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL } from '../core/constants';
-import { emitApiMetrics } from './api-metrics.server';
 
 const VALID_SUGGESTED_ACTIONS: SandboxSuggestedAction[] = [
   'dismiss',
@@ -356,14 +356,12 @@ export async function extractSandboxAnalysis(options: {
           return createFallbackExtraction(rawMarkdown, `API error: ${result.status}`);
         }
 
-        // Set token usage on span
         const usage = result.data.usage;
         if (usage) {
           span.setAttribute('security_agent.input_tokens', usage.prompt_tokens);
           span.setAttribute('security_agent.output_tokens', usage.completion_tokens);
         }
 
-        // Emit API metrics (only if o11y client secret is configured)
         if (usage && userId && O11Y_KILO_GATEWAY_CLIENT_SECRET) {
           const responseToolCalls = result.data.choices?.[0]?.message?.tool_calls ?? [];
           const toolsUsed = responseToolCalls

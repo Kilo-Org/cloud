@@ -1489,8 +1489,8 @@ describe('pending session messages', () => {
         callbackTarget: { url: 'https://example.com/repair-interrupt' },
       });
       let failTerminalEffect = true;
-      const originalEnsure = (instance as any).ensureTerminalMessageEvent.bind(instance);
-      (instance as any).ensureTerminalMessageEvent = (params: unknown) => {
+      const originalEnsure = (instance as any).ensureUniqueMessageEvent.bind(instance);
+      (instance as any).ensureUniqueMessageEvent = (params: unknown) => {
         if (failTerminalEffect) {
           failTerminalEffect = false;
           throw new Error('interrupt terminal event failed');
@@ -2467,9 +2467,19 @@ describe('pending session messages', () => {
           nextFlushAttemptAt: Date.now() - 1,
         })
       );
-      const originalEnsure = (instance as any).ensureTerminalMessageEvent.bind(instance);
+      const originalEnsure = (instance as any).ensureUniqueMessageEvent.bind(instance);
       let failTerminalEvent = true;
-      (instance as any).ensureTerminalMessageEvent = (params: unknown) => {
+      (instance as any).ensureUniqueMessageEvent = (params: {
+        entityId: string;
+        streamEventType: string;
+      }) => {
+        if (
+          params.entityId !== `terminal-message/${messageId}` ||
+          params.streamEventType !== 'cloud.message.failed'
+        ) {
+          originalEnsure(params);
+          return;
+        }
         if (failTerminalEvent) {
           failTerminalEvent = false;
           throw new Error('terminal effects unavailable');

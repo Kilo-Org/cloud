@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next';
 
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
-import { openExternalUrl } from '@/lib/external-link';
 import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import { parseProviderPrUrl } from '@/lib/pr-review/provider-pr-url';
 
@@ -15,6 +14,7 @@ import {
   buildPrLinkTapActionSheet,
   getSelectedChatLinkAction,
   performChatLinkAction,
+  performChatLinkActionAfterSheet,
 } from './chat-link-actions';
 import { formatLinkHost } from './markdown-link-confirm';
 import { MarkdownText, type MarkdownTextProps } from './markdown-text';
@@ -70,12 +70,8 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
             }
             return;
           }
-          if (action === 'open') {
-            void openExternalUrl(href, { retryOnError: true });
-            return;
-          }
-          if (action === 'share') {
-            void performChatLinkAction('share', href);
+          if (action === 'open' || action === 'share') {
+            performChatLinkActionAfterSheet(action, href);
           }
         }
       );
@@ -106,7 +102,11 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
             }
             return;
           }
-          if (action) {
+          if (action === 'open' || action === 'share') {
+            performChatLinkActionAfterSheet(action, href);
+            return;
+          }
+          if (action === 'copy') {
             void performChatLinkAction(action, href);
           }
         }

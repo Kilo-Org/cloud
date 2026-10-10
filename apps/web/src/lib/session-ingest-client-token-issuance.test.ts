@@ -5,7 +5,7 @@ import {
   verifyKiloTokenForPolicy,
   verifyKiloTokenForResource,
 } from '@kilocode/worker-utils/kilo-token-policy';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   deleteSession,
   fetchSessionMessagesPage,
@@ -15,8 +15,8 @@ import {
 } from './session-ingest-client';
 import { notifyCliSessionRenamed } from './cloud-agent/session-events';
 
-jest.mock('@/lib/config.server', () => ({
-  ...jest.requireActual<Record<string, unknown>>('@/lib/config.server'),
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/config.server'),
   SESSION_INGEST_WORKER_URL: 'https://session-ingest.test.invalid',
 }));
 

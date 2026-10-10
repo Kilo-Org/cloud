@@ -22,7 +22,7 @@ const h = vi.hoisted(() => ({
   push: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
-  alert: vi.fn(),
+  confirm: vi.fn(),
   query: {
     data: undefined as TestProfileDetail | undefined,
     isError: false,
@@ -58,15 +58,23 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
     `/profiles/${id}/agents${org ? `?org=${org}` : ''}`,
 }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  useWindowDimensions: () => ({ width: 402, height: 874, fontScale: 1 }),
   View: 'View',
   ScrollView: 'ScrollView',
-  Alert: { alert: h.alert },
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 62, right: 0, bottom: 34, left: 0 }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ destructiveForeground: '#FFFFFF' }),
 }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
+}));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 vi.mock('@/components/profiles/profile-repo-pins-section', () => ({
   ProfileRepoPinsSection: 'ProfileRepoPinsSection',
 }));
@@ -105,6 +113,31 @@ describe('ProfileOverviewScreen', () => {
 
     expect(findAll(renderer.root, 'Skeleton').length).toBeGreaterThan(0);
     expect(findAll(renderer.root, 'ConfigureRow')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('renders the overview in TabScreenScrollView, including the delete action', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The shared scroll view reserves the tab bar (and, while the keyboard is
+    // up, the IME) below its viewport, so the destructive action at the end of
+    // the content stays reachable above both. A bare ScrollView parked it
+    // behind the bar.
+    const scroll = findOne(renderer.root, 'TabScreenScrollView');
+    // The metadata form's multiline Description (and any field reached by
+    // scrolling) must come out from behind the keyboard; the native iOS content
+    // inset is what reveals the focused field, and TabScreenScrollView then
+    // leaves the IME to it instead of reserving the frame margin twice.
+    expect(scroll.props.automaticallyAdjustKeyboardInsets).toBe(true);
+    expect(findAll(renderer.root, 'ScrollView')).toHaveLength(0);
+
+    const buttons = findAll(renderer.root, 'Button');
+    expect(buttons).toHaveLength(2);
+    expect(findAll(scroll, 'Button')).toHaveLength(buttons.length);
 
     unmount();
   });
@@ -261,7 +294,7 @@ describe('ProfileOverviewScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
-    await pressDelete(renderer.root, h.alert);
+    await pressDelete(renderer.root, h.confirm);
 
     await waitFor(() => h.mutations.deleteProfile.mutateAsync.mock.calls.length > 0);
     expect(h.mutations.deleteProfile.mutateAsync.mock.calls[0]?.[0]).toEqual({
@@ -283,7 +316,7 @@ describe('ProfileOverviewScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
-    await pressDelete(renderer.root, h.alert);
+    await pressDelete(renderer.root, h.confirm);
 
     await waitFor(() => h.error.mock.calls.length > 0);
     expect(h.error).toHaveBeenCalledWith(
@@ -304,7 +337,7 @@ describe('ProfileOverviewScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
-    await pressDelete(renderer.root, h.alert);
+    await pressDelete(renderer.root, h.confirm);
 
     await waitFor(() => h.error.mock.calls.length > 0);
     expect(h.error).toHaveBeenCalledWith("Couldn't delete profile");

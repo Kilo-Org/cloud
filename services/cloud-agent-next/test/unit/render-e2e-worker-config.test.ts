@@ -29,14 +29,14 @@ const overrides = {
 };
 
 const REMOVED_CONTAINER_CLASSES = [
-  'Sandbox',
+  'SandboxSmall',
   'SandboxDIND',
   'SandboxCodeReview',
   'SandboxContainment',
   'SandboxSmallContainment',
   'SandboxCodeReviewContainment',
   // `SandboxContainers` is the newest production container class (migration
-  // `v11`). The e2e render keeps only `SandboxSmall`, so it is removed here
+  // `v11`). The e2e render keeps only `Sandbox`, so it is removed here
   // alongside the older sandbox classes; the pinned list must gain it whenever
   // production adds a container class.
   'SandboxContainers',
@@ -72,15 +72,15 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.$schema).toBe('../node_modules/wrangler/config-schema.json');
   });
 
-  it('keeps only SandboxSmall with a rebased image and a 20-instance cap', () => {
+  it('keeps only Sandbox with a rebased image and a 20-instance cap', () => {
     const { config } = render();
     expect(config.containers).toHaveLength(1);
-    expect(config.containers[0].class_name).toBe('SandboxSmall');
+    expect(config.containers[0].class_name).toBe('Sandbox');
     expect(config.containers[0].image).toBe('../Dockerfile');
     expect(config.containers[0].instance_type).toEqual({
-      vcpu: 2,
-      memory_mib: 6144,
-      disk_mb: 10000,
+      vcpu: 4,
+      memory_mib: 12288,
+      disk_mb: 20000,
     });
     expect(config.containers[0].max_instances).toBe(20);
     expect(config.containers[0].ssh.enabled).toBe(true);
@@ -194,7 +194,7 @@ describe('buildE2eWorkerConfig', () => {
       containers: [{ class_name: 'Sandbox' }, { class_name: 'SandboxSmall' }],
       migrations: [
         { tag: 'v1', new_sqlite_classes: ['CloudAgentSession'] },
-        { tag: 'v2', new_classes: ['LegacyDo', 'Sandbox'] },
+        { tag: 'v2', new_classes: ['LegacyDo', 'SandboxSmall'] },
         { tag: 'v10', new_sqlite_classes: ['SandboxSession'] },
       ],
     };
@@ -212,7 +212,7 @@ describe('buildE2eWorkerConfig', () => {
       containers: [{ class_name: 'Sandbox' }, { class_name: 'SandboxSmall' }],
       migrations: [
         { tag: 'v1', new_sqlite_classes: ['CloudAgentSession'] },
-        { tag: 'v2', new_classes: ['Sandbox'] },
+        { tag: 'v2', new_classes: ['SandboxSmall'] },
         { tag: 'v10', new_sqlite_classes: ['SandboxSession'] },
       ],
     };

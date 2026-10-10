@@ -2,13 +2,13 @@ import { cpus } from 'os';
 import { randomInt as secureRandomInt, randomUUID } from 'crypto';
 import { Worker } from 'worker_threads';
 import path from 'path';
-import { closeAllDrizzleConnections, db } from '@/lib/drizzle';
-import { shutdownPosthog } from '@/lib/posthog';
+import { closeAllDrizzleConnections, db } from '@kilocode/web-shared/lib/drizzle';
+import { shutdownPosthog } from '@kilocode/web-shared/lib/posthog';
 import { sql } from 'drizzle-orm';
-import type { UsageMetaData } from '@/lib/ai-gateway/processUsage.types';
+import type { UsageMetaData } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import stats from './stats.json';
-import { GatewayApiKindSchema } from '@kilocode/db';
+import { GatewayApiKindSchema } from '@kilocode/usage-contracts';
 
 const TOTAL_RECORDS = 100_000;
 
@@ -205,6 +205,7 @@ function generateRandomRecord(
       pickRandom(['kilo-auto/frontier', 'kilo-auto/free', 'kilo-auto/small'], Math.random()),
       70
     ),
+    reasoning_setting: null,
     market_cost: core.cost,
     is_free: Math.random() < 0.1,
     abuse_delay: null,

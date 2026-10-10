@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { SheetHeader } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { Server } from '@/components/ui/icons';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -138,6 +139,7 @@ function BackendSettingsSheet({
 }
 
 function BackendSettingsContent({ onClose }: Readonly<{ onClose: () => void }>) {
+  const { confirm, dialog } = useConfirmDialog();
   const { t } = useTranslation();
   const backends = useChatBackends();
   const loaded = useSyncExternalStore(
@@ -178,22 +180,16 @@ function BackendSettingsContent({ onClose }: Readonly<{ onClose: () => void }>) 
     }
   };
   const remove = (backend: StoredChatBackend) => {
-    Alert.alert(
-      t('modelChat.backends.deleteTitle'),
-      t('modelChat.backends.deleteMessage', { name: backend.name }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: () => {
-            if (isCurrentAuthEpoch(epoch.current)) {
-              deleteChatBackend(backend.id);
-            }
-          },
-        },
-      ]
-    );
+    confirm({
+      title: t('modelChat.backends.deleteTitle'),
+      message: t('modelChat.backends.deleteMessage', { name: backend.name }),
+      confirmLabel: t('common.delete'),
+      onConfirm: () => {
+        if (isCurrentAuthEpoch(epoch.current)) {
+          deleteChatBackend(backend.id);
+        }
+      },
+    });
   };
   return (
     <SessionPageSheet visible onClose={onClose}>
@@ -284,6 +280,7 @@ function BackendSettingsContent({ onClose }: Readonly<{ onClose: () => void }>) 
           </ScrollView>
         </SessionPageSheet>
       )}
+      {dialog}
     </SessionPageSheet>
   );
 }

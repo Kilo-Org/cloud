@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { createDelegatedResourceToken } from '@/lib/auth/resource-delegation';
 import { POST } from './route';
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(async () => ({ user: { id: 'oauth/test-user' } })),
 }));
 jest.mock('@/lib/auth/resource-delegation', () => ({

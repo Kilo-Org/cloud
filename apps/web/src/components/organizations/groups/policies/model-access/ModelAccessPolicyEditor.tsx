@@ -1,6 +1,6 @@
 'use client';
 
-import type { OrganizationGroupModelAccessPolicy } from '@/lib/organizations/group-policies/organization-group-policies';
+import type { OrganizationGroupModelAccessPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { ModelsTab } from '@/components/organizations/providers-and-models/ModelsTab';
@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { useTRPC } from '@/lib/trpc/utils';
 
 type Mode = OrganizationGroupModelAccessPolicy['data']['mode'];

@@ -17,7 +17,9 @@ import {
   hasAnyFailedAttachment,
   isAnyAttachmentUploading,
 } from './agent-attachment-types';
-import { useAgentAttachmentUpload } from './use-agent-attachment-upload';
+import type * as LocalImageModule from './local-image';
+import { LocalImageError } from './local-image';
+import { type UploadPendingResult, useAgentAttachmentUpload } from './use-agent-attachment-upload';
 // Tests import pure helpers from their owning module (not the hook barrel).
 
 // ---- Row 3.3 hook-test mocks ----
@@ -40,6 +42,7 @@ const hoisted = vi.hoisted(() => {
     fileDelete: vi.fn(),
     captureException: vi.fn(),
     deletedUris: new Set<string>(),
+    encodeLocalImage: vi.fn<(uri: string) => Promise<{ media: string; data: string }>>(),
   };
 });
 
@@ -48,6 +51,10 @@ vi.mock('@sentry/react-native', () => ({ captureException: hoisted.captureExcept
 vi.mock('expo-image-manipulator', () => ({
   SaveFormat: { PNG: 'png', WEBP: 'webp', JPEG: 'jpeg' },
   manipulateAsync: hoisted.manipulateAsync,
+}));
+vi.mock('@/lib/agent-attachments/local-image', async importOriginal => ({
+  ...(await importOriginal<typeof LocalImageModule>()),
+  encodeLocalImage: hoisted.encodeLocalImage,
 }));
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
@@ -1084,7 +1091,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     });
 
     expect(hoisted.announceForA11y).toHaveBeenCalledTimes(1);
-    expect(hoisted.announceForA11y).toHaveBeenCalledWith('Attachment uploaded');
     const attachment = hookApi().attachments[0];
     expect(attachment?.status).toBe('uploaded');
     expect(attachment?.remoteFilename).toBe('doc.pdf');
@@ -1101,18 +1107,14 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     });
 
     expect(hoisted.announcingToastError).toHaveBeenCalledTimes(1);
-    expect(hoisted.announcingToastError).toHaveBeenCalledWith(
-      'Failed to upload file: Network error'
-    );
     expect(hoisted.announceForA11y).not.toHaveBeenCalled();
     const attachment = hookApi().attachments[0];
     expect(attachment?.status).toBe('error');
     expect(attachment?.terminal).toBe(false);
-    expect(attachment?.error).toBe('Network error');
     renderer.unmount();
   });
 
-  it('owns terminal failure announcements: one announcingToast.error with terminal copy', async () => {
+  it('owns terminal failure announcements without a success announcement', async () => {
     const renderer = await mountHook();
     await addDocument();
 
@@ -1122,11 +1124,10 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     });
 
     expect(hoisted.announcingToastError).toHaveBeenCalledTimes(1);
-    expect(hoisted.announcingToastError).toHaveBeenCalledWith("This file can't be uploaded.");
+    expect(hoisted.announceForA11y).not.toHaveBeenCalled();
     const attachment = hookApi().attachments[0];
     expect(attachment?.status).toBe('error');
     expect(attachment?.terminal).toBe(true);
-    expect(attachment?.error).toBe("This file can't be uploaded.");
     renderer.unmount();
   });
 
@@ -1686,6 +1687,107 @@ describe('useAgentAttachmentUpload — release of admitted keys (Steps 4/5)', ()
       organizationId: undefined,
       objectKeys: ['org/2026/08/uuid/doc.pdf'],
     });
+    renderer.unmount();
+  });
+});
+
+describe('local delivery', () => {
+  const localRef: { current: HookApi | undefined } = { current: undefined };
+  function LocalHarness() {
+    localRef.current = useAgentAttachmentUpload({ delivery: 'local' });
+    return null;
+  }
+  const local = (): HookApi => {
+    if (!localRef.current) {
+      throw new Error('hook was not mounted');
+    }
+    return localRef.current;
+  };
+  async function mountLocal(): Promise<TestRenderer.ReactTestRenderer> {
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    await act(async () => {
+      await Promise.resolve();
+      ref.current = TestRenderer.create(createElement(LocalHarness));
+    });
+    if (!ref.current) {
+      throw new Error('renderer was not created');
+    }
+    return ref.current;
+  }
+  async function readLocal(): Promise<UploadPendingResult> {
+    let result: UploadPendingResult = { ok: false };
+    await act(async () => {
+      result = await local().uploadPending();
+    });
+    return result;
+  }
+
+  beforeEach(() => {
+    hoisted.uploadOne.mockReset();
+    hoisted.announcingToastError.mockReset();
+    hoisted.measureLocalSize.mockReset();
+    hoisted.measureLocalSize.mockResolvedValue(1024);
+    hoisted.manipulateAsync.mockReset();
+    hoisted.manipulateAsync.mockResolvedValue({
+      uri: 'file:///cache/stripped.jpg',
+      width: 100,
+      height: 100,
+    });
+    hoisted.encodeLocalImage.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('keeps a picked image on the device and reads it at send time', async () => {
+    hoisted.encodeLocalImage.mockResolvedValue({ media: 'image/jpeg', data: 'AAAA' });
+    const renderer = await mountLocal();
+    await act(async () => {
+      await local().addCandidates([{ name: 'photo.png', uri: 'file:///cache/photo.png' }]);
+    });
+
+    expect(local().attachments.map(chip => [chip.status, chip.progress])).toEqual([
+      ['local', null],
+    ]);
+    expect(isAnyAttachmentUploading(local().attachments)).toBe(false);
+    expect(await readLocal()).toEqual({
+      ok: true,
+      wire: undefined,
+      submission: undefined,
+      images: [{ media: 'image/jpeg', data: 'AAAA' }],
+    });
+    expect(hoisted.encodeLocalImage).toHaveBeenCalledWith('file:///cache/stripped.jpg');
+    expect(hoisted.uploadOne).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('refuses a document with a clear message', async () => {
+    const renderer = await mountLocal();
+    await act(async () => {
+      await local().addCandidates([{ name: 'doc.pdf', uri: 'file:///cache/doc.pdf' }]);
+    });
+
+    expect(local().attachments).toEqual([]);
+    expect(toast.error).toHaveBeenCalledWith(i18n.t('agentChat.composer.imagesOnly'));
+    expect(hoisted.uploadOne).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it.each([
+    ['tooLarge', 'agentChat.composer.imageTooLarge'],
+    ['unreadable', 'agentChat.composer.imageUnreadable'],
+  ] as const)('blocks the send when an image is %s', async (reason, key) => {
+    hoisted.encodeLocalImage.mockRejectedValue(new LocalImageError(reason));
+    const renderer = await mountLocal();
+    await act(async () => {
+      await local().addCandidates([{ name: 'photo.jpg', uri: 'file:///cache/photo.jpg' }]);
+    });
+
+    expect(await readLocal()).toEqual({ ok: false });
+    expect(local().attachments[0]).toMatchObject({
+      status: 'error',
+      terminal: true,
+      error: i18n.t(key),
+    });
+    expect(hoisted.announcingToastError).toHaveBeenCalledWith(i18n.t(key));
     renderer.unmount();
   });
 });

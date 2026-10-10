@@ -80,9 +80,6 @@ export function KiloCommandRowView({
             </Text>
           ) : null}
         </View>
-        <Text className="text-xs text-muted-foreground">
-          {enabled ? t('common.enabled') : t('common.disabled')}
-        </Text>
         <Switch value={enabled} accessibilityLabel={name} onValueChange={onToggle} />
       </View>
       <View className="flex-row items-center justify-end gap-1">

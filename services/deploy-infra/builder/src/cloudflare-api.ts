@@ -3,11 +3,6 @@ import type { DeploymentFile, WorkerMetadata } from './types';
 import type { PlaintextEnvVar } from '../../../../apps/web/src/lib/user-deployments/env-vars-validation';
 
 /**
- * Cloudflare API Client - Handles interactions with Cloudflare Workers API.
- * Provides methods for asset uploads and worker deployments.
- */
-
-/**
  * Error thrown when a worker is not found in Cloudflare (error code 10007).
  */
 export class WorkerNotFoundError extends Error {
@@ -17,9 +12,6 @@ export class WorkerNotFoundError extends Error {
   }
 }
 
-/**
- * Standard Cloudflare API response structure.
- */
 const cloudflareErrorSchema = z.object({
   code: z.number(),
   message: z.string(),
@@ -53,31 +45,15 @@ export const parseCloudflareResponse = <T>(
   };
 };
 
-/**
- * CloudflareAPI class for interacting with Cloudflare Workers API.
- * Handles asset upload sessions, batch uploads, and worker deployments.
- */
 export class CloudflareAPI {
   private accountId: string;
   private apiToken: string;
 
-  /**
-   * Create a new CloudflareAPI instance.
-   *
-   * @param accountId - Cloudflare account ID
-   * @param apiToken - Cloudflare API token with Workers deployment permissions
-   */
   constructor(accountId: string, apiToken: string) {
     this.accountId = accountId;
     this.apiToken = apiToken;
   }
 
-  /**
-   * Get headers for API requests.
-   *
-   * @param contentType - Optional Content-Type header value
-   * @returns Headers object with authorization and optional content type
-   */
   private getHeaders(contentType?: string): HeadersInit {
     const headers: HeadersInit = {
       Authorization: `Bearer ${this.apiToken}`,
@@ -90,9 +66,6 @@ export class CloudflareAPI {
     return headers;
   }
 
-  /**
-   * Retry a function with exponential backoff for transient errors
-   */
   private async retryWithBackoff<T>(
     fn: () => Promise<T>,
     operation: string,
@@ -106,14 +79,12 @@ export class CloudflareAPI {
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
-        // Check if it's a 5xx error (transient)
         const is5xxError = lastError.message.includes('status: 5');
 
         if (!is5xxError || attempt === maxAttempts) {
           throw lastError;
         }
 
-        // Exponential backoff: 1s, 2s, 4s, etc., max 30s
         const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
         console.log(
           `${operation} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delayMs}ms...`
@@ -126,14 +97,6 @@ export class CloudflareAPI {
     throw lastError ?? new Error('Unknown error in retry logic');
   }
 
-  /**
-   * Create an asset upload session for a worker script.
-   *
-   * @param scriptName - Name of the worker script
-   * @param manifest - Manifest mapping file paths to their hash and size
-   * @param dispatchNamespace - Dispatch namespace for the worker
-   * @returns Upload session JWT and bucket assignments
-   */
   async createAssetUploadSession(
     scriptName: string,
     manifest: Record<string, { hash: string; size: number }>,
@@ -176,14 +139,6 @@ export class CloudflareAPI {
     }, 'Create asset upload session');
   }
 
-  /**
-   * Upload a batch of assets to Cloudflare.
-   *
-   * @param uploadToken - JWT token from the upload session
-   * @param fileHashes - Array of file hashes to upload in this batch
-   * @param fileContents - Map of hash to file content (Buffer) and MIME type
-   * @returns Completion JWT if all files uploaded (status 201), null otherwise
-   */
   async uploadAssetBatch(
     scriptName: string,
     uploadToken: string,
@@ -193,7 +148,6 @@ export class CloudflareAPI {
     return await this.retryWithBackoff(async () => {
       const url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/workers/assets/upload?base64=true`;
 
-      // Build FormData with each file
       const formData = new FormData();
 
       for (const hash of fileHashes) {
@@ -202,10 +156,8 @@ export class CloudflareAPI {
           throw new Error(`Missing file content for hash ${hash}`);
         }
 
-        // Convert Buffer to base64 string (matches VibeSDK pattern)
         const base64Content = fileData.buffer.toString('base64');
 
-        // Create blob with base64 content as text
         const blob = new Blob([base64Content], { type: fileData.mimeType });
 
         // Append to form data with hash as both field name and filename
@@ -266,26 +218,17 @@ export class CloudflareAPI {
     }, 'Upload asset batch');
   }
 
-  /**
-   * Deploy a worker script to Cloudflare.
-   */
   async deployWorker(params: {
-    /** Name of the worker script */
     scriptName: string;
-    /** Worker metadata including main module, compatibility settings, and assets */
     metadata: WorkerMetadata;
-    /** Worker script file */
     workerScript: DeploymentFile;
-    /** Dispatch namespace for the worker */
     dispatchNamespace: string;
-    /** Optional array of artifact files to include in deployment */
     artifacts?: DeploymentFile[];
     /** Environment variables (only non-secret) */
     envVars?: PlaintextEnvVar[];
   }): Promise<void> {
     const { scriptName, metadata, workerScript, dispatchNamespace, artifacts, envVars } = params;
 
-    // Assert that envVars don't contain any secret variables
     if (envVars?.some(v => v.isSecret)) {
       throw new Error(
         'Secret environment variables must be set via setSecrets(), not deployWorker()'
@@ -295,7 +238,6 @@ export class CloudflareAPI {
     return await this.retryWithBackoff(async () => {
       const url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/workers/dispatch/namespaces/${dispatchNamespace}/scripts/${scriptName}`;
 
-      // Add plain text environment variables to metadata bindings
       const plainTextBindings = (envVars || []).map(v => ({
         type: 'plain_text',
         name: v.key,
@@ -315,7 +257,6 @@ export class CloudflareAPI {
       });
       formData.append('index.js', workerBlob, 'index.js');
 
-      // Append artifact files if provided
       if (artifacts && artifacts.length > 0) {
         for (const artifact of artifacts) {
           const artifactBlob = new Blob([new Uint8Array(artifact.content)], {
@@ -357,7 +298,6 @@ export class CloudflareAPI {
           const existingClass = messageStr.match(/class "([^"]+)"/)?.[1];
 
           if (existingClass && metadata.migrations) {
-            // Filter out the existing class from migrations
             const filteredMigrations = metadata.migrations
               .map(migration => ({
                 ...migration,
@@ -365,7 +305,6 @@ export class CloudflareAPI {
               }))
               .filter(migration => !migration.new_classes || migration.new_classes.length > 0);
 
-            // Retry with filtered migrations (preserve envVars for retry)
             return await this.deployWorker({
               scriptName,
               metadata: { ...metadata, migrations: filteredMigrations },
@@ -386,10 +325,6 @@ export class CloudflareAPI {
     }, 'Deploy worker');
   }
 
-  /**
-   * Sets secrets for a worker in a dispatch namespace using Cloudflare's Secrets API.
-   * Secrets are set individually via PUT requests, processed in parallel batches.
-   */
   async setSecrets(
     scriptName: string,
     dispatchNamespace: string,
@@ -437,11 +372,7 @@ export class CloudflareAPI {
   }
 
   /**
-   * Delete a worker script from a dispatch namespace.
    * Note: Assets are automatically cleaned up when the script is deleted.
-   *
-   * @param scriptName - Name of the worker script to delete
-   * @param dispatchNamespace - Dispatch namespace containing the worker
    */
   async deleteWorker(scriptName: string, dispatchNamespace: string): Promise<void> {
     return await this.retryWithBackoff(async () => {

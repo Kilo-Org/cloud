@@ -1,7 +1,7 @@
 import { describe, test, expect } from '@jest/globals';
 import { domainIsRestrictedFromStytchFreeCredits } from './domainIsRestrictedFromStytchFreeCredits';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 
 describe('domainIsRestrictedFromStytchFreeCredits', () => {
   test('should return false for personal domain (@@personal@@)', async () => {

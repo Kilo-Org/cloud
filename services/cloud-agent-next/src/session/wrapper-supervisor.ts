@@ -11,6 +11,10 @@ import type { AgentRuntime } from './agent-runtime.js';
 import { WRAPPER_NO_OUTPUT_TIMEOUT_MS, WRAPPER_PING_INTERVAL_MS } from './agent-runtime.js';
 import type { MessageSettlementOutbox } from './message-settlement-outbox.js';
 import {
+  assistantErrorDetail,
+  assistantReportsNoActionableOutput,
+} from '../shared/assistant-failure.js';
+import {
   assistantFailureMessage,
   classifyAssistantFailure,
   classifyAssistantFailureMessage,
@@ -30,7 +34,7 @@ import {
   type TerminalizeParams,
 } from './session-message-state.js';
 import type { WrapperTerminalFailureCode } from '../shared/protocol.js';
-import type { AssistantMessagePart, LatestAssistantMessage } from './types.js';
+import type { LatestAssistantMessage } from './types.js';
 import type { SandboxId } from '../types.js';
 import {
   MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_LOG_CHUNK_SIZE,
@@ -285,34 +289,18 @@ function matchesDisconnectGraceFence(
   return true;
 }
 
-function getAssistantErrorMessage(error: unknown): string | undefined {
-  if (error === undefined || error === null) return undefined;
-  if (typeof error === 'string') return error;
-  if (typeof error === 'object') {
-    if ('data' in error && error.data && typeof error.data === 'object') {
-      if ('message' in error.data && typeof error.data.message === 'string') {
-        return error.data.message;
-      }
-    }
-    if ('message' in error && typeof error.message === 'string') {
-      return error.message;
-    }
-  }
-  return 'Assistant message failed';
-}
-
 function assistantErrorTerminalizeParams(info: LatestAssistantMessage['info']): TerminalizeParams {
   const assistantError = info.error;
   if (isAssistantInterrupt(assistantError)) {
     return {
       kind: 'interrupted',
-      error: getAssistantErrorMessage(assistantError) ?? 'The message was interrupted by the user',
+      error: assistantErrorDetail(assistantError) ?? 'The message was interrupted by the user',
       completionSource: 'interrupt',
       failureStage: 'interruption',
       failureCode: 'user_interrupt',
     };
   }
-  const errorMessage = getAssistantErrorMessage(assistantError) ?? 'Assistant request failed';
+  const errorMessage = assistantErrorDetail(assistantError) ?? 'Assistant request failed';
   const assistantFailure = classifyAssistantFailure(assistantError);
   return {
     kind: 'failed',
@@ -332,28 +320,6 @@ function hasAssistantCompletionMarker(info: LatestAssistantMessage['info']): boo
   const time = info.time;
   if (typeof time !== 'object' || time === null || !('completed' in time)) return false;
   return typeof time.completed === 'number';
-}
-
-function assistantTextFromParts(parts: AssistantMessagePart[]): string {
-  return parts
-    .filter(part => part.type === 'text')
-    .map(part => (typeof part.text === 'string' ? part.text : ''))
-    .join('\n');
-}
-
-/**
- * The CLI ends a turn whose model hit its output limit mid-reasoning with a
- * plain assistant text notice instead of a terminal error, so the wrapper
- * reports the batch complete. A code review that ends with this notice produced
- * no review content, yet it settled as completed and reported a successful
- * GitHub check (Kilo-Org/cloud#5630). Matched as two independent fragments so
- * small copy drift in either half still detects, while a review that merely
- * discusses output limits cannot false-positive without the
- * "no actionable output" half.
- */
-function assistantReportsNoActionableOutput(assistantMessage: LatestAssistantMessage): boolean {
-  const text = assistantTextFromParts(assistantMessage.parts);
-  return /no actionable output/i.test(text) && /(?:output|token) limit/i.test(text);
 }
 
 /**
@@ -393,7 +359,7 @@ function projectWrapperDeathReconciliation(
     return assistantErrorTerminalizeParams(assistantMessage.info);
   }
   if (!hasAssistantCompletionMarker(assistantMessage.info)) return null;
-  if (codeReviewSession && assistantReportsNoActionableOutput(assistantMessage)) {
+  if (codeReviewSession && assistantReportsNoActionableOutput(assistantMessage.parts)) {
     return noActionableAssistantOutputTerminalizeParams(assistantMessage.info.id);
   }
   return {
@@ -1422,7 +1388,7 @@ export function createWrapperSupervisor(
           message,
           observeCorrelatedActivity: true,
           params:
-            codeReviewSession && assistantReportsNoActionableOutput(assistantMessage)
+            codeReviewSession && assistantReportsNoActionableOutput(assistantMessage.parts)
               ? noActionableAssistantOutputTerminalizeParams(assistantMessage.info.id)
               : {
                   kind: 'completed',

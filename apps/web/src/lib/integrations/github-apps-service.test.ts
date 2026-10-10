@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { organizations, platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   getIntegrationForOrganization,
   getIntegrationForOwner,

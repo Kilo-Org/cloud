@@ -3,13 +3,13 @@ process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
 import { NextRequest } from 'next/server';
 
 jest.mock('@/lib/device-auth/device-auth');
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/device-auth/device-auth-viewer-token');
 jest.mock('@vercel/firewall');
 jest.mock('@sentry/nextjs');
 
 import { pollDeviceAuthRequest, denyDeviceAuthRequest } from '@/lib/device-auth/device-auth';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { checkRateLimit } from '@vercel/firewall';
 import * as Sentry from '@sentry/nextjs';

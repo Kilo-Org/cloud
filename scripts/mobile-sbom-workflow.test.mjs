@@ -60,6 +60,7 @@ test('every production build generates, retains and publishes a per-artifact SBO
     '--ipa artifacts/app.ipa',
     '--aab artifacts/app.aab',
     '--build-json build.json',
+    '--podfile-lock artifacts/Podfile.lock',
     '--out-dir artifacts',
   ]) {
     assert.ok((generator.run ?? '').includes(argument), `the generator must pass ${argument}`);
@@ -137,7 +138,12 @@ test('every production build generates, retains and publishes a per-artifact SBO
       /Authorization/,
       `${step.name}: must not write an Authorization header`
     );
-    assert.doesNotMatch(text, /https?:\/\//, `${step.name}: must not embed an artifact URL`);
+    // Tag release names the github.com git config key for its push token.
+    assert.doesNotMatch(
+      text,
+      /https?:\/\/(?!github\.com\/)/,
+      `${step.name}: must not embed an artifact URL`
+    );
   }
 });
 

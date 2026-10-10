@@ -3,7 +3,7 @@ import 'server-only';
 import { webhook_events, type WebhookEvent } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 const BitbucketWebhookIdentitySchema = z
   .object({

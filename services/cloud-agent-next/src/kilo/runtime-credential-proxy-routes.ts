@@ -1,10 +1,12 @@
+import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+
 export type RuntimeCredentialProxyTargets = {
   backendBaseUrl: string;
   providerBaseUrl: string;
   sessionIngestBaseUrl: string;
 };
 
-export type RuntimeCredentialProxyRoute = 'backend' | 'provider' | 'ingest';
+export type RuntimeCredentialProxyRoute = 'backend' | 'provider' | 'ingest' | 'exa';
 
 type ResolveRuntimeCredentialProxyRouteInput = {
   targets: RuntimeCredentialProxyTargets;
@@ -113,12 +115,29 @@ function logicalProviderPath(pathname: string): string | null {
   return isAllowedProviderRoute('GET', path) || isAllowedProviderRoute('POST', path) ? path : null;
 }
 
+export const EXA_PROXY_PATHS = [
+  '/api/exa/search',
+  '/api/exa/contents',
+  '/api/exa/findSimilar',
+  '/api/exa/answer',
+  '/api/exa/context',
+] as const;
+
+const exaProxyPathSet: ReadonlySet<string> = new Set(EXA_PROXY_PATHS);
+
+function isAllowedExaRoute(method: string, path: string): boolean {
+  return method === 'POST' && exaProxyPathSet.has(path);
+}
+
 /** Identifies the facade plane only; the route resolver still enforces its allowlist. */
 export function inferRuntimeCredentialProxyRoute(
   pathname: string
 ): RuntimeCredentialProxyRoute | null {
   if (pathname.startsWith('/api/openrouter/') || pathname.startsWith('/api/gateway/')) {
     return 'provider';
+  }
+  if (pathname.startsWith('/api/exa/')) {
+    return 'exa';
   }
   if (
     pathname === '/api/session' ||
@@ -186,6 +205,56 @@ function isAllowedIngestRoute(
   );
 }
 
+export function resolveRuntimeCredentialProxyScopedIngestRoute(
+  input: ResolveRuntimeCredentialProxyRouteInput
+): URL | null {
+  if (
+    input.route !== 'ingest' ||
+    input.method !== 'POST' ||
+    !containedKiloSessionIdSchema.safeParse(input.kiloSessionId).success ||
+    (input.organizationId !== undefined && !ORGANIZATION_ID.test(input.organizationId))
+  ) {
+    return null;
+  }
+  const path = safePathname(input.pathname);
+  if (!path) return null;
+  let sessionId: unknown;
+  if (path === '/api/session') {
+    if (
+      input.contentType?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json' ||
+      input.bodyText === undefined ||
+      input.bodyText.length > 8192
+    ) {
+      return null;
+    }
+    try {
+      const body: unknown = JSON.parse(input.bodyText);
+      if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
+      const values = body as Record<string, unknown>;
+      if (Object.keys(values).some(key => key !== 'sessionId' && key !== 'parentSessionId'))
+        return null;
+      if (
+        values.parentSessionId !== undefined &&
+        !containedKiloSessionIdSchema.safeParse(values.parentSessionId).success
+      ) {
+        return null;
+      }
+      sessionId = values.sessionId;
+    } catch {
+      return null;
+    }
+  } else {
+    sessionId = /^\/api\/session\/([A-Za-z0-9_-]+)\/ingest$/.exec(path)?.[1];
+  }
+  if (
+    sessionId === input.kiloSessionId ||
+    !containedKiloSessionIdSchema.safeParse(sessionId).success
+  ) {
+    return null;
+  }
+  return targetUrl(input.targets.sessionIngestBaseUrl, path, input.search);
+}
+
 /** Resolves only exact credential-bearing routes; unrecognized input fails closed. */
 export function resolveRuntimeCredentialProxyRoute(
   input: ResolveRuntimeCredentialProxyRouteInput
@@ -203,6 +272,9 @@ export function resolveRuntimeCredentialProxyRoute(
     input.route === 'backend' &&
     isAllowedBackendRoute(input.method, path, input.organizationId)
   ) {
+    return targetUrl(input.targets.backendBaseUrl, path, input.search);
+  }
+  if (input.route === 'exa' && isAllowedExaRoute(input.method, path)) {
     return targetUrl(input.targets.backendBaseUrl, path, input.search);
   }
   if (input.route === 'provider') {

@@ -1,5 +1,5 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   credit_transactions,
   organization_invitations,
@@ -7,8 +7,11 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  createOrganization,
+  addUserToOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import type { User, Organization } from '@kilocode/db/schema';
 
 jest.mock('@/lib/organizations/organization-billing', () => ({

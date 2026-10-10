@@ -139,20 +139,30 @@ function isSelectedModelActionRequiredMessage(message: string): boolean {
   );
 }
 
+const TRANSIENT_TRANSPORT_ERROR_PHRASES = [
+  'network connection lost',
+  'durable object instance is no longer active',
+  'durable object reset because its code was updated',
+] as const;
+
+function isTransientTransportErrorMessage(normalizedErrorMessage: string): boolean {
+  return TRANSIENT_TRANSPORT_ERROR_PHRASES.some(phrase => normalizedErrorMessage.includes(phrase));
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function hasRetryableSandboxMarker(value: unknown): boolean {
+function hasRetryableErrorMarker(value: unknown, errorCode: string): boolean {
   if (!isRecord(value)) {
     return false;
   }
 
-  if (value.error === 'sandbox_internal_server_error' && value.retryable === true) {
+  if (value.error === errorCode && value.retryable === true) {
     return true;
   }
 
-  return Object.values(value).some(nested => hasRetryableSandboxMarker(nested));
+  return Object.values(value).some(nested => hasRetryableErrorMarker(nested, errorCode));
 }
 
 function parseJsonBody(body: string): unknown {
@@ -175,6 +185,7 @@ type CloudAgentNextFreshRetryFailureCategory =
   | 'deterministic_action_required_failure'
   | 'deterministic_non_retryable_failure'
   | 'sandbox_api_or_storage_failure'
+  | 'billing_unavailable'
   | 'wrapper_version_mismatch'
   | 'wrapper_wait_for_port_timeout'
   | 'wrapper_kilo_server_start_timeout'
@@ -274,6 +285,15 @@ function classifyCloudAgentNextFreshSessionRetry(
     );
   }
 
+  if (isTransientTransportErrorMessage(normalizedErrorMessage)) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      true,
+      'sandbox_api_or_storage_failure',
+      'transient_transport_error_retryable'
+    );
+  }
+
   if (!cloudAgentNextError) {
     return cloudAgentNextFreshRetryClassification(
       undefined,
@@ -361,12 +381,21 @@ function classifyCloudAgentNextFreshSessionRetry(
   }
 
   const parsedBody = parseJsonBody(cloudAgentNextError.body);
-  if (hasRetryableSandboxMarker(parsedBody)) {
+  if (hasRetryableErrorMarker(parsedBody, 'sandbox_internal_server_error')) {
     return cloudAgentNextFreshRetryClassification(
       cloudAgentNextError,
       true,
       'sandbox_api_or_storage_failure',
       'sandbox_retryable_marker'
+    );
+  }
+
+  if (hasRetryableErrorMarker(parsedBody, 'BILLING_UNAVAILABLE')) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      true,
+      'billing_unavailable',
+      'billing_unavailable_retryable_marker'
     );
   }
 

@@ -1,5 +1,5 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import {
   platform_access_token_credentials,
@@ -28,7 +28,7 @@ import {
   GitLabProjectAccessTokenPermissionError,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import { randomBytes, randomUUID } from 'crypto';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   DEFAULT_GITLAB_INSTANCE_URL,
   GitLabInstanceUrlError,

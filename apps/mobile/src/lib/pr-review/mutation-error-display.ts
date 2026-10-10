@@ -1,6 +1,7 @@
 // Pure selection of the inline mutation-error copy shown in the
-// comment-composer and review-submit formSheets. Classification lives in
-// `classifyPrReviewMutationError`; this helper maps kind → display message.
+// comment-composer, review-submit and own-comment edit formSheets.
+// Classification lives in `classifyPrReviewMutationError`; this helper maps
+// kind → display message.
 //
 // FORBIDDEN always passes the server-provided classification.message
 // through verbatim (the server already sanitizes it to actionable copy).
@@ -15,10 +16,21 @@ import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
-type MutationErrorDisplaySurface = 'composer' | 'submit';
+export type MutationErrorDisplaySurface = 'composer' | 'submit' | 'edit-comment';
 
-type MutationErrorDisplayKind = 'retryable' | 'bad-request' | 'forbidden' | 'reconnect';
+/**
+ * The inline-error kinds the display helper can return. `not-found` is the
+ * edit surface's terminal 404 (the posted comment no longer exists); it renders
+ * like the other inline kinds but keeps the surface's primary control down.
+ */
+export type MutationErrorDisplayKind =
+  | 'retryable'
+  | 'bad-request'
+  | 'forbidden'
+  | 'reconnect'
+  | 'not-found';
 
 type MutationErrorDisplay = {
   kind: MutationErrorDisplayKind;
@@ -28,7 +40,7 @@ type MutationErrorDisplay = {
 type Classification = ReturnType<typeof classifyPrReviewMutationError>;
 
 type MutationErrorDisplayOptions = {
-  /** The raw thrown error, used for the retryable composer copy. */
+  /** The raw thrown error, used for the retryable composer / edit-comment copy. */
   readonly rawError?: unknown;
   /**
    * The connected provider's noun, already translated (s6f): on the submit
@@ -41,9 +53,13 @@ type MutationErrorDisplayOptions = {
 
 /**
  * The bad-request inline copy per surface. The submit surface words the
- * rejection after the connected provider when a term rides (s6f).
+ * rejection after the connected provider when a term rides (s6f); the
+ * edit-comment surface says the posted comment can no longer be edited.
  */
 function badRequestMessage(surface: MutationErrorDisplaySurface, term?: string): string {
+  if (surface === 'edit-comment') {
+    return i18n.t('prReview.discussion.commentEditUnavailable');
+  }
   if (surface === 'composer') {
     return i18n.t('prReview.mutationError.commentNotPosted');
   }
@@ -78,6 +94,14 @@ export function mutationErrorDisplay(
   }
   if (classification.kind === 'bad-request') {
     return { kind: 'bad-request', message: badRequestMessage(surface, options?.term) };
+  }
+  // A 404 on the own-comment edit surface means the posted comment is gone
+  // (GitHub 404s a deleted comment): terminal, so the sheet shows the "can't
+  // be edited" copy and keeps Save down instead of offering a retry that can
+  // never succeed. Other surfaces keep the retryable fall-through — their
+  // 404s (a missing PR / App access) are outside this slice.
+  if (surface === 'edit-comment' && readTrpcErrorField(rawError, 'code') === 'NOT_FOUND') {
+    return { kind: 'not-found', message: i18n.t('prReview.discussion.commentEditUnavailable') };
   }
   if (classification.kind === 'reconnect') {
     return { kind: 'reconnect', message: i18n.t('prReview.connectionExpired') };

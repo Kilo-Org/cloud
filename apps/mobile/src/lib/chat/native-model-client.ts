@@ -110,7 +110,6 @@ function failure(problem: LocalModelProblem, started: boolean): ModelError {
   });
 }
 
-
 /**
  * A deliberately high guess of about three characters per token. It is not a
  * count: it exists so a session on a small on-device window still compacts

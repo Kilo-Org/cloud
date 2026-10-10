@@ -94,9 +94,10 @@ describe('cloud-agent pending-upload ledger', () => {
         objectKey: buildObjectKey(kiloUserId, messageUuid, crypto.randomUUID()),
         byteSize: 42,
       })
-    ).rejects.toThrow(
-      `Maximum ${CLOUD_AGENT_ATTACHMENT_MAX_COUNT} attachments allowed per message`
-    );
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: `Maximum ${CLOUD_AGENT_ATTACHMENT_MAX_COUNT} attachments allowed per message`,
+    });
 
     const rows = await db
       .select()
@@ -122,10 +123,89 @@ describe('cloud-agent pending-upload ledger', () => {
         objectKey: buildObjectKey(kiloUserId, messageUuid, crypto.randomUUID()),
         byteSize: CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES + 1,
       })
-    ).rejects.toThrow('Attachment exceeds the maximum size');
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Attachment exceeds the maximum size',
+    });
 
     await expect(db.select().from(cloud_agent_pending_uploads)).resolves.toHaveLength(0);
   });
+
+  it('refreshes a pending row when the same key is admitted again', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachmentId = crypto.randomUUID();
+    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachmentId);
+    const soon = new Date(Date.now() + 60_000).toISOString();
+    await insertPendingRow({ kiloUserId, messageUuid, attachmentId, expiresAt: soon });
+
+    await admitPendingUpload({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 99 });
+
+    const rows = await db
+      .select()
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: 'pending', byte_size: 99 });
+    expect(new Date(rows[0]?.expires_at ?? 0).getTime()).toBeGreaterThan(
+      Date.now() + 23 * 60 * 60 * 1000
+    );
+  });
+
+  it('admits a same-key retry at the file-count bound', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachmentIds = Array.from({ length: CLOUD_AGENT_ATTACHMENT_MAX_COUNT }, () =>
+      crypto.randomUUID()
+    );
+    for (const attachmentId of attachmentIds) {
+      await admitPendingUpload({
+        kiloUserId,
+        messageUuid,
+        attachmentId,
+        objectKey: buildObjectKey(kiloUserId, messageUuid, attachmentId),
+        byteSize: 42,
+      });
+    }
+
+    const retriedId = attachmentIds[0] ?? '';
+    await admitPendingUpload({
+      kiloUserId,
+      messageUuid,
+      attachmentId: retriedId,
+      objectKey: buildObjectKey(kiloUserId, messageUuid, retriedId),
+      byteSize: 42,
+    });
+
+    const rows = await db
+      .select()
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.message_uuid, messageUuid));
+    expect(rows).toHaveLength(CLOUD_AGENT_ATTACHMENT_MAX_COUNT);
+  });
+
+  it.each(['linked', 'reaped'] as const)(
+    'refuses to admit a key whose row is already %s',
+    async status => {
+      const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+      const messageUuid = crypto.randomUUID();
+      const attachmentId = crypto.randomUUID();
+      const objectKey = buildObjectKey(kiloUserId, messageUuid, attachmentId);
+      const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      await insertPendingRow({ kiloUserId, messageUuid, attachmentId, expiresAt: future, status });
+
+      await expect(
+        admitPendingUpload({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 99 })
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+      const rows = await db
+        .select()
+        .from(cloud_agent_pending_uploads)
+        .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ status, byte_size: 42 });
+    }
+  );
 
   it('links only the supplied object keys and leaves unmatched rows pending', async () => {
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;

@@ -156,6 +156,8 @@ export const ggufModelProvider: LocalModelProvider = {
         };
   },
   supportsTools: fileId => ggufStore().model(fileId)?.tools ?? false,
+  // No vision projector is loaded, so a downloaded model reads text only.
+  supportsImages: () => false,
 };
 
 export const ggufDownloadActions = {

@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
 
+import { type Question } from './state';
+
 /**
  * The question a chat is waiting on an answer to.
  *
@@ -10,20 +12,27 @@ import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
  * also means a question whose answer never arrived — the app was killed, the
  * network went, the person pressed stop — is nowhere afterwards.
  *
- * So the app remembers it with the target it was asked of, and the chat screen
- * draws it as the last thing said with a Retry under it. It is written before
- * any move or request and removed when the answer lands, so what is here is
- * always a question with no answer, never one silently rerouted by a failed move.
+ * So the app remembers it with the target it was asked of and the images it
+ * carries, and the chat screen draws it as the last thing said with a Retry
+ * under it. It is written before any move or request and removed when the
+ * answer lands, so what is here is always a question with no answer, never one
+ * silently rerouted by a failed move.
  */
 
 const SCOPE = 'chat-asked-target';
 const LEGACY_SCOPE = 'chat-asked';
-const askedSchema = z.object({ text: z.string(), model: z.string() });
+const askedSchema = z.object({
+  text: z.string(),
+  model: z.string(),
+  // A question remembered before images existed carries none.
+  images: z.array(z.object({ media: z.string(), data: z.string() })).default([]),
+});
 
-type Asked = z.infer<typeof askedSchema>;
+/** A question with no answer, the target it was asked of, and its images. */
+export type Asked = Question & { readonly model: string };
 
-export async function rememberAsked(sessionId: string, text: string, model: string): Promise<void> {
-  await setItem(SCOPE, sessionId, JSON.stringify({ text, model }));
+export async function rememberAsked(sessionId: string, asked: Asked): Promise<void> {
+  await setItem(SCOPE, sessionId, JSON.stringify(asked));
   await removeItem(LEGACY_SCOPE, sessionId);
 }
 
@@ -44,7 +53,7 @@ export async function migrateAsked(sessionId: string, model: string): Promise<vo
     return;
   }
   await ((await askedIn(sessionId)) === null
-    ? rememberAsked(sessionId, text, model)
+    ? rememberAsked(sessionId, { text, model, images: [] })
     : removeItem(LEGACY_SCOPE, sessionId));
 }
 
@@ -52,7 +61,7 @@ export async function migrateAsked(sessionId: string, model: string): Promise<vo
 export async function moveAsked(from: string, to: string): Promise<void> {
   const asked = await askedIn(from);
   if (asked !== null) {
-    await rememberAsked(to, asked.text, asked.model);
+    await rememberAsked(to, asked);
   }
   await forgetAsked(from);
 }

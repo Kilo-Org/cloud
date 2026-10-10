@@ -30,6 +30,7 @@ describe('asMessages', () => {
         ],
         answering: '',
         asked: null,
+        askedImages: [],
         waiting: [],
       })
     ).toEqual([
@@ -52,6 +53,7 @@ describe('asMessages', () => {
         ],
         answering: '',
         asked: null,
+        askedImages: [],
         waiting: [],
       })
     ).toEqual([{ role: 'assistant', said: 'a burrito' }]);
@@ -65,6 +67,7 @@ describe('asMessages', () => {
         turns: [turn('t1', 'user', [text('p1', 'first')])],
         answering: 'well',
         asked: 'second',
+        askedImages: [],
         waiting: [],
       })
     ).toEqual([
@@ -81,6 +84,7 @@ describe('asMessages', () => {
       turns: [turn('t1', 'user', [text('p1', 'first')])],
       answering: 'well',
       asked: 'second',
+      askedImages: [],
       waiting: [],
     });
 
@@ -95,6 +99,7 @@ describe('asMessages', () => {
         turns: [],
         answering: 'a bur',
         asked: 'what is a monad',
+        askedImages: [],
         waiting: [],
       })
     ).toEqual([
@@ -111,7 +116,11 @@ describe('asMessages', () => {
         turns: [],
         answering: 'a bur',
         asked: 'what is a monad',
-        waiting: ['and a functor', 'and a natural transformation'],
+        askedImages: [],
+        waiting: [
+          { text: 'and a functor', images: [] },
+          { text: 'and a natural transformation', images: [] },
+        ],
       })
     ).toEqual([
       { role: 'user', said: 'what is a monad' },
@@ -128,9 +137,72 @@ describe('asMessages', () => {
       turns: [turn('t1', 'assistant', [text('p1', 'a burrito')])],
       answering: '',
       asked: null,
+      askedImages: [],
       waiting: [],
     });
 
     expect(message?.info).toMatchObject({ modelID: 'kilo/two', providerID: 'kilo' });
+  });
+
+  it('draws a stored image as a file part the bubble shows', () => {
+    const [message] = asMessages({
+      sessionId: 's1',
+      model: 'kilo/one',
+      turns: [
+        turn('t1', 'user', [
+          { id: 'p1', kind: 'image', media: 'image/jpeg', body: 'AAAA' },
+          text('p2', 'what is this'),
+        ]),
+      ],
+      answering: '',
+      asked: null,
+      askedImages: [],
+      waiting: [],
+    });
+
+    expect(message?.parts).toEqual([
+      {
+        id: 'p1',
+        sessionID: 's1',
+        messageID: 't1',
+        type: 'file',
+        mime: 'image/jpeg',
+        url: 'data:image/jpeg;base64,AAAA',
+      },
+      expect.objectContaining({ type: 'text', text: 'what is this' }),
+    ]);
+  });
+
+  it('draws a turn that is only an image', () => {
+    expect(
+      asMessages({
+        sessionId: 's1',
+        model: 'kilo/one',
+        turns: [turn('t1', 'user', [{ id: 'p1', kind: 'image', media: 'image/png', body: 'AA' }])],
+        answering: '',
+        asked: null,
+        askedImages: [],
+        waiting: [],
+      })
+    ).toHaveLength(1);
+  });
+
+  it('shows the images of the unanswered and waiting questions ahead of their words', () => {
+    const image = { media: 'image/jpeg', data: 'BBBB' };
+    const messages = asMessages({
+      sessionId: 's1',
+      model: 'kilo/one',
+      turns: [],
+      answering: '',
+      asked: 'look',
+      askedImages: [image],
+      waiting: [{ text: '', images: [image] }],
+    });
+
+    expect(messages.map(message => message.parts.map(part => part.type))).toEqual([
+      ['file', 'text'],
+      ['file'],
+    ]);
+    expect(messages[0]?.parts[0]).toMatchObject({ url: 'data:image/jpeg;base64,BBBB' });
   });
 });

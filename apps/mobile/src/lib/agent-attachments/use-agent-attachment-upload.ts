@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- the upload hook owns the candidate classification, metadata strip, deferred upload, send-admission state machine, and cancel-handle registration in one cohesive module */
+/* eslint-disable max-lines -- the upload hook owns the candidate classification, metadata strip, deferred upload or local read, send-admission state machine, and cancel-handle registration in one cohesive module */
 import * as Crypto from 'expo-crypto';
 import * as Sentry from '@sentry/react-native';
 import { File, Paths } from 'expo-file-system';
@@ -40,6 +40,11 @@ import {
   releasePendingUploads,
   uploadOne,
 } from '@/lib/agent-attachments/upload-task';
+import {
+  encodeLocalImage,
+  type LocalImage,
+  LocalImageError,
+} from '@/lib/agent-attachments/local-image';
 import { registerTempFile } from '@/lib/temp-file-registry';
 
 // Re-export only the types consumers import from this module.
@@ -184,6 +189,12 @@ function resolveRestoredAttachmentReference(input: {
 
 type UseAgentAttachmentUploadOptions = {
   organizationId?: string;
+  /**
+   * `upload` sends each file to Cloud Agent storage. `local` accepts images
+   * only, never leaves the device, and reads them at send time as bounded
+   * base64 for a model the app talks to directly.
+   */
+  delivery?: 'upload' | 'local';
 };
 
 export type UploadPendingResult =
@@ -191,6 +202,8 @@ export type UploadPendingResult =
       ok: true;
       wire: AgentAttachmentWire | undefined;
       submission: AgentAttachmentSubmissionPayload | undefined;
+      /** The images read for `local` delivery, in chip order. */
+      images?: readonly LocalImage[];
     }
   | { ok: false };
 
@@ -228,7 +241,7 @@ type UploadRunResult =
 export function useAgentAttachmentUpload(
   options: UseAgentAttachmentUploadOptions = {}
 ): UseAgentAttachmentUploadReturn {
-  const { organizationId } = options;
+  const { organizationId, delivery = 'upload' } = options;
   const [attachments, setAttachments] = useState<AgentAttachment[]>([]);
   // Live mirror of `attachments` so `uploadPending` reads the current chip list
   // without waiting on a render. Written in every commit below.
@@ -478,6 +491,8 @@ export function useAgentAttachmentUpload(
         const classified = classifyAttachment({ name: candidate.name, size });
         if (!classified.ok) {
           toast.error(describeClassificationFailure(classified.reason));
+        } else if (delivery === 'local' && classified.kind !== 'image') {
+          toast.error(i18n.t('agentChat.composer.imagesOnly'));
         } else {
           let ext = classified.extension;
           let localUri = candidate.uri;
@@ -511,6 +526,16 @@ export function useAgentAttachmentUpload(
             localFileOwned = true;
           }
           const filename = normalizeFilename(candidate.name, ext);
+          // A strip-failed image is a terminal error chip: it never uploads,
+          // hides Retry, and blocks Send/Start. A local image never uploads
+          // either, so its chip is 'local' rather than 'pending': it reports no
+          // progress and no upload affordance.
+          let status: AgentAttachment['status'] = 'pending';
+          if (metadataStripFailed) {
+            status = 'error';
+          } else if (delivery === 'local') {
+            status = 'local';
+          }
           additions.push({
             id: Crypto.randomUUID(),
             filename,
@@ -521,12 +546,11 @@ export function useAgentAttachmentUpload(
             localUri,
             localFileOwned,
             metadataStripFailed: metadataStripFailed || undefined,
-            // A strip-failed image is a terminal error chip: it never uploads,
-            // hides Retry, and blocks Send/Start.
-            status: metadataStripFailed ? 'error' : 'pending',
+            status,
             error: metadataStripFailed ? i18n.t('chat.attachment.metadataStripFailed') : undefined,
             terminal: metadataStripFailed ? true : undefined,
-            progress: metadataStripFailed ? null : 0,
+            // A local image never uploads, so its chip shows no upload progress.
+            progress: metadataStripFailed || delivery === 'local' ? null : 0,
           });
         }
       }
@@ -546,12 +570,13 @@ export function useAgentAttachmentUpload(
       // A strip-failed image stays a terminal error chip and never uploads.
       for (const addition of additions) {
         liveIdsRef.current.add(addition.id);
-        if (addition.metadataStripFailed !== true) {
+        // A local image is read at send time and never uploads.
+        if (addition.metadataStripFailed !== true && delivery === 'upload') {
           void startUpload(addition, pathRef.current);
         }
       }
     },
-    [attachments.length, commitAttachments, startUpload]
+    [attachments.length, commitAttachments, delivery, startUpload]
   );
 
   const removeAttachment = useCallback(
@@ -696,7 +721,45 @@ export function useAgentAttachmentUpload(
     });
   }, [organizationId]);
 
+  /**
+   * Reads every chip as a bounded image. A chip that cannot be read, or stays
+   * too large after scaling, becomes a terminal error chip and blocks the send.
+   */
+  const readLocalImages = useCallback(async (): Promise<UploadPendingResult> => {
+    const chips = attachmentsRef.current;
+    if (chips.some(chip => chip.status === 'error')) {
+      return { ok: false };
+    }
+    const read = await Promise.all(
+      chips.map(async chip => {
+        try {
+          return await encodeLocalImage(chip.localUri);
+        } catch (error) {
+          const key =
+            error instanceof LocalImageError && error.reason === 'tooLarge'
+              ? 'agentChat.composer.imageTooLarge'
+              : 'agentChat.composer.imageUnreadable';
+          updateAttachment(chip.id, {
+            status: 'error',
+            error: i18n.t(key),
+            terminal: true,
+            progress: null,
+          });
+          announcingToast.error(i18n.t(key));
+          return null;
+        }
+      })
+    );
+    const images = read.filter(image => image !== null);
+    return images.length === chips.length
+      ? { ok: true, wire: undefined, submission: undefined, images }
+      : { ok: false };
+  }, [updateAttachment]);
+
   const uploadPending = useCallback(async (): Promise<UploadPendingResult> => {
+    if (delivery === 'local') {
+      return readLocalImages();
+    }
     const chips = attachmentsRef.current;
     // A failed chip (retryable or terminal) blocks the send: the user must
     // retry or remove it through the chip affordance, never re-upload at send.
@@ -748,7 +811,7 @@ export function useAgentAttachmentUpload(
     const wire = buildWirePayload(uploaded, pathRef.current);
     const submission = buildSubmissionPayload(uploaded, pathRef.current, messageUuidRef.current);
     return { ok: true, wire, submission };
-  }, [startUpload]);
+  }, [delivery, readLocalImages, startUpload]);
 
   const isUploading = isAnyAttachmentUploading(attachments);
   const hasFailedAttachments = hasAnyFailedAttachment(attachments);

@@ -15,6 +15,8 @@ export type BackendModel = {
   contextWindow?: number;
   maxOutputTokens?: number;
   tools: boolean;
+  /** Image parts are sent only when this is true. */
+  images: boolean;
 };
 export type StoredChatBackend = {
   id: string;
@@ -69,6 +71,8 @@ const backendModelSchema = z
     contextWindow: z.number().int().positive().optional(),
     maxOutputTokens: z.number().int().positive().optional(),
     tools: z.boolean(),
+    // A profile stored before the flag existed reads as text-only.
+    images: z.boolean().default(false),
   })
   .strip();
 

@@ -23,6 +23,7 @@ export function BackendModelRow({
 }>) {
   const { t } = useTranslation();
   const [tools, setTools] = useState(model.tools);
+  const [images, setImages] = useState(model.images);
   return (
     <View className="gap-3 rounded-xl border border-border p-4">
       <FormField
@@ -70,6 +71,18 @@ export function BackendModelRow({
           onValueChange={value => {
             setTools(value);
             onChange({ tools: value });
+          }}
+        />
+      </View>
+      <View className="flex-row items-center justify-between gap-3">
+        <Text className="flex-1">{t('modelChat.backends.modelImages')}</Text>
+        <Switch
+          accessibilityLabel={t('modelChat.backends.modelImages')}
+          value={images}
+          disabled={busy}
+          onValueChange={value => {
+            setImages(value);
+            onChange({ images: value });
           }}
         />
       </View>

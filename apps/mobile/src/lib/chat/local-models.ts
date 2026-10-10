@@ -23,6 +23,8 @@ export type LocalModelProvider = {
   /** Limits from the last availability answer. Empty until one arrives. */
   readonly facts: (modelId: string) => ModelFacts;
   readonly supportsTools: (modelId: string) => boolean;
+  /** Image parts reach `client` only when this is true for the model. */
+  readonly supportsImages: (modelId: string) => boolean;
 };
 
 type SystemProvider = Exclude<LocalProvider, 'gguf'>;
@@ -103,8 +105,9 @@ function systemModelProvider(
       addListener: (eventName, listener) => native.addListener(eventName, listener),
     }),
     facts: () => systemFacts(known.get(provider)),
-    // System on-device models are text-only: no tool definitions are sent.
+    // System on-device models are text-only: no tool definitions or images are sent.
     supportsTools: () => false,
+    supportsImages: () => false,
   };
 }
 

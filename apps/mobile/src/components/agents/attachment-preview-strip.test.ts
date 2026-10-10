@@ -40,6 +40,20 @@ describe('describeAttachmentChip — happy / in-flight', () => {
     expect(desc.showRemove).toBe(true);
   });
 
+  it('reports no progress for a file this device keeps', () => {
+    const desc = describeAttachmentChip({
+      ...baseState,
+      status: 'local',
+      progress: null,
+    });
+
+    expect(desc.progressText).toBe('');
+    expect(desc.message).toBeNull();
+    expect(desc.accessibilityLabel).toBe('doc.pdf, 1 kB');
+    expect(desc.showRetry).toBe(false);
+    expect(desc.showRemove).toBe(true);
+  });
+
   it('shows determinate progress while uploading', () => {
     const desc = describeAttachmentChip({
       ...baseState,

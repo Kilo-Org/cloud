@@ -12,7 +12,12 @@ import { i18n } from '@/i18n';
 import { type AgentAttachmentExtension, type AgentAttachmentMime } from './constants';
 
 type AgentAttachmentKind = 'image' | 'document';
-type AgentAttachmentStatus = 'pending' | 'uploading' | 'uploaded' | 'error';
+/**
+ * `pending` and `uploading` mean an upload is coming or running. `local` is a
+ * file this device keeps: no upload ever starts for it, so its chip must not
+ * report progress and must not read as uploading.
+ */
+type AgentAttachmentStatus = 'pending' | 'uploading' | 'uploaded' | 'local' | 'error';
 
 export type AgentAttachment = {
   id: string;

@@ -12,7 +12,6 @@ import {
   type GgufDownload,
   type GgufDownloadProblem,
   type GgufDownloadsSnapshot,
-  type GgufModelRecord,
 } from '@/lib/chat/gguf-records';
 import { formatFileSize } from '@/lib/format';
 

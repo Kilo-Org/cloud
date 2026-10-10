@@ -160,6 +160,59 @@ describe('useKeepAwake', () => {
     expect(rejections).toEqual([]);
   });
 
+  it('keeps the tag for a remounted owner when the older activation lands late', async () => {
+    const activations: PromiseWithResolvers<undefined>[] = [];
+    native.activate.mockImplementation(async (tag: string) => {
+      const activation = Promise.withResolvers<undefined>();
+      activations.push(activation);
+      await activation.promise;
+      native.tags.add(tag);
+    });
+    // Same tag remounts while the first activation is still in flight, as in
+    // a StrictMode effect replay or a quick reopen of the same session.
+    const first = await mount('session-g');
+    await unmount(first);
+    const second = await mount('session-g');
+
+    activations[0]?.resolve(undefined);
+    activations[1]?.resolve(undefined);
+    await flush();
+
+    expect(native.deactivate).not.toHaveBeenCalled();
+    expect(native.tags).toEqual(new Set(['session-g']));
+
+    await unmount(second);
+
+    expect(native.deactivate).toHaveBeenCalledWith('session-g');
+    expect(native.tags.size).toBe(0);
+  });
+
+  it('releases a late older activation when the newer owner never activated', async () => {
+    const activation = Promise.withResolvers<undefined>();
+    native.activate
+      .mockImplementationOnce(async (tag: string) => {
+        await activation.promise;
+        native.tags.add(tag);
+      })
+      .mockImplementationOnce(async () => {
+        await Promise.resolve();
+        throw new Error("Call to function 'ExpoKeepAwake.activate' has been rejected.");
+      });
+    const first = await mount('session-h');
+    await unmount(first);
+    const second = await mount('session-h');
+
+    activation.resolve(undefined);
+    await flush();
+    expect(native.tags).toEqual(new Set(['session-h']));
+
+    await unmount(second);
+
+    expect(native.deactivate).toHaveBeenCalledWith('session-h');
+    expect(native.tags.size).toBe(0);
+    expect(rejections).toEqual([]);
+  });
+
   it('turns the screen on for a recreated activity after a rejected release', async () => {
     const first = await mount('session-e');
     // The activity goes away with the tag still held, so the release rejects

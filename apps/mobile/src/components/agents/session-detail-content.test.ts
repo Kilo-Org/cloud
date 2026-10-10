@@ -200,7 +200,7 @@ vi.mock('@/lib/navigation/stack-safe-replace', () => ({
     },
   }),
 }));
-vi.mock('expo-keep-awake', () => ({ useKeepAwake: vi.fn() }));
+vi.mock('@/lib/keep-awake', () => ({ useKeepAwake: vi.fn() }));
 const hapticsSelection = vi.hoisted(() => vi.fn());
 vi.mock('expo-haptics', () => ({
   selectionAsync: hapticsSelection,

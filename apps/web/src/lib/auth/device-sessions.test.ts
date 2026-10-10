@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
-import { eq, getTableName, sql } from 'drizzle-orm';
+import { and, eq, getTableName, isNotNull, isNull, sql } from 'drizzle-orm';
 import {
   createDeviceSession,
   issueSessionCredentials,
@@ -127,28 +127,131 @@ describe('device-sessions', () => {
       expect(session!.revoked_at).toBeNull();
     });
 
-    test('reused refresh token revokes the session', async () => {
-      const sessionId = await createDeviceSession({ userId: testUserId });
-      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
-
-      // First rotation succeeds
-      const first = await rotateRefreshToken(refreshToken);
-      expect(first.ok).toBe(true);
-
-      // Second use of the SAME refresh token must fail and revoke
-      const second = await rotateRefreshToken(refreshToken);
-      expect(second.ok).toBe(false);
-      if (!second.ok) {
-        expect(second.error).toBe('INVALID_REFRESH_TOKEN');
-      }
-
-      // Session must be revoked with the right reason
+    async function readSession(sessionId: string) {
       const [session] = await db
         .select()
         .from(device_sessions)
         .where(eq(device_sessions.id, sessionId));
-      expect(session!.revoked_at).not.toBeNull();
-      expect(session!.revoked_reason).toBe('refresh_reuse_detected');
+      return session!;
+    }
+
+    test('replay after the session chain advanced revokes the session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      // The client rotates twice, so the chain has moved past the first token.
+      const first = await rotateRefreshToken(refreshToken);
+      expect(first.ok).toBe(true);
+      if (!first.ok) return;
+      const second = await rotateRefreshToken(first.refreshToken);
+      expect(second.ok).toBe(true);
+
+      // A use of the first token now is a replay: refuse and revoke.
+      const replay = await rotateRefreshToken(refreshToken);
+      expect(replay).toEqual({ ok: false, error: 'INVALID_REFRESH_TOKEN' });
+
+      const session = await readSession(sessionId);
+      expect(session.revoked_at).not.toBeNull();
+      expect(session.revoked_reason).toBe('refresh_reuse_detected');
+    });
+
+    test('a lost rotation response is retried with the consumed token without revocation', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      // The server commits the rotation, but the client never stores the
+      // response (suspended mid-request, dropped connection, keychain write
+      // failure) and retries with the token it still holds.
+      const lost = await rotateRefreshToken(refreshToken);
+      expect(lost.ok).toBe(true);
+      if (!lost.ok) return;
+
+      const retry = await rotateRefreshToken(refreshToken);
+      expect(retry.ok).toBe(true);
+      if (!retry.ok) return;
+      expect(retry.refreshToken).not.toBe(lost.refreshToken);
+      expect((await readSession(sessionId)).revoked_at).toBeNull();
+
+      // The session keeps one live refresh token: the one the client stored.
+      const live = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(
+          and(
+            eq(device_refresh_tokens.device_session_id, sessionId),
+            isNull(device_refresh_tokens.consumed_at)
+          )
+        );
+      expect(live).toHaveLength(1);
+
+      // The retried pair keeps rotating.
+      const next = await rotateRefreshToken(retry.refreshToken);
+      expect(next.ok).toBe(true);
+      expect((await readSession(sessionId)).revoked_at).toBeNull();
+    });
+
+    test('a use of the retired pair from a lost rotation revokes the session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      const lost = await rotateRefreshToken(refreshToken);
+      expect(lost.ok).toBe(true);
+      if (!lost.ok) return;
+      const retry = await rotateRefreshToken(refreshToken);
+      expect(retry.ok).toBe(true);
+
+      // Two holders of the session diverged: refuse and revoke.
+      const replay = await rotateRefreshToken(lost.refreshToken);
+      expect(replay).toEqual({ ok: false, error: 'INVALID_REFRESH_TOKEN' });
+      expect((await readSession(sessionId)).revoked_reason).toBe('refresh_reuse_detected');
+    });
+
+    test('concurrent rotations of the same token both succeed and leave one live token', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      // Two callers on one device send the same stored token at once. Both
+      // pass the pre-transaction checks; the session lock serializes them.
+      const results = await Promise.all([
+        rotateRefreshToken(refreshToken),
+        rotateRefreshToken(refreshToken),
+      ]);
+
+      expect(results.map(result => result.ok)).toEqual([true, true]);
+      expect((await readSession(sessionId)).revoked_at).toBeNull();
+      const live = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(
+          and(
+            eq(device_refresh_tokens.device_session_id, sessionId),
+            isNull(device_refresh_tokens.consumed_at)
+          )
+        );
+      expect(live).toHaveLength(1);
+    });
+
+    test('a consumed token outside the lost-rotation grace revokes the session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      const lost = await rotateRefreshToken(refreshToken);
+      expect(lost.ok).toBe(true);
+
+      // Move the consume outside the 24-hour grace.
+      await db
+        .update(device_refresh_tokens)
+        .set({ consumed_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() })
+        .where(
+          and(
+            eq(device_refresh_tokens.device_session_id, sessionId),
+            isNotNull(device_refresh_tokens.consumed_at)
+          )
+        );
+
+      const replay = await rotateRefreshToken(refreshToken);
+      expect(replay).toEqual({ ok: false, error: 'INVALID_REFRESH_TOKEN' });
+      expect((await readSession(sessionId)).revoked_reason).toBe('refresh_reuse_detected');
     });
 
     test('refresh for a revoked session returns SESSION_REVOKED', async () => {

@@ -138,7 +138,6 @@ function printUsage(): void {
   console.log('  pnpm dev:seed app:live-cli-stream ada@example.com 120 5 150 4000');
 }
 
-
 function openCliSocket(url: string, token: string): Promise<WebSocket> {
   const { promise, resolve, reject } = Promise.withResolvers<WebSocket>();
   const socket = new WebSocket(url, { headers: { Authorization: `Bearer ${token}` } });

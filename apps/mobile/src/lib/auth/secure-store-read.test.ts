@@ -239,7 +239,8 @@ describe('readStoredValueWithRetry', () => {
     const { setProtectedDataAvailable } = await import('@/lib/protected-data');
     getItemAsync.mockImplementation(async () => {
       setProtectedDataAvailable(false);
-      return await rejectedRead('User interaction is not allowed.');
+      await Promise.resolve();
+      throw new Error('User interaction is not allowed.');
     });
     const readStoredValueWithRetry = await loadHelper();
     try {

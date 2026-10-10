@@ -325,16 +325,16 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         },
         onDisconnected: () => {
           if (expectedGeneration !== lifecycleGeneration || !replaying) return;
+          sink.onServiceEvent(stoppedEvent);
           cancelReplay();
           stoppedReceived = true;
-          sink.onServiceEvent(stoppedEvent);
         },
         onUnexpectedDisconnect: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
           if (stoppedReceived && !replaying) return;
+          sink.onServiceEvent(stoppedEvent);
           cancelReplay();
           stoppedReceived = true;
-          sink.onServiceEvent(stoppedEvent);
         },
         onError: streamError => {
           if (expectedGeneration !== lifecycleGeneration) return;

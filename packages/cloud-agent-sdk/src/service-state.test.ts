@@ -23,6 +23,53 @@ function makeSession(id: string, parentID?: string): Session {
 
 describe('createServiceState', () => {
   describe('replay batching', () => {
+    it('publishes the observed snapshot once when replay is canceled without a following event', () => {
+      const state = createServiceState(makeConfig());
+      const snapshots: ReturnType<typeof state.snapshot>[] = [];
+      state.subscribe(() => snapshots.push(state.snapshot()));
+      state.beginReplay();
+      state.process({ type: 'connected', cloudStatus: { type: 'ready' } });
+      state.process({ type: 'session.created', info: makeSession('root-1') });
+      state.process({ type: 'question.asked', requestId: 'pending', questions: [] });
+      expect(snapshots).toHaveLength(0);
+      state.cancelReplay();
+      expect(snapshots).toEqual([state.snapshot()]);
+      expect(snapshots[0].question?.requestId).toBe('pending');
+      expect(snapshots[0].sessionInfo?.id).toBe('root-1');
+      expect(snapshots[0].cloudStatus).toEqual({ type: 'ready' });
+      state.cancelReplay();
+      expect(snapshots).toHaveLength(1);
+    });
+
+    it('retains replayed delivery failures without replaying live failure callbacks', () => {
+      const onMessageFailed = jest.fn();
+      const state = createServiceState(makeConfig({ onMessageFailed }));
+      state.beginReplay();
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'historical',
+        error: 'Delivery exhausted',
+        reason: 'exhausted',
+        attempts: 5,
+      });
+      state.endReplay();
+      expect(state.getPendingMessages().get('historical')).toEqual({
+        status: 'failed',
+        error: 'Delivery exhausted',
+        reason: 'exhausted',
+        attempts: 5,
+      });
+      expect(onMessageFailed).not.toHaveBeenCalled();
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'live',
+        error: 'Live delivery exhausted',
+        reason: 'exhausted',
+      });
+      expect(onMessageFailed).toHaveBeenCalledTimes(1);
+      expect(onMessageFailed).toHaveBeenCalledWith('live', state.getPendingMessages().get('live'));
+    });
+
     it('does not raise an unchanged error again on a subsequent restore', () => {
       const onError = jest.fn();
       const state = createServiceState(makeConfig({ onError }));

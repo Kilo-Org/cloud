@@ -1088,7 +1088,10 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       const batch = replay;
       replay = null;
       config = initialConfig;
-      if (batch) publishReplayEffects(batch);
+      if (batch) {
+        publishReplayEffects(batch);
+        notify();
+      }
     },
 
     getActivity: () => activity,

@@ -43,13 +43,10 @@ export const adminDeploymentsRouter = createTRPCRouter({
     const { page, limit, sortBy, sortOrder, search, ownerType } = input;
     const searchTerm = search?.trim() || '';
 
-    // Create alias for created_by user (different from owned_by user)
     const createdByUser = alias(kilocode_users, 'created_by_user');
 
-    // Build where conditions
     const conditions: SQL[] = [];
 
-    // Search condition
     if (searchTerm) {
       const searchConditions: SQL[] = [
         ilike(deployments.deployment_slug, `%${searchTerm}%`),
@@ -60,7 +57,6 @@ export const adminDeploymentsRouter = createTRPCRouter({
         eq(deployments.created_by_user_id, searchTerm),
       ];
 
-      // Only add org ID search if searchTerm looks like a valid UUID
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (uuidRegex.test(searchTerm)) {
         searchConditions.push(eq(deployments.owned_by_organization_id, searchTerm));
@@ -72,21 +68,17 @@ export const adminDeploymentsRouter = createTRPCRouter({
       }
     }
 
-    // ownerType filter
     if (ownerType === 'user') {
       conditions.push(isNotNull(deployments.owned_by_user_id));
     } else if (ownerType === 'org') {
       conditions.push(isNotNull(deployments.owned_by_organization_id));
     }
-    // 'all' means no filter
 
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
-    // Build order condition
     const orderFunction = sortOrder === 'asc' ? asc : desc;
     const orderCondition = orderFunction(deployments[sortBy]);
 
-    // Query deployments with joins
     const deploymentsResult = await db
       .select({
         deployment: deployments,
@@ -117,7 +109,6 @@ export const adminDeploymentsRouter = createTRPCRouter({
       .limit(limit)
       .offset((page - 1) * limit);
 
-    // Get total count for pagination
     const totalCountResult = await db
       .select({ count: count() })
       .from(deployments)
@@ -128,7 +119,6 @@ export const adminDeploymentsRouter = createTRPCRouter({
     const totalCount = totalCountResult[0]?.count || 0;
     const totalPages = Math.ceil(totalCount / limit);
 
-    // Transform results to API response format
     const deploymentsData: AdminDeploymentTableProps[] = deploymentsResult.map(row => ({
       id: row.deployment.id,
       deployment_slug: row.deployment.deployment_slug,
@@ -162,7 +152,6 @@ export const adminDeploymentsRouter = createTRPCRouter({
   getBuilds: adminProcedure.input(GetBuildsSchema).query(async ({ input }) => {
     const { deploymentId } = input;
 
-    // Query the last 5 builds for this deployment
     const buildsResult = await db
       .select({
         id: deployment_builds.id,
@@ -176,7 +165,6 @@ export const adminDeploymentsRouter = createTRPCRouter({
       .orderBy(desc(deployment_builds.created_at))
       .limit(5);
 
-    // Transform results to API response format
     const builds: AdminDeploymentBuild[] = buildsResult.map(row => ({
       id: row.id,
       status: row.status,
@@ -191,14 +179,12 @@ export const adminDeploymentsRouter = createTRPCRouter({
   getBuildEvents: adminProcedure.input(GetBuildEventsSchema).query(async ({ input }) => {
     const { buildId, limit, afterEventId } = input;
 
-    // Build the query conditions
     const conditions = [eq(deployment_events.build_id, buildId)];
 
     if (afterEventId !== undefined) {
       conditions.push(gt(deployment_events.event_id, afterEventId));
     }
 
-    // Query deployment events for this build
     const eventsResult = await db
       .select({
         id: deployment_events.event_id,
@@ -217,7 +203,6 @@ export const adminDeploymentsRouter = createTRPCRouter({
   delete: adminProcedure.input(DeleteDeploymentSchema).mutation(async ({ input }) => {
     const { id: deploymentId } = input;
 
-    // Get owner from deployment
     const deployment = await db.query.deployments.findFirst({
       where: eq(deployments.id, deploymentId),
       columns: {

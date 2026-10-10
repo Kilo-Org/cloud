@@ -73,7 +73,6 @@ export const adminAppBuilderRouter = createTRPCRouter({
   get: adminProcedure.input(GetProjectSchema).query(async ({ input }) => {
     const { id: projectId } = input;
 
-    // Query project with joins for owner info
     const [result] = await db
       .select({
         project: app_builder_projects,
@@ -99,7 +98,6 @@ export const adminAppBuilderRouter = createTRPCRouter({
       });
     }
 
-    // Fetch all sessions for this project with linked CLI session info.
     // Join both v2 and v1 CLI session tables so older projects still resolve their trace link.
     const projectSessions = await db
       .select({
@@ -162,10 +160,8 @@ export const adminAppBuilderRouter = createTRPCRouter({
     const { offset, limit, sortBy, sortOrder, search, ownerType } = input;
     const searchTerm = search?.trim() || '';
 
-    // Build where conditions
     const conditions: SQL[] = [];
 
-    // Search condition
     if (searchTerm) {
       const searchConditions: SQL[] = [
         ilike(app_builder_projects.title, `%${searchTerm}%`),
@@ -174,7 +170,6 @@ export const adminAppBuilderRouter = createTRPCRouter({
         eq(app_builder_projects.created_by_user_id, searchTerm),
       ];
 
-      // Only add UUID column searches if searchTerm looks like a valid UUID
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (uuidRegex.test(searchTerm)) {
         searchConditions.push(eq(app_builder_projects.id, searchTerm));
@@ -187,21 +182,17 @@ export const adminAppBuilderRouter = createTRPCRouter({
       }
     }
 
-    // ownerType filter
     if (ownerType === 'user') {
       conditions.push(isNotNull(app_builder_projects.owned_by_user_id));
     } else if (ownerType === 'org') {
       conditions.push(isNotNull(app_builder_projects.owned_by_organization_id));
     }
-    // 'all' means no filter
 
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
-    // Build order condition
     const orderFunction = sortOrder === 'asc' ? asc : desc;
     const orderCondition = orderFunction(app_builder_projects[sortBy]);
 
-    // Query projects with joins
     const projectsResult = await db
       .select({
         project: app_builder_projects,
@@ -222,7 +213,6 @@ export const adminAppBuilderRouter = createTRPCRouter({
       .limit(limit)
       .offset(offset);
 
-    // Get total count for pagination
     const totalCountResult = await db
       .select({ count: count() })
       .from(app_builder_projects)
@@ -233,7 +223,6 @@ export const adminAppBuilderRouter = createTRPCRouter({
     const totalCount = totalCountResult[0]?.count || 0;
     const totalPages = Math.ceil(totalCount / limit);
 
-    // Transform results to API response format
     const projectsData: AdminAppBuilderProject[] = projectsResult.map(row => ({
       id: row.project.id,
       title: truncateTitle(row.project.title),
@@ -266,7 +255,6 @@ export const adminAppBuilderRouter = createTRPCRouter({
   delete: adminProcedure.input(DeleteProjectSchema).mutation(async ({ input }) => {
     const { id: projectId } = input;
 
-    // Verify project exists
     const project = await db.query.app_builder_projects.findFirst({
       where: eq(app_builder_projects.id, projectId),
       columns: {
@@ -281,7 +269,6 @@ export const adminAppBuilderRouter = createTRPCRouter({
       });
     }
 
-    // Delete external resources (git repo, etc.)
     await appBuilderClient.deleteProject(projectId);
 
     // Delete the project (messages cascade via FK)

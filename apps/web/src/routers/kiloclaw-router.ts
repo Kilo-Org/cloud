@@ -1303,7 +1303,6 @@ async function insertUserSubscriptionChangeLogBestEffort(params: {
   }
 }
 
-/** Returns true if a Stripe error indicates the schedule is already in a terminal state. */
 function isScheduleAlreadyInactive(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error);
   return (
@@ -1454,9 +1453,6 @@ async function ensureProvisionAccess(
     message: 'A current KiloClaw subscription is required to provision an instance.',
   });
 }
-
-// ── Personal subscription management schemas ──────────────────────────
-
 const KiloclawInstanceInputSchema = z.object({ instanceId: z.string().uuid() });
 const KiloclawOptionalInstanceInputSchema = z.object({
   instanceId: z.string().uuid().optional(),
@@ -1547,9 +1543,6 @@ type CreditReprovisionRecoveryEligibility = CreditReprovisionRecoveryPreview & {
   eligible: false;
   reason: 'no_current_subscription' | 'subscription_not_current';
 };
-
-// ── Personal subscription helpers ──────────────────────────────────────
-
 const COMMIT_ADMISSION_ERROR_MESSAGE =
   'Commit is no longer available. Choose Standard for month-to-month KiloClaw hosting.';
 
@@ -3103,7 +3096,6 @@ export const kiloclawRouter = createTRPCRouter({
     const instances = await listAllActiveInstances(ctx.user.id);
     if (instances.length === 0) return [];
 
-    // Build org name map for instances that belong to organizations
     const orgIds = [
       ...new Set(instances.map(i => i.organizationId).filter((id): id is string => id !== null)),
     ];
@@ -3118,7 +3110,6 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }
 
-    // Fetch live status from each instance's worker in parallel
     const client = new KiloClawInternalClient();
     const results = await Promise.all(
       instances.map(async instance => {
@@ -3694,7 +3685,6 @@ export const kiloclawRouter = createTRPCRouter({
         );
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
-          // Extract message from worker response body (JSON or plain text)
           let message = `Secret patch failed (${err.statusCode})`;
           try {
             const parsed = JSON.parse(err.responseBody);
@@ -4022,9 +4012,6 @@ export const kiloclawRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     return client.runDoctor(ctx.user.id, workerInstanceId(instance));
   }),
-
-  // ── Kilo CLI Run ──────────────────────────────────────────────────
-
   startKiloCliRun: clawAccessProcedure
     .input(z.object({ prompt: z.string().min(1).max(10_000) }))
     .mutation(async ({ ctx, input }) => {
@@ -4340,7 +4327,6 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
 
-      // Verify the version exists and is available
       // Note: There is a small TOCTOU window between this check and the insert below.
       // Worst case: a user pins to a version disabled milliseconds before. The FK constraint
       // on image_tag ensures referential integrity, and the status check is best-effort.
@@ -4568,8 +4554,6 @@ export const kiloclawRouter = createTRPCRouter({
         handleFileOperationError(err, 'patch openclaw config');
       }
     }),
-
-  // ── Agent config CRUD ─────────────────────────────────────────────────
   listAgents: clawAccessProcedure.query(async ({ ctx }) => {
     try {
       const instance = await getActiveInstance(ctx.user.id);
@@ -4661,9 +4645,6 @@ export const kiloclawRouter = createTRPCRouter({
         handleFileOperationError(err, 'update agent bindings');
       }
     }),
-
-  // ── Billing endpoints ────────────────────────────────────────────────
-
   getBillingStatus: baseProcedure.query(async ({ ctx }) => {
     return await getPersonalBillingStatus(ctx.user);
   }),
@@ -4676,9 +4657,6 @@ export const kiloclawRouter = createTRPCRouter({
     const billing = await getPersonalBillingStatus(ctx.user);
     return summarizePersonalBillingStatus(billing);
   }),
-
-  // ── Personal subscription management ─────────────────────────────────
-
   listPersonalSubscriptions: baseProcedure
     .output(KiloclawPersonalSubscriptionsOutputSchema)
     .query(async ({ ctx }) => {

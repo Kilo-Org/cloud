@@ -16,8 +16,6 @@ import {
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import type { User } from '@kilocode/db/schema';
 
-// ── Zod schemas matching Gastown API response shapes ─────────────────────────
-
 const UserTownRecord = z.object({
   id: z.string(),
   name: z.string(),
@@ -269,7 +267,6 @@ function requireGastownUrl(): string {
   return GASTOWN_SERVICE_URL;
 }
 
-/** GET request to the Gastown worker, parsing the response with the given schema. */
 async function gastownGet<T>(adminUser: User, path: string, schema: z.ZodType<T>): Promise<T> {
   const baseUrl = requireGastownUrl();
   const response = await fetch(`${baseUrl}${path}`, {
@@ -292,7 +289,6 @@ async function gastownGet<T>(adminUser: User, path: string, schema: z.ZodType<T>
   return schema.parse(raw.data);
 }
 
-/** PATCH request to the Gastown worker. */
 async function gastownPatch<T>(
   adminUser: User,
   path: string,
@@ -322,7 +318,6 @@ async function gastownPatch<T>(
 }
 
 /**
- * Call the Gastown worker's tRPC endpoint (GET query) and return the result.
  * The admin JWT has isAdmin=true which satisfies gastownProcedure.
  * Note: procedures that call verifyTownOwnership will fail for towns not owned
  * by the admin user — those procedures need admin-bypass support in the worker.
@@ -350,7 +345,6 @@ async function gastownTrpcGet<T>(
 }
 
 /**
- * Call a Gastown worker tRPC mutation (POST) and return the result.
  * Returns null on failure.
  */
 async function gastownTrpcMutate<T>(
@@ -384,11 +378,7 @@ async function gastownTrpcMutate<T>(
   return parsed.success ? parsed.data.result.data : null;
 }
 
-// ── Router ────────────────────────────────────────────────────────────────────
-
 export const adminGastownRouter = createTRPCRouter({
-  // ── User → Towns ─────────────────────────────────────────────────────────
-
   /**
    * List all towns owned by a given user.
    * Calls: GET /api/users/:userId/towns (kiloAuthMiddleware, no ownership check)
@@ -427,10 +417,7 @@ export const adminGastownRouter = createTRPCRouter({
       return rigLists.flat();
     }),
 
-  // ── Town inspection ───────────────────────────────────────────────────────
-
   /**
-   * Get the alarm status snapshot for a town.
    * Calls the admin-bypass gastown.adminGetAlarmStatus endpoint.
    */
   getTownHealth: adminProcedure
@@ -446,7 +433,6 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   /**
-   * Get Cloudflare dashboard links for a town.
    * Fetches DO IDs from the gastown worker and constructs CF dashboard URLs.
    * Gracefully degrades when env vars are not configured.
    */
@@ -499,7 +485,6 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   /**
-   * List all beads in a town, with optional filters.
    * The user-facing tRPC listBeads requires a rigId and verifies ownership.
    * Admin-level town-wide listing requires bead 0 admin endpoints on the worker.
    * Until then, callers can use getUserRigs + per-rig listBeads via the tRPC client.
@@ -539,7 +524,6 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   /**
-   * Get bead events for a town or specific bead.
    */
   getBeadEvents: adminProcedure
     .input(
@@ -562,7 +546,6 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   /**
-   * List all agents in a town.
    * The user-facing tRPC listAgents requires rigId and ownership verification.
    * Admin-level town-wide listing requires bead 0 admin endpoints.
    */
@@ -580,7 +563,6 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   /**
-   * Get agent events from the AgentDO.
    * The HTTP endpoint for agent events uses agent JWT auth.
    * Admin access requires bead 0 admin bypass endpoint.
    */
@@ -601,7 +583,6 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   /**
-   * List dispatch attempts for a town, optionally filtered by bead or agent.
    * Requires bead 0 (TownDO.listDispatchAttempts).
    */
   listDispatchAttempts: adminProcedure
@@ -619,7 +600,6 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   /**
-   * List container events for a town.
    * Requires bead 0 (TownDO.listContainerEvents).
    */
   listContainerEvents: adminProcedure
@@ -636,7 +616,6 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   /**
-   * List credential events for a town, optionally filtered by rig.
    * Requires bead 0 (TownDO.listCredentialEvents).
    */
   listCredentialEvents: adminProcedure
@@ -653,7 +632,6 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   /**
-   * List the admin audit log for a town.
    * Requires bead 0 (TownDO.listAdminAuditLog).
    */
   listAuditLog: adminProcedure
@@ -665,7 +643,6 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   /**
-   * Get the town config.
    * Calls: GET /api/towns/:townId/config (kiloAuthMiddleware, no ownership check).
    */
   getTownConfig: adminProcedure
@@ -676,7 +653,6 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   /**
-   * Get convoy status (convoy + tracked beads) for a specific convoyId.
    * Calls tRPC gastown.listConvoys and filters by convoyId.
    * Requires admin-bypass support for verifyTownOwnership (bead 0).
    */
@@ -695,7 +671,6 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   /**
-   * List all convoys in a town.
    * Calls tRPC gastown.listConvoys (requires admin-bypass for verifyTownOwnership).
    */
   listConvoys: adminProcedure
@@ -710,8 +685,6 @@ export const adminGastownRouter = createTRPCRouter({
       );
       return result ?? [];
     }),
-
-  // ── Admin interventions ───────────────────────────────────────────────────
 
   forceResetAgent: adminProcedure
     .input(z.object({ townId: z.string().uuid(), agentId: z.string().uuid() }))
@@ -814,7 +787,6 @@ export const adminGastownRouter = createTRPCRouter({
     }),
 
   /**
-   * Admin-level town config update.
    * Calls: PATCH /api/towns/:townId/config (kiloAuthMiddleware, no ownership check).
    */
   updateTownConfig: adminProcedure

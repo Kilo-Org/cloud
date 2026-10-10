@@ -79,12 +79,10 @@ function isSessionNotFoundError(err: unknown): boolean {
   if (err instanceof TRPCClientError) {
     const data = err.data as { code?: string; httpStatus?: number } | undefined;
     const shape = err.shape as { data?: { code?: string; httpStatus?: number } } | undefined;
-    // Check TRPC error code
     const code = data?.code ?? shape?.data?.code;
     if (code === 'NOT_FOUND') {
       return true;
     }
-    // Also check HTTP status 404
     const httpStatus = data?.httpStatus ?? shape?.data?.httpStatus;
     if (httpStatus === 404) {
       return true;
@@ -512,9 +510,6 @@ export function getPrLinkVerificationKey(
 
 const createdOnPlatformField = z.string().min(1).max(100);
 
-/**
- * Fields to select for session list/get operations
- */
 const commonSessionFields = {
   session_id: cli_sessions_v2.session_id,
   title: cli_sessions_v2.title,
@@ -727,9 +722,6 @@ const GetSessionMessagesPageInputSchema = z
     }
   });
 
-/**
- * Verify the user owns the session and still has access to its organization.
- */
 async function getSessionWithAccessCheck(
   sessionId: string,
   ctx: Parameters<typeof ensureOrganizationAccess>[0]
@@ -949,9 +941,6 @@ function joinWithAnd(fragments: SQL[]): SQL {
 }
 
 /**
- * Router for cli_sessions_v2 table operations.
- * Used by cloud-agent-next for session storage and retrieval.
- *
  * Note: Records in this table are created by the cloud-agent-next worker.
  * This router only queries the data.
  */
@@ -1195,9 +1184,6 @@ export const cliSessionsV2Router = createTRPCRouter({
       }
     }),
 
-  /**
-   * List sessions for the current user with cursor-based pagination.
-   */
   list: baseProcedure.input(ListSessionsInputSchema).query(async ({ ctx, input }) => {
     const {
       cursor,
@@ -1286,9 +1272,6 @@ export const cliSessionsV2Router = createTRPCRouter({
     };
   }),
 
-  /**
-   * Search sessions by title or session_id with ILIKE matching.
-   */
   search: baseProcedure.input(SearchInputSchema).query(async ({ ctx, input }) => {
     const {
       search_string,
@@ -1432,9 +1415,6 @@ export const cliSessionsV2Router = createTRPCRouter({
       };
     }),
 
-  /**
-   * Get a single session by session_id.
-   */
   get: baseProcedure.input(GetSessionInputSchema).query(async ({ ctx, input }) => {
     const { session_id } = input;
 
@@ -1479,7 +1459,6 @@ export const cliSessionsV2Router = createTRPCRouter({
   }),
 
   /**
-   * Get a session by its cloud_agent_session_id.
    * Used for reverse lookup from cloud-agent session ID to kilo session.
    */
   getByCloudAgentSessionId: baseProcedure
@@ -1512,9 +1491,6 @@ export const cliSessionsV2Router = createTRPCRouter({
       return session;
     }),
 
-  /**
-   * Get snapshot metadata and messages for a V2 session from the session ingest worker.
-   */
   getSessionMessages: baseProcedure
     .input(z.object({ session_id: sessionIdField }))
     .query(async ({ ctx, input }) => {
@@ -1667,7 +1643,6 @@ export const cliSessionsV2Router = createTRPCRouter({
     .input(GetSessionInputSchema)
     .output(
       z.object({
-        // DB fields
         session_id: z.string(),
         title: z.string().nullable(),
         cloud_agent_session_id: z.string().nullable(),
@@ -1681,7 +1656,6 @@ export const cliSessionsV2Router = createTRPCRouter({
         updated_at: z.coerce.date(),
         version: z.number(),
         total_cost_microdollars: z.number().nullable(),
-        // Runtime state from DO (null for CLI sessions without cloud_agent_session_id)
         runtimeState: baseGetSessionNextOutputSchema.nullable(),
         // Associated GitHub pull request for this session's branch, if any.
         // Populated by the pull_request webhook handler or a manual refresh.
@@ -1734,7 +1708,6 @@ export const cliSessionsV2Router = createTRPCRouter({
         await ensureOrganizationAccess(ctx, session.organization_id);
       }
 
-      // 2. If session has cloud_agent_session_id, fetch runtime state from DO
       let runtimeState: z.infer<typeof baseGetSessionNextOutputSchema> | null = null;
 
       if (session.cloud_agent_session_id) {
@@ -1755,7 +1728,6 @@ export const cliSessionsV2Router = createTRPCRouter({
             console.log(
               `Session ${session_id} not found in cloud-agent DO - treating as legacy session`
             );
-            // runtimeState stays null
           } else {
             console.error(
               `Failed to fetch runtime state for session ${session_id}:`,

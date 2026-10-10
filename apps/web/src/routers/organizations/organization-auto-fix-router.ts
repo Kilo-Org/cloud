@@ -71,7 +71,6 @@ export const organizationAutoFixRouter = createTRPCRouter({
     .input(SaveAutoFixConfigInputSchema)
     .mutation(async ({ input, ctx }) => {
       try {
-        // Extract organizationId from input (provided by organizationBillingProcedure)
         const typedInput = input as typeof input & { organizationId: string };
 
         const owner: Owner = {
@@ -80,12 +79,10 @@ export const organizationAutoFixRouter = createTRPCRouter({
           userId: ctx.user.id,
         };
 
-        // Ensure bot user exists when saving config with enabled_for_issues
         if (input.enabled_for_issues) {
           await ensureBotUserForOrg(typedInput.organizationId, 'auto-fix');
         }
 
-        // Build config object with defaults for optional fields
         const config: AutoFixAgentConfig = {
           enabled_for_issues: input.enabled_for_issues,
           enabled_for_review_comments: input.enabled_for_review_comments ?? false,
@@ -127,7 +124,6 @@ export const organizationAutoFixRouter = createTRPCRouter({
     .input(ToggleAutoFixAgentInputSchema)
     .mutation(async ({ input, ctx }) => {
       try {
-        // Extract organizationId from input (provided by organizationBillingProcedure)
         const typedInput = input as typeof input & { organizationId: string };
 
         const owner: Owner = {
@@ -136,7 +132,6 @@ export const organizationAutoFixRouter = createTRPCRouter({
           userId: ctx.user.id,
         };
 
-        // Ensure bot user exists when enabling auto-fix
         if (input.isEnabled) {
           await ensureBotUserForOrg(typedInput.organizationId, 'auto-fix');
         }
@@ -144,7 +139,6 @@ export const organizationAutoFixRouter = createTRPCRouter({
         const existingConfig = await getAgentConfigForOwner(owner, 'auto_fix', 'github');
 
         if (!existingConfig) {
-          // Create default config if it doesn't exist
           const config = {
             ...DEFAULT_AUTO_FIX_CONFIG,
             enabled_for_issues: input.isEnabled,
@@ -198,10 +192,8 @@ export const organizationAutoFixRouter = createTRPCRouter({
       })
     )
     .query(async ({ input, ctx }) => {
-      // Extract organizationId from input (provided by organizationMemberProcedure)
       const typedInput = input as typeof input & { organizationId: string };
 
-      // Forward to the base router with organizationId
       return await autoFixRouter.createCaller(ctx).listTicketsForOrganization({
         organizationId: typedInput.organizationId,
         limit: input.limit,

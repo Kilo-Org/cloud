@@ -24,7 +24,6 @@ function isForeignKeyViolation(error: unknown): boolean {
   );
 }
 
-// Input schemas
 const ProfileIdSchema = z.object({
   profileId: z.uuid(),
 });
@@ -44,10 +43,8 @@ const CommandsSchema = z.object({
   commands: z.array(z.string().max(500)).max(20),
 });
 
-// Owner type schema
 const ProfileOwnerTypeSchema = z.enum(['organization', 'user']);
 
-// Output schemas
 const ProfileSummarySchema = z.object({
   id: z.uuid(),
   name: z.string(),
@@ -153,10 +150,6 @@ const ProfileResponseSchema = z.object({
   kiloCommands: z.array(ProfileKiloCommandResponseSchema),
 });
 
-/**
- * Helper to determine owner from input.
- * If organizationId is provided, returns org owner; otherwise returns user owner.
- */
 function getOwner(organizationId: string | undefined, userId: string): ProfileOwner {
   if (organizationId) {
     return { type: 'organization', id: organizationId };
@@ -179,9 +172,6 @@ const publicKey = AGENT_ENV_VARS_PUBLIC_KEY ?? '';
  * When organizationId is omitted, operates on user's personal profiles.
  */
 export const agentProfilesRouter = createTRPCRouter({
-  /**
-   * List all profiles for the current user or organization.
-   */
   list: baseProcedure
     .input(z.object({ organizationId: z.uuid().optional() }))
     .output(z.array(ProfileSummarySchema))
@@ -215,7 +205,6 @@ export const agentProfilesRouter = createTRPCRouter({
         profileService.listProfiles(db, { type: 'user', id: ctx.user.id }),
       ]);
 
-      // Effective default: personal default takes precedence over org default
       const effectiveDefault =
         personalProfiles.find(p => p.isDefault) ?? orgProfiles.find(p => p.isDefault);
 
@@ -226,9 +215,6 @@ export const agentProfilesRouter = createTRPCRouter({
       };
     }),
 
-  /**
-   * Get a single profile by ID.
-   */
   get: baseProcedure
     .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
     .output(ProfileResponseSchema)
@@ -240,9 +226,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return profileService.getProfile(db, input.profileId, owner);
     }),
 
-  /**
-   * Create a new profile.
-   */
   create: baseProcedure
     .input(ProfileNameSchema.extend({ organizationId: z.uuid().optional() }))
     .output(z.object({ id: z.uuid() }))
@@ -254,9 +237,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return profileService.createProfile(db, owner, ctx.user.id, input.name, input.description);
     }),
 
-  /**
-   * Update profile metadata (name, description).
-   */
   update: baseProcedure
     .input(
       ProfileIdSchema.extend({
@@ -278,10 +258,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  /**
-   * Delete a profile.
-   * Returns an error if the profile is referenced by webhook triggers.
-   */
   delete: baseProcedure
     .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
     .output(z.object({ success: z.boolean() }))
@@ -294,7 +270,6 @@ export const agentProfilesRouter = createTRPCRouter({
         await profileService.deleteProfile(db, input.profileId, owner);
         return { success: true };
       } catch (error) {
-        // Check for FK violation (profile referenced by webhook triggers)
         if (isForeignKeyViolation(error)) {
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
@@ -306,9 +281,6 @@ export const agentProfilesRouter = createTRPCRouter({
       }
     }),
 
-  /**
-   * Set a profile as the default for the user/org.
-   */
   setAsDefault: baseProcedure
     .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
     .output(z.object({ success: z.boolean() }))
@@ -321,9 +293,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  /**
-   * Clear the default status from a profile.
-   */
   clearDefault: baseProcedure
     .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
     .output(z.object({ success: z.boolean() }))
@@ -336,10 +305,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  /**
-   * Set or update an environment variable.
-   * If isSecret is true, the value is encrypted before storage.
-   */
   setVar: baseProcedure
     .input(
       ProfileIdSchema.extend({
@@ -364,9 +329,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  /**
-   * Delete an environment variable.
-   */
   deleteVar: baseProcedure
     .input(
       ProfileIdSchema.extend({
@@ -403,9 +365,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  /**
-   * Bind an environment profile to a repository.
-   */
   bindToRepo: baseProcedure
     .input(
       z.object({
@@ -429,9 +388,6 @@ export const agentProfilesRouter = createTRPCRouter({
       );
     }),
 
-  /**
-   * Remove the profile binding for a repository.
-   */
   unbindRepo: baseProcedure
     .input(
       z.object({
@@ -448,9 +404,6 @@ export const agentProfilesRouter = createTRPCRouter({
       await repoBindingService.unbindRepo(db, owner, input.repoFullName, input.platform);
     }),
 
-  /**
-   * List all repo-profile bindings for the current user or organization.
-   */
   listRepoBindings: baseProcedure
     .input(
       z.object({
@@ -464,8 +417,6 @@ export const agentProfilesRouter = createTRPCRouter({
       const owner = getOwner(input.organizationId, ctx.user.id);
       return repoBindingService.listBindings(db, owner);
     }),
-
-  // ============ MCP SERVERS ============
 
   /**
    * Create an MCP server on a profile from a CLI-native input (local or remote).
@@ -517,9 +468,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  /**
-   * Delete an MCP server.
-   */
   deleteMcp: baseProcedure
     .input(
       ProfileIdSchema.extend({
@@ -537,9 +485,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  /**
-   * Toggle an MCP server's enabled flag.
-   */
   setMcpEnabled: baseProcedure
     .input(
       ProfileIdSchema.extend({
@@ -563,8 +508,6 @@ export const agentProfilesRouter = createTRPCRouter({
       );
       return { success: true };
     }),
-
-  // ============ SKILLS ============
 
   /**
    * Create a custom skill by pasting SKILL.md directly (optionally with
@@ -596,9 +539,6 @@ export const agentProfilesRouter = createTRPCRouter({
       );
     }),
 
-  /**
-   * Update a skill's fields (name, description, rawMarkdown, files, enabled).
-   */
   updateSkill: baseProcedure
     .input(
       ProfileIdSchema.extend({
@@ -628,9 +568,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  /**
-   * Delete a skill from a profile.
-   */
   deleteSkill: baseProcedure
     .input(
       ProfileIdSchema.extend({
@@ -648,9 +585,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  /**
-   * Toggle a skill's enabled flag.
-   */
   setSkillEnabled: baseProcedure
     .input(
       ProfileIdSchema.extend({
@@ -674,8 +608,6 @@ export const agentProfilesRouter = createTRPCRouter({
       );
       return { success: true };
     }),
-
-  // ============ AGENTS ============
 
   /**
    * Create an agent on a profile. The agent config is injected into
@@ -705,9 +637,6 @@ export const agentProfilesRouter = createTRPCRouter({
       );
     }),
 
-  /**
-   * Update an agent's fields (slug, name, config).
-   */
   updateAgent: baseProcedure
     .input(
       ProfileIdSchema.extend({
@@ -735,9 +664,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  /**
-   * Delete an agent from a profile.
-   */
   deleteAgent: baseProcedure
     .input(
       ProfileIdSchema.extend({
@@ -754,8 +680,6 @@ export const agentProfilesRouter = createTRPCRouter({
       await profileAgentsService.deleteAgent(db, input.profileId, input.agentId, owner);
       return { success: true };
     }),
-
-  // ============ KILO COMMANDS ============
 
   createKiloCommand: baseProcedure
     .input(

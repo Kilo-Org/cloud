@@ -3,7 +3,6 @@ import { posthogQuery } from '@/lib/posthog-query';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
-// Types for feature interest data
 export type FeatureInterestLeaderboard = {
   feature: string;
   unique_signups: number;
@@ -30,7 +29,6 @@ export type FeatureSignupUser = {
   signed_up_at: string;
 };
 
-// Input schemas
 const TimelineInputSchema = z.object({
   weeks: z.number().min(1).max(52).default(12),
 });
@@ -49,9 +47,7 @@ const escapeHogQLStringLiteral = (value: string) =>
   value.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/%/g, '\\%').replace(/_/g, '\\_');
 
 export const adminFeatureInterestRouter = createTRPCRouter({
-  // Feature Interest Leaderboard
   list: adminProcedure.query(async () => {
-    // Query 1: Feature Interest Leaderboard - aggregated counts per feature
     // Match events containing 'early' or 'beta' to include all signup sources
     const leaderboardQuery = `
       SELECT
@@ -64,7 +60,6 @@ export const adminFeatureInterestRouter = createTRPCRouter({
       ORDER BY unique_signups DESC
     `;
 
-    // Query 2: Signups by Feature Slug - for single-feature signups
     // Match events containing 'early' or 'beta' to include all signup sources
     const bySlugQuery = `
       SELECT
@@ -118,7 +113,6 @@ export const adminFeatureInterestRouter = createTRPCRouter({
     return { leaderboard, bySlug, leaderboardQuery, bySlugQuery };
   }),
 
-  // Feature Interest Timeline
   timeline: adminProcedure.input(TimelineInputSchema).query(async ({ input }) => {
     const { weeks } = input;
 
@@ -156,7 +150,6 @@ export const adminFeatureInterestRouter = createTRPCRouter({
     return { timeline, query: timelineQuery };
   }),
 
-  // Feature Interest Detail (by slug)
   detail: adminProcedure.input(DetailInputSchema).query(async ({ input }) => {
     const { slug, name: nameParam, limit, offset } = input;
 
@@ -167,13 +160,10 @@ export const adminFeatureInterestRouter = createTRPCRouter({
     const escapedValue = escapeHogQLStringLiteral(featureName);
     const escapedSlug = escapeHogQLStringLiteral(slug);
 
-    // Build the WHERE condition based on search type
-    // Use LIKE for partial matching to capture all variations of feature names
     const whereCondition = nameParam
       ? `properties.features LIKE '%${escapedValue}%'`
       : `(properties.feature_slug = '${escapedSlug}' OR properties.features LIKE '%${escapedValue}%')`;
 
-    // Query for users interested in a specific feature
     // Match events containing 'early' or 'beta' to include all signup sources
     const usersQuery = `
       SELECT
@@ -190,7 +180,6 @@ export const adminFeatureInterestRouter = createTRPCRouter({
       OFFSET ${offset}
     `;
 
-    // Query for total count
     const countQuery = `
       SELECT count(DISTINCT properties.email) as total
       FROM events

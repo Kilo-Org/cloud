@@ -1,10 +1,3 @@
-/**
- * Auto Triage tRPC Router
- *
- * API endpoints for managing auto-triage tickets and configuration.
- * Supports both organization and personal user auto-triage.
- */
-
 import {
   createTRPCRouter,
   baseProcedure,
@@ -44,15 +37,10 @@ import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrati
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 
 export const autoTriageRouter = createTRPCRouter({
-  /**
-   * List triage tickets for an organization
-   * Requires organization membership
-   */
   listTicketsForOrganization: organizationMemberProcedure
     .input(ListTriageTicketsInputSchema.omit({ organizationId: true }))
     .query(async ({ input, ctx }) => {
       try {
-        // organizationId comes from organizationMemberProcedure's input
         // TypeScript doesn't know about it due to .omit(), but it exists at runtime
         const fullInput = input as typeof input & { organizationId: string };
 
@@ -96,9 +84,6 @@ export const autoTriageRouter = createTRPCRouter({
       }
     }),
 
-  /**
-   * List triage tickets for the current user (personal)
-   */
   listTicketsForUser: baseProcedure
     .input(ListTriageTicketsForUserInputSchema)
     .query(async ({ input, ctx }) => {
@@ -143,10 +128,6 @@ export const autoTriageRouter = createTRPCRouter({
       }
     }),
 
-  /**
-   * Get a specific triage ticket by ID
-   * Verifies user ownership
-   */
   getTicket: baseProcedure.input(GetTriageTicketInputSchema).query(async ({ input, ctx }) => {
     try {
       const ticket = await getTriageTicketById(input.ticketId);
@@ -158,12 +139,9 @@ export const autoTriageRouter = createTRPCRouter({
         });
       }
 
-      // Authorization check based on owner type
       if (ticket.owned_by_organization_id) {
-        // Organization ticket: verify user is org member
         await ensureOrganizationAccess(ctx, ticket.owned_by_organization_id);
       } else if (ticket.owned_by_user_id) {
-        // Personal ticket: verify user owns it
         if (ticket.owned_by_user_id !== ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -171,7 +149,6 @@ export const autoTriageRouter = createTRPCRouter({
           });
         }
       } else {
-        // Should not happen, but handle edge case
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Invalid ticket ownership data',
@@ -187,10 +164,6 @@ export const autoTriageRouter = createTRPCRouter({
     }
   }),
 
-  /**
-   * Retrigger a failed triage ticket
-   * Resets status to 'pending' and dispatches for processing
-   */
   retrigger: baseProcedure
     .input(RetriggerTriageTicketInputSchema)
     .mutation(async ({ input, ctx }) => {
@@ -204,12 +177,9 @@ export const autoTriageRouter = createTRPCRouter({
           });
         }
 
-        // Authorization check based on owner type
         if (ticket.owned_by_organization_id) {
-          // Organization ticket: verify user is org member
           await ensureOrganizationAccess(ctx, ticket.owned_by_organization_id);
         } else if (ticket.owned_by_user_id) {
-          // Personal ticket: verify user owns it
           if (ticket.owned_by_user_id !== ctx.user.id) {
             throw new TRPCError({
               code: 'FORBIDDEN',
@@ -217,7 +187,6 @@ export const autoTriageRouter = createTRPCRouter({
             });
           }
         } else {
-          // Should not happen, but handle edge case
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Invalid ticket ownership data',
@@ -232,7 +201,6 @@ export const autoTriageRouter = createTRPCRouter({
           });
         }
 
-        // Reset the ticket for retry
         await resetTriageTicketForRetry(input.ticketId);
 
         return successResult({ message: 'Triage ticket retriggered successfully' });
@@ -246,15 +214,10 @@ export const autoTriageRouter = createTRPCRouter({
       }
     }),
 
-  /**
-   * Get auto-triage configuration for an organization
-   * Requires organization membership
-   */
   getConfig: organizationMemberProcedure
     .input(GetAutoTriageConfigInputSchema.omit({ organizationId: true }))
     .query(async ({ input }) => {
       try {
-        // organizationId comes from organizationMemberProcedure's input
         const fullInput = input as typeof input & { organizationId: string };
 
         const config = await getAgentConfig(fullInput.organizationId, 'auto_triage', 'github');
@@ -277,15 +240,10 @@ export const autoTriageRouter = createTRPCRouter({
       }
     }),
 
-  /**
-   * Save auto-triage configuration for an organization
-   * Requires organization owner role
-   */
   saveConfig: organizationBillingProcedure
     .input(SaveAutoTriageConfigSchema.omit({ organizationId: true }))
     .mutation(async ({ input, ctx }) => {
       try {
-        // organizationId comes from organizationBillingProcedure's input
         const fullInput = input as typeof input & { organizationId: string };
 
         // Only enforce trial/subscription when enabling — expired orgs must
@@ -294,7 +252,6 @@ export const autoTriageRouter = createTRPCRouter({
           await requireActiveSubscriptionOrTrial(fullInput.organizationId);
         }
 
-        // Build config object with defaults for optional fields
         const config = {
           enabled_for_issues: fullInput.enabled_for_issues,
           repository_selection_mode: fullInput.repository_selection_mode,
@@ -390,7 +347,6 @@ export const autoTriageRouter = createTRPCRouter({
         owner = { type: 'user', id: ctx.user.id, userId: ctx.user.id };
       }
 
-      // Pull title/body/labels from GitHub via the owner's installation.
       let issue;
       try {
         issue = await fetchIssueForOwner(owner, parsedUrl);

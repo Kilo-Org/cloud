@@ -21,6 +21,8 @@ export const BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE =
 export const BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE =
   'git-token-service:bitbucket-code-review:webhook-delete';
 export const GITLAB_CREDENTIAL_BROKER_AUDIENCE = 'git-token-service:gitlab-credentials';
+export const GITEA_CREDENTIAL_BROKER_AUDIENCE = 'git-token-service:gitea-credentials';
+export const FORGEJO_CREDENTIAL_BROKER_AUDIENCE = 'git-token-service:forgejo-credentials';
 export const GITHUB_USER_ACCESS_TOKEN_AUDIENCE = 'git-token-service:github-user-access-token';
 export const GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE =
   'git-token-service:github-user-authorizations:disconnect';

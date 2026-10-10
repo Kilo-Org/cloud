@@ -21,6 +21,8 @@ export const hosted_domain_specials = {
   apple: '@@apple@@',
   github: '@@github@@',
   gitlab: '@@gitlab@@',
+  gitea: '@@gitea@@',
+  forgejo: '@@forgejo@@',
   linkedin: '@@linkedin@@',
   discord: '@@discord@@',
   openai: '@@openai@@',

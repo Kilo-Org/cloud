@@ -43,6 +43,12 @@ export const botIdentityRedisKey = (platform: string, teamId: string, userId: st
 export const gitLabOAuthCredentialsRedisKey = (credentialRef: string) =>
   redisKey(`auth-credentials:gitlab:${credentialRef}`);
 
+export const giteaOAuthCredentialsRedisKey = (credentialRef: string) =>
+  redisKey(`auth-credentials:gitea:${credentialRef}`);
+
+export const forgejoOAuthCredentialsRedisKey = (credentialRef: string) =>
+  redisKey(`auth-credentials:forgejo:${credentialRef}`);
+
 export const githubUserAuthorizationPkceRedisKey = (verifierRef: string) =>
   redisKey(`auth-pkce:github-user:${verifierRef}`);
 

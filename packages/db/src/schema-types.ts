@@ -1243,6 +1243,8 @@ export type AuthProviderId =
   | 'anaconda'
   | 'github'
   | 'gitlab'
+  | 'gitea'
+  | 'forgejo'
   | 'linkedin'
   | 'discord'
   | 'openai'

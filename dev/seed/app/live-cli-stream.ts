@@ -291,34 +291,40 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   heartbeat('busy');
   const heartbeatTimer = setInterval(() => heartbeat('busy'), HEARTBEAT_INTERVAL_MS);
-  replayTurn();
+  try {
+    replayTurn();
 
-  console.log(`Streaming for ${seconds}s. Open kiloapp://agent-chat/${SESSION_ID} now.`);
-  let cursor = 0;
-  const deadline = Date.now() + seconds * 1000;
-  while (Date.now() < deadline) {
-    // A few characters per delta, word-sized like a model token.
-    const delta = STREAM_BLOCK.slice(cursor, cursor + 6);
-    cursor = (cursor + 6) % STREAM_BLOCK.length;
-    text += delta;
-    event('message.part.delta', {
-      sessionID: SESSION_ID,
-      messageID: ASSISTANT_ID,
-      partID: PART_ID,
-      field: 'text',
-      delta,
+    console.log(`Streaming for ${seconds}s. Open kiloapp://agent-chat/${SESSION_ID} now.`);
+    let cursor = 0;
+    const deadline = Date.now() + seconds * 1000;
+    while (Date.now() < deadline) {
+      // A few characters per delta, word-sized like a model token.
+      const delta = STREAM_BLOCK.slice(cursor, cursor + 6);
+      cursor = (cursor + 6) % STREAM_BLOCK.length;
+      text += delta;
+      event('message.part.delta', {
+        sessionID: SESSION_ID,
+        messageID: ASSISTANT_ID,
+        partID: PART_ID,
+        field: 'text',
+        delta,
+      });
+      await sleep(deltaIntervalMs);
+    }
+
+    event('message.part.updated', {
+      part: { id: PART_ID, sessionID: SESSION_ID, messageID: ASSISTANT_ID, type: 'text', text },
     });
-    await sleep(deltaIntervalMs);
+    event('session.status', { sessionID: SESSION_ID, status: { type: 'idle' } });
+    heartbeat('idle');
+    await sleep(1_000);
+  } finally {
+    // Clear the heartbeat and the socket on every path: either one left open
+    // after a failed stream keeps the event loop alive, so the seed would hang
+    // instead of exiting with the error.
+    clearInterval(heartbeatTimer);
+    socket.close();
   }
-
-  event('message.part.updated', {
-    part: { id: PART_ID, sessionID: SESSION_ID, messageID: ASSISTANT_ID, type: 'text', text },
-  });
-  event('session.status', { sessionID: SESSION_ID, status: { type: 'idle' } });
-  clearInterval(heartbeatTimer);
-  heartbeat('idle');
-  await sleep(1_000);
-  socket.close();
 
   console.log(
     'This fixture represents: a CLI session whose connected CLI streams one long assistant answer as text deltas.'

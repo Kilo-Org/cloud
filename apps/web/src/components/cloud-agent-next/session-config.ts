@@ -247,3 +247,16 @@ export function needsResumeConfiguration(params: {
   if (resumeConfig || persistedResumeConfig) return false;
   return !isValidSessionConfig(sessionConfig);
 }
+
+/**
+ * The branch a session actually runs on is the branch session ingest records
+ * from the CLI's git metadata (also the branch PR association matches on).
+ * The runtime `upstreamBranch` is the requested base branch used to create the
+ * workspace, so it must never stand in for the assigned branch.
+ */
+export function selectAssignedSessionBranch(
+  _upstreamBranch: string | null | undefined,
+  storedGitBranch: string | null
+): string | null {
+  return storedGitBranch;
+}

@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import Stripe from 'stripe';
 import { isNotNull } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   evaluateKiloClawPriceRolloutAudit,
   formatKiloClawPriceRolloutAuditReport,
@@ -40,6 +40,7 @@ const LEGACY_AMOUNT_PATTERNS = [
 ];
 const SCAN_ROOTS = [
   'apps/web/src',
+  'packages/web-shared/src',
   'services/kiloclaw-billing/src',
   'services/kiloclaw/src',
   'packages/db/src',

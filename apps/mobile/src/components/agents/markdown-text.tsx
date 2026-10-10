@@ -1,29 +1,23 @@
-import { useMemo, useRef, useState } from 'react';
-import { useColorScheme, View } from 'react-native';
-import { useMarkdown } from 'react-native-marked';
+import { useMemo, useRef } from 'react';
+import { View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { MarkdownEnriched } from './markdown-enriched';
+import {
+  type MarkdownCopyCodeHandler,
+  type MarkdownLinkLongPressHandler,
+  type MarkdownLinkPressHandler,
+} from './markdown-handlers';
+import { convertHtmlToMarkdown } from './markdown-html-convert';
 import {
   MarkdownHtml,
   type MarkdownHtmlSnapshot,
   splitMarkdownHtmlIncremental,
 } from './markdown-html';
-import {
-  getMarkdownStyles,
-  getPalette,
-  type MarkdownPalette,
-  type MarkdownVariant,
-} from './markdown-palette';
-import {
-  type MarkdownCodeLongPressHandler,
-  type MarkdownCopyCodeHandler,
-  type MarkdownLinkLongPressHandler,
-  type MarkdownLinkPressHandler,
-  MarkdownRenderer,
-} from './markdown-renderer';
-import { MarkdownTable } from './markdown-table';
-import { type MarkdownSplitSegment, splitMarkdownTables } from './markdown-table-extract';
+import { MarkdownMermaid } from './markdown-mermaid';
+import { getPalette, type MarkdownVariant } from './markdown-palette';
+import { markdownHtmlSplitCache } from './markdown-parse-cache';
 
 export type MarkdownTextProps = {
   value: string;
@@ -39,15 +33,9 @@ export type MarkdownTextProps = {
   onPressLink?: MarkdownLinkPressHandler;
   /**
    * Optional handler that hands a rendered code fence's source to the caller.
-   * When omitted, fences render statically with no copy affordance.
+   * When omitted, fences render with no copy button.
    */
   onCopyCode?: MarkdownCopyCodeHandler;
-  /**
-   * Optional long-press handler for a code fence's copy trigger. Transcript
-   * hosts forward their message-details long-press here so press-and-hold on a
-   * fence still opens details. Ignored when `onCopyCode` is omitted.
-   */
-  onLongPressCode?: MarkdownCodeLongPressHandler;
 };
 
 export function MarkdownText({
@@ -57,7 +45,6 @@ export function MarkdownText({
   onLongPressLink,
   onPressLink,
   onCopyCode,
-  onLongPressCode,
 }: Readonly<MarkdownTextProps>) {
   const colors = useThemeColors();
 
@@ -65,21 +52,32 @@ export function MarkdownText({
 
   // Re-lex only past the previous snapshot's tail boundary (its last block run
   // and any list or blockquote that can still absorb it): a streaming append can
-  // only change that region, so the head segments (and the MarkdownContent
-  // instances keyed by index) stay stable while the message grows. The memo
-  // keeps an unrelated re-render from re-lexing an unchanged value; the ref
-  // survives it so the next value still extends the snapshot.
+  // only change that region, so the head segments (and the elements keyed by
+  // index) stay stable while the message grows. The memo keeps an unrelated
+  // re-render from re-lexing an unchanged value; the ref survives it so the
+  // next value still extends the snapshot.
   const snapshotRef = useRef<MarkdownHtmlSnapshot | undefined>(undefined);
-  const { segments, snapshot } = useMemo(
-    () => splitMarkdownHtmlIncremental(value, snapshotRef.current),
-    [value]
-  );
+  const { segments, snapshot } = useMemo(() => {
+    // A remount (a FlashList row re-entering the window) starts without a
+    // snapshot, so the incremental parser can only rebuild the whole value.
+    // Completed values were cached on the previous mount — including the last
+    // streaming publish, which is the value a remount sees — so reuse that
+    // parse instead of lexing and segmenting the same source again.
+    const cached =
+      snapshotRef.current === undefined ? markdownHtmlSplitCache.get(value) : undefined;
+    // HTML that markdown can express becomes markdown first, so it renders
+    // natively; only the rest reaches the HTML engine.
+    const result =
+      cached ?? splitMarkdownHtmlIncremental(convertHtmlToMarkdown(value), snapshotRef.current);
+    markdownHtmlSplitCache.set(value, result);
+    return result;
+  }, [value]);
   snapshotRef.current = snapshot;
 
   // Always render through the same wrapping View with index keys: switching to
-  // a bare MarkdownContent when no HTML token exists would change the root
-  // element type, remounting the markdown prefix (and wiping its table
-  // snapshot and CodeBlock keys) as soon as the first HTML token streams in.
+  // a bare markdown element when no HTML token exists would change the root
+  // element type, remounting the markdown prefix as soon as the first HTML
+  // token streams in.
   return (
     <View>
       {segments.map((segment, index) =>
@@ -93,162 +91,47 @@ export function MarkdownText({
             onPressLink={onPressLink}
           />
         ) : (
-          <MarkdownContent
-            key={`md-content-${index}`}
-            value={segment.raw}
-            palette={palette}
-            selectable={selectable}
-            onLongPressLink={onLongPressLink}
-            onPressLink={onPressLink}
-            onCopyCode={onCopyCode}
-            onLongPressCode={onLongPressCode}
-          />
+          splitMermaidFences(segment.raw).map((part, partIndex) =>
+            part.type === 'mermaid' ? (
+              <MarkdownMermaid
+                key={`md-mermaid-${index}-${partIndex}`}
+                source={part.raw}
+                palette={palette}
+              />
+            ) : (
+              <MarkdownEnriched
+                key={`md-content-${index}-${partIndex}`}
+                value={part.raw}
+                palette={palette}
+                selectable={selectable}
+                onLongPressLink={onLongPressLink}
+                onPressLink={onPressLink}
+                onCopyCode={onCopyCode}
+              />
+            )
+          )
         )
       )}
     </View>
   );
 }
 
-type MarkdownContentProps = Omit<MarkdownTextProps, 'variant'> & {
-  palette: MarkdownPalette;
-};
+// A closed ```mermaid fence at the start of a line. An unclosed fence (still
+// streaming) does not match, so it stays a code block until it closes.
+const MERMAID_FENCE = /^```mermaid[ \t]*\n([\s\S]*?)\n```[ \t]*$/gm;
 
-// A GFM table needs a delimiter row: a line of `:?-+:?` cells. Pipes are not
-// required by GFM: `a\n:-\nb` lexes as a table in the repo's marked, and a
-// single-cell row (`| --- |`) is valid, so the row is recognized by a pipe or
-// a colon. A pipe-less, colon-less run of dashes (`---`, `- - -`) is a setext
-// underline or thematic break, not a table, and stays on the fast path.
-// Without a match, `splitTableSegments` returns the value as a single markdown
-// run, which is what `splitMarkdownTables` returns for a table-free value (its
-// markdown run concatenates token raws, and marked's token raws concatenate to
-// the input), so the lex can be skipped entirely.
-const GFM_DELIMITER_ROW =
-  /^[ \t]*(?=.*[|:])\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/m;
-
-function splitTableSegments(
-  value: string,
-  previous?: Parameters<typeof splitMarkdownTables>[1]
-): MarkdownSplitSegment[] {
-  if (!GFM_DELIMITER_ROW.test(value)) {
-    return value.length === 0 ? [] : [{ type: 'markdown', raw: value }];
+function splitMermaidFences(raw: string): { type: 'markdown' | 'mermaid'; raw: string }[] {
+  const parts: { type: 'markdown' | 'mermaid'; raw: string }[] = [];
+  let last = 0;
+  for (const match of raw.matchAll(MERMAID_FENCE)) {
+    if (match.index > last) {
+      parts.push({ type: 'markdown', raw: raw.slice(last, match.index) });
+    }
+    parts.push({ type: 'mermaid', raw: match[1] ?? '' });
+    last = match.index + match[0].length;
   }
-  return splitMarkdownTables(value, previous);
-}
-
-function MarkdownContent({
-  value,
-  palette,
-  selectable = true,
-  onLongPressLink,
-  onPressLink,
-  onCopyCode,
-  onLongPressCode,
-}: Readonly<MarkdownContentProps>) {
-  // Tables are extracted before any renderer runs: each table becomes a chip
-  // (parsed on open), and the remaining markdown runs render through useMarkdown.
-  const [snapshot, setSnapshot] = useState(() => ({
-    value,
-    segments: splitTableSegments(value),
-  }));
-  const segments = useMemo(
-    () => (snapshot.value === value ? snapshot.segments : splitTableSegments(value, snapshot)),
-    [value, snapshot]
-  );
-  if (snapshot.value !== value) {
-    setSnapshot({ value, segments });
+  if (last < raw.length || parts.length === 0) {
+    parts.push({ type: 'markdown', raw: raw.slice(last) });
   }
-
-  return (
-    <View>
-      {segments.map((segment, index) =>
-        segment.type === 'table' ? (
-          <MarkdownTable
-            key={segment.key}
-            palette={palette}
-            raw={segment.raw}
-            tableKey={segment.key}
-            columnCount={segment.columnCount}
-            rowCount={segment.rowCount}
-            selectable={selectable}
-            onLongPressLink={onLongPressLink}
-            onPressLink={onPressLink}
-          />
-        ) : (
-          <MarkdownSegment
-            key={`md-text-${index}`}
-            value={segment.raw}
-            palette={palette}
-            selectable={selectable}
-            onLongPressLink={onLongPressLink}
-            onPressLink={onPressLink}
-            onCopyCode={onCopyCode}
-            onLongPressCode={onLongPressCode}
-          />
-        )
-      )}
-    </View>
-  );
-}
-
-type MarkdownSegmentProps = {
-  value: string;
-  palette: MarkdownPalette;
-  selectable: boolean;
-  onLongPressLink?: MarkdownLinkLongPressHandler;
-  onPressLink?: MarkdownLinkPressHandler;
-  onCopyCode?: MarkdownCopyCodeHandler;
-  onLongPressCode?: MarkdownCodeLongPressHandler;
-};
-
-function MarkdownSegment({
-  value,
-  palette,
-  selectable,
-  onLongPressLink,
-  onPressLink,
-  onCopyCode,
-  onLongPressCode,
-}: Readonly<MarkdownSegmentProps>) {
-  const colorScheme = useColorScheme();
-
-  const styles = useMemo(() => getMarkdownStyles(palette), [palette]);
-
-  const theme = useMemo(
-    () => ({
-      colors: {
-        text: palette.textColor,
-        code: palette.textColor,
-        link: palette.textColor,
-        border: palette.borderColor,
-      },
-    }),
-    [palette]
-  );
-
-  // react-native-marked keys elements with a per-instance monotonic slugger;
-  // reusing one instance across re-parses re-keys every element and remounts
-  // the subtree, resetting local state (e.g. CodeBlock truncation) during
-  // streaming. A fresh instance per `value` change yields identical keys for
-  // identical parse prefixes, so element state survives while streaming
-  // updates flow in as props.
-  const renderer = useMemo(
-    () =>
-      new MarkdownRenderer(palette, selectable, {
-        onLongPressLink,
-        onPressLink,
-        onCopyCode,
-        onLongPressCode,
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `value` intentionally recreates the renderer per markdown-source change so element keys stay stable across streaming re-parses
-    [palette, selectable, onLongPressLink, onPressLink, onCopyCode, onLongPressCode, value]
-  );
-
-  const elements = useMarkdown(value, {
-    colorScheme,
-    theme,
-    styles,
-    renderer,
-  });
-
-  return <View>{elements}</View>;
+  return parts;
 }

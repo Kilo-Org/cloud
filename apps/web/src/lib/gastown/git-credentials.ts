@@ -1,5 +1,5 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, and } from 'drizzle-orm';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';

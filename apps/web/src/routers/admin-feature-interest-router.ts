@@ -1,4 +1,4 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { posthogQuery } from '@/lib/posthog-query';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';

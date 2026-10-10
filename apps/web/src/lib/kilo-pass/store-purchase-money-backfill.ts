@@ -24,8 +24,8 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 
 import { kilo_pass_store_purchases } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 import { getGooglePlaySubscriptionOrder } from './google-play-sdk';
 import {

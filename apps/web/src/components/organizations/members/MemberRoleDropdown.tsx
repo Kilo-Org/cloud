@@ -13,7 +13,7 @@ import { useUpdateMemberRole } from '@/app/api/organizations/hooks';
 import type {
   OrganizationRole,
   OrganizationMemberResponse,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   useIsKiloAdmin,
   useUserOrganizationRole,

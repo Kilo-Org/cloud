@@ -4,11 +4,13 @@ import path from 'node:path';
 import {
   CONTROL_LOG_ARCHIVE_NAME,
   CONTROL_LOG_MAX_ARCHIVE_BYTES,
+  controlUploadFailureStartsEpisode,
+  type ControlDiagnosticProjector,
   type ControlDiagnosticReporter,
   type ControlLogUploadResult,
+  type ControlUploadFailureSample,
 } from '../../../src/shared/control-diagnostics.js';
 import { createTarStream, type TarArchiveEntry } from '../log-uploader.js';
-import { restoreIncompleteRulesPath } from '../restore-incomplete.js';
 import { logToFile, withTimeoutAndAbort } from '../utils.js';
 
 export type ControlFileLogUploader = {
@@ -25,6 +27,7 @@ type Options = {
   homeRoot?: string;
   fetch?: (url: string, init: RequestInit) => Promise<Response>;
   onDiagnostic?: ControlDiagnosticReporter;
+  projector?: ControlDiagnosticProjector;
   intervalMs?: number;
   uploadTimeoutMs?: number;
 };
@@ -48,25 +51,6 @@ export function listControlKiloLogDirs(homeRoot = defaultControlWorktreeHomeRoot
     if (existsSync(logDir)) dirs.push(logDir);
   }
   return dirs;
-}
-
-/**
- * The agent-facing incomplete-restore note, for every live session home. The
- * uploaded archive is the only observable copy of the sandbox session home, so
- * the named outcome must travel with the logs; the note is absent after a
- * complete restore because the wrapper removes it.
- */
-export function listControlRestoreIncompletePaths(
-  homeRoot = defaultControlWorktreeHomeRoot()
-): string[] {
-  if (!existsSync(homeRoot)) return [];
-  const paths: string[] = [];
-  for (const entry of readdirSync(homeRoot, { withFileTypes: true })) {
-    if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
-    const rulesPath = restoreIncompleteRulesPath(path.join(homeRoot, entry.name));
-    if (existsSync(rulesPath)) paths.push(rulesPath);
-  }
-  return paths;
 }
 
 export function selectControlFileLogPaths(input: {
@@ -162,17 +146,35 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
   let queuedUpload: Upload | undefined;
   let finalUpload: Promise<void> | undefined;
   let stopped = false;
+  let lastFailureSample: ControlUploadFailureSample | undefined;
 
   function reportFailure(category: ControlLogUploadResult, statusCode?: number): void {
     try {
+      const safeStatusCode =
+        statusCode !== undefined && statusCode >= 100 && statusCode <= 599 ? statusCode : undefined;
+      // The archive owner still buffers one R2 record per failure while the
+      // uploader accepts; the native stderr line is a separate episode latch so
+      // a repeated same-category failure does not repeat the line.
       options.onDiagnostic?.('control.upload', {
         phase: 'failed',
         category,
-        statusCode:
-          statusCode !== undefined && statusCode >= 100 && statusCode <= 599
-            ? statusCode
-            : undefined,
+        statusCode: safeStatusCode,
       });
+      const sample: ControlUploadFailureSample = {
+        category,
+        ...(safeStatusCode === undefined ? {} : { statusCode: safeStatusCode }),
+      };
+      if (
+        options.projector?.enabled &&
+        controlUploadFailureStartsEpisode(lastFailureSample, sample)
+      ) {
+        options.projector('control.upload', {
+          phase: 'failed',
+          category,
+          statusCode: safeStatusCode,
+        });
+      }
+      lastFailureSample = sample;
     } catch {
       return;
     }
@@ -209,7 +211,6 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
                 wrapperLogPath,
                 kiloLogDirs: listControlKiloLogDirs(homeRoot),
               }),
-              ...listControlRestoreIncompletePaths(homeRoot),
             ];
             const entries = archiveEntries(files, wrapperLogPath, homeRoot);
             if (entries.length === 0) return;
@@ -236,6 +237,9 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
             if (!abort.signal.aborted && response.status !== 204) {
               logToFile(`Control file log upload failed: ${response.status}`);
               reportFailure('http_rejection', response.status);
+            } else if (!abort.signal.aborted) {
+              // A 204 accepts the archive: the next failure starts a new episode.
+              lastFailureSample = undefined;
             }
             void response.body?.cancel().catch(() => undefined);
           })(),

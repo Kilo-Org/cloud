@@ -1,9 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { grantCreditForCategory } from '@/lib/promotionalCredits';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 import type { AddCreditRequest } from '@/types/admin';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import { kilocode_users } from '@kilocode/db/schema';
 import { userCanManageCredits } from '@/lib/admin/credit-management';

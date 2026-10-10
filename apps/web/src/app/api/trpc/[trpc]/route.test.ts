@@ -1,7 +1,7 @@
 import { afterEach, expect, it, jest } from '@jest/globals';
 import { initTRPC, TRPCError } from '@trpc/server';
 
-jest.mock('@/lib/trpc/init', () => ({
+jest.mock('@kilocode/web-shared/lib/trpc/init', () => ({
   createTRPCContext: () => ({}),
 }));
 

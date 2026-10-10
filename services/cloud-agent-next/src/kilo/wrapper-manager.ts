@@ -17,9 +17,12 @@ import {
 } from '../agent-sandbox/protocol.js';
 import { logger } from '../logger.js';
 import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
-import { KILO_AGENT_SESSION_LABEL, KILO_WRAPPER_PORT_LABEL } from './devcontainer.js';
 import { dockerSocketEnv, resolveDockerSocketPath } from './sandbox-runtime.js';
 import { shellQuote } from './utils.js';
+
+// Labels remain necessary to discover and stop already-running retired containers.
+export const KILO_AGENT_SESSION_LABEL = 'kilo.agentSession';
+export const KILO_WRAPPER_PORT_LABEL = 'kilo.wrapperPort';
 
 // Re-export Process type from sandbox for consumers
 type Process = Awaited<ReturnType<SandboxInstance['listProcesses']>>[number];

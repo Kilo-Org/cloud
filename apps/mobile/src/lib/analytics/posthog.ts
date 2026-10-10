@@ -441,3 +441,13 @@ export function useFeatureFlag(key: string, defaultValue = false): boolean {
   const getSnapshot = useCallback(() => isFeatureEnabled(key, defaultValue), [key, defaultValue]);
   return useSyncExternalStore(subscribe, getSnapshot);
 }
+
+/**
+ * Read a boolean feature flag once, outside React. One-shot actions (a
+ * long-press menu item, a sheet's PR tap) need the current value at press time,
+ * not a subscription. Same fail-open contract as `useFeatureFlag`: an
+ * uninitialized client or unloaded flag returns `defaultValue`.
+ */
+export function isFeatureFlagEnabled(key: string, defaultValue = false): boolean {
+  return isFeatureEnabled(key, defaultValue);
+}

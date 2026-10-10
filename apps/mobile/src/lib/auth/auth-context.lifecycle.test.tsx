@@ -340,6 +340,13 @@ vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   clearTrustedHosts: vi.fn(),
 }));
 
+// Image-host trust is a second SecureStore preference that pulls the same
+// secure-store-preference -> sonner-native -> react-native chain, so the
+// account-boundary clear needs the same mock as the link list above.
+vi.mock('@/lib/hooks/use-trusted-image-hosts', () => ({
+  clearTrustedImageHosts: vi.fn(),
+}));
+
 vi.mock('@/components/agents/markdown-image-confirm', () => ({
   clearMarkdownImageConfirmMemory: vi.fn(),
 }));
@@ -396,7 +403,7 @@ vi.mock('@/lib/last-active-instance', () => ({
 // regression test must observe the real gate closing before any await and
 // blocking a late persist from calling SecureStore.setItem.
 
-vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
+vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));
 
@@ -453,7 +460,7 @@ type AuthContextValue = {
 };
 
 /** Build a Kilo JWT whose payload carries `kiloUserId` (same shape as
- *  `generateApiToken` in apps/web/src/lib/tokens.ts). */
+ *  `generateApiToken` in packages/web-shared/src/lib/tokens.ts). */
 function base64url(input: string): string {
   return btoa(input).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 }
@@ -758,6 +765,7 @@ describe('sign-out teardown ordering', () => {
   it('clears the session-scoped state on sign-in (account switch)', async () => {
     const { ctx, unmount } = await mountAndGetContext();
     const trustedHosts = await import('@/lib/hooks/use-trusted-hosts');
+    const trustedImageHosts = await import('@/lib/hooks/use-trusted-image-hosts');
     const imageConfirm = await import('@/components/agents/markdown-image-confirm');
     const { getSessionAutoApproveEnabled, setSessionAutoApproveEnabled } =
       await import('@/components/agents/session-auto-approve');
@@ -768,6 +776,7 @@ describe('sign-out teardown ordering', () => {
     });
 
     expect(trustedHosts.clearTrustedHosts).toHaveBeenCalled();
+    expect(trustedImageHosts.clearTrustedImageHosts).toHaveBeenCalled();
     expect(imageConfirm.clearMarkdownImageConfirmMemory).toHaveBeenCalled();
     // A per-session auto-approve flag must not survive the account boundary.
     expect(getSessionAutoApproveEnabled('switch-session-a')).toBe(false);
@@ -1057,7 +1066,7 @@ describe('stale sign-in continuation', () => {
 
     expect(hoisted.appsflyer.trackEvent).toHaveBeenCalledTimes(1);
     const { resetPurchaseErrorToastDedup } =
-      await import('@/lib/kilo-pass/use-store-kilo-pass-purchase');
+      await import('@/lib/credits/use-store-credit-purchase');
     expect(resetPurchaseErrorToastDedup).toHaveBeenCalledTimes(1);
     // The sign-out won the race to the final state.
     expect(getCtx().token).toBeUndefined();
@@ -1085,7 +1094,7 @@ describe('stale sign-in continuation', () => {
 
     expect(hoisted.appsflyer.trackEvent).toHaveBeenCalledTimes(2);
     const { resetPurchaseErrorToastDedup } =
-      await import('@/lib/kilo-pass/use-store-kilo-pass-purchase');
+      await import('@/lib/credits/use-store-credit-purchase');
     expect(resetPurchaseErrorToastDedup).toHaveBeenCalledTimes(2);
     expect(getCtx().token).toBe('second-token');
 

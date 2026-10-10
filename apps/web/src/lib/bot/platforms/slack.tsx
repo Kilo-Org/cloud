@@ -12,7 +12,7 @@ import {
 } from '@/lib/bot/platforms/shared';
 import type { BotPlatform, RequesterInfo } from '@/lib/bot/platforms/types';
 import { BOT_CONTEXT_MESSAGE_LIMIT } from '@/lib/bot/constants';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getAccessTokenFromInstallation } from '@/lib/integrations/slack-service';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getSlackMessagePermalink } from '@/lib/slack-bot/slack-utils';

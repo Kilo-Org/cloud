@@ -2,8 +2,8 @@ import 'server-only';
 
 import { z } from 'zod';
 import { GITLAB_CREDENTIAL_BROKER_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { GIT_TOKEN_SERVICE_API_URL } from '@/lib/config.server';
-import { generateBoundedInternalServiceToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { GIT_TOKEN_SERVICE_API_URL } from '@kilocode/web-shared/lib/config.server';
+import { generateBoundedInternalServiceToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 
 const GITLAB_CREDENTIAL_RESPONSE_MAX_BYTES = 16_384;
 const GITLAB_CREDENTIAL_REQUEST_TIMEOUT_MS = 30_000;

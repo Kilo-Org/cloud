@@ -28,6 +28,9 @@ import { QuickChatScreen } from './quick-chat-screen';
 vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: 'StateSurfaceInsets',
 }));
+vi.mock('@/components/agents/session-preview-overlay', () => ({
+  SessionPreviewOverlay: () => null,
+}));
 
 const listMessagesQueryFn = vi.hoisted(() => vi.fn());
 const getOrCreateThreadMutate = vi.hoisted(() => vi.fn());
@@ -202,12 +205,6 @@ vi.mock('@/lib/hooks/use-session-model-options', () => ({
   }),
 }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
-vi.mock('@/components/agents/session-keyboard-container-state', () => ({
-  getSessionKeyboardContainerKind: () => 'keyboard-avoiding',
-}));
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
-  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
-}));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));

@@ -20,7 +20,7 @@
 
 import { localDb, localPool } from '@/scripts/lib/local-database';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
-import type { OrganizationPlan } from '@/lib/organizations/organization-base-types';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-base-types';
 import { eq, inArray } from 'drizzle-orm';
 
 type TrialStateConfig = {

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
 import type * as CliRunnerModule from './cli-runner';
 import type * as DbModule from './db';
 import { DECIDER_CASES } from './datasets/decider-cases';
@@ -63,6 +64,8 @@ import {
   getCaseResults,
   getExistingCaseResultIds,
   getRunWithModels,
+  listPendingCurrentProfiles,
+  getRunningRun,
   syncPlatformRegistryRows,
   getLatestRoutingTable,
   countCurrentProfilesByStatus,
@@ -98,6 +101,7 @@ const successfulCliResult = {
 const env = {
   INTERNAL_API_SECRET_PROD: { get: tokenGet },
   KILO_CLI_API_URL: 'http://host.docker.internal:3000',
+  KILO_WEB_API_BASE_URL: 'http://host.docker.internal:3000',
   BENCH_DB: {} as D1Database,
   BENCH_QUEUE: { sendBatch: queueSendBatch },
   AUTO_ROUTING_CONFIG: { delete: vi.fn() },
@@ -148,7 +152,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getBenchmarkConfig).mockResolvedValue({
     classifierModels: ['classifier/a'],
-    deciderModels: [{ id: model, reasoningEffort: null }],
+    deciderModels: [{ id: model }],
     minAccuracy: 0.7,
     maxConcurrency: 100,
     userMaxConcurrency: 100,
@@ -170,12 +174,20 @@ beforeEach(() => {
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
   vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
+  vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
+  vi.mocked(getRunningRun).mockResolvedValue(undefined);
   tokenGet.mockResolvedValue('internal-secret');
   queueSendBatch.mockResolvedValue(undefined);
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () =>
-      Response.json({ token: 'kilo-user-token', expiresAt: '2026-06-16T01:00:00.000Z' })
+    vi.fn(async url =>
+      String(url).includes('/api/openrouter/models')
+        ? Response.json({
+            data: [
+              { id: model, opencode: { variants: { max: { reasoning: { effort: 'max' } } } } },
+            ],
+          })
+        : Response.json({ token: 'kilo-user-token', expiresAt: '2026-06-16T01:00:00.000Z' })
     )
   );
   mockRunSnapshot();
@@ -482,28 +494,8 @@ describe('processJob — decider chunk chaining', () => {
   });
 });
 
-describe('processJob — saved canonical variant reaches the CLI and publish', () => {
-  it('passes a saved canonical variant to the CLI as variant', async () => {
-    mockRunSnapshot([{ model, variant: 'max', enqueued: true, reasoning_effort: null }]);
-
-    await processJob(env, deciderMessage({ variant: 'max' }));
-
-    expect(runDeciderCaseViaCli).toHaveBeenCalledWith(
-      env,
-      expect.objectContaining({
-        model,
-        variant: 'max',
-        instanceName: `${runId}:${model}:max:0:0`,
-      })
-    );
-    expect(upsertCaseResult).toHaveBeenCalledWith(
-      env.BENCH_DB,
-      expect.objectContaining({ model, variant: 'max' })
-    );
-  });
-
-  // Publish-fidelity harness: a completed platform run whose snapshot row is
-  // variant-only publishes variant; an enum effort row keeps the effort shape.
+describe('processJob — canonical registry publication', () => {
+  // A completed registry profile keeps its non-enum catalog key in publication.
   function mockPublishHarness(variant: string, reasoningEffort: string | null) {
     mockRunSnapshot([{ model, variant, enqueued: true, reasoning_effort: reasoningEffort }]);
     vi.mocked(countCaseResultsByLane).mockResolvedValue([
@@ -521,6 +513,7 @@ describe('processJob — saved canonical variant reaches the CLI and publish', (
         cost_usd: 0.001,
         error: null,
         fallback_reason: null,
+        route_hit: null,
         retried: null,
         exit_code: 0,
         output_prefix: 'ok',
@@ -541,7 +534,6 @@ describe('processJob — saved canonical variant reaches the CLI and publish', (
   }
 
   async function seedRegistrySummaries(variant: string) {
-    const { TAXONOMY_ROUTE_KEYS } = await import('@kilocode/auto-routing-contracts');
     vi.mocked(getSummariesForRuns).mockResolvedValue(
       TAXONOMY_ROUTE_KEYS.map(routeKey => ({
         runId,
@@ -556,6 +548,7 @@ describe('processJob — saved canonical variant reaches the CLI and publish', (
         cases: 5,
         errors: 0,
         timeouts: 0,
+        routeAccuracy: null,
       }))
     );
   }
@@ -568,23 +561,12 @@ describe('processJob — saved canonical variant reaches the CLI and publish', (
 
     expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
     const table = vi.mocked(saveRoutingTable).mock.calls[0]?.[1];
-    expect(table).toBeDefined();
-    const firstRoute = Object.values(table.routes)[0];
-    expect(firstRoute[0]).toMatchObject({ model, variant: 'max', reasoningEffort: null });
-  });
-
-  it('publishes a routing table with the legacy effort shape for an enum key', async () => {
-    mockPublishHarness('high', 'high');
-    await seedRegistrySummaries('high');
-
-    await processJob(env, { ...deciderMessage({ variant: 'high' }), chunk: 9999 });
-
-    const table = vi.mocked(saveRoutingTable).mock.calls[0]?.[1];
-    expect(table).toBeDefined();
-    const firstRoute = Object.values(table.routes)[0];
-    expect(firstRoute[0]).toMatchObject({ model, reasoningEffort: 'high' });
-    expect(
-      firstRoute[0] && 'variant' in firstRoute[0] ? firstRoute[0].variant : undefined
-    ).toBeUndefined();
+    expect(table?.routes['implementation/code_generation']?.[0]).toEqual({
+      model,
+      variant: 'max',
+      accuracy: 0.9,
+      avgCostUsd: 0.001,
+      meetsThreshold: true,
+    });
   });
 });

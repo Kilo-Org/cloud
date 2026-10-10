@@ -75,6 +75,7 @@ const mocks = vi.hoisted(() => ({
   clearSessionAutoApprove: vi.fn(),
   clearToolCardImageCache: vi.fn(),
   clearTrustedHosts: vi.fn(),
+  clearTrustedImageHosts: vi.fn(),
   notifyArtifactsChanged: vi.fn(),
   reapTempFiles: vi.fn(),
   resetArtifactMirrorSyncState: vi.fn(),
@@ -109,6 +110,11 @@ vi.mock('@/lib/agent-attachments/clipboard-image', () => ({
 vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   clearTrustedHosts: mocks.clearTrustedHosts,
 }));
+// Image-host trust is a second SecureStore preference; its module reaches
+// SecureStore and Sentry on import, so it is mocked beside the link list.
+vi.mock('@/lib/hooks/use-trusted-image-hosts', () => ({
+  clearTrustedImageHosts: mocks.clearTrustedImageHosts,
+}));
 vi.mock('@/lib/temp-file-registry', () => ({ reapTempFiles: mocks.reapTempFiles }));
 // The platform provider bridge: sign-out has to tell an open Files app the tree
 // changed, or it keeps the listing it read before the wipe.
@@ -124,6 +130,7 @@ vi.mock('@/lib/artifacts/artifact-mirror-sync', () => ({
 /** Every mocked member, in declaration order; the mirror and goal stores stay real. */
 const SESSION_MEMBERS = [
   mocks.clearTrustedHosts,
+  mocks.clearTrustedImageHosts,
   mocks.clearMarkdownImageConfirmMemory,
   mocks.clearToolCardImageCache,
   mocks.clearFilePartCache,

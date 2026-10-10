@@ -13,8 +13,8 @@ const DEFAULT_ICON_CONTAINER_CLASS = 'h-14 w-14 rounded-2xl border border-border
 type EmptyStateProps = {
   icon: LucideIcon;
   title: string;
-  /** Muted centered text, or a node that carries its own styling (e.g. AccessibleStatus). */
-  description: ReactNode;
+  /** Optional muted text, or a node that carries its own styling (e.g. AccessibleStatus). */
+  description?: ReactNode;
   className?: string;
   action?: ReactNode;
   /** `center` scrolls the content inside a measured `StateSurface`; `top`

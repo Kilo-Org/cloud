@@ -4,7 +4,7 @@ import { createHash, createPublicKey } from 'node:crypto';
 import {
   BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID,
   BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY,
-} from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/config.server';
 import { encryptKeyedEnvelope } from '@kilocode/encryption';
 import {
   GITLAB_OAUTH_CREDENTIAL_ENVELOPE_SCHEME,

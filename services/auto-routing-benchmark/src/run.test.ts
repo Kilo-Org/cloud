@@ -25,6 +25,7 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
     cost_usd: 0.001,
     error: null,
     fallback_reason: null,
+    route_hit: null,
     retried: null,
     exit_code: null,
     output_prefix: null,
@@ -122,6 +123,23 @@ describe('summarize — classifier kind', () => {
     expect(s.errors).toBe(2);
     // error rows have score 0 which drags accuracy down
     expect(s.accuracy).toBe(Number((1 / 3).toFixed(4)));
+  });
+
+  it('computes routeAccuracy from route hits, counting failed cases as misses', () => {
+    const rows: CaseResultRow[] = [
+      makeRow({ case_id: 'c1', route_hit: true }),
+      makeRow({ case_id: 'c2', route_hit: true }),
+      makeRow({ case_id: 'c3', route_hit: false }),
+      makeRow({ case_id: 'c4', score: 0, error: 'http_500', route_hit: false }),
+    ];
+
+    const [s] = summarize(rows, 'classifier');
+    expect(s.routeAccuracy).toBe(0.5);
+  });
+
+  it('leaves routeAccuracy null when no row carries a route hit', () => {
+    const [s] = summarize([makeRow({ route_key: 'implementation/code_generation' })], 'decider');
+    expect(s.routeAccuracy).toBeNull();
   });
 });
 
@@ -341,6 +359,7 @@ describe('pickClassifierWinner', () => {
     cases: 36,
     errors: 0,
     timeouts: 0,
+    routeAccuracy: null,
   });
 
   it('picks the cheapest model meeting the threshold', () => {
@@ -389,6 +408,7 @@ describe('pickClassifierWinner', () => {
     p50LatencyMs: 80,
     p95LatencyMs: p95,
     timeouts: 0,
+    routeAccuracy: null,
     cases: 36,
     errors: 0,
   });

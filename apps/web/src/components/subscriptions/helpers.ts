@@ -1,6 +1,6 @@
 import { formatDollars, formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
-import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { KiloPassCadence, type KiloPassTier } from '@/lib/kilo-pass/enums';
+import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import { KiloPassCadence, type KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { formatKiloClawPlanPrice } from '@/app/(app)/claw/components/billing/billing-types';
 import { isMonthlyCodingPlan } from '@/lib/coding-plans/pricing';
 

@@ -16,8 +16,8 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
-import { send as sendEmail, RawHtml, type TemplateName } from '@/lib/email';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { send as sendEmail, RawHtml, type TemplateName } from '@kilocode/web-shared/lib/email';
 
 // Constant-time comparison so a public attacker can't probe the
 // internal-api secret via response-timing differences.

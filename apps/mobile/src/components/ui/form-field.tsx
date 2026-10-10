@@ -84,7 +84,7 @@ function FormField({
           }
         }}
         className={cn(
-          // The box (min-h-[44px] px-3 leading-[normal]) lives in
+          // The box (min-h-[44px] pl-3 pr-3 leading-[normal]) lives in
           // `@/components/ui/input`, so every single-line field shares it and
           // the class cannot be copied back wrong. No vertical padding: iOS
           // insets the already-centered text rect by it, drawing the value and

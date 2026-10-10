@@ -97,7 +97,7 @@ const mockFetchGitHubRepositories = jest.fn<() => Promise<PlatformRepository[]>>
 let connectionManagementEnabled = false;
 let selectResults: unknown[][] = [];
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: () => ({
       from: () => ({ where: async () => selectResults.shift() ?? [] }),
@@ -195,7 +195,7 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   logExceptInTest: (...args: unknown[]) => mockLogExceptInTest(...args),
 }));
 

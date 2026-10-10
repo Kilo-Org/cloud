@@ -81,6 +81,7 @@ export function VoiceInputSettingsScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('preferences.voiceInput')} />
       <TabScreenScrollView
+        // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
         className="flex-1"
         contentContainerClassName="px-6 gap-3 pt-4"

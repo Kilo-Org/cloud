@@ -225,6 +225,7 @@ function makeDb(limitResults: (unknown[] | Error)[]): WorkerDb {
 
 type DoStubOverrides = {
   registerSession?: ReturnType<typeof vi.fn>;
+  registerSessionFromMetadata?: ReturnType<typeof vi.fn>;
   createSessionWithInitialAdmission?: ReturnType<typeof vi.fn>;
   getMetadata?: ReturnType<typeof vi.fn>;
   getMessageResult?: ReturnType<typeof vi.fn>;
@@ -233,6 +234,8 @@ type DoStubOverrides = {
 function makeDoStub(overrides: DoStubOverrides = {}) {
   return {
     registerSession: overrides.registerSession ?? vi.fn().mockResolvedValue({ success: true }),
+    registerSessionFromMetadata:
+      overrides.registerSessionFromMetadata ?? vi.fn().mockResolvedValue({ success: true }),
     createSessionWithInitialAdmission:
       overrides.createSessionWithInitialAdmission ??
       vi.fn().mockResolvedValue({
@@ -258,6 +261,40 @@ function makeDoStub(overrides: DoStubOverrides = {}) {
         },
       } satisfies MessageResultRPCResponse),
   };
+}
+
+/**
+ * The create/register RPC arg in whichever plane wrote it: the control plane
+ * nests the persisted metadata under `metadata`, the legacy plane sends the
+ * grouped command directly. Tests assert against the persisted metadata.
+ */
+function createdRpcInput(doStub: ReturnType<typeof makeDoStub>): {
+  metadata?: SessionMetadata;
+  message?: unknown;
+  runtimeAuthorizationSeal?: string;
+} & SessionMetadata {
+  const arg =
+    doStub.createSessionWithInitialAdmission.mock.calls[0]?.[0] ??
+    doStub.registerSession.mock.calls[0]?.[0] ??
+    doStub.registerSessionFromMetadata.mock.calls[0]?.[0];
+  if (arg && typeof arg === 'object' && 'metadata' in arg) {
+    return arg as {
+      metadata?: SessionMetadata;
+      message?: unknown;
+      runtimeAuthorizationSeal?: string;
+    } & SessionMetadata;
+  }
+  return {
+    metadata: arg as SessionMetadata,
+  } as {
+    metadata?: SessionMetadata;
+    message?: unknown;
+    runtimeAuthorizationSeal?: string;
+  } & SessionMetadata;
+}
+
+function createdMetadata(doStub: ReturnType<typeof makeDoStub>): SessionMetadata | undefined {
+  return createdRpcInput(doStub).metadata;
 }
 
 function makeEnv(doStub: ReturnType<typeof makeDoStub>): Env {
@@ -453,7 +490,7 @@ describe('explicit sandbox session creation', () => {
           [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: expect.any(String),
         })
       );
-      const command = doStub.createSessionWithInitialAdmission.mock.calls[0]?.[0];
+      const command = createdMetadata(doStub);
       const metadata = parseSessionMetadata({
         ...command,
         metadataSchemaVersion: 2,
@@ -488,7 +525,7 @@ describe('explicit sandbox session creation', () => {
       generateSessionIdMock.mockReturnValue(CLOUD_AGENT_SESSION_ID);
       await runCreate(ctx, requestForPreset(preset));
       expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
-      const command = doStub.createSessionWithInitialAdmission.mock.calls[0]?.[0];
+      const command = createdMetadata(doStub);
       expect(command?.workspace).toMatchObject({ sandboxAllocation: preset });
       expect(command?.workspace?.sandboxProvider).toBe('cloudflare');
       expect(command?.workspace?.sandboxId).toMatch(sandboxId);
@@ -504,7 +541,7 @@ describe('explicit sandbox session creation', () => {
       ctx.env.VERCEL_SANDBOX_ORG_IDS = '';
       await runCreate(ctx, requestForPreset(preset));
       expect(generateSessionIdMock).toHaveBeenCalledWith('control');
-      const command = doStub.createSessionWithInitialAdmission.mock.calls[0]?.[0];
+      const command = createdMetadata(doStub);
       expect(command?.workspace).toMatchObject({
         sandboxAllocation: preset,
         sandboxProvider: 'vercel',
@@ -555,7 +592,7 @@ describe('explicit sandbox session creation', () => {
         })
       );
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledOnce();
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({ workspace: expect.objectContaining({ sandboxAllocation }) })
       );
       expect(settleOperationMock).toHaveBeenCalledOnce();
@@ -649,7 +686,7 @@ describe('explicit sandbox session creation', () => {
       };
       request.finalization = { autoCommit: true };
       await runCreate(ctx, request);
-      const command = doStub.createSessionWithInitialAdmission.mock.calls[0]?.[0];
+      const command = createdMetadata(doStub);
       const metadata = parseSessionMetadata({
         ...command,
         metadataSchemaVersion: 2,
@@ -761,7 +798,7 @@ describe('explicit sandbox session creation', () => {
       });
       expect(generateSessionIdMock).not.toHaveBeenCalled();
       expect(createSessionReportMock).not.toHaveBeenCalled();
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
           workspace: expect.objectContaining({
             worktreeId: WORKTREE_ID,
@@ -805,7 +842,7 @@ describe('explicit sandbox session creation', () => {
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       replayed: true,
     });
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         workspace: expect.objectContaining({
           sandboxProvider: 'cloudflare-containers',
@@ -946,7 +983,7 @@ describe('explicit sandbox session creation', () => {
       await expect(
         runCreate(ctx, makeRequest({ runtime: { sandboxAllocation: 'cloudflare-single' } }))
       ).resolves.toMatchObject({ cloudAgentSessionId: CLOUD_AGENT_SESSION_ID });
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
           workspace: expect.objectContaining({ sandboxAllocation: 'cloudflare-single' }),
         })
@@ -1004,7 +1041,7 @@ describe('explicit sandbox session creation', () => {
       replayed: true,
     });
     expect(generateSessionIdMock).not.toHaveBeenCalled();
-    expect(doStub.registerSession).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         workspace: expect.objectContaining({
           sandboxAllocation: 'vercel-large',
@@ -1177,7 +1214,7 @@ describe('createSessionWithLedger admission ladder', () => {
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
     });
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
@@ -1206,13 +1243,13 @@ describe('createSessionWithLedger admission ladder', () => {
       })
     );
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         identity: expect.objectContaining({
           sessionId: CLOUD_AGENT_SESSION_ID,
           userId: USER_ID,
         }),
-        workspace: expect.objectContaining({ sandboxId: 'sb-test-123' }),
+        workspace: expect.objectContaining({ sandboxId: 'ses-0123456789abcdef' }),
         message: expect.objectContaining({
           initialTurn: expect.objectContaining({
             messageId: INITIAL_MESSAGE_ID,
@@ -1299,7 +1336,7 @@ describe('createSessionWithLedger admission ladder', () => {
 
           await runCreate(ctx, makeRequest({ repository }));
 
-          expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+          expect(createdMetadata(doStub)).toMatchObject(
             expect.objectContaining({
               identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
               workspace: expect.objectContaining({
@@ -1328,7 +1365,7 @@ describe('createSessionWithLedger admission ladder', () => {
 
     ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'true';
 
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
         workspace: expect.objectContaining({
@@ -1353,7 +1390,7 @@ describe('createSessionWithLedger admission ladder', () => {
       makeRequest({ repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' } })
     );
 
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID }),
         workspace: expect.objectContaining({
@@ -1367,39 +1404,6 @@ describe('createSessionWithLedger admission ladder', () => {
       })
     );
   });
-
-  it.each([
-    {
-      sessionId: WORKSPACE_SESSION_ID,
-      expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
-    },
-    {
-      sessionId: CLOUD_AGENT_SESSION_ID,
-      expected: { github: false, gitlab: false, bitbucket: false, kilocode: false },
-    },
-  ])(
-    'excludes devcontainers from toggle containment for $sessionId',
-    async ({ sessionId, expected }) => {
-      generateSessionIdMock.mockReturnValue(sessionId);
-      generateSandboxRoutingTargetMock.mockResolvedValueOnce({
-        kind: 'isolated',
-        sandboxId: 'dind-abcdef',
-      });
-      const doStub = makeDoStub();
-      const ctx = makeContext(doStub);
-
-      await runCreate(ctx, makeRequest({ runtime: { devcontainer: true } }));
-
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
-        expect.objectContaining({
-          workspace: expect.objectContaining({
-            devcontainerRequested: true,
-            credentialContainment: expected,
-          }),
-        })
-      );
-    }
-  );
 
   it('routes and persists isolated Standard allocation for an enrolled organization', async () => {
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
@@ -1436,7 +1440,7 @@ describe('createSessionWithLedger admission ladder', () => {
       undefined,
       expect.objectContaining({ sandboxAllocation: 'isolated-standard' })
     );
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         identity: expect.objectContaining({ orgId, createdOnPlatform: 'webhook' }),
         workspace: expect.objectContaining({
@@ -1550,16 +1554,16 @@ describe('createSessionWithLedger admission ladder', () => {
         'https://github.com/acme/repo',
         undefined,
         WORKTREE_ID,
-        { sandboxId: 'sb-test-123', provider: 'cloudflare' }
+        { sandboxId: 'ses-0123456789abcdef', provider: 'cloudflare' }
       );
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
-          repository: expect.objectContaining({ branch: 'main' }),
+          repository: expect.objectContaining({ upstreamBranch: 'main' }),
           finalization,
           workspace: expect.objectContaining({
             worktreeId: WORKTREE_ID,
             workspacePath: `/workspace/${USER_ID}/worktrees/${WORKTREE_ID}`,
-            sandboxId: 'sb-test-123',
+            sandboxId: 'ses-0123456789abcdef',
             sandboxProvider: 'cloudflare',
           }),
         })
@@ -1606,7 +1610,7 @@ describe('createSessionWithLedger admission ladder', () => {
       expect(result.cloudAgentSessionId).toBe(WORKSPACE_SESSION_ID);
       expect(generateSessionIdMock).toHaveBeenCalledWith('control');
       expect(createCliSessionMock.mock.calls[0]).toHaveLength(10);
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
           finalization: { autoCommit: true },
           workspace: expect.not.objectContaining({ worktreeId: expect.anything() }),
@@ -1661,7 +1665,7 @@ describe('createSessionWithLedger admission ladder', () => {
       expect(generateSessionIdMock).toHaveBeenCalledTimes(1);
       expect(generateKiloSessionIdMock).toHaveBeenCalledTimes(1);
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({ finalization: { autoCommit } })
       );
     }
@@ -1768,7 +1772,7 @@ describe('createSessionWithLedger admission ladder', () => {
       })
     );
 
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         identity: expect.objectContaining({ userId, orgId: organizationId }),
         workspace: expect.objectContaining({
@@ -1801,7 +1805,7 @@ describe('createSessionWithLedger admission ladder', () => {
       );
 
       expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
           identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID }),
         })
@@ -1832,7 +1836,7 @@ describe('createSessionWithLedger admission ladder', () => {
       );
 
       expect(createCliSessionMock.mock.calls[0]).toHaveLength(10);
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
           finalization: { autoCommit: true },
           workspace: expect.not.objectContaining({
@@ -1844,10 +1848,7 @@ describe('createSessionWithLedger admission ladder', () => {
     }
   );
 
-  it.each([
-    ['devcontainer', { devcontainer: true }, undefined],
-    ['bot identity', undefined, 'bot_123'],
-  ] as const)(
+  it.each([['bot identity', undefined, 'bot_123']] as const)(
     'leaves %s browser sessions ungrouped with their requested auto-commit',
     async (_label, runtime, botId) => {
       const doStub = makeDoStub();
@@ -1870,7 +1871,7 @@ describe('createSessionWithLedger admission ladder', () => {
       );
 
       expect(createCliSessionMock.mock.calls[0]).toHaveLength(10);
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
           finalization: { autoCommit: true },
           workspace: expect.not.objectContaining({ worktreeId: expect.anything() }),
@@ -1895,7 +1896,7 @@ describe('createSessionWithLedger admission ladder', () => {
     );
 
     expect(createCliSessionMock.mock.calls[0]).toHaveLength(10);
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({ finalization: { autoCommit: true } })
     );
   });
@@ -1918,7 +1919,7 @@ describe('createSessionWithLedger admission ladder', () => {
     );
 
     expect(createCliSessionMock.mock.calls[0]).toHaveLength(10);
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({ finalization: { autoCommit: true } })
     );
   });
@@ -2349,7 +2350,7 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
     });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
@@ -3133,16 +3134,13 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
             resourceKind: 'cloud-agent-next',
           })
         );
-        expect(stub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
-          expect.objectContaining({
-            auth: expect.objectContaining({
-              kilocodeToken: 'runtime-token',
-              kiloSessionId: KILO_SESSION_ID,
-            }),
-            runtimeAuthorizationSeal: 'runtime-seal',
-            message: { initialTurn: expect.objectContaining({ messageId: INITIAL_MESSAGE_ID }) },
-          })
-        );
+        const rpcInput = createdRpcInput(stub);
+        expect(rpcInput.metadata?.auth).toMatchObject({
+          kilocodeToken: 'runtime-token',
+          kiloSessionId: KILO_SESSION_ID,
+        });
+        expect(rpcInput.runtimeAuthorizationSeal).toBe('runtime-seal');
+        expect(rpcInput.message).toMatchObject({ messageId: INITIAL_MESSAGE_ID });
         expect(assertKiloModelAvailable).toHaveBeenCalledWith(
           expect.objectContaining({ originalToken: 'runtime-token' })
         );
@@ -3232,25 +3230,22 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
       expect(generateSandboxRoutingTargetMock).toHaveBeenCalledTimes(1);
       expect(createSessionReportMock).toHaveBeenCalledTimes(1);
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
-        expect.objectContaining({
-          identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID, userId: USER_ID }),
-          auth: expect.objectContaining({ kiloSessionId: KILO_SESSION_ID }),
-          finalization: { autoCommit, condenseOnComplete: true },
-          workspace: expect.objectContaining({
-            sandboxId,
-            sandboxProvider: 'cloudflare',
-            worktreeId: WORKTREE_ID,
-            workspacePath: `/workspace/${USER_ID}/worktrees/${WORKTREE_ID}`,
-          }),
-          message: {
-            initialTurn: expect.objectContaining({
-              messageId: INITIAL_MESSAGE_ID,
-              prompt: 'Build the feature',
-            }),
-          },
-        })
-      );
+      const rpcInput = createdRpcInput(doStub);
+      expect(rpcInput.metadata).toMatchObject({
+        identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID, userId: USER_ID }),
+        auth: expect.objectContaining({ kiloSessionId: KILO_SESSION_ID }),
+        finalization: { autoCommit, condenseOnComplete: true },
+        workspace: expect.objectContaining({
+          sandboxId,
+          sandboxProvider: 'cloudflare',
+          worktreeId: WORKTREE_ID,
+          workspacePath: `/workspace/${USER_ID}/worktrees/${WORKTREE_ID}`,
+        }),
+      });
+      expect(rpcInput.message).toMatchObject({
+        messageId: INITIAL_MESSAGE_ID,
+        turn: expect.objectContaining({ prompt: 'Build the feature' }),
+      });
       expect(settleOperationMock).toHaveBeenCalledTimes(1);
       expect(settleOperationMock).toHaveBeenCalledWith(
         expect.any(Object),
@@ -3333,7 +3328,7 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
         [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(input),
       })
     );
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         finalization: input.finalization,
         workspace: expect.objectContaining({ worktreeId: WORKTREE_ID }),
@@ -3481,14 +3476,14 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
     expect(generateKiloSessionIdMock).toHaveBeenCalledTimes(1);
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
     expect(doStub.getMessageResult).toHaveBeenCalledWith(INITIAL_MESSAGE_ID);
-    for (const [payload] of doStub.createSessionWithInitialAdmission.mock.calls) {
+    for (const [arg] of doStub.createSessionWithInitialAdmission.mock.calls) {
+      const payload = (arg as { metadata?: SessionMetadata }).metadata ?? (arg as SessionMetadata);
       expect(payload).toMatchObject({
         identity: { sessionId: WORKSPACE_SESSION_ID },
         finalization: { autoCommit: true, condenseOnComplete: true },
-        message: { initialTurn: { messageId: INITIAL_MESSAGE_ID } },
       });
-      expect(payload.workspace.worktreeId).toBeUndefined();
-      expect(payload.workspace.workspacePath).toBeUndefined();
+      expect(payload.workspace?.worktreeId).toBeUndefined();
+      expect(payload.workspace?.workspacePath).toBeUndefined();
     }
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
   });
@@ -3554,20 +3549,15 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
           { sandboxId, provider: 'cloudflare' }
         );
       }
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({
-          finalization: { autoCommit: false, condenseOnComplete: true },
-          message: {
-            initialTurn: {
-              type: 'prompt',
-              messageId: INITIAL_MESSAGE_ID,
-              prompt: 'Build the feature',
-              attachments: undefined,
-            },
-          },
-          workspace: expect.objectContaining({ worktreeId: WORKTREE_ID }),
-        })
-      );
+      const rpcInput = createdRpcInput(doStub);
+      expect(rpcInput.metadata).toMatchObject({
+        finalization: { autoCommit: false, condenseOnComplete: true },
+        workspace: expect.objectContaining({ worktreeId: WORKTREE_ID }),
+      });
+      expect(rpcInput.message).toMatchObject({
+        messageId: INITIAL_MESSAGE_ID,
+        turn: { type: 'prompt', prompt: 'Build the feature' },
+      });
       expect(generateSessionIdMock).not.toHaveBeenCalled();
       expect(generateKiloSessionIdMock).not.toHaveBeenCalled();
       expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
@@ -3625,7 +3615,7 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
         replayed: true,
       });
 
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
           workspace: expect.objectContaining({
             sandboxId: storedSandboxId,
@@ -3754,7 +3744,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
     });
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
@@ -4230,7 +4220,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
     });
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
@@ -4284,7 +4274,10 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       'https://github.com/acme/repo',
       SOURCE_KILO_SESSION_ID
     );
-    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
+    expect(
+      doStub.registerSession.mock.calls.length +
+        doStub.registerSessionFromMetadata.mock.calls.length
+    ).toBe(1);
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({ rowId: ROW_ID, status: 'completed', outcomeCode: 'ok' })
@@ -4317,12 +4310,15 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     expect(sandboxSessionIdFromName).toHaveBeenCalledWith(`${USER_ID}:${WORKSPACE_SESSION_ID}`);
     expect(sandboxSessionGet).toHaveBeenCalledTimes(1);
     expect(cloudAgentSessionGet).not.toHaveBeenCalled();
-    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
-    expect(doStub.registerSession.mock.calls[0]?.[0].clone).toEqual({
+    expect(
+      doStub.registerSession.mock.calls.length +
+        doStub.registerSessionFromMetadata.mock.calls.length
+    ).toBe(1);
+    expect(createdMetadata(doStub)?.clone).toEqual({
       cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
     });
     expect(recordOperationProgressMock.mock.calls[0]?.[2]).not.toHaveProperty('reportingCreatedAt');
-    expect(doStub.registerSession).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         workspace: expect.objectContaining({
           credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: true },
@@ -4388,7 +4384,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     );
 
     expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID, orgId }),
         workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
@@ -4396,12 +4392,48 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     );
   });
 
+  it('routes an enrolled Code Reviewer owner to the control plane via the trusted billing origin', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = '';
+    ctx.env.CODE_REVIEW_CONTROL_PLANE_IDS = USER_ID;
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+
+    await createSessionWithLedger(
+      makeRequest({
+        options: { operationKey: OPERATION_KEY, createdOnPlatform: 'code-review' },
+      }),
+      ctx,
+      { ...CREATE_OPTIONS, billingOrigin: 'code-review' }
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+    expect(createdMetadata(doStub)).toMatchObject(
+      expect.objectContaining({
+        identity: expect.objectContaining({ createdOnPlatform: 'code-review' }),
+      })
+    );
+  });
+
+  it('keeps a Code Reviewer owner on the legacy plane when only CONTROL_PLANE_IDS is enrolled', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = USER_ID;
+    ctx.env.CODE_REVIEW_CONTROL_PLANE_IDS = '';
+    generateSessionIdMock.mockReturnValue(CLOUD_AGENT_SESSION_ID);
+
+    await createSessionWithLedger(
+      makeRequest({
+        options: { operationKey: OPERATION_KEY, createdOnPlatform: 'code-review' },
+      }),
+      ctx,
+      { ...CREATE_OPTIONS, billingOrigin: 'code-review' }
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+  });
+
   it.each([
-    {
-      name: 'devcontainer',
-      runtime: { devcontainer: true, sandboxAllocation: 'isolated-standard' } as const,
-      billingOrigin: 'cloud-agent',
-    },
     {
       name: 'code review',
       runtime: { sandboxAllocation: 'isolated-standard' } as const,
@@ -4588,7 +4620,10 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
     const result = await runCreate(ctx, cloneRequest());
 
-    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
+    expect(
+      doStub.registerSession.mock.calls.length +
+        doStub.registerSessionFromMetadata.mock.calls.length
+    ).toBe(1);
     expect(deleteCliSessionMock).not.toHaveBeenCalled();
     expect(recordSessionFailureMock).not.toHaveBeenCalled();
     expect(recordOperationProgressMock).not.toHaveBeenCalledWith(
@@ -4622,7 +4657,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
     expect(recordOperationProgressMock).toHaveBeenCalledTimes(2);
     expect(recordOperationProgressMock).toHaveBeenNthCalledWith(2, expect.any(Object), ROW_ID, {
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
       sandboxProvider: 'cloudflare',
     });
   });
@@ -4646,7 +4681,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
 
     await registerNewSession(request, makeContext(doStub));
 
-    expect(doStub.registerSession).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         clone: { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID, reportingCreatedAt },
       })
@@ -4668,7 +4703,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     });
 
     expect(recordOperationProgressMock.mock.calls[0]?.[2]).not.toHaveProperty('reportingCreatedAt');
-    expect(doStub.createSessionWithInitialAdmission.mock.calls[0]?.[0].clone).toEqual({
+    expect(createdMetadata(doStub)?.clone).toEqual({
       cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
     });
     expect(createSessionReportMock).toHaveBeenCalledTimes(1);
@@ -4698,7 +4733,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
       createIntentFingerprint: await sessionCreateIntentFingerprint(cloneRequest()),
     });
-    expect(doStub.registerSession).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         clone: { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID, reportingCreatedAt },
       })
@@ -4725,7 +4760,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
     });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
@@ -4751,7 +4786,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       canonical_result: {
         cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
-        sandboxId: 'sb-test-123',
+        sandboxId: 'ses-0123456789abcdef',
         sandboxProvider: 'cloudflare',
         [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
         ...overrides,
@@ -4830,7 +4865,10 @@ describe('createSessionWithLedger clone reconciliation', () => {
         'https://github.com/acme/repo',
         SOURCE_KILO_SESSION_ID
       );
-      expect(doStub.registerSession).toHaveBeenCalledTimes(1);
+      expect(
+        doStub.registerSession.mock.calls.length +
+          doStub.registerSessionFromMetadata.mock.calls.length
+      ).toBe(1);
       expect(settleOperationMock).toHaveBeenCalledWith(
         expect.any(Object),
         expect.objectContaining({
@@ -4848,7 +4886,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         kiloSessionId: KILO_SESSION_ID,
         replayed: true,
       });
-      expect(doStub.registerSession.mock.calls[0]?.[0].clone).toEqual({
+      expect(createdMetadata(doStub)?.clone).toEqual({
         cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
         ...(reportingCreatedAt ? { reportingCreatedAt } : {}),
       });
@@ -4919,7 +4957,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         replayed: true,
       });
 
-      expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
           identity: expect.objectContaining({ sessionId }),
           workspace: expect.objectContaining({ sandboxProvider, credentialContainment: expected }),
@@ -5043,7 +5081,10 @@ describe('createSessionWithLedger clone reconciliation', () => {
       'https://github.com/acme/repo',
       SOURCE_KILO_SESSION_ID
     );
-    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
+    expect(
+      doStub.registerSession.mock.calls.length +
+        doStub.registerSessionFromMetadata.mock.calls.length
+    ).toBe(1);
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
@@ -5057,7 +5098,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
     });
-    expect(doStub.registerSession.mock.calls[0]?.[0].clone).toEqual({
+    expect(createdMetadata(doStub)?.clone).toEqual({
       cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
       reportingCreatedAt,
     });
@@ -5153,7 +5194,10 @@ describe('createSessionWithLedger clone reconciliation', () => {
       'https://github.com/acme/repo',
       SOURCE_KILO_SESSION_ID
     );
-    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
+    expect(
+      doStub.registerSession.mock.calls.length +
+        doStub.registerSessionFromMetadata.mock.calls.length
+    ).toBe(1);
     expect(settleOperationMock).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
@@ -5249,7 +5293,10 @@ describe('createSessionWithLedger clone reconciliation', () => {
       'https://github.com/acme/repo',
       SOURCE_KILO_SESSION_ID
     );
-    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
+    expect(
+      doStub.registerSession.mock.calls.length +
+        doStub.registerSessionFromMetadata.mock.calls.length
+    ).toBe(1);
     expect(result).toEqual({
       cloudAgentSessionId: FRESH_CLOUD_ID,
       kiloSessionId: FRESH_KILO_ID,
@@ -5274,7 +5321,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
 
     const result = await runCreate(ctx, request);
 
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+    expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
         message: expect.objectContaining({
           initialTurn: expect.objectContaining({

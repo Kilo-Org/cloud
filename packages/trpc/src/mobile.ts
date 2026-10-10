@@ -1,5 +1,5 @@
 import 'server-only';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { organizationsRouter } from '@/routers/organizations/organization-router';
 import { userRouter } from '@/routers/user-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
@@ -10,6 +10,7 @@ import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router'
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
 import { kiloPassRouter } from '@/routers/kilo-pass-router';
+import { creditsRouter } from '@/routers/credits-router';
 import { kiloclawRouter } from '@/routers/kiloclaw-router';
 import { modelsRouter } from '@/routers/models-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
@@ -40,6 +41,7 @@ const mobileRouter = createTRPCRouter({
   personalReviewAgent: personalReviewAgentRouter,
   securityAgent: securityAgentRouter,
   kiloPass: kiloPassRouter,
+  credits: creditsRouter,
   kiloclaw: kiloclawRouter,
   models: modelsRouter,
   activeSessions: activeSessionsRouter,

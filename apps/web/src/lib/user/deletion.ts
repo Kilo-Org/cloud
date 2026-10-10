@@ -7,7 +7,7 @@ import {
   type UserDeletionRequest,
   type UserDeletionStep,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ACTIVE_REQUEST_STATUSES } from '@/lib/user/deletion-queue/deletion-types';
 
 export { SoftDeletePreconditionError } from '@/lib/user';

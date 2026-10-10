@@ -6,8 +6,8 @@ import {
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
 } from '@kilocode/db/schema';
-import { KILOCLAW_INBOUND_EMAIL_DOMAIN } from '@/lib/config.server';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { KILOCLAW_INBOUND_EMAIL_DOMAIN } from '@kilocode/web-shared/lib/config.server';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 const MAX_ALIAS_INSERT_ATTEMPTS = 16;
 

@@ -1,7 +1,7 @@
 'use client';
 
 import type { DrawerStackHelpers } from '@/components/drawer';
-import type { OrganizationGroupPolicies } from '@/lib/organizations/group-policies/organization-group-policies';
+import type { OrganizationGroupPolicies } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, Plus } from 'lucide-react';
 import { organizationGroupPolicyDefinition } from '@/components/organizations/groups/policies/registry.client';

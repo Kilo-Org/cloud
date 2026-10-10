@@ -155,8 +155,6 @@ export class GastownClient {
     return ('data' in body ? body.data : undefined) as T;
   }
 
-  // -- Agent-scoped endpoints --
-
   async prime(): Promise<PrimeContext> {
     return this.request<PrimeContext>(this.agentPath('/prime'));
   }
@@ -195,8 +193,6 @@ export class GastownClient {
       body: JSON.stringify({ message }),
     });
   }
-
-  // -- Rig-scoped endpoints --
 
   async getBead(beadId: string): Promise<Bead> {
     return this.request<Bead>(this.rigPath(`/beads/${beadId}`));
@@ -364,8 +360,6 @@ export class MayorGastownClient {
 
     return ('data' in body ? body.data : undefined) as T;
   }
-
-  // -- Mayor tool endpoints --
 
   async sling(input: {
     rig_id: string;
@@ -577,7 +571,6 @@ export class MayorGastownClient {
     });
   }
 
-  // -- Wasteland tool endpoints --
   // The wasteland is auto-resolved by the worker from the town's connection.
 
   async wastelandBrowse(input: {

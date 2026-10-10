@@ -7,8 +7,8 @@ import {
   OAUTH_STATE_TTL_SECONDS,
   verifyOAuthStateDetailed,
 } from '@/lib/integrations/oauth-state';
-import { redisClient } from '@/lib/redis';
-import { githubConnectionPkceRedisKey } from '@/lib/redis-keys';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { githubConnectionPkceRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 
 const PREFIX = 'github-connection:';
 const Payload = z.object({

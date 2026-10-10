@@ -3,7 +3,7 @@ import 'server-only';
 import {
   observeServiceFeeAssessmentDispute,
   type ServiceFeeAssessmentRecord,
-} from '@/lib/service-fees/assessments';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
 import {
   resolveServiceFeeAssessmentFromStripeRefs,
   ServiceFeeObservationNotReadyError,

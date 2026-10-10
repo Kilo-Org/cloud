@@ -4,7 +4,7 @@ import { decode as decodeCbor } from 'cbor2';
 import { AsnParser } from '@peculiar/asn1-schema';
 import { Certificate } from '@peculiar/asn1-x509';
 import * as asn1js from 'asn1js';
-import { APPLE_APP_BUNDLE_ID, APPLE_TEAM_ID } from '@/lib/config.server';
+import { APPLE_APP_BUNDLE_ID, APPLE_TEAM_ID } from '@kilocode/web-shared/lib/config.server';
 import { captureMessage } from '@sentry/nextjs';
 
 /**

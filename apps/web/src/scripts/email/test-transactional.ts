@@ -3,7 +3,7 @@ import {
   sendOrgRenewedEmail,
   sendOrgSSOUserJoinedEmail,
   sendOrgSubscriptionEmail,
-} from '@/lib/email';
+} from '@kilocode/web-shared/lib/email';
 import { assert } from 'node:console';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));

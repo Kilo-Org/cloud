@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   generateSessionId,
+  isCodeReviewControlPlaneOwner,
+  isCodeReviewSession,
   isControlPlaneOwner,
+  isControlSession,
   isInteractiveWebSession,
+  isLegacySession,
   isWorktreeOwner,
+  sessionDoName,
+  sessionFor,
+  sessionIdFromDoName,
   sessionPlaneForNewOwner,
   sessionPlaneFromId,
   sessionSupportsTerminal,
@@ -19,6 +26,19 @@ describe('session plane identity', () => {
     expect(sessionPlaneFromId('agent2_12345678-1234-1234-1234-123456789abc')).toBe('legacy');
   });
 
+  it('exposes thin plane predicates over sessionPlaneFromId', () => {
+    const control = 'workspace_12345678-1234-1234-1234-123456789abc';
+    const legacy = 'agent_12345678-1234-1234-1234-123456789abc';
+
+    expect(isControlSession(control)).toBe(true);
+    expect(isControlSession(legacy)).toBe(false);
+    expect(isLegacySession(legacy)).toBe(true);
+    expect(isLegacySession(control)).toBe(false);
+    // A non-`workspace_` id is legacy even when it is not a valid `agent_` id.
+    expect(isLegacySession('agent2_12345678-1234-1234-1234-123456789abc')).toBe(true);
+    expect(isControlSession('agent2_12345678-1234-1234-1234-123456789abc')).toBe(false);
+  });
+
   it('accepts agent_ and workspace_ session IDs and rejects agent2_', () => {
     expect(SESSION_ID_RE.test('agent_12345678-1234-1234-1234-123456789abc')).toBe(true);
     expect(SESSION_ID_RE.test('workspace_12345678-1234-1234-1234-123456789abc')).toBe(true);
@@ -30,6 +50,15 @@ describe('session plane identity', () => {
     expect(sessionIdSchema.safeParse('agent2_12345678-1234-1234-1234-123456789abc').success).toBe(
       false
     );
+  });
+
+  it('names a Session DO as ownerId:sessionId and recovers the bare session id', () => {
+    const sessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
+    expect(sessionDoName('user-1', sessionId)).toBe(`user-1:${sessionId}`);
+    expect(sessionIdFromDoName(`user-1:${sessionId}`)).toBe(sessionId);
+    // `ownerId` may contain colons, so the split is on the last one.
+    expect(sessionIdFromDoName(`oauth/google:12345:${sessionId}`)).toBe(sessionId);
+    expect(sessionIdFromDoName(sessionId)).toBe(sessionId);
   });
 
   it('mints workspace_ only for allowlisted interactive web sessions', () => {
@@ -66,6 +95,83 @@ describe('session plane identity', () => {
       ).toBe('legacy');
     }
   );
+
+  it('treats only the trusted billing origin as a code-review session', () => {
+    expect(isCodeReviewSession({ billingOrigin: 'code-review' })).toBe(true);
+    expect(isCodeReviewSession({ createdOnPlatform: 'code-review' })).toBe(false);
+    expect(
+      isCodeReviewSession({ createdOnPlatform: 'code-review', billingOrigin: 'cloud-agent' })
+    ).toBe(false);
+    expect(isCodeReviewSession({})).toBe(false);
+    expect(isCodeReviewSession()).toBe(false);
+  });
+
+  it('routes enrolled code-review owners to the control plane through CODE_REVIEW_CONTROL_PLANE_IDS', () => {
+    const origin = { createdOnPlatform: 'code-review', billingOrigin: 'code-review' };
+    expect(
+      sessionPlaneForNewOwner(
+        { CODE_REVIEW_CONTROL_PLANE_IDS: 'user-1' },
+        { userId: 'user-1' },
+        origin
+      )
+    ).toBe('control');
+    expect(
+      sessionPlaneForNewOwner(
+        { CODE_REVIEW_CONTROL_PLANE_IDS: 'org-1' },
+        { userId: 'user-2', orgId: 'org-1' },
+        origin
+      )
+    ).toBe('control');
+    expect(
+      sessionPlaneForNewOwner({ CODE_REVIEW_CONTROL_PLANE_IDS: '*' }, { userId: 'user-3' }, origin)
+    ).toBe('control');
+    expect(
+      sessionPlaneForNewOwner(
+        { CODE_REVIEW_CONTROL_PLANE_IDS: 'other' },
+        { userId: 'user-3' },
+        origin
+      )
+    ).toBe('legacy');
+    expect(sessionPlaneForNewOwner({}, { userId: 'user-1' }, origin)).toBe('legacy');
+  });
+
+  it('keeps the code-review allowlist independent of the interactive control-plane allowlist', () => {
+    const codeReview = { createdOnPlatform: 'code-review', billingOrigin: 'code-review' };
+    const web = { createdOnPlatform: 'cloud-agent-web' };
+
+    expect(
+      sessionPlaneForNewOwner({ CONTROL_PLANE_IDS: '*' }, { userId: 'user-1' }, codeReview)
+    ).toBe('legacy');
+    expect(
+      sessionPlaneForNewOwner({ CODE_REVIEW_CONTROL_PLANE_IDS: '*' }, { userId: 'user-1' }, web)
+    ).toBe('legacy');
+  });
+
+  it('does not route a spoofed code-review platform string to the control plane', () => {
+    expect(
+      sessionPlaneForNewOwner(
+        { CODE_REVIEW_CONTROL_PLANE_IDS: '*' },
+        { userId: 'user-1' },
+        { createdOnPlatform: 'code-review' }
+      )
+    ).toBe('legacy');
+  });
+
+  it('matches CODE_REVIEW_CONTROL_PLANE_IDS owners the same way as other allowlists', () => {
+    expect(
+      isCodeReviewControlPlaneOwner(
+        { CODE_REVIEW_CONTROL_PLANE_IDS: 'user-1, org-1' },
+        { userId: 'user-2', orgId: 'org-1' }
+      )
+    ).toBe(true);
+    expect(
+      isCodeReviewControlPlaneOwner(
+        { CODE_REVIEW_CONTROL_PLANE_IDS: 'user-1' },
+        { userId: 'user-2' }
+      )
+    ).toBe(false);
+    expect(isCodeReviewControlPlaneOwner({}, { userId: 'user-1' })).toBe(false);
+  });
 
   it('treats only cloud-agent-web as an interactive web session', () => {
     expect(isInteractiveWebSession({ createdOnPlatform: 'cloud-agent-web' })).toBe(true);
@@ -115,5 +221,37 @@ describe('session plane identity', () => {
     expect(sessionHasTerminal(legacySessionId, 'cloudflare')).toBe(true);
     expect(sessionHasTerminal(legacySessionId, 'vercel')).toBe(false);
     expect(PROVIDER_CAPABILITIES.vercel.terminal).toBe(false);
+  });
+});
+
+describe('sessionFor', () => {
+  const controlSessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
+  const legacySessionId = 'agent_12345678-1234-1234-1234-123456789abc';
+
+  it('routes a control session to the control branch and a legacy session to the legacy branch', () => {
+    const control = vi.fn(() => 'control');
+    const legacy = vi.fn(() => 'legacy');
+
+    expect(sessionFor(controlSessionId, control, legacy)).toBe('control');
+    expect(sessionFor(legacySessionId, control, legacy)).toBe('legacy');
+    expect(control).toHaveBeenCalledTimes(1);
+    expect(legacy).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves a factory that builds a fresh stub on every call, which withDORetry relies on', () => {
+    const control = vi.fn(() => ({ stub: 'control' }));
+    const legacy = vi.fn(() => ({ stub: 'legacy' }));
+    const getStub = sessionFor(
+      controlSessionId,
+      () => control,
+      () => legacy
+    );
+
+    const first = getStub();
+    const second = getStub();
+
+    expect(control).toHaveBeenCalledTimes(2);
+    expect(legacy).not.toHaveBeenCalled();
+    expect(first).not.toBe(second);
   });
 });

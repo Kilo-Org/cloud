@@ -10,6 +10,8 @@ import { inlineSqlPlugin } from './vitest.sql-plugin';
 // project.
 export default defineProject({
   plugins: [inlineSqlPlugin()],
+  // Vendored text assets resolve to a URL, like images, instead of being run as JS.
+  assetsInclude: ['**/*.txt'],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('src', import.meta.url)),

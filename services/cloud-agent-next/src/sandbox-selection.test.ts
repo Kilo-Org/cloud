@@ -29,74 +29,56 @@ const owner = { userId: 'oauth/user', orgId: 'org-id' };
 describe('sandbox selection policy', () => {
   it.each([
     {
-      name: 'shared Cloudflare',
+      name: 'isolated Cloudflare without an allowlist',
       overrides: {},
-      devcontainer: false,
-      expected: getSandboxAllocationRequest('cloudflare-shared'),
+      expected: getSandboxAllocationRequest('cloudflare-single'),
     },
     {
-      name: 'isolated Cloudflare',
-      overrides: { PER_SESSION_SANDBOX_ORG_IDS: owner.orgId },
-      devcontainer: false,
+      name: 'isolated Cloudflare with an empty allowlist',
+      overrides: { PER_SESSION_SANDBOX_ORG_IDS: '' },
       expected: getSandboxAllocationRequest('cloudflare-single'),
     },
     {
       name: 'Vercel with provider-default resources',
-      overrides: { PER_SESSION_SANDBOX_ORG_IDS: owner.orgId, VERCEL_SANDBOX_ORG_IDS: owner.orgId },
-      devcontainer: false,
+      overrides: { VERCEL_SANDBOX_ORG_IDS: owner.orgId },
       expected: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
     },
     {
       name: 'Vercel with user-level control-plane enrollment',
       overrides: {
         CONTROL_PLANE_IDS: owner.userId,
-        PER_SESSION_SANDBOX_ORG_IDS: '*',
         VERCEL_SANDBOX_ORG_IDS: '*',
       },
-      devcontainer: false,
       expected: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
     },
     {
       name: 'legacy isolation despite Vercel enrollment',
       overrides: {
         CONTROL_PLANE_IDS: '',
-        PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
         VERCEL_SANDBOX_ORG_IDS: owner.orgId,
       },
-      devcontainer: false,
       expected: getSandboxAllocationRequest('cloudflare-single'),
     },
     {
-      name: 'shared routing despite Vercel enrollment',
-      overrides: { VERCEL_SANDBOX_ORG_IDS: owner.orgId },
-      devcontainer: false,
-      expected: getSandboxAllocationRequest('cloudflare-shared'),
+      name: 'isolated Cloudflare outside the former allowlist',
+      overrides: { PER_SESSION_SANDBOX_ORG_IDS: 'other-org' },
+      expected: getSandboxAllocationRequest('cloudflare-single'),
     },
     {
       name: 'missing Vercel configuration',
       overrides: {
-        PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
         VERCEL_SANDBOX_ORG_IDS: owner.orgId,
         VERCEL_TOKEN: undefined,
       },
-      devcontainer: false,
       expected: getSandboxAllocationRequest('cloudflare-single'),
-    },
-    {
-      name: 'devcontainer instead of the normal Vercel default',
-      overrides: { PER_SESSION_SANDBOX_ORG_IDS: owner.orgId, VERCEL_SANDBOX_ORG_IDS: owner.orgId },
-      devcontainer: true,
-      expected: { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
     },
     {
       name: 'enforced default skips Vercel even when explicit Vercel is enrolled',
       overrides: {
-        PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
         VERCEL_SANDBOX_ORG_IDS: owner.orgId,
         CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
         CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: owner.orgId,
       },
-      devcontainer: false,
       expected: getSandboxAllocationRequest('cloudflare-single'),
     },
     {
@@ -106,43 +88,33 @@ describe('sandbox selection policy', () => {
         VERCEL_SANDBOX_ORG_IDS: '',
         CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
       },
-      devcontainer: false,
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-4'),
     },
     {
-      name: 'unchanged shared Cloudflare when the owner is not isolated',
+      name: 'Cloudflare containers without an isolation allowlist',
       overrides: {
         VERCEL_SANDBOX_ORG_IDS: '',
         CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
       },
-      devcontainer: false,
-      expected: getSandboxAllocationRequest('cloudflare-shared'),
+      expected: getSandboxAllocationRequest('cloudflare-containers-standard-4'),
     },
-  ])(
-    'previews $name consistently with actual routing',
-    async ({ overrides, devcontainer, expected }) => {
-      const env = { ...configured, ...overrides } as Env;
-      const capabilities = getSandboxSelectionCapabilities(env, owner, devcontainer);
-      expect(capabilities.defaultDestination).toEqual(expected);
-      const plane = sessionPlaneForNewOwner(env, owner, { createdOnPlatform: 'cloud-agent-web' });
-      const actual = await selectSandboxForNewSession({
-        env,
-        ...owner,
-        sessionId: `${plane === 'control' ? 'workspace' : 'agent'}_12345678-1234-1234-1234-123456789012`,
-        devcontainer,
-      });
-      expect(actual.provider).toBe(expected.provider.id);
-      if (actual.provider === 'cloudflare') {
-        expect(classifySandboxId(actual.sandboxId)).toBe(
-          expected.instanceType === 'shared'
-            ? 'shared'
-            : expected.instanceType === 'devcontainer'
-              ? 'devcontainer'
-              : 'isolated-small'
-        );
-      }
+  ])('previews $name consistently with actual routing', async ({ overrides, expected }) => {
+    const env = { ...configured, ...overrides } as Env;
+    const capabilities = getSandboxSelectionCapabilities(env, owner);
+    expect(capabilities.defaultDestination).toEqual(expected);
+    const plane = sessionPlaneForNewOwner(env, owner, { createdOnPlatform: 'cloud-agent-web' });
+    const actual = await selectSandboxForNewSession({
+      env,
+      ...owner,
+      sessionId: `${plane === 'control' ? 'workspace' : 'agent'}_12345678-1234-1234-1234-123456789012`,
+    });
+    expect(actual.provider).toBe(expected.provider.id);
+    if (actual.provider === 'cloudflare') {
+      expect(classifySandboxId(actual.sandboxId)).toBe(
+        expected.instanceType === 'shared' ? 'shared' : 'isolated-small'
+      );
     }
-  );
+  });
 
   it('does not authorize a Kilo allocation from a BYOC capability with the same size', () => {
     expect(

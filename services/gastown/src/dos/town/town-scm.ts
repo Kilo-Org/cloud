@@ -317,7 +317,7 @@ async function classifyThreadsViaKiloGateway(
     Authorization: `Bearer ${townConfig.kilocode_token}`,
     'Content-Type': 'application/json',
     // Feature attribution for microdollar usage; 'gastown' is in FEATURE_VALUES
-    // (apps/web/src/lib/feature-detection.ts).
+    // (packages/web-shared/src/lib/feature-detection.ts).
     'X-KiloCode-Feature': 'gastown',
   };
   if (townConfig.organization_id) {

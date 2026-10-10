@@ -7,7 +7,7 @@
       "instanceLifecycle": "Phiên bản của bạn có bản cập nhật",
       "scheduledAction": "Một hành động đã lên lịch có bản cập nhật",
       "lowBalance": "Số dư của bạn cần được chú ý",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Chi tiêu của bạn cần được chú ý",
       "securityFinding": "Một phát hiện bảo mật cần được chú ý",
       "activeAgentsGlanceable": "Các tác nhân đang hoạt động có bản cập nhật"
     }
@@ -44,8 +44,8 @@
       "body": "Số dư của {{organizationName}} đã giảm xuống dưới ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Cảnh báo chi tiêu",
+      "body": "Chi tiêu của {{scopeName}} đã vượt ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Phát hiện bảo mật mới ({{severity}})",

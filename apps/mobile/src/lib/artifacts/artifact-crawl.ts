@@ -9,7 +9,9 @@ import {
   type ArtifactMirrorSession,
   safeArtifactDisplayName,
   safeArtifactSessionName,
+  uniqueArtifactDisplayNames,
 } from '@/lib/artifacts/artifact-mirror-manifest';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { trpcClient } from '@/lib/trpc';
 
 /**
@@ -334,7 +336,12 @@ export async function fetchSessionMessagesPage(
  * Assemble the mirror's session entries. A session keeps its folder even with
  * no files. Its label is sanitized ({@link safeArtifactSessionName}) rather than
  * taken verbatim: the title is free text, and both file browsers need one
- * non-empty path component, with `Session <id>` as the fallback.
+ * non-empty path component, with `Session <id>` as the fallback. The title is
+ * first gated through {@link sessionDisplayTitle}, so a row still carrying the
+ * backend's `New session - <ISO>` placeholder gets the fallback label instead
+ * of the machine string the app itself would never paint. Duplicate filenames
+ * within a session are disambiguated by {@link uniqueArtifactDisplayNames}, so
+ * the browser shows one row per artifact.
  */
 export function buildSessionArtifacts(
   sessions: MirrorSessionRow[],
@@ -342,9 +349,14 @@ export function buildSessionArtifacts(
 ): ArtifactMirrorSession[] {
   return sessions.map(session => ({
     id: session.id,
-    title: safeArtifactSessionName({ id: session.id, title: session.title }),
+    title: safeArtifactSessionName({
+      id: session.id,
+      title: sessionDisplayTitle(session.title) ?? null,
+    }),
     updatedAt: session.updatedAt,
-    files: (artifactsBySession.get(session.id) ?? []).map(artifact => toMirrorFile(artifact)),
+    files: uniqueArtifactDisplayNames(
+      (artifactsBySession.get(session.id) ?? []).map(artifact => toMirrorFile(artifact))
+    ),
   }));
 }
 

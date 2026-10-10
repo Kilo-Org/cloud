@@ -3,12 +3,14 @@ import type { ToolPart } from './types';
 import { ToolCardShell } from './ToolCardShell';
 import { ToolCodeBlock } from './ToolOutput';
 import { normalizeTerminalOutput } from './normalize-terminal-output';
+import { useStickToBottom } from './hooks/useStickToBottom';
 
 type BashToolCardProps = {
   toolPart: ToolPart;
 };
 
 const WORKSPACE_PATH_PATTERN = /\/workspace\/(?:[^/\s]+\/)?[^/\s]+\/sessions\/[^/\s]+/g;
+const STREAMING_OUTPUT_WINDOW_CLASS = 'max-h-24';
 
 function getCommandPreview(command: string): string {
   const normalized = command.replace(WORKSPACE_PATH_PATTERN, '.');
@@ -34,6 +36,8 @@ export function BashToolCard({ toolPart }: BashToolCardProps) {
         ? metadata.output
         : '';
   const output = normalizeTerminalOutput(rawOutput);
+  const outputScroll = useStickToBottom<HTMLPreElement>(output);
+  const hasOutputStreaming = state.status === 'running' && Boolean(output.trim());
 
   return (
     <ToolCardShell
@@ -61,6 +65,9 @@ export function BashToolCard({ toolPart }: BashToolCardProps) {
           label="Output"
           compact
           isStreaming={state.status === 'running'}
+          maxHeightClassName={hasOutputStreaming ? STREAMING_OUTPUT_WINDOW_CLASS : undefined}
+          scrollRef={hasOutputStreaming ? outputScroll.ref : undefined}
+          onScroll={hasOutputStreaming ? outputScroll.onScroll : undefined}
         />
       ) : null}
       {state.status === 'completed' && !output.trim() && (

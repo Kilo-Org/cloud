@@ -1,5 +1,5 @@
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
-import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
+import { isContainerConcurrencyLimitError } from '../container-concurrency.js';
 import {
   containersBillingIdentity,
   parseSandboxBillingInput,
@@ -25,6 +25,7 @@ import type {
   ProviderAllocationIntent,
   ProviderCreateIntent,
 } from './provider.js';
+import { ProviderCreationError } from './provider.js';
 
 const LOG_MAX_BYTES = 1024 * 1024;
 
@@ -75,8 +76,13 @@ export function createCloudflareContainersProviderAdapter(deps: {
   ) => {
     if (!billing) return;
     const parsed = decodeOwnedProviderRef(ref);
-    if (!parsed) throw new Error('Invalid Cloudflare containers allocation');
-    const input = parseSandboxBillingInput(billing);
+    if (!parsed) throw new ProviderCreationError('invalid_configuration');
+    let input: ReturnType<typeof parseSandboxBillingInput>;
+    try {
+      input = parseSandboxBillingInput(billing);
+    } catch {
+      throw new ProviderCreationError('invalid_configuration');
+    }
     const container = deps.getContainer(deps.logicalSandboxId);
     let blocked = false;
     try {
@@ -88,7 +94,8 @@ export function createCloudflareContainersProviderAdapter(deps: {
       let admission: SandboxBillingAdmissionResult;
       try {
         admission = await container.ensureBillingAdmission(input, instance);
-      } catch {
+      } catch (error) {
+        if (isContainerConcurrencyLimitError(error)) throw error;
         admission = {
           success: false,
           code: 'meter_unavailable',
@@ -96,15 +103,14 @@ export function createCloudflareContainersProviderAdapter(deps: {
         };
       }
       if (!admission.success) {
-        throw new AgentSandboxUnavailableError(
-          admission.code === 'insufficient_credits' || admission.code === 'stopping'
-            ? 'Container billing requires additional credits'
-            : 'Container billing admission is temporarily unavailable',
-          'billing_blocked'
-        );
+        throw new ProviderCreationError(admission.code);
       }
     } else {
-      await container.configureBilling(input, instance).catch(() => undefined);
+      await withDORetry(
+        () => deps.getContainer(deps.logicalSandboxId),
+        container => container.configureBilling(input, instance),
+        'configureSandboxContainersBilling'
+      );
     }
   };
 
@@ -118,19 +124,21 @@ export function createCloudflareContainersProviderAdapter(deps: {
       await ensureBillingAdmission(providerRef, intent.billing);
       return { providerRef };
     },
-    async launch(ref, env) {
+    async launch(ref, env, options) {
       const owned = decodeOwnedProviderRef(ref);
       if (owned === null) {
-        throw new Error('Invalid Cloudflare containers allocation');
+        throw new ProviderCreationError('invalid_configuration');
       }
       const container = deps.getContainer(deps.logicalSandboxId);
       const workloadLimitMb =
         env['CONTROL_WORKLOAD_LIMIT_MB'] ??
         String(containersBillingIdentity(instance).capacity.memoryMiB);
-      await container.launchWrapper({
+      const { startSource } = await container.launchWrapper({
         allocationRef: ref,
         instance,
         containment: owned.containment,
+        ...(options?.repoKey === undefined ? {} : { repoKey: options.repoKey }),
+        ...(options?.discardRepository === true ? { discardRepository: true as const } : {}),
         env: {
           ...env,
           CONTROL_WORKLOAD_LIMIT_MB: workloadLimitMb,
@@ -142,6 +150,17 @@ export function createCloudflareContainersProviderAdapter(deps: {
       // recovery admission gate can delay. Establish the initial lease here so
       // the container is not reaped by its inactivity timeout before then.
       await container.ensureLeaseAtLeast(ref, leaseAtLeastMs());
+      return { startSource };
+    },
+    async captureRepository(ref, repoKey, commit) {
+      if (decodeOwnedProviderRef(ref) === null) return false;
+      try {
+        return await deps
+          .getContainer(deps.logicalSandboxId)
+          .captureRepository(ref, repoKey, commit);
+      } catch {
+        return false;
+      }
     },
     async observe(ref, intent) {
       const providerRef = resolveProviderRef(ref, intent);
@@ -162,6 +181,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       const diagnostic = {
         provider: 'cloudflare-containers',
         allocationName: deps.logicalSandboxId,
+        intentId: intent?.intentId,
       };
       if (resolved === null || decodeOwnedProviderRef(resolved) === null) {
         logControlDiagnostic('native_stop', { ...diagnostic, result: 'invalid_reference' });

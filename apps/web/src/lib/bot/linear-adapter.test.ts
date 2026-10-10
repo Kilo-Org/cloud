@@ -17,7 +17,7 @@ jest.mock(
 
 // Force every Linear env var to the empty-string value getEnvVariable returns
 // when the var is missing. config.server snapshots these at module load time.
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   LINEAR_CLIENT_ID: '',
   LINEAR_CLIENT_SECRET: '',
   LINEAR_WEBHOOK_SECRET: '',

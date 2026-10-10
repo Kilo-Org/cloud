@@ -114,9 +114,11 @@ describe('notificationPathForData', () => {
         running: 1,
         needsInput: 0,
         idle: 0,
+        scheduled: 0,
         updatedAt: '2026-01-01T00:00:00.000Z',
         expiresAt: '2026-01-01T08:00:00.000Z',
         needsInputSince: '2026-01-01T00:00:00.000Z',
+        scheduledAt: null,
         newestResultKind: 'running',
         newestResultAt: '2026-01-01T00:00:00.000Z',
       })

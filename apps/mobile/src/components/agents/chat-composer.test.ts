@@ -5,7 +5,6 @@ import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
-import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import { Text as renderText } from '@/components/ui/text';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
@@ -23,6 +22,8 @@ const remoteExitState: RemoteCommandState = {
 
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
 const safeAreaInsets = vi.hoisted(() => ({ bottom: 0, left: 0, right: 0, top: 0 }));
+const voiceStatus = vi.hoisted(() => ({ value: 'idle' }));
+const announceForAccessibility = vi.hoisted(() => vi.fn());
 const TEXT_DIRECTIONS = [
   { direction: 'LTR', isRTL: false, style: undefined },
   {
@@ -95,6 +96,7 @@ vi.mock('react', async () => {
 
 // ── react-native and native bridges ────────────────────────────────────────
 vi.mock('react-native', () => ({
+  AccessibilityInfo: { announceForAccessibility },
   AppState: {
     addEventListener: () => ({ remove: vi.fn() }),
   },
@@ -215,8 +217,21 @@ vi.mock('@/components/agents/attachment-picker', () => ({
   pickAgentAttachments: vi.fn(),
 }));
 
+// The exit confirm is a hook now; this suite pins only that a rejected
+// slash-command submission never asks for it.
+const exitConfirmMock = vi.hoisted(() => ({ confirmExit: vi.fn() }));
+
 vi.mock('@/components/agents/remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn(),
+  useRemoteSessionExitConfirmation: () => ({
+    confirmExit: exitConfirmMock.confirmExit,
+    exitDialog: null,
+  }),
+}));
+
+// The composer reaches this hook; the suite calls the component as a plain
+// function, so every hook on its path is stubbed.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
 }));
 
 vi.mock('@/components/agents/use-text-height', () => ({
@@ -253,10 +268,6 @@ vi.mock('@/components/agents/chat-composer-input-state', () => ({
 const MockBlurBar = () => null;
 
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: MockBlurBar }));
-
-vi.mock('@/components/voice-input-control', () => ({
-  VoiceInputStatus: () => null,
-}));
 
 // ── hooks and libs ─────────────────────────────────────────────────────────
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -342,7 +353,7 @@ vi.mock('@/lib/voice-input/use-voice-input', () => ({
       available: false,
       isActive: false,
       settleBeforeSubmit: vi.fn(async () => true),
-      status: 'idle',
+      status: voiceStatus.value,
       toggle: vi.fn(),
     };
   },
@@ -509,6 +520,7 @@ beforeEach(() => {
   returnSendsPref.returnSendsMessage = false;
   reducedMotionOn.value = false;
   layoutDirection.isRTL = false;
+  voiceStatus.value = 'idle';
   safeAreaInsets.bottom = 0;
   safeAreaInsets.left = 0;
   safeAreaInsets.right = 0;
@@ -912,7 +924,7 @@ describe('ChatComposer slash-command rejection feedback', () => {
     );
     expect(statusMessage(rejected)).toBe('/quit does not take arguments.');
     expect(onSendMock).not.toHaveBeenCalled();
-    expect(showRemoteSessionExitConfirmation).not.toHaveBeenCalled();
+    expect(exitConfirmMock.confirmExit).not.toHaveBeenCalled();
   });
 
   it('clears the rejection once the input is edited', async () => {
@@ -930,5 +942,28 @@ describe('ChatComposer slash-command rejection feedback', () => {
       makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
     );
     expect(statusMessage(edited)).toBeNull();
+  });
+});
+
+// A caption row under the toolbar used to carry the voice status, so starting
+// speech grew the composer and shifted the transcript above it. The status now
+// rides in the input's placeholder slot, which keeps the composer's height.
+describe('ChatComposer voice status', () => {
+  it.each([
+    { status: 'idle', placeholder: 'Message the agent' },
+    { status: 'listening', placeholder: 'Listening...' },
+    { status: 'transcribing', placeholder: 'Transcribing...' },
+  ])('shows "$placeholder" in the input while $status', async ({ status, placeholder }) => {
+    voiceStatus.value = status;
+    const render = await mount(makeProps({ placeholder: 'Message the agent' }));
+
+    expect(findInputRowProps(render)?.placeholder).toBe(placeholder);
+  });
+
+  it('announces transcribing, which no live region carries any more', async () => {
+    voiceStatus.value = 'transcribing';
+    await mount(makeProps({}));
+
+    expect(announceForAccessibility).toHaveBeenCalledWith('Transcribing...');
   });
 });

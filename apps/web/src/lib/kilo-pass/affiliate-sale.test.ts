@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import type Stripe from 'stripe';
 
-import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type * as affiliateEventsModule from '@/lib/impact/affiliate-events';
 
 // Use global `jest.mock` so SWC hoists it before the static import below.

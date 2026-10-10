@@ -11,7 +11,7 @@ import {
   isSeatsTerminal,
   isWarningStatus,
 } from '@/components/subscriptions/helpers';
-import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { capitalize } from '@/lib/utils';
 import { formatSeatPrice } from './seat-price';
 import { SeatsSubscribeCard } from './SeatsSubscribeCard';

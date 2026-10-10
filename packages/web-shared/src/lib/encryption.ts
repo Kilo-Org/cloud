@@ -1,0 +1,19 @@
+/**
+ * Re-exports from @kilocode/encryption.
+ *
+ * All encryption logic lives in the shared package; this file exists so that
+ * existing imports from `@kilocode/web-shared/lib/encryption` continue to work without changes.
+ */
+export {
+  EncryptionConfigurationError,
+  EncryptionFormatError,
+  encryptWithPublicKey,
+  decryptWithPrivateKey,
+  encryptKeyedEnvelope,
+  encryptWithSymmetricKey,
+  decryptWithSymmetricKey,
+  decryptSecrets,
+  mergeEnvVarsWithSecrets,
+} from '@kilocode/encryption';
+
+export type { EncryptedEnvelope } from '@kilocode/encryption';

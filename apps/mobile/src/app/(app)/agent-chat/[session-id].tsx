@@ -98,7 +98,16 @@ export default function SessionDetailScreen() {
   if (openStart.current.sessionId !== rawSessionId) {
     openStart.current = { sessionId: rawSessionId, startedAt: Date.now() };
   }
-  useRouteForegroundRefresh([[['cliSessionsV2']], [['modelPreferences']]]);
+  // Narrow the metadata invalidation to this session's own query key. The whole
+  // `cliSessionsV2` procedure prefix would also invalidate the stored
+  // `cliSessionsV2.list` pages behind this pushed route, so returning to the app
+  // (or refocusing the route) refetched every retained list page alongside the
+  // metadata. `SessionDetailContent` already refetches `getWithRuntimeState` on
+  // focus, and this key still refreshes the opened session's metadata.
+  useRouteForegroundRefresh([
+    trpc.cliSessionsV2.get.queryKey({ session_id: sessionId ?? '' }),
+    [['modelPreferences']],
+  ]);
   const sessionQuery = useQuery({
     ...trpc.cliSessionsV2.get.queryOptions(
       { session_id: sessionId ?? '' },

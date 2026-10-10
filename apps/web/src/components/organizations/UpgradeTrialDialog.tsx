@@ -4,8 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { PlanCard } from './subscription/PlanCard';
 import { Button } from '@/components/Button';
-import type { BillingCycle, OrganizationPlan } from '@/lib/organizations/organization-types';
-import { seatPrice } from '@/lib/organizations/constants';
+import type {
+  BillingCycle,
+  OrganizationPlan,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { seatPrice } from '@kilocode/web-shared/lib/organizations/constants';
 import { ENTERPRISE_FEATURES, TEAMS_FEATURES } from './subscription/plan-features';
 import {
   useOrganizationSubscriptionLink,

@@ -193,7 +193,7 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          if ! ENV_OUTPUT=$(pnpx eas-cli@21.8.0 env:list --environment production --format long 2>&1); then
+          if ! ENV_OUTPUT=$(pnpx eas-cli@24.8.0 env:list --environment production --format long 2>&1); then
             echo "$ENV_OUTPUT"
             echo "::error::eas env:list failed"
             exit 1
@@ -219,7 +219,7 @@ jobs:
         # makes that evaluation throw on env the CLI never injects. SENTRY_AUTH_TOKEN
         # is a SECRET variable that only EAS builders can read, so the assertion run
         # gets a placeholder. The step above proves the real secret exists.
-        run: pnpx eas-cli@21.8.0 env:exec production --non-interactive 'EAS_BUILD_PROFILE=production SENTRY_AUTH_TOKEN=preflight-placeholder pnpm assert:config'
+        run: pnpx eas-cli@24.8.0 env:exec production --non-interactive 'EAS_BUILD_PROFILE=production SENTRY_AUTH_TOKEN=preflight-placeholder pnpm assert:config'
 
   build-and-submit:
     needs: [check-changes, validate, preflight]
@@ -252,7 +252,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           mkdir -p artifacts
-          pnpx eas-cli@21.8.0 build --profile production --platform all --non-interactive --json --wait > build.json
+          pnpx eas-cli@24.8.0 build --profile production --platform all --non-interactive --json --wait > build.json
           node ../../scripts/inspect-mobile-artifacts.mjs --select build.json > urls.txt
           echo "IOS_URL=$(sed -n '1p' urls.txt)" >> "$GITHUB_ENV"
           echo "ANDROID_URL=$(sed -n '2p' urls.txt)" >> "$GITHUB_ENV"
@@ -376,13 +376,13 @@ jobs:
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: pnpx eas-cli@21.8.0 submit --profile production --platform ios --non-interactive --path artifacts/app.ipa
+        run: pnpx eas-cli@24.8.0 submit --profile production --platform ios --non-interactive --path artifacts/app.ipa
 
       - name: Submit Android
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: pnpx eas-cli@21.8.0 submit --profile production --platform android --non-interactive --path artifacts/app.aab
+        run: pnpx eas-cli@24.8.0 submit --profile production --platform android --non-interactive --path artifacts/app.aab
 
       # Release detection only: the next run reads this to find the last release.
       # The upload cap never counts it (a partial run writes no release tag).
@@ -624,7 +624,11 @@ jobs:
             gh pr edit "$PR" --body-file "$RUNNER_TEMP/kilo-app-bump-pr.md"
             echo "Refreshed the version-bump PR #$PR for $BRANCH"
           else
+            # --head is required: this job checks out main, and without it gh
+            # resolves the head to the checked-out branch and the API refuses
+            # the PR with "No commits between main and main".
             gh pr create --base main \
+              --head "$BRANCH" \
               --title "chore(kilo-app): bump version to $NEW" \
               --body-file "$RUNNER_TEMP/kilo-app-bump-pr.md" \
               --assignee iscekic \

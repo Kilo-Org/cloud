@@ -20,6 +20,13 @@ export type GlanceableSink = {
   publish(snapshot: GlanceableAgentsSnapshot): void;
   /** Owns native terminal dismissal; await submission, never schedule a later JS end. */
   waitForNativeTerminal?(): Promise<void>;
+  /**
+   * Resolves once the most recent `startOrUpdate` native submission landed. A
+   * surface with asynchronous native work implements this so the background
+   * push path can hold the headless task open (and reject on failure) instead of
+   * finishing before the card is posted. A synchronous surface omits it.
+   */
+  waitForNativeStart?(): Promise<void>;
   endImmediate(): void;
   startOrUpdate(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext): void;
 };

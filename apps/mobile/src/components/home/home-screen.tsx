@@ -23,11 +23,6 @@ import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog'
 
 export function HomeScreen() {
   const { t } = useTranslation();
-  // The page body clears the landscape side safe areas (notch/Dynamic Island,
-  // Android cutout) with the same shared hook the header chrome uses
-  // (ScreenHeader), so the brand mark and the body below it always share one
-  // leading edge. One implementation for both platforms; zero insets collapse
-  // to a no-op and leave the portrait geometry unchanged.
   const sideInsetStyle = useSideInsetStyle();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const [refreshing, setRefreshing] = useState(false);
@@ -73,7 +68,7 @@ export function HomeScreen() {
         // and actions use (`mx-4`), not a wider header-only gutter.
         className="px-4 pb-1"
       />
-      <View className="flex-1" style={sideInsetStyle}>
+      <View className="flex-1" style={centerFeedback ? sideInsetStyle : undefined}>
         {centerFeedback ? (
           <LiveSessionFeedback
             context={context}

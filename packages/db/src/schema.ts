@@ -101,6 +101,7 @@ import {
   CODE_REVIEW_ANALYTICS_SCHEMA_VERSION,
   CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION,
   CodeReviewAnalyticsCaptureStatus,
+  CodeReviewPublicationStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
   CodeReviewAnalyticsComplexityLevel,
@@ -132,6 +133,7 @@ import type {
   UserDeletionAuditDetails,
   UserDeletionActivityDetails,
   CustomLlmDefinition,
+  AutoFreeConfig,
   KiloClawAdminAuditAction,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
@@ -151,7 +153,6 @@ import type {
   AuditLogAction,
   EncryptedData,
   AuthProviderId,
-  AbuseClassification,
   PlatformRepository,
   IntegrationPermissions,
   BuildStatus,
@@ -173,9 +174,9 @@ import type {
   OpenRouterModel,
   StripeSubscriptionStatus,
   StoredModel,
-  GatewayApiKind,
   ContributorChampionTier,
 } from './schema-types';
+import type { AbuseClassification, GatewayApiKind } from '@kilocode/usage-contracts';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { INSTANCE_TYPE_VALUES } from '@kilocode/kiloclaw-instance-tiers';
 
@@ -303,6 +304,7 @@ export const SCHEMA_CHECK_ENUMS = {
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
   CodeReviewAnalyticsCaptureStatus,
+  CodeReviewPublicationStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
   CodeReviewAnalyticsComplexityLevel,
@@ -2669,6 +2671,18 @@ export const microdollar_usage = pgTable(
   },
   table => [
     index('idx_created_at').on(table.created_at),
+    // Covering index for the spend-alert hourly rollup: it scans
+    // `created_at >= $from AND created_at <= $now` and reads exactly
+    // `kilo_user_id`, `organization_id` and `cost`, so leading with
+    // `created_at` and carrying those three payload columns lets Postgres
+    // satisfy the scan index-only. Drizzle 0.45's PgIndexBuilder cannot
+    // declare `INCLUDE`, and this composite is size-equivalent to one (both
+    // store the payload columns per entry). Built CONCURRENTLY because
+    // `microdollar_usage` is ~1.6B rows; `idx_created_at` stays in place so
+    // the table is never left without a `created_at` index during the build.
+    index('idx_microdollar_usage_created_at_rollup')
+      .on(table.created_at, table.kilo_user_id, table.organization_id, table.cost)
+      .concurrently(),
     index('idx_abuse_classification').on(table.abuse_classification),
     index('idx_kilo_user_id_created_at2').on(table.kilo_user_id, table.created_at),
     index('idx_microdollar_usage_organization_id')
@@ -2792,6 +2806,7 @@ export const microdollar_usage_metadata = pgTable(
     session_id: text(),
     mode_id: integer(),
     auto_model_id: integer(),
+    reasoning_setting_id: integer(),
     market_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
     abuse_delay: integer(),
@@ -2817,12 +2832,18 @@ export const api_request_log = pgTable(
     provider: text(),
     model: text(),
     status_code: integer(),
+    /** Unused and always empty; the request body is stored in R2 under `request_r2_key`. */
     request: jsonb(),
+    /** Unused and always empty; the response body is stored in R2 under `response_r2_key`. */
     response: text(),
     error: jsonb(),
+    request_r2_key: text(),
+    response_r2_key: text(),
   },
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
+
+export type ApiRequestLog = typeof api_request_log.$inferSelect;
 
 export const http_user_agent = pgTable(
   'http_user_agent',
@@ -2942,6 +2963,15 @@ export const auto_model = pgTable(
   table => [uniqueIndex('UQ_auto_model').on(table.auto_model)]
 );
 
+export const reasoning_setting = pgTable(
+  'reasoning_setting',
+  {
+    reasoning_setting_id: serial().notNull().primaryKey(),
+    reasoning_setting: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_reasoning_setting').on(table.reasoning_setting)]
+);
+
 export const microdollar_usage_view = pgView('microdollar_usage_view', {
   id: uuid().notNull(),
   kilo_user_id: text().notNull(),
@@ -2991,6 +3021,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   session_id: text(),
   mode: text(),
   auto_model: text(),
+  reasoning_setting: text(),
   market_cost: bigint({ mode: 'number' }),
   is_free: boolean(),
   abuse_delay: integer(),
@@ -3045,6 +3076,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.session_id,
     md.mode,
     am.auto_model,
+    rs.reasoning_setting,
     meta.market_cost,
     meta.is_free,
     meta.abuse_delay,
@@ -3063,6 +3095,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   LEFT JOIN ${feature} feat ON meta.feature_id = feat.feature_id
   LEFT JOIN ${mode} md ON meta.mode_id = md.mode_id
   LEFT JOIN ${auto_model} am ON meta.auto_model_id = am.auto_model_id
+  LEFT JOIN ${reasoning_setting} rs ON meta.reasoning_setting_id = rs.reasoning_setting_id
 `);
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
@@ -3280,57 +3313,6 @@ export const organizations = pgTable(
 );
 
 export type Organization = typeof organizations.$inferSelect;
-
-export type OrganizationDomainClaimStatus = 'pending' | 'verified';
-
-export const organization_domain_claims = pgTable(
-  'organization_domain_claims',
-  {
-    id: idPrimaryKeyColumn,
-    organization_id: uuid()
-      .notNull()
-      .references(() => organizations.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    domain: text().notNull(),
-    status: text().$type<OrganizationDomainClaimStatus>().notNull().default('pending'),
-    workos_organization_id: text(),
-    workos_domain_id: text(),
-    verified_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    unique('UQ_organization_domain_claims_organization_domain').on(
-      table.organization_id,
-      table.domain
-    ),
-    uniqueIndex('UQ_organization_domain_claims_verified_domain')
-      .on(table.domain)
-      .where(sql`${table.status} = 'verified'`),
-    uniqueIndex('UQ_organization_domain_claims_workos_domain_id')
-      .on(table.workos_domain_id)
-      .where(sql`${table.workos_domain_id} IS NOT NULL`),
-    index('IDX_organization_domain_claims_organization_id').on(table.organization_id),
-    check(
-      'organization_domain_claims_canonical_domain_check',
-      sql`length(${table.domain}) BETWEEN 1 AND 253 AND ${table.domain} = lower(btrim(${table.domain}))`
-    ),
-    check(
-      'organization_domain_claims_status_check',
-      sql`${table.status} IN ('pending', 'verified')`
-    ),
-    check(
-      'organization_domain_claims_verification_shape_check',
-      sql`(${table.status} = 'pending' AND ${table.verified_at} IS NULL)
-        OR (${table.status} = 'verified' AND ${table.verified_at} IS NOT NULL AND ${table.workos_organization_id} IS NOT NULL AND ${table.workos_domain_id} IS NOT NULL)`
-    ),
-  ]
-);
-
-export type OrganizationDomainClaim = typeof organization_domain_claims.$inferSelect;
-export type NewOrganizationDomainClaim = typeof organization_domain_claims.$inferInsert;
 
 export const kilo_pass_org_term_versions = pgTable(
   'kilo_pass_org_term_versions',
@@ -5794,6 +5776,7 @@ export const ai_gateway_config = pgTable(
   {
     id: integer().primaryKey().default(1),
     config: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    auto_free: jsonb().$type<AutoFreeConfig>(),
   },
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );
@@ -5893,6 +5876,7 @@ export const cloud_agent_code_reviews = pgTable(
     // Previous summary captured before the agent updates the platform comment
     previous_summary_body: text(),
     previous_summary_head_sha: text(),
+    previous_summary_observed: boolean(),
 
     // Usage tracking (populated on completion by orchestrator)
     model: text(), // LLM model slug used (e.g., 'anthropic/claude-sonnet-4.6')
@@ -5934,6 +5918,24 @@ export const cloud_agent_code_reviews = pgTable(
     index('idx_cloud_agent_code_reviews_created_at').on(table.created_at),
     // Index for GitHub ID lookups
     index('idx_cloud_agent_code_reviews_pr_author_github_id').on(table.pr_author_github_id),
+    // Outcome-time windows and the start-latency sample each range-scan their own
+    // timestamp; the missing-outcome-time aggregate matches only null completed_at
+    // on terminal rows, which neither idx_cloud_agent_code_reviews_status nor the
+    // non-null completed_at index can serve.
+    index('idx_cloud_agent_code_reviews_completed_at')
+      .on(table.completed_at)
+      .concurrently()
+      .where(isNotNull(table.completed_at)),
+    index('idx_cloud_agent_code_reviews_started_at')
+      .on(table.started_at)
+      .concurrently()
+      .where(isNotNull(table.started_at)),
+    index('idx_cloud_agent_code_reviews_terminal_missing_completed_at')
+      .on(table.status)
+      .concurrently()
+      .where(
+        sql`${table.status} IN ('completed', 'failed', 'cancelled', 'interrupted') AND ${table.completed_at} IS NULL`
+      ),
     // Owner check constraint (exactly one must be set)
     check(
       'cloud_agent_code_reviews_owner_check',
@@ -6064,6 +6066,7 @@ export const cloud_agent_code_review_attempts = pgTable(
     terminal_reason: text(),
     started_at: timestamp({ withTimezone: true, mode: 'string' }),
     completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    publication_status: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6086,6 +6089,11 @@ export const cloud_agent_code_review_attempts = pgTable(
     check(
       'cloud_agent_code_review_attempts_attempt_number_check',
       sql`${table.attempt_number} >= 1`
+    ),
+    enumCheck(
+      'cloud_agent_code_review_attempts_publication_status_check',
+      table.publication_status,
+      CodeReviewPublicationStatus
     ),
   ]
 );
@@ -6401,6 +6409,15 @@ export const cli_sessions_v2 = pgTable(
     platform: text(), // PR host (e.g. github), NOT the OS.
     pr_url: text(),
     pr_number: integer(),
+    // The head ref and head commit the session reported for its own PR. Used to
+    // verify the link against GitHub before it is stored or shown. Nullable so
+    // rows written by older CLIs and pre-existing (unverified) links stay
+    // unshown until the session reports verifiable evidence.
+    pr_head_ref: text(),
+    pr_head_sha: text(),
+    // Set only after the link has been verified against GitHub. Null means the
+    // link is not trustworthy yet and must not be shown.
+    pr_link_verified_at: timestamp({ withTimezone: true, mode: 'string' }),
     status: text(),
     status_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
     last_activity_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -6446,8 +6463,17 @@ export const cli_sessions_v2 = pgTable(
       .on(table.kilo_user_id, table.cloud_agent_worktree_id, table.updated_at)
       .concurrently()
       .where(isNotNull(table.cloud_agent_worktree_id)),
-    // Supports joins from github_branch_pull_requests on (git_url, git_branch).
+    // Supports session lookups by repository and branch.
     index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
+    // Supports the webhook verified-link gate, which updates sessions by
+    // `(git_url, pr_number)`. Without this index that UPDATE can only use the
+    // `git_url` prefix of the branch index above and then heap-fetches every
+    // session in the repository to test `pr_number` and the head evidence, so
+    // webhook latency and DB load grow with sessions-per-repository. Built
+    // concurrently — `cli_sessions_v2` is large.
+    index('IDX_cli_sessions_v2_git_url_pr_number')
+      .on(table.git_url, table.pr_number)
+      .concurrently(),
   ]
 );
 
@@ -6487,6 +6513,8 @@ export type CloudAgentFailureReason =
   | 'managed_provider_authentication'
   | 'managed_model_configuration'
   | 'provider_unavailable'
+  | 'provider_disconnect'
+  | 'gateway_unavailable'
   | 'request_timeout'
   | 'assistant_invalid_request'
   | 'assistant_context_limit'
@@ -6507,6 +6535,7 @@ export type CloudAgentFailureReason =
   | 'session_import_timeout'
   | 'session_import_failed'
   | 'setup_command_timeout'
+  | 'container_limit_reached'
   | 'admission_capacity'
   | 'admission_not_found'
   | 'admission_internal'
@@ -6640,6 +6669,8 @@ export type CloudAgentSessionRunFailureStage =
   | 'unknown';
 export type CloudAgentSessionRunFailureCode =
   | 'sandbox_connect_failed'
+  | 'container_limit_reached'
+  | 'admission_billing_unavailable'
   | 'workspace_setup_failed'
   | 'kilo_server_failed'
   | 'wrapper_start_failed'
@@ -6724,15 +6755,15 @@ export type CloudAgentSessionRun = typeof cloud_agent_session_runs.$inferSelect;
 export type NewCloudAgentSessionRun = typeof cloud_agent_session_runs.$inferInsert;
 
 /**
- * Per-tenant cache of the latest GitHub pull request observed for a
- * `(repo, branch)` pair. Written by the `pull_request` webhook handler
+ * Per-tenant cache of the latest GitHub state observed for a `(repo, PR number)`
+ * identity. Written by the `pull_request` webhook handler
  * and the manual `refreshAssociatedPullRequest` mutation; read by the
  * cli-sessions-v2 router to attach `associatedPr` to a session.
  *
  * Tenancy: XOR ownership columns mirror `platform_integrations`. A webhook
  * delivery from an org installation writes a row under that org; a user
  * installation writes under the user. Different tenants caching the same
- * `(git_url, git_branch)` produce separate rows and never contaminate
+ * `(git_url, pr_number)` produce separate rows and never contaminate
  * each other's reads.
  *
  * `git_url` is always stored in normalized form (see `normalizeGitUrl` in
@@ -6766,22 +6797,22 @@ export const github_branch_pull_requests = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Partial unique indexes serve as ON CONFLICT targets for the webhook
-    // upsert. Identity columns (git_url, git_branch) lead; tenant column
-    // trails since all hot-path reads supply every column anyway.
-    uniqueIndex('UQ_github_branch_prs_org')
-      .on(table.git_url, table.git_branch, table.owned_by_organization_id)
-      .where(isNotNull(table.owned_by_organization_id)),
-    uniqueIndex('UQ_github_branch_prs_user')
-      .on(table.git_url, table.git_branch, table.owned_by_user_id)
-      .where(isNotNull(table.owned_by_user_id)),
-    // The session-to-PR LEFT JOIN matches (git_url, git_branch) and picks the
-    // tenant column with an OR. Neither partial unique index above can serve
-    // that join: the planner cannot prove `owned_by_*_id IS NOT NULL` per row,
-    // so it falls back to a hash join and sequentially scans this whole table
-    // on every session list and search. This plain index restores the nested
-    // loop (292 ms to 2.8 ms on a 1M-row cache).
-    index('IDX_github_branch_prs_url_branch').on(table.git_url, table.git_branch).concurrently(),
+    // Identity is the PR, not the branch: the cache is only a state/review
+    // cache for a PR a session already verifiably links. Branch names are
+    // reused and shared across sessions, so (git_url, git_branch) can never
+    // identify which PR belongs to which session. These partial unique indexes
+    // serve as ON CONFLICT targets for the webhook upsert, keyed by PR number.
+    uniqueIndex('UQ_github_branch_prs_repo_pr_org')
+      .on(table.git_url, table.pr_number, table.owned_by_organization_id)
+      .where(isNotNull(table.pr_number))
+      .concurrently(),
+    uniqueIndex('UQ_github_branch_prs_repo_pr_user')
+      .on(table.git_url, table.pr_number, table.owned_by_user_id)
+      .where(isNotNull(table.pr_number))
+      .concurrently(),
+    // Reads resolve a PR by identity (git_url, pr_number); branch columns are
+    // no longer part of the join key.
+    index('IDX_github_branch_prs_url_pr_number').on(table.git_url, table.pr_number).concurrently(),
     check(
       'github_branch_pull_requests_owner_check',
       sql`(
@@ -7078,10 +7109,11 @@ export const openai_chatgpt_connections = pgTable(
     is_shared_services: boolean().default(false).notNull(),
     /**
      * The last time OpenAI answered a delegated request with a plan usage
-     * limit. The gateway writes it and a reconnect clears it. It is request
-     * state, not credential state, so it stays out of the encrypted payload. A
-     * recorded limit is not cleared by success: `readOpenAiChatGptUsageLimit`
-     * hides it once the reset time OpenAI reported has passed.
+     * limit. The gateway writes it, a request through the same connection that
+     * succeeds clears it, and a reconnect clears it. It is request state, not
+     * credential state, so it stays out of the encrypted payload. It gates
+     * nothing: `readOpenAiChatGptUsageLimit` hides a record once the reset time
+     * OpenAI reported has passed, and routing never reads it.
      */
     usage_limit_reached_at: timestamp({ withTimezone: true, mode: 'string' }),
     /** The reset time OpenAI reported with the limit, when it reported one. */
@@ -11267,6 +11299,10 @@ export const container_usage_interval = pgTable(
       table.subject_id,
       table.started_at
     ),
+    index('IDX_container_usage_interval_open_subject')
+      .on(table.subject_type, table.subject_id)
+      .concurrently()
+      .where(sql`${table.status} = 'open'`),
     uniqueIndex('UQ_container_usage_interval_single_open')
       .on(table.service, table.instance_id)
       .where(sql`${table.status} = 'open'`),
@@ -11552,6 +11588,115 @@ export const external_side_effect_outbox = pgTable(
 
 export type ExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferSelect;
 export type NewExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferInsert;
+
+/**
+ * Durable outbox for Bouncer financial credit events (charge steps and store
+ * money events). Financial callers enqueue a row atomically with the primary
+ * write and before they acknowledge a payment or webhook; the cron drainer
+ * claims due `pending` rows, delivers them over HTTP, and marks `delivered`.
+ * On a transport failure it backs off and retries, failing a row after 8
+ * attempts; `sending` claims older than 5 minutes are reclaimed. A unique
+ * `(event_id, event_type)` — the same identity bouncer's credit ledger dedupes
+ * on, where `event_id` is the source event id (a Stripe event id or an Apple
+ * `notificationUUID`) — makes an enqueue idempotent within the retention
+ * window: a webhook replay in that window reports nothing new. Retention is
+ * bounded, so it is not a permanent dedupe; an event replayed after the window
+ * is recreated, but it keeps its original `occurredAt`, so bouncer's standing
+ * (current) computation still does not double-count it. `payload` holds the
+ * shaped wire body for the event and carries account PII (user id, client ip,
+ * card fingerprint, JA4 client-fingerprint digest); `user_id` is denormalized
+ * onto the row so user soft deletion can delete it.
+ */
+export type BouncerCreditEventOutboxPayload = Record<string, unknown>;
+
+export const bouncer_credit_event_outbox = pgTable(
+  'bouncer_credit_event_outbox',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    /** The source event id; with `event_type`, the dedupe key that makes enqueue idempotent. */
+    event_id: text().notNull(),
+    /** The `CreditEvent` discriminant, for observability and metrics. */
+    event_type: text().notNull(),
+    /** The Kilo account the event is about; not a UUID for OAuth users. */
+    user_id: text().notNull(),
+    payload: jsonb().$type<BouncerCreditEventOutboxPayload>().notNull(),
+    status: text()
+      .$type<'pending' | 'sending' | 'delivered' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    attempts: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    delivered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error: text(),
+  },
+  table => [
+    uniqueIndex('UQ_bouncer_credit_event_outbox_event_id_type').on(
+      table.event_id,
+      table.event_type
+    ),
+    index('IDX_bouncer_credit_event_outbox_status_next_attempt_at').on(
+      table.status,
+      table.next_attempt_at
+    ),
+    index('IDX_bouncer_credit_event_outbox_user_id').on(table.user_id),
+  ]
+);
+
+export type BouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferSelect;
+export type NewBouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferInsert;
+
+/**
+ * Durable outbox for Bouncer usage events of requests whose decide verdict said `spendWatch`.
+ * Bouncer debits a watched account's spend bucket from these events, so they must not be lost to a
+ * Bouncer or network outage. The usage write enqueues the row in the same transaction as the
+ * `microdollar_usage` insert, the gateway then tries one immediate delivery, and the cron drainer
+ * retries failures with the same state machine as `bouncer_credit_event_outbox`. `request_id` is
+ * the bouncer request id shared by decide and the usage event; Bouncer dedupes on it, so a
+ * redelivery counts once. `payload` is the shaped usage-event wire body and carries account PII
+ * (account id, client ip, JA4 client-fingerprint digest); `user_id` is denormalized onto the row
+ * so user soft deletion can delete it.
+ */
+export type BouncerUsageEventOutboxPayload = Record<string, unknown>;
+
+export const bouncer_usage_event_outbox = pgTable(
+  'bouncer_usage_event_outbox',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    /** The bouncer request id; the dedupe key that makes enqueue idempotent. */
+    request_id: text().notNull(),
+    /** The Kilo user who made the request; not a UUID for OAuth users. */
+    user_id: text().notNull(),
+    payload: jsonb().$type<BouncerUsageEventOutboxPayload>().notNull(),
+    status: text()
+      .$type<'pending' | 'sending' | 'delivered' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    attempts: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    delivered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error: text(),
+  },
+  table => [
+    uniqueIndex('UQ_bouncer_usage_event_outbox_request_id').on(table.request_id),
+    index('IDX_bouncer_usage_event_outbox_status_next_attempt_at').on(
+      table.status,
+      table.next_attempt_at
+    ),
+    index('IDX_bouncer_usage_event_outbox_user_id').on(table.user_id),
+  ]
+);
+
+export type BouncerUsageEventOutboxRow = typeof bouncer_usage_event_outbox.$inferSelect;
 
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
 

@@ -10,6 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "paths": {
       "@/*": ["./src/*"],
+      "@kilocode/web-shared/*": ["../../packages/web-shared/src/*"],
       "@kilocode/db": ["../../packages/db/src/index.ts"],
       "@kilocode/db/*": ["../../packages/db/src/*"],
       "@kilocode/cloud-agent-profile": ["../../packages/cloud-agent-profile/src/index.ts"],
@@ -41,12 +42,12 @@
   "include": [
     "next-env.d.ts",
     "src/**/*",
+    "../../packages/web-shared/src/**/*",
     "tests/**/*",
     ".next/types/**/*.ts",
     "jest.config.ts",
     "knip.ts",
     "sentry.edge.config.ts",
-    "sentry.server.config.ts",
     ".next/dev/types/**/*.ts",
     "dev/discord-gateway-cron.ts"
   ],

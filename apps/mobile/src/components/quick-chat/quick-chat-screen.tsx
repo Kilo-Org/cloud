@@ -1,7 +1,8 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useEffect, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { Keyboard, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
@@ -9,8 +10,6 @@ import { ChatComposer } from '@/components/agents/chat-composer';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
-import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ContextControl } from '@/components/context-control';
@@ -106,7 +105,6 @@ function ScopedQuickChatScreen() {
   }, []);
 
   const tabBarBottomPadding = useTabBarBottomPadding();
-  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
   const composerScope = `${authEpoch}:${organizationId ?? 'personal'}`;
   const draftKey = `quick-chat:${composerScope}`;
   const composerDraft = useFencedDraftLoad({ userId, isIdentityLoading, entityKey: draftKey });
@@ -260,15 +258,9 @@ function ScopedQuickChatScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.chat')} showBackButton={false} context={<ContextControl />} />
-      {keyboardContainerKind === 'app-aware-padding' ? (
-        <AppAwareKeyboardPaddingView className="flex-1">
-          {renderKeyboardBody()}
-        </AppAwareKeyboardPaddingView>
-      ) : (
-        <KeyboardAvoidingView className="flex-1" behavior="padding">
-          {renderKeyboardBody()}
-        </KeyboardAvoidingView>
-      )}
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
+        {renderKeyboardBody()}
+      </KeyboardAvoidingView>
     </View>
   );
 }

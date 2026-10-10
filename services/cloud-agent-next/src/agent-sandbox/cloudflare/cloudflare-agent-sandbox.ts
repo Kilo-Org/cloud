@@ -8,29 +8,25 @@ import {
   type WrapperObservation,
   type WrapperStopTarget,
 } from '../protocol.js';
-import type {
-  Env,
-  SandboxId,
-  SandboxInstance,
-  SessionId as ServiceSessionId,
-} from '../../types.js';
+import type { Env, SandboxId, SandboxInstance } from '../../types.js';
 import {
   requiresContainmentSandbox,
+  hasRetiredDevcontainerRuntime,
+  DEVCONTAINER_RETIRED_MESSAGE,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import type { SandboxDeleteReason, WrapperStopReason } from '../protocol.js';
 import { getSandbox } from '@cloudflare/sandbox';
-import { posix } from 'node:path';
 import { SANDBOX_SLEEP_AFTER_SECONDS } from '../../core/lease.js';
 import {
   generateSandboxId,
+  deriveRetiredDindSandboxId,
   getSandboxNamespace,
-  isOrgInList,
   MANAGED_SCM_OUTBOUND_HANDLER,
 } from '../../sandbox-id.js';
 import { SessionService } from '../../session-service.js';
 import { logger } from '../../logger.js';
-import { WrapperClient, WrapperContainerClient, WrapperError } from '../../kilo/wrapper-client.js';
+import { WrapperClient, WrapperContainerClient } from '../../kilo/wrapper-client.js';
 import {
   discoverSessionWrappers,
   findWrapperForSession,
@@ -50,27 +46,10 @@ import {
 import { SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE } from '../../sandbox-recovery.js';
 import { withTimeout } from '@kilocode/worker-utils';
 import { WRAPPER_VERSION } from '../../shared/wrapper-version.js';
-import { isStrippedGitConfigEnvVar } from '../../shared/runtime-environment.js';
 import { ExecutionError } from '../../execution/errors.js';
-import { readProfileBundle, type SessionProfileBundle } from '../../session-profile.js';
-import {
-  logWorkspaceBackupDisabled,
-  logWorkspaceBackupLifecycle,
-  type WorkspaceBackupFailureCategory,
-} from '../../workspace-backup-observability.js';
-import {
-  buildWorkspaceBackupCandidate,
-  createWorkspaceBackupRecord,
-  loadWorkspaceBackupRecord,
-  storeWorkspaceBackupRecord,
-  WORKSPACE_BACKUP_TTL_MS,
-  type WorkspaceBackupCandidate,
-} from '../../workspace-backup-cache.js';
 import {
   isSandboxFilesystemUnusableError,
   SandboxCapacityInspectionError,
-  WorkspaceCapacityAdmissionRejectedError,
-  WorkspaceFilesystemPreparationError,
 } from '../../workspace-errors.js';
 import { KILO_SERVER_ENV_KEYS, type KiloServerEnv } from '../../shared/kilo-server-env.js';
 import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../../shared/tool-cgroup-env.js';
@@ -84,6 +63,7 @@ import {
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
+import { withDORetry } from '../../utils/do-retry.js';
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
@@ -97,14 +77,6 @@ const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
  * because nothing was observed.
  */
 type StopInspection = WrapperObservation | { status: 'absent-no-container' };
-
-function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
-
-function elapsedMs(startedAt: number): number {
-  return Math.max(0, Date.now() - startedAt);
-}
 
 /**
  * `TOOL_CGROUP_*` knobs to pass through to the wrapper (see
@@ -133,52 +105,6 @@ function buildKiloServerEnv(env: Env): KiloServerEnv | undefined {
     if (value) vars[key] = value;
   }
   return Object.keys(vars).length > 0 ? vars : undefined;
-}
-
-function reportWorkspaceBackupProgress(
-  onProgress: EnsureWrapperRequest['onProgress'],
-  step: 'workspace_restore' | 'workspace_backup',
-  message: string
-): void {
-  try {
-    onProgress?.(step, message);
-  } catch {
-    return;
-  }
-}
-
-export function deriveSetupEnvironment(
-  profile: Pick<SessionProfileBundle, 'envVars' | 'encryptedSecrets'>,
-  materializedEnvironment: Record<string, string>
-): {
-  variables: Record<string, string>;
-  secretIdentities: Record<string, string>;
-} | null {
-  const encryptedSecrets = profile.encryptedSecrets ?? {};
-  const variables: Record<string, string> = {};
-  for (const key of Object.keys(profile.envVars ?? {})) {
-    if (Object.hasOwn(encryptedSecrets, key)) continue;
-    // The runtime environment owns git's configuration and drops these before
-    // the sandbox starts, so they are absent from `materializedEnvironment` by
-    // design. Treating that as an unresolved variable would silently disable
-    // workspace snapshots for every session on the profile.
-    if (isStrippedGitConfigEnvVar(key)) continue;
-    if (!Object.hasOwn(materializedEnvironment, key)) return null;
-    const value = materializedEnvironment[key];
-    if (value === undefined) return null;
-    variables[key] = value;
-  }
-
-  const secretIdentities: Record<string, string> = {};
-  for (const [key, envelope] of Object.entries(encryptedSecrets)) {
-    secretIdentities[key] = JSON.stringify({
-      algorithm: envelope.algorithm,
-      version: envelope.version,
-      encryptedData: envelope.encryptedData,
-      encryptedDEK: envelope.encryptedDEK,
-    });
-  }
-  return { variables, secretIdentities };
 }
 
 function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string): Promise<T> {
@@ -253,16 +179,19 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     if (!this.sandboxIdPromise) {
       this.sandboxIdPromise = this.metadata.workspace?.sandboxId
         ? Promise.resolve(this.metadata.workspace.sandboxId)
-        : generateSandboxId(
-            this.env.PER_SESSION_SANDBOX_ORG_IDS,
-            this.metadata.identity.orgId,
-            this.metadata.identity.userId,
-            this.metadata.identity.sessionId,
-            this.metadata.identity.botId,
-            {
-              createdOnPlatform: this.metadata.identity.billingOrigin,
-            }
-          );
+        : hasRetiredDevcontainerRuntime(this.metadata)
+          ? deriveRetiredDindSandboxId(this.metadata.identity.sessionId)
+          : generateSandboxId(
+              this.env.PER_SESSION_SANDBOX_ORG_IDS,
+              this.metadata.identity.orgId,
+              this.metadata.identity.userId,
+              this.metadata.identity.sessionId,
+              this.metadata.identity.botId,
+              {
+                createdOnPlatform: this.metadata.identity.billingOrigin,
+                legacyFallback: true,
+              }
+            );
     }
     return this.sandboxIdPromise;
   }
@@ -302,10 +231,12 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     bypassBilling?: boolean;
   }): Promise<SandboxInstance> {
     const sandboxId = await this.resolveSandboxId();
-    const sandbox = this.resolveSandbox(
-      sandboxId,
-      options?.sleepAfter === undefined ? undefined : { sleepAfter: options.sleepAfter }
-    );
+    const resolveSandbox = () =>
+      this.resolveSandbox(
+        sandboxId,
+        options?.sleepAfter === undefined ? undefined : { sleepAfter: options.sleepAfter }
+      );
+    let sandbox = resolveSandbox();
     const input = this.billingInput(sandboxId);
     if (!options?.bypassBilling) {
       const blocked = await this.sandboxBillingBlocked(sandbox);
@@ -320,11 +251,14 @@ export class CloudflareAgentSandbox implements AgentSandbox {
           );
         }
       } else {
-        void this.configureBilling(sandbox, input).catch(error => {
-          logger
-            .withFields({ error: error instanceof Error ? error.message : String(error) })
-            .warn('Container usage shadow configuration deferred');
-        });
+        sandbox = await withDORetry(
+          resolveSandbox,
+          async sandbox => {
+            await this.configureBilling(sandbox, input);
+            return sandbox;
+          },
+          'configureSandboxBilling'
+        );
       }
     }
     return sandbox;
@@ -366,19 +300,8 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     }
   }
 
-  private requiresPreparedDevcontainerRuntime(request: EnsureWrapperRequest): boolean {
-    return (
-      request.plan.workspace.metadata.workspace?.devcontainerRequested === true ||
-      request.plan.workspace.metadata.devcontainer !== undefined
-    );
-  }
-
   private usesDevcontainerRuntime(): boolean {
-    return (
-      this.metadata.workspace?.sandboxId?.startsWith('dind-') === true ||
-      this.metadata.workspace?.devcontainerRequested === true ||
-      this.metadata.devcontainer !== undefined
-    );
+    return hasRetiredDevcontainerRuntime(this.metadata);
   }
 
   private existingWrapperSessionName(): string {
@@ -386,255 +309,15 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     return this.usesDevcontainerRuntime() ? sessionId : `${sessionId}-bootstrap`;
   }
 
-  private backupMode(): { bucket: R2Bucket; localBucket: boolean } | null {
-    const bucket = this.env.BACKUP_BUCKET;
-    if (!bucket) return null;
-    try {
-      const hostname = new URL(this.env.WORKER_URL ?? '').hostname;
-      if (
-        hostname === 'localhost' ||
-        hostname === '127.0.0.1' ||
-        hostname === 'host.docker.internal'
-      ) {
-        return { bucket, localBucket: true };
-      }
-    } catch {
-      logWorkspaceBackupDisabled('invalid_worker_url');
-      return null;
-    }
-    if (
-      !this.env.BACKUP_BUCKET_NAME ||
-      !this.env.CLOUDFLARE_R2_ACCOUNT_ID ||
-      !this.env.R2_ACCESS_KEY_ID ||
-      !this.env.R2_SECRET_ACCESS_KEY
-    ) {
-      return null;
-    }
-    return { bucket, localBucket: false };
-  }
-
-  private async buildBackupCandidate(request: EnsureWrapperRequest) {
-    const readyRequest = request.prepared.readyRequest;
-    if (!readyRequest) return null;
-    if (!isOrgInList(this.env.REPO_SNAPSHOT_ORG_IDS, request.plan.scope.orgId)) return null;
-    const profile = readProfileBundle(request.plan.workspace.metadata);
-    const setupEnvironment = deriveSetupEnvironment(profile, readyRequest.materialized.env);
-    if (setupEnvironment === null) return null;
-    const repo = readyRequest.repo;
-    return buildWorkspaceBackupCandidate({
-      fresh: request.plan.workspace.metadata.lifecycle.preparedAt === undefined,
-      devcontainer: readyRequest.devcontainer?.requested === true,
-      setupCommands: readyRequest.materialized.setupCommands,
-      setupEnvironment,
-      userId: request.plan.scope.userId,
-      orgId: request.plan.scope.orgId,
-      repository:
-        repo?.kind === 'github'
-          ? { type: 'github', repo: repo.repo }
-          : repo
-            ? { type: repo.platform === 'gitlab' ? 'gitlab' : 'git', url: repo.url }
-            : undefined,
-      shallow: repo?.shallow,
-    });
-  }
-
-  private async cleanWorkspaceTarget(
-    sandbox: SandboxInstance,
-    workspacePath: string
-  ): Promise<void> {
-    const removal = await sandbox.exec(`rm -rf -- ${shellQuote(workspacePath)}`);
-    if (removal.exitCode !== 0) {
-      throw new WorkspaceFilesystemPreparationError(
-        'workspace_directory',
-        `Failed to remove workspace directory: ${removal.stderr || `exit code ${removal.exitCode}`}`,
-        removal
-      );
-    }
-  }
-
-  private async prepareWorkspaceRestoreParent(
-    sandbox: SandboxInstance,
-    workspacePath: string
-  ): Promise<void> {
-    const parentPath = posix.dirname(workspacePath);
-    const creation = await sandbox.exec(`mkdir -p -- ${shellQuote(parentPath)}`);
-    if (creation.exitCode !== 0) {
-      throw new WorkspaceFilesystemPreparationError(
-        'workspace_directory',
-        `Failed to create workspace parent directory: ${creation.stderr || `exit code ${creation.exitCode}`}`,
-        creation
-      );
-    }
-  }
-
-  private async restoreWorkspaceBackup(
-    sandbox: SandboxInstance,
-    workspacePath: string,
-    candidate: WorkspaceBackupCandidate,
-    bucket: R2Bucket,
-    onProgress?: EnsureWrapperRequest['onProgress']
-  ): Promise<string | undefined> {
-    const record = await loadWorkspaceBackupRecord(bucket, candidate);
-    if (!record) return undefined;
-    reportWorkspaceBackupProgress(
-      onProgress,
-      'workspace_restore',
-      'Restoring prepared workspace...'
-    );
-    const startedAt = Date.now();
-    logWorkspaceBackupLifecycle({ operation: 'restore', outcome: 'started' });
-    let failureCategory: WorkspaceBackupFailureCategory = 'workspace_cleanup_failed';
-    try {
-      await this.cleanWorkspaceTarget(sandbox, workspacePath);
-      failureCategory = 'workspace_parent_prepare_failed';
-      await this.prepareWorkspaceRestoreParent(sandbox, workspacePath);
-      failureCategory = 'backup_restore_failed';
-      await sandbox.restoreBackup({ ...record.backup, dir: workspacePath });
-      failureCategory = 'backup_validation_failed';
-      const validation = await sandbox.exec(
-        `test -d ${shellQuote(`${workspacePath}/.git`)} && test "$(git -C ${shellQuote(workspacePath)} rev-parse --verify HEAD)" = ${shellQuote(record.sourceCommit)} && test "$(git -C ${shellQuote(workspacePath)} remote get-url origin)" = ${shellQuote(candidate.canonicalRepository)}`
-      );
-      if (validation.exitCode !== 0) throw new Error('restored workspace validation failed');
-      logWorkspaceBackupLifecycle({
-        operation: 'restore',
-        outcome: 'completed',
-        durationMs: elapsedMs(startedAt),
-      });
-      return record.sourceCommit;
-    } catch (error) {
-      if (error instanceof WorkspaceFilesystemPreparationError) {
-        logWorkspaceBackupLifecycle({
-          operation: 'restore',
-          outcome: 'failed',
-          durationMs: elapsedMs(startedAt),
-          failureCategory,
-        });
-        throw error;
-      }
-      try {
-        await this.cleanWorkspaceTarget(sandbox, workspacePath);
-      } catch (cleanupError) {
-        logWorkspaceBackupLifecycle({
-          operation: 'restore',
-          outcome: 'failed',
-          durationMs: elapsedMs(startedAt),
-          failureCategory: 'fallback_cleanup_failed',
-        });
-        throw cleanupError;
-      }
-      logWorkspaceBackupLifecycle({
-        operation: 'restore',
-        outcome: 'failed',
-        durationMs: elapsedMs(startedAt),
-        failureCategory,
-      });
-      return undefined;
-    }
-  }
-
-  private async publishWorkspaceBackup(options: {
-    sandbox: SandboxInstance;
-    bootstrapSession: Awaited<ReturnType<SandboxInstance['createSession']>>;
-    workspacePath: string;
-    candidate: WorkspaceBackupCandidate;
-    bucket: R2Bucket;
-    localBucket: boolean;
-    onProgress?: EnsureWrapperRequest['onProgress'];
-  }): Promise<void> {
-    const { sandbox, bootstrapSession, workspacePath, candidate, bucket, localBucket, onProgress } =
-      options;
-    reportWorkspaceBackupProgress(onProgress, 'workspace_backup', 'Saving prepared workspace...');
-    const startedAt = Date.now();
-    logWorkspaceBackupLifecycle({ operation: 'create', outcome: 'started' });
-    let failureCategory: WorkspaceBackupFailureCategory = 'source_commit_read_failed';
-    try {
-      const head = await bootstrapSession.exec(
-        `git -C ${shellQuote(workspacePath)} rev-parse --verify HEAD`
-      );
-      const sourceCommit = head.stdout.trim();
-      if (head.exitCode !== 0 || !/^[a-f0-9]{40,64}$/i.test(sourceCommit)) {
-        throw new Error('Cannot publish workspace backup without a readable HEAD');
-      }
-      failureCategory = 'active_origin_read_failed';
-      const origin = await bootstrapSession.exec(
-        `git -C ${shellQuote(workspacePath)} remote get-url origin`
-      );
-      if (origin.exitCode !== 0 || !origin.stdout.trim()) {
-        throw new Error('Cannot capture active workspace origin');
-      }
-      const activeOrigin = origin.stdout.trim();
-      let originChanged = false;
-      let backup: Awaited<ReturnType<SandboxInstance['createBackup']>> | undefined;
-      let publicationFailure:
-        | { error: unknown; category: WorkspaceBackupFailureCategory }
-        | undefined;
-      let originRestored = true;
-      try {
-        failureCategory = 'canonical_origin_set_failed';
-        const setCanonical = await bootstrapSession.exec(
-          `git -C ${shellQuote(workspacePath)} remote set-url origin ${shellQuote(candidate.canonicalRepository)}`
-        );
-        if (setCanonical.exitCode !== 0)
-          throw new Error('Failed to set canonical workspace origin');
-        originChanged = true;
-        failureCategory = 'backup_create_failed';
-        backup = await sandbox.createBackup({
-          dir: workspacePath,
-          ttl: WORKSPACE_BACKUP_TTL_MS / 1000,
-          multipart: false,
-          ...(localBucket ? { localBucket: true } : {}),
-        });
-      } catch (error) {
-        publicationFailure = { error, category: failureCategory };
-      } finally {
-        if (originChanged) {
-          failureCategory = 'authenticated_origin_restore_failed';
-          const restoreCommand = `git -C ${shellQuote(workspacePath)} remote set-url origin ${shellQuote(activeOrigin)}`;
-          originRestored = false;
-          for (let attempt = 1; attempt <= 2; attempt += 1) {
-            const restoreOrigin = await bootstrapSession.exec(restoreCommand);
-            if (restoreOrigin.exitCode === 0) {
-              originRestored = true;
-              break;
-            }
-          }
-        }
-      }
-      if (!originRestored) {
-        throw new WorkspaceFilesystemPreparationError(
-          'workspace_directory',
-          'Failed to restore workspace repository authentication',
-          new Error('Authenticated workspace origin restoration failed after two attempts')
-        );
-      }
-      if (publicationFailure) {
-        failureCategory = publicationFailure.category;
-        throw publicationFailure.error;
-      }
-      failureCategory = 'backup_create_failed';
-      if (!backup) throw new Error('Workspace backup creation returned no handle');
-      failureCategory = 'backup_record_create_failed';
-      const record = createWorkspaceBackupRecord(candidate, backup, sourceCommit);
-      failureCategory = 'index_write_failed';
-      await storeWorkspaceBackupRecord(bucket, candidate, record);
-      logWorkspaceBackupLifecycle({
-        operation: 'create',
-        outcome: 'completed',
-        durationMs: elapsedMs(startedAt),
-      });
-    } catch (error) {
-      logWorkspaceBackupLifecycle({
-        operation: 'create',
-        outcome: 'failed',
-        durationMs: elapsedMs(startedAt),
-        failureCategory,
-      });
-      throw error;
-    }
-  }
-
   async ensureWrapper(request: EnsureWrapperRequest) {
     const { plan, prepared } = request;
+    if (
+      hasRetiredDevcontainerRuntime(this.metadata) ||
+      hasRetiredDevcontainerRuntime(plan.workspace.metadata) ||
+      plan.workspace.sandboxId.startsWith('dind-')
+    ) {
+      throw ExecutionError.invalidRequest(DEVCONTAINER_RETIRED_MESSAGE);
+    }
     const { sessionId, userId, orgId } = plan.scope;
     this.sandboxIdPromise = Promise.resolve(plan.workspace.sandboxId as SandboxId);
     const sandboxId = await this.resolveSandboxId();
@@ -652,98 +335,9 @@ export class CloudflareAgentSandbox implements AgentSandbox {
       logger.withFields({ sandboxId, sessionId }).info('Activated managed SCM containment');
     }
 
-    if (this.requiresPreparedDevcontainerRuntime(request)) {
-      let preparedWorkspace;
-      try {
-        preparedWorkspace = await withWorkspacePreparationTimeout(
-          this.sessionService.prepareWorkspace({
-            sandbox,
-            sandboxId,
-            orgId,
-            userId,
-            sessionId: sessionId as ServiceSessionId,
-            kilocodeModel: plan.agent.model,
-            env: this.env,
-            metadata: plan.workspace.metadata,
-            onProgress: request.onProgress,
-          }),
-          'devcontainer workspace preparation'
-        );
-      } catch (error) {
-        if (error instanceof WorkspaceCapacityAdmissionRejectedError) throw error;
-        const storageFull =
-          error instanceof SandboxCapacityInspectionError ||
-          isSandboxFilesystemUnusableError(error);
-        throw ExecutionError.workspaceSetupFailed(
-          storageFull ? 'Sandbox storage is full' : 'Devcontainer workspace preparation failed',
-          error,
-          {
-            subtype: storageFull ? 'sandbox_storage_full' : 'workspace_setup_unknown',
-            safeFailureMessage: storageFull
-              ? 'Sandbox storage is full'
-              : 'Devcontainer workspace preparation failed',
-          }
-        );
-      }
-      if (!preparedWorkspace.devcontainer || !preparedWorkspace.ready.devcontainer) {
-        throw ExecutionError.workspaceSetupFailed(
-          'Devcontainer workspace preparation did not resolve runtime metadata',
-          undefined,
-          {
-            subtype: 'workspace_setup_unknown',
-            safeFailureMessage:
-              'Devcontainer workspace preparation did not resolve runtime metadata',
-          }
-        );
-      }
-      const toolCgroupEnv = buildToolCgroupEnv(this.env);
-      const kiloServerEnv = buildKiloServerEnv(this.env);
-      let wrapper: Awaited<ReturnType<typeof WrapperClient.ensureWrapper>>;
-      try {
-        wrapper = await WrapperClient.ensureWrapper(sandbox, preparedWorkspace.session, {
-          agentSessionId: sessionId,
-          userId,
-          workspacePath: preparedWorkspace.context.workspacePath,
-          sessionId: plan.wrapper.kiloSessionId,
-          runtimeEnv: preparedWorkspace.runtimeEnv,
-          devcontainer: preparedWorkspace.devcontainer,
-          fixedPort: preparedWorkspace.ready.devcontainer.wrapperPort,
-          ...(request.leasedInstance ? { leasedInstance: request.leasedInstance } : {}),
-          ...(toolCgroupEnv ? { toolCgroupEnv } : {}),
-          ...(kiloServerEnv ? { kiloServerEnv } : {}),
-        });
-      } catch (error) {
-        throw ExecutionError.wrapperStartFailed(
-          `Failed to start devcontainer wrapper: ${error instanceof Error ? error.message : String(error)}`,
-          error
-        );
-      }
-      await wrapper.client.updateRuntimeEnvironment(preparedWorkspace.runtimeEnv);
-      return {
-        status: 'session-ready' as const,
-        client: wrapper.client,
-        ready: preparedWorkspace.ready,
-        kiloSessionId: wrapper.sessionId,
-      };
-    }
-
     const workspacePath = prepared.context.workspacePath;
     const workspaceWarm = await this.workspaceHasGit(sandbox, workspacePath);
-    const backupMode = !workspaceWarm ? this.backupMode() : null;
-    const backupCandidate = backupMode ? await this.buildBackupCandidate(request) : null;
-    const restoredSourceCommit =
-      backupCandidate && backupMode
-        ? await this.restoreWorkspaceBackup(
-            sandbox,
-            workspacePath,
-            backupCandidate,
-            backupMode.bucket,
-            request.onProgress
-          )
-        : undefined;
-    const workspaceRestored = restoredSourceCommit !== undefined;
-    let shouldPublishBackup = backupCandidate !== null && !workspaceRestored;
-    if (!workspaceWarm && !workspaceRestored) {
+    if (!workspaceWarm) {
       request.onProgress?.('disk_check', 'Checking disk space...');
       await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId, {
         inspectContainers: sandboxId.startsWith('dind-'),
@@ -771,56 +365,11 @@ export class CloudflareAgentSandbox implements AgentSandbox {
       return { status: 'wrapper-running' as const, client: wrapper.client };
     }
 
-    const readyRequest = workspaceRestored
-      ? {
-          ...prepared.readyRequest,
-          workspace: {
-            ...prepared.readyRequest.workspace,
-            restoredFromBackup: true,
-          },
-        }
-      : prepared.readyRequest;
-    let readyResult: Awaited<ReturnType<WrapperClient['ensureSessionReady']>>;
-    try {
-      readyResult = await withWorkspacePreparationTimeout(
-        wrapper.client.ensureSessionReady(readyRequest),
-        'wrapper readiness'
-      );
-    } catch (error) {
-      if (
-        !workspaceRestored ||
-        !(error instanceof WrapperError) ||
-        error.code !== 'WORKSPACE_RECONCILIATION_FAILED'
-      ) {
-        throw error;
-      }
-
-      await this.cleanWorkspaceTarget(sandbox, workspacePath);
-      request.onProgress?.('disk_check', 'Checking disk space...');
-      await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId, {
-        inspectContainers: sandboxId.startsWith('dind-'),
-      });
-      shouldPublishBackup = true;
-      readyResult = await withWorkspacePreparationTimeout(
-        wrapper.client.ensureSessionReady(prepared.readyRequest),
-        'wrapper readiness after restored workspace fallback'
-      );
-    }
-    if (shouldPublishBackup && backupCandidate && backupMode) {
-      try {
-        await this.publishWorkspaceBackup({
-          sandbox,
-          bootstrapSession,
-          workspacePath,
-          candidate: backupCandidate,
-          bucket: backupMode.bucket,
-          localBucket: backupMode.localBucket,
-          onProgress: request.onProgress,
-        });
-      } catch (error) {
-        if (error instanceof WorkspaceFilesystemPreparationError) throw error;
-      }
-    }
+    const readyRequest = prepared.readyRequest;
+    const readyResult = await withWorkspacePreparationTimeout(
+      wrapper.client.ensureSessionReady(readyRequest),
+      'wrapper readiness'
+    );
     return {
       status: 'session-ready' as const,
       client: wrapper.client,

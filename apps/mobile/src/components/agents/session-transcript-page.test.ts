@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type KiloSdkStoredMessage } from '@kilocode/cloud-agent-sdk';
 
+import { sessionTranscriptQueryOptions } from './session-transcript-page';
+
 const mocks = vi.hoisted(() => ({
   getSessionMessagesPageQuery: vi.fn(),
 }));
@@ -12,8 +14,6 @@ vi.mock('@/lib/trpc', () => ({
     },
   },
 }));
-
-import { sessionTranscriptQueryOptions } from './session-transcript-page';
 
 function storedMessage(id = 'msg_user_01'): KiloSdkStoredMessage {
   return {
@@ -61,14 +61,27 @@ describe('sessionTranscriptQueryOptions', () => {
     await expect(sessionTranscriptQueryOptions('ses_123').queryFn()).resolves.toEqual([]);
   });
 
-  it('rejects with the typed worker failure so the preview keeps its error state', async () => {
+  it('rejects with the retryable code so the preview keeps its retry action', async () => {
     mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
       kiloSessionId: 'ses_123',
       history: { kind: 'retryable_failure', phase: 'message_scan' },
     });
 
-    await expect(sessionTranscriptQueryOptions('ses_123').queryFn()).rejects.toThrow(
-      'Session history temporarily unavailable'
-    );
+    await expect(sessionTranscriptQueryOptions('ses_123').queryFn()).rejects.toMatchObject({
+      message: 'Session history temporarily unavailable',
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+  });
+
+  it('rejects an oversized page with a terminal code, so no retry is offered', async () => {
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_123',
+      history: { kind: 'too_large', maximumBytes: 1024, phase: 'page_parts' },
+    });
+
+    await expect(sessionTranscriptQueryOptions('ses_123').queryFn()).rejects.toMatchObject({
+      message: 'Session history too large to load',
+      code: 'UNPROCESSABLE_CONTENT',
+    });
   });
 });

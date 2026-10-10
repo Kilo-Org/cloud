@@ -16,7 +16,7 @@ import {
 type TestMessage = { info: { id: string }; parts: readonly never[] };
 
 type TranscriptState = {
-  data: { messages: readonly TestMessage[] } | undefined;
+  data: readonly TestMessage[] | undefined;
   isLoading: boolean;
   isError: boolean;
   error: { data: { code: string } } | null;

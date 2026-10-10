@@ -1,7 +1,8 @@
 import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import {
   fetchMobileSessionSnapshotPage,
-  SESSION_HISTORY_FAILURE_MESSAGES,
+  SESSION_HISTORY_FAILURES,
+  SessionHistoryFailureError,
 } from './mobile-session-page-adapter';
 
 /** Shared by the overlay read and the gesture-start prefetch, so a reopen paints from cache. */
@@ -28,7 +29,7 @@ async function fetchNewestSessionTranscript(sessionId: string): Promise<readonly
   if (page.kind !== 'success') {
     // A typed worker failure is not a page: the preview must show its error
     // state instead of an empty transcript.
-    throw new Error(SESSION_HISTORY_FAILURE_MESSAGES[page.kind]);
+    throw new SessionHistoryFailureError(SESSION_HISTORY_FAILURES[page.kind]);
   }
   return page.messages;
 }

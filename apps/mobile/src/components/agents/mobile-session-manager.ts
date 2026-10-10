@@ -14,7 +14,8 @@ import { withCloudAgentDiagnostics } from '@/components/agents/mobile-session-di
 import { RequestDeadlineError } from '@kilocode/event-service';
 import {
   fetchMobileSessionSnapshotPage,
-  SESSION_HISTORY_FAILURE_MESSAGES,
+  SESSION_HISTORY_FAILURES,
+  SessionHistoryFailureError,
 } from '@/components/agents/mobile-session-page-adapter';
 import { type AgentMode } from '@/components/agents/mode-normalize';
 import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
@@ -296,7 +297,7 @@ export function createMobileAgentSessionManager({
         fetchMobileSessionSnapshotPage(id, {}),
       ]);
       if (page.kind !== 'success') {
-        throw new Error(SESSION_HISTORY_FAILURE_MESSAGES[page.kind]);
+        throw new SessionHistoryFailureError(SESSION_HISTORY_FAILURES[page.kind]);
       }
       // The paged read already projects the goal from the session metadata, so
       // the fixed goal section survives a snapshot replay.

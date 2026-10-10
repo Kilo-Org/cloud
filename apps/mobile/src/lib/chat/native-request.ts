@@ -95,7 +95,9 @@ export function nativeRequest(request: ModelRequest, options: RequestOptions): N
       )
     : [];
   const sent =
-    maxImages === undefined ? new Set(offered) : new Set(offered.slice(Math.max(0, offered.length - maxImages)));
+    maxImages === undefined
+      ? new Set(offered)
+      : new Set(offered.slice(Math.max(0, offered.length - maxImages)));
 
   const messages: NativeMessage[] = [];
   for (const message of request.prompt.messages) {

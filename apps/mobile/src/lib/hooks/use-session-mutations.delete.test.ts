@@ -32,8 +32,10 @@ vi.mock('@tanstack/react-query', async importOriginal => {
     ...actual,
     useQueryClient: () => client,
     useMutation: (options: MutationOptions) => ({
-      mutateAsync: async (input: Input) =>
-        await client.getMutationCache().build(client, options).execute(input),
+      mutateAsync: async (input: Input) => {
+        const result = await client.getMutationCache().build(client, options).execute(input);
+        return result;
+      },
     }),
   };
 });

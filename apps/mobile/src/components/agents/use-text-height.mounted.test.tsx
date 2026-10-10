@@ -235,14 +235,14 @@ describe('useTextHeight pitch snapping', () => {
 
   it('still records a report that moves the pitch to another native line box', async () => {
     // The other half of the gate: a real pitch change (a different font, a
-    // different platform's line box) must still reach the snap.
+    // different platform's line box) at the same line count must still reach the
+    // snap through the pitch clause, not the line-count one.
     const renderer = await mount();
-    reportNativeContentSize(24 + 6 * 18.667);
     layoutMirror(renderer, 6 * 20);
+    reportNativeContentSize(24 + 6 * 18.667);
     expect(published.maxHeight).toBeCloseTo(24 + 5 * 18.667, 2);
 
     const renders = reportNativeContentSize(24 + 6 * 22);
-    layoutMirror(renderer, 6 * 20);
     expect(renders).toBeGreaterThan(0);
     expect(published.maxHeight).toBeCloseTo(24 + 4 * 22, 2);
     renderer.unmount();

@@ -1751,8 +1751,9 @@ describe('local delivery', () => {
     });
 
     expect(local().attachments.map(chip => [chip.status, chip.progress])).toEqual([
-      ['pending', null],
+      ['local', null],
     ]);
+    expect(isAnyAttachmentUploading(local().attachments)).toBe(false);
     expect(await readLocal()).toEqual({
       ok: true,
       wire: undefined,

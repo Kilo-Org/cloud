@@ -1,8 +1,10 @@
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
-import { FlatList, Pressable, View } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
+import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
 import { cn } from '@/lib/utils';
 
@@ -19,13 +21,21 @@ import {
  */
 const SLASH_COMMAND_ITEM_PREFIX = 'slash-command:';
 
-/**
- * Rows the list mounts on its first pass. The menu is at most `max-h-48` tall,
- * so a handful of rows fills it; bounding the first pass keeps typing `/`
- * (which matches every command) from enqueuing a whole 256-command catalog to
- * the translation gateway. Rows beyond the window mount as they scroll in.
- */
-const SLASH_COMMAND_INITIAL_ROWS = 8;
+// FlashList needs a concrete viewport; maxHeight alone collapses this inline list.
+// Each description row fits within 56 points; longer rows remain scrollable.
+const MAX_MENU_HEIGHT = 192;
+const MENU_ROW_HEIGHT = 56;
+
+/** The menu frame plus the themed card background and top border. */
+function menuStyle(colors: ThemeColors, count: number): ViewStyle {
+  return {
+    height: Math.min(MAX_MENU_HEIGHT, count * MENU_ROW_HEIGHT),
+    flex: 0,
+    backgroundColor: colors.card,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+  };
+}
 
 type SlashCommandSuggestionsProps = {
   commands: MobileSlashCommandInfo[];
@@ -86,7 +96,9 @@ function SlashCommandSuggestionRow({
     >
       <View className="flex-1">
         <View className="flex-row items-center gap-2">
-          <Text className="text-sm font-semibold text-foreground">/{command.name}</Text>
+          <Text className="min-w-0 flex-1 text-sm font-semibold text-foreground" numberOfLines={1}>
+            {`/${command.name}`}
+          </Text>
           {isSkill ? (
             <View className="rounded-full bg-muted px-2 py-0.5">
               <Text className="text-[10px] font-semibold uppercase tracking-[0.5px] text-muted-foreground">
@@ -124,18 +136,17 @@ export function SlashCommandSuggestions({
   commands,
   onSelect,
 }: Readonly<SlashCommandSuggestionsProps>) {
+  const colors = useThemeColors();
+
   if (commands.length === 0) {
     return null;
   }
 
   return (
-    <FlatList
-      className="max-h-48 border-t border-border bg-card"
+    <FlashList
+      style={menuStyle(colors, commands.length)}
       data={commands}
       keyExtractor={command => command.name}
-      initialNumToRender={SLASH_COMMAND_INITIAL_ROWS}
-      maxToRenderPerBatch={SLASH_COMMAND_INITIAL_ROWS}
-      windowSize={3}
       keyboardShouldPersistTaps="handled"
       renderItem={({ item, index }) => (
         <SlashCommandSuggestionRow

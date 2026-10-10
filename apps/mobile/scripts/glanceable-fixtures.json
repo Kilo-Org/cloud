@@ -1,0 +1,58 @@
+{
+  "url": "kiloapp:///dev/glanceable-fixture/{name}",
+  "release": "kiloapp:///dev/glanceable-fixture/release",
+  "fixtures": [
+    { "name": "signed-out", "description": "Signed out: the sign-in copy, no counts, no actions." },
+    { "name": "waiting", "description": "First load: no snapshot yet, the waiting copy." },
+    { "name": "empty", "description": "Signed in, no agents: the empty copy with New agent." },
+    {
+      "name": "privacy",
+      "description": "Locked (org switch/privacy): the open-Kilo copy, no counts."
+    },
+    { "name": "expired", "description": "Expired: counts dropped, the expired copy." },
+    { "name": "stale", "description": "Delayed: the mixed counts under the updates-delayed copy." },
+    {
+      "name": "needs-approval",
+      "description": "Only needs input, 2 of 3 approvable (waiting 28 min): Approve shows."
+    },
+    {
+      "name": "needs-input-question",
+      "description": "Only needs input, questions only (waiting 12 min): no Approve."
+    },
+    { "name": "running-only", "description": "Only running: three agents working." },
+    {
+      "name": "scheduled-only",
+      "description": "Only scheduled: two agents, the soonest wake on a round clock time."
+    },
+    {
+      "name": "idle-only",
+      "description": "Only idle: two connected agents doing nothing, New agent offered."
+    },
+    {
+      "name": "mixed",
+      "description": "All four kinds (2 needs input, 3 running, 1 scheduled, 2 idle); newest is running."
+    },
+    {
+      "name": "large-counts",
+      "description": "Width stress: 128 needs input, 1,234 running, 56 scheduled, 999 idle."
+    },
+    { "name": "long-title", "description": "Mixed counts with a very long newest-session title." },
+    {
+      "name": "approving",
+      "description": "Needs approval while the in-place Approve runs: the Approving line."
+    },
+    {
+      "name": "could-not-approve",
+      "description": "Needs approval after Approve failed: the Could-not-approve line."
+    },
+    {
+      "name": "newest-needs-input",
+      "description": "Mixed counts; newest change is needs input (large footer)."
+    },
+    {
+      "name": "newest-scheduled",
+      "description": "Mixed counts; newest change is scheduled (large footer)."
+    },
+    { "name": "newest-idle", "description": "Mixed counts; newest change is idle (large footer)." }
+  ]
+}

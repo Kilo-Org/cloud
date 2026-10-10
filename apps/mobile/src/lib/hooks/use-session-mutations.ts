@@ -1,4 +1,5 @@
 import { hashKey, type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
 import { rememberUserSessionTitle } from '@/components/agents/session-detail-rename-state';
 import { i18n } from '@/i18n';
@@ -185,24 +186,34 @@ export function useSessionMutations() {
     },
   });
 
-  // Preserve per-session sequencing and the detail caller's rejection contract.
-  const renameSessionAsync = async (sessionId: string, title: string) => {
-    const epoch = currentAuthEpoch();
-    const input = { session_id: sessionId, title };
-    // Record the user's own title before the write so the render paths never
-    // hide it as the backend's unnamed placeholder (the rename API accepts any
-    // nonblank title, including one that looks like the placeholder).
-    rememberUserSessionTitle(sessionId, title);
-    operationEpochs.set(input, epoch);
-    await chainSave(sessionId, async () => {
-      assertCurrentOperation(epoch);
-      await renameSessionMutation.mutateAsync(input);
-      assertCurrentOperation(epoch);
-    });
-  };
+  // The mutation result object is rebuilt every render, so depend on the
+  // observer-bound `mutateAsync` (stable for the hook's lifetime) instead.
+  // Callers list these callbacks in their own dependency arrays; an unstable
+  // identity there would re-render every visible row on unrelated updates.
+  const deleteSessionAsync = deleteSessionMutation.mutateAsync;
+  const renameSessionMutationAsync = renameSessionMutation.mutateAsync;
 
-  return {
-    deleteSession: (sessionId: string, onDeleted?: () => void) => {
+  // Preserve per-session sequencing and the detail caller's rejection contract.
+  const renameSessionAsync = useCallback(
+    async (sessionId: string, title: string) => {
+      const epoch = currentAuthEpoch();
+      const input = { session_id: sessionId, title };
+      // Record the user's own title before the write so the render paths never
+      // hide it as the backend's unnamed placeholder (the rename API accepts any
+      // nonblank title, including one that looks like the placeholder).
+      rememberUserSessionTitle(sessionId, title);
+      operationEpochs.set(input, epoch);
+      await chainSave(sessionId, async () => {
+        assertCurrentOperation(epoch);
+        await renameSessionMutationAsync(input);
+        assertCurrentOperation(epoch);
+      });
+    },
+    [renameSessionMutationAsync]
+  );
+
+  const deleteSession = useCallback(
+    (sessionId: string, onDeleted?: () => void) => {
       const epoch = currentAuthEpoch();
       const input = { session_id: sessionId };
       operationEpochs.set(input, epoch);
@@ -210,7 +221,7 @@ export function useSessionMutations() {
         try {
           await chainSave(sessionId, async () => {
             assertCurrentOperation(epoch);
-            await deleteSessionMutation.mutateAsync(input);
+            await deleteSessionAsync(input);
           });
           assertCurrentOperation(epoch);
           announcingToast.success(i18n.t('agents.sessionRow.sessionDeleted'));
@@ -220,7 +231,11 @@ export function useSessionMutations() {
         }
       })();
     },
-    renameSession: (sessionId: string, title: string) => {
+    [deleteSessionAsync]
+  );
+
+  const renameSession = useCallback(
+    (sessionId: string, title: string) => {
       void (async () => {
         try {
           await renameSessionAsync(sessionId, title);
@@ -229,6 +244,12 @@ export function useSessionMutations() {
         }
       })();
     },
+    [renameSessionAsync]
+  );
+
+  return {
+    deleteSession,
+    renameSession,
     renameSessionAsync,
   };
 }

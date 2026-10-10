@@ -1,9 +1,9 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { agent_configs } from '@kilocode/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
-import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 

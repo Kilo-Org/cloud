@@ -1,6 +1,35 @@
 import { describe, expect, it } from 'vitest';
 
-import { newestSessionTitle } from './newest-session';
+import { newestSessionTitle, pickNewestSession } from './newest-session';
+
+describe('pickNewestSession', () => {
+  it('ranks the status-change time above every other clock, like the snapshot', () => {
+    // The widget's newest result reads `statusUpdatedAt`; the named session
+    // must be the same row even when another row was updated later.
+    const rows = [
+      { id: 'updated', status: 'busy', updatedAt: '2026-01-09T00:00:00.000Z' },
+      {
+        id: 'changed',
+        status: 'question',
+        statusUpdatedAt: '2026-01-02T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    expect(pickNewestSession(rows)).toEqual({ row: rows[1], at: '2026-01-02T00:00:00.000Z' });
+  });
+
+  it('names the first row when no row carries a usable time', () => {
+    const rows = [
+      { id: 'a', status: 'busy', statusUpdatedAt: 'not a date' },
+      { id: 'b', status: 'idle' },
+    ];
+    expect(pickNewestSession(rows)).toEqual({ row: rows[0], at: null });
+  });
+
+  it('returns null only for an empty tray', () => {
+    expect(pickNewestSession([])).toBeNull();
+  });
+});
 
 describe('newestSessionTitle', () => {
   it('returns null for an empty tray', () => {

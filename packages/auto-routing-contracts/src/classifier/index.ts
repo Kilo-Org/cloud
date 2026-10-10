@@ -1,13 +1,14 @@
-export { buildClassifierMessages, CLASSIFIER_MAX_TOKENS, DEFAULT_CLASSIFIER_MODEL } from './prompt';
 export { default as classifierTaxonomy } from './taxonomy.json';
-export { ClassifierOutputParseError, parseClassifierOutput, type ClassifierOutput } from './output';
-export { fallbackClassifierOutput } from './output-fallback';
+export type { ClassifierOutput } from '../index';
 export {
-  classifyWithOpenRouter,
+  buildClassifierRequest,
+  buildClassifierState,
+  classifyWithSystemOne,
   ClassifierRunError,
-  type ClassifierCallOptions,
-  type ClassifierModelCallMeta,
+  DEFAULT_CLASSIFIER_MODEL,
+  OPENROUTER_SYSTEM_ONE_URL,
+  type ClassifierFailureStage,
   type ClassifierRunFailureMetadata,
-  type ClassifierRunFallbackMetadata,
   type ClassifierRunResult,
-} from './model-classifier';
+  type SystemOneClient,
+} from './system-one-classifier';

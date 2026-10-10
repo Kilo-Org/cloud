@@ -25,8 +25,8 @@
 
 import Stripe from 'stripe';
 import { execFileSync } from 'node:child_process';
-import { getEnvVariable } from '@/lib/dotenvx';
-import { db } from '@/lib/drizzle';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilo_pass_audit_log,
   kilo_pass_issuances,
@@ -37,7 +37,7 @@ import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassCadence,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 type AffectedRow = {
   stripe_invoice_id: string;

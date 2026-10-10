@@ -2,11 +2,11 @@ import * as z from 'zod';
 
 import { getCodeReviewAnalyticsDashboard } from '@/lib/code-reviews/analytics/db';
 import { setReviewAnalyticsEnabled } from '@/lib/code-reviews/analytics/settings';
-import { readDb } from '@/lib/drizzle';
-import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import { timedUsageQuery } from '@/lib/usage-query';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 

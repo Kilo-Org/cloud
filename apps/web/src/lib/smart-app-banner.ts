@@ -1,4 +1,4 @@
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { webPathToAppPath } from '@kilocode/app-shared/universal-links';
 
 const IOS_APP_STORE_ID = '6761193135';

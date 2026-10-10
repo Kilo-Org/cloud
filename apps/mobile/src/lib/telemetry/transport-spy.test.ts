@@ -1,5 +1,5 @@
 /* oxlint-disable max-lines -- one transport-spy suite per SDK; splitting would duplicate the shared mock scaffold */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type SentryInitExtras } from '@/lib/sentry-init';
 
@@ -35,7 +35,10 @@ const hoisted = vi.hoisted(() => {
   const device = { deviceType: null as number | null };
 
   const appsFlyer = {
-    initSdk: vi.fn(),
+    init: vi.fn(),
+    registerSessionReadyListener: vi.fn(),
+    isSessionReady: vi.fn(),
+    start: vi.fn(),
     logEvent: vi.fn(),
     stop: vi.fn(),
     setConsentData: vi.fn(),
@@ -130,27 +133,25 @@ vi.mock('react-native', () => ({ Platform: hoisted.platform }));
 
 vi.mock('react-native-appsflyer', () => ({
   default: {
-    initSdk: hoisted.appsFlyer.initSdk,
+    init: hoisted.appsFlyer.init,
+    registerSessionReadyListener: hoisted.appsFlyer.registerSessionReadyListener,
+    isSessionReady: hoisted.appsFlyer.isSessionReady,
+    start: hoisted.appsFlyer.start,
     logEvent: hoisted.appsFlyer.logEvent,
     stop: hoisted.appsFlyer.stop,
     setConsentData: hoisted.appsFlyer.setConsentData,
   },
-  // oxlint-disable-next-line func-names
-  AppsFlyerConsent: vi.fn(function (
-    this: Record<string, unknown>,
-    ...args: (boolean | undefined)[]
-  ) {
-    this.isUserSubjectToGDPR = args[0];
-    this.hasConsentForDataUsage = args[1];
-    this.hasConsentForAdsPersonalization = args[2];
-    this.hasConsentForAdStorage = args[3];
-  }),
   AppsFlyerPurchaseConnector: {
     create: hoisted.appsFlyer.create,
     startObservingTransactions: hoisted.appsFlyer.startObservingTransactions,
     stopObservingTransactions: hoisted.appsFlyer.stopObservingTransactions,
   },
   StoreKitVersion: { SK1: 'SK1', SK2: 'SK2' },
+}));
+
+vi.mock('expo-tracking-transparency', () => ({
+  getTrackingPermissionsAsync: vi.fn().mockResolvedValue({ status: 'granted' }),
+  PermissionStatus: { UNDETERMINED: 'undetermined' },
 }));
 
 vi.mock('@sentry/react-native', () => ({
@@ -297,27 +298,40 @@ describe('PostHog transport spy', () => {
 // ---- AppsFlyer transport ----
 
 describe('AppsFlyer transport spy', () => {
+  const logEventSpy =
+    vi.fn<(eventName: string, eventValues: Record<string, string>) => Promise<void>>();
+
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     hoisted.platform.OS = 'ios';
     hoisted.appsFlyer.create.mockResolvedValue(undefined);
-    hoisted.appsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        onSuccess('ok');
+    hoisted.appsFlyer.init.mockResolvedValue(undefined);
+    hoisted.appsFlyer.isSessionReady.mockResolvedValue(false);
+    hoisted.appsFlyer.start.mockResolvedValue(undefined);
+    hoisted.appsFlyer.stop.mockResolvedValue(undefined);
+    hoisted.appsFlyer.setConsentData.mockResolvedValue(undefined);
+    // Native reports the session ready as soon as the listener registers.
+    hoisted.appsFlyer.registerSessionReadyListener.mockImplementation(
+      // oxlint-disable-next-line require-await -- async required by promise-function-async
+      async (onReady: () => void) => {
+        onReady();
       }
     );
+    logEventSpy.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('observes the logEvent transport after init + trackEvent', async () => {
     const { appsflyer, ctrl } = await loadModules();
-
-    const logEventSpy = vi.fn();
-    appsflyer.wrapAppsFlyerLogEventForTests(() => (name, values) => {
-      logEventSpy(name, values);
-    });
+    appsflyer.wrapAppsFlyerLogEventForTests(() => logEventSpy);
 
     ctrl.setTelemetryDecision('acct', true);
     appsflyer.initAppsFlyer();
+    await vi.advanceTimersByTimeAsync(0);
     appsflyer.trackEvent('login');
 
     expect(logEventSpy).toHaveBeenCalledTimes(1);
@@ -326,36 +340,30 @@ describe('AppsFlyer transport spy', () => {
 
   it('does not call the logEvent transport after optional consent turns false', async () => {
     const { appsflyer, ctrl } = await loadModules();
-
-    const logEventSpy = vi.fn();
-    appsflyer.wrapAppsFlyerLogEventForTests(() => (name, values) => {
-      logEventSpy(name, values);
-    });
+    appsflyer.wrapAppsFlyerLogEventForTests(() => logEventSpy);
 
     ctrl.setTelemetryDecision('acct', true);
     appsflyer.initAppsFlyer();
+    await vi.advanceTimersByTimeAsync(0);
 
     ctrl.setTelemetryDecision('acct', false);
     appsflyer.trackEvent('login');
+    await vi.advanceTimersByTimeAsync(0);
 
     expect(logEventSpy).not.toHaveBeenCalled();
   });
 
-  it('drains a queued event through the logEvent transport after init completes', async () => {
+  it('drains a queued event through the logEvent transport after start completes', async () => {
     const { appsflyer, ctrl } = await loadModules();
-
-    const logEventSpy = vi.fn();
-    appsflyer.wrapAppsFlyerLogEventForTests(() => (name, values) => {
-      logEventSpy(name, values);
-    });
+    appsflyer.wrapAppsFlyerLogEventForTests(() => logEventSpy);
 
     ctrl.setTelemetryDecision('acct', true);
     // Queue before init: initialized is false, so the event is buffered.
     appsflyer.trackEvent('login');
     expect(logEventSpy).not.toHaveBeenCalled();
 
-    // init fires the success callback synchronously, which drains the queue.
     appsflyer.initAppsFlyer();
+    await vi.advanceTimersByTimeAsync(0);
 
     expect(logEventSpy).toHaveBeenCalledTimes(1);
     expect(logEventSpy).toHaveBeenCalledWith('login', {});

@@ -8,7 +8,10 @@ import {
 import { FreeTrialWarningDialog } from './FreeTrialWarningDialog';
 import { FreeTrialWarningBanner } from './FreeTrialWarningBanner';
 import { UpgradeTrialDialog } from './UpgradeTrialDialog';
-import { getDaysRemainingInTrial, isStatusReadOnly } from '@/lib/organizations/trial-utils';
+import {
+  getDaysRemainingInTrial,
+  isStatusReadOnly,
+} from '@kilocode/web-shared/lib/organizations/trial-utils';
 import { OrganizationUpgradeProvider } from '@/contexts/OrganizationUpgradeContext';
 import { LockableContainerProvider } from '@/contexts/LockableContainerContext';
 import { useUser } from '@/hooks/useUser';

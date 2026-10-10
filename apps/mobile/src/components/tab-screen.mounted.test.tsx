@@ -15,6 +15,18 @@ const layout = vi.hoisted(() => ({
   fontScale: 1.5,
   platform: 'android' as 'android' | 'ios',
 }));
+/**
+ * The keyboard height `useKeyboardState` reports. Mocked at the module boundary
+ * so the cases below drive the shared scroll view's own decision (replace the
+ * tab-bar band, report it onward) without reproducing the platform's keyboard
+ * events.
+ */
+const keyboard = vi.hoisted(() => ({ occlusion: 0 }));
+
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: <T,>(selector: (state: { height: number }) => T) =>
+    selector({ height: keyboard.occlusion }),
+}));
 
 vi.mock('react-native', () => ({
   // Read through a getter: the clearance cases run on the Android bar, the
@@ -28,6 +40,8 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   useWindowDimensions: () => ({ height: 320, width: 160, fontScale: layout.fontScale }),
+  Keyboard: { addListener: () => ({ remove: () => undefined }) },
+  AppState: { addEventListener: () => ({ remove: () => undefined }) },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: layout.bottom, left: 0, right: 0, top: 0 }),
@@ -54,6 +68,7 @@ afterEach(() => {
   layout.bottom = 16;
   layout.fontScale = DEFAULT_FONT_SCALE;
   layout.platform = 'android';
+  keyboard.occlusion = 0;
 });
 
 describe('tab screen bottom clearance', () => {
@@ -104,6 +119,78 @@ describe('TabScreenScrollView', () => {
     expect(childTypes).toEqual(['Content', 'View']);
     const [spacer] = findByType('View');
     expect(spacer?.props.style).toEqual({ height: 16 });
+    unmount();
+  });
+});
+
+describe('TabScreenScrollView keyboard occlusion', () => {
+  it('replaces the tab-bar band with the IME occlusion so the two never stack', async () => {
+    layout.platform = 'android';
+    layout.bottom = 16;
+    layout.fontScale = 1.5;
+    keyboard.occlusion = 300;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(TabScreenScrollView, null, createElement('Content'))
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+    // 300, not 300 + the tab-bar height: `tabBarHideOnKeyboard` hides the bar, so
+    // the band is replaced while the IME is up.
+    expect(scroll?.props.style).toEqual([undefined, { marginBottom: 300 }]);
+    unmount();
+  });
+
+  it('leaves the IME to the native inset when an iOS caller opts in', async () => {
+    // The input screens set `automaticallyAdjustKeyboardInsets`, which reserves
+    // the IME and reveals the focused field natively. Folding the occlusion into
+    // the frame margin as well would book it twice, so the frame keeps no
+    // keyboard margin here (the tab bar hides while the IME is up).
+    layout.platform = 'ios';
+    layout.bottom = 34;
+    layout.fontScale = 1;
+    keyboard.occlusion = 300;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        TabScreenScrollView,
+        { automaticallyAdjustKeyboardInsets: true },
+        createElement('Content')
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+    expect(scroll?.props.style).toEqual([undefined, { marginBottom: 0 }]);
+    unmount();
+  });
+
+  it('reports the reserved occlusion and defaults keyboardShouldPersistTaps', async () => {
+    layout.platform = 'android';
+    keyboard.occlusion = 250;
+    const reports: number[] = [];
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        TabScreenScrollView,
+        {
+          onKeyboardOcclusionChange: (occlusion: number) => {
+            reports.push(occlusion);
+          },
+        },
+        createElement('Content')
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+    expect(scroll?.props.keyboardShouldPersistTaps).toBe('handled');
+    expect(reports.at(-1)).toBe(250);
+    unmount();
+  });
+
+  it('honours an explicit keyboardShouldPersistTaps', async () => {
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(
+        TabScreenScrollView,
+        { keyboardShouldPersistTaps: 'never' },
+        createElement('Content')
+      )
+    );
+    const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
+    expect(scroll?.props.keyboardShouldPersistTaps).toBe('never');
     unmount();
   });
 });

@@ -1,6 +1,6 @@
-import { db } from '@/lib/drizzle';
-import { promoCreditCategories } from '@/lib/promoCreditCategories';
-import { has_Payment } from '@/lib/promoCustomerRequirement';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { promoCreditCategories } from '@kilocode/web-shared/lib/promoCreditCategories';
+import { has_Payment } from '@kilocode/web-shared/lib/promoCustomerRequirement';
 import { sql } from 'drizzle-orm';
 
 const coreMultiplierCategories = [

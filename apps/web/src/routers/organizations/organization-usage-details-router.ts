@@ -1,10 +1,10 @@
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationMemberProcedure,
   organizationAdminMutationProcedure,
-} from '@/routers/organizations/utils';
-import { db, readDb } from '@/lib/drizzle';
+} from '@kilocode/web-shared/routers/organizations/utils';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { organizations, organization_recommendation_dismissals } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import * as z from 'zod';
@@ -17,13 +17,13 @@ import {
   RECOMMENDATION_KEYS,
   getOrganizationRecommendations,
 } from '@/lib/organizations/recommendations';
-import { getOrganizationMembers } from '@/lib/organizations/organizations';
+import { getOrganizationMembers } from '@kilocode/web-shared/lib/organizations/organizations';
 import { TRPCError } from '@trpc/server';
 import {
   getAgentInteractionsPerDay,
   getCloudAgentSessionsPerDay,
   getCodeReviewsPerDay,
-} from '@/lib/organizations/organization-usage';
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getAutocompleteAcceptedSuggestionsPerDay } from '@/lib/organizations/posthog-autocomplete-queries';
 import {
   buildActivityDataMaps,

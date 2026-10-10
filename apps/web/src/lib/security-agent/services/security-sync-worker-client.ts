@@ -1,6 +1,9 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
-import { INTERNAL_API_SECRET, SECURITY_SYNC_WORKER_URL } from '@/lib/config.server';
+import {
+  INTERNAL_API_SECRET,
+  SECURITY_SYNC_WORKER_URL,
+} from '@kilocode/web-shared/lib/config.server';
 
 export type AcceptedSecurityWorkerCommand = {
   accepted: true;

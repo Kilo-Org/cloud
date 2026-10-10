@@ -17,15 +17,23 @@ import {
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { getSandboxProvider } from '../persistence/session-metadata.js';
-import type { ResponseFrame, SessionRequestIdentity } from '../shared/sandbox-control-protocol.js';
 import type { AgentSandboxProvider } from '../types.js';
 import { WORKTREE_CHANGED_EVENT } from '../shared/worktree-changes-wire.js';
 
 export const WORKTREE_CHANGES_KEY = 'worktree_changes';
 export const WORKTREE_FILE_PREFIX = 'worktree_file:';
 
+/**
+ * Transport-neutral outcome of one worktree-change request. The legacy plane
+ * maps its `ResponseFrame` into this shape at the call site; the V2 Session DO
+ * maps the new control-plane result. The manager itself carries no old frame.
+ */
+export type WorktreeCaptureOutcome =
+  | { ok: true; result: unknown }
+  | { ok: false; code: string; message: string; retryable: boolean };
+
 export type WorktreeChangesContext = {
-  session: SessionRequestIdentity;
+  session: { sessionId: string; kiloSessionId: string; directory: string };
   ownerId: string;
   orgId?: string;
   sandboxId: string;
@@ -53,8 +61,8 @@ type WorktreeChangesDependencies = {
   requestCapture(
     context: WorktreeChangesContext,
     payload: WorktreeChangesCaptureRequest,
-    operation: 'session.git.snapshot' | 'session.git.summary'
-  ): Promise<ResponseFrame>;
+    operation: 'snapshot' | 'summary'
+  ): Promise<WorktreeCaptureOutcome>;
   waitUntil(promise: Promise<unknown>): void;
 };
 
@@ -170,23 +178,23 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
         revision: requestedRevision,
         ...(context.baseRef ? { baseRef: context.baseRef } : {}),
       };
-      let response = await deps.requestCapture(context, payload, 'session.git.snapshot');
+      let outcome = await deps.requestCapture(context, payload, 'snapshot');
       if (trigger.generation !== generation) return { status: 'failed', snapshot };
-      const legacy = !response.ok && response.error?.code === 'unknown_operation';
+      const legacy = !outcome.ok && outcome.code === 'unknown_operation';
       if (legacy) {
-        response = await deps.requestCapture(context, payload, 'session.git.summary');
+        outcome = await deps.requestCapture(context, payload, 'summary');
         if (trigger.generation !== generation) return { status: 'failed', snapshot };
       }
-      if (!response.ok) {
-        return { status: response.error?.code === 'not_ready' ? 'offline' : 'failed', snapshot };
+      if (!outcome.ok) {
+        return { status: outcome.code === 'not_ready' ? 'offline' : 'failed', snapshot };
       }
       let captured: WorktreeSnapshotCapture;
       if (legacy) {
-        const parsed = worktreeChangesCaptureSchema.safeParse(response.result);
+        const parsed = worktreeChangesCaptureSchema.safeParse(outcome.result);
         if (!parsed.success) return { status: 'failed', snapshot };
         captured = { summary: parsed.data, files: [] };
       } else {
-        const parsed = worktreeSnapshotCaptureSchema.safeParse(response.result);
+        const parsed = worktreeSnapshotCaptureSchema.safeParse(outcome.result);
         if (!parsed.success) return { status: 'failed', snapshot };
         captured = parsed.data;
       }

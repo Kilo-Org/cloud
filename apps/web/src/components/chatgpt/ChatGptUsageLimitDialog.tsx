@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CHATGPT_USAGE_SETTINGS_URL } from '@/lib/ai-gateway/openai-chatgpt/usage-limit';
+import { CHATGPT_USAGE_SETTINGS_URL } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
 
 /**
  * The usage-limit message from the "Sign in with ChatGPT" partner guidelines.

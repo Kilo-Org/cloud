@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 
-import { CRON_SECRET } from '@/lib/config.server';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { collectReplicationHealth, isReplicationSlotMonitored } from '@/lib/replication-health';
 
 /**

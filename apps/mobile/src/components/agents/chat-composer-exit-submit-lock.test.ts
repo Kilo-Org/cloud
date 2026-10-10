@@ -1,18 +1,33 @@
-import { type AlertButton, type AlertOptions } from 'react-native';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+/* eslint-disable @typescript-eslint/promise-function-async, require-await -- The confirm stub hands the composer an unsettled Promise the test answers from outside, so it cannot await anything. */
+import { describe, expect, it, vi } from 'vitest';
 
-import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
 import { createSubmitLock, type SubmitLock } from '@/lib/submit-lock';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
-type AlertCall = [title: string, message: string, buttons: AlertButton[], options?: AlertOptions];
-
-const reactNativeMock = vi.hoisted(() => ({
-  alert: vi.fn<(...args: AlertCall) => void>(),
-}));
-
-vi.mock('react-native', () => ({ Alert: { alert: reactNativeMock.alert } }));
+/**
+ * The exit confirm the composer hands to `executeChatComposerSubmission`. The
+ * in-app dialog answers through `answerNext`; the composer only sees the
+ * Promise, so the lock-holding behaviour is what this suite pins.
+ */
+function createConfirmQueue() {
+  const pending: ((confirmed: boolean) => void)[] = [];
+  return {
+    confirmExitSession: () =>
+      new Promise<boolean>(resolve => {
+        pending.push(resolve);
+      }),
+    /** Answers the confirm the composer is waiting on. */
+    answerNext(confirmed: boolean) {
+      const resolve = pending.shift();
+      if (!resolve) {
+        throw new Error('No exit confirmation is waiting');
+      }
+      resolve(confirmed);
+    },
+    waiting: () => pending.length,
+  };
+}
 
 function createSubmitLockAdapter(lock: SubmitLock): { current: boolean } {
   return {
@@ -29,7 +44,7 @@ function createSubmitLockAdapter(lock: SubmitLock): { current: boolean } {
   };
 }
 
-function createExitSubmissionHarness() {
+function createExitSubmissionHarness(confirmExitSession: () => Promise<boolean>) {
   const lock = createSubmitLock();
   const lockAdapter = createSubmitLockAdapter(lock);
   const order: string[] = [];
@@ -63,7 +78,7 @@ function createExitSubmissionHarness() {
           await executeChatComposerSubmission(
             { type: 'exit-session' },
             {
-              confirmExitSession: showRemoteSessionExitConfirmation,
+              confirmExitSession,
               onExitSession,
               onSendCommand: vi.fn(),
               onCreateSession: vi.fn(),
@@ -79,21 +94,10 @@ function createExitSubmissionHarness() {
   };
 }
 
-function getAlertCall(index: number): AlertCall {
-  const call = reactNativeMock.alert.mock.calls[index];
-  if (!call) {
-    throw new Error(`Expected Alert.alert call ${index + 1}`);
-  }
-  return call;
-}
-
 describe('remote session exit submit lock integration', () => {
-  beforeEach(() => {
-    reactNativeMock.alert.mockReset();
-  });
-
-  it('holds the lock until native cancellation and allows a later submission', async () => {
-    const harness = createExitSubmissionHarness();
+  it('holds the lock until the exit is cancelled and allows a later submission', async () => {
+    const confirm = createConfirmQueue();
+    const harness = createExitSubmissionHarness(confirm.confirmExitSession);
     const first = harness.submit();
     let firstSettled = false;
     async function observeFirstSettlement() {
@@ -103,16 +107,18 @@ describe('remote session exit submit lock integration', () => {
     void observeFirstSettlement();
 
     await vi.waitFor(() => {
-      expect(reactNativeMock.alert).toHaveBeenCalledTimes(1);
+      expect(confirm.waiting()).toBe(1);
     });
     await Promise.resolve();
 
     expect(firstSettled).toBe(false);
     expect(harness.lock.isLocked()).toBe(true);
     await expect(harness.submit()).resolves.toBe(false);
-    expect(reactNativeMock.alert).toHaveBeenCalledTimes(1);
+    // The held confirmation is the only one waiting: a blocked second submit
+    // never asks again.
+    expect(confirm.waiting()).toBe(1);
 
-    getAlertCall(0)[2][0]?.onPress?.();
+    confirm.answerNext(false);
     await expect(first).resolves.toBe(true);
 
     expect(harness.onExitSession).not.toHaveBeenCalled();
@@ -122,9 +128,9 @@ describe('remote session exit submit lock integration', () => {
 
     const afterCancel = harness.submit();
     await vi.waitFor(() => {
-      expect(reactNativeMock.alert).toHaveBeenCalledTimes(2);
+      expect(confirm.waiting()).toBe(1);
     });
-    getAlertCall(1)[3]?.onDismiss?.();
+    confirm.answerNext(false);
     await expect(afterCancel).resolves.toBe(true);
 
     expect(harness.onExitSession).not.toHaveBeenCalled();
@@ -133,17 +139,18 @@ describe('remote session exit submit lock integration', () => {
     expect(harness.lock.isLocked()).toBe(false);
   });
 
-  it('executes once after destructive confirmation and releases the lock', async () => {
-    const harness = createExitSubmissionHarness();
+  it('executes once after the exit is confirmed and releases the lock', async () => {
+    const confirm = createConfirmQueue();
+    const harness = createExitSubmissionHarness(confirm.confirmExitSession);
     const first = harness.submit();
 
     await vi.waitFor(() => {
-      expect(reactNativeMock.alert).toHaveBeenCalledTimes(1);
+      expect(confirm.waiting()).toBe(1);
     });
     await expect(harness.submit()).resolves.toBe(false);
-    expect(reactNativeMock.alert).toHaveBeenCalledTimes(1);
+    expect(confirm.waiting()).toBe(1);
 
-    getAlertCall(0)[2][1]?.onPress?.();
+    confirm.answerNext(true);
     await expect(first).resolves.toBe(true);
 
     expect(harness.onExitSession).toHaveBeenCalledTimes(1);

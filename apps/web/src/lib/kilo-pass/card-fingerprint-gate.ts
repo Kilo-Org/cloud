@@ -8,26 +8,26 @@ import {
   kilocode_users,
   transactional_email_log,
 } from '@kilocode/db/schema';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { db } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassWelcomePromoEligibilityReason,
   KiloPassWelcomePromoPaymentFingerprintType,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type {
   RefundableSettlementTarget,
   SettledInvoicePaymentResolution,
   SupportedReusablePaymentMethodType,
-} from '@/lib/kilo-pass/stripe-handlers-utils';
+} from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-utils';
 import { and, eq, isNotNull, or, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { captureException } from '@sentry/nextjs';
-import { sendKiloPassDuplicateCardCanceledEmail } from '@/lib/email';
+import { sendKiloPassDuplicateCardCanceledEmail } from '@kilocode/web-shared/lib/email';
 import { createHash } from 'node:crypto';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
 
 const KILO_PASS_DUPLICATE_CARD_EMAIL_TYPE = 'kilo_pass_duplicate_card_canceled';
 

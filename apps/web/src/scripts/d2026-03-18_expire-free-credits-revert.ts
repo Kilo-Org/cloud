@@ -18,7 +18,7 @@ import '../lib/load-env';
 import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 import pLimit from 'p-limit';
-import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
+import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { and, eq, isNull, isNotNull } from 'drizzle-orm';
 

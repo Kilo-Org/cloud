@@ -52,6 +52,26 @@ const baseStartInput = {
 };
 
 describe('grouped unified session input contracts', () => {
+  it('rejects retired devcontainer requests at the legacy API boundary', () => {
+    const input = {
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      devcontainer: true,
+    };
+    const result = PrepareSessionInput.safeParse(input);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ['devcontainer'],
+          message: 'Devcontainer support has been retired',
+        })
+      );
+    }
+    expect(PrepareSessionInput.safeParse({ ...input, devcontainer: false }).success).toBe(true);
+  });
+
   it('preserves the full grouped start payload shape', () => {
     const input = {
       message: {

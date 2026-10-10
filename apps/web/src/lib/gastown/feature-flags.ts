@@ -1,4 +1,4 @@
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
+import { isFeatureFlagEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 
 const GASTOWN_ACCESS_FLAG = 'gastown-access';
 

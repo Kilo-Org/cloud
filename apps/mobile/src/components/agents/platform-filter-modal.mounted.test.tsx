@@ -1,11 +1,11 @@
-/* eslint-disable max-lines -- the sheet's rows, window bounds, dismissal paths, and derived-list memoization share one mounted harness */
 /* eslint-disable max-lines -- cohesive mounted-test suite for the session filter sheet */
 import { act, type ComponentProps } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { Modal, Pressable, ScrollView } from 'react-native';
+import { type Pressable, ScrollView, View } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Button } from '@/components/ui/button';
+import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { type AgentSessionFilters } from '@/lib/agent-session-filters';
@@ -18,6 +18,7 @@ let insets = { top: 0, bottom: 0, left: 0, right: 0 };
 
 vi.mock('react-native', () => ({
   Modal: 'Modal',
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -93,14 +94,15 @@ function pressButton(renderer: RenderedView['renderer'], label: string) {
   });
 }
 
-function findSheetCard(renderer: RenderedView['renderer']) {
-  const card = renderer.root
-    .findAllByType(Pressable)
-    .find(pressable => String(pressable.props.className).includes('bg-popover'));
-  if (!card) {
-    throw new Error('missing sheet card');
+/** The sheet's content column: it fills the detent and pads the bottom inset. */
+function findSheetContent(renderer: RenderedView['renderer']) {
+  const content = renderer.root
+    .findAllByType(View)
+    .find(view => view.props.className === 'flex-1 gap-4 p-5');
+  if (!content) {
+    throw new Error('missing sheet content');
   }
-  return card;
+  return content;
 }
 
 /** Project rows only, in render order, so a toggle's reorder would show up. */
@@ -132,7 +134,7 @@ describe('SessionFilterModal', () => {
       selectedPlatforms: ['cloud-agent'],
       selectedProjects: [firstProject.gitUrl],
     });
-    expect(renderer.root.findByType(Modal).props.visible).toBe(true);
+    expect(renderer.root.findByType(Sheet).props.visible).toBe(true);
     expect(renderer.root.findAllByType(ScrollView)).toHaveLength(1);
     expect(renderer.root.findByType(ScrollView).props.horizontal).toBeUndefined();
     const checkboxes = renderer.root.findAllByProps({ accessibilityRole: 'checkbox' });
@@ -154,22 +156,18 @@ describe('SessionFilterModal', () => {
     ).toEqual([true, false, false, false, false, false, false, true, false]);
   });
 
-  it('caps the sheet to the window and keeps the action row out of the option list', async () => {
+  it('keeps the action row out of the scrollable option list', async () => {
     const { renderer } = await renderModal();
-    const card = findSheetCard(renderer);
-    expect(card.props.style).toMatchObject({ maxHeight: 700 - 48 });
     const options = renderer.root.findByType(ScrollView);
-    expect(String(options.props.className)).toContain('shrink');
+    expect(renderer.root.findAllByType(ScrollView)).toHaveLength(1);
     expect(options.findAllByType(Button)).toHaveLength(0);
     expect(renderer.root.findAllByType(Button)).toHaveLength(2);
   });
 
-  it('reserves the safe-area insets inside the window cap', async () => {
+  it('reserves the bottom safe-area inset in the sheet padding', async () => {
     insets = { top: 47, bottom: 34, left: 0, right: 0 };
     const { renderer } = await renderModal();
-    expect(findSheetCard(renderer).props.style).toMatchObject({
-      maxHeight: 700 - 47 - 34 - 48,
-    });
+    expect(findSheetContent(renderer).props.style).toMatchObject({ paddingBottom: 34 + 20 });
   });
 
   it('uses the supplied platform options and omits an empty project section', async () => {
@@ -382,7 +380,7 @@ describe('SessionFilterModal', () => {
     expect(props.onClose).toHaveBeenCalledOnce();
   });
 
-  it.each(['cancel', 'backdrop', 'native'] as const)(
+  it.each(['cancel', 'sheet'] as const)(
     'dismisses through %s without applying draft selections',
     async dismissal => {
       const { renderer, props } = await renderModal();
@@ -392,17 +390,12 @@ describe('SessionFilterModal', () => {
       if (dismissal === 'cancel') {
         pressButton(renderer, i18n.t('common.cancel'));
       } else {
+        // Android Back, a swipe down, and a backdrop tap all dismiss through
+        // the native sheet's one `onClose` path.
         act(() => {
-          if (dismissal === 'native') {
-            (renderer.root.findByType(Modal).props.onRequestClose as () => void)();
-          } else {
-            const backdrop = renderer.root.findAllByType(Pressable)[0];
-            if (!backdrop) {
-              throw new Error('missing backdrop');
-            }
-            expect(backdrop.props.accessible).toBe(false);
-            (backdrop.props.onPress as () => void)();
-          }
+          const close = renderer.root.find(node => (node.type as unknown) === 'BottomSheet').props
+            .onClose as () => void;
+          close();
         });
       }
       expect(props.onClose).toHaveBeenCalledOnce();
@@ -411,15 +404,17 @@ describe('SessionFilterModal', () => {
   );
 
   // The sheet offers one row per recent repository (up to the server's LIMIT)
-  // plus one per selected project. A long list must not push the Apply/Cancel
-  // row off-screen: the sheet is bounded and its single list shrinks to scroll.
-  it('bounds the sheet and shrinks its single list so extra project rows stay reachable', async () => {
+  // plus one per selected project. The sheet fills its detent, so the single
+  // list takes the slack and scrolls; a long list can never push the
+  // Apply/Cancel row off-screen.
+  it('gives the single list the sheet slack so extra project rows stay reachable', async () => {
     const { renderer } = await renderModal();
+    const content = findSheetContent(renderer);
     const scrollViews = renderer.root.findAllByType(ScrollView);
     expect(scrollViews).toHaveLength(1);
     const scrollView = renderer.root.findByType(ScrollView);
-    expect(scrollView.props.className).toContain('shrink');
-    expect(scrollView.parent?.props.className).toContain('max-h-[80%]');
+    expect(String(scrollView.props.className)).toContain('flex-1');
+    expect(content.findAllByType(ScrollView)).toHaveLength(1);
   });
 
   // The sheet re-derives its rows only when the props they read change. A

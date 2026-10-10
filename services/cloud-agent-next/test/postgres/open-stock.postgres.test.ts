@@ -2,13 +2,19 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDrizzleClient, getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { eq } from 'drizzle-orm';
-import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/schema';
-import { logger } from '../../src/logger.js';
 import {
-  OPEN_STOCK_METRIC,
+  cli_sessions_v2,
+  cloud_agent_session_runs,
+  cloud_agent_sessions,
+  kilocode_users,
+} from '@kilocode/db/schema';
+import { logger } from '../../src/logger.js';
+import { AGENT_OPEN_METRIC, COLLECTION_METRIC } from '../../src/telemetry/outcome-aggregate.js';
+import {
   assembleOpenStock,
   readOpenStock,
   runCloudAgentOpenStockCollection,
+  type OpenStockCell,
   type OpenStockQueryRow,
 } from '../../src/telemetry/open-stock.js';
 
@@ -26,10 +32,12 @@ vi.mock('../../src/db/pg.js', () => ({ getPgDb: getPgDbMock }));
 // suite unaffected.
 const FIXTURE_RETENTION_CUTOFF = '2095-01-01T00:00:00.000Z';
 const FIXTURE_CREATED_AT = '2096-02-01T00:00:00.000Z';
+const OBSERVED_AT = '2096-02-01T00:10:00.000Z';
 
 let connectionString: string;
 let reader: WorkerDb;
 let writer: ReturnType<typeof createDrizzleClient>;
+let originUserId: string;
 const trackedSessionIds: string[] = [];
 
 function requirePostgresUrl(): string {
@@ -41,15 +49,36 @@ function requirePostgresUrl(): string {
 const uniqueSessionId = (plane: 'agent' | 'workspace') => `${plane}_${randomUUID()}`;
 const uniqueMessageId = () => `msg_${randomUUID().replace(/-/g, '')}`;
 
-async function insertSession(sessionId: string, createdAt: string): Promise<string> {
+async function insertOrigin(
+  cloudAgentSessionId: string,
+  kiloSessionId: string,
+  createdOnPlatform: string
+): Promise<void> {
+  await writer.db.insert(cli_sessions_v2).values({
+    session_id: kiloSessionId,
+    kilo_user_id: originUserId,
+    cloud_agent_session_id: cloudAgentSessionId,
+    created_on_platform: createdOnPlatform,
+  });
+}
+
+async function insertSession(
+  sessionId: string,
+  createdAt: string,
+  createdOnPlatform?: string
+): Promise<string> {
   trackedSessionIds.push(sessionId);
   const initialMessageId = uniqueMessageId();
+  const kiloSessionId = `ses_${randomUUID().replace(/-/g, '').slice(0, 26)}`;
   await writer.db.insert(cloud_agent_sessions).values({
     cloud_agent_session_id: sessionId,
-    kilo_session_id: `ses_${randomUUID().replace(/-/g, '').slice(0, 26)}`,
+    kilo_session_id: kiloSessionId,
     initial_message_id: initialMessageId,
     created_at: createdAt,
   });
+  if (createdOnPlatform !== undefined) {
+    await insertOrigin(sessionId, kiloSessionId, createdOnPlatform);
+  }
   return initialMessageId;
 }
 
@@ -78,9 +107,22 @@ async function readStock(cutoff = FIXTURE_RETENTION_CUTOFF): Promise<OpenStockQu
 function stockRow(
   rows: OpenStockQueryRow[],
   generation: OpenStockQueryRow['generation'],
-  status: OpenStockQueryRow['status']
+  status: OpenStockQueryRow['status'],
+  origin: OpenStockQueryRow['origin'] = 'unknown'
 ): OpenStockQueryRow | undefined {
-  return rows.find(row => row.generation === generation && row.status === status);
+  return rows.find(
+    row => row.generation === generation && row.status === status && row.origin === origin
+  );
+}
+
+function cell(
+  cells: OpenStockCell[],
+  generation: OpenStockCell['generation'],
+  productOrigin: OpenStockCell['productOrigin']
+): OpenStockCell | undefined {
+  return cells.find(
+    entry => entry.generation === generation && entry.productOrigin === productOrigin
+  );
 }
 
 function failAtSelect(
@@ -100,10 +142,19 @@ function failAtSelect(
   return { db: instrumented, state };
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   connectionString = requirePostgresUrl();
   reader = getWorkerDb(connectionString);
   writer = createDrizzleClient({ connectionString, ssl: false });
+  originUserId = `oauth/test-origin-${randomUUID()}`;
+  await writer.db.insert(kilocode_users).values({
+    id: originUserId,
+    google_user_email: `origin-${randomUUID()}@example.test`,
+    google_user_name: 'Origin fixture',
+    google_user_image_url: '',
+    stripe_customer_id: '',
+    api_token_pepper: null,
+  });
 });
 
 afterEach(async () => {
@@ -117,13 +168,15 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await writer.db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.kilo_user_id, originUserId));
+  await writer.db.delete(kilocode_users).where(eq(kilocode_users.id, originUserId));
   await writer.pool.end();
   const readerPool = (reader as unknown as { $client?: { end: () => Promise<void> } }).$client;
   await readerPool?.end();
 });
 
 describe('cloud agent open stock against PostgreSQL', () => {
-  it('counts a null-age queued row beside a timestamped one in the same session', async () => {
+  it('counts a null-age queued row beside a timestamped one in the same session without inventing an age', async () => {
     const sessionId = uniqueSessionId('agent');
     await insertSession(sessionId, FIXTURE_CREATED_AT);
     const queuedAt = '2026-02-01T00:05:00.000Z';
@@ -133,9 +186,12 @@ describe('cloud agent open stock against PostgreSQL', () => {
     const rows = await readStock();
     const queued = stockRow(rows, 'legacy', 'queued');
     expect(queued?.turns).toBe(2);
-    expect(queued?.sessions).toBe(1);
     expect(queued?.oldestQueuedEpochMs).toBe(Date.parse(queuedAt));
-    expect(queued?.queuedMissingAgeTurns).toBe(1);
+
+    const cells = assembleOpenStock(rows, OBSERVED_AT);
+    expect(cell(cells, 'legacy', 'unknown')?.oldestQueuedAgeMs).toBe(
+      Date.parse(OBSERVED_AT) - Date.parse(queuedAt)
+    );
   });
 
   it('keeps an all-null queued group and an all-null accepted group with null ages', async () => {
@@ -154,20 +210,15 @@ describe('cloud agent open stock against PostgreSQL', () => {
     const rows = await readStock();
     const queued = stockRow(rows, 'legacy', 'queued');
     expect(queued?.turns).toBe(1);
-    expect(queued?.sessions).toBe(1);
     expect(queued?.oldestQueuedEpochMs).toBeNull();
-    expect(queued?.queuedMissingAgeTurns).toBe(1);
 
     const accepted = stockRow(rows, 'legacy', 'accepted');
     expect(accepted?.turns).toBe(1);
-    expect(accepted?.sessions).toBe(1);
     expect(accepted?.oldestAcceptedEpochMs).toBeNull();
-    expect(accepted?.acceptedMissingAgeTurns).toBe(1);
 
-    const assembled = assembleOpenStock(rows, '2026-02-01T00:10:00.000Z');
-    const legacy = assembled.find(entry => entry.generation === 'legacy');
-    expect(legacy?.oldestQueuedAgeMs).toBeNull();
-    expect(legacy?.oldestAcceptedAgeMs).toBeNull();
+    const cells = assembleOpenStock(rows, OBSERVED_AT);
+    expect(cell(cells, 'legacy', 'unknown')?.oldestQueuedAgeMs).toBeNull();
+    expect(cell(cells, 'legacy', 'unknown')?.oldestAcceptedAgeMs).toBeNull();
   });
 
   it('excludes terminal statuses and non-terminal rows that carry a terminal_at', async () => {
@@ -210,9 +261,7 @@ describe('cloud agent open stock against PostgreSQL', () => {
 
     const rows = await readStock();
     expect(stockRow(rows, 'legacy', 'queued')?.turns).toBe(3);
-    expect(stockRow(rows, 'legacy', 'queued')?.sessions).toBe(3);
     expect(stockRow(rows, 'control', 'queued')?.turns).toBe(1);
-    expect(stockRow(rows, 'control', 'queued')?.sessions).toBe(1);
   });
 
   it('keeps the queued and accepted ages separate with discriminating timestamps', async () => {
@@ -236,9 +285,15 @@ describe('cloud agent open stock against PostgreSQL', () => {
     expect(stockRow(rows, 'legacy', 'accepted')?.oldestAcceptedEpochMs).toBe(
       Date.parse(dispatchAcceptedAt)
     );
+
+    const cells = assembleOpenStock(rows, OBSERVED_AT);
+    const legacy = cell(cells, 'legacy', 'unknown');
+    expect(legacy?.queuedTurns).toBe(1);
+    expect(legacy?.acceptedTurns).toBe(1);
+    expect(legacy?.oldestQueuedAgeMs).not.toBe(legacy?.oldestAcceptedAgeMs);
   });
 
-  it('counts two open turns in one session as two turns and one session', async () => {
+  it('counts two open turns in one session as two turns', async () => {
     const sessionId = uniqueSessionId('agent');
     await insertSession(sessionId, FIXTURE_CREATED_AT);
     await insertRun({
@@ -254,7 +309,6 @@ describe('cloud agent open stock against PostgreSQL', () => {
 
     const rows = await readStock();
     expect(stockRow(rows, 'legacy', 'queued')?.turns).toBe(2);
-    expect(stockRow(rows, 'legacy', 'queued')?.sessions).toBe(1);
     expect(stockRow(rows, 'legacy', 'queued')?.oldestQueuedEpochMs).toBe(
       Date.parse('2026-02-01T00:00:00.000Z')
     );
@@ -278,7 +332,6 @@ describe('cloud agent open stock against PostgreSQL', () => {
 
     const rows = await readStock(cutoff);
     expect(stockRow(rows, 'legacy', 'queued')?.turns).toBe(1);
-    expect(stockRow(rows, 'legacy', 'queued')?.sessions).toBe(1);
   });
 
   it('returns exact finite epoch milliseconds and numeric counts from the raw reader', async () => {
@@ -304,7 +357,6 @@ describe('cloud agent open stock against PostgreSQL', () => {
     const rows = await readStock();
     const queued = stockRow(rows, 'legacy', 'queued');
     expect(typeof queued?.turns).toBe('number');
-    expect(typeof queued?.sessions).toBe('number');
     expect(typeof queued?.oldestQueuedEpochMs).toBe('number');
     expect(Number.isFinite(queued?.oldestQueuedEpochMs)).toBe(true);
     expect(queued?.oldestQueuedEpochMs).toBe(Date.parse(queuedAt));
@@ -317,10 +369,47 @@ describe('cloud agent open stock against PostgreSQL', () => {
     const controlAccepted = stockRow(rows, 'control', 'accepted');
     expect(controlAccepted?.turns).toBe(1);
     expect(controlAccepted?.oldestAcceptedEpochMs).toBeNull();
-    expect(controlAccepted?.acceptedMissingAgeTurns).toBe(1);
   });
 
-  it('emits a failed record instead of zeros when the query is injected to fail', async () => {
+  it('keeps three created_on_platform origins as three cells inside the six rows', async () => {
+    const reviewSession = uniqueSessionId('agent');
+    const otherSession = uniqueSessionId('agent');
+    const unknownSession = uniqueSessionId('agent');
+    await insertSession(reviewSession, FIXTURE_CREATED_AT, 'code-review');
+    await insertSession(otherSession, FIXTURE_CREATED_AT, 'cloud-agent-web');
+    await insertSession(unknownSession, FIXTURE_CREATED_AT);
+    await insertRun({
+      cloudAgentSessionId: reviewSession,
+      status: 'queued',
+      queuedAt: '2026-02-01T00:00:00.000Z',
+    });
+    await insertRun({
+      cloudAgentSessionId: otherSession,
+      status: 'queued',
+      queuedAt: '2026-02-01T00:01:00.000Z',
+    });
+    await insertRun({
+      cloudAgentSessionId: unknownSession,
+      status: 'queued',
+      queuedAt: '2026-02-01T00:02:00.000Z',
+    });
+
+    const rows = await readStock();
+    expect(stockRow(rows, 'legacy', 'queued', 'code-review')?.turns).toBe(1);
+    expect(stockRow(rows, 'legacy', 'queued', 'other')?.turns).toBe(1);
+    expect(stockRow(rows, 'legacy', 'queued', 'unknown')?.turns).toBe(1);
+
+    const cells = assembleOpenStock(rows, OBSERVED_AT);
+    expect(cells).toHaveLength(6);
+    expect(cell(cells, 'legacy', 'code-review')?.queuedTurns).toBe(1);
+    expect(cell(cells, 'legacy', 'other')?.queuedTurns).toBe(1);
+    expect(cell(cells, 'legacy', 'unknown')?.queuedTurns).toBe(1);
+    expect(cell(cells, 'legacy', 'code-review')?.oldestQueuedAgeMs).toBe(
+      Date.parse(OBSERVED_AT) - Date.parse('2026-02-01T00:00:00.000Z')
+    );
+  });
+
+  it('emits one collection row instead of zeros when the query is injected to fail', async () => {
     const injected = new Error('injected open-stock select failure');
     const instrumented = failAtSelect(reader, injected);
 
@@ -333,7 +422,7 @@ describe('cloud agent open stock against PostgreSQL', () => {
 
     let records: Record<string, unknown>[] = [];
     try {
-      await runCloudAgentOpenStockCollection({} as never, new Date('2026-02-01T00:10:00.000Z'));
+      await runCloudAgentOpenStockCollection({} as never, new Date(OBSERVED_AT));
       records = withFieldsSpy.mock.calls.map(([fields]) => fields as Record<string, unknown>);
     } finally {
       getPgDbMock.mockReset();
@@ -341,11 +430,14 @@ describe('cloud agent open stock against PostgreSQL', () => {
     }
 
     expect(instrumented.state.selectCalls).toBe(1);
-    expect(records).toHaveLength(1);
-    expect(records[0].metric).toBe(OPEN_STOCK_METRIC);
-    expect(records[0].collectionStatus).toBe('failed');
-    expect(records[0].failureKind).toBe('db_query_failed');
-    expect(records[0].generations).toBeUndefined();
+    expect(records).toEqual([
+      {
+        metric: COLLECTION_METRIC,
+        collector: AGENT_OPEN_METRIC,
+        observedAt: OBSERVED_AT,
+        status: 'failed',
+      },
+    ]);
     expect(errorMock).toHaveBeenCalledTimes(1);
     expect(infoMock).not.toHaveBeenCalled();
   });

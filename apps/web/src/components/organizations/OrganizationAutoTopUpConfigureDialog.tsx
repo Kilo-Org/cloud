@@ -26,7 +26,7 @@ import {
   ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
   type OrgAutoTopUpAmountCents,
-} from '@/lib/autoTopUpConstants';
+} from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { formatCents, formatPaymentMethodDescription } from '@/lib/utils';
 
 type Props = {
@@ -132,7 +132,6 @@ export function OrganizationAutoTopUpConfigureDialog({
                   charges; you can resume automatic top ups at any time.
                 </li>
                 <li>You can disable automatic top up at any time.</li>
-                <li>As always, purchased credits never expire.</li>
               </ul>
             </div>
           </DialogDescription>

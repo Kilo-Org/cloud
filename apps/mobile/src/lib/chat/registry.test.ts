@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- the registry suite pins one question at a time, the moves onto another model or tool set, and the MCP discovery around an open on one fake SDK harness. */
+import { type PartDraft } from '@kilocode/harness-sdk';
 import { Effect, Layer, Stream } from 'effect';
 import { type StoredChatBackend } from './backend-store';
 import { backendTargetId } from './backend-target';
@@ -19,7 +20,12 @@ import { i18n } from '@/i18n';
  * the discovery.
  */
 
-type Asked = { readonly sessionId: string; readonly text: string };
+type Asked = {
+  readonly sessionId: string;
+  readonly text: string;
+  /** What was asked, when it was more than words. */
+  readonly parts?: readonly PartDraft[];
+};
 
 const asked: Asked[] = [];
 /** What the session was opened with, so the tools it offers can be read back. */
@@ -84,14 +90,22 @@ const TURN = {
 
 const handleFor = (id: string) => ({
   id,
-  ask: (text: string) => {
+  ask: (input: string | readonly PartDraft[]) => {
+    const said: Asked =
+      typeof input === 'string'
+        ? { sessionId: id, text: input }
+        : {
+            sessionId: id,
+            text: input.flatMap(part => (part.kind === 'text' ? [part.body] : [])).join(''),
+            parts: input,
+          };
     if (failAnswerFor === id) {
-      asked.push({ sessionId: id, text });
+      asked.push(said);
       return Stream.fail(new Error('custom answer failed'));
     }
     return Stream.asyncPush<{ kind: 'delta'; text: string }>(emit =>
       Effect.sync(() => {
-        asked.push({ sessionId: id, text });
+        asked.push(said);
         emit.single({ kind: 'delta', text: 'ok' });
         finish = () => {
           emit.end();
@@ -254,6 +268,9 @@ const { change, snapshotOf } = await import('./state');
 const { chatPlaceOf } = await import('./use-chat');
 const { askedIn, forgetAsked } = await import('./pending');
 
+/** The words of the line that is waiting, which is what most of these read. */
+const waitingWords = (sessionId: string) => snapshotOf(sessionId).waiting.map(one => one.text);
+
 const place = { chatScope: 'me:personal', org: { kind: 'personal' } } as const;
 
 /** The settings tools a chat is opened with while the group switch is on. */
@@ -320,7 +337,7 @@ describe('what a chat is opened with', () => {
        run has visited are not each copied for it. */
     expect(clonedWith).toBeUndefined();
 
-    await say(opened, 'hello', 'kilo/one');
+    await say(opened, { text: 'hello', images: [] }, 'kilo/one');
     await settled();
 
     expect(clonedWith).toEqual({ tools: ['time'] });
@@ -334,7 +351,7 @@ describe('what a chat is opened with', () => {
        offering a tool the person just took away. */
     storedTools = ['time', ...SETTINGS];
     settingsSwitch.enabled = false;
-    await say(opened, 'hello', 'kilo/one');
+    await say(opened, { text: 'hello', images: [] }, 'kilo/one');
     await settled();
 
     expect(clonedWith).toEqual({ tools: ['time'] });
@@ -348,7 +365,7 @@ describe('what a chat is opened with', () => {
     await refreshChatTools();
     await settled();
 
-    await say(opened, 'hello', 'kilo/one');
+    await say(opened, { text: 'hello', images: [] }, 'kilo/one');
     await settled();
 
     expect(clonedWith).toBeUndefined();
@@ -430,7 +447,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     await releaseChat(opened);
     opened = await startChat(place, 'kilo/one');
     await settled();
-    await say(opened, 'first', 'kilo/one');
+    await say(opened, { text: 'first', images: [] }, 'kilo/one');
     await settled();
 
     await setMcpEnabled(opened, false);
@@ -479,7 +496,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     mcp.tools.length = 0;
     missingCloneFor = opened;
 
-    await say(opened, 'second', 'kilo/two');
+    await say(opened, { text: 'second', images: [] }, 'kilo/two');
     await settled();
 
     expect(clonedWith).toEqual({ model: 'kilo/two', tools: ['time', ...SETTINGS] });
@@ -527,19 +544,19 @@ describe('the Kilo MCP tools a chat is opened with', () => {
 
 describe('a second question while the first is being answered', () => {
   it('waits rather than starting a second read of the session', async () => {
-    await say(opened, 'first', 'kilo/one');
+    await say(opened, { text: 'first', images: [] }, 'kilo/one');
     await settled();
-    await say(opened, 'second', 'kilo/one');
+    await say(opened, { text: 'second', images: [] }, 'kilo/one');
     await settled();
 
     expect(asked.map(one => one.text)).toEqual(['first']);
-    expect(snapshotOf(opened).waiting).toEqual(['second']);
+    expect(waitingWords(opened)).toEqual(['second']);
   });
 
   it('is asked when the answer lands, on the model it was sent with', async () => {
-    await say(opened, 'first', 'kilo/one');
+    await say(opened, { text: 'first', images: [] }, 'kilo/one');
     await settled();
-    await say(opened, 'second', 'kilo/two');
+    await say(opened, { text: 'second', images: [] }, 'kilo/two');
     await settled();
 
     finish?.();
@@ -554,9 +571,9 @@ describe('a second question while the first is being answered', () => {
   });
 
   it('is asked when the person stops the answer, because they still asked it', async () => {
-    await say(opened, 'first', 'kilo/one');
+    await say(opened, { text: 'first', images: [] }, 'kilo/one');
     await settled();
-    await say(opened, 'second', 'kilo/one');
+    await say(opened, { text: 'second', images: [] }, 'kilo/one');
     await settled();
 
     await stopChat(opened);
@@ -566,9 +583,9 @@ describe('a second question while the first is being answered', () => {
   });
 
   it('goes with the chat when the chat is closed', async () => {
-    await say(opened, 'first', 'kilo/one');
+    await say(opened, { text: 'first', images: [] }, 'kilo/one');
     await settled();
-    await say(opened, 'second', 'kilo/one');
+    await say(opened, { text: 'second', images: [] }, 'kilo/one');
     await settled();
 
     await releaseChat(opened);
@@ -578,11 +595,79 @@ describe('a second question while the first is being answered', () => {
   });
 });
 
+describe('a question with images', () => {
+  const image = { media: 'image/jpeg', data: 'AAAA' };
+
+  it('asks the session with the images first and the words after', async () => {
+    await say(opened, { text: 'what is this', images: [image] }, 'kilo/one');
+    await settled();
+
+    expect(asked.at(-1)?.parts).toEqual([
+      { kind: 'image', body: 'AAAA', media: 'image/jpeg' },
+      { kind: 'text', body: 'what is this' },
+    ]);
+    expect(snapshotOf(opened).askedImages).toEqual([image]);
+    expect(await askedIn(opened)).toEqual({
+      text: 'what is this',
+      model: 'kilo/one',
+      images: [image],
+    });
+  });
+
+  it('sends an image with no words as the image alone', async () => {
+    await say(opened, { text: '', images: [image] }, 'kilo/one');
+    await settled();
+
+    expect(asked.at(-1)?.parts).toEqual([{ kind: 'image', body: 'AAAA', media: 'image/jpeg' }]);
+  });
+
+  it('keeps its images when the answer fails and the person retries', async () => {
+    failAnswerFor = opened;
+    await say(opened, { text: 'what is this', images: [image] }, 'kilo/one');
+    await settled();
+    expect(snapshotOf(opened)).toMatchObject({ asked: 'what is this', askedImages: [image] });
+
+    failAnswerFor = undefined;
+    await retryChat(opened);
+    await settled();
+
+    expect(asked.map(one => one.parts)).toEqual([
+      [
+        { kind: 'image', body: 'AAAA', media: 'image/jpeg' },
+        { kind: 'text', body: 'what is this' },
+      ],
+      [
+        { kind: 'image', body: 'AAAA', media: 'image/jpeg' },
+        { kind: 'text', body: 'what is this' },
+      ],
+    ]);
+    finish?.();
+    await settled();
+    expect(snapshotOf(opened)).toMatchObject({ asked: null, askedImages: [] });
+  });
+
+  it('carries the images of a question that waited for the answer before it', async () => {
+    await say(opened, { text: 'first', images: [] }, 'kilo/one');
+    await settled();
+    await say(opened, { text: 'and this', images: [image] }, 'kilo/one');
+    await settled();
+    expect(snapshotOf(opened).waiting).toEqual([{ text: 'and this', images: [image] }]);
+
+    finish?.();
+    await settled();
+
+    expect(asked.at(-1)?.parts).toEqual([
+      { kind: 'image', body: 'AAAA', media: 'image/jpeg' },
+      { kind: 'text', body: 'and this' },
+    ]);
+  });
+});
+
 describe('a chat that moved', () => {
   it('leaves the chat it moved off pointing at the one it became', async () => {
-    await say(opened, 'first', 'kilo/one');
+    await say(opened, { text: 'first', images: [] }, 'kilo/one');
     await settled();
-    await say(opened, 'second', 'kilo/two');
+    await say(opened, { text: 'second', images: [] }, 'kilo/two');
     await settled();
 
     finish?.();
@@ -595,9 +680,9 @@ describe('a chat that moved', () => {
   });
 
   it('keeps the transcript on screen while the screen follows the chat it became', async () => {
-    await say(opened, 'first', 'kilo/one');
+    await say(opened, { text: 'first', images: [] }, 'kilo/one');
     await settled();
-    await say(opened, 'second', 'kilo/two');
+    await say(opened, { text: 'second', images: [] }, 'kilo/two');
     await settled();
 
     finish?.();
@@ -612,9 +697,9 @@ describe('a chat that moved', () => {
   });
 
   it('follows a route still naming the moved-off id instead of failing on it', async () => {
-    await say(opened, 'first', 'kilo/one');
+    await say(opened, { text: 'first', images: [] }, 'kilo/one');
     await settled();
-    await say(opened, 'second', 'kilo/two');
+    await say(opened, { text: 'second', images: [] }, 'kilo/two');
     await settled();
 
     finish?.();
@@ -631,9 +716,9 @@ describe('a chat that moved', () => {
   });
 
   it('ends the chat it points at when the id it moved off is released', async () => {
-    await say(opened, 'first', 'kilo/one');
+    await say(opened, { text: 'first', images: [] }, 'kilo/one');
     await settled();
-    await say(opened, 'second', 'kilo/two');
+    await say(opened, { text: 'second', images: [] }, 'kilo/two');
     await settled();
 
     finish?.();
@@ -729,7 +814,7 @@ describe('a question asked before the session has opened', () => {
     /* No await: this is a person typing while the screen is still opening the
        chat, which is exactly the window the question used to be dropped in. */
     const entering = enterChat(place, 'later');
-    await say('later', 'typed early', 'kilo/one');
+    await say('later', { text: 'typed early', images: [] }, 'kilo/one');
     await entering;
     await settled();
 
@@ -740,7 +825,7 @@ describe('a question asked before the session has opened', () => {
     await releaseChat(opened);
     asked.length = 0;
 
-    await say(opened, 'into nothing', 'kilo/one');
+    await say(opened, { text: 'into nothing', images: [] }, 'kilo/one');
     await settled();
 
     expect(asked).toEqual([]);
@@ -760,7 +845,7 @@ describe('custom backend question targets', () => {
     apiKind: 'chat_completions',
     apiKey: '',
     headers: {},
-    models: [{ id: 'same-model', name: 'Model', tools: false }],
+    models: [{ id: 'same-model', name: 'Model', tools: false, images: false }],
     allowLocalHttp: false,
   };
 
@@ -768,10 +853,10 @@ describe('custom backend question targets', () => {
     backendState.profiles = [backend];
     storedTools = ['time', ...SETTINGS];
     const target = backendTargetId(backend, 'same-model');
-    await say(opened, 'first', 'kilo/one');
+    await say(opened, { text: 'first', images: [] }, 'kilo/one');
     await settled();
-    await say(opened, 'second', target);
-    expect(snapshotOf(opened).waiting).toEqual(['second']);
+    await say(opened, { text: 'second', images: [] }, target);
+    expect(waitingWords(opened)).toEqual(['second']);
     finish?.();
     await settled();
     expect(clonedWith).toEqual({ model: target, tools: [] });
@@ -787,10 +872,10 @@ describe('custom backend question targets', () => {
     async (mutation, errorKey) => {
       backendState.profiles = [backend];
       const target = backendTargetId(backend, 'same-model');
-      await say(opened, 'first', 'kilo/one');
+      await say(opened, { text: 'first', images: [] }, 'kilo/one');
       await settled();
-      await say(opened, 'custom question', target);
-      expect(snapshotOf(opened).waiting).toEqual(['custom question']);
+      await say(opened, { text: 'custom question', images: [] }, target);
+      expect(waitingWords(opened)).toEqual(['custom question']);
 
       backendState.profiles = mutation === 'deleted' ? [] : [{ ...backend, revision: 2 }];
       finish?.();
@@ -808,7 +893,7 @@ describe('custom backend question targets', () => {
         failed: i18n.t(errorKey),
         failureKey: errorKey,
       });
-      expect(await askedIn(opened)).toEqual({ text: 'custom question', model: target });
+      expect(await askedIn(opened)).toEqual({ text: 'custom question', model: target, images: [] });
 
       await retryChat(opened);
       await settled();
@@ -848,10 +933,10 @@ describe('custom backend question targets', () => {
       const target = backendTargetId(backend, 'same-model');
       await releaseChat(opened);
       opened = await startChat(place, target);
-      await say(opened, 'first', target);
+      await say(opened, { text: 'first', images: [] }, target);
       await settled();
-      await say(opened, 'queued custom question', target);
-      await say(opened, 'queued Kilo question', 'kilo/one');
+      await say(opened, { text: 'queued custom question', images: [] }, target);
+      await say(opened, { text: 'queued Kilo question', images: [] }, 'kilo/one');
       await refreshChatTools();
 
       backendState.profiles = mutation === 'deleted' ? [] : [{ ...backend, revision: 2 }];
@@ -866,7 +951,10 @@ describe('custom backend question targets', () => {
         status: 'idle',
         asked: null,
         askedModel: null,
-        waiting: ['queued custom question', 'queued Kilo question'],
+        waiting: [
+          { text: 'queued custom question', images: [] },
+          { text: 'queued Kilo question', images: [] },
+        ],
         failed: i18n.t(errorKey),
         failureKey: errorKey,
       });
@@ -874,14 +962,11 @@ describe('custom backend question targets', () => {
       // Retry reattempts the tool move without losing either queued target.
       await retryChat(opened);
       expect(snapshotOf(opened).failed).toBe(i18n.t(errorKey));
-      expect(snapshotOf(opened).waiting).toEqual([
-        'queued custom question',
-        'queued Kilo question',
-      ]);
+      expect(waitingWords(opened)).toEqual(['queued custom question', 'queued Kilo question']);
       expect(asked).toHaveLength(1);
 
       // Only an explicit valid choice can move off the invalid backend.
-      await say(opened, 'explicit Kilo recovery', 'kilo/one');
+      await say(opened, { text: 'explicit Kilo recovery', images: [] }, 'kilo/one');
       await settled();
       expect(snapshotOf(opened)).toMatchObject({
         model: 'kilo/one',
@@ -895,19 +980,20 @@ describe('custom backend question targets', () => {
       expect(snapshotOf(opened)).toMatchObject({
         asked: 'queued custom question',
         askedModel: target,
-        waiting: ['queued Kilo question'],
+        waiting: [{ text: 'queued Kilo question', images: [] }],
         failed: i18n.t(errorKey),
         failureKey: errorKey,
       });
       expect(await askedIn(snapshotOf(opened).sessionId)).toEqual({
         text: 'queued custom question',
         model: target,
+        images: [],
       });
       await retryChat(opened);
       expect(asked).toHaveLength(2);
       expect(snapshotOf(opened).askedModel).toBe(target);
 
-      await say(opened, 'explicit replacement question', 'kilo/one');
+      await say(opened, { text: 'explicit replacement question', images: [] }, 'kilo/one');
       await settled();
       finish?.();
       await settled();
@@ -933,15 +1019,15 @@ describe('custom backend question targets', () => {
     const target = backendTargetId(backend, 'same-model');
     await releaseChat(opened);
     opened = await startChat(place, target);
-    await say(opened, 'first', target);
+    await say(opened, { text: 'first', images: [] }, target);
     await settled();
-    await say(opened, 'second', target);
+    await say(opened, { text: 'second', images: [] }, target);
     await refreshChatTools();
     backendState.profiles = [];
     finish?.();
     await settled();
     expect(snapshotOf(opened).failed).toBe(i18n.t('modelChat.backends.deletedBackend'));
-    expect(snapshotOf(opened).waiting).toEqual(['second']);
+    expect(waitingWords(opened)).toEqual(['second']);
 
     backendState.profiles = [backend];
     // Becoming valid does not automatically send anything or select Kilo.
@@ -965,7 +1051,7 @@ describe('custom backend question targets', () => {
     const target = backendTargetId(backend, 'same-model');
     failForgetFor = opened;
 
-    await say(opened, 'custom question', target);
+    await say(opened, { text: 'custom question', images: [] }, target);
 
     expect(asked).toEqual([]);
     expect(snapshotOf(opened)).toMatchObject({
@@ -977,7 +1063,7 @@ describe('custom backend question targets', () => {
       failureKey: 'common.somethingWentWrong',
     });
     expect(await askedIn('s1')).toBeNull();
-    expect(await askedIn('s2')).toEqual({ text: 'custom question', model: target });
+    expect(await askedIn('s2')).toEqual({ text: 'custom question', model: target, images: [] });
 
     // The route still names s1; Retry must follow the installed custom session.
     await retryChat(opened);
@@ -1000,7 +1086,7 @@ describe('custom backend question targets', () => {
     const target = backendTargetId(backend, 'same-model');
     failAnswerFor = 's2';
 
-    await say(opened, 'custom question', target);
+    await say(opened, { text: 'custom question', images: [] }, target);
     await settled();
 
     expect(snapshotOf(opened)).toMatchObject({
@@ -1012,7 +1098,7 @@ describe('custom backend question targets', () => {
       turns: [TURN],
     });
     expect(snapshotOf(opened).failed).not.toBeNull();
-    expect(await askedIn('s2')).toEqual({ text: 'custom question', model: target });
+    expect(await askedIn('s2')).toEqual({ text: 'custom question', model: target, images: [] });
 
     backendState.profiles = [];
     await retryChat(opened);
@@ -1024,12 +1110,16 @@ describe('custom backend question targets', () => {
 
   it('replaces a failed question target when the person asks a different question', async () => {
     const target = backendTargetId(backend, 'same-model');
-    await say(opened, 'invalid custom question', target);
+    await say(opened, { text: 'invalid custom question', images: [] }, target);
     expect(snapshotOf(opened).askedModel).toBe(target);
 
-    await say(opened, 'a new Kilo question', 'kilo/one');
+    await say(opened, { text: 'a new Kilo question', images: [] }, 'kilo/one');
     await settled();
-    expect(await askedIn(opened)).toEqual({ text: 'a new Kilo question', model: 'kilo/one' });
+    expect(await askedIn(opened)).toEqual({
+      text: 'a new Kilo question',
+      model: 'kilo/one',
+      images: [],
+    });
     finish?.();
     await settled();
 
@@ -1045,10 +1135,10 @@ describe('custom backend question targets', () => {
     await enterChat(place, opened);
 
     expect(snapshotOf(opened)).toMatchObject({ asked: text, askedModel: 'kilo/one' });
-    expect(await askedIn(opened)).toEqual({ text, model: 'kilo/one' });
+    expect(await askedIn(opened)).toEqual({ text, model: 'kilo/one', images: [] });
     expect(storedQuestions.has(`chat-asked:${opened}`)).toBe(false);
     expect(storedQuestions.get(`chat-asked-target:${opened}`)).toBe(
-      JSON.stringify({ text, model: 'kilo/one' })
+      JSON.stringify({ text, model: 'kilo/one', images: [] })
     );
   });
 
@@ -1068,6 +1158,7 @@ describe('custom backend question targets', () => {
     expect(await askedIn('s2')).toEqual({
       text: 'remembered before the upgrade',
       model: 'kilo/one',
+      images: [],
     });
     expect(storedQuestions.has('chat-asked:s1')).toBe(false);
   });
@@ -1087,7 +1178,7 @@ describe('custom backend question targets', () => {
 
   it('forgets both the text and target when the question is discarded', async () => {
     const target = backendTargetId(backend, 'same-model');
-    await say(opened, 'invalid custom question', target);
+    await say(opened, { text: 'invalid custom question', images: [] }, target);
     storedQuestions.set(`chat-asked:${opened}`, 'old question');
 
     await releaseChat(opened);

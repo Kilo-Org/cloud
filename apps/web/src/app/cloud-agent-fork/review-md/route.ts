@@ -20,7 +20,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 
-import { createCallerFactory, createTRPCContext } from '@/lib/trpc/init';
+import { createCallerFactory, createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import {
   CODE_REVIEW_MD_CONVERSION_FLAG,
@@ -28,10 +28,10 @@ import {
   REVIEW_MD_CONVERSION_RATE_LIMIT,
   REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS,
 } from '@/lib/code-reviews/core/constants';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { buildReviewMdConversionPrompt } from '@/lib/code-reviews/prompts/review-md-conversion-prompt';
-import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
-import { redisClient } from '@/lib/redis';
+import { isFeatureFlagEnabledOrDevelopment } from '@kilocode/web-shared/lib/posthog-feature-flags';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { buildAllowedRepositoryFullNames } from '@/lib/code-reviews/core/selectable-repositories';
 
 const createCaller = createCallerFactory(rootRouter);

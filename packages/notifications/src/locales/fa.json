@@ -7,7 +7,7 @@
       "instanceLifecycle": "نمونه شما به‌روزرسانی دارد",
       "scheduledAction": "یک اقدام زمان‌بندی‌شده به‌روزرسانی دارد",
       "lowBalance": "موجودی شما نیاز به توجه دارد",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "هزینه شما نیاز به توجه دارد",
       "securityFinding": "یک یافته امنیتی نیاز به توجه دارد",
       "activeAgentsGlanceable": "عامل‌های فعال به‌روزرسانی دارند"
     }
@@ -44,8 +44,8 @@
       "body": "موجودی {{organizationName}} به زیر ${{minimumBalanceUsd}} رسید"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "هشدار هزینه",
+      "body": "هزینه {{scopeName}} از ${{amountUsd}} عبور کرد"
     },
     "securityFindingNew": {
       "title": "یافته امنیتی جدید ({{severity}})",

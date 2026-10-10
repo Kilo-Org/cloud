@@ -26,6 +26,36 @@ import {
 
 const isProductionBuild = process.env.EAS_BUILD_PROFILE === 'production';
 
+// The Android channel Firebase falls back to when an FCM message omits
+// `channel_id` (packages/notifications `ANDROID_NOTIFICATION_CHANNELS`). The
+// server omits the id for a token whose app version it never recorded
+// (push-presentation.ts `androidChannelIdForPushDataToAppVersion`), so this
+// fallback still carries needs-input/chat alerts that must alert. It therefore
+// has to be a channel the app creates with sound and vibration. The progress
+// channel is silent by design (src/lib/notifications.ts
+// `SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS`), so naming it here would deliver
+// every unaddressed alert silently; `needs-input` is the app-owned sounding
+// channel for the alert kinds. Every start creates it, and the headless
+// background task creates it too (src/lib/notifications.ts
+// `runBackgroundNotificationTask`) because a headless start never evaluates the
+// root layout. Naming it in the manifest as Firebase's default silences
+// "Missing Default Notification Channel metadata".
+const ANDROID_DEFAULT_NOTIFICATION_CHANNEL = 'needs-input';
+
+// expo-task-manager resolves its headless app loader by name from
+// AndroidManifest metadata (`org.unimodules.core.AppLoader#react-native-headless`
+// in expo-modules-core). The class's `@DoNotStrip` sits on the constructor, not
+// the class, so expo-modules-core's class-level consumer keep rule does not
+// match it: R8 removes the class from a minified release, `Class.forName`
+// throws ClassNotFoundException, `TaskService.getAppLoader` returns null, and a
+// background FCM data message either NPEs in `TaskService.executeTask` or drops
+// the task. Keep the class name and its no-arg constructor so the headless task
+// runs in release builds.
+const ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES = [
+  '# expo-task-manager headless app loader, resolved reflectively by name.',
+  '-keep class expo.modules.adapters.react.apploader.RNHeadlessAppLoader { <init>(); }',
+].join('\n');
+
 // Required env is fatal by build intent: a production build must never ship
 // with a missing value, so throw under EAS_BUILD_PROFILE === 'production'.
 // Otherwise keep the old behavior: warn under GITHUB_ACTIONS, throw locally.
@@ -97,7 +127,7 @@ const config: ExpoConfig = {
   // Keep in lockstep with AGENT_CHANNEL_SPLIT_APP_VERSION in
   // @kilocode/notifications: this is the first build that creates the split
   // agent channels, so older tokens stay on the legacy `agent` channel.
-  version: '1.0.12',
+  version: '1.0.14',
   // Rotation is supported on iOS and Android: `default` resolves to portrait +
   // both landscapes in UISupportedInterfaceOrientations on iOS and all
   // orientations in the Android manifest, satisfying WCAG 1.3.4 (Orientation)
@@ -252,6 +282,10 @@ const config: ExpoConfig = {
       {
         android: {
           enableMinifyInReleaseBuilds: true,
+          // Keep expo-task-manager's reflectively-loaded headless app loader.
+          // R8 runs on release builds and llama.rn's JSI bindings are reached
+          // only through JNI, so every com.rnllama class has to be kept too.
+          extraProguardRules: `${ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES}\n-keep class com.rnllama.** { *; }`,
           // Old release AABs shipped without resource shrinking. Keep this on so
           // the unused zz_unused_shrink_sentinel raw resource is stripped and
           // the inspector contract can catch a shrink regression before it lands.
@@ -263,6 +297,8 @@ const config: ExpoConfig = {
         },
         ios: {
           ccacheEnabled: true,
+          // SDK 27 requires the scene lifecycle, including scene-based window and link handling.
+          enableSceneSupport: true,
           // iOS consumes React Native Core prebuilt by default, so the pnpm patch
           // over RCTComponentViewFactory.mm would never compile into the app.
           // The Expo Podfile maps this to ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
@@ -307,6 +343,15 @@ const config: ExpoConfig = {
     ],
     'expo-router',
     'expo-image',
+    // Inline video file parts in the session transcript (file-part-renderer).
+    'expo-video',
+    [
+      'expo-image-picker',
+      {
+        cameraPermission: PERMISSION_PROMPT_COPY.en.NSCameraUsageDescription,
+        photosPermission: PERMISSION_PROMPT_COPY.en.NSPhotoLibraryUsageDescription,
+      },
+    ],
     'expo-font',
     // The app owns its Android backup rules (plugins/withAndroidManifestFix.js
     // writes the union of the SecureStore and AppsFlyer exclusions). Disable the
@@ -327,19 +372,29 @@ const config: ExpoConfig = {
       {
         icon: './assets/images/android-notification-icon.png',
         color: '#FAF74F',
+        // Name the channel Firebase falls back to when a message omits
+        // `channel_id`. Without it FirebaseMessaging logs "Missing Default
+        // Notification Channel metadata in AndroidManifest" on every message.
+        defaultChannel: ANDROID_DEFAULT_NOTIFICATION_CHANNEL,
         // iOS requires `remote-notification` in UIBackgroundModes for the
         // headless background task (`registerTaskAsync`) to deliver a data-only
         // `active_agents_glanceable` push while the app is not in the foreground.
         enableBackgroundRemoteNotifications: true,
       },
     ],
+    // Registers the BGTaskScheduler identifier and the `processing` background
+    // mode for the periodic glanceable refresh, the fallback for a dropped push
+    // (src/lib/glanceable-refresh-task.ts).
+    'expo-background-task',
     'expo-web-browser',
+    // Must stay before '@sentry/react-native/expo': it edits the RNSentrySDK.start() line that plugin writes.
+    './plugins/withReactMountLogBreadcrumbs',
     [
       '@sentry/react-native/expo',
       {
         url: 'https://sentry.io/',
         project: 'kilo-app',
-        organization: 'kilo-code',
+        organization: 'anaconda-nq',
         useNativeInit: true,
         options: SENTRY_NATIVE_OPTIONS,
       },
@@ -360,6 +415,11 @@ const config: ExpoConfig = {
       {
         locationWhenInUsePermission:
           'Allow $(PRODUCT_NAME) to use your location to set up local weather.',
+        // The app requests only foreground location for weather setup.
+        locationAlwaysAndWhenInUsePermission: false,
+        locationAlwaysPermission: false,
+        // Apple requires this key for the library's linked motion APIs, even though Kilo never calls them.
+        motionUsagePermission: PERMISSION_PROMPT_COPY.en.NSMotionUsageDescription,
         isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
         isAndroidForegroundServiceEnabled: false,

@@ -1,4 +1,4 @@
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   DISCORD_OAUTH_BOT_TOKEN: 'bot-token',
   DISCORD_SERVER_ID: '123456789012345678',
 }));

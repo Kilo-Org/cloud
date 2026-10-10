@@ -24,7 +24,6 @@ export async function handleContainerEviction(
   c: Context<GastownEnv>,
   params: { townId: string }
 ): Promise<Response> {
-  // Authenticate with container JWT
   const token = extractBearerToken(c.req.header('Authorization'));
   if (!token) {
     return c.json(resError('Authentication required'), 401);
@@ -41,7 +40,6 @@ export async function handleContainerEviction(
     return c.json(resError(result.error), 401);
   }
 
-  // Cross-town guard
   if (result.payload.townId !== params.townId) {
     return c.json(resError('Cross-town access denied'), 403);
   }

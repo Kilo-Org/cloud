@@ -53,7 +53,7 @@ const backend: StoredChatBackend = {
   apiKind: 'chat_completions',
   apiKey: '',
   headers: { Authorization: 'Bearer stored-secret', 'X-API-Key': 'stored-api-key' },
-  models: [{ id: 'model', name: 'Model', tools: false }],
+  models: [{ id: 'model', name: 'Model', tools: false, images: false }],
   allowLocalHttp: false,
 };
 

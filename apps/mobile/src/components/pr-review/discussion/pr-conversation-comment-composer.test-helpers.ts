@@ -14,8 +14,13 @@ import * as React from 'react';
 import type * as ReactI18next from 'react-i18next';
 import { expect, vi } from 'vitest';
 
-type AlertButton = { text?: string; style?: string; onPress?: () => void };
-export type AlertCall = { title: string; message: string; buttons: AlertButton[] };
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+};
 export type InlineErrorProps = {
   inlineError?: string;
   inlineErrorKind?: string;
@@ -26,7 +31,7 @@ export type Trigger = (element: React.ReactElement) => void;
 
 const hoisted = vi.hoisted(() => ({
   hookState: { boxes: [] as unknown[], cursor: 0 },
-  alertCalls: [] as AlertCall[],
+  confirmRequests: [] as ConfirmRequest[],
   addCommentMocks: {
     mutateAsync: vi.fn<() => Promise<unknown>>(),
     isPending: false,
@@ -53,7 +58,7 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 export const hookState = hoisted.hookState;
-export const alertCalls = hoisted.alertCalls;
+export const confirmRequests = hoisted.confirmRequests;
 export const addCommentMocks = hoisted.addCommentMocks;
 export const draftLoadMock = hoisted.draftLoadMock;
 export const termsGateMock = hoisted.termsGateMock;
@@ -102,11 +107,6 @@ vi.mock('react', async () => {
 });
 
 vi.mock('react-native', () => ({
-  Alert: {
-    alert: (title: string, message: string, buttons: AlertCall['buttons']) => {
-      alertCalls.push({ title, message, buttons });
-    },
-  },
   BackHandler: {
     addEventListener: (event: string, handler: () => boolean) => {
       const armed = event === 'hardwareBackPress';
@@ -132,6 +132,17 @@ vi.mock('react-native', () => ({
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
   NotificationFeedbackType: { Success: 'Success' },
+}));
+
+// The composer renders `{dialog}` from `useConfirmDialog`; stub the hook so
+// the test reads the request it was handed and drives its confirm.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: ConfirmRequest) => {
+      confirmRequests.push(request);
+    },
+    dialog: null,
+  }),
 }));
 
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -220,15 +231,14 @@ export function typeBody(element: React.ReactElement, text: string): void {
   (field.props as { onChangeText?: (value: string) => void }).onChangeText?.(text);
 }
 
-/** Presses the discard Alert's Keep editing button. */
-export function pressKeepEditing(call: AlertCall): void {
-  call.buttons.find(button => button.text === 'Keep editing')?.onPress?.();
-}
-
-/** Presses the discard Alert's destructive Discard button. */
-export function pressDiscard(call: AlertCall): void {
-  call.buttons.find(button => button.style === 'destructive')?.onPress?.();
-}
+/** Returns the last confirm request, failing when none was shown. */
+export const lastConfirm = (): ConfirmRequest => {
+  const request = confirmRequests.at(-1);
+  if (!request) {
+    throw new Error('No discard confirmation was shown');
+  }
+  return request;
+};
 
 /** Drains the microtask queue plus one macrotask tick. */
 export async function flushMicrotasks(): Promise<void> {
@@ -291,12 +301,3 @@ export const dismissTriggers: readonly (readonly [string, Trigger])[] = [
     },
   ],
 ];
-
-/** Returns the last recorded Alert call, failing when none was shown. */
-export const lastAlert = (): AlertCall => {
-  const call = alertCalls.at(-1);
-  if (!call) {
-    throw new Error('No discard Alert was shown');
-  }
-  return call;
-};

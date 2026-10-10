@@ -1,243 +1,104 @@
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'bun:test';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { installInterceptTrustIfEnabled, trustRuntimeCert, type RuntimeCertPaths } from './cert';
+import { describe, expect, it } from 'bun:test';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createControlDiagnosticProjector } from '../../../src/shared/control-diagnostics.js';
+import { SANDBOX_INTERCEPT_HTTPS_ENV } from '../../../src/shared/container-intercept.js';
+import { installInterceptTrustIfEnabled, trustRuntimeCert } from './cert.js';
 
-const CERT_CONTENT = '-----BEGIN CERTIFICATE-----\nABCDEF\n-----END CERTIFICATE-----\n';
-const BUNDLE_CONTENT = '# system bundle\n';
-
-const BUNDLE_NAMES = [
-  'ca-certificates.crt',
-  'ca-bundle.crt',
-  'ca-bundle.pem',
-  'cert.pem',
-  'tls-ca-bundle.pem',
-  'legacy-cert.pem',
-];
-
-let root: string;
-let certPath: string;
-let systemBundlePaths: string[];
-let runtimePaths: RuntimeCertPaths;
-
-let mockProcessExit: Mock<(code?: string | number | null) => never>;
-let sleepSpy: { mockRestore: () => void } | undefined;
-let dateSpy: { mockRestore: () => void } | undefined;
-
-function bundlePath(index: number): string {
-  const bundle = systemBundlePaths[index];
-  if (bundle === undefined) throw new Error(`No bundle at index ${index}`);
-  return bundle;
+class ExitError extends Error {
+  constructor(readonly code: number) {
+    super(`process.exit(${code})`);
+  }
 }
 
-function writeCert(content = CERT_CONTENT): void {
-  writeFileSync(certPath, content);
-}
+describe('intercept trust refusal projection', () => {
+  it.each([
+    { failure: 'cert_unavailable', fixture: 'missing', enabled: true },
+    { failure: 'cert_unreadable', fixture: 'directory', enabled: true },
+    { failure: 'cert_append_failed', fixture: 'bundle-directory', enabled: true },
+    { failure: 'cert_unreadable', fixture: 'directory', enabled: false },
+  ])(
+    '$failure with native logs enabled=$enabled refuses before startup',
+    async testCase => {
+      const dir = await mkdtemp(join(tmpdir(), 'cert-refusal-'));
+      const certPath = join(dir, 'ca.crt');
+      const bundlePath = join(dir, 'bundle');
+      const lines: string[] = [];
+      const logs: string[] = [];
+      const projector = createControlDiagnosticProjector({
+        enabled: testCase.enabled,
+        write: line => lines.push(line),
+        now: () => 1,
+      });
+      const originalExit = process.exit.bind(process);
+      const previous = process.env[SANDBOX_INTERCEPT_HTTPS_ENV];
+      process.exit = ((code?: number) => {
+        throw new ExitError(code ?? 0);
+      }) as typeof process.exit;
+      process.env[SANDBOX_INTERCEPT_HTTPS_ENV] = '1';
+      try {
+        if (testCase.fixture === 'directory') await mkdir(certPath);
+        if (testCase.fixture === 'bundle-directory') {
+          await writeFile(certPath, 'CERT');
+          await mkdir(bundlePath);
+        }
+        const startedAt = Date.now();
+        await installInterceptTrustIfEnabled(
+          message => logs.push(message),
+          {
+            certPath,
+            systemBundlePaths: testCase.fixture === 'bundle-directory' ? [bundlePath] : [],
+          },
+          projector
+        ).then(
+          () => {
+            throw new Error('Expected certificate refusal');
+          },
+          error => {
+            expect(error).toBeInstanceOf(ExitError);
+            expect(error).toMatchObject({ code: 1 });
+          }
+        );
+        if (testCase.fixture === 'missing') {
+          expect(Date.now() - startedAt).toBeGreaterThanOrEqual(4_900);
+        }
+        expect(logs).toHaveLength(1);
+        expect(logs[0]).toContain('refusing to start without HTTPS interception enabled');
+        expect(lines).toHaveLength(testCase.enabled ? 1 : 0);
+        if (testCase.enabled) {
+          expect(JSON.parse(lines[0] ?? '{}')).toMatchObject({
+            event: 'wrapper.lifecycle',
+            fields: { phase: 'start_failed', interceptTrustFailure: testCase.failure },
+          });
+          expect(lines[0]).not.toContain(dir);
+        }
+      } finally {
+        process.exit = originalExit;
+        if (previous === undefined) delete process.env[SANDBOX_INTERCEPT_HTTPS_ENV];
+        else process.env[SANDBOX_INTERCEPT_HTTPS_ENV] = previous;
+        await rm(dir, { recursive: true, force: true });
+      }
+    },
+    15_000
+  );
 
-function writeBundle(index: number, content = BUNDLE_CONTENT): void {
-  writeFileSync(bundlePath(index), content);
-}
-
-function expectBundleAppended(index: number, certContent = CERT_CONTENT): void {
-  expect(readFileSync(bundlePath(index), 'utf8')).toBe(`${BUNDLE_CONTENT}\n${certContent}`);
-}
-
-function expectBundleVarsPointAt(bundle: string): void {
-  expect(process.env.SSL_CERT_FILE).toBe(bundle);
-  expect(process.env.CURL_CA_BUNDLE).toBe(bundle);
-  expect(process.env.REQUESTS_CA_BUNDLE).toBe(bundle);
-  expect(process.env.GIT_SSL_CAINFO).toBe(bundle);
-}
-
-function expectBundleVarsUnset(): void {
-  expect(process.env.SSL_CERT_FILE).toBeUndefined();
-  expect(process.env.CURL_CA_BUNDLE).toBeUndefined();
-  expect(process.env.REQUESTS_CA_BUNDLE).toBeUndefined();
-  expect(process.env.GIT_SSL_CAINFO).toBeUndefined();
-}
-
-function clearCaEnv(): void {
-  delete process.env.NODE_EXTRA_CA_CERTS;
-  delete process.env.SSL_CERT_FILE;
-  delete process.env.CURL_CA_BUNDLE;
-  delete process.env.REQUESTS_CA_BUNDLE;
-  delete process.env.GIT_SSL_CAINFO;
-  delete process.env.SANDBOX_INTERCEPT_HTTPS;
-}
-
-beforeEach(() => {
-  root = mkdtempSync(path.join(os.tmpdir(), 'intercept-cert-'));
-  certPath = path.join(root, 'cloudflare-containers-ca.crt');
-  systemBundlePaths = BUNDLE_NAMES.map(name => path.join(root, name));
-  runtimePaths = { certPath, systemBundlePaths };
-  mockProcessExit = vi.spyOn(process, 'exit').mockImplementation((): never => {
-    throw new Error('process.exit');
-  });
-  clearCaEnv();
-});
-
-afterEach(() => {
-  sleepSpy?.mockRestore();
-  dateSpy?.mockRestore();
-  mockProcessExit.mockRestore();
-  sleepSpy = undefined;
-  dateSpy = undefined;
-  clearCaEnv();
-  rmSync(root, { recursive: true, force: true });
-});
-
-describe('trustRuntimeCert', () => {
-  it('exits with code 1 when the cert file is not found', async () => {
-    const log = vi.fn();
-    sleepSpy = vi.spyOn(Bun, 'sleep').mockResolvedValue();
-    dateSpy = vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValue(10_000);
-
-    await trustRuntimeCert(log, runtimePaths).catch(() => undefined);
-
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
-    expect(log.mock.calls[0]?.[0]).toContain('Certificate not found');
-    expectBundleVarsUnset();
-    expect(process.env.NODE_EXTRA_CA_CERTS).toBeUndefined();
-  });
-
-  it('exits with code 1 when reading the runtime cert fails', async () => {
-    mkdirSync(certPath);
-    writeBundle(0);
-
-    await trustRuntimeCert(vi.fn(), runtimePaths).catch(() => undefined);
-
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
-    expect(readFileSync(bundlePath(0), 'utf8')).toBe(BUNDLE_CONTENT);
-    expectBundleVarsUnset();
-  });
-
-  it('exits with code 1 when appending to the system bundle fails', async () => {
-    writeCert();
-    mkdirSync(bundlePath(0));
-
-    await trustRuntimeCert(vi.fn(), runtimePaths).catch(() => undefined);
-
-    expect(mockProcessExit).toHaveBeenCalledWith(1);
-    expectBundleVarsUnset();
-  });
-
-  it('appends the cert content to the primary system bundle when it exists', async () => {
-    writeCert();
-    writeBundle(0);
-
-    await trustRuntimeCert(vi.fn(), runtimePaths);
-
-    expectBundleAppended(0);
-    expectBundleVarsPointAt(bundlePath(0));
-    expect(process.env.NODE_EXTRA_CA_CERTS).toBeUndefined();
-  });
-
-  it('leaves a pre-existing NODE_EXTRA_CA_CERTS value unchanged after a successful append', async () => {
-    process.env.NODE_EXTRA_CA_CERTS = '/tmp/existing-node-extra-ca-certs';
-    writeCert();
-    writeBundle(0);
-
-    await trustRuntimeCert(vi.fn(), runtimePaths);
-
-    expectBundleAppended(0);
-    expect(process.env.NODE_EXTRA_CA_CERTS).toBe('/tmp/existing-node-extra-ca-certs');
-    expectBundleVarsPointAt(bundlePath(0));
-  });
-
-  it('appends to the first existing fallback system bundle when the primary is absent', async () => {
-    writeCert();
-    writeBundle(1);
-
-    await trustRuntimeCert(vi.fn(), runtimePaths);
-
-    expectBundleAppended(1);
-    expectBundleVarsPointAt(bundlePath(1));
-  });
-
-  it('leaves pre-existing bundle vars and NODE_EXTRA_CA_CERTS when no system bundle exists', async () => {
-    process.env.SSL_CERT_FILE = '/tmp/existing-ssl-cert-file';
-    process.env.CURL_CA_BUNDLE = '/tmp/existing-curl-ca-bundle';
-    process.env.REQUESTS_CA_BUNDLE = '/tmp/existing-requests-ca-bundle';
-    process.env.GIT_SSL_CAINFO = '/tmp/existing-git-ssl-cainfo';
-    process.env.NODE_EXTRA_CA_CERTS = '/tmp/existing-node-extra-ca-certs';
-    writeCert();
-
-    await trustRuntimeCert(vi.fn(), runtimePaths);
-
-    expect(process.env.NODE_EXTRA_CA_CERTS).toBe('/tmp/existing-node-extra-ca-certs');
-    expect(process.env.SSL_CERT_FILE).toBe('/tmp/existing-ssl-cert-file');
-    expect(process.env.CURL_CA_BUNDLE).toBe('/tmp/existing-curl-ca-bundle');
-    expect(process.env.REQUESTS_CA_BUNDLE).toBe('/tmp/existing-requests-ca-bundle');
-    expect(process.env.GIT_SSL_CAINFO).toBe('/tmp/existing-git-ssl-cainfo');
-    expect(readdirSync(root)).toEqual(['cloudflare-containers-ca.crt']);
-  });
-
-  it('leaves NODE_EXTRA_CA_CERTS undefined when no system bundle exists', async () => {
-    writeCert();
-
-    await trustRuntimeCert(vi.fn(), runtimePaths);
-
-    expect(process.env.NODE_EXTRA_CA_CERTS).toBeUndefined();
-    expectBundleVarsUnset();
-    expect(readdirSync(root)).toEqual(['cloudflare-containers-ca.crt']);
-  });
-});
-
-describe('installInterceptTrustIfEnabled', () => {
-  it('does nothing when the marker is absent', async () => {
-    await installInterceptTrustIfEnabled(vi.fn(), runtimePaths);
-
-    expect(mockProcessExit).not.toHaveBeenCalled();
-    expectBundleVarsUnset();
-    expect(readdirSync(root)).toEqual([]);
-  });
-
-  it('does not exit or append bundle vars until a delayed cert file appears', async () => {
-    process.env.SANDBOX_INTERCEPT_HTTPS = '1';
-    writeBundle(0);
-    let releaseSleep: (() => void) | undefined;
-    sleepSpy = vi
-      .spyOn(Bun, 'sleep')
-      .mockImplementation(() => new Promise<void>(resolve => (releaseSleep = resolve)));
-    dateSpy = vi.spyOn(Date, 'now').mockReturnValue(0);
-
-    const installPromise = installInterceptTrustIfEnabled(vi.fn(), runtimePaths);
-
-    await Promise.resolve();
-    expect(releaseSleep).toBeDefined();
-    expect(mockProcessExit).not.toHaveBeenCalled();
-    expect(readFileSync(bundlePath(0), 'utf8')).toBe(BUNDLE_CONTENT);
-    expectBundleVarsUnset();
-
-    writeCert();
-    releaseSleep?.();
-    await installPromise;
-
-    expectBundleAppended(0);
-    expect(process.env.NODE_EXTRA_CA_CERTS).toBeUndefined();
-    expectBundleVarsPointAt(bundlePath(0));
-    expect(mockProcessExit).not.toHaveBeenCalled();
-  });
-});
-
-describe('control wrapper bootstrap trust ordering', () => {
-  it('awaits intercept trust before starting telemetry and main', async () => {
-    const source = (await Bun.file(new URL('./main.ts', import.meta.url)).text()).replace(
-      /\s+/g,
-      ' '
-    );
-
-    const starting = source.indexOf("phase: 'starting'");
-    const install = source.indexOf('await installInterceptTrustIfEnabled(logToFile)');
-    const diagnosticsStart = source.indexOf('diagnostics.start()');
-    const fileLogsStart = source.indexOf('fileLogs.start()');
-    const mainCall = source.indexOf('main(diagnostics, fileLogs, wrapperInstanceId)');
-
-    expect(starting).toBeGreaterThanOrEqual(0);
-    expect(install).toBeGreaterThan(starting);
-    expect(diagnosticsStart).toBeGreaterThan(install);
-    expect(fileLogsStart).toBeGreaterThan(install);
-    expect(mainCall).toBeGreaterThan(install);
+  it('does not refuse or project when no system CA bundle is present', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cert-refusal-'));
+    const certPath = join(dir, 'ca.crt');
+    const lines: string[] = [];
+    const logs: string[] = [];
+    try {
+      await writeFile(certPath, 'CERT');
+      await trustRuntimeCert(
+        message => logs.push(message),
+        { certPath, systemBundlePaths: [] },
+        createControlDiagnosticProjector({ enabled: true, write: line => lines.push(line) })
+      );
+      expect(logs).toEqual(['No supported system CA bundle found']);
+      expect(lines).toHaveLength(0);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

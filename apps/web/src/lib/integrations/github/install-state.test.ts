@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { randomUUID } from 'node:crypto';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { github_install_states, kilocode_users } from '@kilocode/db/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
 import {

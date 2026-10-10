@@ -1,6 +1,6 @@
 export const CONTROL_PLANE_SANDBOX_PERMISSION = {
   external_directory: 'allow',
-  read: 'allow',
+  read: { '*': 'allow', '*.env': 'allow', '*.env.*': 'allow' },
   edit: 'allow',
   glob: 'allow',
   grep: 'allow',
@@ -16,4 +16,9 @@ export const CONTROL_PLANE_SANDBOX_PERMISSION = {
   todoread: 'allow',
   doom_loop: 'allow',
   suggest: 'deny',
+  schedule_wakeup: 'deny',
+  cancel_wakeup: 'deny',
+  cron_create: 'deny',
+  cron_list: 'deny',
+  cron_delete: 'deny',
 } as const;

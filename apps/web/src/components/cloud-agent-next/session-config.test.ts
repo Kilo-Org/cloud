@@ -6,6 +6,7 @@ import {
   modeControlValue,
   needsResumeConfiguration,
   normalizeAlias,
+  selectAssignedSessionBranch,
   type CustomModeOption,
 } from './session-config';
 import type { SessionConfig, ResumeConfig } from './types';
@@ -315,5 +316,20 @@ describe('dedupeCustomModeOptions', () => {
   it('drops an empty slug', () => {
     const options: CustomModeOption[] = [{ value: '', label: '', description: '' }];
     expect(dedupeCustomModeOptions(options)).toEqual([]);
+  });
+});
+
+describe('selectAssignedSessionBranch', () => {
+  it('uses the assigned branch instead of the requested base branch', () => {
+    expect(selectAssignedSessionBranch('main', 'kilo/assigned')).toBe('kilo/assigned');
+  });
+
+  it('never falls back to the requested branch when no assigned branch is recorded', () => {
+    expect(selectAssignedSessionBranch('main', null)).toBeNull();
+    expect(selectAssignedSessionBranch(undefined, null)).toBeNull();
+  });
+
+  it('passes through a recorded assigned branch without a requested branch', () => {
+    expect(selectAssignedSessionBranch(undefined, 'session/agent_x')).toBe('session/agent_x');
   });
 });

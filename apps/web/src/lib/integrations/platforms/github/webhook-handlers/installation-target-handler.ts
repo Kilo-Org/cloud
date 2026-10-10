@@ -3,7 +3,7 @@ import { updateGitHubInstallationAccountIdentity } from '@/lib/integrations/db/g
 import type { GitHubAppType } from '../app-selector';
 import { fetchGitHubInstallationDetails } from '@/lib/integrations/platforms/github/adapter';
 import type { InstallationTargetRenamedPayload } from '../webhook-schemas';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export async function handleInstallationTargetRenamed(
   payload: InstallationTargetRenamedPayload,

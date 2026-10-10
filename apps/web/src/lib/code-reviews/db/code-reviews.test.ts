@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
   cloud_agent_code_review_attempts,
@@ -11,9 +11,10 @@ import {
   platform_integrations,
 } from '@kilocode/db/schema';
 import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import type { CodeReviewCouncilResult, ManualCodeReviewConfig } from '@kilocode/db/schema-types';
+import { CodeReviewPublicationStatus } from '@kilocode/db/schema-types';
 import {
   bitbucketCodeReviewerLifecycleLockKey,
   cancelActiveCodeReviewsById,
@@ -38,6 +39,9 @@ import {
   resetCodeReviewForRetry,
   failReservedQueuedReview,
   updatePreviousReviewSummary,
+  recordCodeReviewAttemptPublicationStatus,
+  claimCodeReviewAttemptPublicationOutcome,
+  getCodeReviewAttemptPublicationStatus,
 } from './code-reviews';
 
 const REPO = `test-org/session-continuation-${Date.now()}`;
@@ -2047,6 +2051,7 @@ describe('resetCodeReviewForRetry', () => {
     await updatePreviousReviewSummary(reviewId, {
       body: '## Summary\nactual\0NUL, literal \\u0000, and 😀',
       headSha: 'previous-head-sha',
+      observed: true,
     });
 
     const stored = await db.query.cloud_agent_code_reviews.findFirst({
@@ -2056,14 +2061,16 @@ describe('resetCodeReviewForRetry', () => {
       '## Summary\nactual\ufffdNUL, literal \\u0000, and 😀'
     );
     expect(stored?.previous_summary_head_sha).toBe('previous-head-sha');
+    expect(stored?.previous_summary_observed).toBe(true);
 
-    await updatePreviousReviewSummary(reviewId, { body: null, headSha: null });
+    await updatePreviousReviewSummary(reviewId, { body: null, headSha: null, observed: false });
 
     const cleared = await db.query.cloud_agent_code_reviews.findFirst({
       where: eq(cloud_agent_code_reviews.id, reviewId),
     });
     expect(cleared?.previous_summary_body).toBeNull();
     expect(cleared?.previous_summary_head_sha).toBeNull();
+    expect(cleared?.previous_summary_observed).toBe(false);
   });
 
   it('marks a reserved review failed when its dispatch error contains a NUL character', async () => {
@@ -2082,6 +2089,75 @@ describe('resetCodeReviewForRetry', () => {
     expect(stored?.status).toBe('failed');
     expect(stored?.dispatch_reservation_id).toBeNull();
     expect(stored?.error_message).toBe('Dispatch failed: actual\ufffdNUL');
+  });
+});
+
+describe('recordCodeReviewAttemptPublicationStatus', () => {
+  let testUser: User;
+  const reviewIds: string[] = [];
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    if (reviewIds.length === 0) return;
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, reviewIds));
+    reviewIds.length = 0;
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function insertReviewWithAttempt() {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: testUser.id,
+        repo_full_name: REPO,
+        pr_number: 1,
+        pr_url: `https://github.com/${REPO}/pull/1`,
+        pr_title: 'Test PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/test',
+        head_sha: `sha-${crypto.randomUUID()}`,
+        status: 'completed',
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    reviewIds.push(review.id);
+    return createCodeReviewAttempt({ codeReviewId: review.id, status: 'completed' });
+  }
+
+  it('stores the first publication status and leaves it on a later write', async () => {
+    const attempt = await insertReviewWithAttempt();
+
+    await recordCodeReviewAttemptPublicationStatus(attempt.id, 'published');
+    await recordCodeReviewAttemptPublicationStatus(attempt.id, 'unknown');
+
+    const stored = await db.query.cloud_agent_code_review_attempts.findFirst({
+      where: eq(cloud_agent_code_review_attempts.id, attempt.id),
+    });
+    expect(stored?.publication_status).toBe('published');
+  });
+
+  it('resolves and leaves publication status null when the write fails the check constraint', async () => {
+    const attempt = await insertReviewWithAttempt();
+
+    await expect(
+      recordCodeReviewAttemptPublicationStatus(
+        attempt.id,
+        'not-a-status' as CodeReviewPublicationStatus
+      )
+    ).resolves.toBeUndefined();
+
+    const stored = await db.query.cloud_agent_code_review_attempts.findFirst({
+      where: eq(cloud_agent_code_review_attempts.id, attempt.id),
+    });
+    expect(stored?.publication_status).toBeNull();
   });
 });
 
@@ -2190,5 +2266,132 @@ describe('listCodeReviews narrows the list DTO', () => {
       aggregationStrategy: 'unanimous',
       specialists: [],
     });
+  });
+});
+
+describe('claimCodeReviewAttemptPublicationOutcome', () => {
+  async function createAttempt(): Promise<{
+    reviewId: string;
+    attemptId: string;
+    userId: string;
+  }> {
+    const user = await insertTestUser();
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: `publication-outcome-${Date.now()}-${Math.random()}`,
+        platform_account_id: `publication-outcome-account`,
+        platform_account_login: `publication-outcome-account`,
+        repository_access: 'all',
+        integration_status: 'active',
+      })
+      .returning({ id: platform_integrations.id });
+    if (!integration) throw new Error('Expected publication outcome integration');
+    const repoFullName = `${REPO}-publication-outcome-${Math.random()}`;
+    const reviewId = await createCodeReview({
+      owner: { type: 'user', id: user.id, userId: user.id },
+      platformIntegrationId: integration.id,
+      repoFullName,
+      prNumber: 33,
+      prUrl: `https://github.com/${repoFullName}/pull/33`,
+      prTitle: 'publication outcome',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/publication-outcome',
+      headSha: `publication-outcome-${Math.random()}`,
+      platform: 'github',
+    });
+    const attempt = await createCodeReviewAttempt({ codeReviewId: reviewId, status: 'queued' });
+    return { reviewId, attemptId: attempt.id, userId: user.id };
+  }
+
+  async function listRow(reviewId: string, userId: string) {
+    const rows = await listCodeReviews({
+      owner: { type: 'user', id: userId, userId },
+      limit: 50,
+      offset: 0,
+    });
+    const row = rows.find(r => r.id === reviewId);
+    if (!row) throw new Error('Expected publication outcome list row');
+    return row;
+  }
+
+  it('records once, writes the review sentence, and treats a later claim as already recorded', async () => {
+    const { reviewId, attemptId, userId } = await createAttempt();
+
+    await expect(
+      claimCodeReviewAttemptPublicationOutcome({
+        attemptId,
+        reviewId,
+        status: CodeReviewPublicationStatus.Missing,
+        sentence: 'not published',
+      })
+    ).resolves.toBe('recorded');
+    await expect(getCodeReviewAttemptPublicationStatus(attemptId)).resolves.toBe('missing');
+    expect((await listRow(reviewId, userId)).error_message).toBe('not published');
+
+    await expect(
+      claimCodeReviewAttemptPublicationOutcome({
+        attemptId,
+        reviewId,
+        status: CodeReviewPublicationStatus.Published,
+        sentence: null,
+      })
+    ).resolves.toBe('already_recorded');
+    await expect(getCodeReviewAttemptPublicationStatus(attemptId)).resolves.toBe('missing');
+    expect((await listRow(reviewId, userId)).error_message).toBe('not published');
+  });
+
+  it('records published without a sentence', async () => {
+    const { reviewId, attemptId, userId } = await createAttempt();
+
+    await expect(
+      claimCodeReviewAttemptPublicationOutcome({
+        attemptId,
+        reviewId,
+        status: CodeReviewPublicationStatus.Published,
+        sentence: null,
+      })
+    ).resolves.toBe('recorded');
+    expect((await listRow(reviewId, userId)).error_message).toBeNull();
+  });
+
+  it('does not overwrite an existing review error message', async () => {
+    const { reviewId, attemptId } = await createAttempt();
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ error_message: 'preexisting' })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    await expect(
+      claimCodeReviewAttemptPublicationOutcome({
+        attemptId,
+        reviewId,
+        status: CodeReviewPublicationStatus.Unknown,
+        sentence: 'not verified',
+      })
+    ).resolves.toBe('recorded');
+    const [stored] = await db
+      .select({ error: cloud_agent_code_reviews.error_message })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+    expect(stored?.error).toBe('preexisting');
+  });
+
+  it('rolls back the attempt status when the review sentence write fails', async () => {
+    const { attemptId } = await createAttempt();
+
+    await expect(
+      claimCodeReviewAttemptPublicationOutcome({
+        attemptId,
+        reviewId: 'not-a-uuid',
+        status: CodeReviewPublicationStatus.Missing,
+        sentence: 'not published',
+      })
+    ).resolves.toBe('write_failed');
+    await expect(getCodeReviewAttemptPublicationStatus(attemptId)).resolves.toBeNull();
   });
 });

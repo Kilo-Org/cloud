@@ -20,7 +20,7 @@ const draft: ChatBackendDraft = {
   apiKey: 'old-account-secret',
   headers: {},
   allowLocalHttp: false,
-  models: [{ id: 'same-name', name: 'Manual model', tools: false }],
+  models: [{ id: 'same-name', name: 'Manual model', tools: false, images: false }],
 };
 const firstId = '00000000-0000-4000-8000-000000000001';
 const secondId = '00000000-0000-4000-8000-000000000002';
@@ -168,5 +168,22 @@ describe('secure backend profiles', () => {
       completionTokenField: 'max_tokens',
     });
     expect(first.completionTokenField).toBe('max_completion_tokens');
+  });
+
+  it('reads a stored model without the image flag as text-only, and keeps a set flag', async () => {
+    const store = await import('./backend-store');
+    const stored = {
+      ...draft,
+      id: firstId,
+      revision: 1,
+      models: [
+        { id: 'old', name: 'Stored before images', tools: true },
+        { id: 'vision', name: 'Reads images', tools: false, images: true },
+      ],
+    };
+    expect(store.parseChatBackends(JSON.stringify([stored]))[0]?.models).toEqual([
+      { id: 'old', name: 'Stored before images', tools: true, images: false },
+      { id: 'vision', name: 'Reads images', tools: false, images: true },
+    ]);
   });
 });

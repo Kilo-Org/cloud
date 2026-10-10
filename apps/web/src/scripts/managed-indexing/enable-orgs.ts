@@ -1,8 +1,8 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations, kilocode_users, type Organization } from '@kilocode/db/schema';
 import { isNull, eq, and, or, gt, gte, sql } from 'drizzle-orm';
-import { updateOrganizationSettings } from '@/lib/organizations/organizations';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { updateOrganizationSettings } from '@kilocode/web-shared/lib/organizations/organizations';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { cliConfirm } from '@/scripts/lib/cli-confirm';
 
 /**

@@ -1,5 +1,7 @@
 import { type Turn } from '@kilocode/harness-sdk';
 
+import { type LocalImage } from '@/lib/agent-attachments/local-image';
+
 /**
  * What a chat looks like to whoever is drawing it.
  *
@@ -7,6 +9,12 @@ import { type Turn } from '@kilocode/harness-sdk';
  * registry whether or not a screen is mounted, and every change to one is
  * published to whoever is watching.
  */
+
+/** Something a person asked: the words and the images that go with them. */
+export type Question = {
+  readonly text: string;
+  readonly images: readonly LocalImage[];
+};
 
 /** What a chat screen draws. */
 export type ChatState = {
@@ -23,6 +31,8 @@ export type ChatState = {
    * puts a Retry under the last thing the person said.
    */
   readonly asked: string | null;
+  /** The images that question carries. Empty when it carries none. */
+  readonly askedImages: readonly LocalImage[];
   /** The target that question was asked of, even if moving onto it failed. */
   readonly askedModel: string | null;
   /**
@@ -31,7 +41,7 @@ export type ChatState = {
    * twice; a session answers one question at a time, so the second waits here
    * rather than racing the first.
    */
-  readonly waiting: readonly string[];
+  readonly waiting: readonly Question[];
   /** Why the last question ended with no answer, for the log rather than the screen. */
   readonly failed: string | null;
   /** A fixed localization key safe to display, never a provider's raw error. */
@@ -100,8 +110,9 @@ export const NOTHING = {
   turns: [] as readonly Turn[],
   answering: '',
   asked: null,
+  askedImages: [] as readonly LocalImage[],
   askedModel: null,
-  waiting: [] as readonly string[],
+  waiting: [] as readonly Question[],
   failed: null,
   failureKey: null,
 } satisfies Omit<ChatState, 'sessionId' | 'model' | 'status'>;

@@ -20,7 +20,7 @@ const sharedAssociation = {
   userRecordId: null,
   userBlockedReason: null,
 };
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: () => {
       const query = {
@@ -33,7 +33,7 @@ jest.mock('@/lib/drizzle', () => ({
     },
   },
 }));
-jest.mock('@/lib/utils.server', () => ({ logExceptInTest: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({ logExceptInTest: jest.fn() }));
 jest.mock('./app-selector', () => ({
   getGitHubAppCredentials: () => ({ appId: '1', privateKey: 'test' }),
 }));

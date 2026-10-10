@@ -139,23 +139,40 @@ describe('the Kilo MCP connection', () => {
 
 describe('remembered question targets', () => {
   it('discards the questions and targets of wiped chats without touching another account', async () => {
-    await rememberAsked('gone', 'unsent custom question', 'backend:private:1:model');
-    await rememberAsked('kept', 'another account question', 'kilo/one');
+    await rememberAsked('gone', {
+      text: 'unsent custom question',
+      model: 'backend:private:1:model',
+      images: [],
+    });
+    await rememberAsked('kept', {
+      text: 'another account question',
+      model: 'kilo/one',
+      images: [],
+    });
 
     await clearChatsForSignOut('user-1');
 
     expect(await askedIn('gone')).toBeNull();
-    expect(await askedIn('kept')).toEqual({ text: 'another account question', model: 'kilo/one' });
+    expect(await askedIn('kept')).toEqual({
+      text: 'another account question',
+      model: 'kilo/one',
+      images: [],
+    });
   });
 
   it('keeps the questions and targets when an account switch retains its stored chats', async () => {
-    await rememberAsked('gone', 'unsent custom question', 'backend:private:1:model');
+    await rememberAsked('gone', {
+      text: 'unsent custom question',
+      model: 'backend:private:1:model',
+      images: [],
+    });
 
     await releaseChatsForAccountSwitch();
 
     expect(await askedIn('gone')).toEqual({
       text: 'unsent custom question',
       model: 'backend:private:1:model',
+      images: [],
     });
   });
 });
@@ -208,7 +225,7 @@ describe('custom backend credentials at account boundaries', () => {
       apiKind: 'chat_completions',
       apiKey: 'test-account-key',
       headers: { 'x-private-header': 'test-account-header' },
-      models: [{ id: 'model', name: 'Model', tools: false }],
+      models: [{ id: 'model', name: 'Model', tools: false, images: false }],
       allowLocalHttp: false,
     });
     expect(listChatBackends()).toEqual([backend]);

@@ -1,0 +1,58 @@
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { PostHog } from 'posthog-node';
+
+let instance: PostHog | null = null;
+
+export default function PostHogClient(): Pick<
+  PostHog,
+  'capture' | 'isFeatureEnabled' | 'getFeatureFlag' | 'debug' | 'alias'
+> {
+  if (instance) return instance;
+
+  const key = getEnvVariable('NEXT_PUBLIC_POSTHOG_KEY') ?? '';
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (!isProduction) {
+    return {
+      capture: () => {},
+      isFeatureEnabled: async () => false,
+      getFeatureFlag: async () => undefined,
+      debug: () => {},
+      alias: () => {},
+    };
+  }
+  // Single shared PostHog client for the process.
+  // Disabled outside production to avoid sending real events during tests/dev.
+  instance = new PostHog(isProduction ? key : key || 'disabled', {
+    host: 'https://us.i.posthog.com',
+    flushAt: 1,
+    flushInterval: 0,
+    disabled: !isProduction,
+  });
+
+  // if (!isProduction) {
+  //   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  //   (instance as any).capture = function (...args: any[]) {
+  //     console.log('POSTHOG CAPTURE', ...args);
+  //   };
+  // }
+
+  return instance;
+}
+
+/**
+ * Flushes buffered events. A no-op outside production, where no shared
+ * instance exists, so callers can always await it.
+ */
+export async function flushPostHog(): Promise<void> {
+  if (!instance) {
+    return;
+  }
+  await instance.flush();
+}
+
+export async function shutdownPosthog(): Promise<void> {
+  if (instance) {
+    await instance.shutdown();
+    instance = null;
+  }
+}

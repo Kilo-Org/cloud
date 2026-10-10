@@ -45,19 +45,35 @@ export function isReasoningPart(part: Part): part is ReasoningPart {
 }
 
 /**
+ * Per-message memo for the stripped message. The SDK keeps a row's
+ * `StoredMessage` object identity across a streamed delta on another row, so an
+ * unchanged message must map to the same derived object every pass; otherwise
+ * every stripped message loses its memo identity on every publish. WeakMap so a
+ * discarded message takes its derived copy with it.
+ */
+const withoutReasoningPartsMemo = new WeakMap<StoredMessage, StoredMessage>();
+
+function withoutReasoningPartsOfMessage(message: StoredMessage): StoredMessage {
+  const cached = withoutReasoningPartsMemo.get(message);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const parts = message.parts.filter(part => !isReasoningPart(part));
+  const derived = parts.length === message.parts.length ? message : { ...message, parts };
+  withoutReasoningPartsMemo.set(message, derived);
+  return derived;
+}
+
+/**
  * Returns the messages with every reasoning part removed, for the
  * "Hide thinking details" option. A message that has no reasoning part keeps
  * its identity, and the input array itself is returned when nothing changed,
- * so memoized consumers do not churn when thinking is already absent.
+ * so memoized consumers do not churn when thinking is already absent. A message
+ * that does carry reasoning maps to the same derived object each pass, so an
+ * unchanged row keeps its identity while thinking is hidden.
  */
 export function withoutReasoningParts(messages: readonly StoredMessage[]): StoredMessage[] {
-  const next = messages.map(message => {
-    const parts = message.parts.filter(part => !isReasoningPart(part));
-    if (parts.length === message.parts.length) {
-      return message;
-    }
-    return { ...message, parts };
-  });
+  const next = messages.map(message => withoutReasoningPartsOfMessage(message));
   const changed = next.some((message, index) => message !== messages[index]);
   // Hand back the input array itself when nothing was removed. Callers only
   // read the result, so widening the readonly view is safe.

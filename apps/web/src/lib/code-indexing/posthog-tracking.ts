@@ -5,7 +5,7 @@
  * Events are designed to capture comprehensive context for analytics and debugging.
  */
 
-import PostHogClient from '@/lib/posthog';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { captureException } from '@sentry/nextjs';
 
 const posthogClient = PostHogClient();

@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { submitManualFindingDismissal } from './manual-dismiss-client';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'test-internal-secret',
   SECURITY_SYNC_WORKER_URL: 'https://security-sync.test',
 }));
@@ -275,7 +275,7 @@ describe('submitManualFindingDismissal env configuration', () => {
 
   it('throws a stable PRECONDITION_FAILED TRPCError when SECURITY_SYNC_WORKER_URL is empty (not a raw Error)', async () => {
     jest.resetModules();
-    jest.doMock('@/lib/config.server', () => ({
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
       INTERNAL_API_SECRET: 'test-internal-secret',
       SECURITY_SYNC_WORKER_URL: '',
     }));
@@ -301,7 +301,7 @@ describe('submitManualFindingDismissal env configuration', () => {
 
   it('throws a stable PRECONDITION_FAILED TRPCError when INTERNAL_API_SECRET is empty (not a raw Error)', async () => {
     jest.resetModules();
-    jest.doMock('@/lib/config.server', () => ({
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
       INTERNAL_API_SECRET: '',
       SECURITY_SYNC_WORKER_URL: 'https://security-sync.test',
     }));

@@ -38,7 +38,6 @@ const buttons = vi.hoisted(() => ({
 const viewRenders = vi.hoisted(() => ({
   list: [] as { style?: unknown; className?: string; children?: unknown }[],
 }));
-const modalRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
 const nativePlatform = vi.hoisted(() => ({ OS: 'ios' }));
 const sessionListRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
 const composerRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
@@ -72,10 +71,6 @@ vi.mock('react-native', () => ({
   View: (props: { style?: unknown; className?: string; children?: ReactNode }) => {
     viewRenders.list.push(props);
     return createElement('View', props, props.children);
-  },
-  Modal: (props: { visible?: boolean; children?: ReactNode }) => {
-    modalRenders.list.push(props);
-    return props.visible ? createElement('Modal', props, props.children) : null;
   },
   Pressable: 'Pressable',
   Platform: nativePlatform,
@@ -221,6 +216,11 @@ function collectText(node: unknown): string[] {
   return [];
 }
 
+/** The native transcript sheet host, absent until the sheet is opened. */
+function transcriptSheets(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(node => (node.type as string) === 'BottomSheet');
+}
+
 function makeReview(over: Record<string, unknown> = {}) {
   return {
     pr_title: 'Fix login',
@@ -296,7 +296,6 @@ beforeEach(() => {
   queryErrors.errors = [];
   buttons.rendered = [];
   viewRenders.list = [];
-  modalRenders.list = [];
   nativePlatform.OS = 'ios';
   sessionListRenders.list = [];
   composerRenders.list = [];
@@ -606,12 +605,13 @@ describe('ReviewDetailScreen transcript sheet', () => {
   });
 
   it('shows a transcript button without mounting the transcript inline', () => {
-    const texts = renderScreen();
+    const renderer = mountScreen();
+    const texts = collectText(renderer.toJSON());
 
     expect(texts).toContain('Session transcript');
     expect(texts).not.toContain('Waiting for the review transcript.');
     expect(texts).not.toContain('Done');
-    expect(modalRenders.list.at(-1)?.visible).toBe(false);
+    expect(transcriptSheets(renderer)).toHaveLength(0);
     expect(sessionListRenders.list).toHaveLength(0);
     expect(spectatorStream.createReviewSpectatorStream).not.toHaveBeenCalled();
   });
@@ -629,18 +629,30 @@ describe('ReviewDetailScreen transcript sheet', () => {
         await Promise.resolve();
       });
 
-      const modal = modalRenders.list.at(-1);
-      expect(modal?.visible).toBe(true);
-      expect(modal?.animationType).toBe('slide');
-      expect(modal?.presentationStyle).toBe(platform === 'ios' ? 'pageSheet' : undefined);
+      const sheet = transcriptSheets(renderer)[0];
+      expect(sheet?.props.index).toBe(0);
+      expect(sheet?.props.snapPoints).toEqual(['100%']);
       expect(collectText(renderer.toJSON())).toContain('Done');
       expect(connection.connect).toHaveBeenCalledTimes(1);
       expect(composerRenders.list).toHaveLength(0);
 
+      // Android expands the sheet over the status bar, so the surface pads the
+      // top inset; iOS presents below it and pads nothing.
+      const surface = renderer.root.findAll(
+        node => node.props.testID === 'session-page-sheet-surface'
+      )[0];
+      expect(surface?.props.style).toEqual({ paddingTop: platform === 'ios' ? 0 : 24 });
+
       act(() => {
-        (modal?.onRequestClose as (() => void) | undefined)?.();
+        (sheet?.props.onClose as (() => void) | undefined)?.();
       });
-      expect(modalRenders.list.at(-1)?.visible).toBe(false);
+      // The surface stays mounted through the dismiss animation: onClose starts
+      // it (index -1) and the native dismiss event ends it.
+      expect(transcriptSheets(renderer)[0]?.props.index).toBe(-1);
+      act(() => {
+        (transcriptSheets(renderer)[0]?.props.onDismiss as (() => void) | undefined)?.();
+      });
+      expect(transcriptSheets(renderer)).toHaveLength(0);
       expect(connection.destroy).toHaveBeenCalledTimes(1);
 
       openTranscriptSheet();
@@ -655,7 +667,11 @@ describe('ReviewDetailScreen transcript sheet', () => {
       act(() => {
         (done?.props.onPress as (() => void) | undefined)?.();
       });
-      expect(modalRenders.list.at(-1)?.visible).toBe(false);
+      expect(transcriptSheets(renderer)[0]?.props.index).toBe(-1);
+      act(() => {
+        (transcriptSheets(renderer)[0]?.props.onDismiss as (() => void) | undefined)?.();
+      });
+      expect(transcriptSheets(renderer)).toHaveLength(0);
       expect(connection.destroy).toHaveBeenCalledTimes(2);
     }
   );
@@ -667,10 +683,13 @@ describe('ReviewDetailScreen transcript sheet', () => {
       resolveConnection = resolve;
     });
     spectatorStream.createReviewSpectatorStream.mockReturnValue(pendingConnection);
-    mountScreen(true);
+    const renderer = mountScreen(true);
 
     act(() => {
-      (modalRenders.list.at(-1)?.onRequestClose as (() => void) | undefined)?.();
+      (transcriptSheets(renderer)[0]?.props.onClose as (() => void) | undefined)?.();
+    });
+    act(() => {
+      (transcriptSheets(renderer)[0]?.props.onDismiss as (() => void) | undefined)?.();
     });
     await act(async () => {
       resolveConnection?.(connection);
@@ -693,7 +712,7 @@ describe('ReviewDetailScreen transcript sheet', () => {
       renderer.update(createElement(ReviewDetailScreen, { scope: 'personal', reviewId: 'rev-2' }));
     });
 
-    expect(modalRenders.list.at(-1)?.visible).toBe(false);
+    expect(transcriptSheets(renderer)).toHaveLength(0);
     expect(connection.destroy).toHaveBeenCalledTimes(1);
     expect(spectatorStream.createReviewSpectatorStream).toHaveBeenCalledTimes(1);
   });

@@ -34,11 +34,8 @@ describe('Mayor idle lifecycle', () => {
     });
   });
 
-  // ── waiting status ──────────────────────────────────────────────────
-
   describe('waiting status', () => {
     it('should allow setting an agent to waiting', async () => {
-      // Register a mayor agent directly
       const agentsBefore = await town.listAgents({ role: 'mayor' });
       expect(agentsBefore.length).toBe(0);
 
@@ -46,12 +43,10 @@ describe('Mayor idle lifecycle', () => {
       const result = await town.ensureMayor();
       expect(result.agentId).toBeTruthy();
 
-      // Set the agent to working first, then waiting
       await town.updateAgentStatus(result.agentId, 'working');
       const workingAgent = await town.getAgentAsync(result.agentId);
       expect(workingAgent?.status).toBe('working');
 
-      // mayorWaiting should transition working → waiting
       await town.mayorWaiting(result.agentId);
       const waitingAgent = await town.getAgentAsync(result.agentId);
       expect(waitingAgent?.status).toBe('waiting');
@@ -60,11 +55,9 @@ describe('Mayor idle lifecycle', () => {
     it('should not transition non-working agents to waiting', async () => {
       const result = await town.ensureMayor();
 
-      // Agent starts as idle (container not running in test env)
       const agent = await town.getAgentAsync(result.agentId);
       expect(agent?.status).toBe('idle');
 
-      // mayorWaiting should NOT change idle to waiting
       await town.mayorWaiting(result.agentId);
       const afterAgent = await town.getAgentAsync(result.agentId);
       expect(afterAgent?.status).toBe('idle');
@@ -74,25 +67,20 @@ describe('Mayor idle lifecycle', () => {
       const result = await town.ensureMayor();
       await town.updateAgentStatus(result.agentId, 'working');
 
-      // Call with undefined agentId — should resolve to mayor
       await town.mayorWaiting();
       const agent = await town.getAgentAsync(result.agentId);
       expect(agent?.status).toBe('waiting');
     });
   });
 
-  // ── hasActiveWork / alarm interval ──────────────────────────────────
-
   describe('alarm interval with waiting mayor', () => {
     it('should use idle alarm interval when mayor is waiting', async () => {
       const result = await town.ensureMayor();
 
-      // Set mayor to working → alarm should be active (5s)
       await town.updateAgentStatus(result.agentId, 'working');
       const activeStatus = await town.getAlarmStatus();
       expect(activeStatus.alarm.intervalMs).toBe(5_000);
 
-      // Set mayor to waiting → alarm should drop to idle (5 min)
       await town.updateAgentStatus(result.agentId, 'waiting');
       const idleStatus = await town.getAlarmStatus();
       expect(idleStatus.alarm.intervalMs).toBe(5 * 60_000);
@@ -102,31 +90,25 @@ describe('Mayor idle lifecycle', () => {
       const result = await town.ensureMayor();
       await town.updateAgentStatus(result.agentId, 'waiting');
 
-      // Create a convoy to get a working polecat
       const convoy = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Test',
         tasks: [{ title: 'Task 1' }],
       });
 
-      // Run alarm to assign and dispatch the polecat
       await runDurableObjectAlarm(town);
 
       const bead = await town.getBeadAsync(convoy.beads[0].bead.bead_id);
       expect(bead?.assignee_agent_bead_id).toBeTruthy();
 
-      // Set the polecat to working
       if (bead?.assignee_agent_bead_id) {
         await town.updateAgentStatus(bead.assignee_agent_bead_id, 'working');
       }
 
-      // Now alarm should be active (polecat is working)
       const status = await town.getAlarmStatus();
       expect(status.alarm.intervalMs).toBe(5_000);
     });
   });
-
-  // ── getMayorStatus mapping ─────────────────────────────────────────
 
   describe('getMayorStatus', () => {
     it('should report waiting mayor as active', async () => {
@@ -137,8 +119,6 @@ describe('Mayor idle lifecycle', () => {
       expect(status.session?.status).toBe('active');
     });
   });
-
-  // ── getAlarmStatus agent counts ────────────────────────────────────
 
   describe('getAlarmStatus agent counts', () => {
     it('should include waiting in agent counts', async () => {

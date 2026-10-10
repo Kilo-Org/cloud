@@ -15,6 +15,7 @@ import { withDORetry } from '@kilocode/worker-utils';
 import { applyMetadataChanges, flushPartialMetadataChanges } from './ingest/metadata';
 export { createItemExtractor } from './ingest/item-extractor';
 import { createItemExtractor } from './ingest/item-extractor';
+import { toRpcBody } from './ingest/stage-and-enqueue';
 import { getUserConnectionDO } from './dos/UserConnectionDO';
 import type { AttentionSignal } from './dos/session-ingest-attention';
 import {
@@ -294,11 +295,13 @@ function createIngestChunker(
       const itemR2Key = `items/${kiloUserId}/${sessionId}/${item_id}/${ingestedAt}`;
       const staged = await withDORetry(
         () => getSessionIngestDO(env, { kiloUserId, sessionId }),
-        stub =>
-          stub.stageR2Object(
+        async stub => {
+          const itemBytes = encoder.encode(itemDataJson);
+          return stub.stageR2Object(
             { kiloUserId, sessionId, key: itemR2Key },
-            new Blob([itemDataJson]).stream()
-          ),
+            await toRpcBody(itemBytes, itemBytes.byteLength)
+          );
+        },
         'SessionIngestDO.stageR2Object'
       );
       if (!staged) {

@@ -10,7 +10,7 @@
  */
 
 import crypto from 'crypto';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   cloud_agent_code_reviews,
   kilocode_users,
@@ -31,7 +31,7 @@ import {
   updateCodeReviewStatusIfNonTerminal,
 } from '../db/code-reviews';
 import { captureException } from '@sentry/nextjs';
-import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import { CodeReviewPlatformSchema, type CodeReviewPlatform } from '../core/schemas';
 import { DEFAULT_CODE_REVIEW_MODEL } from '../core/constants';
@@ -41,7 +41,7 @@ import { appendCodeReviewAnalyticsPromptAppendix } from '../analytics/contracts'
 import { getReviewAnalyticsEnabledFromConfig } from '../analytics/settings';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   CODE_REVIEW_TERMINAL_REASONS,

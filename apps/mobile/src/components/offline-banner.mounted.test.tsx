@@ -6,11 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { type ConnectivityState } from '@/lib/connectivity-online';
-import {
-  createOfflineBannerStore,
-  OFFLINE_BANNER_HEIGHT,
-  type OfflineBannerStore,
-} from '@/lib/offline-banner-state';
+import { createOfflineBannerStore, type OfflineBannerStore } from '@/lib/offline-banner-state';
 import { SettingsOverviewScreen } from './security-agent/settings-overview-screen';
 import {
   advanceBy,
@@ -165,7 +161,7 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
     expect(announceForA11y).not.toHaveBeenCalled();
   });
 
-  it('shows only confirmed offline with touch transparency, safe-area top, and alert semantics', async () => {
+  it('shows only confirmed offline with touch transparency and alert semantics', async () => {
     const confirmation = Promise.withResolvers<boolean>();
     probe.mockReturnValue(confirmation.promise);
     const renderer = await mountTree();
@@ -180,14 +176,9 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
     expect(findHost(renderer.root, 'Text')[0]?.props.children).toBe('No internet connection');
     const outer = findHost(renderer.root, 'View')[0];
     expect(outer?.props.pointerEvents).toBe('none');
-    expect(outer?.props.style).toEqual({ top: 47 });
     const alert = findHost(renderer.root, 'Animated.View')[0];
     expect(alert?.props.accessibilityRole).toBe('alert');
     expect(alert?.props.accessibilityLabel).toBe('No internet connection');
-    // The painted row is exactly OFFLINE_BANNER_HEIGHT tall: surfaces reserve
-    // that constant above their pinned headers so the overlay never covers a
-    // title (uxs2 spot check). Keep the height style in sync with the export.
-    expect(alert?.props.style).toEqual({ height: OFFLINE_BANNER_HEIGHT });
     expect(findHost(renderer.root, 'WifiOff')).toHaveLength(1);
     expect(announceForA11y).toHaveBeenCalledExactlyOnceWith('No internet connection');
   });

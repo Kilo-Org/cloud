@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { SheetHeader } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { SlidersHorizontal, Wrench } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { Text } from '@/components/ui/text';
@@ -199,6 +200,7 @@ type McpSettingsSheetProps = {
 };
 
 export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSettingsSheetProps>) {
+  const { confirm, dialog } = useConfirmDialog();
   const { t } = useTranslation();
   const [form, setForm] = useState<McpServerFormTarget | null>(null);
   // Each open is a new native form. Android recycles EditTexts across two
@@ -240,18 +242,16 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
     (id: string) => {
       /* The server's tools leave every chat, so the delete is asked for and
          never taken on the tap alone. */
-      Alert.alert(t('modelChat.mcp.deleteTitle'), t('modelChat.mcp.deleteMessage'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: () => {
-            void settings.deleteServer(id);
-          },
+      confirm({
+        title: t('modelChat.mcp.deleteTitle'),
+        message: t('modelChat.mcp.deleteMessage'),
+        confirmLabel: t('common.delete'),
+        onConfirm: () => {
+          void settings.deleteServer(id);
         },
-      ]);
+      });
     },
-    [settings, t]
+    [confirm, settings, t]
   );
 
   const submitForm = useCallback(
@@ -373,6 +373,7 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
           onClose={closeForm}
         />
       )}
+      {dialog}
     </SessionPageSheet>
   );
 }

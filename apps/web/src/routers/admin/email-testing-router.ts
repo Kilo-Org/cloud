@@ -1,8 +1,11 @@
 import { TRPCError } from '@trpc/server';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { NEXTAUTH_URL } from '@/lib/config.server';
-import { getEmailVerificationRecipient, sendViaMailgun } from '@/lib/email-mailgun';
-import { verifyEmail } from '@/lib/email-neverbounce';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
+import {
+  getEmailVerificationRecipient,
+  sendViaMailgun,
+} from '@kilocode/web-shared/lib/email-mailgun';
+import { verifyEmail } from '@kilocode/web-shared/lib/email-neverbounce';
 import {
   subjects,
   creditsVars,
@@ -12,9 +15,9 @@ import {
   RawHtml,
   renderTemplate,
   type TemplateName,
-} from '@/lib/email';
+} from '@kilocode/web-shared/lib/email';
 import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
-import { USER_DELETION_COMPLETION_HTML } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_COMPLETION_HTML } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import * as z from 'zod';
 import { format } from 'date-fns';
 

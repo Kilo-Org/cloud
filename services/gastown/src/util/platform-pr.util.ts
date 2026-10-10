@@ -25,8 +25,6 @@ function hostnameOf(urlStr: string): string | null {
   }
 }
 
-// -- PR body template --
-
 export type QualityGateResult = {
   name: string;
   passed: boolean;
@@ -81,8 +79,6 @@ ${diffSection}
 *Created by Gastown Refinery.*`;
 }
 
-// -- PR/MR status polling schemas --
-
 /** Schema for GitHub PR status responses (used by checkPRStatus). */
 export const GitHubPRStatusSchema = z.object({
   state: z.string(),
@@ -95,8 +91,6 @@ export const GitHubPRStatusSchema = z.object({
 export const GitLabMRStatusSchema = z.object({
   state: z.string(),
 });
-
-// -- GitHub PR creation --
 
 const GitHubPRResponse = z.object({
   html_url: z.string(),
@@ -209,8 +203,6 @@ export async function createGitHubPR(params: {
 
   return { pr_url: parsed.html_url, pr_number: parsed.number };
 }
-
-// -- GitLab MR creation --
 
 const GitLabMRResponse = z.object({
   web_url: z.string(),

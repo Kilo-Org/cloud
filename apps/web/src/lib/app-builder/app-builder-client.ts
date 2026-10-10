@@ -5,7 +5,7 @@
  * project initialization, preview deployments, and builds.
  */
 
-import { APP_BUILDER_URL, APP_BUILDER_AUTH_TOKEN } from '@/lib/config.server';
+import { APP_BUILDER_URL, APP_BUILDER_AUTH_TOKEN } from '@kilocode/web-shared/lib/config.server';
 
 // Import shared schemas from cloudflare-app-builder
 import {

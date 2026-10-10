@@ -6,7 +6,7 @@ import {
   kilo_pass_org_qualifying_spend_events,
 } from '@kilocode/db/schema';
 import { KiloPassOrgBonusMode } from '@kilocode/db/schema-types';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, eq, gte, isNull, lt, sql } from 'drizzle-orm';
 
 const REPAIR_BATCH_SIZE = 250;

@@ -1,4 +1,4 @@
-jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
 
 jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   createScheduledJobRun: jest.fn(() => ({ runId: 'run-id' })),
@@ -8,7 +8,9 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
 }));
 
 jest.mock('@/lib/security-agent/db/security-analysis', () => ({ cleanupStaleAnalyses: jest.fn() }));
-jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => jest.fn()) }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  sentryLogger: jest.fn(() => jest.fn()),
+}));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 import { cleanupStaleAnalyses } from '@/lib/security-agent/db/security-analysis';

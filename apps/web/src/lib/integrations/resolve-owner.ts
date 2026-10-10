@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import type { Owner } from './core/types';
-import type { TRPCContext } from '@/lib/trpc/init';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 /** Shared zod schema for endpoints that optionally accept an organizationId. */
 export const optionalOrgInput = z

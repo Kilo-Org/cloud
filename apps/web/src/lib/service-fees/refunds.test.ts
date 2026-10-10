@@ -8,13 +8,13 @@ import {
   settleServiceFeeAssessment,
   upsertServiceFeeAssessment,
   type ServiceFeeAssessmentRecord,
-} from '@/lib/service-fees/assessments';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
 import {
   SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
   SERVICE_FEE_METADATA_TYPE,
   SERVICE_FEE_RATE_BASIS_POINTS,
   SERVICE_FEE_VERSION,
-} from '@/lib/service-fees/constants';
+} from '@kilocode/web-shared/lib/service-fees/constants';
 import {
   applyDeferredServiceFeeRefunds,
   buildServiceFeeRefundAllocationMetadata,

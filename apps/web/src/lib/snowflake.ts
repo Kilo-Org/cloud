@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 // ---------------------------------------------------------------------------
 // Types

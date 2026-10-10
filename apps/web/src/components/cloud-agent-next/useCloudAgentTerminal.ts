@@ -5,7 +5,7 @@ import type { RefObject } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
-import { CLOUD_AGENT_NEXT_WS_URL } from '@/lib/constants';
+import { CLOUD_AGENT_NEXT_WS_URL } from '@kilocode/web-shared/lib/constants';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
   classifyTerminalCreateError,

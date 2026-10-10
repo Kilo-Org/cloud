@@ -1,7 +1,7 @@
 import {
   AdminSlackNotificationError,
   type AdminSlackNotification,
-} from '@/lib/slack/admin-notifications';
+} from '@kilocode/web-shared/lib/slack/admin-notifications';
 import { assertServiceFeeAuditReadOnly } from '@/lib/service-fees/read-only';
 
 export { assertServiceFeeAuditReadOnly } from '@/lib/service-fees/read-only';

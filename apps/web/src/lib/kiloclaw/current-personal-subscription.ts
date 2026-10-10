@@ -2,7 +2,7 @@ import 'server-only';
 
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { kiloclaw_instances, kiloclaw_subscriptions } from '@kilocode/db/schema';
 
 export type PersonalSubscriptionResolverDb = typeof db | DrizzleTransaction;

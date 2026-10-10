@@ -6,7 +6,7 @@
 
 import { useMemo } from 'react';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
-import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 
 type UseOrganizationModelsReturn = {

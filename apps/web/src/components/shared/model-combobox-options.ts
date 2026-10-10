@@ -1,5 +1,3 @@
-import { preferredModels } from '@/lib/ai-gateway/models';
-
 export type ModelOption = {
   id: string; // e.g., "anthropic/claude-sonnet-4.5"
   name: string; // e.g., "Claude Sonnet 4.5"
@@ -18,6 +16,8 @@ export type ModelOption = {
   unavailable?: boolean;
   /** Ordered list of variant key names (e.g., ["none","low","medium","high","max"]) */
   variants?: string[];
+  /** Reasoning-control variants only; [] is known default-only, absent is unknown. */
+  reasoningVariants?: string[];
 };
 
 export type ModelOptionGroup = {
@@ -26,7 +26,10 @@ export type ModelOptionGroup = {
   models: ModelOption[];
 };
 
-export function buildModelOptionGroups(models: ModelOption[]): ModelOptionGroup[] {
+export function buildModelOptionGroups(
+  models: ModelOption[],
+  preferredModels: ReadonlyArray<string>
+): ModelOptionGroup[] {
   const groups: ModelOptionGroup[] = [];
   const groupIndexes = new Map<string, number>();
   const ungrouped: ModelOption[] = [];

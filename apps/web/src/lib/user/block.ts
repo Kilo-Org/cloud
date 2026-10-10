@@ -7,7 +7,7 @@ import {
   device_refresh_tokens,
   native_attested_keys,
 } from '@kilocode/db/schema';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 export type BlockUserParams = {
   kiloUserId: string;

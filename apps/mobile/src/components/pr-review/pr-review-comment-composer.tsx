@@ -9,7 +9,7 @@ import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Keyboard, ScrollView, type TextInput, View } from 'react-native';
+import { Keyboard, ScrollView, type TextInput, View } from 'react-native';
 
 import {
   PrFormSheetHeader,
@@ -26,6 +26,7 @@ import {
   ContextPreview,
 } from '@/components/pr-review/pr-review-comment-composer-parts';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -84,6 +85,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   } = props;
   const pending = usePendingReview();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const createComment = useCreateReviewCommentMutation(prRef ?? { owner, repo, number });
   const isEdit = mode.kind === 'edit';
 
@@ -271,19 +273,18 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       ? bodyRef.current !== bodyBaselineRef.current
       : bodyRef.current.trim().length > 0;
     if (dirty) {
-      Alert.alert(t('prReview.composer.discardTitle'), t('prReview.composer.discardMessage'), [
-        { text: t('common.keepEditing'), style: 'cancel' },
-        {
-          text: t('common.discard'),
-          style: 'destructive',
-          onPress: () => {
-            if (draftUserId) {
-              void clearDraft(draftUserId, commentDraftKey);
-            }
-            onDismiss();
-          },
+      confirm({
+        title: t('prReview.composer.discardTitle'),
+        message: t('prReview.composer.discardMessage'),
+        confirmLabel: t('common.discard'),
+        cancelLabel: t('common.keepEditing'),
+        onConfirm: () => {
+          if (draftUserId) {
+            void clearDraft(draftUserId, commentDraftKey);
+          }
+          onDismiss();
         },
-      ]);
+      });
       return;
     }
     onDismiss();
@@ -335,7 +336,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
 
   // PickerSheet invariant: [header, ScrollView] as direct children (no
   // wrapper View, no sticky-footer sibling). Footer is trailing scroll
-  // content so keyboard insets + AppAwareKeyboardPaddingView keep CTAs
+  // content so the keyboard insets the scroll body and the comment CTA stays
   // tappable without overpainting the pinned header.
   return (
     <>
@@ -400,6 +401,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
           onCancel={handleCancel}
         />
       </ScrollView>
+      {dialog}
     </>
   );
 }

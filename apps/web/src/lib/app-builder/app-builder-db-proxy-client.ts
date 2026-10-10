@@ -5,7 +5,10 @@
  * database credentials for user app databases.
  */
 
-import { APP_BUILDER_DB_PROXY_URL, APP_BUILDER_DB_PROXY_AUTH_TOKEN } from '@/lib/config.server';
+import {
+  APP_BUILDER_DB_PROXY_URL,
+  APP_BUILDER_DB_PROXY_AUTH_TOKEN,
+} from '@kilocode/web-shared/lib/config.server';
 
 // Import shared schemas from cloudflare-db-proxy
 import {

@@ -4,9 +4,9 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { captureException } from '@sentry/nextjs';
 import { eq, and } from 'drizzle-orm';
-import { APP_BUILDER_AUTH_TOKEN } from '@/lib/config.server';
-import { logExceptInTest } from '@/lib/utils.server';
-import { db } from '@/lib/drizzle';
+import { APP_BUILDER_AUTH_TOKEN } from '@kilocode/web-shared/lib/config.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { deployments } from '@kilocode/db/schema';
 import { redeploy } from '@/lib/user-deployments/deployments-service';
 

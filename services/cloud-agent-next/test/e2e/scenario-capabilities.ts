@@ -23,7 +23,12 @@ export type CapabilityName =
   | 'deployedHttpAuthBoundary'
   | 'callbacks'
   | 'gates'
-  | 'sandboxFaults';
+  | 'sandboxFaults'
+  | 'controlPlaneV2'
+  | 'controlPlaneRuntime'
+  | 'credentialContainment'
+  | 'attachments'
+  | 'reports';
 
 /**
  * Local container inspection. `waitForOwnedContainer` returns `null` on
@@ -126,6 +131,106 @@ export type CallbackObservation = { open(signal?: AbortSignal): Promise<Callback
 export type GatesObservation = { parkedStreamsSupported: true };
 
 /**
+ * The control-plane V2 (`workspace_*` new plane) is routed and launched. Plan
+ * B11 writes scenarios against it before the C1 cutover, so the local profile
+ * advertises this capability only when the operator opts in with
+ * `E2E_CONTROL_PLANE_V2=1`. Without it every V2 scenario reports `unsupported`
+ * with the missing-capability reason instead of failing against the legacy
+ * plane.
+ *
+ * The flag alone is not proof: a `workspace_*` id prefix is produced by the
+ * legacy plane too. Every V2 scenario additionally declares `controlPlaneRuntime`
+ * and proves the owned container runs the new-plane wrapper before asserting
+ * anything, so an opted-in run against a still-legacy plane fails loudly instead
+ * of false-passing.
+ */
+export type ControlPlaneV2Observation = { ready: true };
+
+/**
+ * Local-Docker proof that the session's owned container runs the new plane.
+ * `proveNewPlane` captures the new-plane control wrapper uniquely in the owned
+ * container; a legacy container has no such process and the call throws. The
+ * returned identity is the same physical handle the fault operations use.
+ */
+export type ControlPlaneRuntimeObservation = {
+  proveNewPlane(allocation: SandboxFaultAllocation): Promise<{ instanceId: string; pid: number }>;
+  /**
+   * The text parts of one user message in the live Kilo history, via the Kilo
+   * session-message API inside the owned container. Scenario 19 uses this to
+   * require the replayed user turn appears once (the B8 duplicate-parts
+   * behaviour would report two text parts).
+   */
+  userMessageParts(
+    allocation: SandboxFaultAllocation,
+    userMessageId: string
+  ): Promise<{ found: boolean; textParts: number; text: string }>;
+  /** Raw process environment of the owned container (containment negative check). */
+  containerEnvironment(allocation: SandboxFaultAllocation): Promise<Record<string, string>>;
+  /** The checkout's `origin` remote URL, or `null` (containment negative check). */
+  gitRemoteUrl(allocation: SandboxFaultAllocation): Promise<string | null>;
+  /** Count of summary (compaction) messages in the live Kilo history. */
+  summaryCount(allocation: SandboxFaultAllocation): Promise<number>;
+};
+
+/**
+ * The Worker under test resolves outbound clone/model credentials through the
+ * contained lookup instead of direct credentials (spec §11 scenario 7). The
+ * harness reads the Worker's own `.dev.vars` value (the same source the Worker
+ * reads) so there is no second flag to keep in sync; a profile that cannot read
+ * that source provides no capability and the scenario is `unsupported`.
+ */
+export type CredentialContainmentObservation = { enabled: true };
+
+/**
+ * One staged attachment reference that the Worker can download from R2
+ * (`attachments.path` + `attachments.files`). Staging requires write access to
+ * the attachments bucket, which no harness profile has today, so this is a
+ * declared contract with no implementation yet: the command/attachment scenario
+ * skips its attachment half with a reason rather than sending an unreachable
+ * reference.
+ */
+export type SeededAttachment = { path: string; files: string[] };
+
+export type AttachmentsObservation = {
+  seed(input: { userId: string; name: string; contents: string }): Promise<SeededAttachment>;
+};
+
+/**
+ * One persisted run-report row (`cloud_agent_session_runs`) for
+ * `(cloudAgentSessionId, messageId)`. This is the report the queue consumer
+ * wrote to Postgres, not the worker-log diagnostic: a report that the consumer
+ * dropped (schema-invalid) leaves no row, so the scenario fails instead of
+ * passing on an independent log line.
+ */
+export type ReportRow = {
+  messageId: string;
+  status: string;
+  failureStage?: string;
+  failureCode?: string;
+  failureResponsibility?: string;
+  failureReason?: string;
+  terminalAt?: string;
+};
+
+/**
+ * Local-only persisted-report observation, backed by the harness's
+ * `DATABASE_URL`. A profile without a database connection provides no
+ * capability, so a report-dependent scenario is `unsupported`.
+ */
+export type ReportsObservation = {
+  /**
+   * Poll for the persisted report row of `messageId` within `timeoutMs`.
+   * Returns `null` when none is stored in the window.
+   */
+  waitForReportRow(input: {
+    cloudAgentSessionId: string;
+    messageId: string;
+    timeoutMs: number;
+    signal?: AbortSignal;
+  }): Promise<ReportRow | null>;
+};
+
+/**
  * The identity observed before a sandbox fault. The operation must fail closed
  * if the observed identity no longer matches, so a replacement cannot be
  * silently rediscovered and killed/frozen instead of the intended target.
@@ -145,12 +250,19 @@ export type SandboxFaultTarget = {
    * process; it does not survive a container/wrapper replacement.
    */
   expectedWrapperInstanceId: string;
+  /**
+   * Which control-wrapper basename to capture and guard. Absent means the
+   * legacy `kilocode-control-wrapper.js`; the new-plane scenarios set
+   * `kilocode-control-plane-wrapper.js`, because a new-plane container has no
+   * legacy wrapper process (and vice versa).
+   */
+  wrapperProcessBasename?: string;
 };
 
 /** The allocation half of a target, sufficient to capture a wrapper identity. */
 export type SandboxFaultAllocation = Pick<
   SandboxFaultTarget,
-  'cloudAgentSessionId' | 'kiloSessionId' | 'expectedAllocationRef'
+  'cloudAgentSessionId' | 'kiloSessionId' | 'expectedAllocationRef' | 'wrapperProcessBasename'
 >;
 
 /**
@@ -171,10 +283,53 @@ export type SandboxFaultObservation = {
   killOwnedContainer(
     target: SandboxFaultTarget
   ): Promise<{ killed: boolean; observedRef: string; detail: string }>;
+  /**
+   * `SIGUSR1` the captured control wrapper so it drops its socket and reconnects.
+   * The new plane has no `session.attach` request diagnostic, so the boot
+   * scenario signals as soon as the wrapper process exists instead of waiting
+   * for a legacy attach record that never arrives.
+   */
+  recycleWrapperSocket(
+    target: SandboxFaultTarget
+  ): Promise<{ recycled: boolean; pid: number; detail: string }>;
   freezeWrapperProcess(
     target: SandboxFaultTarget
   ): Promise<{ frozen: boolean; pid: number; detail: string }>;
   unfreezeWrapperProcess(target: SandboxFaultTarget): Promise<void>;
+  /**
+   * `SIGKILL` the exact captured control-wrapper process (scenario 13). The
+   * supervisor restarts the wrapper; the identity guards are the same as
+   * `freezeWrapperProcess`.
+   */
+  killWrapperProcess(
+    target: SandboxFaultTarget
+  ): Promise<{ killed: boolean; pid: number; detail: string }>;
+  /**
+   * `SIGKILL` the captured `kilo serve` process for the session (scenario 12).
+   * The Kilo root is discovered by `kiloSessionId` and the observed container
+   * must match `expectedAllocationRef` and the wrapper identity must match
+   * `expectedWrapperInstanceId`; a mismatch fails closed.
+   */
+  killKiloServerProcess(
+    target: SandboxFaultTarget
+  ): Promise<{ killed: boolean; pid: number; detail: string }>;
+  /**
+   * `SIGSTOP` the captured `kilo serve` process (scenario 19). The retained
+   * handle backs `unfreezeKiloServerProcess`, so a stopped Kilo is never
+   * rediscovered while it cannot answer.
+   */
+  freezeKiloServerProcess(
+    target: SandboxFaultTarget
+  ): Promise<{ frozen: boolean; pid: number; detail: string }>;
+  unfreezeKiloServerProcess(target: SandboxFaultTarget): Promise<void>;
+  /**
+   * Capture the current `kilo serve` pid for the session, bound to the owned
+   * container. Used to prove the pid changed after a Kilo restart, and that a
+   * killed wrapper's old Kilo processes are gone.
+   */
+  captureKiloServerIdentity(allocation: SandboxFaultAllocation): Promise<{ pid: number }>;
+  /** Whether a captured Kilo pid is still present in the owned container. */
+  kiloServerProcessExists(allocation: SandboxFaultAllocation, pid: number): Promise<boolean>;
   /**
    * Cursor at the current end of the worker-log evidence stream. Capture it
    * before inducing a fault so a later `observeReapEvidence` only matches
@@ -192,6 +347,8 @@ export type SandboxFaultObservation = {
     fromByte: number;
     waitMs: number;
     inflight: boolean;
+    /** Stop waiting on a terminal `native_stop` instead of the legacy transition. */
+    controlPlane?: boolean;
     messageId?: string;
     signal?: AbortSignal;
   }): Promise<SandboxFaultReapEvidence>;
@@ -221,7 +378,14 @@ export type SandboxFaultObservation = {
     sessionId: string;
     kiloSessionId: string;
     containerId: string;
-    expectedWrapperInstanceId: string;
+    /**
+     * Prior wrapper identity. When omitted, the process captured at signal time
+     * is the identity: the new-plane scenario signals as soon as the container
+     * exists, before a separate capture would lose the attach window.
+     */
+    expectedWrapperInstanceId?: string;
+    /** Absent means the legacy wrapper basename. */
+    wrapperProcessBasename?: string;
     waitForAttachMs: number;
   }): Promise<{
     attachRequestId: string;
@@ -239,15 +403,31 @@ export type SandboxFaultObservation = {
   countPromptDispatches(input: { fromByte: number; sessionId: string }): Promise<number>;
 };
 
+/**
+ * Physical cleanup a profile owns once a scenario has released its sessions:
+ * stop the sandboxes those sessions owned. It is not a scenario requirement, so
+ * it is not a `CapabilityName`. Only a profile with a sandbox it may stop
+ * (`local`) provides it. It reports problems and never throws.
+ */
+export type SandboxReclaim = (
+  sessions: ReadonlyArray<{ sessionId: string; kiloSessionId?: string }>
+) => Promise<void>;
+
 export type ScenarioEnvironment = {
   profile: Profile;
   requireControlPlaneSession: boolean;
+  reclaimSessions?: SandboxReclaim;
   sandbox?: SandboxObservation;
   sessionSandbox?: SessionSandboxObservation;
   deployedHttpAuthBoundary?: DeployedAuthBoundaryObservation;
   callbacks?: CallbackObservation;
   gates?: GatesObservation;
   sandboxFaults?: SandboxFaultObservation;
+  controlPlaneV2?: ControlPlaneV2Observation;
+  controlPlaneRuntime?: ControlPlaneRuntimeObservation;
+  credentialContainment?: CredentialContainmentObservation;
+  attachments?: AttachmentsObservation;
+  reports?: ReportsObservation;
 };
 
 /** The shape `runSharedScenario` needs; `SharedScenario` is structurally assignable. */
@@ -368,9 +548,11 @@ export function isScenarioSupported(
  *    because it observes identity through the e2e surface;
  * 4. a declared or profile-mandatory capability that is absent → explicit
  *    `unsupported`;
- * 5. otherwise run the scenario. Under the deployed profile the gate also owns
- *    session teardown: the run receives a composed config that records every id
- *    a create reports, and the ids are released after the run (see below).
+ * 5. otherwise run the scenario. The gate owns teardown for every profile: the
+ *    run receives a composed config that records every id a create reports, the
+ *    ids are released after the run (interrupt then delete, newest first), and
+ *    the profile's `reclaimSessions` then stops the sandboxes they owned, so a
+ *    finished scenario does not hold memory until the idle stop.
  */
 export async function runSharedScenario(
   def: RunnableSharedScenario,
@@ -410,18 +592,15 @@ export async function runSharedScenario(
     };
   }
 
-  // The deployed profile now owns session teardown. The cleanup composes the
-  // scenario's own `onSessionCreated`, so an id is recorded as soon as a create
-  // reports it and is released even if a later assertion throws. The `local`
-  // and `local-http` profiles keep their existing external cleanup.
-  if (env.profile !== 'deployed') {
-    return def.run({ ...args, api: resolvedApi.api }, env);
-  }
-
   const owned = createOwnedSessionRegistry(args.config, cleanupRemoteSession);
   try {
     return await def.run({ ...args, api: resolvedApi.api, config: owned.config }, env);
   } finally {
     await owned.cleanup(def.name);
+    await env.reclaimSessions?.(owned.entries()).catch(error => {
+      console.warn(
+        `${def.name}: sandbox reclaim failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    });
   }
 }

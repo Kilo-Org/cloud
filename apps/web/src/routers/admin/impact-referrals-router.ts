@@ -2,8 +2,8 @@ import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, inArray, or } from 'drizzle-orm';
 
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   impact_advocate_participants,
   impact_advocate_registration_attempts,

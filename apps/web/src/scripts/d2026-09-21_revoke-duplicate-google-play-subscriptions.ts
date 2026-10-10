@@ -33,14 +33,17 @@ import '../lib/load-env';
 
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
-import { closeAllDrizzleConnections, db } from '@/lib/drizzle';
+import { closeAllDrizzleConnections, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilo_pass_audit_log,
   kilo_pass_store_events,
   kilo_pass_store_purchases,
   operation_ledgers,
 } from '@kilocode/db/schema';
-import { KiloPassAuditLogAction, KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import {
+  KiloPassAuditLogAction,
+  KiloPassPaymentProvider,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { reverseDuplicateGooglePlaySubscription } from '@/lib/kilo-pass/google-play-duplicate-subscription';
 import {
   assertGooglePlayServiceAccountConfigured,

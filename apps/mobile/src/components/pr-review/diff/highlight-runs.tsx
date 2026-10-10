@@ -18,8 +18,8 @@
 // is one chunk of lines and a fence pays a span only for its tagged tokens,
 // never for its untagged runs.
 //
-// The caller must give the parent `Text` the base ink (`tokenColorFor(null,
-// isDark)` — the theme foreground, or the bubble's text color), which is what
+// The caller must give the parent `Text` the base ink (`tokenColorForScheme(null,
+// scheme)` — the theme foreground, or the bubble's text color), which is what
 // an untagged run inherits.
 
 import { type ReactNode } from 'react';
@@ -29,22 +29,24 @@ import { type ReactNode } from 'react';
 import { Text as RNText } from 'react-native';
 
 import { type HighlightToken } from '@/lib/pr-review/diff/highlight';
-import { tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
+import { tokenColorForScheme, type TokenScheme } from '@/lib/pr-review/diff/syntax-colors';
 
 /**
  * Children for one highlighted line: a nested `Text` per tagged token run and
- * a raw string per untagged run.
+ * a raw string per untagged run. `scheme` is the surface scheme of the card
+ * the line is painted on: the diff rows pass their app-scheme pair, while the
+ * markdown code block derives it from the bubble it sits in.
  */
 export function highlightRunChildren(
   tokens: readonly HighlightToken[],
-  isDark: boolean
+  scheme: TokenScheme
 ): ReactNode[] {
   return tokens.map((token, index) =>
     token.className === null ? (
       token.text
     ) : (
       // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- per-token syntax color
-      <RNText key={`tok-${index}`} style={{ color: tokenColorFor(token.className, isDark) }}>
+      <RNText key={`tok-${index}`} style={{ color: tokenColorForScheme(token.className, scheme) }}>
         {token.text}
       </RNText>
     )

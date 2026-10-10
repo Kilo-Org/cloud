@@ -1,6 +1,6 @@
 import { SecurityAgentLayout } from '@/components/security-agent/SecurityAgentLayout';
 import { SecurityAgentProvider } from '@/components/security-agent/SecurityAgentContext';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 
 export const metadata = {
   title: 'Security Agent | Kilo Code',

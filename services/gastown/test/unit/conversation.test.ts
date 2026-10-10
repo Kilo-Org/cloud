@@ -28,8 +28,6 @@ function buildPrompt(params: {
   return parts.join('\n\n');
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────
-
 type TestEvent = {
   id: number;
   agent_id: string;
@@ -64,8 +62,6 @@ function makeTextPartUpdated(
     part: { id: partId, messageID: messageId, type: 'text', text },
   });
 }
-
-// ── Tests ────────────────────────────────────────────────────────────
 
 describe('reconstructConversation', () => {
   it('returns empty array when no events', () => {

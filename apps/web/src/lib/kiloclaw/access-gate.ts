@@ -3,7 +3,7 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kiloclaw_instances } from '@kilocode/db/schema';
 import {
   getCurrentPersonalKiloClawSubscriptionForUser,
@@ -11,7 +11,7 @@ import {
   CurrentPersonalSubscriptionResolutionError,
 } from '@/lib/kiloclaw/access-state';
 import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
-import { baseProcedure } from '@/lib/trpc/init';
+import { baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 
 /**
  * Check whether a user has active KiloClaw access via subscription or trial.

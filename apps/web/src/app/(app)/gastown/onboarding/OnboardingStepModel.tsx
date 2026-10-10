@@ -11,7 +11,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { useOnboarding } from './OnboardingContext';
 import { PRESETS } from './onboarding.domain';
 import type { ModelPreset, PresetConfig } from './onboarding.domain';

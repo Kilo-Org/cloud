@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["fra1", "sfo1"],
+  "skipMiddlewareRequestBody": true
+}

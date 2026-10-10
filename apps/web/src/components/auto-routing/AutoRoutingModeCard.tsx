@@ -17,7 +17,7 @@ import { Plus, Route, Trash2, X } from 'lucide-react';
 // slice's owned paths. Keep the default until Jest is switched to the automatic runtime.
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -33,8 +33,8 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
-import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
-import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------

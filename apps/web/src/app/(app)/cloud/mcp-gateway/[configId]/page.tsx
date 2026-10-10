@@ -1,4 +1,4 @@
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { notFound } from 'next/navigation';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { McpGatewayDetailContent } from '../McpGatewayDetailContent';

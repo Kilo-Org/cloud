@@ -1,7 +1,8 @@
 import {
-  alertSpy,
   buttonByLabel,
+  type CapturedConfirm,
   confirmRemoval,
+  confirmSpy,
   emptyDescription,
   first,
   hasButtonLabel,
@@ -17,6 +18,7 @@ import {
   toastError,
   toastSuccess,
   UNNAMED,
+  USED,
 } from './passkeys-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -95,6 +97,22 @@ describe('PasskeysScreen', () => {
     view.unmount();
   });
 
+  it('shows the last-used date only on a passkey the server recorded a use for', async () => {
+    // One credential carries a last_used_at and one does not, so the test reads
+    // both sides of the condition from the same render.
+    store.rows = [USED, MACBOOK];
+    const view = await mount();
+    await waitFor(() => texts(view).includes('Work laptop'));
+
+    expect(texts(view)).toContain('Work laptop');
+    expect(texts(view)).toContain('MacBook');
+    expect(texts(view)).toContain('Added Jan 1, 2026');
+    // Only the recorded-use row carries the line; a credential the server has
+    // never seen used keeps the name-and-added pair.
+    expect(texts(view).filter(text => text === 'Last used Jan 1, 2026')).toHaveLength(1);
+    view.unmount();
+  });
+
   it('asks before removing, drops the row, and empties the list when it was the last one', async () => {
     let releaseDelete: (() => void) | undefined = undefined;
     store.rows = [MACBOOK];
@@ -110,17 +128,17 @@ describe('PasskeysScreen', () => {
     await waitFor(() => texts(view).includes('MacBook'));
 
     await press(rowAction(view, 'Remove'));
-    expect(alertSpy).toHaveBeenCalledOnce();
-    expect(alertSpy.mock.calls[0]?.[0]).toBe('Remove passkey?');
-    expect(alertSpy.mock.calls[0]?.[2]).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ style: 'destructive', text: 'Remove passkey' }),
-      ])
-    );
+    // The confirmation is the in-app dialog, not a native alert: the request
+    // carries the labels the dialog renders and the onConfirm that removes.
+    expect(confirmSpy).toHaveBeenCalledOnce();
+    const request = confirmSpy.mock.calls[0]?.[0] as CapturedConfirm;
+    expect(request.title).toBe('Remove passkey?');
+    expect(request.message).toBe('You will no longer be able to sign in with this passkey.');
+    expect(request.confirmLabel).toBe('Remove passkey');
 
     // Removed optimistically, before the server answered: with no row left, the
     // empty state is the surface.
-    await confirmRemoval(alertSpy);
+    await confirmRemoval();
     await waitFor(() => nodes(view, 'EmptyState').length === 1);
     expect(texts(view)).not.toContain('MacBook');
 
@@ -139,7 +157,7 @@ describe('PasskeysScreen', () => {
     await waitFor(() => texts(view).includes('MacBook'));
 
     await press(rowAction(view, 'Remove'));
-    await confirmRemoval(alertSpy);
+    await confirmRemoval();
 
     // The row is back, the failure is inline beside it, and the toast carries
     // the server's own message.
@@ -315,7 +333,7 @@ describe('PasskeysScreen', () => {
     await waitFor(() => texts(view).includes('MacBook'));
 
     await press(rowAction(view, 'Remove'));
-    await confirmRemoval(alertSpy);
+    await confirmRemoval();
     await waitFor(() => texts(view).includes('Could not remove that passkey. Try again.'));
 
     // The retried delete is now in flight. While it is, the control must not be
@@ -349,7 +367,7 @@ describe('PasskeysScreen', () => {
     await waitFor(() => texts(view).includes('MacBook'));
 
     await press(rowAction(view, 'Remove'));
-    await confirmRemoval(alertSpy);
+    await confirmRemoval();
     await waitFor(() => texts(view).includes('Could not remove that passkey. Try again.'));
 
     // The passkey is gone from the server list — another device removed it, or

@@ -3,13 +3,13 @@ const mockDeleteBitbucketWorkspaceWebhooksFromTokenService = jest.fn();
 let mockAppUrl = 'https://app.kilo.ai';
 let mockWebhookBaseUrl = '';
 
-jest.mock('@/lib/constants', () => ({
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
   get APP_URL() {
     return mockAppUrl;
   },
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL() {
     return mockWebhookBaseUrl;
   },

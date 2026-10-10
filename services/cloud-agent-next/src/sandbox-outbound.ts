@@ -18,10 +18,8 @@ import {
   inspectGitHubRateLimitResponse,
   resolveGitHubRateLimitRetryDelayMs,
 } from './github-rate-limit-diagnostics.js';
-import {
-  cloudAgentSessionScopeHeaders,
-  cloudAgentSessionScopeProtocolVersion,
-} from '@kilocode/session-ingest-contracts';
+import { cloudAgentSessionScopeHeaders } from '@kilocode/session-ingest-contracts';
+import { forwardCloudAgentSessionScopeRequest } from './cloud-agent-session-scope-proxy.js';
 
 export { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 
@@ -204,39 +202,6 @@ function isKiloSessionBootstrapRequest(request: Request): boolean {
  * Reads a clone of the request body, stopping as soon as it exceeds maxBytes
  * so an unbounded (or under-declared) body is never fully buffered.
  */
-async function readBoundedRequestBody(
-  request: Request,
-  maxBytes: number
-): Promise<string | undefined> {
-  const body: ReadableStream<Uint8Array> | null = request.clone().body;
-  if (!body) return undefined;
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > maxBytes) return undefined;
-      chunks.push(value);
-    }
-  } finally {
-    reader.cancel().catch(() => {});
-  }
-  const buffer = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    buffer.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder().decode(buffer);
-}
-
-/**
- * Byte-exact sibling of readBoundedRequestBody for replay. It stops as soon as
- * the body exceeds maxBytes and returns undefined instead of decoding anything.
- */
 async function readBoundedRequestBodyBytes(
   request: Request,
   maxBytes: number
@@ -264,6 +229,14 @@ async function readBoundedRequestBodyBytes(
     offset += chunk.byteLength;
   }
   return buffer;
+}
+
+async function readBoundedRequestBody(
+  request: Request,
+  maxBytes: number
+): Promise<string | undefined> {
+  const buffer = await readBoundedRequestBodyBytes(request, maxBytes);
+  return buffer === undefined ? undefined : new TextDecoder().decode(buffer);
 }
 
 async function getKiloSessionBootstrapId(request: Request): Promise<string | undefined> {
@@ -493,62 +466,6 @@ async function forwardRedeemedRequest(
   }
   return fetch(
     new Request(request, {
-      headers,
-      redirect: 'manual',
-    })
-  );
-}
-
-function getCloudAgentSessionScopeInternalUrl(requestUrl: string): URL | null {
-  const url = new URL(requestUrl);
-  if (url.pathname.endsWith('/api/session')) {
-    url.pathname = '/internal/cloud-agent/v1/session';
-    return url;
-  }
-  if (/\/api\/session\/[^/]+\/ingest$/.test(url.pathname)) {
-    const sessionId = url.pathname.split('/').at(-2);
-    if (!sessionId) return null;
-    url.pathname = `/internal/cloud-agent/v1/session/${encodeURIComponent(sessionId)}/ingest`;
-    return url;
-  }
-  return null;
-}
-
-async function forwardCloudAgentSessionScopeRequest(
-  request: Request,
-  env: Cloudflare.Env,
-  result: {
-    authorization: string;
-    sessionIngestScope: { cloudAgentSessionId: string; rootKiloSessionId: string };
-  }
-): Promise<Response> {
-  const url = getCloudAgentSessionScopeInternalUrl(request.url);
-  if (!url) throw new Error('Unsupported Cloud Agent session scope route');
-
-  const internalSecret = await env.INTERNAL_API_SECRET_PROD.get();
-  if (!internalSecret) throw new Error('Session Ingest internal secret unavailable');
-
-  const headers = new Headers(request.headers);
-  headers.delete('Authorization');
-  headers.delete('X-Internal-Secret');
-  for (const headerName of [...headers.keys()]) {
-    if (headerName.toLowerCase().startsWith('x-kilo-')) headers.delete(headerName);
-  }
-  headers.set('Authorization', result.authorization);
-  headers.set('X-Internal-Secret', internalSecret);
-  headers.set(
-    cloudAgentSessionScopeHeaders.cloudAgentSessionId,
-    result.sessionIngestScope.cloudAgentSessionId
-  );
-  headers.set(
-    cloudAgentSessionScopeHeaders.rootKiloSessionId,
-    result.sessionIngestScope.rootKiloSessionId
-  );
-  headers.set(cloudAgentSessionScopeHeaders.protocolVersion, cloudAgentSessionScopeProtocolVersion);
-
-  const internalRequest = new Request(url, request);
-  return env.SESSION_INGEST.fetch(
-    new Request(internalRequest, {
       headers,
       redirect: 'manual',
     })

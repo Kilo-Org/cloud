@@ -16,6 +16,22 @@ type RemoveDeletedSessionInput = SessionQueryContext & {
   deleteSessionFromStore: (sessionId: string) => Promise<void>;
 };
 
+export function getWorktreeDeletionRedirect(
+  url: URL,
+  worktreeId: string,
+  deletedSessionIds: readonly string[],
+  organizationId?: string
+): string | null {
+  const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
+  if (url.pathname !== `${basePath}/chat`) return null;
+
+  const sessionId = url.searchParams.get('sessionId');
+  const isDeletedSelection = sessionId
+    ? deletedSessionIds.includes(sessionId)
+    : url.searchParams.get('worktreeId') === worktreeId;
+  return isDeletedSelection ? basePath : null;
+}
+
 export function invalidateSessionQueries({ queryClient, trpc }: SessionQueryContext) {
   return Promise.all([
     queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter()),

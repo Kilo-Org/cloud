@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import {
+  controlPlaneFailureReasonSchema,
+  controlPlanePreparationStepSchema,
+  controlPlaneWorkspaceFailureSubtypeSchema,
+} from './control-plane-protocol.js';
+import {
   CONTROL_OPERATIONS,
   controlErrorCodes,
   worktreeDeletePayloadSchema,
@@ -21,6 +26,55 @@ export const controlLogUploadResults = [
   'cancelled',
 ] as const;
 export type ControlLogUploadResult = (typeof controlLogUploadResults)[number];
+
+/** Launch-env gate for the native control-plane stderr projector. */
+export const CONTROL_PLANE_NATIVE_LOGS_ENV = 'CONTROL_PLANE_NATIVE_LOGS';
+
+/** The one native stderr gate read, shared by the wrapper entry and process cleanup. */
+export function nativeControlPlaneLogsEnabled(env: Record<string, string | undefined>): boolean {
+  return env[CONTROL_PLANE_NATIVE_LOGS_ENV] === '1';
+}
+
+/**
+ * The one native connection-phase list. The diagnostic schema and the wrapper
+ * connection derive from it, so a new phase cannot be added to one and silently
+ * dropped by the other.
+ */
+export const nativeConnectionPhases = [
+  'idle',
+  'connecting',
+  'awaiting_welcome',
+  'connected',
+  'closed',
+] as const;
+export type NativeConnectionPhase = (typeof nativeConnectionPhases)[number];
+
+/** Fault restart reasons; wrapper adds the deliberate `credentials` refresh. */
+export const kiloRestartFaultReasonSchema = z.enum(['hang', 'exit', 'feed']);
+export type KiloRestartFaultReason = z.infer<typeof kiloRestartFaultReasonSchema>;
+
+export type ControlUploadFailureSample = {
+  category: ControlLogUploadResult;
+  statusCode?: number;
+};
+
+/**
+ * Whether an upload failure belongs to a new stderr episode. Shared by the
+ * diagnostic uploader and the archive uploader so their equality cannot drift:
+ * a category change is a new episode, a 401/403 after a non-auth HTTP rejection
+ * is the grant rejection, and any other repeat stays in the current episode.
+ */
+export function controlUploadFailureStartsEpisode(
+  previous: ControlUploadFailureSample | undefined,
+  next: ControlUploadFailureSample
+): boolean {
+  if (!previous) return true;
+  if (previous.category !== next.category) return true;
+  if (previous.category !== 'http_rejection') return false;
+  const previousAuth = previous.statusCode === 401 || previous.statusCode === 403;
+  const nextAuth = next.statusCode === 401 || next.statusCode === 403;
+  return !previousAuth && nextAuth;
+}
 
 export type ControlDiagnosticFields = Record<string, string | number | boolean | undefined>;
 export type ControlDiagnosticReporter = (event: string, fields: ControlDiagnosticFields) => void;
@@ -77,6 +131,9 @@ export const controlDiagnosticFieldsSchema = z
       'hello_accepted',
       'closed',
       'retired',
+      'hello_rejected',
+      'reconnect_exhausted',
+      'explicitly_closed',
       'connect_attempt',
       'retry_scheduled',
       'keepalive_sent',
@@ -93,6 +150,16 @@ export const controlDiagnosticFieldsSchema = z
       'forward_response_timeout',
       'outbox_rejected',
       'socket_overflow',
+      'kilo_unavailable',
+      'kilo_restarting',
+      'kilo_restarted',
+      'kilo_restart_failed',
+      'kilo_memory_hold_started',
+      'kilo_memory_hold_ended',
+      'prepare_failed',
+      'session_ready',
+      'session_outcome',
+      'status',
     ]),
     stage: z
       .enum([
@@ -171,6 +238,17 @@ export const controlDiagnosticFieldsSchema = z
       ])
       .optional(),
     reason: z.string().min(1).max(128).optional(),
+    preparationStep: controlPlanePreparationStepSchema.optional(),
+    subtype: controlPlaneWorkspaceFailureSubtypeSchema.optional(),
+    kiloRestartReason: kiloRestartFaultReasonSchema.optional(),
+    memoryHoldOutcome: z
+      .enum(['recovered', 'cleared', 'expired', 'restarted', 'stopped'])
+      .optional(),
+    interceptTrustFailure: z
+      .enum(['cert_unavailable', 'cert_unreadable', 'cert_append_failed'])
+      .optional(),
+    outcomeReason: controlPlaneFailureReasonSchema.optional(),
+    nativeConnectionPhase: z.enum(nativeConnectionPhases).optional(),
     failureReason: z
       .enum([
         'expired',
@@ -222,13 +300,20 @@ export const controlDiagnosticFieldsSchema = z
       .regex(/^[A-Za-z0-9_.:-]{1,128}$/)
       .optional(),
     messageId: identifier.optional(),
+    partId: identifier.optional(),
+    toolStatus: z.enum(['pending', 'running', 'completed', 'error']).optional(),
+    probeStatus: z.enum(['found', 'missing', 'unavailable']).optional(),
+    probeStage: z.enum(['pre_deadline', 'deadline']).optional(),
+    outputBytes: count.optional(),
     requestId: identifier.optional(),
     connectionId: identifier.optional(),
     incarnation: identifier.optional(),
     elapsedMs: milliseconds.optional(),
+    deadlineAt: milliseconds.optional(),
     lastSentAt: milliseconds.optional(),
     sinceLastSentMs: milliseconds.optional(),
     lastEventAt: milliseconds.optional(),
+    toolObservedAt: milliseconds.optional(),
     ageMs: milliseconds.optional(),
     sentAt: milliseconds.optional(),
     preparedAt: milliseconds.optional(),
@@ -237,12 +322,21 @@ export const controlDiagnosticFieldsSchema = z
     delayMs: milliseconds.optional(),
     sequence: count.optional(),
     eventsReceived: count.optional(),
+    descendantProgressEvents: count.optional(),
     sessionCount: count.optional(),
     questionCount: count.optional(),
     permissionCount: count.optional(),
     bufferedBytes: count.optional(),
     bytes: count.optional(),
     attempt: count.optional(),
+    outboxBytes: count.optional(),
+    preparingCount: count.optional(),
+    activeTurnCount: count.optional(),
+    recentTerminalCount: count.optional(),
+    runtimeCount: count.optional(),
+    suspectedCount: count.optional(),
+    restartingCount: count.optional(),
+    unavailableCount: count.optional(),
     attemptCount: count.optional(),
     pendingCount: count.optional(),
     pendingBytes: count.optional(),
@@ -276,7 +370,7 @@ export const controlDiagnosticFieldsSchema = z
     questionQueryPending: z.boolean().optional(),
     permissionQueryPending: z.boolean().optional(),
     workloadPhase: z
-      .enum(['probe', 'applied', 'migration', 'oom', 'stats', 'rollback', 'failed'])
+      .enum(['probe', 'applied', 'protection', 'migration', 'oom', 'stats', 'rollback', 'failed'])
       .optional(),
     workloadFailure: z
       .enum([
@@ -295,18 +389,47 @@ export const controlDiagnosticFieldsSchema = z
       .optional(),
     containerLimitBytes: count.optional(),
     aggregateMaxBytes: count.optional(),
+    toolsMaxBytes: count.optional(),
     reserveBytes: count.optional(),
     appliedMaxBytes: count.optional(),
     readbackMaxBytes: count.optional(),
+    serverMinBytes: count.optional(),
     currentBytes: count.optional(),
     peakBytes: count.optional(),
+    anonBytes: count.optional(),
+    fileBytes: count.optional(),
+    shmemBytes: count.optional(),
+    toolCurrentBytes: count.optional(),
+    toolPeakBytes: count.optional(),
+    serverCurrentBytes: count.optional(),
+    serverPeakBytes: count.optional(),
     oomKills: count.optional(),
     oomGroupKills: count.optional(),
+    toolOomKills: count.optional(),
+    serverOomKills: count.optional(),
     migratedCount: count.optional(),
     toolCount: count.optional(),
     serverCount: count.optional(),
     pressureSomeTotal: count.optional(),
     pressureFullTotal: count.optional(),
+    pressureAvailable: z.boolean().optional(),
+    memoryMaxEvents: count.optional(),
+    memoryOomEvents: count.optional(),
+    cpuUsageUsec: count.optional(),
+    cpuThrottledUsec: count.optional(),
+    cpuThrottleCount: count.optional(),
+    ioReadBytes: count.optional(),
+    ioWriteBytes: count.optional(),
+    toolCpuUsageUsec: count.optional(),
+    serverCpuUsageUsec: count.optional(),
+    toolIoReadBytes: count.optional(),
+    toolIoWriteBytes: count.optional(),
+    toolAnonBytes: count.optional(),
+    toolFileBytes: count.optional(),
+    toolShmemBytes: count.optional(),
+    serverAnonBytes: count.optional(),
+    serverFileBytes: count.optional(),
+    serverShmemBytes: count.optional(),
     cpuController: z.boolean().optional(),
     siblingProtection: z.boolean().optional(),
     workloadLimitSource: z.enum(['cgroup', 'explicit', 'meminfo']).optional(),
@@ -327,6 +450,7 @@ export const controlDiagnosticRecordSchema = z
       'control.event',
       'control.upload',
       'control.workload',
+      'wrapper.status',
     ]),
     fields: controlDiagnosticFieldsSchema,
   })
@@ -334,6 +458,75 @@ export const controlDiagnosticRecordSchema = z
 
 export type ControlDiagnosticRecord = z.infer<typeof controlDiagnosticRecordSchema>;
 export type RetirementCause = NonNullable<ControlDiagnosticRecord['fields']['retirementCause']>;
+
+const NON_PROJECTABLE_PHASES = new Set(['keepalive_sent', 'keepalive_failed', 'retry_scheduled']);
+const PROJECTABLE_SOCKET_PHASES = new Set(['closed', 'connect_attempt', 'hello_rejected']);
+const PROJECTABLE_LIFECYCLE_PHASES = new Set([
+  'starting',
+  'ready',
+  'stopping',
+  'start_failed',
+  'failed',
+  'kilo_unavailable',
+  'kilo_restarting',
+  'kilo_restarted',
+  'kilo_restart_failed',
+  'kilo_memory_hold_started',
+  'kilo_memory_hold_ended',
+  'prepare_failed',
+  'session_ready',
+  'session_outcome',
+]);
+
+/**
+ * The one native-stderr allowlist, next to the schema. Everything a native owner
+ * projects into stderr must pass here: lifecycle start/ready/failure and the
+ * normal prepare/outcome transitions, terminal task and execution phases, the
+ * socket episode, upload failure, workload apply/failure, request failures, the
+ * owner lines, and the periodic `wrapper.status` line. Heartbeats, keepalive and
+ * retry scheduling are excluded.
+ */
+export function isProjectableControlDiagnostic(
+  event: string,
+  fields: ControlDiagnosticFields
+): boolean {
+  const phase = fields.phase;
+  if (event === 'control.heartbeat') return false;
+  if (typeof phase === 'string' && NON_PROJECTABLE_PHASES.has(phase)) return false;
+  switch (event) {
+    case 'wrapper.lifecycle':
+      return typeof phase === 'string' && PROJECTABLE_LIFECYCLE_PHASES.has(phase);
+    case 'control.socket':
+      if (phase === 'connect_attempt') return fields.ok === false;
+      return typeof phase === 'string' && PROJECTABLE_SOCKET_PHASES.has(phase);
+    case 'session.task':
+      return phase === 'finished' || phase === 'failed' || phase === 'deadline_expired';
+    case 'session.execution':
+      return (
+        fields.status !== undefined ||
+        phase === 'execution_failed' ||
+        phase === 'outcome_sending' ||
+        phase === 'outcome_sent' ||
+        phase === 'outcome_failed' ||
+        phase === 'abort_completed' ||
+        phase === 'abort_failed'
+      );
+    case 'control.upload':
+      return phase === 'failed';
+    case 'control.workload':
+      return (
+        phase === 'failed' ||
+        fields.workloadFailure !== undefined ||
+        (phase === 'started' && fields.workloadPhase === 'applied')
+      );
+    case 'control.request':
+      return phase === 'response_failed' || phase === 'forward_response_timeout';
+    case 'wrapper.status':
+      return phase === 'status';
+    default:
+      return false;
+  }
+}
 
 const retirementCauseByReason = new Map<string, RetirementCause>([
   ['Kilo event feed is no longer healthy', 'event_feed_unhealthy'],
@@ -450,4 +643,40 @@ export function createControlDiagnosticRecord(
   } catch {
     return undefined;
   }
+}
+
+export type ControlDiagnosticProjector = {
+  (event: string, fields: ControlDiagnosticFields): void;
+  readonly enabled: boolean;
+};
+
+/**
+ * The one native-gated stderr projector. It is a safe write only: it no-ops
+ * when the gate is unset, applies the allowlist, validates the record, drops
+ * `detail` and `reason`, and writes one JSON line. It does not read `accepting`,
+ * buffer, upload, dedup, or touch `logToFile`.
+ */
+export function createControlDiagnosticProjector(options: {
+  enabled: boolean;
+  write?: (line: string) => void;
+  now?: () => number;
+}): ControlDiagnosticProjector {
+  const write = options.write ?? ((line: string): void => console.error(line));
+  const now = options.now ?? Date.now;
+  const project = ((event: string, fields: ControlDiagnosticFields): void => {
+    if (!options.enabled) return;
+    try {
+      if (!isProjectableControlDiagnostic(event, fields)) return;
+      const record = createControlDiagnosticRecord(event, fields, now());
+      if (!record) return;
+      const safeFields = { ...record.fields };
+      delete safeFields.detail;
+      delete safeFields.reason;
+      write(JSON.stringify({ ...record, fields: safeFields }));
+    } catch {
+      // The projector must never throw into its caller.
+    }
+  }) as ControlDiagnosticProjector;
+  Object.defineProperty(project, 'enabled', { value: options.enabled, enumerable: true });
+  return project;
 }

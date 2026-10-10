@@ -42,7 +42,6 @@ function loadEnvFile(): Record<string, string> {
     const key = trimmed.slice(0, eqIndex);
     let value = trimmed.slice(eqIndex + 1);
 
-    // Remove surrounding quotes if present
     if (
       (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
@@ -145,13 +144,11 @@ async function main() {
   const slug = parsed.slug || path.basename(directory);
   const envVars = parsed.envVars;
 
-  // Validate directory exists
   if (!fs.existsSync(directory)) {
     console.error(`Error: Directory not found: ${directory}`);
     process.exit(1);
   }
 
-  // Validate directory is actually a directory
   if (!fs.statSync(directory).isDirectory()) {
     console.error(`Error: Not a directory: ${directory}`);
     process.exit(1);
@@ -169,12 +166,10 @@ async function main() {
   console.log('='.repeat(60));
   console.log('');
 
-  // Create tar.gz archive in temp location
   const archivePath = `/tmp/${slug}-${Date.now()}.tar.gz`;
 
   console.log('📦 Creating archive...');
 
-  // Build exclusion list for tar command
   const excludePatterns = [
     '.next',
     'node_modules', // Dependencies
@@ -212,7 +207,6 @@ async function main() {
   console.log('');
 
   try {
-    // Upload to builder
     console.log('🚀 Uploading to builder...');
     const archiveData = fs.readFileSync(archivePath);
 
@@ -246,13 +240,11 @@ async function main() {
     console.log(`   Build ID: ${result.buildId}`);
     console.log('');
 
-    // Poll for status
     console.log('⏳ Building...');
     let lastStatus = '';
     let lastEventCount = 0;
 
     while (true) {
-      // Fetch and display new events
       const eventsResponse = await fetch(`${BUILDER_URL}/deploy/${result.buildId}/events`, {
         headers: { Authorization: `Bearer ${BUILDER_AUTH_TOKEN}` },
       });
@@ -262,7 +254,6 @@ async function main() {
         payload: { status?: string };
       }[];
 
-      // Show new log events
       for (let i = lastEventCount; i < events.length; i++) {
         const event = events[i];
         console.log(`   ${JSON.stringify(event.payload)}`);
@@ -273,7 +264,6 @@ async function main() {
       }
       lastEventCount = events.length;
 
-      // Check if finished
       if (['deployed', 'failed', 'cancelled'].includes(lastStatus)) {
         break;
       }
@@ -297,7 +287,6 @@ async function main() {
       process.exit(1);
     }
   } finally {
-    // Cleanup archive
     try {
       fs.unlinkSync(archivePath);
     } catch {

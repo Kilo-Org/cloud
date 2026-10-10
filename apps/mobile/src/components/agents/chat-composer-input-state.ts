@@ -33,7 +33,7 @@ type ChatComposerControlState = {
   inputAccessibilityDisabled: boolean;
   /** Drives the attachment picker. */
   paperclipDisabled: boolean;
-  /** Toolbar (mode/variant/model row) visibility. */
+  /** Toolbar (mode/variant/model row) visibility; false while send-gated. */
   showToolbar: boolean;
   /** Latches the toolbar's mode/model controls while send, stream, or disabled. */
   toolbarDisabled: boolean;
@@ -52,7 +52,8 @@ type ChatComposerControlState = {
  * terminally failed attachment chip gates send (`hasFailedAttachments`), so a
  * failed upload renders Send disabled instead of toasting on press. A session
  * that cannot send (`sendDisabled`) still leaves the input editable: the reader
- * types the next message while Retry sits beside it.
+ * types the next message while Retry sits beside it, and the mode/model toolbar
+ * collapses because those pills would be inert until the session recovers.
  */
 export function resolveChatComposerControlState(
   input: ChatComposerControlInput
@@ -78,7 +79,10 @@ export function resolveChatComposerControlState(
   // upload-in-progress lock.
   // `sendDisabled` is the session's live send capability: it collapses the
   // toolbar and send like `disabled` did, but leaves the input editable, so a
-  // failed turn cannot take the composer away from the reader.
+  // failed turn cannot take the composer away from the reader. `showToolbar`
+  // honors this: while `sendGated` the mode/model row is hidden outright (the
+  // pills would be inert), even though focus or a typed draft would otherwise
+  // reveal it.
   const sendGated = disabled || sendDisabled;
   const toolbarDisabled = sendGated || isSending;
   const voiceDisabled = toolbarDisabled;
@@ -87,7 +91,8 @@ export function resolveChatComposerControlState(
   // Voice activity no longer makes the input read-only: dictation inserts at
   // the caret, so the user can keep editing (an edit aborts the session).
   const inputEditable = !(disabled || isSending);
-  const showToolbar = isFocused || hasText || attachmentsCount > 0 || voiceInputActive;
+  const showToolbar =
+    !sendGated && (isFocused || hasText || attachmentsCount > 0 || voiceInputActive);
   const hasSendableContent = hasText || sendableAttachmentsCount > 0;
   return {
     canSend:

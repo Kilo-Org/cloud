@@ -1,7 +1,7 @@
 import { redactSecrets } from './redact-output.js';
 import { type ExecResult, type ProcessOptions, type ProcessOutputStream } from './utils.js';
 import { workspaceBootstrapError } from './bootstrap-error.js';
-import { gitFailureDetail, gitOperationError } from './git-errors.js';
+import { gitFailureDetail, gitOperationError, type GitRouteClass } from './git-errors.js';
 
 const LONG_GIT_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
 const LONG_GIT_COMMAND_HARD_TIMEOUT_MS = 300_000;
@@ -22,6 +22,8 @@ export type GitReviewRefOptions = {
   signal?: AbortSignal;
   onProgress?: (message: string) => void;
   redact?: (text: string) => string;
+  /** Diagnostic route class only; never the URL, host or token. */
+  route?: GitRouteClass;
 };
 
 function gitProgressReporter(
@@ -92,7 +94,7 @@ export async function checkoutSyntheticReviewRef(options: GitReviewRefOptions): 
         false
       );
     }
-    throw gitOperationError(fetchResult, 'checkout', redact);
+    throw gitOperationError(fetchResult, 'checkout', redact, options.route);
   }
 
   const checkoutResult = await options.runGit(
@@ -105,6 +107,6 @@ export async function checkoutSyntheticReviewRef(options: GitReviewRefOptions): 
     )
   );
   if (checkoutResult.exitCode !== 0) {
-    throw gitOperationError(checkoutResult, 'checkout', redact);
+    throw gitOperationError(checkoutResult, 'checkout', redact, options.route);
   }
 }

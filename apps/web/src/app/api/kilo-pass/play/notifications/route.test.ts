@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/nextjs';
 import { OAuth2Client } from 'google-auth-library';
 
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { processGooglePlayKiloPassNotification } from '@/lib/kilo-pass/google-play-notifications';
 import { POST } from './route';
 
@@ -9,7 +9,7 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
-jest.mock('@/lib/dotenvx', () => ({
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
   getEnvVariable: jest.fn(),
 }));
 

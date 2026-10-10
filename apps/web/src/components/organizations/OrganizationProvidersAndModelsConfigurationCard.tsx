@@ -11,9 +11,9 @@ import { CondensedProviderAndModelsList } from '@/components/models/CondensedPro
 import { DefaultModelDialog } from './providers-and-models/DefaultModelDialog';
 import { AvailableModelsDialog } from './providers-and-models/AvailableModelsDialog';
 import { useOrganizationConfiguration } from './providers-and-models/useOrganizationConfiguration';
-import { useOpenRouterModelsAndProviders } from '@/lib/ai-gateway/hooks';
+import { useOpenRouterModelsAndProviders } from '@/lib/hooks/use-openrouter-models';
 import type { ProviderSelection } from '@/components/models/util';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 type OrganizationProvidersAndModelsConfigurationCardProps = {
   organizationId: string;

@@ -4,11 +4,11 @@ import {
   getReasoningEffort,
   getReasoningEffortTimeoutSuggestion,
   removeChatCompletionsToolNames,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
 
 describe('getReasoningEffort', () => {

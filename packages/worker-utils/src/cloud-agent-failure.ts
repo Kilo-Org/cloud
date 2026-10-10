@@ -28,6 +28,8 @@ export const CLOUD_AGENT_FAILURE_CODES = [
   'wrapper_error_after_activity',
   'missing_assistant_reply',
   'payment_required',
+  'admission_billing_unavailable',
+  'container_limit_reached',
   'user_interrupt',
   'container_shutdown',
   'system_interrupt',
@@ -119,6 +121,8 @@ export const CLOUD_AGENT_FAILURE_REASONS = [
   'managed_provider_authentication',
   'managed_model_configuration',
   'provider_unavailable',
+  'provider_disconnect',
+  'gateway_unavailable',
   'request_timeout',
   'assistant_invalid_request',
   'assistant_context_limit',
@@ -139,6 +143,7 @@ export const CLOUD_AGENT_FAILURE_REASONS = [
   'session_import_timeout',
   'session_import_failed',
   'setup_command_timeout',
+  'container_limit_reached',
   'admission_capacity',
   'admission_not_found',
   'admission_internal',
@@ -171,6 +176,8 @@ export const CLOUD_AGENT_ASSISTANT_FAILURE_REASONS = [
   'model_unavailable',
   'provider_authentication',
   'provider_unavailable',
+  'provider_disconnect',
+  'gateway_unavailable',
   'timeout',
   'invalid_request',
   'context_limit',
@@ -328,6 +335,17 @@ function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClas
       ? classified('provider', 'provider_unavailable')
       : classified('provider', 'provider_ownership_unknown');
   }
+  if (input.assistantReason === 'provider_disconnect') {
+    return classified('provider', 'provider_disconnect');
+  }
+  if (input.assistantReason === 'gateway_unavailable') {
+    // The gateway's own `temporarily_unavailable` (our over-limit guard or our
+    // managed-provider payment failure). Kept on the model-serving path as one
+    // provider bucket: the distinct reason exists so the component is visible in
+    // triage, not to move the platform share. Re-attributing this to `platform`
+    // is a deliberate metric change, tracked separately.
+    return classified('provider', 'gateway_unavailable');
+  }
   if (input.assistantReason === 'context_limit') {
     return classified('provider', 'assistant_context_limit');
   }
@@ -377,6 +395,8 @@ export function classifyCloudAgentFailure(
   }
 
   switch (input.code) {
+    case 'container_limit_reached':
+      return classified('user', 'container_limit_reached');
     case 'workspace_setup_failed':
       return classifyWorkspaceFailure(input.workspaceSubtype);
     case 'sandbox_connect_failed':
@@ -403,6 +423,8 @@ export function classifyCloudAgentFailure(
     case 'payment_required':
     case 'model_missing':
       return classifyAssistantFailure(input);
+    case 'admission_billing_unavailable':
+      return classified('platform', 'admission_billing_unavailable');
     case 'unclassified':
       return classified('unknown', 'unclassified');
     case 'user_interrupt':

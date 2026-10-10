@@ -1,64 +1,17 @@
-import * as React from 'react';
-
 import { describe, expect, it, vi } from 'vitest';
 
-import { type SessionContextInfo } from '@/lib/session-context-info';
-
-import { SessionContextMetrics } from './session-context-metrics';
-import { findAll } from './session-context-metrics-test-helpers';
+import {
+  expectDashLabel,
+  expectHiddenReservedBox,
+  findAll,
+  info,
+  PILL_LAYOUT_TOKENS,
+  render,
+} from './session-context-metrics-test-helpers';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('./context-usage-ring', () => ({ ContextUsageRing: 'ContextUsageRing' }));
-
-function info(partial: Partial<SessionContextInfo> = {}): SessionContextInfo {
-  return {
-    contextTokens: 32_418,
-    providerID: 'kilo',
-    modelID: 'anthropic/claude-sonnet-4',
-    contextWindow: 200_000,
-    percentage: 16,
-    ...partial,
-  };
-}
-
-function render(props: React.ComponentProps<typeof SessionContextMetrics>): React.ReactElement {
-  // eslint-disable-next-line new-cap
-  return SessionContextMetrics(props) as React.ReactElement;
-}
-
-const PILL_LAYOUT_TOKENS = [
-  'h-[44px]',
-  'flex-row',
-  'items-center',
-  'gap-2',
-  'rounded-full',
-  'border',
-  'border-border',
-  'bg-secondary',
-  'px-3',
-  // The header row hands the trailing cluster a capped 50% box, but RN's
-  // default flexShrink is 0. Without these the pill keeps its natural width
-  // and paints past the row's right edge instead of compressing.
-  'shrink',
-  'min-w-0',
-] as const;
-
-function expectHiddenReservedBox(root: React.ReactElement): void {
-  expect(root.type).toBe('View');
-  const className = (root.props as { className?: string }).className ?? '';
-  expect(className).toContain('opacity-0');
-  for (const token of PILL_LAYOUT_TOKENS) {
-    expect(className).toContain(token);
-  }
-  expect(findAll(root, el => el.type === 'ContextUsageRing').length).toBeGreaterThan(0);
-  const props = root.props as {
-    accessibilityElementsHidden?: boolean;
-    importantForAccessibility?: string;
-  };
-  expect(props.accessibilityElementsHidden).toBe(true);
-  expect(props.importantForAccessibility).toBe('no');
-}
 
 describe('SessionContextMetrics', () => {
   it.each([
@@ -315,7 +268,7 @@ describe('SessionContextMetrics', () => {
     }
   });
 
-  it('messages with neither info nor cost show a visible track-only ring', () => {
+  it('messages with neither info nor cost show a visible dash beside the track-only ring', () => {
     const root = render({
       hasMessages: true,
       info: undefined,
@@ -327,12 +280,53 @@ describe('SessionContextMetrics', () => {
     expect(
       (root.props as { accessibilityElementsHidden?: boolean }).accessibilityElementsHidden
     ).toBeUndefined();
-    expect(findAll(root, el => el.type === 'Text')).toHaveLength(0);
+    expectDashLabel(root);
     const ring = findAll(root, el => el.type === 'ContextUsageRing')[0];
     expect(ring).toBeDefined();
     if (ring == null) {
       throw new Error('expected ContextUsageRing');
     }
     expect((ring.props as { arcFraction?: number }).arcFraction).toBe(0);
+  });
+
+  // Owner audit gap D5: a session whose transcript failed to load (no usage,
+  // no messages, loading finished) must not show a bare unlabeled ring that
+  // reads as a rendering bug. The dash labels the slot, and the accessibility
+  // label names usage as unavailable, in both themes.
+  it('load-error session shows the dash beside the ring and names usage unavailable', () => {
+    const onPress = vi.fn<() => void>();
+    const root = render({
+      info: undefined,
+      totalCostMicrodollars: null,
+      hasMessages: false,
+      onPress,
+    });
+    expect(root.type).toBe('Pressable');
+    const props = root.props as {
+      accessibilityLabel?: string;
+      className?: string;
+    };
+    expect(props.accessibilityLabel).toContain('usage unavailable');
+    expect(props.accessibilityLabel).toContain('Tap to view context details.');
+    expect(props.className ?? '').not.toContain('opacity-0');
+    for (const token of PILL_LAYOUT_TOKENS) {
+      expect(props.className ?? '').toContain(token);
+    }
+    expectDashLabel(root);
+  });
+
+  it('loading pill keeps the placeholder body without a label', () => {
+    const onPress = vi.fn<() => void>();
+    const root = render({
+      info: undefined,
+      totalCostMicrodollars: null,
+      hasMessages: false,
+      loading: true,
+      onPress,
+    });
+    expect(root.type).toBe('Pressable');
+    const props = root.props as { accessibilityLabel?: string };
+    expect(props.accessibilityLabel).not.toContain('usage unavailable');
+    expect(findAll(root, el => el.type === 'Text')).toHaveLength(0);
   });
 });

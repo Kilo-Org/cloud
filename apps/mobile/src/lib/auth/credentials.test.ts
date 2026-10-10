@@ -94,7 +94,7 @@ vi.mock('@/lib/last-active-instance', () => ({
 // `expo`, which needs `__DEV__` and cannot load in the node test environment.
 vi.mock('@/lib/last-opened-session', () => ({ clearLastOpenedSession: vi.fn() }));
 vi.mock('@/lib/native-launcher-surfaces', () => ({ clearLauncherSurfaces: vi.fn() }));
-vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
+vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));
 vi.mock('@/lib/persist/read-cache', () => ({
@@ -129,6 +129,13 @@ vi.mock('react-native', () => ({
 // credential deletes.
 vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   clearTrustedHosts: vi.fn(),
+}));
+
+// Image-host trust is a second SecureStore preference that pulls the same
+// secure-store-preference -> sonner-native -> react-native chain, so the
+// account-boundary clear needs the same mock as the link list above.
+vi.mock('@/lib/hooks/use-trusted-image-hosts', () => ({
+  clearTrustedImageHosts: vi.fn(),
 }));
 
 vi.mock('@/components/agents/markdown-image-confirm', () => ({

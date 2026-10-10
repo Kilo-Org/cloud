@@ -5,7 +5,7 @@ import type {
   KiloclawStartReason,
   KiloclawStopReason,
 } from '@kilocode/worker-utils';
-import { INTERNAL_API_SECRET, KILOCLAW_API_URL } from '@/lib/config.server';
+import { INTERNAL_API_SECRET, KILOCLAW_API_URL } from '@kilocode/web-shared/lib/config.server';
 import type {
   ImageVersionEntry,
   ProvisionInput,

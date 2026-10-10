@@ -105,6 +105,7 @@ export function ChildSessionDrawer({
     lastScrollTopRef,
     resetKey: selectedSessionId,
     overflowCheckKey: messages.length,
+    ready: hydrationState.status === 'ready',
   });
   const autoScrollFrameRef = useRef(0);
   const followUpAutoScrollFrameRef = useRef(0);
@@ -306,6 +307,11 @@ export function ChildSessionDrawer({
                 <span>
                   {selectedEntry?.agent ? `Agent: ${selectedEntry.agent}` : 'Sub-agent session'}
                 </span>
+                {selectedEntry?.model && (
+                  <span className="truncate" title={selectedEntry.model}>
+                    Model: {selectedEntry.model}
+                  </span>
+                )}
                 {selectedSessionId && (
                   <span className="truncate font-mono text-xs">{selectedSessionId}</span>
                 )}

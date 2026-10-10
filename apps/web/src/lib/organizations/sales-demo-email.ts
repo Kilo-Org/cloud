@@ -1,4 +1,4 @@
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 
 // Kept in sync with `platformAdminDomains` in `@/lib/admin/platform-admin.ts`.
 // That file is server-only, so this small module exists to expose the same

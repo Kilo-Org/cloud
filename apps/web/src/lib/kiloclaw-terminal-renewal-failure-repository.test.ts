@@ -1,6 +1,6 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { eq } from 'drizzle-orm';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   findUnresolvedTerminalRenewalFailure,
   kiloclaw_subscriptions,
@@ -13,7 +13,7 @@ import {
   type KiloClawSubscription,
 } from '@kilocode/db';
 import type { User } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 async function insertTestPureCreditSubscription(
   userId: string,

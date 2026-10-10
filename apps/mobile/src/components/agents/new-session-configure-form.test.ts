@@ -3,7 +3,6 @@ import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
-import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import {
   type NewSessionRepository,
@@ -86,9 +85,6 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   useColorScheme: () => 'light',
-}));
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
-  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
 
 // The profile row's loading state is asserted as a `Skeleton` node. The real
@@ -261,26 +257,6 @@ function findElementByComponent(node: Node, component: unknown): Record<string, 
   return null;
 }
 
-/** Height of the first node carrying an explicit `style.height` (an in-scroll spacer). */
-function findElementHeight(node: Node): number | null {
-  if (node === null || typeof node !== 'object') {
-    return null;
-  }
-  const props = node.props ?? {};
-  const style = props.style as { height?: unknown } | undefined;
-  if (typeof style?.height === 'number') {
-    return style.height;
-  }
-  const children = props.children;
-  for (const child of Array.isArray(children) ? children : [children]) {
-    const found = findElementHeight(child as Node);
-    if (found !== null) {
-      return found;
-    }
-  }
-  return null;
-}
-
 type ElementNode = { type?: unknown; props?: Record<string, unknown> } | null;
 
 /** The first node of `typeName`, so a test can inspect its position in the tree. */
@@ -300,38 +276,6 @@ function findElement(node: Node, typeName: string): ElementNode {
     }
   }
   return null;
-}
-
-/** The first node below the ScrollView carrying an `onLayout` (the composer wrapper). */
-function findOnLayoutHandler(
-  node: Node
-): ((event: { nativeEvent: { layout: { y: number; height: number } } }) => void) | null {
-  if (node === null || typeof node !== 'object') {
-    return null;
-  }
-  const props = node.props ?? {};
-  const children = props.children;
-  const type = (node as { type?: unknown }).type;
-  if (type !== 'ScrollView' && typeof props.onLayout === 'function') {
-    return props.onLayout as (event: {
-      nativeEvent: { layout: { y: number; height: number } };
-    }) => void;
-  }
-  for (const child of Array.isArray(children) ? children : [children]) {
-    const found = findOnLayoutHandler(child as Node);
-    if (found) {
-      return found;
-    }
-  }
-  return null;
-}
-
-/** The pinned footer's own bottom padding — the form's single clearance source. */
-function findFooterPaddingBottom(node: Node): number | null {
-  const lift = findElementByType(node, 'AppAwareKeyboardPaddingView');
-  const footer = findElementByType(lift?.children as Node, 'View');
-  const style = footer?.style as { paddingBottom?: unknown } | undefined;
-  return typeof style?.paddingBottom === 'number' ? style.paddingBottom : null;
 }
 
 const INSTANCE: InstancePickerInstance = {
@@ -440,71 +384,6 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'NewSessionRunTarget')?.disabled).toBe(true);
   });
 
-  it.each(['android', 'ios'] as const)(
-    'floors the pinned footer at the safe-area bottom and lifts it above the IME on %s',
-    async os => {
-      platformState.OS = os;
-      insetsState.bottom = 42;
-      try {
-        const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-        // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-        const element = NewSessionConfigureForm({ ...defaultProps() }) as Node;
-
-        // The helper floors the raw inset at 16 and adds 16: max(42, 16) + 16.
-        expect(findFooterPaddingBottom(element)).toBe(58);
-        // Neither platform resizes the window for the IME, so the footer sits
-        // inside a keyboard-lift view that adds the IME height on top of the
-        // safe area — the same implementation on iOS and Android.
-        expect(findElementByType(element, 'AppAwareKeyboardPaddingView')).not.toBeNull();
-      } finally {
-        insetsState.bottom = 0;
-        platformState.OS = 'android';
-      }
-    }
-  );
-
-  // ── The primary action is pinned below the scroll body, never inside it ──
-  it('keeps the Start action out of the scroll body so the bottom bar cannot clip it', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    insetsState.bottom = 44;
-    try {
-      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-      const element = NewSessionConfigureForm({ ...defaultProps() }) as Node;
-
-      // The form is taller than a short screen: a Start button in this content
-      // sits below the visible viewport, leaving only the top of the control
-      // showing above the navigation bar (the device capture).
-      const scrollBody = findElement(element, 'ScrollView');
-      expect(scrollBody).not.toBeNull();
-      expect(findElementByType(scrollBody, 'NewSessionStartButton')).toBeNull();
-
-      // It renders in the footer instead: a sibling of the body, wrapped in
-      // the keyboard-lift view, so it is always on screen and the IME lifts it.
-      const liftView = findElement(element, 'AppAwareKeyboardPaddingView');
-      expect(liftView).not.toBeNull();
-      expect(findElementByType(liftView, 'NewSessionStartButton')).not.toBeNull();
-      // The footer alone rides the lift view; the scroll body stays outside it,
-      // so the IME shrinks the body instead of covering the action.
-      expect(findElementByType(liftView, 'ScrollView')).toBeNull();
-
-      // Below the body, not above it: the pinned bottom bar.
-      const rootView = findElement(element, 'View');
-      const rootChildren = (rootView?.props as { children?: Node[] } | undefined)?.children ?? [];
-      const bodyIndex = rootChildren.findIndex(
-        child => (child as { type?: unknown } | undefined)?.type === 'ScrollView'
-      );
-      const footerIndex = rootChildren.findIndex(
-        child => findElementByType(child, 'AppAwareKeyboardPaddingView') !== null
-      );
-      expect(bodyIndex).toBe(0);
-      expect(footerIndex).toBeGreaterThan(bodyIndex);
-    } finally {
-      insetsState.bottom = 0;
-    }
-  });
-
   it('keeps the cloud-create failure with the Start action it answers', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
     const cloudCreateError = { retryable: true, message: 'prepare failed' };
@@ -522,7 +401,7 @@ describe('NewSessionConfigureForm', () => {
     expect(scrollBody).not.toBeNull();
     expect(findElementByType(scrollBody, 'NewSessionCloudCreateError')).toBeNull();
     expect(findElementByType(element, 'NewSessionCloudCreateError')).not.toBeNull();
-    const lift = findElement(element, 'AppAwareKeyboardPaddingView');
+    const lift = findElement(element, 'KeyboardAvoidingView');
     expect(findElement(lift, 'NewSessionCloudCreateError')).not.toBeNull();
 
     // Switching the target to a computer must not surface the stale failure.
@@ -831,9 +710,6 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === '3 commands · 1 MCP · 2 skills · 4 agents')).toBe(
       true
     );
-    // The chip's own copy is covered by its mounted test; here the row must
-    // hand it a resolved (non-null) indicator state.
-    expect(findElementByComponent(element, ActiveProfileIndicator)?.state).not.toBeNull();
   });
 
   it('renders "Default environment" when no profile resolves', () => {
@@ -841,8 +717,6 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findTextContent(element, t => t === 'Default environment')).toBe(true);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
-    // The chip is mounted but holds no state, so it renders nothing.
-    expect(findElementByComponent(element, ActiveProfileIndicator)?.state).toBeNull();
   });
 
   it('renders an inline error with Retry when the profile query fails', () => {
@@ -858,10 +732,6 @@ describe('NewSessionConfigureForm', () => {
     const element = renderRow({ profile: null, overrideNeedsAttention: true });
 
     expect(findTextContent(element, t => t === 'Config needs attention')).toBe(true);
-    expect(findElementByComponent(element, ActiveProfileIndicator)?.state).toMatchObject({
-      kind: 'config-needs-attention',
-      needsAttention: true,
-    });
   });
 
   it('keeps the environment row at reserved height with skeletons while loading', () => {
@@ -1067,69 +937,6 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 
-  // ── Case 15: bottom navigation-bar clearance ──
-  it('reserves the bottom safe-area inset on the pinned footer so Start clears the navigation bar', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    insetsState.bottom = 44;
-    try {
-      // The inset is 44; the helper floors at 16 and adds 16.
-      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-      const element = NewSessionConfigureForm(defaultProps()) as Node;
-
-      // The footer is the single source: the root adds no raw inset, so the
-      // padded chain is the floor once, not inset + floor (double padding).
-      expect(findElementByType(element, 'View')?.style).toBeUndefined();
-      expect(findFooterPaddingBottom(element)).toBe(60);
-    } finally {
-      insetsState.bottom = 0;
-    }
-  });
-
-  // ── Case 15b: the clearance leaves no dead space in the scroll body ──
-  it('leaves no in-scroll spacer after the last field', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    insetsState.bottom = 44;
-    try {
-      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-      const element = NewSessionConfigureForm(defaultProps()) as Node;
-
-      const scrollBody = findElementByType(element, 'ScrollView');
-      expect(scrollBody).not.toBeNull();
-      expect(findElementHeight(scrollBody?.children as Node)).toBeNull();
-    } finally {
-      insetsState.bottom = 0;
-    }
-  });
-
-  // ── Case 15a: the primary action is pinned outside the scroll body ──
-  it('pins Start and the cloud-create recovery outside the scroll body, under the keyboard lift', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm({
-      ...defaultProps(),
-      cloudCreateError: { retryable: true, message: 'prepare failed' },
-    }) as Node;
-
-    // A Start inside the scroll sits below the fold while the composer's
-    // auto-focus keyboard is up, so the primary action must not live there.
-    const scrollBody = findElementByType(element, 'ScrollView');
-    expect(scrollBody).not.toBeNull();
-    expect(findElementByType(scrollBody?.children as Node, 'NewSessionStartButton')).toBeNull();
-    expect(
-      findElementByType(scrollBody?.children as Node, 'NewSessionCloudCreateError')
-    ).toBeNull();
-
-    // Both ride the keyboard-lift footer below the body: the lift shrinks the
-    // body and keeps the action above the IME on either platform.
-    const lift = findElementByType(element, 'AppAwareKeyboardPaddingView');
-    expect(lift).not.toBeNull();
-    expect(findElementByType(lift?.children as Node, 'NewSessionStartButton')).not.toBeNull();
-    expect(findElementByType(lift?.children as Node, 'NewSessionCloudCreateError')).not.toBeNull();
-  });
-
   // ── Case 13: reorder wiring lock ──
   it('wires onMoveAttachment and onReorderAttachments through to NewSessionPrompt', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
@@ -1185,64 +992,5 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'ScrollView')?.onLayout).toEqual(expect.any(Function));
     // The mocked useState holds the initial measurement (0) and never setStates.
     expect(findElementByType(element, 'NewSessionPrompt')?.frameHeight).toBe(0);
-  });
-
-  // ── Case 16: reveal the composer card's bottom row above the IME ──
-  it('scrolls the composer card bottom above the keyboard once it opens', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm(defaultProps()) as Node;
-
-    const scrollView = findElementByType(element, 'ScrollView');
-    if (!scrollView) {
-      throw new Error('expected the form to render a ScrollView');
-    }
-    const scrollTo = vi.fn();
-    // The hook's ScrollView ref is the reveal's target; the plain-function
-    // mount leaves it on the element props (ref is a regular prop in React 19).
-    (scrollView.ref as { current: unknown }).current = { scrollTo };
-
-    // The keyboard-lift view shrinks the scroll viewport once the IME is up.
-    (scrollView.onLayout as (event: unknown) => void)({
-      nativeEvent: { layout: { height: 380 } },
-    });
-
-    // The composer card sits 16pt below the content top and is 420pt tall, so
-    // its bottom edge is 56pt below the lifted viewport bottom.
-    const onComposerLayout = findOnLayoutHandler(element);
-    if (!onComposerLayout) {
-      throw new Error('expected the composer wrapper to carry an onLayout');
-    }
-    onComposerLayout({ nativeEvent: { layout: { y: 16, height: 420 } } });
-
-    // Nothing moves while the keyboard is down — the keyboard-down state is untouched.
-    expect(scrollTo).not.toHaveBeenCalled();
-
-    keyboardSubscribers.show?.();
-    expect(scrollTo).toHaveBeenCalledTimes(1);
-    expect(scrollTo).toHaveBeenCalledWith({ y: 56, animated: false });
-  });
-
-  // ── Case 17: the restore needs the user's live offset ──
-  it('feeds the ScrollView onScroll into the composer reveal', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm(defaultProps()) as Node;
-
-    const scrollView = findElementByType(element, 'ScrollView');
-    if (!scrollView) {
-      throw new Error('expected the form to render a ScrollView');
-    }
-    // Dropping either wiring would silently disable the keyboard-hide restore.
-    expect(typeof scrollView.onScroll).toBe('function');
-    expect(scrollView.scrollEventThrottle).toBe(16);
-
-    // The handler is the hook's `onScroll`: it must forward the native offset.
-    const onScroll = scrollView.onScroll as (event: unknown) => void;
-    expect(() => {
-      onScroll({ nativeEvent: { contentOffset: { y: 120 } } });
-    }).not.toThrow();
   });
 });

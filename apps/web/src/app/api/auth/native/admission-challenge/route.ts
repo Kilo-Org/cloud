@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
 import { issueAdmissionChallenge, ChallengeRateLimitError } from '@/lib/auth/native-admission';
-import { withRestTiming } from '@/lib/observability/request-timing';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 /**
  * POST /api/auth/native/admission-challenge

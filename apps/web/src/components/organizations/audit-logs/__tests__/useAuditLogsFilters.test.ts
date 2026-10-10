@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import type { AuditLogsFilters } from '../useAuditLogsFilters';
-import type { AuditLogAction } from '@/lib/organizations/organization-audit-logs';
+import type { AuditLogAction } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 
 // Since we can't easily test the full hook without a React environment,
 // let's at least test the serialization functions by extracting them

@@ -8,8 +8,8 @@ import { NextResponse } from 'next/server';
 import {
   listBenchmarkRuns,
   startBenchmarkRun,
-} from '@/lib/ai-gateway/auto-routing-benchmark-admin-client';
-import { getUserFromAuth } from '@/lib/user/server';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 export async function GET(request: NextRequest) {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });

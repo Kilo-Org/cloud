@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createGatewayRepository } from './repository';
 import { createOAuthGrantService } from './oauth-grant-service';
 

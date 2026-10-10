@@ -248,12 +248,7 @@ export function PrReviewOverview({
           headRepoFullName={data.headRepoFullName}
           isCrossRepo={data.isCrossRepo}
         />
-        <PrCountsLine
-          commits={data.counts.commits}
-          changedFiles={data.counts.changedFiles}
-          additions={data.counts.additions}
-          deletions={data.counts.deletions}
-        />
+        <PrCountsLine commits={data.counts.commits} changedFiles={data.counts.changedFiles} />
       </View>
 
       <PrOverviewMeta overview={data} />

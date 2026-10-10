@@ -613,6 +613,7 @@ describe('SessionContextSheet connection row', () => {
     { display: 'connecting' as const, copy: 'agentChat.sessionConnection.connecting' },
     { display: 'reconnecting' as const, copy: 'agentChat.sessionConnection.reconnecting' },
     { display: 'lost' as const, copy: 'agentChat.sessionConnection.connectionLost' },
+    { display: 'scheduled' as const, copy: 'common.scheduled' },
   ])('renders the Connection label and the $display copy', async ({ display, copy }) => {
     const renderer = await mountSheet({ connectionDisplay: display });
     const values = textValues(renderer);

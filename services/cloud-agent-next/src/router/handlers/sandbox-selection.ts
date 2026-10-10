@@ -23,9 +23,8 @@ export const getSandboxSelectionOptions = protectedProcedure
         input.kilocodeOrganizationId
       );
     }
-    return getSandboxSelectionCapabilities(
-      ctx.env,
-      { userId: ctx.userId, orgId: input.kilocodeOrganizationId },
-      input.devcontainer
-    );
+    return getSandboxSelectionCapabilities(ctx.env, {
+      userId: ctx.userId,
+      orgId: input.kilocodeOrganizationId,
+    });
   });

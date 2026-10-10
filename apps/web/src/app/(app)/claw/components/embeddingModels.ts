@@ -1,7 +1,7 @@
 import {
   KILO_DEFAULT_EMBEDDING_MODEL,
   KILO_EMBEDDING_MODELS,
-} from '@/lib/ai-gateway/embeddings/kilo-embedding-models';
+} from '@kilocode/web-shared/lib/ai-gateway/embeddings/kilo-embedding-models';
 
 export type EmbeddingModelOption = {
   id: string;

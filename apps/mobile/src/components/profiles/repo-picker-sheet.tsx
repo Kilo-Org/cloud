@@ -170,7 +170,7 @@ export function RepoPickerSheet({
           clearButtonMode="while-editing"
           returnKeyType="search"
           accessibilityLabel={t('profiles.repoBindings.search')}
-          className="flex-1 px-0 text-base text-foreground"
+          className="flex-1 pl-0 pr-0 text-base text-foreground"
           onChangeText={setSearch}
         />
       </View>

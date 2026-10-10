@@ -425,10 +425,14 @@ export type StoredSession = {
   sessionStatus?: string | null;
   sessionStatusUpdatedAt?: string | null;
   /**
-   * Associated GitHub pull request for this session's branch, if any.
-   * - `AssociatedPr`: a cache row exists, populated by the webhook handler or a
-   *   manual refresh.
-   * - `null`: server confirmed no matching PR for this `(git_url, git_branch)`.
+   * Associated GitHub pull request for this session's own verified link, if
+   * any.
+   * - `AssociatedPr`: the session's own stored link passed GitHub verification.
+   *   Live cache fields (title, state, review decision) are served once the
+   *   per-PR cache has synced; a verified link whose cache row is missing
+   *   renders as a pending partial (state `unknown`) so it can be refreshed.
+   * - `null`: no stored link, or a stored link GitHub has not verified, so
+   *   there is nothing trustworthy to show.
    * - `undefined`: PR data was not requested or not yet loaded for this row.
    */
   associatedPr?: AssociatedPr | null;

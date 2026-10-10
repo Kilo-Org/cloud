@@ -1846,8 +1846,78 @@
     {
       "idx": 263,
       "version": "7",
-      "when": 1790386493501,
-      "tag": "0263_drop_quick_chat",
+      "when": 1790342499948,
+      "tag": "0263_spend_alerts_rollup_covering_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 264,
+      "version": "7",
+      "when": 1790615501221,
+      "tag": "0264_api_request_log_r2",
+      "breakpoints": true
+    },
+    {
+      "idx": 265,
+      "version": "7",
+      "when": 1790674171304,
+      "tag": "0265_dizzy_starhawk",
+      "breakpoints": true
+    },
+    {
+      "idx": 266,
+      "version": "7",
+      "when": 1790685532635,
+      "tag": "0266_eminent_molecule_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 267,
+      "version": "7",
+      "when": 1790693604336,
+      "tag": "0267_pink_miek",
+      "breakpoints": true
+    },
+    {
+      "idx": 268,
+      "version": "7",
+      "when": 1790963679520,
+      "tag": "0268_goofy_betty_ross",
+      "breakpoints": true
+    },
+    {
+      "idx": 269,
+      "version": "7",
+      "when": 1791150629226,
+      "tag": "0269_pr_link_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 270,
+      "version": "7",
+      "when": 1791305453929,
+      "tag": "0270_puzzling_meltdown",
+      "breakpoints": true
+    },
+    {
+      "idx": 271,
+      "version": "7",
+      "when": 1791369247100,
+      "tag": "0271_same_mephisto",
+      "breakpoints": true
+    },
+    {
+      "idx": 272,
+      "version": "7",
+      "when": 1791409322642,
+      "tag": "0272_harsh_scarecrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 273,
+      "version": "7",
+      "when": 1791468981098,
+      "tag": "0273_fast_sandman",
       "breakpoints": true
     }
   ]

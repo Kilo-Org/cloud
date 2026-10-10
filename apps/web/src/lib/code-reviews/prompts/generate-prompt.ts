@@ -9,11 +9,11 @@
 import { z } from 'zod';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { DEFAULT_CODE_REVIEW_MODEL } from '@/lib/code-reviews/core/constants';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import DEFAULT_PROMPT_TEMPLATE_BITBUCKET from '@/lib/code-reviews/prompts/default-prompt-template-bitbucket.json';
 import DEFAULT_PROMPT_TEMPLATE_GITHUB from '@/lib/code-reviews/prompts/default-prompt-template.json';
 import DEFAULT_PROMPT_TEMPLATE_GITLAB from '@/lib/code-reviews/prompts/default-prompt-template-gitlab.json';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';
 import { getPlatformConfig } from './platform-helpers';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -111,7 +111,7 @@ they do not replace them:
 - Keep internal reasoning short. Verify with tools (read, grep, diff) instead of reasoning
   through the code at length.
 - Keep the normal order: finish verifying, submit all inline comments in one call, then update
-  the summary last.
+  the summary last. If the inline call fails, publish the summary before any retry.
 - Do not deliberate about these instructions, the review policy, or sub-agent tiers.
 - Do not recompute diff line numbers repeatedly; if a line number is uncertain, re-read the diff
   and apply the existing diff-line rules.`;

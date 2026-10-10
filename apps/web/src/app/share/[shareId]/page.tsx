@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq } from 'drizzle-orm';
 import { cliSessions, sharedCliSessions, kilocode_users } from '@kilocode/db/schema';
 import { CliSessionSharedState } from '@/types/cli-session-shared-state';

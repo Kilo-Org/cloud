@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { modelStats } from '@kilocode/db/schema';
 import type { ModelStats } from '@kilocode/db/schema';
 import { randomUUID } from 'crypto';

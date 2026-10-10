@@ -1,13 +1,18 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getStripeTopUpCheckoutUrl } from '@/lib/stripe';
-import { MAXIMUM_TOP_UP_AMOUNT, MINIMUM_TOP_UP_AMOUNT } from '@/lib/constants';
+import { MAXIMUM_TOP_UP_AMOUNT, MINIMUM_TOP_UP_AMOUNT } from '@kilocode/web-shared/lib/constants';
 import { isValidReturnUrl } from '@/lib/payment-return-url';
 import { captureException } from '@sentry/nextjs';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import { clientIpFromHeaders } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import {
+  ipCountryFromHeaders,
+  ja4FromHeaders,
+} from '@kilocode/web-shared/lib/bouncer/credit-events';
 
 /**
  * NOTE: Crypto payment support (Coinbase Commerce) was removed in January 2026.
@@ -66,11 +71,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
   }
 
   let stripeCustomerId: string | null | undefined;
+  let accountCreatedAt: Date | string = currentUser.created_at;
+  let accountUsedMicrodollars = currentUser.microdollars_used;
   if (organizationId) {
     const orgContext = await getAuthorizedOrgContext(organizationId, ORGANIZATION_BILLING_ROLES);
     if (!orgContext.success) {
       return orgContext.nextResponse;
     }
+    accountCreatedAt = orgContext.data.organization.created_at;
+    accountUsedMicrodollars = orgContext.data.organization.microdollars_used;
     stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
   } else {
     stripeCustomerId = currentUser.stripe_customer_id;
@@ -85,7 +94,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
     validationResult.amount as number,
     origin,
     organizationId,
-    cancelPath
+    cancelPath,
+    {
+      accountCreatedAt,
+      accountUsedMicrodollars,
+      ip: clientIpFromHeaders(request.headers),
+      ipCountry: ipCountryFromHeaders(request.headers),
+      ja4: ja4FromHeaders(request.headers),
+    }
   );
 
   if (!url) {

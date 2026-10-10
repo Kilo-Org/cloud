@@ -15,6 +15,23 @@ import { PrReviewDiscussionTab } from './pr-review-discussion-tab';
 const hoisted = vi.hoisted(() => ({
   insetsState: { top: 0, bottom: 0, left: 0, right: 0 },
   pushMock: vi.fn(),
+  // The tab's own-comment delete confirmation (s4). Plain array so a test can
+  // read the request `useConfirmDialog().confirm` was handed.
+  confirmRequests: [] as {
+    title: string;
+    message: string;
+    confirmLabel: string;
+    cancelLabel?: string;
+    onConfirm: () => void;
+  }[],
+  deleteMutate: vi.fn(),
+  // The delete confirmation's submit gate reads the committed connectivity
+  // (ux2): 'online' by default, flipped per test. The real module pulls in
+  // NetInfo + the probe store, which the node environment cannot resolve.
+  connectivity: { value: 'online' as 'online' | 'offline' | 'unknown' },
+  // The delete gate's visible failure feedback (ux2). The real adapter wraps
+  // sonner-native, which the node environment cannot resolve.
+  toastError: vi.fn(),
   // The tab's screen focus drives the CTA bar's keyboard lift (a foreign
   // surface's keyboard must not lift the bar behind it — uxs3, e4-confirm-
   // discard). Flippable so the suite can mount the tab unfocused.
@@ -43,6 +60,10 @@ const hoisted = vi.hoisted(() => ({
 
 export const insetsState = hoisted.insetsState;
 export const pushMock = hoisted.pushMock;
+export const confirmRequests = hoisted.confirmRequests;
+export const deleteMutate = hoisted.deleteMutate;
+export const connectivity = hoisted.connectivity;
+export const toastError = hoisted.toastError;
 export const focusState = hoisted.focusState;
 export const replyScrollFns = hoisted.replyScrollFns;
 export const discussionState = hoisted.discussionState;
@@ -50,6 +71,16 @@ export const discussionState = hoisted.discussionState;
 vi.mock('react-native', () => ({
   View: 'View',
   Platform: { OS: 'ios' },
+}));
+// The tab renders `{dialog}` from `useConfirmDialog`; stub the hook so the
+// test reads the request it was handed and drives its confirm.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: (typeof hoisted.confirmRequests)[number]) => {
+      hoisted.confirmRequests.push(request);
+    },
+    dialog: null,
+  }),
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: pushMock }),
@@ -90,6 +121,24 @@ vi.mock('@/components/pr-review/discussion/comment-moderation', () => ({
 }));
 vi.mock('@/components/pr-review/discussion/pr-comment-cta', () => ({
   PrCommentCta: 'PrCommentCta',
+}));
+// s4: the tab owns the delete write; the hook's optimistic/rollback behaviour
+// is covered by use-pr-comment-crud-mutations.test.ts and the list mounted
+// suite, so here it is a captured `mutate`.
+vi.mock('@/lib/pr-review/discussion/use-pr-comment-crud-mutations', () => ({
+  useDeletePrCommentMutation: () => ({ mutate: hoisted.deleteMutate }),
+}));
+// ux2: the delete confirmation's offline gate. The real modules reach NetInfo /
+// sonner-native, neither of which this node-environment suite can resolve.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => hoisted.connectivity.value,
+}));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: {
+    success: vi.fn(),
+    error: hoisted.toastError,
+    warning: vi.fn(),
+  },
 }));
 
 export const BASE_PROPS = {
@@ -151,6 +200,7 @@ export function resetState(): void {
   discussionState.conversation = [];
   discussionState.firstPageErrorState = null;
   discussionState.laterPageError = false;
+  hoisted.connectivity.value = 'online';
 }
 
 export function expectCtaPresence(

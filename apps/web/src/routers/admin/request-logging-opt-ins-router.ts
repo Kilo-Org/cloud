@@ -1,12 +1,12 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   createRequestLoggingOptIn,
   deleteRequestLoggingOptIn,
   getRequestLoggingOptIns,
   type RequestLoggingOptIn,
-} from '@/lib/ai-gateway/request-logging-opt-ins';
+} from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 
 const CreateOptInSchema = z.object({
   target_type: z.enum(['account', 'organization']),

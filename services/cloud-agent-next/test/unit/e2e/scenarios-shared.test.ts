@@ -62,7 +62,6 @@ import type {
   ScenarioEnvironment,
   SessionSandboxObservation,
 } from '../../e2e/scenario-capabilities.js';
-import { AttachWindowMissedError } from '../../e2e/attach-window-evidence.js';
 import {
   awaitCorrelatedChildText,
   buildAuthRejectProbes,
@@ -612,7 +611,7 @@ describe('cold-hot sandbox identity', () => {
     );
   });
 
-  it('fails a hot turn when a new container appeared', async () => {
+  it('ignores an unrelated container that appears while the cold container persists', async () => {
     installColdHotScenario();
     let call = 0;
     const sandbox = sandboxStub({
@@ -627,9 +626,7 @@ describe('cold-hot sandbox identity', () => {
 
     const result = await coldHot({ config, conversation: 'echo:hi' }, localEnvironment(sandbox));
 
-    expect(result.ok).toBe(false);
-    expect(result.message).toContain('sandbox identity changed');
-    expect(result.message).toContain('container_new');
+    expect(result.ok).toBe(true);
   });
 
   it('fails a hot turn when the cold container disappeared', async () => {
@@ -1756,7 +1753,10 @@ describe('callback scenario behaviour under both profiles', () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(mocks.interruptSession).toHaveBeenCalledWith(config, SESSION_ID);
+    expect(mocks.interruptSession).toHaveBeenCalledWith(
+      expect.objectContaining(config),
+      SESSION_ID
+    );
   });
 
   it('interrupts the prepared session when a two-step start fails between prepare and initiation', async () => {
@@ -1779,7 +1779,10 @@ describe('callback scenario behaviour under both profiles', () => {
 
     expect(result.ok).toBe(false);
     expect(result.message).toContain('initiateFromKilocodeSessionV2 failed');
-    expect(mocks.interruptSession).toHaveBeenCalledWith(config, preparedId);
+    expect(mocks.interruptSession).toHaveBeenCalledWith(
+      expect.objectContaining(config),
+      preparedId
+    );
   });
 
   it.each(profiles)('callback-interrupt passes in the %s profile', async profile => {
@@ -1802,7 +1805,7 @@ describe('callback scenario behaviour under both profiles', () => {
     expect(result.ok).toBe(true);
     expect(result.message).toContain('status=interrupted');
     expect(mocks.interruptSession).toHaveBeenCalledWith(
-      config,
+      expect.objectContaining(config),
       SESSION_ID,
       expect.any(AbortSignal)
     );
@@ -1828,7 +1831,7 @@ describe('callback scenario behaviour under both profiles', () => {
     expect(result.ok).toBe(false);
     expect(result.message).toContain('paced progress');
     expect(mocks.interruptSession).toHaveBeenCalledWith(
-      config,
+      expect.objectContaining(config),
       SESSION_ID,
       expect.any(AbortSignal)
     );
@@ -1947,7 +1950,6 @@ describe('moved queue, micro, and continuity scenarios', () => {
   const names = [
     'queue-while-busy',
     'queue-rapid-fire-no-gate',
-    'queue-overflow',
     'queue-interrupt-clears',
     'interrupt-mid-stream',
     'interrupt-then-continue',
@@ -1962,6 +1964,13 @@ describe('moved queue, micro, and continuity scenarios', () => {
     expect(definition?.name).toBe(name);
     expect(definition?.requires).toEqual(['sessionSandbox']);
   });
+
+  it('queue-overflow needs no container capability (it fills a cold queue)', () => {
+    const definition = SHARED_SCENARIOS['queue-overflow'];
+    expect(definition).toBeDefined();
+    expect(definition?.name).toBe('queue-overflow');
+    expect(definition?.requires).toEqual([]);
+  });
 });
 
 describe('converted load and fault scenarios', () => {
@@ -1972,22 +1981,29 @@ describe('converted load and fault scenarios', () => {
     }
   });
 
-  it('kill-mid-flight requires sessionSandbox + sandboxFaults + gates', () => {
+  it('kill-mid-flight requires the new-plane fault capabilities plus gates', () => {
     expect(SHARED_SCENARIOS['kill-mid-flight']?.requires).toEqual([
       'sessionSandbox',
       'sandboxFaults',
       'gates',
+      'controlPlaneRuntime',
+      'controlPlaneV2',
     ]);
   });
 
-  it('the other fault scenarios require sessionSandbox + sandboxFaults', () => {
+  it('the other fault scenarios require the new-plane fault capabilities', () => {
     for (const name of [
       'external-kill',
       'wrapper-freeze-settled-reap',
       'wrapper-freeze-inflight-reap',
       'control-socket-recycle-boot',
     ]) {
-      expect(SHARED_SCENARIOS[name]?.requires).toEqual(['sessionSandbox', 'sandboxFaults']);
+      expect(SHARED_SCENARIOS[name]?.requires).toEqual([
+        'sessionSandbox',
+        'sandboxFaults',
+        'controlPlaneRuntime',
+        'controlPlaneV2',
+      ]);
       expect(SHARED_SCENARIOS[name]?.requiresWorktreeCreation).toBe(true);
     }
   });
@@ -2004,9 +2020,11 @@ describe('converted load and fault scenarios', () => {
     expect(result.message).toContain('sandboxFaults');
   });
 
-  it('control-socket-recycle-boot fails a post-signal failure instead of retrying a window miss', async () => {
+  it('control-socket-recycle-boot recycles before opening the stream and fails a post-recycle turn', async () => {
     const messageId = 'message_boot';
-    const stream = fakeStream([preparingEvent(messageId)], completedEvent(messageId));
+    const failed = streamEvent('cloud.message.failed', { messageId });
+    const stream = fakeStream([preparingEvent(messageId), failed], failed);
+    const order: string[] = [];
     mocks.prepareBrowserSession.mockReset();
     mocks.prepareBrowserSession.mockResolvedValue({
       cloudAgentSessionId: SESSION_ID,
@@ -2015,20 +2033,16 @@ describe('converted load and fault scenarios', () => {
     mocks.getSessionSnapshot.mockReset();
     mocks.getSessionSnapshot.mockResolvedValue({ initialMessageId: messageId });
     mocks.openConnectedStream.mockReset();
-    mocks.openConnectedStream.mockResolvedValue(stream);
-    mocks.getMessageResult.mockReset();
-    mocks.getMessageResult.mockResolvedValue({ status: 'running' });
+    mocks.openConnectedStream.mockImplementation(async () => {
+      order.push('stream');
+      return stream;
+    });
 
-    // The capability reports a window miss but the turn has already failed: the
-    // failure must take precedence, so no second session is created.
     const sandboxFaults = {
-      captureWorkerLogCursor: vi.fn(async () => 0),
-      captureWrapperIdentity: vi.fn(async () => ({ instanceId: 'container_1:4242' })),
-      dropControlSocketDuringAttach: vi.fn(async () => {
-        stream.events.push(streamEvent('cloud.message.failed', { messageId }));
-        throw new AttachWindowMissedError();
+      recycleWrapperSocket: vi.fn(async () => {
+        order.push('recycle');
+        return { recycled: true, pid: 4242, detail: 'recycled' };
       }),
-      countPromptDispatches: vi.fn(async () => 1),
     } as unknown as SandboxFaultObservation;
 
     const env: ScenarioEnvironment = {
@@ -2044,6 +2058,10 @@ describe('converted load and fault scenarios', () => {
         currentContainer: vi.fn(async () => 'container_1'),
       },
       sandboxFaults,
+      controlPlaneV2: { ready: true },
+      controlPlaneRuntime: {
+        proveNewPlane: vi.fn(async () => ({ instanceId: 'container_1:4242', pid: 4242 })),
+      } as unknown as ScenarioEnvironment['controlPlaneRuntime'],
     };
 
     const result = await runSharedScenario(SHARED_SCENARIOS['control-socket-recycle-boot'], {
@@ -2053,65 +2071,10 @@ describe('converted load and fault scenarios', () => {
       env,
     });
 
+    expect(order).toEqual(['recycle', 'stream']);
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('failed after the attach-window signal');
+    expect(result.message).toContain('failed after the control-socket recycle');
     expect(mocks.prepareBrowserSession).toHaveBeenCalledTimes(1);
-  });
-
-  it('waits for the discarded attempt to settle before retrying a window miss', async () => {
-    const messageId = 'message_boot';
-    const stream = fakeStream([preparingEvent(messageId)], completedEvent(messageId));
-    mocks.prepareBrowserSession.mockReset();
-    mocks.prepareBrowserSession.mockResolvedValue({
-      cloudAgentSessionId: SESSION_ID,
-      kiloSessionId: KILO_SESSION_ID,
-    });
-    mocks.getSessionSnapshot.mockReset();
-    mocks.getSessionSnapshot.mockResolvedValue({ initialMessageId: messageId });
-    mocks.openConnectedStream.mockReset();
-    mocks.openConnectedStream.mockResolvedValue(stream);
-    mocks.getMessageResult.mockReset();
-    // The turn is still running when the miss is observed and only fails on the
-    // next durable sample: the wait must catch it instead of retrying it away.
-    mocks.getMessageResult
-      .mockResolvedValueOnce({ status: 'running' })
-      .mockResolvedValue({ status: 'failed' });
-
-    const sandboxFaults = {
-      captureWorkerLogCursor: vi.fn(async () => 0),
-      captureWrapperIdentity: vi.fn(async () => ({ instanceId: 'container_1:4242' })),
-      dropControlSocketDuringAttach: vi.fn(async () => {
-        throw new AttachWindowMissedError();
-      }),
-      countPromptDispatches: vi.fn(async () => 1),
-    } as unknown as SandboxFaultObservation;
-
-    const env: ScenarioEnvironment = {
-      profile: 'local',
-      requireControlPlaneSession: false,
-      sandbox: {
-        snapshotContainerIds: vi.fn(async () => new Set<string>()),
-        waitForOwnedContainer: vi.fn(async () => 'container_1'),
-        waitForNewContainer: vi.fn(async () => 'container_1'),
-      },
-      sessionSandbox: {
-        waitForContainer: vi.fn(async () => 'container_1'),
-        currentContainer: vi.fn(async () => 'container_1'),
-      },
-      sandboxFaults,
-    };
-
-    const result = await runSharedScenario(SHARED_SCENARIOS['control-socket-recycle-boot'], {
-      config,
-      conversation: SHARED_SCENARIOS['control-socket-recycle-boot'].defaultConversation,
-      api: 'unified',
-      env,
-    });
-
-    expect(result.ok).toBe(false);
-    expect(result.message).toContain('failed after the attach-window signal');
-    expect(mocks.prepareBrowserSession).toHaveBeenCalledTimes(1);
-    expect(mocks.getMessageResult).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -2195,8 +2158,11 @@ function runInterruptClearsWith(extraEvents: StreamEvent[]): Promise<LifecycleRe
 }
 
 describe('moved queue scenario run isolation', () => {
-  it('queue-overflow boots before the hold and never touches the gate registry', async () => {
+  it('queue-overflow fills a cold queue and never touches the gate registry', async () => {
     installPacedHold('message_boot', 'message_held');
+    // The scenario has no warm-up hold, so the fill must see only queued acks
+    // (the helper's one-shot held-send ack is dropped).
+    mocks.sendMessage.mockReset();
     mocks.sendMessage.mockResolvedValue({ messageId: 'message_q', delivery: 'queued' });
 
     const result = await runSharedScenario(SHARED_SCENARIOS['queue-overflow'], {
@@ -2422,7 +2388,7 @@ describe('moved micro scenarios', () => {
     expect(currentContainer).toHaveBeenCalledTimes(1);
   });
 
-  it('hot fails when the warm follow-up creates an extra container', async () => {
+  it('hot ignores an unrelated container that appears during the warm follow-up', async () => {
     startQueueSession('message_warm');
     mocks.openConnectedStream
       .mockResolvedValueOnce(fakeStream([], completedEvent('message_warm')))
@@ -2454,9 +2420,8 @@ describe('moved micro scenarios', () => {
       env,
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.message).toContain('sameContainers=false');
-    expect(result.message).toContain('container_extra');
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('sameContainers=true');
   });
 
   it('hot fails when the warm container disappears before the follow-up', async () => {
@@ -2581,7 +2546,7 @@ describe('moved continuity scenario run isolation', () => {
     expect(result.ok).toBe(true);
     expect(result.message).toContain('sameContainer=true');
     expect(mocks.interruptSession).toHaveBeenCalledWith(
-      config,
+      expect.objectContaining(config),
       SESSION_ID,
       expect.any(AbortSignal)
     );
@@ -2608,7 +2573,7 @@ describe('moved continuity scenario run isolation', () => {
     expect(result.ok).toBe(false);
     expect(result.message).toContain('paced progress');
     expect(mocks.interruptSession).toHaveBeenCalledWith(
-      config,
+      expect.objectContaining(config),
       SESSION_ID,
       expect.any(AbortSignal)
     );

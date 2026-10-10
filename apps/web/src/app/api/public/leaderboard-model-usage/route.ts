@@ -4,7 +4,7 @@ import {
   createPublicSnowflakeReport,
   publicSnowflakeReportOptions,
 } from '@/lib/public-snowflake-report';
-import { LEADERBOARD_MODEL_USAGE_REDIS_KEY } from '@/lib/redis-keys';
+import { LEADERBOARD_MODEL_USAGE_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 
 const LEADERBOARD_MODEL_USAGE_QUERY = `
 select

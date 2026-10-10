@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import type {
   ControlPlanePromptPayload,
   ControlPlaneRouteSpec,
@@ -501,6 +501,65 @@ describe('turn manager submission', () => {
     const client = h.client(routeSpec());
     expect(client.commands).toHaveLength(1);
     expect(client.commands[0]).toMatchObject({ sessionId: KILO_SESSION, command: 'init' });
+  });
+
+  it('cancels a compact completion wait without dispatching its follow-up after Stop', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    expect(h.manager.hasPendingWork()).toBe(true);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    h.manager.abort(SESSION_ID);
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(routeSpec()).prompts).toEqual([]);
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'cancelled', lastMessageId: 'm1' }]);
+    expect(h.manager.hasPendingWork()).toBe(false);
+  });
+
+  it('fails a standalone compact when its close is not observed within the bounded wait', async () => {
+    const h = createHarness();
+    const timeouts = spyOn(globalThis, 'setTimeout');
+    try {
+      h.registerRoute(routeSpec());
+      h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+      await settle();
+      expect(h.manager.hasPendingWork()).toBe(true);
+      expect(outcomeFrames(h.frames)).toEqual([]);
+      const timeout = timeouts.mock.calls.find(([, ms]) => ms === 120_000)?.[0];
+      if (typeof timeout !== 'function') throw new Error('Compact completion timeout not armed');
+      timeout();
+      await settle();
+      expect(outcomeFrames(h.frames)).toMatchObject([
+        { status: 'failed', reason: 'prompt_failed', lastMessageId: 'c1' },
+      ]);
+      expect(h.manager.hasPendingWork()).toBe(false);
+    } finally {
+      h.manager.abort(SESSION_ID);
+      timeouts.mockRestore();
+    }
+  });
+
+  it('retires the old compact completion wait without failing its restart resubmission', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    await settle();
+    expect(h.client(routeSpec()).summaries).toHaveLength(2);
+    expect(h.client(routeSpec()).prompts).toEqual([]);
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(h.client(routeSpec()).prompts.map(call => call.messageId)).toEqual(['m1']);
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
   });
 
   it('drains the inbox when a heartbeat arrives after Kilo recovers', async () => {

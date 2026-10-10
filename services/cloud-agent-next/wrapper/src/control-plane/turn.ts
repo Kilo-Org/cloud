@@ -24,6 +24,7 @@ import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js'
 import type { KiloFeedEvent } from '../control/worktree-feed.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
+import { withTimeoutAndAbort } from '../utils.js';
 import { isUnresponsiveRestart, type KiloRestartInfo } from './kilo-runtime.js';
 import type {
   SessionSupervisor,
@@ -100,6 +101,7 @@ type PendingPrompt = {
   deliveryResumedAt?: number;
   nativeObserved?: boolean;
   acknowledged?: boolean;
+  onNativeClose?: () => void;
   abort: AbortController;
   message?: Promise<MaterializedPrompt>;
   /** The prompt, compact or command call has been made to Kilo. */
@@ -407,6 +409,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         continue;
       }
       turn.deferredCompletion = undefined;
+      for (const pending of turn.prompts) pending.onNativeClose?.();
       if (lastReceivedMessageId(turn) === deferred.lastMessageId) void finalize(turn);
     }
   }
@@ -501,6 +504,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
         });
       } else if (pending.payload.turn.command === 'compact') {
         if (model === undefined) throw new Error('Compact requires a model');
+        const nativeClose = Promise.withResolvers<void>();
+        pending.onNativeClose = nativeClose.resolve;
         markDispatched(turn, pending);
         const summarized = await client.summarizeSession({
           sessionId: route.kiloSessionId,
@@ -509,6 +514,22 @@ export function createTurnManager(deps: TurnManagerDeps) {
           model: { modelID: model },
         });
         if (!summarized) throw new Error('Session summarization failed');
+        if (!isCurrent()) return;
+        // The response can overtake the feed. Keep follow-ups undispatched until
+        // the compact's close is processed, so it cannot complete newer work.
+        try {
+          await withTimeoutAndAbort(nativeClose.promise, {
+            signal: dispatchSignal,
+            timeoutMs: PROMPT_DELIVERY_TIMEOUT_MS,
+            timeoutMessage: 'Compact completion was not observed',
+            abortMessage: 'Compact completion wait cancelled',
+          });
+        } catch (error) {
+          if (dispatchSignal.aborted) throw dispatchSignal.reason;
+          throw error;
+        } finally {
+          if (pending.onNativeClose === nativeClose.resolve) pending.onNativeClose = undefined;
+        }
       } else {
         markDispatched(turn, pending);
         await client.sendCommand({
@@ -1072,6 +1093,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
           }
           return;
         }
+        if (event.properties.reason === 'completed') {
+          for (const pending of turn.prompts) pending.onNativeClose?.();
+        }
       }
       if (event.type === 'message.updated') {
         const info = event.properties.info;
@@ -1119,6 +1143,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
             pending.dispatched = false;
             pending.nativeObserved = false;
             pending.acknowledged = false;
+            pending.onNativeClose = undefined;
             pending.receivedAt = now();
           }
           turn.submitting = Promise.resolve();
@@ -1230,11 +1255,12 @@ export function createTurnManager(deps: TurnManagerDeps) {
           turn.phase === 'finalizing' ||
           turn.prompts.some(
             entry =>
-              !entry.nativeObserved &&
-              // The live native execution running the serialized command owns compute,
-              // including sleeping while that command waits on the user.
-              !blockedBySerializedCommand(turn, entry) &&
-              !deliveryExpired(turn, entry)
+              entry.onNativeClose !== undefined ||
+              (!entry.nativeObserved &&
+                // The live native execution running the serialized command owns compute,
+                // including sleeping while that command waits on the user.
+                !blockedBySerializedCommand(turn, entry) &&
+                !deliveryExpired(turn, entry))
           )
       );
     },

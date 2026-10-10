@@ -57,7 +57,6 @@ export function CodeIndexingView({
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
 
-  // Fetch detailed organization stats
   const { data: orgStats, isLoading: isLoadingOrgStats } = useQuery({
     ...trpc.codeIndexing.getOrganizationStats.queryOptions({
       organizationId: organizationId || null,
@@ -66,7 +65,6 @@ export function CodeIndexingView({
 
   const projects = orgStats || [];
 
-  // Selected project for branch viewing and files
   const [selectedProjectForBranches, setSelectedProjectForBranches] = useState<string | null>(null);
   const [selectedProjectForFiles, setSelectedProjectForFiles] = useState<string | null>(null);
   const [selectedBranchForFiles, setSelectedBranchForFiles] = useState<string | null>(null);
@@ -75,7 +73,6 @@ export function CodeIndexingView({
   const [filesPage, setFilesPage] = useState(1);
   const filesPageSize = 15;
 
-  // Project sorting state - default to storage size
   const projectSortBy = 'storage';
 
   const queryClient = useQueryClient();
@@ -128,7 +125,6 @@ export function CodeIndexingView({
         } else {
           void queryClient.invalidateQueries(trpc.codeIndexing.pathFilter());
         }
-        // Clear selected project if it was deleted
         if (selectedProjectForBranches === projectId) {
           setSelectedProjectForBranches(null);
         }
@@ -243,7 +239,6 @@ export function CodeIndexingView({
     }
   };
 
-  // Search state
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [selectedBranch, setSelectedBranch] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -253,11 +248,9 @@ export function CodeIndexingView({
     query: string;
   } | null>(null);
 
-  // Get branches for search dropdown
   const searchProjectData = projects.find(p => p.project_id === selectedProject);
   const availableBranches = searchProjectData?.branches || [];
 
-  // Sort and filter projects
   const sortedProjects = useMemo(() => {
     const sorted = [...projects];
     if (projectSortBy === 'storage') {
@@ -270,7 +263,6 @@ export function CodeIndexingView({
     return sorted;
   }, [projects, projectSortBy]);
 
-  // Filter branches based on search query
   const selectedProjectData = projects.find(p => p.project_id === selectedProjectForBranches);
   const filteredBranches = useMemo(() => {
     if (!selectedProjectData) return [];
@@ -282,7 +274,6 @@ export function CodeIndexingView({
     return branches.filter(branch => branch.branch_name.toLowerCase().includes(query));
   }, [selectedProjectData, branchSearchQuery]);
 
-  // Fetch project files when a project is selected
   const { data: projectFiles, isLoading: isLoadingFiles } = useQuery({
     ...trpc.codeIndexing.getProjectFiles.queryOptions({
       organizationId: organizationId || null,
@@ -295,7 +286,6 @@ export function CodeIndexingView({
     enabled: !!selectedProjectForFiles,
   });
 
-  // Search results - only runs when submittedSearch is set
   const { data: searchResults, isLoading: isSearching } = useQuery({
     ...trpc.codeIndexing.search.queryOptions({
       organizationId: organizationId,
@@ -316,7 +306,6 @@ export function CodeIndexingView({
     }
   };
 
-  // Reset search when project or branch changes
   const handleProjectChange = (value: string) => {
     setSelectedProject(value);
     setSelectedBranch('');

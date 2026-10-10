@@ -4,7 +4,7 @@ import type { GET as RouteGet } from './route';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
-jest.mock('@/lib/redis', () => ({
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: {
     get: jest.fn<() => Promise<string | null>>().mockResolvedValue(null),
     set: jest.fn<() => Promise<string>>().mockResolvedValue('OK'),

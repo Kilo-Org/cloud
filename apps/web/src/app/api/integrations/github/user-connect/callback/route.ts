@@ -2,8 +2,8 @@ import type { NextRequest } from 'next/server';
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { APP_URL } from '@/lib/constants';
-import { getUserFromAuth } from '@/lib/user/server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { consumeGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
 import { exchangeAndStoreGitHubUserAuthorization } from '@/lib/integrations/platforms/github/user-authorization';
 

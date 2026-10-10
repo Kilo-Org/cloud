@@ -7,11 +7,13 @@ const mockIntegrationsCard = jest.fn(() => null);
 
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuanceOrRedirect: mockGetUserForCredentialIssuance,
 }));
-jest.mock('@/lib/tokens', () => ({ generateApiToken: mockGenerateApiToken }));
-jest.mock('@/lib/customerInfo', () => ({ getCustomerInfo: mockGetCustomerInfo }));
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({ generateApiToken: mockGenerateApiToken }));
+jest.mock('@kilocode/web-shared/lib/customerInfo', () => ({
+  getCustomerInfo: mockGetCustomerInfo,
+}));
 jest.mock('@/components/auth/getExtensionUrl', () => ({
   getExtensionUrl: jest.fn(() => ({ ideName: 'VS Code' })),
 }));
@@ -51,10 +53,12 @@ jest.mock('@/components/auto-routing/AutoRoutingModeCard', () => ({
 }));
 jest.mock('@/components/profile/DeleteAccountDialog', () => ({ DeleteAccountDialog: () => null }));
 jest.mock('@/lib/user', () => ({ getOAuthDisplayNames: jest.fn(() => new Map()) }));
-jest.mock('@/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   getUserOrganizationsWithSeats: jest.fn(() => []),
 }));
-jest.mock('@/lib/posthog-feature-flags', () => ({ isFeatureFlagEnabled: jest.fn(() => false) }));
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
+  isFeatureFlagEnabled: jest.fn(() => false),
+}));
 jest.mock('@/lib/contributor-champions/service', () => ({
   getContributorChampionProfileBadgeForUser: jest.fn(() => null),
 }));

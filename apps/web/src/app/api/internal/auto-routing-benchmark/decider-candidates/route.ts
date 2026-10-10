@@ -7,7 +7,7 @@ import {
   AUTO_DECIDER_MIN_COST_USD,
   listAutoRoutingDeciderCandidates,
 } from '@/lib/model-stats/auto-routing-decider-candidates';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 function parseCostBound(value: string | null, fallback: number): number {
   if (value === null) return fallback;

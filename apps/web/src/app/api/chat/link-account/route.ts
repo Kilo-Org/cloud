@@ -1,5 +1,5 @@
 import { bot } from '@/lib/bot';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { captureException } from '@sentry/nextjs';
 import { after } from 'next/server';
 import {
@@ -8,7 +8,7 @@ import {
   verifyLinkToken,
   type PlatformIdentity,
 } from '@/lib/bot-identity';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import {
   canKiloUserAccessPlatformIntegration,
   getPlatformIntegration,

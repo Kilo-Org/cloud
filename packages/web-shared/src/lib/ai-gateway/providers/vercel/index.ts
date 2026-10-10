@@ -1,0 +1,322 @@
+import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { VercelUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  DirectUserByokInferenceProviderIdSchema,
+  AzureCredentialsSchema,
+  BedrockCredentialsSchema,
+  normalizeVercelInferenceProviderIdForRouting,
+  openRouterToVercelInferenceProviderId,
+  VertexCredentialsSchema,
+  VercelUserByokInferenceProviderIdSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type {
+  GatewayRequest,
+  OpenRouterProviderConfig,
+  VercelInferenceProviderConfig,
+  VercelProviderConfig,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import {
+  getCachedVercelInferenceProviderIdsForModel,
+  getVercelModelsFromDatabase,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import type { GatewayProviderOptions } from '@ai-sdk/gateway';
+import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
+import { passesRoutingPercentage } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-percentage';
+
+export function hasCompatibleVercelInferenceProvider(
+  openRouterInferenceProviders: string[],
+  vercelInferenceProviders: string[] | null
+) {
+  if (!vercelInferenceProviders) {
+    return true;
+  }
+
+  return openRouterInferenceProviders.some(provider => {
+    const vercelProviderId = openRouterToVercelInferenceProviderId(provider);
+    return vercelInferenceProviders
+      .map(providerId => normalizeVercelInferenceProviderIdForRouting(providerId))
+      .includes(vercelProviderId);
+  });
+}
+
+export function getVercelInferenceProvidersExcludingIgnored(
+  ignoredProviders: string[],
+  onlyProviders: string[] | undefined,
+  vercelInferenceProviders: string[]
+) {
+  const ignored = new Set(ignoredProviders.map(openRouterToVercelInferenceProviderId));
+  const only = onlyProviders
+    ? new Set(onlyProviders.map(openRouterToVercelInferenceProviderId))
+    : null;
+
+  return [
+    ...new Set(
+      vercelInferenceProviders
+        .map(providerId => normalizeVercelInferenceProviderIdForRouting(providerId))
+        .filter(provider => !ignored.has(provider) && (!only || only.has(provider)))
+    ),
+  ];
+}
+
+export function passesVercelRoutingPercentage(randomSeed: string, routingPercentage: number) {
+  return passesRoutingPercentage('vercel', randomSeed, routingPercentage);
+}
+
+export function isVercelRoutingOptOut(requestedModel: string, optOutModels: ReadonlySet<string>) {
+  return optOutModels.has(requestedModel);
+}
+
+export async function shouldRouteToVercel(
+  requestedModel: string,
+  request: GatewayRequest,
+  randomSeed: string,
+  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
+) {
+  const routingConfig = await getRuntimeGatewayRoutingConfig();
+  if (isVercelRoutingOptOut(requestedModel, routingConfig.vercelOptOutModels)) {
+    console.debug(`[shouldRouteToVercel] model ${requestedModel} opted out of Vercel routing`);
+    return false;
+  }
+
+  console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
+  const routingPercentage = isFreeModel(requestedModel)
+    ? routingConfig.vercelFree
+    : routingConfig.vercelPaid;
+
+  const passedRandomization = passesVercelRoutingPercentage(randomSeed, routingPercentage);
+
+  if (!passedRandomization) {
+    return false;
+  }
+
+  const vercelModels = await getVercelModelsFromDatabase();
+  const vercelModelId = await mapModelIdToVercel(requestedModel);
+  if (!vercelModels.has(vercelModelId)) {
+    console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
+    return false;
+  }
+
+  const provider = await getRoutingProviderConfig();
+  if (provider && (provider.only || provider.ignore?.length)) {
+    const { only, ignore } = provider;
+    const vercelInferenceProviders =
+      await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
+
+    if (ignore?.length) {
+      if (!vercelInferenceProviders) {
+        console.debug(
+          '[shouldRouteToVercel] not routing to Vercel because inference provider data is unavailable'
+        );
+        return false;
+      }
+
+      const effectiveOnly = getVercelInferenceProvidersExcludingIgnored(
+        ignore,
+        only,
+        vercelInferenceProviders
+      );
+      if (effectiveOnly.length === 0) {
+        console.debug(
+          '[shouldRouteToVercel] no inference providers remain after applying provider preferences'
+        );
+        return false;
+      }
+    } else if (only && !hasCompatibleVercelInferenceProvider(only, vercelInferenceProviders)) {
+      console.debug(
+        '[shouldRouteToVercel] none of the requested inference providers are available on Vercel'
+      );
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function convertProviderSort(
+  sort: OpenRouterProviderConfig['sort']
+): GatewayProviderOptions['sort'] {
+  switch (sort) {
+    case 'price':
+      return 'cost';
+    case 'throughput':
+      return 'tps';
+    case 'latency':
+      return 'ttft';
+    default:
+      return undefined;
+  }
+}
+
+export function convertProviderOptions(
+  requestToMutate: GatewayRequest,
+  vercelInferenceProviders: string[] | null
+): VercelProviderConfig {
+  const provider = requestToMutate.body.provider;
+  const only = (() => {
+    if (!provider?.ignore?.length) {
+      return provider?.only?.map(openRouterToVercelInferenceProviderId);
+    }
+    if (!vercelInferenceProviders) {
+      if (provider.only) {
+        return getVercelInferenceProvidersExcludingIgnored(
+          provider.ignore,
+          provider.only,
+          provider.only.map(openRouterToVercelInferenceProviderId)
+        );
+      }
+      throw new Error('Vercel inference provider data became unavailable during request transform');
+    }
+    return getVercelInferenceProvidersExcludingIgnored(
+      provider.ignore,
+      provider.only,
+      vercelInferenceProviders
+    );
+  })();
+
+  const serviceTier = requestToMutate.body.service_tier;
+  return {
+    gateway: {
+      only,
+      order: provider?.order?.map(openRouterToVercelInferenceProviderId),
+      sort: convertProviderSort(provider?.sort),
+      zeroDataRetention: provider?.zdr,
+      disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
+      models: requestToMutate.body.models,
+      serviceTier: serviceTier === 'flex' || serviceTier === 'priority' ? serviceTier : undefined,
+    },
+  };
+}
+
+function parseCredentials<T>(
+  input: string,
+  schema: { parse(input: unknown): T },
+  providerName: string
+): T {
+  try {
+    return schema.parse(JSON.parse(input));
+  } catch {
+    throw new Error(`Failed to parse ${providerName} credentials`);
+  }
+}
+
+export function getAnthropicProviderOptionsForVercel(
+  request: GatewayRequest
+): AnthropicProviderOptions | undefined {
+  const anthropicOptions: AnthropicProviderOptions = {};
+
+  if (request.kind === 'chat_completions' && request.body.verbosity) {
+    anthropicOptions.effort = request.body.verbosity;
+  }
+  if (request.kind === 'responses' && request.body.text?.verbosity) {
+    anthropicOptions.effort = request.body.text.verbosity;
+  }
+
+  if (Object.keys(anthropicOptions).length === 0) {
+    return undefined;
+  }
+
+  return anthropicOptions;
+}
+
+export function getVercelInferenceProviderConfigForUserByok(
+  provider: BYOKResult
+): [VercelUserByokInferenceProviderId, VercelInferenceProviderConfig[]] {
+  const key =
+    provider.providerId === DirectUserByokInferenceProviderIdSchema.enum.codestral
+      ? VercelUserByokInferenceProviderIdSchema.enum.mistral
+      : VercelUserByokInferenceProviderIdSchema.parse(provider.providerId);
+
+  const list = new Array<VercelInferenceProviderConfig>();
+
+  if (key === VercelUserByokInferenceProviderIdSchema.enum.zai) {
+    // Z.ai Coding Plan support
+    // ideally we remove this and have people use the explicit Z.ai Coding Plan option,
+    // but that's a breaking change
+    list.push({
+      apiKey: provider.decryptedAPIKey,
+      baseURL: 'https://api.z.ai/api/coding/paas/v4',
+    });
+  }
+
+  if (key === VercelUserByokInferenceProviderIdSchema.enum.azure) {
+    list.push(parseCredentials(provider.decryptedAPIKey, AzureCredentialsSchema, 'Azure'));
+  } else if (key === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
+    list.push(parseCredentials(provider.decryptedAPIKey, BedrockCredentialsSchema, 'AWS'));
+  } else if (key === VercelUserByokInferenceProviderIdSchema.enum.vertex) {
+    list.push(parseCredentials(provider.decryptedAPIKey, VertexCredentialsSchema, 'Google Vertex'));
+  } else {
+    list.push({ apiKey: provider.decryptedAPIKey });
+  }
+  return [key, list];
+}
+
+export async function applyVercelSettings(
+  requestedModel: string,
+  requestToMutate: GatewayRequest,
+  userByok: BYOKResult[] | null
+) {
+  const vercelModelId = await mapModelIdToVercel(requestedModel);
+  requestToMutate.body.model = vercelModelId;
+
+  if (userByok) {
+    if (userByok.length === 0) {
+      throw new Error('Invalid state: userByok should be null or not empty');
+    }
+    // Only honor the caller's own `provider.ignore` here. The organization /
+    // group `provider.only` allow-list must NOT constrain BYOK selection:
+    // direct BYOK uses the user's own credentials and is intentionally exempt
+    // from organization model/provider restrictions (see ai-gateway AGENTS.md).
+    // Filtering by it also silently drops providers whose OpenRouter slug has
+    // no Vercel BYOK equivalent, turning previously working requests into hard
+    // failures.
+    const ignoredProviders = new Set(
+      (requestToMutate.body.provider?.ignore ?? []).map(openRouterToVercelInferenceProviderId)
+    );
+    const allByokProviders: Record<string, VercelInferenceProviderConfig[]> = {};
+    const retainedByokProviders: Record<string, VercelInferenceProviderConfig[]> = {};
+    for (const provider of userByok) {
+      const [key, list] = getVercelInferenceProviderConfigForUserByok(provider);
+      allByokProviders[key] = [...(allByokProviders[key] ?? []), ...list];
+      if (!ignoredProviders.has(key)) {
+        retainedByokProviders[key] = [...(retainedByokProviders[key] ?? []), ...list];
+      }
+    }
+    // `provider.ignore` is a routing preference, not an authorization boundary,
+    // so it must never remove the last BYOK credential. An empty map would send
+    // `only: []` with `byok: {}`, dropping BYOK pinning so inference bills Kilo's
+    // Vercel account, while the request still counts as BYOK downstream and skips
+    // the zero-balance rejection in the gateway route.
+    const byokProviders =
+      Object.keys(retainedByokProviders).length > 0 ? retainedByokProviders : allByokProviders;
+
+    // Pass request-scoped credentials and restrict routing to the corresponding providers.
+    requestToMutate.body.providerOptions = {
+      gateway: {
+        only: Object.keys(byokProviders),
+        sort: convertProviderSort(requestToMutate.body.provider?.sort),
+        byok: byokProviders,
+        models: requestToMutate.body.models,
+      },
+    };
+  } else {
+    const vercelInferenceProviders =
+      await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
+    requestToMutate.body.providerOptions = convertProviderOptions(
+      requestToMutate,
+      vercelInferenceProviders
+    );
+  }
+
+  if (requestToMutate.body.providerOptions) {
+    const anthropicOptions = getAnthropicProviderOptionsForVercel(requestToMutate);
+    if (anthropicOptions) {
+      requestToMutate.body.providerOptions.anthropic = anthropicOptions;
+    }
+  }
+
+  delete requestToMutate.body.provider;
+  delete requestToMutate.body.models;
+}

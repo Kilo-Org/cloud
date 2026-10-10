@@ -10,18 +10,9 @@ import { Readable, type PassThrough } from 'stream';
 import type { DeploymentFile } from './types';
 import { getMimeType } from './utils';
 
-// Type for the sandbox stub returned by getSandbox()
 type SandboxStub = Awaited<ReturnType<typeof getSandbox>>;
 
-/**
- * List all files recursively in a directory using the sandbox.
- *
- * @param sandbox - The Cloudflare Sandbox instance
- * @param root - Root directory path to search (e.g., "/workspace/result/assets")
- * @returns Array of file paths relative to root
- */
 export async function listFilesRecursive(sandbox: SandboxStub, root: string): Promise<string[]> {
-  // Execute find command to list all files recursively
   const result = await sandbox.exec(`find ${root} -type f`);
 
   if (!result.success) {
@@ -33,16 +24,13 @@ export async function listFilesRecursive(sandbox: SandboxStub, root: string): Pr
     return [];
   }
 
-  // Parse output into file paths
   const files = result.stdout
     .split('\n')
     .map((line: string) => line.trim())
     .filter((line: string) => line.length > 0)
     .map((path: string) => {
-      // Strip root prefix to get relative paths
       if (path.startsWith(root)) {
         const relativePath = path.slice(root.length);
-        // Remove leading slash if present
         return relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
       }
       return path;
@@ -59,7 +47,6 @@ export async function readFileAsBuffer(session: ExecutionSession, path: string):
   // Escape path for shell command
   const escapedPath = path.replace(/'/g, "'\\''");
 
-  // First, get file metadata to determine size and if it's binary
   const statResult = await session.exec(`stat -c '%s' '${escapedPath}' 2>/dev/null`);
 
   if (!statResult.success || statResult.exitCode !== 0) {
@@ -71,7 +58,6 @@ export async function readFileAsBuffer(session: ExecutionSession, path: string):
     throw new Error(`Invalid file size for ${path}`);
   }
 
-  // Read file in chunks
   const chunkSize = 65535 * 40;
   let bytesRead = 0;
   let blockNumber = 0;
@@ -110,7 +96,6 @@ export async function readFileAsBuffer(session: ExecutionSession, path: string):
       break;
     }
 
-    // Convert chunk to Buffer
     const chunkBuffer = Buffer.from(chunkData, 'base64');
     chunks.push(chunkBuffer);
 
@@ -118,19 +103,9 @@ export async function readFileAsBuffer(session: ExecutionSession, path: string):
     blockNumber++;
   }
 
-  // Concatenate all chunks into a single Buffer
   return Buffer.concat(chunks);
 }
 
-/**
- * Read a folder from the sandbox by creating a tar archive, reading it, and extracting locally.
- * This is useful for efficiently transferring entire directory structures from the sandbox.
- *
- * @param session - The Cloudflare Sandbox ExecutionSession instance
- * @param folderPath - Absolute path to the folder in the sandbox
- * @param excludePatterns - Optional array of patterns to exclude (e.g., ['node_modules', '*.log', '.git'])
- * @returns Array of DeploymentFile objects with paths relative to the archived folder and their contents as buffers
- */
 export async function readFolderAsArchive(
   session: ExecutionSession,
   folderPath: string,
@@ -139,7 +114,6 @@ export async function readFolderAsArchive(
   // Escape path for shell command
   const escapedPath = folderPath.replace(/'/g, "'\\''");
 
-  // Create a temporary tar file in the sandbox using a UUID
   const tmpArchivePath = `/tmp/folder-archive-${crypto.randomUUID()}.tar`;
   const escapedArchivePath = tmpArchivePath.replace(/'/g, "'\\''");
 
@@ -158,14 +132,12 @@ export async function readFolderAsArchive(
   try {
     const archiveBuffer = await readFileAsBuffer(session, tmpArchivePath);
 
-    // Extract the archive
     const files: DeploymentFile[] = [];
 
     const bufferStream = Readable.from(archiveBuffer);
     const extractStream = extract();
 
     extractStream.on('entry', (header: Headers, stream: PassThrough, next: () => void) => {
-      // Only process files, not directories
       if (header.type === 'file') {
         const chunks: Buffer[] = [];
 
@@ -177,7 +149,6 @@ export async function readFolderAsArchive(
           const fileBuffer = Buffer.concat(chunks);
           const mimeType = getMimeType(header.name);
 
-          // Normalize path: remove leading "./" or "/"
           let normalizedPath = header.name;
           if (normalizedPath.startsWith('./')) {
             normalizedPath = normalizedPath.slice(2);
@@ -197,13 +168,11 @@ export async function readFolderAsArchive(
           throw new Error(`Error reading file ${header.name} from archive: ${err.message}`);
         });
       } else {
-        // Skip directories
         stream.resume();
         next();
       }
     });
 
-    // Process the archive
     await pipeline(bufferStream, extractStream);
 
     return files;

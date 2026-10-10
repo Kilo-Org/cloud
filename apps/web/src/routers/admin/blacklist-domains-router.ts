@@ -1,15 +1,15 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { redisClient } from '@/lib/redis';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 import {
   BlacklistDomainsConfigSchema,
   BlacklistDomainsInputSchema,
   DEFAULT_BLACKLIST_DOMAINS_CONFIG,
   getBlacklistedDomains,
-} from '@/lib/blacklist-domains-config';
-import { BLACKLIST_DOMAINS_REDIS_KEY } from '@/lib/redis-keys';
-import type { BlacklistDomainsConfig } from '@/lib/blacklist-domains-config';
+} from '@kilocode/web-shared/lib/blacklist-domains-config';
+import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
+import type { BlacklistDomainsConfig } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { TRPCError } from '@trpc/server';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { sql, count, isNotNull, desc, min, max } from 'drizzle-orm';
 import * as z from 'zod';

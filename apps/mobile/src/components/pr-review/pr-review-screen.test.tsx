@@ -1,8 +1,5 @@
 /* eslint-disable max-lines -- Submit-review, share, merge, and inset reachability tests share the direct-invocation screen harness. */
-// P1-F-46b: the "Submit review" affordance must be reachable from the
-// Overview tab (header right) and the Files tab (floating action bar,
-// see `pr-diff-floating-actions.test.tsx`). The Discussion tab is
-// intentionally left without a submit affordance.
+// Share, Submit review, and Merge remain in the header on every tab.
 //
 // This test renders the screen shell as a plain function call (the
 // same pattern used by `pr-merge-sheet.test.tsx`) and walks the
@@ -53,7 +50,7 @@ vi.mock('react', async () => {
     }),
     useEffect: vi.fn((_effect: React.EffectCallback) => {
       // no-op; the recents backfill and merge banner focus effect
-      // aren't part of P1-F-46b's reachability contract.
+      // aren't part of the header actions' reachability contract.
     }),
     useCallback: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => fn),
   };
@@ -233,7 +230,7 @@ function findScreenHeaderSubmitButton(): React.ReactElement | null {
   });
 }
 
-describe('PrReviewScreen Submit review reachability (P1-F-46b)', () => {
+describe('PrReviewScreen Submit review reachability', () => {
   beforeEach(() => {
     routerPush.mockClear();
   });
@@ -245,6 +242,52 @@ describe('PrReviewScreen Submit review reachability (P1-F-46b)', () => {
     const button = findScreenHeaderSubmitButton();
     expect(button).not.toBeNull();
   });
+
+  it.each(['overview', 'files', 'discussion'] as const)(
+    'keeps compact actions on the %s tab',
+    tab => {
+      vi.mocked(React.useState).mockReturnValueOnce([tab, vi.fn<() => void>()]);
+      // eslint-disable-next-line new-cap
+      const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+      for (const label of ['Share pull request', 'Submit review', 'Merge now']) {
+        const button = findElement({
+          node: element,
+          type: 'Button',
+          prop: 'accessibilityLabel',
+          value: label,
+        });
+        expect(button).not.toBeNull();
+        expect(button?.props).toEqual(expect.objectContaining({ size: 'icon' }));
+        if (label !== 'Merge now') {
+          expect(button?.props).toEqual(expect.objectContaining({ disabled: false }));
+        }
+      }
+      const submit = findElement({
+        node: element,
+        type: 'Button',
+        prop: 'accessibilityLabel',
+        value: 'Submit review',
+      });
+      const submitProps = submit?.props as { onPress: () => void };
+      submitProps.onPress();
+      expect(routerPush).toHaveBeenCalledWith({
+        pathname: '/(app)/pr-review/[owner]/[repo]/[number]/review-submit',
+        params: { owner: 'octocat', repo: 'hello', number: 7 },
+      });
+      expect(
+        findElement({
+          node: element,
+          type: {
+            overview: 'PrReviewOverview',
+            files: 'PrReviewFilesTab',
+            discussion: 'PrReviewDiscussionTab',
+          }[tab],
+          prop: 'owner',
+          value: 'octocat',
+        })
+      ).not.toBeNull();
+    }
+  );
 
   it('navigates to the review-submit route with owner/repo/number on press (Overview)', () => {
     const button = findScreenHeaderSubmitButton();
@@ -260,79 +303,30 @@ describe('PrReviewScreen Submit review reachability (P1-F-46b)', () => {
       params: { owner: 'octocat', repo: 'hello', number: 7 },
     });
   });
-});
 
-// The header clamps a trailing action to half the row (ScreenHeader's
-// `max-w-[50%]`) and the Button's own base is `shrink-0`, so a label that
-// cannot shrink keeps its width and is clipped by the screen edge at large font
-// scales — the explorer found the Overview "Submit review" label cut off at
-// font scale 2 (#6328). The button must bound itself with a hard max-w cap
-// while keeping the shrink allowance, so the label wraps in place instead of
-// clipping.
-describe('PrReviewScreen Submit review header fit', () => {
-  function findSubmitButton(): React.ReactElement | null {
-    // eslint-disable-next-line new-cap
-    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
-    return findElement({
-      node: element,
-      type: 'Button',
-      prop: 'accessibilityLabel',
-      value: 'Submit review',
-    });
-  }
-
-  it('bounds the Submit review button so its label cannot push the cluster off-screen', () => {
-    const button = findSubmitButton();
-    if (!button) {
-      throw new Error('Submit review button not found');
+  it.each([
+    {
+      ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 12 },
+      href: '/(app)/pr-review/gitlab/group/repo/12/review-submit',
+    },
+    {
+      ref: { platform: 'bitbucket', workspace: 'team', repoSlug: 'repo', prId: 12 },
+      href: '/(app)/pr-review/bitbucket/team/repo/12/review-submit',
+    },
+  ])('keeps the $ref.platform review-submit route', ({ ref, href }) => {
+    vi.mocked(React.useContext).mockReturnValue({ ref, organizationId: 'org' });
+    try {
+      const button = findScreenHeaderSubmitButton();
+      if (!button) {
+        throw new Error('Provider Submit review button not found');
+      }
+      expect(button.props).toEqual(expect.objectContaining({ disabled: false }));
+      const buttonProps = button.props as { onPress: () => void };
+      buttonProps.onPress();
+      expect(routerPush).toHaveBeenCalledWith(href);
+    } finally {
+      vi.mocked(React.useContext).mockReturnValue(null);
     }
-    const className = (button.props as { className?: string }).className ?? '';
-    // Widest the button may be with the Share and Merge icon buttons beside it
-    // on the narrowest supported 320 dp viewport: 132 dp of row (288 dp of
-    // px-4 content − 48 dp back control + gap − 12 dp cluster margin − 96 dp
-    // Share/Merge cluster) plus the 16 dp gutter that keeps an at-cap cluster
-    // on-screen. Without a cap the font-scale-2 label pushed the cluster past
-    // the screen edge (#6328); the regression cannot come back uncapped.
-    const cap = /max-w-\[(\d+)px\]/.exec(className);
-    if (!cap) {
-      throw new Error('Submit review button has no max-w cap');
-    }
-    expect(Number(cap[1])).toBeLessThanOrEqual(148);
-  });
-
-  it('keeps the Submit review button shrinkable so the label wraps inside the cap', () => {
-    const button = findSubmitButton();
-    if (!button) {
-      throw new Error('Submit review button not found');
-    }
-    const className = (button.props as { className?: string }).className ?? '';
-    expect(className).toContain('shrink');
-    expect(className).not.toContain('shrink-0');
-    expect(className).toContain('min-w-0');
-  });
-
-  it('lets the Submit review label wrap instead of drawing off-screen', () => {
-    const button = findSubmitButton();
-    if (!button) {
-      throw new Error('Submit review button not found');
-    }
-    const label = findElement({
-      node: button,
-      type: 'Text',
-      prop: 'className',
-      value: 'shrink text-center',
-    });
-    if (!label) {
-      throw new Error('Submit review label not found');
-    }
-    const labelProps = label.props as {
-      numberOfLines?: number;
-      allowFontScaling?: boolean;
-    };
-    // Wrapping, not truncation: no line cap and no disabled scaling, so a
-    // large font scale wraps the label inside the cap instead of clipping it.
-    expect(labelProps.numberOfLines).toBeUndefined();
-    expect(labelProps.allowFontScaling).not.toBe(false);
   });
 });
 
@@ -406,17 +400,39 @@ describe('PrReviewScreen share action', () => {
       message: 'Fix the thing\nhttps://github.com/octocat/hello/pull/7',
     });
   });
+
+  it('keeps Share disabled when a provider URL is unavailable', () => {
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 12 },
+      organizationId: null,
+    });
+    try {
+      // eslint-disable-next-line new-cap
+      const element = PrReviewScreen({ owner: 'group', repo: 'repo', number: 12 });
+      const button = findElement({
+        node: element,
+        type: 'Button',
+        prop: 'accessibilityLabel',
+        value: 'Share merge request',
+      });
+      expect(button).not.toBeNull();
+      expect(button?.props).toEqual(expect.objectContaining({ disabled: true }));
+      const buttonProps = button?.props as { onPress: () => void };
+      buttonProps.onPress();
+      expect(shareMock).not.toHaveBeenCalled();
+    } finally {
+      vi.mocked(React.useContext).mockReturnValue(null);
+    }
+  });
 });
 
-// Owner request item 3: the header carries a Merge icon button while the PR is
-// mergeable, opening the same merge sheet the Overview section pushes. A
-// merged/closed PR keeps Share + Submit review and gains no Merge affordance.
-describe('PrReviewScreen Merge action (owner request item 3)', () => {
+describe('PrReviewScreen Merge action', () => {
   const MERGEABLE_OVERVIEW = {
     state: 'open',
     mergeable: true,
     mergeableState: 'clean',
     number: 7,
+    counts: { changedFiles: 1 },
     repo: { allowMergeCommit: true, allowSquashMerge: true, allowRebaseMerge: false },
   };
 
@@ -449,35 +465,52 @@ describe('PrReviewScreen Merge action (owner request item 3)', () => {
     expect(findHeaderMergeButton()).not.toBeNull();
   });
 
-  it('opens the merge sheet with the default method on press', () => {
-    prQueryResult = {
-      data: MERGEABLE_OVERVIEW,
-      isLoading: false,
-      isError: false,
-      isFetching: false,
-    };
-    const button = findHeaderMergeButton();
-    if (!button) {
-      throw new Error('Merge button not found');
+  it.each(['overview', 'files', 'discussion'])(
+    'opens the merge confirmation sheet from %s',
+    tab => {
+      vi.mocked(React.useState).mockReturnValueOnce([tab, vi.fn<() => void>()]);
+      prQueryResult = {
+        data: MERGEABLE_OVERVIEW,
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+      };
+      const button = findHeaderMergeButton();
+      if (!button) {
+        throw new Error('Merge button not found');
+      }
+      expect(button.props).toEqual(expect.objectContaining({ disabled: false }));
+      const buttonProps = button.props as { onPress?: () => void };
+      buttonProps.onPress?.();
+
+      expect(routerPush).toHaveBeenCalledTimes(1);
+      expect(routerPush).toHaveBeenCalledWith({
+        pathname: '/(app)/pr-review/[owner]/[repo]/[number]/merge',
+        params: { owner: 'octocat', repo: 'hello', number: '7', mode: 'merge', method: 'merge' },
+      });
     }
-    const onPress = (button.props as { onPress?: () => void }).onPress;
-    onPress?.();
+  );
 
-    expect(routerPush).toHaveBeenCalledTimes(1);
-    expect(routerPush).toHaveBeenCalledWith({
-      pathname: '/(app)/pr-review/[owner]/[repo]/[number]/merge',
-      params: { owner: 'octocat', repo: 'hello', number: '7', mode: 'merge', method: 'merge' },
-    });
-  });
+  it.each(['merged', 'closed', 'open'])(
+    'disables Merge for an unavailable %s pull request',
+    state => {
+      prQueryResult = {
+        data: { state, mergeable: null, mergeableState: null },
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+      };
+      const button = findHeaderMergeButton();
+      expect(button).not.toBeNull();
+      expect(button?.props).toEqual(expect.objectContaining({ disabled: true }));
+    }
+  );
 
-  it('does not render the Merge affordance for a merged pull request', () => {
-    prQueryResult = {
-      data: { state: 'merged', mergeable: null, mergeableState: null },
-      isLoading: false,
-      isError: false,
-      isFetching: false,
-    };
-    expect(findHeaderMergeButton()).toBeNull();
+  it('disables Merge while the PR data has not loaded', () => {
+    prQueryResult = { data: undefined, isLoading: true, isError: false, isFetching: false };
+    const button = findHeaderMergeButton();
+    expect(button).not.toBeNull();
+    expect(button?.props).toEqual(expect.objectContaining({ disabled: true }));
   });
 
   it('offers Merge for an open provider merge request and pushes its own sheet route', () => {
@@ -677,56 +710,58 @@ describe('PrReviewScreen recents backfill per provider', () => {
   });
 });
 
-// The header reserves the width of the trailing cluster this screen renders,
-// so it can reflow the actions onto their own row before the title is squeezed
-// (the finding: PR review at 320 dp with a font scale of 2).
-describe('PrReviewScreen header trailing cluster width', () => {
-  const MERGEABLE_OVERVIEW = {
-    state: 'open',
-    mergeable: true,
-    mergeableState: 'clean',
-    number: 7,
-    repo: { allowMergeCommit: true, allowSquashMerge: true, allowRebaseMerge: false },
-  };
-
-  it('declares the width of the controls it renders', () => {
-    prQueryResult = {
-      data: MERGEABLE_OVERVIEW,
-      isLoading: false,
-      isError: false,
-      isFetching: false,
-    };
-    // eslint-disable-next-line new-cap
-    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
-    // Share 44 + `gap-1` 4 + Submit review 140 + `gap-1` 4 + Merge 44.
-    expect(
-      findElement({
-        node: element,
-        type: 'ScreenHeader',
-        prop: 'headerRightWidth',
-        value: 236,
-      })
-    ).not.toBeNull();
+describe('PrReviewScreen fixed header and disabled actions', () => {
+  afterEach(() => {
+    vi.mocked(React.useContext).mockReturnValue(null);
   });
 
-  it('leaves out a control this screen does not render', () => {
-    // A merged PR renders no Merge action: Share 44 + `gap-1` 4 + Submit 140.
-    prQueryResult = {
-      data: { state: 'merged', mergeable: null, mergeableState: null },
-      isLoading: false,
-      isError: false,
-      isFetching: false,
-    };
+  it('keeps the title single-line and opts out of action stacking', () => {
     // eslint-disable-next-line new-cap
     const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
-    expect(
-      findElement({
+    const header = findElement({
+      node: element,
+      type: 'ScreenHeader',
+      prop: 'allowHeaderRightStacking',
+      value: false,
+    });
+    expect(header).not.toBeNull();
+    expect(header?.props).toEqual(expect.objectContaining({ titleNumberOfLines: 1 }));
+  });
+
+  it('disables all actions after the initial load fails', () => {
+    prQueryResult = { data: undefined, isLoading: false, isError: true, isFetching: false };
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    for (const label of ['Share pull request', 'Submit review', 'Merge now']) {
+      const button = findElement({
         node: element,
-        type: 'ScreenHeader',
-        prop: 'headerRightWidth',
-        value: 188,
-      })
-    ).not.toBeNull();
+        type: 'Button',
+        prop: 'accessibilityLabel',
+        value: label,
+      });
+      expect(button).not.toBeNull();
+      expect(button?.props).toEqual(expect.objectContaining({ disabled: true }));
+    }
+  });
+
+  it('disables Review and Merge at the Bitbucket organization boundary', () => {
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: { platform: 'bitbucket', workspace: 'team', repoSlug: 'repo', prId: 7 },
+      organizationId: null,
+    });
+    prQueryResult = { data: undefined, isLoading: true, isError: false, isFetching: false };
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'team', repo: 'repo', number: 7 });
+    for (const label of ['Submit review', 'Merge now']) {
+      const button = findElement({
+        node: element,
+        type: 'Button',
+        prop: 'accessibilityLabel',
+        value: label,
+      });
+      expect(button).not.toBeNull();
+      expect(button?.props).toEqual(expect.objectContaining({ disabled: true }));
+    }
   });
 });
 

@@ -9,6 +9,7 @@ import {
   glanceableAgentsSnapshotSchema,
   glanceableStatusKind,
   isEligibleGlanceableWork,
+  isStartableGlanceableWork,
   newestGlanceableResult,
   oldestNeedsInputSince,
   shouldDiscardGlanceableRevision,
@@ -28,7 +29,7 @@ describe('countGlanceableSessions', () => {
       { status: 'idle' },
       { status: 'idle' },
     ]);
-    expect(counts).toEqual({ running: 2, needsInput: 4, idle: 2 });
+    expect(counts).toEqual({ running: 2, needsInput: 4, idle: 2, scheduled: 0 });
   });
 
   it('counts Cloud Agent-shaped and CLI-shaped rows together on status alone', () => {
@@ -38,6 +39,7 @@ describe('countGlanceableSessions', () => {
       running: 1,
       needsInput: 1,
       idle: 0,
+      scheduled: 0,
     });
   });
 
@@ -46,7 +48,17 @@ describe('countGlanceableSessions', () => {
       running: 0,
       needsInput: 0,
       idle: 2,
+      scheduled: 0,
     });
+  });
+
+  it('counts a scheduled row as scheduled, not idle or running', () => {
+    expect(
+      countGlanceableSessions([
+        { status: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+        { status: 'scheduled' },
+      ])
+    ).toEqual({ running: 0, needsInput: 0, idle: 0, scheduled: 2 });
   });
 
   it('counts completed, failed, unknown, and empty statuses as running', () => {
@@ -57,7 +69,7 @@ describe('countGlanceableSessions', () => {
         { status: 'mystery' },
         { status: '' },
       ])
-    ).toEqual({ running: 4, needsInput: 0, idle: 0 });
+    ).toEqual({ running: 4, needsInput: 0, idle: 0, scheduled: 0 });
   });
 });
 
@@ -67,19 +79,19 @@ describe('countGlanceableApprovals', () => {
       label: 'permission-only',
       sessions: [{ status: 'permission' }],
       approvals: 1,
-      counts: { running: 0, needsInput: 1, idle: 0 },
+      counts: { running: 0, needsInput: 1, idle: 0, scheduled: 0 },
     },
     {
       label: 'question-only',
       sessions: [{ status: 'question' }],
       approvals: 0,
-      counts: { running: 0, needsInput: 1, idle: 0 },
+      counts: { running: 0, needsInput: 1, idle: 0, scheduled: 0 },
     },
     {
       label: 'retry-only',
       sessions: [{ status: 'retry' }],
       approvals: 0,
-      counts: { running: 0, needsInput: 1, idle: 0 },
+      counts: { running: 0, needsInput: 1, idle: 0, scheduled: 0 },
     },
     {
       label: 'mixed',
@@ -91,7 +103,7 @@ describe('countGlanceableApprovals', () => {
         { status: 'idle' },
       ],
       approvals: 1,
-      counts: { running: 1, needsInput: 3, idle: 1 },
+      counts: { running: 1, needsInput: 3, idle: 1, scheduled: 0 },
     },
   ] as const;
 
@@ -139,6 +151,17 @@ describe('glanceableStatusKind', () => {
 
   it('maps idle to idle', () => {
     expect(glanceableStatusKind('idle')).toBe('idle');
+  });
+
+  it('maps the literal scheduled status to scheduled', () => {
+    expect(glanceableStatusKind('scheduled')).toBe('scheduled');
+  });
+
+  it('maps an unknown status kind to running, never idle', () => {
+    expect(glanceableStatusKind('mystery')).toBe('running');
+    expect(glanceableStatusKind('mystery')).not.toBe('idle');
+    expect(glanceableStatusKind('')).toBe('running');
+    expect(glanceableStatusKind('')).not.toBe('idle');
   });
 });
 
@@ -278,6 +301,56 @@ describe('buildGlanceableSnapshot', () => {
     }
   });
 
+  it('parses a version-1 record written before the scheduled fields existed', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    const { scheduled: _scheduled, scheduledAt: _scheduledAt, ...previousRelease } = snapshot;
+
+    const result = glanceableAgentsSnapshotSchema.safeParse(previousRelease);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.scheduled).toBe(0);
+      expect(result.data.scheduledAt).toBeNull();
+    }
+  });
+
+  it('fills scheduled from the rows and scheduledAt as the soonest wake', () => {
+    const later = new Date(NOW + 3_600_000).toISOString();
+    const sooner = new Date(NOW + 600_000).toISOString();
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [
+        { status: 'scheduled', scheduledAt: later },
+        { status: 'busy' },
+        { status: 'scheduled', scheduledAt: sooner },
+      ],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(snapshot.scheduled).toBe(2);
+    expect(snapshot.scheduledAt).toBe(sooner);
+    expect(snapshot.running).toBe(1);
+    expect(isEligibleGlanceableWork(snapshot)).toBe(true);
+    expect(isStartableGlanceableWork(snapshot)).toBe(true);
+  });
+
+  it('yields scheduledAt null when a scheduled row carries no wake time', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'scheduled' }, { status: 'scheduled', scheduledAt: 'not a date' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(snapshot.scheduled).toBe(2);
+    expect(snapshot.scheduledAt).toBeNull();
+    expect(snapshot.status).toBe('happy');
+  });
+
   it('sets organizationBound only when organizationId is a string', () => {
     const personal = buildGlanceableSnapshot({
       sessions: [],
@@ -367,7 +440,7 @@ describe('buildGlanceableSnapshot', () => {
 });
 
 describe('isEligibleGlanceableWork and revision discard', () => {
-  it('reports eligibility from the three counts', () => {
+  it('reports eligibility from the four counts', () => {
     const empty = buildGlanceableSnapshot({
       sessions: [],
       userId: 'u1',
@@ -380,8 +453,17 @@ describe('isEligibleGlanceableWork and revision discard', () => {
       organizationId: null,
       now: NOW,
     });
+    const scheduled = buildGlanceableSnapshot({
+      sessions: [{ status: 'scheduled' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
     expect(isEligibleGlanceableWork(empty)).toBe(false);
     expect(isEligibleGlanceableWork(busy)).toBe(true);
+    expect(isEligibleGlanceableWork(scheduled)).toBe(true);
+    expect(isStartableGlanceableWork(scheduled)).toBe(true);
+    expect(isStartableGlanceableWork(empty)).toBe(false);
   });
 
   it('discards a lower revision and an older updatedAt at equal revision', () => {
@@ -493,6 +575,7 @@ describe('newestGlanceableResult', () => {
       // newest-result line can never disagree with the row above it.
       ['completed', 'running'],
       ['idle', 'idle'],
+      ['scheduled', 'scheduled'],
     ] as const;
     for (const [status, kind] of cases) {
       expect(newestGlanceableResult([{ status, statusUpdatedAt: at(1000) }])).toEqual({

@@ -5,17 +5,23 @@ import {
   findUserByEmailCaseInsensitive,
   findUserByNormalizedEmail,
 } from '@/lib/user';
-import { getUserFromAuth } from '@/lib/user/server';
-import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
-import { defineTestUser } from '@/tests/helpers/user.helper';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import {
+  setAdminAccessSinkForTest,
+  type AdminAccessEvent,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 
 const mockSecrets = {
   SUPPORT_API_SECRET: 'mock-support-api-secret',
 };
 
-jest.mock('@/lib/config.server', () => {
-  const actual = jest.requireActual('@/lib/config.server') as Record<string, unknown>;
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/config.server') as Record<
+    string,
+    unknown
+  >;
   return {
     ...actual,
     get SUPPORT_API_SECRET() {
@@ -30,7 +36,7 @@ jest.mock('@/lib/user', () => ({
   findUserByNormalizedEmail: jest.fn(),
 }));
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 

@@ -2,7 +2,7 @@ import 'server-only';
 
 import { and, asc, eq, inArray, lte, or, sql } from 'drizzle-orm';
 
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   isImpactConfigured,
   sendImpactConversionPayload,

@@ -1,5 +1,6 @@
 import { and, eq, isNotNull, isNull, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import type { WorkerDb } from '@kilocode/db/client';
 import type {
   CloudAgentQueueReport,
@@ -17,7 +18,6 @@ const CLOUD_AGENT_ERROR_RETENTION_DAYS = 30;
 
 const isoTimestampSchema = z.string().datetime({ offset: true });
 const cloudAgentSessionIdSchema = z.string().regex(SESSION_ID_RE);
-const kiloSessionIdSchema = z.string().startsWith('ses_').length(30);
 const diagnosticSchema = z.object({
   errorMessageRedacted: z.string().min(1).max(4096),
   errorExpiresAt: isoTimestampSchema,

@@ -11,8 +11,8 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import { DEFAULT_DO_RETRY_CONFIG } from '@kilocode/worker-utils';
 import { getSandboxProvider, type SessionMetadata } from '../persistence/session-metadata';
-import { getSandboxSessionStub, resolveSessionStub } from '../sandbox-session/session-stub';
-import { sessionPlaneFromId } from '../session-plane';
+import { resolveSessionStub } from '../sandbox-session/session-stub';
+import { isControlSession } from '../session-plane';
 import { withDORetry } from '../utils/do-retry';
 import type { Env } from '../types';
 import { logControlDiagnostic } from './diagnostics';
@@ -96,12 +96,12 @@ function lookupSessionRuntimeLocator(
   deadlineAt: number
 ): Promise<SessionRuntimeLocator | null> {
   return withDORetry(
-    () =>
-      sessionPlaneFromId(session.cloudAgentSessionId) === 'control'
-        ? getSandboxSessionStub(env, params.kiloUserId, session.cloudAgentSessionId)
-        : resolveSessionStub(env, params.kiloUserId, session.cloudAgentSessionId),
-    stub => stub.getRuntimeLocation(),
-    'getRuntimeLocation',
+    () => resolveSessionStub(env, params.kiloUserId, session.cloudAgentSessionId),
+    async stub => {
+      const metadata = await stub.getMetadata();
+      return metadata === null ? null : sessionRuntimeLocator(metadata);
+    },
+    'getMetadata',
     { ...DEFAULT_DO_RETRY_CONFIG, scope: { deadlineAt } }
   ).then(value => sessionRuntimeLocatorSchema.nullable().parse(value));
 }
@@ -112,9 +112,7 @@ function matchesTarget(candidate: CloudAgentWorktreeLocation, target: CloudAgent
 
 function ownerNeedsRuntimeLookup(owner: UnresolvedCloudAgentSandboxOwner): boolean {
   if (owner.worktreeId !== null) return true;
-  return owner.sessions.some(
-    session => sessionPlaneFromId(session.cloudAgentSessionId) === 'control'
-  );
+  return owner.sessions.some(session => isControlSession(session.cloudAgentSessionId));
 }
 
 type OwnerOutcome =

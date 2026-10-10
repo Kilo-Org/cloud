@@ -6,8 +6,8 @@ import {
   buildAffiliateEventDedupeKey,
   enqueueAffiliateEventForUser,
 } from '@/lib/impact/affiliate-events';
-import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
-import { sentryLogger } from '@/lib/utils.server';
+import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 const logWarning = sentryLogger('kilo-pass-affiliate-sale', 'warning');
 

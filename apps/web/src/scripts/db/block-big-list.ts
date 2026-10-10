@@ -1,5 +1,5 @@
 import { kilocode_users } from '@kilocode/db/schema';
-import { pool, db } from '@/lib/drizzle';
+import { pool, db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, isNull } from 'drizzle-orm';
 import fs from 'node:fs';
 

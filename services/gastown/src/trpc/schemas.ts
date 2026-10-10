@@ -50,7 +50,6 @@ export const BeadOutput = z.object({
   closed_at: z.string().nullable(),
 });
 
-// Agent
 export const AgentOutput = z.object({
   id: z.string(),
   rig_id: z.string().nullable(),
@@ -82,13 +81,11 @@ export const BeadEventOutput = z.object({
   rig_name: z.string().optional(),
 });
 
-// MayorSendResult
 export const MayorSendResultOutput = z.object({
   agentId: z.string(),
   sessionStatus: z.enum(['idle', 'active', 'starting']),
 });
 
-// MayorStatus
 export const MayorStatusOutput = z.object({
   configured: z.boolean(),
   townId: z.string().nullable(),
@@ -126,7 +123,6 @@ export const BillingStatusOutput = z.object({
   lastReportedAt: z.number().optional(),
 });
 
-// StreamTicket
 export const StreamTicketOutput = z.object({
   url: z.string(),
   ticket: z.string(),
@@ -138,7 +134,6 @@ export const PtySessionOutput = z.object({
   wsUrl: z.string(),
 });
 
-// Convoy summary
 export const ConvoyOutput = z.object({
   id: z.string(),
   title: z.string(),
@@ -173,7 +168,6 @@ export const ConvoyDetailOutput = ConvoyOutput.extend({
   ),
 });
 
-// SlingResult
 export const SlingResultOutput = z.object({
   bead: BeadOutput,
   agent: AgentOutput,
@@ -194,7 +188,6 @@ export const RigDetailOutput = z.object({
   beads: z.array(BeadOutput),
 });
 
-// ── rpcSafe wrappers ──────────────────────────────────────────────────
 // tRPC's .output() forces TypeScript to check that the handler return type
 // is assignable to the schema's input type. When handlers return values from
 // Cloudflare Rpc.Promisified DO stubs, the deeply recursive proxy types
@@ -215,7 +208,6 @@ export const RpcConvoyOutput = rpcSafe(ConvoyOutput);
 export const RpcConvoyDetailOutput = rpcSafe(ConvoyDetailOutput);
 export const RpcSlingResultOutput = rpcSafe(SlingResultOutput);
 
-// Alarm status
 const AlarmStatusOutput = z.object({
   alarm: z.object({
     nextFireAt: z.string().nullable(),
@@ -253,8 +245,6 @@ const AlarmStatusOutput = z.object({
 });
 export const RpcAlarmStatusOutput = rpcSafe(AlarmStatusOutput);
 export const RpcRigDetailOutput = rpcSafe(RigDetailOutput);
-
-// ── Merge Queue ──────────────────────────────────────────────────────
 
 const MergeQueueBeadOutput = z.object({
   bead_id: z.string(),

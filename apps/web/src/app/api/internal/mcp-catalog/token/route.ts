@@ -27,10 +27,10 @@ import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token'
 import { and, eq } from 'drizzle-orm';
 import { resolveBenchmarkIdentity } from '@kilocode/auto-routing-contracts';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
-import { getBenchmarkConfig } from '@/lib/ai-gateway/auto-routing-benchmark-admin-client';
-import { db } from '@/lib/drizzle';
-import { generateApiToken } from '@/lib/tokens';
-import { MCP_CATALOG_TOKEN_SECRET } from '@/lib/config.server';
+import { getBenchmarkConfig } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { MCP_CATALOG_TOKEN_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 const ONE_HOUR_IN_SECONDS = 60 * 60;
 

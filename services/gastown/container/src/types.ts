@@ -318,7 +318,6 @@ export type HeartbeatPayload = {
   townId: string;
   status: AgentStatus;
   timestamp: string;
-  // SDK activity watermark
   lastEventType: string | null;
   lastEventAt: string | null;
   activeTools: string[];

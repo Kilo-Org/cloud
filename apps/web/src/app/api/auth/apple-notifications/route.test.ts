@@ -3,8 +3,8 @@ jest.mock('@/lib/auth/apple-jwks', () => ({
   ...jest.requireActual('@/lib/auth/apple-jwks'),
   verifyAppleJwtWithJwks: jest.fn(),
 }));
-jest.mock('@/lib/web-session-revocation', () => {
-  const actual = jest.requireActual('@/lib/web-session-revocation');
+jest.mock('@kilocode/web-shared/lib/web-session-revocation', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/web-session-revocation');
   return { ...actual, revokeWebSessions: jest.fn(actual.revokeWebSessions) };
 });
 
@@ -19,9 +19,9 @@ import {
 } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
 import { verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
-import { revokeWebSessions } from '@/lib/web-session-revocation';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { POST } from './route';
 
 const mockVerifyAppleJwtWithJwks = jest.mocked(verifyAppleJwtWithJwks);

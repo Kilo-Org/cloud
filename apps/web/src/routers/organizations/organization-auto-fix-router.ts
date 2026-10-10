@@ -1,9 +1,9 @@
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
   organizationBillingMutationProcedure,
-} from './utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   getAgentConfigForOwner,

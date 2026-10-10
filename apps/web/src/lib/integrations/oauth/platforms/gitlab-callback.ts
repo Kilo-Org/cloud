@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
@@ -12,7 +12,7 @@ import {
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/instance-url';
 import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createHash } from 'crypto';
 import {
   type VerifiedGitLabOAuthState,

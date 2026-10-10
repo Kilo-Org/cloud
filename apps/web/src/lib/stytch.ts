@@ -1,18 +1,17 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import type { FraudFingerprintLookupResponse } from 'stytch';
 import { Client, envs } from 'stytch';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { User } from '@kilocode/db/schema';
 import { stytch_fingerprints } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { blockUser } from '@/lib/user/block';
-import { getFraudDetectionHeaders } from './utils';
+import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { captureException } from '@sentry/nextjs';
-import { updateStytchValidation } from './customerInfo';
+import { updateStytchValidation } from '@kilocode/web-shared/lib/customerInfo';
 import { domainIsRestrictedFromStytchFreeCredits } from './domainIsRestrictedFromStytchFreeCredits';
-import { grantCreditForCategory } from './promotionalCredits';
-import PostHogClient from '@/lib/posthog';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
+import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 
 const NEXT_PUBLIC_STYTCH_PROJECT_ENV = getEnvVariable('NEXT_PUBLIC_STYTCH_PROJECT_ENV');
@@ -158,18 +157,6 @@ export async function saveFingerprints(
     });
     if (didBlock) {
       await revokeGatewayGrantsForBlockedUser(user.id);
-      void reportEvents({
-        events: [
-          {
-            type: 'user.blocked',
-            data: {
-              kilo_user_id: user.id,
-              reason: 'autoban: stytch SMART_RATE_LIMIT_BANNED',
-              actor_email: null,
-            },
-          },
-        ],
-      });
     }
     if (process.env.NODE_ENV !== 'test')
       console.log('SECURITY: autobanned user for SMART_RATE_LIMIT_BANNED:', {

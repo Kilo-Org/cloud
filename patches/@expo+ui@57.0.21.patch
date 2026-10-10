@@ -1,0 +1,91 @@
+diff --git a/build/swift-ui/Text/index.d.ts b/build/swift-ui/Text/index.d.ts
+index a8843b7..69b242d 100644
+--- a/build/swift-ui/Text/index.d.ts
++++ b/build/swift-ui/Text/index.d.ts
+@@ -1,9 +1,19 @@
+ import * as React from 'react';
+ import { type ClosedRangeDate, type CommonViewModifierProps } from '../types';
+ /**
+- * The style used to format a date in a SwiftUI `Text` view.
++ * The style used to format a date in a SwiftUI `Text` view. `elapsed` and `ago`
++ * (repo-local) are the time since `date` in its single largest unit, seconds
++ * only under a minute, on iOS 18+; `ago` words it as a past reference
++ * ("31 minutes ago", "yesterday"). Earlier versions show the `relative` style.
+  */
+-export type TextDateStyle = 'timer' | 'relative' | 'offset' | 'date' | 'time';
++export type TextDateStyle =
++  | 'timer'
++  | 'relative'
++  | 'offset'
++  | 'date'
++  | 'time'
++  | 'elapsed'
++  | 'ago';
+ export interface TextProps extends CommonViewModifierProps {
+     /**
+      * Text content or nested Text components.
+diff --git a/ios/TextView.swift b/ios/TextView.swift
+index 7dfe0a9..2d8e9da 100644
+--- a/ios/TextView.swift
++++ b/ios/TextView.swift
+@@ -5,11 +5,17 @@ import ExpoModulesCore
+ 
+ public enum TextDateStyle: String, Enumerable {
+   case timer, relative, offset, date, time
++  // Repo-local styles the SDK lacks:
++  // `elapsed` — the time since `date` in its single largest unit, seconds
++  // included only when under a minute ("31 minutes", "1 hour", "3 days",
++  // "20 seconds"); `ago` — the same, worded as a past reference ("31 minutes
++  // ago", "yesterday"). Both fall back to the relative style below iOS 18.
++  case elapsed, ago
+ 
+   func toSwiftUI() -> SwiftUI.Text.DateStyle {
+     switch self {
+     case .timer: return .timer
+-    case .relative: return .relative
++    case .relative, .elapsed, .ago: return .relative
+     case .offset: return .offset
+     case .date: return .date
+     case .time: return .time
+@@ -55,6 +61,15 @@ public struct TextView: ExpoSwiftUI.View {
+         pauseTime: props.pauseTime,
+         countsDown: props.countsDown ?? true
+       )
++    } else if let date = props.date, props.dateStyle == .elapsed || props.dateStyle == .ago {
++      if #available(iOS 18.0, tvOS 18.0, *) {
++        let fields: Set<Date.ComponentsFormatStyle.Field> = [.day, .hour, .minute, .second]
++        text = props.dateStyle == .ago
++          ? Text(.currentDate, format: .reference(to: date, allowedFields: fields, maxFieldCount: 1))
++          : Text(.currentDate, format: .offset(to: date, allowedFields: fields, maxFieldCount: 1))
++      } else {
++        text = Text(date, style: .relative)
++      }
+     } else if let date = props.date {
+       text = Text(date, style: props.dateStyle?.toSwiftUI() ?? .date)
+     } else {
+diff --git a/src/swift-ui/Text/index.tsx b/src/swift-ui/Text/index.tsx
+index 2351ee8..e9c590f 100644
+--- a/src/swift-ui/Text/index.tsx
++++ b/src/swift-ui/Text/index.tsx
+@@ -5,9 +5,19 @@ import { createViewModifierEventListener } from '../modifiers/utils';
+ import { type ClosedRangeDate, type CommonViewModifierProps } from '../types';
+ 
+ /**
+- * The style used to format a date in a SwiftUI `Text` view.
++ * The style used to format a date in a SwiftUI `Text` view. `elapsed` and `ago`
++ * (repo-local) are the time since `date` in its single largest unit, seconds
++ * only under a minute, on iOS 18+; `ago` words it as a past reference
++ * ("31 minutes ago", "yesterday"). Earlier versions show the `relative` style.
+  */
+-export type TextDateStyle = 'timer' | 'relative' | 'offset' | 'date' | 'time';
++export type TextDateStyle =
++  | 'timer'
++  | 'relative'
++  | 'offset'
++  | 'date'
++  | 'time'
++  | 'elapsed'
++  | 'ago';
+ 
+ export interface TextProps extends CommonViewModifierProps {
+   /**

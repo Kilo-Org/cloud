@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { randomUUID } from 'crypto';
 
 // Mock stripe-client before importing handleUpdateSeatCount
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     subscriptions: {
       retrieve: jest.fn(),
@@ -29,8 +29,8 @@ jest.mock('@/lib/organizations/organization-seats', () => ({
 }));
 
 import { handleUpdateSeatCount, KNOWN_SEAT_PRICE_IDS } from './stripe';
-import { client } from '@/lib/stripe-client';
-import { STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID } from '@/lib/config.server';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
+import { STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID } from '@kilocode/web-shared/lib/config.server';
 import { handleOrganizationKiloPassInvoicePaid } from '@/lib/kilo-pass-org/stripe-adapter';
 
 // Get references to the mocked functions after import

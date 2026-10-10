@@ -1,7 +1,7 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { notFound } from 'next/navigation';
 import { AutoFixPageClient } from './AutoFixPageClient';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
+import { isFeatureFlagEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 
 type AutoFixPageProps = {
   params: Promise<{ id: string }>;

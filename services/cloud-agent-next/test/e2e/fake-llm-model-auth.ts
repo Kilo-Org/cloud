@@ -5,7 +5,7 @@
  * server and the local driver must not pull in (LD1). The local Node model
  * routes deliberately accept unauthenticated calls — the Next.js gateway dials
  * them with the static `local-fake-llm` credential
- * (`apps/web/src/lib/ai-gateway/local-fake-llm.ts`).
+ * (`packages/web-shared/src/lib/ai-gateway/local-fake-llm.ts`).
  *
  * `kiloTokenPayload` omits `tokenPurpose`/`credentialExchange` and a non-strict
  * Zod parse strips unknown keys, so a policy-bearing token can never be
@@ -14,7 +14,7 @@
  * separately for the claims an ordinary personal token must not carry.
  *
  * The pepper check mirrors the first half of production's API-token rule
- * (`apps/web/src/lib/user/server.ts`): an absent `apiTokenPepper` claim is
+ * (`packages/web-shared/src/lib/user/server.ts`): an absent `apiTokenPepper` claim is
  * rejected, while an explicit `null` is accepted, because production compares
  * the claim to the account's stored pepper and a null pepper is valid for such
  * an account. That equality half cannot be replicated here — the fake has no

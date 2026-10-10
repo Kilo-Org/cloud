@@ -34,6 +34,7 @@ function makeSummary(model: string): BenchmarkModelSummary {
     cases: 216,
     errors: 0,
     timeouts: 0,
+    routeAccuracy: null,
   };
 }
 
@@ -52,7 +53,7 @@ describe('replaceModelSummaries', () => {
     await replaceModelSummaries({} as D1Database, 'run-1', summaries);
 
     expect(mocks.insertValues).toHaveBeenCalledTimes(2);
-    // 13 bind values per row × 7 rows = 91 < 100 D1 variable ceiling.
+    // 14 bind values per row × 7 rows = 98 < 100 D1 variable ceiling.
     expect(mocks.insertValues.mock.calls.map(([rows]) => (rows as unknown[]).length)).toEqual([
       7, 3,
     ]);

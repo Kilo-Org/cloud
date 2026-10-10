@@ -1,5 +1,5 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
-import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
+import { isLocalCodeReviewDevelopmentEnabled } from '@kilocode/web-shared/lib/config.server';
 import { smartAppBannerItunes } from '@/lib/smart-app-banner';
 import { ReviewAgentPageClient } from './ReviewAgentPageClient';
 

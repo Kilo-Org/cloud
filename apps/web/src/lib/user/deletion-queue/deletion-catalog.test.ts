@@ -12,7 +12,7 @@ import {
 import {
   USER_DELETION_CATALOG_VERSION,
   USER_DELETION_ID_ONLY_CATALOG_VERSION,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 
 describe('deletion catalog v1', () => {
   it('stays frozen at the original six Cloud steps', () => {

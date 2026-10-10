@@ -1,18 +1,18 @@
 import { NextRequest } from 'next/server';
-import { send as sendEmail } from '@/lib/email';
-import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
+import { send as sendEmail } from '@kilocode/web-shared/lib/email';
+import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
 import { enqueueAffiliateEventForUser } from '@/lib/impact/affiliate-events';
 import { enforceKiloClawCommitRetirementGuard } from '@/lib/kiloclaw/commit-retirement';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-secret',
 }));
 
-jest.mock('@/lib/email', () => ({
+jest.mock('@kilocode/web-shared/lib/email', () => ({
   send: jest.fn(),
 }));
 
-jest.mock('@/lib/autoTopUp', () => ({
+jest.mock('@kilocode/web-shared/lib/autoTopUp', () => ({
   maybePerformAutoTopUp: jest.fn(),
 }));
 
@@ -20,11 +20,11 @@ jest.mock('@/lib/kiloclaw/stripe-handlers', () => ({
   ensureAutoIntroSchedule: jest.fn(),
 }));
 
-jest.mock('@/lib/kiloclaw/stripe-price-ids.server', () => ({
+jest.mock('@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server', () => ({
   isIntroPriceId: jest.fn().mockReturnValue(true),
 }));
 
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     subscriptions: {
       retrieve: jest.fn(),
@@ -40,7 +40,7 @@ jest.mock('@/lib/kiloclaw/credit-billing', () => ({
   projectPendingKiloPassBonusMicrodollars: jest.fn(),
 }));
 
-jest.mock('@/lib/kilo-pass/usage-triggered-bonus', () => ({
+jest.mock('@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus', () => ({
   maybeIssueKiloPassBonusFromUsageThreshold: jest.fn(),
 }));
 

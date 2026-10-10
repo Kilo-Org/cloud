@@ -52,6 +52,11 @@ const nextConfig = {
     root: monorepoRoot,
   },
 
+  // packages/web-shared/src/lib/email.ts reads these at runtime.
+  outputFileTracingIncludes: {
+    '/**': ['../../packages/web-shared/src/emails/*.html'],
+  },
+
   // The dev-tools indicator is a fixed overlay pinned to a viewport corner. On
   // phone-sized viewports (device runs) it covers the bottom-right of the page,
   // e.g. the final lines of the Terms paragraph. Hide it; compile and runtime

@@ -1,6 +1,6 @@
 import * as Clipboard from 'expo-clipboard';
 import { Share } from 'react-native';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner-native';
 
 import { openExternalUrl } from '@/lib/external-link';
@@ -8,8 +8,10 @@ import { openExternalUrl } from '@/lib/external-link';
 import {
   buildChatLinkActionSheet,
   buildPrLinkTapActionSheet,
+  CHAT_LINK_SHEET_DISMISS_DELAY_MS,
   getSelectedChatLinkAction,
   performChatLinkAction,
+  performChatLinkActionAfterSheet,
 } from './chat-link-actions';
 
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
@@ -171,4 +173,36 @@ describe('chat link actions', () => {
     expect(openExternalUrl).not.toHaveBeenCalled();
     expect(Clipboard.setStringAsync).not.toHaveBeenCalled();
   });
+});
+
+describe('performChatLinkActionAfterSheet', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  it('opens the browser only after the sheet dismiss delay', async () => {
+    performChatLinkActionAfterSheet('open', 'https://example.com/pr/42');
+
+    expect(openExternalUrl).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(CHAT_LINK_SHEET_DISMISS_DELAY_MS);
+    expect(openExternalUrl).toHaveBeenCalledWith('https://example.com/pr/42', {
+      retryOnError: true,
+    });
+  });
+
+  it('defers share and runs copy at once', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+    performChatLinkActionAfterSheet('share', 'https://example.com/pr/42');
+    performChatLinkActionAfterSheet('copy', 'https://example.com/pr/42');
+
+    expect(mockedShare).not.toHaveBeenCalled();
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith('https://example.com/pr/42');
+    await vi.advanceTimersByTimeAsync(CHAT_LINK_SHEET_DISMISS_DELAY_MS);
+    expect(mockedShare).toHaveBeenCalledWith({ message: 'https://example.com/pr/42' });
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });

@@ -4,7 +4,7 @@ import {
   SLACK_CLIENT_SECRET,
   SLACK_ENCRYPTION_KEY,
   SLACK_SIGNING_SECRET,
-} from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/config.server';
 
 export const slackAdapter = createSlackAdapter({
   clientId: SLACK_CLIENT_ID,

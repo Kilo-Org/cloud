@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
-import { client as stripeClient } from '@/lib/stripe-client';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { captureException } from '@sentry/nextjs';
 
 export async function POST(request: NextRequest) {

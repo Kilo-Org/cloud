@@ -1,4 +1,4 @@
-import type { Organization, OrganizationSeatsPurchase } from '@kilocode/db/schema';
+import type { Organization } from '@kilocode/db/schema';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import {
   kilocode_users,
@@ -8,7 +8,7 @@ import {
   organization_membership_removals,
   organizations,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, desc, and, count, gt, isNull, ne, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import type Stripe from 'stripe';
@@ -17,25 +17,33 @@ import {
   getOrganizationMembers,
   getOrganizationById,
   isOrganizationMember,
-} from '@/lib/organizations/organizations';
-import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
-import { getLowerDomainFromEmail } from '@/lib/utils';
-import { errorExceptInTest, logExceptInTest, sentryLogger } from '@/lib/utils.server';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
+import {
+  errorExceptInTest,
+  logExceptInTest,
+  sentryLogger,
+} from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
-import PostHogClient from '@/lib/posthog';
-import { findUserById } from '@/lib/user';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { after } from 'next/server';
-import { sendOrgCancelledEmail, sendOrgRenewedEmail, sendOrgSubscriptionEmail } from '@/lib/email';
-import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
-import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import {
+  sendOrgCancelledEmail,
+  sendOrgRenewedEmail,
+  sendOrgSubscriptionEmail,
+} from '@kilocode/web-shared/lib/email';
+import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   OrganizationPlanSchema,
   billingCycleFromStripeInterval,
   billingCycleToDb,
-} from '@/lib/organizations/organization-types';
-import { client as stripeClient } from '@/lib/stripe-client';
-import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
-import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
+import { isSeatLineItem } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
+import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 
 const sentryError = sentryLogger('organization_seats', 'error');
 
@@ -63,45 +71,6 @@ const SubscriptionMetadataSchema = z.object({
 });
 
 export type SubscriptionMetadata = z.infer<typeof SubscriptionMetadataSchema>;
-
-/**
- * Returns the most recently created seat purchase for an organization.
- *
- * organization_seats_purchases is append-only: every subscription event
- * (creation, renewal, cancellation) inserts a new row.  The most recently
- * created row therefore always reflects the current subscription state.
- */
-export async function getMostRecentSeatPurchase(
-  organizationId: Organization['id']
-): Promise<OrganizationSeatsPurchase | null> {
-  const [purchase] = await db
-    .select()
-    .from(organization_seats_purchases)
-    .where(eq(organization_seats_purchases.organization_id, organizationId))
-    .orderBy(desc(organization_seats_purchases.created_at))
-    .limit(1);
-
-  return purchase || null;
-}
-
-/** Returns the most recently ended seat purchase by period end. Used for resubscribe flow. */
-export async function getMostRecentEndedSeatPurchase(
-  organizationId: Organization['id']
-): Promise<OrganizationSeatsPurchase | null> {
-  const [purchase] = await db
-    .select()
-    .from(organization_seats_purchases)
-    .where(
-      and(
-        eq(organization_seats_purchases.organization_id, organizationId),
-        eq(organization_seats_purchases.subscription_status, 'ended')
-      )
-    )
-    .orderBy(desc(organization_seats_purchases.expires_at))
-    .limit(1);
-
-  return purchase || null;
-}
 
 export async function getOrganizationSeatUsage(
   organizationId: Organization['id']

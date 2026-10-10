@@ -8,7 +8,7 @@
 import { getFixTicketById } from '@/lib/auto-fix/db/fix-tickets';
 import type { AutoFixTicket } from '@kilocode/db/schema';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';

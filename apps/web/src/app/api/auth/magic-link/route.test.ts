@@ -2,21 +2,21 @@ import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import {
   createMagicLinkToken,
   type MagicLinkTokenWithPlaintext,
-} from '@/lib/auth/magic-link-tokens';
-import { sendMagicLinkEmail } from '@/lib/email';
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
+import { sendMagicLinkEmail } from '@kilocode/web-shared/lib/email';
 import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { MAGIC_LINK_EMAIL_ERRORS } from '@/lib/schemas/email';
 import { checkRateLimit } from '@vercel/firewall';
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 
 jest.mock('@vercel/firewall');
 jest.mock('@/lib/auth/verify-turnstile-jwt');
-jest.mock('@/lib/auth/magic-link-tokens');
-jest.mock('@/lib/email');
+jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens');
+jest.mock('@kilocode/web-shared/lib/email');
 jest.mock('@/lib/user');
-jest.mock('@/lib/organizations/organization-sso-policy');
+jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy');
 
 import { POST } from './route';
 

@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { r2CloudAgentAttachmentsBucketName } from '@/lib/r2/client';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { r2CloudAgentAttachmentsBucketName } from '@kilocode/web-shared/lib/r2/client';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 type GenerateImageMCPTokenParams = {
   userId: string;

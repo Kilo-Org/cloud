@@ -1,10 +1,10 @@
 import 'server-only';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organization_memberships, type User } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import crypto from 'crypto';
 import type { BotType } from './types';
 import { generateBotUserId, generateBotUserEmail, getBotDisplayName } from './types';
@@ -12,7 +12,7 @@ import {
   generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
-} from '@/lib/ai-gateway/providerHash';
+} from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 
 /**
  * Get the user ID of a bot for an organization

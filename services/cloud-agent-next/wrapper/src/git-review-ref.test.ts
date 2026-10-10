@@ -69,6 +69,30 @@ describe('git review refs', () => {
     expect(detail).not.toContain('\u001b[');
   });
 
+  it('carries the diagnostic route class into a classified fetch failure', async () => {
+    let failure: unknown;
+    try {
+      await checkoutSyntheticReviewRef({
+        runGit: async () => ({
+          stdout: '',
+          stderr:
+            "fatal: unable to access 'https://github.com/acme/repo.git/': The requested URL returned error: 429",
+          exitCode: 128,
+        }),
+        workspacePath: '/workspace',
+        branchName: 'refs/pull/404/head',
+        route: 'managed',
+      });
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toMatchObject({
+      subtype: 'git_rate_limited',
+      gitFailure: 'matcher=git_rate_limited http=429 operation=checkout route=managed',
+    });
+  });
+
   it('checks out FETCH_HEAD after a successful fetch', async () => {
     const calls: string[][] = [];
     await checkoutSyntheticReviewRef({

@@ -423,7 +423,11 @@ function requireHeadShaFence(mr: GitLabMergeRequestDetail, expectedHeadSha: stri
 /**
  * Merge the MR. The caller's `expectedHeadSha` is re-verified against a fresh
  * fetch and passed to GitLab as `sha`, so the merge can only land the exact
- * revision the reviewer saw.
+ * revision the reviewer saw. GitLab's merge endpoint accepts only a whole
+ * commit message (`squash_commit_message` when `squash` is true, otherwise
+ * `merge_commit_message`) and has no separate title parameter, so the sheet's
+ * `commitTitle` becomes the message's leading line and `commitMessage` follows
+ * as the body.
  */
 export async function mergePullRequest(
   target: GitLabMrTarget & {
@@ -450,6 +454,9 @@ export async function mergePullRequest(
     if (mr.state === 'closed' || mr.state === 'locked') {
       throw new GitLabReviewError('bad_request', 'The merge request is closed.');
     }
+    const fullCommitMessage = [target.commitTitle, target.commitMessage]
+      .filter((part): part is string => Boolean(part))
+      .join('\n\n');
     await requestGitLabJson(access, `${mrPath(access, target.mrIid)}/merge`, {
       method: 'PUT',
       body: {
@@ -458,8 +465,11 @@ export async function mergePullRequest(
         ...(target.shouldRemoveSourceBranch !== undefined
           ? { should_remove_source_branch: target.shouldRemoveSourceBranch }
           : {}),
-        ...(target.commitTitle ? { merge_commit_title: target.commitTitle } : {}),
-        ...(target.commitMessage ? { merge_commit_message: target.commitMessage } : {}),
+        ...(fullCommitMessage
+          ? target.squash
+            ? { squash_commit_message: fullCommitMessage }
+            : { merge_commit_message: fullCommitMessage }
+          : {}),
       },
     });
     return { done: true, replayed: false };

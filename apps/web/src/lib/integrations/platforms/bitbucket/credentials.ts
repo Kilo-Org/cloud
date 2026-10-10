@@ -4,8 +4,8 @@ import { createPublicKey, randomUUID } from 'node:crypto';
 import {
   BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID,
   BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY,
-} from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner } from '@/lib/integrations/core/types';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';

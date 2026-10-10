@@ -367,7 +367,6 @@ const toHeaderRecord = (headers: Record<string, unknown>): Record<string, string
     })
   );
 
-// ---------------------------------------------------------------------------
 // Firefox scripting backend
 //
 // Firefox exposes no `chrome.debugger`, so the debugger-backed session cannot exist there.
@@ -375,7 +374,6 @@ const toHeaderRecord = (headers: Record<string, unknown>): Record<string, string
 // MAIN-world scripting call through `evalInTabWithScripting`.
 // It reuses the page-helper layer in `agent-workflow-runner.ts` for text-based targeting.
 // This is the same hard platform split the eval path in `tab-debugger.ts` already makes.
-// ---------------------------------------------------------------------------
 
 const scriptJson = (value: unknown): string => JSON.stringify(value) ?? 'null';
 

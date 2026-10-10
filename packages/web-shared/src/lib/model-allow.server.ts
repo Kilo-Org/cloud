@@ -1,0 +1,71 @@
+import 'server-only';
+import { getKiloExclusiveInferenceProviderRestriction } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import {
+  CUSTOM_LLM_PREFIX,
+  KILO_AUTO_MODEL_PREFIX,
+  normalizeModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+
+export type ProviderAwareAllowPredicate = (modelId: string) => Promise<boolean>;
+
+export type ModelRestrictions = {
+  requireModelInCurrentSnapshot: boolean;
+  providerAllowList?: string[];
+  modelDenyList: string[];
+};
+
+/** Receives the requested model id as-is (including variant suffixes such as `:free`). */
+export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
+
+export async function isModelRestrictionExempt(modelId: string): Promise<boolean> {
+  const requestedModelId = modelId.trim().toLowerCase();
+  if (
+    requestedModelId.startsWith(CUSTOM_LLM_PREFIX) ||
+    requestedModelId.startsWith(KILO_AUTO_MODEL_PREFIX)
+  ) {
+    return true;
+  }
+  const directByokModel = await getDirectByokModel(requestedModelId);
+  return directByokModel.provider !== null && directByokModel.model !== null;
+}
+
+export function hasActiveModelRestrictions(restrictions: ModelRestrictions): boolean {
+  return restrictions.providerAllowList !== undefined || restrictions.modelDenyList.length > 0;
+}
+
+export function createAllowPredicateFromProviderAllowList(
+  modelDenyList: string[] | undefined,
+  providerAllowList: string[] | undefined,
+  providerLookup: ProviderLookup = getProviderSlugsForModel,
+  requireModelInCurrentSnapshot = false
+): ProviderAwareAllowPredicate {
+  const modelDenySet = new Set(modelDenyList?.map(normalizeModelId));
+  const providerAllowSet = providerAllowList ? new Set(providerAllowList) : undefined;
+  return async (modelId: string): Promise<boolean> => {
+    const normalizedModelId = normalizeModelId(modelId);
+    if (!requireModelInCurrentSnapshot && !providerAllowSet && modelDenySet.size === 0) return true;
+    if (await isModelRestrictionExempt(modelId)) return true;
+    if (modelDenySet.has(normalizedModelId)) {
+      return false;
+    }
+    const providerSlugs =
+      getKiloExclusiveInferenceProviderRestriction(modelId) ?? (await providerLookup(modelId));
+    if (providerSlugs.size === 0) return false;
+    if (!providerAllowSet) return true;
+    return [...providerSlugs].some(slug => providerAllowSet.has(slug));
+  };
+}
+
+export function createAllowPredicateFromRestrictions(
+  restrictions: ModelRestrictions,
+  providerLookup: ProviderLookup = getProviderSlugsForModel
+): ProviderAwareAllowPredicate {
+  return createAllowPredicateFromProviderAllowList(
+    restrictions.modelDenyList,
+    restrictions.providerAllowList,
+    providerLookup,
+    restrictions.requireModelInCurrentSnapshot
+  );
+}

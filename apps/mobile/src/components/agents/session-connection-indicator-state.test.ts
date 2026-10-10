@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one resolve/display precedence suite over the shared connection-state fixtures */
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -7,9 +8,16 @@ import {
   type SessionConnectionState,
 } from '@/components/agents/session-connection-indicator-state';
 
-type StatusType = 'idle' | 'autocommit' | 'error' | 'disconnected' | 'interrupted';
+type StatusType = 'idle' | 'autocommit' | 'error' | 'disconnected' | 'interrupted' | 'scheduled';
 
-const STATUSES: StatusType[] = ['idle', 'autocommit', 'error', 'disconnected', 'interrupted'];
+const STATUSES: StatusType[] = [
+  'idle',
+  'autocommit',
+  'error',
+  'disconnected',
+  'interrupted',
+  'scheduled',
+];
 const CONNECTION_VALUES: boolean[] = [true, false];
 
 function resolve(input: {
@@ -200,6 +208,7 @@ function resolveDisplay(input: {
   userWebConnected: boolean;
   reconnectExhausted?: boolean;
   everConnected?: boolean;
+  agentStatusType?: StatusType;
   sessionRefresh?: { isLoading: boolean };
 }): SessionConnectionDisplay {
   return resolveSessionConnectionDisplay({
@@ -207,6 +216,7 @@ function resolveDisplay(input: {
     userWebConnected: input.userWebConnected,
     reconnectExhausted: input.reconnectExhausted ?? false,
     everConnected: input.everConnected ?? false,
+    ...(input.agentStatusType ? { agentStatusType: input.agentStatusType } : {}),
     ...(input.sessionRefresh ? { sessionRefresh: input.sessionRefresh } : {}),
   });
 }
@@ -272,5 +282,59 @@ describe('resolveSessionConnectionDisplay', () => {
       resolveDisplay({ transport: 'down', userWebConnected: true, reconnectExhausted: true })
     ).toBe('connecting');
     expect(resolveDisplay({ transport: 'up', userWebConnected: false })).toBe('connected');
+  });
+});
+
+describe('resolveSessionConnectionDisplay - scheduled agent status', () => {
+  it('reports scheduled for a scheduled agent status over an up transport', () => {
+    expect(
+      resolveDisplay({ transport: 'up', userWebConnected: true, agentStatusType: 'scheduled' })
+    ).toBe('scheduled');
+  });
+
+  it('keeps the down display for a scheduled agent status over a down transport', () => {
+    expect(
+      resolveDisplay({ transport: 'down', userWebConnected: false, agentStatusType: 'scheduled' })
+    ).toBe('connecting');
+    expect(
+      resolveDisplay({
+        transport: 'down',
+        userWebConnected: false,
+        everConnected: true,
+        agentStatusType: 'scheduled',
+      })
+    ).toBe('reconnecting');
+  });
+
+  it('keeps lost for a scheduled agent status over an exhausted transport', () => {
+    expect(
+      resolveDisplay({
+        transport: 'exhausted',
+        userWebConnected: false,
+        agentStatusType: 'scheduled',
+      })
+    ).toBe('lost');
+  });
+
+  it('keeps lost for a scheduled agent status while the cached-metadata refresh failed', () => {
+    expect(
+      resolveDisplay({
+        transport: 'up',
+        userWebConnected: true,
+        agentStatusType: 'scheduled',
+        sessionRefresh: { isLoading: false },
+      })
+    ).toBe('lost');
+  });
+
+  it('leaves every other agent status unchanged', () => {
+    for (const status of STATUSES.filter(item => item !== 'scheduled')) {
+      expect(
+        resolveDisplay({ transport: 'up', userWebConnected: true, agentStatusType: status })
+      ).toBe('connected');
+      expect(
+        resolveDisplay({ transport: 'down', userWebConnected: false, agentStatusType: status })
+      ).toBe('connecting');
+    }
   });
 });

@@ -1,10 +1,11 @@
-import { NEXTAUTH_SECRET, NEXTAUTH_URL, TURNSTILE_SECRET_KEY } from '@/lib/config.server';
+import { NEXTAUTH_SECRET, NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
+import { TURNSTILE_SECRET_KEY } from '@/lib/web-config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import { assertNotNullish } from '@/lib/utils';
-import type { TurnstileJwtPayload } from '@/lib/user/server';
+import type { TurnstileJwtPayload } from '@/lib/user/next-auth-options';
 
 // JWT secret for signing Turnstile verification tokens
 const JWT_SECRET = NEXTAUTH_SECRET;

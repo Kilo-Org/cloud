@@ -1,10 +1,10 @@
 import { createElement, type ReactNode } from 'react';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
-import { afterEach, beforeEach, vi } from 'vitest';
+import { afterEach, beforeEach, expect, vi } from 'vitest';
 import { createKiloAppQueryClient } from '@/lib/query-client';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
-import { setSignOutActive } from '@/lib/auth/sign-out-state';
+import { isSignOutActive, setSignOutActive } from '@/lib/auth/sign-out-state';
 
 import {
   ActiveSessionsLiveSync,
@@ -298,6 +298,19 @@ export function replaceMutationAccount(client: QueryClient, listKey: readonly un
   client.clear();
   setSignOutActive(false);
   seedMutationSessions(client, listKey, 'Account B');
+}
+
+/** Assert the replaced account's caches and notification budget are untouched. */
+export function expectMutationAccountUnchanged(
+  client: QueryClient,
+  listKey: readonly unknown[],
+  messages: string[]
+): void {
+  expect(mutationStoredTitles(client, listKey)).toEqual(['Account B', 'Other']);
+  expect(mutationActiveTitle(client)).toBe('Account B');
+  expect(messages).toEqual([]);
+  expect(client.getQueryState(listKey)?.isInvalidated).toBe(false);
+  expect(isSignOutActive()).toBe(false);
 }
 
 export { ActiveSessionsLiveSync };

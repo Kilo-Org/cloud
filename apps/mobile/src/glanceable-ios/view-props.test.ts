@@ -18,9 +18,7 @@ const NOW = Date.parse('2026-01-02T00:00:00Z');
 
 const COPY: Record<string, string> = {
   'glanceable.approving': 'Approving…',
-  'common.starting': 'Starting…',
   'glanceable.couldNotApprove': 'Could not approve',
-  'glanceable.couldNotStart': 'Could not start',
   'glanceable.newestSession': 'Newest: {{title}}',
 };
 const translate = (key: string): string => COPY[key] ?? key;
@@ -56,25 +54,15 @@ const QUESTION_ROW: GlanceableSessionRow = {
 describe('newestTitleFor', () => {
   it.each([
     ['approving', 'Approving…'],
-    ['starting', 'Starting…'],
     ['couldNotApprove', 'Could not approve'],
-    ['couldNotStart', 'Could not start'],
   ] as const)('renders the %s action feedback on a happy surface', (feedback, expected) => {
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: feedback });
     const props = buildGlanceableViewProps(snapshotFor([{ status: 'question' }]), {}, translate);
     expect(props.newestTitle).toBe(expected);
   });
 
-  it('renders a failed create in the empty surface’s reserved line', () => {
-    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: 'couldNotStart' });
-    const props = buildGlanceableViewProps(snapshotFor([], 'empty'), {}, translate);
-    expect(props.newestTitle).toBe('Could not start');
-    expect(props.countLines).toEqual([]);
-    expect(props.actions).toEqual({ approve: false, newAgent: true });
-  });
-
   it('never draws the reserved line on a locked surface, even with feedback set', () => {
-    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'starting' });
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'approving' });
     expect(
       buildGlanceableViewProps(snapshotFor([], 'signed_out'), { signedOut: true }, translate)
         .newestTitle
@@ -94,8 +82,8 @@ describe('newestTitleFor', () => {
   });
 
   it('never shows the newest-session title on the empty surface', () => {
-    // Empty offers the create, so its slot carries the create's feedback; with
-    // none in flight the slot is blank rather than a stale title.
+    // Empty offers no in-place action, so its slot stays blank rather than
+    // carrying a stale title.
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
     expect(
       buildGlanceableViewProps(snapshotFor([], 'empty'), {}, translate).newestTitle
@@ -109,6 +97,39 @@ describe('actions', () => {
     // waiting means the only action the surface can offer is a new agent.
     const props = buildGlanceableViewProps(snapshotFor([{ status: 'idle' }]), {}, translate);
     expect(props.actions).toEqual({ approve: false, newAgent: true });
+  });
+
+  it('does not offer New agent when a session is scheduled', () => {
+    const props = buildGlanceableViewProps(snapshotFor([{ status: 'scheduled' }]), {}, translate);
+    expect(props.actions).toEqual({ approve: false, newAgent: false });
+    expect(props.primaryKind).toBe('scheduled');
+  });
+
+  it('carries the soonest wake, or null when a scheduled row has none', () => {
+    const later = '2026-09-24T10:00:00.000Z';
+    const sooner = '2026-09-24T09:00:00.000Z';
+    const withWake = buildGlanceableViewProps(
+      snapshotFor([
+        { status: 'scheduled', scheduledAt: later },
+        { status: 'scheduled', scheduledAt: sooner },
+      ]),
+      {},
+      translate
+    );
+    // The count row exists whether or not a wake is known, so the surface
+    // never reflows when the CLI reports a wake for a session it had none for;
+    // only the time beside the row is conditional.
+    expect(withWake.countLines.find(line => line.kind === 'scheduled')).toEqual({
+      label: 'common.scheduled',
+      kind: 'scheduled',
+      count: 2,
+    });
+    expect(withWake.scheduledAt).toBe(sooner);
+    expect(withWake.primaryKind).toBe('scheduled');
+
+    const noWake = buildGlanceableViewProps(snapshotFor([{ status: 'scheduled' }]), {}, translate);
+    expect(noWake.countLines.find(line => line.kind === 'scheduled')?.count).toBe(1);
+    expect(noWake.scheduledAt).toBeNull();
   });
 
   it('keeps New agent disabled while a permission waits', () => {
@@ -188,6 +209,7 @@ describe('buildGlanceableLiveActivityContentState needsApproval', () => {
     const props = buildGlanceableViewProps(snapshotFor([PERMISSION_ROW]), {}, translate);
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
+      'actionLine',
       'actions',
       'countLines',
       'needsInputSince',
@@ -198,6 +220,7 @@ describe('buildGlanceableLiveActivityContentState needsApproval', () => {
       'primaryCount',
       'primaryKind',
       'primaryLabel',
+      'scheduledAt',
       'statusLine',
     ]);
     expect('needsApproval' in props).toBe(false);

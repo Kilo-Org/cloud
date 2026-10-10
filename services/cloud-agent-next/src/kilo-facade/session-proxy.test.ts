@@ -103,6 +103,50 @@ describe('resolveLiveWrapperTarget billing admission', () => {
     ).resolves.toMatchObject({ kind: 'available', target: { port: 5000 } });
   });
 
+  it('retries shadow configuration and inspects the wrapper through the recovered handle', async () => {
+    const error = Object.assign(new Error('Durable Object reset'), { retryable: true });
+    const failed = { configureBilling: vi.fn().mockRejectedValue(error) };
+    const recovered = { configureBilling: vi.fn().mockResolvedValue(undefined) };
+    mocks.getSandbox
+      .mockReturnValueOnce(failed)
+      .mockReturnValueOnce(failed)
+      .mockReturnValue(recovered);
+    mocks.findWrapperForSession.mockResolvedValue({ port: 5000 });
+
+    await expect(
+      resolveLiveWrapperTarget({
+        env: { CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'false' } as Env,
+        userId: 'user_facade',
+        cloudAgentSessionId: 'agent_facade',
+      })
+    ).resolves.toEqual({ kind: 'available', target: { sandbox: recovered, port: 5000 } });
+
+    expect(mocks.getSandbox).toHaveBeenCalledTimes(3);
+    expect(failed.configureBilling).toHaveBeenCalledOnce();
+    expect(recovered.configureBilling).toHaveBeenCalledWith(
+      failed.configureBilling.mock.calls[0][0]
+    );
+    expect(mocks.findWrapperForSession).toHaveBeenCalledWith(recovered, 'agent_facade');
+  });
+
+  it('does not inspect the wrapper when shadow configuration retries are exhausted', async () => {
+    const error = Object.assign(new Error('Durable Object reset'), { retryable: true });
+    const configureBilling = vi.fn().mockRejectedValue(error);
+    mocks.getSandbox.mockImplementation(() => ({ configureBilling }));
+
+    await expect(
+      resolveLiveWrapperTarget({
+        env: { CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'false' } as Env,
+        userId: 'user_facade',
+        cloudAgentSessionId: 'agent_facade',
+      })
+    ).rejects.toBe(error);
+
+    expect(configureBilling).toHaveBeenCalledTimes(3);
+    expect(mocks.getSandbox).toHaveBeenCalledTimes(4);
+    expect(mocks.findWrapperForSession).not.toHaveBeenCalled();
+  });
+
   it('allows shadow acquisition when the callable billing block proxy rejects', async () => {
     mocks.getSandbox.mockReturnValue({
       isBillingBlocked: vi.fn().mockRejectedValue(new Error('RPC unavailable')),

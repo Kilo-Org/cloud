@@ -6,16 +6,16 @@ import {
 } from '@kilocode/db/schema-types';
 import * as z from 'zod';
 
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   findOrganizationGroupPolicy,
   OrganizationGroupPoliciesSchema,
   type OrganizationGroupPolicies,
-} from '@/lib/organizations/group-policies/organization-group-policies';
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
-} from '@/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 
 const ModelAccessPolicySummarySchema = z.discriminatedUnion('mode', [
   z.object({

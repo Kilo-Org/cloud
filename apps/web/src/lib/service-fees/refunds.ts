@@ -6,19 +6,19 @@ import type Stripe from 'stripe';
 import {
   AdminSlackNotificationError,
   sendAdminSlackNotification,
-} from '@/lib/slack/admin-notifications';
+} from '@kilocode/web-shared/lib/slack/admin-notifications';
 import {
   observeServiceFeeAssessmentRefunds,
   type ServiceFeeAssessmentRecord,
   type ServiceFeeAssessmentStore,
-} from '@/lib/service-fees/assessments';
-import { calculateCumulativeFeeRefundMinor } from '@/lib/service-fees/calculation';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
+import { calculateCumulativeFeeRefundMinor } from '@kilocode/web-shared/lib/service-fees/calculation';
 import {
   getInvoiceLineInvoiceItemId,
   isKiloClawInvoiceLine,
   isSeatInvoiceLine,
   isServiceFeeInvoiceLine,
-} from '@/lib/service-fees/stripe-lines';
+} from '@kilocode/web-shared/lib/service-fees/stripe-lines';
 
 export const SERVICE_FEE_REFUND_ALLOCATION_UNRESOLVED = 'refund_allocation_unresolved';
 export const SERVICE_FEE_REFUND_ALLOCATION_UNRESOLVED_SENTRY_TAG =

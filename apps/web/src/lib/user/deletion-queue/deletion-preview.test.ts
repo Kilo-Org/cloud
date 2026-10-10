@@ -1,10 +1,10 @@
 import { sql } from 'drizzle-orm';
 import { user_deletion_requests } from '@kilocode/db/schema';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { inspectDeletionTargets } from '@/lib/user/deletion-queue/deletion-preview';
 import { DeletionRefusalCode } from '@/lib/user/deletion-queue/deletion-intake';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 async function deletionRequestCount(): Promise<number> {
   const [{ count }] = await db

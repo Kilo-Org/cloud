@@ -7,7 +7,7 @@
       "instanceLifecycle": "He whakahoutanga tā tō wae",
       "scheduledAction": "He whakahoutanga tā tētahi mahi kua whakaritea",
       "lowBalance": "Me aro ki tō toenga",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Me aro ki tō whakapaunga",
       "securityFinding": "Me aro ki tētahi kitenga haumaru",
       "activeAgentsGlanceable": "He whakahoutanga tā ngā māngai hohe"
     }
@@ -44,8 +44,8 @@
       "body": "Kua heke te toenga {{organizationName}} ki raro i te ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "He whakatūpato whakapaunga",
+      "body": "Kua eke te whakapaunga a {{scopeName}} ki runga ake i te ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "He kitenga haumaru hōu ({{severity}})",

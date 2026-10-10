@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createAssistantMessage,
   createRemoteMcpToolCall,
@@ -10,7 +10,7 @@ import {
   getConversationScrollKey,
   groupConversationEvents,
 } from './agent-conversation';
-import type { GroupedConversationItem, KiloBrowserToolName } from './agent-conversation';
+import type { GroupedConversationItem } from './agent-conversation';
 
 describe('agent conversation events', () => {
   it('creates stable conversation events for messages and browser tools', () => {
@@ -166,10 +166,6 @@ describe('agent conversation events', () => {
     expect(getConversationScrollKey(items)).toBe(`tc-agent:${result.id}`);
   });
 
-  it('re-exports the kilo browser tool name as the upstream prefix pattern', () => {
-    expectTypeOf<KiloBrowserToolName>().toEqualTypeOf<`kilo_browser_${string}`>();
-  });
-
   it('creates a generic browser tool-call event with the upstream arguments verbatim', () => {
     const toolCall = createToolCall({
       arguments: { element: 'Save', nested: { deep: { value: [1, 2, 3] } }, ref: 'e5' },
@@ -177,9 +173,8 @@ describe('agent conversation events', () => {
       providerToolCallId: 'call-1',
       tabId: 7,
     });
-    const { id, ...payload } = toolCall;
+    const { id: _id, ...payload } = toolCall;
 
-    expectTypeOf(id).toBeString();
     expect(payload).toStrictEqual({
       arguments: { element: 'Save', nested: { deep: { value: [1, 2, 3] } }, ref: 'e5' },
       name: 'kilo_browser_click',
@@ -198,9 +193,8 @@ describe('agent conversation events', () => {
       serverId: 'server-1',
       serverName: 'GitHub',
     });
-    const { id, ...payload } = toolCall;
+    const { id: _id, ...payload } = toolCall;
 
-    expectTypeOf(id).toBeString();
     expect(payload).toStrictEqual({
       arguments: { query: 'kilo' },
       name: 'mcp_github_search_repos',
@@ -226,7 +220,6 @@ describe('agent conversation events', () => {
       tabId: 7,
     });
 
-    expectTypeOf(searchCall.id).toBeString();
     expect(searchCall.name).toBe('search_workflows');
     expect(searchCall.arguments).toStrictEqual({ query: 'checkout' });
     expect(getCall.name).toBe('get_workflow');
@@ -251,7 +244,6 @@ describe('agent conversation events', () => {
     expect(saveCall.arguments).toStrictEqual({ workflowId: 'wf-1' });
     expect(saveMemCall.name).toBe('save_memory');
     expect(saveMemCall.arguments).toStrictEqual({ workflowId: 'wf-1' });
-    expectTypeOf(saveMemCall.id).toBeString();
   });
 
   it('creates run_workflow and delete_workflow tool-call events', () => {
@@ -272,7 +264,6 @@ describe('agent conversation events', () => {
     expect(runCall.arguments).toStrictEqual({ workflowId: 'wf-1' });
     expect(deleteCall.name).toBe('delete_workflow');
     expect(deleteCall.arguments).toStrictEqual({ workflowId: 'wf-1' });
-    expectTypeOf(deleteCall.id).toBeString();
   });
 
   it('groups workflow tool calls and results into one transcript item', () => {

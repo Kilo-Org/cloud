@@ -9,7 +9,8 @@ import {
   type CodeReviewType,
   type ManualCodeReviewConfig,
 } from '@kilocode/db/schema-types';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
+import { isUniqueViolation } from '@/lib/db-errors';
 import {
   CodeReviewAgentConfigSchema,
   type CodeReviewAgentConfig,
@@ -21,7 +22,7 @@ import {
 } from '@kilocode/worker-utils/code-review-council';
 import { assertCouncilCreationAllowed } from './core/council-entitlement';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
+import { isLocalCodeReviewDevelopmentEnabled } from '@kilocode/web-shared/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
@@ -32,7 +33,7 @@ import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/
 import type { CodeReviewPlatform, Owner } from './core';
 import { createCodeReview, findActiveProviderPublishingReview } from './db/code-reviews';
 import { tryDispatchPendingReviews } from './dispatch/dispatch-pending-reviews';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 const MANUAL_REVIEW_REQUEST_TIMEOUT_MS = 10_000;
 
@@ -285,11 +286,7 @@ export async function createManualCodeReviewJob(params: {
     await tryDispatchPendingReviews(params.owner);
     return { reviewId, outputMode };
   } catch (error) {
-    if (
-      getDatabaseErrorCode(error) === '23505' &&
-      outputMode === 'provider' &&
-      source.integrationId
-    ) {
+    if (isUniqueViolation(error) && outputMode === 'provider' && source.integrationId) {
       const activePublisher = await findActiveProviderPublishingReview({
         platformIntegrationId: source.integrationId,
         repoFullName: source.repoFullName,
@@ -776,12 +773,6 @@ function getGitLabRepositoryIdFromIntegration(
   const repositories = integration.repositories;
   const repository = repositories?.find(candidate => candidate.full_name === projectPath);
   return typeof repository?.id === 'number' ? repository.id : undefined;
-}
-
-function getDatabaseErrorCode(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null || !('code' in error)) return null;
-  const code = Reflect.get(error, 'code');
-  return typeof code === 'string' ? code : null;
 }
 
 class ProviderFetchError extends Error {

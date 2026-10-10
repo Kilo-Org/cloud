@@ -713,6 +713,13 @@ describe('createPromptHandler', () => {
       model: 'anthropic/claude-sonnet-4-20250514',
       upstreamBranch: 'main',
       commitCoAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
+      agent: {
+        mode: 'code',
+        model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4-20250514' },
+        variant: 'thinking',
+        system: 'You are a helpful assistant',
+        tools: { read_file: true, write_file: false },
+      },
     });
     expect(deps.kiloClient.sendPromptAsync).toHaveBeenCalledWith({
       sessionId: 'kilo_sess_1',
@@ -1069,6 +1076,7 @@ describe('createCommandHandler', () => {
       condenseOnComplete: false,
       model: 'anthropic/claude-sonnet-4-20250514',
       upstreamBranch: undefined,
+      agent: { model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4-20250514' } },
     });
   });
 

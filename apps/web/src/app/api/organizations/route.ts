@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getProfileOrganizations } from '@/lib/organizations/organizations';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getProfileOrganizations } from '@kilocode/web-shared/lib/organizations/organizations';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 export async function GET(
   _request: NextRequest

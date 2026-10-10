@@ -1,6 +1,6 @@
 import { isCloudDataExportUIEnabled } from './user-data-export-ui';
 
-jest.mock('@/lib/posthog', () => ({
+jest.mock('@kilocode/web-shared/lib/posthog', () => ({
   __esModule: true,
   default: () => ({ getFeatureFlag: (...args: unknown[]) => mockGetFeatureFlag(...args) }),
 }));

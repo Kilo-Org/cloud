@@ -2,15 +2,16 @@ import 'server-only';
 
 import { kilo_pass_store_purchases, kilo_pass_subscriptions } from '@kilocode/db/schema';
 
-import type { db as defaultDb } from '@/lib/drizzle';
+import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import { and, desc, eq, inArray, ne } from 'drizzle-orm';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassPaymentProvider,
-} from '@/lib/kilo-pass/enums';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 
 type Db = typeof defaultDb;
 
@@ -101,6 +102,10 @@ export async function reconcileStoreSubscriptionExpiry(
         .returning({ id: kilo_pass_subscriptions.id });
 
       if (updated.length === 0) return;
+      await closePauseEvent(tx, {
+        kiloPassSubscriptionId: candidate.subscriptionId,
+        resumedAt: nowIso,
+      });
 
       expiredSubscriptionCount += 1;
 

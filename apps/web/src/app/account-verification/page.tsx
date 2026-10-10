@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { Suspense } from 'react';
 import { StytchClient } from '@/components/auth/StytchClient';
 import { AccountCreationScreen } from '@/components/auth/AccountCreationScreen';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { getStytchStatus, handleSignupPromotion, type SignupSource } from '@/lib/stytch';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { browserLandingPath } from '@/lib/app-link-safe-redirect';

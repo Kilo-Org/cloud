@@ -1,19 +1,19 @@
 import 'server-only';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { Organization, User } from '@kilocode/db/schema';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
 import {
   organizationTarget,
   recordKiloAdminElevationForRequest,
-} from '@/lib/admin/admin-access-log';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
-import { db } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, inArray, and, isNull } from 'drizzle-orm';
-import { sentryLogger } from '@/lib/utils.server';
-import type { CustomResult } from '@/lib/maybe-result';
-import { successResult } from '@/lib/maybe-result';
-import { getOrganizationById } from '@/lib/organizations/organizations';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import type { CustomResult } from '@kilocode/web-shared/lib/maybe-result';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import z from 'zod';
 
 const warnInSentry = sentryLogger('org_auth', 'warning');

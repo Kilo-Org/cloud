@@ -9,7 +9,7 @@
  * 2. Ticket completion (status update API) to dispatch next in queue
  */
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_fix_tickets, type AutoFixTicket } from '@kilocode/db/schema';
 import { eq, and, count } from 'drizzle-orm';
 import type { Owner } from '../core/schemas';
@@ -17,7 +17,7 @@ import { prepareFixPayload } from '../triggers/prepare-fix-payload';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { updateFixTicketStatus } from '../db/fix-tickets';
 import { captureException } from '@sentry/nextjs';
-import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { autoFixWorkerClient } from '../client/auto-fix-worker-client';
 import { AUTO_FIX_CONSTANTS } from '../core/schemas';
 

@@ -9,7 +9,12 @@ import { type GgufModelFile } from './gguf-records';
 
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 
-const FILE: GgufModelFile = { path: '/models/a.gguf', contextWindow: 2048, tools: true };
+const FILE: GgufModelFile = {
+  path: '/models/a.gguf',
+  contextWindow: 2048,
+  tools: true,
+  projector: undefined,
+};
 const NO_TOOLS: GgufModelFile = { ...FILE, tools: false };
 
 const chatCaps = { tools: true, toolCalls: true, systemRole: true, parallelToolCalls: false };
@@ -18,17 +23,28 @@ const PLAIN_TEMPLATE = { llamaChat: true, jinja: { default: false } };
 
 type Completion = (params: unknown, onToken?: (data: unknown) => void) => Promise<unknown>;
 
+type Multimodal = { readonly loads: boolean; readonly vision: boolean };
+
+const READS_IMAGES: Multimodal = { loads: true, vision: true };
+
 /** A context whose model description and native call are scripted. */
-function contextOf(chatTemplates: unknown, completion: Completion) {
+function contextOf(
+  chatTemplates: unknown,
+  completion: Completion,
+  multimodal: Multimodal = READS_IMAGES
+) {
   const stopCompletion = vi.fn(async () => undefined);
   const release = vi.fn(async () => undefined);
+  const initMultimodal = vi.fn(async () => multimodal.loads);
   const context = {
     model: { chatTemplates },
     completion,
     stopCompletion,
     release,
+    initMultimodal,
+    getMultimodalSupport: async () => ({ vision: multimodal.vision, audio: false }),
   } as unknown as GgufContext;
-  return { context, stopCompletion, release };
+  return { context, stopCompletion, release, initMultimodal };
 }
 
 function clientWith(contexts: readonly GgufContext[], file: GgufModelFile = FILE, files = ['a']) {
@@ -44,7 +60,7 @@ function clientWith(contexts: readonly GgufContext[], file: GgufModelFile = FILE
   return {
     init,
     ...ggufModelClient({
-      runtime: { init },
+      runtime: { init, gpu: true },
       fileOf: id => (files.includes(id) ? file : undefined),
     }),
   };
@@ -186,6 +202,78 @@ describe('an answer over a downloaded model', () => {
     expect(calls[1]?.name).toBe('time');
     expect(calls[1]?.id).toMatch(/^gguf-\d+-call-1$/);
     expect(doneOf(events)?.stop).toBe('tools');
+  });
+});
+
+describe('a vision model', () => {
+  const VISION: GgufModelFile = { ...FILE, tools: false, projector: '/models/a.mmproj.gguf' };
+
+  const imageRequest: ModelRequest = {
+    ...request,
+    tools: [],
+    prompt: {
+      system: [],
+      messages: [
+        {
+          role: 'user',
+          cache: false,
+          parts: [
+            { kind: 'text', text: 'Describe it.' },
+            { kind: 'image', media: 'image/jpeg', data: 'AAAA' },
+          ],
+        },
+      ],
+    },
+  };
+
+  it('loads the projector with the context and sends the image to the model', async () => {
+    const asked: { messages?: unknown }[] = [];
+    const answer: Completion = async params => {
+      asked.push(params as { messages?: unknown });
+      return {
+        text: 'A red square.',
+        tokens_evaluated: 70,
+        tokens_predicted: 4,
+        stopped_eos: true,
+      };
+    };
+    const loaded = contextOf(PLAIN_TEMPLATE, answer);
+    const { client, init } = clientWith([loaded.context], VISION);
+
+    const events = await collect(client.stream(imageRequest));
+
+    // llama.rn requires a context that never shifts once media is in it.
+    expect(init).toHaveBeenCalledWith(expect.objectContaining({ ctx_shift: false, n_ctx: 2048 }));
+    expect(loaded.initMultimodal).toHaveBeenCalledWith({ path: VISION.projector, use_gpu: true });
+    expect(asked[0]?.messages).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Describe it.' },
+          { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AAAA' } },
+        ],
+      },
+    ]);
+    expect(textOf(events)).toEqual(['A red square.']);
+  });
+
+  it.each([
+    ['does not load', { loads: false, vision: false }],
+    ['loads without vision', { loads: true, vision: false }],
+  ])('frees the context and fails as unavailable when the projector %s', async (_, multimodal) => {
+    const loaded = contextOf(PLAIN_TEMPLATE, SHORT_ANSWER, multimodal);
+    const { client } = clientWith([loaded.context], VISION);
+
+    expect(await refusal(client.stream(imageRequest))).toBe('modelChat.localModels.unavailable');
+    expect(loaded.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads no projector for a text-only model', async () => {
+    const loaded = contextOf(PLAIN_TEMPLATE, SHORT_ANSWER);
+    const { client, init } = clientWith([loaded.context], NO_TOOLS);
+    await collect(client.stream(request));
+    expect(init).toHaveBeenCalledWith({ model: '/models/a.gguf', n_ctx: 2048, n_parallel: 1 });
+    expect(loaded.initMultimodal).not.toHaveBeenCalled();
   });
 });
 

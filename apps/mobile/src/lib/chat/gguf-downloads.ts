@@ -1,42 +1,38 @@
 import {
-  type GgufDownload,
   type GgufDownloadProblem,
   type GgufDownloadSource,
   type GgufDownloadsSnapshot,
-  type GgufDownloadTask,
   type GgufInspect,
-  ggufModelName,
+  type GgufModelFile,
   type GgufModelRecord,
-  ggufPartialName,
   type GgufStorage,
+  modelFileOf,
   modelIndexFullyParsed,
   orphanedModelFiles,
   readModelIndex,
+  recordFileNames,
+  removeQuietly,
   settled,
   STORAGE_HEADROOM_BYTES,
 } from './gguf-records';
+import {
+  activeDownload,
+  currentTransfer,
+  downloadProgress,
+  expectedBytes,
+  type GgufActiveDownload,
+  moveIntoPlace,
+  transfersOf,
+} from './gguf-transfers';
 
-type Active = {
-  readonly fileId: string;
-  readonly name: string;
-  readonly url: string;
-  readonly expected: number | undefined;
-  task: GgufDownloadTask;
-  phase: GgufDownload['phase'];
-  written: number;
-  total: number;
-  /** Why the store itself ended the task, as opposed to a network failure. */
-  stop: 'cancel' | 'space' | undefined;
-  /** Set while a paused download resumes; a refused resume starts once more from zero. */
-  resuming: boolean;
-  restarted: boolean;
-};
+type Active = GgufActiveDownload;
 
 /**
  * Downloaded GGUF models and the one download in progress. A download the
- * person starts can pause, resume, or cancel. Every failure and every cancel
- * removes the partial file, and a partial file left by a previous run goes on
- * load, so storage only ever holds whole, verified models.
+ * person starts can pause, resume, or cancel. A vision model downloads its
+ * projector as part of the same download, after the model file. Every failure
+ * and every cancel removes the partial files, and partial files left by a
+ * previous run go on load, so storage only ever holds whole, verified models.
  */
 export function ggufDownloads({
   storage,
@@ -57,16 +53,7 @@ export function ggufDownloads({
   const publish = () => {
     snapshot = {
       models,
-      download:
-        active === undefined
-          ? null
-          : {
-              fileId: active.fileId,
-              name: active.name,
-              phase: active.phase,
-              written: active.written,
-              total: active.total,
-            },
+      download: active === undefined ? null : downloadProgress(active),
       failure,
     };
     for (const listener of listeners) {
@@ -80,10 +67,8 @@ export function ggufDownloads({
   };
 
   const discard = (download: Active) => {
-    try {
-      storage.remove(ggufPartialName(download.fileId));
-    } catch {
-      // Nothing was written yet, or the partial file is already gone.
+    for (const transfer of download.transfers) {
+      removeQuietly(storage, transfer.part);
     }
     if (active === download) {
       active = undefined;
@@ -96,28 +81,35 @@ export function ggufDownloads({
     publish();
   };
 
-  const complete = async (download: Active) => {
-    download.phase = 'verifying';
+  /** Starts the transfer at the current step from zero. */
+  const begin = (download: Active) => {
+    const { url, part, expected } = currentTransfer(download);
+    download.written = 0;
+    download.total = expected ?? 0;
+    download.resuming = false;
+    const progress = onProgress(() => download);
+    download.task = storage.createDownload(url, part, progress);
     publish();
-    const part = ggufPartialName(download.fileId);
-    const size = storage.size(part);
-    const expected = download.expected ?? (download.total > 0 ? download.total : undefined);
-    if (size === 0 || (expected !== undefined && size !== expected)) {
-      fail(download, download.expected === undefined ? 'network' : 'invalidFile');
+    void settle(download, download.task.downloadAsync());
+  };
+
+  /** Every file is whole and sized; llama.cpp has to read them before they are a model. */
+  const verify = async (download: Active, sizeBytes: number) => {
+    const [model, projector] = download.transfers;
+    if (model === undefined) {
       return;
     }
-    // A whole, sized file is not yet a model: llama.cpp has to read it.
-    const read = await settled(inspect(storage.path(part)));
+    const projectorPath = projector === undefined ? undefined : storage.path(projector.part);
+    const read = await settled(inspect(storage.path(model.part), projectorPath));
     if (active !== download) {
       return;
     }
-    if (!read.ok) {
-      fail(download, 'invalidFile');
-      return;
-    }
-    try {
-      storage.move(part, ggufModelName(download.fileId));
-    } catch {
+    // A projector the model cannot read images with is not the file the catalog promised.
+    if (
+      !read.ok ||
+      (projector !== undefined && !read.value.vision) ||
+      !moveIntoPlace(storage, download.transfers)
+    ) {
       fail(download, 'invalidFile');
       return;
     }
@@ -127,13 +119,38 @@ export function ggufDownloads({
       {
         fileId: download.fileId,
         name: download.name,
-        url: download.url,
-        sizeBytes: size,
+        url: model.url,
+        sizeBytes,
         contextWindow: read.value.contextWindow,
         tools: read.value.tools,
+        vision: projector !== undefined,
       },
     ]);
     publish();
+  };
+
+  /** One transfer finished: check its size, then start the next or verify the model. */
+  const complete = async (download: Active) => {
+    const last = download.step === download.transfers.length - 1;
+    if (last) {
+      download.phase = 'verifying';
+      publish();
+    }
+    const transfer = currentTransfer(download);
+    const size = storage.size(transfer.part);
+    const expected = transfer.expected ?? (download.total > 0 ? download.total : undefined);
+    if (size === 0 || (expected !== undefined && size !== expected)) {
+      fail(download, transfer.expected === undefined ? 'network' : 'invalidFile');
+      return;
+    }
+    if (!last) {
+      download.done += size;
+      download.step += 1;
+      download.restarted = false;
+      begin(download);
+      return;
+    }
+    await verify(download, download.done + size);
   };
 
   const onProgress =
@@ -145,13 +162,14 @@ export function ggufDownloads({
       }
       // Bytes arriving after a resume mean the server accepted it.
       current.resuming = false;
+      const { expected } = currentTransfer(current);
       const firstLength = current.total <= 0 && progress.totalBytes > 0;
       current.written = progress.bytesWritten;
-      current.total = progress.totalBytes > 0 ? progress.totalBytes : (current.expected ?? 0);
+      current.total = progress.totalBytes > 0 ? progress.totalBytes : (expected ?? 0);
       const room = storage.freeBytes();
       if (
         firstLength &&
-        current.expected === undefined &&
+        expected === undefined &&
         room < current.total - current.written + STORAGE_HEADROOM_BYTES
       ) {
         current.stop = 'space';
@@ -163,22 +181,9 @@ export function ggufDownloads({
 
   /** A resume the server refused: drop the partial file and download it again from zero. */
   const restart = (download: Active) => {
-    try {
-      storage.remove(ggufPartialName(download.fileId));
-    } catch {
-      // The refused resume left nothing behind.
-    }
-    download.resuming = false;
+    removeQuietly(storage, currentTransfer(download).part);
     download.restarted = true;
-    download.written = 0;
-    download.total = 0;
-    download.task = storage.createDownload(
-      download.url,
-      ggufPartialName(download.fileId),
-      onProgress(() => download)
-    );
-    publish();
-    void settle(download, download.task.downloadAsync());
+    begin(download);
   };
 
   const settle = async (download: Active, operation: Promise<unknown>) => {
@@ -211,11 +216,12 @@ export function ggufDownloads({
     load: () => {
       const names = storage.list();
       const index = storage.readIndex();
+      // A model whose projector is gone is not the model that was verified.
       const kept = readModelIndex(index).filter(model =>
-        names.includes(ggufModelName(model.fileId))
+        recordFileNames(model).every(name => names.includes(name))
       );
-      const partial = active === undefined ? undefined : ggufPartialName(active.fileId);
-      for (const name of orphanedModelFiles({ names, index, kept, partialName: partial })) {
+      const partialNames = active?.transfers.map(transfer => transfer.part) ?? [];
+      for (const name of orphanedModelFiles({ names, index, kept, partialNames })) {
         storage.remove(name);
       }
       models = kept;
@@ -234,45 +240,44 @@ export function ggufDownloads({
       };
     },
     model: (fileId: string) => models.find(model => model.fileId === fileId),
-    modelPath: (fileId: string) => storage.path(ggufModelName(fileId)),
+    /** The files the inference client loads for a downloaded model. */
+    file: (fileId: string): GgufModelFile | undefined => {
+      const record = models.find(model => model.fileId === fileId);
+      return record === undefined ? undefined : modelFileOf(storage, record);
+    },
     start: (source: GgufDownloadSource) => {
       const fileId = source.kind === 'catalog' ? source.model.fileId : source.fileId;
       if (active !== undefined || models.some(model => model.fileId === fileId)) {
         return false;
       }
-      const expected = source.kind === 'catalog' ? source.model.sizeBytes : undefined;
+      const transfers = transfersOf(source, fileId);
+      const expected = expectedBytes(transfers);
       failure = null;
       if (expected !== undefined && storage.freeBytes() < expected + STORAGE_HEADROOM_BYTES) {
         failure = { fileId, problem: 'space' };
         publish();
         return false;
       }
-      const url = source.kind === 'catalog' ? source.model.url : source.url;
-      const name = source.kind === 'catalog' ? source.model.name : source.name;
-      try {
-        storage.remove(ggufPartialName(fileId));
-      } catch {
-        // No partial file from an earlier attempt.
+      for (const transfer of transfers) {
+        // No partial file from an earlier attempt survives.
+        removeQuietly(storage, transfer.part);
+      }
+      const [first] = transfers;
+      if (first === undefined) {
+        return false;
       }
       let download: Active | undefined = undefined;
       const task = storage.createDownload(
-        url,
-        ggufPartialName(fileId),
+        first.url,
+        first.part,
         onProgress(() => download)
       );
-      download = {
+      download = activeDownload({
         fileId,
-        name,
-        url,
-        expected,
+        name: source.kind === 'catalog' ? source.model.name : source.name,
+        transfers,
         task,
-        phase: 'downloading',
-        written: 0,
-        total: expected ?? 0,
-        stop: undefined,
-        resuming: false,
-        restarted: false,
-      };
+      });
       active = download;
       publish();
       void settle(download, task.downloadAsync());
@@ -312,14 +317,14 @@ export function ggufDownloads({
       publish();
     },
     remove: async (fileId: string) => {
-      if (!models.some(model => model.fileId === fileId)) {
+      const record = models.find(model => model.fileId === fileId);
+      if (record === undefined) {
         return;
       }
       await release(fileId);
-      try {
-        storage.remove(ggufModelName(fileId));
-      } catch {
-        // Already gone; the list entry still goes.
+      // A file already gone does not keep the list entry.
+      for (const name of recordFileNames(record)) {
+        removeQuietly(storage, name);
       }
       save(models.filter(model => model.fileId !== fileId));
       publish();

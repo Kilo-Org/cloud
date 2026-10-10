@@ -469,6 +469,11 @@ function evaluateEntry(platform: string): {
           },
         };
       }
+      case './src/lib/protected-data-native': {
+        // The entry records the iOS protected-data state before any keychain
+        // read; the stub answers with the one call it makes.
+        return { installProtectedDataSource: (): void => undefined };
+      }
       case './src/lib/dev-logbox': {
         // The entry drops expo-iap's developer copy for a failed
         // available-purchases query before the router entry loads; the stub

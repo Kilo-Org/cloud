@@ -541,7 +541,8 @@ export function useAgentAttachmentUpload(
             status: metadataStripFailed ? 'error' : 'pending',
             error: metadataStripFailed ? i18n.t('chat.attachment.metadataStripFailed') : undefined,
             terminal: metadataStripFailed ? true : undefined,
-            progress: metadataStripFailed ? null : 0,
+            // A local image never uploads, so its chip shows no upload progress.
+            progress: metadataStripFailed || delivery === 'local' ? null : 0,
           });
         }
       }

@@ -11,7 +11,7 @@
  * This avoids surprising balance changes for users while still ensuring the org row and
  * credit transaction baselines are self-consistent.
  */
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   credit_transactions,
@@ -21,8 +21,8 @@ import {
   type Organization,
 } from '@kilocode/db/schema';
 import { eq, and, asc, gt } from 'drizzle-orm';
-import { type Result, failureResult, successResult } from '@/lib/maybe-result';
-import { computeExpiration } from '@/lib/creditExpiration';
+import { type Result, failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { computeExpiration } from '@kilocode/web-shared/lib/creditExpiration';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
 import { mergeSortedByCreatedAt } from '@/lib/user/recompute-balances';
 

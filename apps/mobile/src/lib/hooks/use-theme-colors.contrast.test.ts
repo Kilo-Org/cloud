@@ -158,6 +158,30 @@ describe('light diff token contrast on tinted surfaces (WCAG AA text)', () => {
   });
 });
 
+// Tailwind v4's `neutral-200` / `neutral-800` (oklch(92.2% 0 0) /
+// oklch(26.9% 0 0)) as sRGB. They are the badge surface the model chip's
+// thinking-effort label paints on (`bg-neutral-200 dark:bg-neutral-800`).
+const NEUTRAL_200 = '#e5e5e5';
+const NEUTRAL_800 = '#262626';
+
+describe('disabled toolbar badge label contrast (WCAG AA text)', () => {
+  // While the toolbar is shown disabled, every label must clear 4.5:1; the
+  // dim-only-chevron/icon rule does not cover the thinking-effort badge's
+  // text. `text-muted-foreground` on these surfaces measures ~4.26:1 light
+  // and ~4.18:1 dark, so the label uses `text-foreground` instead.
+  it('light theme: foreground vs the neutral-200 badge >= 4.5:1', () => {
+    expect(contrastRatio(lightColors.foreground, NEUTRAL_200)).toBeGreaterThanOrEqual(
+      MIN_TEXT_RATIO
+    );
+  });
+
+  it('dark theme: foreground vs the neutral-800 badge >= 4.5:1', () => {
+    expect(contrastRatio(darkColors.foreground, NEUTRAL_800)).toBeGreaterThanOrEqual(
+      MIN_TEXT_RATIO
+    );
+  });
+});
+
 describe('disabled primary fill contrast (WCAG AA text)', () => {
   // A disabled default-variant Button paints primaryForeground on
   // `--primary-disabled`; the pair must clear 4.5:1 in both themes so the

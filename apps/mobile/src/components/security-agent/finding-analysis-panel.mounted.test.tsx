@@ -42,6 +42,13 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
 }));
+// The panel's confirm is `useConfirmDialog`'s `DestructiveConfirmDialog`,
+// which reads the bottom inset; the native module cannot load under this
+// partial `react-native` mock. `@rn-primitives/dialog` itself is stubbed for
+// the whole project by vitest.setup.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 24, left: 0, right: 0, top: 0 }),
+}));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));

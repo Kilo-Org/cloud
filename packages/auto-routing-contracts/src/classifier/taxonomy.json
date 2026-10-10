@@ -1,15 +1,5 @@
 {
   "version": 1,
-  "outputContract": {
-    "taskType": "One taskTypes[].id. Classify the user's primary intent, not the implementation mechanism.",
-    "subtaskType": "One taskTypes[].subtypes[].id under the selected taskType.",
-    "contextComplexity": "One axes.contextComplexity.values[].id: small, medium, or large.",
-    "reasoningComplexity": "One axes.reasoningComplexity.values[].id: low, medium, or high.",
-    "riskLevel": "One axes.riskLevel.values[].id: low, medium, or high.",
-    "executionMode": "One axes.executionMode.values[].id.",
-    "requiresTools": "Boolean. Mark true when accurate completion likely requires repository, terminal, browser, or external tool use.",
-    "confidence": "Number from 0 to 1 representing classification confidence."
-  },
   "decisionRules": [
     "Classify taskType by the user's goal. Use executionMode and requiresTools for how the work must be done.",
     "When a request mixes categories, choose the taskType that describes the final deliverable and use subtaskType for the most specific intent.",

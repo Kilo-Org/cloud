@@ -1,33 +1,34 @@
 import { type ReactNode } from 'react';
-import { Modal, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StateSurface } from '@/components/centered-state-surface';
+import { Sheet } from '@/components/ui/sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+
+/** The one detent: the whole window. */
+const SHEET_SNAP_POINTS = ['100%'];
 
 type SessionPageSheetProps = {
   visible: boolean;
   onClose: () => void;
-  /** Fires on iOS after the native pageSheet dismiss animation completes. */
+  /** Fires after the native dismiss animation completes. */
   onDismiss?: () => void;
   children: ReactNode;
 };
 
 /**
- * Shared sheet surface for the session page. On iOS it renders the native
- * pageSheet Modal and keeps the current safe-area behavior; callers render
- * their own SheetHeader, scroll content, and safe bottom spacer inside it.
- * On Android the Modal fills the window, so the surface pads the top inset to
- * keep the content out of the system status bar. Android Back and Done both
- * route through `onClose`.
+ * Shared full-window sheet for the session page. Callers render their own
+ * SheetHeader, scroll content, and safe bottom spacer inside it. Android Back
+ * and Done both route through `onClose`.
  *
- * On both platforms this surface owns the top of the window, so a header
- * inside it would reserve a dead band above the title if it read the window
- * top inset: the native iOS pageSheet presents below the status bar, and the
- * Android Modal fills the window and this surface pads the top inset itself.
- * Callers pass `topInset="ios-page-sheet"` to their SheetHeader to drop that
- * inset on both platforms; nothing here overrides the safe-area context, so a
- * full-screen Modal opened from sheet content keeps the window insets.
+ * It is a native sheet at the full detent, so it stacks above the session
+ * screen and above another native sheet. The sheet owns the whole window, so a
+ * header inside it would reserve a dead band above the title if it read the
+ * window top inset: iOS presents the sheet below the status bar already, while
+ * Android expands it over the status bar and this surface pads the top inset
+ * itself. Callers pass `topInset="ios-page-sheet"` to their SheetHeader to drop
+ * that inset on both platforms.
  */
 export function SessionPageSheet({
   visible,
@@ -37,40 +38,25 @@ export function SessionPageSheet({
 }: Readonly<SessionPageSheetProps>) {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-
-  if (Platform.OS === 'ios') {
-    return (
-      <Modal
-        visible={visible}
-        // RN Modal paints its container white. Android unmounts the children
-        // before the slide-out ends, so the container shows as a white flash.
-        backdropColor={colors.background}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={onClose}
-        onDismiss={onDismiss}
-      >
-        <StateSurface className="flex-1 bg-background" testID="session-page-sheet-surface">
-          {children}
-        </StateSurface>
-      </Modal>
-    );
-  }
+  // Android expands the sheet over the status bar; iOS presents it below.
+  const sheetTopInset = Platform.OS === 'ios' ? 0 : insets.top;
 
   return (
-    <Modal
+    <Sheet
       visible={visible}
-      backdropColor={colors.background}
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      onDismiss={onDismiss}
+      snapPoints={SHEET_SNAP_POINTS}
+      showHandle={false}
+      background={colors.background}
     >
       <StateSurface
-        style={{ paddingTop: insets.top }}
+        style={{ paddingTop: sheetTopInset }}
         className="flex-1 bg-background"
         testID="session-page-sheet-surface"
       >
         {children}
       </StateSurface>
-    </Modal>
+    </Sheet>
   );
 }

@@ -20,6 +20,7 @@ import {
   textValues,
 } from './pr-review-entry-screen-test-utils';
 import { recentPrKey } from '@/lib/pr-review/recent-prs';
+import { type ConfirmDialogRequest } from '@/components/ui/dialog';
 
 const SAME_TRIPLE = { owner: 'acme', repo: 'api', number: 7, lastOpenedAt: 1_700_000_000_000 };
 
@@ -84,19 +85,15 @@ describe('recents identity across providers', () => {
       p => p.accessibilityLabel === 'Remove acme/api!7 from recents'
     );
     (propsOf(removeGitLab).onPress as () => void)();
-    expect(mocks.alert).toHaveBeenCalledWith(
-      'Remove from recents?',
-      'This review will be removed from your recents.',
-      expect.arrayContaining([
-        expect.objectContaining({ text: 'Cancel' }),
-        expect.objectContaining({ text: 'Remove' }),
-      ])
-    );
-    const alertCall = mocks.alert.mock.calls[0] as
-      | [string, string, { text: string; onPress?: () => void }[]]
-      | undefined;
-    const destructive = alertCall?.[2].find(button => button.text === 'Remove');
-    destructive?.onPress?.();
+    expect(mocks.confirm).toHaveBeenCalledWith({
+      title: 'Remove from recents?',
+      message: 'This review will be removed from your recents.',
+      confirmLabel: 'Remove',
+      onConfirm: expect.any(Function),
+    });
+    // The hoisted mock is untyped; the request shape is the dialog contract.
+    const request = mocks.confirm.mock.calls.at(0)?.at(0) as ConfirmDialogRequest | undefined;
+    request?.onConfirm();
     await flush();
     const remaining = storedRecents();
     expect(remaining).toHaveLength(2);

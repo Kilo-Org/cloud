@@ -89,7 +89,20 @@ export type HeaderPillContent = {
   /** `undefined` = indeterminate arc; `0` = track only (no usage asserted). */
   arcFraction: number | undefined;
   interactive: boolean;
+  /**
+   * Settled without usage: the pill labels the slot with the unknown-usage
+   * mark, and the accessibility label names usage as unavailable. Stays false
+   * while the session is still loading, when the pill is a bare placeholder.
+   */
+  usageUnavailable: boolean;
 };
+
+/**
+ * Label the pill shows for unknown usage once the session stopped loading: the
+ * slot keeps a visible value (or this mark) instead of degrading to a bare
+ * unlabeled ring that reads as a rendering bug.
+ */
+const UNKNOWN_USAGE_LABEL = '—';
 
 /**
  * Single selector for the session-detail header pill. Always returns content
@@ -99,10 +112,12 @@ export function getHeaderPillContent({
   info,
   totalCostMicrodollars,
   hasMessages,
+  loading = false,
 }: {
   info: SessionContextInfo | undefined;
   totalCostMicrodollars: number | null;
   hasMessages: boolean;
+  loading?: boolean;
 }): HeaderPillContent {
   if (info) {
     const tone = getContextTone(info.percentage);
@@ -118,17 +133,23 @@ export function getHeaderPillContent({
       tone,
       arcFraction: getArcFraction(info.percentage),
       interactive: true,
+      usageUnavailable: false,
     };
   }
 
   const costText = hasMessages ? formatSessionTotalCost(totalCostMicrodollars) : null;
+  // Usage unknown. While the session is unresolved the pill keeps its loading
+  // placeholder (no label). Once loading has stopped, the pill shows the value
+  // this screen already had — the cost — or the dash that marks the slot as
+  // intentionally without usage, in both themes.
   return {
-    primary: costText,
+    primary: costText ?? (loading ? null : UNKNOWN_USAGE_LABEL),
     secondary: null,
     hasCost: costText !== null,
     tone: 'neutral',
     arcFraction: 0,
     interactive: false,
+    usageUnavailable: !loading,
   };
 }
 
@@ -186,21 +207,37 @@ export function getContextSheetContent(
   };
 }
 
+/**
+ * Spoken body for a pill whose usage is unknown. While the session is
+ * unresolved the loading placeholder keeps its former spoken shape; once
+ * loading has stopped, unknown usage is named as unavailable instead of
+ * reading as an empty, unlabeled control.
+ */
+function getUnknownUsageBody(spoken: string | null, usageUnavailable: boolean): string {
+  if (!usageUnavailable) {
+    return spoken ? i18n.t('agents.sessionRow.costSpoken', { cost: spoken }) : '';
+  }
+  const unavailable = i18n.t('agentChat.contextUsage.usageUnavailable');
+  const costPart = spoken ? i18n.t('agentChat.contextUsage.costSuffix', { cost: spoken }) : '';
+  return `${unavailable}${costPart}.`;
+}
+
 export function getMetricsAccessibilityLabel({
   info,
   totalCostMicrodollars,
   interactive,
+  usageUnavailable = false,
 }: {
   info: SessionContextInfo | undefined;
   totalCostMicrodollars: number | null;
   interactive: boolean;
+  usageUnavailable?: boolean;
 }): string {
   const spoken = formatSpokenCost(totalCostMicrodollars);
   const tapPart = interactive ? ` ${i18n.t('agentChat.contextUsage.tapToViewDetails')}` : '';
 
   if (!info) {
-    const body = spoken ? i18n.t('agents.sessionRow.costSpoken', { cost: spoken }) : '';
-    return `${body}${tapPart}`.trim();
+    return `${getUnknownUsageBody(spoken, usageUnavailable)}${tapPart}`.trim();
   }
 
   const costPart = spoken ? i18n.t('agentChat.contextUsage.costSuffix', { cost: spoken }) : '';

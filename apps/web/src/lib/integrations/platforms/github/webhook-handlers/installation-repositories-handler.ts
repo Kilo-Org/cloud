@@ -3,13 +3,8 @@ import { type PlatformRepository } from '@/lib/integrations/core/types';
 import { updateGitHubInstallationRepositories } from '@/lib/integrations/db/github-installations';
 import type { InstallationRepositoriesPayload } from '../webhook-schemas';
 import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { GitHubAppType } from '../app-selector';
-
-/**
- * GitHub Installation Repositories Event Handler
- * Handles: repositories added/removed
- */
 
 export async function handleInstallationRepositories(
   payload: InstallationRepositoriesPayload,

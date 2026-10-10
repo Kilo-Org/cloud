@@ -1,13 +1,13 @@
 import { type ComponentProps, createElement } from 'react';
 import { MockTextInput } from '@/test/native-input.test-helpers';
 import { act, TestRenderer } from '@/test/renderer';
-import { Alert } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { i18n } from '@/i18n';
 
 import { QuestionCard } from './question-card';
 
 vi.mock('react-native', () => ({
-  Alert: { alert: vi.fn() },
   // `@/components/ui/input` reads `I18nManager.isRTL` through
   // `@/lib/rtl-text`; the mock must expose it or the shared box throws.
   I18nManager: { isRTL: false },
@@ -15,6 +15,12 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   TextInput: MockTextInput,
   View: 'View',
+}));
+// The skip confirm renders through this surface; the stub keeps the destructive
+// variant out of this suite's react-native stub while still letting the test
+// read the request and run its confirm.
+vi.mock('@/components/destructive-confirm-dialog', () => ({
+  DestructiveConfirmDialog: 'DestructiveConfirmDialog',
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('expo-haptics', () => ({
@@ -178,12 +184,18 @@ describe('QuestionCard action layout', () => {
     const { renderer, props } = await mount();
     press(action(renderer.root, 'Skip'));
     expect(props.onReject).not.toHaveBeenCalled();
-    const confirmation = vi.mocked(Alert.alert).mock.calls[0]?.[2];
-    expect(confirmation).toEqual([
-      expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
-      expect.objectContaining({ text: 'Skip', style: 'destructive', onPress: props.onReject }),
-    ]);
-    confirmation?.[1]?.onPress?.();
+    const confirmation = renderer.root.findAllByType('DestructiveConfirmDialog')[0];
+    if (!confirmation) {
+      throw new Error('missing skip confirmation');
+    }
+    expect(confirmation.props).toMatchObject({
+      title: i18n.t('agentChat.questionCard.skipQuestionsTitle'),
+      message: i18n.t('agentChat.questionCard.skipQuestionsMessage'),
+      confirmLabel: 'Skip',
+    });
+    act(() => {
+      (confirmation.props.onConfirm as () => void)();
+    });
     expect(props.onReject).toHaveBeenCalledOnce();
   });
 });

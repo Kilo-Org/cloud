@@ -131,8 +131,6 @@ export const GastownPlugin: Plugin = async ({ client }) => {
     tool: tools,
 
     event: async ({ event }) => {
-      // console.log(`[${SERVICE}] event:`, event);
-
       if (event.type === 'session.deleted' && gastownClient) {
         // Notify Rig DO that session ended — best-effort, don't throw
         try {
@@ -147,14 +145,6 @@ export const GastownPlugin: Plugin = async ({ client }) => {
         }
       }
     },
-
-    // 'chat.message'(input, output) {
-    //   console.log(`[${SERVICE}] chat.message:`, input, output);
-    // },
-
-    // 'experimental.text.complete'(input, output) {
-    //   console.log(`[${SERVICE}] experimental.text.complete:`, input, output);
-    // },
 
     // Inject context into the system prompt before each LLM call.
     // - Rig agents: prime context (bead assignment, mail, open beads)

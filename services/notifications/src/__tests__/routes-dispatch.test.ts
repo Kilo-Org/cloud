@@ -145,4 +145,46 @@ describe('POST /internal/v1/dispatch', () => {
       })
     );
   });
+
+  it('logs failed recipients with the caller-supplied dispatch id and no recipient ids', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockDispatchInternalPushCore.mockResolvedValue({
+      perRecipient: [
+        { userId: 'user-a', outcome: 'delivered' },
+        { userId: 'user-b', outcome: 'failed', reason: 'expo_ticket_rejected' },
+      ],
+    });
+
+    const res = await SELF.fetch('https://example.com/internal/v1/dispatch', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-Internal-Secret': TEST_INTERNAL_SECRET,
+        'X-Dispatch-Id': 'dispatch-123',
+      },
+      body: JSON.stringify(validLowBalanceBody),
+    });
+
+    expect(res.status).toBe(200);
+    expect(warnSpy).toHaveBeenCalledWith('Internal dispatch completed with failed recipients', {
+      dispatchId: 'dispatch-123',
+      kind: 'low_balance',
+      failedRecipients: 1,
+      totalRecipients: 2,
+    });
+    warnSpy.mockRestore();
+  });
+
+  it('does not log when every recipient succeeded', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const res = await SELF.fetch(
+      'https://example.com/internal/v1/dispatch',
+      dispatchRequest({ secret: TEST_INTERNAL_SECRET, body: validLowBalanceBody })
+    );
+
+    expect(res.status).toBe(200);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
 });

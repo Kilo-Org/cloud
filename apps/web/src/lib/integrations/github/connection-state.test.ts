@@ -1,12 +1,14 @@
 import { createHash } from 'node:crypto';
-import { redisClient } from '@/lib/redis';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 import {
   consumeGitHubConnectionOAuthState,
   createGitHubConnectionOAuthState,
 } from './connection-state';
 
-jest.mock('@/lib/config.server', () => ({ NEXTAUTH_SECRET: 'connection-state-test-secret' }));
-jest.mock('@/lib/redis', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  NEXTAUTH_SECRET: 'connection-state-test-secret',
+}));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { set: jest.fn(), getdel: jest.fn() },
 }));
 

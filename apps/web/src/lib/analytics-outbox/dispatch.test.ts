@@ -20,17 +20,17 @@ import type { AnalyticsEventOutboxRow } from '@kilocode/db/schema';
 const mockCapture = jest.fn();
 const mockFlushPostHog = jest.fn();
 
-jest.mock('@/lib/posthog', () => ({
+jest.mock('@kilocode/web-shared/lib/posthog', () => ({
   __esModule: true,
   default: jest.fn(() => ({ capture: mockCapture })),
   flushPostHog: (...args: unknown[]) => mockFlushPostHog(...args),
 }));
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {},
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   IS_IN_AUTOMATED_TEST: true,
 }));
 

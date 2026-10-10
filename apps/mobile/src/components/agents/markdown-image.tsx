@@ -2,26 +2,26 @@ import { type ReactElement, useState, useSyncExternalStore } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { ImageViewerModal } from '@/components/image-viewer-modal';
+import { ImageViewer } from '@/components/ui/image-viewer';
 import { AlertCircle, Download, RotateCcw } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { formatTrustedImageHost } from '@/lib/hooks/use-trusted-image-hosts';
 
 import {
-  confirmMarkdownImage,
-  isMarkdownImageConfirmed,
-  subscribeMarkdownImageConfirmMemory,
+  isMarkdownImageLoadAllowed,
+  requestMarkdownImageTrust,
+  subscribeMarkdownImageLoadAllowed,
 } from './markdown-image-confirm';
-import { resolveMarkdownImageSrc } from './markdown-image-src';
+import { markdownImageFilename, resolveMarkdownImageSrc } from './markdown-image-src';
 import { getLinkAccessibilityActions } from './markdown-link';
 import {
   IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
   resolveImagePreviewAspectRatio,
 } from './tool-card-attachments';
-import { getFilename } from './tool-card-utils';
 
 type MarkdownImageKind = 'https' | 'http' | 'data' | null;
 
@@ -36,14 +36,6 @@ function classifyUri(uri: string): MarkdownImageKind {
     return 'data';
   }
   return null;
-}
-
-function imageHostDisplay(uri: string): string | null {
-  try {
-    return new URL(uri).hostname.toLowerCase();
-  } catch {
-    return null;
-  }
 }
 
 function FixedImageSlot({
@@ -69,7 +61,7 @@ function BlockedImageChip({
 }: Readonly<{ kind: 'http' | 'data'; uri: string; onShowLinkActions?: () => void }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const host = kind === 'http' ? imageHostDisplay(uri) : null;
+  const host = kind === 'http' ? formatTrustedImageHost(uri) : null;
   const label = host
     ? `${host} · ${t('agentChat.markdownImage.httpsOnly')}`
     : t('agentChat.markdownImage.httpsOnly');
@@ -101,7 +93,7 @@ function UnconfirmedImageChip({
 }: Readonly<{ uri: string; onLoad: () => void; onShowLinkActions?: () => void }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const host = imageHostDisplay(uri);
+  const host = formatTrustedImageHost(uri);
   return (
     <View className="h-full flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
       <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={1}>
@@ -168,29 +160,31 @@ export function MarkdownImage({
     setMeasuredAspectRatio(undefined);
   }
 
-  const filename =
-    alt || (uri.startsWith('http') ? getFilename(uri.split('?')[0] ?? '') : '') || 'image';
+  const filename = markdownImageFilename(uri, alt);
   const imageAccessibilityLabel = alt
     ? t('agentChat.filePart.viewImageWithAlt', { alt })
     : t('agentChat.filePart.viewImage');
 
   const kind = classifyUri(uri);
-  const confirmed = useSyncExternalStore(subscribeMarkdownImageConfirmMemory, () =>
-    isMarkdownImageConfirmed(uri)
+  // Only an HTTPS URI can ever auto-load, so a blocked http/data URI answers
+  // from the kind alone. Parsing its URL in the snapshot would run on every
+  // render of every inline data image, before the chip early-returns.
+  const loadAllowed = useSyncExternalStore(subscribeMarkdownImageLoadAllowed, () =>
+    kind === 'https' ? isMarkdownImageLoadAllowed(uri) : false
   );
 
   if (kind === 'http' || kind === 'data') {
     return <BlockedImageChip kind={kind} uri={uri} onShowLinkActions={onShowLinkActions} />;
   }
 
-  if (kind === 'https' && !confirmed) {
+  if (kind === 'https' && !loadAllowed) {
     return (
       <FixedImageSlot aspectRatio={aspectRatio}>
         <UnconfirmedImageChip
           uri={uri}
           onShowLinkActions={onShowLinkActions}
           onLoad={() => {
-            confirmMarkdownImage(uri);
+            requestMarkdownImageTrust(uri);
           }}
         />
       </FixedImageSlot>
@@ -282,7 +276,7 @@ export function MarkdownImage({
         </Pressable>
       </FixedImageSlot>
       {viewerVisible && (
-        <ImageViewerModal
+        <ImageViewer
           visible={viewerVisible}
           uri={resolveMarkdownImageSrc(uri)}
           filename={filename}

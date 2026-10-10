@@ -1,6 +1,6 @@
 import { ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
-import { r2Client } from '@/lib/r2/client';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { r2Client } from '@kilocode/web-shared/lib/r2/client';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 function getAppBuilderAssetsBucketName(): string {
   const name = getEnvVariable('APP_BUILDER_ASSETS_BUCKET_NAME');

@@ -14,7 +14,7 @@ import { CancelSubscriptionModal } from './CancelSubscriptionModal';
 import { SeatChangeModal } from './SeatChangeModal';
 import { BillingCycleChangeDialog } from './BillingCycleChangeDialog';
 import Link from 'next/link';
-import { seatPrice } from '@/lib/organizations/constants';
+import { seatPrice } from '@kilocode/web-shared/lib/organizations/constants';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
 import { formatDate, canManageBilling, findPaidSeatItem } from './utils';
 import type { SubscriptionWithPeriod } from './types';

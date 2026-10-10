@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  computeContentHashes,
-  deriveConversationKey,
-  deriveOutboundSessionId,
-} from './conversation-identity';
+import { computeContentHashes, deriveConversationKey } from './conversation-identity';
 import type { NormalizedClassifierInput } from '@kilocode/auto-routing-contracts';
 
 const baseInput = {
@@ -73,17 +69,5 @@ describe('deriveConversationKey', () => {
     const right = deriveConversationKey({ userId: 'u2', sessionId: 's1', machineId: null }, hashes);
 
     expect(left).not.toBe(right);
-  });
-});
-
-describe('deriveOutboundSessionId', () => {
-  it('produces a stable hash that does not contain the raw identity', async () => {
-    const key = 'user:anon:203.0.113.7:task:s1';
-    const first = await deriveOutboundSessionId(key);
-    const second = await deriveOutboundSessionId(key);
-
-    expect(first).toBe(second);
-    expect(first).toMatch(/^[0-9a-f]{16}$/);
-    expect(first).not.toContain('203.0.113.7');
   });
 });

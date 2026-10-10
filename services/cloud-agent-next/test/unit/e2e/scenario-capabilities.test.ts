@@ -279,8 +279,15 @@ function sandboxFaultsStub(): SandboxFaultObservation {
   return {
     captureWrapperIdentity: vi.fn(async () => ({ instanceId: 'c:1', pid: 1 })),
     killOwnedContainer: vi.fn(async () => ({ killed: true, observedRef: 'c', detail: '' })),
+    recycleWrapperSocket: vi.fn(async () => ({ recycled: true, pid: 1, detail: '' })),
     freezeWrapperProcess: vi.fn(async () => ({ frozen: true, pid: 1, detail: '' })),
     unfreezeWrapperProcess: vi.fn(async () => {}),
+    killWrapperProcess: vi.fn(async () => ({ killed: true, pid: 1, detail: '' })),
+    killKiloServerProcess: vi.fn(async () => ({ killed: true, pid: 2, detail: '' })),
+    freezeKiloServerProcess: vi.fn(async () => ({ frozen: true, pid: 2, detail: '' })),
+    unfreezeKiloServerProcess: vi.fn(async () => {}),
+    captureKiloServerIdentity: vi.fn(async () => ({ pid: 2 })),
+    kiloServerProcessExists: vi.fn(async () => false),
     captureEvidenceCursor: vi.fn(async () => 0),
     captureWorkerLogCursor: vi.fn(async () => 0),
     dropControlSocketDuringAttach: vi.fn(async () => ({
@@ -324,6 +331,43 @@ describe('assessScenarioSupport', () => {
       required: ['sandbox'],
       missing: [],
     });
+  });
+
+  it('gates new-plane scenarios on the control-plane V2 opt-in', () => {
+    expect(assessScenarioSupport({ requires: ['controlPlaneV2'] }, localEnv())).toEqual({
+      supported: false,
+      required: ['sandbox', 'controlPlaneV2'],
+      missing: ['controlPlaneV2'],
+    });
+    expect(
+      isScenarioSupported(
+        { requires: ['controlPlaneV2'] },
+        { ...localEnv(), controlPlaneV2: { ready: true } }
+      )
+    ).toBe(true);
+  });
+
+  it('gates new-plane scenarios on the control-plane runtime proof too', () => {
+    expect(assessScenarioSupport({ requires: ['controlPlaneRuntime'] }, localEnv())).toEqual({
+      supported: false,
+      required: ['sandbox', 'controlPlaneRuntime'],
+      missing: ['controlPlaneRuntime'],
+    });
+    expect(
+      isScenarioSupported(
+        { requires: ['controlPlaneRuntime'] },
+        {
+          ...localEnv(),
+          controlPlaneRuntime: {
+            proveNewPlane: vi.fn(async () => ({ instanceId: 'c:1', pid: 1 })),
+            userMessageParts: vi.fn(async () => ({ found: true, textParts: 1, text: '' })),
+            containerEnvironment: vi.fn(async () => ({})),
+            gitRemoteUrl: vi.fn(async () => null),
+            summaryCount: vi.fn(async () => 0),
+          },
+        }
+      )
+    ).toBe(true);
   });
 });
 

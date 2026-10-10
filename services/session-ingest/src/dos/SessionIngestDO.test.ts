@@ -230,6 +230,61 @@ describe('SessionIngestDO ingest ordering', () => {
     expect(metaWrites).toContain('closeReason:completed');
     expect(metaWrites).not.toContain('title:Hello');
   });
+
+  it('reports the whole PR-link tuple, including head evidence, atomically', async () => {
+    const selectQuery = {
+      from: vi.fn(() => selectQuery),
+      where: vi.fn(() => selectQuery),
+      get: vi.fn(() => undefined),
+    };
+    const db = {
+      select: vi.fn(() => selectQuery),
+      insert: vi.fn(() => ({
+        values: vi.fn(() => ({
+          onConflictDoUpdate: vi.fn(() => ({ run: vi.fn() })),
+        })),
+      })),
+      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+    };
+    drizzleMocks.db = db;
+
+    const state = {
+      storage: { setAlarm: vi.fn() },
+      blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
+    } as unknown as DurableObjectState;
+    const env = { SESSION_INGEST_R2: { delete: vi.fn() } } as never;
+
+    const durableObject = new SessionIngestDO(state, env);
+    const result = await durableObject.ingest(
+      [
+        {
+          type: 'session_pr_link',
+          data: {
+            platform: 'github',
+            prUrl: 'https://github.com/acme/widgets/pull/42',
+            prNumber: 42,
+            headRef: 'fix/typo',
+            headSha: 'abc123',
+          },
+        },
+      ],
+      'usr_pr',
+      'ses_pr',
+      1,
+      1
+    );
+
+    expect(result).toMatchObject({
+      accepted: true,
+      changes: [
+        { name: 'prPlatform', value: 'github' },
+        { name: 'prUrl', value: 'https://github.com/acme/widgets/pull/42' },
+        { name: 'prNumber', value: '42' },
+        { name: 'prHeadRef', value: 'fix/typo' },
+        { name: 'prHeadSha', value: 'abc123' },
+      ],
+    });
+  });
 });
 
 describe('SessionIngestDO session-ready push', () => {

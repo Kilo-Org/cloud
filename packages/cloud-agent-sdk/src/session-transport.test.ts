@@ -8,9 +8,7 @@ import type { KiloSessionId } from './types';
 import type { UserWebSystemEvent } from './user-web-connection';
 import { kiloId, cloudAgentId, makeSnapshot } from './test-helpers';
 
-// ---------------------------------------------------------------------------
 // WebSocket mock — needed because connect() → resolveSession → transport → WS
-// ---------------------------------------------------------------------------
 
 type MockWebSocket = {
   onopen: ((ev: Event) => void) | null;
@@ -43,10 +41,6 @@ afterEach(() => {
   // @ts-expect-error -- cleanup
   delete global.WebSocket;
 });
-
-// ---------------------------------------------------------------------------
-// Constants & helpers
-// ---------------------------------------------------------------------------
 
 const kiloSessionId = kiloId('ses_transport-tests');
 const cloudAgentSessionId = cloudAgentId('agent_12345678-1234-1234-1234-123456789abc');
@@ -86,11 +80,9 @@ function createCloudAgentResolvedSession(api: CloudAgentApi): CloudAgentSession 
 
 async function connectSession(session: CloudAgentSession): Promise<void> {
   session.connect();
-  // Allow resolveAndConnect to resolve + transport to be created
   await new Promise(r => setTimeout(r, 0));
   await new Promise(r => setTimeout(r, 0));
   await new Promise(r => setTimeout(r, 0));
-  // Simulate WebSocket open
   mockWs.onopen?.(new Event('open'));
 }
 
@@ -152,10 +144,6 @@ function emitHeartbeatOwner(
     },
   });
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('Cloud Agent worktree refresh event pipeline', () => {
   it.each([false, true])(
@@ -403,6 +391,70 @@ describe('session transport delegation (cloud agent)', () => {
 
     session.destroy();
   });
+
+  it.each(['answer', 'reject'] as const)(
+    '%s clears the acknowledged question without a live resolution event',
+    async action => {
+      const api = createMockApi();
+      let acknowledge: (result: { success: boolean }) => void = () => {};
+      api[action].mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            acknowledge = resolve;
+          })
+      );
+      const session = createCloudAgentResolvedSession(api);
+      await connectSession(session);
+      const questions = [{ question: 'Pick one', header: 'Q', options: [] }];
+      session.state.process({ type: 'question.asked', requestId: 'req-1', questions });
+      session.state.process({ type: 'question.asked', requestId: 'req-2', questions });
+
+      const submission =
+        action === 'answer'
+          ? session.answer({ requestId: 'req-1', answers: [['yes']] })
+          : session.reject({ requestId: 'req-1' });
+      expect(session.state.getQuestion()?.requestId).toBe('req-1');
+      acknowledge({ success: true });
+      await submission;
+
+      expect(session.state.getQuestion()?.requestId).toBe('req-2');
+      session.state.process({ type: 'question.replied', requestId: 'req-1' });
+      expect(session.state.getQuestion()?.requestId).toBe('req-2');
+      if (action === 'answer') {
+        await session.answer({ requestId: 'req-2', answers: [['yes']] });
+      } else {
+        await session.reject({ requestId: 'req-2' });
+      }
+      expect(session.state.getQuestion()).toBeNull();
+      session.destroy();
+    }
+  );
+
+  it.each(['answer', 'reject'] as const)(
+    '%s keeps the question available for retry when submission fails',
+    async action => {
+      const api = createMockApi();
+      api[action].mockRejectedValueOnce(new Error('Network error'));
+      api[action].mockResolvedValueOnce({ success: false });
+      const session = createCloudAgentResolvedSession(api);
+      await connectSession(session);
+      session.state.process({
+        type: 'question.asked',
+        requestId: 'req-1',
+        questions: [{ question: 'Pick one', header: 'Q', options: [] }],
+      });
+
+      const submit = () =>
+        action === 'answer'
+          ? session.answer({ requestId: 'req-1', answers: [['yes']] })
+          : session.reject({ requestId: 'req-1' });
+      await expect(submit()).rejects.toThrow('Network error');
+      expect(session.state.getQuestion()?.requestId).toBe('req-1');
+      await expect(submit()).rejects.toThrow('Please try again.');
+      expect(session.state.getQuestion()?.requestId).toBe('req-1');
+      session.destroy();
+    }
+  );
 
   it('session.respondToPermission() delegates to api.respondToPermission', async () => {
     const api = createMockApi();
@@ -791,13 +843,10 @@ describe('disconnect during resolution', () => {
     });
 
     session.connect();
-    // disconnect while resolveSession is still pending
     session.disconnect();
 
-    // Now let the resolution complete
     resolveSession({ type: 'cloud-agent', kiloSessionId, cloudAgentSessionId });
     await resolvePromise;
-    // Flush microtasks so resolveAndConnect can run its post-resolve code
     await new Promise(r => setTimeout(r, 0));
 
     // No WebSocket should have been created — the stale generation bailed out

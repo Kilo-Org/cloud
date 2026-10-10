@@ -92,9 +92,11 @@ export function LanguagePickerRow({
             edge. Unicode bidi already renders each script correctly inside
             the line. */}
         <Text className={cn('text-sm font-medium', alignClass)}>{item.row.endonym}</Text>
-        <Text variant="muted" className={cn('mt-0.5 text-xs', alignClass)}>
-          {item.row.englishName}
-        </Text>
+        {item.row.englishName !== item.row.endonym ? (
+          <Text variant="muted" className={cn('mt-0.5 text-xs', alignClass)}>
+            {item.row.englishName}
+          </Text>
+        ) : null}
       </View>
     </ChoiceRow>
   );

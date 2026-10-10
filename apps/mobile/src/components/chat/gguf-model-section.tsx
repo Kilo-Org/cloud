@@ -1,9 +1,9 @@
-import { type TFunction } from 'i18next';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { GGUF_CATALOG, GGUF_URL_ERROR_KEYS, readGgufLink } from '@/lib/chat/gguf-catalog';
@@ -12,7 +12,6 @@ import {
   type GgufDownload,
   type GgufDownloadProblem,
   type GgufDownloadsSnapshot,
-  type GgufModelRecord,
 } from '@/lib/chat/gguf-records';
 import { formatFileSize } from '@/lib/format';
 
@@ -47,25 +46,9 @@ function progressKey(download: GgufDownload): string {
   return 'modelChat.gguf.downloading';
 }
 
-function confirmDelete(record: GgufModelRecord, t: TFunction) {
-  Alert.alert(
-    t('modelChat.gguf.deleteTitle'),
-    t('modelChat.gguf.deleteMessage', { name: record.name }),
-    [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => {
-          void ggufDownloadActions.remove(record.fileId);
-        },
-      },
-    ]
-  );
-}
-
 function GgufModelRow({ fileId, name, detail, snapshot, onDownload }: Readonly<RowProps>) {
   const { t, i18n } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const record = snapshot.models.find(model => model.fileId === fileId);
   const download = snapshot.download?.fileId === fileId ? snapshot.download : undefined;
   const failure = snapshot.failure?.fileId === fileId ? snapshot.failure : undefined;
@@ -85,7 +68,14 @@ function GgufModelRow({ fileId, name, detail, snapshot, onDownload }: Readonly<R
           <Button
             variant="ghost"
             onPress={() => {
-              confirmDelete(record, t);
+              confirm({
+                title: t('modelChat.gguf.deleteTitle'),
+                message: t('modelChat.gguf.deleteMessage', { name }),
+                confirmLabel: t('common.delete'),
+                onConfirm: () => {
+                  void ggufDownloadActions.remove(fileId);
+                },
+              });
             }}
           >
             <Text>{t('common.delete')}</Text>
@@ -140,6 +130,7 @@ function GgufModelRow({ fileId, name, detail, snapshot, onDownload }: Readonly<R
           {t(FAILURE_KEYS[failure.problem])}
         </Text>
       )}
+      {dialog}
     </View>
   );
 }

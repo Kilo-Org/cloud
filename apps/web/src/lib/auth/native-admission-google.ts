@@ -6,8 +6,8 @@ import {
   GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS,
   GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER,
   GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY,
-} from '@/lib/config.server';
-import { getEnvVariable } from '@/lib/dotenvx';
+} from '@kilocode/web-shared/lib/config.server';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 /**
  * Google Play Integrity verifier.

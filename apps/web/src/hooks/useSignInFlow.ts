@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { signIn } from 'next-auth/react';
 import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
-import type { AuthProviderId } from '@/lib/auth/provider-metadata';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { useSignInHint, type SignInHint } from '@/hooks/useSignInHint';
 import { emailSchema, validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { sendMagicLink } from '@/lib/auth/send-magic-link';
@@ -21,6 +21,7 @@ const callbackAuthErrors = new Set([
   'PROVIDER-ALREADY-LINKED',
   'LINKING-FAILED',
   'SIGNUP-RATE-LIMITED',
+  'SIGNUP-UNAVAILABLE',
   'EMAIL-ALREADY-USED',
   'EMAIL-MUST-BE-LOWERCASE',
   'EMAIL-CANNOT-CONTAIN-PLUS',

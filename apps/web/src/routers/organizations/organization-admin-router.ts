@@ -1,5 +1,6 @@
-import { adminProcedure, createTRPCRouter, creditManagerProcedure } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { creditManagerProcedure } from '@/lib/trpc/admin-procedures';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   organization_memberships,
@@ -31,24 +32,25 @@ import type { PgColumn } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 import { AdminCreditTransactionSchema, OrganizationsApiGetResponseSchema } from '@/types/admin';
 import { STRIPE_SUBSCRIPTION_STATUS_VALUES } from '@/lib/admin/stripe-subscription-statuses';
-import { getLowerDomainFromEmail, isValidUUID, toMicrodollars } from '@/lib/utils';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { isValidUUID } from '@/lib/utils';
 import { millisecondsInHour } from 'date-fns/constants';
 import {
   createOrganization,
   getOrganizationById,
   addUserToOrganization,
   markOrganizationAsDeleted,
-} from '@/lib/organizations/organizations';
-import { OrganizationRoleSchema } from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { OrganizationRoleSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
-import { findUserById } from '@/lib/user';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { TRPCError } from '@trpc/server';
-import { successResult } from '@/lib/maybe-result';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
-import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
-import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { getAdminCreditTransactionsForOrganization } from '@/lib/creditTransactions';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { getMostRecentSeatPurchase } from '@kilocode/web-shared/lib/organizations/organization-seat-purchases';
+import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { getAdminCreditTransactionsForOrganization } from '@kilocode/web-shared/lib/creditTransactions';
 import {
   assertOrganizationHierarchyChangeAllowed,
   KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR,
@@ -59,7 +61,7 @@ import {
   computeNextExpirationAmount,
   processOrganizationExpirations,
   closeOutExpiringOrganizationCredits,
-} from '@/lib/creditExpiration';
+} from '@kilocode/web-shared/lib/creditExpiration';
 import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,
@@ -76,8 +78,8 @@ import {
   ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MAX_LENGTH,
   ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MIN_LENGTH,
   setOrganizationServiceFeeExemption,
-} from '@/lib/service-fees/organization-exemptions';
-import { createDefaultOrganizationServiceFeeExemptionStore } from '@/lib/service-fees/drizzle-store';
+} from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
+import { createDefaultOrganizationServiceFeeExemptionStore } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
 
 const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -805,20 +807,6 @@ export const organizationAdminRouter = createTRPCRouter({
           .where(eq(organizations.id, organizationId));
       });
 
-      if (amountMicrodollars > 0 && existingOrg.created_by_kilo_user_id) {
-        void reportEvents({
-          events: [
-            {
-              type: 'billing.credit_purchased',
-              data: {
-                kilo_user_id: existingOrg.created_by_kilo_user_id,
-                microdollars_acquired: amountMicrodollars,
-              },
-            },
-          ],
-        });
-      }
-
       return {
         message: `Successfully granted $${amount_usd} credits to organization ${existingOrg.name}`,
         amount_usd,
@@ -1055,20 +1043,6 @@ export const organizationAdminRouter = createTRPCRouter({
         });
       }
       throw error;
-    }
-
-    if (existingOrg.created_by_kilo_user_id) {
-      void reportEvents({
-        events: [
-          {
-            type: 'org.deleted',
-            data: {
-              kilo_user_id: existingOrg.created_by_kilo_user_id,
-              organization_id: organizationId,
-            },
-          },
-        ],
-      });
     }
 
     return successResult();

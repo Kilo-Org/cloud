@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -18,6 +18,7 @@ import {
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Terminal } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -51,6 +52,7 @@ export function ProfileKiloCommandsScreen({
   organizationId,
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfile(profileId, organizationId);
   const {
     createKiloCommand,
@@ -108,16 +110,14 @@ export function ProfileKiloCommandsScreen({
   };
 
   const confirmDelete = (source: KiloCommandSource) => {
-    Alert.alert(t('common.delete'), source.name, [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => {
-          void runDelete(source.id);
-        },
+    confirm({
+      title: t('common.delete'),
+      message: source.name,
+      confirmLabel: t('common.delete'),
+      onConfirm: () => {
+        void runDelete(source.id);
       },
-    ]);
+    });
   };
 
   const move = (index: number, delta: number) => {
@@ -247,6 +247,8 @@ export function ProfileKiloCommandsScreen({
           }}
         />
       ) : null}
+
+      {dialog}
     </View>
   );
 }

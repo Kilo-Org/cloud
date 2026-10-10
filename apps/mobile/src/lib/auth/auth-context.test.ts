@@ -70,7 +70,7 @@ vi.mock('@/lib/last-active-instance', () => ({
   clearLastActiveInstance: vi.fn(),
 }));
 
-vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
+vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));
 

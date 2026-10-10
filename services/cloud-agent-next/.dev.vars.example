@@ -46,6 +46,10 @@ PER_SESSION_SANDBOX_ORG_IDS=
 # Local wrangler `dev` also defaults these to `*` in wrangler.jsonc.
 CONTROL_PLANE_IDS=*
 WORKTREE_CREATION_ENABLED_IDS=*
+# Code Reviewer sessions for these owners run on the control plane instead of
+# the legacy plane. Comma-separated user or org IDs. Off by default; set the
+# enrolled org in the Cloudflare dashboard.
+# CODE_REVIEW_CONTROL_PLANE_IDS=
 # Comma-separated user or org IDs allowed to pick a sandbox destination, or `*` for all
 SANDBOX_SELECTION_IDS=*
 
@@ -54,9 +58,11 @@ RUNTIME_ISOLATION_ENABLED=true
 
 CREDENTIAL_CONTAINMENT_ENABLED=false
 
-# Repo snapshot org IDs (optional)
-# Comma-separated list of org IDs that receive workspace repo snapshots, or `*` for all orgs/users
-REPO_SNAPSHOT_ORG_IDS=
+# Container repo snapshot IDs (optional)
+# Comma-separated user or org IDs whose isolated control-plane containers start from a saved
+# repository snapshot, or `*` for all. Empty disables it. Needs the REPO_SNAPSHOTS KV
+# binding and only applies to the constant isolated workspace path.
+CONTAINER_REPO_SNAPSHOT_IDS=
 
 # Vercel Sandbox operational configuration (optional)
 # Snapshot/build values must come from a successful `pnpm --filter cloud-agent-next snapshot:vercel`
@@ -106,10 +112,6 @@ R2_ENDPOINT=""
 R2_ATTACHMENTS_BUCKET=""
 R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID=""
 R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY=""
-
-# Optional: production R2 credentials for Cloudflare Sandbox directory backups
-R2_ACCESS_KEY_ID=""
-R2_SECRET_ACCESS_KEY=""
 
 # Session ingest URL used by the wrapper to post session data.
 # Sandbox containers reach the host via `host.docker.internal`.

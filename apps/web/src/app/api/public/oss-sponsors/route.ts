@@ -1,4 +1,4 @@
-import { db, sql } from '@/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
 import { and, isNull } from 'drizzle-orm';

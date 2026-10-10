@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 // Dependency-contract guard for the repository release-age policy in
 // pnpm-workspace.yaml. The global minimumReleaseAge gate must stay intact, the
-// SDK 57 alignment exemptions must each name one exact package@version (a
+// container-runtime exemptions must each name one exact package@version (a
 // name-only or wildcard entry would un-gate every future release), and every
 // pre-existing base exclusion must survive unchanged.
 const EXPECTED_MINIMUM_RELEASE_AGE_MINUTES = 6842;
@@ -50,22 +50,19 @@ const CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES = [
   '@cloudflare/workerd-windows-64@1.20260918.1',
 ] as const;
 
-// The exact versions the Expo SDK 57 aligned graph installs (verified against
-// pnpm-lock.yaml): the four 2026-09-08 patch releases `expo install --check`
-// expects plus the transitive resolutions blocked by the 6842-minute gate.
-const SDK_57_EXACT_EXCLUDE_ENTRIES = [
-  'expo@57.0.21',
-  '@expo/ui@57.0.17',
-  'expo-router@57.0.20',
-  'expo-widgets@57.0.18',
-  'babel-preset-expo@57.0.11',
-  'expo-modules-core@57.0.17',
-  'expo-modules-jsi@57.1.0',
-  '@expo/cli@57.0.23',
-  '@expo/metro-file-map@57.0.3',
-  'expo-glass-effect@57.0.2',
+// Four mobile pins must move without waiting out the gate: FlashList 2.3.3
+// carries the EngagedIndicesTracker scroll-window fix the agent transcript list
+// depends on, react-native-keyboard-controller 1.22.6 carries the
+// KeyboardChatScrollView fixes the keyboard phase depends on (SDK 57 pins
+// 1.21.9), react-native-enriched-markdown 1.1.0 adds the image and code block
+// press events the transcript markdown wires, and react-native-reanimated 4.7.1
+// carries the stability fixes the app needs. One exact package@version each.
+const MOBILE_EXACT_EXCLUDE_ENTRIES = [
+  '@shopify/flash-list@2.3.3',
+  'react-native-keyboard-controller@1.22.6',
+  'react-native-enriched-markdown@1.1.0',
+  'react-native-reanimated@4.7.1',
 ] as const;
-
 // Exact pnpm syntax for one pinned package version: bare or @scoped name, then
 // @ and a version starting with a digit. Rejects name-only entries, ranges,
 // wildcards, and future-version placeholders alike.
@@ -109,15 +106,15 @@ describe('minimum release age policy contract', () => {
     expect(Number(match?.[1])).toBe(EXPECTED_MINIMUM_RELEASE_AGE_MINUTES);
   });
 
-  it('excludes exactly the base list plus the container-runtime and SDK 57 exact versions', () => {
-    // Order as written: tsx, the container-runtime exemptions, the ten
-    // aligned-version exemptions, then the remaining base entries — the base
-    // list with nothing dropped or changed.
+  it('excludes exactly the base list plus the container-runtime and mobile exact versions', () => {
+    // Order as written: tsx, the container-runtime exemptions, then the
+    // remaining base entries, then the mobile exemptions — the base list with
+    // nothing dropped or changed.
     const expected = [
       BASE_EXCLUDE_ENTRIES[0],
       ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
-      ...SDK_57_EXACT_EXCLUDE_ENTRIES,
       ...BASE_EXCLUDE_ENTRIES.slice(1),
+      ...MOBILE_EXACT_EXCLUDE_ENTRIES,
     ];
     expect(excludeEntries).toEqual(expected);
   });
@@ -125,7 +122,7 @@ describe('minimum release age policy contract', () => {
   it('scopes every new exclusion to one exact package@version', () => {
     expect(newExclusions).toEqual([
       ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
-      ...SDK_57_EXACT_EXCLUDE_ENTRIES,
+      ...MOBILE_EXACT_EXCLUDE_ENTRIES,
     ]);
     for (const entry of newExclusions) {
       expect(entry).toMatch(EXACT_VERSION_PATTERN);

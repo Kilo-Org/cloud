@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { User } from '@kilocode/db/schema';
 import { user_auth_provider, kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -9,7 +9,7 @@ import {
   unlinkAuthProviderFromUser,
   findUserIdByAuthProvider,
 } from '@/lib/user';
-import { insertTestUserAndGoogleAuth } from '@/tests/helpers/user.helper';
+import { insertTestUserAndGoogleAuth } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { assertNotNullish } from '@/lib/utils';
 
 describe('Multi-Auth System', () => {

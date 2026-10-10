@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { webhook_events, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { logWebhookEvent } from './webhook-events';
 
 async function findEventBySignature(signature: string) {

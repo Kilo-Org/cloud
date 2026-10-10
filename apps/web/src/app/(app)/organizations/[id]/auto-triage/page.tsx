@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
+import { isFeatureFlagEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { AutoTriagePageClient } from './AutoTriagePageClient';
 
 type AutoTriagePageProps = {

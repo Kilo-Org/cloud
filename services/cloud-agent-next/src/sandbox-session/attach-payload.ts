@@ -1,5 +1,7 @@
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
+import { materializeMcpServers } from '../mcp-config.js';
+import { codeReviewIdFromCallbackTarget } from '../router/schemas.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
 import { readProfileBundle } from '../session-profile.js';
 import { getSessionWorkspacePath } from '../workspace.js';
@@ -46,9 +48,18 @@ function gitFromMetadata(
   };
 }
 
+export function isReadOnlyBitbucketReview(
+  metadata: Pick<SessionMetadata, 'identity' | 'repository' | 'callback'>
+): boolean {
+  if (metadata.identity.createdOnPlatform !== 'code-review') return false;
+  if (metadata.repository?.type !== 'bitbucket') return false;
+  return codeReviewIdFromCallbackTarget(metadata.callback?.target) !== null;
+}
+
 export function buildSessionAttachPayload(
   metadata: SessionMetadata,
-  preparation?: SessionAttachPayload['preparation']
+  preparation?: SessionAttachPayload['preparation'],
+  mcpPrivateKey?: string
 ): SessionAttachPayload {
   const directory =
     metadata.workspace?.workspacePath ??
@@ -64,9 +75,10 @@ export function buildSessionAttachPayload(
       ? 'working'
       : undefined;
   const profile = readProfileBundle(metadata);
+  const readOnlyBitbucketReview = isReadOnlyBitbucketReview(metadata);
   validateControlSessionOptions(metadata);
   const env = {
-    ...(profile.envVars ?? {}),
+    ...(!readOnlyBitbucketReview ? (profile.envVars ?? {}) : {}),
     ...(metadata.auth.kilocodeToken ? { KILOCODE_TOKEN: metadata.auth.kilocodeToken } : {}),
   };
   rejectReservedControlRuntimeEnvironment(env);
@@ -77,6 +89,9 @@ export function buildSessionAttachPayload(
     ...(metadata.auth.kiloSessionId ? { snapshotIdentity: metadata.auth.kiloSessionId } : {}),
     ...(git ? { git } : {}),
     ...(Object.keys(env).length > 0 ? { env } : {}),
+    ...(!readOnlyBitbucketReview && profile.mcpServers && Object.keys(profile.mcpServers).length > 0
+      ? { mcp: materializeMcpServers(profile.mcpServers, mcpPrivateKey) }
+      : {}),
     ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),
     ...(preparation ? { preparation } : {}),
   };
@@ -84,10 +99,18 @@ export function buildSessionAttachPayload(
 
 export function adaptSessionAttachPayloadForWrapper(
   payload: SessionAttachPayload,
-  supportsWorkingBranches: boolean
+  supportsWorkingBranches: boolean,
+  supportsGitAuthor = false
 ): SessionAttachPayload {
-  if (supportsWorkingBranches || payload.branchMode !== 'working') return payload;
-
-  const { branch: _branch, branchMode: _branchMode, ...legacyPayload } = payload;
-  return legacyPayload;
+  let adapted = payload;
+  if (!supportsWorkingBranches && adapted.branchMode === 'working') {
+    const { branch: _branch, branchMode: _branchMode, ...legacyPayload } = adapted;
+    adapted = legacyPayload;
+  }
+  if (!supportsGitAuthor && adapted.git?.author) {
+    const { author: _author, ...git } = adapted.git;
+    adapted = { ...adapted, git };
+  }
+  if (adapted.mcp) adapted = { ...adapted, runtimeIsolation: 'per-session' };
+  return adapted;
 }

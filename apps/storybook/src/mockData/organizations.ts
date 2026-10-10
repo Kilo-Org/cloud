@@ -2,8 +2,8 @@ import { generateMock } from '@anatine/zod-mock';
 import type {
   OrganizationWithMembers,
   OrganizationMember,
-} from '@/lib/organizations/organization-types';
-import { OrganizationSchema } from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { OrganizationSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { mockDataRng as rng, randomChoice, randomBoolean, randomId, randomInt } from './random';
 import { COMPANY_TYPES, ORG_ROLES, ORG_STATUSES } from './constants';
 

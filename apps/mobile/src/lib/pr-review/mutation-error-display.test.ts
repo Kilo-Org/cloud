@@ -102,6 +102,42 @@ describe('mutationErrorDisplay', () => {
     });
   });
 
+  it('uses the edit-comment bad-request copy for the own-comment edit surface', () => {
+    // The own-comment edit sheet rejects a body the server will no longer
+    // accept with the "can't be edited" copy, not the composer's post copy.
+    const classification = classifyPrReviewMutationError(
+      makeError('BAD_REQUEST', 'Comment is too long')
+    );
+    expect(mutationErrorDisplay('edit-comment', classification)).toEqual({
+      kind: 'bad-request',
+      message: "This comment can't be edited. It may have been deleted.",
+    });
+    expect(
+      mutationErrorDisplayFromError('edit-comment', makeError('BAD_REQUEST', 'Comment is too long'))
+    ).toEqual({
+      kind: 'bad-request',
+      message: "This comment can't be edited. It may have been deleted.",
+    });
+  });
+
+  it('maps a provider 404 to the terminal edit-comment copy', () => {
+    // GitHub 404s a comment that no longer exists. The edit sheet must show
+    // the deleted-comment copy with Save down (the `not-found` kind), not the
+    // retryable fall-through its classifier yields for NOT_FOUND.
+    const gone = makeError('NOT_FOUND', 'PR not found, you do not have access');
+    expect(classifyPrReviewMutationError(gone)).toEqual({ kind: 'retryable' });
+    expect(mutationErrorDisplayFromError('edit-comment', gone)).toEqual({
+      kind: 'not-found',
+      message: "This comment can't be edited. It may have been deleted.",
+    });
+    // Other surfaces keep the retryable fall-through: their 404s are outside
+    // the own-comment edit slice.
+    expect(mutationErrorDisplayFromError('composer', gone)).toEqual({
+      kind: 'retryable',
+      message: 'PR not found, you do not have access',
+    });
+  });
+
   it('words the submit bad-request copy after the connected provider when a term rides', () => {
     // s6f: a rejected review submit on a GitLab merge request must never read
     // "pull request". The provider arm passes the translated noun as `term`;

@@ -8,7 +8,7 @@ For `apps/web`, that skill replaces the root `DESIGN.md`. Its `src/tokens.cloud.
 
 ## Web Environment Variables
 
-When a shared web environment variable needs to be added or rotated across tracked dotenv files and Vercel deployments, tell the user to run `pnpm web:env set <VARIABLE>`. Agents must not run this command because it prompts for secret values and writes to external systems. This rule also applies to work under `scripts/web-env/`. See [DEVELOPMENT.md](../../DEVELOPMENT.md) for the user-run workflow.
+When a shared web environment variable needs to be added or rotated across tracked dotenv files and Vercel deployments, tell the user to run `pnpm web:env set <VARIABLE>`. To fill a new Vercel project from an existing one, tell the user to run `pnpm web:env copy`. Agents must not run either command, even with `--dry-run`, because they read or prompt for secret values and write to external systems. This rule also applies to work under `scripts/web-env/`. See [DEVELOPMENT.md](../../DEVELOPMENT.md) for the user-run workflow.
 
 ## Client Server State
 

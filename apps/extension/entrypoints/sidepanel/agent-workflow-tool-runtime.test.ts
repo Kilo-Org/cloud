@@ -22,16 +22,12 @@ import {
   resolveWorkflowStartUrl,
 } from './agent-workflow-tool-runtime';
 
-// ---------- mocks ----------
-
 // eslint-disable-next-line vitest/prefer-import-in-mock
 vi.mock('@/src/shared/agent-workflow-runner', () => ({
   runWorkflow: vi.fn().mockResolvedValue({ ok: true, pagesVisited: 1, result: 'success' }),
 }));
 
 import { runWorkflow } from '@/src/shared/agent-workflow-runner';
-
-// ---------- helpers ----------
 
 const createBaseCtx = (overrides: Partial<WorkflowToolContext> = {}): WorkflowToolContext => ({
   allowWorkflowsInSafeMode: false,
@@ -80,8 +76,6 @@ const deferredApproval = (): {
   };
 };
 
-// ---------- search_workflows ----------
-
 describe('search_workflows', () => {
   it('returns empty message when no workflows match', async () => {
     const ctx = createBaseCtx();
@@ -125,8 +119,6 @@ describe('search_workflows', () => {
   });
 });
 
-// ---------- get_workflow ----------
-
 describe('get_workflow', () => {
   it('returns workflow by id', async () => {
     const ctx = createBaseCtx();
@@ -160,8 +152,6 @@ describe('get_workflow', () => {
     expect(result.ok).toBe(false);
   });
 });
-
-// ---------- save_workflow ----------
 
 describe('save_workflow', () => {
   it('approved outcome returns saved:true with workflowId and the ask-the-user nextStep', async () => {
@@ -255,7 +245,6 @@ describe('save_workflow', () => {
   });
 
   it('create store-full pre-check returns without showing card', async () => {
-    // Pre-fill store to max.
     const fullWorkflows = Array.from({ length: 100 }, (_unused, index) => ({
       createdAt: index,
       description: 'd',
@@ -268,7 +257,6 @@ describe('save_workflow', () => {
     const ctx = createBaseCtx();
     (ctx.storage.getItem as ReturnType<typeof vi.fn>).mockResolvedValue(fullWorkflows);
 
-    // RequestApproval should never be called.
     const result = await executeWorkflowToolCall(
       createToolCall('save_workflow', {
         description: 'desc',
@@ -572,9 +560,6 @@ describe('save_workflow', () => {
   });
 
   it('reports the runs toggle at the completed save, not when the card opened', async () => {
-    // The setting starts ON when the card opens.
-    // The user flips it OFF while the approval is pending.
-    // The nextStep must report the OFF state, never the stale ON.
     const { requestApproval, settle } = deferredApproval();
     const ctx = createBaseCtx({ requestApproval });
     const settingsValue: Record<string, unknown> = {
@@ -594,14 +579,12 @@ describe('save_workflow', () => {
       ctx
     );
 
-    // Wait for the approval request to be in flight before changing the setting.
     await vi.waitFor(() => {
       if (requestApproval.mock.calls.length === 0) {
         throw new Error('approval not requested yet');
       }
     });
 
-    // Flip the toggle while the approval card is pending, then approve.
     settingsValue['autoApproveWorkflowRuns'] = false;
     settle({ autoApproved: false, savedId: 'new-wf-id', status: 'approved' });
 
@@ -619,9 +602,6 @@ describe('save_workflow', () => {
   });
 
   it('reports a run toggle flipped on while approval is pending', async () => {
-    // The setting starts OFF when the card opens.
-    // The user flips it ON while the approval is pending.
-    // The completed save reports the ON state.
     const { requestApproval, settle } = deferredApproval();
     const ctx = createBaseCtx({ requestApproval });
     const settingsValue: Record<string, unknown> = {
@@ -641,7 +621,6 @@ describe('save_workflow', () => {
       ctx
     );
 
-    // Wait for the approval request to be in flight before changing the setting.
     await vi.waitFor(() => {
       if (requestApproval.mock.calls.length === 0) {
         throw new Error('approval not requested yet');
@@ -742,7 +721,6 @@ describe('save_workflow', () => {
       ctx
     );
 
-    // Wait for the real requestApproval to persist the draft and show the card.
     const atomStore = getDefaultStore();
     await vi.waitFor(() => {
       if (atomStore.get(pendingApprovalAtom) === undefined) {
@@ -759,7 +737,6 @@ describe('save_workflow', () => {
       kind: entry.kind,
     }).toStrictEqual({ draftPersisted: true, kind: 'workflow' });
 
-    // Approve on the card through the same path the card uses.
     const outcome = await applyApprovalDecision(storage, 'workflow', entry.draft, true);
     if (outcome.status !== 'approved') {
       throw new Error('expected an approved outcome');
@@ -778,7 +755,6 @@ describe('save_workflow', () => {
       },
     });
 
-    // The workflow is stored, the draft cleared, and the lock released.
     const workflows = values.get(AGENT_WORKFLOWS_STORAGE_KEY) as Record<string, unknown>[];
     expect({
       count: workflows.length,
@@ -820,8 +796,6 @@ describe('save_workflow', () => {
     });
   });
 });
-
-// ---------- run_workflow ----------
 
 describe('run_workflow', () => {
   it('refuses to run in safe mode with toggle off', async () => {
@@ -934,8 +908,6 @@ describe('run_workflow', () => {
   });
 });
 
-// ---------- delete_workflow ----------
-
 describe('delete_workflow', () => {
   it('deletes in dangerous mode and names the workflow', async () => {
     const setItem = vi.fn().mockResolvedValue(undefined);
@@ -965,7 +937,6 @@ describe('delete_workflow', () => {
       ok: true,
       value: { deleted: true, name: 'My WF', workflowId: 'wf-1' },
     });
-    // The store no longer holds the workflow.
     expect(setItem).toHaveBeenCalledWith('local:kiloAgentWorkflows', []);
   });
 
@@ -1024,8 +995,6 @@ describe('delete_workflow', () => {
     expect(result.ok).toBe(false);
   });
 });
-
-// ---------- save_memory ----------
 
 describe('save_memory', () => {
   it('approved outcome returns saved:true with memoryId', async () => {
@@ -1114,8 +1083,6 @@ describe('save_memory', () => {
     );
   });
 });
-
-// ---------- workflow params ----------
 
 describe('workflow params through tools', () => {
   it('rejects save_workflow with duplicate param names', async () => {

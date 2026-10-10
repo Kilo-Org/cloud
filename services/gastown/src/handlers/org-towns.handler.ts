@@ -96,7 +96,6 @@ export async function handleCreateOrgRig(c: Context<GastownEnv>, params: { orgId
     `${ORG_TOWNS_LOG} handleCreateOrgRig: rig created id=${rig.id}, now configuring Town DO`
   );
 
-  // Configure the Town DO with rig metadata and register the rig.
   // If this fails, roll back the rig creation to avoid an orphaned record.
   try {
     const townDOStub = getTownDOStub(c.env, parsed.data.town_id);
@@ -207,7 +206,6 @@ export async function handleDeleteOrgRig(
   const deleted = await orgDO.deleteRig(params.rigId);
   if (!deleted) return c.json(resError('Rig not found'), 404);
 
-  // Remove the rig from the Town DO
   try {
     const townDOStub = getTownDOStub(c.env, rig.town_id);
     await townDOStub.removeRig(params.rigId);

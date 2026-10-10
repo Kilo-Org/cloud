@@ -13,8 +13,6 @@ import { AgentsBlockingCards } from './agents-blocking-cards';
 import { AgentsComposer } from './agents-composer';
 import { AgentsMessageList } from './agents-message-list';
 
-// ---- AgentsMessageList rendering ----
-
 describe('agents message list rendering', () => {
   /*
    * Transcript rendering is covered elsewhere: the pure mapping in
@@ -28,8 +26,6 @@ describe('agents message list rendering', () => {
     expect(container.textContent).toContain('No messages yet');
   });
 });
-
-// ---- AgentsComposer rendering ----
 
 describe('agents composer rendering', () => {
   it('renders read-only banner when isReadOnly is true', () => {
@@ -303,8 +299,6 @@ describe('agents composer rendering', () => {
   });
 });
 
-// ---- AgentsBlockingCards rendering ----
-
 const asyncNoop = async () => {};
 
 describe('agents blocking cards rendering', () => {
@@ -381,8 +375,6 @@ describe('agents blocking cards rendering', () => {
   });
 });
 
-// ---- PermissionCard error handling (Fix 4) ----
-
 describe('permission card error handling', () => {
   it('shows error and re-enables buttons after a failed respondToPermission', async () => {
     // eslint-disable-next-line require-await -- async makes throw a promise rejection
@@ -425,8 +417,6 @@ describe('permission card error handling', () => {
     });
   });
 });
-
-// ---- QuestionCard error handling (Fix 4) ----
 
 describe('question card error handling', () => {
   it('shows error and re-enables after a failed answerQuestion', async () => {
@@ -521,8 +511,6 @@ describe('question card error handling', () => {
     expect(dismissBtnAfter?.getAttribute('disabled')).toBeNull();
   });
 });
-
-// ---- AgentsSessionView integration tests ----
 
 const atomMap = new Map<object, string>();
 
@@ -696,8 +684,6 @@ describe('agents session view integration', () => {
     );
   }
 
-  // ---- Status indicator error Retry ----
-
   it('shows Retry button when status indicator type is error', async () => {
     storedAtomValues['statusIndicator'] = {
       type: 'error',
@@ -712,8 +698,6 @@ describe('agents session view integration', () => {
     expect(container.textContent).toContain('Dismiss');
   });
 
-  // ---- Credits error ----
-
   it('shows Add credits link when error contains credits message', async () => {
     storedAtomValues['error'] =
       'Insufficient credits. Please add at least $1 to continue using Cloud Agent.';
@@ -727,8 +711,6 @@ describe('agents session view integration', () => {
     );
   });
 
-  // ---- Non-credits error shows Retry ----
-
   it('shows Retry button for non-credits errors', async () => {
     storedAtomValues['error'] = 'Connection lost. Please retry in a moment.';
     storedAtomValues['isStreaming'] = false;
@@ -738,8 +720,6 @@ describe('agents session view integration', () => {
     const retryBtn = [...container.querySelectorAll('button')].find(b => b.textContent === 'Retry');
     expect(retryBtn).not.toBeNull();
   });
-
-  // ---- Status indicator credits: no Retry (non-retryable) ----
 
   it('shows no Retry button when status indicator is a credits error', async () => {
     storedAtomValues['statusIndicator'] = {
@@ -756,8 +736,6 @@ describe('agents session view integration', () => {
     );
   });
 
-  // ---- Credits URL uses getKiloApiBaseUrl() ----
-
   it('uses getKiloApiBaseUrl() for credits link', async () => {
     mockGetKiloApiBaseUrl.mockReturnValue('https://custom.api.example.com');
     storedAtomValues['error'] = 'Insufficient credits. Please add at least $1 to continue.';
@@ -767,8 +745,6 @@ describe('agents session view integration', () => {
     expect(link).not.toBeNull();
     expect(link!.getAttribute('href')).toContain('https://custom.api.example.com/credits');
   });
-
-  // ---- Failed prompt Retry ----
 
   it('shows Retrying… state on failed prompt while send is pending', async () => {
     // eslint-disable-next-line init-declarations -- resolved inside Promise constructor
@@ -799,8 +775,6 @@ describe('agents session view integration', () => {
     await sendPromise;
   });
 
-  // ---- Failed prompt retry: true hides row ----
-
   it('hides failed prompt row when retry succeeds (send returns true)', async () => {
     mockManager.send.mockResolvedValue(true);
 
@@ -821,8 +795,6 @@ describe('agents session view integration', () => {
 
     expect(mockManager.clearError).toHaveBeenCalledWith();
   });
-
-  // ---- Failed prompt retry: false keeps row ----
 
   it('keeps failed prompt row when retry fails (send returns false)', async () => {
     mockManager.send.mockResolvedValue(false);
@@ -847,8 +819,6 @@ describe('agents session view integration', () => {
       expect(retryBtnAfter!.getAttribute('disabled')).toBeNull();
     });
   });
-
-  // ---- Error retry: disabled state (same as switch retry) ----
 
   it('shows Retrying… on error atom Retry while switchSession is pending', async () => {
     // eslint-disable-next-line init-declarations -- resolved inside Promise constructor
@@ -875,8 +845,6 @@ describe('agents session view integration', () => {
     resolveSwitch();
     await switchPromise;
   });
-
-  // ---- Blocking card errors: inline via card components, no double error ----
 
   it('shows blocking card error inline when answerQuestion fails', async () => {
     mockManager.answerQuestion.mockRejectedValue(new Error('boom'));
@@ -972,8 +940,6 @@ describe('agents session view integration', () => {
     });
   });
 
-  // ---- Fix 1: Status error retry hidden when failedPrompt exists ----
-
   it('hides status error Retry when failedPrompt is set (keeps Dismiss)', async () => {
     storedAtomValues['statusIndicator'] = {
       type: 'error',
@@ -1011,8 +977,6 @@ describe('agents session view integration', () => {
     expect(container.textContent).toContain('Dismiss');
     expect(container.textContent).toContain('Retry');
   });
-
-  // ---- Fix 2: variant included in prompt payload ----
 
   it('includes sessionConfig.variant in send payload when present', async () => {
     storedAtomValues['sessionConfig'] = { mode: 'code', model: 'gpt-4', variant: 'high' };
@@ -1080,8 +1044,6 @@ describe('agents session view integration', () => {
     });
   });
 
-  // ---- Fix 3: Stale failed-prompt banner hidden after successful composer send ----
-
   it('hides failed-prompt banner after a new composer send', async () => {
     storedAtomValues['failedPrompt'] = 'old failed message';
     storedAtomValues['sessionConfig'] = { mode: 'code', model: 'gpt-4' };
@@ -1102,7 +1064,6 @@ describe('agents session view integration', () => {
     );
     fireEvent.click(sendBtn!);
 
-    // Banner should be hidden after send
     await vi.waitFor(() => {
       expect(container.textContent).not.toContain('Message failed to send');
     });
@@ -1170,13 +1131,11 @@ describe('agents session view integration', () => {
     );
     fireEvent.click(sendBtn!);
 
-    // Banner should remain visible since send returned false
     await vi.waitFor(() => {
       // eslint-disable-next-line jest/prefer-called-with -- checking call count not args
       expect(mockManager.send).toHaveBeenCalled();
     });
 
-    // Assert on same container — no fresh mount
     expect(container.textContent).toContain('Message failed to send');
   });
 
@@ -1202,13 +1161,11 @@ describe('agents session view integration', () => {
     );
     fireEvent.click(sendBtn!);
 
-    // Banner should remain visible since send rejected
     await vi.waitFor(() => {
       // eslint-disable-next-line jest/prefer-called-with -- checking call count not args
       expect(mockManager.send).toHaveBeenCalled();
     });
 
-    // Assert on same container — no fresh mount
     expect(container.textContent).toContain('Message failed to send');
   });
 
@@ -1243,8 +1200,6 @@ describe('agents session view integration', () => {
       expect(container.textContent).toContain('Message failed to send');
     });
   });
-
-  // ---- Fix 4: org-aware credits URL in status indicator ----
 
   it('includes organizationId in status indicator credits link as org route', async () => {
     storedOrganizationId = 'org-test-123';
@@ -1302,10 +1257,7 @@ describe('agents session view integration', () => {
     expect(link!.getAttribute('href')).not.toContain('/organizations/');
   });
 
-  // ---- Fix 5: same-text re-fail after retry succeeded ----
-
   it('reshows failed-prompt banner when composer re-sends same text that then fails', async () => {
-    // Step 1: retry succeeds, hiding the banner
     mockManager.send.mockResolvedValue(true);
     storedAtomValues['failedPrompt'] = 'hello world';
     storedAtomValues['isStreaming'] = false;
@@ -1315,17 +1267,14 @@ describe('agents session view integration', () => {
     const { container } = await renderView();
     expect(container.textContent).toContain('Message failed to send');
 
-    // Click retry — succeeds, row hides
     const retryBtn = [...container.querySelectorAll('button')].find(b => b.textContent === 'Retry');
     fireEvent.click(retryBtn!);
     await vi.waitFor(() => {
       expect(container.textContent).not.toContain('Message failed to send');
     });
 
-    // Step 2: now make send return false
     mockManager.send.mockResolvedValue(false);
 
-    // Step 3: type same text in composer and send
     const textarea = container.querySelector('textarea');
     fireEvent.change(textarea!, { target: { value: 'hello world' } });
     const sendBtn = [...container.querySelectorAll('button')].find(
@@ -1338,8 +1287,6 @@ describe('agents session view integration', () => {
       expect(container.textContent).toContain('Message failed to send');
     });
   });
-
-  // ---- Repair r6: retrySucceeded guards ----
 
   it('re-exposes status indicator Retry after failed-prompt retry succeeds', async () => {
     mockManager.send.mockResolvedValue(true);
@@ -1439,8 +1386,6 @@ describe('agents session view integration', () => {
     expect(retryBtns).toHaveLength(1);
   });
 
-  // ---- Regression: empty mode defaults to 'code' ----
-
   it('defaults mode to code when sessionConfig.mode is empty string', async () => {
     storedAtomValues['sessionConfig'] = { mode: '', model: 'gpt-4' };
     storedAtomValues['canSend'] = true;
@@ -1490,8 +1435,6 @@ describe('agents session view integration', () => {
     expect(h1!.textContent).toBe('Session');
   });
 
-  // ---- Unmount destroys manager transport ----
-
   it('calls manager.destroy() on unmount', async () => {
     vi.useFakeTimers();
     const { unmount } = await renderView();
@@ -1505,8 +1448,6 @@ describe('agents session view integration', () => {
     expect(mockManager.destroy).toHaveBeenCalledOnce();
     vi.useRealTimers();
   });
-
-  // ---- StrictMode-safe lifecycle: cleanup/re-setup reconnects ----
 
   it('calls switchSession again after cleanup/re-setup (StrictMode simulation)', async () => {
     vi.useFakeTimers();
@@ -1573,8 +1514,6 @@ describe('agents session view integration', () => {
     vi.useRealTimers();
   });
 
-  // ---- Context usage + session cost indicator ----
-
   const usageAtom = { contextTokens: 12_000, modelID: 'a/b', providerID: 'kilo' };
   const gatewayModel: KiloGatewayModelOption = {
     contextLength: 200_000,
@@ -1629,8 +1568,6 @@ describe('agents session view integration', () => {
     );
     expect(compactBtn?.getAttribute('disabled')).not.toBeNull();
   });
-
-  // ---- In-session model picker ----
 
   async function renderWithPicker(sessionType: string, protocol: string) {
     // Jsdom has no scrollIntoView; the picker scrolls its selected row into view.

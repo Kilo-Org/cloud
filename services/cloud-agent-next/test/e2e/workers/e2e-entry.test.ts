@@ -1,14 +1,11 @@
-import { createExecutionContext, env, runInDurableObject, SELF } from 'cloudflare:test';
+import { createExecutionContext, env, SELF } from 'cloudflare:test';
 import { createDrizzleClient } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import production from '../../../src/index.js';
 import { e2eSurfaceApp } from '../../../src/e2e-surface/app.js';
-import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
-import type { SandboxControl } from '../../../src/persistence/SandboxControl.js';
-import { groupedRegisterSessionInput } from '../../helpers/session-setup.js';
 
 const ALLOWED_USER = 'usr_e2e_surface_allowed';
 const SESSION_ID = `agent_${crypto.randomUUID()}`;
@@ -224,141 +221,5 @@ describe('internal tRPC reachability (deliberately widened by the single secret)
     expect(response.status).toBe(401);
     const body = (await response.json()) as { error?: { message?: string } };
     expect(body.error?.message).toBe('Invalid or missing internal API key');
-  });
-});
-
-describe('allocation inspect', () => {
-  it('returns exactly the logical id and the persisted physical projection', async () => {
-    const sessionId = `agent_${crypto.randomUUID()}`;
-    const kiloSessionId = `ses_e2e_surface_alloc_${crypto.randomUUID().slice(0, 8)}`;
-    const sandboxId = 'usr-123456789abc';
-    const providerRef = 'e2e-provider-ref-2';
-
-    await db.db
-      .insert(cli_sessions_v2)
-      .values({
-        session_id: kiloSessionId,
-        kilo_user_id: ALLOWED_USER,
-        cloud_agent_session_id: sessionId,
-      })
-      .onConflictDoNothing();
-
-    await runInDurableObject(
-      env.CLOUD_AGENT_SESSION.getByName(`${ALLOWED_USER}:${sessionId}`),
-      async instance => {
-        const session = instance as unknown as CloudAgentSession;
-        const registered = await session.registerSession(
-          groupedRegisterSessionInput({
-            sessionId,
-            userId: ALLOWED_USER,
-            prompt: 'echo:hi',
-            mode: 'code',
-            model: 'kilo/fake-deterministic',
-            kiloSessionId,
-            sandboxId,
-          })
-        );
-        if (!registered.success) {
-          throw new Error(`registerSession failed: ${registered.error}`);
-        }
-        const ready = await session.recordSessionReady({
-          workspacePath: `/workspace/${ALLOWED_USER}/sessions/${sessionId}`,
-          sandboxId,
-          sessionHome: `/home/${sessionId}`,
-          branchName: `session/${sessionId}`,
-          kiloSessionId,
-        });
-        if (!ready.success) {
-          throw new Error(`recordSessionReady failed: ${ready.error}`);
-        }
-      }
-    );
-
-    await runInDurableObject(env.SANDBOX_CONTROL.getByName(sandboxId), async instance => {
-      const control = instance as unknown as SandboxControl;
-      await control.claimCreate('e2e-intent');
-      await control.confirmInstance(providerRef);
-    });
-
-    const response = await SELF.fetch(
-      allocationRequest(sessionId, tokenFor(ALLOWED_USER), internalApiSecret)
-    );
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as Record<string, unknown>;
-    expect(Object.keys(body).sort()).toEqual([
-      'logicalSandboxId',
-      'physicalProviderRef',
-      'physicalState',
-    ]);
-    expect(body.logicalSandboxId).toBe(sandboxId);
-    expect(body.physicalProviderRef).toBe(providerRef);
-    expect(body.physicalState).toBe('running');
-
-    await db.db
-      .delete(cli_sessions_v2)
-      .where(eq(cli_sessions_v2.cloud_agent_session_id, sessionId));
-  });
-
-  it('reports the persisted creating state before a provider reference exists', async () => {
-    const sessionId = `agent_${crypto.randomUUID()}`;
-    const kiloSessionId = `ses_e2e_surface_creating_${crypto.randomUUID().slice(0, 8)}`;
-    const sandboxId = 'usr-000000000abc';
-
-    await db.db
-      .insert(cli_sessions_v2)
-      .values({
-        session_id: kiloSessionId,
-        kilo_user_id: ALLOWED_USER,
-        cloud_agent_session_id: sessionId,
-      })
-      .onConflictDoNothing();
-
-    await runInDurableObject(
-      env.CLOUD_AGENT_SESSION.getByName(`${ALLOWED_USER}:${sessionId}`),
-      async instance => {
-        const session = instance as unknown as CloudAgentSession;
-        const registered = await session.registerSession(
-          groupedRegisterSessionInput({
-            sessionId,
-            userId: ALLOWED_USER,
-            prompt: 'echo:hi',
-            mode: 'code',
-            model: 'kilo/fake-deterministic',
-            kiloSessionId,
-            sandboxId,
-          })
-        );
-        if (!registered.success) {
-          throw new Error(`registerSession failed: ${registered.error}`);
-        }
-        const ready = await session.recordSessionReady({
-          workspacePath: `/workspace/${ALLOWED_USER}/sessions/${sessionId}`,
-          sandboxId,
-          sessionHome: `/home/${sessionId}`,
-          branchName: `session/${sessionId}`,
-          kiloSessionId,
-        });
-        if (!ready.success) {
-          throw new Error(`recordSessionReady failed: ${ready.error}`);
-        }
-      }
-    );
-
-    await runInDurableObject(env.SANDBOX_CONTROL.getByName(sandboxId), async instance => {
-      const control = instance as unknown as SandboxControl;
-      await control.claimCreate('e2e-creating-intent');
-    });
-
-    const response = await SELF.fetch(
-      allocationRequest(sessionId, tokenFor(ALLOWED_USER), internalApiSecret)
-    );
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as Record<string, unknown>;
-    expect(body.physicalProviderRef).toBeNull();
-    expect(body.physicalState).toBe('creating');
-
-    await db.db
-      .delete(cli_sessions_v2)
-      .where(eq(cli_sessions_v2.cloud_agent_session_id, sessionId));
   });
 });

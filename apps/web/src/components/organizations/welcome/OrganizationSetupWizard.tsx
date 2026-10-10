@@ -32,7 +32,7 @@ import {
   ORGANIZATION_ONBOARDING_STEP_KEYS,
   type OrganizationOnboardingStepKey,
 } from '@/lib/organizations/onboarding-steps';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';

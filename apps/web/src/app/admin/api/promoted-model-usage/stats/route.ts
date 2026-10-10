@@ -1,14 +1,14 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { free_model_usage } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
 import {
   PROMOTION_WINDOW_HOURS,
   PROMOTION_MAX_REQUESTS,
   ADMIN_RATE_LIMIT_TEST_MODEL,
-} from '@/lib/constants';
+} from '@kilocode/web-shared/lib/constants';
 
 export type PromotedModelUsageStatsResponse = {
   // Current window stats (anonymous only, last PROMOTION_WINDOW_HOURS)

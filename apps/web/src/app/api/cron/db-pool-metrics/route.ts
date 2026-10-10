@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { CRON_SECRET } from '@/lib/config.server';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 
 /**

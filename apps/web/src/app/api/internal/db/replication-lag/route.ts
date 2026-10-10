@@ -1,7 +1,7 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import { NextResponse } from 'next/server';
 
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { collectReplicationHealth } from '@/lib/replication-health';
 
 export async function GET(request: Request) {

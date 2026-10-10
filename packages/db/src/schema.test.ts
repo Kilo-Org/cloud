@@ -1016,6 +1016,13 @@ describe('database schema', () => {
       CodingPlanSubscriptionStatus: ['active', 'past_due', 'canceled'],
       CodingPlanTermKind: ['activation', 'extension', 'renewal'],
       CodeReviewAnalyticsCaptureStatus: ['captured', 'missing', 'invalid', 'omitted'],
+      CodeReviewPublicationStatus: [
+        'missing',
+        'not_applicable',
+        'published',
+        'unchanged',
+        'unknown',
+      ],
       CodeReviewAnalyticsChangeType: [
         'bug_fix',
         'feature',

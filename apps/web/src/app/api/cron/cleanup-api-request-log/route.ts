@@ -5,12 +5,12 @@ import {
   createScheduledJobRun,
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
 import { asc, inArray, lt } from 'drizzle-orm';
-import { CRON_SECRET } from '@/lib/config.server';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 
-const RETENTION_DAYS = 7;
+const RETENTION_DAYS = 30;
 const BATCH_SIZE = 10_000;
 
 function getDaysAgo(days: number) {

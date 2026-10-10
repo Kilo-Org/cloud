@@ -72,10 +72,6 @@ import { findLatestContextUsage } from './context-usage';
 import type { ContextUsage } from './context-usage';
 import { CLI_MODEL_ID, cliModelLabel } from './cli-model';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 type StoredMessage = { info: MessageInfo; parts: Part[] };
 type SessionManagerPromptPayload = Omit<SendPromptPayload, 'model'> & { model?: string };
 type SessionManagerSendPayload = SessionManagerPromptPayload | SendCommandPayload;
@@ -289,6 +285,13 @@ type FetchedSessionData = {
   isInitiated: boolean;
   needsLegacyPrepare: boolean;
   isPreparingAsync: boolean;
+  /**
+   * Whether the session currently has a ready route that can own a terminal.
+   * Undefined when the adapter cannot resolve route state. Persisted
+   * `preparedAt`/`initiatedAt` are NOT readiness: a stopped sandbox clears the
+   * route while leaving both set.
+   */
+  routeReady?: boolean;
   prompt: string | null;
   initialMessageId: string | null;
   /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
@@ -429,7 +432,6 @@ type SessionManagerConfig = {
   onRemoteSessionMessageSent?: (data: { kiloSessionId: KiloSessionId }) => void;
 };
 
-// Writable/read-only atom aliases for the public atoms record
 type W<T> = WritableAtom<T, [T], void>;
 
 type SessionManagerAtoms = {
@@ -643,10 +645,6 @@ type SessionManager = {
   atoms: SessionManagerAtoms;
 };
 
-// ---------------------------------------------------------------------------
-// Error formatting
-// ---------------------------------------------------------------------------
-
 const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
 /** Terminal message for a child session whose first page is a worker 404 (not-found). */
 const CHILD_SESSION_NOT_FOUND_MESSAGE = 'This session is no longer available.';
@@ -715,10 +713,6 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
 function formatError(err: unknown): string {
   return formatErrorDetail(err).message;
 }
-
-// ---------------------------------------------------------------------------
-// Streaming detection
-// ---------------------------------------------------------------------------
 
 function isMessageStreaming(msg: StoredMessage): boolean {
   if (msg.info.role === 'assistant' && msg.info.error) return false;
@@ -826,10 +820,6 @@ function insertOptimisticUserMessage(input: {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Status → indicator mapping
-// ---------------------------------------------------------------------------
-
 function indicatorForCloudStatus(cs: CloudStatus): SessionStatusIndicator | null {
   const now = Date.now();
   if (cs.type === 'preparing') {
@@ -883,6 +873,9 @@ function indicatorForStatus(s: AgentStatus): SessionStatusIndicator | null {
     };
   if (s.type === 'interrupted')
     return { type: 'info', message: 'Session stopped', timestamp: now, code: 'session-stopped' };
+  // A scheduled session renders no bottom-bar indicator: the session-detail
+  // connection row owns that reading.
+  if (s.type === 'scheduled') return null;
   return null;
 }
 
@@ -916,10 +909,6 @@ function removePendingRequest<T extends { requestId: string }>(
     : list;
 }
 
-// ---------------------------------------------------------------------------
-// Factory
-// ---------------------------------------------------------------------------
-
 function createSessionManager(config: SessionManagerConfig): SessionManager {
   const { store } = config;
 
@@ -929,11 +918,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // authoritative message exactly once.
   const remoteOptimisticIds = new Set<string>();
 
-  // Internal atoms
   const sessionStorageAtom = atom<JotaiSessionStorage | null>(null);
   const rootSessionIdAtom = atom<string | null>(null);
 
-  // Public writable atoms
   const isStreamingAtom = atom(false);
   const isLoadingAtom = atom(false);
   /**
@@ -1120,56 +1107,133 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
-  // Derived atoms
+  function sameMessageRows(
+    previous: readonly StoredMessage[],
+    next: readonly StoredMessage[]
+  ): boolean {
+    if (previous.length !== next.length) return false;
+    for (let i = 0; i < next.length; i++) {
+      if (previous[i] !== next[i]) return false;
+    }
+    return true;
+  }
+
+  let previousMessagesList: StoredMessage[] | null = null;
   const messagesListAtom = atom<StoredMessage[]>(get => {
     const storage = get(sessionStorageAtom);
-    if (!storage) return [];
-    const ids = get(storage.atoms.messageIds);
-    const msgMap = get(storage.atoms.messages);
-    const partsMap = get(storage.atoms.parts);
-    get(storage.atoms.partsRevision);
-    const rootSessionId = get(rootSessionIdAtom);
     const out: StoredMessage[] = [];
-    for (const id of ids) {
-      const info = msgMap.get(id);
-      if (!info) continue;
-      if (rootSessionId !== null && info.sessionID !== rootSessionId) continue;
-      out.push(memoizedStoredMessage(id, info, partsMap.get(id) ?? EMPTY_PARTS));
+    if (storage) {
+      const ids = get(storage.atoms.messageIds);
+      const msgMap = get(storage.atoms.messages);
+      const partsMap = get(storage.atoms.parts);
+      get(storage.atoms.partsRevision);
+      const rootSessionId = get(rootSessionIdAtom);
+      for (const id of ids) {
+        const info = msgMap.get(id);
+        if (!info) continue;
+        if (rootSessionId !== null && info.sessionID !== rootSessionId) continue;
+        out.push(memoizedStoredMessage(id, info, partsMap.get(id) ?? EMPTY_PARTS));
+      }
+      pruneStoredMessageMemo(ids);
     }
-    pruneStoredMessageMemo(ids);
+    if (previousMessagesList !== null && sameMessageRows(previousMessagesList, out)) {
+      return previousMessagesList;
+    }
+    previousMessagesList = out;
     return out;
   });
 
   const notStreaming = (msg: StoredMessage) => !isMessageStreaming(msg);
-  const staticMessagesAtom = atom(
-    get => splitByContiguousPrefix(get(messagesListAtom), notStreaming).staticItems
-  );
-  const dynamicMessagesAtom = atom(
-    get => splitByContiguousPrefix(get(messagesListAtom), notStreaming).dynamicItems
-  );
+  let previousStaticMessages: StoredMessage[] | null = null;
+  const staticMessagesAtom = atom(get => {
+    const next = splitByContiguousPrefix(get(messagesListAtom), notStreaming).staticItems;
+    if (previousStaticMessages !== null && sameMessageRows(previousStaticMessages, next)) {
+      return previousStaticMessages;
+    }
+    previousStaticMessages = next;
+    return next;
+  });
+  let previousDynamicMessages: StoredMessage[] | null = null;
+  const dynamicMessagesAtom = atom(get => {
+    const next = splitByContiguousPrefix(get(messagesListAtom), notStreaming).dynamicItems;
+    if (previousDynamicMessages !== null && sameMessageRows(previousDynamicMessages, next)) {
+      return previousDynamicMessages;
+    }
+    previousDynamicMessages = next;
+    return next;
+  });
   const totalCostAtom = atom(get => {
     let t = 0;
     for (const m of get(messagesListAtom)) if (m.info.role === 'assistant') t += m.info.cost;
     return t;
   });
   const contextUsageAtom = atom(get => findLatestContextUsage(get(messagesListAtom)));
+
+  type ChildSessionRowProjection = { id: string; info: MessageInfo; parts: Part[] };
+  const EMPTY_CHILD_MESSAGES_GETTER = (): StoredMessage[] => [];
+  let childMessagesStorage: JotaiSessionStorage | null = null;
+  let childMessagesRootSessionId: string | null = null;
+  let childMessagesProjection: ChildSessionRowProjection[] = [];
+  let childMessagesGetter: ((childSessionId: string) => StoredMessage[]) | null = null;
+
   const childMessagesAtom = atom(get => {
     const storage = get(sessionStorageAtom);
-    if (!storage) return (): StoredMessage[] => [];
+    const rootSessionId = get(rootSessionIdAtom);
+    if (!storage) {
+      childMessagesStorage = null;
+      childMessagesRootSessionId = rootSessionId;
+      childMessagesProjection = [];
+      childMessagesGetter = EMPTY_CHILD_MESSAGES_GETTER;
+      return EMPTY_CHILD_MESSAGES_GETTER;
+    }
     const ids = get(storage.atoms.messageIds);
     const msgMap = get(storage.atoms.messages);
     const partsMap = get(storage.atoms.parts);
     get(storage.atoms.partsRevision);
     pruneStoredMessageMemo(ids);
-    return (childSessionId: string): StoredMessage[] => {
+
+    const projection: ChildSessionRowProjection[] = [];
+    for (const id of ids) {
+      const info = msgMap.get(id);
+      if (!info) continue;
+      if (rootSessionId !== null && info.sessionID === rootSessionId) continue;
+      projection.push({ id, info, parts: partsMap.get(id) ?? EMPTY_PARTS });
+    }
+
+    const lifetimeMatches =
+      childMessagesGetter !== null &&
+      childMessagesStorage === storage &&
+      childMessagesRootSessionId === rootSessionId;
+    const signatureMatches =
+      childMessagesProjection.length === projection.length &&
+      projection.every((row, index) => {
+        const previousRow = childMessagesProjection[index];
+        return (
+          previousRow !== undefined &&
+          previousRow.id === row.id &&
+          previousRow.info === row.info &&
+          previousRow.parts === row.parts
+        );
+      });
+
+    if (lifetimeMatches && signatureMatches && childMessagesGetter !== null) {
+      return childMessagesGetter;
+    }
+
+    const rows = projection;
+    childMessagesStorage = storage;
+    childMessagesRootSessionId = rootSessionId;
+    childMessagesProjection = projection;
+    childMessagesGetter = (childSessionId: string): StoredMessage[] => {
       const out: StoredMessage[] = [];
-      for (const id of ids) {
-        const info = msgMap.get(id);
-        if (info?.sessionID === childSessionId)
-          out.push(memoizedStoredMessage(id, info, partsMap.get(id) ?? EMPTY_PARTS));
+      for (const row of rows) {
+        if (row.info.sessionID === childSessionId) {
+          out.push(memoizedStoredMessage(row.id, row.info, row.parts));
+        }
       }
       return out;
     };
+    return childMessagesGetter;
   });
   const childSessionHydrationStateAtom = atom(get => {
     const states = get(childSessionHydrationStatesAtom);
@@ -1181,7 +1245,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     return (childSessionId: string): string | null => errors.get(childSessionId) ?? null;
   });
 
-  // Private mutable state
   let activeSessionId: KiloSessionId | null = null;
   let switchGeneration = 0;
   let currentSession: CloudAgentSession | null = null;
@@ -1241,6 +1304,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * live gate recovers (or the session switches).
    */
   let postInterruptUnlock = false;
+  /**
+   * After Stop ACK the turn can stay busy/retrying until the terminal status
+   * arrives. Keep Stop disabled for that session until then so a second click
+   * cannot issue a duplicate interrupt.
+   */
+  let interruptAwaitingIdleSession: CloudAgentSession | null = null;
   let stateUnsub: (() => void) | null = null;
   let metadataRecoveryCleanups: Array<() => void> = [];
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1311,6 +1380,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     remoteHistoryReplaying = true;
     postClearSurvivorIds = null;
     postInterruptUnlock = false;
+    interruptAwaitingIdleSession = null;
     store.set(remoteModelOverrideAtom, null);
     store.set(cloudAgentModelOverrideAtom, null);
     store.set(canSendAtom, false);
@@ -1621,8 +1691,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function updateCapabilityAtoms(session: CloudAgentSession): void {
     const cloudStatus = store.get(cloudStatusAtom);
     const cloudReady =
-      cloudStatus === null || cloudStatus.type === 'ready' || cloudStatus.type === 'error';
-    const liveCanSend = session.canSend && cloudReady;
+      cloudStatus === null ||
+      cloudStatus.type === 'ready' ||
+      cloudStatus.type === 'error' ||
+      (activeSessionType === 'cloud-agent' &&
+        (cloudStatus.type === 'preparing' || cloudStatus.type === 'finalizing'));
+    const liveCanSend = activeSessionType !== 'read-only' && session.canSend && cloudReady;
     if (postInterruptUnlock) {
       if (liveCanSend) {
         postInterruptUnlock = false;
@@ -1635,7 +1709,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     } else {
       store.set(canSendAtom, liveCanSend);
     }
-    store.set(canInterruptAtom, session.canInterrupt);
+    store.set(canInterruptAtom, session.canInterrupt && interruptAwaitingIdleSession !== session);
   }
 
   /**
@@ -1763,11 +1837,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   ): void {
     let firstActivityFired = false;
     let prevAct = '';
+    let prevRetry: Extract<SessionActivity, { type: 'retrying' }> | null = null;
+    let retryIndicator: SessionStatusIndicator | null = null;
     let prevSk = '';
     let prevCsk = '';
     let prevCloudStatusHadIndicator = false;
     const sKey = (s: AgentStatus) =>
-      s.type === 'autocommit' ? `${s.type}:${s.step}:${s.commitHash ?? ''}` : s.type;
+      s.type === 'autocommit'
+        ? `${s.type}:${s.step}:${s.commitHash ?? ''}`
+        : s.type === 'scheduled'
+          ? `${s.type}:${s.scheduledAt ?? ''}`
+          : s.type;
     const csKey = (cs: CloudStatus | null) =>
       cs === null
         ? ''
@@ -1805,6 +1885,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (st.type === 'disconnected') {
         postInterruptUnlock = false;
       }
+      if (
+        interruptAwaitingIdleSession === session &&
+        (st.type === 'disconnected' || (act.type !== 'busy' && act.type !== 'retrying'))
+      ) {
+        interruptAwaitingIdleSession = null;
+      }
 
       // Only update read-only state after the transport has been resolved.
       // During the 'connecting' phase the transport is null so canSend is
@@ -1826,19 +1912,31 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         setIndicator(null);
       }
 
-      if (act.type !== prevAct) {
+      if (
+        act.type !== prevAct ||
+        (act.type === 'retrying' &&
+          (act.attempt !== prevRetry?.attempt || act.message !== prevRetry?.message))
+      ) {
         if (act.type === 'busy') {
           setIndicator(null);
         } else if (act.type === 'retrying') {
-          setIndicator({
+          retryIndicator = {
             type: 'warning',
             message: `Retrying… ${act.message}`,
             timestamp: Date.now(),
-          });
+          };
+          setIndicator(retryIndicator);
         } else if (act.type === 'idle') {
+          // Only replace our own retry warning; a newer error/cloud indicator stays.
+          if (retryIndicator !== null && store.get(statusIndicatorAtom) === retryIndicator) {
+            const cloudInd = cs && cs.type !== 'ready' ? indicatorForCloudStatus(cs) : null;
+            setIndicator(cloudInd ?? indicatorForStatus(st));
+          }
           config.onComplete?.();
         }
         prevAct = act.type;
+        prevRetry = act.type === 'retrying' ? act : null;
+        if (act.type !== 'retrying') retryIndicator = null;
       }
 
       // Cloud status takes priority over agent status when active
@@ -1856,7 +1954,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         const shouldClearCloudIndicator = prevCloudStatusHadIndicator;
         if (csk !== prevCsk) prevCsk = csk;
         prevCloudStatusHadIndicator = false;
-        // Fall through to existing agent status indicator logic
         const sk = sKey(st);
         if (sk !== prevSk || shouldClearCloudIndicator) {
           const ind = indicatorForStatus(st);
@@ -2704,6 +2801,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     onOptimisticSend?: () => void;
   }): Promise<boolean> {
     store.set(errorAtom, null);
+    interruptAwaitingIdleSession = null;
     if (store.get(agentStatusAtom).type !== 'disconnected') {
       setIndicator(null);
     }
@@ -2898,13 +2996,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   function restoreAfterInterrupt(session: CloudAgentSession): void {
     const cs = store.get(cloudStatusAtom);
-    const cloudReady = cs === null || cs.type === 'ready' || cs.type === 'error';
+    const cloudReady =
+      cs === null ||
+      cs.type === 'ready' ||
+      cs.type === 'error' ||
+      (activeSessionType === 'cloud-agent' &&
+        (cs.type === 'preparing' || cs.type === 'finalizing'));
     const readOnly = activeSessionType === 'read-only';
     postInterruptUnlock = !readOnly;
     store.set(isStreamingAtom, false);
     store.set(isReadOnlyAtom, readOnly);
     store.set(canSendAtom, !readOnly && cloudReady);
-    store.set(canInterruptAtom, session.canInterrupt);
+    store.set(canInterruptAtom, session.canInterrupt && interruptAwaitingIdleSession !== session);
   }
 
   async function interrupt(): Promise<void> {
@@ -2926,6 +3029,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         await session.interrupt();
       }
       if (currentSession === session) {
+        const activityType = session.state.getActivity().type;
+        if (activityType === 'busy' || activityType === 'retrying') {
+          interruptAwaitingIdleSession = session;
+        }
         restoreAfterInterrupt(session);
         setIndicator({
           type: 'info',

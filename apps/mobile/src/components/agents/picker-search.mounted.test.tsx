@@ -176,13 +176,18 @@ describe('repository picker Bitbucket scope note', () => {
       throw new Error('Picker search input did not mount');
     }
     const changeSearch = input.props.onChangeText as (text: string) => void;
-    act(() => {
+    // The filtered list trails the input through `useDeferredValue`: a plain
+    // sync `act()` can return before that low-priority render commits, so the
+    // assertion below would race the deferred value instead of reading it.
+    await act(async () => {
       changeSearch('org/repo');
+      await Promise.resolve();
     });
     expect(hosts(renderer, 'Pressable')).toHaveLength(1);
     expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(false);
-    act(() => {
+    await act(async () => {
       changeSearch('');
+      await Promise.resolve();
     });
     expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(true);
   });
@@ -217,6 +222,39 @@ describe('repository picker search placeholder', () => {
   });
 });
 
+describe('picker search alignment follows the interface direction', () => {
+  const cases = [
+    { name: 'model', Component: ModelPickerContent },
+    { name: 'repository', Component: RepoPickerScreen },
+  ];
+
+  it.each(cases)(
+    'right-aligns the $name search input content in a right-to-left interface',
+    async ({ Component }) => {
+      i18nManager.isRTL = true;
+      const renderer = await mount(Component);
+      const input = hosts(renderer, 'TextInput')[0];
+      if (!input) {
+        throw new Error('Picker search input did not mount');
+      }
+      expect(inputStyle(input).textAlign).toBe('right');
+    }
+  );
+
+  it.each(cases)(
+    'leaves the $name search input content unaligned in a left-to-right interface',
+    async ({ Component }) => {
+      i18nManager.isRTL = false;
+      const renderer = await mount(Component);
+      const input = hosts(renderer, 'TextInput')[0];
+      if (!input) {
+        throw new Error('Picker search input did not mount');
+      }
+      expect(inputStyle(input).textAlign).toBeUndefined();
+    }
+  );
+});
+
 describe('repository picker query alignment', () => {
   function searchInput(renderer: Awaited<ReturnType<typeof mount>>) {
     const input = hosts(renderer, 'TextInput')[0];
@@ -232,16 +270,17 @@ describe('repository picker query alignment', () => {
     // sit at the right, leaving a dead gap between them.
     i18nManager.isRTL = true;
     const renderer = await mount(RepoPickerScreen);
-    expect(searchInput(renderer).props.style).toEqual([
-      { textAlign: 'right' },
-      { color: theme.foreground },
-    ]);
+    const style = inputStyle(searchInput(renderer));
+    expect(style.textAlign).toBe('right');
+    expect(style.color).toBe(theme.foreground);
   });
 
-  it('leaves the input style to the caller in LTR so English is unchanged', async () => {
+  it('leaves the input alignment to the caller in LTR so English is unchanged', async () => {
     i18nManager.isRTL = false;
     const renderer = await mount(RepoPickerScreen);
-    expect(searchInput(renderer).props.style).toEqual({ color: theme.foreground });
+    const style = inputStyle(searchInput(renderer));
+    expect(style.color).toBe(theme.foreground);
+    expect(style.textAlign).toBeUndefined();
   });
 });
 
@@ -261,13 +300,13 @@ describe('model picker query alignment', () => {
     // them. The model picker had no alignment at all before this.
     i18nManager.isRTL = true;
     const renderer = await mount(ModelPickerContent);
-    expect(searchInput(renderer).props.style).toEqual([{ textAlign: 'right' }, undefined]);
+    expect(inputStyle(searchInput(renderer)).textAlign).toBe('right');
   });
 
-  it('leaves the input style to the caller in LTR so English is unchanged', async () => {
+  it('leaves the input alignment to the caller in LTR so English is unchanged', async () => {
     i18nManager.isRTL = false;
     const renderer = await mount(ModelPickerContent);
-    expect(searchInput(renderer).props.style).toBeUndefined();
+    expect(inputStyle(searchInput(renderer)).textAlign).toBeUndefined();
   });
 });
 
@@ -279,6 +318,15 @@ async function mount(Component: () => ReactNode) {
 
 function hosts(renderer: Awaited<ReturnType<typeof mount>>, type: string) {
   return renderer.root.findAll(node => node.type === type);
+}
+
+/** The style RN flattens an input's array to, or nothing when it carries none. */
+function inputStyle(input: ReturnType<typeof hosts>[number]): Record<string, unknown> {
+  const entries: unknown[] = [input.props.style];
+  return Object.assign(
+    {},
+    ...entries.flat(Infinity).filter(entry => typeof entry === 'object' && entry !== null)
+  );
 }
 
 // The model picker hosts its rows in a FlashList and manages its own scrolling
@@ -307,8 +355,12 @@ describe.each([
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);
 
     const changeSearch = input.props.onChangeText as (text: string) => void;
-    act(() => {
+    // The filtered list trails the input through `useDeferredValue`: a plain
+    // sync `act()` can return before that low-priority render commits, so the
+    // assertion below would race the deferred value instead of reading it.
+    await act(async () => {
       changeSearch('no matching choice');
+      await Promise.resolve();
     });
     expect(hosts(renderer, rowHost)).toHaveLength(0);
     if (!hasShellScrollView) {
@@ -319,8 +371,9 @@ describe.each([
     expect(hosts(renderer, 'SheetHeader')[0]).toBe(header);
     expect(header.parent).toBe(group);
 
-    act(() => {
+    await act(async () => {
       changeSearch('');
+      await Promise.resolve();
     });
     expect(hosts(renderer, rowHost).length).toBeGreaterThan(0);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);

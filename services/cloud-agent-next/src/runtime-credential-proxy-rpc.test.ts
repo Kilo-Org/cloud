@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import type { SessionMetadata } from './persistence/session-metadata.js';
@@ -13,6 +13,25 @@ import {
   type RuntimeProxyFence,
   type RuntimeProxyGrant,
 } from './runtime-credential-proxy.js';
+
+const { loggerWarnMock, loggerWithFieldsMock } = vi.hoisted(() => ({
+  loggerWarnMock: vi.fn(),
+  loggerWithFieldsMock: vi.fn(),
+}));
+
+vi.mock('./logger.js', () => {
+  const logger = {
+    withFields: loggerWithFieldsMock,
+    warn: loggerWarnMock,
+  };
+  loggerWithFieldsMock.mockReturnValue(logger);
+  return { logger };
+});
+
+beforeEach(() => {
+  loggerWarnMock.mockClear();
+  loggerWithFieldsMock.mockClear();
+});
 
 const secret = 'test-secret';
 const env = { NEXTAUTH_SECRET: secret } as never;
@@ -567,5 +586,119 @@ describe('persisted runtime credential proxy RPC', () => {
 
     expect(resolved).toBeNull();
     vi.useRealTimers();
+  });
+
+  it('emits one bounded local rejection diagnostic when the runtime fence is unavailable', async () => {
+    const store = storage();
+    const token = signedToken(Date.now() + 10 * 60_000);
+    const handle = await issue({ store, token });
+
+    await expect(
+      resolvePersistedRuntimeProxyCredential({
+        env,
+        storage: store,
+        handle: handle!,
+        metadata: async () => metadata(),
+        authorization: async () => authorization(),
+        fence: async () => null,
+        token: async () => token,
+      })
+    ).resolves.toBeNull();
+
+    expect(loggerWarnMock).toHaveBeenCalledTimes(1);
+    expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
+    expect(loggerWithFieldsMock).toHaveBeenCalledWith({
+      logTag: 'runtime_proxy_request_failed',
+      upstreamAttempted: false,
+      rejectionStage: 'fence',
+      sessionId: 'agent_1',
+      kiloSessionId: 'kilo_1',
+    });
+  });
+
+  it('names the grant stage and includes opaque allocation and wrapper correlation', async () => {
+    const store = storage();
+    const token = signedToken(Date.now() + 10 * 60_000);
+    const handle = await issue({ store, currentFence: controlFence('connection_1'), token });
+
+    await expect(
+      resolvePersistedRuntimeProxyCredential({
+        env,
+        storage: store,
+        handle: handle!,
+        metadata: async () => metadata(),
+        authorization: async () => authorization(),
+        fence: async () => controlFence('connection_1', { wrapperInstanceId: 'wrapper_2' }),
+        token: async () => token,
+      })
+    ).resolves.toBeNull();
+
+    expect(loggerWarnMock).toHaveBeenCalledTimes(1);
+    expect(loggerWithFieldsMock).toHaveBeenCalledWith({
+      logTag: 'runtime_proxy_request_failed',
+      upstreamAttempted: false,
+      rejectionStage: 'grant',
+      sessionId: 'agent_1',
+      kiloSessionId: 'kilo_1',
+      allocationId: 'allocation_1',
+      wrapperInstanceId: 'wrapper_2',
+      connectionId: 'connection_1',
+    });
+  });
+
+  it('emits no diagnostic for a successful resolution', async () => {
+    const store = storage();
+    const token = signedToken(Date.now() + 10 * 60_000);
+    const handle = await issue({ store, token });
+
+    await expect(
+      resolvePersistedRuntimeProxyCredential({
+        env,
+        storage: store,
+        handle: handle!,
+        metadata: async () => metadata(),
+        authorization: async () => authorization(),
+        fence: async () => fence(),
+        token: async () => token,
+      })
+    ).resolves.toMatchObject({ token });
+
+    expect(loggerWarnMock).not.toHaveBeenCalled();
+    expect(loggerWithFieldsMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the diagnostic payload to the allowlisted bounded fields', async () => {
+    const store = storage();
+    const token = signedToken(Date.now() + 10 * 60_000);
+    const handle = await issue({ store, currentFence: controlFence('connection_1'), token });
+
+    await resolvePersistedRuntimeProxyCredential({
+      env,
+      storage: store,
+      handle: handle!,
+      metadata: async () => metadata(),
+      authorization: async () => authorization(),
+      fence: async () => controlFence('connection_1', { wrapperInstanceId: 'wrapper_2' }),
+      token: async () => token,
+    });
+
+    const fields = loggerWithFieldsMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(fields).toBeDefined();
+    expect(Object.keys(fields).sort()).toEqual(
+      [
+        'allocationId',
+        'connectionId',
+        'kiloSessionId',
+        'logTag',
+        'rejectionStage',
+        'sessionId',
+        'upstreamAttempted',
+        'wrapperInstanceId',
+      ].sort()
+    );
+
+    const serialized = JSON.stringify(fields);
+    expect(serialized.length).toBeLessThan(1024);
+    expect(serialized).not.toMatch(/token|secret|bearer|https?:|@/i);
   });
 });

@@ -27,6 +27,7 @@ describe('abortKiloSessionForShutdown', () => {
         },
         isConnected: () => true,
         reconnectEventSubscription: () => {},
+        isGitHubReviewPublicationInstalled: () => false,
       }
     );
     const kiloClient: Pick<WrapperKiloClient, 'abortSession'> = {
@@ -95,6 +96,7 @@ describe('abortKiloSessionForShutdown', () => {
         },
         isConnected: () => true,
         reconnectEventSubscription: () => {},
+        isGitHubReviewPublicationInstalled: () => false,
       }
     );
 

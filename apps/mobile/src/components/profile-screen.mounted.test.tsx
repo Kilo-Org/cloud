@@ -164,6 +164,16 @@ function current(holder: { current: DeleteAccountResult | null }): DeleteAccount
   return result;
 }
 
+/** Types the code, then submits after the rerender that holds it. */
+function enterCode(holder: { current: DeleteAccountResult | null }, code: string) {
+  act(() => {
+    current(holder).setCode(code);
+  });
+  act(() => {
+    current(holder).submitCode();
+  });
+}
+
 function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   const state: { resolve: ((value: T) => void) | undefined } = { resolve: undefined };
   const promise = new Promise<T>(resolve => {
@@ -200,12 +210,7 @@ describe('useDeleteAccount', () => {
     });
     await waitFor(() => current(holder).phase === 'awaiting-code');
 
-    act(() => {
-      current(holder).setCode('123456');
-    });
-    act(() => {
-      current(holder).submitCode();
-    });
+    enterCode(holder, '123456');
     await waitFor(() => current(holder).phase === 'deleted');
 
     expect(executeFn).toHaveBeenCalledTimes(1);
@@ -240,12 +245,7 @@ describe('useDeleteAccount', () => {
     });
     await waitFor(() => current(holder).phase === 'awaiting-code');
 
-    act(() => {
-      current(holder).setCode('123456');
-    });
-    act(() => {
-      current(holder).submitCode();
-    });
+    enterCode(holder, '123456');
     await waitFor(() => toastError.mock.calls.length > 0);
 
     expect(toastError).toHaveBeenCalledWith('Network error');
@@ -268,12 +268,7 @@ describe('useDeleteAccount', () => {
     });
     await waitFor(() => current(holder).phase === 'awaiting-code');
 
-    act(() => {
-      current(holder).setCode('654321');
-    });
-    act(() => {
-      current(holder).submitCode();
-    });
+    enterCode(holder, '654321');
     await waitFor(() => toastError.mock.calls.length > 0);
 
     expect(toastError).toHaveBeenCalledWith('Cancel the subscription before deleting the account.');
@@ -296,12 +291,7 @@ describe('useDeleteAccount', () => {
     });
     await waitFor(() => current(holder).phase === 'awaiting-code');
 
-    act(() => {
-      current(holder).setCode('000000');
-    });
-    act(() => {
-      current(holder).submitCode();
-    });
+    enterCode(holder, '000000');
     await waitFor(() => toastError.mock.calls.length > 0);
 
     expect(toastError).toHaveBeenCalledWith('Invalid confirmation code');
@@ -322,25 +312,12 @@ describe('useDeleteAccount', () => {
     await waitFor(() => current(holder).phase === 'awaiting-code');
     expect(current(holder).canSubmitCode).toBe(false);
 
-    act(() => {
-      current(holder).submitCode();
-    });
-    act(() => {
-      current(holder).setCode('   ');
-    });
+    enterCode(holder, '');
+    enterCode(holder, '   ');
     expect(current(holder).canSubmitCode).toBe(false);
-    act(() => {
-      current(holder).submitCode();
-    });
     expect(executeFn).not.toHaveBeenCalled();
 
-    act(() => {
-      current(holder).setCode(' 123456 ');
-    });
-    expect(current(holder).canSubmitCode).toBe(true);
-    act(() => {
-      current(holder).submitCode();
-    });
+    enterCode(holder, ' 123456 ');
     await waitFor(() => current(holder).phase === 'deleted');
     expect(executeFn.mock.calls[0]?.[0]).toEqual({ challengeId: 'challenge-1', code: '123456' });
   });

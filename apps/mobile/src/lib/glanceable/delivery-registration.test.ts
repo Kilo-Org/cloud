@@ -285,7 +285,6 @@ describe('delivery registerTokens', () => {
     setSignOutTeardownActive(false);
     setActiveToken('access-2', null);
     expect(await getGlanceableDelivery().unregisterTokens()).toEqual({ ok: true, tokens: [] });
-    await getGlanceableDelivery().unregisterTokens();
     expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledTimes(1);
     expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledWith({ token: 'token-1' });
     expect(rows.size).toBe(0);

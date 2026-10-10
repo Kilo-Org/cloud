@@ -15,15 +15,10 @@ import {
   DEFAULT_FORGEJO_INSTANCE_URL,
   normalizeForgejoInstanceUrl,
 } from '@/lib/integrations/platforms/forgejo/adapter';
-import {
-  mutateForgejoMetadataInTransaction,
-  readForgejoMetadataInTransaction,
-} from '@/lib/integrations/platforms/forgejo/metadata-mutation';
 import { requireNumericPlatformRepositories, type Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { updateRepositoriesForIntegration } from '@/lib/integrations/db/platform-integrations';
 import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * Forgejo Integration Service
@@ -72,16 +67,6 @@ function requireMetadataRecord(metadata: unknown): Readonly<Record<string, unkno
     });
   }
   return { ...metadata };
-}
-
-function getForgejoIntegrationOwner(integration: PlatformIntegration): Owner {
-  if (integration.owned_by_user_id && !integration.owned_by_organization_id) {
-    return { type: 'user', id: integration.owned_by_user_id };
-  }
-  if (integration.owned_by_organization_id && !integration.owned_by_user_id) {
-    return { type: 'org', id: integration.owned_by_organization_id };
-  }
-  throw new Error('Forgejo integration must have exactly one owner');
 }
 
 /**

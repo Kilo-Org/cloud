@@ -1,9 +1,7 @@
 import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
-import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import * as giteaService from '@/lib/integrations/gitea-service';
-import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   resolveOwner,
@@ -12,16 +10,7 @@ import {
 } from '@/lib/integrations/resolve-owner';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
-import {
-  getIntegrationForOwner,
-  updateIntegrationMetadataForOwner,
-} from '@/lib/integrations/db/platform-integrations';
-import {
-  getGiteaIntegration,
-  getValidGiteaProjectAccessToken,
-} from '@/lib/integrations/gitea-service';
 import { validateGiteaInstance } from '@/lib/integrations/platforms/gitea/adapter';
-import { PLATFORM } from '@/lib/integrations/core/constants';
 
 export const giteaRouter = createTRPCRouter({
   /**

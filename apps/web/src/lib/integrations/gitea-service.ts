@@ -15,15 +15,10 @@ import {
   DEFAULT_GITEA_INSTANCE_URL,
   normalizeGiteaInstanceUrl,
 } from '@/lib/integrations/platforms/gitea/adapter';
-import {
-  mutateGiteaMetadataInTransaction,
-  readGiteaMetadataInTransaction,
-} from '@/lib/integrations/platforms/gitea/metadata-mutation';
 import { requireNumericPlatformRepositories, type Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { updateRepositoriesForIntegration } from '@/lib/integrations/db/platform-integrations';
 import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * Gitea Integration Service
@@ -69,34 +64,6 @@ function requireMetadataRecord(metadata: unknown): Readonly<Record<string, unkno
     throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid Gitea integration metadata' });
   }
   return { ...metadata };
-}
-
-function copyMetadataObject(
-  metadata: Readonly<Record<string, unknown>>,
-  key: string
-): Record<string, unknown> {
-  const value = metadata[key];
-  if (value === undefined) return {};
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new Error(`Gitea metadata ${key} must be an object`);
-  }
-  return { ...value };
-}
-
-function countMetadataObjectEntries(value: unknown): number {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? Object.keys(value).length
-    : 0;
-}
-
-function getGiteaIntegrationOwner(integration: PlatformIntegration): Owner {
-  if (integration.owned_by_user_id && !integration.owned_by_organization_id) {
-    return { type: 'user', id: integration.owned_by_user_id };
-  }
-  if (integration.owned_by_organization_id && !integration.owned_by_user_id) {
-    return { type: 'org', id: integration.owned_by_organization_id };
-  }
-  throw new Error('Gitea integration must have exactly one owner');
 }
 
 function requireGiteaProjectId(projectId: string | number): string {

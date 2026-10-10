@@ -174,34 +174,61 @@ describe('useTextHeight pitch snapping', () => {
     renderer.unmount();
   });
 
-  it('records a report only when it moves the pitch, so a growing draft does not re-render per report', async () => {
-    // What the device does while a draft streams in and the user types: the
-    // draft grows a line, the mirror lays that line out (20dp each, as
-    // `lineHeight` requests), and the real input reports its own content height
-    // for the same text at the pitch it actually renders (18.67dp per line on
-    // Android). The content height and the line count grow together, so the
-    // pitch does not move: every report after the first must cost no render at
-    // all, or the caller re-rendered its whole composer — and its input, which
-    // then reported again — once per native content-size event.
+  it('drops a report that keeps the pitch at the line count it was measured over', async () => {
+    // What the device does while a transcript streams in and the draft does not
+    // change: the real input re-reports its own content height (24dp padding
+    // included, 18.67dp per line on Android) on every content-size event, at
+    // the same line count. None of those reports moves the pitch the cap snaps
+    // to, so none may cost a render — the pre-change composer re-rendered
+    // itself and its input on each one, and the input then reported again, the
+    // nested-update cascade that ended in "Maximum update depth exceeded".
     const renderer = await mount();
-    reportNativeContentSize(24 + 6 * 18.667);
+    // The mirror lays the draft's six lines out first; the input then reports
+    // its content height at the pitch it renders.
     layoutMirror(renderer, 6 * 20);
+    reportNativeContentSize(24 + 6 * 18.667);
     expect(published.maxHeight).toBeCloseTo(24 + 5 * 18.667, 2);
 
     const reportRenders: number[] = [];
+    for (let update = 1; update <= 30; update += 1) {
+      // A touch of measurement drift, well under the stable step.
+      reportRenders.push(reportNativeContentSize(24 + 6 * 18.667 + update * 0.01));
+      // eslint-disable-next-line no-await-in-loop -- one report per stream update mirrors the device
+      await act(async () => {
+        await Promise.resolve();
+      });
+    }
+
+    expect(reportRenders).toEqual(Array.from({ length: 30 }, () => 0));
+    // The pitch the first report established still snaps the cap.
+    expect(published.maxHeight).toBeCloseTo(24 + 5 * 18.667, 2);
+    renderer.unmount();
+  });
+
+  it('records a report that follows a line growth, so the snapped cap survives the draft growing', async () => {
+    // The report is divided by the line count the mirror currently shows, so a
+    // report that follows a line growth must be recorded even though the pitch
+    // it implies is unchanged: the height the earlier report left behind belongs
+    // to the shorter draft, and dividing it by the taller count would decay the
+    // estimated pitch and unsnap the cap as the draft grows.
+    const renderer = await mount();
+    layoutMirror(renderer, 6 * 20);
+    reportNativeContentSize(24 + 6 * 18.667);
+    expect(published.maxHeight).toBeCloseTo(24 + 5 * 18.667, 2);
+
     for (const lineCount of [7, 8, 9, 10]) {
-      // The draft grows a line first; the mirror lays that line out, and the
-      // real input then reports its content height for the same text.
+      // The draft grows a line, the mirror lays that line out, and the real
+      // input reports its content height for the same text at the pitch it
+      // renders (18.67dp per line).
       layoutMirror(renderer, lineCount * 20);
-      reportRenders.push(reportNativeContentSize(24 + lineCount * 18.667));
+      reportNativeContentSize(24 + lineCount * 18.667);
       // eslint-disable-next-line no-await-in-loop -- one report per rendered line mirrors the device
       await act(async () => {
         await Promise.resolve();
       });
     }
 
-    expect(reportRenders).toEqual([0, 0, 0, 0]);
-    // The pitch the first report established still snaps the cap.
+    // The pitch never moved, so the cap stays snapped to five native lines.
     expect(published.maxHeight).toBeCloseTo(24 + 5 * 18.667, 2);
     renderer.unmount();
   });

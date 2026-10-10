@@ -52,10 +52,11 @@ const NATIVE_PITCH_STABLE_STEP = 0.5;
  * that lands on the minimum stays a whole number of native lines too.
  *
  * The caller pushes that report in with `setNativeContentHeight`, which keeps
- * the height out of the caller's own state: a report only records a new height
- * when it moves the pitch the snap uses, so a draft that grows a line — the
- * content height and the line count grow together, so the pitch stays put —
- * never re-renders the caller.
+ * the height out of the caller's own state: the report is recorded only when
+ * the pitch the snap uses moves, or when it is measured over a new line count,
+ * so a burst of reports at one line count — every native content-size event
+ * while the draft and the transcript stream — never re-renders the caller, and
+ * re-renders only this leaf once when the draft grows a line.
  */
 export function useTextHeight({
   minHeight,
@@ -76,12 +77,14 @@ export function useTextHeight({
   // out at: the mirror `Text` honors `lineHeight`, while the native input uses
   // the platform's own line box.
   const [nativeContentHeight, setNativeContentHeightInState] = useState<number | null>(null);
-  // The pitch the last recorded report implied; a report that keeps the pitch
-  // within `NATIVE_PITCH_STABLE_STEP` of it is dropped without a state update:
-  // the report arrives on every native content-size event, and scheduling one
-  // per report re-rendered the caller's whole composer and its input on each
-  // one.
+  // The pitch the last recorded report implied and the line count it was
+  // measured over. A report that keeps that pitch within
+  // `NATIVE_PITCH_STABLE_STEP`, at that same line count, is dropped without a
+  // state update: the report arrives on every native content-size event, and
+  // scheduling one per report re-rendered the caller's whole composer and its
+  // input on each one.
   const acceptedPitchRef = useRef<number | null>(null);
+  const acceptedLineCountRef = useRef<number | null>(null);
   const measuredText = text.length === 0 || text.endsWith('\n') ? `${text} ` : text;
   const measurementWidth = Math.max(textContentWidth, 0);
   // Pre-scale only when the caller opted in (the agent composers). The
@@ -108,9 +111,15 @@ export function useTextHeight({
   /**
    * The caller's `onContentSizeChange` report. Records the height only when the
    * pitch it implies (at the mirror's current line count) has moved by at least
-   * `NATIVE_PITCH_STABLE_STEP`; a report that keeps the pitch where it was does
-   * not schedule an update at all, so the caller does not re-render its input
-   * on every native content-size event.
+   * `NATIVE_PITCH_STABLE_STEP`, or when the report is measured over a different
+   * line count than the last recorded one; a report that keeps the pitch where
+   * it was, at the count it was measured over, does not schedule an update at
+   * all, so the caller does not re-render its input on every native
+   * content-size event. The line count is part of the key because the snap
+   * divides the recorded height by the *current* count: a height left behind at
+   * an earlier count would decay the estimated pitch and unsnap the cap as the
+   * draft grows, so a report that follows a line growth must be recorded even
+   * when the pitch it implies is unchanged.
    */
   function setNativeContentHeight(nextContentHeight: number): void {
     const nextPitch =
@@ -121,11 +130,13 @@ export function useTextHeight({
     if (
       nextPitch !== null &&
       acceptedPitch !== null &&
+      acceptedLineCountRef.current === mirrorLineCount &&
       Math.abs(nextPitch - acceptedPitch) < NATIVE_PITCH_STABLE_STEP
     ) {
       return;
     }
     acceptedPitchRef.current = nextPitch;
+    acceptedLineCountRef.current = mirrorLineCount;
     setNativeContentHeightInState(nextContentHeight);
   }
   // `minHeight` is the caller's one-line floor in the requested line box

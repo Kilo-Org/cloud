@@ -139,6 +139,7 @@ type DeleteAccountResult = {
   phase: DeleteAccountPhase;
   isPending: boolean;
   devCode: string | null;
+  canSubmitCode: boolean;
   beginDelete: () => void;
   submitCode: () => void;
   setCode: (code: string) => void;
@@ -201,6 +202,8 @@ describe('useDeleteAccount', () => {
 
     act(() => {
       current(holder).setCode('123456');
+    });
+    act(() => {
       current(holder).submitCode();
     });
     await waitFor(() => current(holder).phase === 'deleted');
@@ -239,6 +242,8 @@ describe('useDeleteAccount', () => {
 
     act(() => {
       current(holder).setCode('123456');
+    });
+    act(() => {
       current(holder).submitCode();
     });
     await waitFor(() => toastError.mock.calls.length > 0);
@@ -265,6 +270,8 @@ describe('useDeleteAccount', () => {
 
     act(() => {
       current(holder).setCode('654321');
+    });
+    act(() => {
       current(holder).submitCode();
     });
     await waitFor(() => toastError.mock.calls.length > 0);
@@ -291,6 +298,8 @@ describe('useDeleteAccount', () => {
 
     act(() => {
       current(holder).setCode('000000');
+    });
+    act(() => {
       current(holder).submitCode();
     });
     await waitFor(() => toastError.mock.calls.length > 0);
@@ -299,6 +308,41 @@ describe('useDeleteAccount', () => {
     expect(signOutFn).not.toHaveBeenCalled();
     // Challenge kept: the user can re-enter a correct code.
     expect(current(holder).phase).toBe('awaiting-code');
+  });
+
+  it('empty code: sends nothing until the field holds a code', async () => {
+    challengeFn.mockResolvedValue({ challengeId: 'challenge-1' });
+    executeFn.mockResolvedValue({ status: 'deleted' });
+
+    const holder = await mountProbe();
+
+    act(() => {
+      current(holder).beginDelete();
+    });
+    await waitFor(() => current(holder).phase === 'awaiting-code');
+    expect(current(holder).canSubmitCode).toBe(false);
+
+    act(() => {
+      current(holder).submitCode();
+    });
+    act(() => {
+      current(holder).setCode('   ');
+    });
+    expect(current(holder).canSubmitCode).toBe(false);
+    act(() => {
+      current(holder).submitCode();
+    });
+    expect(executeFn).not.toHaveBeenCalled();
+
+    act(() => {
+      current(holder).setCode(' 123456 ');
+    });
+    expect(current(holder).canSubmitCode).toBe(true);
+    act(() => {
+      current(holder).submitCode();
+    });
+    await waitFor(() => current(holder).phase === 'deleted');
+    expect(executeFn.mock.calls[0]?.[0]).toEqual({ challengeId: 'challenge-1', code: '123456' });
   });
 
   it('pending: isPending is true while the challenge is in flight', async () => {

@@ -699,6 +699,167 @@ describe('database schema', () => {
     }
   });
 
+  describe('cloud agent repository environments', () => {
+    it('enforces ownership XOR and platform identity consistency', async () => {
+      const userId = `schema-env-${crypto.randomUUID()}`;
+      await schemaTestDb.db.insert(schema.kilocode_users).values({
+        id: userId,
+        google_user_email: `${userId}@example.com`,
+        google_user_name: 'Schema env test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+      const [organization] = await schemaTestDb.db
+        .insert(schema.organizations)
+        .values({ name: `Schema env org ${crypto.randomUUID()}` })
+        .returning({ id: schema.organizations.id });
+
+      const workspaceUuid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const repositoryUuid = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+      try {
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            owned_by_organization_id: organization.id,
+            name: 'both-owners',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_owner_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            name: 'no-owner',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_owner_check' },
+        });
+
+        // Raw SQL because 'gitea' is not a valid value of the typed platform
+        // union; the database check is the guard for non-TypeScript writers.
+        await expect(
+          schemaTestDb.db.execute(sql`
+            INSERT INTO cloud_agent_environments
+              (owned_by_user_id, name, platform, repo_full_name, gitlab_clone_url, bitbucket_workspace_uuid)
+            VALUES
+              (${userId}, 'bad-platform', 'gitea', 'acme/widgets', 'https://gitlab.com/group/project.git', ${workspaceUuid}::uuid)
+          `)
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_platform_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'github-with-url',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+            gitlab_clone_url: 'https://gitlab.com/group/project.git',
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_github_identity_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'gitlab-without-url',
+            platform: 'gitlab',
+            repo_full_name: 'group/project',
+            // A non-null identity keeps the GitHub check satisfied, so the
+            // GitLab check is the one that rejects this row.
+            bitbucket_workspace_uuid: workspaceUuid,
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_gitlab_identity_check' },
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'bitbucket-half',
+            platform: 'bitbucket',
+            repo_full_name: 'team/repo',
+            bitbucket_workspace_uuid: workspaceUuid,
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'cloud_agent_environments_bitbucket_identity_check' },
+        });
+
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          owned_by_user_id: userId,
+          name: 'github-ok',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        });
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          owned_by_organization_id: organization.id,
+          name: 'bitbucket-ok',
+          platform: 'bitbucket',
+          repo_full_name: 'team/repo',
+          bitbucket_workspace_uuid: workspaceUuid,
+          bitbucket_repository_uuid: repositoryUuid,
+        });
+      } finally {
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environments)
+          .where(eq(schema.cloud_agent_environments.owned_by_user_id, userId));
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environments)
+          .where(eq(schema.cloud_agent_environments.owned_by_organization_id, organization.id));
+        await schemaTestDb.db
+          .delete(schema.organizations)
+          .where(eq(schema.organizations.id, organization.id));
+        await schemaTestDb.db
+          .delete(schema.kilocode_users)
+          .where(eq(schema.kilocode_users.id, userId));
+      }
+    });
+
+    it('enforces one name per repository identity and owner', async () => {
+      const userId = `schema-env-unique-${crypto.randomUUID()}`;
+      await schemaTestDb.db.insert(schema.kilocode_users).values({
+        id: userId,
+        google_user_email: `${userId}@example.com`,
+        google_user_name: 'Schema env unique test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+
+      try {
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          owned_by_user_id: userId,
+          name: 'duplicate',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        });
+
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'duplicate',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'UQ_cloud_agent_environments_github_user' },
+        });
+      } finally {
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environments)
+          .where(eq(schema.cloud_agent_environments.owned_by_user_id, userId));
+        await schemaTestDb.db
+          .delete(schema.kilocode_users)
+          .where(eq(schema.kilocode_users.id, userId));
+      }
+    });
+  });
+
   /**
    * This test ensures that if someone adds/removes values from enums used in schema check constraints,
    * they are reminded to generate a migration. The check constraints in the database must match the

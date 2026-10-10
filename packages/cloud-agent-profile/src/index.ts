@@ -32,10 +32,12 @@ export {
 // Session-config merge (main entry point for callers)
 export {
   mergeProfileConfiguration,
+  mergeEnvironmentWithInline,
   profileMcpServersToClientRecord,
   ProfileNotFoundError,
   type MergeProfileConfigurationArgs,
   type MergeProfileConfigurationResult,
+  type EnvironmentInlineArgs,
   type MergedSkillForSession,
   type MergedAgentForSession,
   type MergedKiloCommandForSession,
@@ -221,3 +223,35 @@ export {
   type PostImportKiloCommand,
   type PostImportSkill,
 } from './profile-import-service';
+// Repository environments
+export {
+  ENVIRONMENT_LIMITS,
+  ENVIRONMENT_KEY_PATTERN,
+  isReservedEnvironmentKey,
+  validateEnvironmentName,
+  assertValidEnvironmentKey,
+  validateEnvironmentPlainVars,
+  validateEnvironmentSecretValue,
+  validateEnvironmentCommands,
+  validateEnvironmentVarCount,
+  type EnvironmentOwner,
+  type EnvironmentPlatform,
+  type EnvironmentRepositoryIdentity,
+  type EnvironmentCreateInput,
+  type EnvironmentSecretChange,
+  type EnvironmentUpdateInput,
+  type EnvironmentSessionLayer,
+  type EnvironmentResponse,
+  type EnvironmentSummary,
+} from './environment-contracts';
+export {
+  createEnvironment,
+  updateEnvironment,
+  deleteEnvironment,
+  getEnvironment,
+  listEnvironments,
+  listEnvironmentsForOwner,
+  loadEnvironmentForSession,
+  lockActiveOrganization,
+  type EnvironmentTransaction,
+} from './environment-service';

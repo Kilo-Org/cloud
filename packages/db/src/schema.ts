@@ -8594,6 +8594,150 @@ export const agent_environment_profile_commands = pgTable(
 
 export type AgentEnvironmentProfileCommand = typeof agent_environment_profile_commands.$inferSelect;
 
+// ============ CLOUD AGENT REPOSITORY ENVIRONMENTS ============
+// A repository environment is a saved, owner-scoped setup for one repository.
+// It is distinct from an agent environment profile: a profile holds personal
+// preferences, an environment holds how one repository is set up and shared.
+// Identity columns are never compared across platforms: GitHub uses the
+// lowercased repo path, GitLab the canonical credential-free clone URL, and
+// Bitbucket the workspace/repository UUID pair.
+
+export const cloud_agent_environments = pgTable(
+  'cloud_agent_environments',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    // Ownership: exactly one must be set (org XOR user) - matches the profile pattern.
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    created_by_user_id: text(), // Audit trail: the user who created this environment.
+
+    name: text().notNull(),
+    platform: text({ enum: ['github', 'gitlab', 'bitbucket'] }).notNull(),
+    repo_full_name: text().notNull(),
+    gitlab_clone_url: text(),
+    bitbucket_workspace_uuid: uuid(),
+    bitbucket_repository_uuid: uuid(),
+
+    // Ordered setup commands run after clone. Array order is the run order.
+    commands: text().array().default([]).notNull(),
+
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    // One environment name per repository identity and owner.
+    uniqueIndex('UQ_cloud_agent_environments_github_user')
+      .on(table.owned_by_user_id, table.repo_full_name, table.name)
+      .where(sql`${table.platform} = 'github' AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_cloud_agent_environments_github_org')
+      .on(table.owned_by_organization_id, table.repo_full_name, table.name)
+      .where(sql`${table.platform} = 'github' AND ${table.owned_by_organization_id} IS NOT NULL`),
+    uniqueIndex('UQ_cloud_agent_environments_gitlab_user')
+      .on(table.owned_by_user_id, table.gitlab_clone_url, table.name)
+      .where(sql`${table.platform} = 'gitlab' AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_cloud_agent_environments_gitlab_org')
+      .on(table.owned_by_organization_id, table.gitlab_clone_url, table.name)
+      .where(sql`${table.platform} = 'gitlab' AND ${table.owned_by_organization_id} IS NOT NULL`),
+    uniqueIndex('UQ_cloud_agent_environments_bitbucket_user')
+      .on(
+        table.owned_by_user_id,
+        table.bitbucket_workspace_uuid,
+        table.bitbucket_repository_uuid,
+        table.name
+      )
+      .where(sql`${table.platform} = 'bitbucket' AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_cloud_agent_environments_bitbucket_org')
+      .on(
+        table.owned_by_organization_id,
+        table.bitbucket_workspace_uuid,
+        table.bitbucket_repository_uuid,
+        table.name
+      )
+      .where(
+        sql`${table.platform} = 'bitbucket' AND ${table.owned_by_organization_id} IS NOT NULL`
+      ),
+    index('IDX_cloud_agent_environments_user_id').on(table.owned_by_user_id),
+    index('IDX_cloud_agent_environments_org_id').on(table.owned_by_organization_id),
+    check(
+      'cloud_agent_environments_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    check(
+      'cloud_agent_environments_platform_check',
+      sql`${table.platform} IN ('github', 'gitlab', 'bitbucket')`
+    ),
+    check(
+      'cloud_agent_environments_github_identity_check',
+      sql`(
+        (${table.platform} = 'github') = (
+          ${table.gitlab_clone_url} IS NULL AND
+          ${table.bitbucket_workspace_uuid} IS NULL AND
+          ${table.bitbucket_repository_uuid} IS NULL
+        )
+      )`
+    ),
+    check(
+      'cloud_agent_environments_gitlab_identity_check',
+      sql`(
+        (${table.platform} = 'gitlab') = (
+          ${table.gitlab_clone_url} IS NOT NULL AND
+          ${table.bitbucket_workspace_uuid} IS NULL AND
+          ${table.bitbucket_repository_uuid} IS NULL
+        )
+      )`
+    ),
+    check(
+      'cloud_agent_environments_bitbucket_identity_check',
+      sql`(
+        (${table.platform} = 'bitbucket') = (
+          ${table.bitbucket_workspace_uuid} IS NOT NULL AND
+          ${table.bitbucket_repository_uuid} IS NOT NULL AND
+          ${table.gitlab_clone_url} IS NULL
+        )
+      )`
+    ),
+  ]
+);
+
+export type CloudAgentEnvironment = typeof cloud_agent_environments.$inferSelect;
+
+// Single table for both env vars and secrets - matches the profile var table.
+export const cloud_agent_environment_vars = pgTable(
+  'cloud_agent_environment_vars',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    environment_id: uuid()
+      .notNull()
+      .references(() => cloud_agent_environments.id, { onDelete: 'cascade' }),
+    key: text().notNull(),
+    value: text().notNull(), // Plaintext if is_secret=false, RSA+AES envelope JSON if is_secret=true
+    is_secret: boolean().notNull().default(false),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_cloud_agent_environment_vars_environment_id').on(table.environment_id),
+    unique('UQ_cloud_agent_environment_vars_environment_key').on(table.environment_id, table.key),
+  ]
+);
+
+export type CloudAgentEnvironmentVar = typeof cloud_agent_environment_vars.$inferSelect;
+
 // ============ AGENT ENVIRONMENT PROFILE REPO BINDINGS ============
 // Bind a single environment profile to a repository so sessions auto-inherit it
 

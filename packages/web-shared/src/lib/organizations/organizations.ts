@@ -13,6 +13,7 @@ import {
   OrganizationSettingsSchema,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
+  cloud_agent_environments,
   kilocode_users,
   organization_invitations,
   organization_membership_removals,
@@ -917,6 +918,9 @@ export async function markOrganizationAsDeleted(
     await tx
       .delete(provider_oauth_attempts)
       .where(eq(provider_oauth_attempts.owned_by_organization_id, organizationId));
+    await tx
+      .delete(cloud_agent_environments)
+      .where(eq(cloud_agent_environments.owned_by_organization_id, organizationId));
     await tx
       .update(organizations)
       .set({ ...auto_deleted_at })

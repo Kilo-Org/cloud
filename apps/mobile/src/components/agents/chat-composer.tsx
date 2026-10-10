@@ -437,11 +437,6 @@ export function ChatComposer({
     };
   }, []);
 
-  // The row reports the real input's content height (dp, padding included) on
-  // every content change. `useTextHeight` reads the line pitch that input
-  // lays out at from it, so the capped height it publishes lands on a whole
-  // rendered line.
-  const [inputContentHeight, setInputContentHeight] = useState<number | null>(null);
   // The mirror measurement lives in `ChatComposerMeasure`, a leaf that owns the
   // per-keystroke text state. It publishes the height and the line-snapped cap
   // back through `handleMeasureChange`, so this component re-renders only when
@@ -455,6 +450,16 @@ export function ChatComposer({
     setInputMaxHeight(maxHeight);
   }, []);
   const measureHandleRef = useRef<ChatComposerMeasureHandle | null>(null);
+  // The row reports the real input's content height (dp, padding included) on
+  // every content change, and `useTextHeight` reads the line pitch that input
+  // lays out at from it, so the capped height it publishes lands on a whole
+  // rendered line. The report goes straight into the leaf: holding it here
+  // re-rendered this composer — and so the input, which then reported again —
+  // on every native content-size event, and the nested-update counter climbed
+  // with each one.
+  const handleInputContentSizeChange = useCallback((contentHeight: number) => {
+    measureHandleRef.current?.setNativeContentHeight(contentHeight);
+  }, []);
   // Derived values the composer renders, kept as guard refs so a keystroke that
   // does not change one publishes nothing. The raw character count is never
   // held here: only the counter's near-limit value (or null while hidden) and
@@ -1299,7 +1304,6 @@ export function ChatComposer({
           lineHeight={TEXT_INPUT_LINE_HEIGHT}
           maxHeight={rawInputMaxHeight}
           minHeight={inputMinHeight}
-          nativeContentHeight={inputContentHeight}
           onMeasureChange={handleMeasureChange}
           textContentWidth={resolveComposerTextContentWidth(inputWidth)}
           verticalPadding={TEXT_INPUT_VERTICAL_PADDING}
@@ -1426,7 +1430,7 @@ export function ChatComposer({
                 setIsFocused(true);
               }}
               onInputLayout={handleInputLayout}
-              onInputContentSizeChange={setInputContentHeight}
+              onInputContentSizeChange={handleInputContentSizeChange}
               onInsertNewline={handleInsertNewline}
               onSelectionChange={handleSelectionChange}
               onStop={handleStop}

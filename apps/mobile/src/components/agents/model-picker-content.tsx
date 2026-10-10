@@ -310,8 +310,13 @@ export function ModelPickerContent() {
         <FlashList<ModelPickerRow>
           style={[listStyle, { backgroundColor: colors.background, marginBottom: bottom }]}
           data={rows}
-          keyExtractor={item => item.key}
-          getItemType={item => item.type}
+          // FlashList stores its props during render. When React discards a
+          // deferred search render, FlashList can keep that render's shorter
+          // rows and then ask for a row past their end, so the row can be
+          // undefined (Sentry KILO-APP-3K0). The fallbacks are the ones FlashList
+          // uses when these callbacks are absent.
+          keyExtractor={(item: ModelPickerRow | undefined, index) => item?.key ?? String(index)}
+          getItemType={(item: ModelPickerRow | undefined) => item?.type}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           renderItem={renderItem}

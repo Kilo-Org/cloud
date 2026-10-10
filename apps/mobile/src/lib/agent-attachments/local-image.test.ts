@@ -1,3 +1,4 @@
+/* eslint-disable require-await, typescript-eslint/require-await -- the fakes resolve at once, as the native image API does */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /** One rendered native image: the shape the encoder reads and releases. */
@@ -94,10 +95,17 @@ describe('encodeLocalImage', () => {
   it('releases the native image and refuses an image that stays too large', async () => {
     const image = makeImage(200, 200, 'C'.repeat(6 * 1024 * 1024));
 
-    const failure = await encodeLocalImage('file:///cache/d.png').catch((error: unknown) => error);
+    let failure: unknown = undefined;
+    try {
+      await encodeLocalImage('file:///cache/d.png');
+    } catch (error: unknown) {
+      failure = error;
+    }
 
-    expect(failure).toBeInstanceOf(LocalImageError);
-    expect((failure as LocalImageError).reason).toBe('tooLarge');
+    if (!(failure instanceof LocalImageError)) {
+      throw new TypeError(`expected a LocalImageError, got ${String(failure)}`);
+    }
+    expect(failure.reason).toBe('tooLarge');
     expect(image.release).toHaveBeenCalledOnce();
   });
 });

@@ -70,6 +70,11 @@ export type SessionCreateRequest = {
     /** Inclusive cut: copy source messages up to and including this ID. */
     cloneUpToMessageId?: string;
   };
+  /**
+   * Repository environment to resolve in preflight. Read only there; never
+   * persisted on session metadata, the route spec, or the attach payload.
+   */
+  environmentId?: string;
   profile?: {
     id?: string;
     overrides?: ProfileOverrides;

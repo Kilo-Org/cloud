@@ -569,6 +569,11 @@ const PrepareSessionSharedFields = {
     .uuid()
     .optional()
     .describe('Profile ID to resolve (repo binding + default still apply on top)'),
+  environmentId: z
+    .string()
+    .uuid()
+    .optional()
+    .describe('Repository environment ID to resolve for this session'),
 
   ...AttachmentFieldsSchema,
   createdOnPlatform: z
@@ -927,6 +932,11 @@ export const StartSessionInput = z
       .optional(),
     repository: RepositoryInputSchema,
     profile: ProfileInputSchema,
+    environmentId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe('Repository environment ID to resolve for this session'),
     runtime: egressPolicySchema
       .safeExtend({
         sandboxAllocation: ManagedSandboxAllocationInput.optional(),

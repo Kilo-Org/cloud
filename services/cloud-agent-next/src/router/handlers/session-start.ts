@@ -71,6 +71,7 @@ function startInputToSessionCreateRequest(
     agent: input.agent,
     repository,
     ...(input.runtime ? { runtime: input.runtime } : {}),
+    environmentId: input.environmentId,
     profile: profile
       ? {
           id: profile.id,

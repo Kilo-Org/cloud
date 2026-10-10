@@ -26,7 +26,10 @@ import {
   type SessionRequestIdentity,
   type SessionEventIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
-import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
+import {
+  CONTROL_RUNTIME_RESERVED_ENV_VARS,
+  RESERVED_ENV_VAR_PREFIXES,
+} from '../../../src/shared/runtime-environment.js';
 import { resolveKiloExecutable } from '../../../src/shared/runtime-distribution.js';
 import {
   createWrapperKiloClient,
@@ -328,9 +331,7 @@ export function buildWorktreeKiloEnvironment(
   const isRuntimeOwned = (name: string): boolean =>
     reserved.has(name) ||
     name === 'HOME' ||
-    name.startsWith('XDG_') ||
-    name.startsWith('KILO') ||
-    name.startsWith('OPENCODE');
+    RESERVED_ENV_VAR_PREFIXES.some(prefix => name.startsWith(prefix));
 
   // The `KILO*` filter below strips the installer's selection from the inherited
   // loop. Copy the trusted inherited value aside so only that copy is put back

@@ -138,6 +138,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
           ...(input.cloneUpToMessageId ? { cloneUpToMessageId: input.cloneUpToMessageId } : {}),
         }
       : undefined,
+    environmentId: input.environmentId,
     profile: {
       id: input.profileId,
       overrides: {

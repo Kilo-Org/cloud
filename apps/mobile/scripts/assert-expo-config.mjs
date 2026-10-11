@@ -101,7 +101,7 @@ const DEV_CLIENT_PLUGIN_OPTIONS = {
 const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSCameraUsageDescription',
   'NSPhotoLibraryUsageDescription',
-  ...(process.env.EAS_BUILD_PROFILE === 'production' ? [] : ['NSLocalNetworkUsageDescription']),
+  'NSLocalNetworkUsageDescription',
   'NSMicrophoneUsageDescription',
   'NSMotionUsageDescription',
   'NSSpeechRecognitionUsageDescription',

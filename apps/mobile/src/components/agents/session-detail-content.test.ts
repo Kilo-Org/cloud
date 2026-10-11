@@ -1266,9 +1266,10 @@ function roleAgent(slug: string, name: string) {
 
 function composerCustomValues(renderer: ReactTestRenderer): string[] {
   const composer = renderer.root.findByType('ChatComposer');
-  return (composer.props as { customOptions: { value: string }[] }).customOptions.map(
-    option => option.value
-  );
+  const { modeControl } = composer.props as {
+    modeControl?: { customOptions?: { value: string }[] };
+  };
+  return (modeControl?.customOptions ?? []).map(option => option.value);
 }
 
 describe('session detail role picker profile source', () => {
@@ -3954,6 +3955,17 @@ describe('session detail composer placeholder (explorer session-detail)', () => 
       expect(copy).not.toBe('undefined');
       expect(copy.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('session detail composer mode chip', () => {
+  it('hands the composer a mode control, because a session has modes', async () => {
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer.props.modeControl).toMatchObject({
+      mode: expect.any(String),
+      onModeChange: expect.any(Function),
+    });
   });
 });
 

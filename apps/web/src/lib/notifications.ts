@@ -50,7 +50,7 @@ export function passesLegacyExtensionGate(
   return isLegacyExtension;
 }
 
-const normalUnconditionalNotifications: KiloNotification[] = [
+export const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
   {
@@ -124,6 +124,15 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     suggestModelId: 'nvidia/nemotron-3-super-120b-a12b:free',
     showIn: ['extension', 'cli'],
     expiresAt: '2026-03-25T08:00:00Z',
+  },
+  {
+    id: 'stepfun-step-5-preview-free-oct-8',
+    title: 'StepFun Step 5 Preview is free in Kilo!',
+    message:
+      'StepFun Step 5 Preview is now free to use in Kilo — a flagship agentic coding model with a 1M-token context window, tool calling, and image and video input.',
+    suggestModelId: 'stepfun/step-5-preview-free',
+    showIn: ['extension', 'cli'],
+    expiresAt: '2026-10-22T08:00:00Z',
   },
 ];
 

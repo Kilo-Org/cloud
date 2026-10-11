@@ -4,7 +4,6 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type AgentMode } from '@/components/agents/mode-selector';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { type ChatComposer } from './chat-composer';
 
@@ -305,8 +304,6 @@ function makeProps(overrides: Partial<ComposerProps> = {}): ComposerProps {
     onRestartSession: vi.fn(async () => true),
     onExitSession: vi.fn(async () => undefined),
     onStop: vi.fn(async () => undefined),
-    mode: 'code' as AgentMode,
-    onModeChange: vi.fn(() => undefined),
     model: 'anthropic/claude-sonnet-4',
     variant: 'medium',
     modelOptions: [],
@@ -440,6 +437,44 @@ describe('ChatComposer attachment-only send', () => {
 
     expect(onSendMock).not.toHaveBeenCalled();
     expect(toastErrorMock).toHaveBeenCalledWith('Wait for attachments to finish uploading.');
+  });
+
+  it('hands the images of a local delivery to onSend', async () => {
+    uploadState.attachments = [{ status: 'pending' }];
+    uploadState.uploadPending = () => ({
+      ok: true,
+      wire: undefined,
+      submission: undefined,
+      images: [{ media: 'image/jpeg', data: 'AAAA' }],
+    });
+
+    const render = await mount(makeProps({ attachmentDelivery: 'local' }));
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(onSendMock).toHaveBeenCalledWith('', {
+      attachments: undefined,
+      submission: undefined,
+      images: [{ media: 'image/jpeg', data: 'AAAA' }],
+      onOptimisticSend: expect.any(Function),
+    });
+  });
+
+  it('refuses local images once the model changed to one that reads none', async () => {
+    uploadState.attachments = [{ status: 'pending' }];
+
+    const render = await mount(
+      makeProps({ attachmentDelivery: 'local', attachmentsEnabled: false })
+    );
+
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(onSendMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'This model does not read images. Remove the images or choose another model.'
+    );
   });
 });
 

@@ -323,7 +323,7 @@ function CreditsHowItWorks({
         <div className="space-y-1 px-3.5 pb-3">
           <div className="text-muted-foreground flex items-start gap-2 py-0.5 text-xs">
             <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
-            <span>Your payment converts 1:1 into paid credits that never expire</span>
+            <span>Your payment converts 1:1 into paid credits</span>
           </div>
           <div className="text-muted-foreground flex items-start gap-2 py-0.5 text-xs">
             <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />

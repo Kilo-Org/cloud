@@ -10,7 +10,7 @@ export const IMAGE_NOT_SENT =
   '[An image was shared here. This model reads only the most recent images, so it is not sent.]';
 
 /** A base64 image and its media type, as the harness prompt carries it. */
-export type NativeImage = { readonly media: string; readonly data: string };
+type NativeImage = { readonly media: string; readonly data: string };
 
 export type NativeToolCall = {
   readonly id: string;

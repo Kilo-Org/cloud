@@ -8,7 +8,7 @@
 // QueryError, not the happy empty copy; its compact retry only appears once
 // rows exist and names the failure for screen readers. Four-state coverage adds
 // the assistant reply after a stream (happy), the stream-failure-after-accept
-// outcome, the empty copy, and the flag-off replace to Home. The hook also must
+// outcome, the empty copy, and the always-visible Chat tab. The hook also must
 // not fetch history, create a thread, or accept a send before the org scope
 // hydrates (showing the skeleton, not EmptyState), and a send must abort an
 // in-flight stream.
@@ -69,11 +69,8 @@ const buttonRenders = vi.hoisted(() => ({
 const emptyStateRenders = vi.hoisted(() => ({ list: [] as { title?: string }[] }));
 const skeletonRenders = vi.hoisted(() => ({ count: 0 }));
 
-// Feature-flag / router / org-hydration knobs shared by the flag-gate and
-// org-loading tests.
-const quickChatFlagEnabled = vi.hoisted(() => ({ value: true }));
+// KiloClaw visibility and organization-hydration knobs shared by the tests.
 const kiloclawVisible = vi.hoisted(() => ({ value: false }));
-const focusedSegments = vi.hoisted(() => ({ value: ['(app)', '(tabs)', '(0_home)'] }));
 const orgLoaded = vi.hoisted(() => ({ value: true }));
 const organizationId = vi.hoisted(() => ({ value: null as string | null }));
 const authEpoch = vi.hoisted(() => ({ value: 0 }));
@@ -93,11 +90,12 @@ vi.mock('sonner-native', () => ({
   toast: { error: toastError, success: vi.fn(), warning: vi.fn() },
 }));
 vi.mock('expo-router', () => {
-  const Tabs = Object.assign(() => null, { Screen: () => null });
+  const Tabs = Object.assign(({ children }: { children: ReactNode }): ReactNode => children, {
+    Screen: 'TabScreen',
+  });
   return {
     useRouter: () => ({ replace: routerReplace, navigate: routerNavigate, push: routerNavigate }),
     usePathname: () => '/(app)/(tabs)/(0_home)',
-    useSegments: () => focusedSegments.value,
     Tabs,
   };
 });
@@ -144,10 +142,6 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 }));
 vi.mock('@/lib/persist/use-draft-load', () => ({
   useFencedDraftLoad: () => ({ settled: true, value: null }),
-}));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_QUICK_CHAT: 'mobile-quick-chat',
-  useFeatureFlag: () => quickChatFlagEnabled.value,
 }));
 vi.mock('@/lib/hooks/use-kiloclaw-tab-visible', () => ({
   useKiloClawTabVisible: () => kiloclawVisible.value,
@@ -327,9 +321,7 @@ beforeEach(() => {
   buttonRenders.list = [];
   emptyStateRenders.list = [];
   skeletonRenders.count = 0;
-  quickChatFlagEnabled.value = true;
   kiloclawVisible.value = false;
-  focusedSegments.value = ['(app)', '(tabs)', '(0_home)'];
   orgLoaded.value = true;
   organizationId.value = null;
   authEpoch.value = 0;
@@ -951,13 +943,25 @@ describe('QuickChatScreen org hydration', () => {
   });
 });
 
-describe('QuickChat flag gate', () => {
-  it('replaces to Home when the flag is off while the Chat tab is focused', async () => {
-    quickChatFlagEnabled.value = false;
-    focusedSegments.value = ['(app)', '(tabs)', '(4_chat)'];
+describe('Chat tab visibility', () => {
+  it.each([false, true])('always shows Chat with KiloClaw visibility %s', async visible => {
+    kiloclawVisible.value = visible;
+    const { renderer, unmount } = await renderWithProviders(createElement(TabsLayout));
+    const chatTab = renderer.root.findByProps({ name: '(4_chat)' });
+    const options = chatTab.props.options as {
+      href?: string | null;
+      tabBarAccessibilityLabel: string;
+    };
 
-    await renderWithProviders(createElement(TabsLayout));
-
-    expect(routerReplace).toHaveBeenCalledWith('/(app)/(tabs)/(0_home)');
+    expect(options.href).toBeUndefined();
+    expect(options.tabBarAccessibilityLabel).toBe(
+      i18n.t('tabs.position', {
+        name: i18n.t('common.chat'),
+        position: visible ? 4 : 3,
+        total: visible ? 5 : 4,
+      })
+    );
+    expect(routerReplace).not.toHaveBeenCalled();
+    unmount();
   });
 });

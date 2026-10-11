@@ -137,10 +137,6 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: ({ children }: { children?: unknown }) => children,
 }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'pr-review',
-  useFeatureFlag: () => true,
-}));
 vi.mock('@/lib/code-reviewer-open-pr-destination', () => ({
   resolveCodeReviewerOpenPrDestination: () => ({ kind: 'browser' }),
 }));

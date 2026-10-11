@@ -7,7 +7,7 @@ import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { useOrganization } from '@/lib/organization-context';
-import { resolveSessionPrPressTarget } from '@/lib/session-pr-navigation';
+import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
 import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -59,13 +59,13 @@ type RemoteSessionRowProps = {
 };
 
 /**
- * Opens a session's associated PR through the provider-aware, flag-aware route.
+ * Opens a session's associated PR through the provider-aware route.
  * The native router and browser imports are lazy: they cannot load under the
  * mounted row tests' node environment, and only the long-press entry reaches
  * them.
  */
 async function openSessionPr(url: string | null | undefined, label: string): Promise<void> {
-  const target = await resolveSessionPrPressTarget({ url });
+  const target = resolveSessionPrTapTarget({ url });
   if (target.kind === 'in-app') {
     const { router } = await import('expo-router');
     router.push(target.href);

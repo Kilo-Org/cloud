@@ -29,7 +29,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
 import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
@@ -57,7 +56,6 @@ export function ReviewDetailScreen({
   const router = useRouter();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
@@ -262,10 +260,7 @@ export function ReviewDetailScreen({
           <Button
             variant="secondary"
             onPress={() => {
-              const destination = resolveCodeReviewerOpenPrDestination(
-                review.pr_url,
-                prReviewEnabled
-              );
+              const destination = resolveCodeReviewerOpenPrDestination(review.pr_url);
               if (destination.kind === 'in-app') {
                 router.push(destination.href);
                 return;

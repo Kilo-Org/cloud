@@ -88,11 +88,6 @@ vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
 }));
 
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'mobile-pr-review',
-  useFeatureFlag: () => true,
-}));
-
 vi.mock('@/components/use-delete-account', () => ({
   useDeleteAccount: () => ({
     phase: 'idle',

@@ -19,12 +19,10 @@ import { ProductChoices } from '@/components/home/product-choices';
 import { ScreenHeader } from '@/components/screen-header';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useSideInsetStyle } from '@/lib/screen-insets';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 
 export function HomeScreen() {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const [refreshing, setRefreshing] = useState(false);
   const context = useLiveSessionContext();
   const sessions = useLiveAgentSessions({
@@ -34,8 +32,7 @@ export function HomeScreen() {
   const refetch = context.isError ? context.refetch : sessions.refetch;
   const headerTitle = buildTimedGreeting();
   const liveContent = liveSessionContent(context, sessions);
-  const centerFeedback =
-    liveContent === 'error' && !context.isReady && !(context.accountReady && prReviewEnabled);
+  const centerFeedback = liveContent === 'error' && !context.isReady && !context.accountReady;
 
   const handleRefresh = useCallback(() => {
     void (async () => {

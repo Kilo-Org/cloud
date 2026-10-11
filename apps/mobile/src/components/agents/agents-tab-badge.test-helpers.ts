@@ -139,10 +139,6 @@ vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#666666' }),
 }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_QUICK_CHAT: 'quick-chat',
-  useFeatureFlag: () => false,
-}));
 vi.mock('@/lib/hooks/use-kiloclaw-tab-visible', () => ({ useKiloClawTabVisible: () => false }));
 
 export function key(organizationId: string | null = null) {

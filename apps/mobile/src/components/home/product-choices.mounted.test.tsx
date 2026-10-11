@@ -8,7 +8,6 @@ import { getCodeReviewerProfilePath, getPrReviewEntryPath } from '@/lib/profile-
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 const push = vi.hoisted(() => vi.fn());
-const prReviewEnabled = vi.hoisted(() => ({ value: true }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
@@ -26,10 +25,6 @@ vi.mock('@/components/ui/icons', () => ({
   GitMerge: 'GitMerge',
   GitPullRequest: 'GitPullRequest',
   ShieldCheck: 'ShieldCheck',
-}));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'mobile-pr-review',
-  useFeatureFlag: () => prReviewEnabled.value,
 }));
 
 function rows(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
@@ -77,8 +72,7 @@ async function unmount(renderer: TestRenderer.ReactTestRenderer): Promise<void> 
 }
 
 describe('ProductChoices', () => {
-  it('renders all three product rows when PR Review is enabled', async () => {
-    prReviewEnabled.value = true;
+  it('renders all three product rows', async () => {
     const renderer = await mountProductChoices('org-1');
     expect(rows(renderer.root).map(row => row.props.title)).toEqual([
       'Code Reviewer',
@@ -90,7 +84,6 @@ describe('ProductChoices', () => {
   });
 
   it('navigates each row to its product path', async () => {
-    prReviewEnabled.value = true;
     push.mockClear();
     const renderer = await mountProductChoices('org-1');
 
@@ -107,7 +100,6 @@ describe('ProductChoices', () => {
   });
 
   it('falls back to the personal scope when no organization is selected', async () => {
-    prReviewEnabled.value = true;
     push.mockClear();
     const renderer = await mountProductChoices(null);
 
@@ -117,17 +109,6 @@ describe('ProductChoices', () => {
     pressRow(renderer.root, 'Security Agent');
     expect(push).toHaveBeenCalledWith(getSecurityAgentPath('personal'));
 
-    await unmount(renderer);
-  });
-
-  it('hides PR Review when the flag is false', async () => {
-    prReviewEnabled.value = false;
-    const renderer = await mountProductChoices('org-1');
-    expect(rows(renderer.root).map(row => row.props.title)).toEqual([
-      'Code Reviewer',
-      'Security Agent',
-    ]);
-    prReviewEnabled.value = true;
     await unmount(renderer);
   });
 });

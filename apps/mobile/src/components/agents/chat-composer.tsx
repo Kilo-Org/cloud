@@ -42,8 +42,7 @@ import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
-import { ChatToolbar } from '@/components/agents/chat-toolbar';
-import { type AgentMode } from '@/components/agents/mode-selector';
+import { ChatToolbar, type ChatToolbarModeControl } from '@/components/agents/chat-toolbar';
 import { pickAgentAttachments, pickAgentImages } from '@/components/agents/attachment-picker';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -106,7 +105,6 @@ import {
 } from '@/lib/agent-attachments/use-clipboard-paste';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
-import { type ModeOption } from '@/components/agents/mode-normalize';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -193,14 +191,12 @@ type ChatComposerProps = {
   sendDisabledReason?: string | null;
   isStreaming?: boolean;
   placeholder?: string;
-  mode: AgentMode;
-  onModeChange: (mode: AgentMode) => void;
+  /** The toolbar's mode chip. Omit it where modes do not apply (Quick Chat). */
+  modeControl?: ChatToolbarModeControl;
   model: string;
   variant: string;
   modelOptions: (ModelOption | SessionModelOption)[];
   onModelSelect: (modelId: string, variant: string) => void;
-  /** Custom mode options shown under the built-ins in the mode picker. */
-  customOptions?: ModeOption[];
   /** Locks the model picker to the pinned agent model (Cloud Agent only). */
   modelLocked?: boolean;
   /** Agent name shown in the locked model chip's accessibility label. */
@@ -266,13 +262,11 @@ export function ChatComposer({
   sendDisabledReason = null,
   isStreaming = false,
   placeholder = i18n.t('common.sendMessage'),
-  mode,
-  onModeChange,
+  modeControl,
   model,
   variant,
   modelOptions,
   onModelSelect,
-  customOptions = [],
   modelLocked = false,
   modelLockLabel,
   organizationId,
@@ -1335,8 +1329,7 @@ export function ChatComposer({
             exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
           >
             <ChatToolbar
-              mode={mode}
-              onModeChange={onModeChange}
+              modeControl={modeControl}
               model={model}
               variant={variant}
               modelOptions={modelOptions}
@@ -1344,7 +1337,6 @@ export function ChatComposer({
               disabled={control.toolbarDisabled}
               onPaste={attachmentsEnabled ? pasteClipboard : undefined}
               pasteDisabled={!control.inputEditable}
-              customOptions={customOptions}
               modelLocked={modelLocked}
               modelLockLabel={modelLockLabel}
             />

@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { Tabs, usePathname, useRouter } from 'expo-router';
+import { Tabs, usePathname, useRouter, useSegments } from 'expo-router';
 import { Bot, House, MessageCircle, MessageSquare, UserRound } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
@@ -12,6 +12,7 @@ import { TabBarButton } from '@/components/tab-bar-button';
 import { TabBarLabel } from '@/components/tab-bar-label';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
+
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
 import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -103,13 +104,14 @@ function TabLabel({
 
 export default function TabsLayout() {
   const pathname = usePathname();
+  const segments = useSegments();
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom, left, right } = useSafeAreaInsets();
   const { width, fontScale } = useWindowDimensions();
   const tabLabelLines = tabLabelLineCount(fontScale);
   const allowLabelWrap = tabLabelLines > 1;
-  const hideTabs = shouldHideTabBar(pathname);
+  const hideTabs = shouldHideTabBar(pathname, segments);
   const showKiloClawTab = useKiloClawTabVisible();
   const tabFlags = { showKiloClaw: showKiloClawTab };
   const tabCount = visibleTabCount(showKiloClawTab);

@@ -645,7 +645,12 @@ native activity plus the existing Cloud-work and PTY protections.
 ### Crash resistance
 
 - The wrapper does not exit on disconnect, reconnect failure, Kilo failure or unhandled promise
-  rejection; it logs them. It exits only on `shutdown`, SIGTERM or an uncaught exception.
+  rejection; it logs them. It exits only on `shutdown` (exit 0, terminal), SIGTERM (exit 1) or an
+  uncaught exception (exit 1).
+- The wrapper cannot tell a stray SIGTERM from one the supervisor forwards, so it always exits 1 and
+  records `wrapper.lifecycle` `stopping`, not `failed`. The supervisor owns the outcome: a SIGTERM
+  sent to the wrapper alone restarts it within the existing budget, while the supervisor's own
+  TERM/INT trap forwards SIGTERM and then exits terminally.
 - Each Kilo spawn writes a pidfile with PID and process start time. At startup the wrapper kills the
   process groups of stale pidfiles whose PID and start time still match, before it starts Kilo.
 
@@ -653,8 +658,9 @@ native activity plus the existing Cloud-work and PTY protections.
 
 The provider launch command starts a small supervisor loop that runs the wrapper. After a non-zero
 exit it restarts the wrapper with 1 s to 30 s backoff, at most 5 times in 10 minutes. Exit code 0
-ends the loop. If the loop gives up, the Sandbox DO `starting` or `disconnected` timer stops the
-sandbox.
+ends the loop; that is the wrapper's terminal `shutdown` path, while a SIGTERM sent to the wrapper
+alone is non-zero and restarts. If the loop gives up, the Sandbox DO `starting` or `disconnected`
+timer stops the sandbox.
 
 The provider launch command is not the only starter. On the native Cloudflare Containers runtime the
 container main process is the supervisor: `start()` is issued with `['/bin/sh', supervisor-path]` as

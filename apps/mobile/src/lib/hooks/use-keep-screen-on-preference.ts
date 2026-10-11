@@ -22,8 +22,13 @@ export function clearKeepScreenOnPreference() {
   store.clear();
 }
 
-function setKeepScreenOn(value: boolean) {
+export function setKeepScreenOn(value: boolean) {
   store.set(value);
+}
+
+/** The stored keep-screen-on value for callers with no React tree (the settings registry). */
+export function getKeepScreenOn(): boolean {
+  return store.get();
 }
 
 export function useKeepScreenOnPreference() {

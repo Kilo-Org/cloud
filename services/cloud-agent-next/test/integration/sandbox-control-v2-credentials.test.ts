@@ -236,9 +236,10 @@ function setGrantExpiry(
 async function setup(
   provider: FakeProvider,
   broker: FakeCredentialBroker = createFakeCredentialBroker(),
-  extraEnv: Record<string, unknown> = {}
+  extraEnv: Record<string, unknown> = {},
+  sandboxId: string = SANDBOX_ID
 ): Promise<DurableObjectStub<SandboxControlV2>> {
-  const stub = sandboxNamespace.getByName(SANDBOX_ID);
+  const stub = sandboxNamespace.getByName(sandboxId);
   // R1: a Vercel route with a runtime proxy now mints a handle on the first
   // connected `session.prepare`; the fake Session peer mints a verifiable one.
   const sessionPeer = createRuntimeProxyMintingPeer(env, sessionId => ({
@@ -1913,5 +1914,118 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(next?.type).toBe('session.prepare');
     if (next?.type !== 'session.prepare') throw new Error('expected session.prepare');
     expect(next.spec.sessionId).toBe(SESSION_NEXT);
+  });
+});
+
+describe('SandboxControlV2 placed sandbox keys', () => {
+  const PLACED_ID = `sbx-${'d'.repeat(48)}`;
+  const smallPool = { idFromName: (name: string) => ({ toString: () => `small_${name}` }) };
+  const codeReviewPool = { idFromName: (name: string) => ({ toString: () => `review_${name}` }) };
+
+  function setupPlaced(provider: FakeProvider) {
+    return setup(
+      provider,
+      createFakeCredentialBroker(),
+      { SandboxSmallContainment: smallPool, SandboxCodeReviewContainment: codeReviewPool },
+      PLACED_ID
+    );
+  }
+
+  function readPin(stub: DurableObjectStub<SandboxControlV2>) {
+    return runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const rows = await db
+        .select({ pin: allocationTable.provider_pin })
+        .from(allocationTable)
+        .where(eq(allocationTable.id, 'current'));
+      return JSON.parse(rows[0]?.pin ?? 'null') as { sandboxKind?: unknown } | null;
+    });
+  }
+
+  it('pins the kind and names the outbound container in its pool', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupPlaced(provider);
+
+    await stub.prepare({
+      ...prepareInput(SESSION),
+      sandboxSelection: {
+        provider: 'cloudflare',
+        sandboxKind: 'isolated',
+        containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+      },
+    });
+
+    const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      outboundContainerId?: string;
+    };
+    // A placed key never reaches the prefix table, which would have chosen SandboxContainment.
+    expect(grant.outboundContainerId).toBe(`small_${PLACED_ID}`);
+    expect((await readPin(stub))?.sandboxKind).toBe('isolated');
+  });
+
+  it('keeps the pinned kind when a later prepare names another', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupPlaced(provider);
+    await stub.prepare({
+      ...prepareInput(SESSION),
+      sandboxSelection: {
+        provider: 'cloudflare',
+        sandboxKind: 'isolated',
+        containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+      },
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+
+    await stub.prepare({
+      ...prepareInput(SESSION_NEXT),
+      sandboxSelection: {
+        provider: 'cloudflare',
+        sandboxKind: 'code-review',
+        containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+      },
+    });
+
+    const grant = JSON.parse((await readRouteRow(stub, SESSION_NEXT))?.grant ?? '{}') as {
+      outboundContainerId?: string;
+    };
+    expect(grant.outboundContainerId).toBe(`small_${PLACED_ID}`);
+    expect((await readPin(stub))?.sandboxKind).toBe('isolated');
+  });
+
+  it('rejects a placed key selection without its kind', async () => {
+    const provider = createFakeProvider();
+    const stub = await setupPlaced(provider);
+
+    // In-DO call: the rejection is asserted without crossing the RPC boundary.
+    await runInDurableObject(stub, instance =>
+      expect(
+        instance.prepare({
+          ...prepareInput(SESSION),
+          sandboxSelection: {
+            provider: 'cloudflare',
+            containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+          },
+        })
+      ).rejects.toThrow('Sandbox selection kind does not match the sandbox key')
+    );
+    expect(provider.intents).toHaveLength(0);
+  });
+
+  it('rejects a kind for a legacy prefixed key', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+
+    await runInDurableObject(stub, instance =>
+      expect(
+        instance.prepare({
+          ...prepareInput(SESSION),
+          sandboxSelection: {
+            provider: 'cloudflare',
+            sandboxKind: 'isolated',
+            containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+          },
+        })
+      ).rejects.toThrow('Sandbox selection kind does not match the sandbox key')
+    );
   });
 });

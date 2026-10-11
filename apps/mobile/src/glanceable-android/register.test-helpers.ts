@@ -56,7 +56,7 @@ async function runTask(
       widgetName: 'ActiveAgentsWidget',
       widgetId: 1,
       width,
-      height: 200,
+      height: 224,
       screenInfo: {
         screenWidthDp: 400,
         screenHeightDp: 800,
@@ -108,4 +108,21 @@ export function collectText(node: ReactNode | undefined): string[] {
   }
   const text = node.props.text === undefined ? [] : [node.props.text];
   return [...text, ...collectText(node.props.children)];
+}
+
+/** Spoken labels of the in-widget controls (the whole-widget open action excluded). */
+export function collectControls(node: ReactNode | undefined, root = true): string[] {
+  if (Array.isArray(node)) {
+    return node.flatMap((child: ReactNode) => collectControls(child, false));
+  }
+  if (
+    !isValidElement<{ clickAction?: string; accessibilityLabel?: string; children?: ReactNode }>(
+      node
+    )
+  ) {
+    return [];
+  }
+  const own =
+    !root && node.props.clickAction !== undefined ? [node.props.accessibilityLabel ?? ''] : [];
+  return [...own, ...collectControls(node.props.children, false)];
 }

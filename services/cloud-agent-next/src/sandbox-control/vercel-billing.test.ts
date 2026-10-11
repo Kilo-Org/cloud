@@ -288,6 +288,71 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe('MeteredBillingLifecycle placed sandbox admission', () => {
+  const PLACED_ID = `sbx-${'e'.repeat(48)}`;
+  function placedInput(sandboxKind: string | undefined, sandboxId = PLACED_ID) {
+    return {
+      sandboxId,
+      subject: { type: 'user', id: 'user-1' },
+      actor: { type: 'user', id: 'user-1' },
+      sessionId: 'workspace_placed',
+      metadata: { origin: 'cloud-agent' },
+      enforcementRequested: true,
+      ...(sandboxKind ? { sandboxKind } : {}),
+    };
+  }
+
+  it.each(['SandboxSmallContainment', 'SandboxVercelSmall'] as const)(
+    'admits a placed sandbox in %s and meters it under its neutral key',
+    async sandboxClassName => {
+      const { lifecycle, meter, container } = setup();
+      container.running = false;
+
+      await expect(
+        lifecycle.ensureBillingAdmission({ sandboxClassName }, placedInput('isolated'))
+      ).resolves.toEqual({ success: true });
+
+      expect(meter.recordStartInputs).toHaveLength(1);
+      expect(meter.recordStartInputs[0]).toMatchObject({
+        instanceId: PLACED_ID,
+        sessionId: 'workspace_placed',
+      });
+      expect(meter.recordStartInputs[0]).not.toHaveProperty('sandboxKind');
+    }
+  );
+
+  it("rejects a placed sandbox admitted outside its kind's classes", async () => {
+    const { lifecycle, meter } = setup();
+
+    await expect(
+      lifecycle.ensureBillingAdmission(
+        { sandboxClassName: 'SandboxContainment' },
+        placedInput('isolated')
+      )
+    ).rejects.toThrow('SandboxContainment billing received an incompatible sandbox ID');
+    await expect(
+      lifecycle.ensureBillingAdmission(
+        { sandboxClassName: 'SandboxSmallContainment' },
+        placedInput(undefined)
+      )
+    ).rejects.toThrow('Sandbox key and kind do not match');
+    expect(meter.recordStartInputs).toHaveLength(0);
+  });
+
+  it('still admits a legacy prefixed key without a kind', async () => {
+    const { lifecycle, meter, container } = setup();
+    container.running = false;
+
+    await expect(
+      lifecycle.ensureBillingAdmission(
+        { sandboxClassName: 'SandboxSmallContainment' },
+        placedInput(undefined, `ses-${'e'.repeat(48)}`)
+      )
+    ).resolves.toEqual({ success: true });
+    expect(meter.recordStartInputs[0]).toMatchObject({ instanceId: `ses-${'e'.repeat(48)}` });
+  });
+});
+
 describe('pinMeasurementCursor', () => {
   it('pins the supplied cursor and does not restamp it on the next schedule', async () => {
     const { storage, container, lifecycle, heartbeat } = setup();

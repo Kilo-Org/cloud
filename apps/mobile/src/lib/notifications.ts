@@ -24,12 +24,17 @@ import {
   type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 
 import { captureEvent } from '@/lib/analytics/posthog';
 import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
+import {
+  rememberHomeWidgetSnapshot,
+  setHomeWidgetDetails,
+} from '@/lib/glanceable/home-widget-data';
 import {
   getLastGlanceableSnapshot,
   getLocalScopeKey,
@@ -221,7 +226,7 @@ export async function applyGlanceablePushData(
 
   // Fence and rebase against the latest publication after storage reads.
   // A publication during the reads also wins a timestamp tie.
-  const { type: _type, ...fields } = data;
+  const { type: _type, homeWidgetDetails, ...fields } = data;
   const current = getLastGlanceableSnapshot();
   if (
     current !== null &&
@@ -236,6 +241,8 @@ export async function applyGlanceablePushData(
     revision: current === null ? fields.revision : current.revision + 1,
     accountEpoch: authEpoch,
   };
+  setHomeWidgetDetails(homeWidgetDetails ?? EMPTY_HOME_WIDGET_DETAILS);
+  rememberHomeWidgetSnapshot(snapshot);
 
   const ctx = { userId, organizationId };
   const eligible = isEligibleGlanceableWork(snapshot);

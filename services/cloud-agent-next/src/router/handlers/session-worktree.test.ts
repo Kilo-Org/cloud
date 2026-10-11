@@ -1349,6 +1349,57 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
     expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
   });
 
+  function placedSourceMetadata(): SessionMetadata {
+    const metadata = sourceMetadata();
+    return {
+      ...metadata,
+      workspace: {
+        ...metadata.workspace,
+        sandboxId: `sbx-${'c'.repeat(48)}`,
+        sandboxRoute: undefined,
+        sandboxKind: 'shared',
+      },
+    };
+  }
+
+  it('copies the placed key and its kind into the sibling pin', async () => {
+    const metadata = placedSourceMetadata();
+    const { caller, input, destinationStub } = fixture({ metadata });
+
+    await caller.createWorktreeChat(input);
+
+    const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
+    expect(registration?.metadata.workspace).toMatchObject({
+      sandboxId: metadata.workspace?.sandboxId,
+      sandboxKind: 'shared',
+    });
+    expect(registration?.sandboxSelection).toMatchObject({
+      sandboxKind: 'shared',
+      billing: { sandboxKind: 'shared' },
+    });
+  });
+
+  it('rejects destination metadata with a different kind for the same key', async () => {
+    const metadata = placedSourceMetadata();
+    const { caller, input, destinationStub } = fixture({ metadata });
+    const destination = destinationMetadata(metadata);
+    destination.workspace = {
+      ...destination.workspace,
+      sandboxKind: 'isolated',
+    };
+    destinationStub.getMetadata.mockResolvedValueOnce(destination);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({
+        status: 'reconcile_pending',
+        canonical_result: await progressFor(input),
+      }),
+    });
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+  });
+
   it('rejects destination metadata that points at a different physical route', async () => {
     const { caller, input, metadata, destinationStub } = fixture();
     const destination = destinationMetadata(metadata);

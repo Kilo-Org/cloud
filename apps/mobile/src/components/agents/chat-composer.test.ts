@@ -4,7 +4,6 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type AgentMode } from '@/components/agents/mode-selector';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import { Text as renderText } from '@/components/ui/text';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
@@ -377,8 +376,6 @@ function makeProps(overrides: Partial<ComposerProps> = {}): ComposerProps {
     onRestartSession: vi.fn(async () => true),
     onExitSession: vi.fn(async () => undefined),
     onStop: vi.fn(async () => undefined),
-    mode: 'code' as AgentMode,
-    onModeChange: vi.fn(() => undefined),
     model: 'anthropic/claude-sonnet-4',
     variant: 'medium',
     modelOptions: [],

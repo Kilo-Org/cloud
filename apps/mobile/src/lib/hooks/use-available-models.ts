@@ -35,6 +35,8 @@ export type ModelOption = {
   hasUserByokAvailable?: boolean;
   context_length?: number | null;
   pricing?: { prompt?: string; completion?: string };
+  /** The catalog lists image input for this model. */
+  supportsImages?: boolean;
 };
 
 type ModelResponse = {
@@ -47,6 +49,7 @@ type ModelResponse = {
     context_length?: number | null;
     preferredIndex?: number;
     pricing?: { prompt?: string; completion?: string };
+    architecture?: { input_modalities?: string[] };
     opencode?: {
       variants?: Record<string, unknown>;
     };
@@ -70,6 +73,7 @@ export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
     variants: Object.keys(model.opencode?.variants ?? {}),
     preferredIndex: model.preferredIndex,
     context_length: model.context_length ?? null,
+    supportsImages: model.architecture?.input_modalities?.includes('image') === true,
   }));
 
   items.sort((a, b) => {
@@ -98,6 +102,7 @@ export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
     hasUserByokAvailable: item.hasUserByokAvailable,
     pricing: item.pricing,
     context_length: item.context_length,
+    supportsImages: item.supportsImages,
   }));
 }
 
@@ -126,6 +131,7 @@ export const OpenRouterModelsResponseSchema = z.object({
         .object({ prompt: z.string().optional(), completion: z.string().optional() })
         .optional(),
       opencode: z.object({ variants: z.record(z.string(), z.unknown()).optional() }).optional(),
+      architecture: z.object({ input_modalities: z.array(z.string()).optional() }).optional(),
     })
   ),
 });

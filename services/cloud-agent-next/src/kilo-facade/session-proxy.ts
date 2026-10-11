@@ -3,6 +3,7 @@ import { findWrapperForSession } from '../kilo/wrapper-manager.js';
 import { requiresContainmentSandbox } from '../persistence/session-metadata.js';
 import { generateSandboxId, getSandboxNamespace } from '../sandbox-id.js';
 import { fetchSessionMetadata } from '../session-service.js';
+import { isControlSession } from '../session-plane.js';
 import type { Env, SandboxInstance, SandboxId, SessionId } from '../types.js';
 import {
   buildSandboxBillingInput,
@@ -77,6 +78,10 @@ export async function resolveLiveWrapperTarget(params: {
   cloudAgentSessionId: string;
 }): Promise<LiveWrapperResolution> {
   const { env, userId, cloudAgentSessionId } = params;
+  // A control-plane sandbox runs one supervisor per allocation and never a
+  // per-session legacy wrapper process, so the lookup below cannot match it.
+  // Touching the sandbox would only wake and bill it.
+  if (isControlSession(cloudAgentSessionId)) return { kind: 'unavailable' };
   const metadata = await fetchSessionMetadata(env, userId, cloudAgentSessionId);
   if (!metadata) {
     return { kind: 'unavailable' };

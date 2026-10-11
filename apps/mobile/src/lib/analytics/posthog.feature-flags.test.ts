@@ -22,7 +22,7 @@ const hoisted = vi.hoisted(() => {
   // Mutable so each test can set the build version under test before the
   // module loads. `useFeatureFlag` reads it at read time, not import time.
   const application = {
-    nativeApplicationVersion: '1.0.8' as string | undefined,
+    nativeApplicationVersion: '1.0.11' as string | undefined,
     nativeBuildVersion: '45',
   };
   const controller = {
@@ -63,7 +63,7 @@ vi.mock('@/lib/feature-flags', async importOriginal => {
     ...actual,
     getFeatureFlagDefinition: (key: string) =>
       key === 'mobile-test-feature'
-        ? { key, minAppVersion: '1.0.6', defaultValue: false }
+        ? { key, minAppVersion: '1.0.11', defaultValue: true }
         : undefined,
   };
 });
@@ -109,7 +109,7 @@ async function readFlag(key: string, defaultValue: boolean): Promise<boolean | u
 beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
-  hoisted.application.nativeApplicationVersion = '1.0.8';
+  hoisted.application.nativeApplicationVersion = '1.0.11';
   hoisted.controller.allowsOptional.mockReturnValue(true);
   hoisted.controller.currentGeneration.mockReturnValue(0);
   hoisted.client.getFeatureFlag.mockReset();
@@ -117,7 +117,7 @@ beforeEach(() => {
 
 describe('version-aware feature flags', () => {
   it('an older build falls back to the default for a flag introduced in a newer version', async () => {
-    // The test flag starts at 1.0.6; older builds ignore its remote value.
+    // Older builds use the definition's default, not the caller's default.
     hoisted.application.nativeApplicationVersion = '1.0.5';
     hoisted.client.getFeatureFlag.mockImplementation(
       (key: string) => (key === 'mobile-test-feature' ? true : undefined) as never
@@ -127,7 +127,7 @@ describe('version-aware feature flags', () => {
 
     const probe = await readFlag('mobile-test-feature', false);
 
-    expect(probe).toBe(false);
+    expect(probe).toBe(true);
   });
 
   it('a build at or above the minimum applies the remote flag value', async () => {
@@ -145,7 +145,7 @@ describe('version-aware feature flags', () => {
   });
 
   it('a build at exactly the minimum version applies the flag', async () => {
-    hoisted.application.nativeApplicationVersion = '1.0.6';
+    hoisted.application.nativeApplicationVersion = '1.0.11';
     hoisted.client.getFeatureFlag.mockImplementation(
       (key: string) => (key === 'mobile-test-feature' ? true : undefined) as never
     );

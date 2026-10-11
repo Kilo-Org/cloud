@@ -32,11 +32,18 @@ export function applyThemePreference(pref: ThemePreference): void {
   Appearance.setColorScheme(colorSchemeForPreference(pref) ?? 'unspecified');
 }
 
+/** The stored theme preference for callers with no React tree (the settings registry). */
+export function getThemePreference(): ThemePreference {
+  return store.get();
+}
+
 export function setThemePreference(pref: ThemePreference): void {
-  store.set(pref);
-  // Apply synchronously so a same-render useColorScheme() read sees the new
-  // value without waiting for the async disk persist to settle.
+  // Appearance first, then the store emit: notifying subscribers and then
+  // changing the scheme updates useColorScheme on components still mounting
+  // from that emit (LogBox: "Can't perform a React state update on a
+  // component that hasn't mounted yet" over the tab bar).
   applyThemePreference(pref);
+  store.set(pref);
 }
 
 /** Start the theme-preference disk read at module scope, before React mounts. */

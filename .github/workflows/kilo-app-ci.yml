@@ -104,6 +104,9 @@ jobs:
       - name: Build trpc types
         run: pnpm --filter @kilocode/trpc run build
 
+      - name: Build harness SDK
+        run: pnpm --filter @kilocode/harness-sdk run build
+
       - name: Typecheck
         run: pnpm --filter kilo-app run typecheck
 
@@ -137,6 +140,9 @@ jobs:
       - name: Build trpc types
         run: pnpm --filter @kilocode/trpc run build
 
+      - name: Build harness SDK
+        run: pnpm --filter @kilocode/harness-sdk run build
+
       - name: Lint
         run: pnpm --filter kilo-app run lint
 
@@ -164,6 +170,9 @@ jobs:
 
       - name: Build trpc types
         run: pnpm --filter @kilocode/trpc run build
+
+      - name: Build harness SDK
+        run: pnpm --filter @kilocode/harness-sdk run build
 
       - name: Check i18n catalogs and leftover copy
         run: pnpm --filter kilo-app run check:i18n
@@ -221,6 +230,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build harness SDK
+        run: pnpm --filter @kilocode/harness-sdk run build
+
       - name: Check unused exports
         run: pnpm --filter kilo-app run check:unused
 
@@ -248,6 +260,9 @@ jobs:
 
       - name: Build trpc types
         run: pnpm --filter @kilocode/trpc run build
+
+      - name: Build harness SDK
+        run: pnpm --filter @kilocode/harness-sdk run build
 
       - name: Test
         run: pnpm --filter kilo-app run test

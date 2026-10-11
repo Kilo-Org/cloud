@@ -822,6 +822,8 @@ describe('serialized command delivery wait', () => {
   it('still expires a follow-up waiting behind an ordinary prompt response', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());
+    // A live native execution, so only the prompt type keeps m2 from the exemption.
+    h.setState(KILO_SESSION, runningState);
     const client = h.client(routeSpec());
     const first = Promise.withResolvers<void>();
     client.setPromptImpl(opts => (opts.messageId === 'm1' ? first.promise : Promise.resolve()));

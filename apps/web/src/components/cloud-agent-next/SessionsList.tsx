@@ -44,7 +44,6 @@ export function SessionsList({ sessions, organizationId, onSessionClick }: Sessi
       {sessions.map(session => {
         const chatUrl = `${basePath}/chat?sessionId=${session.sessionId}`;
 
-        // Determine badge based on created_on_platform field
         const platform = session.createdOnPlatform;
         let badge: React.ReactNode;
 
@@ -77,7 +76,6 @@ export function SessionsList({ sessions, organizationId, onSessionClick }: Sessi
             </span>
           );
         } else {
-          // Default to Extension badge for unknown, vscode, etc.
           badge = (
             <span className="inline-flex shrink-0 items-center gap-1 rounded bg-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-400">
               <Puzzle className="h-3 w-3" />

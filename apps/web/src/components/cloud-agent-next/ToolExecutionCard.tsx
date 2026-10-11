@@ -156,7 +156,6 @@ function truncateText(
 export function ToolExecutionCard({ execution, toolPart }: ToolExecutionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Normalize the data from either V1 or V2 format
   const data = useMemo((): NormalizedToolData | null => {
     if (toolPart) {
       return normalizeV2ToolPart(toolPart);
@@ -167,7 +166,6 @@ export function ToolExecutionCard({ execution, toolPart }: ToolExecutionCardProp
     return null;
   }, [toolPart, execution]);
 
-  // Return null if no data provided
   if (!data) {
     return null;
   }
@@ -187,7 +185,6 @@ export function ToolExecutionCard({ execution, toolPart }: ToolExecutionCardProp
   const shouldShowExpand =
     isOutputTruncated || isErrorTruncated || isRawInputTruncated || inputStr.length > 300;
 
-  // Display title: prefer V2 title, fallback to tool name
   const displayTitle = data.title || data.toolName;
 
   return (

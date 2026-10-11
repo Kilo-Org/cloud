@@ -38,14 +38,12 @@ export function useOrgContextCommand(organizationId?: string) {
       const { orgContext, pendingSession } = params;
 
       try {
-        // 1. Update IndexedDB with confirmed org context
         await updateOrgContext({
           sessionId: pendingSession.sessionId,
           orgContext,
           orgContextConfirmed: true,
         });
 
-        // 2. Check if we need to navigate to a DIFFERENT org
         const needsNavigation = orgContext && orgContext.organizationId !== organizationId;
 
         if (needsNavigation && orgContext) {

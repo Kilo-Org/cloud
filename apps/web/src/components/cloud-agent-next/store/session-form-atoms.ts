@@ -15,10 +15,6 @@
 
 import { atom } from 'jotai';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export type EnvVar = {
   key: string;
   value: string;
@@ -29,10 +25,6 @@ export type ProfileConfig = {
   vars: EnvVar[];
   commands: string[];
 };
-
-// ============================================================================
-// Base Atoms - Manual Configuration
-// ============================================================================
 
 /**
  * Manual environment variables added by user via EnvVarsDialog
@@ -63,10 +55,6 @@ export const hasAutoSelectedDefaultAtom = atom(false);
  */
 export const profileConfigAtom = atom<ProfileConfig | null>(null);
 
-// ============================================================================
-// Derived Atoms - Effective Configuration
-// ============================================================================
-
 /**
  * Effective environment variables: profile + manual merged
  * Manual vars take precedence (override profile vars with same key)
@@ -75,17 +63,14 @@ export const effectiveEnvVarsAtom = atom(get => {
   const manual = get(manualEnvVarsAtom);
   const profileConfig = get(profileConfigAtom);
 
-  // Start with profile vars
   const effective: Record<string, string> = {};
 
-  // Add profile vars first
   if (profileConfig) {
     for (const v of profileConfig.vars) {
       effective[v.key] = v.value;
     }
   }
 
-  // Manual vars override profile vars
   for (const [key, value] of Object.entries(manual)) {
     effective[key] = value;
   }
@@ -103,7 +88,6 @@ export const effectiveSetupCommandsAtom = atom(get => {
 
   const profileCommands = profileConfig?.commands || [];
 
-  // Start with profile commands, add manual ones that aren't duplicates
   const commandSet = new Set(profileCommands);
   const effectiveCommands = [...profileCommands];
 
@@ -116,10 +100,6 @@ export const effectiveSetupCommandsAtom = atom(get => {
 
   return effectiveCommands;
 });
-
-// ============================================================================
-// Action Atoms
-// ============================================================================
 
 /**
  * Add or update a manual env var

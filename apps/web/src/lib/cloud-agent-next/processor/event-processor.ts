@@ -286,7 +286,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     const message = messagesMap.get(key);
 
     if (!message) {
-      // Queue for later - message hasn't arrived yet
       const queue = pendingParts.get(key) ?? [];
       queue.push({ part });
       pendingParts.set(key, queue);
@@ -329,7 +328,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
       callbacks.onSessionStatusChanged?.(status);
     }
 
-    // Update streaming state based on status
     if (status.type === 'idle') {
       // Complete user messages when session becomes idle (for both root and child).
       // Streaming is NOT stopped here — the wrapper's `complete` event is the
@@ -606,7 +604,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
       data = data.properties;
     }
 
-    // Skip unknown event types
     if (!isHandledEventType(streamEventType)) {
       return;
     }

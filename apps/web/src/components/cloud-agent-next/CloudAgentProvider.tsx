@@ -149,7 +149,6 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           // Active sessions unavailable — fall through to other checks
         }
 
-        // 2. Check if the session has a cloud agent session ID
         try {
           const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
           if (session.cloud_agent_session_id) {

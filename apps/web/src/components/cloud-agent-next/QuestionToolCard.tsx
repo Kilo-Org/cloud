@@ -255,7 +255,6 @@ function QuestionTab({
 }
 
 export function QuestionToolCard(props: QuestionToolCardProps) {
-  // Normalize: tool-part vs standalone question
   const isStandalone = 'questions' in props;
   const questions: QuestionInfo[] = isStandalone
     ? props.questions
@@ -285,7 +284,6 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
       ? questionRequestIds.get(props.toolPart.callID)
       : undefined;
 
-  // Get answers from metadata for completed state
   const completedAnswers: string[][] = (() => {
     if (isStandalone) return [];
     const { state } = props.toolPart;
@@ -324,7 +322,6 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
         return updated;
       });
 
-      // Single-select: picking an option deselects custom
       if (!isMultiple) {
         setCustomSelected(prev => {
           const updated = [...prev];
@@ -348,7 +345,6 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
         return updated;
       });
 
-      // Single-select: selecting custom deselects options
       if (!isMultiple) {
         setSelectedAnswers(prev => {
           const updated = [...prev];
@@ -367,7 +363,6 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
         updated[questionIndex] = value;
         return updated;
       });
-      // Auto-select custom when user types
       if (value.length > 0) {
         setCustomSelected(prev => {
           if (prev[questionIndex]) return prev;
@@ -375,7 +370,6 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
           updated[questionIndex] = true;
           return updated;
         });
-        // Single-select: auto-selecting custom deselects options
         const question = questions[questionIndex];
         if (question?.multiple !== true) {
           setSelectedAnswers(prev => {
@@ -606,7 +600,6 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
     );
   }
 
-  // Non-running states: use shared shell
   return (
     <ToolCardShell
       icon={MessageCircleQuestion}

@@ -33,7 +33,6 @@ export function useOrganizationModels(
   organizationId?: string,
   enabled = true
 ): UseOrganizationModelsReturn {
-  // Fetch models for the model selector
   const { data: openRouterModels, isLoading: isLoadingOpenRouter } = useModelSelectorList(
     organizationId,
     enabled
@@ -41,7 +40,6 @@ export function useOrganizationModels(
 
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
 
-  // Format models for the combobox
   const modelOptions = useMemo<ModelOption[]>(() => {
     return (
       openRouterModels?.data.map(model => ({

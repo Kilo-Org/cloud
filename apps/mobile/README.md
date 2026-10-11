@@ -4,6 +4,13 @@ AI agents: see [AGENTS.md](AGENTS.md).
 
 Humans: follow instructions below or talk to [@iscekic](https://github.com/iscekic)
 
+## Feature availability
+
+- Chat and PR Review always appear in signed-in navigation.
+- The `mobile-chat` and `mobile-pr-review` flags no longer control these features.
+- PostHog feature flag infrastructure and the version-aware registry remain available for future flags.
+- KiloClaw tab visibility still depends on instance ownership.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.

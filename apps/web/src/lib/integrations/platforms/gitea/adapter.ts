@@ -151,8 +151,6 @@ function buildRedirectRequestInit(
   return { ...init, headers };
 }
 
-type ResolvedGiteaUrl = GiteaResolvedUrl & { address: string };
-
 function fetchGiteaBoundToAddress(
   resolvedUrl: GiteaResolvedUrl & { address: string },
   init?: RequestInit
@@ -243,10 +241,6 @@ function fetchGiteaBoundToAddress(
     }
     req.end();
   });
-}
-
-function isGiteaRedirectStatus(status: number): boolean {
-  return isGiteaRedirect(status);
 }
 
 function headersInitToRecord(headers: HeadersInit | undefined): Record<string, string> {

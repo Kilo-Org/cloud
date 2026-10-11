@@ -20,6 +20,7 @@ import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { COMPACT_H11_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { pickNewestSession } from '@/lib/glanceable/newest-session';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
@@ -33,14 +34,20 @@ export function statusRowTestId(kind: GlanceableStatusKind): string {
 /** Shared minimum frame; text determines the loaded card's height. */
 const CARD_CLASS = 'overflow-hidden rounded-2xl border border-border bg-card';
 const COUNTS_CLASS = 'gap-2 px-4 py-3';
-const COUNT_ROW_CLASS = 'min-h-6 flex-row items-center gap-2';
+// The row is a control, so its own 38.5pt frame clears the control-size audit's
+// floor and the per-side slop carries the touch region to 44pt (see
+// `@/lib/a11y/tap-target`). The counts' `gap-2` is 7pt, more than twice the
+// 3pt slop, so two facing rows' regions never overlap.
+const COUNT_ROW_CLASS = 'min-h-11 flex-row items-center gap-2';
+const COUNT_ROW_HIT_SLOP = {
+  top: COMPACT_H11_HIT_SLOP_DP,
+  bottom: COMPACT_H11_HIT_SLOP_DP,
+  left: 0,
+  right: 0,
+};
 const DIVIDER_CLASS = 'h-px bg-border';
 const NEWEST_BLOCK_CLASS = 'min-h-[68px] justify-center gap-1 px-4 py-3';
 const NEWEST_ROW_CLASS = 'min-h-5 flex-row items-center gap-2';
-
-function labelKeyFor(kind: GlanceableStatusKind): string {
-  return statusFilterLabelKey(kind);
-}
 
 type GlanceableActiveCardProps = {
   sessions: readonly ActiveSession[];
@@ -89,7 +96,7 @@ export function GlanceableActiveCard({
       ? null
       : (namedSessionTitle(newestSession.title, newestSession.id) ??
         t('agents.sessionRow.untitled'));
-  const stateLabel = newestKind === null ? null : t(labelKeyFor(newestKind));
+  const stateLabel = newestKind === null ? null : t(statusFilterLabelKey(newestKind));
   const newestAt = newest?.at ?? null;
   const newestAge = newestAt === null ? null : timeAgo(parseTimestamp(newestAt), undefined, now);
   const newestLabel = [newestTitle, stateLabel, newestAge].filter(Boolean).join(', ');
@@ -107,6 +114,9 @@ export function GlanceableActiveCard({
                 onPressStatus(line.kind);
               }}
               accessibilityRole="button"
+              // The row's own count and status texts are its spoken name, so a
+              // screen reader reads "13 Idle" and no separate label is needed.
+              hitSlop={COUNT_ROW_HIT_SLOP}
               testID={statusRowTestId(line.kind)}
               className={cn(COUNT_ROW_CLASS, 'active:opacity-70')}
             >

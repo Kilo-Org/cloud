@@ -22,55 +22,58 @@ import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-a
 import { type BannerState } from '@/lib/offline-banner-state';
 
 type Org = { organizationId: string; organizationName: string };
-const state = vi.hoisted(() => ({
-  focused: true,
-  fontScale: 1,
-  // The window width `ScreenHeader` reads to decide whether the header's
-  // controls share the title's row. Undefined by default keeps every other case
-  // on the single-row layout; a case that sets it exercises the reflow.
-  windowWidth: undefined as number | undefined,
-  // Mutable so a case can put the tree on Android: the platform decides
-  // whether the floating pull-to-refresh indicator is safe (device defect
-  // uxs1) or the reserved band carries the in-flight state instead.
-  platform: { OS: 'ios' as string },
-  // Mutable so a case can turn reduced motion on: the platform control is then
-  // inert and a centered body draws the pull's static progress itself.
-  reducedMotion: false,
-  topInset: 0,
-  leftInset: 0,
-  rightInset: 0,
-  tabBarHeight: 60,
-  focusCallbacks: new Set<() => void>(),
-  listeners: new Set<(state: string) => void>(),
-  // Keyboard listeners, keyed by the event the platform reports (the screen's
-  // empty state reserves the IME's height, so a case must be able to raise it).
-  keyboard: new Map<string, Set<(event: { endCoordinates: { height: number } }) => void>>(),
-  auth: { token: 'account' as string | undefined, isLoading: false, isSigningOut: false },
-  organization: { organizationId: null as string | null, isLoaded: true },
-  boundary: { orgs: [] as Org[] | undefined, isResolving: false, isError: false },
-  live: {
-    activeSessions: [] as ActiveSession[],
-    isLoading: false,
-    isError: false,
-    hasAcceptedSuccess: true,
-    isFetching: false,
-    isPaused: false,
-    terminalError: null as ReturnType<typeof useLiveAgentSessions>['terminalError'],
-  },
-  internet: 'online' as BannerState,
-  connection: { isConnected: true, reconnectExhausted: false },
-  refetch: vi.fn<() => Promise<boolean>>(),
-  boundaryRefetch: vi.fn(),
-  socketRetry: vi.fn(),
-  invalidate: vi.fn(),
-  announcements: [] as string[],
-  destination: '',
-  sessionId: '',
+const state = vi.hoisted(() => {
   // Route parameters the screen reads; a case sets `status` to mount the
   // transient status filter the Home card opens.
-  routeParams: {} as Record<string, string | undefined>,
-  liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
-}));
+  const routeParams: Record<string, string | undefined> = {};
+  return {
+    focused: true,
+    fontScale: 1,
+    // The window width `ScreenHeader` reads to decide whether the header's
+    // controls share the title's row. Undefined by default keeps every other case
+    // on the single-row layout; a case that sets it exercises the reflow.
+    windowWidth: undefined as number | undefined,
+    // Mutable so a case can put the tree on Android: the platform decides
+    // whether the floating pull-to-refresh indicator is safe (device defect
+    // uxs1) or the reserved band carries the in-flight state instead.
+    platform: { OS: 'ios' as string },
+    // Mutable so a case can turn reduced motion on: the platform control is then
+    // inert and a centered body draws the pull's static progress itself.
+    reducedMotion: false,
+    topInset: 0,
+    leftInset: 0,
+    rightInset: 0,
+    tabBarHeight: 60,
+    focusCallbacks: new Set<() => void>(),
+    listeners: new Set<(state: string) => void>(),
+    // Keyboard listeners, keyed by the event the platform reports (the screen's
+    // empty state reserves the IME's height, so a case must be able to raise it).
+    keyboard: new Map<string, Set<(event: { endCoordinates: { height: number } }) => void>>(),
+    auth: { token: 'account' as string | undefined, isLoading: false, isSigningOut: false },
+    organization: { organizationId: null as string | null, isLoaded: true },
+    boundary: { orgs: [] as Org[] | undefined, isResolving: false, isError: false },
+    live: {
+      activeSessions: [] as ActiveSession[],
+      isLoading: false,
+      isError: false,
+      hasAcceptedSuccess: true,
+      isFetching: false,
+      isPaused: false,
+      terminalError: null as ReturnType<typeof useLiveAgentSessions>['terminalError'],
+    },
+    internet: 'online' as BannerState,
+    connection: { isConnected: true, reconnectExhausted: false },
+    refetch: vi.fn<() => Promise<boolean>>(),
+    boundaryRefetch: vi.fn(),
+    socketRetry: vi.fn(),
+    invalidate: vi.fn(),
+    announcements: [] as string[],
+    destination: '',
+    sessionId: '',
+    routeParams,
+    liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
+  };
+});
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 // Mutable so a case can put the tree in an RTL interface: the header action's
 // letterspaced capitals are LTR-only and must drop under RTL, keeping the

@@ -4,8 +4,11 @@ import * as ReactQuery from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type GlanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
+
 import { i18n } from '@/i18n';
 import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
+import { statusRowTestId } from '@/components/home/glanceable-active-card';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
@@ -209,7 +212,7 @@ function newestButton() {
 
 function statusButton(kind: string) {
   const button = nodes('Pressable').find(
-    candidate => candidate.props.testID === `live-card-status-${kind}`
+    candidate => candidate.props.testID === statusRowTestId(kind as GlanceableStatusKind)
   );
   if (!button) {
     throw new Error(`Missing ${kind} status button`);

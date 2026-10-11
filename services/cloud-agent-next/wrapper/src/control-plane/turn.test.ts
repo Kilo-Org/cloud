@@ -606,6 +606,34 @@ describe('serialized command delivery wait', () => {
     expect(client.prompts.map(call => call.messageId)).toEqual(['m1', 'm2']);
   });
 
+  it('dispatches a prompt parked during a restart before a command received after it', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    h.registerRoute(spec);
+    h.setFlags(spec, { restarting: true, suspected: true });
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+
+    // Kilo is back, and c1 arrives before anything drains the inbox.
+    h.setFlags(spec, { restarting: false, suspected: false });
+    const { client, summary } = blockedCompact(h);
+    const promptsBeforeSummary: string[][] = [];
+    client.setSummaryImpl(() => {
+      promptsBeforeSummary.push(client.prompts.map(call => call.messageId));
+      return summary.promise;
+    });
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.tick();
+    await settle();
+    expect(promptsBeforeSummary).toEqual([['m1']]);
+
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    summary.resolve(true);
+  });
+
   it('excludes waiting behind a live observed non-compact command too', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());

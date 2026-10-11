@@ -411,6 +411,19 @@ export function createTurnManager(deps: TurnManagerDeps) {
     }
   }
 
+  /**
+   * Kilo cannot take the prompt now, or an earlier-received prompt is still parked undispatched.
+   * Parking behind it keeps dispatch order equal to receipt order; the next drain re-chains both.
+   */
+  function mustPark(turn: Turn, pending: PendingPrompt): boolean {
+    if (queueState(turn.route) === 'queue') return true;
+    for (const earlier of turn.prompts) {
+      if (earlier === pending) return false;
+      if (earlier.dispatched !== true) return true;
+    }
+    return false;
+  }
+
   function chainSubmit(turn: Turn, pending: PendingPrompt): void {
     const prompts = turn.prompts;
     turn.submitting = turn.submitting
@@ -456,13 +469,13 @@ export function createTurnManager(deps: TurnManagerDeps) {
       message = await pending.message;
     }
     if (!isCurrent()) return;
-    if (queueState(route) === 'queue') {
+    if (mustPark(turn, pending)) {
       if (!turn.inbox.includes(pending)) turn.inbox.push(pending);
       return;
     }
     const client = await runtime.ensure();
     if (!isCurrent()) return;
-    if (runtime.isRetiredClient(client) || queueState(route) === 'queue') {
+    if (runtime.isRetiredClient(client) || mustPark(turn, pending)) {
       if (!turn.inbox.includes(pending)) turn.inbox.push(pending);
       return;
     }

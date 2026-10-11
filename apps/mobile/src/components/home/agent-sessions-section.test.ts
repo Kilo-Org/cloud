@@ -210,9 +210,11 @@ function newestButton() {
   return button;
 }
 
-function statusButton(kind: string) {
+const STATUS_KINDS: GlanceableStatusKind[] = ['needsInput', 'running', 'scheduled', 'idle'];
+
+function statusButton(kind: GlanceableStatusKind) {
   const button = nodes('Pressable').find(
-    candidate => candidate.props.testID === statusRowTestId(kind as GlanceableStatusKind)
+    candidate => candidate.props.testID === statusRowTestId(kind)
   );
   if (!button) {
     throw new Error(`Missing ${kind} status button`);
@@ -297,7 +299,7 @@ describe('Home live section', () => {
         session('later', 'scheduled'),
       ],
     });
-    for (const kind of ['needsInput', 'running', 'scheduled', 'idle']) {
+    for (const kind of STATUS_KINDS) {
       expect(statusButton(kind).props.accessibilityRole).toBe('button');
     }
     (statusButton('idle').props.onPress as () => void)();
@@ -325,7 +327,7 @@ describe('Home live section', () => {
     // Nothing to open: the newest block is not a button, but every status row
     // keeps its control so a zero count still opens the filtered list.
     expect(newestButton().props.accessibilityRole).toBeUndefined();
-    for (const kind of ['needsInput', 'running', 'scheduled', 'idle']) {
+    for (const kind of STATUS_KINDS) {
       expect(statusButton(kind).props.accessibilityRole).toBe('button');
     }
     // The header keeps See all's box but hides it.

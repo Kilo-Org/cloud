@@ -222,7 +222,14 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => state.focused }),
-  useLocalSearchParams: () => state.routeParams,
+  // Real `setParams` shallow-merges and cannot delete a key; the real
+  // `useLocalSearchParams` then hides an undefined value. The mock keeps the
+  // merged key and masks it on read, so a cleared status is absent to the
+  // screen exactly as it is on the device.
+  useLocalSearchParams: () =>
+    Object.fromEntries(
+      Object.entries(state.routeParams).filter(([, value]) => value !== undefined)
+    ),
   useFocusEffect: (effect: () => void) => {
     state.focusCallbacks.add(effect);
   },

@@ -269,13 +269,7 @@ function CodeBlockImpl({
         )}
       </View>
     ),
-    [
-      keepBlankLineBox,
-      mountedChunks,
-      effectiveSelectable,
-      textBase,
-      effectiveTokenScheme,
-    ]
+    [keepBlankLineBox, mountedChunks, effectiveSelectable, textBase, effectiveTokenScheme]
   );
 
   const truncatedMarker = isTruncated ? (

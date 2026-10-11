@@ -736,6 +736,9 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       </VStack>
     );
     if (wide) {
+      // A 164pt device card has 132pt inside its 16pt band. Keep the
+      // placeholders plus the 24pt header and footer below that height;
+      // otherwise SwiftUI centres the overflowing stack across the band.
       body = (
         <HStack alignment="top" spacing={0}>
           <VStack
@@ -747,9 +750,9 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
             {bar(96, 12, 8)}
           </VStack>
           <VStack alignment="leading" spacing={0}>
-            {bar(150, 12, 30)}
+            {bar(150, 12, 26)}
             {bar(100, 10, 8)}
-            {bar(140, 12, 12)}
+            {bar(140, 12, 8)}
             {bar(90, 10, 8)}
           </VStack>
         </HStack>

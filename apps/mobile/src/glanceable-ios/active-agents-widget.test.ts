@@ -677,6 +677,12 @@ describe('nothing running, updating, last known', () => {
     expectBaselines(tree, family, [['Updating agents', family === 'systemLarge' ? 363 : 151]]);
   });
 
+  it('fits medium placeholders inside the 16pt band on a 164pt card', () => {
+    const tree = render(propsFor([], { status: 'waiting' }), 'systemMedium');
+    const intrinsicHeight = children(tree).reduce((sum, node) => sum + place(node, 0, []), 0);
+    expect(intrinsicHeight).toBeLessThanOrEqual(164 - 16 * 2);
+  });
+
   it.each(HOME_FAMILIES)(
     'keeps last known work with its time and no relative age in %s',
     family => {

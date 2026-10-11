@@ -45,6 +45,14 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - Check both displays, all three fold poses, and each orientation after the rebuild.
 - When the app moves to Expo SDK 58, remove the scene support option; its template includes scene support.
 
+#### Widget layout checks
+
+- Home widgets keep a 16pt band on all four sides, including the updating placeholder.
+- Check the medium placeholder on a 164pt-tall card: its header, bars and footer must fit within 132pt or SwiftUI centres the overflow into the padding.
+- Arabic Live Activity direction comes from `homeWidgetLocale` in the shared app group, not the simulator language.
+- The Live Activity direction override is native code in `patches/expo-widgets@57.0.22.patch`. Rebuild the iOS extension after changing the patch; restarting Metro alone leaves the installed extension unchanged.
+- After switching the app language, reopen the development client on Metro before applying a fixture and capturing widgets.
+
 #### Responsive layout checks
 
 - Shared tab and detail scroll views reserve the reported left and right safe areas.

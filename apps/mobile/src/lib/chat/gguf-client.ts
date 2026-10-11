@@ -12,11 +12,33 @@ import { type GgufModelFile, settled } from './gguf-records';
 import { answerOf, type CompletionResult, paramsOf, readCompletion, stopOf } from './gguf-template';
 
 /** The part of a llama.rn context this client drives. */
-export type GgufContext = Pick<LlamaContext, 'model' | 'completion' | 'stopCompletion' | 'release'>;
+export type GgufContext = Pick<
+  LlamaContext,
+  'model' | 'completion' | 'stopCompletion' | 'release' | 'initMultimodal' | 'getMultimodalSupport'
+>;
 
 export type GgufRuntime = {
   readonly init: (params: ContextParams) => Promise<GgufContext>;
+  /** Whether the vision projector runs on the GPU. */
+  readonly gpu: boolean;
 };
+
+/**
+ * Loads a projector into an open context. True only when llama.cpp reports
+ * that the model now reads images; the projector's own release runs with the
+ * context's.
+ */
+export async function loadProjector(
+  context: Pick<GgufContext, 'initMultimodal' | 'getMultimodalSupport'>,
+  projector: string,
+  gpu: boolean
+): Promise<boolean> {
+  if (!(await context.initMultimodal({ path: projector, use_gpu: gpu }))) {
+    return false;
+  }
+  const support = await context.getMultimodalSupport();
+  return support.vision;
+}
 
 /** Fixed copy only: llama.cpp errors are never shown or logged. */
 function failure(problem: LocalModelProblem, started: boolean): ModelError {
@@ -71,16 +93,32 @@ export function ggufModelClient({
     await settled(context.value.release());
   };
 
+  /** A vision model whose projector does not load is not the model that was verified. */
+  const open = async (file: GgufModelFile): Promise<GgufContext> => {
+    const context = await runtime.init({
+      model: file.path,
+      n_ctx: file.contextWindow,
+      n_parallel: 1,
+      // llama.rn requires this for media: a shift would move the image tokens.
+      ...(file.projector === undefined ? {} : { ctx_shift: false }),
+    });
+    if (file.projector === undefined) {
+      return context;
+    }
+    const vision = await settled(loadProjector(context, file.projector, runtime.gpu));
+    if (!vision.ok || !vision.value) {
+      await settled(context.release());
+      throw new Error('projector');
+    }
+    return context;
+  };
+
   const load = async (fileId: string, file: GgufModelFile): Promise<GgufContext> => {
     if (loaded?.fileId === fileId) {
       return loaded.context;
     }
     await release();
-    const context = runtime.init({
-      model: file.path,
-      n_ctx: file.contextWindow,
-      n_parallel: 1,
-    });
+    const context = open(file);
     loaded = { fileId, context };
     return context;
   };

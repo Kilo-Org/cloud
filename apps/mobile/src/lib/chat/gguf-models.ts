@@ -7,7 +7,7 @@ import { AppState, Platform } from 'react-native';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { localTargetId } from './backend-target';
-import { ggufModelClient } from './gguf-client';
+import { ggufModelClient, loadProjector } from './gguf-client';
 import { ggufDownloads } from './gguf-downloads';
 import {
   type GgufDownloadSource,
@@ -56,39 +56,37 @@ const storage: GgufStorage = {
     File.createDownloadTask(url, fileIn(name), { onProgress }),
 };
 
+// Metal runs every layer on iOS. Android stays on the CPU: llama.rn's GPU
+// paths there are experimental and limited to some Adreno and Hexagon parts.
+const GPU = Platform.OS === 'ios';
+
 const model = ggufModelClient({
   runtime: {
-    // Metal runs every layer on iOS. Android stays on the CPU: llama.rn's GPU
-    // paths there are experimental and limited to some Adreno and Hexagon parts.
     init: async params => {
-      const context = await initLlama({
-        ...params,
-        n_gpu_layers: Platform.OS === 'ios' ? 99 : 0,
-      });
+      const context = await initLlama({ ...params, n_gpu_layers: GPU ? 99 : 0 });
       return context;
     },
+    gpu: GPU,
   },
-  fileOf: fileId => {
-    const record = downloads.model(fileId);
-    return record === undefined
-      ? undefined
-      : {
-          path: downloads.modelPath(fileId),
-          contextWindow: record.contextWindow,
-          tools: record.tools,
-        };
-  },
+  fileOf: fileId => downloads.file(fileId),
 });
 
 const downloads = ggufDownloads({
   storage,
-  // Loads only the vocabulary and the template, which is enough to read both facts.
-  inspect: async path => {
-    const context = await initLlama({ model: path, vocab_only: true, n_ctx: 512 });
+  // The vocabulary and the template are enough for the window and the tool
+  // rule. A projector checks its size against the model's weights, so a vision
+  // model loads in full to prove it reads images.
+  inspect: async (path, projector) => {
+    const context = await initLlama({
+      model: path,
+      n_ctx: 512,
+      ...(projector === undefined ? { vocab_only: true } : { n_gpu_layers: 0 }),
+    });
     try {
       return {
         contextWindow: contextWindowFor(context.model.metadata),
         tools: templateSupportsTools(context.model.chatTemplates),
+        vision: projector !== undefined && (await loadProjector(context, projector, GPU)),
       };
     } finally {
       await context.release();
@@ -156,8 +154,8 @@ export const ggufModelProvider: LocalModelProvider = {
         };
   },
   supportsTools: fileId => ggufStore().model(fileId)?.tools ?? false,
-  // No vision projector is loaded, so a downloaded model reads text only.
-  supportsImages: () => false,
+  // True only for a model whose projector llama.cpp reported as reading images.
+  supportsImages: fileId => ggufStore().model(fileId)?.vision ?? false,
 };
 
 export const ggufDownloadActions = {

@@ -42,4 +42,20 @@ describe('a direct download link', () => {
       expect(model.license).not.toBe('');
     }
   });
+
+  it('pins a vision model and its projector to the same repository and revision', () => {
+    const pairs = GGUF_CATALOG.flatMap(model =>
+      model.projector === undefined ? [] : [{ model, projector: model.projector }]
+    );
+    expect(pairs.length).toBeGreaterThanOrEqual(1);
+    for (const { model, projector } of pairs) {
+      expect(readGgufLink(projector.url).ok).toBe(true);
+      const repository = /^(.*\/resolve\/[0-9a-f]{40}\/)/.exec(projector.url)?.[1];
+      expect(repository).toBeDefined();
+      expect(model.url.startsWith(repository ?? '-')).toBe(true);
+      expect(projector.url).not.toBe(model.url);
+      expect(projector.sizeBytes).toBeGreaterThan(0);
+      expect(projector.sha256).toMatch(/^[0-9a-f]{64}$/);
+    }
+  });
 });

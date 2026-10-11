@@ -93,7 +93,12 @@ const request: ModelRequest = {
 
 describe('the llama.rn call', () => {
   it('renders the history through the model template and caps the answer to the window', () => {
-    const params = paramsOf(request, { path: '/m/a.gguf', contextWindow: 2048, tools: false });
+    const params = paramsOf(request, {
+      path: '/m/a.gguf',
+      contextWindow: 2048,
+      tools: false,
+      projector: undefined,
+    });
     expect(params.n_predict).toBe(2048);
     expect(params.jinja).toBe(true);
     expect(params.enable_thinking).toBe(false);
@@ -105,7 +110,12 @@ describe('the llama.rn call', () => {
   });
 
   it('sends the tool list and keeps calls and results for a model that supports tools', () => {
-    const params = paramsOf(request, { path: '/m/a.gguf', contextWindow: 4096, tools: true });
+    const params = paramsOf(request, {
+      path: '/m/a.gguf',
+      contextWindow: 4096,
+      tools: true,
+      projector: undefined,
+    });
     expect(params.tool_choice).toBe('auto');
     expect(params.tools).toHaveLength(1);
     expect(params.messages).toEqual([
@@ -118,6 +128,63 @@ describe('the llama.rn call', () => {
       },
       { role: 'tool', tool_call_id: 'c1', content: 'noon' },
     ]);
+  });
+
+  const imageRequest: ModelRequest = {
+    model: 'file-a',
+    maxTokens: 512,
+    prompt: {
+      system: [],
+      messages: [
+        {
+          role: 'user',
+          cache: false,
+          parts: [
+            { kind: 'text', text: 'What is this?' },
+            { kind: 'image', media: 'image/jpeg', data: 'AAAA' },
+          ],
+        },
+        {
+          role: 'user',
+          cache: false,
+          parts: [{ kind: 'image', media: 'image/png', data: 'BBBB' }],
+        },
+      ],
+    },
+  };
+
+  it('sends each image as a data URL in its place for a model whose projector is loaded', () => {
+    const params = paramsOf(imageRequest, {
+      path: '/m/a.gguf',
+      contextWindow: 4096,
+      tools: false,
+      projector: '/m/a.mmproj.gguf',
+    });
+    expect(params.messages).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'What is this?' },
+          { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AAAA' } },
+        ],
+      },
+      {
+        role: 'user',
+        content: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,BBBB' } }],
+      },
+    ]);
+    // llama.rn takes the media from the parts; no file is written for them.
+    expect(params.media_paths).toBeUndefined();
+  });
+
+  it('drops images for a model without a projector', () => {
+    const params = paramsOf(imageRequest, {
+      path: '/m/a.gguf',
+      contextWindow: 4096,
+      tools: false,
+      projector: undefined,
+    });
+    expect(params.messages).toEqual([{ role: 'user', content: 'What is this?' }]);
   });
 });
 

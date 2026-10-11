@@ -1,4 +1,4 @@
-import { type ModelRequest, type StopReason } from '@kilocode/harness-sdk';
+import { type ModelRequest, type PromptPart, type StopReason } from '@kilocode/harness-sdk';
 import { type CompletionParams, type LlamaContext } from 'llama.rn';
 import { z } from 'zod';
 
@@ -52,9 +52,14 @@ export function templateSupportsTools(templates: ModelInfo['chatTemplates']): bo
   return caps?.tools === true && caps.toolCalls;
 }
 
+/** A user turn with an image is a list of parts, in the order the person wrote them. */
+type LlamaContentPart =
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'image_url'; readonly image_url: { readonly url: string } };
+
 type LlamaMessage = {
   readonly role: 'system' | 'user' | 'assistant' | 'tool';
-  readonly content: string;
+  readonly content: string | LlamaContentPart[];
   readonly tool_call_id?: string;
   readonly tool_calls?: readonly {
     readonly type: 'function';
@@ -64,13 +69,32 @@ type LlamaMessage = {
 };
 
 /**
- * The OpenAI-shaped history llama.rn renders through the model's own template.
- * Reasoning and images never reach the model, and a turn that held nothing but
- * them is left out. Tool calls and results are kept only for a model that
- * verified tool support; otherwise they are dropped like every other part a
- * text-only model cannot read.
+ * A user turn with an image, for a model whose projector is loaded. The image
+ * goes as a data URL: llama.rn puts its media marker where the image was and
+ * decodes the base64 itself, so no image file is written.
  */
-function messagesOf(request: ModelRequest, tools: boolean): LlamaMessage[] {
+function imageContent(parts: readonly PromptPart[]): LlamaContentPart[] {
+  return parts.flatMap((part): LlamaContentPart[] => {
+    if (part.kind === 'text') {
+      return [{ type: 'text', text: part.text }];
+    }
+    if (part.kind === 'image') {
+      return [{ type: 'image_url', image_url: { url: `data:${part.media};base64,${part.data}` } }];
+    }
+    return [];
+  });
+}
+
+/**
+ * The OpenAI-shaped history llama.rn renders through the model's own template.
+ * Reasoning never reaches the model, images reach only a model whose projector
+ * is loaded, and a turn that held nothing the model reads is left out. Tool
+ * calls and results are kept only for a model that verified tool support;
+ * otherwise they are dropped like every other part a text-only model cannot read.
+ */
+function messagesOf(request: ModelRequest, file: GgufModelFile): LlamaMessage[] {
+  const { tools } = file;
+  const vision = file.projector !== undefined;
   const messages: LlamaMessage[] = [];
   const system = request.prompt.system.map(block => block.text).join('\n\n');
   if (system !== '') {
@@ -109,7 +133,9 @@ function messagesOf(request: ModelRequest, tools: boolean): LlamaMessage[] {
         }
       }
     }
-    if (message.role === 'user' && text !== '') {
+    if (message.role === 'user' && vision && message.parts.some(part => part.kind === 'image')) {
+      messages.push({ role: 'user', content: imageContent(message.parts) });
+    } else if (message.role === 'user' && text !== '') {
       messages.push({ role: 'user', content: text });
     }
   }
@@ -120,7 +146,7 @@ function messagesOf(request: ModelRequest, tools: boolean): LlamaMessage[] {
 export function paramsOf(request: ModelRequest, file: GgufModelFile): CompletionParams {
   const tools = file.tools && request.tools !== undefined && request.tools.length > 0;
   return {
-    messages: messagesOf(request, file.tools),
+    messages: messagesOf(request, file),
     jinja: true,
     // Small phone models answer directly; a thinking template would spend the window.
     enable_thinking: false,

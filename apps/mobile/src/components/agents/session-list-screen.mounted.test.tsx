@@ -66,6 +66,9 @@ const state = vi.hoisted(() => ({
   announcements: [] as string[],
   destination: '',
   sessionId: '',
+  // Route parameters the screen reads; a case sets `status` to mount the
+  // transient status filter the Home card opens.
+  routeParams: {} as Record<string, string | undefined>,
   liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
 }));
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
@@ -216,6 +219,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => state.focused }),
+  useLocalSearchParams: () => state.routeParams,
   useFocusEffect: (effect: () => void) => {
     state.focusCallbacks.add(effect);
   },
@@ -226,6 +230,9 @@ vi.mock('expo-router', () => ({
     },
     replace: (path: string) => {
       state.destination = path;
+    },
+    setParams: (params: Record<string, string | undefined>) => {
+      Object.assign(state.routeParams, params);
     },
   }),
   useScrollToTop: () => undefined,
@@ -267,6 +274,9 @@ vi.mock('@/components/agents/session-list-content', () => ({
 }));
 vi.mock('@/components/agents/session-list-search-header', () => ({
   SessionListSearchHeader: 'SessionListSearchHeader',
+}));
+vi.mock('@/components/agents/session-status-filter-bar', () => ({
+  SessionStatusFilterBar: 'SessionStatusFilterBar',
 }));
 vi.mock('@/components/agents/platform-filter-modal', async importOriginal => ({
   ...(await importOriginal<typeof PlatformFilterModule>()),
@@ -540,6 +550,7 @@ beforeEach(() => {
   keyboardStore.setHeight(0);
   state.destination = '';
   state.sessionId = '';
+  state.routeParams = {};
   state.announcements = [];
   Object.assign(state.auth, { token: 'account', isLoading: false, isSigningOut: false });
   Object.assign(state.organization, { organizationId: null, isLoaded: true });
@@ -2050,6 +2061,43 @@ describe('AgentSessionListScreen live filtering', () => {
 
     const list = requireNode('FlashList');
     expect((list.props.data as ActiveSession[]).map(session => session.id)).toEqual(['a1']);
+  });
+
+  it('narrows the live list to the status the Home card sets and clears the filter', async () => {
+    state.live.activeSessions = [
+      { ...row, id: 'idle-1', status: 'idle' },
+      { ...row, id: 'work-1', status: 'running' },
+    ];
+    state.routeParams = { status: 'idle' };
+    await renderScreen();
+
+    const list = requireNode('FlashList');
+    expect((list.props.data as ActiveSession[]).map(session => session.id)).toEqual(['idle-1']);
+    const bar = requireNode('SessionStatusFilterBar');
+    expect(bar.props.kind).toBe('idle');
+    expect(bar.props.count).toBe(1);
+
+    act(() => {
+      (bar.props.onClear as () => void)();
+    });
+    expect(state.routeParams.status).toBeUndefined();
+  });
+
+  it('shows a clearable no-match state when the Home status filter has no rows', async () => {
+    state.live.activeSessions = [{ ...row, id: 'work-1', status: 'running' }];
+    state.routeParams = { status: 'idle' };
+    const renderer = await renderScreen();
+
+    expect(nodes('FlashList')).toHaveLength(0);
+    // The bar still names the active filter, with a zero count.
+    expect(requireNode('SessionStatusFilterBar').props.count).toBe(0);
+    const emptyState = renderer.root.findByType(EmptyState);
+    expect(emptyState.props.title).toBe('No sessions match');
+    const clearAction = emptyState.props.action as { props: { onPress: () => void } };
+    act(() => {
+      clearAction.props.onPress();
+    });
+    expect(state.routeParams.status).toBeUndefined();
   });
 
   it('shows a clearable no-match state when every live row is filtered out', async () => {

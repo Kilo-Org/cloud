@@ -9,6 +9,10 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import {
+  STATUS_FILTER_ORDER,
+  statusFilterLabelKey,
+} from '@/components/agents/live-session-status-filter';
+import {
   namedSessionTitle,
   useUserSessionTitlesRevision,
 } from '@/components/agents/session-detail-rename-state';
@@ -21,18 +25,10 @@ import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
-/**
- * The four ranked state counts, in the order every glanceable surface draws
- * them: what the user must act on, then what is making progress, then what will
- * wake later, then what is only connected. Zero rows still draw, so every
- * state remains visible even when no session currently occupies it.
- */
-const COUNT_LINES: readonly { kind: GlanceableStatusKind; labelKey: string }[] = [
-  { kind: 'needsInput', labelKey: 'glanceable.needsInput' },
-  { kind: 'running', labelKey: 'common.working' },
-  { kind: 'scheduled', labelKey: 'common.scheduled' },
-  { kind: 'idle', labelKey: 'common.idle' },
-];
+/** Test id for the selectable row of one status kind. */
+export function statusRowTestId(kind: GlanceableStatusKind): string {
+  return `live-card-status-${kind}`;
+}
 
 /** Shared minimum frame; text determines the loaded card's height. */
 const CARD_CLASS = 'overflow-hidden rounded-2xl border border-border bg-card';
@@ -43,25 +39,33 @@ const NEWEST_BLOCK_CLASS = 'min-h-[68px] justify-center gap-1 px-4 py-3';
 const NEWEST_ROW_CLASS = 'min-h-5 flex-row items-center gap-2';
 
 function labelKeyFor(kind: GlanceableStatusKind): string {
-  return COUNT_LINES.find(line => line.kind === kind)?.labelKey ?? 'common.working';
+  return statusFilterLabelKey(kind);
 }
 
 type GlanceableActiveCardProps = {
   sessions: readonly ActiveSession[];
   onPressSession: (session: ActiveSession) => void;
+  /**
+   * Open the Agents list filtered to one status kind. Every count row calls
+   * this, including a zero row, so the row is always a control and the user
+   * gets the same empty-list explanation instead of a dead row.
+   */
+  onPressStatus: (kind: GlanceableStatusKind) => void;
 };
 
 /**
  * The Home `Live now` card, composed from the native glanceable's vocabulary:
  * the four ranked state counts with the shared state dots, the soonest
  * scheduled wake beside its count, and the newest session with its state and
- * relative age. Tapping the newest session opens it; `See all` in the section
- * header opens the live index. With no sessions it is the zero state: every
- * count reads 0 and the newest block centers `Nothing running`.
+ * relative age. Tapping a count row opens the Agents list filtered to that
+ * status; tapping the newest session opens it; `See all` in the section header
+ * opens the live index. With no sessions it is the zero state: every count
+ * reads 0 and the newest block centers `Nothing running`.
  */
 export function GlanceableActiveCard({
   sessions,
   onPressSession,
+  onPressStatus,
 }: Readonly<GlanceableActiveCardProps>) {
   const { t } = useTranslation();
   // A minute-bucketed clock keeps the relative age fresh without reading
@@ -71,7 +75,7 @@ export function GlanceableActiveCard({
   // cold start; subscribing re-renders the block once it lands.
   useUserSessionTitlesRevision();
   const counts = countGlanceableSessions(sessions);
-  const primaryKind = COUNT_LINES.find(line => counts[line.kind] > 0)?.kind ?? null;
+  const primaryKind = STATUS_FILTER_ORDER.find(line => counts[line.kind] > 0)?.kind ?? null;
   const scheduledAt = soonestScheduledAt(sessions);
   const scheduledWake = scheduledAt === null ? null : formatScheduledWake(scheduledAt);
   // The widgets name the same session (`pickNewestSession`), and any live
@@ -93,10 +97,19 @@ export function GlanceableActiveCard({
   return (
     <View className={CARD_CLASS}>
       <View className={COUNTS_CLASS}>
-        {COUNT_LINES.map(line => {
+        {STATUS_FILTER_ORDER.map(line => {
           const isPrimary = line.kind === primaryKind;
+          const label = t(line.labelKey);
           return (
-            <View key={line.kind} className={COUNT_ROW_CLASS}>
+            <Pressable
+              key={line.kind}
+              onPress={() => {
+                onPressStatus(line.kind);
+              }}
+              accessibilityRole="button"
+              testID={statusRowTestId(line.kind)}
+              className={cn(COUNT_ROW_CLASS, 'active:opacity-70')}
+            >
               <SessionStatusIcon kind={line.kind} />
               <Text className="text-sm font-semibold text-foreground">{counts[line.kind]}</Text>
               <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
@@ -106,13 +119,13 @@ export function GlanceableActiveCard({
                     isPrimary ? 'text-foreground' : 'text-muted-foreground'
                   )}
                 >
-                  {t(line.labelKey)}
+                  {label}
                 </Text>
                 {line.kind === 'scheduled' && scheduledWake !== null ? (
                   <Text className="max-w-full text-xs text-muted-foreground">{scheduledWake}</Text>
                 ) : null}
               </View>
-            </View>
+            </Pressable>
           );
         })}
       </View>
@@ -126,6 +139,7 @@ export function GlanceableActiveCard({
         }}
         accessibilityRole={newestSession === null ? undefined : 'button'}
         accessibilityLabel={newestSession === null ? undefined : newestLabel}
+        testID="live-card-newest"
         className="active:opacity-70"
       >
         <View className={cn(NEWEST_BLOCK_CLASS, newestSession === null && 'items-center')}>
@@ -160,7 +174,7 @@ export function GlanceableActiveCardSkeleton() {
       importantForAccessibility="no-hide-descendants"
     >
       <View className={COUNTS_CLASS}>
-        {COUNT_LINES.map(line => (
+        {STATUS_FILTER_ORDER.map(line => (
           <View key={line.kind} className={COUNT_ROW_CLASS}>
             <Skeleton className="size-3 rounded-full" />
             <Skeleton className="h-3 w-6 rounded" />

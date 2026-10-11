@@ -199,10 +199,20 @@ afterEach(() => {
 
 function newestButton() {
   const button = nodes('Pressable').find(
-    candidate => candidate.props.accessibilityRole === 'button'
+    candidate => candidate.props.testID === 'live-card-newest'
   );
   if (!button) {
     throw new Error('Missing newest session button');
+  }
+  return button;
+}
+
+function statusButton(kind: string) {
+  const button = nodes('Pressable').find(
+    candidate => candidate.props.testID === `live-card-status-${kind}`
+  );
+  if (!button) {
+    throw new Error(`Missing ${kind} status button`);
   }
   return button;
 }
@@ -266,11 +276,31 @@ describe('Home live section', () => {
     await render({ ...settled, activeSessions: [session('a1')] });
     expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
     (node('SectionHeader').props.onActionPress as () => void)();
-    expect(navigateSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
-    expect(dismissToSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
+    const href = { pathname: '/(app)/(tabs)/(2_agents)/', params: {} };
+    expect(navigateSpy).toHaveBeenCalledWith(href);
+    expect(dismissToSpy).toHaveBeenCalledWith(href);
     expect(navigateSpy.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
       dismissToSpy.mock.invocationCallOrder[0] ?? 0
     );
+  });
+
+  it('opens the Agents list filtered to the status a count row names', async () => {
+    await render({
+      ...settled,
+      activeSessions: [
+        session('need', 'question'),
+        session('work', 'busy'),
+        session('idle', 'idle'),
+        session('later', 'scheduled'),
+      ],
+    });
+    for (const kind of ['needsInput', 'running', 'scheduled', 'idle']) {
+      expect(statusButton(kind).props.accessibilityRole).toBe('button');
+    }
+    (statusButton('idle').props.onPress as () => void)();
+    const expected = { pathname: '/(app)/(tabs)/(2_agents)/', params: { status: 'idle' } };
+    expect(navigateSpy).toHaveBeenCalledWith(expected);
+    expect(dismissToSpy).toHaveBeenCalledWith(expected);
   });
 
   it('shows a skeleton until the live list resolves', async () => {
@@ -289,10 +319,12 @@ describe('Home live section', () => {
       expect(text()).toContain(`0\n${label}`);
     }
     expect(text()).toContain(i18n.t('home.noLiveSessions'));
-    // Nothing to open: the newest block is not a button.
-    expect(
-      nodes('Pressable').some(pressable => pressable.props.accessibilityRole === 'button')
-    ).toBe(false);
+    // Nothing to open: the newest block is not a button, but every status row
+    // keeps its control so a zero count still opens the filtered list.
+    expect(newestButton().props.accessibilityRole).toBeUndefined();
+    for (const kind of ['needsInput', 'running', 'scheduled', 'idle']) {
+      expect(statusButton(kind).props.accessibilityRole).toBe('button');
+    }
     // The header keeps See all's box but hides it.
     expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
     expect(node('SectionHeader').props.actionHidden).toBe(true);

@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- token-color, truncation, and copy/long-press suites share the direct-invocation CodeBlock harness. */
+/* eslint-disable max-lines -- rendering, truncation, accessibility, and pass-through suites share the CodeBlock harness. */
 import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 

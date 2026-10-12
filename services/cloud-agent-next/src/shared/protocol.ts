@@ -1,5 +1,7 @@
 import type { SlashCommandCatalogStatus, SlashCommandInfo } from './slash-commands.js';
 
+export const WRAPPER_RECONNECT_GRACE_MS = 5 * 60_000;
+
 /**
  * Event types that flow through the streaming system.
  *

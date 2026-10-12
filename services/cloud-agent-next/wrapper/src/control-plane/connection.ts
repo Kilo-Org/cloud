@@ -108,6 +108,7 @@ export function createControlPlaneConnection(
   let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   let ackTimer: ReturnType<typeof setTimeout> | undefined;
   let negotiationTimer: ReturnType<typeof setTimeout> | undefined;
+  let handshakeTimer: ReturnType<typeof setTimeout> | undefined;
   let heartbeatAck = false;
   const outbox: OutboxEntry[] = [];
   let outboxBytes = 0;
@@ -146,42 +147,55 @@ export function createControlPlaneConnection(
       return;
     }
     while (outbox.length >= maxFrames || outboxBytes + bytes > maxBytes) {
-      // Keep outcome and route frames: drop the oldest event frame first.
       const droppableIndex = outbox.findIndex(entry => entry.droppable);
-      const index = droppableIndex >= 0 ? droppableIndex : 0;
-      const [removed] = outbox.splice(index, 1);
+      if (droppableIndex < 0) {
+        if (droppable) droppedEvents += 1;
+        log('control-plane outbox dropped the newest frame under critical-only pressure');
+        return;
+      }
+      const [removed] = outbox.splice(droppableIndex, 1);
       if (!removed) break;
       outboxBytes -= removed.bytes;
-      if (removed.droppable) droppedEvents += 1;
-      else log('control-plane outbox dropped a non-event frame');
+      droppedEvents += 1;
     }
     outbox.push({ serialized, bytes, droppable });
     outboxBytes += bytes;
   }
 
-  function writeRaw(target: WebSocket, frame: ControlPlaneWrapperFrame): void {
+  function writeRaw(target: WebSocket, frame: ControlPlaneWrapperFrame): boolean {
     try {
       target.send(JSON.stringify(frame));
+      return true;
     } catch {
-      // Best effort; a failed send surfaces through the socket close handler.
+      reconnectSocket(target, 'send failed');
+      return false;
     }
   }
 
-  function flushOutbox(target: WebSocket): void {
+  function flushOutbox(target: WebSocket): boolean {
     if (droppedEvents > 0) {
-      // One marker for every event frame dropped while the socket was down.
-      writeRaw(target, { type: 'events_dropped', dropped: droppedEvents });
+      if (!writeRaw(target, { type: 'events_dropped', dropped: droppedEvents })) return false;
       droppedEvents = 0;
     }
-    const pending = outbox.splice(0, outbox.length);
-    outboxBytes = 0;
-    for (const entry of pending) {
+    while (outbox.length > 0) {
+      const entry = outbox[0];
+      if (!entry) break;
       try {
         target.send(entry.serialized);
       } catch {
         log('control-plane outbox send failed after reconnect');
+        reconnectSocket(target, 'outbox send failed after reconnect');
+        return false;
       }
+      outbox.shift();
+      outboxBytes -= entry.bytes;
     }
+    return true;
+  }
+
+  function stopHandshake(): void {
+    clearTimeout(handshakeTimer);
+    handshakeTimer = undefined;
   }
 
   function stopHeartbeat(): void {
@@ -201,12 +215,7 @@ export function createControlPlaneConnection(
     const deadline = setTimeout(() => {
       if (ackTimer !== deadline || socket !== target || phase !== 'connected' || !heartbeatAck)
         return;
-      onSocketEnd(target, 'heartbeat acknowledgement timeout');
-      try {
-        target.close(1000, 'heartbeat acknowledgement timeout');
-      } catch {
-        log('control-plane timed-out socket close failed');
-      }
+      reconnectSocket(target, 'heartbeat acknowledgement timeout');
     }, options.timers.wrapper.heartbeatAckTimeoutMs);
     ackTimer = deadline;
   }
@@ -242,6 +251,7 @@ export function createControlPlaneConnection(
   function detachAndReconnect(): void {
     const wasConnected = phase === 'connected';
     attempt = 0;
+    stopHandshake();
     stopHeartbeat();
     const previous = socket;
     socket = null;
@@ -262,6 +272,7 @@ export function createControlPlaneConnection(
     const wasConnected = phase === 'connected';
     const wasConnecting = phase === 'connecting' || phase === 'awaiting_welcome';
     socket = null;
+    stopHandshake();
     stopHeartbeat();
     if (phase === 'closed') return;
     if (wasConnected) reportDisconnectEpisode('closed');
@@ -269,6 +280,16 @@ export function createControlPlaneConnection(
     phase = 'idle';
     if (wasConnected) options.onDisconnected?.(reason);
     scheduleReconnect();
+  }
+
+  function reconnectSocket(target: WebSocket, reason: string): void {
+    if (socket !== target) return;
+    onSocketEnd(target, reason);
+    try {
+      target.close(1000, reason);
+    } catch {
+      log('control-plane failed socket close failed');
+    }
   }
 
   function onMessage(target: WebSocket, event: MessageEvent): void {
@@ -289,11 +310,12 @@ export function createControlPlaneConnection(
     const frame = result.data;
     if (frame.type === 'welcome') {
       if (phase !== 'awaiting_welcome') return;
-      disconnectEpisodeReported = false;
+      stopHandshake();
       phase = 'connected';
+      if (!flushOutbox(target)) return;
+      disconnectEpisodeReported = false;
       attempt = 0;
       startHeartbeat(target, frame.heartbeatAck === true);
-      flushOutbox(target);
       options.onConnected?.();
       return;
     }
@@ -321,22 +343,35 @@ export function createControlPlaneConnection(
     } catch (error) {
       log(`control-plane connection failed: ${messageOf(error)}`);
       reportDisconnectEpisode('connect_attempt');
+      phase = 'idle';
       scheduleReconnect();
       return;
     }
     socket = target;
+    const deadline = setTimeout(() => {
+      if (
+        handshakeTimer !== deadline ||
+        socket !== target ||
+        (phase !== 'connecting' && phase !== 'awaiting_welcome')
+      )
+        return;
+      reconnectSocket(target, 'handshake timeout');
+    }, options.timers.sandbox.wrapperHelloMs);
+    handshakeTimer = deadline;
     target.onopen = () => {
-      if (socket !== target || phase === 'closed') return;
+      if (socket !== target || phase !== 'connecting') return;
       phase = 'awaiting_welcome';
-      writeRaw(target, {
-        type: 'hello',
-        wrapperId,
-        allocationId: options.allocationId,
-        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
-        heartbeatAck: true,
-        redactsNamedSecrets: true,
-      });
-      // Older v2 peers strictly reject the capability-bearing hello.
+      if (
+        !writeRaw(target, {
+          type: 'hello',
+          wrapperId,
+          allocationId: options.allocationId,
+          protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+          heartbeatAck: true,
+          redactsNamedSecrets: true,
+        })
+      )
+        return;
       negotiationTimer = setTimeout(() => {
         if (socket !== target || phase !== 'awaiting_welcome') return;
         negotiationTimer = undefined;
@@ -350,20 +385,11 @@ export function createControlPlaneConnection(
     };
     target.onmessage = event => onMessage(target, event);
     target.onclose = () => onSocketEnd(target, 'connection closed');
-    target.onerror = () => {
-      // Bun fires `error` and then `close`; the close handler drives reconnect.
-      // The episode latch makes the pair one native line. A deliberate recycle
-      // is not a failure.
-      if (socket !== target || phase === 'closed') return;
-      if (phase === 'connected') reportDisconnectEpisode('closed');
-      else if (phase === 'connecting' || phase === 'awaiting_welcome') {
-        reportDisconnectEpisode('connect_attempt');
-      }
-    };
+    target.onerror = () => reconnectSocket(target, 'connection error');
   }
 
   function start(): void {
-    if (phase !== 'idle') return;
+    if (phase !== 'idle' || reconnectTimer !== undefined) return;
     connect();
   }
 
@@ -375,13 +401,21 @@ export function createControlPlaneConnection(
     } catch {
       return;
     }
-    if (phase === 'connected' && socket && socket.readyState === WebSocket.OPEN) {
-      try {
-        socket.send(serialized);
-        return;
-      } catch {
-        // Buffer below and reconnect.
+    if (phase === 'connected' && socket) {
+      const target = socket;
+      if (target.readyState === WebSocket.OPEN) {
+        try {
+          target.send(serialized);
+          return;
+        } catch {
+          enqueue(serialized, isDroppable(frame));
+          reconnectSocket(target, 'send failed');
+          return;
+        }
       }
+      enqueue(serialized, isDroppable(frame));
+      reconnectSocket(target, 'socket not open');
+      return;
     }
     enqueue(serialized, isDroppable(frame));
   }
@@ -402,6 +436,7 @@ export function createControlPlaneConnection(
       clearTimeout(reconnectTimer);
       reconnectTimer = undefined;
     }
+    stopHandshake();
     stopHeartbeat();
     const current = socket;
     socket = null;

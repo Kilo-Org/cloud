@@ -200,15 +200,46 @@ describe('session card layout: states', () => {
     expect(shown).toContain('Finished');
     expect(shown).toContain('Finished in 38 min');
     expect(shown).toContain('Pull request opened');
-    // The cost belongs to the expanded view only.
-    expect(shown).not.toContain('$0.12');
+    // The cost belongs to the expanded view and to a finished card.
+    expect(shown).toContain('$0.12');
     expect(texts(expandedBottom)).toContain('$0.12');
+  });
+
+  it('keeps the cost off a working Lock Screen card and shows it when finished', () => {
+    const working = texts(
+      render({
+        ...BASE,
+        costMicrodollars: 120_000,
+        changes: { files: 4, added: 120, removed: 30 },
+      }).banner
+    );
+    expect(working).not.toContain('$0.12');
+    const done = texts(
+      render({
+        ...BASE,
+        statusKind: 'idle',
+        statusSince: new Date(NOW).toISOString(),
+        costMicrodollars: 120_000,
+        outcome: { kind: 'none' },
+      }).banner
+    );
+    expect(done).toContain('$0.12');
+    const stopped = texts(
+      render({
+        ...BASE,
+        statusKind: 'failed',
+        failure: { kind: 'tool' },
+        costMicrodollars: 120_000,
+      }).banner
+    );
+    expect(stopped).toContain('$0.12');
   });
 
   it('shows the stop reason and the files changed when the turn failed', () => {
     const { banner } = render({
       ...BASE,
       statusKind: 'failed',
+      statusSince: new Date().toISOString(),
       failure: { kind: 'provider' },
       changes: { files: 3, added: 12, removed: 4 },
       plan: { done: 2, total: 5, current: null },
@@ -216,7 +247,8 @@ describe('session card layout: states', () => {
     const shown = texts(banner);
     expect(shown).toContain('Stopped: provider error');
     expect(shown).toContain('2/5');
-    expect(shown).not.toContain('Provider error');
+    // The card names when it stopped, like every other state (spec "Content" rule 3).
+    expect(collect(banner).some(item => item.props.dateStyle === 'time')).toBe(true);
   });
 
   it('never prints the step target twice, and keeps a target-only step readable', () => {

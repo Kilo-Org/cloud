@@ -273,6 +273,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     }
     return `${stepWords} ${stepTarget}`;
   })();
+  const finished = kind === 'idle' || kind === 'failed';
+  const hasCost = (props.costMicrodollars ?? 0) > 0;
   const plan = props.plan ?? null;
   const planDone = plan === null ? 0 : plan.done;
   const planTotal = plan === null ? 0 : plan.total;
@@ -622,7 +624,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       modifiers={[layoutPriority(1), accessibilityElement('combine'), accessibilityLabel(spoken)]}
     >
       {text(title, scheme.titleSize, scheme.fg, 'semibold')}
-      {statusLine(scheme, kind === 'needsInput' || quiet)}
+      {statusLine(scheme, kind === 'needsInput' || kind === 'failed' || quiet)}
       {detailLine(scheme, 13)}
     </VStack>
   );
@@ -703,6 +705,13 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       {expanded ? (
         <VStack alignment="leading" spacing={6} modifiers={[padding({ top: 10 })]}>
           {changesLine(scheme, 12)}
+          {costLine(scheme, 12)}
+        </VStack>
+      ) : null}
+      {!expanded && hasCost && finished ? (
+        // The cost belongs to the expanded island and to a finished card
+        // (spec "Content" rule 11); a working Lock Screen card keeps it off.
+        <VStack alignment="leading" spacing={0} modifiers={[padding({ top: 8 })]}>
           {costLine(scheme, 12)}
         </VStack>
       ) : null}

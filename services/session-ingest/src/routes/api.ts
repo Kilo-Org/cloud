@@ -7,6 +7,7 @@ import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  messageIdSchema,
   persistedKiloSdkMessageHistorySchema,
   sessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
@@ -476,14 +477,28 @@ api.get('/session/:sessionId/export', async c => {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
 
-  const kiloUserId = c.get('user_id');
-  const stream = await getSessionExport(c.env, parsed.data, kiloUserId);
-
-  if (stream === null) {
-    return c.json({ success: false, error: 'session_not_found' }, 404);
+  // Optional inclusive cut: export only the transcript up to this message.
+  const rawUpToMessageId = c.req.query('upToMessageId');
+  let upToMessageId: string | undefined;
+  if (rawUpToMessageId !== undefined) {
+    const parsedCut = messageIdSchema.safeParse(rawUpToMessageId);
+    if (!parsedCut.success) {
+      return c.json(
+        { success: false, error: 'Invalid upToMessageId', issues: parsedCut.error.issues },
+        400
+      );
+    }
+    upToMessageId = parsedCut.data;
   }
 
-  return c.body(stream, 200, {
+  const kiloUserId = c.get('user_id');
+  const result = await getSessionExport(c.env, parsed.data, kiloUserId, upToMessageId);
+
+  if (result.status !== 'ok') {
+    return c.json({ success: false, error: result.status }, 404);
+  }
+
+  return c.body(result.stream, 200, {
     'content-type': 'application/json; charset=utf-8',
   });
 });

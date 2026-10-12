@@ -157,7 +157,10 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
    * When `cloneFromKiloSessionId` is absent the legacy empty-storage path runs
    * unchanged and returns a zero-item clone acknowledgement. When present, the
    * source transcript is cloned into the destination Durable Object before the
-   * PostgreSQL insert; the clone is finalized before the row is written.
+   * PostgreSQL insert; the clone is finalized before the row is written. With
+   * `cloneUpToMessageId`, only the transcript up to and including that message
+   * is cloned and the session diff is dropped; an absent cut message rejects
+   * with `clone_cut_not_found`.
    */
   async createSessionForCloudAgent(
     params: CreateSessionForCloudAgentParams
@@ -195,6 +198,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         sourceOrganizationId: source.organizationId,
         destinationOrganizationId: parsed.organizationId ?? null,
         destinationTitle: parsed.title,
+        upToMessageId: parsed.cloneUpToMessageId,
       });
 
       if (outcome.status === 'rejected') return { status: 'rejected', code: outcome.code };

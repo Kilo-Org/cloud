@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { McpSettingsSheet, useMcpSettings } from '@/components/chat/mcp-settings-sheet';
 import { i18n } from '@/i18n';
 import { type KiloMcpState } from '@/lib/chat/kilo-mcp';
-import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp';
+import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp-state';
 import {
   type RemoteMcpServerDraft,
   type RemoteMcpServerPatch,
@@ -485,6 +485,25 @@ describe('the chat-tools sheet', () => {
     expect(required(buttonFor('Retry'), 'Retry').props.loading).toBe(false);
     // The chat's tool list has to move onto what the Retry just found.
     expect(h.refreshChatTools).toHaveBeenCalled();
+  });
+
+  it('asks the servers as it opens, so a restart never leaves a server unasked', async () => {
+    h.servers.value = [server('alpha')];
+    await mount();
+    await flush();
+
+    // The open is not a person's Retry, so it gets the automatic deadline.
+    expect(h.ensureRemoteMcp).toHaveBeenCalledWith(place);
+    expect(h.refreshChatTools).toHaveBeenCalled();
+  });
+
+  it('offers a Retry on a server that answered with no tools', async () => {
+    h.servers.value = [server('alpha')];
+    h.discovered.value = [serverState('alpha', { status: 'ready', retryable: true })];
+    await mount();
+
+    expect(buttonFor('Retry')).toBeDefined();
+    expect(texts()).toContain('No tools available');
   });
 
   it('turns a server off for the chats and tells the registry', async () => {

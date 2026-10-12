@@ -1926,6 +1926,13 @@
       "when": 1791665999549,
       "tag": "0274_drop_quick_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 275,
+      "version": "7",
+      "when": 1791802756295,
+      "tag": "0275_skinny_ironclad",
+      "breakpoints": true
     }
   ]
 }

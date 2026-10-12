@@ -1,4 +1,3 @@
-/** Dialog for managing repo-profile bindings with repo picker. */
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -74,13 +73,11 @@ export function RepoProfileBindingsDialog({
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [repoPopoverOpen, setRepoPopoverOpen] = useState(false);
 
-  // Fetch repo bindings
   const { data: bindings, isLoading: isBindingsLoading } = useRepoBindings({
     organizationId,
     enabled: open,
   });
 
-  // Fetch profiles
   const { data: personalProfiles } = useProfiles({
     enabled: open && !organizationId,
   });
@@ -91,7 +88,6 @@ export function RepoProfileBindingsDialog({
 
   const profiles = organizationId ? combinedProfiles?.orgProfiles : personalProfiles;
 
-  // Fetch repositories (same pattern as NewSessionPanel)
   const { data: githubRepoData, isLoading: isLoadingGitHubRepos } = useQuery(
     organizationId
       ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
@@ -220,11 +216,9 @@ export function RepoProfileBindingsDialog({
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Add binding form */}
               {isAdding && (
                 <div className="space-y-3 rounded-lg border p-3">
                   <div className="flex items-start gap-2">
-                    {/* Repo picker with Command */}
                     <Popover open={repoPopoverOpen} onOpenChange={setRepoPopoverOpen}>
                       <PopoverTrigger asChild>
                         <Button
@@ -310,7 +304,6 @@ export function RepoProfileBindingsDialog({
                       </PopoverContent>
                     </Popover>
 
-                    {/* Profile selector */}
                     <Select value={selectedProfileId} onValueChange={setSelectedProfileId}>
                       <SelectTrigger className="w-[160px] shrink-0">
                         <SelectValue placeholder="Select profile" />
@@ -344,7 +337,6 @@ export function RepoProfileBindingsDialog({
                 </div>
               )}
 
-              {/* Existing bindings list */}
               {!bindings || bindings.length === 0 ? (
                 <div className="py-8 text-center">
                   <p className="text-muted-foreground">No defaults configured</p>
@@ -404,10 +396,6 @@ export function RepoProfileBindingsDialog({
     </Dialog>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Internal sub-component for repo items in the Command list
-// ---------------------------------------------------------------------------
 
 function RepoCommandItem({
   repo,

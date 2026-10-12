@@ -1,4 +1,3 @@
-/** Agents tab for the profile editor (modern replacement for "custom modes"). */
 'use client';
 
 import { useMemo, useState } from 'react';

@@ -1,4 +1,3 @@
-/** Kilo commands tab for the profile editor. */
 'use client';
 
 import { useState, useMemo } from 'react';

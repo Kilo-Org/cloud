@@ -1,4 +1,3 @@
-/** Dialog to list and manage all environment profiles with list+detail layout. */
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -113,7 +112,6 @@ export function ProfilesListDialog({
   const [savingNew, setSavingNew] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Open in "new profile" mode if requested
   useEffect(() => {
     if (open && openToNewProfile) {
       setIsCreating(true);
@@ -124,7 +122,6 @@ export function ProfilesListDialog({
     }
   }, [open, openToNewProfile]);
 
-  // When the caller asks us to open to a specific profile, honor it on open.
   useEffect(() => {
     if (open && !openToNewProfile && initialSelectedProfileId) {
       setSelectedId(initialSelectedProfileId);
@@ -132,7 +129,6 @@ export function ProfilesListDialog({
     }
   }, [open, openToNewProfile, initialSelectedProfileId]);
 
-  // Select first profile when list loads and nothing is selected
   useEffect(() => {
     if (!isCreating && !selectedId && allProfiles.length > 0) {
       setSelectedId(allProfiles[0]?.id ?? null);
@@ -203,7 +199,6 @@ export function ProfilesListDialog({
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1">
-          {/* Left panel — profile list */}
           <div className="flex w-52 flex-shrink-0 flex-col border-r">
             <div className="min-h-0 flex-1 overflow-y-auto">
               {isLoading ? (
@@ -266,7 +261,6 @@ export function ProfilesListDialog({
               )}
             </div>
 
-            {/* New profile button */}
             <div className="border-t p-2">
               <button
                 className={cn(
@@ -287,7 +281,6 @@ export function ProfilesListDialog({
             </div>
           </div>
 
-          {/* Right panel — detail view */}
           <div className="min-h-0 flex-1 overflow-y-auto">
             {isCreating ? (
               <NewProfilePane
@@ -344,10 +337,6 @@ export function ProfilesListDialog({
   );
 }
 
-// -------------------------------------------------------------------
-// ProfileListItem
-// -------------------------------------------------------------------
-
 type ProfileListItemProps = {
   profile: ProfileSummaryWithOwner;
   isSelected: boolean;
@@ -394,10 +383,6 @@ function ProfileListItem({
     </div>
   );
 }
-
-// -------------------------------------------------------------------
-// NewProfilePane
-// -------------------------------------------------------------------
 
 type NewProfilePaneProps = {
   organizationId?: string;
@@ -491,10 +476,6 @@ function NewProfilePane({
   );
 }
 
-// -------------------------------------------------------------------
-// ProfileDetailPane
-// -------------------------------------------------------------------
-
 type ProfileDetailPaneProps = {
   profileId: string;
   ownerType: ProfileOwnerType;
@@ -542,7 +523,6 @@ function ProfileDetailPane({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b px-4 py-2.5">
         <h3 className="truncate text-sm font-semibold">{profile.name}</h3>
         {onProfileSelect && (
@@ -552,7 +532,6 @@ function ProfileDetailPane({
         )}
       </div>
 
-      {/* Tabs */}
       <div className="flex shrink-0 border-b">
         {(
           [
@@ -603,7 +582,6 @@ function ProfileDetailPane({
         ))}
       </div>
 
-      {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'overview' && (
           <OverviewTab
@@ -755,10 +733,6 @@ function AutoSaveField({ kind, id, label, placeholder, initialValue, onSave }: A
   );
 }
 
-// -------------------------------------------------------------------
-// OverviewTab
-// -------------------------------------------------------------------
-
 type OverviewTabProps = {
   profile: NonNullable<ReturnType<typeof useProfile>['data']>;
   ownerType: ProfileOwnerType;
@@ -801,7 +775,6 @@ function OverviewTab({
 
   return (
     <div className="space-y-4 p-4">
-      {/* Name */}
       <AutoSaveField
         key={`name-${profile.id}`}
         kind="input"
@@ -826,7 +799,6 @@ function OverviewTab({
         }}
       />
 
-      {/* Description */}
       <AutoSaveField
         key={`desc-${profile.id}`}
         kind="textarea"
@@ -847,7 +819,6 @@ function OverviewTab({
         }}
       />
 
-      {/* Default toggle */}
       <div className="flex items-center justify-between rounded-lg border p-3">
         <div>
           <div className="flex items-center gap-2 text-sm font-medium">
@@ -867,10 +838,8 @@ function OverviewTab({
         />
       </div>
 
-      {/* Repo bindings */}
       <RepoPinsSection profileId={profile.id} organizationId={organizationId} />
 
-      {/* Delete profile */}
       <div className="flex items-center justify-between rounded-lg border p-3">
         <div>
           <div className="flex items-center gap-2 text-sm font-medium">
@@ -891,10 +860,6 @@ function OverviewTab({
     </div>
   );
 }
-
-// -------------------------------------------------------------------
-// RepoPinsSection — shows repos this profile is bound to, with add/remove
-// -------------------------------------------------------------------
 
 type RepoOption = { id: number; fullName: string; private: boolean; platform: 'github' | 'gitlab' };
 
@@ -1000,7 +965,6 @@ function RepoPinsSection({
         Auto-loaded whenever a session targets one of these repositories.
       </p>
 
-      {/* Add binding form */}
       {isAdding && (
         <div className="flex items-center gap-2">
           <Popover open={repoPopoverOpen} onOpenChange={setRepoPopoverOpen}>
@@ -1169,10 +1133,6 @@ function RepoPinCommandItem({
   );
 }
 
-// -------------------------------------------------------------------
-// VarsTab
-// -------------------------------------------------------------------
-
 type VarsTabProps = {
   profileId: string;
   organizationId?: string;
@@ -1237,7 +1197,6 @@ function VarsTab({ profileId, organizationId, vars, mutations }: VarsTabProps) {
       const newRows = parsed.map(p =>
         makeDraft({ key: p.key, value: p.value, isSecret: target.isSecret })
       );
-      // Replace the current row if it's empty; otherwise insert after it.
       const before = prev.slice(0, idx);
       const after = prev.slice(idx + 1);
       if (targetIsEmpty) {
@@ -1547,10 +1506,6 @@ function VarsTab({ profileId, organizationId, vars, mutations }: VarsTabProps) {
   );
 }
 
-// -------------------------------------------------------------------
-// .env paste parsing
-// -------------------------------------------------------------------
-
 function stripEnvQuotes(value: string): string {
   if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
     return value.slice(1, -1).replace(/\\(["\\n])/g, (_m, ch: string) => (ch === 'n' ? '\n' : ch));
@@ -1589,10 +1544,6 @@ function parseEnvText(content: string): { key: string; value: string }[] {
   }
   return out;
 }
-
-// -------------------------------------------------------------------
-// CommandsTab
-// -------------------------------------------------------------------
 
 type CommandsTabProps = {
   profileId: string;

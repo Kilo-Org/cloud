@@ -1,4 +1,3 @@
-/** Skills tab for the profile editor. */
 'use client';
 
 import { useState, type DragEvent } from 'react';
@@ -423,10 +422,6 @@ async function extractSkillZip(file: File): Promise<ExtractedSkill> {
     frontmatterDescription: frontmatter.description,
   };
 }
-
-// -------------------------------------------------------------------
-// SkillForm — shared create/edit form
-// -------------------------------------------------------------------
 
 type SkillFormProps = {
   profileId: string;

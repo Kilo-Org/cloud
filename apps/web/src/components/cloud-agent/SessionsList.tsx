@@ -48,7 +48,6 @@ export function SessionsList<T extends SessionsListItem>({
         const createdDate = new Date(session.createdAt);
         const timeAgo = formatDistanceToNow(createdDate, { addSuffix: true });
 
-        // Determine badge based on created_on_platform field
         const platform = session.createdOnPlatform;
         let badge: React.ReactNode;
 

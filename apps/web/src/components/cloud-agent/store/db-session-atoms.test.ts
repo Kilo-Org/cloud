@@ -45,7 +45,6 @@ describe('extractRepoFromGitUrl', () => {
   });
 
   test('should handle URLs with nested paths', () => {
-    // Only takes first two path segments as owner/repo
     expect(extractRepoFromGitUrl('https://github.com/owner/repo/tree/main')).toBe('owner/repo');
   });
 });

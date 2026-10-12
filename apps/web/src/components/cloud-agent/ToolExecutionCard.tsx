@@ -63,7 +63,6 @@ export function ToolExecutionCard({ execution }: ToolExecutionCardProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-3 pt-0">
-        {/* Input */}
         <div>
           <div className="text-muted-foreground mb-1 text-xs font-medium">Input:</div>
           <pre className="bg-background overflow-wrap-anywhere overflow-hidden rounded-md p-2 text-xs break-words whitespace-pre-wrap">
@@ -71,7 +70,6 @@ export function ToolExecutionCard({ execution }: ToolExecutionCardProps) {
           </pre>
         </div>
 
-        {/* Output */}
         {execution.output !== undefined && (
           <div>
             <div className="text-muted-foreground mb-1 text-xs font-medium">Output:</div>
@@ -87,7 +85,6 @@ export function ToolExecutionCard({ execution }: ToolExecutionCardProps) {
           </div>
         )}
 
-        {/* Error */}
         {execution.error && (
           <div>
             <div className="text-muted-foreground mb-1 text-xs font-medium">Error:</div>
@@ -97,7 +94,6 @@ export function ToolExecutionCard({ execution }: ToolExecutionCardProps) {
           </div>
         )}
 
-        {/* Expand/Collapse Button */}
         {shouldShowExpand && (
           <Button
             variant="ghost"

@@ -43,7 +43,6 @@ export function extractRepoFromGitUrl(gitUrl: string | null | undefined): string
       if (fullPath.endsWith('.git')) {
         return fullPath.replace(/\.git$/, '');
       }
-      // Non-clone URL: only take owner/repo (first two segments)
       return `${pathParts[0]}/${pathParts[1]}`;
     }
   } catch {

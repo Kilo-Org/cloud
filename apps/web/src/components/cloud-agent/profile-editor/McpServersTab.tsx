@@ -1,4 +1,3 @@
-/** MCP servers tab for the profile editor. */
 'use client';
 
 import { useState } from 'react';
@@ -188,10 +187,6 @@ function McpServerRow({
   );
 }
 
-// -------------------------------------------------------------------
-// McpForm — shared create/edit form
-// -------------------------------------------------------------------
-
 type McpFormProps = {
   profileId: string;
   organizationId: string | undefined;
@@ -244,7 +239,6 @@ function initialFormState(initial: ProfileMcpServer | undefined): FormState {
   return { type: 'local', name, enabled, commandText: '', url: '', envJson: '' };
 }
 
-/** Parse JSON and validate it's a `Record<string,string>`. */
 function parseRecord(raw: string):
   | {
       ok: true;

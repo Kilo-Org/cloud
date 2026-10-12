@@ -46,7 +46,6 @@ export function ProfilePickerPopover({
   const [openToNewProfile, setOpenToNewProfile] = useState(false);
   const [editProfileId, setEditProfileId] = useState<string | null>(null);
 
-  // Reset override-picker mode whenever the popover closes.
   useEffect(() => {
     if (!open) setPickingOverride(false);
   }, [open]);

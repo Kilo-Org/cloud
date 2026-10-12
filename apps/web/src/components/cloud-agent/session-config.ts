@@ -1,9 +1,3 @@
-/**
- * Session Config Utilities
- *
- * Centralized logic for building, validating, and deriving SessionConfig.
- */
-
 import type { SessionConfig, ResumeConfig, StreamResumeConfig, AgentMode } from './types';
 
 // Re-export AgentMode for backwards compatibility
@@ -16,34 +10,22 @@ type ResumeConfigInput = {
   setupCommands?: string[];
 };
 
-/**
- * Partial session info from DB (last_mode/last_model)
- */
 export type DbSessionInfo = {
   last_mode: string | null;
   last_model: string | null;
 };
 
-/**
- * Options for building a session config
- */
 export type BuildSessionConfigOptions = {
-  /** Session ID (cloud agent or kilo session) */
   sessionId: string;
 
-  /** Repository in owner/repo format */
   repository?: string | null;
 
-  /** Resume config from user modal (highest priority) */
   resumeConfig?: ResumeConfigInput | null;
 
-  /** Session info from database (second priority) */
   dbSession?: DbSessionInfo | null;
 
-  /** Default mode to use if not found elsewhere */
   defaultMode?: AgentMode;
 
-  /** Default model to use if not found elsewhere */
   defaultModel?: string;
 };
 
@@ -84,7 +66,6 @@ export function buildSessionConfig(options: BuildSessionConfigOptions): SessionC
     defaultModel = '',
   } = options;
 
-  // Precedence: resumeConfig > dbSession > defaults
   const mode = resumeConfig?.mode || dbSession?.last_mode || defaultMode;
   const model = resumeConfig?.model || dbSession?.last_model || defaultModel;
 
@@ -116,14 +97,6 @@ export function isValidSessionConfig(config: SessionConfig | null): config is Se
   return hasValidMode && hasValidModel;
 }
 
-/**
- * Get mode and model from various sources with debug info.
- *
- * Useful for logging which source provided the values.
- *
- * @param options - Configuration sources
- * @returns Object with mode, model, and source info
- */
 export function getModeModelWithSource(options: {
   resumeConfig?: ResumeConfigInput | null;
   dbSession?: DbSessionInfo | null;
@@ -136,7 +109,6 @@ export function getModeModelWithSource(options: {
   let modeSource = 'default';
   let modelSource = 'default';
 
-  // Check dbSession first (lower priority)
   if (dbSession?.last_mode) {
     mode = dbSession.last_mode;
     modeSource = 'dbSession';
@@ -146,7 +118,6 @@ export function getModeModelWithSource(options: {
     modelSource = 'dbSession';
   }
 
-  // Then resumeConfig (higher priority - overwrites)
   if (resumeConfig?.mode) {
     mode = resumeConfig.mode;
     modeSource = 'resumeConfig';
@@ -159,7 +130,6 @@ export function getModeModelWithSource(options: {
   return { mode, model, modeSource, modelSource };
 }
 
-/** Check if a session needs configuration before sending messages. */
 export function needsResumeConfiguration(params: {
   currentDbSessionId: string | null;
   resumeConfig: ResumeConfig | null;

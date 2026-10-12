@@ -1,16 +1,21 @@
-import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   buildSessionLiveActivityContentState,
-  sessionLiveActivityRelevance,
+  type SessionLiveActivityContentState,
   type SessionLiveActivityRow,
 } from '@kilocode/notifications';
-import { after, type LiveActivity } from 'expo-widgets';
+import { after } from 'expo-widgets';
 
 import {
   getLiveActivityEnabled,
   getNotificationPermissionGranted,
 } from '@/lib/glanceable/live-activity-switch';
 import {
+  type FollowedSessionCounts,
+  setFollowedSessionsSource,
+} from '@/lib/glanceable/followed-sessions';
+import {
+  deleteSessionActivityToken,
+  observedSessionActivityIds,
   registerSessionActivityToken,
   releaseSessionActivity,
   retrySessionActivityTokens,
@@ -18,6 +23,15 @@ import {
 import { getGlanceableDelivery } from '@/lib/glanceable/sink-registry';
 import { launcherSessionUrl } from '@/lib/launcher-surfaces';
 
+import {
+  clearSessionCardPress,
+  readSessionCards,
+  SESSION_CARD_STALE_AFTER_SECONDS,
+  type SessionActivity,
+  sessionCardPress,
+  sessionCardRelevance,
+  settleCardWork,
+} from './session-card-press';
 import { SessionLiveActivity, type SessionLiveActivityProps } from './session-live-activity';
 import { liveActivitiesAllowedBySystem } from './system-switch';
 
@@ -37,22 +51,15 @@ import { liveActivitiesAllowedBySystem } from './system-switch';
  * other's cards.
  */
 
-export type SessionActivity = LiveActivity<SessionLiveActivityProps>;
-
 export type SessionFollowContext = { userId: string; organizationId: string | null };
 
 export type FollowResult = 'started' | 'followed' | 'refused';
-
-/** ActivityKit takes the stale window in seconds. */
-const STALE_AFTER_SECONDS = GLANCEABLE_STALE_MS / 1000;
 
 /** A finished card stays on the Lock Screen this long (spec "Ending" rule 1). */
 export const SESSION_FINISHED_DISMISS_MS = 15 * 60 * 1000;
 
 /** The visible card of each followed session. */
 const cards = new Map<string, SessionActivity>();
-/** The in-flight Approve press or its failure line, by session id. */
-const presses = new Map<string, Pick<SessionLiveActivityProps, 'approving' | 'notice'>>();
 const listeners = new Set<() => void>();
 let revision = 0;
 
@@ -84,20 +91,15 @@ function isLive(activity: SessionActivity): boolean {
   return state === 'active' || state === 'stale';
 }
 
-/** Every native session card, or none when ActivityKit cannot be read. */
-function readInstances(includeEnded: boolean): SessionActivity[] {
+/** The card's push token, or the one it last reported when ActivityKit has none. */
+async function readToken(
+  activity: SessionActivity,
+  reported: string | null
+): Promise<string | null> {
   try {
-    return SessionLiveActivity.getInstances(includeEnded);
+    return (await activity.getPushToken()) ?? reported;
   } catch {
-    return [];
-  }
-}
-
-async function readToken(activity: SessionActivity): Promise<string | null> {
-  try {
-    return await activity.getPushToken();
-  } catch {
-    return null;
+    return reported;
   }
 }
 
@@ -110,23 +112,37 @@ function endCard(
   dismissal: 'immediate' | { after: Date },
   props?: SessionLiveActivityProps
 ): void {
-  const token = readToken(activity);
-  releaseSessionActivity(activity.getId());
+  const token = readToken(activity, releaseSessionActivity(activity.getId()));
   getGlanceableDelivery().cleanupTokens('session', token);
-  const relevance =
-    props?.statusKind === undefined ? undefined : sessionLiveActivityRelevance(props.statusKind);
-  void activity.end(dismissal, props, new Date(), relevance).catch(() => {
-    // An end for a card iOS already removed has nothing left to do.
-  });
+  const relevance = props === undefined ? undefined : sessionCardRelevance(props);
+  void settleCardWork(activity.end(dismissal, props, new Date(), relevance));
 }
 
 /**
  * Rebuild the map from native truth. A second live card for one session is a
- * duplicate (spec "Starting" rule 3), so it ends at once.
+ * duplicate (spec "Starting" rule 3), so it ends at once. A card this process
+ * knew that is no longer live (iOS or the server ended it) is released, and the
+ * token it reported is deleted, so no retry registers a dead token again. An
+ * unreadable ActivityKit changes nothing.
  */
 export function discoverSessionCards(): SessionActivity[] {
+  const instances = readSessionCards(false);
+  if (instances === null) {
+    return [...cards.values()];
+  }
+  const liveIds = new Set(instances.map(activity => activity.getId()));
+  const known = new Set([
+    ...[...cards.values()].map(activity => activity.getId()),
+    ...observedSessionActivityIds(),
+  ]);
+  for (const activityId of known) {
+    const reported = liveIds.has(activityId) ? null : releaseSessionActivity(activityId);
+    if (reported !== null) {
+      deleteSessionActivityToken(reported);
+    }
+  }
   const next = new Map<string, SessionActivity>();
-  for (const activity of readInstances(false)) {
+  for (const activity of instances) {
     const sessionId = activity.getProps()?.sessionId;
     if (sessionId === undefined || sessionId.length === 0) {
       // A card with no session cannot route or be updated by the server.
@@ -159,6 +175,9 @@ export function discoverSessionCards(): SessionActivity[] {
 export function restoreFollowedSessionCards(ctx: SessionFollowContext | null): void {
   if (!getLiveActivityEnabled()) {
     // The in-app switch turned off while no process ran: no card may stay.
+    // Retire the token scope first, so it reads each card's token before the
+    // end drops it.
+    getGlanceableDelivery().cleanupTokens('scope');
     endAllSessionCards();
     return;
   }
@@ -173,6 +192,21 @@ export function restoreFollowedSessionCards(ctx: SessionFollowContext | null): v
     }
   }
   retrySessionActivityTokens();
+}
+
+/** Start the card collapsed and silent, or null when iOS refuses it. */
+function startCard(content: SessionLiveActivityContentState): SessionActivity | null {
+  try {
+    return SessionLiveActivity.start(
+      content,
+      launcherSessionUrl(content.sessionId),
+      SESSION_CARD_STALE_AFTER_SECONDS,
+      sessionCardRelevance(content)
+    );
+  } catch {
+    // Live Activities off in Settings, or the system limit of activities.
+    return null;
+  }
 }
 
 /**
@@ -205,16 +239,8 @@ export function followSession(
   ) {
     return 'refused';
   }
-  let activity: SessionActivity;
-  try {
-    activity = SessionLiveActivity.start(
-      content,
-      launcherSessionUrl(row.id),
-      STALE_AFTER_SECONDS,
-      sessionLiveActivityRelevance(content.statusKind)
-    );
-  } catch {
-    // Live Activities off in Settings, or the system limit of activities.
+  const activity = startCard(content);
+  if (activity === null) {
     return 'refused';
   }
   cards.set(row.id, activity);
@@ -230,7 +256,7 @@ export function unfollowSession(sessionId: string): void {
     return;
   }
   cards.delete(sessionId);
-  presses.delete(sessionId);
+  clearSessionCardPress(sessionId);
   endCard(activity, 'immediate');
   emit();
 }
@@ -240,7 +266,7 @@ export function unfollowSession(sessionId: string): void {
  * A live card stays: the user still follows that session.
  */
 export function dismissFinishedSessionCard(sessionId: string): void {
-  for (const activity of readInstances(true)) {
+  for (const activity of readSessionCards(true) ?? []) {
     const props = activity.getProps();
     if (props?.sessionId === sessionId && (!isLive(activity) || props.statusKind === 'idle')) {
       if (cards.get(sessionId)?.getId() === activity.getId()) {
@@ -255,18 +281,16 @@ export function dismissFinishedSessionCard(sessionId: string): void {
 /**
  * End every session card at once: sign-out, an account change, an organization
  * switch, a lost organization, and the in-app switch turned off (spec "Ending"
- * rule 3). Every caller also retires the whole token scope, which deletes the
- * session card tokens with it before the device session is revoked, so this
+ * rule 3). Every caller retires the whole token scope first, which reads each
+ * card's token and deletes it before the device session is revoked, so this
  * only ends the native cards.
  */
 export function endAllSessionCards(): void {
-  for (const activity of readInstances(true)) {
+  for (const activity of readSessionCards(true) ?? []) {
     releaseSessionActivity(activity.getId());
-    void activity.end('immediate').catch(() => {
-      // An end for a card iOS already removed has nothing left to do.
-    });
+    void settleCardWork(activity.end('immediate'));
   }
-  presses.clear();
+  clearSessionCardPress();
   if (cards.size > 0) {
     cards.clear();
     emit();
@@ -287,6 +311,20 @@ function drawsSame(a: SessionLiveActivityProps | null, b: SessionLiveActivityPro
 }
 
 /**
+ * True when the row describes a state older than the one the card shows. A
+ * server push can land before the tray catches up, and the stale row must not
+ * undo it (or drop the approval key it carried).
+ */
+function isOlderThanCard(
+  row: SessionLiveActivityRow,
+  card: SessionLiveActivityProps | null
+): boolean {
+  const rowAt = row.statusUpdatedAt == null ? Number.NaN : Date.parse(row.statusUpdatedAt);
+  const cardAt = card?.statusSince == null ? Number.NaN : Date.parse(card.statusSince);
+  return Number.isFinite(rowAt) && Number.isFinite(cardAt) && rowAt < cardAt;
+}
+
+/**
  * Update the followed cards from the foreground tray rows. A finished session
  * ends its card with the Finished content, kept on the Lock Screen for 15
  * minutes. A session missing from the rows is left to the server, which knows
@@ -304,7 +342,7 @@ export function syncFollowedSessionCards(
   for (const [sessionId, activity] of cards) {
     const row = rows.find(candidate => candidate.id === sessionId);
     const current = activity.getProps();
-    if (row !== undefined && isLive(activity)) {
+    if (row !== undefined && isLive(activity) && !isOlderThanCard(row, current)) {
       const content = buildSessionLiveActivityContentState(row, {
         // A pushed key names the request the server saw; Approve revalidates it.
         approvalKey: current?.approvalKey ?? null,
@@ -313,19 +351,17 @@ export function syncFollowedSessionCards(
       });
       if (content.statusKind === 'idle') {
         cards.delete(sessionId);
-        presses.delete(sessionId);
+        clearSessionCardPress(sessionId);
         ended = true;
         endCard(activity, after(new Date(Date.now() + SESSION_FINISHED_DISMISS_MS)), content);
       } else if (!drawsSame(current, content)) {
-        void activity
-          .update(
-            { ...content, ...presses.get(sessionId) },
-            STALE_AFTER_SECONDS,
-            sessionLiveActivityRelevance(content.statusKind)
+        void settleCardWork(
+          activity.update(
+            { ...content, ...sessionCardPress(sessionId) },
+            SESSION_CARD_STALE_AFTER_SECONDS,
+            sessionCardRelevance(content)
           )
-          .catch(() => {
-            // The next foreground or push corrects the card.
-          });
+        );
       }
     }
   }
@@ -335,13 +371,7 @@ export function syncFollowedSessionCards(
 }
 
 /** Live counts by status kind of the followed sessions, for the aggregate card. */
-export function followedSessionCounts(): {
-  running: number;
-  needsInput: number;
-  needsApproval: number;
-  idle: number;
-  scheduled: number;
-} {
+export function followedSessionCounts(): FollowedSessionCounts {
   const counts = { running: 0, needsInput: 0, needsApproval: 0, idle: 0, scheduled: 0 };
   for (const activity of cards.values()) {
     const props = isLive(activity) ? activity.getProps() : null;
@@ -355,52 +385,14 @@ export function followedSessionCounts(): {
   return counts;
 }
 
-/** The session card a press came from: the press names its ActivityKit id. */
-export function findSessionCard(activityId: string): SessionActivity | null {
-  return readInstances(true).find(activity => activity.getId() === activityId) ?? null;
-}
-
-/**
- * Draw an Approve press on its card: the Approving… pill while it runs, the
- * failure line after a retryable failure, or (with `answered`) the card
- * without Approve once the request is answered or gone. The server's next push
- * brings the new status.
- */
-export async function renderSessionCardPress(
-  activity: SessionActivity,
-  press: Pick<SessionLiveActivityProps, 'approving' | 'notice'> | null,
-  answered = false
-): Promise<void> {
-  const current = activity.getProps();
-  if (current?.sessionId === undefined || current.statusKind === undefined) {
-    return;
-  }
-  if (press === null) {
-    presses.delete(current.sessionId);
-  } else {
-    presses.set(current.sessionId, press);
-  }
-  const { approving: _approving, notice: _notice, ...content } = current;
-  const next: SessionLiveActivityProps = {
-    ...content,
-    ...(answered ? { awaitingPermission: false, approvalKey: null } : {}),
-    ...press,
-  };
-  try {
-    await activity.update(
-      next,
-      STALE_AFTER_SECONDS,
-      sessionLiveActivityRelevance(next.statusKind ?? 'running')
-    );
-  } catch {
-    // The next push or foreground corrects the card.
-  }
-}
+// The aggregate card and its Approve read the followed sessions through this
+// source, so their test graphs never load ActivityKit or the token graph.
+setFollowedSessionsSource({ ids: () => cards.keys(), counts: followedSessionCounts });
 
 /** Test-only: drop the map and the press state. */
 export function _resetSessionFollowForTests(): void {
   cards.clear();
-  presses.clear();
+  clearSessionCardPress();
   listeners.clear();
   revision = 0;
 }

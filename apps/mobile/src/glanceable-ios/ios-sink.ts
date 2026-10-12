@@ -6,9 +6,10 @@ import {
   isEligibleGlanceableWork,
   isStartableGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { LIVE_ACTIVITY_RELEVANCE } from '@kilocode/notifications';
+import { aggregateLiveActivityRelevance } from '@kilocode/notifications';
 
 import { i18n } from '@/i18n';
+import { getFollowedSessionCounts } from '@/lib/glanceable/followed-sessions';
 import { getHomeWidgetDataForSnapshot } from '@/lib/glanceable/home-widget-data';
 import {
   getLastGlanceableSnapshot,
@@ -46,7 +47,6 @@ import {
   toWidgetProps,
   widgetTimelineFrames,
 } from './view-props';
-import { followedSessionCounts } from './session-follow';
 
 /** ActivityKit takes the stale window in seconds. */
 const STALE_AFTER_SECONDS = GLANCEABLE_STALE_MS / 1000;
@@ -54,12 +54,11 @@ const STALE_AFTER_SECONDS = GLANCEABLE_STALE_MS / 1000;
 /**
  * The aggregate card's place among this app's cards (spec "Presentation
  * order"): above a running session card while something needs input, below it
- * otherwise. The server pushes the same scores.
+ * otherwise, then the newer state change first. The server pushes the same
+ * scores.
  */
-function aggregateRelevance(contentState: GlanceableLiveActivityProps): number {
-  return contentState.needsInput > 0
-    ? LIVE_ACTIVITY_RELEVANCE.aggregateNeedsInput
-    : LIVE_ACTIVITY_RELEVANCE.aggregate;
+function aggregateRelevance(snapshot: GlanceableAgentsSnapshot): number {
+  return aggregateLiveActivityRelevance(snapshot.needsInput, snapshot.newestResultAt);
 }
 
 /**
@@ -71,7 +70,7 @@ function aggregateRelevance(contentState: GlanceableLiveActivityProps): number {
  * reads this; the Home widget keeps every session.
  */
 function withoutFollowedSessions(snapshot: GlanceableAgentsSnapshot): GlanceableAgentsSnapshot {
-  const followed = followedSessionCounts();
+  const followed = getFollowedSessionCounts();
   if (followed.running + followed.needsInput + followed.idle + followed.scheduled === 0) {
     return snapshot;
   }
@@ -215,7 +214,7 @@ function startCard(
       inFlightUpdate = activity.update(
         contentState,
         STALE_AFTER_SECONDS,
-        aggregateRelevance(contentState)
+        aggregateRelevance(snapshot)
       );
       return;
     }
@@ -234,7 +233,7 @@ function startCard(
       contentState,
       OPEN_AGENTS_URL,
       STALE_AFTER_SECONDS,
-      aggregateRelevance(contentState)
+      aggregateRelevance(snapshot)
     );
     activity = started;
     inFlightUpdate = null;
@@ -563,7 +562,7 @@ export const iosSink: GlanceableSink = {
     // Never start here. Recheck cached native work and preserve update/end ordering.
     if (refreshActivity() && activity !== null) {
       lastProps = contentState;
-      inFlightUpdate = activity.update(lastProps, STALE_AFTER_SECONDS, aggregateRelevance(lastProps));
+      inFlightUpdate = activity.update(lastProps, STALE_AFTER_SECONDS, aggregateRelevance(card));
     }
   },
 
@@ -647,7 +646,7 @@ export const iosSink: GlanceableSink = {
     inFlightUpdate = activity.update(
       contentState,
       STALE_AFTER_SECONDS,
-      aggregateRelevance(contentState)
+      aggregateRelevance(snapshot)
     );
     revision = snapshot.revision;
   },

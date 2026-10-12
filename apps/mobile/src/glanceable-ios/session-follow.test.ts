@@ -1,7 +1,8 @@
+/* eslint-disable max-lines -- one follow-controller suite sharing the fake ActivityKit harness */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { LIVE_ACTIVITY_RELEVANCE } from '@kilocode/notifications';
+import { sessionLiveActivityRelevance } from '@kilocode/notifications';
 
 import {
   _resetLiveActivitySwitchForTests,
@@ -23,7 +24,6 @@ import {
   syncFollowedSessionCards,
   unfollowSession,
 } from './session-follow';
-import { SessionLiveActivity } from './session-live-activity';
 
 type Props = Record<string, unknown>;
 type FakeActivity = {
@@ -40,10 +40,14 @@ type FakeActivity = {
 const mocks = vi.hoisted(() => ({
   instances: [] as FakeActivity[],
   startError: null as Error | null,
+  start: vi.fn(),
+  getInstances: vi.fn(),
   systemAllowed: true,
   registerSessionActivityToken: vi.fn(),
-  releaseSessionActivity: vi.fn(),
+  releaseSessionActivity: vi.fn<(id: string) => string | null>(() => null),
   retrySessionActivityTokens: vi.fn(),
+  observedSessionActivityIds: vi.fn<() => string[]>(() => []),
+  deleteSessionActivityToken: vi.fn(),
   cleanupTokens: vi.fn(),
 }));
 
@@ -75,34 +79,19 @@ function fakeActivity(id: string, props: Props): FakeActivity {
 
 vi.mock('expo-widgets', () => ({ after: (date: Date) => ({ after: date }) }));
 vi.mock('./session-live-activity', () => ({
-  SessionLiveActivity: {
-    start: vi.fn((props: Props) => {
-      if (mocks.startError !== null) {
-        throw mocks.startError;
-      }
-      const activity = fakeActivity(`activity-${mocks.instances.length}`, props);
-      mocks.instances.push(activity);
-      return activity;
-    }),
-    getInstances: (includeEnded = false) =>
-      mocks.instances.filter(
-        activity =>
-          activity.state === 'active' ||
-          activity.state === 'stale' ||
-          (includeEnded && activity.state === 'ended')
-      ),
-  },
+  SessionLiveActivity: { start: mocks.start, getInstances: mocks.getInstances },
 }));
 vi.mock('./system-switch', () => ({ liveActivitiesAllowedBySystem: () => mocks.systemAllowed }));
 vi.mock('@/lib/glanceable/session-activity-tokens', () => ({
   registerSessionActivityToken: mocks.registerSessionActivityToken,
   releaseSessionActivity: mocks.releaseSessionActivity,
   retrySessionActivityTokens: mocks.retrySessionActivityTokens,
+  observedSessionActivityIds: mocks.observedSessionActivityIds,
+  deleteSessionActivityToken: mocks.deleteSessionActivityToken,
 }));
 vi.mock('@/lib/glanceable/sink-registry', () => ({
   getGlanceableDelivery: () => ({ cleanupTokens: mocks.cleanupTokens }),
 }));
-
 
 const NOW = Date.parse('2026-10-12T10:00:00.000Z');
 const CTX = { userId: 'user-1', organizationId: 'org-1' };
@@ -113,8 +102,30 @@ const RUNNING = {
   statusUpdatedAt: '2026-10-12T09:48:00.000Z',
 };
 
+function startFake(props: Props): FakeActivity {
+  if (mocks.startError !== null) {
+    throw mocks.startError;
+  }
+  const activity = fakeActivity(`activity-${mocks.instances.length}`, props);
+  mocks.instances.push(activity);
+  return activity;
+}
+
+function listFakes(includeEnded = false): FakeActivity[] {
+  return mocks.instances.filter(
+    activity =>
+      activity.state === 'active' ||
+      activity.state === 'stale' ||
+      (includeEnded && activity.state === 'ended')
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.start.mockImplementation(startFake);
+  mocks.getInstances.mockImplementation(listFakes);
+  mocks.releaseSessionActivity.mockReturnValue(null);
+  mocks.observedSessionActivityIds.mockReturnValue([]);
   mocks.instances = [];
   mocks.startError = null;
   mocks.systemAllowed = true;
@@ -125,12 +136,12 @@ beforeEach(() => {
 
 describe('followSession', () => {
   it('starts one collapsed card for the session and registers its token', () => {
-    const listener = vi.fn();
+    const listener = vi.fn<() => void>();
     subscribeSessionFollows(listener);
 
     expect(followSession(RUNNING, CTX, NOW)).toBe('started');
 
-    expect(SessionLiveActivity.start).toHaveBeenCalledWith(
+    expect(mocks.start).toHaveBeenCalledWith(
       {
         sessionId: 'session-1',
         title: 'Migrate the billing webhooks',
@@ -143,7 +154,7 @@ describe('followSession', () => {
       },
       'kiloapp:///cloud/sessions/session-1',
       GLANCEABLE_STALE_MS / 1000,
-      LIVE_ACTIVITY_RELEVANCE.sessionActive
+      sessionLiveActivityRelevance('running', RUNNING.statusUpdatedAt)
     );
     expect(mocks.registerSessionActivityToken).toHaveBeenCalledWith(
       'activity-0',
@@ -158,7 +169,7 @@ describe('followSession', () => {
     followSession(RUNNING, CTX, NOW);
 
     expect(followSession(RUNNING, CTX, NOW)).toBe('followed');
-    expect(SessionLiveActivity.start).toHaveBeenCalledTimes(1);
+    expect(mocks.start).toHaveBeenCalledTimes(1);
   });
 
   it('stays unfollowed when iOS refuses the start', () => {
@@ -182,7 +193,7 @@ describe('followSession', () => {
     mocks.systemAllowed = true;
     expect(followSession({ ...RUNNING, status: 'idle' }, CTX, NOW)).toBe('refused');
 
-    expect(SessionLiveActivity.start).not.toHaveBeenCalled();
+    expect(mocks.start).not.toHaveBeenCalled();
   });
 });
 
@@ -240,12 +251,16 @@ describe('syncFollowedSessionCards', () => {
     syncFollowedSessionCards([RUNNING], NOW + 60_000);
     expect(card?.update).not.toHaveBeenCalled();
 
-    const waiting = { ...RUNNING, status: 'permission', statusUpdatedAt: '2026-10-12T10:01:00.000Z' };
+    const waiting = {
+      ...RUNNING,
+      status: 'permission',
+      statusUpdatedAt: '2026-10-12T10:01:00.000Z',
+    };
     syncFollowedSessionCards([waiting], NOW + 60_000);
     expect(card?.update).toHaveBeenCalledWith(
       expect.objectContaining({ statusKind: 'needsInput', statusSince: waiting.statusUpdatedAt }),
       GLANCEABLE_STALE_MS / 1000,
-      LIVE_ACTIVITY_RELEVANCE.sessionNeedsInput
+      sessionLiveActivityRelevance('needsInput', waiting.statusUpdatedAt)
     );
   });
 
@@ -263,7 +278,7 @@ describe('syncFollowedSessionCards', () => {
       { after: new Date(now + SESSION_FINISHED_DISMISS_MS) },
       expect.objectContaining({ statusKind: 'idle', statusSince: finished.statusUpdatedAt }),
       expect.any(Date),
-      LIVE_ACTIVITY_RELEVANCE.sessionIdle
+      sessionLiveActivityRelevance('idle', finished.statusUpdatedAt)
     );
     vi.restoreAllMocks();
     expect(mocks.cleanupTokens).toHaveBeenCalledWith('session', expect.any(Promise));
@@ -318,7 +333,11 @@ describe('followedSessionCounts', () => {
   it('counts each live followed card by status kind', () => {
     mocks.instances = [
       fakeActivity('native-1', { sessionId: 's1', statusKind: 'running' }),
-      fakeActivity('native-2', { sessionId: 's2', statusKind: 'needsInput', awaitingPermission: true }),
+      fakeActivity('native-2', {
+        sessionId: 's2',
+        statusKind: 'needsInput',
+        awaitingPermission: true,
+      }),
       fakeActivity('native-3', { sessionId: 's3', statusKind: 'scheduled' }),
     ];
     discoverSessionCards();
@@ -330,5 +349,89 @@ describe('followedSessionCounts', () => {
       idle: 0,
       scheduled: 1,
     });
+  });
+});
+
+describe('session card tokens', () => {
+  it('deletes the reported token of a known card that is no longer live', () => {
+    followSession(RUNNING, CTX, NOW);
+    const [card] = mocks.instances;
+    if (card === undefined) {
+      throw new Error('expected a card');
+    }
+    // The server ended the card and iOS dismissed it while the app was away.
+    card.state = 'dismissed';
+    mocks.observedSessionActivityIds.mockReturnValue(['activity-0', 'activity-gone']);
+    mocks.releaseSessionActivity.mockImplementation(id => `reported-${id}`);
+
+    discoverSessionCards();
+
+    expect(mocks.releaseSessionActivity).toHaveBeenCalledWith('activity-0');
+    expect(mocks.releaseSessionActivity).toHaveBeenCalledWith('activity-gone');
+    expect(mocks.deleteSessionActivityToken.mock.calls).toEqual([
+      ['reported-activity-0'],
+      ['reported-activity-gone'],
+    ]);
+    expect(isSessionFollowed('session-1')).toBe(false);
+  });
+
+  it('changes nothing when ActivityKit cannot be read', () => {
+    followSession(RUNNING, CTX, NOW);
+    mocks.getInstances.mockImplementation(() => {
+      throw new Error('ActivityKit unavailable');
+    });
+
+    discoverSessionCards();
+
+    expect(mocks.releaseSessionActivity).not.toHaveBeenCalled();
+    expect(isSessionFollowed('session-1')).toBe(true);
+  });
+
+  it('falls back to the reported token when the native read has none', async () => {
+    followSession(RUNNING, CTX, NOW);
+    const [card] = mocks.instances;
+    card?.getPushToken.mockResolvedValue(null);
+    mocks.releaseSessionActivity.mockReturnValue('reported-token');
+
+    unfollowSession('session-1');
+
+    await expect(mocks.cleanupTokens.mock.calls[0]?.[1]).resolves.toBe('reported-token');
+  });
+
+  it('retires the token scope before ending the cards when the switch is off at restore', () => {
+    followSession(RUNNING, CTX, NOW);
+    const [card] = mocks.instances;
+    setLiveActivityEnabledValue(false);
+
+    restoreFollowedSessionCards(CTX);
+
+    expect(mocks.cleanupTokens).toHaveBeenCalledWith('scope');
+    expect(card?.end).toHaveBeenCalledWith('immediate');
+    expect(mocks.cleanupTokens.mock.invocationCallOrder[0]).toBeLessThan(
+      card?.end.mock.invocationCallOrder[0] ?? 0
+    );
+  });
+});
+
+describe('syncFollowedSessionCards against a newer push', () => {
+  it('keeps the pushed content when the row is older than the card', () => {
+    followSession(RUNNING, CTX, NOW);
+    const [card] = mocks.instances;
+    if (card === undefined) {
+      throw new Error('expected a card');
+    }
+    // A push moved the card into a permission wait with its approval key.
+    card.props = {
+      ...card.props,
+      statusKind: 'needsInput',
+      statusSince: '2026-10-12T10:02:00.000Z',
+      awaitingPermission: true,
+      approvalKey: 'c'.repeat(64),
+    };
+
+    syncFollowedSessionCards([RUNNING], NOW + 60_000);
+
+    expect(card.update).not.toHaveBeenCalled();
+    expect(card.end).not.toHaveBeenCalled();
   });
 });

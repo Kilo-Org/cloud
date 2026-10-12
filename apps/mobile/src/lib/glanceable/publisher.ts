@@ -16,6 +16,7 @@ import {
 } from '@kilocode/app-shared/home-widget';
 
 import { isGlanceableFixtureHeld } from './fixture-hold';
+import { getFollowedSessionIds } from './followed-sessions';
 import {
   getLastHomeWidgetData,
   hasSameHomeWidgetDetails,
@@ -429,13 +430,21 @@ export class GlanceablePublisher {
 
   /**
    * The rows the ask selection may name: every row except the session whose ask
-   * was already actioned. That row still counts in the snapshot.
+   * was already actioned, and every session this device follows. A followed
+   * session has its own card and its own Approve, so the aggregate card's
+   * Approve must never answer its request. Both still count in the snapshot.
    */
   private askRows(
     sessions: readonly (NewestSessionRow & WaitingAskRow)[]
   ): readonly (NewestSessionRow & WaitingAskRow)[] {
     const skip = this.skipWaitingAskSessionId;
-    return skip === undefined ? sessions : sessions.filter(row => row.id !== skip);
+    const followed = getFollowedSessionIds();
+    if (skip === undefined && followed.size === 0) {
+      return sessions;
+    }
+    return sessions.filter(
+      row => row.id !== skip && (row.id === undefined || !followed.has(row.id))
+    );
   }
 
   /**

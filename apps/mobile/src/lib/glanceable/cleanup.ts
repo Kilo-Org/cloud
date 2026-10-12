@@ -128,7 +128,7 @@ function writeTerminalAndEnd(status: 'signed_out' | 'privacy'): void {
   forEachSink('terminal_end', sink => {
     sink.endImmediate();
   });
-  for (const end of [...terminalEnds]) {
+  for (const end of terminalEnds) {
     guardSink('terminal_end', end);
   }
 }

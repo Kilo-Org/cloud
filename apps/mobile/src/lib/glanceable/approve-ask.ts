@@ -12,7 +12,7 @@ import { readTrpcErrorField } from '@/lib/trpc-error';
 import { createGlanceablePublisher } from './create-publisher';
 import { resolveAnsweredRaises } from './attention-rows';
 import { resolvePendingPermissionId } from './pending-permission';
-import { readWaitingAsk, recordWaitingAsk, type WaitingAsk } from './waiting-ask';
+import { readWaitingAsk, recordWaitingAsk } from './waiting-ask';
 
 /**
  * The one answer path. The in-app permission card answers through
@@ -247,10 +247,11 @@ async function approvalKeyOf(kiloSessionId: string, permissionId: string): Promi
   // Lazy require keeps the native digest out of the pure test graph.
   // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
   const { CryptoDigestAlgorithm, digestStringAsync } = require('expo-crypto') as typeof ExpoCrypto;
-  return digestStringAsync(
+  const key = await digestStringAsync(
     CryptoDigestAlgorithm.SHA256,
     JSON.stringify([kiloSessionId, permissionId])
   );
+  return key;
 }
 
 /**

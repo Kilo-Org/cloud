@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one press-routing suite for the aggregate and session cards, sharing one mock harness */
 import { type UserInteractionEvent } from 'expo-widgets';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -61,7 +62,7 @@ vi.mock('@/lib/glanceable/waiting-ask', () => ({
 vi.mock('@/lib/glanceable/persist', () => ({
   restorePersistedGlanceable: mocks.restorePersistedGlanceable,
 }));
-vi.mock('./session-follow', () => ({
+vi.mock('./session-card-press', () => ({
   findSessionCard: mocks.findSessionCard,
   renderSessionCardPress: mocks.renderSessionCardPress,
 }));
@@ -370,7 +371,9 @@ describe('handleGlanceableInteraction on a session card', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getInstances.mockReturnValue([{ getId: () => ACTIVITY_ID }]);
-    mocks.findSessionCard.mockImplementation(id => (id === SESSION_ACTIVITY_ID ? card(WAITING) : null));
+    mocks.findSessionCard.mockImplementation(id =>
+      id === SESSION_ACTIVITY_ID ? card(WAITING) : null
+    );
     mocks.readStoredValue.mockResolvedValue('org-1');
     mocks.runGlanceableApprove.mockResolvedValue({ kind: 'approved' });
     mocks.renderSessionCardPress.mockResolvedValue(undefined);
@@ -405,6 +408,19 @@ describe('handleGlanceableInteraction on a session card', () => {
     ).resolves.toEqual({ kind: 'retryable' });
 
     expect(mocks.toastError).toHaveBeenCalledWith('glanceable.approveFailed');
+    expect(mocks.renderSessionCardPress).toHaveBeenLastCalledWith(expect.anything(), {
+      notice: 'glanceable.approveFailed',
+    });
+  });
+
+  it('turns an unreadable stored scope into a retryable press with the failure line', async () => {
+    mocks.readStoredValue.mockRejectedValue(new Error('keychain locked'));
+
+    await expect(
+      handleGlanceableInteraction(event(SESSION_ACTIVITY_ID, GLANCEABLE_APPROVE_TARGET))
+    ).resolves.toEqual({ kind: 'retryable' });
+
+    expect(mocks.runGlanceableApprove).not.toHaveBeenCalled();
     expect(mocks.renderSessionCardPress).toHaveBeenLastCalledWith(expect.anything(), {
       notice: 'glanceable.approveFailed',
     });

@@ -4,10 +4,12 @@ import {
   awaitLogoutReconciliationSettled,
   hasPendingActivityUnregister,
 } from '@/lib/auth/logout-reconciliation';
+import { SessionLiveActivity } from '@/glanceable-ios/session-live-activity';
 import { trpcClient } from '@/lib/trpc';
 
-import { type GlanceableActivity } from './sink-registry';
+import { getGlanceableDelivery, type GlanceableActivity } from './sink-registry';
 import { enqueueTokenMutation } from './token-mutation-queue';
+import { deleteActivityTokens, readUnregisterAuthToken } from './unregister-session';
 
 /**
  * The push tokens of the followed session cards (`ios_session_activity`,
@@ -73,15 +75,17 @@ async function registerToken(
     ) {
       return;
     }
-    await enqueueTokenMutation(async () => {
+    // The callback returns the token this upsert replaced, if any.
+    const rotatedFrom = await enqueueTokenMutation(async (): Promise<string | null> => {
       if (
         !isCurrent(activityId, registration) ||
         registration.token !== token ||
         registration.registeredToken === token
       ) {
-        return;
+        return null;
       }
       sessionActivityTokens.add(token);
+      const previous = registration.registeredToken;
       await trpcClient.user.registerActivityToken.mutate({
         token,
         kind: 'ios_session_activity',
@@ -90,7 +94,13 @@ async function registerToken(
         sessionId: registration.sessionId,
       });
       registration.registeredToken = token;
+      return previous;
     });
+    if (rotatedFrom !== null) {
+      // iOS rotated the card's token. The new row is live, so the old row is
+      // retired; outside the queue, because the delete runs through it.
+      deleteSessionActivityToken(rotatedFrom);
+    }
   } catch {
     // The card keeps its local content; `retrySessionActivityTokens` retries at
     // the next foreground. An uncertain upsert still needs cleanup, so the
@@ -153,23 +163,113 @@ export function retrySessionActivityTokens(): void {
   }
 }
 
-/** Stop observing one card. Its token delete is the caller's (`cleanupTokens('session')`). */
-export function releaseSessionActivity(activityId: string): void {
-  registrations.get(activityId)?.subscription?.remove();
-  registrations.delete(activityId);
+/** Delete one session card token's server row; a failure is tombstoned. */
+export function deleteSessionActivityToken(token: string): void {
+  getGlanceableDelivery().cleanupTokens(
+    'session',
+    new Promise<string>(resolve => {
+      resolve(token);
+    })
+  );
 }
 
-/** Stop observing every card: the scope is torn down and its tokens are deleted with it. */
-export function releaseAllSessionActivities(): void {
+/** The native ids of every card this process observes. */
+export function observedSessionActivityIds(): string[] {
+  return [...registrations.keys()];
+}
+
+/**
+ * Stop observing one card. Returns the newest token the card reported, so the
+ * caller can delete it (`cleanupTokens('session')`) when the native read can no
+ * longer supply it.
+ */
+export function releaseSessionActivity(activityId: string): string | null {
+  const registration = registrations.get(activityId);
+  registration?.subscription?.remove();
+  registrations.delete(activityId);
+  return registration?.token ?? registration?.registeredToken ?? null;
+}
+
+/**
+ * Stop observing every card: the scope is torn down and its tokens are deleted
+ * with it. Returns every token the cards reported, registered or not.
+ */
+export function releaseAllSessionActivities(): string[] {
   epoch += 1;
+  const tokens: string[] = [];
   for (const registration of registrations.values()) {
     registration.subscription?.remove();
+    for (const token of [registration.token, registration.registeredToken]) {
+      if (token !== null) {
+        tokens.push(token);
+      }
+    }
   }
   registrations.clear();
+  return tokens;
 }
 
 /** Test-only: drop every registration and recorded token. */
 export function _resetSessionActivityTokensForTests(): void {
   releaseAllSessionActivities();
   sessionActivityTokens.clear();
+}
+
+/**
+ * Scope teardown: stop observing every card and record every session card
+ * token for the scope delete, cards a previous process started included. The
+ * native reads start now, before the cards end and drop their tokens; the
+ * returned promise settles once they landed in `sessionActivityTokens`.
+ */
+export async function collectSessionScopeTokens(): Promise<void> {
+  for (const token of releaseAllSessionActivities()) {
+    sessionActivityTokens.add(token);
+  }
+  let instances: GlanceableActivity[] = [];
+  try {
+    instances = SessionLiveActivity.getInstances(true);
+  } catch {
+    // The recorded tokens still cover every card this process observed.
+  }
+  const reads = instances.map(async instance => {
+    try {
+      return await instance.getPushToken();
+    } catch {
+      return null;
+    }
+  });
+  for (const token of await Promise.all(reads)) {
+    if (token !== null) {
+      sessionActivityTokens.add(token);
+    }
+  }
+}
+
+/**
+ * Delete one ended session card's token, in the activity-token FIFO. The
+ * aggregate card's registration and the scope stay as they are. A failed or
+ * unauthorized delete keeps the token for a tombstoned retry.
+ */
+export async function unregisterSessionActivityToken(
+  activityToken?: Promise<string | null>
+): Promise<{ ok: boolean; tokens: string[] }> {
+  const result = await enqueueTokenMutation(async () => {
+    let token: string | null = null;
+    try {
+      token = (await activityToken) ?? null;
+    } catch {
+      // No token to delete.
+    }
+    if (token === null) {
+      return { ok: true, tokens: [] };
+    }
+    sessionActivityTokens.add(token);
+    const authToken = await readUnregisterAuthToken();
+    if (authToken === null) {
+      return { ok: false, tokens: [token] };
+    }
+    const failed = await deleteActivityTokens([token], authToken, [sessionActivityTokens]);
+    return { ok: failed.length === 0, tokens: failed };
+  });
+  return result;
 }

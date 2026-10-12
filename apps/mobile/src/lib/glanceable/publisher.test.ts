@@ -11,6 +11,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { getTerminalBlankEpoch, writeSignedOutSnapshotAndEnd } from './cleanup';
+import { setFollowedSessionsSource } from './followed-sessions';
 import {
   _resetHomeWidgetDataForTests,
   getHomeWidgetDataForSnapshot,
@@ -936,6 +937,32 @@ describe('GlanceablePublisher waiting ask', () => {
     // The skipped row still counts: the snapshot still comes from the tray.
     expect(lastSnapshot(calls, 'startOrUpdate').needsInput).toBe(2);
     publisher.dispose();
+  });
+
+  it('never records a followed session as the aggregate ask', () => {
+    setFollowedSessionsSource({
+      ids: () => ['followed'],
+      counts: () => ({ running: 0, needsInput: 1, needsApproval: 1, idle: 0, scheduled: 0 }),
+    });
+    const { publisher, asks } = makePublisher();
+    publisher.handleSessions(
+      [
+        {
+          id: 'followed',
+          status: 'permission',
+          statusUpdatedAt: new Date(NOW - 60_000).toISOString(),
+        },
+        { id: 'other', status: 'permission', statusUpdatedAt: new Date(NOW - 1000).toISOString() },
+      ],
+      PUB_CTX
+    );
+    // The followed session has its own card and Approve.
+    expect(asks.at(-1)).toMatchObject({ kiloSessionId: 'other' });
+
+    publisher.handleSessions([{ id: 'followed', status: 'permission' }], PUB_CTX);
+    expect(asks.at(-1)).toBeNull();
+    publisher.dispose();
+    setFollowedSessionsSource(null);
   });
 
   it('clears the ask on a fetch error', () => {

@@ -148,12 +148,13 @@ if (Platform.OS === 'ios') {
     const next = getLiveActivityEnabled();
     if (liveActivityAllowed && !next) {
       iosSink.endImmediate();
-      endAllSessionCards();
       // `endImmediate` retires only the activity tokens. The push-to-start
       // subscription outlives them, so a remote start would still reach a
       // switched-off surface. `canRegisterActivityTokenKind` keeps it retired
-      // until the switch returns.
+      // until the switch returns. The scope cleanup also reads every session
+      // card's token, so it runs before those cards end.
       getGlanceableDelivery().cleanupTokens('scope');
+      endAllSessionCards();
     }
     liveActivityAllowed = next;
   });

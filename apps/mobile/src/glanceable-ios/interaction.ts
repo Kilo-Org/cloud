@@ -18,7 +18,11 @@ import {
   setGlanceableActionApproving,
   setGlanceableActionNotice,
 } from './ios-sink';
-import { findSessionCard, renderSessionCardPress, type SessionActivity } from './session-follow';
+import {
+  findSessionCard,
+  renderSessionCardPress,
+  type SessionActivity,
+} from './session-card-press';
 
 /**
  * What a button press on the Live Activity does.
@@ -185,6 +189,27 @@ async function approveFromCard(): Promise<GlanceableInteractionOutcome> {
 }
 
 /**
+ * Answer one session card's request. Every session card ends on an
+ * organization switch, so the stored selection is the scope the card was
+ * started in. A locked keychain throws, which is a failed press the user can
+ * retry.
+ */
+async function answerSessionCard(
+  kiloSessionId: string,
+  approvalKey: string
+): Promise<GlanceableApproveResult> {
+  try {
+    const organizationId = await readStoredValue(ORGANIZATION_STORAGE_KEY);
+    return await runGlanceableApprove({
+      now: () => Date.now(),
+      target: { kiloSessionId, organizationId, approvalKey },
+    });
+  } catch {
+    return { kind: 'retryable' };
+  }
+}
+
+/**
  * Answer the exact request one session card shows. The card names its session
  * and the approval key of that request; `runGlanceableApprove` revalidates the
  * key before it answers, so a stale or already-answered request is never
@@ -199,19 +224,8 @@ async function approveFromSessionCard(activity: SessionActivity): Promise<Glance
   if (sessionId.length === 0 || approvalKey.length === 0 || props?.awaitingPermission !== true) {
     return { kind: 'none' };
   }
-  // Every session card ends on an organization switch, so the stored
-  // selection is the scope the card was started in.
-  const organizationId = await readStoredValue(ORGANIZATION_STORAGE_KEY);
   await renderSessionCardPress(activity, { approving: true });
-  let result: GlanceableApproveResult;
-  try {
-    result = await runGlanceableApprove({
-      now: () => Date.now(),
-      target: { kiloSessionId: sessionId, organizationId, approvalKey },
-    });
-  } catch {
-    result = { kind: 'retryable' };
-  }
+  const result = await answerSessionCard(sessionId, approvalKey);
   if (result.kind === 'retryable') {
     toast.error(i18n.t(APPROVE_FAILED_KEY));
     await renderSessionCardPress(activity, { notice: i18n.t(APPROVE_FAILED_KEY) });

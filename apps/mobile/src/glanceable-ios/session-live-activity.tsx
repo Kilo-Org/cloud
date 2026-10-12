@@ -1,5 +1,15 @@
 /* eslint-disable max-lines -- the 'widget' layout function is stringified whole, so its helpers cannot be extracted to module scope; the surface stays in one function */
-import { Button, Circle, HStack, Image, Link, Spacer, Text, VStack, ZStack } from '@expo/ui/swift-ui';
+import {
+  Button,
+  Circle,
+  HStack,
+  Image,
+  Link,
+  Spacer,
+  Text,
+  VStack,
+  ZStack,
+} from '@expo/ui/swift-ui';
 import {
   accessibilityElement,
   accessibilityLabel,
@@ -130,6 +140,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   const rawTitle = (props.title ?? '').trim();
   const title = rawTitle.length > 0 ? rawTitle : (COPY.agent ?? 'Agent');
 
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- the 'widget' layout is stringified whole; a helper outside it is an undefined global in the widget process
   const usableDate = (value: string | null | undefined) => {
     if (value == null) {
       return null;
@@ -140,7 +151,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   const since = usableDate(props.statusSince);
   const scheduledAt = kind === 'scheduled' ? usableDate(props.scheduledAt) : null;
   const updatedAt = usableDate(props.updatedAt);
-  const lastKnown = activityEnvironment.isStale === true && updatedAt !== null;
+  // The checked time a stale card prints, or null on a current card.
+  const lastKnown = activityEnvironment.isStale === true ? updatedAt : null;
 
   // Approve answers only the exact request the card carries.
   const approving = props.approving === true && kind === 'needsInput';
@@ -228,12 +240,12 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     <HStack alignment="center" spacing={6} modifiers={[frame({ height: 18 })]}>
       {mark(18)}
       <Spacer minLength={8} />
-      {lastKnown && updatedAt !== null ? (
+      {lastKnown === null ? null : (
         <HStack spacing={3}>
           {text(`${COPY.lastKnown ?? 'Last known'} ·`, 11, scheme.muted)}
-          {clock(updatedAt, 11, scheme.muted)}
+          {clock(lastKnown, 11, scheme.muted)}
         </HStack>
-      ) : null}
+      )}
     </HStack>
   );
 

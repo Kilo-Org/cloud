@@ -37,17 +37,22 @@ export function _resetUnregisterSessionForTests(): void {
 }
 
 /**
- * Delete each token for the authenticated owner. Returns the tokens whose
- * delete failed, so the caller keeps them for a later cleanup.
+ * Delete each token for the authenticated owner and drop every deleted token
+ * from the given record sets. Returns the tokens whose delete failed, so the
+ * caller keeps them for a later cleanup.
  */
 export async function deleteActivityTokens(
   tokens: readonly string[],
-  authToken: string
+  authToken: string,
+  records: readonly Set<string>[]
 ): Promise<string[]> {
   const results = await Promise.all(
     tokens.map(async token => {
       try {
         await trpcClient.user.unregisterActivityToken.mutate({ token });
+        for (const record of records) {
+          record.delete(token);
+        }
         return true;
       } catch (error) {
         noteUnregisterFailure(authToken, error);

@@ -181,7 +181,8 @@ export function createControlPlaneSessionHost(options: {
     ...options.runtime,
     onEvent: event => turns?.observeKiloEvent(event),
     onActivityChange: key => turns?.refreshActivity(key),
-    onDeadline: (identity, reason, key) => turns?.onNativeDeadline(identity, reason, key),
+    onDeadline: (identity, reason, retry, key) =>
+      turns?.onNativeDeadline(identity, reason, retry, key),
     onRestart: info => turns?.onRuntimeRestart(info),
     onUnavailable: (directory, key) => turns?.onRuntimeUnavailable(directory, key),
     onMemoryHold: info => turns?.onRuntimeMemoryHold(info),

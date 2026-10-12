@@ -1,6 +1,10 @@
 import type { WrapperKiloClient } from '../kilo-api.js';
 import { KILO_ACTIVITY_MESSAGE_LIMIT } from '../kilo-api.js';
-import type { SessionInteraction, SessionObservation } from './session-supervisor.js';
+import {
+  executionRetry,
+  type SessionInteraction,
+  type SessionObservation,
+} from './session-supervisor.js';
 
 const MAX_ACTIVITY_DIRECTORIES = 64;
 const SNAPSHOT_CONCURRENCY = 4;
@@ -50,7 +54,8 @@ export async function readSessionSnapshot(input: {
     ]);
     for (const id of ids) {
       signal.throwIfAborted();
-      const status = statuses[id]?.type ?? 'idle';
+      const statusEntry = statuses[id];
+      const status = statusEntry?.type ?? 'idle';
       if (status !== 'busy' && status !== 'retry' && status !== 'idle')
         throw new Error('Activity snapshot received unknown session status');
       let details = sessions.get(id);
@@ -96,6 +101,7 @@ export async function readSessionSnapshot(input: {
         directory,
         parentID: details.parentID,
         status,
+        ...(status === 'retry' && statusEntry ? { retry: executionRetry(statusEntry) } : {}),
         messages: [...byId.values()],
         interactions,
       });

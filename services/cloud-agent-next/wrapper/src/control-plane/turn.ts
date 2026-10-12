@@ -1,6 +1,8 @@
 import {
+  assistantFailureMessage,
   classifyAssistantFailure,
   isAssistantInterrupt,
+  type AssistantFailureClassification,
 } from '../../../src/shared/assistant-failure.js';
 import {
   CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
@@ -29,6 +31,7 @@ import type {
   SessionSupervisor,
   ExecutionIdentity,
   ExecutionFailure,
+  ExecutionRetry,
 } from './session-supervisor.js';
 import { runtimeKey } from './prepare.js';
 
@@ -176,6 +179,22 @@ function markDispatched(
   pending.dispatched = true;
   turn.submittedSinceIdle = true;
   if (turn.phase === 'finalizing') turn.idleWhileFinalizing = false;
+}
+
+/**
+ * Kilo sets a `retry` status only from its model-provider retry policy, so retry
+ * text the classifier does not recognize (for example the gateway's "Provider
+ * returned error" 429) is still a provider failure, never `unknown`.
+ */
+function retryFailure(retry: ExecutionRetry): AssistantFailureClassification {
+  const failure = classifyAssistantFailure(retry);
+  return failure.reason === 'unknown'
+    ? {
+        ...failure,
+        reason: 'provider_unavailable',
+        safeMessage: assistantFailureMessage('provider_unavailable'),
+      }
+    : failure;
 }
 
 /** Non-fatal notice for a turn whose Kilo is held under memory pressure; nothing acts on it. */
@@ -1141,7 +1160,12 @@ export function createTurnManager(deps: TurnManagerDeps) {
 
     refreshActivity,
 
-    onNativeDeadline(identity: ExecutionIdentity, reason: ExecutionFailure, key: string): void {
+    onNativeDeadline(
+      identity: ExecutionIdentity,
+      reason: ExecutionFailure,
+      retry: ExecutionRetry | undefined,
+      key: string
+    ): void {
       const root = [identity.sessionId, ...(identity.ancestorSessionIds ?? [])]
         .map(resolveRootKiloSession)
         .find(id => id !== undefined);
@@ -1157,9 +1181,17 @@ export function createTurnManager(deps: TurnManagerDeps) {
       if (!route || route.runtimeKey !== key) return;
       route.deadlineRuntimeId = identity.nativeRuntimeId;
       const turn = turns.get(route.sessionId);
+      // A stall in Kilo's model retry loop fails as the assistant failure Kilo was
+      // retrying (for example a rate limit), not as a platform no-progress failure.
+      const failure = retry ? retryFailure(retry) : undefined;
       if (turn) {
         turn.stepAbort?.abort(new Error(reason));
-        sendOutcome(turn, 'failed', reason);
+        if (failure) {
+          sendOutcome(turn, 'failed', failure.safeMessage, {
+            assistantReason: failure.reason,
+            providerOwnership: failure.providerOwnership,
+          });
+        } else sendOutcome(turn, 'failed', reason);
       } else {
         emitEvents(route.sessionId, [
           {
@@ -1167,8 +1199,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
             properties: {
               sessionID: identity.sessionId,
               reason,
-              error:
-                reason === 'no_progress'
+              error: failure
+                ? `Execution stopped while the model request kept retrying: ${failure.safeMessage}. You can continue in this chat.`
+                : reason === 'no_progress'
                   ? 'Execution stopped because it made no progress. You can continue in this chat.'
                   : 'Execution stopped because it reached its time limit. You can continue in this chat.',
             },

@@ -3,6 +3,7 @@ import {
   createSessionSupervisor,
   type ExecutionFailure,
   type ExecutionIdentity,
+  type ExecutionRetry,
   type SessionObservation,
 } from './session-supervisor.js';
 
@@ -10,7 +11,11 @@ const MINUTE = 60_000;
 
 function fixture() {
   let now = 1_000;
-  const failures: Array<{ identity: ExecutionIdentity; reason: ExecutionFailure }> = [];
+  const failures: Array<{
+    identity: ExecutionIdentity;
+    reason: ExecutionFailure;
+    retry: ExecutionRetry | undefined;
+  }> = [];
   const interruptions: Array<{
     identity: ExecutionIdentity;
     reason: ExecutionFailure;
@@ -23,7 +28,7 @@ function fixture() {
     directory: '/workspace',
     timers: { noProgressMs: 20 * MINUTE, turnHardCapMs: 120 * MINUTE },
     now: () => now,
-    onDeadline: (identity, reason) => failures.push({ identity, reason }),
+    onDeadline: (identity, reason, retry) => failures.push({ identity, reason, retry }),
     interrupt: (identity, reason, signal) => {
       const done = Promise.withResolvers<void>();
       interruptions.push({ identity, reason, signal, done });
@@ -123,6 +128,126 @@ describe('native session supervision', () => {
       expect(f.supervisor.observedSessions()).toEqual([]);
     });
   }
+
+  it('names the retry Kilo was in when no progress expires, through busy retry attempts', () => {
+    const f = fixture();
+    f.open();
+    f.event('session.status', {
+      sessionID: 'root',
+      status: { type: 'retry', attempt: 1, message: 'Rate limit exceeded', next: 5_000 },
+    });
+    f.advance(10 * MINUTE);
+    // Each retry attempt reports busy until the provider rejects it again.
+    f.event('session.status', { sessionID: 'root', status: { type: 'busy' } });
+    f.advance(10 * MINUTE - 1);
+    f.supervisor.tick();
+    expect(f.failures).toEqual([]);
+    f.advance(1);
+    f.supervisor.tick();
+    expect(f.failures.map(({ reason, retry }) => ({ reason, retry }))).toEqual([
+      { reason: 'no_progress', retry: { message: 'Rate limit exceeded' } },
+    ]);
+  });
+
+  it('drops the retry after real progress', () => {
+    const f = fixture();
+    f.open();
+    f.event('session.status', {
+      sessionID: 'root',
+      status: { type: 'retry', attempt: 1, message: 'Rate limit exceeded', next: 5_000 },
+    });
+    f.event('session.status', { sessionID: 'root', status: { type: 'busy' } });
+    f.text('root', 'the retried request streamed');
+    f.advance(20 * MINUTE);
+    f.supervisor.tick();
+    expect(f.failures.map(({ reason, retry }) => ({ reason, retry }))).toEqual([
+      { reason: 'no_progress', retry: undefined },
+    ]);
+  });
+
+  it('drops the retry when Kilo reports idle', () => {
+    const f = fixture();
+    f.open();
+    f.event('session.status', {
+      sessionID: 'root',
+      status: { type: 'retry', attempt: 1, message: 'Rate limit exceeded', next: 5_000 },
+    });
+    f.event('session.status', { sessionID: 'root', status: { type: 'idle' } });
+    f.advance(20 * MINUTE);
+    f.supervisor.tick();
+    expect(f.failures.map(({ reason, retry }) => ({ reason, retry }))).toEqual([
+      { reason: 'no_progress', retry: undefined },
+    ]);
+  });
+
+  it('names a stopped subagent retry when its parent expires first', () => {
+    const f = fixture();
+    f.open();
+    f.tool('root', 'task', 'running', 'task', { sessionId: 'child' });
+    f.open('child', 'root');
+    f.event('session.status', {
+      sessionID: 'child',
+      status: { type: 'retry', attempt: 2, message: 'Too Many Requests', next: 5_000 },
+    });
+    f.advance(20 * MINUTE);
+    f.supervisor.tick();
+    expect(
+      f.failures.map(({ identity, reason, retry }) => ({
+        sessionId: identity.sessionId,
+        reason,
+        retry,
+      }))
+    ).toEqual([
+      { sessionId: 'root', reason: 'no_progress', retry: { message: 'Too Many Requests' } },
+    ]);
+  });
+
+  it('keeps a snapshot retry that is newer than the progress in the same snapshot', () => {
+    const f = fixture();
+    f.open();
+    const token = f.supervisor.beginSnapshot();
+    f.supervisor.reconcile(
+      [
+        {
+          ...observation('root', 'retry'),
+          retry: { message: 'Rate limit exceeded' },
+          messages: [
+            {
+              info: { id: 'assistant-root', role: 'assistant', time: { created: 1_000 } },
+              parts: [
+                { id: 'text', messageID: 'assistant-root', type: 'text', text: 'partial output' },
+              ],
+            },
+          ],
+        },
+      ],
+      token
+    );
+    f.advance(20 * MINUTE);
+    f.supervisor.tick();
+    expect(f.failures.map(({ reason, retry }) => ({ reason, retry }))).toEqual([
+      { reason: 'no_progress', retry: { message: 'Rate limit exceeded' } },
+    ]);
+  });
+
+  it('does not name a retry for the wall-clock execution limit', () => {
+    const f = fixture();
+    f.open();
+    for (let step = 0; step < 6; step++) {
+      f.advance(19 * MINUTE);
+      f.text('root', `output ${step}`);
+      f.supervisor.tick();
+    }
+    f.event('session.status', {
+      sessionID: 'root',
+      status: { type: 'retry', attempt: 1, message: 'Rate limit exceeded', next: 5_000 },
+    });
+    f.advance(6 * MINUTE);
+    f.supervisor.tick();
+    expect(f.failures.map(({ reason, retry }) => ({ reason, retry }))).toEqual([
+      { reason: 'execution_limit', retry: undefined },
+    ]);
+  });
 
   it('gives real tool output just before expiry a fresh window, but ignores unchanged tools and metadata', () => {
     const f = fixture();

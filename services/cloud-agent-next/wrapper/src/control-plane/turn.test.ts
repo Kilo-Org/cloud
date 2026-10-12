@@ -2223,6 +2223,7 @@ describe('native session outcome transitions', () => {
     h.manager.onNativeDeadline(
       { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
       'no_progress',
+      undefined,
       runtimeKey(routeSpec())
     );
     await settle();
@@ -2230,6 +2231,73 @@ describe('native session outcome transitions', () => {
     const native = h.nativeDiagnostics.find(entry => entry.fields.phase === 'session_outcome');
     expect(native?.fields.status).toBe('failed');
     expect(native?.fields.outcomeReason).toBe('no_progress');
+  });
+
+  it('fails a no-progress stall in a model retry loop as the assistant failure Kilo was retrying', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.onNativeDeadline(
+      { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
+      'no_progress',
+      {
+        message:
+          '[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
+      },
+      runtimeKey(routeSpec())
+    );
+    await settle();
+
+    expect(outcomeFrames(h.frames).at(-1)).toMatchObject({
+      status: 'failed',
+      reason: 'Assistant request was rate limited',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'byok',
+    });
+    const native = h.nativeDiagnostics.find(entry => entry.fields.phase === 'session_outcome');
+    expect(native?.fields.status).toBe('failed');
+    expect(native?.fields).not.toHaveProperty('outcomeReason');
+    expect(JSON.stringify(native?.fields)).not.toContain('API key');
+  });
+
+  it('fails a retry stall with unrecognized retry text as a provider failure, never unknown', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.onNativeDeadline(
+      { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
+      'no_progress',
+      { message: 'Provider returned error' },
+      runtimeKey(routeSpec())
+    );
+    await settle();
+
+    expect(outcomeFrames(h.frames).at(-1)).toMatchObject({
+      status: 'failed',
+      reason: 'Assistant service is unavailable',
+      assistantReason: 'provider_unavailable',
+    });
+  });
+
+  it('names the retry cause when an unrouted execution stalls in a model retry loop', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    await settle();
+    h.manager.onNativeDeadline(
+      { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
+      'no_progress',
+      { message: 'Too Many Requests' },
+      runtimeKey(routeSpec())
+    );
+    await settle();
+
+    const error = eventFrames(h.frames).find(event => event.type === 'session.error');
+    expect(error?.properties).toMatchObject({ sessionID: KILO_SESSION, reason: 'no_progress' });
+    expect(String(error?.properties.error)).toBe(
+      'Execution stopped while the model request kept retrying: Assistant request was rate limited. You can continue in this chat.'
+    );
   });
 
   it('never copies a Kilo assistant safeMessage into outcomeReason', async () => {

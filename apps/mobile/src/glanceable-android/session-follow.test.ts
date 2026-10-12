@@ -25,7 +25,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   postSessionCard: vi.fn(),
-  dismissSessionCard: vi.fn(),
+  dismissSessionCard: vi.fn<(sessionId: string) => void>(),
   pruneSessionCards: vi.fn(),
   getStoredSessionCards: vi.fn<
     () => { sessionId: string; organizationId: string | null; approvalKey: string | null }[]

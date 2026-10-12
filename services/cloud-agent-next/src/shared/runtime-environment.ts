@@ -1,3 +1,5 @@
+import { GIT_CREDENTIAL_HELPER } from './runtime-distribution.js';
+
 export const PNPM_STORE_DIR = '/var/cache/kilo/pnpm-store';
 export const PNPM_STORE_ENV_VAR = 'pnpm_config_store_dir';
 
@@ -8,14 +10,14 @@ export const PNPM_STORE_ENV_VAR = 'pnpm_config_store_dir';
  * Spread *after* user-supplied env vars in the runtime environment so these
  * values always win.
  *
- * `GIT_CONFIG_VALUE_0` must match the `COPY` destination in `Dockerfile`,
- * `Dockerfile.dind`, and `Dockerfile.dev`; nothing at build or test time ties
- * the two together, and a mismatch only surfaces as a runtime helper warning.
+ * `GIT_CONFIG_VALUE_0` is the helper's real install path from
+ * `runtime-distribution.ts`, the single owner of the image layout; Dockerfiles
+ * copy the helper there and symlink `GIT_CREDENTIAL_HELPER.linkPath`.
  */
 export const SYSTEM_GIT_CONFIG_ENV = {
   GIT_CONFIG_COUNT: '2',
   GIT_CONFIG_KEY_0: 'credential.helper',
-  GIT_CONFIG_VALUE_0: '/opt/kilo-cloud/kilo-git-credential',
+  GIT_CONFIG_VALUE_0: GIT_CREDENTIAL_HELPER.realPath,
   GIT_CONFIG_KEY_1: 'credential.useHttpPath',
   GIT_CONFIG_VALUE_1: 'false',
 } as const;

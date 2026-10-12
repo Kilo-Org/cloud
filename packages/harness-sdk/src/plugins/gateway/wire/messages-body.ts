@@ -139,17 +139,20 @@ const effortFields = (
   return { output_config: { effort: effort === 'minimal' ? 'low' : effort } };
 };
 
-const toBody = ({ prompt, model, maxTokens, effort, tools }: ModelRequest): MessagesBody => ({
-  model,
-  max_tokens: maxTokens,
-  stream: true,
-  ...effortFields(effort),
-  /* Left out rather than sent empty: a shape that is offered no tool must not
+/* Typed `unknown` outward, as `completions-body.ts` is: the declaration must not
+   name the Anthropic package, which a consumer does not install. */
+const toBody = ({ prompt, model, maxTokens, effort, tools }: ModelRequest): unknown =>
+  ({
+    model,
+    max_tokens: maxTokens,
+    stream: true,
+    ...effortFields(effort),
+    /* Left out rather than sent empty: a shape that is offered no tool must not
      be told there is an empty list of them, and an empty list would sit in the
      prefix of a session that has none. */
-  ...(tools === undefined || tools.length === 0 ? {} : { tools: tools.map(toolBlock) }),
-  system: prompt.system.map(part => textBlock(part.text, part.cache)),
-  messages: prompt.messages.map(renderMessage),
-});
+    ...(tools === undefined || tools.length === 0 ? {} : { tools: tools.map(toolBlock) }),
+    system: prompt.system.map(part => textBlock(part.text, part.cache)),
+    messages: prompt.messages.map(renderMessage),
+  }) satisfies MessagesBody;
 
 export { toBody };

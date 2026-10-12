@@ -1,4 +1,4 @@
-import { Effect } from 'effect';
+import { Effect, FiberRef } from 'effect';
 import { type HttpResponse, type Tool, type ToolCall, ToolFailure } from '@kilocode/harness-sdk';
 import { onlineManager } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -9,6 +9,11 @@ import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
 
 import { chatFetch } from './fetch';
+import {
+  MAX_SEARCHES_PER_QUESTION,
+  type QuestionSearches,
+  questionSearches,
+} from './web-search-budget';
 
 /**
  * Web search through Kilo's Exa proxy, as a tool the chat runs in app JS.
@@ -36,6 +41,9 @@ const OFFLINE =
   'The device is offline, so web search cannot run. Tell the person, and answer from what you know.';
 const SIGNED_OUT = 'The person is signed out, so web search cannot run.';
 const TIMED_OUT = 'Web search took too long and was stopped. Tell the person it did not answer.';
+const OVER_BUDGET =
+  `This question already used ${String(MAX_SEARCHES_PER_QUESTION)} web searches, the limit. ` +
+  'Do not search again: answer with what you have.';
 const ALLOWANCE_EXHAUSTED =
   "The account's free web searches for this month are used up and it has no credit balance. " +
   'Tell the person they can add credits in Kilo to search again.';
@@ -127,14 +135,21 @@ async function postSearch({
   }
 }
 
-async function search(
-  argumentsText: string,
-  organizationId: string | undefined,
-  signal: AbortSignal
-): Promise<SearchOutcome> {
+type SearchContext = {
+  readonly organizationId: string | undefined;
+  readonly signal: AbortSignal;
+  /** The searches spent on the question being answered, when one is being answered. */
+  readonly spent: QuestionSearches | undefined;
+};
+
+async function search(argumentsText: string, context: SearchContext): Promise<SearchOutcome> {
+  const { organizationId, signal, spent } = context;
   const args = parsedBody(argumentsText, argumentsSchema);
   if (args === undefined) {
     return failed('Give web_search a non-empty "query" string.');
+  }
+  if (spent !== undefined && spent.used >= MAX_SEARCHES_PER_QUESTION) {
+    return failed(OVER_BUDGET);
   }
   if (!onlineManager.isOnline()) {
     return failed(OFFLINE);
@@ -142,6 +157,9 @@ async function search(
   const token = await getAuthTokenForRequest();
   if (token === null) {
     return failed(SIGNED_OUT);
+  }
+  if (spent !== undefined) {
+    spent.used += 1;
   }
   const response = await postSearch({ query: args.query, token, organizationId, signal });
   if (response === undefined) {
@@ -177,13 +195,15 @@ export function webSearchTool(organizationId?: string): Tool {
       },
     },
     run: (call: ToolCall) =>
-      Effect.tryPromise({
-        try: async signal => {
-          const outcome = await search(call.arguments, organizationId, signal);
-          return outcome;
-        },
-        catch: cause => new ToolFailure({ cause: `Web search failed: ${String(cause)}` }),
-      }).pipe(
+      Effect.flatMap(FiberRef.get(questionSearches), spent =>
+        Effect.tryPromise({
+          try: async signal => {
+            const outcome = await search(call.arguments, { organizationId, signal, spent });
+            return outcome;
+          },
+          catch: cause => new ToolFailure({ cause: `Web search failed: ${String(cause)}` }),
+        })
+      ).pipe(
         Effect.timeoutFail({
           duration: SEARCH_TIMEOUT,
           onTimeout: () => new ToolFailure({ cause: TIMED_OUT }),

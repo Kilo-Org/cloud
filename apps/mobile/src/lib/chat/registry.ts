@@ -22,6 +22,7 @@ import {
   setMcpEnabled as persistMcpEnabled,
 } from './kilo-mcp';
 import { type ChatPlace } from './scope';
+import { questionSearches } from './web-search-budget';
 import { askedIn, forgetAsked, migrateAsked, moveAsked, rememberAsked } from './pending';
 import { chatToolNames, chatToolNamesStarting } from './tools';
 import {
@@ -502,6 +503,8 @@ function reading(sessionId: string, question: Question, runtime: ChatRuntime): E
       }
     })
   ).pipe(
+    /* Each question, a retry included, starts with no web search spent. */
+    Effect.locally(questionSearches, { used: 0 }),
     Effect.matchCauseEffect({
       onFailure: (cause: Cause.Cause<unknown>) =>
         Effect.promise(async () => {

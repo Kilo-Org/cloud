@@ -7,6 +7,7 @@ import { i18n } from '@/i18n';
 import { type StoredChatBackend } from './backend-store';
 import { backendTargetId, localTargetId } from './backend-target';
 import { webSearchTool } from './web-search';
+import { questionSearches } from './web-search-budget';
 import {
   moveWebSearchEnabled,
   setWebSearchEnabled,
@@ -138,6 +139,32 @@ describe('a web search', () => {
     expect(world.toastError).toHaveBeenCalledExactlyOnceWith(
       i18n.t('modelChat.webSearch.allowanceExhausted')
     );
+  });
+
+  it('stops after five searches in one question, and a new question starts again', async () => {
+    const tool = webSearchTool();
+    const call = { id: 'c', name: 'web_search', arguments: '{"query":"news"}' };
+    const question = () =>
+      Effect.forEach(Array.from({ length: 6 }), () => Effect.either(tool.run(call))).pipe(
+        Effect.locally(questionSearches, { used: 0 })
+      );
+
+    const first = await Effect.runPromise(question());
+
+    expect(first.map(answer => Either.isRight(answer))).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+    ]);
+    expect(world.requests).toHaveLength(5);
+
+    const second = await Effect.runPromise(question());
+
+    expect(Either.isRight(second[0] ?? Either.left(undefined))).toBe(true);
+    expect(world.requests).toHaveLength(10);
   });
 
   it('never reaches the proxy without a signed-in token', async () => {

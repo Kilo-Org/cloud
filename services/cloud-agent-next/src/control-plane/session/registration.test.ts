@@ -384,7 +384,7 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
     expect(JSON.stringify(registration)).not.toContain('secret-value');
   });
 
-  it('withholds profile env and secrets from a read-only Bitbucket review', () => {
+  it('withholds profile env, secrets, agents and commands but keeps skills for a read-only Bitbucket review', () => {
     const envelope = encryptWithPublicKey('secret-value', publicKey);
     const registration = buildControlPlaneSessionRegistration(
       metadata({
@@ -405,7 +405,7 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
         profile: {
           envVars: { USER_SETTING: 'private-profile-env' },
           encryptedSecrets: { DATABASE_URL: envelope },
-          runtimeSkills: [{ name: 'review', rawMarkdown: 'Review' }],
+          runtimeSkills: [{ name: 'bitbucket-cloud-review', rawMarkdown: 'Review' }],
           runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: {} }],
           kiloCommands: [{ name: 'review-now', template: 'Review' }],
         },
@@ -416,7 +416,9 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
     expect(registration.spec.env?.USER_SETTING).toBeUndefined();
     expect(registration.credentials.kiloToken).toBe('native-kilo-token');
     expect(registration.credentials.encryptedSecrets).toBeUndefined();
-    expect(registration.spec.runtimeSkills).toBeUndefined();
+    expect(registration.spec.runtimeSkills).toEqual([
+      { name: 'bitbucket-cloud-review', rawMarkdown: 'Review' },
+    ]);
     expect(registration.spec.runtimeAgents).toBeUndefined();
     expect(registration.spec.kiloCommands).toBeUndefined();
     expect(registration.spec.runtimeIsolation).toBe('per-session');

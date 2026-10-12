@@ -230,21 +230,25 @@ export function buildControlPlaneSessionRegistration(
     if (!validated.success) throw new McpAttachValidationError(validated.reason);
   }
   // A read-only Bitbucket review runs with worker-owned env only, so its
-  // encrypted profile secrets are withheld, mirroring the legacy plane and the
-  // withheld MCP snapshot.
-  const encryptedSecrets = isReadOnlyBitbucketReview(metadata)
-    ? undefined
-    : metadata.profile?.encryptedSecrets;
+  // encrypted profile secrets, agents and commands are withheld, mirroring the
+  // legacy plane and the withheld MCP snapshot. Its runtime skills stay: they
+  // carry the trusted review skill that the Code Reviewer attaches.
+  const readOnlyBitbucketReview = isReadOnlyBitbucketReview(metadata);
+  const encryptedSecrets = readOnlyBitbucketReview ? undefined : metadata.profile?.encryptedSecrets;
   const hasEncryptedSecrets =
     encryptedSecrets !== undefined && Object.keys(encryptedSecrets).length > 0;
-  const profile = isReadOnlyBitbucketReview(metadata) ? {} : readProfileBundle(metadata);
+  const profile = readProfileBundle(metadata);
   const runtimeProfile = {
     ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
-    ...(profile.runtimeAgents?.length ? { runtimeAgents: profile.runtimeAgents } : {}),
-    ...(profile.kiloCommands?.length ? { kiloCommands: profile.kiloCommands } : {}),
+    ...(!readOnlyBitbucketReview && profile.runtimeAgents?.length
+      ? { runtimeAgents: profile.runtimeAgents }
+      : {}),
+    ...(!readOnlyBitbucketReview && profile.kiloCommands?.length
+      ? { kiloCommands: profile.kiloCommands }
+      : {}),
   };
   const createdOnPlatform = metadata.identity.createdOnPlatform;
-  const bitbucketReviewId = isReadOnlyBitbucketReview(metadata)
+  const bitbucketReviewId = readOnlyBitbucketReview
     ? (codeReviewIdFromCallbackTarget(metadata.callback?.target) ?? undefined)
     : undefined;
   const commandGuard = getCommandGuardPolicy(

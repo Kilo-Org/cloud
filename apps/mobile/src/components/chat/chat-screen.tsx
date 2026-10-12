@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { ChatComposer, type ChatComposerSendOptions } from '@/components/agents/chat-composer';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
+import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { EmptyState } from '@/components/empty-state';
@@ -237,18 +238,21 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         />
       );
     }
+    // The host lets a folded thinking row open its text in the part sheet.
     return (
-      <SessionMessageList<StoredMessage>
-        sessionId={state.sessionId}
-        items={messages}
-        keyExtractor={message => message.info.id}
-        hasOlderMessages={false}
-        isLoadingOlderMessages={false}
-        olderMessagesError={null}
-        olderMessagesOmittedItemCount={0}
-        onLoadOlderMessages={() => undefined}
-        renderItem={renderItem}
-      />
+      <PartDetailSheetHost messages={messages}>
+        <SessionMessageList<StoredMessage>
+          sessionId={state.sessionId}
+          items={messages}
+          keyExtractor={message => message.info.id}
+          hasOlderMessages={false}
+          isLoadingOlderMessages={false}
+          olderMessagesError={null}
+          olderMessagesOmittedItemCount={0}
+          onLoadOlderMessages={() => undefined}
+          renderItem={renderItem}
+        />
+      </PartDetailSheetHost>
     );
   }
 

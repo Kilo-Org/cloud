@@ -139,6 +139,9 @@ vi.mock('@/components/agents/message-bubble', () => ({ MessageBubble: 'MessageBu
 vi.mock('@/components/agents/message-details-sheet', () => ({
   MessageDetailsSheet: 'MessageDetailsSheet',
 }));
+vi.mock('@/components/agents/part-detail-sheet-host', () => ({
+  PartDetailSheetHost: 'PartDetailSheetHost',
+}));
 vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: 'SessionMessageList',
 }));

@@ -136,7 +136,9 @@
     "working": "Орындалуда",
     "yourOwnRepositories": "Өзіңіздің репозиторийлеріңіз",
     "dismissed": "Еленбейді",
-    "agent": "Агент"
+    "agent": "Агент",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Тілді қолдану үшін қайта іске қосылуда",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw белсенділігі",
       "balance": "Баланс туралы ескертулер",
       "security": "Анықталған қауіпсіздік мәселелері",
-      "spend": "Шығыс ескертулері"
+      "spend": "Шығыс ескертулері",
+      "followedSessions": "Бақыланатын сессиялар"
     },
     "category": {
       "chatMessagesSubtitle": "сөйлесулеріңіздегі жауаптар",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Сізді күтуде",
     "nextScheduled": "Келесі жоспарланғандар",
     "answerNeeded": "Жауап қажет",
-    "waitingToRetry": "Қайта әрекет күтілуде"
+    "waitingToRetry": "Қайта әрекет күтілуде",
+    "step": {
+      "editing": "Өңдеу",
+      "reading": "Оқу",
+      "running": "Іске қосу",
+      "searching": "Веб іздеу",
+      "thinking": "Ойлану"
+    },
+    "planOf": "/",
+    "filesChanged": "файл өзгертілді",
+    "finishedIn": "Аяқталды",
+    "noActivityFor": "Белсенділік жоқ",
+    "prOpened": "Pull request ашылды",
+    "permissionWants": "Іске қосуды қалайды",
+    "failure": {
+      "provider": "Тоқтатылды: провайдер қатесі",
+      "tool": "Тоқтатылды: құрал қатесі",
+      "cancelled": "Тоқтатылды: бас тартылды",
+      "other": "ТОҚТАТЫЛДЫ"
+    }
   },
   "transcriptionModel": {
     "title": "Дауысты мәтінге айналдыру моделі",

@@ -136,7 +136,9 @@
     "working": "در حال کار",
     "yourOwnRepositories": "مخازن خودتان",
     "dismissed": "نادیده‌گرفته‌شده",
-    "agent": "عامل"
+    "agent": "عامل",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "در حال راه‌اندازی مجدد برای تغییر زبان",
@@ -831,7 +833,8 @@
       "kiloclaw": "فعالیت KiloClaw",
       "balance": "هشدارهای موجودی",
       "security": "یافته‌های امنیتی",
-      "spend": "هشدارهای هزینه"
+      "spend": "هشدارهای هزینه",
+      "followedSessions": "نشست‌های دنبال‌شده"
     },
     "category": {
       "chatMessagesSubtitle": "پاسخ‌های گفت‌وگوهای شما",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "در انتظار شما",
     "nextScheduled": "زمانبندی‌های بعدی",
     "answerNeeded": "نیازمند پاسخ",
-    "waitingToRetry": "در انتظار تلاش مجدد"
+    "waitingToRetry": "در انتظار تلاش مجدد",
+    "step": {
+      "editing": "ویرایش",
+      "reading": "خواندن",
+      "running": "اجرا",
+      "searching": "جستجوی وب",
+      "thinking": "در حال تفکر"
+    },
+    "planOf": "از",
+    "filesChanged": "فایل‌های تغییریافته",
+    "finishedIn": "تمام‌شده در",
+    "noActivityFor": "بدون فعالیت برای",
+    "prOpened": "پول ریکوئست باز شد",
+    "permissionWants": "می‌خواهد اجرا کند",
+    "failure": {
+      "provider": "متوقف شد: خطای ارائه‌دهنده",
+      "tool": "متوقف شد: خطای ابزار",
+      "cancelled": "متوقف شد: لغو شد",
+      "other": "متوقف"
+    }
   },
   "transcriptionModel": {
     "title": "مدل تبدیل گفتار به متن",

@@ -136,7 +136,9 @@
     "working": "Töös",
     "yourOwnRepositories": "Sinu enda hoidlad",
     "dismissed": "Kõrvale jäetud",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw'i tegevus",
       "balance": "Saldohoiatused",
       "security": "Turvaleiud",
-      "spend": "Kulutushoiatused"
+      "spend": "Kulutushoiatused",
+      "followedSessions": "Jälgitud seansid"
     },
     "category": {
       "chatMessagesSubtitle": "vastused sinu vestlustes",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Ootab sind",
     "nextScheduled": "Järgmisena ajastatud",
     "answerNeeded": "Vajab vastust",
-    "waitingToRetry": "Ootab uut katset"
+    "waitingToRetry": "Ootab uut katset",
+    "step": {
+      "editing": "Redigeerimine",
+      "reading": "Lugemine",
+      "running": "Käivitamine",
+      "searching": "Veebiotsing",
+      "thinking": "Läbimõtlemine"
+    },
+    "planOf": "viiest",
+    "filesChanged": "muudetud failid",
+    "finishedIn": "Valmis",
+    "noActivityFor": "Tegevuseta",
+    "prOpened": "Pull request avatud",
+    "permissionWants": "Soovib käivitada",
+    "failure": {
+      "provider": "Peatatud: teenusepakkuja viga",
+      "tool": "Peatatud: tööriista viga",
+      "cancelled": "Peatatud: tühistatud",
+      "other": "PEATATUD"
+    }
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",

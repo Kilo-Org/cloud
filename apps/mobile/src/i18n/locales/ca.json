@@ -136,7 +136,9 @@
     "working": "En curs",
     "yourOwnRepositories": "Els teus repositoris",
     "dismissed": "Descartat",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -847,7 +849,8 @@
       "kiloclaw": "Activitat de KiloClaw",
       "balance": "Alertes de saldo",
       "security": "Problemes de seguretat",
-      "spend": "Alertes de despesa"
+      "spend": "Alertes de despesa",
+      "followedSessions": "Sessions seguides"
     },
     "category": {
       "chatMessagesSubtitle": "respostes a les teves converses",
@@ -3206,7 +3209,26 @@
     "waitingForYou": "Esperant-te",
     "nextScheduled": "Properes programades",
     "answerNeeded": "Pendent de resposta",
-    "waitingToRetry": "Pendent de reintent"
+    "waitingToRetry": "Pendent de reintent",
+    "step": {
+      "editing": "Edició",
+      "reading": "Lectura",
+      "running": "Execució",
+      "searching": "Cerca web",
+      "thinking": "Pensant-ho bé"
+    },
+    "planOf": "de",
+    "filesChanged": "fitxers modificats",
+    "finishedIn": "Acabat en",
+    "noActivityFor": "Sense activitat durant",
+    "prOpened": "Sol·licitud d'extracció oberta",
+    "permissionWants": "Vol executar",
+    "failure": {
+      "provider": "Aturat: error del proveïdor",
+      "tool": "Aturat: error de l'eina",
+      "cancelled": "Aturat: cancel·lat",
+      "other": "ATURAT"
+    }
   },
   "transcriptionModel": {
     "title": "Model de transcripció",

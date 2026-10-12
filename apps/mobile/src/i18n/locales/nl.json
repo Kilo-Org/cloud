@@ -136,7 +136,9 @@
     "working": "Bezig",
     "yourOwnRepositories": "Je eigen coderepository's",
     "dismissed": "Genegeerd",
-    "agent": "Tussenpersoon"
+    "agent": "Tussenpersoon",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -293,7 +295,8 @@
       "kiloclaw": "KiloClaw-activiteit",
       "balance": "Saldowaarschuwingen",
       "security": "Beveiligingsbevindingen",
-      "spend": "Bestedingswaarschuwingen"
+      "spend": "Bestedingswaarschuwingen",
+      "followedSessions": "Gevolgde sessies"
     },
     "category": {
       "chatMessagesSubtitle": "antwoorden in je gesprekken",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Wacht op jou",
     "nextScheduled": "Hierna gepland",
     "answerNeeded": "Antwoord nodig",
-    "waitingToRetry": "Wacht op nieuwe poging"
+    "waitingToRetry": "Wacht op nieuwe poging",
+    "step": {
+      "editing": "Bewerken",
+      "reading": "Lezen",
+      "running": "Uitvoeren",
+      "searching": "Webzoekopdracht",
+      "thinking": "Nadenken"
+    },
+    "planOf": "van",
+    "filesChanged": "bestanden gewijzigd",
+    "finishedIn": "Voltooid in",
+    "noActivityFor": "Geen activiteit gedurende",
+    "prOpened": "Pull request geopend",
+    "permissionWants": "Wil uitvoeren",
+    "failure": {
+      "provider": "Gestopt: providerfout",
+      "tool": "Gestopt: toolfout",
+      "cancelled": "Gestopt: geannuleerd",
+      "other": "GESTOPT"
+    }
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",

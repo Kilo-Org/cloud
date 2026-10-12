@@ -136,7 +136,9 @@
     "working": "በመሥራት ላይ",
     "yourOwnRepositories": "የራስህ ማከማቻዎች",
     "dismissed": "ተወግዷል",
-    "agent": "ወኪል"
+    "agent": "ወኪል",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -831,7 +833,8 @@
       "kiloclaw": "የKiloClaw እንቅስቃሴ",
       "balance": "የቀሪ ሂሳብ ማስጠንቀቂያዎች",
       "security": "የደህንነት ግኝቶች",
-      "spend": "የወጪ ማስጠንቀቂያዎች"
+      "spend": "የወጪ ማስጠንቀቂያዎች",
+      "followedSessions": "የተከታተሉ ክፍለ ጊዜዎች"
     },
     "category": {
       "chatMessagesSubtitle": "በውይይቶችዎ ውስጥ የሚሰጡ ምላሾች",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "እርስዎን በመጠበቅ ላይ",
     "nextScheduled": "ቀጣይ የተያዙ",
     "answerNeeded": "ምላሽ ይፈልጋል",
-    "waitingToRetry": "ዳግም ለመሞከር በመጠበቅ ላይ"
+    "waitingToRetry": "ዳግም ለመሞከር በመጠበቅ ላይ",
+    "step": {
+      "editing": "በማረም ላይ",
+      "reading": "በማንበብ ላይ",
+      "running": "መሮጥ",
+      "searching": "የድር ፍለጋ",
+      "thinking": "በማሰብ ላይ"
+    },
+    "planOf": "ከ",
+    "filesChanged": "ፋይሎች ተቀይረዋል",
+    "finishedIn": "ተጠናቅቋል በ",
+    "noActivityFor": "ምንም እንቅስቃሴ ለ",
+    "prOpened": "የመጎተቻ ጥያቄ ተከፍቷል",
+    "permissionWants": "ለማሄድ ይፈልጋል",
+    "failure": {
+      "provider": "ቆመ: የአቅራቢ ስህተት",
+      "tool": "ቆመ: የመሳሪያ ስህተት",
+      "cancelled": "ቆመ: ተሰርዟል",
+      "other": "ቆሟል"
+    }
   },
   "transcriptionModel": {
     "title": "የድምጽ ወደ ጽሑፍ ሞዴል",

@@ -136,7 +136,9 @@
     "working": "Besig",
     "yourOwnRepositories": "Jou eie bewaarplekke",
     "dismissed": "Verwerp",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw-aktiwiteit",
       "balance": "Saldowaarskuwings",
       "security": "Sekuriteitsbevindings",
-      "spend": "Bestedingswaarskuwings"
+      "spend": "Bestedingswaarskuwings",
+      "followedSessions": "Gevolgde sessies"
     },
     "category": {
       "chatMessagesSubtitle": "antwoorde in jou gesprekke",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Wag vir jou",
     "nextScheduled": "Volgende geskeduleerde",
     "answerNeeded": "Antwoord nodig",
-    "waitingToRetry": "Wag om weer te probeer"
+    "waitingToRetry": "Wag om weer te probeer",
+    "step": {
+      "editing": "Wysig",
+      "reading": "Lees",
+      "running": "Hardloop",
+      "searching": "Websoektog",
+      "thinking": "Dink dit deur"
+    },
+    "planOf": "van",
+    "filesChanged": "lêers verander",
+    "finishedIn": "Klaar in",
+    "noActivityFor": "Geen aktiwiteit vir",
+    "prOpened": "Trekversoek oopgemaak",
+    "permissionWants": "Wil uitvoer",
+    "failure": {
+      "provider": "Gestop: verskafferfout",
+      "tool": "Gestop: gereedskapfout",
+      "cancelled": "Gestop: gekanselleer",
+      "other": "GESTAAK"
+    }
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",

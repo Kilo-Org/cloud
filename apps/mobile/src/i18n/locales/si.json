@@ -136,7 +136,9 @@
     "working": "ක්‍රියාත්මකයි",
     "yourOwnRepositories": "ඔබේම කේත ගබඩා",
     "dismissed": "ඉවතලා ඇත",
-    "agent": "නියෝජිතයා"
+    "agent": "නියෝජිතයා",
+    "durationMinuteShort": "මිනි",
+    "durationHourShort": "පැය"
   },
   "language": {
     "restarting": "භාෂාව යෙදීමට නැවත ආරම්භ කරමින්",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw ක්‍රියාකාරකම්",
       "balance": "ශේෂය පිළිබඳ ඇඟවීම්",
       "security": "හඳුනාගත් ආරක්ෂක ගැටලු",
-      "spend": "වියදම් දැනුම්දීම්"
+      "spend": "වියදම් දැනුම්දීම්",
+      "followedSessions": "අනුගමනය කරන සැසි"
     },
     "category": {
       "chatMessagesSubtitle": "ඔබේ සංවාදවල පිළිතුරු",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "ඔබේ ප්‍රතිචාරය එනතුරු",
     "nextScheduled": "ඊළඟ නියමිත කාර්යයන්",
     "answerNeeded": "පිළිතුරක් අවශ්‍යයි",
-    "waitingToRetry": "නැවත උත්සාහ කිරීමට රැඳී සිටී"
+    "waitingToRetry": "නැවත උත්සාහ කිරීමට රැඳී සිටී",
+    "step": {
+      "editing": "සංස්කරණය",
+      "reading": "කියවීම",
+      "running": "ක්‍රියාත්මක කිරීම",
+      "searching": "වෙබ් සෙවීම",
+      "thinking": "සිතා බැලීම"
+    },
+    "planOf": "න්",
+    "filesChanged": "ගොනු වෙනස් විය",
+    "finishedIn": "අවසන් විය",
+    "noActivityFor": "ක්‍රියාකාරකම් නැත",
+    "prOpened": "Pull request විවෘත කරන ලදී",
+    "permissionWants": "ක්‍රියාත්මක කිරීමට අවශ්‍යයි",
+    "failure": {
+      "provider": "නතර විය: සපයන්නාගේ දෝෂය",
+      "tool": "නතර විය: මෙවලම් දෝෂය",
+      "cancelled": "නතර විය: අවලංගු කරන ලදී",
+      "other": "නතර කර ඇත"
+    }
   },
   "transcriptionModel": {
     "title": "හඬ පෙළට හරවන ආකෘතිය",

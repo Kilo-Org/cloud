@@ -136,7 +136,9 @@
     "working": "Työn alla",
     "yourOwnRepositories": "Omat koodivarastosi",
     "dismissed": "Sivuutettu",
-    "agent": "Agentti"
+    "agent": "Agentti",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw-tapahtumat",
       "balance": "Saldoilmoitukset",
       "security": "Tietoturvahavainnot",
-      "spend": "Kulutusvaroitukset"
+      "spend": "Kulutusvaroitukset",
+      "followedSessions": "Seuratut istunnot"
     },
     "category": {
       "chatMessagesSubtitle": "vastaukset keskusteluissasi",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Odottaa sinua",
     "nextScheduled": "Seuraavaksi ajastetut",
     "answerNeeded": "Odottaa vastausta",
-    "waitingToRetry": "Odottaa uutta yritystä"
+    "waitingToRetry": "Odottaa uutta yritystä",
+    "step": {
+      "editing": "Muokkaus",
+      "reading": "Lukeminen",
+      "running": "Suoritus",
+      "searching": "Verkkohaku",
+      "thinking": "Pohdinta"
+    },
+    "planOf": "viidestä",
+    "filesChanged": "tiedostoa muutettu",
+    "finishedIn": "Valmis",
+    "noActivityFor": "Ei toimintaa",
+    "prOpened": "Pull request avattu",
+    "permissionWants": "Haluaa suorittaa",
+    "failure": {
+      "provider": "Pysäytetty: tarjoajan virhe",
+      "tool": "Pysäytetty: työkalun virhe",
+      "cancelled": "Pysäytetty: peruutettu",
+      "other": "PYSÄYTETTY"
+    }
   },
   "transcriptionModel": {
     "title": "Puheentunnistusmalli",

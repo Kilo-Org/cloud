@@ -136,7 +136,9 @@
     "working": "काम जारी",
     "yourOwnRepositories": "आपकी अपनी रिपॉज़िटरी",
     "dismissed": "खारिज",
-    "agent": "प्रतिनिधि"
+    "agent": "प्रतिनिधि",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "भाषा बदलने के लिए ऐप फिर से शुरू हो रहा है",
@@ -320,7 +322,8 @@
       "kiloclaw": "KiloClaw की गतिविधि",
       "balance": "बैलेंस की चेतावनियाँ",
       "security": "सुरक्षा संबंधी समस्याएँ",
-      "spend": "खर्च की चेतावनियाँ"
+      "spend": "खर्च की चेतावनियाँ",
+      "followedSessions": "फ़ॉलो किए गए सत्र"
     },
     "category": {
       "chatMessagesSubtitle": "आपकी बातचीत में उत्तर",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "आपका इंतज़ार",
     "nextScheduled": "अगले निर्धारित",
     "answerNeeded": "जवाब चाहिए",
-    "waitingToRetry": "फिर कोशिश का इंतज़ार"
+    "waitingToRetry": "फिर कोशिश का इंतज़ार",
+    "step": {
+      "editing": "संपादन",
+      "reading": "पढ़ना",
+      "running": "चलाएँ",
+      "searching": "वेब खोज",
+      "thinking": "गहराई से सोच"
+    },
+    "planOf": "में से",
+    "filesChanged": "फ़ाइलें बदलीं",
+    "finishedIn": "में पूरा हुआ",
+    "noActivityFor": "कोई गतिविधि नहीं",
+    "prOpened": "पुल रिक्वेस्ट खुली",
+    "permissionWants": "चलाना चाहता है",
+    "failure": {
+      "provider": "रुका: प्रदाता त्रुटि",
+      "tool": "रुका: टूल त्रुटि",
+      "cancelled": "रुका: रद्द किया गया",
+      "other": "रुका हुआ"
+    }
   },
   "transcriptionModel": {
     "title": "आवाज़ को टेक्स्ट में बदलने का मॉडल",

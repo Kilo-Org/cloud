@@ -136,7 +136,9 @@
     "working": "Во тек",
     "yourOwnRepositories": "Твоите репозиториуми",
     "dismissed": "Отфрлено",
-    "agent": "Агент"
+    "agent": "Агент",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Се рестартира за да се примени јазикот",
@@ -831,7 +833,8 @@
       "kiloclaw": "Активност на KiloClaw",
       "balance": "Предупредувања за салдо",
       "security": "Безбедносни наоди",
-      "spend": "Предупредувања за трошење"
+      "spend": "Предупредувања за трошење",
+      "followedSessions": "Следени сесии"
     },
     "category": {
       "chatMessagesSubtitle": "одговори во твоите разговори",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Чека на вас",
     "nextScheduled": "Следни закажани",
     "answerNeeded": "Потребен е одговор",
-    "waitingToRetry": "Чека повторен обид"
+    "waitingToRetry": "Чека повторен обид",
+    "step": {
+      "editing": "Уредување",
+      "reading": "Читање",
+      "running": "Извршување",
+      "searching": "Пребарување на веб",
+      "thinking": "Размислување"
+    },
+    "planOf": "од",
+    "filesChanged": "променети датотеки",
+    "finishedIn": "Завршено за",
+    "noActivityFor": "Нема активност за",
+    "prOpened": "Отворено барање за повлекување",
+    "permissionWants": "Сака да изврши",
+    "failure": {
+      "provider": "Запрено: грешка кај провајдерот",
+      "tool": "Запрено: грешка во алатката",
+      "cancelled": "Запрено: откажано",
+      "other": "ЗАПРЕНО"
+    }
   },
   "transcriptionModel": {
     "title": "Модел за транскрипција",

@@ -136,7 +136,9 @@
     "working": "Fix-xogħol",
     "yourOwnRepositories": "Ir-repożitorji tiegħek stess",
     "dismissed": "Imwarrba",
-    "agent": "Aġent"
+    "agent": "Aġent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -879,7 +881,8 @@
       "kiloclaw": "Attività ta' KiloClaw",
       "balance": "Twissijiet tal-bilanċ",
       "security": "Sejbiet tas-sigurtà",
-      "spend": "Twissijiet tal-infiq"
+      "spend": "Twissijiet tal-infiq",
+      "followedSessions": "Sessjonijiet segwiti"
     },
     "category": {
       "chatMessagesSubtitle": "tweġibiet fil-konversazzjonijiet tiegħek",
@@ -3288,7 +3291,26 @@
     "waitingForYou": "Jistenna lilek",
     "nextScheduled": "Ipprogrammati li jmiss",
     "answerNeeded": "Tweġiba meħtieġa",
-    "waitingToRetry": "Jistenna biex jerġa’ jipprova"
+    "waitingToRetry": "Jistenna biex jerġa’ jipprova",
+    "step": {
+      "editing": "Editjar",
+      "reading": "Qari",
+      "running": "Ħaddem",
+      "searching": "Fittxija fuq il-web",
+      "thinking": "Qed jaħseb"
+    },
+    "planOf": "minn",
+    "filesChanged": "fajls mibdula",
+    "finishedIn": "Lest fi",
+    "noActivityFor": "L-ebda attività għal",
+    "prOpened": "Pull request miftuħa",
+    "permissionWants": "Jixtieq iħaddem",
+    "failure": {
+      "provider": "Waqaf: żball tal-fornitur",
+      "tool": "Waqaf: żball tal-għodda",
+      "cancelled": "Waqaf: ikkanċellat",
+      "other": "WAQFET"
+    }
   },
   "transcriptionModel": {
     "title": "Mudell ta' traskrizzjoni",

@@ -136,7 +136,9 @@
     "working": "處理中",
     "yourOwnRepositories": "你自己的存放庫",
     "dismissed": "已忽略",
-    "agent": "代理人"
+    "agent": "代理人",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -320,7 +322,8 @@
       "kiloclaw": "KiloClaw 活動",
       "balance": "餘額提醒",
       "security": "資安問題",
-      "spend": "支出提醒"
+      "spend": "支出提醒",
+      "followedSessions": "已關注的會話"
     },
     "category": {
       "chatMessagesSubtitle": "對話中的回覆",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "等待你回應",
     "nextScheduled": "下次排程",
     "answerNeeded": "等待回答",
-    "waitingToRetry": "等待重試"
+    "waitingToRetry": "等待重試",
+    "step": {
+      "editing": "編輯中",
+      "reading": "讀取中",
+      "running": "執行",
+      "searching": "網頁搜尋",
+      "thinking": "正在思考"
+    },
+    "planOf": "/",
+    "filesChanged": "個檔案已變更",
+    "finishedIn": "耗時",
+    "noActivityFor": "無活動",
+    "prOpened": "拉取請求已開啟",
+    "permissionWants": "想要執行",
+    "failure": {
+      "provider": "已停止：供應商錯誤",
+      "tool": "已停止：工具錯誤",
+      "cancelled": "已停止：已取消",
+      "other": "已停止"
+    }
   },
   "transcriptionModel": {
     "title": "轉錄模型",

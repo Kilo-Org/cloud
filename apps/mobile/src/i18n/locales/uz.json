@@ -136,7 +136,9 @@
     "working": "Ishlamoqda",
     "yourOwnRepositories": "O‘zingizga tegishli repozitoriylar",
     "dismissed": "E’tiborsiz qoldirilgan",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "daq",
+    "durationHourShort": "soat"
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw faoliyati",
       "balance": "Balans haqida ogohlantirishlar",
       "security": "Aniqlangan xavfsizlik muammolari",
-      "spend": "Xarajat bildirishnomalari"
+      "spend": "Xarajat bildirishnomalari",
+      "followedSessions": "Kuzatilayotgan seanslar"
     },
     "category": {
       "chatMessagesSubtitle": "suhbatlaringizdagi javoblar",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Sizni kutmoqda",
     "nextScheduled": "Keyingi rejalashtirilganlar",
     "answerNeeded": "Javob kutilmoqda",
-    "waitingToRetry": "Qayta urinish kutilmoqda"
+    "waitingToRetry": "Qayta urinish kutilmoqda",
+    "step": {
+      "editing": "Tahrirlanmoqda",
+      "reading": "O'qilmoqda",
+      "running": "Ishga tushirish",
+      "searching": "Veb qidiruv",
+      "thinking": "O'ylab ko'rmoqda"
+    },
+    "planOf": "/",
+    "filesChanged": "fayl o'zgardi",
+    "finishedIn": "Tugatish vaqti",
+    "noActivityFor": "Faoliyat yo'q",
+    "prOpened": "Pull request ochildi",
+    "permissionWants": "Ishga tushirmoqchi",
+    "failure": {
+      "provider": "To'xtatildi: provayder xatosi",
+      "tool": "To'xtatildi: vosita xatosi",
+      "cancelled": "To'xtatildi: bekor qilindi",
+      "other": "TO'XTATILGAN"
+    }
   },
   "transcriptionModel": {
     "title": "Matnga aylantirish modeli",

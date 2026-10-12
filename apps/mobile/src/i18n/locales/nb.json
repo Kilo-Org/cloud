@@ -136,7 +136,9 @@
     "working": "Jobber",
     "yourOwnRepositories": "Dine egne kodelagre",
     "dismissed": "Avvist",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarsler",
       "security": "Sikkerhetsfunn",
-      "spend": "Forbruksvarsler"
+      "spend": "Forbruksvarsler",
+      "followedSessions": "Fulgte økter"
     },
     "category": {
       "chatMessagesSubtitle": "svar i samtalene dine",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Venter på deg",
     "nextScheduled": "Neste planlagte",
     "answerNeeded": "Venter på svar",
-    "waitingToRetry": "Venter på nytt forsøk"
+    "waitingToRetry": "Venter på nytt forsøk",
+    "step": {
+      "editing": "Redigerer",
+      "reading": "Leser",
+      "running": "Kjører",
+      "searching": "Nettsøk",
+      "thinking": "Tenker gjennom"
+    },
+    "planOf": "av",
+    "filesChanged": "filer endret",
+    "finishedIn": "Fullført på",
+    "noActivityFor": "Ingen aktivitet i",
+    "prOpened": "Pull request åpnet",
+    "permissionWants": "Vil kjøre",
+    "failure": {
+      "provider": "Stoppet: leverandørfeil",
+      "tool": "Stoppet: verktøyfeil",
+      "cancelled": "Stoppet: avbrutt",
+      "other": "STOPPET"
+    }
   },
   "transcriptionModel": {
     "title": "Transkripsjonsmodell",

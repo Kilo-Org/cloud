@@ -136,7 +136,9 @@
     "working": "În lucru",
     "yourOwnRepositories": "Depozitele tale de cod",
     "dismissed": "Ignorată",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -847,7 +849,8 @@
       "kiloclaw": "Activitate KiloClaw",
       "balance": "Alerte privind soldul",
       "security": "Probleme de securitate detectate",
-      "spend": "Alerte de cheltuieli"
+      "spend": "Alerte de cheltuieli",
+      "followedSessions": "Sesiuni urmărite"
     },
     "category": {
       "chatMessagesSubtitle": "răspunsuri în conversațiile tale",
@@ -3206,7 +3209,26 @@
     "waitingForYou": "Te așteaptă",
     "nextScheduled": "Următoarele programate",
     "answerNeeded": "Așteaptă un răspuns",
-    "waitingToRetry": "Așteaptă reîncercarea"
+    "waitingToRetry": "Așteaptă reîncercarea",
+    "step": {
+      "editing": "Editare",
+      "reading": "Citire",
+      "running": "Rulare",
+      "searching": "Căutare web",
+      "thinking": "Analizează"
+    },
+    "planOf": "din",
+    "filesChanged": "fișiere modificate",
+    "finishedIn": "Finalizat în",
+    "noActivityFor": "Fără activitate de",
+    "prOpened": "Pull request deschis",
+    "permissionWants": "Vrea să ruleze",
+    "failure": {
+      "provider": "Oprit: eroare furnizor",
+      "tool": "Oprit: eroare instrument",
+      "cancelled": "Oprit: anulat",
+      "other": "OPRIT"
+    }
   },
   "transcriptionModel": {
     "title": "Model de transcriere",

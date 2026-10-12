@@ -136,7 +136,9 @@
     "working": "בפעולה",
     "yourOwnRepositories": "המאגרים שלך",
     "dismissed": "סומן להתעלמות",
-    "agent": "סוֹכֵן"
+    "agent": "סוֹכֵן",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -320,7 +322,8 @@
       "kiloclaw": "פעילות KiloClaw",
       "balance": "התראות על היתרה",
       "security": "ממצאי אבטחה",
-      "spend": "התראות הוצאות"
+      "spend": "התראות הוצאות",
+      "followedSessions": "הפעלות במעקב"
     },
     "category": {
       "chatMessagesSubtitle": "תשובות בשיחות שלך",
@@ -3206,7 +3209,26 @@
     "waitingForYou": "ממתין לך",
     "nextScheduled": "התזמונים הבאים",
     "answerNeeded": "נדרשת תשובה",
-    "waitingToRetry": "ממתין לניסיון חוזר"
+    "waitingToRetry": "ממתין לניסיון חוזר",
+    "step": {
+      "editing": "עריכה",
+      "reading": "קריאה",
+      "running": "הרצה",
+      "searching": "חיפוש באינטרנט",
+      "thinking": "חשיבה מעמיקה"
+    },
+    "planOf": "מתוך",
+    "filesChanged": "קבצים שונו",
+    "finishedIn": "הסתיים תוך",
+    "noActivityFor": "אין פעילות במשך",
+    "prOpened": "בקשת משיכה נפתחה",
+    "permissionWants": "רוצה להריץ",
+    "failure": {
+      "provider": "נעצר: שגיאת ספק",
+      "tool": "נעצר: שגיאת כלי",
+      "cancelled": "נעצר: בוטל",
+      "other": "עצור"
+    }
   },
   "transcriptionModel": {
     "title": "מודל תמלול",

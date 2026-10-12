@@ -136,7 +136,9 @@
     "working": "Dolgozik",
     "yourOwnRepositories": "Saját adattáraid",
     "dismissed": "Elvetve",
-    "agent": "Ügynök"
+    "agent": "Ügynök",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw-tevékenység",
       "balance": "Egyenlegértesítések",
       "security": "Biztonsági találatok",
-      "spend": "Költésfigyelmeztetések"
+      "spend": "Költésfigyelmeztetések",
+      "followedSessions": "Követett munkamenetek"
     },
     "category": {
       "chatMessagesSubtitle": "válaszok a beszélgetéseidben",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Rád vár",
     "nextScheduled": "Következő ütemezések",
     "answerNeeded": "Válaszra vár",
-    "waitingToRetry": "Újrapróbálkozásra vár"
+    "waitingToRetry": "Újrapróbálkozásra vár",
+    "step": {
+      "editing": "Szerkesztés",
+      "reading": "Olvasás",
+      "running": "Futtatás",
+      "searching": "Webes keresés",
+      "thinking": "Végiggondolás"
+    },
+    "planOf": "/",
+    "filesChanged": "módosított fájl",
+    "finishedIn": "Befejezve",
+    "noActivityFor": "Nincs aktivitás",
+    "prOpened": "Pull request megnyitva",
+    "permissionWants": "Futtatni szeretne",
+    "failure": {
+      "provider": "Leállt: szolgáltatói hiba",
+      "tool": "Leállt: eszközhiba",
+      "cancelled": "Leállt: megszakítva",
+      "other": "LEÁLLÍTVA"
+    }
   },
   "transcriptionModel": {
     "title": "Átírási modell",

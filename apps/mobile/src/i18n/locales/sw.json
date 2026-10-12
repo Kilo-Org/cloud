@@ -136,7 +136,9 @@
     "working": "Inafanya kazi",
     "yourOwnRepositories": "Hazina zako mwenyewe",
     "dismissed": "Imepuuzwa",
-    "agent": "Wakala"
+    "agent": "Wakala",
+    "durationMinuteShort": "dk",
+    "durationHourShort": "saa"
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -831,7 +833,8 @@
       "kiloclaw": "Shughuli za KiloClaw",
       "balance": "Tahadhari za salio",
       "security": "Matokeo ya ukaguzi wa usalama",
-      "spend": "Tahadhari za matumizi"
+      "spend": "Tahadhari za matumizi",
+      "followedSessions": "Vikao vinavyofuatiliwa"
     },
     "category": {
       "chatMessagesSubtitle": "majibu kwenye mazungumzo yako",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Inakusubiri",
     "nextScheduled": "Zilizopangwa zinazofuata",
     "answerNeeded": "Inasubiri jibu",
-    "waitingToRetry": "Inasubiri kujaribu tena"
+    "waitingToRetry": "Inasubiri kujaribu tena",
+    "step": {
+      "editing": "Kuhariri",
+      "reading": "Kusoma",
+      "running": "Kuendesha",
+      "searching": "Utafutaji wa wavuti",
+      "thinking": "Kufikiri kwa kina"
+    },
+    "planOf": "kati ya",
+    "filesChanged": "faili zilizobadilishwa",
+    "finishedIn": "Imekamilika kwa",
+    "noActivityFor": "Hakuna shughuli kwa",
+    "prOpened": "Ombi la kuvuta limefunguliwa",
+    "permissionWants": "Inataka kuendesha",
+    "failure": {
+      "provider": "Imesimama: hitilafu ya mtoa huduma",
+      "tool": "Imesimama: hitilafu ya zana",
+      "cancelled": "Imesimama: imeghairiwa",
+      "other": "IMESIMAMA"
+    }
   },
   "transcriptionModel": {
     "title": "Modeli ya unukuzi",

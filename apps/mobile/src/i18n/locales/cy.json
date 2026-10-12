@@ -136,7 +136,9 @@
     "working": "Yn gweithio",
     "yourOwnRepositories": "Dy ystorfeydd dy hun",
     "dismissed": "Wedi'i ddiystyru",
-    "agent": "Asiant"
+    "agent": "Asiant",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -895,7 +897,8 @@
       "kiloclaw": "Gweithgaredd KiloClaw",
       "balance": "Rhybuddion balans",
       "security": "Canfyddiadau diogelwch",
-      "spend": "Rhybuddion gwariant"
+      "spend": "Rhybuddion gwariant",
+      "followedSessions": "Sesiynau a ddilynir"
     },
     "category": {
       "chatMessagesSubtitle": "atebion yn eich sgyrsiau",
@@ -3329,7 +3332,26 @@
     "waitingForYou": "Yn aros amdanoch",
     "nextScheduled": "Nesaf ar yr amserlen",
     "answerNeeded": "Angen ateb",
-    "waitingToRetry": "Yn aros i ailgeisio"
+    "waitingToRetry": "Yn aros i ailgeisio",
+    "step": {
+      "editing": "Golygu",
+      "reading": "Darllen",
+      "running": "Rhedeg",
+      "searching": "Chwilio'r we",
+      "thinking": "Meddwl drwyddo"
+    },
+    "planOf": "o",
+    "filesChanged": "ffeiliau wedi newid",
+    "finishedIn": "Gorffen mewn",
+    "noActivityFor": "Dim gweithgaredd am",
+    "prOpened": "Cais tynnu wedi agor",
+    "permissionWants": "Eisiau rhedeg",
+    "failure": {
+      "provider": "Wedi stopio: gwall darparwr",
+      "tool": "Wedi stopio: gwall offeryn",
+      "cancelled": "Wedi stopio: wedi canslo",
+      "other": "WEDI STOPIO"
+    }
   },
   "transcriptionModel": {
     "title": "Model trawsgrifio",

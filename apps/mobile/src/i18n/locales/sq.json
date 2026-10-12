@@ -136,7 +136,9 @@
     "working": "Duke punuar",
     "yourOwnRepositories": "Depot e tua",
     "dismissed": "E hedhur poshtë",
-    "agent": "Agjenti"
+    "agent": "Agjenti",
+    "durationMinuteShort": "min",
+    "durationHourShort": "orë"
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -831,7 +833,8 @@
       "kiloclaw": "Aktiviteti i KiloClaw",
       "balance": "Njoftimet për gjendjen e llogarisë",
       "security": "Gjetjet e sigurisë",
-      "spend": "Njoftime për shpenzimet"
+      "spend": "Njoftime për shpenzimet",
+      "followedSessions": "Sesione të ndjekura"
     },
     "category": {
       "chatMessagesSubtitle": "përgjigje në bisedat e tua",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Pret ty",
     "nextScheduled": "Të planifikuara në vijim",
     "answerNeeded": "Pret përgjigje",
-    "waitingToRetry": "Në pritje për të riprovuar"
+    "waitingToRetry": "Në pritje për të riprovuar",
+    "step": {
+      "editing": "Duke redaktuar",
+      "reading": "Duke lexuar",
+      "running": "Ekzekutim",
+      "searching": "Kërkim në web",
+      "thinking": "Duke e menduar"
+    },
+    "planOf": "nga",
+    "filesChanged": "skedarë të ndryshuar",
+    "finishedIn": "Përfundoi në",
+    "noActivityFor": "Pa aktivitet për",
+    "prOpened": "U hap kërkesa për tërheqje",
+    "permissionWants": "Dëshiron të ekzekutojë",
+    "failure": {
+      "provider": "U ndal: gabim ofruesi",
+      "tool": "U ndal: gabim mjeti",
+      "cancelled": "U ndal: anuluar",
+      "other": "U NDAL"
+    }
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",

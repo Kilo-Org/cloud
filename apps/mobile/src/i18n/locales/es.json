@@ -136,7 +136,9 @@
     "working": "Trabajando",
     "yourOwnRepositories": "Tus propios repositorios",
     "dismissed": "Descartado",
-    "agent": "Agente"
+    "agent": "Agente",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Reiniciando para aplicar el idioma",
@@ -293,7 +295,8 @@
       "kiloclaw": "Actividad de KiloClaw",
       "balance": "Alertas de saldo",
       "security": "Hallazgos de seguridad",
-      "spend": "Alertas de gasto"
+      "spend": "Alertas de gasto",
+      "followedSessions": "Sesiones seguidas"
     },
     "category": {
       "chatMessagesSubtitle": "respuestas en tus conversaciones",
@@ -3206,7 +3209,26 @@
     "waitingForYou": "En espera de tu respuesta",
     "nextScheduled": "Próximas programadas",
     "answerNeeded": "En espera de respuesta",
-    "waitingToRetry": "En espera de reintento"
+    "waitingToRetry": "En espera de reintento",
+    "step": {
+      "editing": "Editando",
+      "reading": "Leyendo",
+      "running": "Ejecutar",
+      "searching": "Búsqueda web",
+      "thinking": "Pensando a fondo"
+    },
+    "planOf": "de",
+    "filesChanged": "archivos modificados",
+    "finishedIn": "Terminado en",
+    "noActivityFor": "Sin actividad durante",
+    "prOpened": "Pull request abierto",
+    "permissionWants": "Quiere ejecutar",
+    "failure": {
+      "provider": "Detenido: error del proveedor",
+      "tool": "Detenido: error de herramienta",
+      "cancelled": "Detenido: cancelado",
+      "other": "DETENIDO"
+    }
   },
   "transcriptionModel": {
     "title": "Modelo de transcripción",

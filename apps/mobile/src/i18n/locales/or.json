@@ -136,7 +136,9 @@
     "working": "କାମ କରୁଛି",
     "yourOwnRepositories": "ଆପଣଙ୍କ ନିଜ ରିପୋଜିଟୋରୀ",
     "dismissed": "ଖାରଜ ହୋଇଛି",
-    "agent": "ଏଜେଣ୍ଟ।"
+    "agent": "ଏଜେଣ୍ଟ।",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "ଭାଷା ବଦଳାଇବାକୁ ଆପ୍ ପୁଣି ଆରମ୍ଭ ହେଉଛି",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw କାର୍ଯ୍ୟକଳାପ",
       "balance": "ଅବଶିଷ୍ଟ ରାଶି ସମ୍ବନ୍ଧୀୟ ସତର୍କ ସୂଚନା",
       "security": "ଚିହ୍ନଟ ସୁରକ୍ଷା ସମସ୍ୟା",
-      "spend": "ଖର୍ଚ୍ଚ ସତର୍କତା"
+      "spend": "ଖର୍ଚ୍ଚ ସତର୍କତା",
+      "followedSessions": "ଅନୁସରଣ କରାଯାଇଥିବା ସେସନ"
     },
     "category": {
       "chatMessagesSubtitle": "ଆପଣଙ୍କ ବାର୍ତ୍ତାଳାପର ଉତ୍ତର",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "ଆପଣଙ୍କ ଅପେକ୍ଷାରେ",
     "nextScheduled": "ପରବର୍ତ୍ତୀ ନିର୍ଧାରିତ",
     "answerNeeded": "ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ",
-    "waitingToRetry": "ପୁନଃଚେଷ୍ଟା ଅପେକ୍ଷାରେ"
+    "waitingToRetry": "ପୁନଃଚେଷ୍ଟା ଅପେକ୍ଷାରେ",
+    "step": {
+      "editing": "ସମ୍ପାଦନ କରୁଛି",
+      "reading": "ପଢ଼ୁଛି",
+      "running": "ଚାଲୁଛି",
+      "searching": "ୱେବ ସନ୍ଧାନ",
+      "thinking": "ଚିନ୍ତା କରୁଛି"
+    },
+    "planOf": "ମଧ୍ୟରୁ",
+    "filesChanged": "ଫାଇଲ ବଦଳିଛି",
+    "finishedIn": "ସମାପ୍ତ",
+    "noActivityFor": "କୌଣସି କାର୍ଯ୍ୟକଳାପ ନାହିଁ",
+    "prOpened": "ପୁଲ ରିକ୍ୱେଷ୍ଟ ଖୋଲାଗଲା",
+    "permissionWants": "ଚଲାଇବାକୁ ଚାହେଁ",
+    "failure": {
+      "provider": "ବନ୍ଦ: ପ୍ରୋଭାଇଡର ତ୍ରୁଟି",
+      "tool": "ବନ୍ଦ: ଟୁଲ ତ୍ରୁଟି",
+      "cancelled": "ବନ୍ଦ: ବାତିଲ",
+      "other": "ବନ୍ଦ"
+    }
   },
   "transcriptionModel": {
     "title": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର ମଡେଲ୍",

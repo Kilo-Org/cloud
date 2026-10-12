@@ -136,7 +136,9 @@
     "working": "పని జరుగుతోంది",
     "yourOwnRepositories": "మీ స్వంత రిపోజిటరీలు",
     "dismissed": "విస్మరించారు",
-    "agent": "ఏజెంట్"
+    "agent": "ఏజెంట్",
+    "durationMinuteShort": "నిమి",
+    "durationHourShort": "గం"
   },
   "language": {
     "restarting": "ఎంచుకున్న భాషను వర్తింపజేయడానికి పునఃప్రారంభిస్తోంది",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw కార్యకలాపాలు",
       "balance": "బ్యాలెన్స్ హెచ్చరికలు",
       "security": "గుర్తించిన భద్రతా సమస్యలు",
-      "spend": "ఖర్చు హెచ్చరికలు"
+      "spend": "ఖర్చు హెచ్చరికలు",
+      "followedSessions": "ఫాలో చేసిన సెషన్లు"
     },
     "category": {
       "chatMessagesSubtitle": "మీ సంభాషణలలో ప్రత్యుత్తరాలు",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "మీ కోసం వేచి ఉంది",
     "nextScheduled": "తదుపరి షెడ్యూల్",
     "answerNeeded": "మీ సమాధానం అవసరం",
-    "waitingToRetry": "మళ్లీ ప్రయత్నించడానికి వేచి ఉంది"
+    "waitingToRetry": "మళ్లీ ప్రయత్నించడానికి వేచి ఉంది",
+    "step": {
+      "editing": "సవరణ",
+      "reading": "చదవడం",
+      "running": "అమలు",
+      "searching": "వెబ్ శోధన",
+      "thinking": "ఆలోచించడం"
+    },
+    "planOf": "లో",
+    "filesChanged": "ఫైళ్లు మారాయి",
+    "finishedIn": "పూర్తయింది",
+    "noActivityFor": "కార్యాచరణ లేదు",
+    "prOpened": "పుల్ రిక్వెస్ట్ తెరవబడింది",
+    "permissionWants": "అమలు చేయాలనుకుంటోంది",
+    "failure": {
+      "provider": "ఆగింది: ప్రొవైడర్ లోపం",
+      "tool": "ఆగింది: సాధన లోపం",
+      "cancelled": "ఆగింది: రద్దు చేయబడింది",
+      "other": "ఆగింది"
+    }
   },
   "transcriptionModel": {
     "title": "వచనంగా మార్చే మోడల్",

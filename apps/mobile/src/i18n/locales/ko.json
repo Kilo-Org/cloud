@@ -136,7 +136,9 @@
     "working": "작업 중",
     "yourOwnRepositories": "내 저장소",
     "dismissed": "무시됨",
-    "agent": "대리인"
+    "agent": "대리인",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -320,7 +322,8 @@
       "kiloclaw": "KiloClaw 활동",
       "balance": "잔액 알림",
       "security": "보안 진단 결과",
-      "spend": "지출 알림"
+      "spend": "지출 알림",
+      "followedSessions": "팔로우한 세션"
     },
     "category": {
       "chatMessagesSubtitle": "대화에 달린 답장",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "사용자 응답 대기",
     "nextScheduled": "다음 예약",
     "answerNeeded": "답변 필요",
-    "waitingToRetry": "재시도 대기"
+    "waitingToRetry": "재시도 대기",
+    "step": {
+      "editing": "편집 중",
+      "reading": "읽는 중",
+      "running": "실행",
+      "searching": "웹 검색",
+      "thinking": "생각 중"
+    },
+    "planOf": "중",
+    "filesChanged": "파일 변경됨",
+    "finishedIn": "완료 시간",
+    "noActivityFor": "활동 없음",
+    "prOpened": "풀 리퀘스트 열림",
+    "permissionWants": "실행하려 함",
+    "failure": {
+      "provider": "중지됨: 공급자 오류",
+      "tool": "중지됨: 도구 오류",
+      "cancelled": "중지됨: 취소됨",
+      "other": "중지됨"
+    }
   },
   "transcriptionModel": {
     "title": "음성 텍스트 변환 모델",

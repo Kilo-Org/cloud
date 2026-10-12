@@ -136,7 +136,9 @@
     "working": "İşləyir",
     "yourOwnRepositories": "Öz repozitoriyaların",
     "dismissed": "Rədd edilib",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw fəaliyyəti",
       "balance": "Balans bildirişləri",
       "security": "Təhlükəsizlik problemləri",
-      "spend": "Xərc bildirişləri"
+      "spend": "Xərc bildirişləri",
+      "followedSessions": "İzlənilən sessiyalar"
     },
     "category": {
       "chatMessagesSubtitle": "söhbətlərindəki cavablar",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Sizi gözləyir",
     "nextScheduled": "Növbəti planlaşdırılanlar",
     "answerNeeded": "Cavab gözləyir",
-    "waitingToRetry": "Təkrar cəhd gözlənilir"
+    "waitingToRetry": "Təkrar cəhd gözlənilir",
+    "step": {
+      "editing": "Redaktə",
+      "reading": "Oxu",
+      "running": "İşləyir",
+      "searching": "Veb axtarış",
+      "thinking": "Dərindən düşünür"
+    },
+    "planOf": "dən",
+    "filesChanged": "fayl dəyişdi",
+    "finishedIn": "Tamamlandı",
+    "noActivityFor": "Fəaliyyət yoxdur",
+    "prOpened": "Çəkmə sorğusu açıldı",
+    "permissionWants": "İşlətmək istəyir",
+    "failure": {
+      "provider": "Dayandı: provayder xətası",
+      "tool": "Dayandı: alət xətası",
+      "cancelled": "Dayandı: ləğv edildi",
+      "other": "DAYANDIRILIB"
+    }
   },
   "transcriptionModel": {
     "title": "Səsin mətnə çevrilməsi modeli",

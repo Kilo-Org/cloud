@@ -136,7 +136,9 @@
     "working": "მუშაობს",
     "yourOwnRepositories": "შენი რეპოზიტორიები",
     "dismissed": "უგულებელყოფილია",
-    "agent": "აგენტი"
+    "agent": "აგენტი",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "ენის შესაცვლელად აპი ხელახლა იტვირთება",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw-ის აქტივობა",
       "balance": "ბალანსის შესახებ გაფრთხილებები",
       "security": "უსაფრთხოების პრობლემები",
-      "spend": "ხარჯვის შეტყობინებები"
+      "spend": "ხარჯვის შეტყობინებები",
+      "followedSessions": "მოყოლილი სესიები"
     },
     "category": {
       "chatMessagesSubtitle": "პასუხები თქვენს საუბრებში",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "გელოდებათ",
     "nextScheduled": "შემდეგი დაგეგმილი",
     "answerNeeded": "პასუხს ელის",
-    "waitingToRetry": "ხელახალ ცდას ელის"
+    "waitingToRetry": "ხელახალ ცდას ელის",
+    "step": {
+      "editing": "რედაქტირება",
+      "reading": "კითხვა",
+      "running": "გაშვება",
+      "searching": "ვებ ძიება",
+      "thinking": "დაფიქრება"
+    },
+    "planOf": "/",
+    "filesChanged": "შეცვლილი ფაილები",
+    "finishedIn": "დასრულდა",
+    "noActivityFor": "აქტივობა არ არის",
+    "prOpened": "Pull request გაიხსნა",
+    "permissionWants": "სურს გაშვება",
+    "failure": {
+      "provider": "შეჩერდა: პროვაიდერის შეცდომა",
+      "tool": "შეჩერდა: ხელსაწყოს შეცდომა",
+      "cancelled": "შეჩერდა: გაუქმდა",
+      "other": "შეჩერებულია"
+    }
   },
   "transcriptionModel": {
     "title": "ტრანსკრიფციის მოდელი",

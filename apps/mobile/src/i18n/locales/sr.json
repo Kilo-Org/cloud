@@ -136,7 +136,9 @@
     "working": "U radu",
     "yourOwnRepositories": "Tvoji repozitorijumi",
     "dismissed": "Odbačeno",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promene jezika",
@@ -847,7 +849,8 @@
       "kiloclaw": "Aktivnosti u KiloClaw-u",
       "balance": "Upozorenja o stanju kredita",
       "security": "Bezbednosni nalazi",
-      "spend": "Obaveštenja o potrošnji"
+      "spend": "Obaveštenja o potrošnji",
+      "followedSessions": "Praćene sesije"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",
@@ -2115,7 +2118,7 @@
       "copyErrorDetails": "Kopiraj detalje greške",
       "backToSessions": "Nazad na sesije",
       "follow": "Prati na zaključanom ekranu",
-      "unfollow": "Prestani da pratiš na zaključanom ekranu",
+      "unfollow": "Prekini praćenje na zaključanom ekranu",
       "couldNotLoad": "Učitavanje sesije nije uspelo.",
       "failedToLoadDetails": "Učitavanje detalja sesije nije uspelo.",
       "failedToStopExecution": "Zaustavljanje izvršavanja nije uspelo.",
@@ -3206,7 +3209,26 @@
     "waitingForYou": "Čeka vas",
     "nextScheduled": "Sledeće zakazano",
     "answerNeeded": "Potreban odgovor",
-    "waitingToRetry": "Čeka ponovni pokušaj"
+    "waitingToRetry": "Čeka ponovni pokušaj",
+    "step": {
+      "editing": "Uređivanje",
+      "reading": "Čitanje",
+      "running": "Pokretanje",
+      "searching": "Web pretraga",
+      "thinking": "Promišljanje"
+    },
+    "planOf": "od",
+    "filesChanged": "promenjenih datoteka",
+    "finishedIn": "Završeno za",
+    "noActivityFor": "Nema aktivnosti već",
+    "prOpened": "Pull request otvoren",
+    "permissionWants": "Želi da pokrene",
+    "failure": {
+      "provider": "Zaustavljeno: greška provajdera",
+      "tool": "Zaustavljeno: greška alata",
+      "cancelled": "Zaustavljeno: otkazano",
+      "other": "ZAUSTAVLJENO"
+    }
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",

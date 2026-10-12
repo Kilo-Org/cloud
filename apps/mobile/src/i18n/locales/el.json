@@ -136,7 +136,9 @@
     "working": "Σε εξέλιξη",
     "yourOwnRepositories": "Τα δικά σου αποθετήρια",
     "dismissed": "Απορρίφθηκε",
-    "agent": "Μέσο"
+    "agent": "Μέσο",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Επανεκκίνηση για εφαρμογή της νέας γλώσσας",
@@ -831,7 +833,8 @@
       "kiloclaw": "Δραστηριότητα KiloClaw",
       "balance": "Ειδοποιήσεις υπολοίπου",
       "security": "Ευρήματα ασφάλειας",
-      "spend": "Ειδοποιήσεις δαπανών"
+      "spend": "Ειδοποιήσεις δαπανών",
+      "followedSessions": "Συνεδρίες που ακολουθούνται"
     },
     "category": {
       "chatMessagesSubtitle": "απαντήσεις στις συνομιλίες σου",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Αναμονή για εσάς",
     "nextScheduled": "Επόμενα προγραμματισμένα",
     "answerNeeded": "Αναμονή απάντησης",
-    "waitingToRetry": "Αναμονή νέας προσπάθειας"
+    "waitingToRetry": "Αναμονή νέας προσπάθειας",
+    "step": {
+      "editing": "Επεξεργασία",
+      "reading": "Ανάγνωση",
+      "running": "Εκτέλεση",
+      "searching": "Αναζήτηση ιστού",
+      "thinking": "Εμβάθυνση"
+    },
+    "planOf": "από",
+    "filesChanged": "αρχεία άλλαξαν",
+    "finishedIn": "Ολοκληρώθηκε σε",
+    "noActivityFor": "Καμία δραστηριότητα για",
+    "prOpened": "Άνοιξε pull request",
+    "permissionWants": "Θέλει να εκτελέσει",
+    "failure": {
+      "provider": "Σταμάτησε: σφάλμα παρόχου",
+      "tool": "Σταμάτησε: σφάλμα εργαλείου",
+      "cancelled": "Σταμάτησε: ακυρώθηκε",
+      "other": "ΣΤΑΜΑΤΗΜΕΝΟ"
+    }
   },
   "transcriptionModel": {
     "title": "Μοντέλο απομαγνητοφώνησης",

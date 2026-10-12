@@ -136,7 +136,9 @@
     "working": "Kuyasebenza",
     "yourOwnRepositories": "Izinqolobane zakho zekhodi",
     "dismissed": "Kuchithiwe",
-    "agent": "Umenzeli"
+    "agent": "Umenzeli",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Kuqaliswa kabusha ukuze kusetshenziswe ulimi olukhethiwe",
@@ -831,7 +833,8 @@
       "kiloclaw": "Umsebenzi we-KiloClaw",
       "balance": "Izexwayiso zebhalansi",
       "security": "Okutholakele kwezokuphepha",
-      "spend": "Izexwayiso zokusebenzisa imali"
+      "spend": "Izexwayiso zokusebenzisa imali",
+      "followedSessions": "Amaseshini alandiwe"
     },
     "category": {
       "chatMessagesSubtitle": "izimpendulo ezingxoxweni zakho",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Kulinde wena",
     "nextScheduled": "Okulandelayo okuhleliwe",
     "answerNeeded": "Kudinga impendulo",
-    "waitingToRetry": "Kulinde ukuzama futhi"
+    "waitingToRetry": "Kulinde ukuzama futhi",
+    "step": {
+      "editing": "Kuhlelwa",
+      "reading": "Kufundwa",
+      "running": "Gijima",
+      "searching": "Usesho lwewebhu",
+      "thinking": "Kucatshangelwa"
+    },
+    "planOf": "/",
+    "filesChanged": "amafayela ashintshiwe",
+    "finishedIn": "Kuqedwe ngo",
+    "noActivityFor": "Akukho msebenzi ku",
+    "prOpened": "Isicelo sokudonsa sivuliwe",
+    "permissionWants": "Ifuna ukugijima",
+    "failure": {
+      "provider": "Kumisiwe: iphutha lomhlinzeki",
+      "tool": "Kumisiwe: iphutha lethuluzi",
+      "cancelled": "Kumisiwe: kukhanseliwe",
+      "other": "IMISIWE"
+    }
   },
   "transcriptionModel": {
     "title": "Imodeli yokuguqula inkulumo",

@@ -136,7 +136,9 @@
     "working": "Vykdoma",
     "yourOwnRepositories": "Tavo saugyklos",
     "dismissed": "Atmesta",
-    "agent": "Agentas"
+    "agent": "Agentas",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -863,7 +865,8 @@
       "kiloclaw": "KiloClaw veikla",
       "balance": "Įspėjimai apie likutį",
       "security": "Saugos problemos",
-      "spend": "Išlaidų įspėjimai"
+      "spend": "Išlaidų įspėjimai",
+      "followedSessions": "Sekamos sesijos"
     },
     "category": {
       "chatMessagesSubtitle": "atsakymai jūsų pokalbiuose",
@@ -3247,7 +3250,26 @@
     "waitingForYou": "Laukia jūsų",
     "nextScheduled": "Artimiausi suplanuoti",
     "answerNeeded": "Laukia atsakymo",
-    "waitingToRetry": "Laukiama pakartojimo"
+    "waitingToRetry": "Laukiama pakartojimo",
+    "step": {
+      "editing": "Redagavimas",
+      "reading": "Skaitymas",
+      "running": "Vykdoma",
+      "searching": "Paieška žiniatinklyje",
+      "thinking": "Mąstoma"
+    },
+    "planOf": "iš",
+    "filesChanged": "pakeisti failai",
+    "finishedIn": "Baigta per",
+    "noActivityFor": "Nėra veiklos",
+    "prOpened": "Atidaryta pull užklausa",
+    "permissionWants": "Nori vykdyti",
+    "failure": {
+      "provider": "Sustabdyta: teikėjo klaida",
+      "tool": "Sustabdyta: įrankio klaida",
+      "cancelled": "Sustabdyta: atšaukta",
+      "other": "SUSTABDYTA"
+    }
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",

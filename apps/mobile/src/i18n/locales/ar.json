@@ -136,7 +136,9 @@
     "working": "جارٍ العمل",
     "yourOwnRepositories": "مستودعاتك الخاصة",
     "dismissed": "مستبعدة",
-    "agent": "عامل"
+    "agent": "عامل",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -320,7 +322,8 @@
       "kiloclaw": "نشاط KiloClaw",
       "balance": "تنبيهات الرصيد",
       "security": "ملاحظات الأمان",
-      "spend": "تنبيهات الإنفاق"
+      "spend": "تنبيهات الإنفاق",
+      "followedSessions": "الجلسات المتابَعة"
     },
     "category": {
       "chatMessagesSubtitle": "الردود في محادثاتك",
@@ -3329,7 +3332,26 @@
     "waitingForYou": "بانتظارك",
     "nextScheduled": "المواعيد المجدولة القادمة",
     "answerNeeded": "بانتظار إجابتك",
-    "waitingToRetry": "بانتظار إعادة المحاولة"
+    "waitingToRetry": "بانتظار إعادة المحاولة",
+    "step": {
+      "editing": "التحرير",
+      "reading": "القراءة",
+      "running": "التشغيل",
+      "searching": "بحث في الويب",
+      "thinking": "التفكير بعمق"
+    },
+    "planOf": "من",
+    "filesChanged": "ملفات متغيّرة",
+    "finishedIn": "اكتمل في",
+    "noActivityFor": "لا نشاط لمدة",
+    "prOpened": "تم فتح طلب سحب",
+    "permissionWants": "يريد التشغيل",
+    "failure": {
+      "provider": "توقف: خطأ في المزوِّد",
+      "tool": "توقف: خطأ في الأداة",
+      "cancelled": "توقف: أُلغي",
+      "other": "متوقف"
+    }
   },
   "transcriptionModel": {
     "title": "نموذج التفريغ الصوتي",

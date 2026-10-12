@@ -136,7 +136,9 @@
     "working": "لە کاردا",
     "yourOwnRepositories": "کۆگاکانی خۆت",
     "dismissed": "پشتگوێخراو",
-    "agent": "بریکار"
+    "agent": "بریکار",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "بۆ جێبەجێکردنی گۆڕینی زمان، دووبارە دەست پێ دەکاتەوە",
@@ -831,7 +833,8 @@
       "kiloclaw": "چالاکییەکانی KiloClaw",
       "balance": "ئاگادارکردنەوەکانی باڵانس",
       "security": "دۆزینەوەکانی ئاسایش",
-      "spend": "ئاگادارکردنەوەکانی خەرجی"
+      "spend": "ئاگادارکردنەوەکانی خەرجی",
+      "followedSessions": "دانیشتنە شوێنکەوتووەکان"
     },
     "category": {
       "chatMessagesSubtitle": "وەڵامەکان لە گفتوگۆکانتدا",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "چاوەڕێی تۆ",
     "nextScheduled": "خشتەکراوەکانی داهاتوو",
     "answerNeeded": "چاوەڕێی وەڵام",
-    "waitingToRetry": "چاوەڕێی هەوڵدانەوە"
+    "waitingToRetry": "چاوەڕێی هەوڵدانەوە",
+    "step": {
+      "editing": "دەستکاریکردن",
+      "reading": "خوێندنەوە",
+      "running": "جێبەجێکردن",
+      "searching": "گەڕان لە وێب",
+      "thinking": "بیرکردنەوە لەسەری"
+    },
+    "planOf": "لە",
+    "filesChanged": "فایل گۆڕدرا",
+    "finishedIn": "تەواو بوو لە",
+    "noActivityFor": "چالاکی نییە بۆ",
+    "prOpened": "داواکاری هێنان کرایەوە",
+    "permissionWants": "دەیەوێت جێبەجێی بکات",
+    "failure": {
+      "provider": "وەستا: هەڵەی دابینکەر",
+      "tool": "وەستا: هەڵەی ئامراز",
+      "cancelled": "وەستا: هەڵوەشێنرا",
+      "other": "وەستاو"
+    }
   },
   "transcriptionModel": {
     "title": "مۆدێلی گۆڕینی دەنگ بۆ دەق",

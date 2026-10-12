@@ -136,7 +136,9 @@
     "working": "В процес",
     "yourOwnRepositories": "Личните ти хранилища",
     "dismissed": "Отхвърлено",
-    "agent": "агент"
+    "agent": "агент",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Рестартиране за смяна на езика",
@@ -831,7 +833,8 @@
       "kiloclaw": "Активност на KiloClaw",
       "balance": "Известия за салдото",
       "security": "Проблеми със сигурността",
-      "spend": "Известия за разходи"
+      "spend": "Известия за разходи",
+      "followedSessions": "Следвани сесии"
     },
     "category": {
       "chatMessagesSubtitle": "отговори в разговорите ти",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Очаква ви",
     "nextScheduled": "Следващи планирани",
     "answerNeeded": "Нужен е отговор",
-    "waitingToRetry": "Изчаква повторен опит"
+    "waitingToRetry": "Изчаква повторен опит",
+    "step": {
+      "editing": "Редактиране",
+      "reading": "Четене",
+      "running": "Изпълнение",
+      "searching": "Търсене в мрежата",
+      "thinking": "Обмисляне"
+    },
+    "planOf": "от",
+    "filesChanged": "променени файла",
+    "finishedIn": "Завършено за",
+    "noActivityFor": "Няма активност за",
+    "prOpened": "Отворена заявка за сливане",
+    "permissionWants": "Иска да изпълни",
+    "failure": {
+      "provider": "Спряно: грешка при доставчика",
+      "tool": "Спряно: грешка в инструмента",
+      "cancelled": "Спряно: отменено",
+      "other": "СПРЯНА"
+    }
   },
   "transcriptionModel": {
     "title": "Модел за транскрипция",

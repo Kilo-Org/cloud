@@ -136,7 +136,9 @@
     "working": "Çalışıyor",
     "yourOwnRepositories": "Kendi depoların",
     "dismissed": "Yok sayıldı",
-    "agent": "Ajan"
+    "agent": "Ajan",
+    "durationMinuteShort": "dk",
+    "durationHourShort": "sa"
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -320,7 +322,8 @@
       "kiloclaw": "KiloClaw etkinliği",
       "balance": "Bakiye uyarıları",
       "security": "Güvenlik bulguları",
-      "spend": "Harcama uyarıları"
+      "spend": "Harcama uyarıları",
+      "followedSessions": "Takip edilen oturumlar"
     },
     "category": {
       "chatMessagesSubtitle": "konuşmalarındaki yanıtlar",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Sizi bekliyor",
     "nextScheduled": "Sıradaki zamanlananlar",
     "answerNeeded": "Yanıt bekliyor",
-    "waitingToRetry": "Yeniden deneme bekleniyor"
+    "waitingToRetry": "Yeniden deneme bekleniyor",
+    "step": {
+      "editing": "Düzenleniyor",
+      "reading": "Okunuyor",
+      "running": "Çalıştır",
+      "searching": "Web araması",
+      "thinking": "İyice düşünüyor"
+    },
+    "planOf": "/",
+    "filesChanged": "dosya değişti",
+    "finishedIn": "Tamamlanma süresi",
+    "noActivityFor": "Etkinlik yok",
+    "prOpened": "Pull request açıldı",
+    "permissionWants": "Çalıştırmak istiyor",
+    "failure": {
+      "provider": "Durduruldu: sağlayıcı hatası",
+      "tool": "Durduruldu: araç hatası",
+      "cancelled": "Durduruldu: iptal edildi",
+      "other": "DURDURULDU"
+    }
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",

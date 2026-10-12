@@ -136,7 +136,9 @@
     "working": "En cours",
     "yourOwnRepositories": "Vos propres dépôts",
     "dismissed": "Ignoré",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -262,7 +264,8 @@
       "kiloclaw": "Activité KiloClaw",
       "balance": "Alertes sur le solde",
       "security": "Problèmes de sécurité",
-      "spend": "Alertes de dépenses"
+      "spend": "Alertes de dépenses",
+      "followedSessions": "Sessions suivies"
     },
     "category": {
       "chatMessagesSubtitle": "réponses dans vos conversations",
@@ -3206,7 +3209,26 @@
     "waitingForYou": "En attente de votre intervention",
     "nextScheduled": "Prochaines exécutions",
     "answerNeeded": "Réponse requise",
-    "waitingToRetry": "Nouvelle tentative en attente"
+    "waitingToRetry": "Nouvelle tentative en attente",
+    "step": {
+      "editing": "Modification",
+      "reading": "Lecture",
+      "running": "Exécution",
+      "searching": "Recherche web",
+      "thinking": "Réflexion"
+    },
+    "planOf": "sur",
+    "filesChanged": "fichiers modifiés",
+    "finishedIn": "Terminé en",
+    "noActivityFor": "Aucune activité depuis",
+    "prOpened": "Pull request ouverte",
+    "permissionWants": "Veut exécuter",
+    "failure": {
+      "provider": "Arrêté : erreur du fournisseur",
+      "tool": "Arrêté : erreur d'outil",
+      "cancelled": "Arrêté : annulé",
+      "other": "ARRÊTÉ"
+    }
   },
   "transcriptionModel": {
     "title": "Modèle de transcription",

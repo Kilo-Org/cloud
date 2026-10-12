@@ -136,7 +136,9 @@
     "working": "កំពុងដំណើរការ",
     "yourOwnRepositories": "ឃ្លាំងកូដផ្ទាល់ខ្លួនរបស់អ្នក",
     "dismissed": "បានសម្គាល់ថាមិនអើពើ",
-    "agent": "ភ្នាក់ងារ"
+    "agent": "ភ្នាក់ងារ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "កំពុងចាប់ផ្តើមឡើងវិញដើម្បីប្រើភាសាដែលបានជ្រើសរើស",
@@ -831,7 +833,8 @@
       "kiloclaw": "សកម្មភាព KiloClaw",
       "balance": "ការជូនដំណឹងអំពីសមតុល្យ",
       "security": "បញ្ហាសុវត្ថិភាពដែលរកឃើញ",
-      "spend": "ការជូនដំណឹងអំពីការចំណាយ"
+      "spend": "ការជូនដំណឹងអំពីការចំណាយ",
+      "followedSessions": "វគ្គដែលបានតាមដាន"
     },
     "category": {
       "chatMessagesSubtitle": "ការឆ្លើយតបនៅក្នុងការសន្ទនារបស់អ្នក",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "កំពុងរង់ចាំអ្នក",
     "nextScheduled": "កាលវិភាគបន្ទាប់",
     "answerNeeded": "ត្រូវការការឆ្លើយតប",
-    "waitingToRetry": "រង់ចាំព្យាយាមម្ដងទៀត"
+    "waitingToRetry": "រង់ចាំព្យាយាមម្ដងទៀត",
+    "step": {
+      "editing": "ការកែសម្រួល",
+      "reading": "ការអាន",
+      "running": "ដំណើរការ",
+      "searching": "ស្វែងរកតាមវេប",
+      "thinking": "ការពិចារណា"
+    },
+    "planOf": "/",
+    "filesChanged": "ឯកសារបានផ្លាស់ប្តូរ",
+    "finishedIn": "បានបញ្ចប់ក្នុង",
+    "noActivityFor": "គ្មានសកម្មភាពរយៈពេល",
+    "prOpened": "បានបើក pull request",
+    "permissionWants": "ចង់ដំណើរការ",
+    "failure": {
+      "provider": "បានឈប់: កំហុសអ្នកផ្តល់សេវា",
+      "tool": "បានឈប់: កំហុសឧបករណ៍",
+      "cancelled": "បានឈប់: បានបោះបង់",
+      "other": "បានឈប់"
+    }
   },
   "transcriptionModel": {
     "title": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទ",

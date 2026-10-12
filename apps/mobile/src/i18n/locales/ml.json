@@ -136,7 +136,9 @@
     "working": "പ്രവർത്തിക്കുന്നു",
     "yourOwnRepositories": "നിങ്ങളുടെ സ്വന്തം റിപ്പോസിറ്ററികൾ",
     "dismissed": "ഒഴിവാക്കി",
-    "agent": "ഏജൻ്റ്"
+    "agent": "ഏജൻ്റ്",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "ഭാഷ മാറ്റാൻ പുനരാരംഭിക്കുന്നു",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw പ്രവർത്തനം",
       "balance": "ബാലൻസ് മുന്നറിയിപ്പുകൾ",
       "security": "സുരക്ഷാ കണ്ടെത്തലുകൾ",
-      "spend": "ചെലവ് മുന്നറിയിപ്പുകൾ"
+      "spend": "ചെലവ് മുന്നറിയിപ്പുകൾ",
+      "followedSessions": "പിന്തുടരുന്ന സെഷനുകൾ"
     },
     "category": {
       "chatMessagesSubtitle": "നിങ്ങളുടെ സംഭാഷണങ്ങളിലെ മറുപടികൾ",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "നിങ്ങൾക്കായി കാത്തിരിക്കുന്നു",
     "nextScheduled": "അടുത്ത ഷെഡ്യൂൾ",
     "answerNeeded": "മറുപടി വേണം",
-    "waitingToRetry": "വീണ്ടും ശ്രമിക്കാൻ കാത്തിരിക്കുന്നു"
+    "waitingToRetry": "വീണ്ടും ശ്രമിക്കാൻ കാത്തിരിക്കുന്നു",
+    "step": {
+      "editing": "എഡിറ്റ് ചെയ്യുന്നു",
+      "reading": "വായിക്കുന്നു",
+      "running": "പ്രവർത്തിപ്പിക്കുക",
+      "searching": "വെബ് തിരയൽ",
+      "thinking": "ചിന്തിക്കുന്നു"
+    },
+    "planOf": "ന്റെ",
+    "filesChanged": "ഫയലുകൾ മാറ്റി",
+    "finishedIn": "പൂർത്തിയായത്",
+    "noActivityFor": "പ്രവർത്തനമില്ല",
+    "prOpened": "പുൾ റിക്വസ്റ്റ് തുറന്നു",
+    "permissionWants": "പ്രവർത്തിപ്പിക്കാൻ ആഗ്രഹിക്കുന്നു",
+    "failure": {
+      "provider": "നിർത്തി: ദാതാവ് പിശക്",
+      "tool": "നിർത്തി: ടൂൾ പിശക്",
+      "cancelled": "നിർത്തി: റദ്ദാക്കി",
+      "other": "നിർത്തി"
+    }
   },
   "transcriptionModel": {
     "title": "ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ",

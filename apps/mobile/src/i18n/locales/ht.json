@@ -136,7 +136,9 @@
     "working": "Ap travay",
     "yourOwnRepositories": "Pwòp depo ou yo",
     "dismissed": "Rejte",
-    "agent": "Ajan"
+    "agent": "Ajan",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -831,7 +833,8 @@
       "kiloclaw": "Aktivite KiloClaw",
       "balance": "Alèt balans",
       "security": "Pwoblèm sekirite detekte",
-      "spend": "Alèt depans"
+      "spend": "Alèt depans",
+      "followedSessions": "Sesyon swiv"
     },
     "category": {
       "chatMessagesSubtitle": "repons nan konvèsasyon ou yo",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Ap tann ou",
     "nextScheduled": "Pwochen ki pwograme",
     "answerNeeded": "Bezwen repons",
-    "waitingToRetry": "Ap tann pou reeseye"
+    "waitingToRetry": "Ap tann pou reeseye",
+    "step": {
+      "editing": "Modifikasyon",
+      "reading": "Lekti",
+      "running": "Ekzekisyon",
+      "searching": "Rechèch wèb",
+      "thinking": "Ap reflechi"
+    },
+    "planOf": "sou",
+    "filesChanged": "fichye chanje",
+    "finishedIn": "Fini nan",
+    "noActivityFor": "Pa gen aktivite pou",
+    "prOpened": "Demann rale ouvè",
+    "permissionWants": "Vle ekzekite",
+    "failure": {
+      "provider": "Sispann: erè founisè",
+      "tool": "Sispann: erè zouti",
+      "cancelled": "Sispann: anile",
+      "other": "SISPANN"
+    }
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",

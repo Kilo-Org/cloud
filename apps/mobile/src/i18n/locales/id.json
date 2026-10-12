@@ -136,7 +136,9 @@
     "working": "Bekerja",
     "yourOwnRepositories": "Repositori milikmu",
     "dismissed": "Diabaikan",
-    "agent": "Agen"
+    "agent": "Agen",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -320,7 +322,8 @@
       "kiloclaw": "Aktivitas KiloClaw",
       "balance": "Peringatan saldo",
       "security": "Temuan keamanan",
-      "spend": "Peringatan pengeluaran"
+      "spend": "Peringatan pengeluaran",
+      "followedSessions": "Sesi yang diikuti"
     },
     "category": {
       "chatMessagesSubtitle": "balasan dalam percakapanmu",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Menunggu Anda",
     "nextScheduled": "Jadwal berikutnya",
     "answerNeeded": "Perlu jawaban",
-    "waitingToRetry": "Menunggu percobaan ulang"
+    "waitingToRetry": "Menunggu percobaan ulang",
+    "step": {
+      "editing": "Mengedit",
+      "reading": "Membaca",
+      "running": "Menjalankan",
+      "searching": "Penelusuran web",
+      "thinking": "Berpikir"
+    },
+    "planOf": "dari",
+    "filesChanged": "file diubah",
+    "finishedIn": "Selesai dalam",
+    "noActivityFor": "Tidak ada aktivitas selama",
+    "prOpened": "Pull request dibuka",
+    "permissionWants": "Ingin menjalankan",
+    "failure": {
+      "provider": "Berhenti: kesalahan penyedia",
+      "tool": "Berhenti: kesalahan alat",
+      "cancelled": "Berhenti: dibatalkan",
+      "other": "BERHENTI"
+    }
   },
   "transcriptionModel": {
     "title": "Model transkripsi",

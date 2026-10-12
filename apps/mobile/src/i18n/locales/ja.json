@@ -136,7 +136,9 @@
     "working": "作業中",
     "yourOwnRepositories": "自分のリポジトリ",
     "dismissed": "却下済み",
-    "agent": "エージェント"
+    "agent": "エージェント",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -320,7 +322,8 @@
       "kiloclaw": "KiloClawのアクティビティ",
       "balance": "残高アラート",
       "security": "セキュリティの検出事項",
-      "spend": "支出アラート"
+      "spend": "支出アラート",
+      "followedSessions": "フォロー中のセッション"
     },
     "category": {
       "chatMessagesSubtitle": "会話内の返信",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "操作待ち",
     "nextScheduled": "次の予定",
     "answerNeeded": "回答が必要",
-    "waitingToRetry": "再試行待ち"
+    "waitingToRetry": "再試行待ち",
+    "step": {
+      "editing": "編集",
+      "reading": "読み取り",
+      "running": "実行",
+      "searching": "ウェブ検索",
+      "thinking": "思考中"
+    },
+    "planOf": "/",
+    "filesChanged": "ファイル変更",
+    "finishedIn": "所要時間",
+    "noActivityFor": "アクティビティなし",
+    "prOpened": "プルリクエストを開きました",
+    "permissionWants": "実行を希望",
+    "failure": {
+      "provider": "停止: プロバイダーエラー",
+      "tool": "停止: ツールエラー",
+      "cancelled": "停止: キャンセル",
+      "other": "停止"
+    }
   },
   "transcriptionModel": {
     "title": "文字起こしモデル",

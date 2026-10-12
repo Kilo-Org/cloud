@@ -136,7 +136,9 @@
     "working": "Hojjechaa jira",
     "yourOwnRepositories": "Kuusaalee koodii mataa keetii",
     "dismissed": "Dhiifame",
-    "agent": "Bakka bu'aa"
+    "agent": "Bakka bu'aa",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Afaan filatame fayyadamuuf irra deebi'ee jalqabaa jira",
@@ -831,7 +833,8 @@
       "kiloclaw": "Sochii KiloClaw",
       "balance": "Akeekkachiisa haftee maallaqaa",
       "security": "Argannoowwan nageenyaa",
-      "spend": "Akeekkachiisa baasii"
+      "spend": "Akeekkachiisa baasii",
+      "followedSessions": "Seeshiniiwwan hordofaman"
     },
     "category": {
       "chatMessagesSubtitle": "deebiiwwan mariiwwan kee keessatti",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Si eeggachaa jira",
     "nextScheduled": "Kan itti aansee karoorfame",
     "answerNeeded": "Deebii barbaada",
-    "waitingToRetry": "Irra deebi'uuf eeggachaa jira"
+    "waitingToRetry": "Irra deebi'uuf eeggachaa jira",
+    "step": {
+      "editing": "Gulaaluu",
+      "reading": "Dubbisuu",
+      "running": "Fiiguu",
+      "searching": "Barbaacha weeb",
+      "thinking": "Xiinxaluu"
+    },
+    "planOf": "keessaa",
+    "filesChanged": "faayiloonni jijjiiraman",
+    "finishedIn": "Xumurame",
+    "noActivityFor": "Sochii hin jiru",
+    "prOpened": "Pull request baname",
+    "permissionWants": "Fiiguu barbaada",
+    "failure": {
+      "provider": "Dhaabbate: dogoggora dhiyeessaa",
+      "tool": "Dhaabbate: dogoggora meeshaa",
+      "cancelled": "Dhaabbate: haqame",
+      "other": "DHAABAME"
+    }
   },
   "transcriptionModel": {
     "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",

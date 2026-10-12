@@ -136,7 +136,9 @@
     "working": "Na-arụ ọrụ",
     "yourOwnRepositories": "Ebe nchekwa koodu nke gị",
     "dismissed": "Elegharala anya",
-    "agent": "Onye nnọchi anya"
+    "agent": "Onye nnọchi anya",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -831,7 +833,8 @@
       "kiloclaw": "Ihe omume KiloClaw",
       "balance": "Ọkwa gbasara ego fọdụrụ",
       "security": "Ihe achọpụtara gbasara nchebe",
-      "spend": "Ọkwa gbasara mmefu"
+      "spend": "Ọkwa gbasara mmefu",
+      "followedSessions": "Seshọn ndị e soro"
     },
     "category": {
       "chatMessagesSubtitle": "azịza na mkparịta ụka gị",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Na-eche gị",
     "nextScheduled": "Ihe ahaziri na-esote",
     "answerNeeded": "Chọrọ azịza",
-    "waitingToRetry": "Na-eche ịnwale ọzọ"
+    "waitingToRetry": "Na-eche ịnwale ọzọ",
+    "step": {
+      "editing": "Na-edezi",
+      "reading": "Na-agụ",
+      "running": "Na-agba",
+      "searching": "Nchọgharị weebụ",
+      "thinking": "Na-eche echiche"
+    },
+    "planOf": "nke",
+    "filesChanged": "faịlụ gbanwere",
+    "finishedIn": "Emechara n'ime",
+    "noActivityFor": "Enweghị ọrụ ruo",
+    "prOpened": "E meghere Pull request",
+    "permissionWants": "Ọ chọrọ ịgba",
+    "failure": {
+      "provider": "Kwụsịrị: njehie onye na-eweta",
+      "tool": "Kwụsịrị: njehie ngwaọrụ",
+      "cancelled": "Kwụsịrị: kagburu",
+      "other": "KWỤSỊRỊ"
+    }
   },
   "transcriptionModel": {
     "title": "Ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",

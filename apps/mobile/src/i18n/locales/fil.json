@@ -136,7 +136,9 @@
     "working": "Nagtatrabaho",
     "yourOwnRepositories": "Mga sarili mong repositoryo",
     "dismissed": "Binalewala",
-    "agent": "Ahente"
+    "agent": "Ahente",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -831,7 +833,8 @@
       "kiloclaw": "Aktibidad ng KiloClaw",
       "balance": "Mga babala sa balanse",
       "security": "Mga natukoy na isyu sa seguridad",
-      "spend": "Mga babala sa gastos"
+      "spend": "Mga babala sa gastos",
+      "followedSessions": "Mga sinusubaybayang sesyon"
     },
     "category": {
       "chatMessagesSubtitle": "mga tugon sa iyong mga pag-uusap",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Hinihintay ka",
     "nextScheduled": "Susunod na naka-iskedyul",
     "answerNeeded": "Kailangan ng sagot",
-    "waitingToRetry": "Naghihintay ng muling pagsubok"
+    "waitingToRetry": "Naghihintay ng muling pagsubok",
+    "step": {
+      "editing": "Nag-e-edit",
+      "reading": "Nagbabasa",
+      "running": "Tumatakbo",
+      "searching": "Paghahanap sa web",
+      "thinking": "Pinag-iisipan"
+    },
+    "planOf": "ng",
+    "filesChanged": "mga file na binago",
+    "finishedIn": "Natapos sa",
+    "noActivityFor": "Walang aktibidad sa loob ng",
+    "prOpened": "Nabuksan ang pull request",
+    "permissionWants": "Gustong patakbuhin",
+    "failure": {
+      "provider": "Huminto: error ng provider",
+      "tool": "Huminto: error ng tool",
+      "cancelled": "Huminto: kinansela",
+      "other": "NAKAHINTO"
+    }
   },
   "transcriptionModel": {
     "title": "Modelo para sa pagsasalin ng boses sa teksto",

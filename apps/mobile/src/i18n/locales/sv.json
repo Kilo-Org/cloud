@@ -136,7 +136,9 @@
     "working": "Arbetar",
     "yourOwnRepositories": "Dina egna kodarkiv",
     "dismissed": "Avskriven",
-    "agent": "Ombud"
+    "agent": "Ombud",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarningar",
       "security": "Säkerhetsanmärkningar",
-      "spend": "Utgiftsvarningar"
+      "spend": "Utgiftsvarningar",
+      "followedSessions": "Följda sessioner"
     },
     "category": {
       "chatMessagesSubtitle": "svar i dina konversationer",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Väntar på dig",
     "nextScheduled": "Nästa schemalagda",
     "answerNeeded": "Väntar på svar",
-    "waitingToRetry": "Väntar på nytt försök"
+    "waitingToRetry": "Väntar på nytt försök",
+    "step": {
+      "editing": "Redigerar",
+      "reading": "Läser",
+      "running": "Kör",
+      "searching": "Webbsökning",
+      "thinking": "Tänker igenom"
+    },
+    "planOf": "av",
+    "filesChanged": "filer ändrade",
+    "finishedIn": "Klart på",
+    "noActivityFor": "Ingen aktivitet i",
+    "prOpened": "Pull request öppnad",
+    "permissionWants": "Vill köra",
+    "failure": {
+      "provider": "Stoppad: leverantörsfel",
+      "tool": "Stoppad: verktygsfel",
+      "cancelled": "Stoppad: avbruten",
+      "other": "STOPPAD"
+    }
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",

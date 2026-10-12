@@ -136,7 +136,9 @@
     "working": "Kei te mahi",
     "yourOwnRepositories": "Ō ake pūranga waehere",
     "dismissed": "Kua whakakorea",
-    "agent": "Kaihoko"
+    "agent": "Kaihoko",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",
@@ -831,7 +833,8 @@
       "kiloclaw": "Ngā mahi KiloClaw",
       "balance": "Ngā matohi mō te toenga pūtea",
       "security": "Ngā kitenga haumarutanga",
-      "spend": "Ngā matohi whakapaunga"
+      "spend": "Ngā matohi whakapaunga",
+      "followedSessions": "Ngā wāhanga e whai ana"
     },
     "category": {
       "chatMessagesSubtitle": "ngā whakautu i ō kōrerorero",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "E tatari ana ki a koe",
     "nextScheduled": "Te whakaritenga e whai ake nei",
     "answerNeeded": "Me whai whakautu",
-    "waitingToRetry": "E tatari ana ki te ngana anō"
+    "waitingToRetry": "E tatari ana ki te ngana anō",
+    "step": {
+      "editing": "Whakatika",
+      "reading": "Pānui",
+      "running": "Whakahaere",
+      "searching": "Rapu ipurangi",
+      "thinking": "Whakaaroaro"
+    },
+    "planOf": "o",
+    "filesChanged": "kōnae kua huri",
+    "finishedIn": "Kua oti i roto i",
+    "noActivityFor": "Kāore he mahi mō",
+    "prOpened": "Kua huaki te tono kume",
+    "permissionWants": "Kei te hiahia whakahaere",
+    "failure": {
+      "provider": "Kua mutu: hapa kaiwhakarato",
+      "tool": "Kua mutu: hapa taputapu",
+      "cancelled": "Kua mutu: kua whakakorea",
+      "other": "KUA MUTU"
+    }
   },
   "transcriptionModel": {
     "title": "Tauira tuhi ā-reo",

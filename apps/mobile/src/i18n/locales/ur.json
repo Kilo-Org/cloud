@@ -136,7 +136,9 @@
     "working": "کام جاری ہے",
     "yourOwnRepositories": "آپ کی اپنی ریپوزٹریز",
     "dismissed": "نظر انداز کردہ",
-    "agent": "ایجنٹ"
+    "agent": "ایجنٹ",
+    "durationMinuteShort": "منٹ",
+    "durationHourShort": "گھنٹہ"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw کی سرگرمی",
       "balance": "بیلنس کی تنبیہات",
       "security": "شناخت شدہ سیکیورٹی مسائل",
-      "spend": "اخراجات کی تنبیہات"
+      "spend": "اخراجات کی تنبیہات",
+      "followedSessions": "فالو کیے گئے سیشنز"
     },
     "category": {
       "chatMessagesSubtitle": "آپ کی گفتگو میں جوابات",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "آپ کا انتظار",
     "nextScheduled": "آئندہ شیڈول",
     "answerNeeded": "جواب درکار",
-    "waitingToRetry": "دوبارہ کوشش کا انتظار"
+    "waitingToRetry": "دوبارہ کوشش کا انتظار",
+    "step": {
+      "editing": "ترمیم",
+      "reading": "پڑھ رہا ہے",
+      "running": "چلائیں",
+      "searching": "ویب تلاش",
+      "thinking": "غور کر رہا ہے"
+    },
+    "planOf": "میں سے",
+    "filesChanged": "فائلیں تبدیل ہوئیں",
+    "finishedIn": "مکمل ہونے میں",
+    "noActivityFor": "کوئی سرگرمی نہیں",
+    "prOpened": "پل ریکویسٹ کھول دی گئی",
+    "permissionWants": "چلانا چاہتا ہے",
+    "failure": {
+      "provider": "رک گیا: فراہم کنندہ کی خرابی",
+      "tool": "رک گیا: ٹول کی خرابی",
+      "cancelled": "رک گیا: منسوخ کیا گیا",
+      "other": "رکا ہوا"
+    }
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",

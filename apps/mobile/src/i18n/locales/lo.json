@@ -136,7 +136,9 @@
     "working": "ກຳລັງເຮັດວຽກ",
     "yourOwnRepositories": "ຄັງໂຄ້ດຂອງທ່ານເອງ",
     "dismissed": "ລະເວັ້ນແລ້ວ",
-    "agent": "ຕົວແທນ"
+    "agent": "ຕົວແທນ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -831,7 +833,8 @@
       "kiloclaw": "ກິດຈະກຳ KiloClaw",
       "balance": "ການແຈ້ງເຕືອນຍອດເງິນ",
       "security": "ບັນຫາດ້ານຄວາມປອດໄພທີ່ກວດພົບ",
-      "spend": "ການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ"
+      "spend": "ການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ",
+      "followedSessions": "ເຊສຊັນທີ່ຕິດຕາມ"
     },
     "category": {
       "chatMessagesSubtitle": "ຄຳຕອບໃນການສົນທະນາຂອງທ່ານ",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "ລໍທ່ານ",
     "nextScheduled": "ກຳນົດເວລາຖັດໄປ",
     "answerNeeded": "ລໍຄຳຕອບ",
-    "waitingToRetry": "ລໍລອງໃໝ່"
+    "waitingToRetry": "ລໍລອງໃໝ່",
+    "step": {
+      "editing": "ກຳລັງແກ້ໄຂ",
+      "reading": "ກຳລັງອ່ານ",
+      "running": "ຮັນ",
+      "searching": "ຄົ້ນຫາເວັບ",
+      "thinking": "ກຳລັງຄິດ"
+    },
+    "planOf": "ຈາກ",
+    "filesChanged": "ໄຟລ໌ທີ່ປ່ຽນແປງ",
+    "finishedIn": "ສຳເລັດໃນ",
+    "noActivityFor": "ບໍ່ມີການເຄື່ອນໄຫວ",
+    "prOpened": "ເປີດ pull request",
+    "permissionWants": "ຕ້ອງການຮັນ",
+    "failure": {
+      "provider": "ຢຸດ: ຂໍ້ຜິດພາດຜູ້ໃຫ້ບໍລິການ",
+      "tool": "ຢຸດ: ຂໍ້ຜິດພາດເຄື່ອງມື",
+      "cancelled": "ຢຸດ: ຍົກເລິກ",
+      "other": "ຢຸດແລ້ວ"
+    }
   },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",

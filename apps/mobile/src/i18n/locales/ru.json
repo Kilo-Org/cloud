@@ -136,7 +136,9 @@
     "working": "В работе",
     "yourOwnRepositories": "Личные репозитории",
     "dismissed": "Отклонено",
-    "agent": "Агент"
+    "agent": "Агент",
+    "durationMinuteShort": "мин",
+    "durationHourShort": "ч"
   },
   "language": {
     "restarting": "Перезапуск для смены языка",
@@ -320,7 +322,8 @@
       "kiloclaw": "Активность KiloClaw",
       "balance": "Оповещения о балансе",
       "security": "Замечания по безопасности",
-      "spend": "Оповещения о расходах"
+      "spend": "Оповещения о расходах",
+      "followedSessions": "Отслеживаемые сеансы"
     },
     "category": {
       "chatMessagesSubtitle": "ответы в вашей переписке",
@@ -3247,7 +3250,26 @@
     "waitingForYou": "Ожидание ваших действий",
     "nextScheduled": "Далее по расписанию",
     "answerNeeded": "Требуется ответ",
-    "waitingToRetry": "Ожидание повтора"
+    "waitingToRetry": "Ожидание повтора",
+    "step": {
+      "editing": "Редактирование",
+      "reading": "Чтение",
+      "running": "Запуск",
+      "searching": "Веб-поиск",
+      "thinking": "Обдумывание"
+    },
+    "planOf": "из",
+    "filesChanged": "файлов изменено",
+    "finishedIn": "Завершено за",
+    "noActivityFor": "Нет активности уже",
+    "prOpened": "Pull request открыт",
+    "permissionWants": "Хочет запустить",
+    "failure": {
+      "provider": "Остановлено: ошибка провайдера",
+      "tool": "Остановлено: ошибка инструмента",
+      "cancelled": "Остановлено: отменено",
+      "other": "ОСТАНОВЛЕН"
+    }
   },
   "transcriptionModel": {
     "title": "Модель распознавания речи",

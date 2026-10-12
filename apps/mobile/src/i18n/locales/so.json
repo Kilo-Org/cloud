@@ -136,7 +136,9 @@
     "working": "Shaqaynaya",
     "yourOwnRepositories": "Kaydadkaaga shakhsiga ah",
     "dismissed": "La iska dhaafay",
-    "agent": "Wakiil"
+    "agent": "Wakiil",
+    "durationMinuteShort": "daq",
+    "durationHourShort": "saac"
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -831,7 +833,8 @@
       "kiloclaw": "Hawlaha KiloClaw",
       "balance": "Digniinaha haraaga",
       "security": "Natiijooyinka amniga",
-      "spend": "Digniinaha kharashka"
+      "spend": "Digniinaha kharashka",
+      "followedSessions": "Fadhiyada la raacay"
     },
     "category": {
       "chatMessagesSubtitle": "jawaabaha wadahadalladaada",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Adiga ku sugaya",
     "nextScheduled": "Qorshaha xiga",
     "answerNeeded": "Jawaab loo baahan yahay",
-    "waitingToRetry": "Dib-u-tijaabin sugaya"
+    "waitingToRetry": "Dib-u-tijaabin sugaya",
+    "step": {
+      "editing": "Tafatirid",
+      "reading": "Akhris",
+      "running": "Socodsii",
+      "searching": "Raadinta webka",
+      "thinking": "Ka fikrid"
+    },
+    "planOf": "ka mid ah",
+    "filesChanged": "faylal la beddelay",
+    "finishedIn": "Ku dhammaaday",
+    "noActivityFor": "Dhaqdhaqaaq ma jiro",
+    "prOpened": "Pull request la furay",
+    "permissionWants": "Wuxuu rabaa inuu socodsiiyo",
+    "failure": {
+      "provider": "La joojiyay: khalad bixiye",
+      "tool": "La joojiyay: khalad qalab",
+      "cancelled": "La joojiyay: la baajiyay",
+      "other": "JOOGSATAY"
+    }
   },
   "transcriptionModel": {
     "title": "Moodeelka qoraal u beddelidda",

@@ -136,7 +136,9 @@
     "working": "W toku",
     "yourOwnRepositories": "Twoje repozytoria",
     "dismissed": "Odrzucone",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -320,7 +322,8 @@
       "kiloclaw": "Aktywność KiloClaw",
       "balance": "Powiadomienia o saldzie",
       "security": "Wykryte problemy z bezpieczeństwem",
-      "spend": "Alerty o wydatkach"
+      "spend": "Alerty o wydatkach",
+      "followedSessions": "Obserwowane sesje"
     },
     "category": {
       "chatMessagesSubtitle": "odpowiedzi w twoich rozmowach",
@@ -3247,7 +3250,26 @@
     "waitingForYou": "Czeka na ciebie",
     "nextScheduled": "Najbliższe zaplanowane",
     "answerNeeded": "Czeka na odpowiedź",
-    "waitingToRetry": "Czeka na ponowną próbę"
+    "waitingToRetry": "Czeka na ponowną próbę",
+    "step": {
+      "editing": "Edytowanie",
+      "reading": "Czytanie",
+      "running": "Uruchamianie",
+      "searching": "Wyszukiwanie w sieci",
+      "thinking": "Przemyśliwanie"
+    },
+    "planOf": "z",
+    "filesChanged": "zmienione pliki",
+    "finishedIn": "Zakończono w",
+    "noActivityFor": "Brak aktywności przez",
+    "prOpened": "Otwarto pull request",
+    "permissionWants": "Chce uruchomić",
+    "failure": {
+      "provider": "Zatrzymano: błąd dostawcy",
+      "tool": "Zatrzymano: błąd narzędzia",
+      "cancelled": "Zatrzymano: anulowano",
+      "other": "ZATRZYMANA"
+    }
   },
   "transcriptionModel": {
     "title": "Model transkrypcji",

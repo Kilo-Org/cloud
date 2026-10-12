@@ -136,7 +136,9 @@
     "working": "કામ ચાલુ છે",
     "yourOwnRepositories": "તમારી પોતાની રિપોઝિટરીઓ",
     "dismissed": "ખારિજ કરેલું",
-    "agent": "એજન્ટ"
+    "agent": "એજન્ટ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "ભાષા લાગુ કરવા ઍપ ફરી શરૂ થઈ રહી છે",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClawની પ્રવૃત્તિ",
       "balance": "બેલેન્સ અંગેની ચેતવણીઓ",
       "security": "સુરક્ષા તપાસનાં તારણો",
-      "spend": "ખર્ચની ચેતવણીઓ"
+      "spend": "ખર્ચની ચેતવણીઓ",
+      "followedSessions": "ફોલો કરેલ સેશન્સ"
     },
     "category": {
       "chatMessagesSubtitle": "તમારી વાતચીતમાં જવાબો",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "તમારી રાહમાં",
     "nextScheduled": "આગામી નિર્ધારિત",
     "answerNeeded": "જવાબ જરૂરી",
-    "waitingToRetry": "ફરી પ્રયાસની રાહમાં"
+    "waitingToRetry": "ફરી પ્રયાસની રાહમાં",
+    "step": {
+      "editing": "સંપાદન",
+      "reading": "વાંચન",
+      "running": "ચલાવો",
+      "searching": "વેબ શોધ",
+      "thinking": "વિચારી રહ્યું છે"
+    },
+    "planOf": "માંથી",
+    "filesChanged": "ફાઇલો બદલાઈ",
+    "finishedIn": "માં પૂર્ણ",
+    "noActivityFor": "કોઈ પ્રવૃત્તિ નથી",
+    "prOpened": "પુલ રિક્વેસ્ટ ખૂલી",
+    "permissionWants": "ચલાવવા માંગે છે",
+    "failure": {
+      "provider": "બંધ થયું: પ્રદાતા ભૂલ",
+      "tool": "બંધ થયું: સાધન ભૂલ",
+      "cancelled": "બંધ થયું: રદ કર્યું",
+      "other": "રોકાયેલું"
+    }
   },
   "transcriptionModel": {
     "title": "અવાજને લખાણમાં ફેરવવાનું મોડેલ",

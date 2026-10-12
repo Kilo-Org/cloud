@@ -136,7 +136,9 @@
     "working": "काम सुरू आहे",
     "yourOwnRepositories": "तुमच्या स्वतःच्या रिपॉझिटरी",
     "dismissed": "दुर्लक्षित",
-    "agent": "एजंट"
+    "agent": "एजंट",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "निवडलेली भाषा लागू करण्यासाठी पुन्हा सुरू होत आहे",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw मधील घडामोडी",
       "balance": "शिल्लक रकमेच्या सूचना",
       "security": "सुरक्षा निष्कर्ष",
-      "spend": "खर्चाच्या सूचना"
+      "spend": "खर्चाच्या सूचना",
+      "followedSessions": "फॉलो केलेली सत्रे"
     },
     "category": {
       "chatMessagesSubtitle": "तुमच्या संभाषणांमधील उत्तरे",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "तुमची प्रतीक्षा",
     "nextScheduled": "पुढील नियोजित",
     "answerNeeded": "उत्तर आवश्यक",
-    "waitingToRetry": "पुन्हा प्रयत्नाची प्रतीक्षा"
+    "waitingToRetry": "पुन्हा प्रयत्नाची प्रतीक्षा",
+    "step": {
+      "editing": "संपादन",
+      "reading": "वाचन",
+      "running": "चालवा",
+      "searching": "वेब शोध",
+      "thinking": "विचार करत आहे"
+    },
+    "planOf": "पैकी",
+    "filesChanged": "फाइल्स बदलल्या",
+    "finishedIn": "पूर्ण झाले",
+    "noActivityFor": "हालचाल नाही",
+    "prOpened": "पुल रिक्वेस्ट उघडली",
+    "permissionWants": "चालवायचे आहे",
+    "failure": {
+      "provider": "थांबले: प्रदाता त्रुटी",
+      "tool": "थांबले: साधन त्रुटी",
+      "cancelled": "थांबले: रद्द केले",
+      "other": "थांबले"
+    }
   },
   "transcriptionModel": {
     "title": "लिप्यंतरण मॉडेल",

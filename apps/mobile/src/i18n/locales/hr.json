@@ -136,7 +136,9 @@
     "working": "U radu",
     "yourOwnRepositories": "Tvoji repozitoriji",
     "dismissed": "Odbačeno",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promjene jezika",
@@ -847,7 +849,8 @@
       "kiloclaw": "Aktivnost u KiloClawu",
       "balance": "Upozorenja o stanju računa",
       "security": "Sigurnosni nalazi",
-      "spend": "Upozorenja o potrošnji"
+      "spend": "Upozorenja o potrošnji",
+      "followedSessions": "Praćene sesije"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",
@@ -3206,7 +3209,26 @@
     "waitingForYou": "Čeka vas",
     "nextScheduled": "Sljedeće zakazano",
     "answerNeeded": "Potreban odgovor",
-    "waitingToRetry": "Čeka ponovni pokušaj"
+    "waitingToRetry": "Čeka ponovni pokušaj",
+    "step": {
+      "editing": "Uređivanje",
+      "reading": "Čitanje",
+      "running": "Pokretanje",
+      "searching": "Web pretraga",
+      "thinking": "Razmišljanje"
+    },
+    "planOf": "od",
+    "filesChanged": "datoteke promijenjene",
+    "finishedIn": "Završeno za",
+    "noActivityFor": "Nema aktivnosti već",
+    "prOpened": "Zahtjev za povlačenje otvoren",
+    "permissionWants": "Želi pokrenuti",
+    "failure": {
+      "provider": "Zaustavljeno: pogreška pružatelja",
+      "tool": "Zaustavljeno: pogreška alata",
+      "cancelled": "Zaustavljeno: otkazano",
+      "other": "ZAUSTAVLJENO"
+    }
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",

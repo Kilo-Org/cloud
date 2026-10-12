@@ -136,7 +136,9 @@
     "working": "Em execução",
     "yourOwnRepositories": "Seus próprios repositórios",
     "dismissed": "Ignorado",
-    "agent": "Agente"
+    "agent": "Agente",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -262,7 +264,8 @@
       "kiloclaw": "Atividade do KiloClaw",
       "balance": "Alertas de saldo",
       "security": "Problemas de segurança",
-      "spend": "Alertas de gastos"
+      "spend": "Alertas de gastos",
+      "followedSessions": "Sessões seguidas"
     },
     "liveActivities": "Atividades ao vivo",
     "liveActivitySubtitle": "Mostrar agentes ativos na tela de bloqueio",
@@ -3206,7 +3209,26 @@
     "waitingForYou": "Aguardando você",
     "nextScheduled": "Próximas agendadas",
     "answerNeeded": "Aguardando resposta",
-    "waitingToRetry": "Aguardando nova tentativa"
+    "waitingToRetry": "Aguardando nova tentativa",
+    "step": {
+      "editing": "Editando",
+      "reading": "Lendo",
+      "running": "Executando",
+      "searching": "Pesquisa na Web",
+      "thinking": "Pensando"
+    },
+    "planOf": "de",
+    "filesChanged": "arquivos alterados",
+    "finishedIn": "Concluído em",
+    "noActivityFor": "Sem atividade há",
+    "prOpened": "Pull request aberto",
+    "permissionWants": "Quer executar",
+    "failure": {
+      "provider": "Parado: erro do provedor",
+      "tool": "Parado: erro da ferramenta",
+      "cancelled": "Parado: cancelado",
+      "other": "PARADO"
+    }
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",

@@ -136,7 +136,9 @@
     "working": "Í vinnslu",
     "yourOwnRepositories": "Þín eigin kóðasöfn",
     "dismissed": "Vísað frá",
-    "agent": "Umboðsmaður"
+    "agent": "Umboðsmaður",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -831,7 +833,8 @@
       "kiloclaw": "Virkni í KiloClaw",
       "balance": "Inneignarviðvaranir",
       "security": "Öryggisniðurstöður",
-      "spend": "Útgjaldaviðvaranir"
+      "spend": "Útgjaldaviðvaranir",
+      "followedSessions": "Fylgdar lotur"
     },
     "category": {
       "chatMessagesSubtitle": "svör í samtölunum þínum",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Bíður eftir þér",
     "nextScheduled": "Næst á dagskrá",
     "answerNeeded": "Bíður eftir svari",
-    "waitingToRetry": "Bíður eftir endurtilraun"
+    "waitingToRetry": "Bíður eftir endurtilraun",
+    "step": {
+      "editing": "Breyting",
+      "reading": "Lestur",
+      "running": "Keyrsla",
+      "searching": "Vefleit",
+      "thinking": "Ígrundun"
+    },
+    "planOf": "af",
+    "filesChanged": "skrár breyttar",
+    "finishedIn": "Lokið á",
+    "noActivityFor": "Engin virkni í",
+    "prOpened": "Pull request opnað",
+    "permissionWants": "Vill keyra",
+    "failure": {
+      "provider": "Stöðvað: villa veitanda",
+      "tool": "Stöðvað: verkfæravilla",
+      "cancelled": "Stöðvað: hætt við",
+      "other": "STÖÐVAÐ"
+    }
   },
   "transcriptionModel": {
     "title": "Umritunarlíkan",

@@ -136,7 +136,9 @@
     "working": "Աշխատում է",
     "yourOwnRepositories": "Քո սեփական պահոցները",
     "dismissed": "Անտեսված",
-    "agent": "Գործակալ"
+    "agent": "Գործակալ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Վերագործարկվում է՝ լեզվի փոփոխությունը կիրառելու համար",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw-ի ակտիվություն",
       "balance": "Մնացորդի մասին զգուշացումներ",
       "security": "Հայտնաբերված անվտանգության խնդիրներ",
-      "spend": "Ծախսերի ծանուցումներ"
+      "spend": "Ծախսերի ծանուցումներ",
+      "followedSessions": "Հետևված սեսիաներ"
     },
     "category": {
       "chatMessagesSubtitle": "պատասխաններ ձեր զրույցներում",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Սպասում է ձեզ",
     "nextScheduled": "Հաջորդ պլանավորվածները",
     "answerNeeded": "Սպասում է պատասխանի",
-    "waitingToRetry": "Սպասում է կրկնափորձի"
+    "waitingToRetry": "Սպասում է կրկնափորձի",
+    "step": {
+      "editing": "Խմբագրում",
+      "reading": "Ընթերցում",
+      "running": "Գործարկում",
+      "searching": "Վեբ որոնում",
+      "thinking": "Մտածում"
+    },
+    "planOf": "/",
+    "filesChanged": "փոփոխված ֆայլեր",
+    "finishedIn": "Ավարտվեց",
+    "noActivityFor": "Ակտիվություն չկա",
+    "prOpened": "Pull request-ը բացվեց",
+    "permissionWants": "Ուզում է գործարկել",
+    "failure": {
+      "provider": "Կանգնեցվեց: մատակարարի սխալ",
+      "tool": "Կանգնեցվեց: գործիքի սխալ",
+      "cancelled": "Կանգնեցվեց: չեղարկվեց",
+      "other": "ԿԱՆԳՆԵՑՎԱԾ Է"
+    }
   },
   "transcriptionModel": {
     "title": "Տեքստի վերածման մոդել",

@@ -136,7 +136,9 @@
     "working": "په کار بوخت",
     "yourOwnRepositories": "ستاسو خپل زېرمتونونه",
     "dismissed": "له پامه غورځول شوی",
-    "agent": "اجنټ"
+    "agent": "اجنټ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -831,7 +833,8 @@
       "kiloclaw": "د KiloClaw فعالیت",
       "balance": "د بیلانس خبرتیاوې",
       "security": "امنیتي موندنې",
-      "spend": "د لګښت خبرتیاوې"
+      "spend": "د لګښت خبرتیاوې",
+      "followedSessions": "تعقیب شوې ناستې"
     },
     "category": {
       "chatMessagesSubtitle": "ستاسو په خبرو اترو کې ځوابونه",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "ستاسو په تمه",
     "nextScheduled": "راتلونکی مهال ویش",
     "answerNeeded": "ځواب ته اړتیا لري",
-    "waitingToRetry": "د بیا هڅې په تمه"
+    "waitingToRetry": "د بیا هڅې په تمه",
+    "step": {
+      "editing": "سمون",
+      "reading": "لوستل",
+      "running": "چلول",
+      "searching": "وېب پلټنه",
+      "thinking": "فکر کول"
+    },
+    "planOf": "له",
+    "filesChanged": "فایلونه بدل شول",
+    "finishedIn": "بشپړ شو",
+    "noActivityFor": "هیڅ فعالیت نشته",
+    "prOpened": "د پل غوښتنه پرانیستل شوه",
+    "permissionWants": "چلول غواړي",
+    "failure": {
+      "provider": "ودرېد: د برابرونکي تېروتنه",
+      "tool": "ودرېد: د وسیلې تېروتنه",
+      "cancelled": "ودرېد: لغوه شو",
+      "other": "درېدلی"
+    }
   },
   "transcriptionModel": {
     "title": "د غږ د متن ته بدلولو ماډل",

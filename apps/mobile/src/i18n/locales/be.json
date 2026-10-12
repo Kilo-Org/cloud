@@ -136,7 +136,9 @@
     "working": "Працуе",
     "yourOwnRepositories": "Твае рэпазіторыі",
     "dismissed": "Адхілена",
-    "agent": "Агент"
+    "agent": "Агент",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Перазапуск для змены мовы",
@@ -863,7 +865,8 @@
       "kiloclaw": "Актыўнасць KiloClaw",
       "balance": "Апавяшчэнні аб балансе",
       "security": "Выяўленыя праблемы бяспекі",
-      "spend": "Апавяшчэнні аб выдатаках"
+      "spend": "Апавяшчэнні аб выдатаках",
+      "followedSessions": "Адсочваемыя сеансы"
     },
     "category": {
       "chatMessagesSubtitle": "адказы ў вашых размовах",
@@ -3247,7 +3250,26 @@
     "waitingForYou": "Чакае вас",
     "nextScheduled": "Наступныя запланаваныя",
     "answerNeeded": "Патрэбны адказ",
-    "waitingToRetry": "Чакае паўторнай спробы"
+    "waitingToRetry": "Чакае паўторнай спробы",
+    "step": {
+      "editing": "Рэдагаванне",
+      "reading": "Чытанне",
+      "running": "Запуск",
+      "searching": "Вэб-пошук",
+      "thinking": "Абдумванне"
+    },
+    "planOf": "з",
+    "filesChanged": "файлаў зменена",
+    "finishedIn": "Завершана за",
+    "noActivityFor": "Няма актыўнасці за",
+    "prOpened": "Запыт на зліццё адкрыты",
+    "permissionWants": "Хоча запусціць",
+    "failure": {
+      "provider": "Спынена: памылка правайдэра",
+      "tool": "Спынена: памылка інструмента",
+      "cancelled": "Спынена: скасавана",
+      "other": "СПЫНЕНЫ"
+    }
   },
   "transcriptionModel": {
     "title": "Мадэль распазнавання маўлення",

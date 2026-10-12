@@ -136,7 +136,9 @@
     "working": "处理中",
     "yourOwnRepositories": "你自己的仓库",
     "dismissed": "已忽略",
-    "agent": "代理人"
+    "agent": "代理人",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -320,7 +322,8 @@
       "kiloclaw": "KiloClaw 活动",
       "balance": "余额提醒",
       "security": "安全问题",
-      "spend": "支出提醒"
+      "spend": "支出提醒",
+      "followedSessions": "已关注的会话"
     },
     "category": {
       "chatMessagesSubtitle": "对话中的回复",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "等待你处理",
     "nextScheduled": "后续计划",
     "answerNeeded": "等待回答",
-    "waitingToRetry": "等待重试"
+    "waitingToRetry": "等待重试",
+    "step": {
+      "editing": "编辑中",
+      "reading": "读取中",
+      "running": "运行",
+      "searching": "网页搜索",
+      "thinking": "正在思考"
+    },
+    "planOf": "/",
+    "filesChanged": "个文件已更改",
+    "finishedIn": "耗时",
+    "noActivityFor": "无活动",
+    "prOpened": "拉取请求已打开",
+    "permissionWants": "想要运行",
+    "failure": {
+      "provider": "已停止：提供商错误",
+      "tool": "已停止：工具错误",
+      "cancelled": "已停止：已取消",
+      "other": "已停止"
+    }
   },
   "transcriptionModel": {
     "title": "转写模型",

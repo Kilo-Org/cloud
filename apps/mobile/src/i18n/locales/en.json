@@ -3187,8 +3187,7 @@
       "tool": "Stopped: tool error",
       "cancelled": "Stopped: cancelled",
       "other": "Stopped"
-    },
-    "followFailedDevice": "Couldn't follow this agent on this device."
+    }
   },
   "transcriptionModel": {
     "title": "Transcription model",

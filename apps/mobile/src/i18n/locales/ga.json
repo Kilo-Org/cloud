@@ -136,7 +136,9 @@
     "working": "Ag obair",
     "yourOwnRepositories": "Do stóir féin",
     "dismissed": "Curtha as an áireamh",
-    "agent": "Gníomhaire"
+    "agent": "Gníomhaire",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -879,7 +881,8 @@
       "kiloclaw": "Gníomhaíocht KiloClaw",
       "balance": "Foláirimh iarmhéid",
       "security": "Torthaí slándála",
-      "spend": "Foláirimh chaiteachais"
+      "spend": "Foláirimh chaiteachais",
+      "followedSessions": "Seisiúin leanta"
     },
     "category": {
       "chatMessagesSubtitle": "freagraí i do chomhráite",
@@ -3288,7 +3291,26 @@
     "waitingForYou": "Ag fanacht leat",
     "nextScheduled": "Sceidealaithe amach romhainn",
     "answerNeeded": "Freagra de dhíth",
-    "waitingToRetry": "Ag fanacht le hatriail"
+    "waitingToRetry": "Ag fanacht le hatriail",
+    "step": {
+      "editing": "Eagarthóireacht",
+      "reading": "Léamh",
+      "running": "Rith",
+      "searching": "Cuardach gréasáin",
+      "thinking": "Ag smaoineamh"
+    },
+    "planOf": "as",
+    "filesChanged": "comhaid athraithe",
+    "finishedIn": "Críochnaithe i",
+    "noActivityFor": "Níl aon ghníomhaíocht le",
+    "prOpened": "Iarratas tarraingthe oscailte",
+    "permissionWants": "Teastaíonn uaidh rith",
+    "failure": {
+      "provider": "Stoptha: earráid soláthraí",
+      "tool": "Stoptha: earráid uirlise",
+      "cancelled": "Stoptha: cealaithe",
+      "other": "STADTA"
+    }
   },
   "transcriptionModel": {
     "title": "Samhail tras-scríobh",

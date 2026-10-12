@@ -136,7 +136,9 @@
     "working": "Ana aiki",
     "yourOwnRepositories": "Ma'ajiyoyinka",
     "dismissed": "An yi watsi da shi",
-    "agent": "Wakili"
+    "agent": "Wakili",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -831,7 +833,8 @@
       "kiloclaw": "Ayyukan KiloClaw",
       "balance": "Faɗakarwar ragowar kuɗi",
       "security": "Sakamakon binciken tsaro",
-      "spend": "Faɗakarwar kashe kuɗi"
+      "spend": "Faɗakarwar kashe kuɗi",
+      "followedSessions": "Zaman da ake bibiya"
     },
     "category": {
       "chatMessagesSubtitle": "amsoshi a cikin tattaunawarka",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Ana jiran ku",
     "nextScheduled": "Na gaba da aka tsara",
     "answerNeeded": "Ana buƙatar amsa",
-    "waitingToRetry": "Ana jiran sake gwadawa"
+    "waitingToRetry": "Ana jiran sake gwadawa",
+    "step": {
+      "editing": "Ana gyarawa",
+      "reading": "Ana karatu",
+      "running": "Gudu",
+      "searching": "Binciken yanar gizo",
+      "thinking": "Ana tunani"
+    },
+    "planOf": "cikin",
+    "filesChanged": "fayiloli sun canza",
+    "finishedIn": "An gama cikin",
+    "noActivityFor": "Babu aiki na",
+    "prOpened": "An buɗe buƙatar ja",
+    "permissionWants": "Yana son gudu",
+    "failure": {
+      "provider": "An tsaya: kuskuren mai bayarwa",
+      "tool": "An tsaya: kuskuren kayan aiki",
+      "cancelled": "An tsaya: an soke",
+      "other": "YA TSAYA"
+    }
   },
   "transcriptionModel": {
     "title": "Samfurin mayar da magana zuwa rubutu",

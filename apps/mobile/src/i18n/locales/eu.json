@@ -136,7 +136,9 @@
     "working": "Lanean",
     "yourOwnRepositories": "Zure biltegiak",
     "dismissed": "Baztertuta",
-    "agent": "Agentea"
+    "agent": "Agentea",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw-en jarduera",
       "balance": "Saldoari buruzko alertak",
       "security": "Antzemandako segurtasun-arazoak",
-      "spend": "Gastu-alertak"
+      "spend": "Gastu-alertak",
+      "followedSessions": "Jarraitutako saioak"
     },
     "category": {
       "chatMessagesSubtitle": "zure elkarrizketetako erantzunak",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Zure zain",
     "nextScheduled": "Hurrengo programatuak",
     "answerNeeded": "Zure erantzunaren zain",
-    "waitingToRetry": "Berriro saiatzeko zain"
+    "waitingToRetry": "Berriro saiatzeko zain",
+    "step": {
+      "editing": "Editatzen",
+      "reading": "Irakurtzen",
+      "running": "Exekutatzen",
+      "searching": "Web bilaketa",
+      "thinking": "Hausnartzen"
+    },
+    "planOf": "etik",
+    "filesChanged": "fitxategiak aldatuta",
+    "finishedIn": "Amaituta",
+    "noActivityFor": "Jarduerarik gabe",
+    "prOpened": "Pull request irekita",
+    "permissionWants": "Exekutatu nahi du",
+    "failure": {
+      "provider": "Geldituta: hornitzailearen errorea",
+      "tool": "Geldituta: tresnaren errorea",
+      "cancelled": "Geldituta: bertan behera utzita",
+      "other": "GELDITUTA"
+    }
   },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",

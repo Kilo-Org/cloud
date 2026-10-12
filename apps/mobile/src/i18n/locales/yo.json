@@ -136,7 +136,9 @@
     "working": "Ń ṣiṣẹ́",
     "yourOwnRepositories": "Àwọn ibi ìpamọ́ kóòdù tìrẹ",
     "dismissed": "A ti kọ̀ sílẹ̀",
-    "agent": "Aṣoju"
+    "agent": "Aṣoju",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "A ń tún bẹ̀rẹ̀ láti lo èdè tí o yàn",
@@ -831,7 +833,8 @@
       "kiloclaw": "Àwọn ìgbòkègbodò KiloClaw",
       "balance": "Àwọn ìkìlọ̀ nípa owó tó kù",
       "security": "Àwọn àwárí ààbò",
-      "spend": "Àwọn ìkìlọ̀ ìnáwó"
+      "spend": "Àwọn ìkìlọ̀ ìnáwó",
+      "followedSessions": "Àwọn sẹ́ṣàn tí a tẹ̀lé"
     },
     "category": {
       "chatMessagesSubtitle": "àwọn ìdáhùn nínú ìjíròrò rẹ",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Ń dúró dè ọ́",
     "nextScheduled": "Àwọn ètò tó kàn",
     "answerNeeded": "Nílò èsì",
-    "waitingToRetry": "Ń dúró láti tún gbìyànjú"
+    "waitingToRetry": "Ń dúró láti tún gbìyànjú",
+    "step": {
+      "editing": "Ṣíṣe àtúnṣe",
+      "reading": "Kíkà",
+      "running": "Ṣiṣẹ́",
+      "searching": "Wíwá lórí wẹ́ẹ̀bù",
+      "thinking": "Ń rònú jinlẹ̀"
+    },
+    "planOf": "nínú",
+    "filesChanged": "àwọn fáìlì tí a yí padà",
+    "finishedIn": "Ó parí ní",
+    "noActivityFor": "Kò sí ìṣe fún",
+    "prOpened": "Ìbéèrè ìfà ti ṣí",
+    "permissionWants": "Ó fẹ́ ṣiṣẹ́",
+    "failure": {
+      "provider": "Ó dúró: àṣìṣe olùpèsè",
+      "tool": "Ó dúró: àṣìṣe irinṣẹ́",
+      "cancelled": "Ó dúró: a fagilé",
+      "other": "TI DÚRÓ"
+    }
   },
   "transcriptionModel": {
     "title": "Àwòṣe ìyípadà ohùn sí ọ̀rọ̀",

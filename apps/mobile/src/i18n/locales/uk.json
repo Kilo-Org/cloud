@@ -136,7 +136,9 @@
     "working": "У роботі",
     "yourOwnRepositories": "Власні репозиторії",
     "dismissed": "Відхилено",
-    "agent": "Агент"
+    "agent": "Агент",
+    "durationMinuteShort": "хв",
+    "durationHourShort": "год"
   },
   "language": {
     "restarting": "Перезапуск для зміни мови",
@@ -320,7 +322,8 @@
       "kiloclaw": "Активність KiloClaw",
       "balance": "Сповіщення про баланс",
       "security": "Виявлені проблеми безпеки",
-      "spend": "Сповіщення про витрати"
+      "spend": "Сповіщення про витрати",
+      "followedSessions": "Відстежувані сеанси"
     },
     "category": {
       "chatMessagesSubtitle": "відповіді у ваших розмовах",
@@ -3247,7 +3250,26 @@
     "waitingForYou": "Очікує на вас",
     "nextScheduled": "Наступні заплановані",
     "answerNeeded": "Очікує відповіді",
-    "waitingToRetry": "Очікує повторної спроби"
+    "waitingToRetry": "Очікує повторної спроби",
+    "step": {
+      "editing": "Редагування",
+      "reading": "Читання",
+      "running": "Запуск",
+      "searching": "Пошук в інтернеті",
+      "thinking": "Обмірковує"
+    },
+    "planOf": "з",
+    "filesChanged": "файлів змінено",
+    "finishedIn": "Завершено за",
+    "noActivityFor": "Немає активності протягом",
+    "prOpened": "Пул-реквест відкрито",
+    "permissionWants": "Хоче запустити",
+    "failure": {
+      "provider": "Зупинено: помилка провайдера",
+      "tool": "Зупинено: помилка інструмента",
+      "cancelled": "Зупинено: скасовано",
+      "other": "ЗУПИНЕНО"
+    }
   },
   "transcriptionModel": {
     "title": "Модель розпізнавання мовлення",

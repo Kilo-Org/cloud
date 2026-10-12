@@ -136,7 +136,9 @@
     "working": "ਕੰਮ ਜਾਰੀ",
     "yourOwnRepositories": "ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਰਿਪੋਜ਼ਿਟਰੀਆਂ",
     "dismissed": "ਖਾਰਜ",
-    "agent": "ਏਜੰਟ"
+    "agent": "ਏਜੰਟ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "ਭਾਸ਼ਾ ਲਾਗੂ ਕਰਨ ਲਈ ਮੁੜ ਚਾਲੂ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw ਦੀ ਗਤੀਵਿਧੀ",
       "balance": "ਬਚੀ ਰਕਮ ਬਾਰੇ ਚੇਤਾਵਨੀਆਂ",
       "security": "ਸੁਰੱਖਿਆ ਜਾਂਚ ਦੇ ਨਤੀਜੇ",
-      "spend": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ"
+      "spend": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ",
+      "followedSessions": "ਫਾਲੋ ਕੀਤੇ ਸੈਸ਼ਨ"
     },
     "category": {
       "chatMessagesSubtitle": "ਤੁਹਾਡੀਆਂ ਗੱਲਬਾਤਾਂ ਵਿੱਚ ਜਵਾਬ",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "ਤੁਹਾਡੀ ਉਡੀਕ",
     "nextScheduled": "ਅਗਲਾ ਨਿਰਧਾਰਿਤ",
     "answerNeeded": "ਜਵਾਬ ਚਾਹੀਦਾ ਹੈ",
-    "waitingToRetry": "ਮੁੜ ਕੋਸ਼ਿਸ਼ ਦੀ ਉਡੀਕ"
+    "waitingToRetry": "ਮੁੜ ਕੋਸ਼ਿਸ਼ ਦੀ ਉਡੀਕ",
+    "step": {
+      "editing": "ਸੰਪਾਦਨ ਕਰ ਰਿਹਾ",
+      "reading": "ਪੜ੍ਹ ਰਿਹਾ",
+      "running": "ਚਲਾ ਰਿਹਾ",
+      "searching": "ਵੈੱਬ ਖੋਜ",
+      "thinking": "ਸੋਚ ਰਿਹਾ"
+    },
+    "planOf": "ਵਿੱਚੋਂ",
+    "filesChanged": "ਫਾਈਲਾਂ ਬਦਲੀਆਂ",
+    "finishedIn": "ਵਿੱਚ ਪੂਰਾ ਹੋਇਆ",
+    "noActivityFor": "ਕੋਈ ਸਰਗਰਮੀ ਨਹੀਂ",
+    "prOpened": "ਪੁੱਲ ਰਿਕੁਐਸਟ ਖੋਲ੍ਹੀ ਗਈ",
+    "permissionWants": "ਚਲਾਉਣਾ ਚਾਹੁੰਦਾ ਹੈ",
+    "failure": {
+      "provider": "ਰੁਕਿਆ: ਪ੍ਰਦਾਤਾ ਗਲਤੀ",
+      "tool": "ਰੁਕਿਆ: ਸਾਧਨ ਗਲਤੀ",
+      "cancelled": "ਰੁਕਿਆ: ਰੱਦ ਕੀਤਾ",
+      "other": "ਰੁਕਿਆ"
+    }
   },
   "transcriptionModel": {
     "title": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਦਾ ਮਾਡਲ",

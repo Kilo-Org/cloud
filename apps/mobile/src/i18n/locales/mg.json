@@ -136,7 +136,9 @@
     "working": "Miasa",
     "yourOwnRepositories": "Ny tahirin-kaodinao manokana",
     "dismissed": "Nesorina",
-    "agent": "mpandraharaha"
+    "agent": "mpandraharaha",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -831,7 +833,8 @@
       "kiloclaw": "Hetsika ao amin'ny KiloClaw",
       "balance": "Fampitandremana momba ny vola sisa",
       "security": "Olana hita amin'ny fiarovana",
-      "spend": "Fampitandremana momba ny fandaniana"
+      "spend": "Fampitandremana momba ny fandaniana",
+      "followedSessions": "Sessions arahina"
     },
     "category": {
       "chatMessagesSubtitle": "valiny amin'ny resakao",
@@ -3165,7 +3168,26 @@
     "waitingForYou": "Miandry anao",
     "nextScheduled": "Voalahatra manaraka",
     "answerNeeded": "Mila valiny",
-    "waitingToRetry": "Miandry hanandrana indray"
+    "waitingToRetry": "Miandry hanandrana indray",
+    "step": {
+      "editing": "Fanovana",
+      "reading": "Famakiana",
+      "running": "Fandehanana",
+      "searching": "Fikarohana an-tserasera",
+      "thinking": "Misaina"
+    },
+    "planOf": "amin'ny",
+    "filesChanged": "rakipeo niova",
+    "finishedIn": "Vita tao anatin'ny",
+    "noActivityFor": "Tsy misy hetsika",
+    "prOpened": "Nisokatra pull request",
+    "permissionWants": "Te hampandeha",
+    "failure": {
+      "provider": "Nijanona: hadisoana mpamatsy",
+      "tool": "Nijanona: hadisoana fitaovana",
+      "cancelled": "Nijanona: nofoanana",
+      "other": "NIJANONA"
+    }
   },
   "transcriptionModel": {
     "title": "Modely fanovana feo ho soratra",

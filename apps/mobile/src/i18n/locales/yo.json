@@ -3359,6 +3359,7 @@
       "quantizations": "Àwọn ìdínkù ìwọ̀n",
       "quantizationsHelp": "Àwọn fáìlì kékeré ń lo ìrántí àti àyè ìpamọ́ díẹ̀. Àwọn fáìlì ńlá sábà máa ń fún ni ní ìdáhùn tí ó dára jù.",
       "quantDetail": "Ìgbàsílẹ̀ {{size}} · nǹkan bí {{memory}} ìrántí",
+      "downloadQuant": "Gbà {{quant}} sílẹ̀",
       "loadingModel": "Ń gbé àlàyé awoṣe wọlé",
       "couldNotLoadModel": "Kò ṣeé ṣe láti gbé awoṣe yìí wọlé",
       "noFiles": "Kò sí fáìlì tí áàpù yìí lè ṣiṣẹ́",

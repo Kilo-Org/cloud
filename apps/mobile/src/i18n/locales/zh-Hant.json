@@ -3359,6 +3359,7 @@
       "quantizations": "量化版本",
       "quantizationsHelp": "較小的檔案佔用較少記憶體和儲存空間。較大的檔案通常能提供較好的回答。",
       "quantDetail": "下載 {{size}} · 約需 {{memory}} 記憶體",
+      "downloadQuant": "下載 {{quant}}",
       "loadingModel": "正在載入模型詳細資料",
       "couldNotLoadModel": "無法載入此模型",
       "noFiles": "沒有此 App 可執行的檔案",

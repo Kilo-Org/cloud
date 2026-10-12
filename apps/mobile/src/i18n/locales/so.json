@@ -3359,6 +3359,7 @@
       "quantizations": "Noocyada qiyaasta",
       "quantizationsHelp": "Faylasha yaryar waxay isticmaalaan xusuus iyo kayd yar. Faylasha waaweyn badanaa waxay bixiyaan jawaabo ka wanaagsan.",
       "quantDetail": "{{size}} soo dejin · qiyaastii {{memory}} oo xusuus ah",
+      "downloadQuant": "Soo deji {{quant}}",
       "loadingModel": "Faahfaahinta moodeelka waa la soo rarayaa",
       "couldNotLoadModel": "Moodeelkan lama soo rari karin",
       "noFiles": "Ma jiraan faylal uu abkani socodsiin karo",

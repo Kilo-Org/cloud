@@ -3400,6 +3400,7 @@
       "quantizations": "Kvantizācijas",
       "quantizationsHelp": "Mazāki faili izmanto mazāk atmiņas un krātuves. Lielāki faili parasti sniedz labākas atbildes.",
       "quantDetail": "Lejupielāde: {{size}} · aptuveni {{memory}} atmiņas",
+      "downloadQuant": "Lejupielādēt {{quant}}",
       "loadingModel": "Ielādē modeļa informāciju",
       "couldNotLoadModel": "Neizdevās ielādēt šo modeli",
       "noFiles": "Nav failu, ko šī lietotne var palaist",

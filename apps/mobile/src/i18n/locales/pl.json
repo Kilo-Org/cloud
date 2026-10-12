@@ -3441,6 +3441,7 @@
       "quantizations": "Kwantyzacje",
       "quantizationsHelp": "Mniejsze pliki zajmują mniej pamięci i miejsca. Większe pliki zwykle dają lepsze odpowiedzi.",
       "quantDetail": "Pobieranie: {{size}} · ok. {{memory}} pamięci",
+      "downloadQuant": "Pobierz {{quant}}",
       "loadingModel": "Wczytywanie szczegółów modelu",
       "couldNotLoadModel": "Nie udało się wczytać tego modelu",
       "noFiles": "Brak plików, które ta aplikacja może uruchomić",

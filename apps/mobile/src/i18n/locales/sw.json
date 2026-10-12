@@ -3359,6 +3359,7 @@
       "quantizations": "Ukwantishaji",
       "quantizationsHelp": "Faili ndogo hutumia kumbukumbu na hifadhi kidogo. Faili kubwa kwa kawaida hutoa majibu bora zaidi.",
       "quantDetail": "Upakuaji wa {{size}} · takriban {{memory}} za kumbukumbu",
+      "downloadQuant": "Pakua {{quant}}",
       "loadingModel": "Inapakia maelezo ya modeli",
       "couldNotLoadModel": "Imeshindwa kupakia modeli hii",
       "noFiles": "Hakuna faili ambazo programu hii inaweza kuendesha",

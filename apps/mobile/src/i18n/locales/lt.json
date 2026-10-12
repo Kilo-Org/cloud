@@ -3441,6 +3441,7 @@
       "quantizations": "Kvantavimai",
       "quantizationsHelp": "Mažesni failai naudoja mažiau atminties ir saugyklos vietos. Didesni failai paprastai pateikia geresnius atsakymus.",
       "quantDetail": "Atsisiuntimas: {{size}} · apie {{memory}} atminties",
+      "downloadQuant": "Atsisiųsti {{quant}}",
       "loadingModel": "Įkeliama modelio informacija",
       "couldNotLoadModel": "Nepavyko įkelti šio modelio",
       "noFiles": "Nėra failų, kuriuos ši programa galėtų paleisti",

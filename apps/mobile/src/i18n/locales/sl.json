@@ -3441,6 +3441,7 @@
       "quantizations": "Kvantizacije",
       "quantizationsHelp": "Manjše datoteke porabijo manj pomnilnika in prostora. Večje datoteke običajno dajejo boljše odgovore.",
       "quantDetail": "Prenos {{size}} · približno {{memory}} pomnilnika",
+      "downloadQuant": "Prenesi {{quant}}",
       "loadingModel": "Nalaganje podrobnosti modela",
       "couldNotLoadModel": "Tega modela ni bilo mogoče naložiti",
       "noFiles": "Ni datotek, ki bi jih ta aplikacija lahko zagnala",

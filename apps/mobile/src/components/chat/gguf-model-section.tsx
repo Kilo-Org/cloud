@@ -46,10 +46,18 @@ type ControlsProps = {
   readonly name: string;
   readonly snapshot: GgufDownloadsSnapshot;
   readonly onDownload: (() => void) | undefined;
+  /** Tells one download button from the others on the same screen. */
+  readonly downloadLabel?: string;
 };
 
 /** One model's state on the device: downloaded, downloading, or ready to download. */
-export function GgufDownloadControls({ fileId, name, snapshot, onDownload }: ControlsProps) {
+export function GgufDownloadControls({
+  fileId,
+  name,
+  snapshot,
+  onDownload,
+  downloadLabel,
+}: ControlsProps) {
   const { t, i18n } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const record = snapshot.models.find(model => model.fileId === fileId);
@@ -122,7 +130,12 @@ export function GgufDownloadControls({ fileId, name, snapshot, onDownload }: Con
         </>
       )}
       {record === undefined && download === undefined && onDownload !== undefined && (
-        <Button variant="outline" disabled={snapshot.download !== null} onPress={onDownload}>
+        <Button
+          variant="outline"
+          disabled={snapshot.download !== null}
+          onPress={onDownload}
+          accessibilityLabel={downloadLabel}
+        >
           <Text>{t('modelChat.gguf.download')}</Text>
         </Button>
       )}

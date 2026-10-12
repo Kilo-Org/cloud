@@ -147,6 +147,7 @@ function QuantRow({
                 download(quant.model, fit);
               }
         }
+        downloadLabel={t('modelChat.catalog.downloadQuant', { quant: quant.label })}
       />
     </View>
   );

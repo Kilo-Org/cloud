@@ -3359,6 +3359,7 @@
       "quantizations": "Pengkuantuman",
       "quantizationsHelp": "Fail yang lebih kecil menggunakan kurang memori dan storan. Fail yang lebih besar biasanya memberikan jawapan yang lebih baik.",
       "quantDetail": "Muat turun {{size}} · kira-kira {{memory}} memori",
+      "downloadQuant": "Muat turun {{quant}}",
       "loadingModel": "Memuatkan butiran model",
       "couldNotLoadModel": "Tidak dapat memuatkan model ini",
       "noFiles": "Tiada fail yang boleh dijalankan oleh apl ini",

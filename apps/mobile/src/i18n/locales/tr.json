@@ -3359,6 +3359,7 @@
       "quantizations": "Nicemlemeler",
       "quantizationsHelp": "Küçük dosyalar daha az bellek ve depolama alanı kullanır. Büyük dosyalar genellikle daha iyi yanıtlar verir.",
       "quantDetail": "{{size}} indirme · yaklaşık {{memory}} bellek",
+      "downloadQuant": "{{quant}} indir",
       "loadingModel": "Model ayrıntıları yükleniyor",
       "couldNotLoadModel": "Bu model yüklenemedi",
       "noFiles": "Bu uygulamanın çalıştırabileceği dosya yok",

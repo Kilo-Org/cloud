@@ -3359,6 +3359,7 @@
       "quantizations": "Kuantizazioak",
       "quantizationsHelp": "Fitxategi txikiagoek memoria eta biltegiratze gutxiago erabiltzen dute. Fitxategi handiagoek erantzun hobeak ematen dituzte normalean.",
       "quantDetail": "{{size}} deskargatzeko · {{memory}} memoria inguru",
+      "downloadQuant": "Deskargatu {{quant}}",
       "loadingModel": "Modeloaren xehetasunak kargatzen",
       "couldNotLoadModel": "Ezin izan da modelo hau kargatu",
       "noFiles": "Ez dago aplikazio honek exekuta dezakeen fitxategirik",

@@ -3482,6 +3482,7 @@
       "quantizations": "Cainníochtuithe",
       "quantizationsHelp": "Úsáideann comhaid níos lú níos lú cuimhne agus stórais. De ghnáth tugann comhaid níos mó freagraí níos fearr.",
       "quantDetail": "Íoslódáil {{size}} · thart ar {{memory}} cuimhne",
+      "downloadQuant": "Íoslódáil {{quant}}",
       "loadingModel": "Sonraí na samhla á lódáil",
       "couldNotLoadModel": "Níorbh fhéidir an tsamhail seo a lódáil",
       "noFiles": "Níl aon chomhaid ann is féidir leis an aip seo a rith",

@@ -3359,6 +3359,7 @@
       "quantizations": "Kwantiserings",
       "quantizationsHelp": "Kleiner lêers gebruik minder geheue en berging. Groter lêers gee gewoonlik beter antwoorde.",
       "quantDetail": "{{size}} aflaai · sowat {{memory}} geheue",
+      "downloadQuant": "Laai {{quant}} af",
       "loadingModel": "Laai tans modelbesonderhede",
       "couldNotLoadModel": "Kon nie hierdie model laai nie",
       "noFiles": "Geen lêers wat hierdie app kan laat loop nie",

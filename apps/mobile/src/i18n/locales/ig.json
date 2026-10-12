@@ -3359,6 +3359,7 @@
       "quantizations": "Kwantaịzeshọn",
       "quantizationsHelp": "Faịlụ ndị dị obere na-eji obere ebe nchekwa na ncheta. Faịlụ ndị ka ibu na-enyekarị azịza ka mma.",
       "quantDetail": "Nbudata {{size}} · ihe dị ka {{memory}} nke ncheta",
+      "downloadQuant": "Budata {{quant}}",
       "loadingModel": "Na-ebunye nkọwa ụdị nlereanya",
       "couldNotLoadModel": "Enweghị ike ibunye ụdị nlereanya a",
       "noFiles": "Ọ dịghị faịlụ ngwa a nwere ike ịgba",

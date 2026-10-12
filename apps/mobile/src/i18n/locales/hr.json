@@ -3400,6 +3400,7 @@
       "quantizations": "Kvantizacije",
       "quantizationsHelp": "Manje datoteke troše manje memorije i prostora. Veće datoteke obično daju bolje odgovore.",
       "quantDetail": "Preuzimanje {{size}} · oko {{memory}} memorije",
+      "downloadQuant": "Preuzmi {{quant}}",
       "loadingModel": "Učitavanje pojedinosti o modelu",
       "couldNotLoadModel": "Učitavanje ovog modela nije uspjelo",
       "noFiles": "Nema datoteka koje ova aplikacija može pokrenuti",

@@ -3359,6 +3359,7 @@
       "quantizations": "Kantifikasyon",
       "quantizationsHelp": "Fichye ki pi piti yo sèvi ak mwens memwa ak espas. Fichye ki pi gwo yo bay pi bon repons anjeneral.",
       "quantDetail": "Telechajman {{size}} · anviwon {{memory}} memwa",
+      "downloadQuant": "Telechaje {{quant}}",
       "loadingModel": "Detay modèl la ap chaje",
       "couldNotLoadModel": "Pa t ka chaje modèl sa a",
       "noFiles": "Pa gen fichye aplikasyon sa a ka kouri",

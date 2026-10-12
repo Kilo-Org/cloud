@@ -3441,6 +3441,7 @@
       "quantizations": "Kvantizace",
       "quantizationsHelp": "Menší soubory zabírají méně paměti a úložiště. Větší soubory obvykle dávají lepší odpovědi.",
       "quantDetail": "Stažení {{size}} · asi {{memory}} paměti",
+      "downloadQuant": "Stáhnout {{quant}}",
       "loadingModel": "Načítání podrobností o modelu",
       "couldNotLoadModel": "Tento model se nepodařilo načíst",
       "noFiles": "Žádné soubory, které tato aplikace umí spustit",

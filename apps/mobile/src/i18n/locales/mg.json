@@ -3359,6 +3359,7 @@
       "quantizations": "Kôantifikasiôna",
       "quantizationsHelp": "Ny rakitra kely kokoa dia mampiasa fahatsiarovana sy toerana fitehirizana kely kokoa. Ny rakitra lehibe kokoa matetika dia manome valiny tsara kokoa.",
       "quantDetail": "{{size}} alaina · fahatsiarovana eo amin'ny {{memory}} eo ho eo",
+      "downloadQuant": "Alaivo ny {{quant}}",
       "loadingModel": "Mampiditra ny antsipirian'ny modely",
       "couldNotLoadModel": "Tsy nahomby ny fampidirana ity modely ity",
       "noFiles": "Tsy misy rakitra azon'ity app ity alefa",

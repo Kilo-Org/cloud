@@ -3359,6 +3359,7 @@
       "quantizations": "Kuantisasi",
       "quantizationsHelp": "File yang lebih kecil menggunakan lebih sedikit memori dan penyimpanan. File yang lebih besar biasanya memberikan jawaban yang lebih baik.",
       "quantDetail": "Unduhan {{size}} · sekitar {{memory}} memori",
+      "downloadQuant": "Unduh {{quant}}",
       "loadingModel": "Memuat detail model",
       "couldNotLoadModel": "Tidak dapat memuat model ini",
       "noFiles": "Tidak ada file yang dapat dijalankan aplikasi ini",

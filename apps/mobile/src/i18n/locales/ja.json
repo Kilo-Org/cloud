@@ -3359,6 +3359,7 @@
       "quantizations": "量子化",
       "quantizationsHelp": "小さいファイルほどメモリとストレージの使用量が少なくなります。大きいファイルのほうが通常は回答の質が高くなります。",
       "quantDetail": "ダウンロード {{size}} · メモリ約 {{memory}}",
+      "downloadQuant": "{{quant}} をダウンロード",
       "loadingModel": "モデルの詳細を読み込み中",
       "couldNotLoadModel": "このモデルを読み込めませんでした",
       "noFiles": "このアプリで実行できるファイルがありません",

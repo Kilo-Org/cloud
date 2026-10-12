@@ -3523,6 +3523,7 @@
       "quantizations": "Cwanteiddiadau",
       "quantizationsHelp": "Mae ffeiliau llai yn defnyddio llai o gof a storfa. Mae ffeiliau mwy fel arfer yn rhoi atebion gwell.",
       "quantDetail": "Lawrlwythiad {{size}} · tua {{memory}} o gof",
+      "downloadQuant": "Lawrlwytho {{quant}}",
       "loadingModel": "Wrthi'n llwytho manylion y model",
       "couldNotLoadModel": "Methu llwytho'r model hwn",
       "noFiles": "Dim ffeiliau y gall yr ap hwn eu rhedeg",

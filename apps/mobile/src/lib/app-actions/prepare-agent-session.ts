@@ -54,6 +54,8 @@ export type PrepareAgentSessionInput =
   | {
       kind: 'continue';
       cloneFromKiloSessionId: string;
+      /** Inclusive fork cut ("Fork from here"); absent clones the whole session. */
+      cloneUpToMessageId?: string;
       repository?: NewSessionRepository | null;
       mode: AgentMode;
       model: string;
@@ -261,7 +263,7 @@ type PrepareSessionSharedFields = PrepareSessionRepositoryFields & {
  */
 type PrepareSessionBody =
   | (PrepareSessionSharedFields & { prompt: string; initialMessageId: string })
-  | (PrepareSessionSharedFields & { cloneFromKiloSessionId: string });
+  | (PrepareSessionSharedFields & { cloneFromKiloSessionId: string; cloneUpToMessageId?: string });
 
 /**
  * The retry fingerprint of an intent. Kept byte-identical to the shape the
@@ -277,6 +279,9 @@ function intentFingerprint(input: PrepareAgentSessionInput): string {
       variant: variantOrUndefined(input.variant),
       mode: input.mode,
       organizationId: input.organizationId ?? null,
+      // Present only for a fork, so a full Continue keeps its stored fingerprint
+      // while a different cut is a different intent.
+      ...(input.cloneUpToMessageId ? { cloneUpToMessageId: input.cloneUpToMessageId } : {}),
     });
   }
   return newIntentFingerprint(input, resolveRepoFingerprint(input.repository ?? null));
@@ -352,6 +357,7 @@ function prepareSessionBody(
       autoInitiate: true,
       operationKey,
       cloneFromKiloSessionId: input.cloneFromKiloSessionId,
+      ...(input.cloneUpToMessageId ? { cloneUpToMessageId: input.cloneUpToMessageId } : {}),
     };
     // The clone variant has no branch: the Continue control clones a session,
     // not a checkout, so no `upstreamBranch` is written.

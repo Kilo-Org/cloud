@@ -204,6 +204,7 @@ import {
   buildContinueHref,
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
+import { type ForkCut, resolveForkCut } from '@/components/agents/fork-cut';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -1090,6 +1091,18 @@ export function SessionDetailContent({
   );
   const isCancelingSelected =
     detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
+  const detailsForkCut = useMemo(
+    () =>
+      detailsMessageId === null
+        ? null
+        : resolveForkCut({
+            messages: displayedMessages,
+            messageId: detailsMessageId,
+            pendingMessages,
+            isSessionStreaming: isStreaming,
+          }),
+    [displayedMessages, detailsMessageId, pendingMessages, isStreaming]
+  );
 
   const baseTranscript = useMemo(() => {
     // A superseded submission's preparation goes with its row: dropping only
@@ -2142,30 +2155,49 @@ export function SessionDetailContent({
     })();
   }, [exitFailure]);
 
+  const pushContinue = useCallback(
+    (cut: ForkCut | null) => {
+      router.push(
+        buildContinueHref({
+          organizationId,
+          cloneFromKiloSessionId: sessionId,
+          cloneSourceTitle: rename.title,
+          cloneUpToMessageId: cut?.cloneUpToMessageId,
+          forkPrefillText: cut?.forkPrefillText,
+          forkSourceIsCloudAgent: Boolean(fetchedData?.cloudAgentSessionId),
+          prefill: buildContinuePrefillParams({
+            gitUrl: fetchedData?.gitUrl,
+            mode: currentMode,
+            model: currentModel,
+            variant: currentVariant,
+          }),
+        }) as Href
+      );
+    },
+    [
+      router,
+      organizationId,
+      sessionId,
+      rename.title,
+      fetchedData?.gitUrl,
+      fetchedData?.cloudAgentSessionId,
+      currentMode,
+      currentModel,
+      currentVariant,
+    ]
+  );
+
   const handleContinueInNewSession = useCallback(() => {
-    router.push(
-      buildContinueHref({
-        organizationId,
-        cloneFromKiloSessionId: sessionId,
-        cloneSourceTitle: rename.title,
-        prefill: buildContinuePrefillParams({
-          gitUrl: fetchedData?.gitUrl,
-          mode: currentMode,
-          model: currentModel,
-          variant: currentVariant,
-        }),
-      }) as Href
-    );
-  }, [
-    router,
-    organizationId,
-    sessionId,
-    rename.title,
-    fetchedData?.gitUrl,
-    currentMode,
-    currentModel,
-    currentVariant,
-  ]);
+    pushContinue(null);
+  }, [pushContinue]);
+
+  const handleForkFromHere = useCallback(() => {
+    if (detailsForkCut === null) {
+      return;
+    }
+    handleCloseDetails();
+    pushContinue(detailsForkCut);
+  }, [detailsForkCut, handleCloseDetails, pushContinue]);
 
   const isFocused = useIsFocused();
   const keepScreenAwake = shouldKeepSessionAwake({
@@ -2331,6 +2363,7 @@ export function SessionDetailContent({
                 ? t('agentChat.session.cancelQueuedUpgradeRequired')
                 : null
             }
+            onForkFromHere={detailsForkCut ? handleForkFromHere : undefined}
           />
 
           {childSessionSheet.sheet ? (

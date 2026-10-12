@@ -112,12 +112,21 @@ function getFirstParam(record: Record<string, string | string[] | undefined>, ke
  * `/(app)/agent-chat/new`, appends `organizationId` when the source has one
  * (same pattern as `new-task-button.tsx`), then the prefill keys, then the
  * clone id and the clone-source title. An empty title is omitted so the form
- * falls back to the session title.
+ * falls back to the session title. A fork ("Fork from here") adds the
+ * inclusive cut and, for a forked user message, its text for the new composer.
  */
 export function buildContinueHref(input: {
   organizationId?: string | null;
   cloneFromKiloSessionId: string;
   cloneSourceTitle?: string | null;
+  cloneUpToMessageId?: string | null;
+  forkPrefillText?: string | null;
+  /**
+   * The fork source is a Cloud Agent session. Its transcript carries no
+   * per-message file edits, so the Continue form explains what the cut fork's
+   * files start from.
+   */
+  forkSourceIsCloudAgent?: boolean;
   prefill: NewSessionPrefillParams;
 }): string {
   let href = '/(app)/agent-chat/new';
@@ -132,6 +141,15 @@ export function buildContinueHref(input: {
   }
   if (input.cloneSourceTitle) {
     entries.push(['cloneSourceTitle', input.cloneSourceTitle]);
+  }
+  if (input.cloneUpToMessageId) {
+    entries.push(['cloneUpToMessageId', input.cloneUpToMessageId]);
+    if (input.forkPrefillText) {
+      entries.push(['forkPrefillText', input.forkPrefillText]);
+    }
+    if (input.forkSourceIsCloudAgent) {
+      entries.push(['forkSourceIsCloudAgent', '1']);
+    }
   }
   if (entries.length === 0) {
     return href;
@@ -151,6 +169,26 @@ export function readCloneFromKiloSessionId(
 /** Read the clone source title from route search params (first array value). */
 export function readCloneSourceTitle(raw: Record<string, string | string[] | undefined>): string {
   return getFirstParam(raw, 'cloneSourceTitle');
+}
+
+/** Read the inclusive fork cut from route search params; empty for a full Continue. */
+export function readCloneUpToMessageId(raw: Record<string, string | string[] | undefined>): string {
+  return getFirstParam(raw, 'cloneUpToMessageId');
+}
+
+/**
+ * Read the forked user message's text from route search params. Empty when
+ * there is no cut: the text only makes sense beside one.
+ */
+export function readForkPrefillText(raw: Record<string, string | string[] | undefined>): string {
+  return readCloneUpToMessageId(raw) ? getFirstParam(raw, 'forkPrefillText') : '';
+}
+
+/** Whether a fork's source is a Cloud Agent session; false without a cut. */
+export function readForkSourceIsCloudAgent(
+  raw: Record<string, string | string[] | undefined>
+): boolean {
+  return readCloneUpToMessageId(raw) !== '' && getFirstParam(raw, 'forkSourceIsCloudAgent') === '1';
 }
 
 /**

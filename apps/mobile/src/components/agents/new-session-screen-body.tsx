@@ -29,6 +29,9 @@ import { useNewSessionPrefillTargets } from '@/components/agents/use-new-session
 import {
   readCloneFromKiloSessionId,
   readCloneSourceTitle,
+  readCloneUpToMessageId,
+  readForkPrefillText,
+  readForkSourceIsCloudAgent,
 } from '@/components/agents/new-session-prefill';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
@@ -51,6 +54,10 @@ import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { usePersistedRunOnDestination } from '@/lib/hooks/use-persisted-run-on-destination';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
+import {
+  FORK_CUT_NOT_SYNCED_KEY,
+  resolveCloneCapabilityRefusal,
+} from '@/lib/hooks/remote-instance-spawn-classifier';
 import {
   resolveContinueStartDisabled,
   resolveNewSessionStartBlockedReason,
@@ -81,6 +88,9 @@ import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
+
+/** The ingest rejection code for a fork cut missing from the cloud source. */
+const CLONE_CUT_NOT_FOUND_CODE = 'clone_cut_not_found';
 
 /**
  * Mounted only for the ordinary new-session entry (not the Continue clone
@@ -113,6 +123,9 @@ export function NewSessionScreenBody() {
     shareId?: string;
     cloneFromKiloSessionId?: string;
     cloneSourceTitle?: string;
+    cloneUpToMessageId?: string;
+    forkPrefillText?: string;
+    forkSourceIsCloudAgent?: string;
     preselectRunOn?: string;
   }>();
   const organizationId = searchParams.organizationId;
@@ -121,6 +134,12 @@ export function NewSessionScreenBody() {
   const cloneFromKiloSessionId = readCloneFromKiloSessionId(searchParams);
   const cloneSourceTitle = readCloneSourceTitle(searchParams);
   const isCloneEntry = cloneFromKiloSessionId !== '';
+  // "Fork from here": the inclusive cut, and a forked user message's text for
+  // the new session's composer. Both empty for a full Continue.
+  const cloneUpToMessageId = isCloneEntry ? readCloneUpToMessageId(searchParams) : '';
+  const forkPrefillText = cloneUpToMessageId ? readForkPrefillText(searchParams) : '';
+  const forkSourceIsCloudAgent =
+    cloneUpToMessageId !== '' && readForkSourceIsCloudAgent(searchParams);
   // The route's explicit Run-on preselection: the tour's cloud path names the
   // Cloud Agent sentinel, the computer path names the tapped connection id.
   const preselectRunOn = readPreselectRunOn(searchParams.preselectRunOn);
@@ -524,10 +543,12 @@ export function NewSessionScreenBody() {
     onSpawnFailed: () => {
       skipDiscardGuardRef.current = false;
     },
-    // Clone entry: the dispatch sends the source id only when the selected
-    // CLI advertises `sessionClone`, and surfaces delivered clone/import
+    // Clone entry: the dispatch sends the source id (and a fork cut) only when
+    // the selected CLI can clone it, and surfaces delivered clone/import
     // failures through this inline-reason callback.
     cloneFromKiloSessionId: isCloneEntry ? cloneFromKiloSessionId : null,
+    cloneUpToMessageId: cloneUpToMessageId || null,
+    forkPrefillText: forkPrefillText || null,
     onCloneImportFailure: handleCloneImportFailure,
     onSpawnReady: armCloneNavigateBypass,
   });
@@ -679,22 +700,29 @@ export function NewSessionScreenBody() {
   );
 
   const isRemoteTargetSelected = runOnInstance !== null;
-  // Optimistic CLI-capability gate: an instance that has not advertised
-  // `sessionClone` is treated as capable; only an explicit
-  // `sessionClone: false` marks it incapable.
-  const instanceHasSessionClone =
-    runOnInstance !== null && runOnInstance.capabilities?.sessionClone !== false;
-  // Clone entry: a CLI the picker reported as incapable shows the inline
-  // "cannot continue" reason immediately; a delivered clone/import failure
-  // overrides it after a Start attempt. Both clear when Run-on changes (see
-  // handleRunOnChange).
-  const incapableCliSelected = isCloneEntry && runOnInstance !== null && !instanceHasSessionClone;
+  // Clone CLI-capability gate: a full clone is optimistic (only an explicit
+  // `sessionClone: false` refuses it); a fork cut needs
+  // `sessionCloneAtMessage: true`. A refused CLI shows its inline reason
+  // immediately; a delivered clone/import failure overrides it after a Start
+  // attempt. Both clear when Run-on changes (see handleRunOnChange).
+  const cloneCapabilityRefusal =
+    runOnInstance === null
+      ? null
+      : resolveCloneCapabilityRefusal(
+          { cloneFromKiloSessionId, cloneUpToMessageId },
+          runOnInstance
+        );
+  const instanceHasSessionClone = runOnInstance !== null && cloneCapabilityRefusal === null;
   let runOnInlineNote: string | null = null;
-  if (incapableCliSelected) {
-    runOnInlineNote = t('agentChat.newSession.cliCannotContinue');
+  if (isCloneEntry && cloneCapabilityRefusal !== null) {
+    runOnInlineNote = t(cloneCapabilityRefusal);
   } else if (cloneImportFailureKey !== null) {
     runOnInlineNote = t(cloneImportFailureKey);
   }
+  // A cut the CLI could not find yet is shown inline but keeps Start enabled:
+  // the source syncs in a moment, so a retry can succeed.
+  const blockingCloneImportFailureKey =
+    cloneImportFailureKey === FORK_CUT_NOT_SYNCED_KEY ? null : cloneImportFailureKey;
 
   function resolveStartDisabled(): boolean {
     if (isCloneEntry) {
@@ -708,7 +736,7 @@ export function NewSessionScreenBody() {
         isRemoteTargetSelected,
         instanceCatalogLoading: instanceCatalog.isLoading,
         instanceHasSessionClone,
-        cloneImportFailureKey,
+        cloneImportFailureKey: blockingCloneImportFailureKey,
         isModelUnavailable: modelView.isSelectionUnavailable,
       });
     }
@@ -761,7 +789,7 @@ export function NewSessionScreenBody() {
             isRemoteTargetSelected,
             instanceCatalogLoading: instanceCatalog.isLoading,
             instanceHasSessionClone,
-            cloneImportFailureKey,
+            cloneImportFailureKey: blockingCloneImportFailureKey,
             isModelUnavailable: modelView.isSelectionUnavailable,
           },
         }
@@ -797,9 +825,10 @@ export function NewSessionScreenBody() {
   const handleStartSession = useCallback(() => {
     if (isCloneEntry) {
       if (runOnInstance !== null) {
-        // Live CLI import: the dispatch carries the clone source id unless the
-        // instance explicitly reported `sessionClone: false` (unknown is
-        // treated as capable).
+        // Live CLI import: the dispatch carries the clone source id (and the
+        // cut) unless the capability gate refuses the instance. A fresh
+        // attempt clears a retryable "not saved yet" note.
+        setCloneImportFailureKey(current => (current === FORK_CUT_NOT_SYNCED_KEY ? null : current));
         remoteSpawn.onStart();
         return;
       }
@@ -810,14 +839,27 @@ export function NewSessionScreenBody() {
         try {
           await runCloudCreate(
             cloneFromKiloSessionId as KiloSessionId,
-            { repository: selectedRepository, model: displayModel, variant: displayVariant },
+            {
+              repository: selectedRepository,
+              model: displayModel,
+              variant: displayVariant,
+              ...(cloneUpToMessageId ? { cloneUpToMessageId } : {}),
+              ...(forkPrefillText ? { forkPrefillText } : {}),
+            },
             mode
           );
         } catch (error) {
-          const message =
-            isCloudPrepareRetryableError(error) || !(error instanceof Error) || !error.message
-              ? i18n.t('agentChat.session.cloneFailedRetry')
-              : error.message;
+          let message = i18n.t('agentChat.session.cloneFailedRetry');
+          if (error instanceof Error && error.message === CLONE_CUT_NOT_FOUND_CODE) {
+            // The cut message is not in the saved source yet: say so, Start stays enabled.
+            message = i18n.t(FORK_CUT_NOT_SYNCED_KEY);
+          } else if (
+            error instanceof Error &&
+            error.message &&
+            !isCloudPrepareRetryableError(error)
+          ) {
+            message = error.message;
+          }
           toast.error(message);
         } finally {
           setIsCreating(false);
@@ -840,6 +882,8 @@ export function NewSessionScreenBody() {
     isCloneEntry,
     runOnInstance,
     cloneFromKiloSessionId,
+    cloneUpToMessageId,
+    forkPrefillText,
     selectedRepository,
     displayModel,
     displayVariant,
@@ -861,6 +905,16 @@ export function NewSessionScreenBody() {
               title: sessionDisplayTitle(cloneSourceTitle) ?? t('agentChat.session.title'),
             })}
           </Text>
+          {/* A Cloud Agent source has no per-message file edits, so a cut fork
+              carries none on any destination. A remote CLI source has its
+              files rebuilt at the cut and needs no note. */}
+          {forkSourceIsCloudAgent ? (
+            <Text className="pt-1 text-sm text-muted-foreground">
+              {runOnInstance === null
+                ? t('agentChat.newSession.forkFilesFromBaseBranch')
+                : t('agentChat.newSession.forkFilesUnchangedOnComputer')}
+            </Text>
+          ) : null}
         </View>
       ) : null}
       <NewSessionConfigureForm

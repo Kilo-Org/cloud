@@ -582,6 +582,30 @@ export function _resetIosSinkForTests(): void {
   actionNotice = null;
   noticeAskKey = null;
   approving = false;
+  lastSinkContext = null;
+}
+
+/**
+ * The context of the last tray update, kept for the follow-change republish.
+ * A follow change carries no tray update of its own, so the republish uses the
+ * one the last publish ran under to register the card's token.
+ */
+let lastSinkContext: GlanceableSinkContext | null = null;
+
+/**
+ * Re-render the aggregate card after a follow or an unfollow, from the last
+ * snapshot the publisher wrote.
+ *
+ * An unfollow makes the reduced card startable again on the spot: the card
+ * ended while the last session was followed, and no tray update follows an
+ * unfollow that changes nothing else, so the card has to come back here.
+ */
+export function republishAggregateCard(): void {
+  const snapshot = getLastGlanceableSnapshot();
+  if (snapshot === null) {
+    return;
+  }
+  iosSink.publish(snapshot, lastSinkContext ?? undefined);
 }
 
 export const iosSink: GlanceableSink = {
@@ -593,7 +617,17 @@ export const iosSink: GlanceableSink = {
     await pendingStart;
   },
 
-  publish(snapshot) {
+  /**
+   * Re-render the aggregate card from a snapshot the publisher already wrote.
+   *
+   * `ctx` is the context of the last tray update. It is present only when the
+   * caller may raise a card: the follow subscription passes it, because a
+   * follow change can make work startable again on the spot — the card ended
+   * while the last session was followed, and no tray update follows an
+   * unfollow that changes nothing else. A background press omits it, because a
+   * press must never raise a new card.
+   */
+  publish(snapshot, ctx) {
     const homeData = getHomeWidgetDataForSnapshot(snapshot);
     const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate, homeData));
     ActiveAgentsWidget.updateSnapshot(props);
@@ -618,14 +652,23 @@ export const iosSink: GlanceableSink = {
       void endNow(immediate ? null : GLANCEABLE_TERMINAL_MS, contentState, true);
       return;
     }
-    // Never start here. Recheck cached native work and preserve update/end ordering.
+    // Recheck cached native work and preserve update/end ordering.
     if (refreshActivity() && activity !== null) {
       lastProps = contentState;
       inFlightUpdate = activity.update(lastProps, STALE_AFTER_SECONDS, aggregateRelevance(card));
+      return;
+    }
+    // No live card. A follow change can make the reduced card startable again
+    // with no tray update behind it, so raise the card here when the caller
+    // carries a context; `startOrUpdate` owns the replacement of a card that is
+    // still waiting out its dismissal.
+    if (ctx !== undefined && isStartableGlanceableWork(card)) {
+      iosSink.startOrUpdate(snapshot, ctx);
     }
   },
 
   startOrUpdate(rawSnapshot, ctx) {
+    lastSinkContext = ctx;
     // The Live Activity counts only the sessions this device does not follow.
     const snapshot = withoutFollowedSessions(rawSnapshot);
     // The in-app switch is checked first: it is the one the user set here, and

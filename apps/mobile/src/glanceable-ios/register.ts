@@ -27,6 +27,7 @@ import { refreshActiveAgentsLiveActivityCopy } from './active-agents-live-activi
 import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
 import { handleGlanceableInteraction } from './interaction';
 import { iosSink, sweepStrayActivities } from './ios-sink';
+import { republishAggregateCard } from './ios-sink';
 import { endAllSessionCards, subscribeSessionFollows } from './session-follow';
 import { refreshSessionLiveActivityCopy } from './session-live-activity';
 import { registerWidgetActionHandling } from './widget-actions';
@@ -113,16 +114,13 @@ if (Platform.OS === 'ios') {
   });
 
   // The aggregate card counts only the sessions this device does not follow,
-  // so a follow or an unfollow re-renders it from the last snapshot. Rendering
-  // never starts a card: the next tray update starts one again after an
-  // unfollow.
+  // so a follow or an unfollow re-renders it from the last snapshot — and an
+  // unfollow raises it again when the reduced card becomes startable, because
+  // no tray update follows a follow change that changes nothing else.
   subscribeSessionFollows(() => {
-    const snapshot = getLastGlanceableSnapshot();
-    if (snapshot !== null) {
-      guardSink('follow_publish', () => {
-        iosSink.publish(snapshot);
-      });
-    }
+    guardSink('follow_publish', () => {
+      republishAggregateCard();
+    });
   });
 
   // Sign-out, an account change, an organization switch, and a lost

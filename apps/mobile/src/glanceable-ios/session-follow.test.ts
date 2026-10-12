@@ -146,17 +146,19 @@ describe('followSession', () => {
 
     expect(followSession(RUNNING, CTX, NOW)).toBe('started');
 
+    const content = mocks.start.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(content).toMatchObject({
+      sessionId: 'session-1',
+      title: 'Migrate the billing webhooks',
+      statusKind: 'running',
+      statusSince: '2026-10-12T09:48:00.000Z',
+      scheduledAt: null,
+      awaitingPermission: false,
+      approvalKey: null,
+      updatedAt: '2026-10-12T10:00:00.000Z',
+    });
     expect(mocks.start).toHaveBeenCalledWith(
-      {
-        sessionId: 'session-1',
-        title: 'Migrate the billing webhooks',
-        statusKind: 'running',
-        statusSince: '2026-10-12T09:48:00.000Z',
-        scheduledAt: null,
-        awaitingPermission: false,
-        approvalKey: null,
-        updatedAt: '2026-10-12T10:00:00.000Z',
-      },
+      content,
       'kiloapp:///cloud/sessions/session-1',
       GLANCEABLE_STALE_MS / 1000,
       sessionLiveActivityRelevance('running', RUNNING.statusUpdatedAt)

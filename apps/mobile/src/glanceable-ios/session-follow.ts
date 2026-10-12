@@ -1,5 +1,6 @@
 import {
   buildSessionLiveActivityContentState,
+  SESSION_CARD_QUIET_AFTER_MS,
   type SessionLiveActivityContentState,
   type SessionLiveActivityRow,
 } from '@kilocode/notifications';
@@ -205,7 +206,7 @@ function startCard(content: SessionLiveActivityContentState): SessionActivity | 
     return SessionLiveActivity.start(
       content,
       launcherSessionUrl(content.sessionId),
-      SESSION_CARD_STALE_AFTER_SECONDS,
+      sessionCardStaleAfterSeconds(content),
       sessionCardRelevance(content)
     );
   } catch {
@@ -312,8 +313,37 @@ function drawsSame(a: SessionLiveActivityProps | null, b: SessionLiveActivityPro
     a.statusSince === b.statusSince &&
     a.scheduledAt === b.scheduledAt &&
     a.awaitingPermission === b.awaitingPermission &&
-    a.approvalKey === b.approvalKey
+    a.approvalKey === b.approvalKey &&
+    // The richer facts and the times move on a push; a local rebuild that
+    // changed one of them is still a change the card must show.
+    JSON.stringify(a.currentStep ?? null) === JSON.stringify(b.currentStep ?? null) &&
+    JSON.stringify(a.plan ?? null) === JSON.stringify(b.plan ?? null) &&
+    JSON.stringify(a.changes ?? null) === JSON.stringify(b.changes ?? null) &&
+    JSON.stringify(a.outcome ?? null) === JSON.stringify(b.outcome ?? null) &&
+    JSON.stringify(a.failure ?? null) === JSON.stringify(b.failure ?? null) &&
+    a.permissionCommand === b.permissionCommand &&
+    a.lastActivityAt === b.lastActivityAt &&
+    a.costMicrodollars === b.costMicrodollars &&
+    a.startedAt === b.startedAt
   );
+}
+
+/**
+ * The number of seconds until the card can no longer claim to be current.
+ * ActivityKit takes a duration, so a working card ends its window five minutes
+ * after the last activity the server reported; that is what lets a card whose
+ * agent stopped reporting activity reach the quiet warning with no push for
+ * the clock alone. Every other card keeps the shared stale window.
+ */
+export function sessionCardStaleAfterSeconds(
+  content: SessionLiveActivityContentState | SessionLiveActivityProps,
+  nowMs: number = Date.now()
+): number {
+  if (content.statusKind !== 'running') return SESSION_CARD_STALE_AFTER_SECONDS;
+  const at = content.lastActivityAt == null ? Number.NaN : Date.parse(content.lastActivityAt);
+  if (!Number.isFinite(at)) return SESSION_CARD_STALE_AFTER_SECONDS;
+  const quietRemaining = Math.max(0, Math.floor((at + SESSION_CARD_QUIET_AFTER_MS - nowMs) / 1000));
+  return Math.min(SESSION_CARD_STALE_AFTER_SECONDS, quietRemaining);
 }
 
 /**
@@ -354,6 +384,9 @@ export function syncFollowedSessionCards(
         approvalKey: current?.approvalKey ?? null,
         updatedAt,
         statusSinceFallback: current?.statusSince ?? updatedAt,
+        // A tray row carries no step, plan, diff or outcome: the rebuild keeps
+        // the ones the last push delivered instead of wiping them.
+        previous: current ?? undefined,
       });
       if (content.statusKind === 'idle') {
         cards.delete(sessionId);
@@ -364,7 +397,7 @@ export function syncFollowedSessionCards(
         void settleCardWork(
           activity.update(
             { ...content, ...sessionCardPress(sessionId) },
-            SESSION_CARD_STALE_AFTER_SECONDS,
+            sessionCardStaleAfterSeconds(content),
             sessionCardRelevance(content)
           )
         );

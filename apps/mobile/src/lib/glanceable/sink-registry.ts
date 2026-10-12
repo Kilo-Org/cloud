@@ -19,7 +19,12 @@ export type GlanceableSinkContext = {
 };
 
 export type GlanceableSink = {
-  publish(snapshot: GlanceableAgentsSnapshot): void;
+  /**
+   * Re-render from a snapshot the publisher already wrote. A sink that can
+   * raise a card may take `ctx` and use it for the token registration of that
+   * card; omit it when the caller must never raise a card.
+   */
+  publish(snapshot: GlanceableAgentsSnapshot, ctx?: GlanceableSinkContext): void;
   /** Owns native terminal dismissal; await submission, never schedule a later JS end. */
   waitForNativeTerminal?(): Promise<void>;
   /**

@@ -1,0 +1,303 @@
+/* eslint-disable max-lines -- one cohesive layout suite for one stringified widget function */
+import { describe, expect, it, vi } from 'vitest';
+
+import type { LiveActivityEnvironment } from 'expo-widgets';
+
+import { SESSION_CARD_QUIET_AFTER_MS } from '@kilocode/notifications';
+
+import { sessionLiveActivityLayout } from './session-live-activity';
+
+function mockComponent(kind: string) {
+  return Object.assign((props: Record<string, unknown>) => ({ kind, props }), { kind });
+}
+
+function mockModifier(name: string) {
+  return (args?: unknown) => ({ $type: name, args });
+}
+
+vi.mock('expo-widgets', () => ({ createLiveActivity: () => ({}), widgetsDirectory: '' }));
+vi.mock('@expo/ui/swift-ui', () => ({
+  Button: mockComponent('Button'),
+  Circle: mockComponent('Circle'),
+  HStack: mockComponent('HStack'),
+  Image: mockComponent('Image'),
+  Link: mockComponent('Link'),
+  ProgressView: mockComponent('ProgressView'),
+  Spacer: mockComponent('Spacer'),
+  Text: mockComponent('Text'),
+  VStack: mockComponent('VStack'),
+  ZStack: mockComponent('ZStack'),
+}));
+vi.mock('@expo/ui/swift-ui/modifiers', () => ({
+  accessibilityElement: mockModifier('accessibilityElement'),
+  accessibilityLabel: mockModifier('accessibilityLabel'),
+  activityBackgroundTint: mockModifier('activityBackgroundTint'),
+  background: (style: unknown) => ({ $type: 'background', args: style }),
+  buttonStyle: mockModifier('buttonStyle'),
+  clipShape: mockModifier('clipShape'),
+  cornerRadius: mockModifier('cornerRadius'),
+  environment: mockModifier('environment'),
+  fixedSize: mockModifier('fixedSize'),
+  font: mockModifier('font'),
+  foregroundStyle: mockModifier('foregroundStyle'),
+  frame: mockModifier('frame'),
+  layoutPriority: mockModifier('layoutPriority'),
+  lineLimit: mockModifier('lineLimit'),
+  monospacedDigit: mockModifier('monospacedDigit'),
+  opacity: mockModifier('opacity'),
+  padding: mockModifier('padding'),
+  resizable: mockModifier('resizable'),
+  shapes: { capsule: () => ({}) },
+  tint: mockModifier('tint'),
+}));
+vi.mock('@/i18n', () => ({ i18n: { on: vi.fn(), t: (key: string) => key } }));
+
+type Rendered = { kind: string; props: Record<string, unknown> };
+type State = Parameters<typeof sessionLiveActivityLayout>[0];
+
+function element(node: unknown): Rendered | null {
+  if (node === null || typeof node !== 'object' || !('type' in node) || !('props' in node)) {
+    return null;
+  }
+  const { type, props } = node;
+  // eslint-disable-next-line anti-slop/no-runtime-typeof -- walks the untyped JSX element tree
+  if (typeof type !== 'function' || !('kind' in type) || typeof type.kind !== 'string') {
+    return null;
+  }
+  return { kind: type.kind, props: props as Record<string, unknown> };
+}
+
+function collect(node: unknown): Rendered[] {
+  const root = element(node);
+  if (root === null) {
+    return Array.isArray(node) ? node.flatMap(item => collect(item)) : [];
+  }
+  const raw = root.props.children;
+  const kids = Array.isArray(raw) ? raw.flat(Infinity) : [raw];
+  return [root, ...kids.flatMap(child => collect(child))];
+}
+
+const modifierArgs = (node: unknown, name: string) => {
+  const item = element(node);
+  const raw = item?.props.modifiers;
+  if (!Array.isArray(raw)) {
+    return undefined;
+  }
+  for (const modifier of raw) {
+    const record = modifier as { $type?: string; args?: unknown };
+    if (record.$type === name) {
+      return record.args;
+    }
+  }
+  return undefined;
+};
+
+const texts = (node: unknown) =>
+  collect(node)
+    .filter(item => item.kind === 'Text' && typeof item.props.children === 'string')
+    .map(item => item.props.children as string);
+
+const ENVIRONMENT: LiveActivityEnvironment = { colorScheme: 'light' };
+const NOW = Date.parse('2026-10-12T10:00:00.000Z');
+
+function render(state: State, environment: LiveActivityEnvironment = ENVIRONMENT) {
+  return sessionLiveActivityLayout(state, environment);
+}
+
+const BASE: State = {
+  sessionId: 'ses_1',
+  title: 'Migrate the billing webhooks',
+  statusKind: 'running',
+  statusSince: new Date(NOW - 12 * 60_000).toISOString(),
+  updatedAt: new Date(NOW).toISOString(),
+  lastActivityAt: new Date(NOW - 20_000).toISOString(),
+  startedAt: new Date(NOW - 38 * 60_000).toISOString(),
+};
+
+describe('session card layout: states', () => {
+  it('shows the step, the plan progress, and the file changes while working', () => {
+    const { banner } = render({
+      ...BASE,
+      currentStep: { verb: 'editing', target: 'auth.ts' },
+      plan: { done: 3, total: 7, current: 'Write tests' },
+      changes: { files: 4, added: 120, removed: 30 },
+    });
+    const shown = texts(banner);
+    expect(shown).toContain('Editing auth.ts');
+    expect(shown).toContain('3');
+    expect(shown).toContain('of');
+    expect(shown).toContain('7');
+    expect(shown).toContain('Write tests');
+    // The diff belongs to the expanded view and to a finished card.
+    expect(shown).not.toContain('+120');
+  });
+
+  it('says no activity once the quiet window has passed', () => {
+    vi.setSystemTime(NOW);
+    const { banner } = render({
+      ...BASE,
+      statusSince: new Date(NOW - 20 * 60_000).toISOString(),
+      lastActivityAt: new Date(NOW - SESSION_CARD_QUIET_AFTER_MS - 60_000).toISOString(),
+      currentStep: { verb: 'reading', target: 'auth.ts' },
+    });
+    const shown = texts(banner);
+    expect(shown).toContain('No activity for');
+    // The quiet line replaces the last-known header instead of repeating it.
+    expect(shown).not.toContain('Last known ·');
+    expect(shown).not.toContain('Editing auth.ts');
+    vi.useRealTimers();
+  });
+
+  it('shows the last-known time when a card in another state is out of date', () => {
+    const { banner } = render(
+      { ...BASE, statusKind: 'scheduled', scheduledAt: new Date(NOW + 3_600_000).toISOString() },
+      { colorScheme: 'light', isStale: true }
+    );
+    expect(texts(banner)).toContain('Last known ·');
+  });
+
+  it('shows the trimmed command with Approve and Open on a permission wait', () => {
+    const { banner } = render({
+      ...BASE,
+      statusKind: 'needsInput',
+      awaitingPermission: true,
+      approvalKey: 'a'.repeat(64),
+      permissionCommand: 'pnpm drizzle migrate',
+      plan: { done: 3, total: 7, current: null },
+    });
+    const shown = texts(banner);
+    expect(shown).toContain('Needs input');
+    expect(shown).toContain('Wants to run');
+    expect(shown).toContain('pnpm drizzle migrate');
+    expect(shown).toContain('Approve');
+    expect(shown).toContain('Open');
+    // The plan bar stays off this state: the command owns the room.
+    expect(shown).not.toContain('7');
+  });
+
+  it('answers a question with the step count and Open', () => {
+    const { banner } = render({
+      ...BASE,
+      statusKind: 'needsInput',
+      awaitingPermission: false,
+      plan: { done: 2, total: 5, current: null },
+    });
+    const shown = texts(banner);
+    expect(shown).toContain('Answer needed');
+    // A question has nothing to approve: Open alone is the way to answer it.
+    expect(shown).not.toContain('Approve');
+    expect(collect(banner).some(item => item.kind === 'Link')).toBe(true);
+  });
+
+  it('shows the wake time and the steps done while scheduled', () => {
+    const { banner } = render({
+      ...BASE,
+      statusKind: 'scheduled',
+      scheduledAt: new Date(NOW + 90 * 60_000).toISOString(),
+      plan: { done: 4, total: 9, current: null },
+    });
+    const shown = texts(banner);
+    expect(shown).toContain('Scheduled');
+    expect(shown).toContain('4/9');
+    expect(shown).not.toContain('Awaiting update');
+  });
+
+  it('shows the duration and the outcome when finished', () => {
+    const { banner, expandedBottom } = render({
+      ...BASE,
+      statusKind: 'idle',
+      statusSince: new Date(NOW).toISOString(),
+      outcome: { kind: 'pr_opened' },
+      changes: { files: 6, added: 220, removed: 40 },
+      costMicrodollars: 123_000,
+    });
+    const shown = texts(banner);
+    expect(shown).toContain('Finished');
+    expect(shown).toContain('Finished in 38 min');
+    expect(shown).toContain('Pull request opened');
+    // The cost belongs to the expanded view only.
+    expect(shown).not.toContain('$0.12');
+    expect(texts(expandedBottom)).toContain('$0.12');
+  });
+
+  it('shows the stop reason and the files changed when the turn failed', () => {
+    const { banner } = render({
+      ...BASE,
+      statusKind: 'failed',
+      failure: { kind: 'provider' },
+      changes: { files: 3, added: 12, removed: 4 },
+      plan: { done: 2, total: 5, current: null },
+    });
+    const shown = texts(banner);
+    expect(shown).toContain('Stopped: provider error');
+    expect(shown).toContain('2/5');
+    expect(shown).not.toContain('Provider error');
+  });
+
+  it('never prints the step target twice, and keeps a target-only step readable', () => {
+    const both = texts(
+      render({
+        ...BASE,
+        currentStep: { verb: 'running', target: 'pnpm test' },
+      }).banner
+    );
+    expect(both.filter(value => value.includes('pnpm'))).toHaveLength(1);
+    const other = texts(render({ ...BASE, currentStep: { verb: 'other', target: 'task' } }).banner);
+    expect(other).toContain('task');
+  });
+});
+
+describe('session card layout: surfaces', () => {
+  it('keeps the compact island on the state and its time, and the minimal one on the dot', () => {
+    const { compactTrailing, minimal } = render(BASE);
+    expect(collect(compactTrailing).map(item => item.kind)).toContain('Circle');
+    expect(collect(minimal).map(item => item.kind)).toEqual(['HStack', 'Circle']);
+  });
+
+  it('carries the same status label spoken on every surface', () => {
+    const label = (node: unknown) =>
+      collect(node)
+        .flatMap(item => {
+          const raw = item.props.modifiers;
+          return Array.isArray(raw) ? raw : [];
+        })
+        .map(modifier => modifier as { $type?: string; args?: unknown })
+        .find(modifier => modifier.$type === 'accessibilityLabel')?.args;
+    const state = render({
+      ...BASE,
+      statusKind: 'needsInput',
+      awaitingPermission: true,
+      approvalKey: 'a'.repeat(64),
+      permissionCommand: 'pnpm test',
+    });
+    expect(String(label(state.banner))).toContain('Needs input');
+    expect(String(label(state.banner))).toContain('Wants to run pnpm test');
+  });
+
+  it('renders the whole card in the expanded island with the diff and the cost', () => {
+    const { expandedBottom } = render({
+      ...BASE,
+      changes: { files: 4, added: 120, removed: 30 },
+      costMicrodollars: 120_000,
+    });
+    const shown = texts(expandedBottom);
+    expect(shown).toContain('+120');
+    expect(shown).toContain('−30');
+    expect(shown).toContain('$0.12');
+    // The diff line prints its own label; the outcome line owns none on a
+    // working card, so the number of files prints once.
+    expect(shown).toContain('4');
+  });
+
+  it('keeps the approve and open targets for a press', () => {
+    const { banner } = render({
+      ...BASE,
+      statusKind: 'needsInput',
+      awaitingPermission: true,
+      approvalKey: 'a'.repeat(64),
+    });
+    const buttons = collect(banner).filter(item => item.kind === 'Button');
+    expect(buttons.map(button => button.props.target)).toEqual(['approve']);
+    expect(collect(banner).some(item => item.kind === 'Link')).toBe(true);
+  });
+});

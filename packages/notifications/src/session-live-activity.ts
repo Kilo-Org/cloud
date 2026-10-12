@@ -6,6 +6,16 @@ import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
 import { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';
 
 import { LIVE_ACTIVITY_RELEVANCE, type SessionLiveActivityContentState } from './push-data';
+import {
+  SESSION_CARD_QUIET_AFTER_MS,
+  type SessionLiveChanges,
+  type SessionLiveFailureKind,
+  type SessionLivePlan,
+  type SessionLiveStep,
+} from './session-live-content';
+
+/** The card's status kinds: the shared vocabulary plus a turn that failed. */
+export type SessionCardStatusKind = GlanceableStatusKind | 'failed';
 
 /**
  * The session card title (spec "Content" rule 2): the home widget row title
@@ -29,11 +39,51 @@ export type SessionLiveActivityRow = {
   status: string;
   statusUpdatedAt?: string | null;
   scheduledAt?: string | null;
+  /** The stored summary the ingest service derived, when the row carries it. */
+  currentStep?: SessionLiveStep | null;
+  plan?: SessionLivePlan | null;
+  changes?: SessionLiveChanges | null;
+  permissionCommand?: string | null;
+  lastActivityAt?: string | null;
+  costMicrodollars?: number | null;
+  outcome?: 'pr_opened' | 'changes' | 'none' | null;
+  failure?: SessionLiveFailureKind | null;
+  startedAt?: string | null;
+  /** True when this session has an open pull request; set on a finished row. */
+  prOpened?: boolean;
+};
+
+export type SessionLiveActivityBuildOptions = {
+  approvalKey: string | null;
+  updatedAt: string;
+  statusSinceFallback: string;
+  /** The content the card already shows, so server-only facts survive. */
+  previous?: SessionLiveActivityContentState | undefined;
 };
 
 function isoOrNull(value: string | null | undefined): string | null {
   const at = value == null ? Number.NaN : Date.parse(value);
   return Number.isFinite(at) ? new Date(at).toISOString() : null;
+}
+
+/** The larger of the stored and the new cost, so a local update never lowers it. */
+function maxCost(
+  previous: number | null | undefined,
+  next: number | null | undefined
+): number | null {
+  if (next === null || next === undefined) return previous ?? null;
+  if (previous === null || previous === undefined) return next;
+  return Math.max(previous, next);
+}
+
+/** How a finished session ended: the PR it opened, its diff, or nothing. */
+function outcomeKind(
+  row: SessionLiveActivityRow,
+  changes: SessionLiveChanges | null
+): 'pr_opened' | 'changes' | 'none' {
+  if (row.outcome !== null && row.outcome !== undefined) return row.outcome;
+  if (row.prOpened === true) return 'pr_opened';
+  return changes === null ? 'none' : 'changes';
 }
 
 /**
@@ -45,13 +95,23 @@ function isoOrNull(value: string | null | undefined): string | null {
  *   `awaitingPermission` is true only when that key is present.
  * - `statusSinceFallback` is used when the row has no usable status time.
  * - `scheduledAt` is set only for the scheduled status kind.
+ * - The richer facts keep the value the row carries, and fall back to the
+ *   content the card already shows. A tray row carries no step, plan, diff or
+ *   outcome, so a local update must not wipe the ones a push delivered.
+ * - A finished row with a failure reads as the `failed` kind, which the layout
+ *   draws as a stopped turn.
  */
 export function buildSessionLiveActivityContentState(
   row: SessionLiveActivityRow,
-  options: { approvalKey: string | null; updatedAt: string; statusSinceFallback: string }
+  options: SessionLiveActivityBuildOptions
 ): SessionLiveActivityContentState {
-  const statusKind = glanceableStatusKind(row.status);
+  const previous = options.previous;
+  const base = glanceableStatusKind(row.status);
+  const failure = row.failure ?? previous?.failure?.kind ?? null;
+  const statusKind: SessionCardStatusKind = base === 'idle' && failure !== null ? 'failed' : base;
   const approvalKey = row.status === 'permission' ? options.approvalKey : null;
+  const changes = row.changes ?? previous?.changes ?? null;
+  const finished = statusKind === 'idle' || statusKind === 'failed';
   return {
     sessionId: row.id,
     title: sessionLiveActivityTitle(row.title),
@@ -61,7 +121,40 @@ export function buildSessionLiveActivityContentState(
     awaitingPermission: approvalKey !== null,
     approvalKey,
     updatedAt: options.updatedAt,
+    currentStep: row.currentStep ?? previous?.currentStep ?? null,
+    plan: row.plan ?? previous?.plan ?? null,
+    permissionCommand:
+      approvalKey === null ? null : (row.permissionCommand ?? previous?.permissionCommand ?? null),
+    changes,
+    lastActivityAt: isoOrNull(row.lastActivityAt) ?? previous?.lastActivityAt ?? null,
+    costMicrodollars: maxCost(previous?.costMicrodollars, row.costMicrodollars),
+    outcome: finished ? { kind: outcomeKind(row, changes) } : null,
+    failure: failure === null || statusKind !== 'failed' ? null : { kind: failure },
+    startedAt: isoOrNull(row.startedAt) ?? previous?.startedAt ?? null,
   };
+}
+
+/**
+ * The moment a card can no longer claim to be current, in Unix seconds.
+ *
+ * A working card goes stale at the end of the quiet window after the last
+ * activity the server saw, so a card whose agent stopped reporting activity
+ * reaches its stale date and the layout can draw the quiet warning. Every
+ * other card keeps the caller's own window (`defaultStaleAtSeconds`), which is
+ * the same stale window the aggregate card uses.
+ */
+export function sessionCardStaleAtSeconds(
+  content: Pick<SessionLiveActivityContentState, 'statusKind' | 'lastActivityAt'>,
+  nowSeconds: number,
+  defaultStaleAtSeconds: number
+): number {
+  if (content.statusKind !== 'running') return defaultStaleAtSeconds;
+  const at = content.lastActivityAt == null ? Number.NaN : Date.parse(content.lastActivityAt);
+  if (!Number.isFinite(at)) return defaultStaleAtSeconds;
+  return Math.min(
+    defaultStaleAtSeconds,
+    Math.floor(at / 1000) + SESSION_CARD_QUIET_AFTER_MS / 1000
+  );
 }
 
 /**
@@ -78,10 +171,7 @@ const RECENCY_HALF_MS = 365 * 24 * 60 * 60_000;
 
 /**
  * A tie-break inside one relevance band (spec "Presentation order" rule 3):
- * a later change gives a higher term. The term grows with the time since a
- * fixed origin and approaches 19 without reaching it, so it never leaves the
- * band. iOS reads `relevance-score` as a Double, so the term keeps a usable
- * resolution for many years. An unusable time gives 0.
+ * a newer change first, and a bounded term so no tie-break can leave its band.
  */
 function recencyTerm(changedAt: string | null): number {
   const at = changedAt === null ? Number.NaN : Date.parse(changedAt);
@@ -95,13 +185,13 @@ function recencyTerm(changedAt: string | null): number {
  * the status kind, then a newer `statusSince` first.
  */
 export function sessionLiveActivityRelevance(
-  statusKind: GlanceableStatusKind,
+  statusKind: SessionCardStatusKind,
   statusSince: string | null
 ): number {
   const band =
     statusKind === 'needsInput'
       ? LIVE_ACTIVITY_RELEVANCE.sessionNeedsInput
-      : statusKind === 'idle'
+      : statusKind === 'idle' || statusKind === 'failed'
         ? LIVE_ACTIVITY_RELEVANCE.sessionIdle
         : LIVE_ACTIVITY_RELEVANCE.sessionActive;
   return band + recencyTerm(statusSince);

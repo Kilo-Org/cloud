@@ -4,3 +4,4 @@ export * from './needs-input-actions';
 export * from './push-data';
 export * from './push-presentation';
 export * from './rpc-schemas';
+export * from './session-live-activity';

@@ -1778,6 +1778,9 @@ importers:
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../app-shared
+      '@kilocode/session-ingest-contracts':
+        specifier: workspace:*
+        version: link:../session-ingest-contracts
       i18next:
         specifier: ^26.3.6
         version: 26.3.6(typescript@5.9.3)

@@ -756,7 +756,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       lastCostPersistedMicrodollars: readIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars'),
     });
 
-    if (decision.persistActivity || decision.persistCost || liveSummaryDecision) {
+    if (decision.persistActivity || decision.persistCost) {
       const columns: {
         costMicrodollars?: number;
         lastActivityAtIso?: string;
@@ -768,7 +768,10 @@ export class SessionIngestDO extends DurableObject<Env> {
       if (decision.persistActivity) {
         columns.lastActivityAtIso = new Date(lastActivityValueMs).toISOString();
       }
-      if (liveSummaryDecision) {
+      // The live summary rides the activity write: a summary change with no
+      // activity (a metadata-only or lifecycle-only batch) must not open a
+      // persist of its own, and the next activity carries the newer summary.
+      if (decision.persistActivity && liveSummaryDecision) {
         columns.liveSummary = currentLiveSummary;
       }
       const costToPersist = columns.costMicrodollars;

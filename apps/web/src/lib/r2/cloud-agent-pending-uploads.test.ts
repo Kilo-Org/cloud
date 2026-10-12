@@ -231,6 +231,52 @@ describe('cloud-agent pending-upload ledger', () => {
     expect(rows).toHaveLength(2);
   });
 
+  it('refreshes the fresh-key row when a retry presigns again without a release', async () => {
+    mockSend.mockResolvedValue({});
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachmentId = crypto.randomUUID();
+    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachmentId);
+    for (let i = 1; i < CLOUD_AGENT_ATTACHMENT_MAX_COUNT; i++) {
+      const otherId = crypto.randomUUID();
+      await admit({
+        kiloUserId,
+        messageUuid,
+        attachmentId: otherId,
+        objectKey: buildObjectKey(kiloUserId, messageUuid, otherId),
+        byteSize: 1,
+      });
+    }
+    await admit({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 42 });
+    await releasePendingUploads(kiloUserId, [objectKey]);
+    const freshKey = await admit({
+      kiloUserId,
+      messageUuid,
+      attachmentId,
+      objectKey,
+      byteSize: 42,
+    });
+
+    // The release of freshKey failed, so the client retries with the same ids.
+    await expect(
+      admit({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 99 })
+    ).resolves.toBe(freshKey);
+
+    const rows = await db
+      .select({
+        object_key: cloud_agent_pending_uploads.object_key,
+        byte_size: cloud_agent_pending_uploads.byte_size,
+      })
+      .from(cloud_agent_pending_uploads)
+      .where(
+        and(
+          eq(cloud_agent_pending_uploads.attachment_id, attachmentId),
+          eq(cloud_agent_pending_uploads.status, 'pending')
+        )
+      );
+    expect(rows).toEqual([{ object_key: freshKey, byte_size: 99 }]);
+  });
+
   it('admits a fresh key when a retry lands while the release still deletes the old object', async () => {
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;
     const messageUuid = crypto.randomUUID();

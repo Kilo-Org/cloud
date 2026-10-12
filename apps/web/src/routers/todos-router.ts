@@ -136,21 +136,27 @@ async function lockPositions(tx: DrizzleTransaction, userId: string): Promise<vo
 }
 
 /**
- * The key for a row moved between `before` and `after`. A missing or stale side
- * is replaced by the sibling adjacent to the other side, so the moved row lands
- * directly next to the neighbour the client named. Returns `null` when the
- * client named no neighbour.
+ * The key for a row moved between `before` and `after`. The client names the
+ * rows it shows around the drop point, but hidden rows (done to-dos,
+ * archived lists) can sit between them: a `positionBetween` over a
+ * non-adjacent pair can return a key an existing row already holds. Only a
+ * truly adjacent `after` is used directly; anything else lands the row right
+ * below `before`. Returns `null` when the client named no neighbour.
  */
 async function positionForMove(
   before: string | null,
   after: string | null,
   adjacent: (direction: 'previous' | 'next', key: string) => Promise<string | null>
 ): Promise<string | null> {
-  if (before !== null && (after === null || after <= before)) {
-    return positionBetween(before, await adjacent('next', before));
+  if (before !== null) {
+    const next = await adjacent('next', before);
+    if (after === null || after <= before || after !== next) {
+      return positionBetween(before, next);
+    }
+    return positionBetween(before, after);
   }
   if (after !== null) {
-    return positionBetween(before ?? (await adjacent('previous', after)), after);
+    return positionBetween(await adjacent('previous', after), after);
   }
   return null;
 }

@@ -111,6 +111,12 @@ type UseRemoteSpawnDispatchArgs = {
    * success navigation is not intercepted as an abandon.
    */
   onSpawnReady?: () => void;
+  /**
+   * Invoked with the spawned session id when a `ready` spawn navigates, so a
+   * caller that started from a to-do can link the session to it. Runs before
+   * the navigation, beside `onSpawnReady`.
+   */
+  onSpawnSucceeded?: (sessionId: string) => void;
 };
 
 type UseRemoteSpawnDispatchResult = {
@@ -175,7 +181,8 @@ export function useRemoteSpawnDispatch({
   onSpawnAdmitted,
   onSpawnFailed,
   onSpawnReady,
-}: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
+  onSpawnSucceeded,
+ }: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
   const router = useStackSafeReplace();
   // Route param is frozen at navigation: missing param means personal, not
   // "inherit live context". `?? null` so undefined does not fall through to
@@ -226,6 +233,7 @@ export function useRemoteSpawnDispatch({
   const onSpawnFailedRef = useRef(onSpawnFailed);
   const onSpawnReadyRef = useRef(onSpawnReady);
   const onCloneImportFailureRef = useRef(onCloneImportFailure);
+  const onSpawnSucceededRef = useRef(onSpawnSucceeded);
   useEffect(() => {
     getSubmitPayloadRef.current = getSubmitPayload;
     spawnFieldsRef.current = { mode, selection, organizationId, directory, cloneFromKiloSessionId };
@@ -233,6 +241,7 @@ export function useRemoteSpawnDispatch({
     onSpawnFailedRef.current = onSpawnFailed;
     onSpawnReadyRef.current = onSpawnReady;
     onCloneImportFailureRef.current = onCloneImportFailure;
+    onSpawnSucceededRef.current = onSpawnSucceeded;
   }, [
     getSubmitPayload,
     mode,
@@ -244,6 +253,7 @@ export function useRemoteSpawnDispatch({
     onSpawnFailed,
     onSpawnReady,
     onCloneImportFailure,
+    onSpawnSucceeded,
   ]);
 
   const onStart = useCallback(() => {
@@ -349,6 +359,7 @@ export function useRemoteSpawnDispatch({
           // Arm the clone entry's busy leave-lock bypass right before the
           // success replace so the navigation is not intercepted as an abandon.
           onSpawnReadyRef.current?.();
+          onSpawnSucceededRef.current?.(outcome.sessionID);
           if (submitPayload === null) {
             router.replace(spawnedPath);
             return;

@@ -180,12 +180,18 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
             if (fromIndex === toIndex || key.startsWith(PENDING_TODO_ID_PREFIX)) {
               return;
             }
+            const beforeId = data[toIndex - 1]?.id ?? null;
+            const afterId = data[toIndex + 1]?.id ?? null;
+            // A neighbour still waiting for its server id is not a UUID the
+            // router accepts; the next refetch settles the dropped row anyway.
+            if (
+              beforeId?.startsWith(PENDING_TODO_ID_PREFIX) ||
+              afterId?.startsWith(PENDING_TODO_ID_PREFIX)
+            ) {
+              return;
+            }
             void Haptics.selectionAsync();
-            move.mutate({
-              id: key,
-              beforeId: data[toIndex - 1]?.id ?? null,
-              afterId: data[toIndex + 1]?.id ?? null,
-            });
+            move.mutate({ id: key, beforeId, afterId });
           }}
         />
         {doneItems.length > 0 ? (

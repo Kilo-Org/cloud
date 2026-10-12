@@ -180,6 +180,26 @@ describe('todos ordering', () => {
     await caller.lists.move({ id: a.id, beforeId: null, afterId: b.id });
     expect(await listNames(caller)).toEqual(['C', 'A', 'B']);
   });
+  it('lands below the named neighbour when a hidden row sits between', async () => {
+    const caller = callerFor();
+    const list = await caller.lists.create({ name: 'List' });
+    const a = await caller.items.create({ listId: list.id, title: 'A' });
+    const b = await caller.items.create({ listId: list.id, title: 'B' });
+    const c = await caller.items.create({ listId: list.id, title: 'C' });
+    const d = await caller.items.create({ listId: list.id, title: 'D' });
+    await caller.items.create({ listId: list.id, title: 'E' });
+    await caller.items.update({ id: c.id, done: true });
+    // Open order is E, D, B, A. Dropping A between the visible D and B
+    // names a non-adjacent pair: the done C sits between them server-side.
+    await caller.items.move({ id: a.id, beforeId: d.id, afterId: b.id });
+    expect(await openTitles(list.id)).toEqual(['E', 'D', 'A', 'B']);
+    const positions = await db
+      .select({ position: todo_items.position })
+      .from(todo_items)
+      .where(eq(todo_items.list_id, list.id));
+    expect(new Set(positions.map(row => row.position)).size).toEqual(positions.length);
+  });
+
 
   it('rejects neighbours from another organization context', async () => {
     const caller = callerFor();

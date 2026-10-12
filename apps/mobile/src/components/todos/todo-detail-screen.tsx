@@ -137,8 +137,9 @@ function TodoDetailBody({ todo }: Readonly<{ todo: TodoItemDetail }>) {
             onChangeText={text => {
               titleRef.current = text;
             }}
+            // `blurAndSubmit` blurs on return, so `onEndEditing` fires for
+            // both return and tap-away; a second handler would save twice.
             onEndEditing={saveTitle}
-            onSubmitEditing={saveTitle}
             submitBehavior="blurAndSubmit"
             multiline
             maxLength={TODO_TITLE_MAX_LENGTH}

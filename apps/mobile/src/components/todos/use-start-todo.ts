@@ -83,7 +83,7 @@ export function useStartTodo() {
         ]);
         navigateToSession(result.sessionId, list.organizationId);
       } finally {
-        setStartingTodoId(null);
+        setStartingTodoId(current => (current === todo.id ? null : current));
       }
     },
     [navigateToSession, queryClient, review, trpc]

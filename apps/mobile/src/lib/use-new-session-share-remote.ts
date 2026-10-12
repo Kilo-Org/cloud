@@ -52,7 +52,12 @@ type UseNewSessionShareRemoteArgs = {
    * to `useRemoteSpawnDispatch`; the route arms its busy leave-lock bypass here.
    */
   onSpawnReady?: () => void;
-};
+  /**
+   * Invoked with the spawned session id on a `ready` spawn. Forwarded to
+   * `useRemoteSpawnDispatch`; the new-session screen links a to-do start.
+   */
+  onSpawnSucceeded?: (sessionId: string) => void;
+ };
 
 /**
  * Wires remote spawn dispatch for the new-session screen and gives it a
@@ -75,7 +80,8 @@ export function useNewSessionShareRemote({
   cloneFromKiloSessionId,
   onCloneImportFailure,
   onSpawnReady,
-}: UseNewSessionShareRemoteArgs) {
+  onSpawnSucceeded,
+ }: UseNewSessionShareRemoteArgs) {
   // Render-time ref assignment, the same pattern `share-prefill.ts:80` and
   // `share-gate-sheet.tsx:91` use, so the snapshot callback stays stable
   // while always reading the current list.
@@ -111,6 +117,7 @@ export function useNewSessionShareRemote({
     cloneFromKiloSessionId,
     onCloneImportFailure,
     onSpawnReady,
+    onSpawnSucceeded,
   });
 
   return { remoteSpawn, handleRunOnInstanceChange: remoteSpawn.onChangeRunOnInstance };

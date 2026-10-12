@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
@@ -83,6 +83,7 @@ import { peekSharePayload } from '@/lib/share-payload';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
+import { linkStartedTodoSession } from '@/lib/hooks/use-todos';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
@@ -429,10 +430,21 @@ export function NewSessionScreenBody() {
   const handleCloneImportFailure = useCallback((key: string) => {
     setCloneImportFailureKey(key);
   }, []);
-
   const armCloneNavigateBypass = useCallback(() => {
     cloneNavigateBypassRef.current = true;
   }, []);
+
+  // A to-do start can target a remote instance instead of Cloud Agent; the
+  // spawned session links to the to-do the same way the cloud path links it.
+  const queryClient = useQueryClient();
+  const handleSpawnSucceeded = useCallback(
+    (sessionId: string) => {
+      if (todoId) {
+        void linkStartedTodoSession({ queryClient, trpc, todoId, sessionId });
+      }
+    },
+    [queryClient, todoId, trpc]
+  );
 
   // The manual draft as the create body carries it: one plaintext value per key
   // (the editor already refuses a key that cleans onto an existing one) and the
@@ -531,14 +543,11 @@ export function NewSessionScreenBody() {
     onSpawnFailed: () => {
       skipDiscardGuardRef.current = false;
     },
-    // Clone entry: the dispatch sends the source id only when the selected
-    // CLI advertises `sessionClone`, and surfaces delivered clone/import
-    // failures through this inline-reason callback.
     cloneFromKiloSessionId: isCloneEntry ? cloneFromKiloSessionId : null,
     onCloneImportFailure: handleCloneImportFailure,
     onSpawnReady: armCloneNavigateBypass,
+    onSpawnSucceeded: handleSpawnSucceeded,
   });
-
   const runCloudCreate = useContinueCloudCreate(organizationId, armCloneNavigateBypass);
 
   const handleModelSelect = useCallback(

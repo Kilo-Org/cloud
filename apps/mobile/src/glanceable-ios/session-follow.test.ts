@@ -346,6 +346,19 @@ describe('dismissFinishedSessionCard', () => {
     expect(isSessionFollowed('session-3')).toBe(false);
     expect(sessionCardPress('session-3')).toBeUndefined();
   });
+
+  it('drops the press state of a card iOS ended', async () => {
+    const card = fakeActivity('native-4', { sessionId: 'session-4', statusKind: 'needsInput' });
+    mocks.instances = [card];
+    discoverSessionCards();
+    await renderSessionCardPress(card as unknown as SessionActivity, { notice: 'Approve failed' });
+
+    mocks.instances = [];
+    discoverSessionCards();
+
+    expect(isSessionFollowed('session-4')).toBe(false);
+    expect(sessionCardPress('session-4')).toBeUndefined();
+  });
 });
 
 describe('followedSessionCounts', () => {

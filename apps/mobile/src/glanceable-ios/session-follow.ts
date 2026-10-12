@@ -156,6 +156,11 @@ export function discoverSessionCards(): SessionActivity[] {
   const changed =
     next.size !== cards.size ||
     [...next].some(([sessionId, activity]) => cards.get(sessionId)?.getId() !== activity.getId());
+  for (const sessionId of cards.keys()) {
+    if (!next.has(sessionId)) {
+      clearSessionCardPress(sessionId);
+    }
+  }
   cards.clear();
   for (const [sessionId, activity] of next) {
     cards.set(sessionId, activity);

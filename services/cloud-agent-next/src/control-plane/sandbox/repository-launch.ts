@@ -10,7 +10,7 @@ const LAUNCH_KEY = 'repository_launch';
 /**
  * How the most recent allocation's container started, and whether its wrapper ever
  * connected. It is the one piece of durable memory the "first start only" rule
- * needs: a repository start whose wrapper never connected is a broken snapshot.
+ * needs: a repository start whose wrapper never connected must fall back to the image.
  */
 export type RepositoryLaunchRecord = {
   allocationId: string;
@@ -40,7 +40,7 @@ export async function recordRepositoryLaunch(
  *
  * The previous `startSource` is carried over but `confirmed` is not: if this
  * launch fails before `recordLaunch` runs, the record must still describe the
- * last completed start, or a broken snapshot this launch was asked to discard
+ * last completed start, or a failed snapshot this launch was asked to skip
  * would be forgotten and reused. Keeping `confirmed` false is what lets
  * `recordLaunch` treat a never-connected wrapper as unconfirmed; only
  * `confirmRepositoryLaunch`, called on `hello`, promotes it.
@@ -85,16 +85,15 @@ export type RepositoryLaunchDecision = {
   preparingRouteCount: number;
   /** Distinct keys across preparing routes; `> 1` is why a snapshot was not used. */
   distinctKeyCount: number;
-  /** The previous repository start was never confirmed, so this start discards it. */
-  discarded: boolean;
+  /** The previous repository start was never confirmed, so this start skips it. */
+  skipped: boolean;
 };
 
 /**
  * The launch options for a new allocation. The key comes from the routes waiting
  * for it: exactly one key shared by all of them, else no snapshot. When the
  * previous allocation started from a repository snapshot and its wrapper never
- * connected, the snapshot is discarded and this start is from the image, so a
- * broken snapshot costs one attempt and the capture that follows replaces it.
+ * connected, the snapshot is retained for debugging and this start is from the image.
  */
 export function repositoryLaunchOptions(
   routes: readonly RouteRecord[],
@@ -110,7 +109,7 @@ export function repositoryLaunchOptions(
       reason: 'no_preparing_routes',
       preparingRouteCount,
       distinctKeyCount,
-      discarded: false,
+      skipped: false,
     };
   }
   if (distinctKeyCount !== 1) {
@@ -119,7 +118,7 @@ export function repositoryLaunchOptions(
       reason: 'multiple_keys',
       preparingRouteCount,
       distinctKeyCount,
-      discarded: false,
+      skipped: false,
     };
   }
   const [repoKey] = keys;
@@ -129,16 +128,16 @@ export function repositoryLaunchOptions(
       reason: 'no_repo_key',
       preparingRouteCount,
       distinctKeyCount,
-      discarded: false,
+      skipped: false,
     };
   }
   const previousStartFailed = previous?.startSource === 'repository' && !previous.confirmed;
   return {
-    options: { repoKey, ...(previousStartFailed ? { discardRepository: true as const } : {}) },
+    options: { repoKey, ...(previousStartFailed ? { skipRepository: true as const } : {}) },
     reason: 'repository',
     preparingRouteCount,
     distinctKeyCount,
-    discarded: previousStartFailed,
+    skipped: previousStartFailed,
   };
 }
 

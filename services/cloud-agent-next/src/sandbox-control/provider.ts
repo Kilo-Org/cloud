@@ -112,11 +112,15 @@ export type ProviderStartSource = 'image' | 'repository';
 export type ProviderLaunchOptions = {
   /** Keyed hash of the launch's scope, repository and env; a provider may start from its snapshot. */
   repoKey?: string;
-  /** Start from the image and forget the snapshot stored for `repoKey`. */
-  discardRepository?: true;
+  /** Start from the image and retain the failed snapshot for debugging. */
+  skipRepository?: true;
+  deadlineAt?: number;
 };
 
-export type ProviderLaunchResult = { startSource: ProviderStartSource };
+export type ProviderLaunchResult = {
+  startSource: ProviderStartSource;
+  snapshotFailed?: true;
+};
 
 export type ProviderAdapter = {
   readonly resumable: boolean;

@@ -383,11 +383,20 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
 - **Start.** `launch` receives the key of the routes waiting for the allocation: exactly one key,
   else none. `SandboxContainers` appends the image, and starts from the
   repository snapshot in the `REPO_SNAPSHOTS` KV index when it has one for that digest, else from
-  the image. `launch` returns `startSource`. A failed repository start removes the index entry.
+   the image. `launch` returns `startSource`. A failed repository start retains the index entry
+   and asks the Sandbox DO to clean up the failed container and launch the image for the same
+   allocation. Cleanup and fallback only run while that allocation is still creating; a wrapper
+   that already connected is never destroyed by fallback. Before cleanup, the Sandbox DO rotates
+   the launch credential so a late wrapper from the failed snapshot cannot connect. The snapshot attempt uses half the
+   remaining launch budget, reserving time for cleanup and the image within the original deadline.
+   Each later sandbox start retries the snapshot once, up to ten failed starts per snapshot ID
+   in that sandbox's durable record. After that it uses the image; a replacement snapshot gets
+   its own failure budget. Failure never deletes or changes the shared snapshot index.
 - **First start only.** The Sandbox DO remembers how the previous allocation started and whether its
   wrapper connected. When a repository start never connected (for example the first-connect timeout
-  stopped it), the next launch discards the entry and starts from the image. A broken snapshot
-  costs one attempt.
+   stopped it), the next launch skips the snapshot and starts from the image without deleting
+   the entry. A completed image fallback records `image`, so the next start tries the retained
+   snapshot again unless its failure budget is exhausted.
 - **Capture.** `session.prepare` carries `capture: true` when the route has a key and the provider
   can capture. A route with setup commands has no key: capture runs after setup, so the snapshot
   would publish the whole container under a key that names only the user and the repository. The

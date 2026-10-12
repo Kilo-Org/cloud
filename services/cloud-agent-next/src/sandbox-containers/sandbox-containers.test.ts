@@ -46,6 +46,7 @@ type StoredRecord = {
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
   wrapperAttempt?: string;
+  repositoryStartFailures?: { snapshotId: string; attempts: number };
 };
 
 const idleRecord: StoredRecord = {
@@ -2050,6 +2051,14 @@ function launchFromRepo(instance: SandboxContainers, ref: string, extra = {}) {
   });
 }
 
+async function launchWithImageFallback(instance: SandboxContainers, ref: string) {
+  const result = await launchFromRepo(instance, ref);
+  if (!result.snapshotFailed) return result;
+  expect(result).toEqual({ started: false, startSource: 'repository', snapshotFailed: true });
+  await expect(instance.stop(ref)).resolves.toBe('terminal');
+  return launchFromRepo(instance, ref, { skipRepository: true });
+}
+
 describe('SandboxContainers repository snapshots', () => {
   it('starts from the repository snapshot stored for the repo key and the current image', async () => {
     const key = await indexKeyFor();
@@ -2152,51 +2161,287 @@ describe('SandboxContainers repository snapshots', () => {
     ]);
   });
 
-  it('forgets the snapshot when its start fails, so the next start is from the image', async () => {
-    const key = await indexKeyFor();
-    const store = fakeKv({ [key]: { snapshotId: 'snap-missing' } });
-    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
-    container.startBehavior = 'reject';
+  it.each(['reject', 'effect-then-reject'] as const)(
+    'falls back after a %s snapshot failure and retries the snapshot on ten separate starts',
+    async startBehavior => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10_000_000);
+      const key = await indexKeyFor();
+      const entry = {
+        snapshotId: 'snap-missing',
+        commit: 'abc123',
+        capturedAt: 9_000_000,
+        size: SNAPSHOT_SIZE,
+      };
+      const store = fakeKv({ [key]: entry });
+      const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+      const start = container.start.bind(container);
+      vi.spyOn(container, 'start').mockImplementation(options => {
+        container.startBehavior = options?.containerSnapshot === undefined ? 'ok' : startBehavior;
+        start(options);
+      });
 
-    await expect(launchFromRepo(instance, REF_A)).rejects.toThrow('container start failed');
-    expect(store.data.has(key)).toBe(false);
-    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-missing' } });
-  });
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        await expect(launchWithImageFallback(instance, `ref-${attempt}`)).resolves.toEqual({
+          started: true,
+          startSource: 'image',
+        });
+        expect(container.startCalls[attempt * 2]).toMatchObject({
+          containerSnapshot: { id: 'snap-missing' },
+        });
+        expect(container.startCalls[attempt * 2 + 1]).toEqual(nativeStartOptions('standard-2'));
+        expect(readRecord().repositoryStartFailures).toEqual({
+          snapshotId: 'snap-missing',
+          attempts: attempt + 1,
+        });
+      }
+      expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual(entry);
+      expect(store.calls.filter(call => call.op === 'put' || call.op === 'delete')).toEqual([]);
 
-  it('forgets the snapshot when the wrapper cannot start from it', async () => {
+      await expect(launchFromRepo(instance, REF_B)).resolves.toEqual({
+        started: true,
+        startSource: 'image',
+      });
+      expect(container.startCalls).toHaveLength(21);
+      expect(container.startCalls[20]).toEqual(nativeStartOptions('standard-2'));
+      expect(readRecord()).toMatchObject({
+        allocationRef: REF_B,
+        state: 'running',
+        startSource: 'image',
+      });
+      expect(store.data.has(key)).toBe(true);
+    }
+  );
+
+  it('falls back when the snapshot supervisor cannot start and retries the snapshot on the next start', async () => {
     vi.useFakeTimers();
     const key = await indexKeyFor();
     const store = fakeKv({ [key]: { snapshotId: 'snap-broken' } });
-    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
-    container.identityAfterStart = 'ambiguous';
-    const failed = expect(launchFromRepo(instance, REF_A)).rejects.toThrow(
-      'wrapper exec timed out'
-    );
+    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+    const start = container.start.bind(container);
+    const startSpy = vi.spyOn(container, 'start').mockImplementation(options => {
+      container.identityAfterStart =
+        options?.containerSnapshot === undefined ? 'supervisor' : 'ambiguous';
+      start(options);
+    });
+    const launched = expect(launchWithImageFallback(instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
     await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
     await vi.advanceTimersByTimeAsync(90_000);
-    await failed;
-    expect(store.data.has(key)).toBe(false);
+    await launched;
+    expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual({ snapshotId: 'snap-broken' });
+    expect(readRecord().repositoryStartFailures).toEqual({
+      snapshotId: 'snap-broken',
+      attempts: 1,
+    });
+    expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
+
+    startSpy.mockRestore();
+    container.identityAfterStart = 'supervisor';
+    await expect(launchFromRepo(instance, REF_B)).resolves.toEqual({
+      started: true,
+      startSource: 'repository',
+    });
+    expect(container.startCalls[1]).toEqual(nativeStartOptions('standard-2'));
+    expect(container.startCalls[2]).toMatchObject({ containerSnapshot: { id: 'snap-broken' } });
+    expect(readRecord().repositoryStartFailures).toEqual({
+      snapshotId: 'snap-broken',
+      attempts: 1,
+    });
   });
 
-  it('forgets nothing when an image start fails', async () => {
+  it('marks nothing when an image start fails', async () => {
     const store = fakeKv();
     const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
     container.startBehavior = 'reject';
 
-    await expect(launchFromRepo(instance, REF_A)).rejects.toThrow('container start failed');
+    await expect(launchWithImageFallback(instance, REF_A)).rejects.toThrow(
+      'container start failed'
+    );
     expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
+    expect(store.calls.filter(call => call.op === 'put')).toEqual([]);
   });
 
-  it('discards the stored snapshot and starts from the image when asked', async () => {
+  it('propagates an image fallback failure without retrying either start', async () => {
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
+    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+    container.startBehavior = 'reject';
+
+    await expect(launchWithImageFallback(instance, REF_A)).rejects.toThrow(
+      'container start failed'
+    );
+    expect(container.startCalls).toHaveLength(2);
+    expect(container.startCalls[1]).toEqual(nativeStartOptions('standard-2'));
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      startSource: 'image',
+      repositoryStartFailures: { snapshotId: 'snap-bad', attempts: 1 },
+    });
+    expect(store.calls.filter(call => call.op === 'put' || call.op === 'delete')).toEqual([]);
+  });
+
+  it('returns snapshot failure without destroying a container or issuing the image start', async () => {
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
+    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+    container.startBehavior = 'effect-then-reject';
+
+    await expect(launchFromRepo(instance, REF_A)).resolves.toEqual({
+      started: false,
+      startSource: 'repository',
+      snapshotFailed: true,
+    });
+    expect(container.startCalls).toHaveLength(1);
+    expect(container.destroyCalls).toBe(0);
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+    expect(store.data.has(key)).toBe(true);
+  });
+
+  it('bounds snapshot confirmation by the supplied deadline so the owner can fall back', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const { diagnostics } = captureLogs();
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
+    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+    container.identityAfterStart = 'ambiguous';
+
+    const failed = expect(
+      launchFromRepo(instance, REF_A, { deadlineAt: 15_000 })
+    ).resolves.toMatchObject({ snapshotFailed: true });
+    await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
+    await vi.advanceTimersByTimeAsync(5_000);
+    await failed;
+    expect(diagnostics('supervisor_confirm')[0].fields.elapsedMs).toBeLessThanOrEqual(2_500);
+    expect(container.destroyCalls).toBe(0);
+  });
+
+  it('does not issue an image start after its supplied deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const { instance, container } = setup();
+
+    await expect(
+      launchFromRepo(instance, REF_A, { deadlineAt: 10_000, skipRepository: true })
+    ).rejects.toThrow('wrapper exec timed out');
+    expect(container.startCalls).toEqual([]);
+  });
+
+  it.each(['index_miss', 'retries_exhausted'] as const)(
+    'keeps the full image readiness budget after %s',
+    async reason => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10_000);
+      const key = await indexKeyFor();
+      const store = fakeKv(reason === 'index_miss' ? {} : { [key]: { snapshotId: 'snap-bad' } });
+      const { instance, container } = setup({
+        env: { REPO_SNAPSHOTS: store.kv },
+        record: {
+          ...idleRecord,
+          repositoryStartFailures: { snapshotId: 'snap-bad', attempts: 10 },
+        },
+      });
+      container.identityAfterStart = 'ambiguous';
+
+      const launched = expect(
+        launchFromRepo(instance, REF_A, { deadlineAt: 130_000 })
+      ).resolves.toEqual({ started: true, startSource: 'image' });
+      await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
+      await vi.advanceTimersByTimeAsync(65_000);
+      container.mainProcess = 'supervisor';
+      await vi.advanceTimersByTimeAsync(1_000);
+      await launched;
+    }
+  );
+
+  it('does not count a snapshot failure when its deadline expires before native issuance', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-good' } });
+    const { instance, container, readRecord, setPutGate, releaseHeldPut } = setup({
+      env: { REPO_SNAPSHOTS: store.kv },
+    });
+    let held = false;
+    setPutGate(value => {
+      if ((value as StoredRecord).state !== 'launching') return 'pass';
+      held = true;
+      return 'hold';
+    });
+
+    const failed = expect(launchFromRepo(instance, REF_A, { deadlineAt: 15_000 })).rejects.toThrow(
+      'wrapper exec timed out'
+    );
+    await vi.waitFor(() => expect(held).toBe(true));
+    await vi.advanceTimersByTimeAsync(6_000);
+    releaseHeldPut();
+    await failed;
+    expect(container.startCalls).toEqual([]);
+    expect(readRecord().repositoryStartFailures).toBeUndefined();
+  });
+
+  it('retains the stored snapshot and starts from the image when asked to skip it', async () => {
     const key = await indexKeyFor();
     const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
     const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
 
-    const result = await launchFromRepo(instance, REF_A, { discardRepository: true });
+    const result = await launchFromRepo(instance, REF_A, { skipRepository: true });
 
     expect(result).toEqual({ started: true, startSource: 'image' });
-    expect(store.data.has(key)).toBe(false);
+    expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual({ snapshotId: 'snap-bad' });
+    expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
     expect(container.startCalls[0]).toMatchObject({ image: IMAGE });
+  });
+
+  it('starts from the image without writing to KV when asked to skip a snapshot', async () => {
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
+    store.failing.put = true;
+    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+
+    await expect(launchFromRepo(instance, REF_A, { skipRepository: true })).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(container.startCalls[0]).toEqual(nativeStartOptions('standard-2'));
+    expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual({ snapshotId: 'snap-bad' });
+    expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
+    expect(store.calls.filter(call => call.op === 'put')).toEqual([]);
+  });
+
+  it('retains a failed entry across starts until a successful capture replaces it', async () => {
+    const { diagnostics } = captureLogs();
+    const key = await indexKeyFor();
+    const entry = { snapshotId: 'snap-bad' };
+    const store = fakeKv({ [key]: entry });
+    const { instance, container } = setup({
+      env: { REPO_SNAPSHOTS: store.kv },
+      record: { ...idleRecord, repositoryStartFailures: { snapshotId: 'snap-bad', attempts: 10 } },
+    });
+
+    await expect(launchFromRepo(instance, REF_A)).resolves.toMatchObject({ startSource: 'image' });
+    expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual(entry);
+    expect(store.calls.filter(call => call.op === 'put' || call.op === 'delete')).toEqual([]);
+    expect(diagnostics('snapshot_lookup')[0].fields).toMatchObject({
+      source: 'image',
+      reason: 'retries_exhausted',
+      attempts: 10,
+    });
+
+    await expect(instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(true);
+    expect(JSON.parse(store.data.get(key) ?? 'null')).toMatchObject({ snapshotId: 'snap-1' });
+    await expect(launchFromRepo(instance, REF_B)).resolves.toMatchObject({
+      startSource: 'repository',
+    });
+    expect(container.startCalls[1]).toMatchObject({ containerSnapshot: { id: 'snap-1' } });
   });
 
   it('uses the recorded source when it resumes a launch that never started the wrapper', async () => {

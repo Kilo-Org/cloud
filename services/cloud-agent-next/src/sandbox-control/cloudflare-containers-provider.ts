@@ -133,12 +133,13 @@ export function createCloudflareContainersProviderAdapter(deps: {
       const workloadLimitMb =
         env['CONTROL_WORKLOAD_LIMIT_MB'] ??
         String(containersBillingIdentity(instance).capacity.memoryMiB);
-      const { startSource } = await container.launchWrapper({
+      const { startSource, snapshotFailed } = await container.launchWrapper({
         allocationRef: ref,
         instance,
         containment: owned.containment,
         ...(options?.repoKey === undefined ? {} : { repoKey: options.repoKey }),
-        ...(options?.discardRepository === true ? { discardRepository: true as const } : {}),
+        ...(options?.skipRepository === true ? { skipRepository: true as const } : {}),
+        ...(options?.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),
         env: {
           ...env,
           CONTROL_WORKLOAD_LIMIT_MB: workloadLimitMb,
@@ -146,6 +147,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
           WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
         },
       });
+      if (snapshotFailed) return { startSource, snapshotFailed };
       // Lease renewal only starts once the wrapper reports ready, which the
       // recovery admission gate can delay. Establish the initial lease here so
       // the container is not reaped by its inactivity timeout before then.

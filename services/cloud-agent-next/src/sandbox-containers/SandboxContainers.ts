@@ -31,6 +31,7 @@ import {
 import {
   createRepoSnapshotIndex,
   repoSnapshotIndexKey,
+  REPO_SNAPSHOT_MAX_START_FAILURES,
   type RepoSnapshotIndex,
 } from './repo-snapshot-index.js';
 import {
@@ -60,13 +61,15 @@ export type ContainersLaunchInput = {
   containment?: boolean;
   /** Keyed hash of the launch's scope, repository and env; absent means no snapshot. */
   repoKey?: string;
-  /** Start from the image and forget the snapshot stored for `repoKey`. */
-  discardRepository?: true;
+  /** Start from the image and retain the failed snapshot for debugging. */
+  skipRepository?: true;
+  deadlineAt?: number;
 };
 
 export type ContainersLaunchResult = {
   started: boolean;
   startSource: ContainersStartSource;
+  snapshotFailed?: true;
 };
 
 export type ContainersObservation = {
@@ -98,13 +101,13 @@ type ContainersRecord = {
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
   wrapperAttempt?: WrapperAttempt;
+  repositoryStartFailures?: { snapshotId: string; attempts: number };
 };
 
 type ResolvedStart = {
   source: ContainersStartSource;
   options: ContainerStartupOptions;
-  /** Set only for a repository start, so a failed one can forget its entry. */
-  indexKey: string | null;
+  snapshotId: string | null;
 };
 
 type DelayedSchedule<T> = {
@@ -330,13 +333,16 @@ export class SandboxContainers extends DurableObject<Env> {
     input: ContainersLaunchInput
   ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
+    if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt) {
+      throw new WrapperExecTimeoutError();
+    }
     const containment = input.containment === true;
     // Persist the accepted physical instance before any early return or physical
     // operation, so a resumed launch whose exec fails still records its size.
     const record = await this.installLaunchInstance(stored, input.instance);
     if (containment) await this.installContainmentProxy(container);
     const start = await this.resolveStart(input, true);
-    return this.issueNativeSupervisor(record, ref, start);
+    return this.issueNativeSupervisor(record, ref, start, input);
   }
 
   /**
@@ -347,7 +353,8 @@ export class SandboxContainers extends DurableObject<Env> {
   private async issueNativeSupervisor(
     record: ContainersRecord,
     ref: string,
-    start: ResolvedStart
+    start: ResolvedStart,
+    input: ContainersLaunchInput
   ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
     // Ownership is retained before start: an ambiguous start that takes effect
@@ -360,11 +367,19 @@ export class SandboxContainers extends DurableObject<Env> {
       wrapperAttempt: 'exec_pending',
       startSource: start.source,
     });
-    await this.runStart(start, async () => {
+    if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt) {
+      throw new WrapperExecTimeoutError();
+    }
+    const readinessDeadline =
+      start.source === 'repository' && input.deadlineAt !== undefined
+        ? Date.now() + remainingMs(input.deadlineAt) / 2
+        : input.deadlineAt;
+    const started = await this.runStart(start, async () => {
       const issuedAt = Date.now();
       await this.startContainerAndActivateBilling(container, record, start.options);
-      await this.awaitSupervisorMainProcess(container, start.source, issuedAt);
+      await this.awaitSupervisorMainProcess(container, start.source, issuedAt, readinessDeadline);
     });
+    if (!started) return { started: false, startSource: 'repository', snapshotFailed: true };
     await this.writeRunning(ref, 'clear');
     return { started: true, startSource: start.source };
   }
@@ -372,11 +387,10 @@ export class SandboxContainers extends DurableObject<Env> {
   /**
    * The one start-source rule: a physical start uses the repository snapshot for
    * the launch's `repoKey` and this image when the index has one, and the image
-   * otherwise. `discard` forgets the stored entry first, so a start that follows a
-   * failed repository start cannot use it again.
+   * otherwise. Failed snapshots are retained and retried before image fallback.
    *
    * Emits one `snapshot_lookup` diagnostic per start so `image` vs `repository`
-   * and the reason (no key, no index, miss, discarded, not allowed) are visible.
+   * and the reason (no key, no index, miss, exhausted, skipped, not allowed) are visible.
    * A hit adds the snapshot's age and size. Like the capture line it carries no
    * repository key; the key is logged by the Sandbox DO, which owns it.
    */
@@ -390,7 +404,7 @@ export class SandboxContainers extends DurableObject<Env> {
         input.instance,
         this.nativeLaunchEnv(input.env, input.containment === true)
       ),
-      indexKey: null,
+      snapshotId: null,
     };
     const index = this.repoSnapshotIndex();
     if (index === null) {
@@ -402,9 +416,8 @@ export class SandboxContainers extends DurableObject<Env> {
       return imageStart;
     }
     const indexKey = await repoSnapshotIndexKey(input.repoKey, this.containerImage());
-    if (input.discardRepository === true) {
-      await index.remove(indexKey);
-      this.logSnapshotLookup('image', 'discarded');
+    if (input.skipRepository === true) {
+      this.logSnapshotLookup('image', 'skipped');
       return imageStart;
     }
     if (!allowRepository) {
@@ -414,6 +427,14 @@ export class SandboxContainers extends DurableObject<Env> {
     const entry = await index.lookup(indexKey);
     if (entry === null) {
       this.logSnapshotLookup('image', 'index_miss');
+      return imageStart;
+    }
+    const failures = (await this.readRecord()).repositoryStartFailures;
+    if (
+      failures?.snapshotId === entry.snapshotId &&
+      failures.attempts >= REPO_SNAPSHOT_MAX_START_FAILURES
+    ) {
+      this.logSnapshotLookup('image', 'retries_exhausted', { attempts: failures.attempts });
       return imageStart;
     }
     // An entry written before `capturedAt` logs no age.
@@ -428,7 +449,7 @@ export class SandboxContainers extends DurableObject<Env> {
         this.nativeLaunchEnv(input.env, input.containment === true),
         entry.snapshotId
       ),
-      indexKey,
+      snapshotId: entry.snapshotId,
     };
   }
 
@@ -449,20 +470,28 @@ export class SandboxContainers extends DurableObject<Env> {
     });
   }
 
-  /**
-   * Run a start and forget the repository snapshot it used when it fails, so a
-   * broken snapshot costs one attempt and the next start is from the image.
-   */
-  private async runStart(start: ResolvedStart, attempt: () => Promise<void>): Promise<void> {
+  /** Count failed snapshot starts durably without changing the shared snapshot index. */
+  private async runStart(start: ResolvedStart, attempt: () => Promise<void>): Promise<boolean> {
     try {
       await attempt();
+      return true;
     } catch (error) {
-      if (start.source === 'repository' && start.indexKey !== null) {
-        await this.repoSnapshotIndex()?.remove(start.indexKey);
-        logControlDiagnostic('snapshot_discard', {
+      if (start.source === 'repository' && start.snapshotId !== null) {
+        const record = await this.readRecord();
+        const previous = record.repositoryStartFailures;
+        const attempts = (previous?.snapshotId === start.snapshotId ? previous.attempts : 0) + 1;
+        await this.writeRecord({
+          ...record,
+          repositoryStartFailures: { snapshotId: start.snapshotId, attempts },
+        });
+        logControlDiagnostic('snapshot_start_failed', {
           sandboxId: this.sandboxNameForLog(),
           reason: 'repository_start_failed',
+          attempts,
+          errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
+          cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
         });
+        return false;
       }
       throw error;
     }
@@ -687,7 +716,7 @@ export class SandboxContainers extends DurableObject<Env> {
     if (containment) await this.installContainmentProxy(container);
     if (!container.running) {
       const start = await this.resolveStart(input, record.startSource === 'repository');
-      return this.issueNativeSupervisor(record, ref, start);
+      return this.issueNativeSupervisor(record, ref, start, input);
     }
     if ((await this.settleRunningMainProcess(record, ref)) === 'supervisor') {
       return { started: true, startSource: recordedStartSource(record) };
@@ -1040,9 +1069,13 @@ export class SandboxContainers extends DurableObject<Env> {
   private async awaitSupervisorMainProcess(
     container: Container,
     source: ContainersStartSource,
-    issuedAt: number
+    issuedAt: number,
+    launchDeadlineAt?: number
   ): Promise<void> {
-    const deadlineAt = Date.now() + DEADLINE_MS.wrapperReadiness;
+    const deadlineAt = Math.min(
+      Date.now() + DEADLINE_MS.wrapperReadiness,
+      launchDeadlineAt ?? Infinity
+    );
     let checks = 0;
     let lastCompleted: MainProcessObservation | null = null;
     for (;;) {
@@ -1104,6 +1137,9 @@ export class SandboxContainers extends DurableObject<Env> {
       lastSnapshot: record.lastSnapshot ?? null,
       ...(record.instance !== undefined ? { instance: record.instance } : {}),
       ...(record.billingConfigured ? { billingConfigured: true } : {}),
+      ...(record.repositoryStartFailures === undefined
+        ? {}
+        : { repositoryStartFailures: record.repositoryStartFailures }),
     };
   }
 

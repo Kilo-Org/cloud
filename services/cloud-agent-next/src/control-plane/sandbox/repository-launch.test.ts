@@ -33,7 +33,7 @@ describe('repositoryLaunchOptions', () => {
       reason: 'no_preparing_routes',
       preparingRouteCount: 0,
       distinctKeyCount: 0,
-      discarded: false,
+      skipped: false,
     });
   });
 
@@ -67,18 +67,18 @@ describe('repositoryLaunchOptions', () => {
     );
     expect(decision.reason).toBe('repository');
     expect(decision.options).toEqual({ repoKey: 'shared' });
-    expect(decision.discarded).toBe(false);
+    expect(decision.skipped).toBe(false);
   });
 
-  it('discards a previous repository start whose wrapper never connected', () => {
+  it('skips a previous repository start whose wrapper never connected', () => {
     const previous: RepositoryLaunchRecord = {
       allocationId: 'allocation_1',
       startSource: 'repository',
       confirmed: false,
     };
     const decision = repositoryLaunchOptions([preparingRoute()], previous);
-    expect(decision.discarded).toBe(true);
-    expect(decision.options).toEqual({ repoKey: 'repo-key', discardRepository: true });
+    expect(decision.skipped).toBe(true);
+    expect(decision.options).toEqual({ repoKey: 'repo-key', skipRepository: true });
   });
 
   it('keeps a confirmed repository start', () => {
@@ -88,7 +88,7 @@ describe('repositoryLaunchOptions', () => {
       confirmed: true,
     };
     const decision = repositoryLaunchOptions([preparingRoute()], previous);
-    expect(decision.discarded).toBe(false);
+    expect(decision.skipped).toBe(false);
     expect(decision.options).toEqual({ repoKey: 'repo-key' });
   });
 });

@@ -2936,18 +2936,65 @@ export class SandboxControlV2 extends DurableObject<Env> {
           reason: launch.reason,
           preparingRoutes: launch.preparingRouteCount,
           distinctKeys: launch.distinctKeyCount,
-          discard: launch.discarded,
+          skip: launch.skipped,
           repoKey: launch.options.repoKey?.slice(0, 16),
         });
         // Persist a placeholder before the launch so a `hello` accepted while it
         // runs confirms this allocation, and that confirmation outlives the
         // allocation stopping before the launch resolves.
         await beginRepositoryLaunch(this.ctx.storage, allocationId);
-        const launched = await withTimeout(
-          this.provider.launch(createdRef, launchEnv, launch.options),
+        if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+        const launchOptions = {
+          ...launch.options,
+          ...(pin.provider === 'cloudflare-containers' ? { deadlineAt: launchDeadline } : {}),
+        };
+        let launched = await withTimeout(
+          this.provider.launch(createdRef, launchEnv, launchOptions),
           remainingMs(launchDeadline),
           'Sandbox launch timed out'
         );
+        if (launched.snapshotFailed) {
+          const imageCredential = generateSandboxCredential();
+          const imageLaunchEnv = await this.wrapperLaunchEnv(imageCredential, allocationId);
+          const imageCredentialHash = await hashSandboxCredential(imageCredential);
+          const ownsCleanup = await this.enqueue(async () => {
+            const latest = await this.readAllocation();
+            if (latest.kind !== 'creating' || latest.allocationId !== allocationId) return false;
+            if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+            await this.ctx.storage.put(CREDENTIAL_HASH_KEY, imageCredentialHash);
+            return true;
+          });
+          if (!ownsCleanup) {
+            await this.recordLaunch(allocationId, launched.startSource);
+            return;
+          }
+          if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+          const confirmed = await withTimeout(
+            this.stopRef(createdRef, allocationId),
+            remainingMs(launchDeadline),
+            'Sandbox cleanup stop timed out'
+          );
+          if (!confirmed) throw new Error('Sandbox snapshot cleanup failed');
+          const afterCleanup = await this.readAllocation();
+          if (afterCleanup.kind !== 'creating' || afterCleanup.allocationId !== allocationId)
+            return;
+          if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+          logControlDiagnostic('snapshot_fallback', {
+            sandboxId: this.sandboxId,
+            allocationId,
+            reason: 'repository_start_failed',
+          });
+          launched = await withTimeout(
+            this.provider.launch(createdRef, imageLaunchEnv, {
+              ...launch.options,
+              skipRepository: true,
+              deadlineAt: launchDeadline,
+            }),
+            remainingMs(launchDeadline),
+            'Sandbox launch timed out'
+          );
+          if (launched.snapshotFailed) throw new Error('Sandbox image launch failed');
+        }
         await this.recordLaunch(allocationId, launched.startSource);
         await this.dispatchResult({
           type: 'created',

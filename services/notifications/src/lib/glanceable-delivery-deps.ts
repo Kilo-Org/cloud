@@ -3,11 +3,18 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { user_activity_tokens, user_push_tokens } from '@kilocode/db/schema';
 import { pushDataSchema } from '@kilocode/notifications';
 import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { z } from 'zod';
 
 import { sendLiveActivityApns, type ApnsCredentials } from './apns-live-activity';
 import { sendWidgetApns } from './apns-widget';
 import { sendPushNotifications } from './expo-push';
 import type { GlanceableDeliveryDeps, IosActivityToken } from './glanceable-delivery';
+import { sessionCardSourceSchema } from './session-card-delivery';
+
+const deliveryExtrasSchema = z.object({
+  liveActivitySnapshot: z.record(z.string(), z.unknown()).optional(),
+  sessionCards: sessionCardSourceSchema.array().optional(),
+});
 
 /** Per-refresh I/O dependencies, shared by every entrypoint through the user DO. */
 export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
@@ -17,6 +24,23 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
     string,
     Pick<typeof user_activity_tokens.$inferSelect, 'id' | 'updated_at' | 'kind'>
   >();
+  // Retire a token that can no longer reach a card: a successful end, or an
+  // APNs 410 on any event. A delayed end must not delete another activity or a
+  // registration refreshed since this delivery selected its target.
+  const retireIosTarget = async (token: string) => {
+    const target = iosTargets.get(token);
+    if (!target) return;
+    await getDbForCall()
+      .delete(user_activity_tokens)
+      .where(
+        and(
+          eq(user_activity_tokens.id, target.id),
+          eq(user_activity_tokens.token, token),
+          eq(user_activity_tokens.kind, target.kind),
+          eq(user_activity_tokens.updated_at, target.updated_at)
+        )
+      );
+  };
 
   return {
     buildSnapshot: async (userId, organizationId) => {
@@ -47,23 +71,95 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
       });
       if (!response.ok) {
         console.warn('Glanceable snapshot route failed', { status: response.status });
-        return null;
+        // The route rechecks organization membership: a 403 means the user
+        // lost the scope, so its session cards must end at once.
+        return response.status === 403 ? 'access_denied' : null;
       }
       if (response.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') {
         console.warn('Glanceable snapshot route returned a non-JSON response');
         return null;
       }
       const raw: unknown = await response.json().catch(() => null);
-      const candidate = {
-        type: 'active_agents_glanceable',
-        ...(typeof raw === 'object' && raw !== null ? raw : {}),
-      };
-      const parsed = pushDataSchema.safeParse(candidate);
+      const body = typeof raw === 'object' && raw !== null ? raw : {};
+      const parsed = pushDataSchema.safeParse({ type: 'active_agents_glanceable', ...body });
       if (!parsed.success || parsed.data.type !== 'active_agents_glanceable') {
         console.warn('Glanceable snapshot route returned an invalid snapshot');
         return null;
       }
-      return parsed.data;
+      // Server-only fields beside the snapshot. A web build older than session
+      // cards omits both, and the aggregate card then counts every session.
+      const extras = deliveryExtrasSchema.safeParse(body);
+      const liveActivity =
+        extras.success && extras.data.liveActivitySnapshot !== undefined
+          ? pushDataSchema.safeParse({
+              type: 'active_agents_glanceable',
+              ...extras.data.liveActivitySnapshot,
+            })
+          : undefined;
+      if (
+        !extras.success ||
+        (liveActivity !== undefined &&
+          (!liveActivity.success || liveActivity.data.type !== 'active_agents_glanceable'))
+      ) {
+        console.warn('Glanceable snapshot route returned invalid session card facts');
+        return null;
+      }
+      return {
+        ...parsed.data,
+        ...(liveActivity?.success && liveActivity.data.type === 'active_agents_glanceable'
+          ? { liveActivitySnapshot: liveActivity.data }
+          : {}),
+        ...(extras.data.sessionCards === undefined ? {} : { sessionCards: extras.data.sessionCards }),
+      };
+    },
+    listIosSessionActivityTokens: async (userId, organizationId) => {
+      const rows = await getDbForCall()
+        .select({
+          token: user_activity_tokens.token,
+          sessionId: user_activity_tokens.session_id,
+          kind: user_activity_tokens.kind,
+          id: user_activity_tokens.id,
+          updated_at: user_activity_tokens.updated_at,
+        })
+        .from(user_activity_tokens)
+        .where(
+          and(
+            eq(user_activity_tokens.user_id, userId),
+            organizationId === null
+              ? isNull(user_activity_tokens.organization_id)
+              : eq(user_activity_tokens.organization_id, organizationId),
+            eq(user_activity_tokens.kind, 'ios_session_activity'),
+            isNull(user_activity_tokens.superseded_at),
+            isNotNull(user_activity_tokens.session_id)
+          )
+        );
+      for (const row of rows) {
+        iosTargets.set(row.token, row);
+      }
+      return rows.flatMap(row =>
+        row.sessionId === null ? [] : [{ token: row.token, sessionId: row.sessionId }]
+      );
+    },
+    sendIosSessionLiveActivity: async (send, timestampSeconds, isCurrent) => {
+      const credentials = await readApnsCredentials(env);
+      if (credentials === null || (isCurrent && !(await isCurrent()))) return false;
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const result = await sendLiveActivityApns({
+        credentials,
+        tokens: [{ token: send.token, event: send.event }],
+        contentState: send.contentState,
+        nowSeconds,
+        timestampSeconds,
+        // Same window as the aggregate card. A stale card keeps its last-known
+        // content with an honest time; it never reads as expired.
+        staleDateSeconds: nowSeconds + GLANCEABLE_STALE_MS / 1000,
+        priority: send.priority,
+        relevanceScore: send.relevanceScore,
+        dismissalDateSeconds: send.dismissalDateSeconds,
+        isCurrent,
+        onEnded: retireIosTarget,
+      });
+      return result.ok === 1;
     },
     listIosActivityTokens: async (userId, organizationId) => {
       const orgPredicate =
@@ -110,7 +206,8 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
       isCurrent,
       beforeEnd,
       onEndRejected,
-      onStarted
+      onStarted,
+      relevanceScore
     ) => {
       const credentials = await readApnsCredentials(env);
       if (credentials === null || (isCurrent && !(await isCurrent()))) return;
@@ -128,22 +225,8 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
         beforeEnd,
         onEndRejected,
         onStarted,
-        onEnded: async token => {
-          const target = iosTargets.get(token);
-          if (!target) return;
-          // A delayed end must not delete another activity or a registration
-          // refreshed since this delivery selected its target.
-          await getDbForCall()
-            .delete(user_activity_tokens)
-            .where(
-              and(
-                eq(user_activity_tokens.id, target.id),
-                eq(user_activity_tokens.token, token),
-                eq(user_activity_tokens.kind, target.kind),
-                eq(user_activity_tokens.updated_at, target.updated_at)
-              )
-            );
-        },
+        relevanceScore,
+        onEnded: retireIosTarget,
       });
       if (result.failed > 0) {
         console.warn('Some Live Activity APNs sends failed', {

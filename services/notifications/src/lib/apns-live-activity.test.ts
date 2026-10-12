@@ -95,6 +95,54 @@ describe('buildLiveActivityApnsRequest', () => {
       props: '{"running":1}',
     });
   });
+
+  it('carries the requested priority and the relevance score', () => {
+    const request = buildLiveActivityApnsRequest({
+      token: 'device-token-1',
+      event: 'update',
+      contentState: { name: 'SessionLiveActivity', props: '{}' },
+      credentials: { teamId: TEAM_ID, keyId: KEY_ID, privateKeyPem: 'pem', topic: TOPIC },
+      authorizationJwt: 'header.payload.sig',
+      timestampSeconds: 1_750_000_000,
+      priority: 5,
+      relevanceScore: 60,
+    });
+
+    expect(request.headers['apns-priority']).toBe('5');
+    expect(JSON.parse(request.body)).toMatchObject({ aps: { 'relevance-score': 60 } });
+  });
+});
+
+describe('sendLiveActivityApns session card options', () => {
+  it('uses the caller dismissal date on an end and rejects a start without an alert', async () => {
+    const privateKeyPem = await generateTestPrivateKeyPem();
+    const requests: { url: string; body: { aps: Record<string, unknown> } }[] = [];
+    const fetchFn = vi.fn(async (url: string, init: RequestInit) => {
+      requests.push({ url, body: JSON.parse(String(init.body)) as { aps: Record<string, unknown> } });
+      return new Response(null, { status: 200 });
+    });
+
+    const result = await sendLiveActivityApns({
+      credentials: { teamId: TEAM_ID, keyId: KEY_ID, privateKeyPem, topic: TOPIC },
+      tokens: [
+        { token: 'card-token', event: 'end' },
+        { token: 'start-token', event: 'start' },
+      ],
+      contentState: { name: 'SessionLiveActivity', props: '{}' },
+      nowSeconds: 1_750_000_000,
+      dismissalDateSeconds: 1_750_000_900,
+      relevanceScore: 20,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    expect(result).toEqual({ attempted: 2, ok: 1, failed: 1 });
+    expect(requests).toHaveLength(1);
+    expect(requests[0].body.aps).toMatchObject({
+      event: 'end',
+      'dismissal-date': 1_750_000_900,
+      'relevance-score': 20,
+    });
+  });
 });
 
 describe('APNs terminal contract', () => {

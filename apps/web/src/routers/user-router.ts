@@ -44,6 +44,7 @@ import {
   user_activity_tokens,
   agent_configs,
   passkey_credentials,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -1386,14 +1387,49 @@ export const userRouter = createTRPCRouter({
 
   registerActivityToken: baseProcedure
     .input(
-      z.object({
-        token: z.string().min(1),
-        kind: z.enum(['ios_push_to_start', 'ios_activity', 'android_ongoing']),
-        platform: z.enum(['ios', 'android']),
-        organizationId: z.string().min(1).nullable(),
-      })
+      z
+        .object({
+          token: z.string().min(1),
+          kind: z.enum(['ios_push_to_start', 'ios_activity', 'ios_session_activity', 'android_ongoing']),
+          platform: z.enum(['ios', 'android']),
+          organizationId: z.string().min(1).nullable(),
+          /** The followed session; required for `ios_session_activity`, rejected for every other kind. */
+          sessionId: z.string().min(1).optional(),
+        })
+        .refine(input => (input.kind === 'ios_session_activity') === (input.sessionId !== undefined), {
+          message: 'sessionId is required for a session card and rejected for every other kind',
+          path: ['sessionId'],
+        })
     )
     .mutation(async ({ ctx, input }) => {
+      const sessionId = input.kind === 'ios_session_activity' ? (input.sessionId ?? null) : null;
+      if (sessionId !== null) {
+        if (input.platform !== 'ios') {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'A session card is iOS only' });
+        }
+        // A session card shows the session title on the Lock Screen, so the
+        // caller must own the session in the scope the card counts against.
+        if (input.organizationId !== null) {
+          await ensureOrganizationAccess(ctx, input.organizationId);
+        }
+        const [session] = await db
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+              input.organizationId === null
+                ? isNull(cli_sessions_v2.organization_id)
+                : eq(cli_sessions_v2.organization_id, input.organizationId)
+            )
+          )
+          .limit(1);
+        if (!session) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+        }
+      }
+
       const retiredTokens = await db.transaction(async tx => {
         // Registration is a replace. An `ios_activity` token is the app adopting
         // its Lock Screen card, and only one card may be live per (user,
@@ -1441,6 +1477,7 @@ export const userRouter = createTRPCRouter({
             kind: input.kind,
             platform: input.platform,
             organization_id: input.organizationId,
+            session_id: sessionId,
           })
           .onConflictDoUpdate({
             target: [user_activity_tokens.token],
@@ -1449,6 +1486,7 @@ export const userRouter = createTRPCRouter({
               kind: input.kind,
               platform: input.platform,
               organization_id: input.organizationId,
+              session_id: sessionId,
               // The app re-adopting its own card must not leave its row marked
               // dead: a re-registration of the same token un-supersedes it.
               superseded_at: null,
@@ -1467,7 +1505,10 @@ export const userRouter = createTRPCRouter({
       // row is already retired and the DB holds the one-live-card invariant, so
       // this is best-effort: a failure only leaves the end to the next
       // scheduled refresh and must never fail the registration.
-      if (retiredTokens.length > 0) {
+      // A new session card leaves the aggregate count and needs its first
+      // server content (the approval key the app cannot mint), so it asks for
+      // the same scope refresh.
+      if (retiredTokens.length > 0 || sessionId !== null) {
         await refreshGlanceableScope({
           userId: ctx.user.id,
           organizationId: input.organizationId,
@@ -1486,14 +1527,29 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await db
+      const removed = await db
         .delete(user_activity_tokens)
         .where(
           and(
             eq(user_activity_tokens.user_id, ctx.user.id),
             eq(user_activity_tokens.token, input.token)
           )
-        );
+        )
+        .returning({
+          kind: user_activity_tokens.kind,
+          organizationId: user_activity_tokens.organization_id,
+        });
+      // An unfollowed session counts on the aggregate card again. Best-effort,
+      // as for registration: the next session change carries it otherwise.
+      const session = removed.find(row => row.kind === 'ios_session_activity');
+      if (session) {
+        await refreshGlanceableScope({
+          userId: ctx.user.id,
+          organizationId: session.organizationId,
+        }).catch(error => {
+          console.error('[unregisterActivityToken] Failed to request glanceable refresh:', error);
+        });
+      }
       return { success: true };
     }),
 

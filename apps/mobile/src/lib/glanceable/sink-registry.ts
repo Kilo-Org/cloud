@@ -131,6 +131,13 @@ export function writeGlanceableFrame(
  */
 export type GlanceableActivity = Pick<LiveActivity, 'getPushToken' | 'addPushTokenListener'>;
 
+/**
+ * `scope` retires every token of the signed-in scope, followed session cards
+ * included. `activity` retires the aggregate card's token. `session` retires
+ * only the one session card token the caller passes.
+ */
+export type ActivityTokenLifetime = 'scope' | 'activity' | 'session';
+
 export type GlanceableDelivery = {
   registerScopeTokens(organizationId: string | null, userId: string | null): void;
   registerTokens(
@@ -140,9 +147,9 @@ export type GlanceableDelivery = {
     activity?: GlanceableActivity
   ): void;
   /** Retire a lifetime and tombstone failures. The optional lookup starts before native end. */
-  cleanupTokens(lifetime: 'scope' | 'activity', activityToken?: Promise<string | null>): void;
+  cleanupTokens(lifetime: ActivityTokenLifetime, activityToken?: Promise<string | null>): void;
   unregisterTokens(
-    lifetime?: 'scope' | 'activity',
+    lifetime?: ActivityTokenLifetime,
     activityToken?: Promise<string | null>
   ): Promise<{ ok: boolean; tokens: string[] }>;
 };

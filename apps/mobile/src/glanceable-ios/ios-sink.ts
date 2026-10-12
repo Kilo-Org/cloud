@@ -6,6 +6,7 @@ import {
   isEligibleGlanceableWork,
   isStartableGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { LIVE_ACTIVITY_RELEVANCE } from '@kilocode/notifications';
 
 import { i18n } from '@/i18n';
 import { getHomeWidgetDataForSnapshot } from '@/lib/glanceable/home-widget-data';
@@ -45,9 +46,51 @@ import {
   toWidgetProps,
   widgetTimelineFrames,
 } from './view-props';
+import { followedSessionCounts } from './session-follow';
 
 /** ActivityKit takes the stale window in seconds. */
 const STALE_AFTER_SECONDS = GLANCEABLE_STALE_MS / 1000;
+
+/**
+ * The aggregate card's place among this app's cards (spec "Presentation
+ * order"): above a running session card while something needs input, below it
+ * otherwise. The server pushes the same scores.
+ */
+function aggregateRelevance(contentState: GlanceableLiveActivityProps): number {
+  return contentState.needsInput > 0
+    ? LIVE_ACTIVITY_RELEVANCE.aggregateNeedsInput
+    : LIVE_ACTIVITY_RELEVANCE.aggregate;
+}
+
+/**
+ * The snapshot the aggregate card counts: the scope's work without the
+ * sessions this device follows (spec "Aggregate card coexistence"). Every
+ * followed session has its own card, so the aggregate card ends when no other
+ * startable work is left, as the server's card does. A followed session the
+ * tray no longer lists cannot push a count below zero. Only the Live Activity
+ * reads this; the Home widget keeps every session.
+ */
+function withoutFollowedSessions(snapshot: GlanceableAgentsSnapshot): GlanceableAgentsSnapshot {
+  const followed = followedSessionCounts();
+  if (followed.running + followed.needsInput + followed.idle + followed.scheduled === 0) {
+    return snapshot;
+  }
+  const running = Math.max(0, snapshot.running - followed.running);
+  const needsInput = Math.max(0, snapshot.needsInput - followed.needsInput);
+  const scheduled = Math.max(0, snapshot.scheduled - followed.scheduled);
+  const startable = running + needsInput + scheduled > 0;
+  return {
+    ...snapshot,
+    running,
+    needsInput,
+    needsApproval: Math.max(0, (snapshot.needsApproval ?? 0) - followed.needsApproval),
+    // While a session is followed, idle work alone does not keep the card.
+    idle: startable ? Math.max(0, snapshot.idle - followed.idle) : 0,
+    scheduled,
+    needsInputSince: needsInput === 0 ? null : snapshot.needsInputSince,
+    scheduledAt: scheduled === 0 ? null : snapshot.scheduledAt,
+  };
+}
 
 let activityKitDeniedState = false;
 let activity: Activity | null = null;
@@ -169,7 +212,11 @@ function startCard(
       lastProps = contentState;
       revision = snapshot.revision;
       getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
-      inFlightUpdate = activity.update(contentState, STALE_AFTER_SECONDS);
+      inFlightUpdate = activity.update(
+        contentState,
+        STALE_AFTER_SECONDS,
+        aggregateRelevance(contentState)
+      );
       return;
     }
     const remaining = ActiveAgentsLiveActivity.getInstances(true).filter(
@@ -186,7 +233,8 @@ function startCard(
     const started = ActiveAgentsLiveActivity.start(
       contentState,
       OPEN_AGENTS_URL,
-      STALE_AFTER_SECONDS
+      STALE_AFTER_SECONDS,
+      aggregateRelevance(contentState)
     );
     activity = started;
     inFlightUpdate = null;
@@ -499,8 +547,10 @@ export const iosSink: GlanceableSink = {
     if (frames !== null) {
       ActiveAgentsWidget.updateTimeline(frames);
     }
-    const contentState = liveActivityContentState(snapshot);
-    if (!isEligibleGlanceableWork(snapshot)) {
+    // The Live Activity counts only the sessions this device does not follow.
+    const card = withoutFollowedSessions(snapshot);
+    const contentState = liveActivityContentState(card);
+    if (!isEligibleGlanceableWork(card)) {
       // ActivityKit owns removal after this call, even if JavaScript stops.
       // The after-date retains Lock Screen content, not the Dynamic Island.
       const immediate = snapshot.status === 'signed_out' || snapshot.status === 'privacy';
@@ -513,11 +563,13 @@ export const iosSink: GlanceableSink = {
     // Never start here. Recheck cached native work and preserve update/end ordering.
     if (refreshActivity() && activity !== null) {
       lastProps = contentState;
-      inFlightUpdate = activity.update(lastProps, STALE_AFTER_SECONDS);
+      inFlightUpdate = activity.update(lastProps, STALE_AFTER_SECONDS, aggregateRelevance(lastProps));
     }
   },
 
-  startOrUpdate(snapshot, ctx) {
+  startOrUpdate(rawSnapshot, ctx) {
+    // The Live Activity counts only the sessions this device does not follow.
+    const snapshot = withoutFollowedSessions(rawSnapshot);
     // The in-app switch is checked first: it is the one the user set here, and
     // honoring it costs no native call. ActivityKit's own switch still decides
     // the rest, and `start` remains the authority on it.
@@ -592,7 +644,11 @@ export const iosSink: GlanceableSink = {
     }
     const contentState = liveActivityContentState(snapshot);
     lastProps = contentState;
-    inFlightUpdate = activity.update(contentState, STALE_AFTER_SECONDS);
+    inFlightUpdate = activity.update(
+      contentState,
+      STALE_AFTER_SECONDS,
+      aggregateRelevance(contentState)
+    );
     revision = snapshot.revision;
   },
 

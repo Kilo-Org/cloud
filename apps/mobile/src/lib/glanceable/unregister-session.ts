@@ -1,5 +1,6 @@
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { isUnauthorizedTrpcError } from '@/lib/auth/trpc-unauthorized';
+import { trpcClient } from '@/lib/trpc';
 
 /**
  * Session gate for activity-token deletes. The server deletes a row only for
@@ -33,4 +34,26 @@ export function noteUnregisterFailure(token: string, error: unknown): void {
 
 export function _resetUnregisterSessionForTests(): void {
   refusedToken = null;
+}
+
+/**
+ * Delete each token for the authenticated owner. Returns the tokens whose
+ * delete failed, so the caller keeps them for a later cleanup.
+ */
+export async function deleteActivityTokens(
+  tokens: readonly string[],
+  authToken: string
+): Promise<string[]> {
+  const results = await Promise.all(
+    tokens.map(async token => {
+      try {
+        await trpcClient.user.unregisterActivityToken.mutate({ token });
+        return true;
+      } catch (error) {
+        noteUnregisterFailure(authToken, error);
+        return false;
+      }
+    })
+  );
+  return tokens.filter((_token, index) => !results[index]);
 }

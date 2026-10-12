@@ -1,5 +1,6 @@
 import { type GlanceableAgentsSnapshotStatus } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { SESSION_CARD_FIXTURES } from './session-fixture-catalog';
 import { type GlanceableActionFeedback } from './surface-extras';
 
 /**
@@ -31,6 +32,12 @@ export type GlanceableFixture = {
   checkedAgo?: number;
   rows?: (now: number) => GlanceableFixtureRow[];
   actionFeedback?: Exclude<GlanceableActionFeedback, null>;
+  /**
+   * iOS: follow one row with a session card. `approvalKey` adds the key a
+   * server push carries for a permission wait; `finish` follows the row while
+   * it works, then reports it finished.
+   */
+  follow?: { index: number; approvalKey?: boolean; finish?: boolean };
 };
 
 const MINUTE_MS = 60_000;
@@ -321,6 +328,7 @@ export const GLANCEABLE_FIXTURES = {
     description: 'Working, scheduled, and idle.',
     rows: combinationRows(['running', 'scheduled', 'idle']),
   },
+  ...SESSION_CARD_FIXTURES,
 } satisfies Record<string, GlanceableFixture>;
 
 export type GlanceableFixtureName = keyof typeof GLANCEABLE_FIXTURES;

@@ -1,10 +1,23 @@
 import {
   buildGlanceableSnapshot,
+  GLANCEABLE_STALE_MS,
   GLANCEABLE_TERMINAL_MS,
   isEligibleGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { buildHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
+import {
+  buildSessionLiveActivityContentState,
+  sessionLiveActivityRelevance,
+  type SessionLiveActivityRow,
+} from '@kilocode/notifications';
+import { Platform } from 'react-native';
 
+import {
+  discoverSessionCards,
+  endAllSessionCards,
+  followSession,
+  syncFollowedSessionCards,
+} from '@/glanceable-ios/session-follow';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 
@@ -67,6 +80,48 @@ function cancelTerminal(): void {
   if (terminalTimer !== null) {
     clearTimeout(terminalTimer);
     terminalTimer = null;
+  }
+}
+
+/**
+ * iOS: follow the fixture's row through the Follow path, so the aggregate card
+ * counts it out and the card is drawn from production content. A permission
+ * fixture then applies the content a server push would carry (the same
+ * builder, with the approval key the server mints); a finished fixture
+ * follows the row while it works and then reports it idle.
+ */
+function applySessionCardFixture(
+  fixture: GlanceableFixture,
+  rows: readonly SessionLiveActivityRow[],
+  ctx: GlanceablePublisherContext,
+  now: number
+): void {
+  endAllSessionCards();
+  const follow = fixture.follow;
+  const row = follow === undefined ? undefined : rows[follow.index];
+  if (follow === undefined || row === undefined) {
+    return;
+  }
+  const at = new Date(now).toISOString();
+  const working = {
+    ...row,
+    status: 'busy',
+    statusUpdatedAt: new Date(now - 20 * 60_000).toISOString(),
+  };
+  log(`session card ${followSession(follow.finish === true ? working : row, ctx, now)}`);
+  if (follow.finish === true) {
+    syncFollowedSessionCards([{ ...row, statusUpdatedAt: at }], now);
+  }
+  if (follow.approvalKey === true) {
+    const card = discoverSessionCards().find(activity => activity.getProps()?.sessionId === row.id);
+    const content = buildSessionLiveActivityContentState(row, {
+      approvalKey: FIXTURE_APPROVAL_KEY,
+      updatedAt: at,
+      statusSinceFallback: at,
+    });
+    void card
+      ?.update(content, GLANCEABLE_STALE_MS / 1000, sessionLiveActivityRelevance(content.statusKind))
+      .catch(() => undefined);
   }
 }
 
@@ -153,6 +208,10 @@ async function apply(name: GlanceableFixtureName, ctx: GlanceablePublisherContex
     actionFeedback: fixture.actionFeedback ?? null,
   });
   recordWaitingAsk(eligible ? selectWaitingAsk(rows, ctx, now) : null);
+  // Before the frame: the aggregate card counts a followed row out.
+  if (Platform.OS === 'ios') {
+    applySessionCardFixture(fixture, rows, ctx, now);
+  }
   writeGlanceableFrame(getGlanceableSinks(), snapshot, ctx);
   if (!eligible) {
     // The publisher's happy → empty terminal: a sink that does not own its
@@ -187,6 +246,9 @@ async function release(): Promise<void> {
   // feedback must not survive into the live surface.
   setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
   recordWaitingAsk(null);
+  if (Platform.OS === 'ios') {
+    endAllSessionCards();
+  }
   releaseGlanceableFixtureHold();
   log('released');
 }

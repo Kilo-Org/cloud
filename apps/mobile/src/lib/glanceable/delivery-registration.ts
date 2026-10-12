@@ -12,10 +12,15 @@ import {
 } from '@/lib/auth/logout-reconciliation';
 import { trpcClient } from '@/lib/trpc';
 
+import {
+  _resetSessionActivityTokensForTests,
+  releaseAllSessionActivities,
+  sessionActivityTokens,
+} from './session-activity-tokens';
 import { enqueueTokenMutation, resetTokenMutationQueue } from './token-mutation-queue';
 import {
   _resetUnregisterSessionForTests,
-  noteUnregisterFailure,
+  deleteActivityTokens,
   readUnregisterAuthToken,
 } from './unregister-session';
 
@@ -253,8 +258,10 @@ const delivery: GlanceableDelivery = {
   },
 
   async unregisterTokens(lifetime, activityToken) {
-    const includeScope = lifetime !== 'activity';
-    let instance = observedActivity;
+    const includeScope = lifetime === undefined || lifetime === 'scope';
+    // A session card end retires its own token only; the aggregate card keeps its registration.
+    const sessionOnly = lifetime === 'session';
+    let instance = sessionOnly ? null : observedActivity;
     if (Platform.OS === 'ios' && instance === null && activityToken === undefined) {
       try {
         instance = ActiveAgentsLiveActivity.getInstances().at(-1) ?? null;
@@ -265,6 +272,7 @@ const delivery: GlanceableDelivery = {
     if (includeScope) {
       registerEpoch += 1;
       scopeRegistration = null;
+      releaseAllSessionActivities();
       if (Platform.OS === 'ios') {
         if (pushToStartToken !== null) {
           scopeTokens.add(pushToStartToken);
@@ -272,36 +280,32 @@ const delivery: GlanceableDelivery = {
         observePushToStart(null);
       }
     }
-    detachActivity();
+    if (!sessionOnly) {
+      detachActivity();
+    }
     const nativeToken = collectActivityToken(instance, activityToken);
     const result = await enqueueTokenMutation(async () => {
       const capturedToken = await nativeToken;
       if (capturedToken) {
-        activityTokens.add(capturedToken);
+        (sessionOnly ? sessionActivityTokens : activityTokens).add(capturedToken);
       }
       // Read the sets inside the FIFO so an already-running upsert is included.
-      const tokens = [
-        ...new Set(includeScope ? [...scopeTokens, ...activityTokens] : activityTokens),
-      ];
+      const listed = includeScope
+        ? [...scopeTokens, ...activityTokens, ...sessionActivityTokens]
+        : [...activityTokens];
+      const sessionToken = capturedToken ? [capturedToken] : [];
+      const tokens = [...new Set(sessionOnly ? sessionToken : listed)];
       // Without a session the delete can only answer 401: keep the tokens for an authorized cleanup.
       const authToken = tokens.length > 0 ? await readUnregisterAuthToken() : null;
       if (authToken === null) {
         return { ok: tokens.length === 0, tokens };
       }
-      const results = await Promise.all(
-        tokens.map(async token => {
-          try {
-            await trpcClient.user.unregisterActivityToken.mutate({ token });
-            scopeTokens.delete(token);
-            activityTokens.delete(token);
-            return true;
-          } catch (error) {
-            noteUnregisterFailure(authToken, error);
-            return false;
-          }
-        })
-      );
-      const failed = tokens.filter((_token, index) => !results[index]);
+      const failed = await deleteActivityTokens(tokens, authToken);
+      for (const token of tokens.filter(candidate => !failed.includes(candidate))) {
+        scopeTokens.delete(token);
+        activityTokens.delete(token);
+        sessionActivityTokens.delete(token);
+      }
       // Keep Android's existing successful-cleanup result contract.
       return {
         ok: failed.length === 0,
@@ -329,6 +333,7 @@ export function _resetDeliveryRegistrationForTests(): void {
   scopeTokens.clear();
   activityTokens.clear();
   pushToStartToken = null;
+  _resetSessionActivityTokensForTests();
   resetTokenMutationQueue();
   _resetUnregisterSessionForTests();
   if (Platform.OS === 'ios') {

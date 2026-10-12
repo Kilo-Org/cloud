@@ -1,6 +1,8 @@
 import { hashKey, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Platform } from 'react-native';
 
+import { syncFollowedSessionCards } from '@/glanceable-ios/session-follow';
 import { i18n } from '@/i18n';
 import {
   buildActiveSessionsTrayInput,
@@ -99,6 +101,13 @@ export function GlanceablePublisherMount(): null {
       setGlanceableFixtureScope(ctx);
     }
     const derive = (sessions: CachedActiveSessionsData['sessions'], checkedAt: number) => {
+      // The followed session cards update first, so the aggregate card below
+      // counts a session whose card just finished. They read the raw rows: an
+      // answered raise counts as idle until its status syncs, but the session
+      // has not finished.
+      if (Platform.OS === 'ios') {
+        syncFollowedSessionCards(sessions, checkedAt);
+      }
       publisher.handleSessions(resolveAnsweredRaises(sessions), ctx, checkedAt);
     };
 

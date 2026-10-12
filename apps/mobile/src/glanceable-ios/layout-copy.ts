@@ -56,6 +56,9 @@ export function glanceableLayoutCopy() {
     running: i18n.t('common.working'),
     scheduled: i18n.t('common.scheduled'),
     idle: i18n.t('common.idle'),
+    // The session card's idle label and its Open control.
+    finished: i18n.t('glanceable.finished'),
+    open: i18n.t('glanceable.openSession'),
     openAgents: i18n.t('glanceable.openAgents'),
     // The Live Activity's button and the widget's in-place actions all read
     // `common.approve`: the permission card, the wrist control, and the widget

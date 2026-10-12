@@ -125,6 +125,15 @@ export function formatLargeNumber(num: number, shorten: boolean = false): string
   return num.toLocaleString();
 }
 
+export function formatBytes(value: number | null): string {
+  if (value === null || !Number.isFinite(value) || value < 0) return 'Not available';
+  if (value === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+  const scaled = value / 1024 ** index;
+  return `${scaled.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
 export function isValidUUID(str: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);

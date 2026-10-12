@@ -199,10 +199,10 @@ test('keeps auto routing workers in their own opt-in group', () => {
   assert.ok(!alwaysOn.includes('auto-routing-benchmark'));
 });
 
-test('keeps the AI gateway app in its own opt-in group', () => {
+test('runs the AI gateway app with the core services', () => {
   const service = getService('ai-gateway');
 
-  assert.equal(service.group, 'ai-gateway');
+  assert.equal(service.group, 'core');
   assert.equal(service.type, 'nextjs');
   assert.equal(service.dir, 'apps/ai-gateway');
   assert.equal(service.port, 3010 + portOffset);
@@ -213,13 +213,39 @@ test('keeps the AI gateway app in its own opt-in group', () => {
     'run',
     'dev',
   ]);
-  assert.deepEqual(resolveTargets(['ai-gateway']), [
-    'redis',
-    'postgres',
-    'redis-http',
-    'ai-gateway',
+  assert.deepEqual(service.dependsOn, ['postgres', 'redis', 'redis-http']);
+  assert.ok(resolveGroups(getAlwaysOnGroupIds()).includes('ai-gateway'));
+});
+
+test('starts the AI gateway app before the web app that rewrites to it', () => {
+  const web = getService('nextjs');
+  const gateway = getService('ai-gateway');
+
+  assert.ok(web.dependsOn.includes('ai-gateway'));
+  assert.deepEqual(web.command, [
+    'env',
+    `AI_GATEWAY_URL=http://localhost:${gateway.port}`,
+    'pnpm',
+    'run',
+    'dev',
   ]);
-  assert.ok(!resolveGroups(getAlwaysOnGroupIds()).includes('ai-gateway'));
+
+  const appTargets = resolveTargets(['app']);
+  assert.ok(appTargets.includes('ai-gateway'));
+  assert.ok(appTargets.indexOf('ai-gateway') < appTargets.indexOf('nextjs'));
+});
+
+test('moves the web app gateway target with the port offset', () => {
+  const originalOffset = portOffset;
+  try {
+    applyPortOffset(4200);
+    assert.deepEqual(getService('nextjs').command.slice(0, 2), [
+      'env',
+      'AI_GATEWAY_URL=http://localhost:7210',
+    ]);
+  } finally {
+    applyPortOffset(originalOffset);
+  }
 });
 
 test('registers user data export with worktree-aware ports and dependencies', () => {
@@ -231,11 +257,12 @@ test('registers user data export with worktree-aware ports and dependencies', ()
   assert.equal(service.port, 8818 + portOffset);
   assert.deepEqual(service.dependsOn, ['postgres', 'nextjs']);
   assert.deepEqual(resolveTargets(['data-export']), [
+    'redis',
     'postgres',
     'stripe',
-    'redis',
-    'cloudflare-session-ingest',
     'redis-http',
+    'cloudflare-session-ingest',
+    'ai-gateway',
     'nextjs',
     'user-data-export',
   ]);

@@ -21,6 +21,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 ### Configuration & Constant URLs
 
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `packages/web-shared/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
+- `AI_GATEWAY_URL` - Optional origin of the `apps/ai-gateway` app that `apps/web` rewrites its AI gateway routes to; read at build time in `apps/web/ai-gateway-rewrites.mjs`. When unset, Vercel's `production` target uses `https://ai-gateway.kilo.ai`, its `staging` target uses `https://staging-ai-gateway.kilo.ai`, and other environments serve the routes from `apps/web` itself. `pnpm dev:start` sets it to the local ai-gateway app. [SERVER]
 - `KILOCLAW_INSTANCE_URL_TEMPLATE` - URL template for KiloClaw instances; used in `packages/web-shared/src/lib/config.server.ts`. [SERVER]
 - `NEXTAUTH_URL` - Base URL for NextAuth.js; used across many auth-related files. [SERVER]
 - `NEXTAUTH_SECRET` - Secret key for NextAuth.js session encryption and five-minute, audience-bound user assertions verified by internal Workers such as user data export. `[SECRET]`
@@ -60,7 +61,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 ### Vercel & Build Info
 
 - `VERCEL_ENV` - Vercel environment (`development`, `preview`, `production`); used in `apps/web/next.config.mjs`, `packages/web-shared/src/lib/constants.ts`, and `apps/web/.env.test`. [SERVER]
-- `VERCEL_TARGET_ENV` - Vercel system or custom deployment environment (`development`, `preview`, `production`, `staging`, etc.); used in `apps/web/src/app/layout.tsx` to identify staging UI. [SERVER]
+- `VERCEL_TARGET_ENV` - Vercel system or custom deployment environment (`development`, `preview`, `production`, `staging`, etc.); used in `apps/web/src/app/layout.tsx` to identify staging UI and in `apps/web/ai-gateway-rewrites.mjs` to pick the AI gateway origin. [SERVER]
 - `VERCEL_URL` - Auto-injected by Vercel; current deployment URL. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
 - `VERCEL_GIT_COMMIT_SHA` - Auto-injected by Vercel; Git commit SHA of the current deployment. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
 - `NEXT_PUBLIC_VERCEL_URL` - Client-exposed Vercel deployment URL from build info. [PUBLIC]
@@ -209,7 +210,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 
 ### Ablation / Experimentation
 
-- `GLOBAL_KILO_BACKEND` - Override to select the global backend region/endpoint; used in `next.config.mjs`. [SERVER]
+- `GLOBAL_KILO_BACKEND` - Marks the `kilocode-global-app` deployment, which serves `/api/exa` and `/api/marketplace` itself instead of rewriting them to `global-api.kilo.ai`; used in `next.config.mjs`. [SERVER]
 - `ANALYZE` - Next.js bundle analyzer switch; enables `@next/bundle-analyzer` in `next.config.mjs`. [SERVER]
 
 ### Database

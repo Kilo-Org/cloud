@@ -2,7 +2,14 @@
 
 Next.js app that serves the AI gateway API on its own. It deploys to the
 `kilocode-ai-gateway` Vercel project, whose functions run in `fra1` and `sfo1`
-(`vercel.json`). `apps/web` still serves the same handlers under its own paths.
+(`vercel.json`), at `ai-gateway.kilo.ai` and `staging-ai-gateway.kilo.ai`.
+
+`apps/web` rewrites its gateway paths to this app (`apps/web/ai-gateway-rewrites.mjs`)
+in Vercel's production and staging targets, and locally when `AI_GATEWAY_URL` is set.
+It keeps its own copies of the routes for every other environment, such as preview
+deployments. A new route here that replaces an `apps/web` route needs a matching
+rewrite; `apps/web/ai-gateway-rewrites.test.mjs` checks every `apps/web` gateway
+route resolves to a route here with the same methods.
 
 - Every route lives under `/api/v1`. There are no `/api/gateway` or `/api/openrouter`
   aliases. Each `apps/web` route maps to the path without that prefix, and the
@@ -16,8 +23,8 @@ Next.js app that serves the AI gateway API on its own. It deploys to the
   `packages/web-shared/AGENTS.md`.
 - Handlers that depend on the path accept both apps' paths, such as the LLM
   proxy's path validation.
-- `pnpm dev` runs with the web app's environment files. Start it with
-  `pnpm dev:start ai-gateway`.
+- `pnpm dev` runs with the web app's environment files. `pnpm dev:start`
+  starts it with the web app and points the web app's rewrites at it.
 - The scheduled `deploy-production.yml` and `deploy-staging.yml` deploy this
   app with the web apps, from the same CI-green commit, after migrations. A
   release is only recorded as complete once the gateway is live too.

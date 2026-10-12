@@ -903,13 +903,16 @@ describe('createMobileAgentSessionManager cloned session first page', () => {
     fetchPage.mockReset();
   });
 
-  function setup(clonedSessionId?: KiloSessionId): SessionManagerConfig {
-    createMobileAgentSessionManager({ store: {}, userWebConnection: {}, clonedSessionId } as never);
-    const config = configHolder.current;
-    if (config?.fetchSnapshotPage === undefined) {
+  function setup(
+    clonedSessionId?: KiloSessionId
+  ): NonNullable<SessionManagerConfig['fetchSnapshotPage']> {
+    const options = { store: {}, userWebConnection: {}, clonedSessionId };
+    createMobileAgentSessionManager(options as never);
+    const reader = configHolder.current?.fetchSnapshotPage;
+    if (reader === undefined) {
       throw new Error('createSessionManager did not capture a page reader');
     }
-    return config;
+    return reader;
   }
 
   it('re-reads an empty first page until the CLI sync of the clone lands', async () => {
@@ -919,9 +922,9 @@ describe('createMobileAgentSessionManager cloned session first page', () => {
         .mockResolvedValueOnce(emptyPage as never)
         .mockResolvedValueOnce(emptyPage as never)
         .mockResolvedValueOnce(syncedPage as never);
-      const config = setup(SESSION_ID);
+      const fetchSnapshotPage = setup(SESSION_ID);
 
-      const result = config.fetchSnapshotPage!(SESSION_ID, {});
+      const result = fetchSnapshotPage(SESSION_ID, {});
       await vi.advanceTimersByTimeAsync(2000);
 
       await expect(result).resolves.toBe(syncedPage);
@@ -929,7 +932,7 @@ describe('createMobileAgentSessionManager cloned session first page', () => {
 
       // A later replay (reconnect) reads once, even when empty.
       fetchPage.mockResolvedValueOnce(emptyPage as never);
-      await expect(config.fetchSnapshotPage!(SESSION_ID, {})).resolves.toBe(emptyPage);
+      await expect(fetchSnapshotPage(SESSION_ID, {})).resolves.toBe(emptyPage);
       expect(fetchPage).toHaveBeenCalledTimes(4);
     } finally {
       vi.useRealTimers();
@@ -940,9 +943,9 @@ describe('createMobileAgentSessionManager cloned session first page', () => {
     vi.useFakeTimers();
     try {
       fetchPage.mockResolvedValue(emptyPage as never);
-      const config = setup(SESSION_ID);
+      const fetchSnapshotPage = setup(SESSION_ID);
 
-      const result = config.fetchSnapshotPage!(SESSION_ID, {});
+      const result = fetchSnapshotPage(SESSION_ID, {});
       await vi.advanceTimersByTimeAsync(SPAWNED_NOT_FOUND_MAX_ATTEMPTS * 1000);
 
       await expect(result).resolves.toBe(emptyPage);
@@ -954,10 +957,10 @@ describe('createMobileAgentSessionManager cloned session first page', () => {
 
   it('reads an ordinary session, a child, and an older page once', async () => {
     fetchPage.mockResolvedValue(emptyPage as never);
-    await setup().fetchSnapshotPage!(SESSION_ID, {});
+    await setup()(SESSION_ID, {});
     const cloned = setup(SESSION_ID);
-    await cloned.fetchSnapshotPage!('ses_child' as KiloSessionId, {});
-    await cloned.fetchSnapshotPage!(SESSION_ID, { cursor: 'older' });
+    await cloned('ses_child' as KiloSessionId, {});
+    await cloned(SESSION_ID, { cursor: 'older' });
 
     expect(fetchPage).toHaveBeenCalledTimes(3);
   });

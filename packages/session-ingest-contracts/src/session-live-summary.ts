@@ -71,9 +71,6 @@ export const sessionLiveSummarySchema = z.object({
 
 export type SessionLiveSummary = z.infer<typeof sessionLiveSummarySchema>;
 
-/** A code point a one-line label must not carry: a control, or a line break. */
-const CONTROL_CODE_POINT = /^[\u0000-\u001f\u007f\u2028\u2029]$/;
-
 /**
  * One line of display text: control characters and line breaks become spaces,
  * runs of white space collapse, and text longer than `limit` ends with an
@@ -83,8 +80,14 @@ const CONTROL_CODE_POINT = /^[\u0000-\u001f\u007f\u2028\u2029]$/;
 export function sessionLiveText(raw: unknown, limit: number): string | null {
   if (typeof raw !== 'string') return null;
   // Iterating code points keeps a surrogate pair whole while the control set is
-  // applied, which a plain character class cannot promise.
-  const flattened = [...raw].map(char => (CONTROL_CODE_POINT.test(char) ? ' ' : char)).join('');
+  // applied. The set is compared numerically: a character class that names the
+  // control range reads as a control character in the source itself.
+  const flattened = [...raw]
+    .map(char => {
+      const code = char.codePointAt(0) ?? 0;
+      return code <= 0x1f || code === 0x7f || code === 0x2028 || code === 0x2029 ? ' ' : char;
+    })
+    .join('');
   const line = flattened.replace(/\s+/g, ' ').trim();
   if (line === '') return null;
   if (line.length <= limit) return line;

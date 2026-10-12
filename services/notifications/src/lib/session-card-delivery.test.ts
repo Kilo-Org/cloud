@@ -128,7 +128,12 @@ describe('planSessionCardSend', () => {
     const planned = plan(
       source({
         status: 'busy',
-        summary: { step, plan: { done: 3, total: 7, current: 'Write tests' }, changes: null, failure: null },
+        summary: {
+          step,
+          plan: { done: 3, total: 7, current: 'Write tests' },
+          changes: null,
+          failure: null,
+        },
         lastActivityAt: '2026-10-12T09:59:30.000Z',
       }),
       previous
@@ -146,7 +151,9 @@ describe('planSessionCardSend', () => {
   });
 
   it('keeps the aggregate stale window for a card that is not working', () => {
-    const planned = plan(source({ status: 'question', lastActivityAt: '2026-10-12T09:59:30.000Z' }));
+    const planned = plan(
+      source({ status: 'question', lastActivityAt: '2026-10-12T09:59:30.000Z' })
+    );
     expect(planned?.send.staleAtSeconds).toBe(nowSeconds + 30 * 60);
   });
 
@@ -164,7 +171,11 @@ describe('planSessionCardSend', () => {
       }),
       shown(source({ status: 'busy' }))
     );
-    expect(failed?.send).toMatchObject({ event: 'end', priority: 10, dismissalDateSeconds: nowSeconds + 900 });
+    expect(failed?.send).toMatchObject({
+      event: 'end',
+      priority: 10,
+      dismissalDateSeconds: nowSeconds + 900,
+    });
     expect(JSON.parse(failed?.send.content.props ?? '{}')).toMatchObject({
       statusKind: 'failed',
       failure: { kind: 'provider' },
@@ -180,7 +191,11 @@ describe('planSessionCardSend', () => {
 
   it('drops the command when the permission is answered', () => {
     const waiting = plan(
-      source({ status: 'permission', approvalKey: 'a'.repeat(64), permissionCommand: 'pnpm drizzle migrate' })
+      source({
+        status: 'permission',
+        approvalKey: 'a'.repeat(64),
+        permissionCommand: 'pnpm drizzle migrate',
+      })
     );
     expect(waiting?.content.permissionCommand).toBe('pnpm drizzle migrate');
     const answered = plan(source({ status: 'busy' }), waiting?.content);
@@ -339,7 +354,10 @@ describe('deliverSessionCards', () => {
       { token: 'ExponentPushToken[aaa]', sessionId: 'ses_2' },
     ]);
 
-    await deliver(deps, [source({ status: 'busy' }), { ...source({ status: 'busy' }), sessionId: 'ses_2' }]);
+    await deliver(deps, [
+      source({ status: 'busy' }),
+      { ...source({ status: 'busy' }), sessionId: 'ses_2' },
+    ]);
 
     expect(sends.map(send => send.sessionId).sort()).toEqual(['ses_1', 'ses_2']);
   });

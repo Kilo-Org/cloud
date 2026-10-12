@@ -179,8 +179,7 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
         // activity for a working card: a stale card keeps its last-known
         // content with an honest time, and the layout draws its quiet warning
         // from this moment. It never reads as expired.
-        staleDateSeconds:
-          send.staleAtSeconds ?? nowSeconds + GLANCEABLE_STALE_MS / 1000,
+        staleDateSeconds: send.staleAtSeconds ?? nowSeconds + GLANCEABLE_STALE_MS / 1000,
         priority: send.priority,
         relevanceScore: send.relevanceScore,
         dismissalDateSeconds: send.dismissalDateSeconds,

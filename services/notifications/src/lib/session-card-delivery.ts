@@ -285,10 +285,11 @@ export function planSessionCardSend(params: {
   };
 }
 
-
-
 /** True when an update moves the card into a state that wakes the user. */
-function urgentKind(kind: SessionCardStatusKind, previous: SessionLiveActivityContentState | undefined): boolean {
+function urgentKind(
+  kind: SessionCardStatusKind,
+  previous: SessionLiveActivityContentState | undefined
+): boolean {
   if (kind === previous?.statusKind) return false;
   return kind === 'needsInput' || kind === 'failed';
 }

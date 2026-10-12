@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { createProjectHashAsync } from '@expo/fingerprint';
+
 import { hashRootNativeInputs } from './mobile-native-build';
 
 import {
@@ -13,6 +15,7 @@ import {
   buildXcodeBuildCommand,
   computeArtifactChecksum,
   defaultIsLockActive,
+  ensureCurrentNativeProject,
   isValidManifest,
   locateProducedApp,
   lookupCache,
@@ -100,24 +103,82 @@ test('fingerprint options include iOS platform and only skip the Expo extra sect
   assert.deepEqual(options.platforms, ['ios']);
   assert.equal(options.silent, true);
   // The generated tree is ignored so the hash is input-deterministic across
-  // worktrees and machines.
-  assert.deepEqual(options.ignorePaths, ['ios/**']);
+  // worktrees and machines. Android, JS, and test files in local modules do
+  // not shape the iOS binary.
+  assert.deepEqual(options.ignorePaths, [
+    'ios/**',
+    'modules/*/android/**',
+    'modules/*/src/**',
+    'modules/**/*.test.ts',
+  ]);
   // SourceSkips.ExpoConfigExtraSection === 4096
   assert.equal(options.sourceSkips & 4096, 4096);
   assert.deepEqual(
-    options.extraSources.map(source => ({
-      type: source.type,
-      id: source.id,
-      contents: source.contents,
-    })),
+    options.extraSources.map(source =>
+      source.type === 'contents'
+        ? { type: source.type, id: source.id, contents: source.contents }
+        : { type: source.type, filePath: source.filePath }
+    ),
     [
       {
         type: 'contents',
         id: 'repoRootNativeInputs',
         contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
       },
+      { type: 'dir', filePath: 'modules' },
+      { type: 'dir', filePath: 'targets' },
     ]
   );
+});
+
+test('fingerprint changes for iOS module and extension sources and ignores unrelated files', async () => {
+  const project = makeTempDir('fingerprint');
+  const write = (relative: string, contents: string) => {
+    fs.mkdirSync(path.dirname(path.join(project, relative)), { recursive: true });
+    fs.writeFileSync(path.join(project, relative), contents);
+  };
+  const hash = () =>
+    createProjectHashAsync(
+      project,
+      buildFingerprintOptions() as Parameters<typeof createProjectHashAsync>[1]
+    );
+  try {
+    write('package.json', '{"name":"fixture"}');
+    write('modules/existing/expo-module.config.json', '{"platforms":["apple"]}');
+    write('modules/existing/ios/Existing.swift', 'let a = 1');
+    write('modules/existing/android/Existing.kt', 'val a = 1');
+    write('modules/existing/src/index.ts', 'export {};');
+    write('modules/existing/existing.test.ts', 'export {};');
+    write('targets/Extension/Extension.swift', 'let b = 1');
+    write('src/app.ts', 'export {};');
+    write('ios/Podfile', '# generated');
+    let current = await hash();
+
+    for (const [relative, contents] of [
+      ['modules/added/expo-module.config.json', '{"platforms":["apple"]}'],
+      ['modules/added/ios/Added.podspec', 'Pod::Spec.new'],
+      ['modules/existing/ios/Existing.swift', 'let a = 2'],
+      ['targets/Extension/Extension.swift', 'let b = 2'],
+    ]) {
+      write(relative, contents);
+      const next = await hash();
+      assert.notEqual(next, current, `${relative} must change the fingerprint`);
+      current = next;
+    }
+
+    for (const [relative, contents] of [
+      ['src/app.ts', 'export const changed = 1;'],
+      ['modules/existing/android/Existing.kt', 'val a = 2'],
+      ['modules/existing/src/index.ts', 'export const changed = 1;'],
+      ['modules/existing/existing.test.ts', 'export const changed = 1;'],
+      ['ios/Podfile', '# regenerated'],
+    ]) {
+      write(relative, contents);
+      assert.equal(await hash(), current, `${relative} must not change the fingerprint`);
+    }
+  } finally {
+    fs.rmSync(project, { recursive: true, force: true });
+  }
 });
 
 // ── Compatibility key ────────────────────────────────────────────────
@@ -640,6 +701,40 @@ test('validateXcodeWorkspace throws with a clear instruction when ios/ is missin
       () => validateXcodeWorkspace(mobileRoot),
       /Kilo\.xcworkspace|run.*expo.*prebuild|prebuild/
     );
+  } finally {
+    fs.rmSync(mobileRoot, { recursive: true, force: true });
+  }
+});
+
+test('ensureCurrentNativeProject prebuilds when ios/ is missing or stale, and only then', () => {
+  const mobileRoot = makeTempDir('prebuild');
+  const prebuilt: string[] = [];
+  const prebuild = (root: string) => {
+    prebuilt.push(root);
+    fs.mkdirSync(path.join(root, 'ios', 'Kilo.xcworkspace'), { recursive: true });
+  };
+  try {
+    ensureCurrentNativeProject({ mobileRoot, nativeHash: 'hash-a', prebuild });
+    assert.equal(prebuilt.length, 1);
+    assert.equal(
+      fs.readFileSync(path.join(mobileRoot, 'ios', '.kilo-native-hash'), 'utf8'),
+      'hash-a\n'
+    );
+
+    ensureCurrentNativeProject({ mobileRoot, nativeHash: 'hash-a', prebuild });
+    assert.equal(prebuilt.length, 1);
+
+    ensureCurrentNativeProject({ mobileRoot, nativeHash: 'hash-b', prebuild });
+    assert.equal(prebuilt.length, 2);
+    assert.equal(
+      fs.readFileSync(path.join(mobileRoot, 'ios', '.kilo-native-hash'), 'utf8'),
+      'hash-b\n'
+    );
+
+    fs.rmSync(path.join(mobileRoot, 'ios', 'Kilo.xcworkspace'), { recursive: true });
+    ensureCurrentNativeProject({ mobileRoot, nativeHash: 'hash-b', prebuild });
+    assert.equal(prebuilt.length, 3);
+    assert.deepEqual(prebuilt, [mobileRoot, mobileRoot, mobileRoot]);
   } finally {
     fs.rmSync(mobileRoot, { recursive: true, force: true });
   }

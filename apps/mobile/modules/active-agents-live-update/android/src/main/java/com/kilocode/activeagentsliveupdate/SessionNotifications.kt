@@ -264,4 +264,21 @@ class SessionNotificationCard : Record {
     put("showWhen", showWhen)
     put("chronometer", chronometer)
   }
+
+  /** Read the shape `toJson` writes; the readable half of the persisted pair. */
+  fun fillFromJson(json: JSONObject) {
+    sessionId = json.optString("sessionId")
+    organizationId = json.optString("organizationId").ifEmpty { null }
+    title = json.optString("title")
+    text = json.optString("text")
+    subText = json.optString("subText").ifEmpty { null }
+    compactText = json.optString("compactText").ifEmpty { null }
+    openLabel = json.optString("openLabel")
+    openUrl = json.optString("openUrl")
+    approveLabel = json.optString("approveLabel").ifEmpty { null }
+    approvalKey = json.optString("approvalKey").ifEmpty { null }
+    whenMs = json.optDouble("whenMs", 0.0)
+    showWhen = json.optBoolean("showWhen")
+    chronometer = json.optBoolean("chronometer")
+  }
 }

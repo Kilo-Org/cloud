@@ -210,7 +210,6 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 
 ### Ablation / Experimentation
 
-- `GLOBAL_KILO_BACKEND` - Marks the `kilocode-global-app` deployment, which serves `/api/exa` and `/api/marketplace` itself instead of rewriting them to `global-api.kilo.ai`; used in `next.config.mjs`. [SERVER]
 - `ANALYZE` - Next.js bundle analyzer switch; enables `@next/bundle-analyzer` in `next.config.mjs`. [SERVER]
 
 ### Database

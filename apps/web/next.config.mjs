@@ -78,25 +78,8 @@ const nextConfig = {
     // beforeFiles rewrites run BEFORE filesystem routes are checked, so they
     // take precedence over filesystem routes.
     // See: https://nextjs.org/docs/app/api-reference/config/next-config-js/rewrites
-    const aiGatewayRewrites = buildAiGatewayRewrites(process.env);
-
-    // Global API rewrites - proxy to global-api.kilo.ai when not on global backend
-    const globalApiRewrites =
-      process.env.VERCEL_ENV === 'production' && process.env.GLOBAL_KILO_BACKEND !== 'true'
-        ? [
-            {
-              source: '/api/exa/:path*',
-              destination: 'https://global-api.kilo.ai/api/exa/:path*',
-            },
-            {
-              source: '/api/marketplace/:path*',
-              destination: 'https://global-api.kilo.ai/api/marketplace/:path*',
-            },
-          ]
-        : [];
-
     return {
-      beforeFiles: [...aiGatewayRewrites, ...globalApiRewrites],
+      beforeFiles: buildAiGatewayRewrites(process.env),
       afterFiles: [
         // /config.json is handled by src/app/config.json/route.ts which merges
         // Kilo-specific schema additions on top of the upstream opencode schema.

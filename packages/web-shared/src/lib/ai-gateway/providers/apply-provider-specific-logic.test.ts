@@ -1,12 +1,11 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { CLAUDE_OPUS_FALLBACK_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import {
-  applyGatewayModelsFallback,
   applyPreferredProvider,
   applyProviderSpecificLogic,
   applyReasoningDetailsTransform,
   getIgnoredProviders,
+  removeModelsFallback,
   removeUnsupportedRequestServiceTier,
   withIgnoredProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
@@ -16,7 +15,6 @@ import {
   ReasoningDetailsTransform,
   type BYOKResult,
   type Provider,
-  type ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
@@ -335,40 +333,13 @@ describe('applyReasoningDetailsTransform', () => {
   });
 });
 
-describe('applyGatewayModelsFallback', () => {
-  it.each([
-    ['openrouter', 'anthropic/claude-fable-5'],
-    ['vercel', 'anthropic/claude-fable-5'],
-    ['openrouter', 'anthropic/claude-opus-5'],
-    ['vercel', 'anthropic/claude-opus-5'],
-  ] satisfies [ProviderId, string][])(
-    'sets Opus 4.8 as the fallback for %s requests to %s',
-    async (providerId, requestedModel) => {
+describe('removeModelsFallback', () => {
+  it.each(['anthropic/claude-fable-5', 'anthropic/claude-opus-5', 'openai/gpt-4o'])(
+    'removes caller-provided fallbacks for %s',
+    requestedModel => {
       const request = makeRequest(requestedModel, ['caller/fallback']);
 
-      await applyGatewayModelsFallback(providerId, requestedModel, request);
-
-      expect(request.body.models).toEqual([requestedModel, CLAUDE_OPUS_FALLBACK_MODEL_ID]);
-    }
-  );
-
-  it.each(['anthropic/claude-fable-5', 'anthropic/claude-opus-5'])(
-    'removes caller-provided fallbacks for %s on other providers',
-    async requestedModel => {
-      const request = makeRequest(requestedModel, ['caller/fallback']);
-
-      await applyGatewayModelsFallback('martian', requestedModel, request);
-
-      expect(request.body.models).toBeUndefined();
-    }
-  );
-
-  it.each(['anthropic/claude-opus-4.8', 'anthropic/claude-opus-6', 'openai/gpt-4o'])(
-    'removes caller-provided fallbacks for other model %s',
-    async requestedModel => {
-      const request = makeRequest(requestedModel, ['caller/fallback']);
-
-      await applyGatewayModelsFallback('openrouter', requestedModel, request);
+      removeModelsFallback(request);
 
       expect(request.body.models).toBeUndefined();
     }

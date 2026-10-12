@@ -46,7 +46,7 @@ vi.mock('@/lib/auth/auth-epoch', () => ({ currentAuthEpoch: () => world.epoch })
 
 /** The provider an OAuth server is discovered with; its storage is its own module's. */
 const { oauthProvider } = vi.hoisted(() => ({ oauthProvider: { redirectUrl: 'kiloapp:///x' } }));
-vi.mock('./remote-mcp-oauth', () => ({ backgroundOAuthProvider: () => oauthProvider }));
+vi.mock('./remote-mcp-oauth-provider', () => ({ remoteMcpOAuthProvider: () => oauthProvider }));
 
 /** The one discovery function, answering from a `let` so a test can change it. */
 let answer: () => Effect.Effect<readonly Tool[], RemoteMcpError> = () => Effect.succeed([]);

@@ -5,7 +5,7 @@ import {
   type RemoteMcpServer,
 } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
-import { backgroundOAuthProvider } from './remote-mcp-oauth';
+import { remoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
 import { listRemoteMcpServers, type StoredRemoteMcpServer } from './remote-mcp-store';
 
 /**
@@ -48,7 +48,7 @@ export function credentialDeps(
   server: StoredRemoteMcpServer
 ): Pick<RemoteMcpClientDeps, 'token' | 'authProvider'> {
   if (server.auth.type === 'oauth') {
-    return { authProvider: backgroundOAuthProvider(server) };
+    return { authProvider: remoteMcpOAuthProvider(server) };
   }
   if (server.auth.type === 'bearer') {
     const serverId = server.id;

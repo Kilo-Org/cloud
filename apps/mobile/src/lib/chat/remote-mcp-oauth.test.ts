@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { authorizationCodeOf, backgroundOAuthProvider } from './remote-mcp-oauth';
+import { authorizationCodeOf } from './remote-mcp-oauth';
+import { remoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
 
 const { openRemoteMcpAuthorization, writeRemoteMcpOAuth } = vi.hoisted(() => ({
   openRemoteMcpAuthorization: vi.fn<(url: string) => Promise<string | null>>(),
@@ -8,10 +9,7 @@ const { openRemoteMcpAuthorization, writeRemoteMcpOAuth } = vi.hoisted(() => ({
 }));
 
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'state-1' }));
-vi.mock('./remote-mcp-oauth-browser', () => ({
-  openRemoteMcpAuthorization,
-  REMOTE_MCP_REDIRECT_URL: 'kiloapp:///remote-mcp',
-}));
+vi.mock('./remote-mcp-oauth-browser', () => ({ openRemoteMcpAuthorization }));
 vi.mock('./remote-mcp-oauth-store', () => ({
   readRemoteMcpOAuth: vi.fn().mockResolvedValue(undefined),
   writeRemoteMcpOAuth,
@@ -47,7 +45,7 @@ describe('the authorization redirect', () => {
 
 describe('the provider discovery runs with', () => {
   it('never opens a browser or replaces the verifier a sign-in in progress made', async () => {
-    const provider = backgroundOAuthProvider({ id: 'remote', url: 'https://remote.example/mcp' });
+    const provider = remoteMcpOAuthProvider({ id: 'remote', url: 'https://remote.example/mcp' });
 
     await provider.saveCodeVerifier('verifier');
     await provider.redirectToAuthorization(new URL('https://auth.example/authorize'));

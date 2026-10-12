@@ -1,6 +1,8 @@
 import * as WebBrowser from 'expo-web-browser';
 import { AppState, Platform } from 'react-native';
 
+import { REMOTE_MCP_REDIRECT_URL } from './remote-mcp-oauth-provider';
+
 /**
  * The browser a remote MCP sign-in runs in, and the redirect it ends on.
  *
@@ -10,8 +12,6 @@ import { AppState, Platform } from 'react-native';
  * (KILO-APP-22); there the redirect arrives as a deep link, which
  * `+native-intent.tsx` hands to `takeRemoteMcpRedirect`.
  */
-
-export const REMOTE_MCP_REDIRECT_URL = 'kiloapp:///remote-mcp';
 
 /**
  * How long a return to the app waits for the redirect. Android can report the

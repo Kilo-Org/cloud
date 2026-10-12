@@ -54,13 +54,24 @@ import {
 // render. No React dependency here: the publisher is plain state.
 registerGlanceableSink(androidSink);
 
-// A sign-out, an account change, or a privacy lock blanks every surface; the
-// followed session notifications are not snapshot sinks, so they end here. The
-// module loads on the event: the widget paths must not carry its graph.
-subscribeGlanceableTerminalEnd(() => {
+/**
+ * The two session-follow entries this file calls. The module loads on demand:
+ * a widget redraw must not carry the notification graph.
+ */
+type SessionFollowLazy = {
+  endAllSessionCards: () => void;
+  restoreFollowedSessionCardsFromStorage: () => Promise<void>;
+};
+
+function sessionFollow(): SessionFollowLazy {
   // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
-  const { endAllSessionCards } = require('./session-follow') as typeof import('./session-follow');
-  endAllSessionCards();
+  return require('./session-follow') as SessionFollowLazy;
+}
+
+// A sign-out, an account change, or a privacy lock blanks every surface; the
+// followed session notifications are not snapshot sinks, so they end here.
+subscribeGlanceableTerminalEnd(() => {
+  sessionFollow().endAllSessionCards();
 });
 
 // A Live Update the permission blocked starts once the user grants it, which
@@ -72,10 +83,7 @@ AppState.addEventListener('change', state => {
     // have updated them while no process ran, and a dismissal the receiver
     // missed leaves a stored card for a session the app no longer follows.
     // Loaded here for the same reason as the terminal end above.
-    // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
-    const { restoreFollowedSessionCardsFromStorage } =
-      require('./session-follow') as typeof import('./session-follow');
-    void restoreFollowedSessionCardsFromStorage();
+    void sessionFollow().restoreFollowedSessionCardsFromStorage();
   }
 });
 

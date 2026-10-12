@@ -68,8 +68,9 @@ function bridgedArity(name: string, source = BRIDGE_SOURCE): number {
   const lazyMarker = `nativeModule()?.${name}(`;
   const start = source.includes(marker) ? source.indexOf(marker) : source.indexOf(lazyMarker);
   const found = source.includes(marker) ? marker : lazyMarker;
-  expect(start, `${marker} is missing from live-update.ts`).toBeGreaterThan(-1);
-  const args = BRIDGE_SOURCE.slice(start + marker.length);
+
+  expect(start, `${found} is missing from the bridge`).toBeGreaterThan(-1);
+  const args = source.slice(start + found.length);
   let depth = 1;
   let end = -1;
   for (let index = 0; index < args.length; index += 1) {

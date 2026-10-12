@@ -544,9 +544,11 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     );
   };
 
-  // The line under the status: the step while the agent works, the wake time
-  // and the steps done while it is scheduled, the stopped reason when it
-  // failed, and the outcome when it finished.
+  // The line under the status: the step and its timer while the agent works,
+  // the steps done while it is scheduled or waits on an answer, the stopped
+  // reason when it failed, and the outcome when it finished. The status line
+  // carries the state time for every kind but a working card, whose timer
+  // sits here beside the step, so each card prints its time once.
   const detailLine = (scheme: Scheme, size: number) => {
     if (kind === 'failed') {
       return (
@@ -601,9 +603,9 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       );
     }
     if (quiet) {
-      return stepLine === null ? null : (
-        <HStack spacing={6}>{text(stepLine, size, scheme.fg, 'semibold')}</HStack>
-      );
+      // The quiet line under the summary replaces the step (spec "Content"
+      // rule 7), so a quiet card shows that one line and no step.
+      return null;
     }
     return (
       <HStack spacing={6}>
@@ -624,7 +626,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       modifiers={[layoutPriority(1), accessibilityElement('combine'), accessibilityLabel(spoken)]}
     >
       {text(title, scheme.titleSize, scheme.fg, 'semibold')}
-      {statusLine(scheme, kind === 'needsInput' || kind === 'failed' || quiet)}
+      {statusLine(scheme, kind !== 'running' || quiet)}
       {detailLine(scheme, 13)}
     </VStack>
   );
@@ -715,7 +717,9 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
           {costLine(scheme, 12)}
         </VStack>
       ) : null}
-      {planLine(scheme, expanded ? 12 : 13) === null || kind === 'needsInput' ? null : (
+      {/* One plan line per card: the full bar for a working card; every other
+          state prints its compact step count in the detail line instead. */}
+      {planLine(scheme, expanded ? 12 : 13) === null || kind !== 'running' ? null : (
         <VStack alignment="leading" spacing={4} modifiers={[padding({ top: 8 })]}>
           {planLine(scheme, expanded ? 12 : 13)}
         </VStack>

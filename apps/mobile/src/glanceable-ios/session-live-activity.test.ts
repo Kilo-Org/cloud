@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- one cohesive layout suite for one stringified widget function */
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type LiveActivityEnvironment } from 'expo-widgets';
 
@@ -99,6 +99,17 @@ const BASE: State = {
   startedAt: new Date(NOW - 38 * 60_000).toISOString(),
 };
 
+// Every state reads the clock (the quiet window, the wake time, today's
+// date), so each test renders at the fixed moment the fixtures name.
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(NOW);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('session card layout: states', () => {
   it('shows the step, the plan progress, and the file changes while working', () => {
     const { banner } = render({
@@ -118,7 +129,6 @@ describe('session card layout: states', () => {
   });
 
   it('says no activity once the quiet window has passed', () => {
-    vi.setSystemTime(NOW);
     const { banner } = render({
       ...BASE,
       statusSince: new Date(NOW - 20 * 60_000).toISOString(),
@@ -126,11 +136,70 @@ describe('session card layout: states', () => {
       currentStep: { verb: 'reading', target: 'auth.ts' },
     });
     const shown = texts(banner);
-    expect(shown).toContain('No activity for');
+    // One line: the quiet warning, once, and no step beside or under it.
+    expect(shown.filter(value => value === 'No activity for')).toHaveLength(1);
+    expect(shown.some(value => value.includes('auth.ts'))).toBe(false);
+    expect(shown).not.toContain('Reading auth.ts');
     // The quiet line replaces the last-known header instead of repeating it.
     expect(shown).not.toContain('Last known ·');
-    expect(shown).not.toContain('Editing auth.ts');
-    vi.useRealTimers();
+  });
+
+  it('shows the step with its verb while the session works', () => {
+    const shown = texts(
+      render({ ...BASE, currentStep: { verb: 'reading', target: 'auth.ts' } }).banner
+    );
+    expect(shown).toContain('Reading auth.ts');
+  });
+
+  it('names the state time of a scheduled and a finished card once', () => {
+    const times = (state: State) =>
+      collect(render(state).banner).filter(item => item.props.dateStyle === 'time');
+    expect(
+      times({
+        ...BASE,
+        statusKind: 'scheduled',
+        scheduledAt: new Date(Date.now() + 90 * 60_000).toISOString(),
+      })
+    ).toHaveLength(1);
+    expect(
+      times({
+        ...BASE,
+        statusKind: 'idle',
+        statusSince: new Date().toISOString(),
+        outcome: { kind: 'none' },
+      })
+    ).toHaveLength(1);
+  });
+
+  it('draws one plan line per card', () => {
+    const plan = { done: 3, total: 7, current: 'Write tests' };
+    const counts = (state: State) => {
+      const shown = texts(render(state).banner);
+      return {
+        full: shown.filter(value => value === '7').length,
+        compact: shown.filter(value => value === '3/7').length,
+        bars: collect(render(state).banner).filter(item => item.kind === 'ProgressView').length,
+      };
+    };
+    // Working: the bar and its count, once.
+    expect(counts({ ...BASE, plan })).toEqual({ full: 1, compact: 0, bars: 1 });
+    // Every other state: the compact count alone, once.
+    for (const statusKind of ['scheduled', 'failed'] as const) {
+      expect(
+        counts({
+          ...BASE,
+          statusKind,
+          plan,
+          scheduledAt: new Date(Date.now() + 90 * 60_000).toISOString(),
+          failure: { kind: 'other' },
+        })
+      ).toEqual({ full: 0, compact: 1, bars: 0 });
+    }
+    expect(counts({ ...BASE, statusKind: 'needsInput', plan })).toEqual({
+      full: 0,
+      compact: 1,
+      bars: 0,
+    });
   });
 
   it('shows the last-known time when a card in another state is out of date', () => {

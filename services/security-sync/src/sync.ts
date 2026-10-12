@@ -1226,7 +1226,7 @@ async function upsertSecurityFinding(
         AND EXISTS (
           SELECT 1
           FROM jsonb_array_elements(COALESCE(${github_app_installations.repositories}, ${platform_integrations.repositories}, '[]'::jsonb)) AS repository
-          WHERE repository->>'full_name' = ${repoFullName}
+          WHERE lower(repository->>'full_name') = lower(${repoFullName})
         )
     ),
     upserted AS (

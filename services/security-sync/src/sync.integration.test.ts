@@ -745,6 +745,51 @@ describe('security sync owner lease in PostgreSQL', () => {
     }
   });
 
+  it('applies a source update when repository metadata casing changes during fetch', async () => {
+    const repo = `acme/case-change-${randomUUID()}`;
+    const integrationId = await insertSyncIntegration(repo);
+    try {
+      stubRelinkFetch();
+      await syncOwner({ ...createSyncOwnerDeps(), runId: 'case-change-open', chunkIndex: 0 });
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          await client.db
+            .update(platform_integrations)
+            .set({
+              repositories: [{ id: 1, name: 'repo', full_name: repo.toUpperCase(), private: true }],
+            })
+            .where(eq(platform_integrations.id, integrationId));
+          return new Response(
+            JSON.stringify([
+              {
+                ...relinkAlert,
+                state: 'fixed',
+                updated_at: '2026-02-15T00:00:00Z',
+                fixed_at: '2026-02-15T00:00:00Z',
+              },
+            ]),
+            { status: 200 }
+          );
+        })
+      );
+
+      const result = await syncOwner({
+        ...createSyncOwnerDeps(),
+        runId: 'case-change-fixed',
+        chunkIndex: 0,
+      });
+      expect(result.errors).toBe(0);
+      expect(await readRelinkFinding(repo)).toMatchObject({
+        status: 'fixed',
+        platform_integration_id: integrationId,
+      });
+    } finally {
+      await cleanupRelink(repo, [integrationId]);
+    }
+  });
+
   it.each(['association', 'canonical', 'new-alert'] as const)(
     'rejects stale %s observations after integration retirement',
     async retirement => {

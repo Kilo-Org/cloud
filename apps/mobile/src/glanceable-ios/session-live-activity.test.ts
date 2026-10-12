@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- one cohesive layout suite for one stringified widget function */
 import { describe, expect, it, vi } from 'vitest';
 
-import type { LiveActivityEnvironment } from 'expo-widgets';
+import { type LiveActivityEnvironment } from 'expo-widgets';
 
 import { SESSION_CARD_QUIET_AFTER_MS } from '@kilocode/notifications';
 
@@ -76,21 +76,6 @@ function collect(node: unknown): Rendered[] {
   const kids = Array.isArray(raw) ? raw.flat(Infinity) : [raw];
   return [root, ...kids.flatMap(child => collect(child))];
 }
-
-const modifierArgs = (node: unknown, name: string) => {
-  const item = element(node);
-  const raw = item?.props.modifiers;
-  if (!Array.isArray(raw)) {
-    return undefined;
-  }
-  for (const modifier of raw) {
-    const record = modifier as { $type?: string; args?: unknown };
-    if (record.$type === name) {
-      return record.args;
-    }
-  }
-  return undefined;
-};
 
 const texts = (node: unknown) =>
   collect(node)

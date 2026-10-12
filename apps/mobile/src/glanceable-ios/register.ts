@@ -8,7 +8,6 @@ import { addUserInteractionListener } from 'expo-widgets';
 
 import { i18n } from '@/i18n';
 import { subscribeGlanceableTerminalEnd } from '@/lib/glanceable/cleanup';
-import { getLastGlanceableSnapshot } from '@/lib/glanceable/persist';
 import {
   getGlanceableDelivery,
   guardSink,
@@ -26,8 +25,7 @@ import { adoptPushStartedActivity, restoreStoredSessionCards } from './adopt-act
 import { refreshActiveAgentsLiveActivityCopy } from './active-agents-live-activity';
 import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
 import { handleGlanceableInteraction } from './interaction';
-import { iosSink, sweepStrayActivities } from './ios-sink';
-import { republishAggregateCard } from './ios-sink';
+import { iosSink, republishAggregateCard, sweepStrayActivities } from './ios-sink';
 import { endAllSessionCards, subscribeSessionFollows } from './session-follow';
 import { refreshSessionLiveActivityCopy } from './session-live-activity';
 import { registerWidgetActionHandling } from './widget-actions';

@@ -21,11 +21,11 @@ import {
   isSessionFollowed,
   restoreFollowedSessionCards,
   SESSION_FINISHED_DISMISS_MS,
-  sessionCardStaleAfterSeconds,
   subscribeSessionFollows,
   syncFollowedSessionCards,
   unfollowSession,
 } from './session-follow';
+import { sessionCardStaleAfterSeconds } from './session-card-facts';
 import {
   renderSessionCardPress,
   SESSION_CARD_STALE_AFTER_SECONDS,

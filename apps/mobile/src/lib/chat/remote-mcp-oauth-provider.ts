@@ -66,6 +66,11 @@ export function remoteMcpOAuthProvider(
   const epoch = currentAuthEpoch();
   let code: string | undefined = undefined;
   let turnedBack = false;
+  /* A sign-in registers its own client (RFC 7591) rather than reusing the
+     stored one: a server that lost its registrations answers an unknown
+     client on the authorize page without redirecting, and the person could
+     then never sign in again. */
+  let registered: RemoteMcpOAuthState['client'] = undefined;
   const save = async (patch: OAuthPatch) => {
     await writeRemoteMcpOAuth({ id: server.id, url: server.url, epoch }, patch);
   };
@@ -74,10 +79,14 @@ export function remoteMcpOAuthProvider(
     clientMetadata,
     ...(signIn === undefined ? {} : { state: () => signIn.state }),
     clientInformation: async () => {
+      if (signIn !== undefined) {
+        return registered;
+      }
       const stored = await readRemoteMcpOAuth(server.id, server.url);
       return stored?.client;
     },
     saveClientInformation: async client => {
+      registered = client;
       await save({ client });
     },
     tokens: async () => {

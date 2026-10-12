@@ -166,7 +166,7 @@ describe('buildHomeWidgetResponseForUser', () => {
     it('binds only the oldest approvable cloud permission and ranks it first', async () => {
       mockedListActiveSessions.mockResolvedValue({ sessions: permissionRows });
       limit.mockResolvedValue([{ cloudAgentSessionId: CLOUD_SESSION }]);
-      mockedReadApprovalKey.mockResolvedValue(KEY);
+      mockedReadApprovalKey.mockResolvedValue({ approvalKey: KEY, command: 'npm test' });
 
       const response = await buildHomeWidgetResponseForUser({
         userId: 'oauth/user-1',
@@ -257,6 +257,17 @@ describe('buildGlanceableDeliveryForUser', () => {
   let storedRows: Fields[];
   let cloudRows: { cloudAgentSessionId: string | null }[];
   let followedWhere: SQL | undefined;
+  let storedWhere: SQL | undefined;
+  let storedFields: Fields | undefined;
+
+  const storedById = (predicate: SQL): Fields[] => {
+    storedWhere = predicate;
+    const query = new PgDialect().sqlToQuery(predicate);
+    const wanted = new Set(
+      (query.params as unknown[]).filter((value): value is string => typeof value === 'string')
+    );
+    return storedRows.filter(row => wanted.has(row.sessionId as string));
+  };
 
   beforeEach(() => {
     mockedListActiveSessions.mockReset();
@@ -267,14 +278,20 @@ describe('buildGlanceableDeliveryForUser', () => {
     followedWhere = undefined;
     // Route each query by its selected fields: the followed token read, the
     // approval identity read, and the read of followed sessions off the list.
+    // The awaited form and the `.limit()` form both work, because the parent
+    // token read awaits the predicate and the follow gate chains `.limit(1)`.
     jest.mocked(db.select).mockReset();
     jest.mocked(db.select).mockImplementation(((fields: Fields) => ({
       from: () => ({
         where: (predicate: SQL) => {
           if ('cloudAgentSessionId' in fields) return { limit: async () => cloudRows };
-          if ('updatedAt' in fields) return Promise.resolve(storedRows);
+          if ('prUrl' in fields) {
+            storedFields = fields;
+            return Promise.resolve(storedById(predicate));
+          }
           followedWhere = predicate;
-          return Promise.resolve(followedRows);
+          const rows = [...followedRows];
+          return Object.assign(rows, { limit: async (_count: number) => rows });
         },
       }),
     })) as never);
@@ -299,7 +316,7 @@ describe('buildGlanceableDeliveryForUser', () => {
     mockedListActiveSessions.mockResolvedValue({ sessions: [running, waiting] });
     followedRows = [{ sessionId: 'ses_waiting' }];
     cloudRows = [{ cloudAgentSessionId: CLOUD_SESSION }];
-    mockedReadApprovalKey.mockResolvedValue(KEY);
+    mockedReadApprovalKey.mockResolvedValue({ approvalKey: KEY, command: 'npm test' });
 
     const delivery = await buildGlanceableDeliveryForUser({
       userId: 'oauth/user-1',
@@ -324,6 +341,12 @@ describe('buildGlanceableDeliveryForUser', () => {
           statusUpdatedAt: '2026-10-12T09:30:00.000Z',
           scheduledAt: null,
           approvalKey: KEY,
+          summary: null,
+          permissionCommand: 'npm test',
+          lastActivityAt: null,
+          costMicrodollars: null,
+          startedAt: null,
+          prOpened: false,
         },
       },
     ]);
@@ -353,6 +376,16 @@ describe('buildGlanceableDeliveryForUser', () => {
         // Production-shaped PostgreSQL timestamp text.
         statusUpdatedAt: '2026-10-12 09:45:12.945+00',
         updatedAt: '2026-10-12 09:46:00+00',
+        summary: {
+          step: null,
+          plan: { done: 1, total: 2, current: 'tests' },
+          changes: { files: 2, added: 10, removed: 3 },
+          failure: { kind: 'provider' },
+        },
+        lastActivityAt: '2026-10-12 09:46:00+00',
+        costMicrodollars: 12345,
+        createdAt: '2026-10-12 09:00:00+00',
+        prUrl: 'https://github.com/acme/repo/pull/7',
       },
     ];
 
@@ -371,10 +404,46 @@ describe('buildGlanceableDeliveryForUser', () => {
           statusUpdatedAt: '2026-10-12T09:45:12.945Z',
           scheduledAt: null,
           approvalKey: null,
+          summary: {
+            step: null,
+            plan: { done: 1, total: 2, current: 'tests' },
+            changes: { files: 2, added: 10, removed: 3 },
+            failure: { kind: 'provider' },
+          },
+          permissionCommand: null,
+          lastActivityAt: '2026-10-12T09:46:00.000Z',
+          costMicrodollars: 12345,
+          startedAt: '2026-10-12T09:00:00.000Z',
+          prOpened: true,
         },
       },
       { sessionId: 'ses_deleted', row: null },
     ]);
+  });
+
+  it('reads a followed session row in one scope-filtered query', async () => {
+    mockedListActiveSessions.mockResolvedValue({ sessions: [running] });
+    followedRows = [{ sessionId: 'ses_running' }];
+
+    await buildGlanceableDeliveryForUser({ userId: 'oauth/user-1', organizationId: null });
+
+    if (storedWhere === undefined) throw new Error('expected the followed session read');
+    const query = new PgDialect().sqlToQuery(storedWhere);
+    expect(Object.keys(storedFields ?? {})).toEqual(
+      expect.arrayContaining([
+        'sessionId',
+        'title',
+        'statusUpdatedAt',
+        'updatedAt',
+        'summary',
+        'lastActivityAt',
+        'costMicrodollars',
+        'createdAt',
+        'prUrl',
+      ])
+    );
+    expect(query.params).toContain('ses_running');
+    expect(query.params).toContain('oauth/user-1');
   });
 
   it('ignores session card tokens older than the ActivityKit lifetime', async () => {

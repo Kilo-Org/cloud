@@ -14,7 +14,11 @@ import {
 import { cli_sessions_v2, user_activity_tokens } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications';
-import { and, eq, gt, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import {
+  sessionLiveSummarySchema,
+  type SessionLiveSummary,
+} from '@kilocode/session-ingest-contracts';
+import { and, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 
 import { type ActiveSession, listActiveSessions } from '@/lib/active-sessions-list';
 import { readCloudAgentWidgetApprovalKey } from '@/lib/cloud-agent-next/cloud-agent-client';
@@ -43,17 +47,18 @@ function pickFrontPermissionRow(sessions: readonly ActiveSession[]): ActiveSessi
 }
 
 /**
- * SHA-256 binding of the one approvable permission, or null. The cloud session
- * lookup is scoped to the same user and organization as the counts, and the
- * Worker re-checks that scope before reading the Session DO's stored pending
- * set (no sandbox wake). Any failure drops only the key: counts and titles stay
- * valid and nothing is fabricated. Logs carry no session, permission or user ids.
+ * SHA-256 binding of the one approvable permission and its command, both null
+ * on any failure. The cloud session lookup is scoped to the same user and
+ * organization as the counts, and the Worker re-checks that scope before
+ * reading the Session DO's stored pending set (no sandbox wake). Any failure
+ * drops only the identity: counts and titles stay valid and nothing is
+ * fabricated. Logs carry no session, permission or user ids.
  */
-async function readApprovalKey(
+async function readApproval(
   scope: HomeWidgetScope,
   front: ActiveSession,
   signal: AbortSignal | undefined
-): Promise<string | null> {
+): Promise<{ approvalKey: string | null; command: string | null }> {
   try {
     const [row] = await db
       .select({ cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id })
@@ -69,7 +74,7 @@ async function readApprovalKey(
       )
       .limit(1);
     // A remote CLI session has no cloud pending set; the app owns its approval.
-    if (!row?.cloudAgentSessionId) return null;
+    if (!row?.cloudAgentSessionId) return { approvalKey: null, command: null };
     return await readCloudAgentWidgetApprovalKey(
       {
         ...scope,
@@ -83,14 +88,14 @@ async function readApprovalKey(
       '[home-widget] approval identity unavailable:',
       error instanceof Error ? error.name : 'unknown'
     );
-    return null;
+    return { approvalKey: null, command: null };
   }
 }
 
 type ScopeRead = {
   sessions: ActiveSession[];
   front: ActiveSession | null;
-  frontApprovalKey: string | null;
+  frontApproval: { approvalKey: string | null; command: string | null };
   rows: HomeWidgetSessionRow[];
   now: number;
 };
@@ -107,13 +112,17 @@ async function readScope(
     signal,
   });
   const front = pickFrontPermissionRow(sessions);
-  const frontApprovalKey =
-    front === null ? null : await readApprovalKey({ userId, organizationId }, front, signal);
+  const frontApproval =
+    front === null
+      ? { approvalKey: null, command: null }
+      : await readApproval({ userId, organizationId }, front, signal);
   const rows: HomeWidgetSessionRow[] =
-    frontApprovalKey === null
+    frontApproval.approvalKey === null
       ? sessions
-      : sessions.map(row => (row === front ? { ...row, approvalKey: frontApprovalKey } : row));
-  return { sessions, front, frontApprovalKey, rows, now: Date.now() };
+      : sessions.map(row =>
+          row === front ? { ...row, approvalKey: frontApproval.approvalKey } : row
+        );
+  return { sessions, front, frontApproval, rows, now: Date.now() };
 }
 
 function homeWidgetResponse(
@@ -153,6 +162,14 @@ export type GlanceableSessionCardSource = {
     statusUpdatedAt: string | null;
     scheduledAt: string | null;
     approvalKey: string | null;
+    /** The stored per-session summary, parsed; null when absent or invalid. */
+    summary: SessionLiveSummary | null;
+    /** The pending request's command, on a `permission` status only. */
+    permissionCommand: string | null;
+    lastActivityAt: string | null;
+    costMicrodollars: number | null;
+    startedAt: string | null;
+    prOpened: boolean;
   } | null;
 };
 
@@ -169,16 +186,21 @@ function isoOrNull(value: string | null): string | null {
   return Number.isFinite(at) ? new Date(at).toISOString() : null;
 }
 
+function liveSummaryOrNull(value: unknown): SessionLiveSummary | null {
+  const parsed = sessionLiveSummarySchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 async function readSessionCards(
   scope: HomeWidgetScope,
   followed: ReadonlySet<string>,
   read: ScopeRead,
   signal: AbortSignal | undefined
 ): Promise<GlanceableSessionCardSource[]> {
+  const ids = [...followed];
   const listed = new Map(read.sessions.map(row => [row.id, row]));
-  const unlisted = [...followed].filter(id => !listed.has(id));
   const stored =
-    unlisted.length === 0
+    ids.length === 0
       ? []
       : await db
           .select({
@@ -186,11 +208,16 @@ async function readSessionCards(
             title: cli_sessions_v2.title,
             statusUpdatedAt: cli_sessions_v2.status_updated_at,
             updatedAt: cli_sessions_v2.updated_at,
+            summary: cli_sessions_v2.live_summary,
+            lastActivityAt: cli_sessions_v2.last_activity_at,
+            costMicrodollars: cli_sessions_v2.total_cost_microdollars,
+            createdAt: cli_sessions_v2.created_at,
+            prUrl: cli_sessions_v2.pr_url,
           })
           .from(cli_sessions_v2)
           .where(
             and(
-              inArray(cli_sessions_v2.session_id, unlisted),
+              inArray(cli_sessions_v2.session_id, ids),
               eq(cli_sessions_v2.kilo_user_id, scope.userId),
               scope.organizationId === null
                 ? isNull(cli_sessions_v2.organization_id)
@@ -200,37 +227,58 @@ async function readSessionCards(
   const storedById = new Map(stored.map(row => [row.sessionId, row]));
 
   return Promise.all(
-    [...followed].map(async (sessionId): Promise<GlanceableSessionCardSource> => {
+    ids.map(async (sessionId): Promise<GlanceableSessionCardSource> => {
       const row = listed.get(sessionId);
-      if (row !== undefined) {
-        const approvalKey =
-          row.status !== 'permission'
-            ? null
-            : row === read.front
-              ? read.frontApprovalKey
-              : await readApprovalKey(scope, row, signal);
+      const kept = storedById.get(sessionId);
+      if (row === undefined && kept === undefined) return { sessionId, row: null };
+      const summary = liveSummaryOrNull(kept?.summary);
+      const lastActivityAt = isoOrNull(row?.lastActivityAt ?? kept?.lastActivityAt ?? null);
+      const costMicrodollars = row?.totalCostMicrodollars ?? kept?.costMicrodollars ?? null;
+      const startedAt = isoOrNull(row?.createdAt ?? kept?.createdAt ?? null);
+      const prOpened = row?.associatedPr !== undefined || (kept?.prUrl ?? null) !== null;
+      if (row === undefined) {
+        // No open run or live connection holds it any more: the agent finished.
         return {
           sessionId,
           row: {
-            title: row.title,
-            status: row.status,
-            statusUpdatedAt: row.statusUpdatedAt ?? null,
-            scheduledAt: row.scheduledAt ?? null,
-            approvalKey,
+            title: kept?.title ?? null,
+            status: 'idle',
+            statusUpdatedAt:
+              isoOrNull(kept?.statusUpdatedAt ?? null) ?? isoOrNull(kept?.updatedAt ?? null),
+            scheduledAt: null,
+            approvalKey: null,
+            summary,
+            permissionCommand: null,
+            lastActivityAt,
+            costMicrodollars,
+            startedAt,
+            prOpened,
           },
         };
       }
-      const kept = storedById.get(sessionId);
-      if (kept === undefined) return { sessionId, row: null };
-      // No open run or live connection holds it any more: the agent finished.
+      // The approval identity is read only on a waiting permission and the
+      // command comes from that same request the key binds.
+      const approval =
+        row.status !== 'permission'
+          ? { approvalKey: null, command: null }
+          : row === read.front
+            ? read.frontApproval
+            : await readApproval(scope, row, signal);
       return {
         sessionId,
         row: {
-          title: kept.title,
-          status: 'idle',
-          statusUpdatedAt: isoOrNull(kept.statusUpdatedAt) ?? isoOrNull(kept.updatedAt),
-          scheduledAt: null,
-          approvalKey: null,
+          title: row.title,
+          status: row.status,
+          statusUpdatedAt:
+            isoOrNull(row.statusUpdatedAt ?? null) ?? isoOrNull(kept?.statusUpdatedAt ?? null),
+          scheduledAt: row.scheduledAt ?? null,
+          approvalKey: approval.approvalKey,
+          summary,
+          permissionCommand: approval.command,
+          lastActivityAt,
+          costMicrodollars,
+          startedAt,
+          prOpened,
         },
       };
     })
@@ -258,14 +306,21 @@ export async function buildGlanceableDeliveryForUser(
           scope.organizationId === null
             ? isNull(user_activity_tokens.organization_id)
             : eq(user_activity_tokens.organization_id, scope.organizationId),
-          eq(user_activity_tokens.kind, 'ios_session_activity'),
           isNull(user_activity_tokens.superseded_at),
           isNotNull(user_activity_tokens.session_id),
-          // ActivityKit ends a card at its maximum lifetime; an older row
-          // follows nothing. The notifications service deletes such rows.
-          gt(
-            user_activity_tokens.created_at,
-            sql`now() - make_interval(secs => ${SESSION_LIVE_ACTIVITY_MAX_AGE_MS / 1000})`
+          or(
+            // ActivityKit ends a card at its maximum lifetime; an older row
+            // follows nothing. The notifications service deletes such rows.
+            and(
+              eq(user_activity_tokens.kind, 'ios_session_activity'),
+              gt(
+                user_activity_tokens.created_at,
+                sql`now() - make_interval(secs => ${SESSION_LIVE_ACTIVITY_MAX_AGE_MS / 1000})`
+              )
+            ),
+            // An Android follow has no system time limit; it lasts until the
+            // user unfollows or dismisses the notification, or the card ends.
+            eq(user_activity_tokens.kind, 'android_session_ongoing')
           )
         )
       ),

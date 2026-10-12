@@ -152,6 +152,7 @@ const ownershipRow = {
   status_updated_at: null,
   last_activity_at: null,
   total_cost_microdollars: null,
+  live_summary: null,
   created_at: INITIAL_TIME,
   updated_at: INITIAL_TIME,
 } satisfies CliSessionV2;

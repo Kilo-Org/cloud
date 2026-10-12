@@ -656,7 +656,7 @@ describe('serialized command delivery wait', () => {
     expect(client.prompts.map(call => call.messageId)).toEqual(['m1']);
   });
 
-  it('does not exempt a follow-up while the compact is dispatched but unobserved', async () => {
+  it('fails the batch on the deadline of a compact that stays unobserved', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());
     h.setState(KILO_SESSION, runningState);
@@ -664,10 +664,16 @@ describe('serialized command delivery wait', () => {
     pendingCompact(h);
     h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
     await settle();
+    h.advance(60_000);
     h.manager.submit(SESSION_ID, promptPayload('m1'));
     await settle();
 
-    h.advance(120_000);
+    // The live execution is other work, so the compact itself is a stuck intake. Its own deadline
+    // runs out first: a follower's budget never starts earlier than the command it waits behind.
+    h.advance(60_000 - 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(1);
     h.manager.tick();
     expect(outcomeFrames(h.frames)).toMatchObject([
       { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },

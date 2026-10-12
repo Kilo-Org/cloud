@@ -52,14 +52,25 @@ const infoFor = (turn: Turn): MessageInfo =>
 /**
  * What of a turn a reader sees.
  *
- * The words and the images, and only those. A chat offers the clock and, when
- * it has them on, the Kilo MCP server's tools — so a tool part can be a call
- * the model made. That is not what was said: the model's prose is the answer,
- * and a call is working, which would draw as an empty bubble. Thinking is the
- * model's own working too, so neither becomes a bubble.
+ * The words and the images. A chat offers the clock and, when it has them on,
+ * the Kilo MCP server's tools — so a tool part can be a call the model made.
+ * That is not what was said: the model's prose is the answer, and a call is
+ * working, which would draw as an empty bubble.
  */
 const said = (turn: Turn) =>
   turn.parts.filter(part => part.kind === 'text' || part.kind === 'image');
+
+type StoredReasoning = Extract<TurnPart, { kind: 'reasoning' }>;
+
+/**
+ * The thinking in front of an answer. A person picks a thinking effort to get
+ * it, so it is drawn with the answer, folded the way the agent bubble folds it.
+ * It never makes a bubble of its own.
+ */
+const thought = (turn: Turn) =>
+  turn.parts.filter(
+    (part): part is StoredReasoning => part.kind === 'reasoning' && part.body !== ''
+  );
 
 type StoredImage = Extract<TurnPart, { kind: 'image' }>;
 
@@ -93,17 +104,27 @@ function imagePart(
 function asMessage(turn: Turn): StoredMessage {
   return {
     info: infoFor(turn),
-    parts: said(turn).map(part =>
-      part.kind === 'image'
-        ? imagePart(part, part.id, turn)
-        : {
-            id: part.id,
-            sessionID: turn.sessionId,
-            messageID: turn.id,
-            type: 'text' as const,
-            text: part.body,
-          }
-    ),
+    parts: [
+      ...thought(turn).map(part => ({
+        id: part.id,
+        sessionID: turn.sessionId,
+        messageID: turn.id,
+        type: 'reasoning' as const,
+        text: part.body,
+        time: { start: 0, end: 0 },
+      })),
+      ...said(turn).map(part =>
+        part.kind === 'image'
+          ? imagePart(part, part.id, turn)
+          : {
+              id: part.id,
+              sessionID: turn.sessionId,
+              messageID: turn.id,
+              type: 'text' as const,
+              text: part.body,
+            }
+      ),
+    ],
   };
 }
 

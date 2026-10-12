@@ -4,6 +4,7 @@ import {
   UnauthorizedError,
 } from '@modelcontextprotocol/sdk/client/auth.js';
 import { Effect } from 'effect';
+import { ended } from './credential.js';
 import { failed } from './failure.js';
 import { bounded, makeDeadline, type RemoteMcpAbort, type RemoteMcpRequest } from './http.js';
 import type { RemoteMcpError, RemoteMcpServer } from './server.js';
@@ -46,7 +47,9 @@ const remoteMcpSignIn = (
         made => Effect.sync(made.stop)
       );
       const options = { serverUrl: server.url, fetchFn: bounded(deps, deadline) };
-      yield* Effect.tryPromise({
+      /* Raced against the deadline, because the browser wait inside
+         `redirectToAuthorization` is the caller's and no request signal reaches it. */
+      const signedIn = Effect.tryPromise({
         try: async () => {
           if ((await auth(deps.authProvider, options)) === 'AUTHORIZED') {
             return;
@@ -61,6 +64,7 @@ const remoteMcpSignIn = (
         },
         catch: cause => failed(server, cause),
       });
+      yield* Effect.raceFirst(signedIn, ended(server, deadline));
     })
   );
 

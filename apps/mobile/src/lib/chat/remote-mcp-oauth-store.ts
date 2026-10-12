@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference';
 import { REMOTE_MCP_OAUTH_KEY } from '@/lib/storage-keys';
 
@@ -81,14 +82,25 @@ export async function readRemoteMcpOAuth(
   return state?.url === url ? state : undefined;
 }
 
-/** Merges fields into this server's state. State saved for another URL is replaced. */
+/**
+ * Merges fields into this server's state. State saved for another URL is
+ * replaced. The epoch check, the read and the write run in one synchronous
+ * step after the disk read, so neither a concurrent write nor a sign-out can
+ * land between them.
+ */
 export async function writeRemoteMcpOAuth(
   id: string,
   url: string,
-  patch: Omit<Partial<RemoteMcpOAuthState>, 'url'>
+  patch: Omit<Partial<RemoteMcpOAuthState>, 'url'>,
+  epoch: number
 ): Promise<void> {
-  const existing = await readRemoteMcpOAuth(id, url);
-  store.set({ ...store.get(), [id]: { ...existing, ...patch, url } });
+  await store.whenLoaded();
+  if (!isCurrentAuthEpoch(epoch)) {
+    return;
+  }
+  const current = store.get();
+  const existing = current[id]?.url === url ? current[id] : undefined;
+  store.set({ ...current, [id]: { ...existing, ...patch, url } });
 }
 
 /** Drops one server's state, which is what deleting the server or changing its URL does. */

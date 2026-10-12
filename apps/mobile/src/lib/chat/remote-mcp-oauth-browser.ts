@@ -19,7 +19,8 @@ import { REMOTE_MCP_REDIRECT_URL } from './remote-mcp-oauth-provider';
  */
 const REDIRECT_GRACE_MS = 1500;
 
-let deliver: ((url: string) => void) | undefined = undefined;
+/** The one Android sign-in waiting for its redirect. A newer sign-in ends it as turned back. */
+let deliver: ((url: string | null) => void) | undefined = undefined;
 
 function redirectOf(path: string): URL | undefined {
   try {
@@ -44,8 +45,10 @@ export function takeRemoteMcpRedirect(path: string): boolean {
 }
 
 async function openOnAndroid(authorizationUrl: string): Promise<string | null> {
-  const redirected = Promise.withResolvers<string>();
-  deliver = redirected.resolve;
+  const redirected = Promise.withResolvers<string | null>();
+  deliver?.(null);
+  const mine = redirected.resolve;
+  deliver = mine;
   const returned = Promise.withResolvers<null>();
   const subscription = AppState.addEventListener('change', state => {
     if (state === 'active') {
@@ -60,7 +63,9 @@ async function openOnAndroid(authorizationUrl: string): Promise<string | null> {
     return answered;
   } finally {
     subscription.remove();
-    deliver = undefined;
+    if (deliver === mine) {
+      deliver = undefined;
+    }
   }
 }
 

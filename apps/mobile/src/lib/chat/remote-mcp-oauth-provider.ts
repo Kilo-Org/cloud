@@ -3,7 +3,7 @@ import {
   type RemoteMcpSignInProvider,
 } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
-import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 
 import {
   readRemoteMcpOAuth,
@@ -67,9 +67,7 @@ export function remoteMcpOAuthProvider(
   let code: string | undefined = undefined;
   let turnedBack = false;
   const save = async (patch: OAuthPatch) => {
-    if (isCurrentAuthEpoch(epoch)) {
-      await writeRemoteMcpOAuth(server.id, server.url, patch);
-    }
+    await writeRemoteMcpOAuth(server.id, server.url, patch, epoch);
   };
   return {
     redirectUrl: REMOTE_MCP_REDIRECT_URL,

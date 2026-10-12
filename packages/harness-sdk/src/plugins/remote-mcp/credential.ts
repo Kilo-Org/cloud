@@ -92,4 +92,4 @@ const authProviderFor = (
 };
 
 export type { RemoteMcpOAuthOption, RemoteMcpToken };
-export { authProviderFor, credentialFor };
+export { authProviderFor, credentialFor, ended };

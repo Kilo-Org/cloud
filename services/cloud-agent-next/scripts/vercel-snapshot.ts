@@ -1,22 +1,53 @@
 #!/usr/bin/env node
 
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { RUNTIME_DISTRIBUTION } from '../src/shared/runtime-distribution.js';
+import {
+  CONTROL_PLANE_SUPERVISOR,
+  GIT_CREDENTIAL_HELPER,
+  WRAPPER_BUNDLES,
+} from '../src/shared/runtime-distribution.js';
+import { CONTROL_PLANE_PROTOCOL_VERSION } from '../src/shared/control-plane-protocol.js';
 import { WRAPPER_VERSION } from '../src/shared/wrapper-version.js';
 import { KILO_CLI_VERSION } from '../src/shared/kilo-cli-version.js';
+import {
+  SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH,
+  SNAPSHOT_MANIFEST_PATH,
+  SNAPSHOT_RUNTIME,
+  SNAPSHOT_WRAPPER_PATH,
+  createRuntimeManifest,
+  exactVersionCheck,
+  hashRuntimeArtifacts,
+  runtimeDistributionSourceFiles,
+  runtimeManifestArtifacts,
+  runtimeVerificationScript,
+  shellQuote,
+  validateRuntimeManifest,
+  type RuntimeArtifact,
+  type RuntimeManifest,
+} from './runtime-manifest.js';
 
-export const SNAPSHOT_RUNTIME = 'node24';
-export const PINNED_BUN_VERSION = '1.3.14';
-export const SNAPSHOT_MANIFEST_PATH = '/usr/local/share/kilo/runtime-manifest.json';
-export const SNAPSHOT_WRAPPER_PATH = '/usr/local/bin/kilocode-wrapper.js';
-export const SNAPSHOT_CONTROL_PLANE_WRAPPER_PATH =
-  '/usr/local/bin/kilocode-control-plane-wrapper.js';
-export const SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH =
-  '/usr/local/bin/kilocode-control-plane-supervisor.sh';
+export {
+  PINNED_BUN_VERSION,
+  SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH,
+  SNAPSHOT_CONTROL_PLANE_WRAPPER_PATH,
+  SNAPSHOT_MANIFEST_PATH,
+  SNAPSHOT_RUNTIME,
+  SNAPSHOT_WRAPPER_PATH,
+  createRuntimeManifest,
+  hashRuntimeArtifacts,
+  runtimeDistributionSourceFiles,
+  runtimeVerificationScript,
+  shellQuote,
+  validateRuntimeManifest,
+} from './runtime-manifest.js';
+export type { RuntimeArtifact, RuntimeManifest } from './runtime-manifest.js';
+
 const API_BASE = 'https://api.vercel.com';
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 const MAX_RESPONSE_BYTES = 1024 * 1024;
@@ -25,27 +56,9 @@ const WAITED_COMMAND_TRANSPORT_ALLOWANCE_MS = 15_000;
 const SECRET_ENV_NAMES = ['VERCEL_TOKEN'];
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DEV_VARS_PATH = resolve(PACKAGE_ROOT, '.dev.vars');
-const DEFAULT_WRAPPER_PATH = resolve(PACKAGE_ROOT, 'wrapper', 'dist', 'wrapper.js');
-const DEFAULT_CONTROL_PLANE_WRAPPER_PATH = resolve(
-  PACKAGE_ROOT,
-  'wrapper',
-  'dist',
-  'control-plane-wrapper.js'
-);
-const DEFAULT_CONTROL_PLANE_SUPERVISOR_PATH = resolve(
-  PACKAGE_ROOT,
-  'wrapper',
-  'control-plane-supervisor.sh'
-);
+const RUNTIME_SOURCE_FILES = runtimeDistributionSourceFiles(PACKAGE_ROOT);
+const CONTROL_PLANE_SMOKE_PATH = resolve(PACKAGE_ROOT, 'wrapper', 'src', 'control-plane-smoke.ts');
 const DEV_VARS_FALLBACK_KEYS = ['VERCEL_TOKEN', 'VERCEL_TEAM_ID', 'VERCEL_PROJECT_ID'];
-
-export type RuntimeManifest = {
-  runtimeBuildId: string;
-  wrapperVersion: string;
-  runtime: typeof SNAPSHOT_RUNTIME;
-  bunVersion: string;
-  wrapperSha256: string;
-};
 
 export type ScanObservation = {
   kind: 'credential-path' | 'git-config' | 'git-remote' | 'repository' | 'session-log';
@@ -78,36 +91,6 @@ export function truncateOutput(text: string, maxChars = MAX_FAILURE_OUTPUT_CHARS
   const trimmed = text.replaceAll('\0', '').trimEnd();
   if (trimmed.length <= maxChars) return trimmed;
   return `…${trimmed.slice(-maxChars)}`;
-}
-
-export function createRuntimeManifest(input: {
-  runtimeBuildId: string;
-  wrapperVersion: string;
-  wrapperBytes: Uint8Array;
-  bunVersion?: string;
-}): RuntimeManifest {
-  if (!/^[A-Za-z0-9._-]{1,128}$/.test(input.runtimeBuildId)) {
-    throw new Error('runtime build ID must be 1-128 URL-safe characters');
-  }
-  if (!/^\d+\.\d+\.\d+$/.test(input.wrapperVersion)) {
-    throw new Error('wrapper version must be a semantic version');
-  }
-  return {
-    runtimeBuildId: input.runtimeBuildId,
-    wrapperVersion: input.wrapperVersion,
-    runtime: SNAPSHOT_RUNTIME,
-    bunVersion: input.bunVersion ?? PINNED_BUN_VERSION,
-    wrapperSha256: createHash('sha256').update(input.wrapperBytes).digest('hex'),
-  };
-}
-
-export function validateRuntimeManifest(actual: unknown, expected: RuntimeManifest): string[] {
-  if (!actual || typeof actual !== 'object' || Array.isArray(actual))
-    return ['manifest is not an object'];
-  const record = actual as Record<string, unknown>;
-  return (Object.keys(expected) as Array<keyof RuntimeManifest>)
-    .filter(key => record[key] !== expected[key])
-    .map(key => `${key} mismatch`);
 }
 
 export function parseScanOutput(output: string): ScanObservation[] {
@@ -225,17 +208,46 @@ export function resolveSnapshotInputs(args: Args): {
   wrapperPath: string;
   controlPlaneWrapperPath: string;
   controlPlaneSupervisorPath: string;
+  artifactPaths: Record<string, string>;
   wrapperVersion: string;
   runtimeBuildId: string;
 } {
+  // A `--wrapper` override moves the whole dist directory: every bundle is read
+  // from the override's directory and the supervisor from its parent, so one
+  // snapshot never mixes artifacts from two builds.
+  const explicitWrapper = optionalArg(args, 'wrapper');
+  const distDir = explicitWrapper
+    ? dirname(resolve(explicitWrapper))
+    : resolve(PACKAGE_ROOT, 'wrapper', 'dist');
+  const wrapperRoot = dirname(distDir);
+  const artifactPaths: Record<string, string> = {
+    [GIT_CREDENTIAL_HELPER.installName]: resolve(PACKAGE_ROOT, GIT_CREDENTIAL_HELPER.packagePath),
+  };
+  for (const bundle of WRAPPER_BUNDLES) {
+    artifactPaths[bundle.installName] = resolve(distDir, bundle.distName);
+  }
+  artifactPaths[CONTROL_PLANE_SUPERVISOR.installName] = resolve(
+    wrapperRoot,
+    CONTROL_PLANE_SUPERVISOR.wrapperPath
+  );
+  const wrapperPath = resolve(explicitWrapper ?? artifactPaths['kilocode-wrapper.js']);
+  const controlPlaneWrapperPath = resolve(
+    optionalArg(args, 'control-plane-wrapper') ?? artifactPaths['kilocode-control-plane-wrapper.js']
+  );
+  const controlPlaneSupervisorPath = resolve(
+    optionalArg(args, 'control-plane-supervisor') ??
+      artifactPaths['kilocode-control-plane-supervisor.sh']
+  );
   return {
-    wrapperPath: resolve(optionalArg(args, 'wrapper') ?? DEFAULT_WRAPPER_PATH),
-    controlPlaneWrapperPath: resolve(
-      optionalArg(args, 'control-plane-wrapper') ?? DEFAULT_CONTROL_PLANE_WRAPPER_PATH
-    ),
-    controlPlaneSupervisorPath: resolve(
-      optionalArg(args, 'control-plane-supervisor') ?? DEFAULT_CONTROL_PLANE_SUPERVISOR_PATH
-    ),
+    wrapperPath,
+    controlPlaneWrapperPath,
+    controlPlaneSupervisorPath,
+    artifactPaths: {
+      ...artifactPaths,
+      'kilocode-wrapper.js': wrapperPath,
+      'kilocode-control-plane-wrapper.js': controlPlaneWrapperPath,
+      'kilocode-control-plane-supervisor.sh': controlPlaneSupervisorPath,
+    },
     wrapperVersion: optionalArg(args, 'wrapper-version') ?? WRAPPER_VERSION,
     runtimeBuildId: optionalArg(args, 'build-id') ?? defaultRuntimeBuildId(),
   };
@@ -582,10 +594,6 @@ async function boundedText(response: Response, operation: string): Promise<strin
   return new TextDecoder().decode(await readBoundedBytes(response, MAX_RESPONSE_BYTES, operation));
 }
 
-function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
-
 function shellCommand(command: string, args: string[]): string {
   return [command, ...args].map(shellQuote).join(' ');
 }
@@ -838,6 +846,7 @@ async function scanRemote(config: ProviderConfig, sessionId: string): Promise<vo
 }
 
 async function installBuilder(config: ProviderConfig, sessionId: string): Promise<void> {
+  const versions = RUNTIME_DISTRIBUTION;
   const steps: Array<{ label: string; script: string }> = [
     {
       label: 'install packages (dnf)',
@@ -855,8 +864,33 @@ async function installBuilder(config: ProviderConfig, sessionId: string): Promis
       ].join('\n'),
     },
     {
-      label: `install bun ${PINNED_BUN_VERSION}`,
-      script: `curl -fsSL https://bun.sh/install | bash -s ${shellQuote(`bun-v${PINNED_BUN_VERSION}`)} && sudo install -m 0755 "$HOME/.bun/bin/bun" /usr/local/bin/bun`,
+      label: `install bun ${versions.bun}`,
+      script: `curl -fsSL https://bun.sh/install | bash -s ${shellQuote(`bun-v${versions.bun}`)} && sudo install -m 0755 "$HOME/.bun/bin/bun" /usr/local/bin/bun`,
+    },
+    {
+      label: `install glab ${versions.glab}`,
+      script: [
+        `GLAB_VERSION=${shellQuote(versions.glab)}`,
+        'curl -fsSL "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.tar.gz" -o /tmp/glab.tar.gz',
+        'mkdir -p /tmp/glab-extract',
+        'tar -xzf /tmp/glab.tar.gz -C /tmp/glab-extract',
+        'sudo install -m 0755 /tmp/glab-extract/bin/glab /usr/local/bin/glab',
+        'rm -rf /tmp/glab.tar.gz /tmp/glab-extract',
+      ].join('\n'),
+    },
+    {
+      label: `install gh ${versions.gh}`,
+      script: [
+        `GH_VERSION=${shellQuote(versions.gh)}`,
+        'curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" -o /tmp/gh.tar.gz',
+        'tar -xzf /tmp/gh.tar.gz -C /tmp',
+        'sudo install -m 0755 "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh',
+        'rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64"',
+      ].join('\n'),
+    },
+    {
+      label: `install pnpm ${versions.pnpm}`,
+      script: `sudo npm install -g ${shellQuote(`pnpm@${versions.pnpm}`)}`,
     },
     {
       label: `install kilo ${KILO_CLI_VERSION}`,
@@ -867,10 +901,15 @@ async function installBuilder(config: ProviderConfig, sessionId: string): Promis
       script: [
         'sudo mkdir -p /usr/local/share/kilo /opt/git/etc',
         'sudo git lfs install --system --skip-repo',
-        `test "$(bun --version)" = ${shellQuote(PINNED_BUN_VERSION)}`,
-        'case "$(node --version)" in v24.*) ;; *) echo "unexpected node $(node --version)" >&2; exit 1 ;; esac',
+        `test "$(bun --version)" = ${shellQuote(versions.bun)}`,
+        `test "$(pnpm --version)" = ${shellQuote(versions.pnpm)}`,
+        `case "$(node --version)" in v${versions.nodeMajor}.*) ;; *) echo "unexpected node $(node --version)" >&2; exit 1 ;; esac`,
         'curl --version >/dev/null',
         'git --version >/dev/null',
+        exactVersionCheck('gh', versions.gh),
+        exactVersionCheck('glab', versions.glab),
+        'command -v rg >/dev/null',
+        'git-lfs version >/dev/null',
         'kilo --version >/dev/null',
       ].join('\n'),
     },
@@ -910,6 +949,40 @@ jq -e --arg version ${shellQuote(manifest.wrapperVersion)} '.version == $version
   });
 }
 
+async function smokeControlPlane(config: ProviderConfig, sessionId: string): Promise<void> {
+  const scratchDir = '/tmp/kilo-cp-smoke';
+  const harnessName = 'control-plane-smoke.ts';
+  const harness = await readFile(CONTROL_PLANE_SMOKE_PATH);
+  await execute(config, sessionId, 'bash', [
+    '-lc',
+    `rm -rf ${shellQuote(scratchDir)} && mkdir -p ${shellQuote(scratchDir)}`,
+  ]);
+  await writeRemoteFile(config, sessionId, scratchDir, harnessName, harness);
+  try {
+    await execute(
+      config,
+      sessionId,
+      'bun',
+      [
+        `${scratchDir}/${harnessName}`,
+        '--supervisor',
+        SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH,
+        '--protocol-version',
+        String(CONTROL_PLANE_PROTOCOL_VERSION),
+        '--allocation-id',
+        `alloc-${randomUUID()}`,
+        '--scratch-dir',
+        `${scratchDir}/run`,
+        '--timeout-ms',
+        '45000',
+      ],
+      { timeoutMs: 90_000, label: 'smoke control-plane supervisor' }
+    );
+  } finally {
+    await executeRaw(config, sessionId, 'rm', ['-rf', scratchDir]).catch(() => undefined);
+  }
+}
+
 async function runLocal(command: string, args: string[], cwd: string): Promise<void> {
   await new Promise<void>((resolvePromise, reject) => {
     const child = spawn(command, args, { cwd, stdio: 'inherit', env: process.env });
@@ -929,20 +1002,108 @@ async function runLocal(command: string, args: string[], cwd: string): Promise<v
   });
 }
 
-async function readExpectedManifest(args: Args): Promise<RuntimeManifest> {
+function runtimeBytes(bytes: Map<string, Uint8Array>, installName: string): Uint8Array {
+  const value = bytes.get(installName);
+  if (!value) throw new Error(`missing runtime artifact: ${installName}`);
+  return value;
+}
+
+async function readExpectedRuntime(
+  args: Args
+): Promise<{ manifest: RuntimeManifest; artifacts: RuntimeArtifact[] }> {
   const input = resolveSnapshotInputs(args);
-  const wrapperBytes = await readFile(input.wrapperPath);
-  return createRuntimeManifest({
-    runtimeBuildId: input.runtimeBuildId,
-    wrapperVersion: input.wrapperVersion,
-    wrapperBytes,
+  const files = await Promise.all(
+    RUNTIME_SOURCE_FILES.map(async file => {
+      const localPath = input.artifactPaths[file.installName];
+      return { ...file, localPath, bytes: await readFile(localPath) };
+    })
+  );
+  const bytes = new Map(files.map(file => [file.installName, file.bytes]));
+  const artifacts = hashRuntimeArtifacts(files);
+  return {
+    manifest: createRuntimeManifest({
+      runtimeBuildId: input.runtimeBuildId,
+      wrapperVersion: input.wrapperVersion,
+      wrapperBytes: runtimeBytes(bytes, 'kilocode-wrapper.js'),
+      controlPlaneWrapperBytes: runtimeBytes(bytes, 'kilocode-control-plane-wrapper.js'),
+      controlPlaneSupervisorBytes: runtimeBytes(bytes, 'kilocode-control-plane-supervisor.sh'),
+      artifacts: runtimeManifestArtifacts(artifacts),
+    }),
+    artifacts,
+  };
+}
+
+async function uploadRuntimeArtifacts(
+  config: ProviderConfig,
+  sessionId: string,
+  artifacts: readonly RuntimeArtifact[]
+): Promise<void> {
+  const staged = artifacts.map(artifact => ({
+    ...artifact,
+    stagedPath: `/tmp/${basename(artifact.installPath)}`,
+  }));
+  for (const artifact of staged) {
+    await writeRemoteFile(
+      config,
+      sessionId,
+      '/tmp',
+      basename(artifact.stagedPath),
+      await readFile(artifact.localPath)
+    );
+  }
+  const installs = staged.map(artifact => {
+    const mode = artifact.executable ? '0755' : '0644';
+    const steps = [
+      `sudo install -D -m ${mode} ${shellQuote(artifact.stagedPath)} ${shellQuote(artifact.installPath)}`,
+    ];
+    if (artifact.linkPath)
+      steps.push(
+        `sudo ln -sfn ${shellQuote(artifact.installPath)} ${shellQuote(artifact.linkPath)}`
+      );
+    return steps.join(' && ');
   });
+  const cleanup = staged.map(artifact => shellQuote(artifact.stagedPath)).join(' ');
+  await execute(
+    config,
+    sessionId,
+    'bash',
+    ['-lc', `${installs.join(' && ')} && rm -f ${cleanup}`],
+    {
+      label: 'install runtime artifacts',
+    }
+  );
+}
+
+async function uploadRuntimeManifest(
+  config: ProviderConfig,
+  sessionId: string,
+  manifest: RuntimeManifest
+): Promise<void> {
+  const stagedPath = `/tmp/${basename(SNAPSHOT_MANIFEST_PATH)}`;
+  await writeRemoteFile(
+    config,
+    sessionId,
+    '/tmp',
+    basename(stagedPath),
+    new TextEncoder().encode(`${JSON.stringify(manifest, null, 2)}\n`)
+  );
+  await execute(
+    config,
+    sessionId,
+    'bash',
+    [
+      '-lc',
+      `sudo install -m 0644 ${shellQuote(stagedPath)} ${shellQuote(SNAPSHOT_MANIFEST_PATH)} && rm -f ${shellQuote(stagedPath)}`,
+    ],
+    { label: 'install runtime manifest' }
+  );
 }
 
 async function validateChild(
   config: ProviderConfig,
   snapshotId: string,
   expected: RuntimeManifest,
+  artifacts: readonly RuntimeArtifact[],
   timeoutMs: number
 ): Promise<void> {
   const target = await createSandbox(
@@ -961,11 +1122,9 @@ async function validateChild(
     }
     const errors = validateRuntimeManifest(manifest, expected);
     if (errors.length) throw new Error(`runtime manifest validation failed: ${errors.join(', ')}`);
-    await execute(config, target.sessionId, 'bash', [
-      '-lc',
-      `test "$(bun --version)" = ${shellQuote(expected.bunVersion)} && test "$(sha256sum ${SNAPSHOT_WRAPPER_PATH} | cut -d' ' -f1)" = ${shellQuote(expected.wrapperSha256)} && test -f ${SNAPSHOT_CONTROL_PLANE_WRAPPER_PATH} && test -f ${SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH} && git --version >/dev/null && kilo --version >/dev/null`,
-    ]);
+    await execute(config, target.sessionId, 'bash', ['-lc', runtimeVerificationScript(artifacts)]);
     await smokeWrapper(config, target.sessionId, expected);
+    await smokeControlPlane(config, target.sessionId);
     await scanRemote(config, target.sessionId);
   } finally {
     await stopSession(config, target).catch(error => {
@@ -977,61 +1136,23 @@ async function validateChild(
 
 async function buildSnapshot(args: Args): Promise<void> {
   const config = providerConfig(args);
-  const { wrapperPath, controlPlaneWrapperPath, controlPlaneSupervisorPath } =
-    resolveSnapshotInputs(args);
+  const { wrapperPath } = resolveSnapshotInputs(args);
   if (args['skip-wrapper-build'] !== true) {
     log('building wrapper bundle');
     await runLocal('bun', ['run', 'build'], dirname(dirname(wrapperPath)));
   }
-  const expected = await readExpectedManifest(args);
+  const { manifest, artifacts } = await readExpectedRuntime(args);
   const timeoutMs = optionalNumber(args, 'timeout-ms', DEFAULT_TIMEOUT_MS);
-  const wrapper = await readFile(wrapperPath);
-  const controlPlaneWrapper = await readFile(controlPlaneWrapperPath);
-  const controlPlaneSupervisor = await readFile(controlPlaneSupervisorPath);
   await withTrackedSessions(config, async () => {
     const builder = await createSandbox(config, `ses-snapshot-builder-${randomUUID()}`, timeoutMs);
     await installBuilder(config, builder.sessionId);
-    const stagedWrapperPath = `/tmp/${basename(SNAPSHOT_WRAPPER_PATH)}`;
-    const stagedControlPlaneWrapperPath = `/tmp/${basename(SNAPSHOT_CONTROL_PLANE_WRAPPER_PATH)}`;
-    const stagedControlPlaneSupervisorPath = `/tmp/${basename(
-      SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH
-    )}`;
-    const stagedManifestPath = `/tmp/${basename(SNAPSHOT_MANIFEST_PATH)}`;
-    log('uploading wrappers, control-plane supervisor, and runtime manifest');
-    await writeRemoteFile(config, builder.sessionId, '/tmp', basename(stagedWrapperPath), wrapper);
-    await writeRemoteFile(
-      config,
-      builder.sessionId,
-      '/tmp',
-      basename(stagedControlPlaneWrapperPath),
-      controlPlaneWrapper
-    );
-    await writeRemoteFile(
-      config,
-      builder.sessionId,
-      '/tmp',
-      basename(stagedControlPlaneSupervisorPath),
-      controlPlaneSupervisor
-    );
-    await writeRemoteFile(
-      config,
-      builder.sessionId,
-      '/tmp',
-      basename(stagedManifestPath),
-      new TextEncoder().encode(`${JSON.stringify(expected, null, 2)}\n`)
-    );
-    await execute(
-      config,
-      builder.sessionId,
-      'bash',
-      [
-        '-lc',
-        `sudo install -m 0755 ${shellQuote(stagedWrapperPath)} ${shellQuote(SNAPSHOT_WRAPPER_PATH)} && sudo install -m 0755 ${shellQuote(stagedControlPlaneWrapperPath)} ${shellQuote(SNAPSHOT_CONTROL_PLANE_WRAPPER_PATH)} && sudo install -m 0755 ${shellQuote(stagedControlPlaneSupervisorPath)} ${shellQuote(SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH)} && sudo install -m 0644 ${shellQuote(stagedManifestPath)} ${shellQuote(SNAPSHOT_MANIFEST_PATH)} && rm -f ${shellQuote(stagedWrapperPath)} ${shellQuote(stagedControlPlaneWrapperPath)} ${shellQuote(stagedControlPlaneSupervisorPath)} ${shellQuote(stagedManifestPath)}`,
-      ],
-      { label: 'install wrappers, supervisor and manifest' }
-    );
+    log('uploading runtime artifacts and manifest');
+    await uploadRuntimeArtifacts(config, builder.sessionId, artifacts);
+    await uploadRuntimeManifest(config, builder.sessionId, manifest);
     log('smoking wrapper');
-    await smokeWrapper(config, builder.sessionId, expected);
+    await smokeWrapper(config, builder.sessionId, manifest);
+    log('smoking control-plane supervisor');
+    await smokeControlPlane(config, builder.sessionId);
     log('scanning builder for leftover credentials/state');
     await scanRemote(config, builder.sessionId);
     log('creating snapshot');
@@ -1040,8 +1161,8 @@ async function buildSnapshot(args: Args): Promise<void> {
     await stopSession(config, builder);
     await inspectSnapshot(config, snapshotId);
     log('validating child from snapshot');
-    await validateChild(config, snapshotId, expected, timeoutMs);
-    const accepted = createAcceptedConfig(snapshotId, expected);
+    await validateChild(config, snapshotId, manifest, artifacts, timeoutMs);
+    const accepted = createAcceptedConfig(snapshotId, manifest);
     if (typeof args.output === 'string')
       await writeFile(resolve(args.output), `${JSON.stringify(accepted, null, 2)}\n`);
     process.stdout.write(`${JSON.stringify(accepted)}\n`);
@@ -1051,16 +1172,17 @@ async function buildSnapshot(args: Args): Promise<void> {
 async function validateSnapshot(args: Args): Promise<void> {
   const config = providerConfig(args);
   await withTrackedSessions(config, async () => {
-    const expected = await readExpectedManifest(args);
+    const { manifest, artifacts } = await readExpectedRuntime(args);
     const snapshotId = requiredArg(args, 'snapshot-id');
     await inspectSnapshot(config, snapshotId);
     await validateChild(
       config,
       snapshotId,
-      expected,
+      manifest,
+      artifacts,
       optionalNumber(args, 'timeout-ms', DEFAULT_TIMEOUT_MS)
     );
-    process.stdout.write(`${JSON.stringify(createAcceptedConfig(snapshotId, expected))}\n`);
+    process.stdout.write(`${JSON.stringify(createAcceptedConfig(snapshotId, manifest))}\n`);
   });
 }
 
@@ -1084,11 +1206,11 @@ async function stopNamedSession(args: Args): Promise<void> {
 async function acceptance(args: Args): Promise<void> {
   const config = providerConfig(args);
   await withTrackedSessions(config, async () => {
-    const expected = await readExpectedManifest(args);
+    const { manifest, artifacts } = await readExpectedRuntime(args);
     const snapshotId = requiredArg(args, 'snapshot-id');
     const timeoutMs = optionalNumber(args, 'timeout-ms', DEFAULT_TIMEOUT_MS);
     await inspectSnapshot(config, snapshotId);
-    await validateChild(config, snapshotId, expected, timeoutMs);
+    await validateChild(config, snapshotId, manifest, artifacts, timeoutMs);
     const snapshotsBefore = await listSnapshotIds(config);
     const target = await createSandbox(
       config,
@@ -1110,10 +1232,6 @@ async function acceptance(args: Args): Promise<void> {
       activeLoss: 'external',
       cloudflareRegression: 'external',
     };
-    await execute(config, target.sessionId, 'bash', [
-      '-lc',
-      'case "$(node --version)" in v24.*) ;; *) echo "unexpected node $(node --version)" >&2; exit 1 ;; esac',
-    ]);
     await extendSession(config, target, 60_000);
     await stopSession(config, target);
     await inspectSnapshot(config, snapshotId);
@@ -1122,7 +1240,7 @@ async function acceptance(args: Args): Promise<void> {
     if (unexpectedSnapshots.length)
       throw new Error('non-persistent session created an unexpected snapshot');
     process.stdout.write(
-      `${JSON.stringify({ acceptedConfig: createAcceptedConfig(snapshotId, expected), results })}\n`
+      `${JSON.stringify({ acceptedConfig: createAcceptedConfig(snapshotId, manifest), results })}\n`
     );
   });
 }

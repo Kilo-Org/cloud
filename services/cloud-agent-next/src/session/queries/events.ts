@@ -1,11 +1,27 @@
-import { count, max, eq, and, gt, gte, lte, lt, inArray, asc, sql } from 'drizzle-orm';
+import {
+  count,
+  max,
+  eq,
+  and,
+  gt,
+  gte,
+  lte,
+  lt,
+  inArray,
+  asc,
+  desc,
+  notExists,
+  sql,
+} from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
+import { alias } from 'drizzle-orm/sqlite-core';
 import * as z from 'zod';
 import type { StoredEvent } from '../../websocket/types.js';
 import type { EventId } from '../../types/ids.js';
 import type { AssistantMessagePart, LatestAssistantMessage } from '../types.js';
 import { events } from '../../db/sqlite-schema.js';
 import type { SQL } from 'drizzle-orm';
+import { CALLBACK_ACTIVITY_MESSAGE_LIMIT } from '../../callbacks/recent-activity.js';
 
 type SqlStorage = DurableObjectState['storage']['sql'];
 
@@ -455,6 +471,67 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
       if (!messageRow) return null;
 
       return buildLatestAssistantMessage(sessionId, rawSql, messageRow);
+    },
+
+    getRecentAssistantMessagesForUserMessage(
+      sessionId: string,
+      kiloSessionId: string,
+      parentMessageId: string
+    ): LatestAssistantMessage[] {
+      const removals = alias(events, 'message_removals');
+      const rows = db
+        .select()
+        .from(events)
+        .where(
+          and(
+            eq(events.session_id, sessionId),
+            eq(events.stream_event_type, 'kilocode'),
+            gte(events.entity_id, 'message/'),
+            lt(events.entity_id, 'message0'),
+            eq(sql<string>`json_extract(${events.payload}, '$.event')`, 'message.updated'),
+            eq(sql<string>`json_extract(${events.payload}, '$.properties.info.role')`, 'assistant'),
+            eq(
+              sql<string>`json_extract(${events.payload}, '$.properties.info.sessionID')`,
+              kiloSessionId
+            ),
+            eq(
+              sql<string>`json_extract(${events.payload}, '$.properties.info.parentID')`,
+              parentMessageId
+            ),
+            notExists(
+              db
+                .select({ id: removals.id })
+                .from(removals)
+                .where(
+                  and(
+                    eq(removals.session_id, sessionId),
+                    eq(removals.stream_event_type, 'kilocode'),
+                    eq(
+                      sql<string>`json_extract(${removals.payload}, '$.event')`,
+                      'message.removed'
+                    ),
+                    eq(
+                      sql<string>`json_extract(${removals.payload}, '$.properties.sessionID')`,
+                      kiloSessionId
+                    ),
+                    eq(
+                      sql<string>`json_extract(${removals.payload}, '$.properties.messageID')`,
+                      sql<string>`json_extract(${events.payload}, '$.properties.info.id')`
+                    ),
+                    // Upserts preserve row IDs, so ambiguous timestamp ties favor removal.
+                    gte(removals.timestamp, events.timestamp)
+                  )
+                )
+            )
+          )
+        )
+        .orderBy(desc(events.entity_id))
+        .limit(CALLBACK_ACTIVITY_MESSAGE_LIMIT)
+        .all();
+      return rows.reverse().flatMap(row => {
+        const message = buildLatestAssistantMessage(sessionId, rawSql, row);
+        return message ? [message] : [];
+      });
     },
 
     // Uses toSQL() + raw exec() for true lazy cursor-based iteration.

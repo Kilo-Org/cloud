@@ -58,12 +58,6 @@ export const cloudAgentGetImageUploadUrlSchema = z.object({
   contentLength: z.number().int().positive().max(CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES),
 });
 
-const cloudAgentAttachmentFilenameSchema = z
-  .string()
-  .regex(
-    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$/
-  );
-
 const DENIED_EXTENSION_SET = new Set<string>(CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS);
 
 /**
@@ -102,9 +96,17 @@ export const cloudAgentRelaxedAttachmentFilenameSchema = z.string().superRefine(
   }
 });
 
+/**
+ * Send-time attachment reference (`prepareSession`, `sendMessage`). Accepts
+ * every basename the upload presign can issue, so a file uploaded with a
+ * relaxed extension is not rejected when the message is sent.
+ */
 export const cloudAgentAttachmentsSchema = z.object({
   path: z.uuid(),
-  files: z.array(cloudAgentAttachmentFilenameSchema).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
+  files: z
+    .array(cloudAgentRelaxedAttachmentFilenameSchema)
+    .min(1)
+    .max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
 });
 
 /**

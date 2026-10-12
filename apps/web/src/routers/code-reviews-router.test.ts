@@ -3339,24 +3339,28 @@ describe('personalReviewAgent.patchReviewConfig', () => {
     });
   }
 
-  it('returns NOT_FOUND when no stored personal config exists', async () => {
+  it('creates a disabled config from the getReviewConfig defaults when none is stored', async () => {
     const caller = await createCallerForUser(testUser.id);
+    const defaults = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
 
-    await expect(
-      caller.personalReviewAgent.patchReviewConfig({
-        platform: 'github',
-        reviewStyle: 'strict',
-      })
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      reviewStyle: 'strict',
+      selectedRepositoryDelta: { add: [303], remove: [] },
+    });
 
+    expect(await caller.personalReviewAgent.getReviewConfig({ platform: 'github' })).toEqual({
+      ...defaults,
+      reviewStyle: 'strict',
+      selectedRepositoryIds: [303],
+    });
     const stored = await db.query.agent_configs.findFirst({
       where: and(
         eq(agent_configs.agent_type, 'code_review'),
         eq(agent_configs.owned_by_user_id, testUser.id)
       ),
     });
-    // PATCH must not have created a row.
-    expect(stored).toBeUndefined();
+    expect(stored?.is_enabled).toBe(false);
   });
 
   it('preserves manuallyAddedRepositories and repositoryModelOverrides when the patch omits them', async () => {

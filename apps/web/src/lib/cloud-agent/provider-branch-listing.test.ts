@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
 import type { PlatformIntegration } from '@kilocode/db/schema';
+import { GitLabBranchesFetchError } from '@/lib/integrations/platforms/gitlab/adapter';
 import { listProviderRepositoryBranches } from './provider-branch-listing';
 
 const mockGetIntegrationForOwner = jest.fn();
@@ -22,6 +23,7 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
 }));
 
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  ...jest.requireActual('@/lib/integrations/platforms/gitlab/adapter'),
   fetchGitLabBranches: (...args: unknown[]) => mockFetchGitLabBranches(...args),
 }));
 
@@ -80,5 +82,150 @@ describe('listProviderRepositoryBranches (gitlab)', () => {
 
     expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
     expect(mockFetchGitLabBranches).not.toHaveBeenCalled();
+  });
+});
+
+/** Octokit's RequestError carries the refusal status; the personal path reads only that. */
+function githubRefusal(status: number, message = 'GitHub refused the request') {
+  return Object.assign(new Error(message), { status });
+}
+
+describe('listProviderRepositoryBranches (github refusals)', () => {
+  const githubIntegration = {
+    ...integrationRow,
+    platform: 'github',
+  } as unknown as PlatformIntegration;
+
+  beforeEach(() => {
+    mockGetIntegrationForOwner.mockResolvedValue(githubIntegration);
+  });
+
+  it('maps a blocked repository (403) to FORBIDDEN instead of a 500', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubRefusal(403, 'Repository access blocked'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'blocked/repo',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('keeps a secondary-rate-limited 403 retryable instead of FORBIDDEN', async () => {
+    mockListGitHubBranches.mockRejectedValue(
+      githubRefusal(403, 'You have exceeded a secondary rate limit.')
+    );
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+  });
+
+  it('keeps a primary-rate-limited 403 retryable', async () => {
+    mockListGitHubBranches.mockRejectedValue(
+      Object.assign(new Error('API rate limit exceeded'), {
+        status: 403,
+        response: { headers: { 'x-ratelimit-remaining': '0' } },
+      })
+    );
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+  });
+
+  it('maps a missing repository (404) to NOT_FOUND instead of a 500', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubRefusal(404, 'Not Found'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'missing/repo',
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('leaves a server-side GitHub failure (5xx) untouched', async () => {
+    const failure = githubRefusal(500, 'Server Error');
+    mockListGitHubBranches.mockRejectedValue(failure);
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toBe(failure);
+  });
+
+  it('returns the listing when GitHub accepts the request', async () => {
+    mockListGitHubBranches.mockResolvedValue({
+      branches: [
+        { name: 'main', isDefault: true },
+        { name: 'dev', isDefault: false },
+      ],
+    });
+
+    const listing = await listProviderRepositoryBranches({
+      platform: 'github',
+      userId: 'user_1',
+      repositoryFullName: 'octocat/hello',
+    });
+
+    expect(listing).toEqual({ defaultBranch: 'main', branches: ['main', 'dev'] });
+  });
+});
+
+describe('listProviderRepositoryBranches (gitlab refusals)', () => {
+  it('maps a 403 from GitLab to FORBIDDEN instead of a 500', async () => {
+    mockFetchGitLabBranches.mockRejectedValue(
+      new GitLabBranchesFetchError(403, 'GitLab branches fetch failed: 403')
+    );
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'gitlab',
+        userId: 'user_1',
+        repositoryFullName: 'group/repo',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('maps a 404 from GitLab to NOT_FOUND instead of a 500', async () => {
+    mockFetchGitLabBranches.mockRejectedValue(
+      new GitLabBranchesFetchError(404, 'GitLab branches fetch failed: 404')
+    );
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'gitlab',
+        userId: 'user_1',
+        repositoryFullName: 'group/repo',
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('maps any other GitLab failure to a retryable BAD_GATEWAY', async () => {
+    mockFetchGitLabBranches.mockRejectedValue(
+      new GitLabBranchesFetchError(500, 'GitLab branches fetch failed: 500')
+    );
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'gitlab',
+        userId: 'user_1',
+        repositoryFullName: 'group/repo',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
   });
 });

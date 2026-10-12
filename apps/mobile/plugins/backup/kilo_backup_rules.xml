@@ -5,13 +5,14 @@
   Union of the exclusions that expo-secure-store and the AppsFlyer SDK would
   otherwise each try to declare on <application>:
     - shared preferences are included wholesale,
-    - the SecureStore shared-preference file is excluded,
+    - the SecureStore and native Home widget shared-preference files are excluded,
     - the AppsFlyer capture files (appsflyer-data, appsflyer-purchase-data,
       afpurchases.db) are excluded.
 -->
 <full-backup-content>
   <include domain="sharedpref" path="."/>
   <exclude domain="sharedpref" path="SecureStore"/>
+  <exclude domain="sharedpref" path="home-widget-refresh"/>
   <exclude domain="sharedpref" path="appsflyer-data"/>
   <exclude domain="sharedpref" path="appsflyer-purchase-data"/>
 </full-backup-content>

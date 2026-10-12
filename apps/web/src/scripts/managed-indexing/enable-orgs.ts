@@ -5,10 +5,6 @@ import { updateOrganizationSettings } from '@kilocode/web-shared/lib/organizatio
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { cliConfirm } from '@/scripts/lib/cli-confirm';
 
-/**
- * Fetch organizations in free trial (created less than 40 days ago)
- * Only includes organizations with deleted_at IS NULL and code indexing not enabled
- */
 async function getTrialOrgs(): Promise<Organization[]> {
   const fortyDaysAgo = new Date();
   fortyDaysAgo.setDate(fortyDaysAgo.getDate() - 40);
@@ -27,10 +23,6 @@ async function getTrialOrgs(): Promise<Organization[]> {
       )
     );
 }
-/**
- * Fetch organizations with seats (seat_count > 0)
- * Only includes organizations with deleted_at IS NULL and code indexing not enabled
- */
 async function getOrgsWithSeats(): Promise<Organization[]> {
   return db
     .select()
@@ -47,9 +39,6 @@ async function getOrgsWithSeats(): Promise<Organization[]> {
     );
 }
 
-/**
- * Enable code indexing for a list of organizations
- */
 async function enableCodeIndexingForOrgs(
   orgs: Organization[],
   adminUserId: string,
@@ -65,16 +54,13 @@ async function enableCodeIndexingForOrgs(
         `   [${successCount + errorCount + 1}/${orgs.length}] ${org.name} (${org.id})... `
       );
 
-      // Get current settings
       const currentSettings = org.settings || {};
 
-      // Update settings to enable code indexing
       await updateOrganizationSettings(org.id, {
         ...currentSettings,
         code_indexing_enabled: true,
       });
 
-      // Create audit log
       await createAuditLog({
         action: 'organization.settings.change',
         actor_email: adminEmail,
@@ -99,21 +85,10 @@ async function enableCodeIndexingForOrgs(
   return { successCount, errorCount };
 }
 
-/**
- * Enable code indexing for eligible organizations
- * Eligible organizations are:
- * 1. Organizations in free trial (created < 40 days ago)
- * 2. Enterprise plan organizations
- * 3. Organizations with seats (seat_count > 0)
- *
- * Usage:
- *   pnpm script:run managed-indexing enable-orgs
- */
 export async function run(): Promise<void> {
   console.log('🚀 Starting code indexing enablement for eligible organizations...');
   console.log('');
 
-  // Fetch the specific admin user for audit logs
   const adminUser = await db
     .select()
     .from(kilocode_users)
@@ -128,14 +103,11 @@ export async function run(): Promise<void> {
   console.log(`   Using admin user: ${admin.google_user_email}`);
   console.log('');
 
-  // Fetch organizations by category
   console.log('📋 Fetching organizations to enable...');
 
-  // Comment out any categories you don't want to enable
   const trialOrgs = await getTrialOrgs();
   const seatsOrgs = await getOrgsWithSeats();
 
-  // Combine all categories (comment out lines to exclude specific categories)
   const allOrgs = [...trialOrgs, ...seatsOrgs];
 
   // Remove duplicates (in case an org matches multiple categories)
@@ -153,11 +125,9 @@ export async function run(): Promise<void> {
     return;
   }
 
-  // Prompt for confirmation
   await cliConfirm(`Do you want to enable code indexing for ${uniqueOrgs.length} organizations?`);
   console.log('');
 
-  // Enable code indexing for all organizations
   console.log('🔧 Enabling code indexing...');
   const { successCount, errorCount } = await enableCodeIndexingForOrgs(
     uniqueOrgs,

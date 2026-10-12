@@ -16,6 +16,10 @@ export type ConnectionLifecycleHooks = {
   onPageshow?: ((handler: (e: { persisted: boolean }) => void) => () => void) | undefined;
   /** Called when the browser comes back online */
   onOnline?: ((handler: () => void) => () => void) | undefined;
+  /** Close the socket this long after `onHidden`, and open no socket and mint no
+   *  auth until `onResume`. A socket that drops while hidden is not replaced.
+   *  Omit to keep the socket open and reconnecting while hidden. */
+  hiddenPauseDelayMs?: number | undefined;
 };
 
 export type BaseConnectionConfig<T = unknown> = {
@@ -87,6 +91,10 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   let stalenessTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let lastMessageTime = 0;
   let hiddenAt = 0;
+  // Both stay false unless `lifecycleHooks.hiddenPauseDelayMs` is set.
+  let hidden = false;
+  let paused = false;
+  let hiddenPauseTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let preconnectAuthRefreshAttempted = false;
   // Coalesce successful mutations into one retry budget at a time. A later mutation may
   // request another bounded cycle after that budget exhausts without any inbound event.
@@ -111,6 +119,37 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }
   }
 
+  function clearHiddenPause(): void {
+    hidden = false;
+    paused = false;
+    if (hiddenPauseTimeoutId !== null) {
+      clearTimeout(hiddenPauseTimeoutId);
+      hiddenPauseTimeoutId = null;
+    }
+  }
+
+  // Close the socket and stop every reconnect path until the next resume.
+  function pauseWhileHidden(): void {
+    if (destroyed || intentionalDisconnect) return;
+    paused = true;
+    if (hiddenPauseTimeoutId !== null) {
+      clearTimeout(hiddenPauseTimeoutId);
+      hiddenPauseTimeoutId = null;
+    }
+    clearReconnectTimer();
+    clearStalenessTimeout();
+    const pausedWs = ws;
+    if (pausedWs !== null) {
+      if (!notifyReplacingConnection()) return;
+      ws = null;
+      pausedWs.close();
+    }
+    if (connected) {
+      connected = false;
+      config.onDisconnected();
+    }
+  }
+
   function clearExhausted(): void {
     if (exhaustionReason !== null) {
       exhaustionReason = null;
@@ -124,7 +163,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   }
 
   async function refreshAuthAndReconnect(expectedGeneration: number) {
-    if (!config.refreshAuth) {
+    if (!config.refreshAuth || paused) {
       return;
     }
 
@@ -150,6 +189,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   }
 
   async function refreshAndConnect(expectedGeneration: number, attempt = 0): Promise<void> {
+    if (paused) return;
     preconnectAuthRefreshAttempted = true;
 
     try {
@@ -178,7 +218,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   }
 
   function scheduleReconnect(attempt: number, expectedGeneration: number) {
-    if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+    if (destroyed || intentionalDisconnect || paused || expectedGeneration !== generation) return;
 
     if (attempt >= maxReconnectAttempts) {
       if (mutationRecovery === 'pending') {
@@ -206,7 +246,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   }
 
   function connectInternal(attempt = 0, expectedGeneration = generation, skipAuthRefresh = false) {
-    if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+    if (destroyed || intentionalDisconnect || paused || expectedGeneration !== generation) return;
 
     if (
       config.refreshAuth &&
@@ -309,6 +349,12 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         config.onDisconnected();
       }
 
+      if (hidden) {
+        config.onUnexpectedDisconnect?.();
+        pauseWhileHidden();
+        return;
+      }
+
       const isAuthFailure = config.isAuthFailure?.(event) ?? false;
 
       if (isAuthFailure && !authRefreshAttempted && config.refreshAuth) {
@@ -356,6 +402,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
 
   function handleVisibilityResume(): void {
     if (destroyed || intentionalDisconnect) return;
+    clearHiddenPause();
 
     reconnectAttempt = 0;
     clearExhausted();
@@ -396,6 +443,10 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     if (destroyed || intentionalDisconnect) return;
     hiddenAt = Date.now();
     clearStalenessTimeout();
+    const pauseDelayMs = config.lifecycleHooks?.hiddenPauseDelayMs;
+    if (pauseDelayMs === undefined || hidden) return;
+    hidden = true;
+    hiddenPauseTimeoutId = setTimeout(pauseWhileHidden, pauseDelayMs);
   }
 
   function handlePageshow(event: { persisted: boolean }): void {
@@ -423,7 +474,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   }
 
   function handleOnline(): void {
-    if (destroyed || intentionalDisconnect) return;
+    if (destroyed || intentionalDisconnect || hidden) return;
 
     if (connected && ws !== null && ws.readyState === WebSocket.OPEN) return;
 
@@ -471,6 +522,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     generation += 1;
     clearReconnectTimer();
     clearStalenessTimeout();
+    clearHiddenPause();
     addEventListeners();
     connectInternal(0, generation);
   }
@@ -483,6 +535,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
 
     clearReconnectTimer();
     clearStalenessTimeout();
+    clearHiddenPause();
     removeEventListeners();
 
     if (ws !== null) {
@@ -551,6 +604,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
 
     clearReconnectTimer();
     clearStalenessTimeout();
+    clearHiddenPause();
     removeEventListeners();
 
     if (ws !== null) {

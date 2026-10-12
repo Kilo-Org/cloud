@@ -2,6 +2,8 @@ import type * as SentryReactNative from '@sentry/react-native';
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type LiveActivity } from 'expo-widgets';
 
+import { rememberHomeWidgetSnapshot } from './home-widget-data';
+
 /**
  * One sink consumes the glanceable snapshot for one native surface (persist,
  * iOS Live Activity/widgets, Android widget/ongoing). Platform sinks register
@@ -105,6 +107,7 @@ export function writeGlanceableFrame(
   snapshot: GlanceableAgentsSnapshot,
   ctx: GlanceableSinkContext | null
 ): boolean {
+  rememberHomeWidgetSnapshot(snapshot);
   let ok = true;
   for (const sink of targets) {
     const writePublish = () => {

@@ -1,7 +1,12 @@
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CountSurfaces } from '@/components/agents/agents-tab-badge.test-helpers';
+import {
+  CountSurfaces,
+  kiloclawVisible,
+  routerReplace,
+} from '@/components/agents/agents-tab-badge.test-helpers';
+import { i18n } from '@/i18n';
 import { type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -27,6 +32,8 @@ function screenOptions(renderer: Mount['renderer']) {
 describe('Tabs layout with the keyboard raised', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    kiloclawVisible.value = false;
+    routerReplace.mockClear();
   });
 
   afterEach(() => {
@@ -51,5 +58,29 @@ describe('Tabs layout with the keyboard raised', () => {
     expect(options.tabBarShowLabel).toBe(true);
     // The resting presentation is unchanged: the bar renders in place.
     expect(options.tabBarStyle.display).toBe('flex');
+  });
+
+  it.each([false, true])('always shows Chat with KiloClaw visibility %s', async visible => {
+    kiloclawVisible.value = visible;
+    const result = await renderWithProviders(createElement(CountSurfaces));
+    mounts.push(result);
+    const chatTab = result.renderer.root.findByProps({ name: '(4_chat)' });
+    const options = chatTab.props.options as {
+      href?: string | null;
+      tabBarAccessibilityLabel: string;
+    };
+
+    expect(options.href).toBeUndefined();
+    expect(options.tabBarAccessibilityLabel).toBe(
+      i18n.t('tabs.position', {
+        name: i18n.t('common.chat'),
+        position: visible ? 4 : 3,
+        total: visible ? 5 : 4,
+      })
+    );
+    expect(routerReplace).not.toHaveBeenCalled();
+    const kiloclawTab = result.renderer.root.findByProps({ name: '(1_kiloclaw)' });
+    const kiloclawOptions = kiloclawTab.props.options as { href?: string | null };
+    expect(kiloclawOptions.href).toBe(visible ? undefined : null);
   });
 });

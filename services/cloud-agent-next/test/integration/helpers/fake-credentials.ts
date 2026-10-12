@@ -16,12 +16,14 @@ export type FakeCredentialBroker = {
     capability: string;
     installationId: number;
     accountLogin: string;
-    appType: 'standard';
+    appType: 'standard' | 'lite';
     source: 'managed';
   }>;
 };
 
-export function createFakeCredentialBroker(): FakeCredentialBroker {
+export function createFakeCredentialBroker(
+  appType: 'standard' | 'lite' = 'standard'
+): FakeCredentialBroker {
   let kiloIssued = 0;
   let githubIssued = 0;
   return {
@@ -38,7 +40,7 @@ export function createFakeCredentialBroker(): FakeCredentialBroker {
         capability: `kgh2.${githubIssued}`,
         installationId: 1,
         accountLogin: 'acme',
-        appType: 'standard' as const,
+        appType,
         source: 'managed' as const,
       };
     },

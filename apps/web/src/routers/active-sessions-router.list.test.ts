@@ -19,16 +19,21 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => {
 let regularUser: User;
 let otherUser: User;
 
-function mockWorkerSessions(sessions: Array<Record<string, unknown>>): jest.SpyInstance {
+function mockWorkerSessions(
+  sessions: Array<Record<string, unknown>>,
+  approvalKey: string | null = null
+): jest.SpyInstance {
   // Fresh Response per call — a single Response body can only be read once.
-  return jest.spyOn(global, 'fetch').mockImplementation(() =>
-    Promise.resolve(
-      new Response(JSON.stringify({ sessions }), {
+  return jest.spyOn(global, 'fetch').mockImplementation(input => {
+    const url = input instanceof Request ? input.url : String(input);
+    const body = url.endsWith('/internal/widgets/approval-key') ? { approvalKey } : { sessions };
+    return Promise.resolve(
+      new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-    )
-  );
+    );
+  });
 }
 
 function mockMalformedWorkerResponse(): jest.SpyInstance {
@@ -58,6 +63,86 @@ describe('active-sessions-router.list', () => {
 
   afterEach(() => {
     fetchSpy?.mockRestore();
+  });
+
+  it('widgetSnapshot requires membership even for a platform administrator', async () => {
+    const admin = await insertTestUser({
+      google_user_email: 'widget-admin-membership@example.com',
+      google_user_name: 'Widget Admin',
+      is_admin: true,
+    });
+    const organization = await createTestOrganization('Admin Foreign Widget Org', otherUser.id, 0);
+    fetchSpy = mockWorkerSessions([]);
+    const caller = await createCallerForUser(admin.id);
+    await expect(
+      caller.activeSessions.widgetSnapshot({
+        organizationId: organization.id,
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('widgetSnapshot rejects a foreign organization before reading private session data', async () => {
+    const organization = await createTestOrganization('Foreign Widget Org', otherUser.id, 0);
+    fetchSpy = mockWorkerSessions([]);
+    const caller = await createCallerForUser(regularUser.id);
+    await expect(
+      caller.activeSessions.widgetSnapshot({
+        organizationId: organization.id,
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('widgetSnapshot refuses malformed upstream data instead of confirming empty work', async () => {
+    fetchSpy = mockMalformedWorkerResponse();
+    const caller = await createCallerForUser(regularUser.id);
+    await expect(
+      caller.activeSessions.widgetSnapshot({
+        organizationId: null,
+      })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+  });
+
+  it('widgetSnapshot returns server presentation and Home-only titles from the authorized rows', async () => {
+    await db.insert(cli_sessions_v2).values({
+      session_id: 'ses_widget_home_authorized',
+      kilo_user_id: regularUser.id,
+      created_on_platform: 'cloud-agent',
+      cloud_agent_session_id: 'agent_widget_home_authorized',
+    });
+    fetchSpy = mockWorkerSessions(
+      [
+        {
+          id: 'ses_widget_home_authorized',
+          status: 'permission',
+          title: 'Home-only title',
+          connectionId: 'conn-widget',
+        },
+      ],
+      'a'.repeat(64)
+    );
+    try {
+      const caller = await createCallerForUser(regularUser.id);
+      const response = await caller.activeSessions.widgetSnapshot({ organizationId: null });
+      expect(response.snapshot).toMatchObject({ needsInput: 1, needsApproval: 1 });
+      expect(response.details.waitingAgents).toEqual([
+        { title: 'Home-only title', kind: 'permission' },
+      ]);
+      expect(response.home).toMatchObject({
+        primaryKind: 'needsInput',
+        primaryCount: 1,
+        primaryTitle: 'Home-only title',
+        canApprove: true,
+      });
+      expect(response.refreshAt).toBe(Date.parse(response.snapshot.updatedAt) + 30 * 60 * 1000);
+      expect(JSON.stringify(response.snapshot)).not.toContain('Home-only title');
+      expect(JSON.stringify(response)).not.toContain('ses_widget_home_authorized');
+    } finally {
+      await db
+        .delete(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, 'ses_widget_home_authorized'));
+    }
   });
 
   it('merges enrichment fields from cli_sessions_v2 with explicit camelCase keys', async () => {

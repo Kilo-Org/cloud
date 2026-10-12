@@ -7,6 +7,7 @@ import {
   billingCapacityForSandboxClass,
   buildSandboxBillingInput,
   configureSandboxBillingInput,
+  parseSandboxBillingInput,
   CONTAINERS_BILLING_CAPACITIES,
   containersBillingIdentity,
   forceDestroyControlPlaneSandbox,
@@ -477,6 +478,55 @@ describe('container usage context', () => {
       'crv-legacy'
     );
     expect(input.metadata?.origin).toBe('other');
+  });
+
+  it.each([
+    ['isolated', 'SandboxSmallContainment', true],
+    ['code-review', 'SandboxCodeReviewContainment', true],
+    ['shared', 'SandboxContainment', false],
+  ] as const)(
+    'attributes a placed %s sandbox from its kind, not its neutral key',
+    (sandboxKind, className, sessionScoped) => {
+      const sandboxId = `sbx-${'a'.repeat(48)}` as SandboxId;
+      const input = buildSandboxBillingInput(
+        {
+          ...metadata({
+            sessionId: 'workspace_placed',
+            userId: 'user_placed',
+            billingOrigin: 'cloud-agent',
+          }),
+          workspace: { sandboxId, sandboxProvider: 'cloudflare', sandboxKind },
+        },
+        sandboxId
+      );
+
+      expect(input.sandboxKind).toBe(sandboxKind);
+      expect(input.sessionId).toBe(sessionScoped ? 'workspace_placed' : undefined);
+      expect(() => assertSandboxBillingAllocation(className, input)).not.toThrow();
+      // The kind survives the strict envelope without reaching the usage context.
+      expect(parseSandboxBillingInput(input)).toEqual({ ...input, enforcementRequested: false });
+    }
+  );
+
+  it('rejects placed billing without its kind and legacy billing with one', () => {
+    const attribution = {
+      sandboxId: `sbx-${'a'.repeat(48)}` as SandboxId,
+      subject: { type: 'user', id: 'user_placed' },
+      actor: { type: 'user', id: 'user_placed' },
+      sessionId: 'workspace_placed',
+      metadata: { origin: 'cloud-agent' },
+    } as const;
+
+    expect(() => assertSandboxBillingAllocation('SandboxSmallContainment', attribution)).toThrow(
+      'Sandbox key and kind do not match'
+    );
+    expect(() =>
+      assertSandboxBillingAllocation('SandboxSmallContainment', {
+        ...attribution,
+        sandboxId: 'ses-abcdef' as SandboxId,
+        sandboxKind: 'isolated',
+      })
+    ).toThrow('Sandbox key and kind do not match');
   });
 
   it('does not trust the public createdOnPlatform label as billing origin', () => {

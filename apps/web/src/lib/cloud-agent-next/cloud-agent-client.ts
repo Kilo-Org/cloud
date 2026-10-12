@@ -1,6 +1,8 @@
 import 'server-only';
 import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
+import { getHTTPStatusCodeFromError } from '@trpc/server/http';
+import { TRPC_ERROR_CODES_BY_KEY, type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
 import {
@@ -31,6 +33,7 @@ import {
   SandboxStatusSnapshotSchema,
   type SandboxStatusSnapshot,
 } from '../../../../../services/cloud-agent-next/src/shared/sandbox-status';
+import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 export type { SendMessagePayload } from './types.js';
 
 /**
@@ -518,10 +521,16 @@ export class CloudAgentBillingError extends Error {
   }
 }
 
+function isTRPCErrorCode(code: unknown): code is TRPC_ERROR_CODE_KEY {
+  return typeof code === 'string' && Object.hasOwn(TRPC_ERROR_CODES_BY_KEY, code);
+}
+
 /**
- * Helper to re-throw InsufficientCreditsError as TRPCError with PAYMENT_REQUIRED code.
+ * Re-throws a Cloud Agent error as a TRPCError for the web tRPC response.
+ * Billing errors keep their billing status. A worker 4xx error keeps its tRPC
+ * code and message; tRPC reports any other error as a 500.
  */
-export function rethrowAsPaymentRequired(error: unknown): never {
+export function rethrowCloudAgentError(error: unknown): never {
   if (error instanceof CloudAgentBillingError) {
     throw new TRPCError({
       code:
@@ -539,6 +548,15 @@ export function rethrowAsPaymentRequired(error: unknown): never {
       code: 'PAYMENT_REQUIRED',
       message: error.message,
     });
+  }
+  if (error instanceof TRPCClientError) {
+    const code: unknown = error.data?.code ?? error.shape?.data?.code;
+    if (isTRPCErrorCode(code)) {
+      const workerError = new TRPCError({ code, message: error.message, cause: error });
+      if (getHTTPStatusCodeFromError(workerError) < 500) {
+        throw workerError;
+      }
+    }
   }
   throw error;
 }
@@ -1286,4 +1304,52 @@ export async function closeCloudAgentOrgStreams(
       `Cloud Agent stream close failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`
     );
   }
+}
+
+// Optional enrichment that runs after the active-session read inside the native
+// widget route's ten-second deadline: a slow identity read drops only the key.
+const WIDGET_APPROVAL_KEY_BUDGET_MS = 1_500;
+
+const widgetApprovalKeyResponseSchema = z.object({
+  approvalKey: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable(),
+});
+
+/**
+ * The Home widget's binding of the oldest pending permission on one owned
+ * control-plane session: SHA-256 of `JSON.stringify([kiloSessionId,
+ * permissionId])`, computed in the Worker so the raw permission never reaches
+ * this process. The Worker re-checks user, organization scope and the
+ * Kilo/cloud session pairing; the key grants no authority. Bounded, and throws
+ * on any non-OK answer so the caller can drop the key while keeping counts.
+ */
+export async function readCloudAgentWidgetApprovalKey(
+  input: {
+    userId: string;
+    organizationId: string | null;
+    kiloSessionId: string;
+    cloudAgentSessionId: string;
+  },
+  signal?: AbortSignal
+): Promise<string | null> {
+  const budget = AbortSignal.timeout(WIDGET_APPROVAL_KEY_BUDGET_MS);
+  const response = await fetchWithinBudget(
+    `${CLOUD_AGENT_NEXT_API_URL}/internal/widgets/approval-key`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-internal-api-key': INTERNAL_API_SECRET,
+      },
+      body: JSON.stringify(input),
+      cache: 'no-store',
+      signal: signal ? AbortSignal.any([budget, signal]) : budget,
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Cloud Agent widget approval key failed: ${response.status}`);
+  }
+  return widgetApprovalKeyResponseSchema.parse(await response.json()).approvalKey;
 }

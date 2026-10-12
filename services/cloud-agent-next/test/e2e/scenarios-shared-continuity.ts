@@ -609,7 +609,6 @@ export const CONTINUITY_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: CONTINUITY_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runInterruptThenContinue,
   },
   'question-idle-resume': {
@@ -618,7 +617,6 @@ export const CONTINUITY_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: QUESTION_IDLE_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runQuestionIdleResume,
   },
 };

@@ -16,6 +16,7 @@ import { zodJsonValidator, withDORetry } from '@kilocode/worker-utils';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
+import { createConnectionTicket } from '../dos/connection-ticket';
 import { getSessionExport } from '../services/session-export';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { handleDirectIngestRequest } from '../ingest/direct-ingest';
@@ -971,18 +972,18 @@ api.get('/user/web', async c => {
 });
 
 // Web UI mints a one-use ticket before opening /api/user/web. The ticket is
-// opaque (UUID); the DO stores { userId, expiresAt } keyed by the ticket and
-// the websocket upgrade consumes it exactly once.
+// opaque; its object stores { userId, expiresAt, secret } and the websocket
+// upgrade consumes it exactly once.
 api.post('/user/web-ticket', async c => {
   const kiloUserId = c.get('user_id');
-  const ticket = crypto.randomUUID();
+  const { ticket, secret, getStub } = createConnectionTicket(c.env.CONNECTION_TICKET_DO);
   const doExpiresAt = Date.now() + 60_000;
 
-  const stub = c.env.CONNECTION_TICKET_DO.get(c.env.CONNECTION_TICKET_DO.idFromName(ticket));
-  await stub.mint({
-    userId: kiloUserId,
-    expiresAt: doExpiresAt,
-  });
+  await withDORetry(
+    getStub,
+    stub => stub.mint({ userId: kiloUserId, expiresAt: doExpiresAt, secret }),
+    'ConnectionTicketDO.mint'
+  );
 
   return c.json({ ticket, expiresAt: Math.floor(doExpiresAt / 1000) }, 200);
 });

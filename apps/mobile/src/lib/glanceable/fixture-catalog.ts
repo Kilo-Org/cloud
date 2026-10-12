@@ -10,7 +10,7 @@ import { type GlanceableActionFeedback } from './surface-extras';
  * relative to the apply moment so relative copy ("28 min") looks real.
  *
  * `apps/mobile/scripts/glanceable-fixtures.json` lists the names and
- * descriptions; `fixture-catalog.test.ts` keeps the two in sync.
+ * descriptions for capture scripts; regenerate it after a catalog change.
  */
 
 export type GlanceableFixtureRow = {
@@ -27,6 +27,8 @@ export type GlanceableFixture = {
   description: string;
   /** Overrides the happy/empty derivation, exactly as the publisher does. */
   status?: Exclude<GlanceableAgentsSnapshotStatus, 'happy' | 'empty'>;
+  /** Minutes since the last successful confirmation. */
+  checkedAgo?: number;
   rows?: (now: number) => GlanceableFixtureRow[];
   actionFeedback?: Exclude<GlanceableActionFeedback, null>;
 };
@@ -84,6 +86,25 @@ function mixedRows(
   ];
 }
 
+const COMBINATION_STATUS = {
+  needsInput: 'permission',
+  running: 'busy',
+  scheduled: 'scheduled',
+  idle: 'idle',
+} as const;
+
+function combinationRows(
+  kinds: readonly (keyof typeof COMBINATION_STATUS)[]
+): (now: number) => GlanceableFixtureRow[] {
+  return now =>
+    kinds.map(kind => ({
+      status: COMBINATION_STATUS[kind],
+      ago: 12,
+      title: kind === 'scheduled' ? 'Nightly dependency audit' : 'Review authentication changes',
+      ...(kind === 'scheduled' ? { scheduledAt: roundWake(now) } : {}),
+    }));
+}
+
 export const GLANCEABLE_FIXTURES = {
   'signed-out': {
     description: 'Signed out: the sign-in copy, no counts, no actions.',
@@ -101,12 +122,15 @@ export const GLANCEABLE_FIXTURES = {
     status: 'privacy',
   },
   expired: {
-    description: 'Expired: counts dropped, the expired copy.',
+    description: 'Expired activity: the Home widget retains last-known mixed work.',
     status: 'expired',
+    checkedAgo: 600,
+    rows: now => mixedRows(now, 'running'),
   },
   stale: {
-    description: 'Delayed: the mixed counts under the updates-delayed copy.',
+    description: 'Delayed: mixed work retains its last successful confirmation time.',
     status: 'stale',
+    checkedAgo: 31,
     rows: now => mixedRows(now, 'running'),
   },
   'needs-approval': {
@@ -202,6 +226,100 @@ export const GLANCEABLE_FIXTURES = {
   'newest-idle': {
     description: 'Mixed counts; newest change is idle (large footer).',
     rows: now => mixedRows(now, 'idle'),
+  },
+  'scheduled-no-time': {
+    description: 'Scheduled agents without a usable wake time.',
+    rows: () => [
+      { status: 'scheduled', ago: 12, title: 'Dependency audit' },
+      { status: 'scheduled', ago: 30, title: 'Usage report' },
+    ],
+  },
+  'scheduled-overdue': {
+    description: 'The earliest scheduled wake passed without confirmation; never invent working.',
+    rows: now => [
+      {
+        status: 'scheduled',
+        ago: 35,
+        title: 'Dependency audit',
+        scheduledAt: new Date(now - 15 * MINUTE_MS).toISOString(),
+      },
+      { status: 'idle', ago: 50, title: 'Review documentation' },
+    ],
+  },
+  'scheduled-tomorrow': {
+    description: 'Three future runs show non-today local dates and times.',
+    rows: now =>
+      [1, 2, 3].map(day => ({
+        status: 'scheduled',
+        ago: 20,
+        title:
+          ['Nightly dependency audit', 'Weekly usage report', 'Release readiness review'][
+            day - 1
+          ] ?? '',
+        scheduledAt: roundWake(now + day * 24 * 60 * MINUTE_MS),
+      })),
+  },
+  'retry-only': {
+    description: 'Needs input from provider retry states, with no permission to approve.',
+    rows: () => [{ status: 'retry', ago: 15, title: 'Recover the interrupted build' }],
+  },
+  untitled: {
+    description: 'Waiting and scheduled rows without titles use a localized generic label.',
+    rows: now => [
+      { status: 'question', ago: 5, title: '' },
+      { status: 'scheduled', ago: 8, title: '', scheduledAt: roundWake(now) },
+    ],
+  },
+  'stale-idle': {
+    description: 'Old idle work remains useful without claiming current confirmation.',
+    checkedAgo: 600,
+    status: 'stale',
+    rows: () => [{ status: 'idle', ago: 30, title: 'Review the onboarding copy' }],
+  },
+  'stale-empty': {
+    description: 'A last-known empty state retains creation and an honest timestamp.',
+    checkedAgo: 180,
+    status: 'stale',
+  },
+  'mix-input-running': {
+    description: 'Needs input and working.',
+    rows: combinationRows(['needsInput', 'running']),
+  },
+  'mix-input-scheduled': {
+    description: 'Needs input and scheduled.',
+    rows: combinationRows(['needsInput', 'scheduled']),
+  },
+  'mix-input-idle': {
+    description: 'Needs input and idle.',
+    rows: combinationRows(['needsInput', 'idle']),
+  },
+  'mix-running-scheduled': {
+    description: 'Working and scheduled.',
+    rows: combinationRows(['running', 'scheduled']),
+  },
+  'mix-running-idle': {
+    description: 'Working and idle.',
+    rows: combinationRows(['running', 'idle']),
+  },
+  'mix-scheduled-idle': {
+    description: 'Scheduled and idle; the wake time takes priority over idle details.',
+    rows: combinationRows(['scheduled', 'idle']),
+  },
+  'mix-input-running-scheduled': {
+    description: 'Needs input, working, and scheduled.',
+    rows: combinationRows(['needsInput', 'running', 'scheduled']),
+  },
+  'mix-input-running-idle': {
+    description: 'Needs input, working, and idle.',
+    rows: combinationRows(['needsInput', 'running', 'idle']),
+  },
+  'mix-input-scheduled-idle': {
+    description: 'Needs input, scheduled, and idle.',
+    rows: combinationRows(['needsInput', 'scheduled', 'idle']),
+  },
+  'mix-running-scheduled-idle': {
+    description: 'Working, scheduled, and idle.',
+    rows: combinationRows(['running', 'scheduled', 'idle']),
   },
 } satisfies Record<string, GlanceableFixture>;
 

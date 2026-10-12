@@ -109,7 +109,14 @@ export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras
       // whenever `profilesSampleRate` is a number (0 included) — the declined
       // branch must not consume its once-only setupOnce slot, and the
       // consented branch registers its own uniquely named instance.
-      ...defaults.filter(integration => integration.name !== 'HermesProfiling'),
+      // Drop TurboModuleContext too: it sets a scope context and two
+      // `turbo_module.*` tags at the start and end of every RNSentry call, and
+      // the native SDK writes the scope to disk on each change (MetricKit
+      // MXDiskWriteException, 1 GB in 24 h, KILO-APP-PT).
+      ...defaults.filter(
+        integration =>
+          integration.name !== 'HermesProfiling' && integration.name !== 'TurboModuleContext'
+      ),
       ...userIntegrations,
     ],
     enableNativeFramesTracking: false,

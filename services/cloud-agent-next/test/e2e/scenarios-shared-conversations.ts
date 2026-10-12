@@ -661,7 +661,6 @@ export const CONVERSATION_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: 'echo:cold',
     defaultTimeoutMs: LONG_CONVERSATION_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runLongConversation,
   },
   'leave-and-return': {
@@ -670,7 +669,6 @@ export const CONVERSATION_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: LEAVE_AND_RETURN_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runLeaveAndReturn,
   },
 };

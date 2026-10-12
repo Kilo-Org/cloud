@@ -106,19 +106,28 @@ describe('control-plane callback recent activity', () => {
     }
   );
 
-  it('falls back to the batch head assistant reply when the representative has none', () => {
+  it('uses the newest assistant reply across the session when the representative has none', () => {
     const stored = new Map<string, PendingCallbackJob>();
-    const assistant = {
+    const holdReply = {
+      eventId: 1 as LatestAssistantMessage['eventId'],
+      timestamp: 10,
+      info: { id: 'hold_reply', role: 'assistant' },
+      parts: [{ id: 'hold_text', messageID: 'hold_reply', type: 'text', text: 'hold output' }],
+    } as LatestAssistantMessage;
+    const batchReply = {
       eventId: 2 as LatestAssistantMessage['eventId'],
-      timestamp: 2,
-      info: { id: 'latest', role: 'assistant' },
-      parts: [{ id: 'final', messageID: 'latest', type: 'text', text: 'batched answer' }],
+      timestamp: 20,
+      info: { id: 'batch_reply', role: 'assistant' },
+      parts: [
+        { id: 'batch_text', messageID: 'batch_reply', type: 'text', text: 'batched answer' },
+      ],
     } as LatestAssistantMessage;
     // A drained batch coalesces into one Kilo turn: the assistant reply is keyed
     // to the batch head, so the representative (last) message has no reply of its
-    // own and must borrow the batch's.
+    // own and must borrow the batch's — not an earlier turn's reply that settled
+    // in the same reduction.
     const getAssistantMessageForUserMessage = vi.fn((_s: string, _k: string, parent: string) =>
-      parent === 'batch_head' ? assistant : null
+      parent === 'hold' ? holdReply : parent === 'batch_head' ? batchReply : null
     );
     const callbacks = createMessageCallbacks({
       storage: {
@@ -136,8 +145,7 @@ describe('control-plane callback recent activity', () => {
       getAssistantMessageForUserMessage,
       getRecentAssistantMessagesForUserMessage: () => [],
     });
-    const head = {
-      messageId: 'batch_head',
+    const base = {
       intent: { agent: {} },
       state: 'completed',
       createdAt: 1,
@@ -145,20 +153,17 @@ describe('control-plane callback recent activity', () => {
       settledAt: 3,
       reason: null,
     } as SessionMessage;
-    const tail = { ...head, messageId: 'batch_tail' } as SessionMessage;
+    const hold = { ...base, messageId: 'hold' } as SessionMessage;
+    const head = { ...base, messageId: 'batch_head' } as SessionMessage;
+    const tail = { ...base, messageId: 'batch_tail' } as SessionMessage;
 
     expect(
       callbacks.persistDrainedBatchCallback(
-        [head, tail],
-        new Set(['batch_head', 'batch_tail'])
+        [hold, head, tail],
+        new Set(['hold', 'batch_head', 'batch_tail'])
       )
     ).toBe(true);
     const payload = stored.get(`${CALLBACK_OUTBOX_PREFIX}batch_tail`)?.job.payload;
     expect(payload?.lastAssistantMessageText).toBe('batched answer');
-    expect(getAssistantMessageForUserMessage).toHaveBeenCalledWith(
-      'workspace_activity',
-      'ses_root',
-      'batch_head'
-    );
   });
 });

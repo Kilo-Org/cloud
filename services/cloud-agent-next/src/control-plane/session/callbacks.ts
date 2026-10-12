@@ -184,8 +184,9 @@ export function createMessageCallbacks(
     const kiloSessionId = metadata.auth.kiloSessionId;
     // A drained batch coalesces several user messages into one Kilo turn, so the
     // assistant reply is keyed to the batch head, not necessarily this
-    // representative (last) message. Try the whole batch so the callback still
-    // carries the answer.
+    // representative message. Resolve the newest reply across the session's
+    // messages (the batch's reply is newer than any earlier turn's) so the
+    // callback still carries the answer this settlement produced.
     const parentIds = [message.messageId, ...batchParentIds].filter(
       (id, index, ids) => ids.indexOf(id) === index
     );
@@ -197,7 +198,12 @@ export function createMessageCallbacks(
           .map(parentMessageId =>
             getAssistantMessageForUserMessage(sessionId, kiloSessionId, parentMessageId)
           )
-          .find(candidate => candidate !== null);
+          .filter((candidate): candidate is LatestAssistantMessage => candidate !== null)
+          .reduce<LatestAssistantMessage | null>(
+            (latest, candidate) =>
+              latest === null || candidate.timestamp >= latest.timestamp ? candidate : latest,
+            null
+          );
         lastAssistantMessageText = assistantMessage
           ? extractAssistantText(assistantMessage)
           : undefined;
@@ -328,9 +334,12 @@ export function createMessageCallbacks(
       facts !== undefined && newlyTerminalMessageIds.has(representative.messageId)
         ? facts
         : undefined;
-    return persistTerminalCallback(representative, metadata, representativeFacts, [
-      ...newlyTerminalMessageIds,
-    ]);
+    return persistTerminalCallback(
+      representative,
+      metadata,
+      representativeFacts,
+      messages.map(message => message.messageId)
+    );
   }
 
   function pendingEntries(): Array<[string, PendingCallbackJob | undefined]> {

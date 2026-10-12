@@ -14,7 +14,7 @@ import {
   stopChat,
 } from './registry';
 import { type ChatState, snapshotOf, watch, watchChats } from './state';
-import { forgetAsked } from './pending';
+import { forgetAsked, titledByAsked } from './pending';
 import { type ChatSummary, deleteChat, listChats, renameChat } from './store';
 
 /**
@@ -52,7 +52,7 @@ export function useChatList(place: ChatPlace | null): ChatList {
         return [];
       }
       await prepareChats(place);
-      return listChats(await encryptedDatabase(), place.chatScope);
+      return titledByAsked(listChats(await encryptedDatabase(), place.chatScope));
     },
   });
   // A chat writes its turns when its answer ends, and the title of a row is the

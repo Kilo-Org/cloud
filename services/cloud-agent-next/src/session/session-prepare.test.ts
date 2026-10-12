@@ -482,11 +482,13 @@ describe('explicit sandbox session creation', () => {
         ctx,
         format === 'structured' ? requestFromStructuredAllocation(preset) : requestForPreset(preset)
       );
+      const persistedAllocation =
+        preset === 'cloudflare-single' ? 'cloudflare-containers-standard-3' : preset;
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,
         expect.objectContaining({
-          sandboxAllocation: preset,
+          sandboxAllocation: persistedAllocation,
           [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: expect.any(String),
         })
       );
@@ -496,8 +498,10 @@ describe('explicit sandbox session creation', () => {
         metadataSchemaVersion: 2,
         lifecycle: { version: 1, timestamp: 1 },
       });
-      expect(metadata.workspace?.sandboxAllocation).toBe(preset);
-      expect(metadata.workspace?.sandboxProvider).toBe(getSandboxAllocationProvider(preset));
+      expect(metadata.workspace?.sandboxAllocation).toBe(persistedAllocation);
+      expect(metadata.workspace?.sandboxProvider).toBe(
+        getSandboxAllocationProvider(persistedAllocation)
+      );
       expect(metadata.workspace?.credentialContainment).toEqual({
         github: true,
         gitlab: false,
@@ -581,17 +585,23 @@ describe('explicit sandbox session creation', () => {
         operationKey: OPERATION_KEY,
       });
       expect(generateSessionIdMock).toHaveBeenCalledOnce();
+      const persistedAllocation =
+        sandboxAllocation === 'cloudflare-single'
+          ? 'cloudflare-containers-standard-3'
+          : sandboxAllocation;
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,
         expect.objectContaining({
-          sandboxAllocation,
+          sandboxAllocation: persistedAllocation,
           [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
         })
       );
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledOnce();
       expect(createdMetadata(doStub)).toMatchObject(
-        expect.objectContaining({ workspace: expect.objectContaining({ sandboxAllocation }) })
+        expect.objectContaining({
+          workspace: expect.objectContaining({ sandboxAllocation: persistedAllocation }),
+        })
       );
       expect(settleOperationMock).toHaveBeenCalledOnce();
       expect(settleOptions(0)?.outboxEvent).toMatchObject({
@@ -1538,7 +1548,7 @@ describe('createSessionWithLedger admission ladder', () => {
         'https://github.com/acme/repo',
         undefined,
         WORKTREE_ID,
-        { sandboxId: 'ses-0123456789abcdef', provider: 'cloudflare' }
+        { sandboxId: 'ses-0123456789abcdef', provider: 'cloudflare-containers' }
       );
       expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
@@ -1548,7 +1558,8 @@ describe('createSessionWithLedger admission ladder', () => {
             worktreeId: WORKTREE_ID,
             workspacePath: `/workspace/${USER_ID}/worktrees/${WORKTREE_ID}`,
             sandboxId: 'ses-0123456789abcdef',
-            sandboxProvider: 'cloudflare',
+            sandboxProvider: 'cloudflare-containers',
+            sandboxAllocation: 'cloudflare-containers-standard-3',
           }),
         })
       );
@@ -3144,7 +3155,8 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
         finalization: { autoCommit, condenseOnComplete: true },
         workspace: expect.objectContaining({
           sandboxId,
-          sandboxProvider: 'cloudflare',
+          sandboxProvider: 'cloudflare-containers',
+          sandboxAllocation: 'cloudflare-containers-standard-3',
           worktreeId: WORKTREE_ID,
           workspacePath: `/workspace/${USER_ID}/worktrees/${WORKTREE_ID}`,
         }),

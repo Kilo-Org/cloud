@@ -188,9 +188,10 @@ export async function prepareChats(place: ChatPlace): Promise<void> {
  */
 export async function startChat(
   place: ChatPlace,
-  model: string,
+  target: ChatTarget,
   mcpEnabled = true
 ): Promise<string> {
+  const { model, effort } = target;
   const runtime = await runtimeFor(place);
   const toolsSupported = targetSupportsTools(model);
   if (toolsSupported && mcpEnabled && KILO_MCP_URL !== undefined) {
@@ -201,6 +202,7 @@ export async function startChat(
     openSession({
       system: SYSTEM,
       model,
+      ...(effort === null ? {} : { effort }),
       tools: toolsSupported ? chatToolNamesStarting(organizationIdOf(place.org), mcpEnabled) : [],
     })
   );
@@ -218,7 +220,7 @@ export async function startChat(
     pendingTools: undefined,
     ...place,
   });
-  change(handle.id, { ...NOTHING, model, effort: null, status: 'idle' });
+  change(handle.id, { ...NOTHING, model, effort, status: 'idle' });
   return handle.id;
 }
 

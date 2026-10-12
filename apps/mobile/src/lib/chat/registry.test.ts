@@ -317,7 +317,7 @@ beforeEach(async () => {
   mcp.enabled.clear();
   remote.tools.length = 0;
   backendState.profiles = [];
-  opened = await startChat(place, 'kilo/one');
+  opened = await startChat(place, { model: 'kilo/one', effort: null });
   await settled();
   /* Cleared after the chat above, so a test counts only its own discoveries. */
   mcp.ensure.mockClear();
@@ -387,7 +387,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     mcp.tools.push(discovered);
     await releaseChat(opened);
 
-    opened = await startChat(place, 'kilo/one');
+    opened = await startChat(place, { model: 'kilo/one', effort: null });
     await settled();
 
     /* The open asks for the automatic deadline, so a slow server leaves the
@@ -400,7 +400,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     mcp.tools.push(discovered);
     await releaseChat(opened);
 
-    opened = await startChat(place, 'kilo/one', false);
+    opened = await startChat(place, { model: 'kilo/one', effort: null }, false);
     await settled();
 
     expect(openedWith?.tools).toEqual(['time', ...SETTINGS]);
@@ -414,7 +414,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
        the switch the person just turned on snaps back off. */
     mcp.tools.push(discovered);
     await releaseChat(opened);
-    opened = await startChat(place, 'kilo/one', false);
+    opened = await startChat(place, { model: 'kilo/one', effort: null }, false);
     await settled();
     expect(mcp.ensure).not.toHaveBeenCalled();
 
@@ -433,7 +433,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
   it('moves an idle chat off the server tools when the setting is turned off', async () => {
     mcp.tools.push(discovered);
     await releaseChat(opened);
-    opened = await startChat(place, 'kilo/one');
+    opened = await startChat(place, { model: 'kilo/one', effort: null });
     await settled();
     expect(snapshotOf(opened).sessionId).toBe('s1');
 
@@ -450,7 +450,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
   it('applies a choice made while an answer was arriving once it settles', async () => {
     mcp.tools.push(discovered);
     await releaseChat(opened);
-    opened = await startChat(place, 'kilo/one');
+    opened = await startChat(place, { model: 'kilo/one', effort: null });
     await settled();
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
     await settled();
@@ -491,7 +491,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
   it('moves onto another model on the names it holds when the stored ones no longer resolve', async () => {
     mcp.tools.push(discovered);
     await releaseChat(opened);
-    opened = await startChat(place, 'kilo/one');
+    opened = await startChat(place, { model: 'kilo/one', effort: null });
     await settled();
     expect(openedWith?.tools).toEqual(['time', ...SETTINGS, 'mcp_kilo_read-file']);
 
@@ -515,7 +515,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
        The retry finds the server, and the session is frozen on what it was
        opened with, so the recovered tools need a session that names them. */
     await releaseChat(opened);
-    opened = await startChat(place, 'kilo/one');
+    opened = await startChat(place, { model: 'kilo/one', effort: null });
     await settled();
     expect(openedWith?.tools).toEqual(['time', ...SETTINGS]);
 
@@ -534,7 +534,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
 
   it('leaves the chat where it is when the retry still finds no tools', async () => {
     await releaseChat(opened);
-    opened = await startChat(place, 'kilo/one');
+    opened = await startChat(place, { model: 'kilo/one', effort: null });
     await settled();
     clonedWith = undefined;
 
@@ -1021,7 +1021,7 @@ describe('custom backend question targets', () => {
       backendState.profiles = [backend];
       const target = backendTargetId(backend, 'same-model');
       await releaseChat(opened);
-      opened = await startChat(place, target);
+      opened = await startChat(place, { model: target, effort: null });
       await say(opened, { text: 'first', images: [] }, { model: target, effort: null });
       await settled();
       await say(
@@ -1124,7 +1124,7 @@ describe('custom backend question targets', () => {
     backendState.profiles = [backend];
     const target = backendTargetId(backend, 'same-model');
     await releaseChat(opened);
-    opened = await startChat(place, target);
+    opened = await startChat(place, { model: target, effort: null });
     await say(opened, { text: 'first', images: [] }, { model: target, effort: null });
     await settled();
     await say(opened, { text: 'second', images: [] }, { model: target, effort: null });

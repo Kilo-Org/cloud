@@ -21,6 +21,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { rememberModelFacts } from '@/lib/chat/layers';
 import { type ChatSummary } from '@/lib/chat/store';
 import { chatPlaceOf, newChat, useChatList } from '@/lib/chat/use-chat';
+import { effortOfVariant } from '@/lib/chat/effort';
 import { useChatBackends } from '@/lib/chat/backend-store';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
@@ -76,6 +77,7 @@ function ScopedChatListScreen() {
   const backends = useChatBackends();
   const localModels = useLocalModels();
   const [picked, setPicked] = useState<string | null>(null);
+  const [pickedVariant, setPickedVariant] = useState('');
   const gatewayOptions = useMemo(
     () => models.map(model => ({ ...model, displayId: model.id, showGatewayMetadata: true })),
     [models]
@@ -118,7 +120,14 @@ function ScopedChatListScreen() {
     setStarting(true);
     void (async () => {
       try {
-        const sessionId = await newChat(place, model);
+        const choices = {
+          variants: options.find(option => option.id === model)?.variants ?? [],
+          efforts: models.find(option => option.id === model)?.variantEfforts,
+        };
+        const sessionId = await newChat(place, {
+          model,
+          effort: effortOfVariant(choices, pickedVariant),
+        });
         // Whatever the last attempt failed with is moot once a chat starts.
         toast.dismiss('chat-start-failed');
         router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);
@@ -138,7 +147,7 @@ function ScopedChatListScreen() {
         setStarting(false);
       }
     })();
-  }, [selectedModel, selectionValid, place, router, t]);
+  }, [selectedModel, selectionValid, place, options, models, pickedVariant, router, t]);
 
   const open = useCallback(
     (sessionId: string) => {
@@ -283,10 +292,11 @@ function ScopedChatListScreen() {
           <View className="px-[22px] py-2">
             <ModelSelector
               value={selectedModel ?? ''}
-              variant=""
+              variant={pickedVariant}
               options={options}
-              onSelect={modelId => {
+              onSelect={(modelId, variantId) => {
                 setPicked(modelId);
+                setPickedVariant(variantId);
               }}
               disabled={starting}
             />

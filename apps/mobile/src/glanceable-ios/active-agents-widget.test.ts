@@ -343,24 +343,28 @@ describe('Home header', () => {
     propsFor([], { status: 'signed_out' }),
   ];
 
-  it.each(HOME_FAMILIES)('draws the Kilo mark, Kilo, and a fixed trailing + slot in %s', family => {
-    for (const props of STATES) {
-      const header = children(render(props, family))[0];
-      if (header === undefined) {
-        throw new Error('no header');
+  it.each(HOME_FAMILIES)(
+    'draws the Kilo mark, no app name, and a fixed trailing + slot in %s',
+    family => {
+      for (const props of STATES) {
+        const header = children(render(props, family))[0];
+        if (header === undefined) {
+          throw new Error('no header');
+        }
+        expect(fixedHeight(header)).toBe(24);
+        const parts = children(header);
+        // The real mark in a fixed 24pt slot, as tall as the header buttons, never a drawn tile.
+        expect(modifier(parts[0], 'frame')).toEqual({ width: 24, height: 24 });
+        expect(children(parts[0])[0]?.props.uiImage).toBe('__KILO_WIDGET_LOGO_URI__');
+        // The mark alone names the app: a spacer, not a "Kilo" label, follows it.
+        expect(parts[1]?.kind).toBe('Spacer');
+        // `+` always owns the last 24pt slot, so a hidden action never moves it.
+        expect(modifier(parts.at(-1), 'frame')).toEqual({ width: 24, height: 24 });
+        // The Approve slot ends 4pt before `+`, pill and circle alike.
+        expect(modifier(parts.at(-2), 'padding')).toEqual({ trailing: 4 });
       }
-      expect(fixedHeight(header)).toBe(24);
-      const parts = children(header);
-      // The real mark in a fixed 24pt slot, as tall as the header buttons, never a drawn tile.
-      expect(modifier(parts[0], 'frame')).toEqual({ width: 24, height: 24 });
-      expect(children(parts[0])[0]?.props.uiImage).toBe('__KILO_WIDGET_LOGO_URI__');
-      expect(parts[1]?.props.children).toBe('Kilo');
-      // `+` always owns the last 24pt slot, so a hidden action never moves it.
-      expect(modifier(parts.at(-1), 'frame')).toEqual({ width: 24, height: 24 });
-      // The Approve slot ends 4pt before `+`, pill and circle alike.
-      expect(modifier(parts.at(-2), 'padding')).toEqual({ trailing: 4 });
     }
-  });
+  );
 
   it.each(HOME_FAMILIES)('keeps an equal 16pt band on all four sides in %s', family => {
     for (const props of STATES) {
@@ -670,7 +674,7 @@ describe('nothing running, updating, last known', () => {
   it.each(HOME_FAMILIES)('draws placeholder bars and no actions while updating in %s', family => {
     const tree = render(propsFor([], { status: 'waiting' }), family);
     expect(buttons(tree)).toEqual([]);
-    expect(texts(tree)).toEqual(['Kilo', 'Updating agents']);
+    expect(texts(tree)).toEqual(['Updating agents']);
     expect(collect(tree).filter(node => node.kind === 'RoundedRectangle').length).toBeGreaterThan(
       1
     );
@@ -701,7 +705,7 @@ describe('locked', () => {
   ] as const)('centres the lock and a balanced message for %s', (status, first, second) => {
     const props = propsFor([PERMISSION], { status });
     const small = render(props, 'systemSmall');
-    expect(texts(small)).toEqual(['Kilo', first, second]);
+    expect(texts(small)).toEqual([first, second]);
     expectBaselines(small, 'systemSmall', [
       [first, 109.5],
       [second, 126.5],
@@ -786,7 +790,7 @@ describe('Lock Screen accessories', () => {
       propsFor([PERMISSION, BUSY, scheduled('Usage report', null)]),
       'accessoryRectangular'
     );
-    expect(texts(tree)).toEqual(['Kilo', '1 Needs input', '1 Working · 1 Scheduled']);
+    expect(texts(tree)).toEqual(['1 Needs input', '1 Working · 1 Scheduled']);
     const others = textNode(tree, '1 Working · 1 Scheduled');
     expect(modifier(others, 'opacity')).toBe(0.62);
     // The monochrome glyph template, never the yellow tile.
@@ -827,6 +831,6 @@ describe('Lock Screen accessories', () => {
     const tree = render(propsFor([], { status: 'signed_out' }), 'accessoryRectangular');
     const marks = collect(tree).filter(node => node.props.uiImage !== undefined);
     expect(marks.map(node => node.props.uiImage)).toEqual(['__KILO_WIDGET_GLYPH_URI__']);
-    expect(texts(tree)).toContain('Kilo');
+    expect(texts(tree)).not.toContain('Kilo');
   });
 });

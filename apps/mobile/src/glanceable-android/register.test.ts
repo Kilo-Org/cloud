@@ -126,7 +126,7 @@ describe.each([172, 360])('headless Home widget at %d dp', width => {
     const { handleWidgetTask } = await registerAfterRestart(snapshotFor());
     const rendered = await runWidgetTask(handleWidgetTask, width);
     const text = collectText(rendered.light);
-    expect(text).toEqual(expect.arrayContaining(['Kilo', '2', 'Needs input']));
+    expect(text).toEqual(expect.arrayContaining(['2', 'Needs input']));
     expect(collectControls(rendered.light)).toEqual(['Approve', 'New agent']);
     expect(text).not.toContain('0');
     expect(text.some(line => line.startsWith('Checked'))).toBe(true);

@@ -206,7 +206,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     widgetEnvironment.widgetRenderingMode === 'accented' ||
     widgetEnvironment.widgetRenderingMode === 'vibrant';
   // The slot keeps its size while the image is missing (the copy has not landed
-  // yet), so "Kilo" beside it never moves. The glyphs sit inside the tile at 65%,
+  // yet), so the header never moves. The glyphs sit inside the tile at 65%,
   // so the template draws a little larger than that to read at the same weight.
   // eslint-disable-next-line unicorn/consistent-function-scoping -- the stringified 'widget' layout cannot hoist helpers to module scope
   const logo = (size: number, template: boolean) => (
@@ -281,7 +281,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
         row =>
           `${count(safeCount(row.count))} ${safeText(row.label) ?? labels[kindOf(row.kind) ?? 'idle']}`
       );
-    // 160x72: the Kilo row (12pt, baseline 16.5), the primary count (15pt bold,
+    // 160x72: the 14pt mark, the primary count (15pt bold,
     // baseline 40) and the other counts (12pt at 62%, baseline 62), 6pt in.
     return (
       <VStack
@@ -294,12 +294,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
           frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'topLeading' }),
         ]}
       >
-        <HStack alignment="center" spacing={5}>
-          {logo(14, true)}
-          <Text modifiers={[font({ size: 12, weight: 'semibold' }), lineLimit(1), white]}>
-            Kilo
-          </Text>
-        </HStack>
+        {logo(14, true)}
         <HStack
           alignment="center"
           spacing={4.5}
@@ -519,7 +514,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       </HStack>
     );
   };
-  // Header: the Kilo mark and name, then the Approve slot and the `+` slot at
+  // Header: the Kilo mark, then the Approve slot and the `+` slot at
   // the trailing edge. A hidden action leaves its slot empty, so `+` never moves.
   // Tinted and Clear keep only each colour's alpha, so an opaque control fill
   // would merge with its glyph into one solid blob; there the fill is the
@@ -593,16 +588,6 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   const header = (
     <HStack alignment="center" spacing={0} modifiers={[frame({ height: 24 })]}>
       {logo(24, monochrome)}
-      <Text
-        modifiers={[
-          font({ size: 13, weight: 'semibold' }),
-          lineLimit(1),
-          foregroundStyle(palette.fg),
-          padding({ leading: 6 }),
-        ]}
-      >
-        Kilo
-      </Text>
       <Spacer minLength={8} />
       <HStack
         spacing={0}

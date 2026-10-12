@@ -3,7 +3,8 @@ import {
   type GlanceableAgentsSnapshot,
   type GlanceableSessionRow,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { afterEach, describe, expect, it } from 'vitest';
+import { EMPTY_HOME_WIDGET_DETAILS, type HomeWidgetData } from '@kilocode/app-shared/home-widget';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { withStatus } from '@/lib/glanceable/publisher';
 import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
@@ -12,6 +13,7 @@ import {
   buildGlanceableLiveActivityContentState,
   buildGlanceableViewProps,
   toWidgetProps,
+  widgetTimelineFrames,
 } from './view-props';
 
 const NOW = Date.parse('2026-01-02T00:00:00Z');
@@ -27,6 +29,7 @@ const translate = (key: string): string => COPY[key] ?? key;
 // that sets them resets them here so it cannot colour the next one.
 afterEach(() => {
   setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
+  vi.useRealTimers();
 });
 
 function snapshotFor(
@@ -99,9 +102,9 @@ describe('actions', () => {
     expect(props.actions).toEqual({ approve: false, newAgent: true });
   });
 
-  it('does not offer New agent when a session is scheduled', () => {
+  it('keeps New agent available when a session is scheduled', () => {
     const props = buildGlanceableViewProps(snapshotFor([{ status: 'scheduled' }]), {}, translate);
-    expect(props.actions).toEqual({ approve: false, newAgent: false });
+    expect(props.actions).toEqual({ approve: false, newAgent: true });
     expect(props.primaryKind).toBe('scheduled');
   });
 
@@ -132,19 +135,28 @@ describe('actions', () => {
     expect(noWake.scheduledAt).toBeNull();
   });
 
-  it('keeps New agent disabled while a permission waits', () => {
+  it('offers New agent alongside Approve while the displayed permission waits', () => {
+    const snapshot = snapshotFor([PERMISSION_ROW]);
+    const props = buildGlanceableViewProps(snapshot, {}, translate, {
+      snapshot,
+      details: { ...EMPTY_HOME_WIDGET_DETAILS, approvalKey: 'a'.repeat(64) },
+    });
+    expect(props.actions).toEqual({ approve: true, newAgent: true });
+  });
+
+  it('offers no blind Approve while the displayed request is unknown', () => {
     const props = buildGlanceableViewProps(snapshotFor([PERMISSION_ROW]), {}, translate);
-    expect(props.actions).toEqual({ approve: true, newAgent: false });
+    expect(props.actions).toEqual({ approve: false, newAgent: true });
   });
 
   it.each(['question', 'retry'] as const)(
-    'offers no button for a %s wait the action cannot answer',
+    'offers no Approve for a %s wait the action cannot answer',
     status => {
       // `needsInput` folds in questions and retries: a question needs an answer
       // and a retry needs the provider back, so neither may draw a button whose
       // press only finds nothing to approve and opens the app instead.
       const props = buildGlanceableViewProps(snapshotFor([{ status }]), {}, translate);
-      expect(props.actions).toEqual({ approve: false, newAgent: false });
+      expect(props.actions).toEqual({ approve: false, newAgent: true });
     }
   );
 });
@@ -206,24 +218,108 @@ describe('buildGlanceableLiveActivityContentState needsApproval', () => {
     // key set so the approvable count (or any other field) cannot silently
     // ship onto a widget shape that has no use for it; the newest-result trio
     // is the deliberate read-only data the large card draws in its footer.
-    const props = buildGlanceableViewProps(snapshotFor([PERMISSION_ROW]), {}, translate);
-    expect(Object.keys(props).toSorted()).toEqual([
-      'accessibilityLabel',
-      'actionLine',
-      'actions',
-      'countLines',
-      'needsInputSince',
-      'newestResultAt',
-      'newestResultKind',
-      'newestResultLabel',
-      'newestTitle',
-      'primaryCount',
-      'primaryKind',
-      'primaryLabel',
-      'scheduledAt',
-      'statusLine',
-    ]);
+    const snapshot = snapshotFor([PERMISSION_ROW]);
+    const props = buildGlanceableViewProps(snapshot, {}, translate, {
+      snapshot,
+      details: { ...EMPTY_HOME_WIDGET_DETAILS, approvalKey: 'a'.repeat(64) },
+    });
+    expect(props.home?.canApprove).toBe(true);
+    expect(props.home?.canCreate).toBe(true);
     expect('needsApproval' in props).toBe(false);
     expect(toWidgetProps(props)).not.toHaveProperty('needsApproval');
+  });
+});
+
+describe('Home-only presentation and timeline', () => {
+  it('keeps retained Home work separate from expired accessory counts', () => {
+    const retained: HomeWidgetData = {
+      snapshot: snapshotFor([PERMISSION_ROW]),
+      details: {
+        approvalKey: 'a'.repeat(64),
+        primaryTitle: 'Private title',
+        waitingAgents: [{ title: 'Private title', kind: 'permission' }],
+        scheduledAgents: [],
+      },
+    };
+    const expired = withStatus(retained.snapshot, 'stale', Date.parse(retained.snapshot.expiresAt));
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: 'couldNotApprove' });
+    const props = buildGlanceableViewProps(
+      expired,
+      {},
+      translate,
+      retained,
+      Date.parse(expired.expiresAt)
+    );
+    expect(props.countLines).toEqual([]);
+    expect(props.home).toMatchObject({
+      primaryKind: 'needsInput',
+      primaryCount: 1,
+      stale: true,
+      primaryTitle: 'Private title',
+      checkedAt: retained.snapshot.updatedAt,
+      canCreate: true,
+      canApprove: true,
+    });
+    expect(props.actionFeedback).toBe('couldNotApprove');
+  });
+
+  it.each([{ signedOut: true }, { orgInvalid: true }])(
+    'clears Home private content when surface flags override retained data',
+    flags => {
+      const retained = {
+        snapshot: snapshotFor([PERMISSION_ROW]),
+        details: { ...EMPTY_HOME_WIDGET_DETAILS, primaryTitle: 'Private title' },
+      };
+      const props = buildGlanceableViewProps(retained.snapshot, flags, translate, retained, NOW);
+      expect(props.home).toMatchObject({
+        primaryCount: 0,
+        primaryTitle: null,
+        waitingAgents: [],
+        scheduledAgents: [],
+        canApprove: false,
+        canCreate: false,
+      });
+    }
+  );
+
+  it('turns a missed wake into Awaiting update without advancing the checked time', () => {
+    const wake = new Date(NOW + 60_000).toISOString();
+    const snapshot = snapshotFor([{ status: 'scheduled', scheduledAt: wake }]);
+    const data = { snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate, data, NOW));
+    const frames = widgetTimelineFrames(snapshot, props, translate, data) ?? [];
+    expect(frames.map(frame => frame.date.getTime())).toEqual(
+      frames.map(frame => frame.date.getTime()).toSorted((left, right) => left - right)
+    );
+    const atWake = frames.find(frame => frame.date.getTime() === Date.parse(wake));
+    expect(atWake?.props.home).toMatchObject({
+      awaitingUpdate: true,
+      primaryKind: 'scheduled',
+      primaryCount: 1,
+      checkedAt: snapshot.updatedAt,
+    });
+    const expired = frames.find(frame => frame.date.getTime() === Date.parse(snapshot.expiresAt));
+    expect(expired?.props.countLines).toEqual([]);
+    expect(expired?.props.home).toMatchObject({
+      primaryKind: 'scheduled',
+      primaryCount: 1,
+      stale: true,
+    });
+  });
+
+  it('omits nested nulls at the UserDefaults boundary, without deleting list entries', () => {
+    const snapshot = snapshotFor([{ status: 'scheduled' }]);
+    const data = {
+      snapshot,
+      details: {
+        ...EMPTY_HOME_WIDGET_DETAILS,
+        scheduledAgents: [{ title: '', scheduledAt: null }],
+      },
+    };
+    const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate, data, NOW));
+    expect(JSON.stringify(props)).not.toContain(':null');
+    expect(props.home?.scheduledAgents).toEqual([{ title: '' }]);
   });
 });

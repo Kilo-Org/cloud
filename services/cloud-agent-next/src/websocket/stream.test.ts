@@ -354,6 +354,85 @@ describe('stream handler handleStreamRequest', () => {
     expect(parsed.data).toEqual({ cloudStatus: { type: 'preparing' } });
   });
 
+  it.each(['', '&fromId=0', '&replay=false'])(
+    'finishes negotiated bootstrap after all state snapshots: %s',
+    async suffix => {
+      const serverWs = makeFakeWebSocket();
+      mockWebSocketPair(serverWs);
+      const notifications = vi.fn();
+      const errors = vi.fn();
+      const observed = createServiceState({ rootSessionId: 'root-1', onError: errors });
+      observed.subscribe(notifications);
+      observed.beginReplay();
+      const handler = createStreamHandler(
+        makeFakeState(),
+        makeFakeEventQueries([
+          makeKiloEvent(1, 'session.error', { sessionID: 'root-1', error: 'Old overload' }),
+          makeKiloEvent(2, 'session.status', { sessionID: 'root-1', status: { type: 'busy' } }),
+          makeKiloEvent(3, 'session.status', { sessionID: 'root-1', status: { type: 'idle' } }),
+        ]),
+        SESSION_ID,
+        {
+          deriveCloudStatus: async () => ({ type: 'preparing' }),
+          readPendingInteractions: () => ({
+            questions: [{ id: 'current-question', sessionID: 'root-1', questions: [] }],
+            permissions: [],
+          }),
+          getPreparationSnapshots: async () => [
+            {
+              ...makeEvent(4, JSON.stringify({ step: 'setup_commands', message: 'Current setup' })),
+              stream_event_type: 'preparing',
+            },
+          ],
+          deriveQueuedMessages: async () => [
+            {
+              messageId: 'current-message',
+              content: 'Current prompt',
+              timestamp: 10,
+              delivery: 'queued',
+            },
+          ],
+          getAvailableCommands: async () => ({ commands: [] }),
+        }
+      );
+      await handler.handleStreamRequest(
+        new Request(`https://example.com/stream?bootstrap=true${suffix}`, {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+      const frames = parseSentMessages(serverWs);
+      expect(
+        frames.find(frame => frame.streamEventType === 'connected')?.data.bootstrapPending
+      ).toBe(true);
+      expect(frames.at(-1)).toMatchObject({
+        eventId: 0,
+        streamEventType: 'bootstrap.complete',
+        data: {},
+      });
+      expect(frames.slice(-4).map(frame => frame.streamEventType)).toEqual([
+        'preparing',
+        'cloud.message.queued',
+        'commands.available',
+        'bootstrap.complete',
+      ]);
+      for (const message of serverWs.sentMessages.slice(0, -1)) {
+        processSdkFrame(observed, JSON.parse(message));
+        expect(notifications).not.toHaveBeenCalled();
+        expect(errors).not.toHaveBeenCalled();
+      }
+      observed.endReplay();
+      expect(notifications).toHaveBeenCalledTimes(1);
+      expect(observed.getStatus()).toEqual({ type: 'idle' });
+      expect(observed.getCloudStatus()).toMatchObject({
+        type: 'preparing',
+        step: 'setup_commands',
+      });
+      expect(observed.getQuestion()?.requestId).toBe('current-question');
+      expect(observed.getPendingMessages().get('current-message')).toEqual({ status: 'queued' });
+      expect(errors).not.toHaveBeenCalled();
+    }
+  );
+
   it('sends cached commands.available on connect when no eventTypes filter is set', async () => {
     const serverWs = makeFakeWebSocket();
     mockWebSocketPair(serverWs);

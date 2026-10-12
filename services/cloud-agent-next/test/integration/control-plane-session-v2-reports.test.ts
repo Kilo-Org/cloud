@@ -153,7 +153,12 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     await stub.send(promptPayload('m2'));
     await waitFor(async () => expect(await messageStatus(stub, 'm2')).toBe('running'));
 
-    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: 'm2' });
+    await stub.onOutcome({
+      sessionId,
+      status: 'completed',
+      lastMessageId: 'm2',
+      gateResult: 'fail',
+    });
     await flush(stub);
 
     expect(captured.reports.map(report => report.run.messageId).sort()).toEqual(['m1', 'm2']);
@@ -174,6 +179,7 @@ describe('SandboxSessionV2 reports and callbacks', () => {
       cloudAgentSessionId: sessionId,
       status: 'completed',
       messageId: 'm2',
+      gateResult: 'fail',
     });
   });
 
@@ -203,6 +209,10 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     }
     expect(captured.callbacks).toHaveLength(1);
     expect(captured.callbacks[0]?.payload.status).toBe('failed');
+    expect(captured.callbacks[0]?.payload.clientError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      retryable: true,
+    });
   });
 
   it('writes interrupted reports and one callback for a Stop batch', async () => {
@@ -224,6 +234,10 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     }
     expect(captured.callbacks).toHaveLength(1);
     expect(captured.callbacks[0]?.payload.status).toBe('interrupted');
+    expect(captured.callbacks[0]?.payload.clientError).toMatchObject({
+      code: 'USER_INTERRUPT',
+      retryable: false,
+    });
   });
 
   it('writes a backstop report for a new-plane reason', async () => {

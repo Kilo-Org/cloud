@@ -42,7 +42,7 @@ export type RepoSnapshotEligibility =
  * after setup, so the snapshot would carry setup output under a key that names
  * only the user and the repository.
  *
- * Enrollment follows the `CONTROL_PLANE_IDS`/`SANDBOX_SELECTION_IDS` convention:
+ * Enrollment follows the `SANDBOX_SELECTION_IDS` allowlist convention:
  * one list matched against the user ID and then the org ID.
  */
 export function repoSnapshotEligibility(

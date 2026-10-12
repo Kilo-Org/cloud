@@ -21,6 +21,7 @@ import {
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentRelaxedAttachmentFilenameSchema,
+  baseSendMessageNextSchema,
 } from './cloud-agent-next-schemas';
 
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
@@ -594,6 +595,42 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
     });
 
     expect(result).not.toHaveProperty('clientProvenance');
+  });
+});
+
+describe('send-time attachment filenames', () => {
+  const prepareInput = {
+    githubRepo: 'acme/repo',
+    prompt: 'Read the attachment',
+    mode: 'code',
+    model: 'kilo/test-model',
+  };
+  const sendInput = {
+    cloudAgentSessionId: 'agent_12345678-1234-4234-9234-123456789abc',
+    payload: { type: 'prompt', prompt: '', mode: 'code', model: 'kilo/test-model' },
+  };
+  const attachmentsWith = (extension: string) => ({
+    path: MESSAGE_UUID,
+    files: [`${ATTACHMENT_ID}.${extension}`],
+  });
+
+  it.each(['zip', 'heic', 'json', 'png'])(
+    'accepts a relaxed "%s" upload in prepareSession and sendMessage',
+    extension => {
+      const attachments = attachmentsWith(extension);
+      expect(basePrepareSessionNextSchema.safeParse({ ...prepareInput, attachments }).success).toBe(
+        true
+      );
+      expect(baseSendMessageNextSchema.safeParse({ ...sendInput, attachments }).success).toBe(true);
+    }
+  );
+
+  it('rejects a deny-listed extension in prepareSession and sendMessage', () => {
+    const attachments = attachmentsWith('exe');
+    expect(basePrepareSessionNextSchema.safeParse({ ...prepareInput, attachments }).success).toBe(
+      false
+    );
+    expect(baseSendMessageNextSchema.safeParse({ ...sendInput, attachments }).success).toBe(false);
   });
 });
 

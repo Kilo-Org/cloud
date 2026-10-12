@@ -3,10 +3,8 @@
 export function generateFakeEmbedding(text: string): number[] {
   const embedding = new Array(1536).fill(0);
 
-  // Extract words from text (lowercase, alphanumeric only)
   const words = text.toLowerCase().match(/\b\w+\b/g) || [];
 
-  // Each word contributes to specific dimensions in the embedding
   words.forEach(word => {
     let wordHash = 0;
     for (let i = 0; i < word.length; i++) {
@@ -14,12 +12,11 @@ export function generateFakeEmbedding(text: string): number[] {
       wordHash = wordHash & wordHash; // Convert to 32-bit integer
     }
 
-    // Spread each word's contribution across multiple dimensions
     // This ensures texts with common words have higher similarity
     // Using stronger contribution to ensure test similarity scores are above 0.4
     for (let dim = 0; dim < 20; dim++) {
       const index = Math.abs(wordHash + dim * 1543) % 1536;
-      embedding[index] += 0.5; // Strong word contribution for test similarity
+      embedding[index] += 0.5;
     }
   });
 
@@ -42,7 +39,6 @@ export function generateFakeEmbedding(text: string): number[] {
     embedding[i] += 0.1;
   }
 
-  // Normalize the embedding vector
   const magnitude = Math.sqrt(embedding.reduce((sum: number, val: number) => sum + val * val, 0));
   if (magnitude === 0) return new Array(1536).fill(0) as number[]; // Edge case: empty text
   return embedding.map((val: number) => val / magnitude);

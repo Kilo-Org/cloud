@@ -78,7 +78,6 @@ import type { GroupedRegisterSessionInput } from './session-registration-metadat
 import { getPgDb } from '../db/pg.js';
 import { generateSessionId, SessionService } from '../session-service.js';
 import {
-  isWorktreeOwner,
   sessionPlaneForNewOwner,
   sessionPlaneFromId,
   type SessionPlane,
@@ -94,6 +93,11 @@ import {
   selectSandboxProvider,
   type SandboxSelection,
 } from '../sandbox-id.js';
+import {
+  sandboxKindMatchesKey,
+  sandboxKindSchema,
+  type SandboxKind,
+} from '../sandbox-placement.js';
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
@@ -145,7 +149,6 @@ function sessionPlaneForCreate(
 
 function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): void {
   if (input.runtime && 'devcontainer' in input.runtime && input.runtime.devcontainer === true) {
@@ -165,16 +168,6 @@ function assertSupportedSandboxAllocation(
       message: 'Sandbox allocations cannot be combined with specialized sandbox routing',
     });
   }
-  // Isolated Standard predates the selectable allocations and remains legacy-plane only.
-  if (
-    allocation === 'isolated-standard' &&
-    sessionPlaneForCreate(input, ctx, options) === 'control'
-  ) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Isolated Standard allocation is not supported for control-plane sessions',
-    });
-  }
 }
 
 export type SessionRegistrationContext = {
@@ -189,6 +182,7 @@ export type SessionRegistrationResult = {
   kiloSessionId: string;
   sandboxId: SandboxId;
   sandboxRoute?: SharedSandboxRouteMetadata;
+  sandboxKind?: SandboxKind;
   sandboxProvider: SandboxSelection['provider'];
   worktreeId?: CloudAgentWorktreeId;
   sandboxAllocation?: SandboxAllocation;
@@ -549,8 +543,7 @@ function worktreeEnabledForCreate(
   const recordedIds = canonicalSessionIds(row);
   if (recordedIds) return recordedIds.cloudAgentSessionId.startsWith('workspace_');
 
-  const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
-  return sessionPlaneForCreate(input, ctx) === 'control' && isWorktreeOwner(ctx.env, owner);
+  return sessionPlaneForCreate(input, ctx) === 'control';
 }
 
 export function assertRuntimeIsolationAdmission(env: Pick<Env, 'RUNTIME_ISOLATION_ENABLED'>): void {
@@ -921,6 +914,16 @@ function rebuildRecordedSessionAllocation(
   const sandboxId = canonical.sandboxId;
   const sandboxProvider = canonical.sandboxProvider;
   const sandboxRoute = canonical.sandboxRoute;
+  // A legacy prefixed key recorded no kind; a placed key never rebuilds without one.
+  const recordedKind = sandboxKindSchema.optional().safeParse(canonical.sandboxKind);
+  if (
+    !recordedKind.success ||
+    typeof sandboxId !== 'string' ||
+    !sandboxKindMatchesKey(sandboxId, recordedKind.data)
+  ) {
+    throw creationInProgressError();
+  }
+  const sandboxKind = recordedKind.data;
   const requested = isSelectableSandboxAllocation(input.runtime?.sandboxAllocation)
     ? input.runtime?.sandboxAllocation
     : undefined;
@@ -937,7 +940,13 @@ function rebuildRecordedSessionAllocation(
         orgId: input.options?.kilocodeOrganizationId,
       },
       auth: {},
-      workspace: { sandboxId, sandboxProvider, sandboxRoute, sandboxAllocation: recorded.data },
+      workspace: {
+        sandboxId,
+        sandboxProvider,
+        sandboxRoute,
+        sandboxKind,
+        sandboxAllocation: recorded.data,
+      },
       lifecycle: { version: 1, timestamp: Date.now() },
     });
     if (!metadata.success) throw creationInProgressError();
@@ -1007,6 +1016,7 @@ function rebuildRecordedSessionAllocation(
     kiloSessionId,
     sandboxId: sandboxId as SandboxId,
     sandboxRoute: route,
+    ...(sandboxKind ? { sandboxKind } : {}),
     sandboxProvider: recordedProvider.data,
     ...(worktreeId ? { worktreeId } : {}),
     ...(recorded.data ? { sandboxAllocation: recorded.data } : {}),
@@ -1100,6 +1110,7 @@ function buildSessionRegistrationCommand(
           }
         : {}),
       ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
+      ...(allocation.sandboxKind ? { sandboxKind: allocation.sandboxKind } : {}),
       credentialContainment: allocation.credentialContainment,
       ...(input.runtime?.sandboxAllocation
         ? { sandboxAllocation: input.runtime.sandboxAllocation }
@@ -1148,7 +1159,7 @@ export async function registerNewSession(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): Promise<SessionRegistrationResult> {
-  assertSupportedSandboxAllocation(input, ctx, options);
+  assertSupportedSandboxAllocation(input, options);
   const allocation = await allocateNewSession(input, ctx, options);
   const stub = resolveLegacySessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId);
   let registerResult: { success: boolean; error?: string };
@@ -1463,7 +1474,7 @@ export async function startNewSession(
   options?: { billingOrigin?: string },
   ledger?: SessionCreationLedgerHooks
 ): Promise<StartedSessionResult> {
-  assertSupportedSandboxAllocation(input, ctx, options);
+  assertSupportedSandboxAllocation(input, options);
   const allocation = await allocateSessionForCreate(input, ctx, options, ledger);
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
@@ -1682,7 +1693,7 @@ export async function createSessionWithLedger(
   ctx: SessionRegistrationContext,
   options: SessionLedgerCreateOptions
 ): Promise<LedgerSessionCreateResult> {
-  assertSupportedSandboxAllocation(input, ctx, { billingOrigin: options.billingOrigin });
+  assertSupportedSandboxAllocation(input, { billingOrigin: options.billingOrigin });
   await assertSandboxAllocationMembership(input, ctx);
   const db = getPgDb(ctx.env);
   const allocation = input.runtime?.sandboxAllocation;

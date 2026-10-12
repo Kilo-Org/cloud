@@ -16,11 +16,14 @@ import {
 const mocks = vi.hoisted(() => ({
   scheduleNotificationAsync: vi.fn(),
   dismissNotificationAsync: vi.fn(),
+  getPermissionsAsync: vi.fn(),
 }));
 
 vi.mock('expo-notifications', () => ({
+  PermissionStatus: { GRANTED: 'granted' },
   scheduleNotificationAsync: mocks.scheduleNotificationAsync,
   dismissNotificationAsync: mocks.dismissNotificationAsync,
+  getPermissionsAsync: mocks.getPermissionsAsync,
 }));
 
 const ACTIVE = 'active';
@@ -42,6 +45,7 @@ beforeEach(() => {
   setTelemetrySink(null);
   mocks.scheduleNotificationAsync.mockReset().mockResolvedValue(undefined);
   mocks.dismissNotificationAsync.mockReset().mockResolvedValue(undefined);
+  mocks.getPermissionsAsync.mockReset().mockResolvedValue({ status: 'granted' });
 });
 
 describe('notificationIdentifierForSession', () => {
@@ -641,6 +645,39 @@ describe('applyNeedsInputNotifications', () => {
     await expect(
       applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [], updates: [] })
     ).resolves.toEqual({ published: [], dismissed: [] });
+    expect(events).toHaveLength(1);
+    expect(events[0]?.tags?.['error.operation']).toBe('needs_input_publish');
+  });
+
+  it('skips the post without a report when notifications are not allowed', async () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
+
+    await expect(
+      applyNeedsInputNotifications({
+        publish: [notifiedRow()],
+        dismiss: ['needs-input:ses_old'],
+        updates: [],
+      })
+    ).resolves.toEqual({ published: [], dismissed: ['needs-input:ses_old'] });
+    expect(mocks.scheduleNotificationAsync).not.toHaveBeenCalled();
+    expect(events).toHaveLength(0);
+  });
+
+  it('reports a failed permission read and skips the post', async () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    mocks.getPermissionsAsync.mockRejectedValue(new Error('no module'));
+
+    await expect(
+      applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [], updates: [] })
+    ).resolves.toEqual({ published: [], dismissed: [] });
+    expect(mocks.scheduleNotificationAsync).not.toHaveBeenCalled();
     expect(events).toHaveLength(1);
     expect(events[0]?.tags?.['error.operation']).toBe('needs_input_publish');
   });

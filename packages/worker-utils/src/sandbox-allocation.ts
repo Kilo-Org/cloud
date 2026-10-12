@@ -188,19 +188,14 @@ export const vercelSandboxResourcesSchema = z.union([
 
 export type VercelSandboxResources = z.infer<typeof vercelSandboxResourcesSchema>;
 
-export function getSandboxAllocationProvider(
-  allocation: SandboxAllocation
-): 'cloudflare' | 'vercel' | 'cloudflare-containers' {
-  if (allocation.startsWith('vercel-')) return 'vercel';
-  if (allocation.startsWith('cloudflare-containers-')) return 'cloudflare-containers';
-  return 'cloudflare';
+export function getSandboxAllocationProvider(allocation: SandboxAllocation) {
+  return allocationRequests[allocation].provider.id;
 }
 
 /**
  * Vercel and DO-managed Cloudflare containers exist only on the control plane, so
- * their allocations force a control-plane session regardless of `CONTROL_PLANE_IDS`.
- * Cloudflare allocations pick the sandbox shape only and leave the plane decision to
- * that allowlist.
+ * their allocations force a control-plane session. Cloudflare allocations pick the
+ * sandbox shape only and leave the plane decision to the session origin.
  */
 export function sandboxAllocationRequiresControlPlane(
   allocation: SandboxAllocation | undefined

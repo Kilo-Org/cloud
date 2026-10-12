@@ -597,6 +597,75 @@ describe('SessionIngestDO integration', () => {
       expect(earlier.nextCursor).toBeNull();
     });
 
+    it('reads the newest page without scanning the part rows that sort after message rows', async () => {
+      const sessionId = 'ses_sdk_page_part_scan_000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const message = (id: string, created: number) => ({
+        id,
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      });
+      const oldest = message('msg_100_oldest', 100);
+      const newest = message('msg_200_newest', 200);
+      const newestPart = {
+        id: 'prt_newest',
+        sessionID: sessionId,
+        messageID: newest.id,
+        type: 'text',
+        text: 'latest',
+      };
+      await stub.ingest(
+        [
+          { type: 'message', data: oldest },
+          { type: 'message', data: newest },
+          { type: 'part', data: newestPart },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      // A long session: thousands of part rows whose `msg_…/prt_…` item ids
+      // sort after every `message/…` item id.
+      const olderPartCount = 2000;
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (let index = 0; index < olderPartCount; index += 1) {
+          const id = `prt_${String(index).padStart(4, '0')}`;
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
+            `${oldest.id}/${id}`,
+            'part',
+            JSON.stringify({ id, sessionID: sessionId, messageID: oldest.id, type: 'text' })
+          );
+        }
+      });
+
+      const rowsRead = await runInDurableObject(stub, async (instance, state) => {
+        const sqlStorage: SqlStorage = Object.getPrototypeOf(state.storage.sql);
+        const exec = sqlStorage.exec;
+        const cursors: Array<{ rowsRead: number }> = [];
+        sqlStorage.exec = function (this: SqlStorage, ...args: Parameters<SqlStorage['exec']>) {
+          const cursor = exec.apply(this, args);
+          cursors.push(cursor);
+          return cursor;
+        };
+        try {
+          await expect(instance.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
+            messages: [{ info: newest, parts: [newestPart] }],
+            nextCursor: expect.any(String),
+            omittedItemCount: 0,
+          });
+        } finally {
+          sqlStorage.exec = exec;
+        }
+        return cursors.reduce((sum, cursor) => sum + cursor.rowsRead, 0);
+      });
+
+      expect(rowsRead).toBeLessThan(100);
+    });
+
     it('clamps oversized direct DO page requests to the shared positive page maximum', async () => {
       const sessionId = 'ses_sdk_page_clamped_000000001';
       const stub = getStub(kiloUserId, sessionId);

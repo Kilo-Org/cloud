@@ -117,12 +117,7 @@ const googleSignInPlugins: NonNullable<ExpoConfig['plugins']> = googleIosUrlSche
 const permissionLocales = buildPermissionPromptLocales(PERMISSION_PROMPT_COPY);
 const focusFilterCatalog = buildFocusFilterStringsFiles(FOCUS_FILTER_COPY);
 const nativeLocales: ExpoConfig['locales'] = Object.fromEntries(
-  SUPPORTED_LANGUAGES.map(tag => {
-    const { NSLocalNetworkUsageDescription: _developmentPrompt, ...productionPrompts } =
-      permissionLocales[tag].ios;
-    // Keep dev-launcher's base description unchanged so its release strip still matches.
-    return [tag, { ios: isProductionBuild ? productionPrompts : permissionLocales[tag].ios }];
-  })
+  SUPPORTED_LANGUAGES.map(tag => [tag, { ios: permissionLocales[tag].ios }])
 );
 
 const config: ExpoConfig = {
@@ -211,6 +206,10 @@ const config: ExpoConfig = {
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      // Custom LAN backends require an app-level approval before each endpoint
+      // can use HTTP. ATS stays enabled for public HTTPS endpoints.
+      NSAppTransportSecurity: { NSAllowsLocalNetworking: true },
+      NSLocalNetworkUsageDescription: permissionLocales.en.ios.NSLocalNetworkUsageDescription,
       // iOS reads this list, not the JS catalog. Without it the system treats
       // the app as English-only, so OS-drawn text we cannot translate — the
       // native Sign in with Apple button above all — stays English on a
@@ -284,7 +283,9 @@ const config: ExpoConfig = {
         android: {
           enableMinifyInReleaseBuilds: true,
           // Keep expo-task-manager's reflectively-loaded headless app loader.
-          extraProguardRules: ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES,
+          // R8 runs on release builds and llama.rn's JSI bindings are reached
+          // only through JNI, so every com.rnllama class has to be kept too.
+          extraProguardRules: `${ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES}\n-keep class com.rnllama.** { *; }`,
           // Old release AABs shipped without resource shrinking. Keep this on so
           // the unused zz_unused_shrink_sentinel raw resource is stripped and
           // the inspector contract can catch a shrink regression before it lands.
@@ -315,6 +316,18 @@ const config: ExpoConfig = {
             { name: 'RecaptchaInterop', modular_headers: true },
           ],
         },
+      },
+    ],
+    // llama.cpp for on-device GGUF inference. The two options are the defaults
+    // turned off: the podspec already compiles itself as C++20, and the app
+    // offloads nothing to Android GPUs, so neither global Podfile flags nor
+    // Qualcomm native libraries belong in the manifest. iOS memory entitlements
+    // stay on: a GGUF context needs the raised ceiling.
+    [
+      'llama.rn',
+      {
+        forceCxx20: false,
+        enableOpenCLAndHexagon: false,
       },
     ],
     [
@@ -381,6 +394,10 @@ const config: ExpoConfig = {
         organization: 'anaconda-nq',
         useNativeInit: true,
         options: SENTRY_NATIVE_OPTIONS,
+        // Android release builds upload NDK debug symbols and the R8 mapping, so
+        // native tombstones (libhermes, libreactnative, Expo modules) and Java
+        // frames symbolicate. The default sentry.gradle.kts uploads only JS source maps.
+        experimental_android: { enableAndroidGradlePlugin: true },
       },
     ],
     // One native splash configuration and shared AnimatedSplashOverlay lifecycle
@@ -484,6 +501,8 @@ const config: ExpoConfig = {
     // Aggregate "Active Agents" glanceable surfaces: one Live Activity plus Home
     // Screen and Lock Screen widgets, rendered by src/glanceable-ios. The widget
     // target reuses the existing app group; no second group is created.
+    // Native Home refresh runs after expo-widgets' source generation (mods run in reverse).
+    './plugins/withHomeWidgetRefresh',
     [
       'expo-widgets',
       {

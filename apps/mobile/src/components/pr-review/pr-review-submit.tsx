@@ -171,8 +171,9 @@ type PrReviewSubmitProps = Readonly<{
    */
   prRef?: ProviderPrRef;
   /**
-   * The review events the server capability list accepts (provider arms).
-   * Absent on GitHub, which keeps the fixed three-option chip row.
+   * The review events to offer: the server capability list on provider arms,
+   * or comment only on the viewer's own GitHub pull request. Absent on any
+   * other GitHub pull request, which keeps the fixed three-option chip row.
    */
   reviewEvents?: readonly ProviderReviewEventOption[];
   onDismiss: () => void;

@@ -7,8 +7,25 @@ export const CONTROL_PLANE_SESSION_PREFIX = 'workspace_';
 /** `billingOrigin` value that identifies a Code Reviewer session. */
 export const CODE_REVIEW_PLATFORM = 'code-review';
 
+/**
+ * Origins whose new sessions run on the control plane: interactive web, the
+ * chat bots, Security Agent analysis/remediation, webhook ingest and scheduled
+ * runs. Every other origin — auto-triage, autofix, app-builder, CLI and unknown
+ * values — stays legacy until it is moved explicitly.
+ */
+const CONTROL_PLANE_ORIGINS: ReadonlySet<string> = new Set([
+  'cloud-agent-web',
+  'slack',
+  'github',
+  'linear',
+  'discord',
+  'security-agent',
+  'security-remediation',
+  'webhook',
+  'scheduled',
+]);
+
 export type ControlPlaneOwnerEnv = {
-  CONTROL_PLANE_IDS?: string;
   CODE_REVIEW_CONTROL_PLANE_IDS?: string;
 };
 
@@ -83,22 +100,14 @@ export type SessionCreateOrigin = {
   billingOrigin?: string;
 };
 
-export function isInteractiveWebSession(origin?: SessionCreateOrigin): boolean {
-  return origin?.createdOnPlatform === 'cloud-agent-web';
+export function isControlPlaneOrigin(origin?: SessionCreateOrigin): boolean {
+  return (
+    origin?.createdOnPlatform !== undefined && CONTROL_PLANE_ORIGINS.has(origin.createdOnPlatform)
+  );
 }
 
 export function isCodeReviewSession(origin?: SessionCreateOrigin): boolean {
   return origin?.billingOrigin === CODE_REVIEW_PLATFORM;
-}
-
-export function isControlPlaneOwner(
-  env: ControlPlaneOwnerEnv,
-  owner: { userId: string; orgId?: string }
-): boolean {
-  return (
-    ownerIdInList(env.CONTROL_PLANE_IDS, owner.userId) ||
-    ownerIdInList(env.CONTROL_PLANE_IDS, owner.orgId)
-  );
 }
 
 export function isCodeReviewControlPlaneOwner(
@@ -111,28 +120,15 @@ export function isCodeReviewControlPlaneOwner(
   );
 }
 
-export function isWorktreeOwner(
-  env: { WORKTREE_CREATION_ENABLED_IDS?: string },
-  owner: { userId: string; orgId?: string }
-): boolean {
-  return (
-    ownerIdInList(env.WORKTREE_CREATION_ENABLED_IDS, owner.userId) ||
-    ownerIdInList(env.WORKTREE_CREATION_ENABLED_IDS, owner.orgId)
-  );
-}
-
 export function sessionPlaneForNewOwner(
   env: ControlPlaneOwnerEnv,
   owner: { userId: string; orgId?: string },
   origin?: SessionCreateOrigin
 ): SessionPlane {
-  if (isInteractiveWebSession(origin)) {
-    return isControlPlaneOwner(env, owner) ? 'control' : 'legacy';
-  }
   if (isCodeReviewSession(origin)) {
     return isCodeReviewControlPlaneOwner(env, owner) ? 'control' : 'legacy';
   }
-  return 'legacy';
+  return isControlPlaneOrigin(origin) ? 'control' : 'legacy';
 }
 
 function ownerIdInList(raw: string | undefined, id: string | undefined): boolean {

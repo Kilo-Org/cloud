@@ -5,6 +5,8 @@ import type * as AnthropicModule from '@kilocode/web-shared/lib/ai-gateway/provi
 import type * as GoogleModule from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import type * as QwenModule from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import type * as StepFunModule from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
+import type * as CustomPricingModule from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import type * as ModelUtilsModule from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 jest.mock('server-only', () => {
   throw new Error('Client-safe model modules must not import server-only modules');
@@ -15,7 +17,7 @@ jest.mock('@kilocode/web-shared/lib/dotenvx', () => {
 });
 
 describe('client-safe model imports', () => {
-  test('loads model preferences, auto-model IDs and vendor helpers without server dependencies', () => {
+  test('loads model preferences, auto-model IDs, vendor helpers and custom pricing without server dependencies', () => {
     jest.isolateModules(() => {
       const models = jest.requireActual<typeof ModelsModule>(
         '@kilocode/web-shared/lib/ai-gateway/models'
@@ -42,6 +44,17 @@ describe('client-safe model imports', () => {
       expect(google.isGeminiModel(google.GEMINI_PRO_CURRENT_MODEL_ID)).toBe(true);
       expect(qwen.isQwenModel(qwen.QWEN37_PLUS_MODEL_ID)).toBe(true);
       expect(stepfun.isStepModel('stepfun/step-3.7-flash')).toBe(true);
+
+      const customPricing = jest.requireActual<typeof CustomPricingModule>(
+        '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants'
+      );
+      const modelUtils = jest.requireActual<typeof ModelUtilsModule>(
+        '@kilocode/web-shared/lib/ai-gateway/model-utils'
+      );
+      expect(customPricing.getCustomPricing(google.GEMINI_FLASH_CURRENT_MODEL_ID)).toBeDefined();
+      expect(modelUtils.normalizeModelId(google.GEMMA_4_26B_A4B_IT_FREE_ID)).toBe(
+        google.GEMMA_4_26B_A4B_IT_ID
+      );
     });
   });
 });

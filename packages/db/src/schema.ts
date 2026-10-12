@@ -134,6 +134,7 @@ import type {
   UserDeletionActivityDetails,
   CustomLlmDefinition,
   AutoFreeConfig,
+  GatewayModelListConfig,
   KiloClawAdminAuditAction,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
@@ -5777,6 +5778,8 @@ export const ai_gateway_config = pgTable(
     id: integer().primaryKey().default(1),
     config: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     auto_free: jsonb().$type<AutoFreeConfig>(),
+    preferred_models: jsonb().$type<GatewayModelListConfig>(),
+    unavailable_models: jsonb().$type<GatewayModelListConfig>(),
   },
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );
@@ -10066,7 +10069,7 @@ export type NewUserPushToken = typeof user_push_tokens.$inferInsert;
 
 // ─── Activity Tokens (Live Activity / push-to-start / Android ongoing) ──
 //
-// Tokens for the glanceable surfaces (iOS Live Activity + push-to-start,
+// Tokens for glanceable surfaces (iOS Live Activity, push-to-start and WidgetKit,
 // Android ongoing notification). These are NOT Expo push tokens and never
 // share a table with `user_push_tokens`. `organization_id` is null for the
 // personal surface and is a server-only lookup key — it never enters a
@@ -10084,7 +10087,9 @@ export const user_activity_tokens = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     token: text().notNull(),
-    kind: text().$type<'ios_push_to_start' | 'ios_activity' | 'android_ongoing'>().notNull(),
+    kind: text()
+      .$type<'ios_push_to_start' | 'ios_activity' | 'ios_widget' | 'android_ongoing'>()
+      .notNull(),
     platform: text().$type<'ios' | 'android'>().notNull(),
     // Null means the personal surface. Server-only lookup key; never sent in a
     // glanceable payload.
@@ -11874,59 +11879,6 @@ export const user_terms_acceptances = pgTable(
 
 export type UserTermsAcceptance = typeof user_terms_acceptances.$inferSelect;
 export type NewUserTermsAcceptance = typeof user_terms_acceptances.$inferInsert;
-
-export const quick_chat_threads = pgTable(
-  'quick_chat_threads',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'restrict' }),
-    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    uniqueIndex('quick_chat_threads_user_personal_uidx')
-      .on(table.user_id)
-      .where(sql`${table.organization_id} IS NULL`),
-    uniqueIndex('quick_chat_threads_user_org_uidx')
-      .on(table.user_id, table.organization_id)
-      .where(sql`${table.organization_id} IS NOT NULL`),
-  ]
-);
-
-export type QuickChatThread = typeof quick_chat_threads.$inferSelect;
-export type NewQuickChatThread = typeof quick_chat_threads.$inferInsert;
-
-export const quick_chat_messages = pgTable(
-  'quick_chat_messages',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    thread_id: uuid()
-      .notNull()
-      .references(() => quick_chat_threads.id, { onDelete: 'cascade' }),
-    role: text().notNull(),
-    content: text().notNull(),
-    client_id: text(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    index('IDX_quick_chat_messages_thread_created_at').on(table.thread_id, table.created_at),
-  ]
-);
-
-export type QuickChatMessage = typeof quick_chat_messages.$inferSelect;
-export type NewQuickChatMessage = typeof quick_chat_messages.$inferInsert;
 
 export const organization_service_fee_exemptions = pgTable(
   'organization_service_fee_exemptions',

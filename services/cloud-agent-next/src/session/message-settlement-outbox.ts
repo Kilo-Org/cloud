@@ -1,4 +1,5 @@
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
+import { renderRecentActivity } from '../callbacks/recent-activity.js';
 import type { CallbackJob } from '../callbacks/types.js';
 import { logger } from '../logger.js';
 import type {
@@ -153,6 +154,11 @@ export type MessageSettlementOutboxDependencies = {
     kiloSessionId: string,
     parentMessageId: string
   ) => LatestAssistantMessage | null;
+  getRecentAssistantMessagesForUserMessage: (
+    sessionId: string,
+    kiloSessionId: string,
+    parentMessageId: string
+  ) => LatestAssistantMessage[];
   ensureTerminalMessageEvent: (event: PersistedMessageEvent) => void;
   hasObservedWrapperIdle: () => Promise<boolean>;
   requestAlarmAtOrBefore: (deadline: number) => Promise<void>;
@@ -197,6 +203,7 @@ export function createMessageSettlementOutbox(
     hasConnectedStreamClients,
     reportTerminalState,
     getAssistantMessageForUserMessage,
+    getRecentAssistantMessagesForUserMessage,
     ensureTerminalMessageEvent,
     hasObservedWrapperIdle,
     requestAlarmAtOrBefore,
@@ -426,6 +433,7 @@ export function createMessageSettlementOutbox(
     const sessionId = await resolveCallbackSessionId(metadata);
 
     let lastAssistantMessageText: string | undefined;
+    let recentActivity: string | undefined;
     if (state.status === 'completed' && metadata?.auth.kiloSessionId) {
       const assistantMessage = getAssistantMessageForUserMessage(
         sessionId,
@@ -434,6 +442,19 @@ export function createMessageSettlementOutbox(
       );
       if (assistantMessage) {
         lastAssistantMessageText = extractAssistantTextFromParts(assistantMessage.parts);
+      }
+      try {
+        recentActivity = renderRecentActivity(
+          getRecentAssistantMessagesForUserMessage(
+            sessionId,
+            metadata.auth.kiloSessionId,
+            state.messageId
+          )
+        );
+      } catch {
+        logger
+          .withFields({ sessionId, messageId: state.messageId })
+          .warn('Unable to include recent activity in the callback snapshot');
       }
     }
 
@@ -472,6 +493,7 @@ export function createMessageSettlementOutbox(
       kiloSessionId: metadata?.auth.kiloSessionId,
       gateResult: state.gateResult,
       lastAssistantMessageText,
+      recentActivity,
       idempotencyKey: state.messageId,
     };
 

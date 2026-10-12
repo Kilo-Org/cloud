@@ -131,6 +131,18 @@ describe('reportAppError', () => {
     });
   });
 
+  it('files a typed error at its declared level', () => {
+    reportAppError(
+      Object.assign(new Error('expected outage'), {
+        [TELEMETRY_DESCRIPTION_KEY]: { fingerprint: ['expected-outage'], level: 'warning' },
+      }),
+      { source: 'query' }
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ level: 'warning', fingerprint: ['expected-outage'] });
+  });
+
   it('ignores a malformed declared telemetry and keeps the generic fingerprint', () => {
     reportAppError(
       Object.assign(new Error('boom'), { [TELEMETRY_DESCRIPTION_KEY]: { fingerprint: [] } }),

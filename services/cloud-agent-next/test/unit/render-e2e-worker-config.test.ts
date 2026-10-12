@@ -25,7 +25,6 @@ import { LOCAL_E2E_INTERNAL_API_SECRET } from '../e2e/e2e-internal-secret';
 const overrides = {
   workerUrl: 'https://cloud-agent-e2e-test.engineering-e11.workers.dev',
   kiloOpenRouterBase: 'https://fake-llm.engineering-e11.workers.dev/api/openrouter',
-  e2eUserId: 'user-1',
 };
 
 const REMOVED_CONTAINER_CLASSES = [
@@ -321,8 +320,7 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.vars.TOOL_CGROUP_MODE).toBe('enforce');
     expect(config.vars.TOOL_CGROUP_RESERVE_MB).toBe('1024');
     expect(config.vars.TOOL_CGROUP_CPU_WEIGHT).toBe('50');
-    expect(config.vars.CONTROL_PLANE_IDS).toBe('user-1');
-    expect(config.vars.WORKTREE_CREATION_ENABLED_IDS).toBe('user-1');
+    expect(config.vars.WORKTREE_CREATION_ENABLED_IDS).toBeUndefined();
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ENABLED).toBe('false');
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_USER_IDS).toBe('');
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS).toBe('');
@@ -330,24 +328,10 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.vars.KILO_SESSION_INGEST_URL).toBe('https://ingest.kilosessions.ai');
   });
 
-  it('fails the render when E2E_USER_ID is absent or empty', () => {
-    for (const e2eUserId of [undefined, '', '   ']) {
-      expect(() => buildE2eWorkerConfig(readSourceConfig(), { ...overrides, e2eUserId })).toThrow(
-        /E2E_USER_ID/
-      );
-    }
-  });
-
   it('renders no surface allowlist: the deployed secret is a Worker secret, not a var', () => {
     const { config } = render();
     expect(config.vars).not.toHaveProperty('E2E_SURFACE_USER_IDS');
     expect(JSON.stringify(config)).not.toContain('E2E_SURFACE_USER_IDS');
-  });
-
-  it('enrols every authenticated user only for an explicit *', () => {
-    const config = buildE2eWorkerConfig(readSourceConfig(), { ...overrides, e2eUserId: ' * ' });
-    expect(config.vars.CONTROL_PLANE_IDS).toBe('*');
-    expect(config.vars.WORKTREE_CREATION_ENABLED_IDS).toBe('*');
   });
 
   it('adds the NEXTAUTH_SECRET binding and keeps existing bindings', () => {

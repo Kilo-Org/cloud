@@ -1,7 +1,7 @@
 /* oxlint-disable max-lines -- one tRPC client suite; the link-options, auth-header, deadline, and observed-fetch cases share one hoisted module-mock scaffold */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type TelemetryEvent } from '@/lib/telemetry/error-sink';
+import { type TelemetryBreadcrumb, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 const httpLinkMock = vi.hoisted(() => vi.fn());
 const httpBatchLinkMock = vi.hoisted(() => vi.fn());
@@ -327,9 +327,11 @@ describe('deadlineFetch', () => {
 
 describe('network error reporting', () => {
   let events: TelemetryEvent[] = [];
+  let breadcrumbs: TelemetryBreadcrumb[] = [];
 
   beforeEach(() => {
     events = [];
+    breadcrumbs = [];
     mockFetch.mockReset();
     vi.stubGlobal('fetch', mockFetch);
   });
@@ -346,10 +348,13 @@ describe('network error reporting', () => {
     httpBatchLinkMock.mockReturnValue({});
     createTRPCClientMock.mockReturnValue({});
 
-    const { setTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    const { setBreadcrumbSink, setTelemetrySink } = await import('@/lib/telemetry/error-sink');
     await import('./trpc');
     setTelemetrySink(event => {
       events.push(event);
+    });
+    setBreadcrumbSink(breadcrumb => {
+      breadcrumbs.push(breadcrumb);
     });
 
     const httpLinkOpts = httpLinkMock.mock.calls[0]?.[0] as { fetch?: typeof fetch } | undefined;
@@ -359,7 +364,7 @@ describe('network error reporting', () => {
     return httpLinkOpts.fetch;
   }
 
-  it('reports one warning tagged error.source trpc carrying the procedure on rejection', async () => {
+  it('leaves one network breadcrumb and no event for a transport failure', async () => {
     const original = new Error('socket closed');
     mockFetch.mockRejectedValue(original);
     const observedFetch = await loadObservedFetch();
@@ -368,15 +373,12 @@ describe('network error reporting', () => {
       observedFetch('https://api.example.com/api/trpc/session.list?batch=1')
     ).rejects.toBe(original);
 
-    expect(events).toHaveLength(1);
-    expect(events[0]?.level).toBe('warning');
-    expect(events[0]?.tags).toMatchObject({
-      'error.subsystem': 'network',
-      'error.source': 'trpc',
-      'network.outcome': 'failed',
-      'trpc.procedure': 'session.list',
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(1);
+    expect(breadcrumbs[0]).toMatchObject({
+      category: 'network',
+      data: { source: 'trpc', path: '/api/trpc/session.list', outcome: 'failed' },
     });
-    expect(events[0]?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'failed']);
   });
 
   it('reports a non-2xx response', async () => {

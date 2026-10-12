@@ -74,7 +74,7 @@ export function KiloCommandRowView({
           </Text>
           {agent.length > 0 || model.length > 0 ? (
             <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-              {[agent.length > 0 ? `${t('profiles.slashCommands.agent')}: ${agent}` : '', model]
+              {[agent.length > 0 ? `${t('common.agent')}: ${agent}` : '', model]
                 .filter(Boolean)
                 .join('  ')}
             </Text>

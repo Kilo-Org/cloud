@@ -7,13 +7,18 @@ import { logger } from '../logger.js';
  * refreshed earlier by the wrapper, from the adopted workspace.
  */
 export const REPO_SNAPSHOT_INDEX_TTL_SECONDS = 10 * 24 * 60 * 60;
+export const REPO_SNAPSHOT_MAX_START_FAILURES = 10;
 
 const KEY_PREFIX = 'repo-snapshot:v1:';
 
+// `capturedAt` (epoch ms) and `size` are diagnostics only; entries written before
+// them lack both, so they stay optional.
 const repoSnapshotEntrySchema = z
   .object({
     snapshotId: z.string().min(1),
     commit: z.string().min(1).optional(),
+    capturedAt: z.number().optional(),
+    size: z.number().optional(),
   })
   .strict();
 
@@ -39,7 +44,6 @@ export async function repoSnapshotIndexKey(repoKey: string, image: string): Prom
 export type RepoSnapshotIndex = {
   lookup(key: string): Promise<RepoSnapshotEntry | null>;
   store(key: string, entry: RepoSnapshotEntry): Promise<boolean>;
-  remove(key: string): Promise<void>;
 };
 
 export function createRepoSnapshotIndex(kv: KVNamespace | undefined): RepoSnapshotIndex | null {
@@ -65,13 +69,6 @@ export function createRepoSnapshotIndex(kv: KVNamespace | undefined): RepoSnapsh
       } catch (error) {
         warn('store', error);
         return false;
-      }
-    },
-    async remove(key) {
-      try {
-        await kv.delete(key);
-      } catch (error) {
-        warn('remove', error);
       }
     },
   };

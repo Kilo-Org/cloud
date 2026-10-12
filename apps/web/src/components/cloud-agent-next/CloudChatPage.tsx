@@ -996,9 +996,12 @@ export default function CloudChatPage({
     sessionIdFromParams,
   ]);
 
-  const handleSelectWorkspaceTab = useCallback((tabId: WorkspaceTabId) => {
-    setWorkspaceTabs(state => selectWorkspaceTab(state, tabId));
-  }, []);
+  const handleSelectWorkspaceTab = useCallback(
+    (tabId: WorkspaceTabId) => {
+      setWorkspaceTabs(state => selectWorkspaceTab(state, tabId));
+    },
+    [setWorkspaceTabs]
+  );
 
   const handleWorkspaceValueChange = (value: string) => {
     const chat = openWorktreeChats.find(chat => value === `chat:${chat.sessionId}`);
@@ -1016,7 +1019,7 @@ export default function CloudChatPage({
       setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
       openSession(destinationKiloSessionId);
     },
-    [closeChangesView, openSession]
+    [closeChangesView, openSession, setWorkspaceTabs]
   );
   const review = useWorktreeReview({
     userId: currentUserId,
@@ -1108,12 +1111,16 @@ export default function CloudChatPage({
     organizationId,
     sessionId,
     sessionIdFromParams,
+    setWorkspaceTabs,
     workspaceTabScope,
   ]);
 
-  const handleCloseFileTab = useCallback((path: string) => {
-    setWorkspaceTabs(state => closeFileTab(state, path));
-  }, []);
+  const handleCloseFileTab = useCallback(
+    (path: string) => {
+      setWorkspaceTabs(state => closeFileTab(state, path));
+    },
+    [setWorkspaceTabs]
+  );
 
   const handleCloseChat = useCallback(
     (closingSessionId: string) => {
@@ -1131,18 +1138,22 @@ export default function CloudChatPage({
       closeSession,
       openWorktreeChats.length,
       sessionIdFromParams,
+      setWorkspaceTabs,
       workspaceTabs.terminals,
     ]
   );
 
-  const handleCloseTerminalTab = useCallback((terminalId: string) => {
-    setWorkspaceTabs(state => closeTerminalTab(state, terminalId));
-    setTerminalStatuses(current => {
-      const next = { ...current };
-      delete next[terminalId];
-      return next;
-    });
-  }, []);
+  const handleCloseTerminalTab = useCallback(
+    (terminalId: string) => {
+      setWorkspaceTabs(state => closeTerminalTab(state, terminalId));
+      setTerminalStatuses(current => {
+        const next = { ...current };
+        delete next[terminalId];
+        return next;
+      });
+    },
+    [setWorkspaceTabs]
+  );
 
   const handleTerminalStatusChange = useCallback(
     (terminalId: string, status: TerminalStatusSummary) => {
@@ -1785,7 +1796,7 @@ export default function CloudChatPage({
                           <div
                             ref={scrollContainerRef}
                             hidden={!chatTabActive}
-                            className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2 transition-opacity duration-150 ${showLoadingIndicator && transcriptPhase === 'live' ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+                            className={`absolute inset-0 overflow-x-hidden overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2 transition-opacity duration-150 ${showLoadingIndicator && transcriptPhase === 'live' ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
                             onScroll={handleScroll}
                           >
                             <div ref={messagesContentRef}>

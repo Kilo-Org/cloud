@@ -46,7 +46,7 @@ describe('native app actions bridge', () => {
       { action: 'NotAnAction' },
       null,
     ];
-    native.registerAppActionDispatcher.mockResolvedValue(buffered);
+    native.registerAppActionDispatcher.mockReturnValue(buffered);
     const bridge = await import('./native-bridge');
     const jsHandler = handler();
     const registration = await bridge.registerNativeAppActionDispatcher(jsHandler);
@@ -59,7 +59,7 @@ describe('native app actions bridge', () => {
   });
 
   it('accepts a single buffered payload that is not wrapped in an array', async () => {
-    native.registerAppActionDispatcher.mockResolvedValue({
+    native.registerAppActionDispatcher.mockReturnValue({
       action: 'OpenPullRequest',
       pullRequest: 'https://github.com/o/r/pull/7',
     });
@@ -71,14 +71,14 @@ describe('native app actions bridge', () => {
   });
 
   it('treats an empty buffer as nothing to replay', async () => {
-    native.registerAppActionDispatcher.mockResolvedValue(undefined);
+    native.registerAppActionDispatcher.mockReturnValue(undefined);
     const bridge = await import('./native-bridge');
     const { buffered } = await bridge.registerNativeAppActionDispatcher(handler());
     expect(buffered).toEqual([]);
   });
 
   it('reports a settled result to the waiting entry point through completeAppAction', async () => {
-    native.registerAppActionDispatcher.mockResolvedValue([]);
+    native.registerAppActionDispatcher.mockReturnValue([]);
     const bridge = await import('./native-bridge');
     const { handle } = await bridge.registerNativeAppActionDispatcher(handler());
     await handle('{"action":"open-needs-input"}');
@@ -89,7 +89,7 @@ describe('native app actions bridge', () => {
   });
 
   it('reports a non-text payload as its canonical JSON text', async () => {
-    native.registerAppActionDispatcher.mockResolvedValue([]);
+    native.registerAppActionDispatcher.mockReturnValue([]);
     const bridge = await import('./native-bridge');
     const { handle } = await bridge.registerNativeAppActionDispatcher(handler());
     await handle({ action: 'OpenNeedsInput' });
@@ -104,14 +104,14 @@ describe('native app actions bridge', () => {
     native.requireOptionalNativeModule.mockReturnValue({
       registerAppActionDispatcher: native.registerAppActionDispatcher,
     });
-    native.registerAppActionDispatcher.mockResolvedValue([]);
+    native.registerAppActionDispatcher.mockReturnValue([]);
     const bridge = await import('./native-bridge');
     const { handle } = await bridge.registerNativeAppActionDispatcher(handler());
     await expect(handle({ action: 'OpenNeedsInput' })).resolves.toEqual(HANDLER_RESULT);
   });
 
   it('keeps the dispatch result when reporting the completion throws', async () => {
-    native.registerAppActionDispatcher.mockResolvedValue([]);
+    native.registerAppActionDispatcher.mockReturnValue([]);
     native.completeAppAction.mockImplementation(() => {
       throw new Error('bridge gone');
     });

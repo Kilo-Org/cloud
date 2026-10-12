@@ -70,6 +70,8 @@ import {
   RUNTIME_PROXY_ATTESTATION_HEADER,
   type RuntimeProxyAttestationAudience,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
+import { TRPCError } from '@trpc/server';
+import { readWidgetApprovalKey, widgetApprovalKeyRequestSchema } from './widget-approval-key.js';
 
 const app = new Hono<HonoContext>();
 
@@ -1083,6 +1085,31 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
   }
 
   return c.body(null, 204);
+});
+
+// Home widget identity read for the trusted web backend only: the internal key
+// gates the route, the body names the exact owned session, and the response
+// carries a one-way binding, never the raw permission or any mutation authority.
+app.post('/internal/widgets/approval-key', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const parsed = widgetApprovalKeyRequestSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.text('Invalid request', 400);
+  }
+
+  let approvalKey: string | null;
+  try {
+    approvalKey = await readWidgetApprovalKey(c.env, parsed.data);
+  } catch (error) {
+    // Ownership refusals (403) and an unavailable access read (503) come from
+    // `requireCurrentSessionAccess`; anything else is a DO failure (500).
+    if (error instanceof TRPCError) return projectSessionAccessHttpError(error);
+    throw error;
+  }
+  c.header('Cache-Control', 'no-store');
+  return c.json({ approvalKey });
 });
 
 app.use('/trpc/*', authMiddleware);

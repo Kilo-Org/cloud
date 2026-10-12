@@ -33,6 +33,10 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  sandboxAllocationSchema,
+  type SandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import {
   ensureTestUser,
   loadDevVars,
   loadExistingUserByEmail,
@@ -41,9 +45,13 @@ import {
 } from './auth.js';
 import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
 import { bootstrapDeployedProfile, fetchStreamTicket, type DeployedAuth } from './deployed-auth.js';
-import { isControlPlaneOwner, isWorktreeOwner } from '../../src/session-plane.js';
 import type { LifecycleResult } from './lifecycle.js';
-import { runSharedScenario, resolveScenarioApi, type Profile } from './scenario-capabilities.js';
+import {
+  runSharedScenario,
+  resolveScenarioApi,
+  type CapabilityName,
+  type Profile,
+} from './scenario-capabilities.js';
 import { SHARED_SCENARIOS, type SharedScenario } from './scenarios-shared.js';
 import {
   createLocalScenarioEnvironment,
@@ -51,18 +59,6 @@ import {
 } from './capabilities-local.js';
 import { createDeployedScenarioEnvironment } from './capabilities-deployed.js';
 import { createLocalHttpScenarioEnvironment } from './e2e-surface-client.js';
-
-/**
- * Local runs that create a control-plane worktree session, so the driver owner
- * must be enrolled in `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS`.
- * Derived from the shared definitions' `requiresWorktreeCreation` flag, so a
- * converted scenario cannot silently skip the enrollment precheck.
- */
-export const WORKTREE_ENROLLMENT_SCENARIOS: ReadonlySet<string> = new Set(
-  Object.values(SHARED_SCENARIOS)
-    .filter(definition => definition.requiresWorktreeCreation === true)
-    .map(definition => definition.name)
-);
 
 /**
  * Every scenario either profile can dispatch, so `--timeout-ms` is accepted for
@@ -146,7 +142,7 @@ export function requireScenarioApi(
 function printUsage(): void {
   const scenarios = Object.keys(SHARED_SCENARIOS).join('|');
   console.error(
-    `Usage: tsx test/e2e/run.ts [--api=unified|legacy] [--verbose] [--timeout-ms=<n>] <${scenarios}> <conversation>`
+    `Usage: tsx test/e2e/run.ts [--api=unified|legacy] [--allocation=<key>] [--verbose] [--timeout-ms=<n>] <${scenarios}> <conversation>`
   );
   console.error('');
   console.error('conversation format: <scenario>[:<arg1>[:<arg2>...]]');
@@ -159,6 +155,14 @@ function printUsage(): void {
   console.error('  per-turn deadline for cold-hot');
   console.error('');
   console.error(
+    '--allocation=<key>  explicit allocation (e.g. vercel-small, cloudflare-containers-standard-4)'
+  );
+  console.error(
+    '  run a scenario that observes the sandbox, e.g. `cold`, under E2E_PROFILE=local-http or deployed and the unified API'
+  );
+  console.error('  the Docker local profile, --api=legacy and non-observing scenarios are refused');
+  console.error('');
+  console.error(
     'E2E_PROFILE=local-http|deployed selects an HTTP-only profile (unified API, except scenarios that pin the legacy prepare flow).'
   );
   console.error(
@@ -167,19 +171,21 @@ function printUsage(): void {
 }
 
 /**
- * Parse `[--api=...] [--verbose] [--timeout-ms=...] <lifecycle> <conversation>` from argv.
+ * Parse `[--api=...] [--allocation=...] [--verbose] [--timeout-ms=...] <lifecycle> <conversation>` from argv.
  * Returns null on malformed input so the caller can print usage and exit.
  * `api` is absent unless `--api=` was given, so the shared resolver — not a
  * local default — decides the surface (and enforces a definition's pin).
  */
 export function parseArgs(argv: string[]): {
   api?: ApiVersion;
+  allocation?: SandboxAllocation;
   lifecycle: string;
   conversation: string;
   verbose: boolean;
   timeoutMs?: number;
 } | null {
   let api: ApiVersion | undefined;
+  let allocation: SandboxAllocation | undefined;
   let verbose = false;
   let timeoutMs: number | undefined;
   const positional: string[] = [];
@@ -191,6 +197,16 @@ export function parseArgs(argv: string[]): {
         return null;
       }
       api = value;
+      continue;
+    }
+    if (arg.startsWith('--allocation=')) {
+      const value = arg.slice('--allocation='.length);
+      const parsed = sandboxAllocationSchema.safeParse(value);
+      if (!parsed.success) {
+        console.error(`invalid --allocation value: ${value}`);
+        return null;
+      }
+      allocation = parsed.data;
       continue;
     }
     if (arg === '--verbose' || arg === '-v') {
@@ -216,11 +232,67 @@ export function parseArgs(argv: string[]): {
   }
   return {
     ...(api !== undefined ? { api } : {}),
+    ...(allocation !== undefined ? { allocation } : {}),
     lifecycle,
     conversation,
     verbose,
     ...(timeoutMs !== undefined ? { timeoutMs } : {}),
   };
+}
+
+/**
+ * An explicit allocation is verified through the HTTP inspect surface, which
+ * reports the persisted provider. The Docker `local` profile observes container
+ * identity directly and has no provider projection, and a Deployed/HTTP profile
+ * cannot observe a local Docker container either, so a selected allocation is
+ * refused on `local` before any session side effect. Leaving `--allocation`
+ * unset keeps the default behaviour unchanged.
+ */
+export function explicitAllocationProfileError(input: {
+  allocation: SandboxAllocation | undefined;
+  profile: Profile;
+}): string | undefined {
+  if (input.allocation === undefined) return undefined;
+  if (input.profile === 'local') {
+    return (
+      `--allocation=${input.allocation} requires E2E_PROFILE=local-http or deployed; ` +
+      'the Docker local profile cannot observe the provider of an explicit allocation'
+    );
+  }
+  return undefined;
+}
+
+/** An explicit allocation is forwarded on the unified start only. */
+export function explicitAllocationApiError(input: {
+  allocation: SandboxAllocation | undefined;
+  api: ApiVersion | undefined;
+}): string | undefined {
+  if (input.allocation !== undefined && input.api === 'legacy') {
+    return `--allocation=${input.allocation} requires the unified API; drop --api=legacy`;
+  }
+  return undefined;
+}
+
+/**
+ * An explicit allocation is only observable through a scenario that inspects
+ * the physical sandbox, i.e. one that declares the `sessionSandbox` capability.
+ * Most scenarios (cold-hot, unknown-model, auth-reject, …) never call
+ * `waitForContainer`/`currentContainer`, so starting them with an explicit
+ * allocation could observe nothing and let a wrong provider pass. Refuse such
+ * scenarios before any test user or environment side effect.
+ */
+export function explicitAllocationScenarioError(input: {
+  allocation: SandboxAllocation | undefined;
+  requires: readonly CapabilityName[];
+}): string | undefined {
+  if (input.allocation === undefined) return undefined;
+  if (!input.requires.includes('sessionSandbox')) {
+    return (
+      `--allocation=${input.allocation} requires a scenario that observes the physical sandbox ` +
+      '(a `sessionSandbox` capability); this scenario never inspects the allocation'
+    );
+  }
+  return undefined;
 }
 
 /**
@@ -318,21 +390,7 @@ async function runLocal(parsed: ParsedArgs): Promise<void> {
     : await ensureTestUser(process.env.DATABASE_URL, email, {
         funded: process.env.E2E_FUNDED === '1',
       });
-  const expectControlPlane = Boolean(devVars.CONTROL_PLANE_IDS?.trim());
-  const requiresWorktreeEnrollment = WORKTREE_ENROLLMENT_SCENARIOS.has(lifecycle);
-  if (
-    requiresWorktreeEnrollment &&
-    (!isControlPlaneOwner(devVars, { userId: user.id }) ||
-      !isWorktreeOwner(devVars, { userId: user.id }))
-  ) {
-    throw new Error(
-      `${lifecycle} requires the E2E user to be enrolled in CONTROL_PLANE_IDS and WORKTREE_CREATION_ENABLED_IDS ` +
-        'in the Worker .dev.vars; no session was started'
-    );
-  }
-  if (expectControlPlane && !isControlPlaneOwner(devVars, { userId: user.id })) {
-    throw new Error('The E2E user is not enrolled in CONTROL_PLANE_IDS; no session was started');
-  }
+  const expectControlPlane = true;
   console.log(
     `driver user: ${user.id} (${user.email}); api=${api}; controlPlane=${expectControlPlane}`
   );
@@ -373,7 +431,7 @@ type DeployedProfileEnv = ReturnType<typeof bootstrapDeployedProfile>;
  * dispatches only from `SHARED_SCENARIOS`.
  */
 async function runLocalHttp(parsed: ParsedArgs): Promise<void> {
-  const { lifecycle, conversation, verbose, timeoutMs } = parsed;
+  const { lifecycle, conversation, verbose, timeoutMs, allocation } = parsed;
   const definition = SHARED_SCENARIOS[lifecycle];
   if (!definition) {
     console.error(
@@ -390,13 +448,21 @@ async function runLocalHttp(parsed: ParsedArgs): Promise<void> {
     );
     process.exit(2);
   }
+  const apiError = explicitAllocationApiError({ allocation, api });
+  if (apiError) {
+    console.error(apiError);
+    process.exit(2);
+  }
 
   const env = bootstrapDeployedProfile();
   const auth = env.auth;
-  const config = buildDeployedConfig(env, auth, {
-    ...(process.env.E2E_GIT_URL ? { gitUrl: process.env.E2E_GIT_URL } : {}),
-    ...(process.env.E2E_MODEL ? { model: process.env.E2E_MODEL } : {}),
-  });
+  const config = {
+    ...buildDeployedConfig(env, auth, {
+      ...(process.env.E2E_GIT_URL ? { gitUrl: process.env.E2E_GIT_URL } : {}),
+      ...(process.env.E2E_MODEL ? { model: process.env.E2E_MODEL } : {}),
+    }),
+    ...(allocation === undefined ? {} : { sandboxAllocation: allocation }),
+  };
 
   const result = await runSharedScenario(definition, {
     config,
@@ -407,6 +473,7 @@ async function runLocalHttp(parsed: ParsedArgs): Promise<void> {
       bearerToken: auth.token,
       internalApiSecret: config.internalApiSecret,
       credentialContainmentEnabled: credentialContainmentEnabled(loadDevVars(SERVICE_PACKAGE_DIR)),
+      ...(allocation === undefined ? {} : { expectedAllocation: allocation }),
     }),
     ...timeoutRequestArgs(definition, timeoutMs),
   });
@@ -451,7 +518,7 @@ export function buildDeployedConfig(
  * backend. It dispatches only from `SHARED_SCENARIOS`.
  */
 async function runDeployed(parsed: ParsedArgs): Promise<void> {
-  const { lifecycle, conversation, verbose, timeoutMs } = parsed;
+  const { lifecycle, conversation, verbose, timeoutMs, allocation } = parsed;
   const definition = SHARED_SCENARIOS[lifecycle];
   if (!definition) {
     console.error(`Unknown lifecycle: ${lifecycle}`);
@@ -466,13 +533,21 @@ async function runDeployed(parsed: ParsedArgs): Promise<void> {
     );
     process.exit(2);
   }
+  const apiError = explicitAllocationApiError({ allocation, api });
+  if (apiError) {
+    console.error(apiError);
+    process.exit(2);
+  }
 
   const env = bootstrapDeployedProfile();
   const auth = env.auth;
-  const config = buildDeployedConfig(env, auth, {
-    ...(process.env.E2E_GIT_URL ? { gitUrl: process.env.E2E_GIT_URL } : {}),
-    ...(process.env.E2E_MODEL ? { model: process.env.E2E_MODEL } : {}),
-  });
+  const config = {
+    ...buildDeployedConfig(env, auth, {
+      ...(process.env.E2E_GIT_URL ? { gitUrl: process.env.E2E_GIT_URL } : {}),
+      ...(process.env.E2E_MODEL ? { model: process.env.E2E_MODEL } : {}),
+    }),
+    ...(allocation === undefined ? {} : { sandboxAllocation: allocation }),
+  };
 
   const result = await runSharedScenario(definition, {
     config,
@@ -482,6 +557,7 @@ async function runDeployed(parsed: ParsedArgs): Promise<void> {
       surfaceUrl: config.workerUrl,
       bearerToken: auth.token,
       internalApiSecret: config.internalApiSecret,
+      ...(allocation === undefined ? {} : { expectedAllocation: allocation }),
     }),
     ...timeoutRequestArgs(definition, timeoutMs),
   });
@@ -496,6 +572,24 @@ async function main(): Promise<void> {
     process.exit(2);
   }
   const profile = resolveProfile();
+  const profileError = explicitAllocationProfileError({ allocation: parsed.allocation, profile });
+  if (profileError) {
+    console.error(profileError);
+    process.exit(2);
+  }
+  // The resolved API gate in the profile runners also runs before any bootstrap
+  // side effect, so `main` only needs the profile and scenario gates here.
+  const definition = SHARED_SCENARIOS[parsed.lifecycle];
+  if (definition) {
+    const scenarioError = explicitAllocationScenarioError({
+      allocation: parsed.allocation,
+      requires: definition.requires,
+    });
+    if (scenarioError) {
+      console.error(scenarioError);
+      process.exit(2);
+    }
+  }
   if (profile === 'deployed') {
     await runDeployed(parsed);
   } else if (profile === 'local-http') {

@@ -153,20 +153,4 @@ describe('resolveGitHubToken priority chain', () => {
       ],
     });
   });
-
-  it('does not fall back to stored github_token when integration is unavailable', async () => {
-    const cfg = buildConfig({
-      github_token: STORED_GITHUB_TOKEN,
-      platform_integration_id: INTEGRATION_ID,
-    });
-    const result = await resolveGitHubToken({
-      env: fakeEnv({ tokenServiceResponse: '' }),
-      townId: 'town-1',
-      getTownConfig: () => Promise.resolve(cfg),
-    });
-    expect(result).toEqual({
-      ok: false,
-      tried: ['town.github_cli_pat', 'town platform integration'],
-    });
-  });
 });

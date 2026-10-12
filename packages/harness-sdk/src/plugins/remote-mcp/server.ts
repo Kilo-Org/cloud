@@ -20,8 +20,15 @@ import { Data } from 'effect';
  * `bearer` sends `Authorization: Bearer <token>` on every request. The token is
  * not here — the client asks an accessor for it, so a credential that expires
  * is refreshed per call without anything in this file knowing how.
+ *
+ * `oauth` hands the caller's `authProvider` to the transport: the library adds
+ * the stored access token, refreshes it on a 401, and fails `unauthorized` when
+ * only a person can sign in again (`remoteMcpSignIn`).
  */
-type RemoteMcpAuth = { readonly type: 'none' } | { readonly type: 'bearer' };
+type RemoteMcpAuth =
+  | { readonly type: 'none' }
+  | { readonly type: 'bearer' }
+  | { readonly type: 'oauth' };
 
 /**
  * One server the harness may reach.

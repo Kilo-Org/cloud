@@ -220,4 +220,18 @@ const readingFile: Tools = {
 const noTools: Tools = { list: [], call: () => ({}) };
 
 export type { Answered, Fixture, Seen, Tools, Wire };
-export { callOf, deps, noTools, only, readingFile, run, schema, serve, serverFor, token };
+export {
+  answer,
+  bodyOf,
+  callOf,
+  deps,
+  noTools,
+  only,
+  readingFile,
+  run,
+  schema,
+  serve,
+  serverFor,
+  token,
+  write,
+};

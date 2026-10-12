@@ -636,12 +636,16 @@ describe('serialized command delivery wait', () => {
 
     summary.resolve(true);
     await settle();
-    expect(client.prompts.map(call => call.messageId)).toEqual(['m1']);
+    // The follower also waits for the compact's close. The close defers while the native
+    // execution is still live; clearing it reconciles the deferred completion.
+    expect(client.prompts).toEqual([]);
     h.manager.observeKiloEvent(completedKiloTurn());
-    // The close defers while the native execution is still live; clearing it
-    // reconciles the deferred completion.
     h.setState(KILO_SESSION, undefined);
     h.manager.refreshActivity(DIRECTORY);
+    await settle();
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m1']);
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.manager.observeKiloEvent(completedKiloTurn());
     await settle();
     expect(outcomeFrames(h.frames)).toEqual([
       { type: 'session.outcome', sessionId: SESSION_ID, status: 'completed', lastMessageId: 'm1' },
@@ -662,6 +666,8 @@ describe('serialized command delivery wait', () => {
     expect(outcomeFrames(h.frames)).toEqual([]);
 
     summary.resolve(true);
+    h.setState(KILO_SESSION, undefined);
+    h.manager.observeKiloEvent(completedKiloTurn());
     await settle();
     expect(client.summaries).toHaveLength(1);
     expect(client.prompts.map(call => call.messageId)).toEqual(['m1', 'm2']);
@@ -814,6 +820,8 @@ describe('serialized command delivery wait', () => {
     // but its own deadline must still run out a normal window later.
     h.setFlags(spec, { restarting: true, suspected: true });
     summary.resolve(true);
+    h.setState(KILO_SESSION, undefined);
+    h.manager.observeKiloEvent(completedKiloTurn());
     await settle();
     h.manager.tick();
     expect(outcomeFrames(h.frames)).toEqual([]);

@@ -1,7 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
 import { and, eq, getTableName, isNotNull, isNull, sql } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
 import {
   createDeviceSession,
   issueSessionCredentials,
@@ -135,6 +136,52 @@ describe('device-sessions', () => {
       return session!;
     }
 
+    // Wait until `count` rotations are blocked on the session row lock. The
+    // wait is a Postgres lock, not a timer, so fake timers cannot drive it:
+    // poll pg_stat_activity until the waiters are visible.
+    async function waitForSessionLockWaiters(count: number) {
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const {
+          rows: [{ blocked }],
+        } = await db.execute<{ blocked: number }>(sql`
+          SELECT count(*)::int AS blocked
+          FROM pg_stat_activity
+          WHERE datname = current_database()
+            AND pid <> pg_backend_pid()
+            AND state = 'active'
+            AND wait_event_type = 'Lock'
+            AND query ILIKE '%device_sessions%'
+        `);
+        if (blocked >= count) {
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      throw new Error(`expected ${count} rotations to wait on the session row lock`);
+    }
+
+    // Hold the session row lock in a separate transaction. `inLock` runs
+    // under the lock after `release` is called, then the transaction commits.
+    async function holdSessionLock(
+      sessionId: string,
+      inLock: (tx: DrizzleTransaction) => Promise<void> = async () => {}
+    ) {
+      const gate = Promise.withResolvers<void>();
+      const held = Promise.withResolvers<void>();
+      const done = db.transaction(async tx => {
+        await tx
+          .select()
+          .from(device_sessions)
+          .where(eq(device_sessions.id, sessionId))
+          .for('update');
+        held.resolve();
+        await gate.promise;
+        await inLock(tx);
+      });
+      await held.promise;
+      return { release: () => gate.resolve(), done };
+    }
+
     test('replay after the session chain advanced revokes the session', async () => {
       const sessionId = await createDeviceSession({ userId: testUserId });
       const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
@@ -206,29 +253,76 @@ describe('device-sessions', () => {
       expect((await readSession(sessionId)).revoked_reason).toBe('refresh_reuse_detected');
     });
 
-    test('concurrent rotations of the same token both succeed and leave one live token', async () => {
+    test('a stale request that read the token before the winning consume retires nothing', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+      const deliveredToken = `delivered-${Date.now()}`;
+
+      // The client times out and retries. The retry wins the session lock,
+      // consumes the token, and delivers a new pair. The aborted request read
+      // the token first but reaches the lock after the retry commits.
+      const lock = await holdSessionLock(sessionId, async tx => {
+        await tx
+          .update(device_refresh_tokens)
+          .set({ consumed_at: sql`clock_timestamp()` })
+          .where(
+            eq(
+              device_refresh_tokens.token_hash,
+              createHash('sha256').update(refreshToken).digest('hex')
+            )
+          );
+        await tx.insert(device_refresh_tokens).values({
+          token_hash: createHash('sha256').update(deliveredToken).digest('hex'),
+          device_session_id: sessionId,
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+      });
+      const staleRequest = rotateRefreshToken(refreshToken);
+      try {
+        await waitForSessionLockWaiters(1);
+      } finally {
+        lock.release();
+        await lock.done;
+      }
+
+      expect(await staleRequest).toEqual({ ok: false, error: 'INVALID_REFRESH_TOKEN' });
+      expect((await readSession(sessionId)).revoked_at).toBeNull();
+
+      // The delivered pair stays live and keeps rotating.
+      const next = await rotateRefreshToken(deliveredToken);
+      expect(next.ok).toBe(true);
+      expect((await readSession(sessionId)).revoked_at).toBeNull();
+    });
+
+    test('a retry that gets the session lock after the lost rotation still recovers', async () => {
       const sessionId = await createDeviceSession({ userId: testUserId });
       const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
 
-      // Two callers on one device send the same stored token at once. Both
-      // pass the pre-transaction checks; the session lock serializes them.
-      const results = await Promise.all([
-        rotateRefreshToken(refreshToken),
-        rotateRefreshToken(refreshToken),
-      ]);
+      // The first request waits on the lock, the client times out and
+      // retries, and the retry waits behind it. The first request consumes
+      // the token, but its response is lost.
+      const lock = await holdSessionLock(sessionId);
+      const first = rotateRefreshToken(refreshToken);
+      let retryRequest = first;
+      try {
+        await waitForSessionLockWaiters(1);
+        retryRequest = rotateRefreshToken(refreshToken);
+        await waitForSessionLockWaiters(2);
+      } finally {
+        lock.release();
+        await lock.done;
+      }
 
-      expect(results.map(result => result.ok)).toEqual([true, true]);
+      expect((await first).ok).toBe(true);
+      const retry = await retryRequest;
+      expect(retry.ok).toBe(true);
       expect((await readSession(sessionId)).revoked_at).toBeNull();
-      const live = await db
-        .select()
-        .from(device_refresh_tokens)
-        .where(
-          and(
-            eq(device_refresh_tokens.device_session_id, sessionId),
-            isNull(device_refresh_tokens.consumed_at)
-          )
-        );
-      expect(live).toHaveLength(1);
+      if (!retry.ok) return;
+
+      // The pair the client stored keeps rotating.
+      const next = await rotateRefreshToken(retry.refreshToken);
+      expect(next.ok).toBe(true);
+      expect((await readSession(sessionId)).revoked_at).toBeNull();
     });
 
     test('a consumed token outside the lost-rotation grace revokes the session', async () => {
@@ -307,27 +401,9 @@ describe('device-sessions', () => {
         const rotatePromise = rotateRefreshToken(refreshToken);
 
         // Deterministic barrier: the rotation cannot pass its `FOR UPDATE`
-        // recheck until the revoke commits, so poll until the rotation is
+        // recheck until the revoke commits, so wait until the rotation is
         // observed waiting on the session row lock inside its transaction.
-        let rotationBlocked = false;
-        for (let attempt = 0; attempt < 200 && !rotationBlocked; attempt++) {
-          const {
-            rows: [{ blocked }],
-          } = await db.execute<{ blocked: number }>(sql`
-            SELECT count(*)::int AS blocked
-            FROM pg_stat_activity
-            WHERE datname = current_database()
-              AND pid <> pg_backend_pid()
-              AND state = 'active'
-              AND wait_event_type = 'Lock'
-              AND query ILIKE '%device_sessions%'
-          `);
-          rotationBlocked = blocked > 0;
-          if (!rotationBlocked) {
-            await new Promise(resolve => setTimeout(resolve, 10));
-          }
-        }
-        expect(rotationBlocked).toBe(true);
+        await waitForSessionLockWaiters(1);
 
         // Commit the revoke; the rotation's locked recheck then refuses.
         releaseRevoke();

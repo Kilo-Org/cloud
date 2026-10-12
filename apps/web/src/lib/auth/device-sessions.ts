@@ -2,7 +2,7 @@ import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
-import { eq, and, isNull, gt, sql } from 'drizzle-orm';
+import { eq, and, isNull, gt, sql, getTableColumns } from 'drizzle-orm';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { createHash, randomBytes } from 'node:crypto';
 import { persistAttestedKeyTx, type VerifyAdmissionOk } from './native-admission';
@@ -112,11 +112,20 @@ export async function issueSessionCredentials(
  * stamped with the original consume time, so a later use of it is a replay
  * and revokes the session. The session keeps one live refresh token.
  *
+ * Stale requests: a request that read the token before the consume that won
+ * is refused without revocation and retires nothing. After a client timeout,
+ * the aborted request can reach the session lock after the retry. It must not
+ * retire the pair that the retry delivered.
+ *
+ * Each consume is stamped with the database time of the request's first read
+ * (`firstReadAt`), not with the time it got the lock. A request writes only if
+ * its first read came after the consume it replaces, so the consume times of
+ * a session are ordered, and a stale request is identified in either lock
+ * order.
+ *
  * The session validity check is repeated INSIDE the transaction under a row
  * lock, so a session revoked concurrently with the rotation cannot receive a
- * replacement pair. The same lock serializes every rotation of the session,
- * and each consume is stamped with the database clock under that lock, so the
- * consume times of a session are ordered.
+ * replacement pair. The same lock serializes every rotation of the session.
  *
  * The consume and the replacement issuance run in one transaction. If issuing
  * the replacement fails, the transaction rolls back so the old token stays
@@ -132,8 +141,12 @@ export async function rotateRefreshToken(
   const now = new Date().toISOString();
 
   // Step 1: Look up the token row to check validity and reuse BEFORE consuming.
+  // `firstReadAt` is the database time of this request's first read.
   const [row] = await db
-    .select()
+    .select({
+      ...getTableColumns(device_refresh_tokens),
+      firstReadAt: sql<string>`clock_timestamp()::text`,
+    })
     .from(device_refresh_tokens)
     .where(eq(device_refresh_tokens.token_hash, tokenHash))
     .limit(1);
@@ -142,6 +155,7 @@ export async function rotateRefreshToken(
   if (!row) {
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
+  const { firstReadAt } = row;
 
   // Expired token: refuse without revocation.
   if (new Date(row.expires_at) <= new Date()) {
@@ -226,7 +240,11 @@ export async function rotateRefreshToken(
     // this session holds the same lock, so this read sees the result of any
     // rotation that ran concurrently with the checks above.
     const [current] = await tx
-      .select()
+      .select({
+        expires_at: device_refresh_tokens.expires_at,
+        consumed_at: device_refresh_tokens.consumed_at,
+        consumedAfterFirstRead: sql<boolean>`${device_refresh_tokens.consumed_at} >= ${firstReadAt}::timestamptz`,
+      })
       .from(device_refresh_tokens)
       .where(eq(device_refresh_tokens.token_hash, tokenHash))
       .limit(1);
@@ -236,6 +254,12 @@ export async function rotateRefreshToken(
     }
 
     if (current.consumed_at) {
+      // The consume that won happened after this request read the token:
+      // this request is stale. Refuse it and change nothing.
+      if (current.consumedAfterFirstRead) {
+        return { kind: 'stale_request' } as const;
+      }
+
       const consumedAt = current.consumed_at;
       const [laterConsume] = await tx
         .select({ token_hash: device_refresh_tokens.token_hash })
@@ -265,7 +289,7 @@ export async function rotateRefreshToken(
         );
       await tx
         .update(device_refresh_tokens)
-        .set({ consumed_at: sql`clock_timestamp()` })
+        .set({ consumed_at: firstReadAt })
         .where(eq(device_refresh_tokens.token_hash, tokenHash));
       console.info('[native-refresh] lost rotation recovered', {
         deviceSessionId: lockedSession.id,
@@ -274,7 +298,7 @@ export async function rotateRefreshToken(
       // Atomic consume — only after the in-transaction revocation check.
       const [consumed] = await tx
         .update(device_refresh_tokens)
-        .set({ consumed_at: sql`clock_timestamp()` })
+        .set({ consumed_at: firstReadAt })
         .where(
           and(
             eq(device_refresh_tokens.token_hash, tokenHash),
@@ -323,6 +347,13 @@ export async function rotateRefreshToken(
 
   if (outcome.kind === 'reuse_detected') {
     await revokeForReuse(session.id, now);
+    return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
+  }
+
+  if (outcome.kind === 'stale_request') {
+    console.info('[native-refresh] stale rotation request refused', {
+      deviceSessionId: session.id,
+    });
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
 

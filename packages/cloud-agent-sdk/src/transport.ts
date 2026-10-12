@@ -35,6 +35,12 @@ type CreateRemoteSessionInput = {
    * it when the instance lacks sessionClone.
    */
   cloneFromKiloSessionId?: string;
+  /**
+   * Inclusive cut for the clone ("Fork from here"). Only valid with
+   * `cloneFromKiloSessionId`; producer must omit it when the instance lacks
+   * sessionCloneAtMessage.
+   */
+  cloneUpToMessageId?: string;
 };
 
 /**

@@ -433,7 +433,7 @@ describe('active-sessions-router', () => {
         name: 'laptop-metadata',
         projectName: 'kilo',
         version: '0.1.2',
-        capabilities: { attachments: true, sessionClone: true },
+        capabilities: { attachments: true, sessionClone: true, sessionCloneAtMessage: true },
         ...metadata,
       };
       jest.spyOn(global, 'fetch').mockResolvedValue(

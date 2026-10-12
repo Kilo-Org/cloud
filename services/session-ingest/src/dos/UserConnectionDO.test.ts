@@ -4741,7 +4741,7 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
-    it('projects metadata and both capabilities from a live hibernated attachment', async () => {
+    it('projects metadata and every capability from a live hibernated attachment', async () => {
       const { doInstance, mockCtx } = setup();
       const instance: Instance = {
         name: 'laptop-cap',
@@ -4751,7 +4751,7 @@ describe('UserConnectionDO', () => {
         startedAt: '2026-08-28T12:34:56.789Z',
         gitBranch: '',
       };
-      const capabilities = { attachments: true, sessionClone: true };
+      const capabilities = { attachments: true, sessionClone: true, sessionCloneAtMessage: true };
       const cliWs = createMockWs(['cli'], {
         role: 'cli',
         connectionId: 'cli-cap',

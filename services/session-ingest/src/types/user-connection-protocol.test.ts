@@ -485,6 +485,19 @@ describe('CLIOutboundMessageSchema capabilities', () => {
       expect(result.data.capabilities).toEqual({ attachments: true });
     }
   });
+
+  it('accepts capabilities.sessionCloneAtMessage beside sessionClone', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: { sessionClone: true, sessionCloneAtMessage: true },
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({ sessionClone: true, sessionCloneAtMessage: true });
+    }
+  });
 });
 
 describe('CLIOutboundMessageSchema prLink', () => {

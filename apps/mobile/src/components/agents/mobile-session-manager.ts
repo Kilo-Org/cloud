@@ -181,7 +181,9 @@ async function fetchClonedSessionFirstPage(
   let page = await fetchMobileSessionSnapshotPage(kiloSessionId, {});
   for (
     let attempt = 0;
-    attempt < SPAWNED_NOT_FOUND_MAX_ATTEMPTS && page.kind === 'success' && page.messages.length === 0;
+    attempt < SPAWNED_NOT_FOUND_MAX_ATTEMPTS &&
+    page.kind === 'success' &&
+    page.messages.length === 0;
     attempt += 1
   ) {
     // eslint-disable-next-line no-await-in-loop -- flat 1s delay between re-reads

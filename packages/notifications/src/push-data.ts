@@ -164,3 +164,41 @@ export type GlanceableLiveActivityContentState = Pick<
   | 'scheduled'
   | 'scheduledAt'
 >;
+
+/**
+ * The raw content-state one followed session's Live Activity renders
+ * (`.specs/mobile-session-live-activity.md`). Unlike the aggregate card, it
+ * carries the session title: the user started the card with Follow. The
+ * session id routes taps and approval and is never drawn. It must never carry
+ * an organization name, repository, generated text, or a raw account id.
+ */
+export const sessionLiveActivityContentStateSchema = z.object({
+  sessionId: nonEmptyStringSchema,
+  /** Trimmed and capped display title; null for an untitled session. */
+  title: z.string().max(120).nullable(),
+  statusKind: z.enum(['needsInput', 'running', 'idle', 'scheduled']),
+  /** ISO 8601; when the current status kind began. */
+  statusSince: z.string(),
+  /** ISO 8601 wake time for a scheduled session, else null. */
+  scheduledAt: z.string().nullable(),
+  /** True only when Approve can answer the waiting permission request. */
+  awaitingPermission: z.boolean(),
+  /** SHA-256 hex of `JSON.stringify([sessionId, permissionId])`, else null. */
+  approvalKey: z.string().nullable(),
+  /** ISO 8601; when the server confirmed this content. */
+  updatedAt: z.string(),
+});
+
+export type SessionLiveActivityContentState = z.infer<typeof sessionLiveActivityContentStateSchema>;
+
+/**
+ * Relevance per spec "Presentation order": iOS shows the highest score in the
+ * Dynamic Island and orders the Lock Screen by it. Both producers use this.
+ */
+export const LIVE_ACTIVITY_RELEVANCE = {
+  sessionNeedsInput: 100,
+  aggregateNeedsInput: 80,
+  sessionActive: 60,
+  aggregate: 40,
+  sessionIdle: 20,
+} as const;

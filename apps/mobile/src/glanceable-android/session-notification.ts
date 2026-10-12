@@ -63,6 +63,11 @@ const storedSessionCardSchema = z.object({
   sessionId: z.string().min(1),
   organizationId: storedOptionalStringSchema,
   approvalKey: storedOptionalStringSchema,
+  /**
+   * Set on a finished card: the epoch time its window ends. It is kept so a
+   * teardown can cancel it, and is never followed again.
+   */
+  finishedUntil: z.number().optional(),
 });
 
 export type StoredSessionCard = z.infer<typeof storedSessionCardSchema>;

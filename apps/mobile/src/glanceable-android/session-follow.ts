@@ -19,9 +19,9 @@ import {
   retryAndroidSessionTokens,
   setAndroidSessionScope,
 } from '@/lib/glanceable/session-activity-tokens-android';
-import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 import { buildSessionNotificationCard } from './session-notification-card';
+import { readStoredContext } from './session-stored-context';
 import {
   dismissSessionCard,
   getStoredSessionCards,
@@ -116,47 +116,24 @@ function render(content: SessionLiveActivityContentState, ctx: SessionFollowCont
   emit();
 }
 
+/**
+ * Stop following one session: forget it, drop its pending registration, and
+ * delete its server row, as every iOS card end releases its token. Every end
+ * path runs through this, so no ended follow leaves a row the server keeps
+ * pushing to. Resolves once the delete settled, for the headless callers.
+ */
+async function endFollow(sessionId: string): Promise<void> {
+  if (followed.delete(sessionId)) {
+    emit();
+  }
+  await releaseAndroidSessionToken(sessionId);
+}
+
 /** Re-post the stored card of one followed session (after an Approve). */
 function repost(sessionId: string): void {
   const stored = followed.get(sessionId);
   if (stored?.content != null) {
     postSessionCard(buildSessionNotificationCard(stored.content, stored.ctx.organizationId), 0);
-  }
-}
-
-/** The one read this module needs from the keychain module. */
-type SecureStoreModule = { getItemAsync: (key: string) => Promise<string | null> };
-
-/** The stored-context reader a suite injects, so no keychain loads under test. */
-type StoredContextReader = () => SessionFollowContext | null;
-
-let storedContextReader: StoredContextReader | null = null;
-
-/** Test-only: replace the keychain read that supplies the stored scope. */
-export function _setStoredContextReaderForTests(reader: StoredContextReader | null): void {
-  storedContextReader = reader;
-}
-
-/**
- * The stored account and scope, as the iOS adoption reads them. The keychain
- * module loads lazily: this module's file is imported by the Home widget
- * register, whose suites never load a native store.
- */
-async function readStoredContext(): Promise<SessionFollowContext | null> {
-  if (storedContextReader !== null) {
-    return storedContextReader();
-  }
-  try {
-    // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
-    const { getItemAsync } = require('@/lib/auth/secure-store') as SecureStoreModule;
-    const userId = await getItemAsync(ACTIVE_USER_ID_KEY);
-    if (userId === null) {
-      return null;
-    }
-    return { userId, organizationId: await getItemAsync(ORGANIZATION_STORAGE_KEY) };
-  } catch {
-    // An unavailable keychain only costs this restoration; the next foreground retries.
-    return null;
   }
 }
 
@@ -166,21 +143,34 @@ async function readStoredContext(): Promise<SessionFollowContext | null> {
  * starts with an empty set, and a push or tray read for a followed session must
  * still find it — and its registration runs again.
  */
-export function restoreFollowedSessionCards(ctx: SessionFollowContext | null): void {
+export function restoreFollowedSessionCards(
+  ctx: SessionFollowContext | null,
+  now: number = Date.now()
+): void {
   const stored = getStoredSessionCards();
   const kept = new Map<string, string | null>();
+  // A finished card in its window: still in the shade, still cancelable by a
+  // teardown, but no longer a follow.
+  const finished: string[] = [];
   for (const card of stored) {
     if (ctx === null || card.organizationId !== ctx.organizationId) {
       dismissSessionCard(card.sessionId);
-    } else {
+    } else if (card.finishedUntil === undefined) {
       kept.set(card.sessionId, card.approvalKey);
+    } else if (card.finishedUntil > now) {
+      finished.push(card.sessionId);
+    } else {
+      // The window passed: the system removed it (API 26+) or it is still
+      // drawn (API 24-25, no timeout). Either way it goes now.
+      dismissSessionCard(card.sessionId);
     }
   }
-  pruneSessionCards([...kept.keys()]);
+  pruneSessionCards([...kept.keys(), ...finished]);
   let changed = false;
   for (const sessionId of followed.keys()) {
     if (!kept.has(sessionId)) {
       followed.delete(sessionId);
+      void releaseAndroidSessionToken(sessionId);
       changed = true;
     }
   }
@@ -204,9 +194,19 @@ export function restoreFollowedSessionCards(ctx: SessionFollowContext | null): v
   }
 }
 
-/** Launch and foreground: rebuild the set from native truth and the stored scope. */
-export async function restoreFollowedSessionCardsFromStorage(): Promise<void> {
-  restoreFollowedSessionCards(await readStoredContext());
+/**
+ * Launch, foreground, and a headless push: rebuild the set from native truth
+ * and the stored scope. Resolves false when the keychain could not be read:
+ * nothing is cancelled then, and the caller must not read the empty set as
+ * "not followed".
+ */
+export async function restoreFollowedSessionCardsFromStorage(): Promise<boolean> {
+  const ctx = await readStoredContext();
+  if (ctx === 'unavailable') {
+    return false;
+  }
+  restoreFollowedSessionCards(ctx);
+  return true;
 }
 
 /** Follow one session from the row the session screen shows. */
@@ -240,12 +240,11 @@ export function followSession(
 
 /** Unfollow: cancel the notification at once and release its token. */
 export function unfollowSession(sessionId: string): void {
-  if (!followed.delete(sessionId)) {
+  if (!followed.has(sessionId)) {
     return;
   }
   dismissSessionCard(sessionId);
-  void releaseAndroidSessionToken(sessionId);
-  emit();
+  void endFollow(sessionId);
 }
 
 /**
@@ -255,11 +254,8 @@ export function unfollowSession(sessionId: string): void {
  * update re-posts it. Runs headless, so it resolves only once the delete settled.
  */
 export async function unfollowDismissedSession(sessionId: string): Promise<void> {
-  if (followed.delete(sessionId)) {
-    emit();
-  }
   dismissSessionCard(sessionId);
-  await releaseAndroidSessionToken(sessionId);
+  await endFollow(sessionId);
 }
 
 /** Opening a session dismisses its finished notification at once (spec "Ending" 1). */
@@ -269,10 +265,8 @@ export function dismissFinishedSessionCard(sessionId: string): void {
   if (stored !== undefined && (stored.content === null || isLiveKind(stored.content.statusKind))) {
     return;
   }
-  if (followed.delete(sessionId)) {
-    emit();
-  }
   dismissSessionCard(sessionId);
+  void endFollow(sessionId);
 }
 
 /**
@@ -280,13 +274,12 @@ export function dismissFinishedSessionCard(sessionId: string): void {
  * a lost organization, and the in-app switch turned off.
  */
 export function endAllSessionCards(): void {
-  for (const sessionId of followed.keys()) {
-    dismissSessionCard(sessionId);
-  }
+  // The native prune also cancels the finished cards still in their window.
   pruneSessionCards([]);
-  if (followed.size > 0) {
-    followed.clear();
-    emit();
+  // `endFollow` deletes its entry before its first await, which a Map
+  // iteration allows.
+  for (const sessionId of followed.keys()) {
+    void endFollow(sessionId);
   }
 }
 
@@ -312,12 +305,11 @@ export function syncFollowedSessionCards(
       if (isLiveKind(content.statusKind)) {
         render(content, stored.ctx);
       } else {
-        followed.delete(sessionId);
-        emit();
         postSessionCard(
           buildSessionNotificationCard(content, stored.ctx.organizationId),
           SESSION_FINISHED_DISMISS_MS
         );
+        void endFollow(sessionId);
       }
     }
   }
@@ -338,8 +330,6 @@ export function applySessionLiveUpdate(
     return false;
   }
   if (event === 'end') {
-    followed.delete(content.sessionId);
-    emit();
     const afterMs = dismissAfterMs ?? SESSION_FINISHED_DISMISS_MS;
     if (afterMs === 0) {
       // A session that is gone or out of scope ends at once, with no content.
@@ -347,6 +337,9 @@ export function applySessionLiveUpdate(
     } else {
       postSessionCard(buildSessionNotificationCard(content, stored.ctx.organizationId), afterMs);
     }
+    // The server retires its row on an accepted end; the release also covers an
+    // end the app reached first, so no path leaves the row behind.
+    void endFollow(content.sessionId);
     return true;
   }
   render(content, stored.ctx);
@@ -362,7 +355,9 @@ export async function approveFollowedSession(
   // live context, so the stored scope is the fallback.
   const stored = followed.get(sessionId);
   const fallback = stored === undefined ? await readStoredContext() : null;
-  const organizationId = stored?.ctx.organizationId ?? fallback?.organizationId ?? null;
+  const organizationId =
+    stored?.ctx.organizationId ??
+    (fallback === null || fallback === 'unavailable' ? null : fallback.organizationId);
   const result = await runGlanceableApprove({
     target: { kiloSessionId: sessionId, organizationId, approvalKey },
     now: () => Date.now(),

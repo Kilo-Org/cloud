@@ -471,7 +471,7 @@ async function handleBackgroundNotificationTask(
     // that, a push for a followed session reads as one for a stranger and its
     // server row would be dropped.
     await restorePersistedGlanceable();
-    await restoreFollowedSessionsFromStorage();
+    const followsKnown = await restoreFollowedSessionsFromStorage();
     const applied = applySessionLiveUpdate(
       pushData.event,
       pushData.content,
@@ -481,7 +481,9 @@ async function handleBackgroundNotificationTask(
     // on another surface) renders nothing and drops its row, so the server stops
     // addressing this token for it. A followed session keeps its row: a push
     // that merely changed nothing must never unfollow it.
-    if (!isSessionFollowed(pushData.content.sessionId)) {
+    // An unreadable keychain leaves the set empty without meaning "unfollowed",
+    // so the row stays until a read can tell.
+    if (followsKnown && !isSessionFollowed(pushData.content.sessionId)) {
       // Awaited: the headless task ends with this promise.
       await releaseAndroidSessionToken(pushData.content.sessionId);
     }

@@ -99,19 +99,19 @@ internal object SessionNotifications {
    * running elapsed time.
    *
    * A positive `dismissAfterMs` marks a finished card: it is no longer followed,
-   * so it is not stored (a restore must not rebuild it as a follow), and it
-   * leaves the shade by itself after that time. The timeout needs API 26; on API
-   * 24-25 the finished card stays until the user opens or swipes it.
+   * and it leaves the shade by itself after that time. It stays stored, with
+   * `finishedUntil`, so a sign-out, an account change, or the privacy lock can
+   * still cancel it, and a restore keeps it out of the followed set and drops it
+   * once the window passes. The timeout needs API 26; on API 24-25 the restore
+   * after the window is what removes it.
    */
   fun post(context: Context, card: SessionNotificationCard, dismissAfterMs: Long) {
     val timeoutMs = dismissAfterMs.coerceAtLeast(0)
-    val editor = state(context).edit()
+    val stored = card.toJson()
     if (timeoutMs > 0) {
-      editor.remove(KEY_PREFIX + card.sessionId)
-    } else {
-      editor.putString(KEY_PREFIX + card.sessionId, card.toJson().toString())
+      stored.put(FINISHED_UNTIL, System.currentTimeMillis() + timeoutMs)
     }
-    editor.commit()
+    state(context).edit().putString(KEY_PREFIX + card.sessionId, stored.toString()).commit()
     val builder = builder(context, card)
     if (timeoutMs > 0 && Build.VERSION.SDK_INT >= 26) {
       builder.setTimeoutAfter(timeoutMs)
@@ -230,6 +230,8 @@ internal object SessionNotifications {
       Build.VERSION.SDK_INT_FULL >= 36_001_000 &&
       manager(context).canPostPromotedNotifications()
 
+  /** Stored beside a finished card: the epoch time its window ends. */
+  private const val FINISHED_UNTIL = "finishedUntil"
   private const val TAG = "session"
   private const val SESSION_NOTIFICATION_ID_BASE = 20_000
   private const val OPEN_OFFSET = 0

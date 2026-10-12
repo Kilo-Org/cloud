@@ -95,6 +95,9 @@ subscribeLiveActivityEnabled(() => {
   const next = getLiveActivityEnabled();
   if (liveUpdateAllowed && !next) {
     androidSink.endImmediate();
+    // The switch off ends every followed session too, and deletes their rows
+    // (spec "Android: updates and ending" rule 4).
+    sessionFollow().endAllSessionCards();
   }
   liveUpdateAllowed = next;
 });

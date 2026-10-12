@@ -119,7 +119,12 @@ async function attemptRegistration(scope: PendingRegistration): Promise<boolean>
       organizationId: scope.organizationId,
       sessionId: scope.sessionId,
     });
-    tokensBySession.set(scope.sessionId, token);
+    // A release during the call already queued the row's delete behind this
+    // upsert; claiming the row now would make a later re-follow skip its own
+    // upsert and leave the session with no row.
+    if (pending.get(scope.sessionId) === scope) {
+      tokensBySession.set(scope.sessionId, token);
+    }
   });
   return tokensBySession.get(scope.sessionId) === token;
 }
@@ -146,6 +151,12 @@ async function runRegistration(sessionId: string): Promise<void> {
     // The follow stays pending; the next foreground or publish retries it.
   } finally {
     inFlight.delete(sessionId);
+  }
+  // A re-follow made while this attempt ran replaced the entry, and the guard
+  // above skipped it: run it now instead of waiting for the next retry.
+  const next = pending.get(sessionId);
+  if (next !== undefined && next !== scope) {
+    await runRegistration(sessionId);
   }
 }
 

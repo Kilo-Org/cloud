@@ -106,12 +106,18 @@ describe('SessionNotifications', () => {
     );
   });
 
-  it('does not keep a finished card as a follow', () => {
-    // A restore rebuilds the followed set from the store, so a finished card
-    // left there would come back as a follow.
-    expect(body(NOTIFICATIONS, 'fun post(')).toMatch(
-      /if \(timeoutMs > 0\) \{\s+editor\.remove\(KEY_PREFIX \+ card\.sessionId\)/
+  it('keeps a finished card stored, marked with its window, so a teardown can cancel it', () => {
+    // The restore reads `finishedUntil` to keep it out of the followed set; the
+    // teardown's prune cancels every stored card, so an unstored one would
+    // survive a sign-out.
+    const post = body(NOTIFICATIONS, 'fun post(');
+    expect(post).toMatch(
+      /if \(timeoutMs > 0\) \{\s+stored\.put\(FINISHED_UNTIL, System\.currentTimeMillis\(\) \+ timeoutMs\)/
     );
+    expect(post).toContain('putString(KEY_PREFIX + card.sessionId, stored.toString())');
+    expect(post).not.toContain('editor.remove(');
+    expect(NOTIFICATIONS).toContain('private const val FINISHED_UNTIL = "finishedUntil"');
+    expect(BRIDGE).toContain('finishedUntil: z.number().optional()');
   });
 });
 

@@ -218,6 +218,30 @@ vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: mocks.captureEvent,
 }));
 
+// The headless session push only: the follow store and the row delete are
+// observed here; every other export keeps its real implementation.
+const sessionPush = vi.hoisted(() => ({
+  restoreFollowedSessionsFromStorage: vi.fn(async () => {
+    await Promise.resolve();
+    return true;
+  }),
+  isSessionFollowed: vi.fn((_sessionId: string) => false),
+  applySessionLiveUpdate: vi.fn(() => false),
+  releaseAndroidSessionToken: vi.fn(async (_sessionId: string) => {
+    await Promise.resolve();
+  }),
+}));
+vi.mock('@/lib/glanceable/session-follow', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  restoreFollowedSessionsFromStorage: sessionPush.restoreFollowedSessionsFromStorage,
+  isSessionFollowed: sessionPush.isSessionFollowed,
+  applySessionLiveUpdate: sessionPush.applySessionLiveUpdate,
+}));
+vi.mock('@/lib/glanceable/session-activity-tokens-android', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  releaseAndroidSessionToken: sessionPush.releaseAndroidSessionToken,
+}));
+
 // Each test starts with fresh channel and pending-link state. Only native
 // storage is replaced; payload parsing, mapping, and the pending slot are real.
 async function loadNotifications() {
@@ -2149,6 +2173,61 @@ describe('runBackgroundNotificationTask', () => {
     });
 
     expect(getNotificationPermissionGranted()).toBe(true);
+  });
+});
+
+describe('a headless session_live_update push', () => {
+  async function deliver(sessionId: string): Promise<void> {
+    const loaded = await loadNotifications();
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+    await loaded.runBackgroundNotificationTask({
+      data: {
+        notification: null,
+        data: {
+          dataString: JSON.stringify({
+            type: 'session_live_update',
+            schemaVersion: 1,
+            event: 'update',
+            content: {
+              sessionId,
+              title: null,
+              statusKind: 'running',
+              statusSince: '2026-10-12T09:48:00.000Z',
+              scheduledAt: null,
+              awaitingPermission: false,
+              approvalKey: null,
+              updatedAt: '2026-10-12T10:00:00.000Z',
+            },
+          }),
+        },
+      },
+      error: null,
+      executionInfo: { eventId: 'e-session', taskName: 'active-agents-glanceable-background-task' },
+    });
+  }
+
+  beforeEach(() => {
+    sessionPush.restoreFollowedSessionsFromStorage.mockClear();
+    sessionPush.isSessionFollowed.mockClear();
+    sessionPush.releaseAndroidSessionToken.mockClear();
+  });
+
+  it('drops the row of a session this device does not follow', async () => {
+    sessionPush.restoreFollowedSessionsFromStorage.mockResolvedValueOnce(true);
+    sessionPush.isSessionFollowed.mockReturnValueOnce(false);
+
+    await deliver('session-9');
+
+    expect(sessionPush.releaseAndroidSessionToken).toHaveBeenCalledExactlyOnceWith('session-9');
+  });
+
+  it('keeps the row when the keychain could not be read', async () => {
+    // The empty follow set then says nothing: a locked keychain is not an unfollow.
+    sessionPush.restoreFollowedSessionsFromStorage.mockResolvedValueOnce(false);
+
+    await deliver('session-1');
+
+    expect(sessionPush.releaseAndroidSessionToken).not.toHaveBeenCalled();
   });
 });
 

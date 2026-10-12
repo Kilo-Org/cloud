@@ -131,6 +131,49 @@ describe('registerAndroidSessionToken', () => {
   });
 });
 
+describe('a release while the registration is in flight', () => {
+  it('does not claim the row it deleted, so a re-follow upserts it again', async () => {
+    const { promise: upsert, resolve: answer } = Promise.withResolvers<undefined>();
+    mocks.register.mockReturnValueOnce(upsert);
+
+    const first = registerAndroidSessionToken(FOLLOW);
+    await vi.waitFor(() => {
+      expect(mocks.register).toHaveBeenCalledTimes(1);
+    });
+    // Unfollow while the upsert is on the wire: its delete queues behind it.
+    const release = releaseAndroidSessionToken('session-1');
+    // Follow again before the first upsert answers.
+    const second = registerAndroidSessionToken(FOLLOW);
+    answer(undefined);
+    await Promise.all([first, release, second]);
+
+    // Upsert, delete, then the re-follow's own upsert: the row exists at the end.
+    expect(mocks.register).toHaveBeenCalledTimes(2);
+    expect(mocks.unregister).toHaveBeenCalledTimes(1);
+    const upsertOrder = mocks.register.mock.invocationCallOrder;
+    const deleteOrder = mocks.unregister.mock.invocationCallOrder[0] ?? 0;
+    expect(upsertOrder[0]).toBeLessThan(deleteOrder);
+    expect(upsertOrder[1]).toBeGreaterThan(deleteOrder);
+    expect(isAndroidSessionTokenPending('session-1')).toBe(false);
+  });
+
+  it('leaves no row claimed when nothing follows the session afterwards', async () => {
+    const { promise: upsert, resolve: answer } = Promise.withResolvers<undefined>();
+    mocks.register.mockReturnValueOnce(upsert);
+    const first = registerAndroidSessionToken(FOLLOW);
+    await vi.waitFor(() => {
+      expect(mocks.register).toHaveBeenCalledTimes(1);
+    });
+    const release = releaseAndroidSessionToken('session-1');
+    answer(undefined);
+    await Promise.all([first, release]);
+
+    // A later follow must upsert: the row was deleted after the first upsert.
+    await registerAndroidSessionToken(FOLLOW);
+    expect(mocks.register).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('releaseAndroidSessionToken', () => {
   it('deletes only that session row, with the token the server accepted', async () => {
     await registerAndroidSessionToken(FOLLOW);

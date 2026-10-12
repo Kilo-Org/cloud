@@ -8,7 +8,6 @@ import {
 
 import {
   _resetSessionFollowForTests,
-  _setStoredContextReaderForTests,
   applySessionLiveUpdate,
   endAllSessionCards,
   followedSessionCounts,
@@ -22,6 +21,7 @@ import {
   syncFollowedSessionCards,
   unfollowSession,
 } from './session-follow';
+import { _setStoredContextReaderForTests } from './session-stored-context';
 
 const mocks = vi.hoisted(() => ({
   postSessionCard: vi.fn(),
@@ -31,7 +31,7 @@ const mocks = vi.hoisted(() => ({
     () => { sessionId: string; organizationId: string | null; approvalKey: string | null }[]
   >(() => []),
   registerAndroidSessionToken: vi.fn(),
-  releaseAndroidSessionToken: vi.fn(async () => {
+  releaseAndroidSessionToken: vi.fn(async (_sessionId: string) => {
     await Promise.resolve();
   }),
   retryAndroidSessionTokens: vi.fn(async () => {
@@ -187,12 +187,14 @@ describe('unfollowSession and endAllSessionCards', () => {
 
     endAllSessionCards();
 
+    // The native prune with an empty keep list cancels every stored card,
+    // the finished ones in their window included.
+    expect(mocks.pruneSessionCards).toHaveBeenCalledWith([]);
     expect(
-      mocks.dismissSessionCard.mock.calls
+      mocks.releaseAndroidSessionToken.mock.calls
         .map(call => call[0])
         .toSorted((a, b) => a.localeCompare(b))
     ).toEqual(['session-1', 'session-2']);
-    expect(mocks.pruneSessionCards).toHaveBeenCalledWith([]);
     expect(followedSessionCounts().running).toBe(0);
   });
 });

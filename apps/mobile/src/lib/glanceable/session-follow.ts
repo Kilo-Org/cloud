@@ -81,12 +81,16 @@ export const applySessionLiveUpdate = (
 /**
  * Android only: hydrate the followed set from storage. A headless push runs in
  * a fresh process whose in-memory follow map is empty, so without this a push
- * for a followed session is indistinguishable from one for a stranger.
+ * for a followed session is indistinguishable from one for a stranger. Resolves
+ * false when the stored scope could not be read: the empty set then says
+ * nothing, and the caller must keep the session's row.
  */
-export const restoreFollowedSessionsFromStorage = async (): Promise<void> => {
-  if (Platform.OS === 'android') {
-    await android().restoreFollowedSessionCardsFromStorage();
+export const restoreFollowedSessionsFromStorage = async (): Promise<boolean> => {
+  if (Platform.OS !== 'android') {
+    return true;
   }
+  const known = await android().restoreFollowedSessionCardsFromStorage();
+  return known;
 };
 
 /** Android only: a dismissed notification is an Unfollow (spec "Android: actions" 3). */

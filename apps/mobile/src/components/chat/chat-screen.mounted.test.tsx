@@ -79,7 +79,7 @@ const mcpModel = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/chat/use-chat', () => ({
-  chatPlaceOf: () => ({ chatScope: 'u1:personal', org: { kind: 'personal' } }),
+  useChatPlace: () => ({ chatScope: 'u1:personal', org: { kind: 'personal' } }),
   useChat: () => ({
     state: {
       sessionId: 's1',

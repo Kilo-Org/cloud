@@ -2,6 +2,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
+import { getAuthenticatedOwner, subscribeAuthenticatedOwner } from '@/lib/context-scope';
+import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
+import { useOrganization } from '@/lib/organization-context';
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 import { type ChatPlace, chatPlaceOf } from './scope';
 import {
@@ -26,8 +29,19 @@ import { type ChatSummary, deleteChat, listChats } from './store';
  * whatever it says.
  */
 
-/** Re-exported so a screen reads where a chat belongs from the hook module. */
-export { chatPlaceOf };
+/**
+ * Where the signed-in account's chats live.
+ *
+ * A chat is on the device, so it must open when the account cannot be
+ * confirmed: offline, or with the API down. The restored account answers then,
+ * the same one the app shell opened on.
+ */
+export function useChatPlace(): ChatPlace | null {
+  const { organizationId } = useOrganization();
+  const owner = useSyncExternalStore(subscribeAuthenticatedOwner, getAuthenticatedOwner);
+  const userId = useRestoredAccountId(owner.authEpoch, owner.restored);
+  return chatPlaceOf(userId, organizationId);
+}
 
 const listKey = (scope: string) => ['chats', scope] as const;
 
@@ -46,6 +60,8 @@ export function useChatList(place: ChatPlace | null): ChatList {
   const query = useQuery({
     queryKey: listKey(scope ?? ''),
     enabled: place !== null,
+    // The list is read from the device's database, so no connection is needed.
+    networkMode: 'always',
     queryFn: async () => {
       if (place === null) {
         return [];

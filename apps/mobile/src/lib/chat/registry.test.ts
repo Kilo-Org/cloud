@@ -265,7 +265,7 @@ const {
   stopChat,
 } = await import('./registry');
 const { change, snapshotOf } = await import('./state');
-const { chatPlaceOf } = await import('./use-chat');
+const { chatPlaceOf } = await import('./scope');
 const { askedIn, forgetAsked } = await import('./pending');
 
 /** The words of the line that is waiting, which is what most of these read. */

@@ -35,9 +35,7 @@ const {
     provider: 'cloudflare',
   }),
   selectSandboxProviderMock: vi.fn(
-    (input?: {
-      sandboxAllocation?: string;
-    }): 'cloudflare' | 'cloudflare-containers' | 'vercel' =>
+    (input?: { sandboxAllocation?: string }): 'cloudflare' | 'cloudflare-containers' | 'vercel' =>
       input?.sandboxAllocation === 'cloudflare-containers-standard-3'
         ? 'cloudflare-containers'
         : 'cloudflare'

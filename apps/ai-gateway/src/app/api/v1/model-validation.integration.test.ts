@@ -45,8 +45,8 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
 
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { POST as personalValidator } from '@/app/api/openrouter/models/validate/route';
-import { POST as organizationValidator } from '@/app/api/organizations/[id]/models/validate/route';
+import { POST as personalValidator } from './models/validate/route';
+import { POST as organizationValidator } from './organizations/[id]/models/validate/route';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import { RUNTIME_PROXY_ATTESTATION_HEADER } from '@kilocode/worker-utils/runtime-proxy-attestation';

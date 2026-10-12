@@ -34,8 +34,7 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
-import { GET as gatewayModels } from '@/app/api/gateway/models/route';
-import { GET as gatewayV1Models } from '@/app/api/gateway/v1/models/route';
+import { GET as models } from './models/route';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -92,15 +91,15 @@ describe('gateway models audience authentication', () => {
   });
 
   test.each([
-    ['legacy credential', 'gateway/models', undefined, gatewayModels],
-    ['gateway-audience credential', 'gateway/v1/models', KILO_GATEWAY_AUDIENCE, gatewayV1Models],
-  ])('%s uses the %s user-specific BYOK path', async (_credential, route, audience, handler) => {
+    ['legacy credential', undefined],
+    ['gateway-audience credential', KILO_GATEWAY_AUDIENCE],
+  ])('%s uses the user-specific BYOK path', async (_credential, audience) => {
     const user = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
     const token = signToken(user.id, user.api_token_pepper, audience);
     currentHeaders = new Headers({ Authorization: `Bearer ${token}` });
 
-    const response = await handler(
-      new NextRequest(`http://localhost/api/${route}`, { headers: currentHeaders })
+    const response = await models(
+      new NextRequest('http://localhost/api/v1/models', { headers: currentHeaders })
     );
 
     expect(await response.json()).toEqual({
@@ -147,8 +146,8 @@ describe('gateway models audience authentication', () => {
       webSessionPepper: user.web_session_pepper,
     });
 
-    const response = await gatewayModels(
-      new NextRequest('http://localhost/api/gateway/models', { headers: currentHeaders })
+    const response = await models(
+      new NextRequest('http://localhost/api/v1/models', { headers: currentHeaders })
     );
 
     expect(await response.json()).toEqual(publicCatalog);

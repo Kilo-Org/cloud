@@ -76,7 +76,7 @@ const nextConfig = {
 
   async rewrites() {
     // beforeFiles rewrites run BEFORE filesystem routes are checked, so they
-    // take precedence over this app's own copies of the proxied routes.
+    // take precedence over filesystem routes.
     // See: https://nextjs.org/docs/app/api-reference/config/next-config-js/rewrites
     const aiGatewayRewrites = buildAiGatewayRewrites(process.env);
 

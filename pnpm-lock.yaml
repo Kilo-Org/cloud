@@ -279,12 +279,18 @@ importers:
         specifier: 19.2.6
         version: 19.2.6(react@19.2.6)
     devDependencies:
+      '@jest/globals':
+        specifier: 30.3.0
+        version: 30.3.0
       '@playwright/test':
         specifier: 1.58.2
         version: 1.58.2
       '@swc/core':
         specifier: 1.15.18
         version: 1.15.18(@swc/helpers@0.5.23)
+      '@types/jest':
+        specifier: 30.0.0
+        version: 30.0.0
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
@@ -9707,9 +9713,6 @@ packages:
 
   '@sinclair/typebox@0.34.41':
     resolution: {integrity: sha512-6gS8pZzSXdyRHTIqoqSVknxolr1kzfy4/CeDnrzsVz8TTIWUbOBr6gnzOmTYJ3eXQNh4IYHIGi5aIL7sOZ2G/g==}
-
-  '@sinclair/typebox@0.34.48':
-    resolution: {integrity: sha512-kKJTNuK3AQOrgjjotVxMrCn1sUJwM76wMszfq1kdU4uYVJjvEWuFQ6HgvLt4Xz3fSmZlTOxJ/Ie13KnIcWQXFA==}
 
   '@sinclair/typebox@0.34.49':
     resolution: {integrity: sha512-brySQQs7Jtn0joV8Xh9ZV/hZb9Ozb0pmazDIASBkYKCjXrXU3mpcFahmK/z4YDhGkQvP9mWJbVyahdtU5wQA+A==}
@@ -24097,7 +24100,7 @@ snapshots:
 
   '@jest/schemas@30.0.5':
     dependencies:
-      '@sinclair/typebox': 0.34.48
+      '@sinclair/typebox': 0.34.49
 
   '@jest/snapshot-utils@30.3.0':
     dependencies:
@@ -27571,8 +27574,6 @@ snapshots:
   '@sinclair/typebox@0.27.10': {}
 
   '@sinclair/typebox@0.34.41': {}
-
-  '@sinclair/typebox@0.34.48': {}
 
   '@sinclair/typebox@0.34.49': {}
 

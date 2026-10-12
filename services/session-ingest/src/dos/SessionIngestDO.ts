@@ -1528,10 +1528,12 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     writeCloneMeta(this.db, 'cloneSourceSessionId', params.sourceSessionId);
     writeCloneMeta(this.db, 'cloneDestinationSessionId', params.destinationSessionId);
-    // Only cut clones record a cut: an empty or same-identity stage never holds
-    // this key for a full clone, so full-clone state is unchanged.
+    // Keep "no cut key <=> full clone" true on every write, without relying on
+    // resets wiping the whole meta table.
     if (params.upToMessageId !== undefined) {
       writeCloneMeta(this.db, 'cloneUpToMessageId', params.upToMessageId);
+    } else {
+      this.db.delete(ingestMeta).where(eq(ingestMeta.key, 'cloneUpToMessageId')).run();
     }
     writeCloneMeta(this.db, 'cloneNextCursor', JSON.stringify(params.nextCursor));
     writeCloneMeta(this.db, 'cloneRollingDigest', params.rollingDigest);

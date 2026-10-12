@@ -1981,10 +1981,11 @@ describe('automatic permissions', () => {
   });
 
   it.each(['skillShell', 'sandboxEscalation'])(
-    'keeps CLI-enforced %s human approvals interactive',
+    'keeps CLI-enforced %s human approvals interactive for web sessions',
     async flag => {
       const h = createHarness();
-      h.registerRoute(routeSpec());
+      const spec = routeSpec({ createdOnPlatform: 'cloud-agent-web' });
+      h.registerRoute(spec);
       h.manager.submit(SESSION_ID, promptPayload('m1'));
       await settle();
       h.manager.observeKiloEvent(
@@ -1995,10 +1996,60 @@ describe('automatic permissions', () => {
         })
       );
       await settle();
-      expect(h.client(routeSpec()).permissionAnswers).toEqual([]);
+      expect(h.client(spec).permissionAnswers).toEqual([]);
       expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toHaveLength(
         1
       );
+    }
+  );
+
+  it.each(
+    ['slack', 'github', 'security-agent', 'webhook', 'scheduled', undefined].flatMap(origin =>
+      ['skillShell', 'sandboxEscalation'].map(flag => [origin, flag] as const)
+    )
+  )(
+    'rejects CLI-enforced human approvals for unattended %s sessions (%s)',
+    async (createdOnPlatform, flag) => {
+      const h = createHarness();
+      const spec = routeSpec({ createdOnPlatform });
+      h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.manager.observeKiloEvent(
+        kiloEvent('permission.asked', {
+          sessionID: KILO_SESSION,
+          id: 'p1',
+          metadata: { [flag]: true },
+        })
+      );
+      h.manager.observeKiloEvent(
+        kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p2' })
+      );
+      await settle();
+      expect(h.client(spec).permissionAnswers).toEqual([
+        {
+          permissionId: 'p1',
+          response: 'reject',
+          message: expect.stringContaining(
+            `${createdOnPlatform ?? 'unattended'} non-interactive mode`
+          ),
+          directory: DIRECTORY,
+        },
+        { permissionId: 'p2', response: 'always', message: undefined, directory: DIRECTORY },
+      ]);
+      expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
+      h.manager.observeKiloEvent(
+        kiloEvent('permission.replied', { sessionID: KILO_SESSION, requestID: 'p1' })
+      );
+      h.manager.observeKiloEvent(
+        kiloEvent('permission.replied', { sessionID: KILO_SESSION, requestID: 'p2' })
+      );
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      expect(eventFrames(h.frames).filter(event => event.type === 'permission.replied')).toEqual(
+        []
+      );
+      expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed' }]);
     }
   );
 
@@ -2086,9 +2137,13 @@ describe('automatic permissions', () => {
     }
   );
 
-  it.each(['code-review', 'security-remediation'])(
+  it.each([
+    ['code-review', {}, 'Code-review permission rejection failed'],
+    ['security-remediation', {}, 'Security-remediation permission rejection failed'],
+    ['webhook', { skillShell: true }, 'Webhook permission rejection failed'],
+  ] as const)(
     'fails closed if a %s permission cannot be rejected',
-    async createdOnPlatform => {
+    async (createdOnPlatform, metadata, reason) => {
       const h = createHarness();
       const spec = routeSpec({ createdOnPlatform });
       h.registerRoute(spec);
@@ -2098,19 +2153,11 @@ describe('automatic permissions', () => {
         throw new Error('reply unavailable');
       });
       h.manager.observeKiloEvent(
-        kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p1' })
+        kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p1', metadata })
       );
       await settle();
       expect(h.client(spec).aborts).toEqual([KILO_SESSION]);
-      expect(outcomeFrames(h.frames)).toMatchObject([
-        {
-          status: 'failed',
-          reason:
-            createdOnPlatform === 'code-review'
-              ? 'Code-review permission rejection failed'
-              : 'Security-remediation permission rejection failed',
-        },
-      ]);
+      expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason }]);
       expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
     }
   );

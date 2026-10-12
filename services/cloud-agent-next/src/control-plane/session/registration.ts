@@ -33,6 +33,7 @@ import { runtimeCredentialProxyFacadeBaseUrl } from '../../runtime-credential-pr
 import { getControlPlaneSessionDirectory } from '../../workspace.js';
 import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session-service.js';
 import { codeReviewIdFromCallbackTarget } from '../../router/schemas.js';
+import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import type { ControlPlaneSessionRegistration } from './session-do.js';
 
 /**
@@ -259,7 +260,7 @@ export function buildControlPlaneSessionRegistration(
   if (payload.directory === undefined)
     throw new Error('Session attach payload requires a directory');
   const permission = {
-    ...(createdOnPlatform !== 'cloud-agent-web' ? { question: 'deny' } : {}),
+    ...(!isInteractiveSessionOrigin(createdOnPlatform) ? { question: 'deny' } : {}),
     ...(commandGuard
       ? getCommandGuardPermissions(commandGuard, payload.directory, bitbucketReviewId)
       : {}),

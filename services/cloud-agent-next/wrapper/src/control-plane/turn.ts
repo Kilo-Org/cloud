@@ -38,6 +38,7 @@ import {
   gateResultFromProperties,
   permissionCategoryFromProperties,
 } from '../../../src/shared/kilo-event-properties.js';
+import { isInteractiveSessionOrigin } from '../../../src/shared/control-plane-permission.js';
 
 const PROMPT_DELIVERY_TIMEOUT_MS = 120_000;
 const SYNTHETIC_KILO_EVENTS = new Set(['server.connected', 'server.heartbeat']);
@@ -160,6 +161,39 @@ type TurnRoute = {
 };
 
 type QueueState = 'ready' | 'queue' | 'unavailable';
+
+type AutomaticPermissionReply =
+  | { response: 'always' }
+  | { response: 'reject'; message: string; failure: string };
+
+/**
+ * The wrapper's answer to a permission, or undefined when a person must answer.
+ * Code review and security remediation reject every permission. Other sessions
+ * approve ordinary permissions. A CLI-enforced human approval waits for a person
+ * only on an interactive origin; an unattended session rejects it so the turn
+ * does not wait for an answer that never comes.
+ */
+function automaticPermissionReply(
+  createdOnPlatform: string | undefined,
+  properties: Record<string, unknown>
+): AutomaticPermissionReply | undefined {
+  if (createdOnPlatform !== 'code-review' && createdOnPlatform !== 'security-remediation') {
+    const metadata = properties.metadata;
+    const requiresHuman =
+      isRecord(metadata) && (metadata.skillShell === true || metadata.sandboxEscalation === true);
+    if (!requiresHuman) return { response: 'always' };
+    if (isInteractiveSessionOrigin(createdOnPlatform)) return undefined;
+  }
+  const origin = createdOnPlatform ?? 'unattended';
+  return {
+    response: 'reject',
+    message:
+      createdOnPlatform === 'code-review'
+        ? 'Permission rejected for code-review non-interactive mode. Continue using another read-only, non-interactive method if available.'
+        : `Permission rejected for ${origin} non-interactive mode. Continue using another permitted method if available.`,
+    failure: `${origin.charAt(0).toUpperCase()}${origin.slice(1)} permission rejection failed`,
+  };
+}
 
 /** The client may wrap the fetch abort as the `cause` of its own error. */
 function isCancelledBy(error: unknown, signal: AbortSignal): boolean {
@@ -839,14 +873,15 @@ export function createTurnManager(deps: TurnManagerDeps) {
     childRoots.set(child.childId, parentRoot);
   }
 
-  async function answerAutomaticPermission(route: TurnRoute, event: KiloFeedEvent): Promise<void> {
+  async function answerAutomaticPermission(
+    route: TurnRoute,
+    event: KiloFeedEvent,
+    reply: AutomaticPermissionReply
+  ): Promise<void> {
     const permissionId = event.properties.id;
     if (typeof permissionId !== 'string') return;
     const turn = turns.get(route.sessionId);
-    const codeReview = route.createdOnPlatform === 'code-review';
-    const securityRemediation = route.createdOnPlatform === 'security-remediation';
-    const rejectPermission = codeReview || securityRemediation;
-    if (codeReview)
+    if (route.createdOnPlatform === 'code-review')
       log(
         JSON.stringify({
           message: 'code_review_permission_rejected',
@@ -863,12 +898,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
         if (runtime === undefined) throw new Error('Kilo runtime unavailable');
         const success = await runtime.client.answerPermission(
           permissionId,
-          rejectPermission ? 'reject' : 'always',
-          codeReview
-            ? 'Permission rejected for code-review non-interactive mode. Continue using another read-only, non-interactive method if available.'
-            : securityRemediation
-              ? 'Permission rejected for security-remediation non-interactive mode. Continue using another permitted method if available.'
-              : undefined,
+          reply.response,
+          reply.response === 'reject' ? reply.message : undefined,
           undefined,
           route.directory
         );
@@ -887,16 +918,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
         }
         if (attempt === 0) continue;
         route.automaticPermissions.delete(permissionId);
-        if (rejectPermission) {
+        if (reply.response === 'reject') {
           if (turn !== undefined && turns.get(route.sessionId) === turn) {
             void abortKilo(route);
-            sendOutcome(
-              turn,
-              'failed',
-              codeReview
-                ? 'Code-review permission rejection failed'
-                : 'Security-remediation permission rejection failed'
-            );
+            sendOutcome(turn, 'failed', reply.failure);
           }
           return;
         }
@@ -1104,18 +1129,11 @@ export function createTurnManager(deps: TurnManagerDeps) {
         if (route.automaticPermissions.delete(event.properties.requestID)) return;
       }
       if (event.type === 'permission.asked' && typeof event.properties.id === 'string') {
-        const metadata = event.properties.metadata;
-        const requiresHuman =
-          isRecord(metadata) &&
-          (metadata.skillShell === true || metadata.sandboxEscalation === true);
-        if (
-          route.createdOnPlatform === 'code-review' ||
-          route.createdOnPlatform === 'security-remediation' ||
-          !requiresHuman
-        ) {
+        const reply = automaticPermissionReply(route.createdOnPlatform, event.properties);
+        if (reply !== undefined) {
           if (!route.automaticPermissions.has(event.properties.id)) {
             route.automaticPermissions.add(event.properties.id);
-            void answerAutomaticPermission(route, event);
+            void answerAutomaticPermission(route, event, reply);
           }
           return;
         }

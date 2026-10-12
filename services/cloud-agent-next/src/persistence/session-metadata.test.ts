@@ -441,6 +441,24 @@ describe('session metadata boundary', () => {
     }
   );
 
+  it('round-trips a clone cut and rejects a malformed one', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_clone', userId: 'user_clone' },
+      auth: {},
+      clone: {
+        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+        cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(() =>
+      parseSessionMetadata({ ...current, clone: { ...current.clone, cloneUpToMessageId: 'x' } })
+    ).toThrow('Invalid current session metadata');
+  });
+
   it('keeps metadata without clone as an empty-session bootstrap', () => {
     const current = {
       metadataSchemaVersion: 2 as const,

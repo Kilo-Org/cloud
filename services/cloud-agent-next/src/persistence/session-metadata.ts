@@ -409,6 +409,8 @@ const MetadataLifecycleSchema = z
 const MetadataCloneSchema = z
   .object({
     cloneFromKiloSessionId: kiloSessionIdSchema,
+    // Inclusive cut ("Fork from here"); absent for a full-session clone.
+    cloneUpToMessageId: MessageIdSchema.optional(),
     reportingCreatedAt: z.string().datetime({ offset: true }).optional(),
   })
   .strip();

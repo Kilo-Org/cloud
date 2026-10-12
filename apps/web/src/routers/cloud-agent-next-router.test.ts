@@ -1375,6 +1375,28 @@ describe('cloudAgentNextRouter.prepareSession', () => {
       expect.objectContaining({ cloneFromKiloSessionId })
     );
   });
+
+  it('forwards cloneUpToMessageId to the Worker', async () => {
+    const caller = createCaller({
+      user: { id: 'user-1', is_admin: false } as User,
+    });
+    const cloneUpToMessageId = 'msg_12345678901212345678901234';
+
+    await caller.prepareSession({
+      cloneFromKiloSessionId: 'ses_12345678901234567890123456',
+      cloneUpToMessageId,
+      autoInitiate: true,
+      operationKey: '12345678-1234-4234-9234-123456789abc',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      devcontainer: false,
+    });
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ cloneUpToMessageId })
+    );
+  });
 });
 
 describe('cloudAgentNextRouter Worker error codes', () => {

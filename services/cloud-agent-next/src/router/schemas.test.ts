@@ -594,6 +594,38 @@ describe('prepareSession clone-only variant', () => {
     ).toBe(false);
   });
 
+  it('accepts a clone cut message ID', () => {
+    const result = PrepareSessionInput.safeParse({
+      ...baseCloneInput,
+      cloneFromKiloSessionId: validKiloSessionId,
+      cloneUpToMessageId: validMessageId,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.cloneUpToMessageId).toBe(validMessageId);
+  });
+
+  it('rejects a malformed clone cut message ID', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        cloneFromKiloSessionId: validKiloSessionId,
+        cloneUpToMessageId: 'not-a-message',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a clone cut without a clone source', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+        prompt: 'Continue',
+        cloneUpToMessageId: validMessageId,
+      }).success
+    ).toBe(false);
+  });
+
   it('still requires a prompt for a non-clone prepare', () => {
     expect(
       PrepareSessionInput.safeParse({

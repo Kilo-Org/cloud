@@ -561,6 +561,36 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
     ).toBe(false);
   });
 
+  it('accepts a clone-only input with a cut message ID', () => {
+    const result = basePrepareSessionNextSchema.safeParse({
+      ...cloneOnlyInput,
+      cloneUpToMessageId: 'msg_12345678901212345678901234',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.cloneUpToMessageId).toBe('msg_12345678901212345678901234');
+    }
+  });
+
+  it('rejects a malformed cut message ID', () => {
+    expect(
+      basePrepareSessionNextSchema.safeParse({ ...cloneOnlyInput, cloneUpToMessageId: 'msg_bad' })
+        .success
+    ).toBe(false);
+  });
+
+  it('rejects a cut without a clone source', () => {
+    expect(
+      basePrepareSessionNextSchema.safeParse({
+        githubRepo: 'acme/repo',
+        prompt: 'Continue',
+        mode: 'code',
+        model: 'kilo/test-model',
+        cloneUpToMessageId: 'msg_12345678901212345678901234',
+      }).success
+    ).toBe(false);
+  });
+
   it('accepts a non-clone input with required prompt and no cloneFromKiloSessionId', () => {
     const result = basePrepareSessionNextSchema.safeParse({
       githubRepo: 'acme/repo',

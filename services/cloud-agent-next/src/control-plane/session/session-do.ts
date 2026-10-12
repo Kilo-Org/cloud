@@ -894,7 +894,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.identity.orgId ?? null) === (metadata.identity.orgId ?? null) &&
       sameRepository(existing.repository, metadata.repository) &&
       this.registration.sandboxId === metadata.workspace?.sandboxId &&
-      (existing.initialMessage?.id ?? null) === (messageId ?? null)
+      (existing.initialMessage?.id ?? null) === (messageId ?? null) &&
+      (existing.clone?.cloneUpToMessageId ?? null) === (metadata.clone?.cloneUpToMessageId ?? null)
     );
   }
 

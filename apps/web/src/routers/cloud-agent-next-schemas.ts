@@ -452,6 +452,7 @@ const PrepareSessionNonCloneVariant = z.object({
    * Old callers omit the field and create an empty destination session.
    */
   cloneFromKiloSessionId: z.undefined().optional(),
+  cloneUpToMessageId: z.undefined().optional(),
   ...PrepareSessionSharedFields,
 });
 
@@ -460,6 +461,11 @@ const PrepareSessionCloneVariant = z.object({
   initialMessageId: z.undefined().optional(),
   initialPayload: z.undefined().optional(),
   cloneFromKiloSessionId: kiloSessionIdSchema,
+  /**
+   * Inclusive cut ("Fork from here"): copy only the source messages up to and
+   * including this message. Omitted copies the whole session.
+   */
+  cloneUpToMessageId: messageIdNextSchema.optional(),
   autoInitiate: z.literal(true),
   operationKey: z.string().uuid(),
   ...PrepareSessionSharedFields,

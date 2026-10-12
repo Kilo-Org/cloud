@@ -58,6 +58,8 @@ export type SessionCreateRequest = {
   runtime?: SessionRuntimeIntent;
   clone?: {
     cloneFromKiloSessionId: string;
+    /** Inclusive cut: copy source messages up to and including this ID. */
+    cloneUpToMessageId?: string;
   };
   profile?: {
     id?: string;

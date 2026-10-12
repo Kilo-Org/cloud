@@ -124,7 +124,10 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
     repository,
     runtime: input.sandboxAllocation ? { sandboxAllocation: input.sandboxAllocation } : undefined,
     clone: input.cloneFromKiloSessionId
-      ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
+      ? {
+          cloneFromKiloSessionId: input.cloneFromKiloSessionId,
+          ...(input.cloneUpToMessageId ? { cloneUpToMessageId: input.cloneUpToMessageId } : {}),
+        }
       : undefined,
     profile: {
       id: input.profileId,

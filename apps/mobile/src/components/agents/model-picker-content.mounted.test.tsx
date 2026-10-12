@@ -93,6 +93,7 @@ vi.mock('@shopify/flash-list', async () => {
         {
           data: props.data,
           getItemType: props.getItemType,
+          renderItem: props.renderItem,
           keyExtractor: props.keyExtractor,
           style: props.style,
           contentContainerStyle: props.contentContainerStyle,
@@ -223,6 +224,17 @@ function keyExtractor(
     item: ModelPickerRow | undefined,
     index: number
   ) => string;
+  /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
+function renderItem(
+  renderer: TestRenderer.ReactTestRenderer
+): (info: { item: ModelPickerRow | undefined; index: number }) => ReactNode {
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  return listHost(renderer).props.renderItem as (info: {
+    item: ModelPickerRow | undefined;
+    index: number;
+  }) => ReactNode;
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
 }
 
@@ -505,6 +517,7 @@ describe('ModelPickerContent deferred search', () => {
 
     expect(getItemType(renderer)(undefined)).toBeUndefined();
     expect(keyExtractor(renderer)(undefined, 7)).toBe('7');
+    expect(renderItem(renderer)({ item: undefined, index: 7 })).toBeNull();
 
     act(() => {
       renderer.unmount();

@@ -17,7 +17,7 @@ type StartableTodo = { id: string; title: string; notes: string | null };
 type StartDefaults = Pick<TodoList, 'organizationId' | 'gitUrl' | 'mode' | 'model' | 'variant'>;
 
 /** The new-session route prefilled from a to-do and its list's defaults. */
-export function todoNewSessionHref(todo: StartableTodo, list: StartDefaults): Href {
+function todoNewSessionHref(todo: StartableTodo, list: StartDefaults): Href {
   const base = list.organizationId
     ? `/(app)/agent-chat/new?organizationId=${encodeURIComponent(list.organizationId)}`
     : '/(app)/agent-chat/new';

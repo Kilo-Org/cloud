@@ -89,6 +89,18 @@ describe('session notification bridge', () => {
     ]);
   });
 
+  it('reads the empty string the native store writes for an absent field as null', () => {
+    // Kotlin `toJson` writes `""` for a Personal follow's organization and a card
+    // with no approval key; the restore compares the scope against null.
+    mocks.getSessionCards.mockReturnValue(
+      JSON.stringify([{ sessionId: 'session-1', organizationId: '', approvalKey: '' }])
+    );
+
+    expect(getStoredSessionCards()).toEqual([
+      { sessionId: 'session-1', organizationId: null, approvalKey: null },
+    ]);
+  });
+
   it('answers an empty list when the native read is missing or not JSON', () => {
     mocks.native = null;
     expect(getStoredSessionCards()).toEqual([]);

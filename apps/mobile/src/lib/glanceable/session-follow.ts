@@ -89,6 +89,13 @@ export const restoreFollowedSessionsFromStorage = async (): Promise<void> => {
   }
 };
 
+/** Android only: a dismissed notification is an Unfollow (spec "Android: actions" 3). */
+export const unfollowDismissedSession = async (sessionId: string): Promise<void> => {
+  if (Platform.OS === 'android') {
+    await android().unfollowDismissedSession(sessionId);
+  }
+};
+
 /** Android only: revalidate the exact request a card shows and answer it. */
 export const approveFollowedSession = async (
   sessionId: string,

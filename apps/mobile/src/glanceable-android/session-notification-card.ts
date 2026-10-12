@@ -85,6 +85,10 @@ export function buildSessionNotificationCard(
   const title = (content.title ?? '').trim();
   const running = content.statusKind === 'running';
   const statusSince = Date.parse(content.statusSince);
+  const stateAt =
+    content.statusKind === 'scheduled' && content.scheduledAt !== null
+      ? Date.parse(content.scheduledAt)
+      : statusSince;
   const waiting = content.statusKind === 'needsInput';
   const canApprove = waiting && content.awaitingPermission && content.approvalKey !== null;
   return {
@@ -99,9 +103,10 @@ export function buildSessionNotificationCard(
     approveLabel: canApprove ? translate('common.approve') : null,
     approvalKey: content.approvalKey,
     // A Working card counts up from the last status change on the system clock;
-    // every other card shows the time it started, waited, or is due.
-    whenMs: running && Number.isFinite(statusSince) ? statusSince : Date.now(),
-    showWhen: !running,
+    // a Scheduled card shows its wake time; every other card the time its state
+    // began. A card with no usable time shows none.
+    whenMs: Number.isFinite(stateAt) ? stateAt : 0,
+    showWhen: !running && Number.isFinite(stateAt),
     chronometer: running && Number.isFinite(statusSince),
     promotion: true,
     color: waiting ? '#956011' : '#4F5A10',

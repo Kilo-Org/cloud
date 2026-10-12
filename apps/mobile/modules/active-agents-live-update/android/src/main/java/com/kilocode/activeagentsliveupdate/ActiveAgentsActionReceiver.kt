@@ -9,7 +9,8 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 
 /**
- * Answers the ongoing notification's Approve action without an Activity.
+ * Answers the ongoing notification's Approve action, and a session
+ * notification's dismissal, without an Activity.
  *
  * The receiver only enqueues and returns: a broadcast has a short budget, and a
  * background `startService` is restricted on Android 8+, so the answer runs as
@@ -31,27 +32,46 @@ class ActiveAgentsActionReceiver : BroadcastReceiver() {
     }
     val sessionId = intent.getStringExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID)
     if (action == ACTION_DISMISS) {
-      // The delete intent fires as the card leaves the shade; dropping the
-      // stored card here keeps a later update from re-posting it.
-      if (sessionId != null) {
-        SessionNotifications.cancel(context, sessionId)
+      if (sessionId == null) {
+        return
       }
+      // A dismissal is an Unfollow (spec "Android: actions" rule 3). Drop the
+      // stored card now, so no later update re-posts it; then the headless JS
+      // stops following the session and deletes its server row. Each session
+      // has its own unique work: a clear-all dismisses several cards at once,
+      // and one shared name would let `KEEP` drop all but the first.
+      SessionNotifications.cancel(context, sessionId)
+      enqueueHeadless(context, "$DISMISS_WORK_PREFIX$sessionId", ACTION_DISMISS, sessionId, null)
       return
     }
+    enqueueHeadless(
+      context,
+      ActiveAgentsApproveWorker.UNIQUE_WORK_NAME,
+      ACTION_APPROVE,
+      sessionId,
+      intent.getStringExtra(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY)
+    )
+  }
+
+  /** Run one action as headless JS through the approval worker. */
+  private fun enqueueHeadless(
+    context: Context,
+    uniqueName: String,
+    action: String,
+    sessionId: String?,
+    approvalKey: String?
+  ) {
     val request = OneTimeWorkRequest.Builder(ActiveAgentsApproveWorker::class.java)
       .setInputData(
         Data.Builder()
           .putString(ActiveAgentsApproveWorker.KEY_ACTION, action)
           .putString(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId)
-          .putString(
-            ActiveAgentsApproveWorker.KEY_APPROVAL_KEY,
-            intent.getStringExtra(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY)
-          )
+          .putString(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY, approvalKey)
           .build()
       )
       .build()
     WorkManager.getInstance(context)
-      .enqueueUniqueWork(ActiveAgentsApproveWorker.UNIQUE_WORK_NAME, ExistingWorkPolicy.KEEP, request)
+      .enqueueUniqueWork(uniqueName, ExistingWorkPolicy.KEEP, request)
   }
 
   companion object {
@@ -63,5 +83,8 @@ class ActiveAgentsActionReceiver : BroadcastReceiver() {
      * card is gone either way, so the app stops following that session.
      */
     const val ACTION_DISMISS = "com.kilocode.activeagentsliveupdate.action.DISMISS"
+
+    /** Unique work per dismissed session; see `onReceive`. */
+    private const val DISMISS_WORK_PREFIX = "active-agents-dismiss:"
   }
 }

@@ -22,7 +22,12 @@ const mocks = vi.hoisted(() => ({
   pruneSessionCards: vi.fn(),
   getStoredSessionCards: vi.fn<() => unknown[]>(() => []),
   registerAndroidSessionToken: vi.fn(),
-  releaseAndroidSessionToken: vi.fn(),
+  releaseAndroidSessionToken: vi.fn(async () => {
+    await Promise.resolve();
+  }),
+  retryAndroidSessionTokens: vi.fn(async () => {
+    await Promise.resolve();
+  }),
   setAndroidSessionScope: vi.fn(),
   runGlanceableApprove: vi.fn(),
 }));
@@ -37,6 +42,7 @@ vi.mock('./session-notification', () => ({
 vi.mock('@/lib/glanceable/session-activity-tokens-android', () => ({
   registerAndroidSessionToken: mocks.registerAndroidSessionToken,
   releaseAndroidSessionToken: mocks.releaseAndroidSessionToken,
+  retryAndroidSessionTokens: mocks.retryAndroidSessionTokens,
   setAndroidSessionScope: mocks.setAndroidSessionScope,
 }));
 
@@ -144,12 +150,84 @@ describe('applySessionLiveUpdate', () => {
       approvalKey: null,
       updatedAt: '2026-10-12T10:05:00.000Z',
     };
-    expect(applySessionLiveUpdate('end', content, 0)).toBe(true);
+    expect(applySessionLiveUpdate('end', content, 900_000)).toBe(true);
     expect(mocks.postSessionCard).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining('Finished') }),
-      0
+      900_000
     );
     expect(isSessionFollowed('session-1')).toBe(false);
+  });
+
+  it('cancels at once an end with no window: the session is gone or out of scope', () => {
+    followSession(RUNNING, CTX, NOW);
+    mocks.postSessionCard.mockClear();
+
+    expect(
+      applySessionLiveUpdate(
+        'end',
+        {
+          sessionId: 'session-1',
+          title: null,
+          statusKind: 'idle',
+          statusSince: '2026-10-12T10:05:00.000Z',
+          scheduledAt: null,
+          awaitingPermission: false,
+          approvalKey: null,
+          updatedAt: '2026-10-12T10:05:00.000Z',
+        },
+        0
+      )
+    ).toBe(true);
+
+    // A posted card with no timeout would stay in the shade and in the store.
+    expect(mocks.postSessionCard).not.toHaveBeenCalled();
+    expect(mocks.dismissSessionCard).toHaveBeenCalledWith('session-1');
+    expect(isSessionFollowed('session-1')).toBe(false);
+  });
+
+  it('shows the wake time of a scheduled card, not the time it was drawn', () => {
+    followSession(RUNNING, CTX, NOW);
+    applySessionLiveUpdate('update', {
+      sessionId: 'session-1',
+      title: 'Nightly dependency audit',
+      statusKind: 'scheduled',
+      statusSince: '2026-10-12T09:30:00.000Z',
+      scheduledAt: '2026-10-12T11:30:00.000Z',
+      awaitingPermission: false,
+      approvalKey: null,
+      updatedAt: '2026-10-12T10:06:00.000Z',
+    });
+
+    expect(lastCard()).toMatchObject({
+      whenMs: Date.parse('2026-10-12T11:30:00.000Z'),
+      showWhen: true,
+      chronometer: false,
+    });
+  });
+
+  it('shows the time a finished card ended, not the time it was drawn', () => {
+    followSession(RUNNING, CTX, NOW);
+    mocks.postSessionCard.mockClear();
+
+    applySessionLiveUpdate(
+      'end',
+      {
+        sessionId: 'session-1',
+        title: 'Migrate the billing webhooks',
+        statusKind: 'idle',
+        statusSince: '2026-10-12T10:05:00.000Z',
+        scheduledAt: null,
+        awaitingPermission: false,
+        approvalKey: null,
+        updatedAt: '2026-10-12T10:05:00.000Z',
+      },
+      900_000
+    );
+
+    expect(lastCard()).toMatchObject({
+      whenMs: Date.parse('2026-10-12T10:05:00.000Z'),
+      showWhen: true,
+    });
   });
 
   it('ignores a push for a session this device does not follow', () => {

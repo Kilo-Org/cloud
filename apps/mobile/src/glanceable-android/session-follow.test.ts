@@ -31,7 +31,12 @@ const mocks = vi.hoisted(() => ({
     () => { sessionId: string; organizationId: string | null; approvalKey: string | null }[]
   >(() => []),
   registerAndroidSessionToken: vi.fn(),
-  releaseAndroidSessionToken: vi.fn(),
+  releaseAndroidSessionToken: vi.fn(async () => {
+    await Promise.resolve();
+  }),
+  retryAndroidSessionTokens: vi.fn(async () => {
+    await Promise.resolve();
+  }),
   setAndroidSessionScope: vi.fn(),
   runGlanceableApprove: vi.fn(),
 }));
@@ -53,6 +58,7 @@ vi.mock('./session-notification', () => ({
 vi.mock('@/lib/glanceable/session-activity-tokens-android', () => ({
   registerAndroidSessionToken: mocks.registerAndroidSessionToken,
   releaseAndroidSessionToken: mocks.releaseAndroidSessionToken,
+  retryAndroidSessionTokens: mocks.retryAndroidSessionTokens,
   setAndroidSessionScope: mocks.setAndroidSessionScope,
 }));
 

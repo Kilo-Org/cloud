@@ -96,17 +96,24 @@ internal object SessionNotifications {
   /**
    * Post or update one session's notification. `card.whenMs` carries the time
    * the card shows; `card.chronometer` marks a Working card whose text is a
-   * running elapsed time. A finished card leaves the shade by itself after
-   * `dismissAfterMs`.
+   * running elapsed time.
+   *
+   * A positive `dismissAfterMs` marks a finished card: it is no longer followed,
+   * so it is not stored (a restore must not rebuild it as a follow), and it
+   * leaves the shade by itself after that time. The timeout needs API 26; on API
+   * 24-25 the finished card stays until the user opens or swipes it.
    */
   fun post(context: Context, card: SessionNotificationCard, dismissAfterMs: Long) {
-    state(context)
-      .edit()
-      .putString(KEY_PREFIX + card.sessionId, card.toJson().toString())
-      .commit()
     val timeoutMs = dismissAfterMs.coerceAtLeast(0)
-    val builder = builder(context, card)
+    val editor = state(context).edit()
     if (timeoutMs > 0) {
+      editor.remove(KEY_PREFIX + card.sessionId)
+    } else {
+      editor.putString(KEY_PREFIX + card.sessionId, card.toJson().toString())
+    }
+    editor.commit()
+    val builder = builder(context, card)
+    if (timeoutMs > 0 && Build.VERSION.SDK_INT >= 26) {
       builder.setTimeoutAfter(timeoutMs)
     }
     manager(context).notify(TAG, notificationId(card.sessionId), builder.build())
@@ -247,7 +254,7 @@ class SessionNotificationCard : Record {
   @Field var showWhen: Boolean = false
   @Field var chronometer: Boolean = false
   @Field var promotion: Boolean = false
-  @Field var color: String = "#4F5A10"
+  @Field var color: String = DEFAULT_COLOR
 
   fun toJson(): JSONObject = JSONObject().apply {
     put("sessionId", sessionId)
@@ -263,6 +270,8 @@ class SessionNotificationCard : Record {
     put("whenMs", whenMs)
     put("showWhen", showWhen)
     put("chronometer", chronometer)
+    put("promotion", promotion)
+    put("color", color)
   }
 
   /** Read the shape `toJson` writes; the readable half of the persisted pair. */
@@ -280,6 +289,8 @@ class SessionNotificationCard : Record {
     whenMs = json.optDouble("whenMs", 0.0)
     showWhen = json.optBoolean("showWhen")
     chronometer = json.optBoolean("chronometer")
+    promotion = json.optBoolean("promotion")
+    color = optionalString(json, "color") ?: DEFAULT_COLOR
   }
 
   /**
@@ -289,5 +300,10 @@ class SessionNotificationCard : Record {
   private fun optionalString(json: JSONObject, key: String): String? {
     if (json.isNull(key)) return null
     return json.optString(key).ifEmpty { null }
+  }
+
+  private companion object {
+    /** The app's primary colour by day (`global.css`). */
+    const val DEFAULT_COLOR = "#4F5A10"
   }
 }

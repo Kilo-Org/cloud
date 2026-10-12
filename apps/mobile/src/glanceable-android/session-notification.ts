@@ -49,10 +49,20 @@ export type SessionNotificationCard = {
  * the card shows. A card that no longer parses is dropped, which costs one
  * notification.
  */
+/**
+ * The native store writes an absent optional field as the empty string (Kotlin
+ * `toJson`), so both forms read as null here. Without this, a Personal follow
+ * (no organization) never matched its scope and was cancelled at every restore.
+ */
+const storedOptionalStringSchema = z
+  .string()
+  .nullable()
+  .transform(value => (value === null || value.length === 0 ? null : value));
+
 const storedSessionCardSchema = z.object({
   sessionId: z.string().min(1),
-  organizationId: z.string().nullable(),
-  approvalKey: z.string().nullable(),
+  organizationId: storedOptionalStringSchema,
+  approvalKey: storedOptionalStringSchema,
 });
 
 export type StoredSessionCard = z.infer<typeof storedSessionCardSchema>;

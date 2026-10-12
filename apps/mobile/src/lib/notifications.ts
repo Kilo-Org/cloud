@@ -30,7 +30,7 @@ import { captureEvent } from '@/lib/analytics/posthog';
 import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
-import { dropAndroidSessionRow } from '@/lib/glanceable/session-activity-tokens-android';
+import { releaseAndroidSessionToken } from '@/lib/glanceable/session-activity-tokens-android';
 import {
   applySessionLiveUpdate,
   isSessionFollowed,
@@ -482,7 +482,8 @@ async function handleBackgroundNotificationTask(
     // addressing this token for it. A followed session keeps its row: a push
     // that merely changed nothing must never unfollow it.
     if (!isSessionFollowed(pushData.content.sessionId)) {
-      dropUnfollowedSessionRow(pushData.content.sessionId);
+      // Awaited: the headless task ends with this promise.
+      await releaseAndroidSessionToken(pushData.content.sessionId);
     }
     return applied
       ? Notifications.BackgroundNotificationTaskResult.NewData
@@ -506,15 +507,6 @@ async function handleBackgroundNotificationTask(
   return applied
     ? Notifications.BackgroundNotificationTaskResult.NewData
     : Notifications.BackgroundNotificationTaskResult.NoData;
-}
-
-/**
- * A push named a session this device no longer follows (a dismissal, or a
- * follow cleared on another surface). Nothing renders; the row is dropped so
- * the server stops addressing this token for that session.
- */
-function dropUnfollowedSessionRow(sessionId: string): void {
-  dropAndroidSessionRow(sessionId);
 }
 
 /**

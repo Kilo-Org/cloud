@@ -16,6 +16,7 @@ import {
 import {
   registerAndroidSessionToken,
   releaseAndroidSessionToken,
+  retryAndroidSessionTokens,
   setAndroidSessionScope,
 } from '@/lib/glanceable/session-activity-tokens-android';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
@@ -44,8 +45,13 @@ export type SessionFollowContext = { userId: string; organizationId: string | nu
 export type SessionLiveUpdateContent = SessionLiveActivityContentState;
 export type FollowResult = 'started' | 'followed' | 'refused';
 
+/**
+ * One followed session. `content` is null for a follow a fresh process rebuilt
+ * from native storage: the store keeps the card, not its content, so the next
+ * push or tray read supplies it.
+ */
 type Followed = {
-  content: SessionLiveActivityContentState;
+  content: SessionLiveActivityContentState | null;
   approvalKey: string | null;
   ctx: SessionFollowContext;
 };
@@ -86,9 +92,10 @@ function isLiveKind(kind: SessionLiveActivityContentState['statusKind']): boolea
 export function followedSessionCounts(): FollowedSessionCounts {
   const counts = { running: 0, needsInput: 0, needsApproval: 0, idle: 0, scheduled: 0 };
   for (const { content } of followed.values()) {
-    if (isLiveKind(content.statusKind)) {
-      // A failed turn is finished work, so it counts with the idle sessions.
-      counts[content.statusKind === 'failed' ? 'idle' : content.statusKind] += 1;
+    // A finished or failed session leaves the set when it ends, so only live
+    // kinds are counted here.
+    if (content !== null && content.statusKind !== 'idle' && content.statusKind !== 'failed') {
+      counts[content.statusKind] += 1;
       if (content.awaitingPermission) {
         counts.needsApproval += 1;
       }
@@ -100,7 +107,7 @@ export function followedSessionCounts(): FollowedSessionCounts {
 /** Post or update one followed session's notification from its content. */
 function render(content: SessionLiveActivityContentState, ctx: SessionFollowContext): void {
   const stored = followed.get(content.sessionId);
-  if (stored !== undefined && content.updatedAt < stored.content.updatedAt) {
+  if (stored?.content != null && content.updatedAt < stored.content.updatedAt) {
     // An out-of-order push must not undo newer content.
     return;
   }
@@ -112,7 +119,7 @@ function render(content: SessionLiveActivityContentState, ctx: SessionFollowCont
 /** Re-post the stored card of one followed session (after an Approve). */
 function repost(sessionId: string): void {
   const stored = followed.get(sessionId);
-  if (stored !== undefined) {
+  if (stored?.content != null) {
     postSessionCard(buildSessionNotificationCard(stored.content, stored.ctx.organizationId), 0);
   }
 }
@@ -154,37 +161,46 @@ async function readStoredContext(): Promise<SessionFollowContext | null> {
 }
 
 /**
- * Rebuild the followed set from native truth. A stored card of another scope, or
- * one the app no longer counts, is cancelled and forgotten; a kept card has its
- * token registered again.
+ * Rebuild the followed set from native truth. A stored card of another scope is
+ * cancelled and forgotten. A kept card is followed again — a fresh process
+ * starts with an empty set, and a push or tray read for a followed session must
+ * still find it — and its registration runs again.
  */
 export function restoreFollowedSessionCards(ctx: SessionFollowContext | null): void {
   const stored = getStoredSessionCards();
-  const kept = new Set<string>();
+  const kept = new Map<string, string | null>();
   for (const card of stored) {
     if (ctx === null || card.organizationId !== ctx.organizationId) {
       dismissSessionCard(card.sessionId);
     } else {
-      kept.add(card.sessionId);
+      kept.set(card.sessionId, card.approvalKey);
     }
   }
-  pruneSessionCards([...kept]);
-  let dropped = false;
+  pruneSessionCards([...kept.keys()]);
+  let changed = false;
   for (const sessionId of followed.keys()) {
     if (!kept.has(sessionId)) {
       followed.delete(sessionId);
-      dropped = true;
+      changed = true;
     }
   }
-  if (dropped) {
+  if (ctx !== null) {
+    for (const [sessionId, approvalKey] of kept) {
+      if (!followed.has(sessionId)) {
+        followed.set(sessionId, { content: null, approvalKey, ctx });
+        changed = true;
+      }
+    }
+  }
+  if (changed) {
     emit();
   }
   if (ctx === null) {
     return;
   }
   setAndroidSessionScope(ctx);
-  for (const sessionId of kept) {
-    registerAndroidSessionToken({ sessionId, ...ctx });
+  for (const sessionId of kept.keys()) {
+    void registerAndroidSessionToken({ sessionId, ...ctx });
   }
 }
 
@@ -218,7 +234,7 @@ export function followSession(
   }
   setAndroidSessionScope(ctx);
   render(content, ctx);
-  registerAndroidSessionToken({ sessionId: row.id, ...ctx });
+  void registerAndroidSessionToken({ sessionId: row.id, ...ctx });
   return 'started';
 }
 
@@ -228,14 +244,29 @@ export function unfollowSession(sessionId: string): void {
     return;
   }
   dismissSessionCard(sessionId);
-  releaseAndroidSessionToken(sessionId);
+  void releaseAndroidSessionToken(sessionId);
   emit();
+}
+
+/**
+ * The user dismissed the notification: that is an Unfollow (spec "Android:
+ * actions" rule 3). The native receiver already cancelled the card; this stops
+ * following the session in this runtime and deletes its server row, so no later
+ * update re-posts it. Runs headless, so it resolves only once the delete settled.
+ */
+export async function unfollowDismissedSession(sessionId: string): Promise<void> {
+  if (followed.delete(sessionId)) {
+    emit();
+  }
+  dismissSessionCard(sessionId);
+  await releaseAndroidSessionToken(sessionId);
 }
 
 /** Opening a session dismisses its finished notification at once (spec "Ending" 1). */
 export function dismissFinishedSessionCard(sessionId: string): void {
   const stored = followed.get(sessionId);
-  if (stored !== undefined && isLiveKind(stored.content.statusKind)) {
+  // A rebuilt follow with no content yet still follows live work.
+  if (stored !== undefined && (stored.content === null || isLiveKind(stored.content.statusKind))) {
     return;
   }
   if (followed.delete(sessionId)) {
@@ -264,6 +295,8 @@ export function syncFollowedSessionCards(
   rows: readonly SessionLiveActivityRow[],
   checkedAt: number = Date.now()
 ): void {
+  // Every publish is a chance to land a registration a network failure left pending.
+  void retryAndroidSessionTokens();
   if (followed.size === 0) {
     return;
   }
@@ -274,7 +307,7 @@ export function syncFollowedSessionCards(
       const content = buildSessionLiveActivityContentState(row, {
         approvalKey: stored.approvalKey,
         updatedAt,
-        statusSinceFallback: stored.content.statusSince,
+        statusSinceFallback: stored.content?.statusSince ?? updatedAt,
       });
       if (isLiveKind(content.statusKind)) {
         render(content, stored.ctx);
@@ -292,7 +325,8 @@ export function syncFollowedSessionCards(
 
 /**
  * Apply one server push. A session the app does not follow renders nothing, and
- * the caller drops that server row.
+ * the caller drops that server row. A headless caller restores the set from
+ * native storage first (`restoreFollowedSessionCardsFromStorage`).
  */
 export function applySessionLiveUpdate(
   event: 'update' | 'end',
@@ -306,10 +340,13 @@ export function applySessionLiveUpdate(
   if (event === 'end') {
     followed.delete(content.sessionId);
     emit();
-    postSessionCard(
-      buildSessionNotificationCard(content, stored.ctx.organizationId),
-      dismissAfterMs ?? SESSION_FINISHED_DISMISS_MS
-    );
+    const afterMs = dismissAfterMs ?? SESSION_FINISHED_DISMISS_MS;
+    if (afterMs === 0) {
+      // A session that is gone or out of scope ends at once, with no content.
+      dismissSessionCard(content.sessionId);
+    } else {
+      postSessionCard(buildSessionNotificationCard(content, stored.ctx.organizationId), afterMs);
+    }
     return true;
   }
   render(content, stored.ctx);
@@ -335,7 +372,10 @@ export async function approveFollowedSession(
   }
   if (result.kind === 'approved' || result.kind === 'gone') {
     followed.set(sessionId, {
-      content: { ...stored.content, awaitingPermission: false, approvalKey: null },
+      content:
+        stored.content === null
+          ? null
+          : { ...stored.content, awaitingPermission: false, approvalKey: null },
       approvalKey: null,
       ctx: stored.ctx,
     });

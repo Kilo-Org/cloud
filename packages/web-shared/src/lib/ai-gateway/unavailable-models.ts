@@ -12,6 +12,10 @@ export function isUnavailableModel(modelId: string): boolean {
   return unavailableModelIds.has(modelId);
 }
 
+export function getUnavailableModelIds(): string[] {
+  return [...unavailableModelIds];
+}
+
 // Only free-model families gate free endpoints; non-free unavailable models
 // (e.g. region-restricted) must not suppress a family's free endpoints.
 const unavailableFreeModelFamilies: ReadonlySet<string> = new Set(

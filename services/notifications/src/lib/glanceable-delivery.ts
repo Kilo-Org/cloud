@@ -183,12 +183,23 @@ export function buildGlanceableExpoMessages(
 type IosActivityRegistration = IosActivityToken & { id: string; updated_at: string };
 
 /** The session card IO. Optional so callers that only drive the aggregate surfaces need none. */
-type SessionCardDeps = Partial<
-  Pick<
-    SessionCardDeliveryDeps,
-    'listIosSessionActivityTokens' | 'sendIosSessionLiveActivity' | 'sessionCardMemory'
-  >
+type SessionCardDeps = Pick<
+  SessionCardDeliveryDeps,
+  | 'listIosSessionActivityTokens'
+  | 'sendIosSessionLiveActivity'
+  | 'listAndroidSessionTokens'
+  | 'sendAndroidSessionLiveUpdate'
+  | 'sessionCardMemory'
 >;
+
+/** True when the deps can reach at least one platform's session cards. */
+export function hasSessionCardIo(deps: SessionCardDeps): boolean {
+  return (
+    (deps.listIosSessionActivityTokens !== undefined &&
+      deps.sendIosSessionLiveActivity !== undefined) ||
+    (deps.listAndroidSessionTokens !== undefined && deps.sendAndroidSessionLiveUpdate !== undefined)
+  );
+}
 
 export type GlanceableDeliveryDeps = SessionCardDeps & {
   /**
@@ -290,8 +301,7 @@ export async function deliverGlanceableSnapshot(
     );
   }
 
-  const { listIosSessionActivityTokens, sendIosSessionLiveActivity } = deps;
-  if (listIosSessionActivityTokens && sendIosSessionLiveActivity) {
+  if (hasSessionCardIo(deps)) {
     await deliverSessionCards(
       {
         userId: params.userId,
@@ -302,8 +312,10 @@ export async function deliverGlanceableSnapshot(
         nowSeconds: Math.floor(Date.now() / 1000),
       },
       {
-        listIosSessionActivityTokens,
-        sendIosSessionLiveActivity,
+        listIosSessionActivityTokens: deps.listIosSessionActivityTokens,
+        sendIosSessionLiveActivity: deps.sendIosSessionLiveActivity,
+        listAndroidSessionTokens: deps.listAndroidSessionTokens,
+        sendAndroidSessionLiveUpdate: deps.sendAndroidSessionLiveUpdate,
         sessionCardMemory: deps.sessionCardMemory,
         isCurrent: deps.isCurrent,
       }

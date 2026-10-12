@@ -9,7 +9,7 @@ import { sendLiveActivityApns, type ApnsCredentials } from './apns-live-activity
 import { sendWidgetApns } from './apns-widget';
 import { sendPushNotifications } from './expo-push';
 import type { GlanceableDeliveryDeps, IosActivityToken } from './glanceable-delivery';
-import { sessionCardSourceSchema } from './session-card-delivery';
+import { sessionCardSourceSchema, sessionLiveUpdateExpoMessage } from './session-card-delivery';
 
 const deliveryExtrasSchema = z.object({
   liveActivitySnapshot: z.record(z.string(), z.unknown()).optional(),
@@ -172,12 +172,15 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
       const result = await sendLiveActivityApns({
         credentials,
         tokens: [{ token: send.token, event: send.event }],
-        contentState: send.contentState,
+        contentState: send.content,
         nowSeconds,
         timestampSeconds,
-        // Same window as the aggregate card. A stale card keeps its last-known
-        // content with an honest time; it never reads as expired.
-        staleDateSeconds: nowSeconds + GLANCEABLE_STALE_MS / 1000,
+        // The aggregate window, or the end of the quiet window after the last
+        // activity for a working card: a stale card keeps its last-known
+        // content with an honest time, and the layout draws its quiet warning
+        // from this moment. It never reads as expired.
+        staleDateSeconds:
+          send.staleAtSeconds ?? nowSeconds + GLANCEABLE_STALE_MS / 1000,
         priority: send.priority,
         relevanceScore: send.relevanceScore,
         dismissalDateSeconds: send.dismissalDateSeconds,
@@ -185,6 +188,49 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
         onEnded: retireIosTarget,
       });
       return result.ok === 1;
+    },
+    listAndroidSessionTokens: async (userId, organizationId) => {
+      const rows = await getDbForCall()
+        .select({ token: user_activity_tokens.token, sessionId: user_activity_tokens.session_id })
+        .from(user_activity_tokens)
+        .where(
+          and(
+            eq(user_activity_tokens.user_id, userId),
+            organizationId === null
+              ? isNull(user_activity_tokens.organization_id)
+              : eq(user_activity_tokens.organization_id, organizationId),
+            eq(user_activity_tokens.kind, 'android_session_ongoing'),
+            isNull(user_activity_tokens.superseded_at),
+            isNotNull(user_activity_tokens.session_id)
+          )
+        );
+      return rows.flatMap(row =>
+        row.sessionId === null ? [] : [{ token: row.token, sessionId: row.sessionId }]
+      );
+    },
+    sendAndroidSessionLiveUpdate: async (send, isCurrent) => {
+      const accessToken = await env.EXPO_ACCESS_TOKEN.get();
+      if (isCurrent && !(await isCurrent())) return false;
+      const result = await sendPushNotifications(
+        [sessionLiveUpdateExpoMessage(send)],
+        accessToken,
+        isCurrent
+      );
+      const accepted = result.ticketTokenPairs.length > 0;
+      // An accepted end and an unregistered device both leave nothing to
+      // update: retire this one session row. The device's other rows stay.
+      if ((accepted && send.event === 'end') || result.staleTokens.includes(send.token)) {
+        await getDbForCall()
+          .delete(user_activity_tokens)
+          .where(
+            and(
+              eq(user_activity_tokens.token, send.token),
+              eq(user_activity_tokens.kind, 'android_session_ongoing'),
+              eq(user_activity_tokens.session_id, send.sessionId)
+            )
+          );
+      }
+      return accepted;
     },
     listIosActivityTokens: async (userId, organizationId) => {
       const orgPredicate =

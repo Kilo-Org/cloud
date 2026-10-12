@@ -310,6 +310,11 @@ function activityTokenScopeLockKey(userId: string, organizationId: string | null
   return `user-activity-token-scope:${userId}:${organizationId ?? ''}`;
 }
 
+/** The token kinds that follow one session and carry its `session_id`. */
+function isSessionTokenKind(kind: string): boolean {
+  return kind === 'ios_session_activity' || kind === 'android_session_ongoing';
+}
+
 function getDeductionKind(
   creditCategory: string | null
 ): z.infer<typeof CreditDeductionKindSchema> {
@@ -1380,10 +1385,11 @@ export const userRouter = createTRPCRouter({
     }),
 
   // Activity tokens for glanceable surfaces (Live Activity / push-to-start /
-  // Android ongoing). Upsert on `token` so a re-registration of the same
-  // device token replaces the row instead of failing the unique index, and
+  // Android ongoing / followed session cards). Upsert on (token, session) so a
+  // re-registration replaces the row instead of failing the unique key, and
   // retire the scope's previous live `ios_activity` row in the same
-  // transaction so one scope never has two live cards.
+  // transaction so one scope never has two live cards. An Android device
+  // registers its one Expo push token once per followed session.
 
   registerActivityToken: baseProcedure
     .input(
@@ -1395,25 +1401,27 @@ export const userRouter = createTRPCRouter({
             'ios_activity',
             'ios_session_activity',
             'android_ongoing',
+            'android_session_ongoing',
           ]),
           platform: z.enum(['ios', 'android']),
           organizationId: z.string().min(1).nullable(),
-          /** The followed session; required for `ios_session_activity`, rejected for every other kind. */
+          /** The followed session; required for a session kind, rejected for every other kind. */
           sessionId: z.string().min(1).optional(),
         })
-        .refine(
-          input => (input.kind === 'ios_session_activity') === (input.sessionId !== undefined),
-          {
-            message: 'sessionId is required for a session card and rejected for every other kind',
-            path: ['sessionId'],
-          }
-        )
+        .refine(input => isSessionTokenKind(input.kind) === (input.sessionId !== undefined), {
+          message: 'sessionId is required for a session card and rejected for every other kind',
+          path: ['sessionId'],
+        })
     )
     .mutation(async ({ ctx, input }) => {
-      const sessionId = input.kind === 'ios_session_activity' ? (input.sessionId ?? null) : null;
+      const sessionId = isSessionTokenKind(input.kind) ? (input.sessionId ?? null) : null;
       if (sessionId !== null) {
-        if (input.platform !== 'ios') {
-          throw new TRPCError({ code: 'BAD_REQUEST', message: 'A session card is iOS only' });
+        const platform = input.kind === 'ios_session_activity' ? 'ios' : 'android';
+        if (input.platform !== platform) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `A ${input.kind} token is ${platform} only`,
+          });
         }
         // A session card shows the session title on the Lock Screen, so the
         // caller must own the session in the scope the card counts against.
@@ -1488,7 +1496,7 @@ export const userRouter = createTRPCRouter({
             session_id: sessionId,
           })
           .onConflictDoUpdate({
-            target: [user_activity_tokens.token],
+            target: [user_activity_tokens.token, user_activity_tokens.session_id],
             set: {
               user_id: ctx.user.id,
               kind: input.kind,
@@ -1532,6 +1540,12 @@ export const userRouter = createTRPCRouter({
     .input(
       z.object({
         token: z.string().min(1),
+        /**
+         * Delete only this session's row. An Android device shares one token
+         * across its followed sessions, so an unfollow names the session.
+         * Without it, every row of the token goes: the device left the scope.
+         */
+        sessionId: z.string().min(1).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -1540,7 +1554,10 @@ export const userRouter = createTRPCRouter({
         .where(
           and(
             eq(user_activity_tokens.user_id, ctx.user.id),
-            eq(user_activity_tokens.token, input.token)
+            eq(user_activity_tokens.token, input.token),
+            input.sessionId === undefined
+              ? undefined
+              : eq(user_activity_tokens.session_id, input.sessionId)
           )
         )
         .returning({
@@ -1549,12 +1566,11 @@ export const userRouter = createTRPCRouter({
         });
       // An unfollowed session counts on the aggregate card again. Best-effort,
       // as for registration: the next session change carries it otherwise.
-      const session = removed.find(row => row.kind === 'ios_session_activity');
-      if (session) {
-        await refreshGlanceableScope({
-          userId: ctx.user.id,
-          organizationId: session.organizationId,
-        }).catch(error => {
+      const scopes = new Set(
+        removed.filter(row => isSessionTokenKind(row.kind)).map(row => row.organizationId)
+      );
+      for (const organizationId of scopes) {
+        await refreshGlanceableScope({ userId: ctx.user.id, organizationId }).catch(error => {
           console.error('[unregisterActivityToken] Failed to request glanceable refresh:', error);
         });
       }

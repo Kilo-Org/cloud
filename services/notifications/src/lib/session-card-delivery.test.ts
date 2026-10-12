@@ -5,8 +5,12 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  androidSessionMemoryKey,
   deliverSessionCards,
   planSessionCardSend,
+  SESSION_CARD_FINISHED_DISMISS_MS,
+  sessionLiveUpdateExpoMessage,
+  type AndroidSessionSend,
   type SessionCardDeliveryDeps,
   type SessionCardSend,
   type SessionCardSource,
@@ -111,11 +115,76 @@ describe('planSessionCardSend', () => {
       relevanceScore: sessionLiveActivityRelevance('idle', '2026-10-12T09:58:00.000Z'),
       dismissalDateSeconds: nowSeconds + 15 * 60,
     });
-    expect(JSON.parse(finished?.send.contentState.props ?? '{}')).toMatchObject({
+    expect(JSON.parse(finished?.send.content.props ?? '{}')).toMatchObject({
       statusKind: 'idle',
       statusSince: '2026-10-12T09:58:00.000Z',
     });
-    expect(finished?.send.contentState.name).toBe('SessionLiveActivity');
+    expect(finished?.send.content.name).toBe('SessionLiveActivity');
+  });
+
+  it('sends a step-only change at priority 5 with the new step and the same timer', () => {
+    const previous = shown(source({ status: 'busy' }));
+    const step = { verb: 'editing' as const, target: 'auth.ts' };
+    const planned = plan(
+      source({
+        status: 'busy',
+        summary: { step, plan: { done: 3, total: 7, current: 'Write tests' }, changes: null, failure: null },
+        lastActivityAt: '2026-10-12T09:59:30.000Z',
+      }),
+      previous
+    );
+    expect(planned?.send).toMatchObject({ event: 'update', priority: 5 });
+    expect(planned?.content).toMatchObject({
+      currentStep: step,
+      plan: { done: 3, total: 7, current: 'Write tests' },
+      statusSince: previous.statusSince,
+    });
+    // The quiet window closes five minutes after the last activity.
+    expect(planned?.send.staleAtSeconds).toBe(
+      Math.floor(Date.parse('2026-10-12T09:59:30.000Z') / 1000) + 300
+    );
+  });
+
+  it('keeps the aggregate stale window for a card that is not working', () => {
+    const planned = plan(source({ status: 'question', lastActivityAt: '2026-10-12T09:59:30.000Z' }));
+    expect(planned?.send.staleAtSeconds).toBe(nowSeconds + 30 * 60);
+  });
+
+  it('ends a failed session with the stopped content at priority 10', () => {
+    const failed = plan(
+      source({
+        status: 'idle',
+        statusUpdatedAt: '2026-10-12T09:58:00.000Z',
+        summary: {
+          step: null,
+          plan: { done: 2, total: 5, current: null },
+          changes: { files: 3, added: 12, removed: 4 },
+          failure: { kind: 'provider' },
+        },
+      }),
+      shown(source({ status: 'busy' }))
+    );
+    expect(failed?.send).toMatchObject({ event: 'end', priority: 10, dismissalDateSeconds: nowSeconds + 900 });
+    expect(JSON.parse(failed?.send.content.props ?? '{}')).toMatchObject({
+      statusKind: 'failed',
+      failure: { kind: 'provider' },
+      outcome: { kind: 'changes' },
+      changes: { files: 3, added: 12, removed: 4 },
+    });
+  });
+
+  it('reads an opened pull request as the outcome of a finished session', () => {
+    const finished = plan(source({ status: 'idle', prOpened: true }));
+    expect(finished?.content).toMatchObject({ statusKind: 'idle', outcome: { kind: 'pr_opened' } });
+  });
+
+  it('drops the command when the permission is answered', () => {
+    const waiting = plan(
+      source({ status: 'permission', approvalKey: 'a'.repeat(64), permissionCommand: 'pnpm drizzle migrate' })
+    );
+    expect(waiting?.content.permissionCommand).toBe('pnpm drizzle migrate');
+    const answered = plan(source({ status: 'busy' }), waiting?.content);
+    expect(answered?.content.permissionCommand).toBeNull();
   });
 
   it('ends a deleted or out-of-scope session at once', () => {
@@ -137,7 +206,7 @@ describe('planSessionCardSend', () => {
       approvalKey: null,
       updatedAt,
     });
-    expect(gone?.send.contentState.props).not.toContain('Fix login');
+    expect(JSON.stringify(gone?.send.content)).not.toContain('Fix login');
     expect(previous.title).toBe('Fix login');
   });
 });
@@ -219,5 +288,89 @@ describe('deliverSessionCards', () => {
     const { deps, sends } = harness([{ token: 'card', sessionId: 'ses_1' }]);
     await deliver({ ...deps, isCurrent: async () => false }, [source({ status: 'busy' })]);
     expect(sends).toHaveLength(0);
+  });
+
+  function androidHarness(tokens: { token: string; sessionId: string }[]) {
+    const memory = new Map<string, SessionLiveActivityContentState>();
+    const sends: AndroidSessionSend[] = [];
+    const deps: SessionCardDeliveryDeps = {
+      listAndroidSessionTokens: vi.fn(async () => tokens),
+      sendAndroidSessionLiveUpdate: vi.fn(async (send: AndroidSessionSend) => {
+        sends.push(send);
+        return send.token !== 'rejected';
+      }),
+      sessionCardMemory: {
+        list: async () => new Map(memory),
+        put: async (key, content) => {
+          memory.set(key, content);
+        },
+        delete: async keys => {
+          for (const key of keys) memory.delete(key);
+        },
+      },
+    };
+    return { deps, memory, sends };
+  }
+
+  it('sends one Expo data message per followed session on Android', async () => {
+    const { deps, memory, sends } = androidHarness([
+      { token: 'ExponentPushToken[aaa]', sessionId: 'ses_1' },
+    ]);
+
+    await deliver(deps, [source({ status: 'busy' })]);
+
+    expect(sends).toHaveLength(1);
+    expect(sends[0]).toMatchObject({
+      token: 'ExponentPushToken[aaa]',
+      sessionId: 'ses_1',
+      event: 'update',
+    });
+    expect(sends[0]?.dismissAfterMs).toBeUndefined();
+    expect(memory.has(androidSessionMemoryKey('ExponentPushToken[aaa]', 'ses_1'))).toBe(true);
+
+    // The same content again is not pushed (spec "Updates" rule 2).
+    await deliver(deps, [source({ status: 'busy' })]);
+    expect(sends).toHaveLength(1);
+  });
+
+  it('keeps one device token per session on Android', async () => {
+    const { deps, sends } = androidHarness([
+      { token: 'ExponentPushToken[aaa]', sessionId: 'ses_1' },
+      { token: 'ExponentPushToken[aaa]', sessionId: 'ses_2' },
+    ]);
+
+    await deliver(deps, [source({ status: 'busy' }), { ...source({ status: 'busy' }), sessionId: 'ses_2' }]);
+
+    expect(sends.map(send => send.sessionId).sort()).toEqual(['ses_1', 'ses_2']);
+  });
+
+  it('ends an Android session after the finished window, and at once with no content', async () => {
+    const { deps, sends } = androidHarness([
+      { token: 'ExponentPushToken[aaa]', sessionId: 'ses_1' },
+    ]);
+
+    await deliver(deps, [source({ status: 'idle' })]);
+    expect(sends[0]?.event).toBe('end');
+    expect(sends[0]?.dismissAfterMs).toBe(SESSION_CARD_FINISHED_DISMISS_MS);
+
+    await deliver(deps, 'end_all');
+    expect(sends[1]).toMatchObject({ event: 'end', dismissAfterMs: 0 });
+    expect(sends[1]?.content.title).toBeNull();
+  });
+
+  it('builds one high-priority data-only Expo message per Android session', () => {
+    const message = sessionLiveUpdateExpoMessage({
+      token: 'ExponentPushToken[aaa]',
+      sessionId: 'ses_1',
+      event: 'update',
+      content: shown(source({})),
+    });
+    expect(message).toMatchObject({
+      to: 'ExponentPushToken[aaa]',
+      priority: 'high',
+      sound: null,
+      _contentAvailable: true,
+      data: { type: 'session_live_update', schemaVersion: 1, event: 'update' },
+    });
   });
 });

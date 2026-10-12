@@ -9,6 +9,7 @@ import {
   aggregateCardWork,
   deliverGlanceableSnapshot,
   type GlanceableDeliveryDeps,
+  hasSessionCardIo,
 } from './glanceable-delivery';
 import { deliverSessionCards, type SessionCardMemory } from './session-card-delivery';
 
@@ -261,8 +262,7 @@ export async function refreshGlanceableSnapshot(
   if (snapshot === 'access_denied') {
     // The user lost the scope: end its session cards at once (spec "Ending"
     // rule 2). Nothing else in the scope may be delivered.
-    const { listIosSessionActivityTokens, sendIosSessionLiveActivity } = deps;
-    if (listIosSessionActivityTokens && sendIosSessionLiveActivity) {
+    if (hasSessionCardIo(deps)) {
       await deliverSessionCards(
         {
           ...scope,
@@ -272,8 +272,10 @@ export async function refreshGlanceableSnapshot(
           nowSeconds: Math.floor(nowMs() / 1000),
         },
         {
-          listIosSessionActivityTokens,
-          sendIosSessionLiveActivity,
+          listIosSessionActivityTokens: deps.listIosSessionActivityTokens,
+          sendIosSessionLiveActivity: deps.sendIosSessionLiveActivity,
+          listAndroidSessionTokens: deps.listAndroidSessionTokens,
+          sendAndroidSessionLiveUpdate: deps.sendAndroidSessionLiveUpdate,
           sessionCardMemory: cardMemory,
           isCurrent,
         }

@@ -1,5 +1,5 @@
 {
-  "id": "f85d73b1-35e2-4694-9b1a-31445706deef",
+  "id": "9813e256-dc16-4ff4-94ae-e79db9014837",
   "prevId": "52551409-3c9e-4c1a-8918-9b770321577e",
   "version": "7",
   "dialect": "postgresql",
@@ -38787,21 +38787,6 @@
         }
       },
       "indexes": {
-        "UQ_user_activity_tokens_token": {
-          "name": "UQ_user_activity_tokens_token",
-          "columns": [
-            {
-              "expression": "token",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "UQ_user_activity_tokens_live_ios_activity": {
           "name": "UQ_user_activity_tokens_live_ios_activity",
           "columns": [
@@ -38862,7 +38847,7 @@
             }
           ],
           "isUnique": false,
-          "where": "\"user_activity_tokens\".\"kind\" = 'ios_session_activity' AND \"user_activity_tokens\".\"superseded_at\" IS NULL",
+          "where": "\"user_activity_tokens\".\"kind\" IN ('ios_session_activity', 'android_session_ongoing') AND \"user_activity_tokens\".\"superseded_at\" IS NULL",
           "concurrently": true,
           "method": "btree",
           "with": {}
@@ -38884,7 +38869,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "UQ_user_activity_tokens_token_session": {
+          "name": "UQ_user_activity_tokens_token_session",
+          "nullsNotDistinct": true,
+          "columns": [
+            "token",
+            "session_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

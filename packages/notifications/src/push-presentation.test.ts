@@ -66,6 +66,24 @@ const channelCases = [
     },
     'agent-progress',
   ],
+  [
+    {
+      type: 'session_live_update',
+      schemaVersion: 1,
+      event: 'end',
+      content: {
+        sessionId: 'ses-1',
+        title: 'Fix the login bug',
+        statusKind: 'running',
+        statusSince: '2026-01-01T00:00:00.000Z',
+        scheduledAt: null,
+        awaitingPermission: false,
+        approvalKey: null,
+        updatedAt: '2026-01-01T00:00:01.000Z',
+      },
+    },
+    'followed-sessions',
+  ],
 ] as const;
 
 function glanceable(needsInput: number) {
@@ -93,6 +111,7 @@ describe('ANDROID_NOTIFICATION_CHANNELS', () => {
       { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
       { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
       { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
+      { id: 'followed-sessions', name: 'Followed sessions', importance: 'low', bypassDnd: false },
     ]);
   });
 

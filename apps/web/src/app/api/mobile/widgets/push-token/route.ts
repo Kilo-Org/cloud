@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
           platform: 'ios',
         })
         .onConflictDoUpdate({
-          target: [user_activity_tokens.token],
+          target: [user_activity_tokens.token, user_activity_tokens.session_id],
           set: {
             user_id: principal.userId,
             organization_id: principal.organizationId,

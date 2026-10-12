@@ -1,13 +1,24 @@
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { ai_gateway_config } from '@kilocode/db/schema';
+import { GatewayModelListConfigSchema } from '@kilocode/db/schema-types';
+import { eq } from 'drizzle-orm';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import {
-  GATEWAY_MODEL_LIST_CACHE_TTL_MS,
-  readGatewayModelList,
-} from '@kilocode/web-shared/lib/ai-gateway/gateway-model-lists';
+
+/** Throws on an invalid stored list, so the cached getter keeps its last valid value. */
+export async function readPreferredModels(): Promise<string[]> {
+  const [row] = await db
+    .select({ preferred_models: ai_gateway_config.preferred_models })
+    .from(ai_gateway_config)
+    .where(eq(ai_gateway_config.id, 1))
+    .limit(1);
+  if (!row?.preferred_models) return [];
+  return GatewayModelListConfigSchema.parse(row.preferred_models).models;
+}
 
 export const getPreferredModels: () => Promise<ReadonlyArray<string>> = createCachedFetch(
-  () => readGatewayModelList('preferred_models'),
-  GATEWAY_MODEL_LIST_CACHE_TTL_MS,
+  readPreferredModels,
+  60_000,
   []
 );
 

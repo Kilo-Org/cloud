@@ -1,10 +1,11 @@
-import { beforeAll, describe, expect, test } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import {
   familyHasUnavailableFreeModel,
   getUnavailableModelIds,
   isUnavailableModel,
+  readUnavailableModelIds,
 } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 
 beforeAll(async () => {
@@ -71,4 +72,29 @@ describe('familyHasUnavailableFreeModel', () => {
       expect(familyHasUnavailableFreeModel(unavailableModelIds, modelId)).toBe(false);
     }
   );
+});
+
+describe('readUnavailableModelIds', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+  });
+
+  test('returns an empty list when no config row exists', async () => {
+    expect(await readUnavailableModelIds()).toEqual([]);
+  });
+
+  test('reads only the unavailable_models column, without the hardcoded model', async () => {
+    await db.insert(ai_gateway_config).values({
+      preferred_models: { models: ['provider/b'] },
+      unavailable_models: { models: ['provider/c:free'] },
+    });
+    expect(await readUnavailableModelIds()).toEqual(['provider/c:free']);
+  });
+
+  test('throws on an invalid stored list', async () => {
+    await db
+      .insert(ai_gateway_config)
+      .values({ unavailable_models: { models: ['Provider/Model'] } });
+    await expect(readUnavailableModelIds()).rejects.toThrow();
+  });
 });

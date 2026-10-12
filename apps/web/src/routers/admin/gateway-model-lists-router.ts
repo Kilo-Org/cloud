@@ -1,12 +1,11 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
-import { GATEWAY_MODEL_LISTS } from '@kilocode/web-shared/lib/ai-gateway/gateway-model-lists';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { GatewayModelListConfigSchema } from '@kilocode/db/schema-types';
 import { eq } from 'drizzle-orm';
 import * as z from 'zod';
 
-const GatewayModelListSchema = z.enum(GATEWAY_MODEL_LISTS);
+const GatewayModelListSchema = z.enum(['preferred_models', 'unavailable_models']);
 
 export type GatewayModelList = z.infer<typeof GatewayModelListSchema>;
 

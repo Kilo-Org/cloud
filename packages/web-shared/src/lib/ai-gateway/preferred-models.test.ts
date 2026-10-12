@@ -1,8 +1,8 @@
-import { beforeAll, describe, expect, it } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { getMonitoredModels, getPreferredModels } from './preferred-models';
+import { getMonitoredModels, getPreferredModels, readPreferredModels } from './preferred-models';
 
 const storedModels = [
   'kilo-auto/efficient',
@@ -44,5 +44,35 @@ describe('getMonitoredModels', () => {
       const isolated = await import('./preferred-models');
       await expect(isolated.getMonitoredModels()).rejects.toThrow('No monitored models');
     });
+  });
+});
+
+describe('readPreferredModels', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+  });
+
+  it('returns an empty list when no config row exists', async () => {
+    expect(await readPreferredModels()).toEqual([]);
+  });
+
+  it('returns an empty list when the column is not set', async () => {
+    await db.insert(ai_gateway_config).values({ unavailable_models: { models: ['provider/a'] } });
+    expect(await readPreferredModels()).toEqual([]);
+  });
+
+  it('reads only the preferred_models column', async () => {
+    await db.insert(ai_gateway_config).values({
+      preferred_models: { models: ['provider/b', 'provider/a'] },
+      unavailable_models: { models: ['provider/c:free'] },
+    });
+    expect(await readPreferredModels()).toEqual(['provider/b', 'provider/a']);
+  });
+
+  it('throws on an invalid stored list', async () => {
+    await db
+      .insert(ai_gateway_config)
+      .values({ preferred_models: { models: ['provider/a', 'provider/a'] } });
+    await expect(readPreferredModels()).rejects.toThrow('Duplicate model');
   });
 });

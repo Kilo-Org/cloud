@@ -1,6 +1,4 @@
 import { test, expect, describe, afterEach, beforeEach } from '@jest/globals';
-import type * as GatewayModelListsModule from '@kilocode/web-shared/lib/ai-gateway/gateway-model-lists';
-import type { GatewayModelList } from '@kilocode/web-shared/lib/ai-gateway/gateway-model-lists';
 import {
   mockOpenRouterModels,
   createMockResponse,
@@ -81,14 +79,18 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {},
 }));
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-model-lists', () => ({
-  ...jest.requireActual<typeof GatewayModelListsModule>(
-    '@kilocode/web-shared/lib/ai-gateway/gateway-model-lists'
-  ),
-  readGatewayModelList: jest.fn(async (list: GatewayModelList) =>
-    list === 'unavailable_models'
-      ? ['google/gemma-4-31b-it:free', 'thinkingmachines/inkling:free']
-      : []
+jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/unavailable-models') as Record<
+    string,
+    unknown
+  >),
+  getUnavailableModelIds: jest.fn(
+    async () =>
+      new Set([
+        'google/gemma-4-26b-a4b-it:free',
+        'google/gemma-4-31b-it:free',
+        'thinkingmachines/inkling:free',
+      ])
   ),
 }));
 

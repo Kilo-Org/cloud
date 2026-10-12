@@ -36633,7 +36633,8 @@
             "ios_push_to_start",
             "ios_activity",
             "ios_session_activity",
-            "android_ongoing"
+            "android_ongoing",
+            "android_session_ongoing"
           ]
         },
         "platform": {
@@ -37048,6 +37049,10 @@
         "token": {
           "type": "string",
           "minLength": 1
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -37057,9 +37062,10 @@
     "tags": [
       "user",
       "unregisteractivitytoken",
-      "token"
+      "token",
+      "sessionid"
     ],
-    "searchBlob": "user.unregisterActivityToken Remove an activity token used for Live Activities or ongoing notifications. user unregisteractivitytoken token token"
+    "searchBlob": "user.unregisterActivityToken Remove an activity token used for Live Activities or ongoing notifications. user unregisteractivitytoken token sessionid token sessionId"
   },
   "user.unregisterPushToken": {
     "path": "user.unregisterPushToken",

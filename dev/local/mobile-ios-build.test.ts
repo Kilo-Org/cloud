@@ -1007,6 +1007,47 @@ test('runBuild falls back to the local builder when the remote fetch misses', as
   }
 });
 
+test('runBuild with requireRemote fails instead of building locally when the remote fetch misses', async () => {
+  const cacheRoot = makeTempDir('build-remote-required');
+  const claimRoot = makeTempDir('claims');
+  const worktree = makeTempDir('wt');
+  const udid = 'UDID-remote-required';
+  fs.writeFileSync(
+    path.join(claimRoot, `${udid}.json`),
+    JSON.stringify({
+      worktreeRoot: worktree,
+      claimId: 'c',
+      status: 'ready',
+      claimedAt: new Date().toISOString(),
+      deviceId: udid,
+    })
+  );
+  let builderCalls = 0;
+  let installs = 0;
+  const deps: BuildDeps = makeBuildDeps({
+    env: fixedEnv({ cacheRoot }),
+    worktreeRoot: worktree,
+    claimRoot,
+    fetchRemote: async () => false,
+    requireRemote: true,
+    build: async () => {
+      builderCalls += 1;
+    },
+    install: () => {
+      installs += 1;
+    },
+  });
+  try {
+    await assert.rejects(() => runBuild(udid, deps), /KILO_REMOTE_NATIVE=required/);
+    assert.equal(builderCalls, 0);
+    assert.equal(installs, 0);
+  } finally {
+    fs.rmSync(cacheRoot, { recursive: true, force: true });
+    fs.rmSync(claimRoot, { recursive: true, force: true });
+    fs.rmSync(worktree, { recursive: true, force: true });
+  }
+});
+
 test('runBuild waiter: two concurrent callers invoke the builder once and both install the same entry', async () => {
   const cacheRoot = makeTempDir('build-waiter');
   const claimRoot = makeTempDir('claims');

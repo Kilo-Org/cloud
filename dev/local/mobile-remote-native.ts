@@ -6,7 +6,8 @@
 //
 // Every failure path returns false/undefined so the caller falls back to
 // the local build — the failure path stays today's path. Set
-// KILO_REMOTE_NATIVE=off to skip remote fetching entirely.
+// KILO_REMOTE_NATIVE=off to skip remote fetching entirely, or
+// KILO_REMOTE_NATIVE=required to fail the build instead of compiling locally.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,6 +23,10 @@ const DOWNLOAD_MAX_BUFFER = 2 * 1024 * 1024 * 1024;
 
 export function remoteNativeDisabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.KILO_REMOTE_NATIVE === 'off';
+}
+
+export function remoteNativeRequired(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.KILO_REMOTE_NATIVE === 'required';
 }
 
 export function artifactName(platform: 'ios' | 'android', nativeHash: string): string {

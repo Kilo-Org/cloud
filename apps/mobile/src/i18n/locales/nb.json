@@ -3325,7 +3325,8 @@
         "notGguf": "Lenken må peke til en .gguf-fil.",
         "space": "Det er ikke nok ledig lagringsplass til denne modellen. Frigjør plass, og prøv igjen.",
         "network": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen, og prøv igjen.",
-        "invalidFile": "Den nedlastede filen er ikke en modell denne appen kan kjøre, så den ble fjernet."
+        "invalidFile": "Den nedlastede filen er ikke en modell denne appen kan kjøre, så den ble fjernet.",
+        "checksum": "Den nedlastede filen samsvarer ikke med den publiserte kontrollsummen, så den ble fjernet. Prøv nedlastingen på nytt."
       }
     },
     "catalog": {

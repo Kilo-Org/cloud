@@ -3489,7 +3489,8 @@
         "notGguf": "Rhaid i'r ddolen bwyntio at ffeil .gguf.",
         "space": "Nid oes digon o storfa rydd ar gyfer y model hwn. Rhyddhewch le a rhowch gynnig arall arni.",
         "network": "Ni orffennodd y lawrlwythiad. Gwiriwch eich cysylltiad a rhowch gynnig arall arni.",
-        "invalidFile": "Nid yw'r ffeil a lawrlwythwyd yn fodel y gall yr ap hwn ei redeg, felly cafodd ei dileu."
+        "invalidFile": "Nid yw'r ffeil a lawrlwythwyd yn fodel y gall yr ap hwn ei redeg, felly cafodd ei dileu.",
+        "checksum": "Nid yw'r ffeil a lawrlwythwyd yn cyfateb i'w siecswm cyhoeddedig, felly cafodd ei dileu. Rhowch gynnig ar y lawrlwythiad eto."
       }
     },
     "catalog": {

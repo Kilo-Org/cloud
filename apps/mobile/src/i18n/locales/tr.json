@@ -3325,7 +3325,8 @@
         "notGguf": "Bağlantı bir .gguf dosyasını göstermelidir.",
         "space": "Bu model için yeterli boş depolama alanı yok. Yer açıp yeniden deneyin.",
         "network": "İndirme tamamlanamadı. Bağlantınızı denetleyip yeniden deneyin.",
-        "invalidFile": "İndirilen dosya bu uygulamanın çalıştırabileceği bir model değil, bu yüzden kaldırıldı."
+        "invalidFile": "İndirilen dosya bu uygulamanın çalıştırabileceği bir model değil, bu yüzden kaldırıldı.",
+        "checksum": "İndirilen dosya yayımlanan sağlama toplamıyla eşleşmiyor, bu yüzden kaldırıldı. İndirmeyi yeniden deneyin."
       }
     },
     "catalog": {

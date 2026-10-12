@@ -3325,7 +3325,8 @@
         "notGguf": "Havola .gguf faylga ishora qilishi kerak.",
         "space": "Bu model uchun yetarli bo‘sh joy yo‘q. Joy bo‘shatib, qayta urinib ko‘ring.",
         "network": "Yuklab olish tugallanmadi. Ulanishni tekshirib, qayta urinib ko‘ring.",
-        "invalidFile": "Yuklab olingan fayl bu ilova ishga tushira oladigan model emas, shuning uchun u o‘chirildi."
+        "invalidFile": "Yuklab olingan fayl bu ilova ishga tushira oladigan model emas, shuning uchun u o‘chirildi.",
+        "checksum": "Yuklab olingan fayl e’lon qilingan nazorat summasiga mos kelmaydi, shuning uchun u o‘chirildi. Qayta yuklab olib ko‘ring."
       }
     },
     "catalog": {

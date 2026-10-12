@@ -3448,7 +3448,8 @@
         "notGguf": "Il-link irid jindika lejn fajl .gguf.",
         "space": "M'hemmx biżżejjed spazju ħieles għal dan il-mudell. Illibera spazju u erġa' pprova.",
         "network": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
-        "invalidFile": "Il-fajl imniżżel mhuwiex mudell li din l-app tista' tmexxi, għalhekk tneħħa."
+        "invalidFile": "Il-fajl imniżżel mhuwiex mudell li din l-app tista' tmexxi, għalhekk tneħħa.",
+        "checksum": "Il-fajl imniżżel ma jaqbilx mal-checksum ippubblikat tiegħu, għalhekk tneħħa. Erġa' pprova t-tniżżil."
       }
     },
     "catalog": {

@@ -3325,7 +3325,8 @@
         "notGguf": "Kiungo lazima kielekee faili ya .gguf.",
         "space": "Hakuna nafasi ya kutosha ya kuhifadhi kwa modeli hii. Toa nafasi na ujaribu tena.",
         "network": "Upakuaji haukukamilika. Angalia muunganisho wako na ujaribu tena.",
-        "invalidFile": "Faili iliyopakuliwa si modeli ambayo programu hii inaweza kuendesha, kwa hivyo iliondolewa."
+        "invalidFile": "Faili iliyopakuliwa si modeli ambayo programu hii inaweza kuendesha, kwa hivyo iliondolewa.",
+        "checksum": "Faili iliyopakuliwa hailingani na checksum yake iliyochapishwa, kwa hivyo iliondolewa. Jaribu kupakua tena."
       }
     },
     "catalog": {

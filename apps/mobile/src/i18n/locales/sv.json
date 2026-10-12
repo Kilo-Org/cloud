@@ -3325,7 +3325,8 @@
         "notGguf": "Länken måste peka på en .gguf-fil.",
         "space": "Det finns inte tillräckligt med ledigt utrymme för den här modellen. Frigör utrymme och försök igen.",
         "network": "Nedladdningen slutfördes inte. Kontrollera anslutningen och försök igen.",
-        "invalidFile": "Den nedladdade filen är inte en modell som den här appen kan köra, så den har tagits bort."
+        "invalidFile": "Den nedladdade filen är inte en modell som den här appen kan köra, så den har tagits bort.",
+        "checksum": "Den nedladdade filen matchar inte sin publicerade kontrollsumma, så den har tagits bort. Försök ladda ner den igen."
       }
     },
     "catalog": {

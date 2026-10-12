@@ -3325,7 +3325,8 @@
         "notGguf": "Der Link muss auf eine .gguf-Datei verweisen.",
         "space": "Es ist nicht genügend freier Speicherplatz für dieses Modell vorhanden. Gib Speicherplatz frei und versuche es erneut.",
         "network": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und versuche es erneut.",
-        "invalidFile": "Die heruntergeladene Datei ist kein Modell, das diese App ausführen kann, und wurde daher entfernt."
+        "invalidFile": "Die heruntergeladene Datei ist kein Modell, das diese App ausführen kann, und wurde daher entfernt.",
+        "checksum": "Die heruntergeladene Datei stimmt nicht mit ihrer veröffentlichten Prüfsumme überein und wurde daher entfernt. Versuche den Download erneut."
       }
     },
     "catalog": {

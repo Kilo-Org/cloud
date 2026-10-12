@@ -3325,7 +3325,8 @@
         "notGguf": "Linket skal pege på en .gguf-fil.",
         "space": "Der er ikke nok ledig lagerplads til denne model. Frigør plads, og prøv igen.",
         "network": "Downloadet blev ikke færdigt. Tjek din forbindelse, og prøv igen.",
-        "invalidFile": "Den downloadede fil er ikke en model, som denne app kan køre, så den blev fjernet."
+        "invalidFile": "Den downloadede fil er ikke en model, som denne app kan køre, så den blev fjernet.",
+        "checksum": "Den downloadede fil matcher ikke sin offentliggjorte kontrolsum, så den blev fjernet. Prøv at downloade igen."
       }
     },
     "catalog": {

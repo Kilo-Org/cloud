@@ -3325,7 +3325,8 @@
         "notGguf": "Xiriirku waa inuu tilmaamaa fayl .gguf ah.",
         "space": "Ma jiro kayd bannaan oo ku filan moodeelkan. Meel bannaan samee oo mar kale isku day.",
         "network": "Soo dejintu ma dhammaanin. Hubi xiriirkaaga oo mar kale isku day.",
-        "invalidFile": "Faylka la soo dejiyay ma aha moodeel uu abkani ku shaqeyn karo, sidaas darteed waa la tirtiray."
+        "invalidFile": "Faylka la soo dejiyay ma aha moodeel uu abkani ku shaqeyn karo, sidaas darteed waa la tirtiray.",
+        "checksum": "Faylka la soo dejiyay kuma eka checksum-kiisa la daabacay, sidaas darteed waa la tirtiray. Mar kale isku day soo dejinta."
       }
     },
     "catalog": {

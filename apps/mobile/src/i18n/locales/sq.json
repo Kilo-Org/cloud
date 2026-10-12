@@ -3325,7 +3325,8 @@
         "notGguf": "Lidhja duhet të tregojë një skedar .gguf.",
         "space": "Nuk ka hapësirë të lirë të mjaftueshme për këtë model. Liro hapësirë dhe provo përsëri.",
         "network": "Shkarkimi nuk përfundoi. Kontrollo lidhjen e internetit dhe provo përsëri.",
-        "invalidFile": "Skedari i shkarkuar nuk është një model që ky aplikacion mund ta ekzekutojë, prandaj u hoq."
+        "invalidFile": "Skedari i shkarkuar nuk është një model që ky aplikacion mund ta ekzekutojë, prandaj u hoq.",
+        "checksum": "Skedari i shkarkuar nuk përputhet me shumën e kontrollit të publikuar, prandaj u hoq. Provoni ta shkarkoni përsëri."
       }
     },
     "catalog": {

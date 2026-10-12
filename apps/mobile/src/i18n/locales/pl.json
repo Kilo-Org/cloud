@@ -3407,7 +3407,8 @@
         "notGguf": "Link musi wskazywać plik .gguf.",
         "space": "Brak wystarczającej ilości wolnego miejsca na ten model. Zwolnij miejsce i spróbuj ponownie.",
         "network": "Pobieranie nie zostało ukończone. Sprawdź połączenie i spróbuj ponownie.",
-        "invalidFile": "Pobrany plik nie jest modelem, który ta aplikacja może uruchomić, więc został usunięty."
+        "invalidFile": "Pobrany plik nie jest modelem, który ta aplikacja może uruchomić, więc został usunięty.",
+        "checksum": "Pobrany plik nie zgadza się z opublikowaną sumą kontrolną, więc został usunięty. Spróbuj pobrać go ponownie."
       }
     },
     "catalog": {

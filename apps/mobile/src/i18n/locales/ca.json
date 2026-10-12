@@ -3366,7 +3366,8 @@
         "notGguf": "L'enllaç ha d'apuntar a un fitxer .gguf.",
         "space": "No hi ha prou espai d'emmagatzematge lliure per a aquest model. Allibera espai i torna-ho a provar.",
         "network": "La descàrrega no s'ha acabat. Comprova la connexió i torna-ho a provar.",
-        "invalidFile": "El fitxer descarregat no és un model que aquesta aplicació pugui executar, així que s'ha eliminat."
+        "invalidFile": "El fitxer descarregat no és un model que aquesta aplicació pugui executar, així que s'ha eliminat.",
+        "checksum": "El fitxer descarregat no coincideix amb la suma de verificació publicada, així que s'ha eliminat. Torna a provar la descàrrega."
       }
     },
     "catalog": {

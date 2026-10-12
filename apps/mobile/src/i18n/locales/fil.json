@@ -3325,7 +3325,8 @@
         "notGguf": "Dapat nakaturo ang link sa isang .gguf file.",
         "space": "Walang sapat na libreng storage para sa modelong ito. Magbakante ng espasyo at subukan muli.",
         "network": "Hindi natapos ang pag-download. Suriin ang iyong koneksyon at subukan muli.",
-        "invalidFile": "Ang na-download na file ay hindi modelong kayang patakbuhin ng app na ito, kaya inalis ito."
+        "invalidFile": "Ang na-download na file ay hindi modelong kayang patakbuhin ng app na ito, kaya inalis ito.",
+        "checksum": "Ang na-download na file ay hindi tumutugma sa nakalathalang checksum nito, kaya inalis ito. Subukang i-download itong muli."
       }
     },
     "catalog": {

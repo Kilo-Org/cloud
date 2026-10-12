@@ -3407,7 +3407,8 @@
         "notGguf": "Nuoroda turi nurodyti į .gguf failą.",
         "space": "Šiam modeliui nepakanka laisvos vietos. Atlaisvinkite vietos ir bandykite dar kartą.",
         "network": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir bandykite dar kartą.",
-        "invalidFile": "Atsisiųstas failas nėra modelis, kurį ši programa gali paleisti, todėl jis buvo pašalintas."
+        "invalidFile": "Atsisiųstas failas nėra modelis, kurį ši programa gali paleisti, todėl jis buvo pašalintas.",
+        "checksum": "Atsisiųstas failas neatitinka paskelbtos kontrolinės sumos, todėl jis buvo pašalintas. Pabandykite atsisiųsti dar kartą."
       }
     },
     "catalog": {

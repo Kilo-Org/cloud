@@ -3366,7 +3366,8 @@
         "notGguf": "Saitei ir jānorāda uz .gguf failu.",
         "space": "Šim modelim nav pietiekami daudz brīvas krātuves vietas. Atbrīvojiet vietu un mēģiniet vēlreiz.",
         "network": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
-        "invalidFile": "Lejupielādētais fails nav modelis, ko šī lietotne var palaist, tāpēc tas tika noņemts."
+        "invalidFile": "Lejupielādētais fails nav modelis, ko šī lietotne var palaist, tāpēc tas tika noņemts.",
+        "checksum": "Lejupielādētais fails neatbilst publicētajai kontrolsummai, tāpēc tas tika noņemts. Mēģiniet lejupielādēt vēlreiz."
       }
     },
     "catalog": {

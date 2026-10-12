@@ -3366,7 +3366,8 @@
         "notGguf": "O link deve apontar para um arquivo .gguf.",
         "space": "Não há espaço livre suficiente para este modelo. Libere espaço e tente novamente.",
         "network": "O download não foi concluído. Verifique sua conexão e tente novamente.",
-        "invalidFile": "O arquivo baixado não é um modelo que este app pode executar, então ele foi removido."
+        "invalidFile": "O arquivo baixado não é um modelo que este app pode executar, então ele foi removido.",
+        "checksum": "O arquivo baixado não corresponde à soma de verificação publicada, então ele foi removido. Tente baixar novamente."
       }
     },
     "catalog": {

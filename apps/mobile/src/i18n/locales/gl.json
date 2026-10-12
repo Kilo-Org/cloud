@@ -3325,7 +3325,8 @@
         "notGguf": "A ligazón debe apuntar a un ficheiro .gguf.",
         "space": "Non hai suficiente espazo libre para este modelo. Libera espazo e téntao de novo.",
         "network": "A descarga non rematou. Comproba a túa conexión e téntao de novo.",
-        "invalidFile": "O ficheiro descargado non é un modelo que esta aplicación poida executar, así que se eliminou."
+        "invalidFile": "O ficheiro descargado non é un modelo que esta aplicación poida executar, así que se eliminou.",
+        "checksum": "O ficheiro descargado non coincide coa súa suma de verificación publicada, así que se eliminou. Tenta descargalo de novo."
       }
     },
     "catalog": {

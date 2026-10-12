@@ -23,6 +23,7 @@ const FAILURE_KEYS = {
   space: 'modelChat.gguf.errors.space',
   network: 'modelChat.gguf.errors.network',
   invalidFile: 'modelChat.gguf.errors.invalidFile',
+  checksum: 'modelChat.gguf.errors.checksum',
 } as const satisfies Record<GgufDownloadProblem, string>;
 
 function progressKey(download: GgufDownload): string {

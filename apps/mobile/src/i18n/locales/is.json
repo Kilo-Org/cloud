@@ -3325,7 +3325,8 @@
         "notGguf": "Tengillinn verður að vísa á .gguf-skrá.",
         "space": "Það er ekki nóg laust geymslupláss fyrir þetta líkan. Losaðu pláss og reyndu aftur.",
         "network": "Niðurhalið kláraðist ekki. Athugaðu tenginguna þína og reyndu aftur.",
-        "invalidFile": "Niðurhalaða skráin er ekki líkan sem þetta forrit getur keyrt, svo henni var eytt."
+        "invalidFile": "Niðurhalaða skráin er ekki líkan sem þetta forrit getur keyrt, svo henni var eytt.",
+        "checksum": "Niðurhalaða skráin passar ekki við uppgefna gátsummu sína, svo henni var eytt. Reyndu að hlaða henni niður aftur."
       }
     },
     "catalog": {

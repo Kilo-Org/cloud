@@ -3325,7 +3325,8 @@
         "notGguf": "De link moet naar een .gguf-bestand verwijzen.",
         "space": "Er is niet genoeg vrije opslagruimte voor dit model. Maak ruimte vrij en probeer het opnieuw.",
         "network": "De download is niet voltooid. Controleer je verbinding en probeer het opnieuw.",
-        "invalidFile": "Het gedownloade bestand is geen model dat deze app kan uitvoeren, dus het is verwijderd."
+        "invalidFile": "Het gedownloade bestand is geen model dat deze app kan uitvoeren, dus het is verwijderd.",
+        "checksum": "Het gedownloade bestand komt niet overeen met de gepubliceerde controlesom, dus het is verwijderd. Probeer het opnieuw te downloaden."
       }
     },
     "catalog": {

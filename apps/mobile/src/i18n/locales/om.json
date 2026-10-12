@@ -3325,7 +3325,8 @@
         "notGguf": "Liinkiin faayilii .gguf agarsiisuu qaba.",
         "space": "Moodeela kanaaf bakka duwwaa gahaan hin jiru. Bakka duwwaa uumiitii irra deebi'ii yaali.",
         "network": "Buufinsi hin xumuramne. Walqunnamtii keessan sakatta'ii irra deebi'ii yaali.",
-        "invalidFile": "Faayiliin buufame moodeela app kanaan hojjetamuu danda'u miti, kanaaf haqame."
+        "invalidFile": "Faayiliin buufame moodeela app kanaan hojjetamuu danda'u miti, kanaaf haqame.",
+        "checksum": "Faayiliin buufame checksum isaa maxxanfameen wal hin simu, kanaaf haqame. Ammas irra deebi'ii buusi."
       }
     },
     "catalog": {

@@ -3325,7 +3325,8 @@
         "notGguf": "Ìjápọ̀ náà gbọ́dọ̀ tọ́ka sí fáìlì .gguf.",
         "space": "Kò sí ààyè tó pọ̀ tó fún awoṣe yìí. Ṣí ààyè kúrò kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
         "network": "Gbígbà sílẹ̀ kò parí. Yẹ ìsopọ̀ rẹ wò kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
-        "invalidFile": "Fáìlì tí a gbà sílẹ̀ kì í ṣe awoṣe tí app yìí lè ṣiṣẹ́, nítorí náà a yọ ọ́ kúrò."
+        "invalidFile": "Fáìlì tí a gbà sílẹ̀ kì í ṣe awoṣe tí app yìí lè ṣiṣẹ́, nítorí náà a yọ ọ́ kúrò.",
+        "checksum": "Fáìlì tí a gbà sílẹ̀ kò bá checksum rẹ̀ tí a tẹ̀ jáde mu, nítorí náà a yọ ọ́ kúrò. Tún gbìyànjú láti gbà á sílẹ̀."
       }
     },
     "catalog": {

@@ -3325,7 +3325,8 @@
         "notGguf": "Me tohu te hononga ki tētahi kōnae .gguf.",
         "space": "Kāore e ranea te wāhi rokiroki mō tēnei tauira. Whakawāteahia he wāhi, ka ngana anō.",
         "network": "Kāore i oti te tikiake. Tirohia tō hononga, ka ngana anō.",
-        "invalidFile": "Ehara te kōnae kua tikiake i tētahi tauira ka taea e tēnei taupānga te whakahaere, nō reira kua tangohia."
+        "invalidFile": "Ehara te kōnae kua tikiake i tētahi tauira ka taea e tēnei taupānga te whakahaere, nō reira kua tangohia.",
+        "checksum": "Kāore te kōnae kua tikiake e ōrite ki tōna tātai arowhai kua whakaputaina, nō reira kua tangohia. Whakamātauria anō te tikiake."
       }
     },
     "catalog": {

@@ -3325,7 +3325,8 @@
         "notGguf": "Isixhumanisi kufanele sikhombe efayeleni le-.gguf.",
         "space": "Asikho isikhala esanele saleli modeli. Khulula isikhala bese uzama futhi.",
         "network": "Ukulanda akuphelanga. Hlola ukuxhumana kwakho bese uzama futhi.",
-        "invalidFile": "Ifayela elilandiwe akusiyo imodeli le app engayisebenzisa, ngakho isusiwe."
+        "invalidFile": "Ifayela elilandiwe akusiyo imodeli le app engayisebenzisa, ngakho isusiwe.",
+        "checksum": "Ifayela elilandiwe alihambisani ne-checksum yalo eshicilelwe, ngakho isusiwe. Zama ukulanda futhi."
       }
     },
     "catalog": {

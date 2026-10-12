@@ -3366,7 +3366,8 @@
         "notGguf": "A ligação tem de apontar para um ficheiro .gguf.",
         "space": "Não há espaço de armazenamento livre suficiente para este modelo. Liberte espaço e tente novamente.",
         "network": "A transferência não terminou. Verifique a sua ligação e tente novamente.",
-        "invalidFile": "O ficheiro transferido não é um modelo que esta aplicação possa executar, por isso foi removido."
+        "invalidFile": "O ficheiro transferido não é um modelo que esta aplicação possa executar, por isso foi removido.",
+        "checksum": "O ficheiro transferido não corresponde à soma de verificação publicada, por isso foi removido. Tente transferir novamente."
       }
     },
     "catalog": {

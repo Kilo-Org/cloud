@@ -3407,7 +3407,8 @@
         "notGguf": "Povezava mora kazati na datoteko .gguf.",
         "space": "Na voljo ni dovolj prostora za shranjevanje tega modela. Sprostite prostor in poskusite znova.",
         "network": "Prenos se ni dokončal. Preverite povezavo in poskusite znova.",
-        "invalidFile": "Prenesena datoteka ni model, ki bi ga ta aplikacija lahko izvajala, zato je bila odstranjena."
+        "invalidFile": "Prenesena datoteka ni model, ki bi ga ta aplikacija lahko izvajala, zato je bila odstranjena.",
+        "checksum": "Prenesena datoteka se ne ujema z objavljeno kontrolno vsoto, zato je bila odstranjena. Poskusite znova prenesti."
       }
     },
     "catalog": {

@@ -3325,7 +3325,8 @@
         "notGguf": "Dole ne hanyar haɗin ta nuna fayil ɗin .gguf.",
         "space": "Babu isasshen sarari kyauta don wannan samfurin. Ka yantar da sarari sannan ka sake gwadawa.",
         "network": "Saukarwar ba ta kammala ba. Duba haɗin ka sannan ka sake gwadawa.",
-        "invalidFile": "Fayil ɗin da aka sauke ba samfurin da wannan manhajar za ta iya gudanarwa ba ne, don haka an cire shi."
+        "invalidFile": "Fayil ɗin da aka sauke ba samfurin da wannan manhajar za ta iya gudanarwa ba ne, don haka an cire shi.",
+        "checksum": "Fayil ɗin da aka sauke bai yi daidai da checksum ɗinsa da aka wallafa ba, don haka an cire shi. Sake gwada saukewa."
       }
     },
     "catalog": {

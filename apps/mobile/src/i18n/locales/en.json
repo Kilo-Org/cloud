@@ -3282,7 +3282,8 @@
         "notGguf": "The link must point to a .gguf file.",
         "space": "There isn't enough free storage for this model. Free up space and try again.",
         "network": "The download didn't finish. Check your connection and try again.",
-        "invalidFile": "The downloaded file isn't a model this app can run, so it was removed."
+        "invalidFile": "The downloaded file isn't a model this app can run, so it was removed.",
+        "checksum": "The downloaded file doesn't match its published checksum, so it was removed. Try the download again."
       }
     },
     "catalog": {

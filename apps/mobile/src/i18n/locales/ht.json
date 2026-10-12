@@ -3325,7 +3325,8 @@
         "notGguf": "Lyen an dwe mennen nan yon fichye .gguf.",
         "space": "Pa gen ase espas lib pou modèl sa a. Lage espas epi eseye ankò.",
         "network": "Telechajman an pa fini. Verifye koneksyon ou epi eseye ankò.",
-        "invalidFile": "Fichye ki telechaje a pa yon modèl aplikasyon sa a ka fè mache, kidonk li te retire."
+        "invalidFile": "Fichye ki telechaje a pa yon modèl aplikasyon sa a ka fè mache, kidonk li te retire.",
+        "checksum": "Fichye ki telechaje a pa koresponn ak checksum ki pibliye pou li a, kidonk li te retire. Eseye telechaje l ankò."
       }
     },
     "catalog": {

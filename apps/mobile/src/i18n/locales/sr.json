@@ -3366,7 +3366,8 @@
         "notGguf": "Link mora da vodi do .gguf fajla.",
         "space": "Nema dovoljno slobodnog prostora za ovaj model. Oslobodite prostor i pokušajte ponovo.",
         "network": "Preuzimanje nije završeno. Proverite vezu i pokušajte ponovo.",
-        "invalidFile": "Preuzeti fajl nije model koji ova aplikacija može da pokrene, pa je uklonjen."
+        "invalidFile": "Preuzeti fajl nije model koji ova aplikacija može da pokrene, pa je uklonjen.",
+        "checksum": "Preuzeti fajl se ne poklapa sa objavljenom kontrolnom sumom, pa je uklonjen. Pokušajte ponovo da ga preuzmete."
       }
     },
     "catalog": {

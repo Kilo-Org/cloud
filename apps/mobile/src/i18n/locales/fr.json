@@ -3366,7 +3366,8 @@
         "notGguf": "Le lien doit pointer vers un fichier .gguf.",
         "space": "L'espace de stockage disponible est insuffisant pour ce modèle. Libérez de l'espace et réessayez.",
         "network": "Le téléchargement ne s'est pas terminé. Vérifiez votre connexion et réessayez.",
-        "invalidFile": "Le fichier téléchargé n'est pas un modèle que cette application peut exécuter ; il a donc été supprimé."
+        "invalidFile": "Le fichier téléchargé n'est pas un modèle que cette application peut exécuter ; il a donc été supprimé.",
+        "checksum": "Le fichier téléchargé ne correspond pas à sa somme de contrôle publiée ; il a donc été supprimé. Réessayez le téléchargement."
       }
     },
     "catalog": {

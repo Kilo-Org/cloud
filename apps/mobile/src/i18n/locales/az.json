@@ -3325,7 +3325,8 @@
         "notGguf": "Link .gguf faylına yönəlməlidir.",
         "space": "Bu model üçün kifayət qədər boş yaddaş yoxdur. Yer boşaldın və yenidən cəhd edin.",
         "network": "Yükləmə tamamlanmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
-        "invalidFile": "Yüklənmiş fayl bu tətbiqin işlədə biləcəyi model deyil, ona görə silindi."
+        "invalidFile": "Yüklənmiş fayl bu tətbiqin işlədə biləcəyi model deyil, ona görə silindi.",
+        "checksum": "Yüklənmiş fayl dərc olunmuş yoxlama cəmi ilə uyğun gəlmir, ona görə silindi. Yükləməni yenidən cəhd edin."
       }
     },
     "catalog": {

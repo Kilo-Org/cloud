@@ -3325,7 +3325,8 @@
         "notGguf": "Tautan harus mengarah ke file .gguf.",
         "space": "Ruang penyimpanan tidak cukup untuk model ini. Kosongkan ruang dan coba lagi.",
         "network": "Unduhan tidak selesai. Periksa koneksi Anda dan coba lagi.",
-        "invalidFile": "File yang diunduh bukan model yang dapat dijalankan aplikasi ini, sehingga file tersebut dihapus."
+        "invalidFile": "File yang diunduh bukan model yang dapat dijalankan aplikasi ini, sehingga file tersebut dihapus.",
+        "checksum": "File yang diunduh tidak cocok dengan checksum yang dipublikasikan, sehingga file tersebut dihapus. Coba unduh lagi."
       }
     },
     "catalog": {

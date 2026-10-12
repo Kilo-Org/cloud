@@ -3325,7 +3325,8 @@
         "notGguf": "Die skakel moet na 'n .gguf-lêer wys.",
         "space": "Daar is nie genoeg gratis berging vir hierdie model nie. Maak spasie vry en probeer weer.",
         "network": "Die aflaai het nie klaargemaak nie. Kontroleer jou verbinding en probeer weer.",
-        "invalidFile": "Die afgelaaide lêer is nie 'n model wat hierdie app kan loop nie, so dit is verwyder."
+        "invalidFile": "Die afgelaaide lêer is nie 'n model wat hierdie app kan loop nie, so dit is verwyder.",
+        "checksum": "Die afgelaaide lêer stem nie ooreen met sy gepubliseerde kontrolesom nie, so dit is verwyder. Probeer die aflaai weer."
       }
     },
     "catalog": {

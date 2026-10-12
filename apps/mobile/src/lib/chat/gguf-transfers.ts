@@ -2,12 +2,16 @@ import {
   type GgufDownload,
   type GgufDownloadSource,
   type GgufDownloadTask,
+  type GgufInspect,
+  type GgufInspection,
   ggufModelName,
   ggufPartialName,
   ggufProjectorName,
   ggufProjectorPartialName,
   type GgufStorage,
   removeQuietly,
+  type Settled,
+  settled,
 } from './gguf-records';
 
 /** One file of a model: the model itself, then its projector when it has one. */
@@ -17,6 +21,8 @@ export type GgufTransfer = {
   readonly name: string;
   readonly part: string;
   readonly expected: number | undefined;
+  /** The published SHA-256; a direct link has none. */
+  readonly sha256: string | undefined;
 };
 
 /** The download in progress, as the store drives it. */
@@ -90,18 +96,23 @@ export function currentTransfer(download: GgufActiveDownload): GgufTransfer {
 
 /** The files a source downloads, in order. Only a catalog model names a projector. */
 export function transfersOf(source: GgufDownloadSource, fileId: string): readonly GgufTransfer[] {
-  const model = (url: string, expected: number | undefined): GgufTransfer => ({
+  const model = (
+    url: string,
+    expected: number | undefined,
+    sha256: string | undefined
+  ): GgufTransfer => ({
     url,
     name: ggufModelName(fileId),
     part: ggufPartialName(fileId),
     expected,
+    sha256,
   });
   if (source.kind === 'url') {
-    return [model(source.url, undefined)];
+    return [model(source.url, undefined, undefined)];
   }
   const { projector } = source.model;
   return [
-    model(source.model.url, source.model.sizeBytes),
+    model(source.model.url, source.model.sizeBytes, source.model.sha256),
     ...(projector === undefined
       ? []
       : [
@@ -110,9 +121,37 @@ export function transfersOf(source: GgufDownloadSource, fileId: string): readonl
             name: ggufProjectorName(fileId),
             part: ggufProjectorPartialName(fileId),
             expected: projector.sizeBytes,
+            sha256: projector.sha256,
           },
         ]),
   ];
+}
+
+/**
+ * Every file with a published hash must hash to it before llama.cpp reads the
+ * model, so a wrong file is never loaded. One file at a time bounds memory and CPU.
+ */
+export async function readVerified(
+  storage: GgufStorage,
+  inspect: GgufInspect,
+  transfers: readonly GgufTransfer[]
+): Promise<Settled<GgufInspection> | 'checksum'> {
+  const [model, projector] = transfers;
+  if (model === undefined) {
+    return { ok: false };
+  }
+  for (const transfer of transfers) {
+    if (transfer.sha256 !== undefined) {
+      // eslint-disable-next-line no-await-in-loop -- files hash one after another on purpose
+      const hash = await settled(storage.sha256(transfer.part));
+      if (!hash.ok || hash.value !== transfer.sha256) {
+        return 'checksum';
+      }
+    }
+  }
+  const projectorPath = projector === undefined ? undefined : storage.path(projector.part);
+  const read = await settled(inspect(storage.path(model.part), projectorPath));
+  return read;
 }
 
 /** The bytes every transfer will write, or undefined while one has no stated size. */

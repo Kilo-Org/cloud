@@ -3325,7 +3325,8 @@
         "notGguf": "Pautan mesti menunjuk ke fail .gguf.",
         "space": "Ruang storan kosong tidak mencukupi untuk model ini. Kosongkan ruang dan cuba lagi.",
         "network": "Muat turun tidak selesai. Semak sambungan anda dan cuba lagi.",
-        "invalidFile": "Fail yang dimuat turun bukan model yang boleh dijalankan oleh aplikasi ini, jadi ia telah dibuang."
+        "invalidFile": "Fail yang dimuat turun bukan model yang boleh dijalankan oleh aplikasi ini, jadi ia telah dibuang.",
+        "checksum": "Fail yang dimuat turun tidak sepadan dengan checksum yang diterbitkan, jadi ia telah dibuang. Cuba muat turun sekali lagi."
       }
     },
     "catalog": {

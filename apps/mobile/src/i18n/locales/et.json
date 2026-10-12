@@ -3325,7 +3325,8 @@
         "notGguf": "Link peab osutama .gguf failile.",
         "space": "Selle mudeli jaoks pole piisavalt vaba salvestusruumi. Vabasta ruumi ja proovi uuesti.",
         "network": "Allalaadimine ei lõppenud. Kontrolli ühendust ja proovi uuesti.",
-        "invalidFile": "Allalaaditud fail ei ole mudel, mida see rakendus saab käivitada, seega see eemaldati."
+        "invalidFile": "Allalaaditud fail ei ole mudel, mida see rakendus saab käivitada, seega see eemaldati.",
+        "checksum": "Allalaaditud fail ei vasta avaldatud kontrollsummale, seega see eemaldati. Proovige uuesti alla laadida."
       }
     },
     "catalog": {

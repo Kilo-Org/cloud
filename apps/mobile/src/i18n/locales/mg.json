@@ -3325,7 +3325,8 @@
         "notGguf": "Tsy maintsy manondro rakitra .gguf ny rohy.",
         "space": "Tsy ampy ny toerana malalaka ho an'ity modely ity. Afaho ny toerana ary andramo indray.",
         "network": "Tsy vita ny fampidinana. Hamarino ny fifandraisanao ary andramo indray.",
-        "invalidFile": "Tsy modely azon'ity rindranasa ity ampiasaina ny rakitra voampidina, ka nesorina izy."
+        "invalidFile": "Tsy modely azon'ity rindranasa ity ampiasaina ny rakitra voampidina, ka nesorina izy.",
+        "checksum": "Tsy mifanaraka amin'ny checksum navoaka ho azy ny rakitra voampidina, ka nesorina izy. Andramo indray ny fampidinana."
       }
     },
     "catalog": {

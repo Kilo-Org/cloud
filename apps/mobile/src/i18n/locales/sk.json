@@ -3407,7 +3407,8 @@
         "notGguf": "Odkaz musí smerovať na súbor .gguf.",
         "space": "Na tento model nie je dostatok voľného úložiska. Uvoľnite miesto a skúste to znova.",
         "network": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a skúste to znova.",
-        "invalidFile": "Stiahnutý súbor nie je model, ktorý by táto aplikácia mohla spustiť, preto bol odstránený."
+        "invalidFile": "Stiahnutý súbor nie je model, ktorý by táto aplikácia mohla spustiť, preto bol odstránený.",
+        "checksum": "Stiahnutý súbor sa nezhoduje so zverejneným kontrolným súčtom, preto bol odstránený. Skúste ho stiahnuť znova."
       }
     },
     "catalog": {

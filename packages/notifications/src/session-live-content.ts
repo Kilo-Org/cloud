@@ -54,7 +54,9 @@ export {
 /** How a finished session ended, for the outcome line. */
 export type SessionLiveOutcomeKind = 'pr_opened' | 'changes' | 'none';
 
-export const sessionLiveOutcomeSchema = z.object({ kind: z.enum(['pr_opened', 'changes', 'none']) });
+export const sessionLiveOutcomeSchema = z.object({
+  kind: z.enum(['pr_opened', 'changes', 'none']),
+});
 
 /**
  * How long a working session may show no activity before the card says so.

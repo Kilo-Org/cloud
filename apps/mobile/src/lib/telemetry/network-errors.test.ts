@@ -1,7 +1,12 @@
 /* oxlint-disable max-lines -- one network-error suite; splitting the fetch and unit cases would duplicate the fake-sink scaffold */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+import {
+  setBreadcrumbSink,
+  setTelemetrySink,
+  type TelemetryBreadcrumb,
+  type TelemetryEvent,
+} from '@/lib/telemetry/error-sink';
 import {
   createNetworkErrorFetch,
   isAbortError,
@@ -16,16 +21,22 @@ import {
 import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
 
 let events: TelemetryEvent[] = [];
+let breadcrumbs: TelemetryBreadcrumb[] = [];
 
 beforeEach(() => {
   events = [];
+  breadcrumbs = [];
   setTelemetrySink(event => {
     events.push(event);
+  });
+  setBreadcrumbSink(breadcrumb => {
+    breadcrumbs.push(breadcrumb);
   });
 });
 
 afterEach(() => {
   setTelemetrySink(null);
+  setBreadcrumbSink(null);
 });
 
 function reportedEvent(): TelemetryEvent | undefined {
@@ -257,32 +268,42 @@ describe('isAbortError', () => {
 });
 
 describe('createNetworkErrorFetch', () => {
-  it('(a) reports one warning event for a fetch rejection and re-throws the original error', async () => {
-    const original = new Error('socket closed');
-    const wrapped = createNetworkErrorFetch(rejectingFetch(original), { source: 'trpc' });
+  // KILO-APP-B1, 2PD, CQ and ~190 siblings: a request with no HTTP response is
+  // the device losing its network, not an app defect. It is a breadcrumb that
+  // rides on the next real event, never an event of its own.
+  it.each([
+    'fetch failed: java.net.UnknownHostException: Unable to resolve host "api.kilo.ai": No address associated with hostname',
+    'fetch failed: The network connection was lost.',
+    'fetch failed: javax.net.ssl.SSLHandshakeException: Connection reset by peer',
+    'fetch failed: java.net.ConnectException: Failed to connect to api.kilo.ai/104.18.0.1:443',
+    'fetch failed: java.net.SocketException: Software caused connection abort',
+  ])(
+    '(a) leaves one breadcrumb and no event for a transport failure and re-throws it: %s',
+    async message => {
+      const original = new Error(message);
+      const wrapped = createNetworkErrorFetch(rejectingFetch(original), { source: 'trpc' });
 
-    await expect(wrapped('https://example.com/api/trpc/session.list?batch=1')).rejects.toBe(
-      original
-    );
+      await expect(wrapped('https://example.com/api/trpc/session.list?batch=1')).rejects.toBe(
+        original
+      );
 
-    expect(events).toHaveLength(1);
-    const event = reportedEvent();
-    expect(event?.level).toBe('warning');
-    expect(event?.error).toBe(original);
-    expect(event?.tags).toMatchObject({
-      'error.subsystem': 'network',
-      'error.source': 'trpc',
-      'network.outcome': 'failed',
-      'trpc.procedure': 'session.list',
-    });
-    expect(event?.contexts?.network).toMatchObject({
-      url: 'https://example.com/api/trpc/session.list',
-      outcome: 'failed',
-      procedure: 'session.list',
-    });
-    expect(typeof event?.contexts?.network?.durationMs).toBe('number');
-    expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'failed']);
-  });
+      expect(events).toHaveLength(0);
+      expect(breadcrumbs).toEqual([
+        {
+          category: 'network',
+          level: 'warning',
+          message: 'GET /api/trpc/session.list failed',
+          data: {
+            source: 'trpc',
+            method: 'GET',
+            path: '/api/trpc/session.list',
+            outcome: 'failed',
+            durationMs: expect.any(Number),
+          },
+        },
+      ]);
+    }
+  );
 
   it('(b) does not report an aborted request and re-throws it', async () => {
     const abort = namedError('AbortError');
@@ -291,6 +312,7 @@ describe('createNetworkErrorFetch', () => {
     await expect(wrapped('https://example.com/api/trpc/session.list')).rejects.toBe(abort);
 
     expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(0);
   });
 
   it('(b2) does not report an Expo FetchRequestCanceledException and re-throws it', async () => {
@@ -315,6 +337,7 @@ describe('createNetworkErrorFetch', () => {
     await expect(wrapped('https://example.com/api/trpc/session.list')).rejects.toBe(cancel);
 
     expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(0);
   });
 
   it('(b4) does not report the production FetchError with a FetchRequestCanceledException cause', async () => {
@@ -341,21 +364,21 @@ describe('createNetworkErrorFetch', () => {
     expect(events).toHaveLength(0);
   });
 
-  it('(c) marks a RequestDeadlineError as a timeout', async () => {
+  it('(c) leaves a timeout breadcrumb and no event for a RequestDeadlineError', async () => {
     const deadline = namedError('RequestDeadlineError', 'Request timed out after 15000ms');
     const wrapped = createNetworkErrorFetch(rejectingFetch(deadline), { source: 'trpc' });
 
-    await expect(wrapped('https://example.com/api/trpc/session.list')).rejects.toBe(deadline);
+    await expect(
+      wrapped('https://example.com/api/trpc/session.list', { method: 'POST' })
+    ).rejects.toBe(deadline);
 
-    expect(events).toHaveLength(1);
-    const event = reportedEvent();
-    expect(event?.tags).toMatchObject({
-      'network.outcome': 'timeout',
-      'trpc.procedure': 'session.list',
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(1);
+    expect(breadcrumbs[0]).toMatchObject({
+      category: 'network',
+      message: 'POST /api/trpc/session.list timeout',
+      data: { method: 'POST', path: '/api/trpc/session.list', outcome: 'timeout' },
     });
-    expect(event?.contexts?.network).toMatchObject({ outcome: 'timeout', timedOut: true });
-    expect(event?.error).toBe(deadline);
-    expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'timeout']);
   });
 
   it('(d) reports a 500 response and returns the same response unchanged', async () => {
@@ -369,6 +392,7 @@ describe('createNetworkErrorFetch', () => {
 
     expect(result).toBe(response);
     expect(events).toHaveLength(1);
+    expect(breadcrumbs).toHaveLength(0);
     const event = reportedEvent();
     expect(event?.level).toBe('warning');
     expect(event?.tags).toMatchObject({
@@ -425,6 +449,7 @@ describe('createNetworkErrorFetch', () => {
     await expect(wrapped('file:///tmp/data')).rejects.toBe(error);
 
     expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(0);
   });
 
   it('respects a shouldReport predicate that declines the URL', async () => {
@@ -436,27 +461,7 @@ describe('createNetworkErrorFetch', () => {
     await expect(wrapped('https://example.com/api/trpc/a.b')).rejects.toBe(error);
 
     expect(events).toHaveLength(0);
-  });
-
-  it('(g) extracts trpc procedure and direct error code from a rejection', async () => {
-    const trpcError = {
-      data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500, path: 'session.list' },
-    };
-    const wrapped = createNetworkErrorFetch(rejectingFetch(trpcError), { source: 'trpc' });
-
-    await expect(wrapped('https://example.com/api/trpc/session.list?batch=1')).rejects.toBe(
-      trpcError
-    );
-
-    const event = reportedEvent();
-    expect(event?.tags).toMatchObject({
-      'trpc.procedure': 'session.list',
-      'trpc.code': 'INTERNAL_SERVER_ERROR',
-    });
-    expect(event?.contexts?.network).toMatchObject({
-      procedure: 'session.list',
-      trpcCode: 'INTERNAL_SERVER_ERROR',
-    });
+    expect(breadcrumbs).toHaveLength(0);
   });
 
   it('(h) never includes the query string in any reported field', async () => {
@@ -467,13 +472,12 @@ describe('createNetworkErrorFetch', () => {
 
     await expect(wrapped(url)).rejects.toBe(error);
 
-    const serialized = JSON.stringify(events);
+    const serialized = JSON.stringify(breadcrumbs);
     expect(serialized).not.toContain('supersecret');
     expect(serialized).not.toContain('input=');
     expect(serialized).not.toContain('batch=1');
-    expect(reportedEvent()?.contexts?.network?.url).toBe(
-      'https://example.com/api/trpc/session.list'
-    );
+    expect(serialized).not.toContain('example.com');
+    expect(breadcrumbs[0]?.data?.path).toBe('/api/trpc/session.list');
   });
 
   it('(i) reports one warning for a 207 batch with the parsed error and keeps the response', async () => {

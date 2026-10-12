@@ -136,6 +136,7 @@ vi.mock('@/components/agents/use-text-height', () => ({
       maxHeight: 160,
       measureElement: null,
       reset: vi.fn(),
+      setNativeContentHeight: vi.fn(),
       setText: vi.fn(),
     };
   },

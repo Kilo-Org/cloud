@@ -8,29 +8,22 @@ import { clearClipboardImages } from '@/lib/agent-attachments/clipboard-image';
 import { clearArtifactMirror } from '@/lib/artifacts/artifact-mirror';
 import { resetArtifactMirrorSyncState } from '@/lib/artifacts/artifact-mirror-sync';
 import { notifyArtifactsChanged } from '@/lib/artifacts/artifact-provider-native';
+import { clearChatBackends } from '@/lib/chat/backend-store';
+import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
+import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
+import { clearSettingsToolsEnabled } from '@/lib/chat/settings-tools-switch';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
+import { reportSystemSearchFailure } from '@/lib/system-search-telemetry';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { reapTempFiles } from '@/lib/temp-file-registry';
 
 /**
- * One report per failed OS search clear, tagged so the subsystem is filterable.
- * The previous account's entries stay searchable until a later clear succeeds,
- * so the failure must be visible and a later clear must be able to retry it.
- */
-function reportSystemSearchClearFailure(error: unknown): void {
-  captureTelemetry({
-    error,
-    level: 'warning',
-    tags: { 'error.subsystem': 'system-search', 'error.operation': 'clear' },
-  });
-}
-
-/**
  * Fire the OS search clear without awaiting, so the caller stays synchronous
- * and never throws, and report a rejection instead of swallowing it. The clear
+ * and never throws, and report a rejection instead of swallowing it. A timeout
+ * is not reported: the next signed-out launch repeats the clear. The clear
  * is idempotent: it wipes the app's whole search domain and the fingerprint
  * ledger the indexer diffs against, so the next sync re-indexes whatever the
  * active account can see.
@@ -42,7 +35,7 @@ function clearSearchIndexBestEffort(): void {
     try {
       await clearSystemSearchIndex();
     } catch (error) {
-      reportSystemSearchClearFailure(error);
+      reportSystemSearchFailure('clear', error);
     }
   })();
 }
@@ -91,14 +84,19 @@ function clearRecentPrsBestEffort(): void {
 /**
  * Clear the session-scoped local state that must not leak across an account
  * boundary: trusted hosts, trusted image hosts, confirmed markdown images, media
- * caches, per-session auto-approve and goal-disclosure flags, the browsable
- * artifact mirror, app-owned temp copies, the stored PR recents, and the
- * phone's own search index.
- * Every member is best-effort; one member's throw falls through to the members
- * after it, and to the caller's own sign-in/sign-out state reset. The recents
- * delete and OS search clear are fired without awaiting, so the function stays
- * synchronous; a rejection is reported through telemetry, and the
- * signed-out-launch re-clear retries the index clear.
+ * caches, per-session auto-approve and goal-disclosure flags, the remote MCP
+ * connection and the stored servers behind it, the app-settings-tools group
+ * switch, the browsable artifact mirror, app-owned temp copies, the stored PR
+ * recents, and the phone's own search index. Every member is best-effort; one
+ * member's throw falls through to the members after it, and to the caller's own
+ * sign-in/sign-out state reset. The recents delete and OS search clear are
+ * fired without awaiting, so the function stays synchronous; a rejection is
+ * reported through telemetry, and the signed-out-launch re-clear retries the
+ * index clear.
+ *
+ * Both boundaries call this: the sign-out body and the account switch. A clear
+ * that only the sign-out path ran would let a direct switch hand the next
+ * account the previous one's choice.
  */
 export function clearSessionScopedState(): void {
   // The link allowlist and the separate image-host trust are both SecureStore
@@ -111,6 +109,10 @@ export function clearSessionScopedState(): void {
   runClear(clearFilePartCache);
   runClear(clearClipboardImages);
   runClear(clearSessionAutoApprove);
+  runClear(forgetRemoteMcp);
+  runClear(clearRemoteMcpServers);
+  runClear(clearChatBackends);
+  runClear(clearSettingsToolsEnabled);
   runClear(clearUserSessionTitles);
   runClear(clearSessionGoalCollapseState);
   // Wiping the mirror is what makes "signed out shows nothing to browse" true;

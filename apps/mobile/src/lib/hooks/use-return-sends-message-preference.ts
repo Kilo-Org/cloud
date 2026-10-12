@@ -15,8 +15,13 @@ const store = createSecureStorePreference<boolean>({
   serialize: value => (value ? 'true' : 'false'),
 });
 
-function setReturnSendsMessage(value: boolean) {
+export function setReturnSendsMessage(value: boolean) {
   store.set(value);
+}
+
+/** The stored return-sends-message value for callers with no React tree. */
+export function getReturnSendsMessage(): boolean {
+  return store.get();
 }
 
 export function useReturnSendsMessagePreference() {

@@ -16,6 +16,7 @@ import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { EventId, SessionId } from '../../../src/types/ids.js';
 import { createStreamHandler } from '../../../src/websocket/stream.js';
 import { persistSandboxControlSessionEvent } from '../../../src/sandbox-session/sandbox-control-event.js';
+import { renderRecentActivity } from '../../../src/callbacks/recent-activity.js';
 
 const messageUpdatedPayloadSchema = z.object({
   properties: z.object({
@@ -60,6 +61,264 @@ afterEach(async () => {
 });
 
 describe('Event Storage', () => {
+  describe('recent callback activity removals', () => {
+    function activityHarness(state: DurableObjectState) {
+      const queries = createEventQueries(
+        drizzle(state.storage, { logger: false }),
+        state.storage.sql
+      );
+      return {
+        queries,
+        emit(
+          type: string,
+          properties: Record<string, unknown>,
+          timestamp: number,
+          sessionId = 'activity'
+        ) {
+          persistSandboxControlSessionEvent({
+            sessionId,
+            payload: { type, properties, timestamp: new Date(timestamp).toISOString() },
+            eventQueries: queries,
+            broadcast: () => {},
+          });
+        },
+        tail: () =>
+          queries.getRecentAssistantMessagesForUserMessage('activity', 'ses_root', 'original_user'),
+      };
+    }
+
+    it('omits removed earlier narration and tools when the latest assistant message is empty', async () => {
+      const result = await runInDurableObject(
+        sessionStub('user_removed_activity', 'removed_activity'),
+        async (_instance, state) => {
+          const harness = activityHarness(state);
+          for (const id of ['assistant_1', 'assistant_2', 'assistant_3']) {
+            harness.emit(
+              'message.updated',
+              { info: { id, role: 'assistant', sessionID: 'ses_root', parentID: 'original_user' } },
+              1_000
+            );
+          }
+          harness.emit(
+            'message.part.updated',
+            {
+              part: {
+                id: 'text',
+                messageID: 'assistant_1',
+                sessionID: 'ses_root',
+                type: 'text',
+                text: 'Removed narration',
+              },
+            },
+            1_001
+          );
+          harness.emit(
+            'message.part.updated',
+            {
+              part: {
+                id: 'tool',
+                messageID: 'assistant_2',
+                sessionID: 'ses_root',
+                type: 'tool',
+                tool: 'read',
+                state: { status: 'completed', output: 'private' },
+              },
+            },
+            1_001
+          );
+          const before = renderRecentActivity(harness.tail());
+          for (const messageID of ['assistant_1', 'assistant_2']) {
+            harness.emit('message.removed', { sessionID: 'ses_root', messageID }, 1_002);
+          }
+          const tail = harness.tail();
+          return {
+            before,
+            messageIds: tail.map(message => message.info.id),
+            activity: renderRecentActivity(tail),
+            retainedMessage: harness.queries.findByEntityId('message/assistant_1'),
+          };
+        }
+      );
+      expect(result.before).toContain('Removed narration');
+      expect(result.before).toContain('read');
+      expect(result.retainedMessage).not.toBeNull();
+      expect(result.messageIds).toEqual(['assistant_3']);
+      expect(result.activity).toBeUndefined();
+    });
+
+    it('replaces removed messages before the five-message limit and scopes removals to Cloud and Kilo sessions', async () => {
+      const ids = await runInDurableObject(
+        sessionStub('user_replacement_activity', 'replacement_activity'),
+        async (_instance, state) => {
+          const harness = activityHarness(state);
+          for (let index = 0; index < 7; index++) {
+            harness.emit(
+              'message.updated',
+              {
+                info: {
+                  id: `assistant_${index}`,
+                  role: 'assistant',
+                  sessionID: 'ses_root',
+                  parentID: 'original_user',
+                },
+              },
+              1_000
+            );
+          }
+          for (const messageID of ['assistant_4', 'assistant_5']) {
+            harness.emit('message.removed', { sessionID: 'ses_root', messageID }, 1_001);
+          }
+          harness.emit(
+            'message.removed',
+            { sessionID: 'ses_root', messageID: 'assistant_1' },
+            1_002,
+            'other_cloud_session'
+          );
+          harness.emit(
+            'message.removed',
+            { sessionID: 'ses_child', messageID: 'assistant_2' },
+            1_002
+          );
+          return harness.tail().map(message => message.info.id);
+        }
+      );
+      expect(ids).toEqual([
+        'assistant_0',
+        'assistant_1',
+        'assistant_2',
+        'assistant_3',
+        'assistant_6',
+      ]);
+    });
+
+    it('reinstates a removed message after a later materialized update despite its unchanged row ID', async () => {
+      const result = await runInDurableObject(
+        sessionStub('user_reinstated_activity', 'reinstated_activity'),
+        async (_instance, state) => {
+          const harness = activityHarness(state);
+          const info = {
+            id: 'assistant_1',
+            role: 'assistant',
+            sessionID: 'ses_root',
+            parentID: 'original_user',
+          };
+          harness.emit('message.updated', { info }, 1_000);
+          harness.emit(
+            'message.part.updated',
+            {
+              part: {
+                id: 'text',
+                messageID: 'assistant_1',
+                sessionID: 'ses_root',
+                type: 'text',
+                text: 'Reinstated narration',
+              },
+            },
+            1_001
+          );
+          const originalRowId = harness.queries.findByEntityId('message/assistant_1')?.id;
+          harness.emit(
+            'message.removed',
+            { sessionID: 'ses_root', messageID: 'assistant_1' },
+            1_002
+          );
+          const removed = harness.tail().length;
+          harness.emit('message.updated', { info }, 1_003);
+          const reinstated = renderRecentActivity(harness.tail());
+          harness.emit(
+            'message.removed',
+            { sessionID: 'ses_root', messageID: 'assistant_1' },
+            1_003
+          );
+          const tiedRemoval = harness.tail().length;
+          harness.emit('message.updated', { info }, 1_003);
+          const tiedReinstatement = harness.tail().length;
+          harness.emit('message.updated', { info }, 1_004);
+          return {
+            originalRowId,
+            updatedRowId: harness.queries.findByEntityId('message/assistant_1')?.id,
+            removed,
+            reinstated,
+            tiedRemoval,
+            tiedReinstatement,
+            finalActivity: renderRecentActivity(harness.tail()),
+          };
+        }
+      );
+      expect(result.originalRowId).toBe(result.updatedRowId);
+      expect(result.removed).toBe(0);
+      expect(result.tiedRemoval).toBe(0);
+      expect(result.tiedReinstatement).toBe(0);
+      expect(result.reinstated).toContain('Reinstated narration');
+      expect(result.finalActivity).toBe(result.reinstated);
+    });
+  });
+
+  it('queries only the bounded chronological assistant tail for the original user message', async () => {
+    const stub = sessionStub('user_activity', 'activity');
+    const result = await runInDurableObject(stub, async (_instance, state) => {
+      const queries = createEventQueries(
+        drizzle(state.storage, { logger: false }),
+        state.storage.sql
+      );
+      const seed = (
+        id: string,
+        sessionId = 'activity',
+        kiloSessionId = 'ses_root',
+        parentID = 'original_user',
+        role = 'assistant'
+      ) => {
+        queries.upsert({
+          executionId: 'execution',
+          sessionId,
+          streamEventType: 'kilocode',
+          timestamp: 1,
+          entityId: `message/${id}`,
+          payload: JSON.stringify({
+            event: 'message.updated',
+            properties: { info: { id, role, sessionID: kiloSessionId, parentID } },
+          }),
+        });
+        queries.upsert({
+          executionId: 'execution',
+          sessionId,
+          streamEventType: 'kilocode',
+          timestamp: 2,
+          entityId: `part/${id}/text`,
+          payload: JSON.stringify({
+            event: 'message.part.updated',
+            properties: { part: { id: 'text', messageID: id, type: 'text', text: id } },
+          }),
+        });
+      };
+      for (let index = 7; index >= 0; index--) seed(`assistant_${index}`);
+      seed('other_parent', 'activity', 'ses_root', 'unrelated_user');
+      seed('other_subsession', 'activity', 'ses_child');
+      seed('other_cloud_session', 'other');
+      seed('user_role', 'activity', 'ses_root', 'original_user', 'user');
+      seed('assistant_3');
+      return queries.getRecentAssistantMessagesForUserMessage(
+        'activity',
+        'ses_root',
+        'original_user'
+      );
+    });
+    expect(result.map(message => message.info.id)).toEqual([
+      'assistant_3',
+      'assistant_4',
+      'assistant_5',
+      'assistant_6',
+      'assistant_7',
+    ]);
+    expect(result.map(message => message.parts[0].text)).toEqual([
+      'assistant_3',
+      'assistant_4',
+      'assistant_5',
+      'assistant_6',
+      'assistant_7',
+    ]);
+  });
+
   it('should insert event with RETURNING id', async () => {
     const stub = sessionStub('user_1', 'sess_1');
 

@@ -216,14 +216,20 @@ export async function readKiloSdkMessages(
   };
 }
 
+// Message rows use `message/<id>` item ids. Part rows (`msg_…/prt_…`) and the
+// singleton rows (`session`, `session_diff`, …) sort after them, so a
+// newest-first scan without an upper bound walks every part row before it
+// reaches a message. Under SQLite's BINARY collation '/' sorts just before '0'.
+const MESSAGE_ITEM_ID_RANGE = { start: 'message/', end: 'message0' };
+
 function messageItemId(messageId: string): string {
-  return `message/${messageId}`;
+  return `${MESSAGE_ITEM_ID_RANGE.start}${messageId}`;
 }
 
 function parsePersistedKiloSdkMessageStorageIdentity(
   itemId: string
 ): PersistedKiloSdkMessageStorageIdentity | null {
-  const prefix = 'message/';
+  const prefix = MESSAGE_ITEM_ID_RANGE.start;
   if (!itemId.startsWith(prefix)) return null;
   const parsed = messageIdSchema.safeParse(itemId.slice(prefix.length));
   return parsed.success && !parsed.data.includes('/') ? { itemId, messageId: parsed.data } : null;
@@ -268,7 +274,11 @@ function hasOlderKiloSdkMessageRows(
       .select({ id: ingestItems.id })
       .from(ingestItems)
       .where(
-        and(eq(ingestItems.item_type, 'message'), lt(ingestItems.item_id, beforeMessageItemId))
+        and(
+          eq(ingestItems.item_type, 'message'),
+          gte(ingestItems.item_id, MESSAGE_ITEM_ID_RANGE.start),
+          lt(ingestItems.item_id, beforeMessageItemId)
+        )
       )
       .limit(1)
       .get()
@@ -316,7 +326,7 @@ async function enumerateBoundedKiloSdkMessageInfos(
   let omittedItemCount = 0;
   let consumedRowCount = 0;
   let lastConsumedMessageStorageIdentity: PersistedKiloSdkMessageStorageIdentity | undefined;
-  let scanBeforeItemId = before ? messageItemId(before.id) : undefined;
+  let scanBeforeItemId = before ? messageItemId(before.id) : MESSAGE_ITEM_ID_RANGE.end;
   while (
     pageNewestFirst.length < limit &&
     consumedRowCount < KILO_SDK_HISTORY_BOUNDED_MESSAGE_SCAN_ROW_WORK_CAP
@@ -327,7 +337,8 @@ async function enumerateBoundedKiloSdkMessageInfos(
       .where(
         and(
           eq(ingestItems.item_type, 'message'),
-          scanBeforeItemId ? lt(ingestItems.item_id, scanBeforeItemId) : undefined
+          gte(ingestItems.item_id, MESSAGE_ITEM_ID_RANGE.start),
+          lt(ingestItems.item_id, scanBeforeItemId)
         )
       )
       .orderBy(desc(ingestItems.item_id))

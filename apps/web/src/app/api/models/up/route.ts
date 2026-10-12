@@ -184,7 +184,23 @@ export async function GET(
     anchorTime = parsed;
   }
 
-  const monitoredModels = await getMonitoredModels();
+  let monitoredModels: string[];
+  try {
+    monitoredModels = await getMonitoredModels();
+  } catch (error) {
+    captureException(error, {
+      tags: { endpoint: 'models/up', source: 'model_health_check' },
+    });
+    console.error('[models/up] returning 500: monitored models unavailable', error);
+    // Fail closed: without a monitored model list, a healthy response would check nothing.
+    return NextResponse.json(
+      {
+        healthy: false,
+        error: error instanceof Error ? error.message : 'Monitored models unavailable',
+      },
+      { status: 500 }
+    );
+  }
 
   try {
     const queryStartTime = Date.now();

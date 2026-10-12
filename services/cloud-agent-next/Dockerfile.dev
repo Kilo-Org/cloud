@@ -4,6 +4,8 @@ FROM docker.io/cloudflare/sandbox:0.12.9
 ARG BUILD_DATE=""
 ARG VCS_REF=""
 ARG KILOCODE_CLI_VERSION="7.8.1"
+ARG PNPM_VERSION="11.1.2"
+ARG GLAB_VERSION="1.93.0"
 
 # Build the kilo binary:
 #   cd ~/projects/kilocode-backend/cloud-agent
@@ -50,8 +52,7 @@ ENV LANG=en_US.UTF-8
 
 # Install GitLab CLI (glab) - download official .deb from GitLab releases.
 # Version 1.82.0+ is required for OAuth2 access token support (GLAB_IS_OAUTH2).
-RUN GLAB_VERSION="1.93.0" \
-	&& wget -nv -O /tmp/glab.deb "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.deb" \
+RUN wget -nv -O /tmp/glab.deb "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.deb" \
 	&& dpkg -i /tmp/glab.deb \
 	&& rm /tmp/glab.deb
 
@@ -60,7 +61,7 @@ RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
 	&& ln -sf /opt/kilo-cloud/kilo-git-credential /usr/local/bin/kilo-git-credential
 
 # Install pnpm and kilocode 
-RUN npm install -g pnpm @kilocode/cli@${KILOCODE_CLI_VERSION}
+RUN npm install -g pnpm@${PNPM_VERSION} @kilocode/cli@${KILOCODE_CLI_VERSION}
 
 # Copy to install pre-built kilo binary (built via ./cloud-agent-build.sh)
 #COPY kilo /usr/local/bin/kilo
@@ -69,6 +70,7 @@ RUN npm install -g pnpm @kilocode/cli@${KILOCODE_CLI_VERSION}
 # === Build wrapper bundle and restore-session script inside container ===
 # This ensures both scripts are built with the same Bun version that will run them,
 # avoiding any compatibility issues between build and runtime environments.
+# The build entrypoint list lives in src/shared/runtime-distribution.ts.
 COPY wrapper /tmp/wrapper-build/wrapper
 COPY src/shared /tmp/wrapper-build/src/shared
 
@@ -76,15 +78,7 @@ COPY src/shared /tmp/wrapper-build/src/shared
 RUN cd /tmp/wrapper-build/wrapper && \
     bun install --production && \
     ln -sfn /tmp/wrapper-build/wrapper/node_modules /tmp/wrapper-build/node_modules && \
-    bun build src/main.ts --outfile=/usr/local/bin/kilocode-wrapper.js --target=bun --minify && \
-    bun build src/restore-session.ts --outfile=/usr/local/bin/kilo-restore-session.js --target=bun --minify && \
-    bun build src/bitbucket-review-cli.ts --outfile=/usr/local/bin/bb --target=bun --minify && \
-    bun build src/github-review-publish-mcp.ts --outfile=/usr/local/bin/github-review-publish-mcp --target=bun --minify && \
-    bun build src/control-plane/main.ts --outfile=/usr/local/bin/kilocode-control-plane-wrapper.js --target=bun --minify && \
-    chmod +x /usr/local/bin/bb && \
-    chmod +x /usr/local/bin/github-review-publish-mcp && \
-    cp control-plane-supervisor.sh /usr/local/bin/kilocode-control-plane-supervisor.sh && \
-    chmod +x /usr/local/bin/kilocode-control-plane-supervisor.sh && \
+    bun run build.ts --install-dir /usr/local/bin && \
     rm -rf /tmp/wrapper-build
 
 # DO NOT override USER, WORKDIR, or ENTRYPOINT from the base image

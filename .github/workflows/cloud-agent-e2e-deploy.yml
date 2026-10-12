@@ -19,10 +19,8 @@ jobs:
       FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
       E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
       FAKE_LLM_WORKER_URL: https://fake-llm.engineering-e11.workers.dev
-      # '*' enrols every authenticated Kilo user in control-plane and
-      # worktree-session creation. The e2e Worker also writes to production
-      # Postgres and R2, so this is a deliberate opt-in, not an isolation boundary.
-      E2E_USER_ID: '*'
+      # The e2e Worker writes to production Postgres and R2, so this deployed
+      # stack is a deliberate opt-in, not an isolation boundary.
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:

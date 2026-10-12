@@ -13,7 +13,7 @@ export async function handleModelEndpointsRequest(
 ) {
   const { provider, model } = await params;
   const modelId = `${provider}/${model}`;
-  if (isUnavailableModel(modelId)) {
+  if (await isUnavailableModel(modelId)) {
     return NextResponse.json(
       { error: { message: 'Not Found', code: 404 } },
       { status: 404, headers: { 'Cache-Control': CACHE_CONTROL } }

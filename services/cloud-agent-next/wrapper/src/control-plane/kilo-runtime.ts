@@ -37,7 +37,7 @@ import {
   type ActivityFault,
 } from './runtime-activity.js';
 import type { readSessionSnapshot } from './session-snapshot.js';
-import type { ExecutionIdentity, ExecutionFailure } from './session-supervisor.js';
+import type { ExecutionIdentity, ExecutionFailure, ExecutionRetry } from './session-supervisor.js';
 
 const PIDFILE_SUFFIX = '.pid.json';
 const KILO_STARTUP_READY_PATTERN = /^kilo server listening on (http:\/\/127\.0\.0\.1:\d+)\r?\n/m;
@@ -278,7 +278,11 @@ export type KiloRuntimeOptions = {
   onNativeDiagnostic?: ControlDiagnosticReporter;
   onEvent?: (event: KiloFeedEvent) => void;
   onActivityChange?: () => void;
-  onDeadline?: (identity: ExecutionIdentity, reason: ExecutionFailure) => void;
+  onDeadline?: (
+    identity: ExecutionIdentity,
+    reason: ExecutionFailure,
+    retry: ExecutionRetry | undefined
+  ) => void;
   readSnapshot?: typeof readSessionSnapshot;
   /** Fired after Kilo comes back with a fresh process; B8 hands over busy turns. */
   onRestart?: (info: KiloRestartInfo) => void;
@@ -875,7 +879,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       timers,
       now: () => scheduler.now(),
       readSnapshot: options.readSnapshot,
-      onDeadline: (identity, reason) => options.onDeadline?.(identity, reason),
+      onDeadline: (identity, reason, retry) => options.onDeadline?.(identity, reason, retry),
       onChange: () => options.onActivityChange?.(),
       onFault: reason => {
         if (nativeRuntimeId !== processId) return true;
@@ -1170,7 +1174,12 @@ export type KiloRuntimesOptions = Omit<
   /** Carries the runtime key so the handler can match its own turns (B8 finding 4). */
   onRestart?: (info: KiloRestartInfo & { key: string }) => void;
   onUnavailable?: (directory: string, key: string) => void;
-  onDeadline?: (identity: ExecutionIdentity, reason: ExecutionFailure, key: string) => void;
+  onDeadline?: (
+    identity: ExecutionIdentity,
+    reason: ExecutionFailure,
+    retry: ExecutionRetry | undefined,
+    key: string
+  ) => void;
   onActivityChange?: (key: string) => void;
   onMemoryHold?: (info: { directory: string; held: boolean; key: string }) => void;
 };
@@ -1270,7 +1279,8 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
         ...(input.workload ? { workload: input.workload } : {}),
         onEvent: event => options.onEvent?.({ ...event, runtimeKey: input.key }),
         onRestart: info => options.onRestart?.({ ...info, key: input.key }),
-        onDeadline: (identity, reason) => options.onDeadline?.(identity, reason, input.key),
+        onDeadline: (identity, reason, retry) =>
+          options.onDeadline?.(identity, reason, retry, input.key),
         onActivityChange: () => options.onActivityChange?.(input.key),
         onUnavailable: directory => options.onUnavailable?.(directory, input.key),
         onMemoryHold: info => options.onMemoryHold?.({ ...info, key: input.key }),

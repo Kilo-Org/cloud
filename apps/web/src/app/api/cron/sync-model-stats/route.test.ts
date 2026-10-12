@@ -1,6 +1,7 @@
 let mockEnabled = false;
 let mockCronSecret: string | undefined = 'cron-secret';
 let mockMonitoredModels = ['fixture/monitored'];
+let mockMonitoredModelsError: Error | null = null;
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get CRON_SECRET() {
@@ -32,7 +33,10 @@ jest.mock('@kilocode/web-shared/lib/model-stats/model-stats-cache', () => ({
 }));
 jest.mock('@/lib/model-stats/sync-enkrypt', () => ({ syncEnkryptBenchmarks: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
-  getMonitoredModels: async () => mockMonitoredModels,
+  getMonitoredModels: async () => {
+    if (mockMonitoredModelsError) throw mockMonitoredModelsError;
+    return mockMonitoredModels;
+  },
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
@@ -101,6 +105,7 @@ describe('GET /api/cron/sync-model-stats', () => {
     mockEnabled = false;
     mockCronSecret = 'cron-secret';
     mockMonitoredModels = [monitoredModel.id];
+    mockMonitoredModelsError = null;
     mockFetch = jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected fetch'));
     jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [monitoredModel] });
     jest.mocked(getEnhancedOpenRouterModels).mockResolvedValue({ data: [monitoredModel] });
@@ -228,6 +233,24 @@ describe('GET /api/cron/sync-model-stats', () => {
     expect(jest.mocked(invalidateModelStatsCache).mock.invocationCallOrder[0]).toBeLessThan(
       mockEmitScheduledJobEvent.mock.invocationCallOrder[0]
     );
+    expect(buildScheduledJobFailureEvent).toHaveBeenCalledWith({ runId: 'run-id' }, error);
+  });
+
+  it('fails without syncing when the monitored model list is unavailable', async () => {
+    const error = new Error('No monitored models');
+    mockMonitoredModelsError = error;
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Failed to sync model stats',
+      message: error.message,
+    });
+    expect(syncOpenRouterModels).not.toHaveBeenCalled();
+    expect(syncArtificialAnalysisBenchmarks).not.toHaveBeenCalled();
+    expect(syncInternalUsageStats).not.toHaveBeenCalled();
     expect(buildScheduledJobFailureEvent).toHaveBeenCalledWith({ runId: 'run-id' }, error);
   });
 

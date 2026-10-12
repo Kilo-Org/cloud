@@ -4,7 +4,7 @@
   "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
   "compatibility_date": "2026-02-26",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "enhanced_error_serialization"],
   "workers_dev": false,
   "observability": {
     "enabled": true,

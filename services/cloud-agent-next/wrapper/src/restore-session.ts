@@ -51,6 +51,7 @@ type SnapshotDiff = {
 };
 
 export type RestoreSessionOptions = {
+  restoreFiles?: boolean;
   env?: NodeJS.ProcessEnv;
   importTimeoutMs?: number;
   importTerminationGraceMs?: number;
@@ -1235,6 +1236,11 @@ export async function restoreSession(
     log(
       `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
     );
+
+    if (options.restoreFiles === false) {
+      log('file restoration delegated to saved worktree snapshot');
+      return { ok: true, downloaded, imported: true, diffs: { applied: 0, skipped: 0, total: 0 } };
+    }
 
     // Extract diffs in a subprocess so the full snapshot JSON is never loaded
     // into this process's heap — only the small diff array crosses the boundary.

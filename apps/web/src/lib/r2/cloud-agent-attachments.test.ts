@@ -118,7 +118,10 @@ describe('cloud-agent attachment upload URL signing', () => {
         contentLength: 42,
         extension: 'exe',
       })
-    ).rejects.toThrow('exe');
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Attachment extension "exe" is not allowed',
+    });
     expect(mockGetSignedUrl).not.toHaveBeenCalled();
   });
 

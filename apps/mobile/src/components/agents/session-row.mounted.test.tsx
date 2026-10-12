@@ -99,13 +99,7 @@ vi.mock('@/lib/trpc', () => {
         queryKey: (input: unknown) => [['activeSessions', 'list'], { input, type: 'query' }],
       },
     },
-    cliSessionsV2: {
-      getSessionMessages: {
-        queryOptions: (input: { session_id: string }) => ({
-          queryKey: ['transcript', input.session_id],
-        }),
-      },
-    },
+    cliSessionsV2: {},
   };
   return { useTRPC: () => trpc };
 });
@@ -549,7 +543,8 @@ describe('StoredSessionRow long-press preview', () => {
       pressableProps(renderer)?.onPressIn?.();
     });
     expect(prefetchSessionTranscript).toHaveBeenCalledWith(previewQueryClient, {
-      queryKey: ['transcript', 'stored-1'],
+      queryKey: ['session-transcript-page', 'stored-1'],
+      queryFn: expect.any(Function),
     });
   });
 

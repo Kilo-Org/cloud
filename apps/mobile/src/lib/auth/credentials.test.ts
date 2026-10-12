@@ -54,6 +54,12 @@ vi.mock('@/lib/auth/logout-cleanup', () => ({
 vi.mock('@/lib/query-client', () => ({
   queryClient: { clear: vi.fn(), invalidateQueries: vi.fn() },
 }));
+vi.mock('@/lib/chat/sign-out', () => ({
+  clearChatsForSignOut: vi.fn(),
+  releaseChatsForAccountSwitch: vi.fn(),
+}));
+// Session-scoped cleanup clears backend profiles; the store reaches native crypto.
+vi.mock('@/lib/chat/backend-store', () => ({ clearChatBackends: vi.fn() }));
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({ setTrpcUnauthorizedHandler: vi.fn() }));
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({ clearAgentModelPreference: vi.fn() }));
 vi.mock('@/lib/hooks/use-persisted-run-on-destination', () => ({
@@ -116,6 +122,12 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
 vi.mock('react-native', () => ({
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
 }));
+// sonner-native is imported by secure-store-preference, which the remote MCP
+// store and the settings-tools switch warm at module scope. It resolves
+// react-native through its own dependency path, so the `react-native` mock
+// above does not cover it: mock the package itself, as the sibling preference
+// suites do, or Node's parser hits react-native's Flow-only `import typeof`.
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
 // These imported session-clear modules pull in native bindings that crash the
 // node test environment: use-trusted-hosts -> secure-store-preference ->

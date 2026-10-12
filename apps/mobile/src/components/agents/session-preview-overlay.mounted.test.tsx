@@ -21,12 +21,10 @@ afterEach(resetPreviewStore);
 
 describe('SessionPreviewOverlay', () => {
   it('renders the transcript rows and every menu item for an open target', () => {
-    previewState.transcript.data = {
-      messages: [
-        { info: { id: 'm1' }, parts: [] },
-        { info: { id: 'm2' }, parts: [] },
-      ],
-    };
+    previewState.transcript.data = [
+      { info: { id: 'm1' }, parts: [] },
+      { info: { id: 'm2' }, parts: [] },
+    ];
     const renderer = mountOverlay();
     openPreview(
       targetWith({

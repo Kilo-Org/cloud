@@ -2,6 +2,7 @@ import { addUserInteractionListener, type UserInteractionEvent } from 'expo-widg
 import { Linking } from 'react-native';
 
 import { i18n } from '@/i18n';
+import { getHomeWidgetDataForSnapshot } from '@/lib/glanceable/home-widget-data';
 import { getLastGlanceableSnapshot } from '@/lib/glanceable/persist';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
@@ -36,29 +37,68 @@ import {
  * Both paths funnel through one sweep that clears the marker from the timeline
  * before invoking the action, so a crash mid-action — or the foreground sweep
  * racing a live listener — can never run the same press twice.
+ *
+ * A press also reloads the widget, and the extension's rebuild replaces the
+ * timeline from the server presentation before a cold launch's JS may have
+ * booted. The extension therefore re-attaches the pressed marker to the rebuilt
+ * timeline while it is younger than `PENDING_ACTION_TTL_MS`, keeping the
+ * `pendingActionAt` the press recorded. The sweep strips that time along with
+ * the marker, which is what tells the extension to stop carrying the press.
  */
 
-/** Read the press marker out of a timeline entry's props, if one is pending. */
+/**
+ * How long a press marker stays live.
+ *
+ * A press triggers a widget reload, and the extension's rebuild replaces the
+ * timeline from the server presentation before a cold launch's JavaScript has
+ * booted. The extension re-attaches a pressed marker to the rebuilt timeline
+ * for this long (`HomeWidgetRefreshStore.pendingActionTTL`) so the launch sweep
+ * still finds it; past it the extension stops carrying the marker, and this
+ * read refuses one that somehow survived. Either way a press from an earlier
+ * session can never fire.
+ */
+export const PENDING_ACTION_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Read the press marker out of a timeline entry's props, if one is pending and
+ * still within its TTL. A marker with no recorded time was read before any
+ * rebuild carried it, so it is never refused for age; `null` reads as fresh so
+ * malformed stored data can never silently drop a real press.
+ */
 export function pendingActionOf(
-  props: WidgetProps | null | undefined
+  props: WidgetProps | null | undefined,
+  now = Date.now()
 ): GlanceableWidgetAction | null {
   const pendingAction = props?.pendingAction;
-  return pendingAction === 'approve' || pendingAction === 'new-agent' ? pendingAction : null;
+  if (pendingAction !== 'approve' && pendingAction !== 'new-agent') {
+    return null;
+  }
+  const carriedAt = props?.pendingActionAt ?? now;
+  return now - carriedAt > PENDING_ACTION_TTL_MS ? null : pendingAction;
 }
 
-/** The pressed entry's props without the marker, in the form the timeline stores. */
+/**
+ * The pressed entry's props without the marker — the action, the approval key
+ * and the time the extension recorded — in the form the timeline stores. This
+ * write is the explicit clear: once it lands, the extension finds no marker to
+ * carry forward and the press can never run twice.
+ */
 function stripPendingAction(props: WidgetProps | null | undefined): WidgetProps {
-  const { pendingAction: _pendingAction, ...rest } = props ?? {};
+  const {
+    pendingAction: _pendingAction,
+    pendingApprovalKey: _pendingApprovalKey,
+    pendingActionAt: _pendingActionAt,
+    ...rest
+  } = props ?? {};
   return rest;
 }
 
 /**
- * One press: the action its entry carries and the entry's date, which is what
- * identifies the entry — the App Intent merges the press marker into the
- * pressed entry's props and never touches its date, so a press read at one
- * moment can be matched against the timeline read at another.
+ * One press: the action its entry carries, the approval it displayed, and the
+ * entry's date, which identifies the entry — the App Intent merges the press
+ * marker into the pressed entry's props and never touches its date.
  */
-type PressedEntry = { date: number; action: GlanceableWidgetAction };
+type PressedEntry = { date: number; action: GlanceableWidgetAction; approvalKey: string | null };
 
 /**
  * The pressed entry a user-interaction event maps to, or null when the event
@@ -79,7 +119,11 @@ function pressedEntryForEvent(
       // A timeline read always carries the entry's date; the fallback keeps a
       // hand-built entry from a caller out of the key, and no production read
       // reaches it.
-      return { date: entry.date?.getTime() ?? 0, action };
+      return {
+        date: entry.date?.getTime() ?? 0,
+        action,
+        approvalKey: entry.props?.pendingApprovalKey ?? null,
+      };
     }
   }
   return null;
@@ -109,9 +153,10 @@ function republishWidgetProps(): void {
     return;
   }
   const translate = (key: string): string => i18n.t(key);
-  const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate));
+  const homeData = getHomeWidgetDataForSnapshot(snapshot);
+  const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate, homeData));
   ActiveAgentsWidget.updateSnapshot(props);
-  const frames = widgetTimelineFrames(snapshot, props, translate);
+  const frames = widgetTimelineFrames(snapshot, props, translate, homeData);
   if (frames !== null) {
     ActiveAgentsWidget.updateTimeline(frames);
   }
@@ -144,7 +189,8 @@ async function openFromPress(uri: string): Promise<void> {
  * question the widget must never invent an answer to) opens the agents list —
  * the same destination the Android twin opens (`glanceable-android/register.ts`).
  */
-async function performWidgetAction(action: GlanceableWidgetAction): Promise<void> {
+async function performWidgetAction(press: PressedEntry): Promise<void> {
+  const { action } = press;
   if (action === 'new-agent') {
     await openFromPress(LAUNCHER_NEW_AGENT_URL);
     return;
@@ -157,7 +203,7 @@ async function performWidgetAction(action: GlanceableWidgetAction): Promise<void
   // The sweep runs its presses sequentially, so no sibling press can observe
   // the gap.
   setSurfaceExtras({ ...getSurfaceExtras(), actionFeedback: null });
-  const result = await runWidgetApprove();
+  const result = await runWidgetApprove(press.approvalKey);
   if (result.kind === 'approved') {
     return;
   }
@@ -168,7 +214,7 @@ async function performWidgetAction(action: GlanceableWidgetAction): Promise<void
     actionFeedback: result.kind === 'failed' ? 'couldNotApprove' : null,
   });
   republishWidgetProps();
-  if (result.kind === 'none' || result.kind === 'no-permission') {
+  if (result.kind === 'none' || result.kind === 'no-permission' || result.kind === 'stale') {
     await openFromPress(OPEN_AGENTS_URI);
   }
 }
@@ -236,7 +282,10 @@ async function carryPendingPress(
     if (
       press !== null &&
       !carriedPresses.some(
-        carried => carried.date === press.date && carried.action === press.action
+        carried =>
+          carried.date === press.date &&
+          carried.action === press.action &&
+          carried.approvalKey === press.approvalKey
       )
     ) {
       carriedPresses.push(press);
@@ -264,16 +313,31 @@ function takeResweepRequest(): boolean {
  * read, which is dropped when this read still carries its marker so the same
  * press never runs twice. The marker is cleared before the action is invoked, so
  * a crash mid-action reads as a dropped press instead of a repeated one.
+ *
+ * A marker past its TTL is cleared by that same write but never run: the
+ * extension stops carrying a press after `PENDING_ACTION_TTL_MS`, and a marker
+ * that somehow outlived one must not be answered late.
  */
 async function sweepPendingActions(): Promise<void> {
   const timeline = await ActiveAgentsWidget.getTimeline();
-  const pending = new Map<number, GlanceableWidgetAction>();
+  const pending = new Set<number>();
   const pressed: PressedEntry[] = [];
   for (const [index, entry] of timeline.entries()) {
-    const action = pendingActionOf(entry.props);
-    if (action !== null) {
-      pending.set(index, action);
-      pressed.push({ date: entry.date.getTime(), action });
+    const rawAction = entry.props.pendingAction;
+    if (rawAction === 'approve' || rawAction === 'new-agent') {
+      // Every marker this read sees is cleared by the write below, a stale one
+      // included: the extension stops re-attaching a marker past its TTL, but
+      // one that outlived it must not sit in storage. Only a fresh marker runs
+      // — an old press is dropped, never answered late.
+      pending.add(index);
+      const action = pendingActionOf(entry.props);
+      if (action !== null) {
+        pressed.push({
+          date: entry.date.getTime(),
+          action,
+          approvalKey: entry.props.pendingApprovalKey ?? null,
+        });
+      }
     }
   }
   const carried = takeCarriedPresses().filter(
@@ -286,11 +350,11 @@ async function sweepPendingActions(): Promise<void> {
       )
     );
   }
-  for (const action of [...pending.values(), ...carried.map(press => press.action)]) {
+  for (const press of [...pressed, ...carried]) {
     // Sequential by design: each action can republish the surface, and two
     // overlapping republishes could push the props out of order.
     // eslint-disable-next-line no-await-in-loop -- one answer on screen at a time
-    await performWidgetAction(action);
+    await performWidgetAction(press);
   }
 }
 

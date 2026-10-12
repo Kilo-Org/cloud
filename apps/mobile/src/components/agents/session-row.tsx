@@ -15,8 +15,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { resolveSessionPrPressTarget } from '@/lib/session-pr-navigation';
-import { useTRPC } from '@/lib/trpc';
+import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
 import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
   composeSessionProvenanceSubtitle,
@@ -27,6 +26,7 @@ import {
   formatSessionTotalCost,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
+import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { openSessionPreviewStore } from './session-preview-state';
 import {
@@ -44,13 +44,13 @@ import {
 export type RowVariant = 'list' | 'card';
 
 /**
- * Opens a session's associated PR through the provider-aware, flag-aware route.
+ * Opens a session's associated PR through the provider-aware route.
  * The native router and browser imports are lazy: they cannot load under the
  * mounted row tests' node environment, and only the long-press entry reaches
  * them.
  */
 async function openSessionPr(url: string | null | undefined, label: string): Promise<void> {
-  const target = await resolveSessionPrPressTarget({ url });
+  const target = resolveSessionPrTapTarget({ url });
   if (target.kind === 'in-app') {
     const { router } = await import('expo-router');
     router.push(target.href);
@@ -124,7 +124,6 @@ export function StoredSessionRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const trpc = useTRPC();
   // The backend names an unnamed session with a raw ISO placeholder
   // ("New session - 2026-09-22T02:05:22.778Z"); it is not a name the user
   // should see. `namedSessionTitle` uses the shared display helper and keeps
@@ -255,7 +254,7 @@ export function StoredSessionRow({
     ? () => {
         void prefetchSessionTranscript(
           queryClient,
-          trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.session_id })
+          sessionTranscriptQueryOptions(session.session_id)
         );
       }
     : undefined;

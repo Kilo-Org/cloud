@@ -3,6 +3,8 @@
  * Keep this file free of server-only dependencies.
  */
 
+import type { OpenRouterModel } from '@kilocode/db/schema-types';
+
 /**
  * Public-id namespace prefixes for Kilo-owned models. These are reserved and
  * must not be claimed by custom upstreams.
@@ -23,4 +25,14 @@ export const KILO_AUTO_MODEL_PREFIX = 'kilo-auto/';
 export function normalizeModelId(modelId: string): string {
   const colonIndex = modelId.indexOf(':');
   return colonIndex >= 0 ? modelId.substring(0, colonIndex) : modelId;
+}
+
+/**
+ * The exact gateway model id a snapshot entry is served as. Snapshot slugs are
+ * unsuffixed; the provider's endpoint carries the variant (`standard`, `free`),
+ * which the gateway exposes as `<slug>:<variant>` for anything but `standard`.
+ */
+export function getSnapshotModelVariantId(model: OpenRouterModel): string {
+  const variant = model.endpoint?.variant;
+  return variant && variant !== 'standard' ? `${model.slug}:${variant}` : model.slug;
 }

@@ -59,8 +59,15 @@ vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
 vi.mock('react-native', () => ({
   Platform: platformMock,
 }));
+// The unregister session gate reads the token owner, whose cold path imports the native store.
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn().mockResolvedValue(null),
+  setItemAsync: vi.fn(),
+  deleteItemAsync: vi.fn(),
+}));
 
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { setActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
 
 import {
   getTerminalBlankEpoch,
@@ -143,6 +150,8 @@ describe('delivery registerTokens', () => {
     logoutMock.awaitLogoutReconciliationSettled.mockResolvedValue(undefined);
     logoutMock.hasPendingActivityUnregister.mockResolvedValue(false);
     _resetLiveActivitySwitchForTests();
+    setSignOutTeardownActive(false);
+    setActiveToken('access-1', null);
     setNotificationPermissionGrantedValue(true);
   });
 
@@ -252,6 +261,60 @@ describe('delivery registerTokens', () => {
     expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenLastCalledWith({
       token: 'android-token-1',
     });
+  });
+
+  it('sends no unregister while signed out, then sends each kept token once', async () => {
+    const rows = trackRemoteTokens();
+    getGlanceableDelivery().registerTokens(snapshot(), null, 'u1');
+    await vi.waitFor(() => {
+      expect(rows.has('token-1')).toBe(true);
+    });
+
+    // Sign-in teardown: the epoch moved and no token can authorize a delete.
+    setSignOutTeardownActive(true);
+    bumpAuthEpoch();
+    writeSignedOutSnapshotAndEnd();
+    expect(await getGlanceableDelivery().unregisterTokens()).toEqual({
+      ok: false,
+      tokens: ['token-1'],
+    });
+    await getGlanceableDelivery().unregisterTokens('activity');
+    expect(trpcMock.unregisterActivityToken.mutate).not.toHaveBeenCalled();
+
+    // The next session publishes its token: the kept token unregisters once.
+    setSignOutTeardownActive(false);
+    setActiveToken('access-2', null);
+    expect(await getGlanceableDelivery().unregisterTokens()).toEqual({ ok: true, tokens: [] });
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledTimes(1);
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledWith({ token: 'token-1' });
+    expect(rows.size).toBe(0);
+  });
+
+  it('does not retry an unregister after the server refused the session with 401', async () => {
+    const rows = trackRemoteTokens();
+    getGlanceableDelivery().registerTokens(snapshot(), null, 'u1');
+    await vi.waitFor(() => {
+      expect(rows.has('token-1')).toBe(true);
+    });
+    trpcMock.unregisterActivityToken.mutate.mockRejectedValueOnce(
+      Object.assign(new Error('User not authenticated'), {
+        data: { code: 'UNAUTHORIZED', httpStatus: 401, authRequired: true },
+      })
+    );
+
+    expect(await getGlanceableDelivery().unregisterTokens()).toEqual({
+      ok: false,
+      tokens: ['token-1'],
+    });
+    await getGlanceableDelivery().unregisterTokens();
+    await getGlanceableDelivery().unregisterTokens('activity');
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledTimes(1);
+
+    // A refresh publishes a new access token: the kept token unregisters with it.
+    setActiveToken('access-2', null);
+    expect(await getGlanceableDelivery().unregisterTokens()).toEqual({ ok: true, tokens: [] });
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledTimes(2);
+    expect(rows.size).toBe(0);
   });
 
   it('blocks a late register and does not unregister the token it recorded while in flight', async () => {

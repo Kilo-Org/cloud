@@ -16,7 +16,7 @@ import {
 type TestMessage = { info: { id: string }; parts: readonly never[] };
 
 type TranscriptState = {
-  data: { messages: readonly TestMessage[] } | undefined;
+  data: readonly TestMessage[] | undefined;
   isLoading: boolean;
   isError: boolean;
   error: { data: { code: string } } | null;
@@ -86,11 +86,6 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     cliSessionsV2: {
-      getSessionMessages: {
-        queryOptions: (input: { session_id: string }) => ({
-          queryKey: ['transcript', input.session_id],
-        }),
-      },
       get: {
         queryOptions: (input: { session_id: string }) => ({
           queryKey: ['session-row', input.session_id],

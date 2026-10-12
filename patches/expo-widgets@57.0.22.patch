@@ -655,7 +655,7 @@ index 2b4c044b597de7e0fab42dbc47af14d8bb521838..e5a0b1ee15272312d707698d739aa5af
    var env: [String: Any] = [
      "showsContainerBackground": environment.showsWidgetContainerBackground,
 diff --git a/ios/Widgets/WidgetLiveActivity.swift b/ios/Widgets/WidgetLiveActivity.swift
-index 24d4571a52d3ebe9d785b5d049d8e134a149d513..adc15b9e81de6953f7338f8509bde6d38f66d20d 100644
+index 24d4571a52d3ebe9d785b5d049d8e134a149d513..964ef18d14607763707c4cbec8a218dfd2897f38 100644
 --- a/ios/Widgets/WidgetLiveActivity.swift
 +++ b/ios/Widgets/WidgetLiveActivity.swift
 @@ -35,9 +35,11 @@ public struct WidgetLiveActivity: Widget {
@@ -681,6 +681,63 @@ index 24d4571a52d3ebe9d785b5d049d8e134a149d513..adc15b9e81de6953f7338f8509bde6d3
          return island.widgetURL(url)
        }
        return island
+@@ -84,11 +86,14 @@ private struct LiveActivitySectionView: View {
+   let sectionName: String
+ 
+   var body: some View {
+-    if let node = nodes[sectionName] as? [String: Any] {
+-      WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
+-    } else {
+-      EmptyView()
++    Group {
++      if let node = nodes[sectionName] as? [String: Any] {
++        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
++      } else {
++        EmptyView()
++      }
+     }
++    .environment(\.layoutDirection, appLayoutDirection())
+   }
+ }
+ 
+@@ -98,16 +103,31 @@ private struct LiveActivityBannerView: View {
+   let nodes: [String: Any]
+ 
+   var body: some View {
+-    if #available(iOS 18.0, *) {
+-      LiveActivityBanner(context: context, nodes: nodes)
+-    } else if let node = nodes["banner"] as? [String: Any] {
+-      WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
+-    } else {
+-      EmptyView()
++    Group {
++      if #available(iOS 18.0, *) {
++        LiveActivityBanner(context: context, nodes: nodes)
++      } else if let node = nodes["banner"] as? [String: Any] {
++        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
++      } else {
++        EmptyView()
++      }
+     }
++    .environment(\.layoutDirection, appLayoutDirection())
+   }
+ }
+ 
++/// The app language's layout direction, not the device's. The app can run in a
++/// language other than the device's, and the extension would otherwise lay the
++/// card out in the device language around copy baked in the app language. The
++/// app writes its language to the shared app group as `homeWidgetLocale`
++/// (repo-local: `HomeWidgetRefreshStore.layoutDirection` reads the same key the
++/// same way for the Home widget).
++private func appLayoutDirection() -> LayoutDirection {
++  let locale = WidgetsStorage.defaults?.string(forKey: "homeWidgetLocale") ?? Locale.current.identifier
++  let language = locale.replacingOccurrences(of: "_", with: "-").split(separator: "-").first.map(String.init) ?? "en"
++  return Locale.characterDirection(forLanguage: language) == .rightToLeft ? .rightToLeft : .leftToRight
++}
++
+ extension WidgetConfiguration {
+   func supplementalActivityFamiliesIfAvailable() -> some WidgetConfiguration {
+     if #available(iOS 18.0, iOSApplicationExtension 18.0, *) {
 diff --git a/ios/WidgetsModule.swift b/ios/WidgetsModule.swift
 index b1b4295e22726e6fe501aa5e514b56061dea57a1..70e62359a00194d6844f36ad8ecf9374314c85ea 100644
 --- a/ios/WidgetsModule.swift

@@ -24,23 +24,28 @@ export type FrontApprovableRow = GlanceableSessionRow & { id: string };
 export function pickFrontApprovableSession<T extends FrontApprovableRow>(
   rows: readonly T[]
 ): T | null {
-  let front: T | null = null;
-  let frontAt: number | null = null;
-  for (const row of rows) {
+  return rankApprovableSessions(rows)[0] ?? null;
+}
+
+/**
+ * Every permission row, front first, under the `pickFrontApprovableSession`
+ * rule: earliest usable `statusUpdatedAt`, rows without one last, list order
+ * breaking ties. The server binds the widget's approval key to the row this
+ * rule puts first (`pickFrontPermissionRow` in
+ * `apps/web/src/lib/glanceable-agents-snapshot-server.ts`), so a bounded scan
+ * of this ranking always includes the displayed request.
+ */
+export function rankApprovableSessions<T extends FrontApprovableRow>(rows: readonly T[]): T[] {
+  const ranked: { row: T; at: number; index: number }[] = [];
+  for (const [index, row] of rows.entries()) {
     if (row.status === 'permission') {
       const parsed =
         row.statusUpdatedAt === undefined ? Number.NaN : Date.parse(row.statusUpdatedAt);
-      const at = Number.isNaN(parsed) ? null : parsed;
-      if (front === null) {
-        front = row;
-        frontAt = at;
-      } else if (at !== null && (frontAt === null || at < frontAt)) {
-        // A row without a usable timestamp sorts last: it cannot displace a row
-        // that carried one, and the earlier list position breaks its own ties.
-        front = row;
-        frontAt = at;
-      }
+      ranked.push({ row, at: Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed, index });
     }
   }
-  return front;
+  // Two untimed rows subtract to NaN, which falls through to list order.
+  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; `ranked` is a local copy
+  ranked.sort((a, b) => a.at - b.at || a.index - b.index);
+  return ranked.map(entry => entry.row);
 }

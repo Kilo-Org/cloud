@@ -9,6 +9,7 @@ import { SyncProvidersContent } from '@/app/admin/sync-providers/SyncProvidersCo
 import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
 import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
 import { AutoFreeContent } from '@/app/admin/gateway/AutoFreeContent';
+import { GatewayModelListContent } from '@/app/admin/gateway/GatewayModelListContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
@@ -17,9 +18,18 @@ const VALID_TABS: readonly string[] = [
   'custom-llms',
   'routing',
   'auto-free',
+  'preferred-models',
+  'unavailable-models',
   'api-request-log',
 ];
-type Tab = 'sync-providers' | 'custom-llms' | 'routing' | 'auto-free' | 'api-request-log';
+type Tab =
+  | 'sync-providers'
+  | 'custom-llms'
+  | 'routing'
+  | 'auto-free'
+  | 'preferred-models'
+  | 'unavailable-models'
+  | 'api-request-log';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -72,6 +82,12 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="auto-free" className={tabTriggerClass}>
               Auto Free
             </TabsTrigger>
+            <TabsTrigger value="preferred-models" className={tabTriggerClass}>
+              Preferred Models
+            </TabsTrigger>
+            <TabsTrigger value="unavailable-models" className={tabTriggerClass}>
+              Unavailable Models
+            </TabsTrigger>
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
             </TabsTrigger>
@@ -87,6 +103,37 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="auto-free" className="mt-4">
             <AutoFreeContent />
+          </TabsContent>
+          <TabsContent value="preferred-models" className="mt-4">
+            <GatewayModelListContent
+              list="preferred_models"
+              title="Preferred Models"
+              ordered
+              description={
+                <>
+                  Ordered list of preferred model IDs, stored in the <code>preferred_models</code>{' '}
+                  column of <code>ai_gateway_config</code>. The model catalog sorts these models
+                  first in this order, and every model in the list except <code>kilo-auto/*</code>{' '}
+                  is monitored by the model stats and health checks.
+                </>
+              }
+            />
+          </TabsContent>
+          <TabsContent value="unavailable-models" className="mt-4">
+            <GatewayModelListContent
+              list="unavailable_models"
+              title="Unavailable Models"
+              ordered={false}
+              description={
+                <>
+                  Model IDs the gateway hides from the catalog and rejects for direct requests,
+                  stored in the <code>unavailable_models</code> column of{' '}
+                  <code>ai_gateway_config</code>. <code>kilo-auto</code> can still route to them.{' '}
+                  <code>google/gemma-4-26b-a4b-it:free</code> is always unavailable and is not
+                  listed here.
+                </>
+              }
+            />
           </TabsContent>
           <TabsContent
             value="api-request-log"

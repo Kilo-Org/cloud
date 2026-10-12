@@ -4,7 +4,8 @@ import { formatFileSize, formatPercent } from '@/lib/format';
 export type ChipStateInput = {
   filename: string;
   size: number;
-  status: 'pending' | 'uploading' | 'uploaded' | 'error';
+  /** `local` is a file this device keeps: no upload starts, so no progress text. */
+  status: 'pending' | 'uploading' | 'uploaded' | 'local' | 'error';
   progress: number | null;
   terminal?: boolean;
 };
@@ -78,6 +79,8 @@ export function describeAttachmentChip(state: ChipStateInput): ChipDescription {
   }
 
   let progressText = '';
+  // A local chip has no progress to report, so it carries no progress label
+  // and its announcement falls back to the file size.
   if (status === 'pending' || status === 'uploading' || status === 'uploaded') {
     progressText = progressLabel(progress);
   }
@@ -89,7 +92,7 @@ export function describeAttachmentChip(state: ChipStateInput): ChipDescription {
     message,
     accessibilityLabel: i18n.t('chat.attachmentPreview.accessibility', {
       filename,
-      status: message ?? progressText,
+      status: message ?? (progressText === '' ? formatFileSize(size, i18n.language) : progressText),
     }),
     showRetry: isRetryable,
     showRemove: true,

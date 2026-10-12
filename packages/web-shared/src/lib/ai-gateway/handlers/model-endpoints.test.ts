@@ -1,4 +1,6 @@
-import { describe, expect, test } from '@jest/globals';
+import { beforeAll, describe, expect, test } from '@jest/globals';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { ai_gateway_config } from '@kilocode/db/schema';
 import { NextRequest } from 'next/server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
@@ -11,6 +13,13 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
 const mockedGetOpenRouterModelsMetadataFromDatabase = jest.mocked(
   getOpenRouterModelsMetadataFromDatabase
 );
+
+beforeAll(async () => {
+  await cleanupDbForTest();
+  await db
+    .insert(ai_gateway_config)
+    .values({ unavailable_models: { models: ['google/gemma-4-31b-it:free'] } });
+});
 
 function request(modelId: string) {
   return new NextRequest(`http://localhost:3000/api/openrouter/models/${modelId}/endpoints`);

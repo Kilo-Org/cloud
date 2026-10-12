@@ -42,9 +42,8 @@ import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
-import { ChatToolbar } from '@/components/agents/chat-toolbar';
-import { type AgentMode } from '@/components/agents/mode-selector';
-import { pickAgentAttachments } from '@/components/agents/attachment-picker';
+import { ChatToolbar, type ChatToolbarModeControl } from '@/components/agents/chat-toolbar';
+import { pickAgentAttachments, pickAgentImages } from '@/components/agents/attachment-picker';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
@@ -97,6 +96,7 @@ import {
   type UploadPendingResult,
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { type LocalImage } from '@/lib/agent-attachments/local-image';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import {
@@ -105,7 +105,6 @@ import {
 } from '@/lib/agent-attachments/use-clipboard-paste';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
-import { type ModeOption } from '@/components/agents/mode-normalize';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -155,6 +154,8 @@ export type ChatComposerControl = {
 export type ChatComposerSendOptions = {
   attachments?: AgentAttachmentWire;
   submission?: AgentAttachmentSubmissionPayload;
+  /** The images read for `local` attachment delivery. */
+  images?: readonly LocalImage[];
   onOptimisticSend?: () => void;
 };
 
@@ -190,21 +191,24 @@ type ChatComposerProps = {
   sendDisabledReason?: string | null;
   isStreaming?: boolean;
   placeholder?: string;
-  mode: AgentMode;
-  onModeChange: (mode: AgentMode) => void;
+  /** The toolbar's mode chip. Omit it where modes do not apply (Quick Chat). */
+  modeControl?: ChatToolbarModeControl;
   model: string;
   variant: string;
   modelOptions: (ModelOption | SessionModelOption)[];
   onModelSelect: (modelId: string, variant: string) => void;
-  /** Custom mode options shown under the built-ins in the mode picker. */
-  customOptions?: ModeOption[];
   /** Locks the model picker to the pinned agent model (Cloud Agent only). */
   modelLocked?: boolean;
   /** Agent name shown in the locked model chip's accessibility label. */
   modelLockLabel?: string;
   organizationId?: string;
-  /** Only Cloud Agent sessions can receive attachments. */
+  /** Only Cloud Agent sessions and image-capable chat models can receive attachments. */
   attachmentsEnabled?: boolean;
+  /**
+   * `upload` sends files to Cloud Agent storage. `local` accepts images only,
+   * keeps them on the device, and hands their bytes to `onSend`.
+   */
+  attachmentDelivery?: 'upload' | 'local';
   /** Active resolved session type — drives slash command selection. */
   activeSessionType?: 'cloud-agent' | 'remote' | 'read-only' | null;
   /** Wrapper commands; remote presentation adds /new and capability-gated /exit after stripping aliases. */
@@ -258,17 +262,16 @@ export function ChatComposer({
   sendDisabledReason = null,
   isStreaming = false,
   placeholder = i18n.t('common.sendMessage'),
-  mode,
-  onModeChange,
+  modeControl,
   model,
   variant,
   modelOptions,
   onModelSelect,
-  customOptions = [],
   modelLocked = false,
   modelLockLabel,
   organizationId,
   attachmentsEnabled = true,
+  attachmentDelivery = 'upload',
   activeSessionType = null,
   commands = [],
   commandCatalogStatus = null,
@@ -381,7 +384,7 @@ export function ChatComposer({
       }
     },
   } satisfies { current: boolean };
-  const upload = useAgentAttachmentUpload({ organizationId });
+  const upload = useAgentAttachmentUpload({ organizationId, delivery: attachmentDelivery });
 
   // Leave confirm for unsent uploads. The composer registers its own
   // `beforeRemove` listener so header back, the iOS swipe-back gesture, and
@@ -437,11 +440,6 @@ export function ChatComposer({
     };
   }, []);
 
-  // The row reports the real input's content height (dp, padding included) on
-  // every content change. `useTextHeight` reads the line pitch that input
-  // lays out at from it, so the capped height it publishes lands on a whole
-  // rendered line.
-  const [inputContentHeight, setInputContentHeight] = useState<number | null>(null);
   // The mirror measurement lives in `ChatComposerMeasure`, a leaf that owns the
   // per-keystroke text state. It publishes the height and the line-snapped cap
   // back through `handleMeasureChange`, so this component re-renders only when
@@ -455,6 +453,16 @@ export function ChatComposer({
     setInputMaxHeight(maxHeight);
   }, []);
   const measureHandleRef = useRef<ChatComposerMeasureHandle | null>(null);
+  // The row reports the real input's content height (dp, padding included) on
+  // every content change, and `useTextHeight` reads the line pitch that input
+  // lays out at from it, so the capped height it publishes lands on a whole
+  // rendered line. The report goes straight into the leaf: holding it here
+  // re-rendered this composer — and so the input, which then reported again —
+  // on every native content-size event, and the nested-update counter climbed
+  // with each one.
+  const handleInputContentSizeChange = useCallback((contentHeight: number) => {
+    measureHandleRef.current?.setNativeContentHeight(contentHeight);
+  }, []);
   // Derived values the composer renders, kept as guard refs so a keystroke that
   // does not change one publishes nothing. The raw character count is never
   // held here: only the counter's near-limit value (or null while hidden) and
@@ -1006,6 +1014,11 @@ export function ChatComposer({
       toast.error(i18n.t('agentChat.composer.removeOrRetryFailed'));
       return;
     }
+    // The model changed after the images were attached, to one that reads none.
+    if (!attachmentsEnabled && attachmentDelivery === 'local' && upload.attachments.length > 0) {
+      toast.error(i18n.t('agentChat.composer.modelCannotReadImages'));
+      return;
+    }
 
     const submission = parseChatComposerSubmission(trimmed, commandList, {
       hasAttachments: upload.attachments.length > 0,
@@ -1086,6 +1099,7 @@ export function ChatComposer({
               await onSend(prompt, {
                 attachments: uploaded?.wire,
                 submission: uploaded?.submission,
+                images: uploaded?.images,
                 onOptimisticSend: () => {
                   // The optimistic row is already in the transcript. Clear the
                   // draft and chips (non-destructively) and stop the spinner so
@@ -1240,7 +1254,7 @@ export function ChatComposer({
     // and the composer's send flow consults `upload.isUploading` /
     // `upload.hasFailedAttachments` to gate admission.
     void addCandidates(
-      await pickAgentAttachments(
+      await (attachmentDelivery === 'local' ? pickAgentImages : pickAgentAttachments)(
         showActionSheetWithOptions,
         {
           userId,
@@ -1250,7 +1264,14 @@ export function ChatComposer({
         themedSheet
       )
     );
-  }, [addCandidates, showActionSheetWithOptions, userId, sessionId, themedSheet]);
+  }, [
+    addCandidates,
+    attachmentDelivery,
+    showActionSheetWithOptions,
+    userId,
+    sessionId,
+    themedSheet,
+  ]);
 
   const textInputStyle: TextStyle = {
     color: colors.foreground,
@@ -1299,7 +1320,6 @@ export function ChatComposer({
           lineHeight={TEXT_INPUT_LINE_HEIGHT}
           maxHeight={rawInputMaxHeight}
           minHeight={inputMinHeight}
-          nativeContentHeight={inputContentHeight}
           onMeasureChange={handleMeasureChange}
           textContentWidth={resolveComposerTextContentWidth(inputWidth)}
           verticalPadding={TEXT_INPUT_VERTICAL_PADDING}
@@ -1313,8 +1333,7 @@ export function ChatComposer({
             exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
           >
             <ChatToolbar
-              mode={mode}
-              onModeChange={onModeChange}
+              modeControl={modeControl}
               model={model}
               variant={variant}
               modelOptions={modelOptions}
@@ -1322,7 +1341,6 @@ export function ChatComposer({
               disabled={control.toolbarDisabled}
               onPaste={attachmentsEnabled ? pasteClipboard : undefined}
               pasteDisabled={!control.inputEditable}
-              customOptions={customOptions}
               modelLocked={modelLocked}
               modelLockLabel={modelLockLabel}
             />
@@ -1426,7 +1444,7 @@ export function ChatComposer({
                 setIsFocused(true);
               }}
               onInputLayout={handleInputLayout}
-              onInputContentSizeChange={setInputContentHeight}
+              onInputContentSizeChange={handleInputContentSizeChange}
               onInsertNewline={handleInsertNewline}
               onSelectionChange={handleSelectionChange}
               onStop={handleStop}

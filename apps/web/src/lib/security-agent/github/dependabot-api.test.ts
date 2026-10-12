@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 const mockPaginate = jest.fn() as jest.MockedFunction<(...args: unknown[]) => Promise<unknown[]>>;
 const mockListAlertsForRepo = jest.fn() as jest.MockedFunction<
@@ -139,5 +139,76 @@ describe('dependabot-api', () => {
       { id: 1, status: 'unknown' },
       { id: 2, status: 'enabled' },
     ]);
+  });
+
+  describe('probing budget', () => {
+    const repositoriesNamed = (owner: string, count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: index + 1,
+        fullName: `${owner}/repo-${index + 1}`,
+      }));
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('returns fast probe results without waiting for the budget', async () => {
+      const { checkDependabotAlertsAvailability } = await import('./dependabot-api');
+      mockListAlertsForRepo.mockResolvedValue({ data: [] });
+      const repositories = repositoriesNamed('fast-budget', 30);
+
+      await expect(
+        checkDependabotAlertsAvailability('fast-budget-installation', 'standard', repositories)
+      ).resolves.toEqual(
+        repositories.map(repository => ({ id: repository.id, status: 'enabled' }))
+      );
+
+      expect(mockListAlertsForRepo).toHaveBeenCalledTimes(30);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('returns unknown for repositories not checked within the budget', async () => {
+      const { checkDependabotAlertsAvailability } = await import('./dependabot-api');
+      mockListAlertsForRepo.mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve({ data: [] }), 1_500))
+      );
+      const repositories = repositoriesNamed('slow-budget', 30);
+
+      const firstCheck = checkDependabotAlertsAvailability(
+        'slow-budget-installation',
+        'standard',
+        repositories
+      );
+      await jest.advanceTimersByTimeAsync(5_000);
+
+      // Five concurrent probes of 1.5 s each finish three batches before the 5 s budget.
+      await expect(firstCheck).resolves.toEqual(
+        repositories.map(repository => ({
+          id: repository.id,
+          status: repository.id <= 15 ? 'enabled' : 'unknown',
+        }))
+      );
+
+      // The fourth batch was in flight at the deadline; queued probes never start.
+      await jest.advanceTimersByTimeAsync(10_000);
+      expect(mockListAlertsForRepo).toHaveBeenCalledTimes(20);
+
+      // In-flight probes still populated the cache, so the next call checks only the rest.
+      const secondCheck = checkDependabotAlertsAvailability(
+        'slow-budget-installation',
+        'standard',
+        repositories
+      );
+      await jest.advanceTimersByTimeAsync(3_000);
+
+      await expect(secondCheck).resolves.toEqual(
+        repositories.map(repository => ({ id: repository.id, status: 'enabled' }))
+      );
+      expect(mockListAlertsForRepo).toHaveBeenCalledTimes(30);
+    });
   });
 });

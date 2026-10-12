@@ -31,7 +31,12 @@ export function rerender(ui: ReactElement) {
   );
 }
 export function retry() {
-  return unlockRoot().findAllByType('Pressable' as ElementType)[0];
+  /* The unlock overlay is not the only Pressable in the tree: a scene can hold
+     settings rows whose label is pressable too. The overlay's Retry is the one
+     that names itself, so the label is what tells them apart. */
+  return unlockRoot()
+    .findAllByType('Pressable' as ElementType)
+    .find(node => node.props.accessibilityLabel === i18n.t('common.retry'));
 }
 export async function unmountUnlock() {
   view?.unmount();

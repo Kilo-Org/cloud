@@ -18,6 +18,9 @@ import {
   flushLastPostHogEvent,
   LOGOUT_EVENT,
 } from '@/lib/analytics/posthog';
+import { clearChatsForSignOut, releaseChatsForAccountSwitch } from '@/lib/chat/sign-out';
+import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
+import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearPendingConsentOutcome } from '@/lib/consent';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { clearAccountBoundPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
@@ -82,6 +85,7 @@ import { clearViewedFiles } from '@/lib/pr-review/viewed-files';
 import {
   ACTIVE_USER_ID_KEY,
   AUTH_TOKEN_KEY,
+  CHAT_BACKENDS_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
   LIVE_SESSION_FILTERS_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
@@ -401,6 +405,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // run, so the provider's restore can never read the prior account's
         // marker.
         await deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY);
+        // Clear backend credentials durably before publishing another account.
+        // A terminated sign-in must not restore B with A's backend credentials.
+        await deleteAccountMetadata(CHAT_BACKENDS_KEY);
         // Bind the pending deep-link slot to the new user id at the same
         // place the auth epoch advances, so a destination captured while this
         // account is signed in restores only for this account.
@@ -431,6 +438,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // A direct account switch must not keep the prior account's query
         // cache: the org list is keyed account-independently, so a stale list
         // would otherwise drive a false lost-org blank in the org fence.
+        // A direct account switch must not keep the prior account's running
+        // chats, which outlive any screen. A release that fails can never hold
+        // up the account signing in.
+        await Promise.allSettled([releaseChatsForAccountSwitch()]);
         queryClient.clear();
         setToken(tokenValue);
         // A direct account switch must not keep the prior account's session
@@ -551,6 +562,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
               await deleteStoredValue(LEGACY_EXCHANGE_DONE_KEY);
             }),
             deleteAccountMetadata(ACTIVE_USER_ID_KEY),
+            deleteAccountMetadata(CHAT_BACKENDS_KEY),
             deleteAccountMetadata(ORGANIZATION_STORAGE_KEY),
             // The Personal-choice marker is account-scoped selection state
             // beside the organization key. Clearing it here (and never on the
@@ -571,6 +583,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // unknown — privacy wins). Best effort: a failed cleanup can
             // never abort sign-out.
             clearCacheScopeForSignOut(readCachedUserId(queryClient)),
+            // The chats on the device are read from the same cached user id,
+            // and an unknown one takes every chat rather than leaving one
+            // account's conversations for the next person to sign in.
+            clearChatsForSignOut(readCachedUserId(queryClient)),
             clearLastActiveInstance(),
             clearKiloClawOwned(),
             clearRecentPrs(),
@@ -604,6 +620,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearKeepScreenOnPreference();
           clearLiveActivityPreference();
           clearSessionScopedState();
+          // The remote MCP connection and the servers stored behind it (which
+          // hold bearer tokens) belong to the account that is leaving. The
+          // settings-tools group switch is account-scoped and cleared by
+          // `clearSessionScopedState` above, on this path and the switch alike.
+          forgetRemoteMcp();
+          clearRemoteMcpServers();
           clearPrReviewFooterPreference();
           clearCondenseToolCallsPreference();
           clearCollapsedConnectCtasPreference();

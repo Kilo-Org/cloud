@@ -16,6 +16,14 @@ const BRIDGE_SOURCE = readFileSync(join(__dirname, 'live-update.ts'), 'utf8');
 
 const SESSION_BRIDGE_SOURCE = readFileSync(join(__dirname, 'session-notification.ts'), 'utf8');
 
+const NOTIFICATIONS_SOURCE = readFileSync(
+  join(
+    __dirname,
+    '../../modules/active-agents-live-update/android/src/main/java/com/kilocode/activeagentsliveupdate/SessionNotifications.kt'
+  ),
+  'utf8'
+);
+
 /**
  * Expo's `Function` builder declares one overload per arity and stops at eight
  * (expo-modules-core `ObjectDefinitionBuilder`: `reified P0` … `reified P7`). A
@@ -264,5 +272,54 @@ describe('ActiveAgentsLiveUpdate durable write queue', () => {
     expect(MODULE_SOURCE, 'no lifecycle hook may stop the shared queue').not.toContain(
       '.shutdown()'
     );
+  });
+});
+
+/**
+ * The session notification path is Kotlin plus a JS bridge, and only a native
+ * build compiles it. A commit shipped a call to `fillFromJson` before the
+ * function existed, which no test on a machine without the Android SDK can
+ * catch by compiling. These read the sources instead: every helper the module
+ * calls must be defined, and the card must be read with the function that
+ * writes the same shape.
+ */
+describe('ActiveAgentsLiveUpdate session notification sources', () => {
+  it('defines every SessionNotifications helper the module calls', () => {
+    const called = new Set(
+      [...MODULE_SOURCE.matchAll(/SessionNotifications\.([a-zA-Z]+)\(/g)].map(match => match[1])
+    );
+    expect(called.size).toBeGreaterThan(0);
+    for (const name of called) {
+      expect(
+        NOTIFICATIONS_SOURCE,
+        `SessionNotifications.${name} is called but never defined`
+      ).toContain(`fun ${name}(`);
+    }
+  });
+
+  it('reads a stored card with the function that writes it', () => {
+    expect(NOTIFICATIONS_SOURCE).toContain('fun toJson()');
+    expect(NOTIFICATIONS_SOURCE).toContain('fun fillFromJson(json: JSONObject)');
+    // The module parses the JSON text the bridge sends, so the two must pair.
+    expect(MODULE_SOURCE).toContain('fillFromJson(JSONObject(cardJson))');
+    for (const field of ['sessionId', 'organizationId', 'approveLabel', 'approvalKey', 'whenMs']) {
+      expect(NOTIFICATIONS_SOURCE, `fillFromJson must read ${field}`).toContain(
+        `${field} = json.opt`
+      );
+      expect(NOTIFICATIONS_SOURCE, `toJson must write ${field}`).toContain(`put("${field}"`);
+    }
+  });
+
+  it('keeps the session action keys the receiver forwards', () => {
+    const worker = readFileSync(
+      join(
+        __dirname,
+        '../../modules/active-agents-live-update/android/src/main/java/com/kilocode/activeagentsliveupdate/ActiveAgentsApproveWorker.kt'
+      ),
+      'utf8'
+    );
+    for (const key of ['KEY_SESSION_ID', 'KEY_APPROVAL_KEY', 'KEY_ORGANIZATION_ID']) {
+      expect(worker, `${key} must be declared`).toContain(`const val ${key}`);
+    }
   });
 });

@@ -10,10 +10,8 @@ import {
   type SessionLiveActivityRow,
 } from '@kilocode/notifications';
 
-import {
-  SESSION_CARD_STALE_AFTER_SECONDS,
-  type SessionLiveActivityProps,
-} from './session-card-press';
+import { SESSION_CARD_STALE_AFTER_SECONDS } from './session-card-press';
+import { type SessionLiveActivityProps } from './session-live-activity';
 
 /** The facts the card draws; a change in anything else is not an update (spec "Updates" rule 2). */
 export function drawsSame(

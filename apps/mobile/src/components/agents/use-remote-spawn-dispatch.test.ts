@@ -658,7 +658,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
 
     const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
     expect(typeof calledWith).toBe('string');
-    expect(calledWith).toContain('spawned=1');
+    expect(calledWith).toContain('spawned=1&cloned=1');
     expect(calledWith).toContain('ses_12345678901234567890123456');
     expect(calledWith).not.toContain('shareId=');
     expect(calledWith).not.toContain('autoSend=');

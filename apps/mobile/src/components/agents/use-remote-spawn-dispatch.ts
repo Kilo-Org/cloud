@@ -378,7 +378,9 @@ export function useRemoteSpawnDispatch({
         if (outcome.status === 'ready') {
           // The spawn settled; the next submit is a fresh intent.
           rotateKey();
-          const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId);
+          const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId, {
+            cloned: Boolean(fields.cloneFromKiloSessionId),
+          });
           // Arm the clone entry's busy leave-lock bypass right before the
           // success replace so the navigation is not intercepted as an abandon.
           onSpawnReadyRef.current?.();

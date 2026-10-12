@@ -45,6 +45,7 @@ export default function SessionDetailScreen() {
     organizationId: routeOrganizationId,
     via,
     spawned,
+    cloned,
     shareId: shareIdParam,
     autoSend: autoSendRaw,
     mode: modeParam,
@@ -64,6 +65,8 @@ export default function SessionDetailScreen() {
      * shows the same permanent state it always did.
      */
     spawned?: string;
+    /** `'1'` when the spawn cloned a session onto a remote CLI; its first page waits for the sync. */
+    cloned?: string;
     shareId?: string;
     autoSend?: string;
     /** Agent mode the spawn was started with; seeds the composer before the CLI reports one. */
@@ -346,6 +349,7 @@ export default function SessionDetailScreen() {
       key={providerKey}
       organizationId={organizationId}
       restoredUserId={restoredUserId ?? undefined}
+      clonedSessionId={cloned === '1' ? (sessionId as KiloSessionId) : undefined}
     >
       <SessionDetailContent
         sessionId={sessionId as KiloSessionId}

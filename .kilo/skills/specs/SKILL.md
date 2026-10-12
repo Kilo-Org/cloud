@@ -21,6 +21,7 @@ to the user if instructions or changes will cause deviations from the original i
 | `.specs/kiloclaw-controller.md` | KiloClaw controller/machine lifecycle, bootstrap, Docker image |
 | `.specs/kiloclaw-datamodel.md` | KiloClaw data model — instance/subscription tables, invariants |
 | `.specs/mcp-gateway-auth.md` | Kilo MCP Gateway v1 — protocol surface, ownership, OAuth lifecycle, provider grants, runtime auth |
+| `.specs/mobile-session-live-activity.md` | iOS per-session Live Activity — Follow, content, privacy, aggregate card coexistence |
 | `.specs/model-experiments.md` | Model experiment routing, bucketing, lifecycle, prompt retention, and reporting rules |
 | `.specs/security-agent.md` | Security Agent Auto Remediation and finding/SLA notification guarantees |
 | `.specs/subscription-center.md` | Subscription Center ownership, states, and user-facing behavior |

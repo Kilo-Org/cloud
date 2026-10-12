@@ -502,8 +502,13 @@ describe('the chat-tools sheet', () => {
     h.discovered.value = [serverState('alpha', { status: 'ready', retryable: true })];
     await mount();
 
-    expect(buttonFor('Retry')).toBeDefined();
-    expect(texts()).toContain('No tools available');
+    // The Kilo row also reads "No tools available", so the remote row is read by its own fields.
+    expect(held.settings?.servers[0]).toMatchObject({
+      statusKey: 'modelChat.mcp.none',
+      retry: true,
+    });
+    const label = i18n.t('modelChat.mcp.retryServerA11y', { name: 'Server alpha' });
+    expect(required(buttonFor('Retry'), 'Retry').props.accessibilityLabel).toBe(label);
   });
 
   it('turns a server off for the chats and tells the registry', async () => {

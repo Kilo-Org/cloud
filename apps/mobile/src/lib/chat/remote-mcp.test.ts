@@ -1,4 +1,3 @@
-import { onlineManager } from '@tanstack/react-query';
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -30,6 +29,7 @@ const world = vi.hoisted(() => ({
   /** Whether the stored list has been read, and what reading it later does. */
   loaded: true,
   load: undefined as (() => void) | undefined,
+  connectivity: 'online' as 'online' | 'offline' | 'unknown',
 }));
 
 vi.mock('./remote-mcp-store', () => ({
@@ -49,6 +49,9 @@ vi.mock('./remote-mcp-store', () => ({
 }));
 
 vi.mock('@/lib/auth/auth-epoch', () => ({ currentAuthEpoch: () => world.epoch }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => world.connectivity,
+}));
 
 /** The one discovery function, answering from a `let` so a test can change it. */
 let answer: () => Effect.Effect<readonly Tool[], RemoteMcpError> = () => Effect.succeed([]);
@@ -94,7 +97,7 @@ beforeEach(() => {
   world.loaded = true;
   world.load = undefined;
   answer = () => Effect.succeed([tool('mcp_alpha_read')]);
-  onlineManager.setOnline(true);
+  world.connectivity = 'online';
   forgetRemoteMcp();
 });
 
@@ -299,10 +302,10 @@ describe('the discovered state', () => {
     expect(remoteServerToolNames()).toEqual(['mcp_alpha_read']);
   });
 
-  it('connects to nothing on an automatic ask made offline, and offers a Retry', async () => {
+  it('connects to nothing on an automatic ask made while confirmed offline, and offers a Retry', async () => {
     const alpha = server({ id: 'alpha' });
     world.servers = [alpha];
-    onlineManager.setOnline(false);
+    world.connectivity = 'offline';
 
     await ensureRemoteMcp(place);
 
@@ -312,6 +315,16 @@ describe('the discovered state', () => {
     ]);
 
     await ensureRemoteMcp(place, { retry: true });
+
+    expect(world.calls).toHaveLength(1);
+    expect(remoteServerToolNames()).toEqual(['mcp_alpha_read']);
+  });
+
+  it('still connects while connectivity is unknown, as at boot', async () => {
+    world.servers = [server({ id: 'alpha' })];
+    world.connectivity = 'unknown';
+
+    await ensureRemoteMcp(place);
 
     expect(world.calls).toHaveLength(1);
     expect(remoteServerToolNames()).toEqual(['mcp_alpha_read']);

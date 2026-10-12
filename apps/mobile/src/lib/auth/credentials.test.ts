@@ -116,6 +116,9 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
   clearViewedFiles: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@/lib/telemetry/controller', () => ({ clearTelemetryDecision: vi.fn() }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('@/lib/telemetry/posthog-storage', () => ({
   purgePostHogPersistence: vi.fn().mockResolvedValue(undefined),
 }));

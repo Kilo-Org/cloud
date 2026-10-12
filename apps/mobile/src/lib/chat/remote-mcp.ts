@@ -1,4 +1,3 @@
-import { onlineManager } from '@tanstack/react-query';
 import { Effect } from 'effect';
 import { type Tool } from '@kilocode/harness-sdk';
 import {
@@ -9,6 +8,7 @@ import {
 } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 
 import {
   connectingOf,
@@ -278,9 +278,10 @@ function failOffline(servers: readonly StoredRemoteMcpServer[]): readonly Remote
  *
  * After a cold start the stored list may not have been read yet, and an empty
  * list then means "not read" rather than "none": the ask waits for it, or a
- * chat opened at launch would discover nothing. An automatic ask made offline
- * connects to nothing, so a chat opens at once rather than after the deadline;
- * a person's Retry still tries.
+ * chat opened at launch would discover nothing. An automatic ask made while
+ * the app has confirmed it is offline connects to nothing, so a chat opens at
+ * once rather than after the deadline. An unknown state, as at boot before
+ * NetInfo settles, still connects; a person's Retry always tries.
  */
 export async function ensureRemoteMcp(
   place: ChatPlace,
@@ -311,7 +312,7 @@ export async function ensureRemoteMcp(
     await inFlight.promise;
     return snapshot;
   }
-  if (request.retry !== true && !onlineManager.isOnline()) {
+  if (request.retry !== true && getCommittedConnectivityStatus() === 'offline') {
     return failOffline(missing);
   }
   for (const server of missing) {

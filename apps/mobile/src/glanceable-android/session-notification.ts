@@ -57,7 +57,7 @@ const storedSessionCardSchema = z.object({
 
 export type StoredSessionCard = z.infer<typeof storedSessionCardSchema>;
 
-const storedSessionCardsSchema = z.array(storedSessionCardSchema);
+const storedSessionCardsSchema = z.array(z.unknown());
 
 type SessionNotificationNativeModule = {
   postSession(cardJson: string, dismissAfterMs: number): void;
@@ -95,9 +95,22 @@ export function pruneSessionCards(keep: readonly string[]): void {
  */
 export function getStoredSessionCards(): StoredSessionCard[] {
   try {
-    const parsed: unknown = JSON.parse(nativeModule?.getSessionCards() ?? '[]');
-    const result = storedSessionCardsSchema.safeParse(parsed);
-    return result.success ? result.data : [];
+    const parsed = storedSessionCardsSchema.safeParse(
+      JSON.parse(nativeModule?.getSessionCards() ?? '[]')
+    );
+    if (!parsed.success) {
+      return [];
+    }
+    // One unreadable record must not hide the others: dropping every card would
+    // cancel the notifications the app still counts.
+    const cards: StoredSessionCard[] = [];
+    for (const value of parsed.data) {
+      const card = storedSessionCardSchema.safeParse(value);
+      if (card.success) {
+        cards.push(card.data);
+      }
+    }
+    return cards;
   } catch {
     return [];
   }

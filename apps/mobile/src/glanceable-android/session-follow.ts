@@ -5,7 +5,10 @@ import {
 } from '@kilocode/notifications';
 
 import { runGlanceableApprove } from '@/lib/glanceable/approve-ask';
-import { setFollowedSessionsSource } from '@/lib/glanceable/followed-sessions';
+import {
+  type FollowedSessionCounts,
+  setFollowedSessionsSource,
+} from '@/lib/glanceable/followed-sessions';
 import {
   getLiveActivityEnabled,
   getNotificationPermissionGranted,
@@ -15,8 +18,8 @@ import {
   releaseAndroidSessionToken,
   setAndroidSessionScope,
 } from '@/lib/glanceable/session-activity-tokens-android';
-import * as SecureStore from '@/lib/auth/secure-store';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+
 import {
   buildSessionNotificationCard,
   SESSION_FINISHED_DISMISS_MS,
@@ -30,19 +33,68 @@ import {
 
 /**
  * The per-session ongoing notification on Android
- * (`.specs/mobile-session-live-activity.md` "Android"): one silent ongoing
- * notification per followed session, keyed by a stable id derived from the
- * session id. Follow starts it from the session screen; a data-only push updates
- * or ends it while the app is backgrounded, and a foreground tray read updates
- * it in place. Native storage is the source of truth: a notification outlives
- * the process that posted it, so a launch rebuilds the followed set from
- * `getStoredSessionCards` and cancels the cards the app no longer counts.
- * `session-notification-card.ts` owns the card's copy and times.
+ * (`.specs/mobile-session-live-activity.md` "Android"). Follow, the store, and
+ * the follow lifecycle live here; `session-notification-card.ts` maps the one
+ * shared content contract to the notification's copy and times, and the native
+ * module owns the notification id, the channel, the actions, and the Live
+ * Update promotion.
  */
 
 export type SessionFollowContext = { userId: string; organizationId: string | null };
 export type SessionLiveUpdateContent = SessionLiveActivityContentState;
 export type FollowResult = 'started' | 'followed' | 'refused';
+
+type Followed = {
+  content: SessionLiveActivityContentState;
+  approvalKey: string | null;
+  ctx: SessionFollowContext;
+};
+
+/** The followed sessions this process holds. */
+const followed = new Map<string, Followed>();
+const listeners = new Set<() => void>();
+let revision = 0;
+
+function emit(): void {
+  revision += 1;
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
+export function getSessionFollowsRevision(): number {
+  return revision;
+}
+
+export function subscribeSessionFollows(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function isSessionFollowed(sessionId: string): boolean {
+  return followed.has(sessionId);
+}
+
+/** A card that still represents work the user follows. */
+function isLiveKind(kind: SessionLiveActivityContentState['statusKind']): boolean {
+  return kind !== 'idle' && kind !== 'failed';
+}
+
+/** Live counts by status kind of the followed sessions, for the aggregate card. */
+export function followedSessionCounts(): FollowedSessionCounts {
+  const counts = { running: 0, needsInput: 0, needsApproval: 0, idle: 0, scheduled: 0 };
+  for (const { content } of followed.values()) {
+    if (isLiveKind(content.statusKind)) {
+      counts[content.statusKind] += 1;
+      if (content.awaitingPermission) {
+        counts.needsApproval += 1;
+      }
+    }
+  }
+  return counts;
+}
 
 /** Post or update one followed session's notification from its content. */
 function render(content: SessionLiveActivityContentState, ctx: SessionFollowContext): void {
@@ -59,13 +111,39 @@ function render(content: SessionLiveActivityContentState, ctx: SessionFollowCont
 /** Re-post the stored card of one followed session (after an Approve). */
 function repost(sessionId: string): void {
   const stored = followed.get(sessionId);
-  if (stored === undefined) {
-    return;
+  if (stored !== undefined) {
+    postSessionCard(buildSessionNotificationCard(stored.content, stored.ctx), 0);
   }
-  postSessionCard(buildSessionNotificationCard(stored.content, stored.ctx), 0);
 }
 
-/** Rebuild the followed set from native truth; re-register every kept card. */
+/** The one read this module needs from the keychain module. */
+type SecureStoreModule = { getItemAsync: (key: string) => Promise<string | null> };
+
+/**
+ * The stored account and scope, as the iOS adoption reads them. The keychain
+ * module loads lazily: this module's file is imported by the Home widget
+ * register, whose suites never load a native store.
+ */
+async function readStoredContext(): Promise<SessionFollowContext | null> {
+  try {
+    // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
+    const { getItemAsync } = require('@/lib/auth/secure-store') as SecureStoreModule;
+    const userId = await getItemAsync(ACTIVE_USER_ID_KEY);
+    if (userId === null) {
+      return null;
+    }
+    return { userId, organizationId: await getItemAsync(ORGANIZATION_STORAGE_KEY) };
+  } catch {
+    // An unavailable keychain only costs this restoration; the next foreground retries.
+    return null;
+  }
+}
+
+/**
+ * Rebuild the followed set from native truth. A stored card of another scope, or
+ * one the app no longer counts, is cancelled and forgotten; a kept card has its
+ * token registered again.
+ */
 export function restoreFollowedSessionCards(ctx: SessionFollowContext | null): void {
   const stored = getStoredSessionCards();
   const kept = new Set<string>();
@@ -94,6 +172,11 @@ export function restoreFollowedSessionCards(ctx: SessionFollowContext | null): v
   for (const sessionId of kept) {
     registerAndroidSessionToken({ sessionId, ...ctx });
   }
+}
+
+/** Launch and foreground: rebuild the set from native truth and the stored scope. */
+export async function restoreFollowedSessionCardsFromStorage(): Promise<void> {
+  restoreFollowedSessionCards(await readStoredContext());
 }
 
 /** Follow one session from the row the session screen shows. */
@@ -147,7 +230,10 @@ export function dismissFinishedSessionCard(sessionId: string): void {
   dismissSessionCard(sessionId);
 }
 
-/** End every followed notification at once: sign-out, an account or organization change, or the switch off. */
+/**
+ * End every followed notification: sign-out, an account or organization change,
+ * a lost organization, and the in-app switch turned off.
+ */
 export function endAllSessionCards(): void {
   for (const sessionId of followed.keys()) {
     dismissSessionCard(sessionId);
@@ -221,8 +307,8 @@ export async function approveFollowedSession(
   sessionId: string,
   approvalKey: string
 ): Promise<boolean> {
-  // The stored card carries the scope it was followed in, which is the scope
-  // the permission belongs to: a headless tap has no live context.
+  // The stored card carries the scope it was followed in; a headless tap has no
+  // live context, so the stored scope is the fallback.
   const stored = followed.get(sessionId);
   const fallback = stored === undefined ? await readStoredContext() : null;
   const organizationId = stored?.ctx.organizationId ?? fallback?.organizationId ?? null;
@@ -255,23 +341,4 @@ export function _resetSessionFollowForTests(): void {
   followed.clear();
   listeners.clear();
   revision = 0;
-}
-
-/** The stored account and scope, as the iOS adoption reads them. */
-async function readStoredContext(): Promise<SessionFollowContext | null> {
-  try {
-    const userId = await SecureStore.getItemAsync(ACTIVE_USER_ID_KEY);
-    if (userId === null) {
-      return null;
-    }
-    return { userId, organizationId: await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY) };
-  } catch {
-    // An unavailable keychain only costs this restoration; the next foreground retries.
-    return null;
-  }
-}
-
-/** Launch and foreground: rebuild the set from native truth and the stored scope. */
-export async function restoreFollowedSessionCardsFromStorage(): Promise<void> {
-  restoreFollowedSessionCards(await readStoredContext());
 }

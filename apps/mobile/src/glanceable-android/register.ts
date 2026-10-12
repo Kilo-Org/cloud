@@ -29,8 +29,6 @@ import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
 
-import { endAllSessionCards, restoreFollowedSessionCardsFromStorage } from './session-follow';
-
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
 import {
   androidSink,
@@ -57,8 +55,13 @@ import {
 registerGlanceableSink(androidSink);
 
 // A sign-out, an account change, or a privacy lock blanks every surface; the
-// followed session notifications are not snapshot sinks, so they end here.
-subscribeGlanceableTerminalEnd(endAllSessionCards);
+// followed session notifications are not snapshot sinks, so they end here. The
+// module loads on the event: the widget paths must not carry its graph.
+subscribeGlanceableTerminalEnd(() => {
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
+  const { endAllSessionCards } = require('./session-follow') as typeof import('./session-follow');
+  endAllSessionCards();
+});
 
 // A Live Update the permission blocked starts once the user grants it, which
 // can happen in Settings while the app is away.
@@ -68,6 +71,10 @@ AppState.addEventListener('change', state => {
     // Rebuild the followed session notifications from native truth: a push may
     // have updated them while no process ran, and a dismissal the receiver
     // missed leaves a stored card for a session the app no longer follows.
+    // Loaded here for the same reason as the terminal end above.
+    // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
+    const { restoreFollowedSessionCardsFromStorage } =
+      require('./session-follow') as typeof import('./session-follow');
     void restoreFollowedSessionCardsFromStorage();
   }
 });

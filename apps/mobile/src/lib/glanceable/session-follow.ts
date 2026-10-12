@@ -1,110 +1,97 @@
 import { Platform } from 'react-native';
 
-import * as android from '@/glanceable-android/session-follow';
-import * as ios from '@/glanceable-ios/session-follow';
+import type * as AndroidFollow from '@/glanceable-android/session-follow';
+import type * as IosFollow from '@/glanceable-ios/session-follow';
 
 /**
  * The per-session follow lifecycle, per platform
  * (`.specs/mobile-session-live-activity.md`).
  *
- * One session card per followed session, on both platforms: an ActivityKit
- * Live Activity on iOS and an ongoing notification on Android. The contract,
- * the content model, the follow store, and the rules are shared; only the
- * native surface and its lifecycle calls differ, so the two modules keep their
- * own implementation and this shim picks the one for the running platform.
- * Every symbol is re-exported, so nothing loads the other platform's module:
- * the iOS module imports `expo-widgets` (ActivityKit), and the Android one
- * imports its own native bridge.
+ * One session card per followed session on both platforms: an ActivityKit Live
+ * Activity on iOS and an ongoing notification on Android. The contract, the
+ * content model, the follow store, and the rules are shared; only the native
+ * surface and its lifecycle calls differ, so each platform keeps its own module
+ * and this shim picks the one for the running platform.
+ *
+ * The platform module loads lazily — each reaches a native surface, and the
+ * Android one also reaches the tRPC client — so importing this shim never costs
+ * the widget or notification graphs that only need one platform.
  */
 
-export type SessionFollowContext = ios.SessionFollowContext;
-export type FollowResult = ios.FollowResult;
-export type SessionCardRow = ios.SessionCardRow;
+function android(): typeof AndroidFollow {
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
+  return require('@/glanceable-android/session-follow') as typeof AndroidFollow;
+}
 
-/** The one shared row shape both platforms follow: the notifications package's. */
-export type SessionFollowRow = SessionCardRow;
+function iosFollow(): typeof IosFollow {
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
+  return require('@/glanceable-ios/session-follow') as typeof IosFollow;
+}
 
-export const getSessionFollowsRevision: () => number =
-  Platform.OS === 'android' ? android.getSessionFollowsRevision : ios.getSessionFollowsRevision;
+export type SessionFollowContext = IosFollow.SessionFollowContext;
+export type FollowResult = IosFollow.FollowResult;
+export type SessionCardRow = IosFollow.SessionCardRow;
+
+function follow(): typeof IosFollow | typeof AndroidFollow {
+  return Platform.OS === 'android' ? android() : iosFollow();
+}
+
+export const getSessionFollowsRevision = (): number => follow().getSessionFollowsRevision();
 
 export const subscribeSessionFollows = (listener: () => void): (() => void) =>
-  Platform.OS === 'android'
-    ? android.subscribeSessionFollows(listener)
-    : ios.subscribeSessionFollows(listener);
+  follow().subscribeSessionFollows(listener);
 
 export const isSessionFollowed = (sessionId: string): boolean =>
-  Platform.OS === 'android'
-    ? android.isSessionFollowed(sessionId)
-    : ios.isSessionFollowed(sessionId);
+  follow().isSessionFollowed(sessionId);
 
 export const followSession = (
   row: SessionCardRow,
   ctx: SessionFollowContext,
   now?: number
-): FollowResult =>
-  Platform.OS === 'android'
-    ? android.followSession(row, ctx, now)
-    : ios.followSession(row, ctx, now);
+): FollowResult => follow().followSession(row, ctx, now);
 
 export const unfollowSession = (sessionId: string): void => {
-  if (Platform.OS === 'android') {
-    android.unfollowSession(sessionId);
-  } else {
-    ios.unfollowSession(sessionId);
-  }
+  follow().unfollowSession(sessionId);
 };
 
 export const dismissFinishedSessionCard = (sessionId: string): void => {
-  if (Platform.OS === 'android') {
-    android.dismissFinishedSessionCard(sessionId);
-  } else {
-    ios.dismissFinishedSessionCard(sessionId);
-  }
+  follow().dismissFinishedSessionCard(sessionId);
 };
 
 export const syncFollowedSessionCards = (
   rows: readonly SessionCardRow[],
   checkedAt?: number
 ): void => {
-  if (Platform.OS === 'android') {
-    android.syncFollowedSessionCards(rows, checkedAt);
-  } else {
-    ios.syncFollowedSessionCards(rows, checkedAt);
-  }
+  follow().syncFollowedSessionCards(rows, checkedAt);
 };
 
 export const endAllSessionCards = (): void => {
-  if (Platform.OS === 'android') {
-    android.endAllSessionCards();
-  } else {
-    ios.endAllSessionCards();
-  }
+  follow().endAllSessionCards();
 };
 
-/** Apply one server update or end to the followed set. Android only; a no-op elsewhere. */
+/** Android only: apply one server push to the followed set. */
 export const applySessionLiveUpdate = (
   event: 'update' | 'end',
-  content: android.SessionLiveUpdateContent,
+  content: AndroidFollow.SessionLiveUpdateContent,
   dismissAfterMs?: number
 ): boolean =>
   Platform.OS === 'android'
-    ? android.applySessionLiveUpdate(event, content, dismissAfterMs)
+    ? android().applySessionLiveUpdate(event, content, dismissAfterMs)
     : false;
 
-/** Launch and foreground: rebuild the followed set from native truth (Android). */
-export const restoreFollowedSessionCardsFromStorage: () => Promise<void> =
-  Platform.OS === 'android'
-    ? android.restoreFollowedSessionCardsFromStorage
-    : async () => {
-        await Promise.resolve();
-      };
+/** Android only: launch and foreground restore from native storage. */
+export const restoreFollowedSessionCardsFromStorage = async (): Promise<void> => {
+  if (Platform.OS === 'android') {
+    await android().restoreFollowedSessionCardsFromStorage();
+  }
+};
 
-/** Revalidate the exact request a card shows and answer it. Android only. */
-export async function approveFollowedSession(
+/** Android only: revalidate the exact request a card shows and answer it. */
+export const approveFollowedSession = async (
   sessionId: string,
   approvalKey: string
-): Promise<void> {
+): Promise<void> => {
   if (Platform.OS === 'android') {
-    await android.approveFollowedSession(sessionId, approvalKey);
+    await android().approveFollowedSession(sessionId, approvalKey);
   }
-}
+};

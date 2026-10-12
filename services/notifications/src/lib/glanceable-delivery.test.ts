@@ -809,7 +809,9 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       },
     });
     expect(cardPushes()[0].aps['stale-date']).toBe(Date.now() / 1000 + 1800);
-    expect(JSON.parse(cardPushes()[0].aps['content-state'].props)).toEqual({
+    // The richer session facts are optional and travel with the content; this
+    // asserts the core card fields the delivery always carries.
+    expect(JSON.parse(cardPushes()[0].aps['content-state'].props)).toMatchObject({
       sessionId: 'ses_followed',
       title: 'Deploy the API',
       statusKind: 'needsInput',

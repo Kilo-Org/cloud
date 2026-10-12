@@ -3241,6 +3241,11 @@
       "deleteTitle": "Izbrisati ovaj razgovor?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Pretraži web",
+      "description": "Dozvolite ovom chatu da traži aktuelne informacije putem vašeg Kilo računa. Pretrage koriste vaš mjesečni limit pretraga.",
+      "allowanceExhausted": "Vaše besplatne web pretrage za ovaj mjesec su potrošene. Dodajte kredite da ponovo pretražujete."
+    },
     "mcp": {
       "title": "Kilo alati",
       "use": "Koristi Kilo alate",

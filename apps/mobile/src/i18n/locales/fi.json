@@ -3200,6 +3200,11 @@
       "deleteTitle": "Poistetaanko tämä keskustelu?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Hae verkosta",
+      "description": "Anna tämän keskustelun hakea ajantasaista tietoa Kilo-tilisi kautta. Haut kuluttavat kuukausittaista hakukiintiötäsi.",
+      "allowanceExhausted": "Tämän kuun ilmaiset verkkohakusi on käytetty. Lisää krediittejä hakeaksesi uudelleen."
+    },
     "mcp": {
       "title": "Kilon työkalut",
       "use": "Käytä Kilon työkaluja",

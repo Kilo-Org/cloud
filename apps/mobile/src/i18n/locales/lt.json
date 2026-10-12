@@ -3282,6 +3282,11 @@
       "deleteTitle": "Ištrinti šį pokalbį?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Ieškoti žiniatinklyje",
+      "description": "Leiskite šiam pokalbiui ieškoti naujausios informacijos per jūsų Kilo paskyrą. Paieškos naudoja jūsų mėnesinį paieškų limitą.",
+      "allowanceExhausted": "Jūsų nemokamos šio mėnesio žiniatinklio paieškos išnaudotos. Pridėkite kreditų, kad vėl galėtumėte ieškoti."
+    },
     "mcp": {
       "title": "Kilo įrankiai",
       "use": "Naudoti Kilo įrankius",

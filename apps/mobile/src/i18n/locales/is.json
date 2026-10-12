@@ -3200,6 +3200,11 @@
       "deleteTitle": "Eyða þessu spjalli?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Leita á vefnum",
+      "description": "Leyfðu þessu spjalli að fletta upp nýjum upplýsingum í gegnum Kilo-reikninginn þinn. Leitir nota mánaðarlegan leitarkvóta þinn.",
+      "allowanceExhausted": "Ókeypis vefleitirnar þínar fyrir þennan mánuð eru búnar. Bættu við inneign til að leita aftur."
+    },
     "mcp": {
       "title": "Kilo-verkfæri",
       "use": "Nota Kilo-verkfæri",

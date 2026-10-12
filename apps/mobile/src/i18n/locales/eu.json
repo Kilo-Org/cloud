@@ -3200,6 +3200,11 @@
       "deleteTitle": "Txat hau ezabatu?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Bilatu sarean",
+      "description": "Utzi txat honi informazio eguneratua bilatzen zure Kilo kontuaren bidez. Bilaketek zure hileko bilaketa-kuota erabiltzen dute.",
+      "allowanceExhausted": "Hilabete honetako doako web-bilaketak agortu dituzu. Gehitu kredituak berriro bilatzeko."
+    },
     "mcp": {
       "title": "Kiloren tresnak",
       "use": "Erabili Kiloren tresnak",

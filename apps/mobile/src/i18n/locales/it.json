@@ -3241,6 +3241,11 @@
       "deleteTitle": "Eliminare questa chat?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Cerca sul web",
+      "description": "Consenti a questa chat di cercare informazioni aggiornate tramite il tuo account Kilo. Le ricerche usano la tua quota mensile di ricerche.",
+      "allowanceExhausted": "Le ricerche web gratuite di questo mese sono esaurite. Aggiungi crediti per cercare di nuovo."
+    },
     "mcp": {
       "title": "Strumenti Kilo",
       "use": "Usa gli strumenti Kilo",

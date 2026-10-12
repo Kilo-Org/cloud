@@ -3200,6 +3200,11 @@
       "deleteTitle": "Padam sembang ini?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Cari di web",
+      "description": "Benarkan sembang ini mencari maklumat terkini melalui akaun Kilo anda. Carian menggunakan peruntukan carian bulanan anda.",
+      "allowanceExhausted": "Carian web percuma anda untuk bulan ini telah habis. Tambah kredit untuk mencari lagi."
+    },
     "mcp": {
       "title": "Alat Kilo",
       "use": "Gunakan alat Kilo",

@@ -3200,6 +3200,11 @@
       "deleteTitle": "Xóa cuộc trò chuyện này?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Tìm kiếm trên web",
+      "description": "Cho phép cuộc trò chuyện này tra cứu thông tin mới nhất qua tài khoản Kilo của bạn. Mỗi lần tìm kiếm dùng hạn mức tìm kiếm hằng tháng của bạn.",
+      "allowanceExhausted": "Bạn đã dùng hết lượt tìm kiếm web miễn phí của tháng này. Hãy thêm tín dụng để tìm kiếm tiếp."
+    },
     "mcp": {
       "title": "Công cụ Kilo",
       "use": "Dùng công cụ Kilo",

@@ -3200,6 +3200,11 @@
       "deleteTitle": "Hamafa ity resaka ity?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Mikaroka amin'ny tranonkala",
+      "description": "Avelao ity resaka ity hikaroka vaovao farany amin'ny alalan'ny kaontinao Kilo. Mampiasa ny fetran'ny fikarohanao isam-bolana ny fikarohana.",
+      "allowanceExhausted": "Lany ny fikarohana an-tranonkala maimaim-poana anao amin'ity volana ity. Ampio crédit mba hikaroka indray."
+    },
     "mcp": {
       "title": "Fitaovana Kilo",
       "use": "Mampiasa fitaovana Kilo",

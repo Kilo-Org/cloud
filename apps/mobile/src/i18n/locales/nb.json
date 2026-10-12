@@ -3200,6 +3200,11 @@
       "deleteTitle": "Slette denne chatten?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Søk på nettet",
+      "description": "La denne chatten slå opp oppdatert informasjon via Kilo-kontoen din. Søk bruker den månedlige søkekvoten din.",
+      "allowanceExhausted": "De gratis nettsøkene dine for denne måneden er brukt opp. Legg til kreditter for å søke igjen."
+    },
     "mcp": {
       "title": "Kilo-verktøy",
       "use": "Bruk Kilo-verktøy",

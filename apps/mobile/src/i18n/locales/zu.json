@@ -3200,6 +3200,11 @@
       "deleteTitle": "Susa le ngxoxo?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Sesha kuwebhu",
+      "description": "Vumela le ngxoxo ibheke ulwazi lwamanje ngokusebenzisa i-akhawunti yakho ye-Kilo. Ukusesha kusebenzisa isabelo sakho sokusesha senyanga.",
+      "allowanceExhausted": "Ukusesha kwakho kwamahhala kuwebhu kwale nyanga kuphelile. Engeza amakhredithi ukuze uphinde useshe."
+    },
     "mcp": {
       "title": "Amathuluzi e-Kilo",
       "use": "Sebenzisa amathuluzi e-Kilo",

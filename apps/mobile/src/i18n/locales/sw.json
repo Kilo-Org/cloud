@@ -3200,6 +3200,11 @@
       "deleteTitle": "Futa gumzo hili?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Tafuta kwenye wavuti",
+      "description": "Ruhusu gumzo hili litafute taarifa za sasa kupitia akaunti yako ya Kilo. Utafutaji hutumia kiwango chako cha utafutaji cha kila mwezi.",
+      "allowanceExhausted": "Utafutaji wako wa bure wa wavuti kwa mwezi huu umekwisha. Ongeza salio ili kutafuta tena."
+    },
     "mcp": {
       "title": "Zana za Kilo",
       "use": "Tumia zana za Kilo",

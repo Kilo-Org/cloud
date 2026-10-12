@@ -3200,6 +3200,11 @@
       "deleteTitle": "Pa ìjíròrò yìí rẹ́?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Wá lórí wẹ́ẹ̀bù",
+      "description": "Jẹ́ kí ìjíròrò yìí wá ìsọfúnni tuntun nípasẹ̀ àkọọ́lẹ̀ Kilo rẹ. Àwọn ìwákiri ń lo ìpín ìwákiri oṣooṣù rẹ.",
+      "allowanceExhausted": "Àwọn ìwákiri wẹ́ẹ̀bù ọ̀fẹ́ rẹ fún oṣù yìí ti tán. Ṣàfikún kírẹ́dítì láti wá lẹ́ẹ̀kan sí i."
+    },
     "mcp": {
       "title": "Àwọn irinṣẹ́ Kilo",
       "use": "Lo àwọn irinṣẹ́ Kilo",

@@ -36,14 +36,16 @@ import {
 } from './mcp-settings-state';
 import { McpServerFormSheet, type McpServerFormTarget } from './mcp-server-form-sheet';
 import { McpServersSection } from './mcp-servers-section';
+import { WebSearchRow, type WebSearchSetting } from './web-search-row';
 
 /**
  * The chat-tools sheet.
  *
- * One sheet, one scroll: the switch for the app-settings tools, the Kilo MCP
- * control, and the remote MCP servers the person added. The state the sheet
- * draws comes from the pure mappings in `mcp-settings-state.ts`, so the same
- * views drive the dot on the header control and every row here.
+ * One sheet, one scroll: the web search switch, the switch for the
+ * app-settings tools, the Kilo MCP control, and the remote MCP servers the
+ * person added. The state the sheet draws comes from the pure mappings in
+ * `mcp-settings-state.ts`, so the same views drive the dot on the header
+ * control and every row here.
  *
  * The hook returns the whole sheet model. It subscribes to the stores rather
  * than copying them, so a switch an agent flips — or a server another screen
@@ -197,9 +199,15 @@ type McpSettingsSheetProps = {
   visible: boolean;
   onClose: () => void;
   settings: McpSettings;
+  webSearch: WebSearchSetting;
 };
 
-export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSettingsSheetProps>) {
+export function McpSettingsSheet({
+  visible,
+  onClose,
+  settings,
+  webSearch,
+}: Readonly<McpSettingsSheetProps>) {
   const { confirm, dialog } = useConfirmDialog();
   const { t } = useTranslation();
   const [form, setForm] = useState<McpServerFormTarget | null>(null);
@@ -281,6 +289,8 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
         contentContainerClassName="gap-4 px-6 pb-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
+        <WebSearchRow setting={webSearch} />
+
         {/* 1. The one switch for the settings-changing tools. */}
         <View className="gap-2">
           <PreferenceRow

@@ -3314,6 +3314,11 @@
       "downloadProgress": "Downloading… {{percent}}%",
       "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again."
     },
+    "webSearch": {
+      "title": "Search the web",
+      "description": "Let this chat look up current information through your Kilo account. Searches use your monthly search allowance.",
+      "allowanceExhausted": "Your free web searches for this month are used up. Add credits to search again."
+    },
     "mcp": {
       "title": "Kilo tools",
       "use": "Use Kilo tools",

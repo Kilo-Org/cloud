@@ -3200,6 +3200,11 @@
       "deleteTitle": "Bu söhbət silinsin?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Vebdə axtar",
+      "description": "Bu söhbətə Kilo hesabınız vasitəsilə aktual məlumat axtarmağa icazə verin. Axtarışlar aylıq axtarış limitinizdən istifadə edir.",
+      "allowanceExhausted": "Bu ay üçün pulsuz veb axtarışlarınız bitdi. Yenidən axtarmaq üçün kredit əlavə edin."
+    },
     "mcp": {
       "title": "Kilo alətləri",
       "use": "Kilo alətlərindən istifadə et",

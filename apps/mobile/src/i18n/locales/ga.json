@@ -3323,6 +3323,11 @@
       "deleteTitle": "An comhrá seo a scriosadh?"
     },
     "beta": "Béite",
+    "webSearch": {
+      "title": "Cuardaigh an gréasán",
+      "description": "Lig don chomhrá seo faisnéis reatha a lorg trí do chuntas Kilo. Úsáideann cuardaigh do liúntas cuardaigh míosúil.",
+      "allowanceExhausted": "Tá do chuardaigh ghréasáin saor in aisce don mhí seo ídithe. Cuir creidmheasanna leis chun cuardach arís."
+    },
     "mcp": {
       "title": "Uirlisí Kilo",
       "use": "Úsáid uirlisí Kilo",

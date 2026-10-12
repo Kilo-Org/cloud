@@ -3200,6 +3200,11 @@
       "deleteTitle": "Ta fshini këtë bisedë?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Kërko në internet",
+      "description": "Lejo këtë bisedë të kërkojë informacion të përditësuar përmes llogarisë sate Kilo. Kërkimet përdorin kuotën tënde mujore të kërkimeve.",
+      "allowanceExhausted": "Kërkimet e tua falas në internet për këtë muaj kanë mbaruar. Shto kredite për të kërkuar përsëri."
+    },
     "mcp": {
       "title": "Mjetet Kilo",
       "use": "Përdor mjetet Kilo",

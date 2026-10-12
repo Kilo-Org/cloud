@@ -3200,6 +3200,11 @@
       "deleteTitle": "Ma tirtiraa wada sheekaysigan?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Ka raadi shabakadda",
+      "description": "U oggolow sheekadan inay ku raadiso macluumaad cusub akoonkaaga Kilo. Raadintu waxay isticmaashaa xaddiga raadinta ee bishii.",
+      "allowanceExhausted": "Raadintaada shabakadda ee bilaashka ah ee bishan way dhammaatay. Ku dar kiridit si aad mar kale u raadiso."
+    },
     "mcp": {
       "title": "Qalabka Kilo",
       "use": "Isticmaal qalabka Kilo",

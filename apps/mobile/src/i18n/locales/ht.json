@@ -3200,6 +3200,11 @@
       "deleteTitle": "Efase chat sa a?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Chèche sou entènèt",
+      "description": "Kite chat sa a chèche enfòmasyon ki ajou atravè kont Kilo ou. Rechèch yo itilize alokasyon rechèch chak mwa ou.",
+      "allowanceExhausted": "Rechèch entènèt gratis ou pou mwa sa a fini. Ajoute kredi pou chèche ankò."
+    },
     "mcp": {
       "title": "Zouti Kilo",
       "use": "Sèvi ak zouti Kilo",

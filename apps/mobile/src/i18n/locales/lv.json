@@ -3241,6 +3241,11 @@
       "deleteTitle": "Vai dzēst šo tērzēšanu?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Meklēt tīmeklī",
+      "description": "Ļaujiet šai tērzēšanai meklēt aktuālu informāciju, izmantojot jūsu Kilo kontu. Meklēšana izmanto jūsu mēneša meklēšanas limitu.",
+      "allowanceExhausted": "Jūsu bezmaksas tīmekļa meklējumi šim mēnesim ir izlietoti. Pievienojiet kredītus, lai meklētu atkal."
+    },
     "mcp": {
       "title": "Kilo rīki",
       "use": "Izmantot Kilo rīkus",

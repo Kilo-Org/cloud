@@ -3200,6 +3200,11 @@
       "deleteTitle": "Hapus obrolan ini?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Cari di web",
+      "description": "Izinkan chat ini mencari informasi terkini melalui akun Kilo Anda. Pencarian menggunakan jatah pencarian bulanan Anda.",
+      "allowanceExhausted": "Pencarian web gratis Anda untuk bulan ini sudah habis. Tambahkan kredit untuk mencari lagi."
+    },
     "mcp": {
       "title": "Alat Kilo",
       "use": "Gunakan alat Kilo",

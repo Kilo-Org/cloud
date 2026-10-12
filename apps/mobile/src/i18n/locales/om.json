@@ -3200,6 +3200,11 @@
       "deleteTitle": "Marii kana haquuf?"
     },
     "beta": "Beetaa",
+    "webSearch": {
+      "title": "Weebii irratti barbaadi",
+      "description": "Haasaan kun herrega Kilo keessaniin odeeffannoo haaraa akka barbaadu hayyami. Barbaacha ji'aan siif kenname barbaachi ni fayyadama.",
+      "allowanceExhausted": "Barbaachi weebii bilisaa ji'a kanaa xumurameera. Ammas barbaaduuf kireedii dabali."
+    },
     "mcp": {
       "title": "Meeshaalee Kilo",
       "use": "Meeshaalee Kilo fayyadami",

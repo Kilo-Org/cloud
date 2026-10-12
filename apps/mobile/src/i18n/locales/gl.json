@@ -3200,6 +3200,11 @@
       "deleteTitle": "Eliminar este chat?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Buscar na web",
+      "description": "Permite que este chat busque información actual a través da túa conta de Kilo. As buscas usan a túa cota mensual de buscas.",
+      "allowanceExhausted": "Esgotaches as buscas web gratuítas deste mes. Engade créditos para volver buscar."
+    },
     "mcp": {
       "title": "Ferramentas de Kilo",
       "use": "Usar as ferramentas de Kilo",

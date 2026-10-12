@@ -3200,6 +3200,11 @@
       "deleteTitle": "A share wannan tattaunawar?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Bincika yanar gizo",
+      "description": "Bari wannan hira ta nemo bayanai na yanzu ta asusunka na Kilo. Bincike yana amfani da adadin bincikenka na wata-wata.",
+      "allowanceExhausted": "Binciken yanar gizo na kyauta na wannan watan ya ƙare. Ƙara kiredit don sake bincike."
+    },
     "mcp": {
       "title": "Kayan aikin Kilo",
       "use": "Yi amfani da kayan aikin Kilo",

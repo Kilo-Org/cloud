@@ -3200,6 +3200,11 @@
       "deleteTitle": "Hichapụ nkata a?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Chọọ na weebụ",
+      "description": "Kwe ka mkparịta ụka a chọọ ozi ọhụrụ site na akaụntụ Kilo gị. Nchọta na-eji oke nchọta gị kwa ọnwa.",
+      "allowanceExhausted": "Nchọta weebụ n'efu gị maka ọnwa a agwụla. Tinye kredit ka ịchọọ ọzọ."
+    },
     "mcp": {
       "title": "Ngwá ọrụ Kilo",
       "use": "Jiri ngwá ọrụ Kilo",

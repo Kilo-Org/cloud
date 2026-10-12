@@ -3282,6 +3282,11 @@
       "deleteTitle": "Odstrániť tento chat?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Hľadať na webe",
+      "description": "Povoľte tomuto četu vyhľadávať aktuálne informácie cez váš účet Kilo. Vyhľadávania čerpajú váš mesačný limit vyhľadávania.",
+      "allowanceExhausted": "Vaše bezplatné webové vyhľadávania na tento mesiac sa minuli. Pridajte kredity a hľadajte znova."
+    },
     "mcp": {
       "title": "Nástroje Kilo",
       "use": "Používať nástroje Kilo",

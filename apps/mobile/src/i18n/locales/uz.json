@@ -3200,6 +3200,11 @@
       "deleteTitle": "Bu chat oʻchirilsinmi?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Internetdan qidirish",
+      "description": "Bu chatga Kilo hisobingiz orqali dolzarb ma’lumot qidirishga ruxsat bering. Qidiruvlar oylik qidiruv limitingizdan foydalanadi.",
+      "allowanceExhausted": "Bu oy uchun bepul veb qidiruvlaringiz tugadi. Qayta qidirish uchun kredit qo‘shing."
+    },
     "mcp": {
       "title": "Kilo vositalari",
       "use": "Kilo vositalaridan foydalanish",

@@ -3282,6 +3282,11 @@
       "deleteTitle": "Izbrišem ta klepet?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Išči po spletu",
+      "description": "Dovolite temu klepetu, da poišče aktualne informacije prek vašega računa Kilo. Iskanja porabljajo vašo mesečno kvoto iskanj.",
+      "allowanceExhausted": "Vaša brezplačna spletna iskanja za ta mesec so porabljena. Dodajte dobroimetje, da boste lahko znova iskali."
+    },
     "mcp": {
       "title": "Orodja Kilo",
       "use": "Uporabi orodja Kilo",

@@ -3364,6 +3364,11 @@
       "deleteTitle": "Dileu'r sgwrs hon?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Chwilio'r we",
+      "description": "Gadewch i'r sgwrs hon chwilio am wybodaeth gyfredol drwy eich cyfrif Kilo. Mae chwiliadau'n defnyddio'ch lwfans chwilio misol.",
+      "allowanceExhausted": "Mae eich chwiliadau gwe am ddim ar gyfer y mis hwn wedi'u defnyddio. Ychwanegwch gredydau i chwilio eto."
+    },
     "mcp": {
       "title": "Offer Kilo",
       "use": "Defnyddio offer Kilo",

@@ -3200,6 +3200,11 @@
       "deleteTitle": "Burahin ang chat na ito?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Maghanap sa web",
+      "description": "Hayaan ang chat na ito na maghanap ng kasalukuyang impormasyon gamit ang iyong Kilo account. Ginagamit ng mga paghahanap ang iyong buwanang allowance sa paghahanap.",
+      "allowanceExhausted": "Naubos na ang iyong libreng web search para sa buwang ito. Magdagdag ng credits para makapaghanap ulit."
+    },
     "mcp": {
       "title": "Mga tool ng Kilo",
       "use": "Gamitin ang mga tool ng Kilo",

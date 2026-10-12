@@ -3323,6 +3323,11 @@
       "deleteTitle": "Tħassar dan iċ-chat?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Fittex fuq il-web",
+      "description": "Ħalli din iċ-chat tfittex informazzjoni kurrenti permezz tal-kont Kilo tiegħek. It-tfittxijiet jużaw il-kwota ta' tfittxija ta' kull xahar tiegħek.",
+      "allowanceExhausted": "It-tfittxijiet web b'xejn tiegħek għal dan ix-xahar spiċċaw. Żid krediti biex terġa' tfittex."
+    },
     "mcp": {
       "title": "Għodod Kilo",
       "use": "Uża l-għodod Kilo",

@@ -3200,6 +3200,11 @@
       "deleteTitle": "Muku i tēnei kōrero?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Rapu i te ipurangi",
+      "description": "Tukuna tēnei kōrerorero kia rapu i ngā mōhiohio hou mā tō pūkete Kilo. Ka whakamahia e ngā rapunga tō wāhanga rapu ā-marama.",
+      "allowanceExhausted": "Kua pau ō rapunga ipurangi utukore mō tēnei marama. Tāpirihia he nama kia rapu anō."
+    },
     "mcp": {
       "title": "Ngā taputapu Kilo",
       "use": "Whakamahia ngā taputapu Kilo",

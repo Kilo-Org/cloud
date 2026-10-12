@@ -3282,6 +3282,11 @@
       "deleteTitle": "Usunąć ten czat?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Szukaj w sieci",
+      "description": "Pozwól temu czatowi wyszukiwać aktualne informacje przez Twoje konto Kilo. Wyszukiwania zużywają Twój miesięczny limit wyszukiwań.",
+      "allowanceExhausted": "Twoje darmowe wyszukiwania w sieci na ten miesiąc się wyczerpały. Dodaj kredyty, aby znów wyszukiwać."
+    },
     "mcp": {
       "title": "Narzędzia Kilo",
       "use": "Używaj narzędzi Kilo",

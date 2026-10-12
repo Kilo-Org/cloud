@@ -3200,6 +3200,11 @@
       "deleteTitle": "刪除這個對話？"
     },
     "beta": "測試版",
+    "webSearch": {
+      "title": "搜尋網路",
+      "description": "允許此聊天透過你的 Kilo 帳戶查詢最新資訊。搜尋會使用你每月的搜尋額度。",
+      "allowanceExhausted": "你本月的免費網路搜尋已用完。新增額度即可再次搜尋。"
+    },
     "mcp": {
       "title": "Kilo 工具",
       "use": "使用 Kilo 工具",

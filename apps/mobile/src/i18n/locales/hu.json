@@ -3200,6 +3200,11 @@
       "deleteTitle": "Törli ezt a csevegést?"
     },
     "beta": "Béta",
+    "webSearch": {
+      "title": "Keresés a weben",
+      "description": "Engedd, hogy ez a csevegés aktuális információkat keressen a Kilo-fiókodon keresztül. A keresések a havi keresési keretedet használják.",
+      "allowanceExhausted": "Elfogytak az e havi ingyenes webes kereséseid. Adj hozzá kreditet, hogy újra kereshess."
+    },
     "mcp": {
       "title": "Kilo-eszközök",
       "use": "Kilo-eszközök használata",

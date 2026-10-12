@@ -3200,6 +3200,11 @@
       "deleteTitle": "Skrap hierdie klets?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Deursoek die web",
+      "description": "Laat hierdie klets huidige inligting deur jou Kilo-rekening opsoek. Soektogte gebruik jou maandelikse soektoelaag.",
+      "allowanceExhausted": "Jou gratis websoektogte vir hierdie maand is opgebruik. Voeg krediete by om weer te soek."
+    },
     "mcp": {
       "title": "Kilo-nutsmiddels",
       "use": "Gebruik Kilo-nutsmiddels",

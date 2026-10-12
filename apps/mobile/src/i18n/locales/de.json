@@ -3200,6 +3200,11 @@
       "deleteTitle": "Diesen Chat löschen?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Im Web suchen",
+      "description": "Lass diesen Chat aktuelle Informationen über dein Kilo-Konto nachschlagen. Suchen verbrauchen dein monatliches Suchkontingent.",
+      "allowanceExhausted": "Deine kostenlosen Websuchen für diesen Monat sind aufgebraucht. Füge Guthaben hinzu, um wieder zu suchen."
+    },
     "mcp": {
       "title": "Kilo-Tools",
       "use": "Kilo-Tools verwenden",

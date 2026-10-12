@@ -3200,6 +3200,11 @@
       "deleteTitle": "Deze chat verwijderen?"
     },
     "beta": "Bèta",
+    "webSearch": {
+      "title": "Zoeken op het web",
+      "description": "Laat deze chat actuele informatie opzoeken via je Kilo-account. Zoekopdrachten gebruiken je maandelijkse zoektegoed.",
+      "allowanceExhausted": "Je gratis webzoekopdrachten voor deze maand zijn op. Voeg tegoed toe om weer te zoeken."
+    },
     "mcp": {
       "title": "Kilo-tools",
       "use": "Kilo-tools gebruiken",

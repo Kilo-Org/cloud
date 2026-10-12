@@ -3200,6 +3200,11 @@
       "deleteTitle": "Bu sohbet silinsin mi?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Web'de ara",
+      "description": "Bu sohbetin Kilo hesabın üzerinden güncel bilgi aramasına izin ver. Aramalar aylık arama hakkını kullanır.",
+      "allowanceExhausted": "Bu ayki ücretsiz web aramaların bitti. Yeniden aramak için kredi ekle."
+    },
     "mcp": {
       "title": "Kilo araçları",
       "use": "Kilo araçlarını kullan",

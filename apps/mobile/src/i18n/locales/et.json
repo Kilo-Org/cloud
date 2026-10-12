@@ -3200,6 +3200,11 @@
       "deleteTitle": "Kas kustutada see vestlus?"
     },
     "beta": "Beeta",
+    "webSearch": {
+      "title": "Otsi veebist",
+      "description": "Luba sellel vestlusel otsida ajakohast teavet sinu Kilo konto kaudu. Otsingud kasutavad sinu igakuist otsingumahtu.",
+      "allowanceExhausted": "Selle kuu tasuta veebiotsingud on otsas. Lisa krediiti, et uuesti otsida."
+    },
     "mcp": {
       "title": "Kilo tööriistad",
       "use": "Kasuta Kilo tööriistu",

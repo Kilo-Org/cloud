@@ -159,6 +159,9 @@ vi.mock('@/components/chat/mcp-settings-sheet', () => ({
   McpSettingsSheet: 'McpSettingsSheet',
   useMcpSettings: () => mcpModel,
 }));
+vi.mock('@/components/chat/web-search-row', () => ({
+  useWebSearchSetting: () => ({ enabled: true, setEnabled: () => undefined }),
+}));
 vi.mock('react-native', () => ({
   Alert: { alert: backendUi.alert },
   ActivityIndicator: 'ActivityIndicator',

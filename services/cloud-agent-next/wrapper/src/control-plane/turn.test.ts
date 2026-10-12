@@ -944,6 +944,7 @@ describe('serialized command delivery wait', () => {
     h.manager.onNativeDeadline(
       { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
       'no_progress',
+      undefined,
       runtimeKey(spec)
     );
     await settle();

@@ -724,7 +724,9 @@ function buildServiceDefs(): ServiceDef[] {
 
     if (name === 'ai-gateway') {
       // The port is passed as AI_GATEWAY_PORT because the session exports PORT
-      // for the web app.
+      // for the web app. The gateway starts before the web app writes
+      // `.dev-port`, so it gets the web port that dev:start already verified
+      // is free.
       const port = aiGatewayPort();
       defs.push({
         name,
@@ -732,7 +734,14 @@ function buildServiceDefs(): ServiceDef[] {
         dir: meta.dir ?? name,
         port,
         dependsOn: meta.dependsOn,
-        command: ['env', `AI_GATEWAY_PORT=${port}`, 'pnpm', 'run', 'dev'],
+        command: [
+          'env',
+          `AI_GATEWAY_PORT=${port}`,
+          `AI_GATEWAY_WEB_PORT=${nextjsTargetPort}`,
+          'pnpm',
+          'run',
+          'dev',
+        ],
         group: meta.group,
       });
       continue;

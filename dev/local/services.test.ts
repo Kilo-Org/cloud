@@ -209,6 +209,7 @@ test('runs the AI gateway app with the core services', () => {
   assert.deepEqual(service.command, [
     'env',
     `AI_GATEWAY_PORT=${3010 + portOffset}`,
+    `AI_GATEWAY_WEB_PORT=${getService('nextjs').port}`,
     'pnpm',
     'run',
     'dev',
@@ -235,15 +236,20 @@ test('starts the AI gateway app before the web app that rewrites to it', () => {
   assert.ok(appTargets.indexOf('ai-gateway') < appTargets.indexOf('nextjs'));
 });
 
-test('moves the web app gateway target with the port offset', () => {
+test('moves the web app and gateway cross-references with the port offset', () => {
   const originalOffset = portOffset;
+  const originalPort = process.env.PORT;
   try {
+    delete process.env.PORT;
     applyPortOffset(4200);
     assert.deepEqual(getService('nextjs').command.slice(0, 2), [
       'env',
       'AI_GATEWAY_URL=http://localhost:7210',
     ]);
+    assert.ok(getService('ai-gateway').command.includes('AI_GATEWAY_WEB_PORT=7200'));
   } finally {
+    if (originalPort === undefined) delete process.env.PORT;
+    else process.env.PORT = originalPort;
     applyPortOffset(originalOffset);
   }
 });

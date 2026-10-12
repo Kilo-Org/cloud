@@ -11,7 +11,12 @@ beforeAll(async () => {
   await cleanupDbForTest();
   await db.insert(ai_gateway_config).values({
     unavailable_models: {
-      models: ['apodex/apodex-1.1-mini:free', 'google/gemma-4-31b-it:free', 'qwen/qwen3.8-27b'],
+      models: [
+        'apodex/apodex-1.1-mini:free',
+        'google/gemma-4-31b-it:free',
+        'qwen/qwen3.8-27b:free',
+        'example/region-restricted',
+      ],
     },
   });
 });
@@ -22,7 +27,8 @@ describe('unavailable models', () => {
       'google/gemma-4-26b-a4b-it:free',
       'apodex/apodex-1.1-mini:free',
       'google/gemma-4-31b-it:free',
-      'qwen/qwen3.8-27b',
+      'qwen/qwen3.8-27b:free',
+      'example/region-restricted',
     ]);
   });
 
@@ -33,6 +39,9 @@ describe('unavailable models', () => {
     expect(await isUnavailableModel('google/gemma-4-26b-a4b-it')).toBe(false);
     expect(await isUnavailableModel('google/gemma-4-31b-it:free')).toBe(true);
     expect(await isUnavailableModel('google/gemma-4-31b-it')).toBe(false);
+    expect(await isUnavailableModel('qwen/qwen3.8-27b:free')).toBe(true);
+    expect(await isUnavailableModel('qwen/qwen3.8-27b')).toBe(false);
+    expect(await isUnavailableModel('example/region-restricted')).toBe(true);
     expect(await isUnavailableModel('openai/gpt-oss-20b:free')).toBe(false);
   });
 });
@@ -41,7 +50,8 @@ describe('familyHasUnavailableFreeModel', () => {
   const unavailableModelIds = new Set([
     'apodex/apodex-1.1-mini:free',
     'google/gemma-4-31b-it:free',
-    'qwen/qwen3.8-27b',
+    'qwen/qwen3.8-27b:free',
+    'example/region-restricted',
   ]);
 
   test.each([
@@ -49,11 +59,13 @@ describe('familyHasUnavailableFreeModel', () => {
     'apodex/apodex-1.1-mini',
     'google/gemma-4-31b-it:free',
     'google/gemma-4-31b-it',
+    'qwen/qwen3.8-27b:free',
+    'qwen/qwen3.8-27b',
   ])('matches the normalized family of %s', modelId => {
     expect(familyHasUnavailableFreeModel(unavailableModelIds, modelId)).toBe(true);
   });
 
-  test.each(['qwen/qwen3.8-27b', 'qwen/qwen3.8-27b:free', 'cohere/north-mini-code'])(
+  test.each(['example/region-restricted', 'cohere/north-mini-code'])(
     'does not match %s, which has no unavailable free model',
     modelId => {
       expect(familyHasUnavailableFreeModel(unavailableModelIds, modelId)).toBe(false);

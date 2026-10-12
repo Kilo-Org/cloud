@@ -508,7 +508,8 @@ describe('turn manager submission', () => {
     h.registerRoute(routeSpec());
     h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
     await settle();
-    expect(h.manager.hasPendingWork()).toBe(true);
+    // The compact's native execution owns compute; its completion wait adds none.
+    expect(h.manager.hasPendingWork()).toBe(false);
     h.manager.submit(SESSION_ID, promptPayload('m1'));
     h.manager.abort(SESSION_ID);
     await settle();
@@ -526,7 +527,8 @@ describe('turn manager submission', () => {
       h.registerRoute(routeSpec());
       h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
       await settle();
-      expect(h.manager.hasPendingWork()).toBe(true);
+      // The compact's native execution owns compute; its completion wait adds none.
+      expect(h.manager.hasPendingWork()).toBe(false);
       expect(outcomeFrames(h.frames)).toEqual([]);
       const timeout = timeouts.mock.calls.find(([, ms]) => ms === 120_000)?.[0];
       if (typeof timeout !== 'function') throw new Error('Compact completion timeout not armed');

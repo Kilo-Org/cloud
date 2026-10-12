@@ -1255,12 +1255,11 @@ export function createTurnManager(deps: TurnManagerDeps) {
           turn.phase === 'finalizing' ||
           turn.prompts.some(
             entry =>
-              entry.onNativeClose !== undefined ||
-              (!entry.nativeObserved &&
-                // The live native execution running the serialized command owns compute,
-                // including sleeping while that command waits on the user.
-                !blockedBySerializedCommand(turn, entry) &&
-                !deliveryExpired(turn, entry))
+              !entry.nativeObserved &&
+              // The live native execution running the serialized command owns compute,
+              // including sleeping while that command waits on the user.
+              !blockedBySerializedCommand(turn, entry) &&
+              !deliveryExpired(turn, entry)
           )
       );
     },

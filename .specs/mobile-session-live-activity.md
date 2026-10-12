@@ -38,7 +38,8 @@ capitals, as shown here.
 - **Scope**: The personal surface or one organization, as for the
   aggregate card.
 - **Status kind**: The shared glanceable vocabulary from
-  `glanceableStatusKind`: `needsInput`, `running`, `idle`, `scheduled`.
+  `glanceableStatusKind` (`needsInput`, `running`, `idle`, `scheduled`),
+  plus `failed` for a run that stopped with an error.
 
 ## Overview
 
@@ -90,15 +91,38 @@ its turn, or when the user loses access to the session.
    - `scheduled`: "Scheduled" and the wake time, with the same time rules
      as the home widget. It MUST NOT read "Idle".
    - `idle`: "Finished" and the finish time.
-4. The timer MUST count on the device. The server MUST NOT push an update
-   only to advance a clock.
-5. The session card MUST NOT show the organization name, the repository,
-   generated text, the session id, or an account id. The session id MAY
-   travel in the card's data for routing and approval, but MUST NOT be
-   drawn.
-6. The card MUST follow the existing glanceable design rules: equal
-   padding, the real logo, RTL mirroring, digits in the app language,
-   labels that truncate at the end, and no repeated information.
+   - `failed`: a stop reason and the time it stopped.
+4. The status label MUST NOT truncate. The card MUST give the label, and
+   every number it shows, priority over the optional detail lines.
+5. The card MUST show the session's current step when one is known: the
+   verb of the latest tool call in the card's own vocabulary ("Editing",
+   "Reading", "Run", "Web search", "Thinking it through") and its short
+   target, capped in length. The card MUST NOT repeat the step on a
+   second line.
+6. The card MUST show plan progress when the session keeps a plan: a bar,
+   the count ("3 of 7"), and the current step's name, capped in length.
+7. A `running` card whose session has no activity for
+   `SESSION_CARD_QUIET_AFTER_MS` (5 minutes) MUST replace the step line
+   with a quiet warning that names the quiet time. The card MUST NOT show
+   "Last known" at the same time.
+8. The card MUST show the diff size when the session has changed files:
+   the file count, the added lines, and the removed lines.
+9. A card that waits on a permission MUST show the command the request
+   runs, trimmed to one short line, beside the Approve control. A card
+   that waits on a question MUST NOT show Approve.
+10. An `idle` card MUST show the duration of the run and its outcome when
+    one is known: that a pull request opened, or the diff size.
+11. The cost so far MUST appear only in the expanded iOS island view and
+    on a finished card. It MUST NOT appear on a working Lock Screen card.
+12. The timer MUST count on the device. The server MUST NOT push an update
+    only to advance a clock.
+13. The session card MUST NOT show the organization name, the repository,
+    the agent's message text, the session id, or an account id. The
+    session id MAY travel in the card's data for routing and approval, but
+    MUST NOT be drawn.
+14. The card MUST follow the existing glanceable design rules: equal
+    padding, the real logo, RTL mirroring, digits in the app language, and
+    no repeated information.
 
 ### Presentation order
 
@@ -128,17 +152,21 @@ its turn, or when the user loses access to the session.
 ### Updates
 
 1. The server MUST update a session card on every status kind change of
-   its session and on every change of the waiting permission request.
+   its session, on every change of the waiting permission request, and on
+   a changed current step, plan, or diff size.
 2. The server MUST NOT update a session card for a change that does not
-   change what the card shows.
-3. Updates that move a card into `needsInput` or `idle` MUST use APNs
-   priority 10. All other session card updates MUST use APNs priority 5,
-   which does not count toward the iOS update budget.
+   change what the card shows. A step-only change MUST be coalesced with
+   the other updates of the same session within the refresh window.
+3. Updates that move a card into `needsInput` or `failed`, and every
+   ending, MUST use APNs priority 10. All other session card updates MUST
+   use APNs priority 5, which does not count toward the iOS update budget.
 4. Each update MUST carry a revision time, so iOS drops an update that
    arrives after a newer one.
 5. A session card MUST carry a stale date. If no update arrives before
    it, the card MUST keep its last-known content with an honest time. It
-   MUST NOT show "Status expired" or "no longer current".
+   MUST NOT show "Status expired" or "no longer current". A running card's
+   stale date MUST follow the session's last activity, so a quiet session
+   reaches the quiet state without a clock update.
 
 ### Aggregate card coexistence
 
@@ -160,15 +188,18 @@ its turn, or when the user loses access to the session.
 1. When the session's status kind becomes `idle`, the system MUST end the
    card with the "Finished" content and dismiss it from the Lock Screen
    after 15 minutes. A tap that opens the session MUST dismiss it at once.
-2. When the session is deleted, or the user loses access to it, the
+2. When the session's status kind becomes `failed`, the system MUST keep
+   the card visible with the stop reason until the user opens the session
+   or unfollows. It MUST NOT dismiss a failed card on a timer.
+3. When the session is deleted, or the user loses access to it, the
    system MUST end the card immediately with no content.
-3. Sign-out, an account change, an organization switch that leaves the
+4. Sign-out, an account change, an organization switch that leaves the
    card's scope, the app privacy lock, and the Live Activity switch turned
    off MUST end every session card immediately.
-4. When iOS ends a card at its time limit, the server MUST drop the
+5. When iOS ends a card at its time limit, the server MUST drop the
    card's token on the next APNs rejection and the session MUST count as
    unfollowed again.
-5. Every ended card MUST release its push token on the server. Token
+6. Every ended card MUST release its push token on the server. Token
    unregister MUST run before the device session is revoked, as it does
    for the aggregate card.
 
@@ -177,9 +208,13 @@ its turn, or when the user loses access to the session.
 1. This spec changes the glanceable privacy rule for session cards only:
    a session card MAY show the session title on the Lock Screen, because
    the user started it with an explicit Follow.
-2. The aggregate card contract does not change. It MUST NOT carry a
+2. A session card MAY also show the current step's verb and short target,
+   the current plan step's name, and the trimmed command a permission
+   request runs. These come from the session's own tool activity. The
+   card MUST NOT show the agent's message text.
+3. The aggregate card contract does not change. It MUST NOT carry a
    title, session id, repository, organization name, or generated text.
-3. Session card data MUST NOT appear in the aggregate card's data, and
+4. Session card data MUST NOT appear in the aggregate card's data, and
    aggregate card data MUST NOT carry the followed session ids.
 
 ### Card data contract
@@ -190,9 +225,18 @@ The session card data MUST hold exactly these facts, and nothing else:
 |---|---|
 | session id | Routing and approval only. Never drawn. |
 | title | Display title, already trimmed and capped in length. |
-| status kind | `running`, `needsInput`, `idle`, or `scheduled`. |
+| status kind | `running`, `needsInput`, `idle`, `scheduled`, or `failed`. |
 | status since | When the current status kind began. |
+| started at | When the run started, for the finished duration. |
 | scheduled at | Wake time, or none. |
+| current step | The latest tool call's verb and short target, or none. |
+| plan | Steps done, steps total, and the current step's name, or none. |
+| permission command | The command the waiting request runs, trimmed, or none. |
+| changes | Changed files, added lines, and removed lines, or none. |
+| last activity at | When the session last did something, or none. |
+| cost | The run's cost so far, or none. |
+| outcome | A pull request opened, changes, or none. |
+| failure | The stop class of a failed run, or none. |
 | awaiting permission | True only when Approve can answer the request. |
 | approval key | Key of the request the card shows, or none. |
 | updated at | When the server confirmed this content. |
@@ -233,10 +277,13 @@ observable behavior is the same.
    in that state. A `running` card MUST show the elapsed time as the platform's
    own counting-up timer, so it stays right while no process runs; every other
    card MUST show the absolute time the rules above define.
-5. The system MAY draw extra detail the platform can show: plan progress, the
-   permission command, the diff size, and the cost so far. The cost MUST appear
-   only in the expanded part of the notification.
-6. The system MUST create the channel before the first post and MUST carry a
+5. The system MAY draw extra detail the platform can show, as the Content
+   rules define it: the current step, plan progress, the permission command,
+   the diff size, and the cost so far. The cost MUST appear only in the
+   expanded part of the notification.
+6. The notification MUST use the platform's progress style for the plan bar,
+   and the platform's short critical text for the quiet warning.
+7. The system MUST create the channel before the first post and MUST carry a
    translated channel name, as the other Android channels do.
 
 ### Android: actions
@@ -253,7 +300,9 @@ observable behavior is the same.
 
 1. The server MUST reach a followed Android session through a high-priority
    data-only push that carries the same content contract as the iOS card, on
-   the same transitions, with the same unchanged-content skip. The message MUST
+   the same transitions, with the same unchanged-content skip, and with the
+   same priority rule: a change into `needsInput` or `failed`, and every
+   ending, is urgent; a step-only or other change is not. The message MUST
    carry a schema version, so a client that does not know a later version
    ignores it instead of failing.
 2. An Android follow MUST NOT expire on its own: the notification has no system
@@ -301,3 +350,14 @@ observable behavior is the same.
 - The Android Home widget keeps every session, as the iOS one does; only the
   aggregate card excludes followed sessions.
 - The server's aggregate exclusion counts both platforms' session rows.
+
+### 2026-10-12 -- Richer content and the failed state
+
+- The card now shows the current step, plan progress, the permission command,
+  the diff size, the time since the last activity, the cost (expanded view and
+  finished cards only), the finished duration and outcome, and a stop reason.
+- Added the `failed` status kind, with no timer dismissal.
+- Session cards may show the step name and the trimmed permission command; the
+  agent's message text stays off the card.
+- A quiet running session shows a warning after 5 minutes instead of the step.
+- The status label and every number MUST NOT truncate.

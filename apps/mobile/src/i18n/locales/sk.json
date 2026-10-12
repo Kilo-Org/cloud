@@ -3278,8 +3278,12 @@
     "list": {
       "loadFailed": "Históriu chatu sa nepodarilo načítať.",
       "new": "Nový chat",
-      "openHint": "Otvorí chat. Dlhým stlačením odstránite.",
       "deleteTitle": "Odstrániť tento chat?"
+    },
+    "rename": {
+      "title": "Premenovať chat",
+      "accessibility": "Premenovať chat: {{title}}",
+      "openHint": "Otvorí chat. Dlhým stlačením ho premenujete alebo odstránite."
     },
     "beta": "Beta",
     "mcp": {

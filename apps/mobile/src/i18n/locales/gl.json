@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Non se puido cargar o historial do chat.",
       "new": "Chat novo",
-      "openHint": "Abre o chat. Mantén premido para eliminar.",
       "deleteTitle": "Eliminar este chat?"
+    },
+    "rename": {
+      "title": "Renomear o chat",
+      "accessibility": "Renomear o chat: {{title}}",
+      "openHint": "Abre o chat. Mantén premido para renomear ou eliminar."
     },
     "beta": "Beta",
     "mcp": {

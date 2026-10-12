@@ -3278,8 +3278,12 @@
     "list": {
       "loadFailed": "Historie chatu se nepodařila načíst.",
       "new": "Nový chat",
-      "openHint": "Otevře chat. Dlouhým stisknutím smažete.",
       "deleteTitle": "Smazat tento chat?"
+    },
+    "rename": {
+      "title": "Přejmenovat chat",
+      "accessibility": "Přejmenovat chat: {{title}}",
+      "openHint": "Otevře chat. Dlouhým stisknutím ho přejmenujete nebo smažete."
     },
     "beta": "Beta",
     "mcp": {

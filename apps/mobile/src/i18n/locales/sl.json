@@ -3278,8 +3278,12 @@
     "list": {
       "loadFailed": "Zgodovine klepeta ni bilo mogoče naložiti.",
       "new": "Nov klepet",
-      "openHint": "Odpre klepet. Pridržite za brisanje.",
       "deleteTitle": "Izbrišem ta klepet?"
+    },
+    "rename": {
+      "title": "Preimenuj klepet",
+      "accessibility": "Preimenuj klepet: {{title}}",
+      "openHint": "Odpre klepet. Pridržite za preimenovanje ali brisanje."
     },
     "beta": "Beta",
     "mcp": {

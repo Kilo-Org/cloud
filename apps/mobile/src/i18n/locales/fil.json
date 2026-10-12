@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Hindi ma-load ang kasaysayan ng chat.",
       "new": "Bagong chat",
-      "openHint": "Binubuksan ang chat. Pindutin nang matagal para burahin.",
       "deleteTitle": "Burahin ang chat na ito?"
+    },
+    "rename": {
+      "title": "Palitan ang pangalan ng chat",
+      "accessibility": "Palitan ang pangalan ng chat: {{title}}",
+      "openHint": "Binubuksan ang chat. Pindutin nang matagal para palitan ang pangalan o burahin."
     },
     "beta": "Beta",
     "mcp": {

@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Kunne ikke laste inn chathistorikken.",
       "new": "Ny chat",
-      "openHint": "Åpner chatten. Trykk og hold for å slette.",
       "deleteTitle": "Slette denne chatten?"
+    },
+    "rename": {
+      "title": "Gi chatten nytt navn",
+      "accessibility": "Gi chatten nytt navn: {{title}}",
+      "openHint": "Åpner chatten. Trykk og hold for å gi nytt navn eller slette."
     },
     "beta": "Beta",
     "mcp": {

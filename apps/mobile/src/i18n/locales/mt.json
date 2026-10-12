@@ -3319,8 +3319,12 @@
     "list": {
       "loadFailed": "Ma setgħux jitgħabbew l-istorja taċ-chat.",
       "new": "Chat ġdid",
-      "openHint": "Jiftaħ iċ-chat. Agħfas fit-tul biex tħassar.",
       "deleteTitle": "Tħassar dan iċ-chat?"
+    },
+    "rename": {
+      "title": "Ibdel l-isem taċ-chat",
+      "accessibility": "Ibdel l-isem taċ-chat: {{title}}",
+      "openHint": "Jiftaħ iċ-chat. Agħfas fit-tul biex tibdel l-isem jew tħassar."
     },
     "beta": "Beta",
     "mcp": {

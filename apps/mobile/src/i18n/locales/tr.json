@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Sohbet geçmişi yüklenemedi.",
       "new": "Yeni sohbet",
-      "openHint": "Sohbeti açar. Silmek için uzun basın.",
       "deleteTitle": "Bu sohbet silinsin mi?"
+    },
+    "rename": {
+      "title": "Sohbeti yeniden adlandır",
+      "accessibility": "Sohbeti yeniden adlandır: {{title}}",
+      "openHint": "Sohbeti açar. Yeniden adlandırmak veya silmek için uzun basın."
     },
     "beta": "Beta",
     "mcp": {

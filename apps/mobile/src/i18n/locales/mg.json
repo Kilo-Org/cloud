@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Tsy afaka nampidirina ny tantaran'ny resaka.",
       "new": "Resaka vaovao",
-      "openHint": "Manokatra ny resaka. Tsindrio ela mba hamafana.",
       "deleteTitle": "Hamafa ity resaka ity?"
+    },
+    "rename": {
+      "title": "Ovay ny anaran'ny resaka",
+      "accessibility": "Ovay ny anaran'ny resaka: {{title}}",
+      "openHint": "Manokatra ny resaka. Tsindrio ela mba hanovana ny anarana na hamafana."
     },
     "beta": "Beta",
     "mcp": {

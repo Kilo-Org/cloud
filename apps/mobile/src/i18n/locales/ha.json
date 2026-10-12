@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Ba a iya loda tarihin tattaunawa.",
       "new": "Sabuwar tattaunawa",
-      "openHint": "Yana buɗe tattaunawar. Danna sosai don sharewa.",
       "deleteTitle": "A share wannan tattaunawar?"
+    },
+    "rename": {
+      "title": "Sauya sunan tattaunawa",
+      "accessibility": "Sauya sunan tattaunawa: {{title}}",
+      "openHint": "Yana buɗe tattaunawar. Danna sosai don sauya suna ko sharewa."
     },
     "beta": "Beta",
     "mcp": {

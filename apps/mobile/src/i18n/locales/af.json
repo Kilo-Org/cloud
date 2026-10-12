@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Kon nie kletsgeskiedenis laai nie.",
       "new": "Nuwe klets",
-      "openHint": "Maak die klets oop. Hou lank in om te skrap.",
       "deleteTitle": "Skrap hierdie klets?"
+    },
+    "rename": {
+      "title": "Hernoem klets",
+      "accessibility": "Hernoem klets: {{title}}",
+      "openHint": "Maak die klets oop. Hou lank in om te hernoem of te skrap."
     },
     "beta": "Beta",
     "mcp": {

@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Ezin izan da txat-historia kargatu.",
       "new": "Txat berria",
-      "openHint": "Txata irekitzen du. Ezabatzeko, sakatu luze.",
       "deleteTitle": "Txat hau ezabatu?"
+    },
+    "rename": {
+      "title": "Berrizendatu txata",
+      "accessibility": "Berrizendatu txata: {{title}}",
+      "openHint": "Txata irekitzen du. Berrizendatzeko edo ezabatzeko, sakatu luze."
     },
     "beta": "Beta",
     "mcp": {

@@ -12,6 +12,7 @@ import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { EmptyState } from '@/components/empty-state';
+import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { MessageCircle, Wrench } from '@/components/ui/icons';
 import { StatusDot } from '@/components/ui/status-dot';
@@ -21,7 +22,8 @@ import { useSessionModelOptions } from '@/lib/hooks/use-session-model-options';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { chatPlaceOf, useChat } from '@/lib/chat/use-chat';
+import { chatPlaceOf, useChat, useChatList } from '@/lib/chat/use-chat';
+import { CHAT_TITLE_MAX_LENGTH } from '@/lib/chat/store';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
@@ -36,7 +38,6 @@ import { BetaPill } from './beta-pill';
 import { ChatFailureRow } from './chat-failure-row';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
-import { ModelToolsHint } from './model-tools-hint';
 import { useChatMessageActions } from './use-chat-message-actions';
 
 /**
@@ -77,6 +78,11 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const { userId } = useCurrentUserId();
   const place = chatPlaceOf(userId, organizationId);
   const { state, send, stop, retry } = useChat(place, opened);
+  const { chats, rename } = useChatList(place);
+  // A chat is listed once its session is written. Until then it has no row to name.
+  const summary = chats.find(chat => chat.sessionId === state.sessionId);
+  const title = summary === undefined || summary.title === '' ? t('common.chat') : summary.title;
+  const [renaming, setRenaming] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   // The sheet's whole model — the Kilo control, the settings-tools group switch
   // and the remote servers — is read here. The header draws its dot from the
@@ -263,8 +269,8 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         ) : null}
 
         <View style={composerPadding}>
-          <ModelToolsHint model={model} backends={backends} localModels={localModels} />
           <ChatComposer
+            toolbarClassName="pb-1"
             controlRef={actions.composerControlRef}
             onSend={handleSend}
             onSendCommand={noSessionCommand}
@@ -292,14 +298,22 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('common.chat')}
+        title={title}
         titleContent={
-          <View className="flex-row items-center gap-2">
-            <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
-              {t('common.chat')}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('modelChat.rename.accessibility', { title })}
+            disabled={summary === undefined}
+            onPress={() => {
+              setRenaming(true);
+            }}
+            className="shrink flex-row items-center gap-2 active:opacity-70"
+          >
+            <Text className="shrink text-lg font-semibold text-foreground" numberOfLines={1}>
+              {title}
             </Text>
             <BetaPill />
-          </View>
+          </Pressable>
         }
         headerRight={
           <View className="flex-row">
@@ -329,6 +343,20 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         }}
         settings={mcp}
       />
+      {renaming ? (
+        <RenameModal
+          title={t('modelChat.rename.title')}
+          placeholder={t('chat.conversation.renamePlaceholder')}
+          initialValue={summary?.title ?? ''}
+          maxLength={CHAT_TITLE_MAX_LENGTH}
+          onSave={async name => {
+            await rename(state.sessionId, name);
+          }}
+          onClose={() => {
+            setRenaming(false);
+          }}
+        />
+      ) : null}
       <MessageDetailsSheet {...actions.details} modelOptions={modelOptions.options} />
     </View>
   );

@@ -3237,8 +3237,12 @@
     "list": {
       "loadFailed": "Neizdevās ielādēt tērzēšanas vēsturi.",
       "new": "Jauna tērzēšana",
-      "openHint": "Atver tērzēšanu. Turiet nospiestu, lai dzēstu.",
       "deleteTitle": "Vai dzēst šo tērzēšanu?"
+    },
+    "rename": {
+      "title": "Pārdēvēt tērzēšanu",
+      "accessibility": "Pārdēvēt tērzēšanu: {{title}}",
+      "openHint": "Atver tērzēšanu. Turiet nospiestu, lai pārdēvētu vai dzēstu."
     },
     "beta": "Beta",
     "mcp": {

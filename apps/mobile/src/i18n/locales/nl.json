@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Kon de chatgeschiedenis niet laden.",
       "new": "Nieuwe chat",
-      "openHint": "Opent de chat. Lang indrukken om te verwijderen.",
       "deleteTitle": "Deze chat verwijderen?"
+    },
+    "rename": {
+      "title": "Chat hernoemen",
+      "accessibility": "Chat hernoemen: {{title}}",
+      "openHint": "Opent de chat. Lang indrukken om te hernoemen of te verwijderen."
     },
     "beta": "Bèta",
     "mcp": {

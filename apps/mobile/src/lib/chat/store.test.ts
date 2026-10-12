@@ -12,6 +12,7 @@ import {
   listChats,
   moveChat,
   rememberChat,
+  renameChat,
   scopeOfChat,
   toolsOfSession,
   wipeChats,
@@ -24,10 +25,9 @@ import {
  * breaks this suite rather than passing against a copy that no longer matches.
  */
 
-const CHATS = readFileSync(
-  new URL('../../../drizzle/0001_safe_hellfire_club.sql', import.meta.url),
-  'utf8'
-);
+const CHATS = ['0001_safe_hellfire_club.sql', '0002_eminent_scalphunter.sql']
+  .map(file => readFileSync(new URL(`../../../drizzle/${file}`, import.meta.url), 'utf8'))
+  .join('--> statement-breakpoint');
 
 const chatDatabase = (database: DatabaseSync): ChatDatabase => ({
   getAllSync: <T>(source: string, params: (string | number)[]) =>
@@ -153,6 +153,19 @@ describe('moveChat', () => {
     ]);
     expect(scopeOfChat(db, 'old')).toBeNull();
     expect(scopeOfChat(db, 'new')).toBe('me:personal');
+  });
+
+  it('keeps the name a person gave the chat', async () => {
+    await write(conversation('old', 'kilo/one', 'hello'));
+    await write(conversation('new', 'kilo/two', 'hello'));
+    rememberChat(db, { sessionId: 'old', scope: 'me:personal', at: 100 });
+    renameChat(db, 'old', 'Greetings');
+
+    moveChat(db, { from: 'old', to: 'new', at: 400 });
+
+    expect(listChats(db, 'me:personal')).toEqual([
+      { sessionId: 'new', model: 'kilo/two', title: 'Greetings', updatedAt: 400 },
+    ]);
   });
 });
 

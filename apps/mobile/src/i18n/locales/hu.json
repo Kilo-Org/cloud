@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Nem sikerült betölteni a csevegés előzményeit.",
       "new": "Új csevegés",
-      "openHint": "Megnyitja a csevegést. Hosszan nyomja meg a törléshez.",
       "deleteTitle": "Törli ezt a csevegést?"
+    },
+    "rename": {
+      "title": "Csevegés átnevezése",
+      "accessibility": "Csevegés átnevezése: {{title}}",
+      "openHint": "Megnyitja a csevegést. Hosszan nyomja meg az átnevezéshez vagy a törléshez."
     },
     "beta": "Béta",
     "mcp": {

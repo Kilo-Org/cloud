@@ -3237,8 +3237,12 @@
     "list": {
       "loadFailed": "Nije moguće učitati istoriju ćaskanja.",
       "new": "Novo ćaskanje",
-      "openHint": "Otvara ćaskanje. Dugo pritisnite za brisanje.",
       "deleteTitle": "Izbrisati ovo ćaskanje?"
+    },
+    "rename": {
+      "title": "Preimenuj ćaskanje",
+      "accessibility": "Preimenuj ćaskanje: {{title}}",
+      "openHint": "Otvara ćaskanje. Dugo pritisnite za preimenovanje ili brisanje."
     },
     "beta": "Beta",
     "mcp": {

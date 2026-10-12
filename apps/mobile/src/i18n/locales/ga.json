@@ -3319,8 +3319,12 @@
     "list": {
       "loadFailed": "Níorbh fhéidir stair an chomhrá a lódáil.",
       "new": "Comhrá nua",
-      "openHint": "Osclaíonn sé an comhrá. Brúigh go fada chun scriosadh.",
       "deleteTitle": "An comhrá seo a scriosadh?"
+    },
+    "rename": {
+      "title": "Athainmnigh an comhrá",
+      "accessibility": "Athainmnigh an comhrá: {{title}}",
+      "openHint": "Osclaíonn sé an comhrá. Brúigh go fada chun athainmniú nó scriosadh."
     },
     "beta": "Béite",
     "mcp": {

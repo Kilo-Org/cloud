@@ -90,7 +90,7 @@ function ScopedChatListScreen() {
     rememberModelFacts(models);
   }, [models]);
 
-  const { chats, isLoading, isError, refetch, remove } = useChatList(place);
+  const { chats, isLoading, isError, refetch, remove, rename } = useChatList(place);
 
   const nameOf = useCallback(
     (id: string) => options.find(model => model.id === id)?.name ?? '',
@@ -162,9 +162,10 @@ function ScopedChatListScreen() {
         last={index === chats.length - 1}
         onPress={open}
         onDelete={drop}
+        onRename={rename}
       />
     ),
-    [chats.length, drop, nameOf, open]
+    [chats.length, drop, nameOf, open, rename]
   );
 
   // Nothing to start a chat with is nothing for the button to do, and an empty

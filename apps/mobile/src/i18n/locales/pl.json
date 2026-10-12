@@ -3278,8 +3278,12 @@
     "list": {
       "loadFailed": "Nie udało się wczytać historii czatu.",
       "new": "Nowy czat",
-      "openHint": "Otwiera czat. Naciśnij i przytrzymaj, aby usunąć.",
       "deleteTitle": "Usunąć ten czat?"
+    },
+    "rename": {
+      "title": "Zmień nazwę czatu",
+      "accessibility": "Zmień nazwę czatu: {{title}}",
+      "openHint": "Otwiera czat. Naciśnij i przytrzymaj, aby zmienić nazwę lub usunąć."
     },
     "beta": "Beta",
     "mcp": {

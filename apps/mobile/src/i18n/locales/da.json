@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Kunne ikke indlæse chathistorik.",
       "new": "Ny chat",
-      "openHint": "Åbner chatten. Tryk og hold for at slette.",
       "deleteTitle": "Slet denne chat?"
+    },
+    "rename": {
+      "title": "Omdøb chat",
+      "accessibility": "Omdøb chat: {{title}}",
+      "openHint": "Åbner chatten. Tryk og hold for at omdøbe eller slette."
     },
     "beta": "Beta",
     "mcp": {

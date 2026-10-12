@@ -3360,8 +3360,12 @@
     "list": {
       "loadFailed": "Ni ellid llwytho hanes y sgwrs.",
       "new": "Sgwrs newydd",
-      "openHint": "Yn agor y sgwrs. Pwyswch yn hir i ddileu.",
       "deleteTitle": "Dileu'r sgwrs hon?"
+    },
+    "rename": {
+      "title": "Ailenwi sgwrs",
+      "accessibility": "Ailenwi sgwrs: {{title}}",
+      "openHint": "Yn agor y sgwrs. Pwyswch yn hir i ailenwi neu ddileu."
     },
     "beta": "Beta",
     "mcp": {

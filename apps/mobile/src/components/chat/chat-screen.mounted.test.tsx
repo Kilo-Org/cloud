@@ -96,6 +96,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
     stop: vi.fn(),
     retry: state.retry,
   }),
+  useChatList: () => ({ chats: [], rename: vi.fn() }),
 }));
 vi.mock('@/lib/chat/turns', () => ({
   asMessages: () => state.messages,

@@ -3237,8 +3237,12 @@
     "list": {
       "loadFailed": "Nu s-a putut încărca istoricul de chat.",
       "new": "Chat nou",
-      "openHint": "Deschide chatul. Apasă lung pentru a șterge.",
       "deleteTitle": "Ștergi acest chat?"
+    },
+    "rename": {
+      "title": "Redenumește chatul",
+      "accessibility": "Redenumește chatul: {{title}}",
+      "openHint": "Deschide chatul. Apasă lung pentru a redenumi sau a șterge."
     },
     "beta": "Beta",
     "mcp": {

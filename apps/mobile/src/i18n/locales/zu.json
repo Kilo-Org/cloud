@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Asikwazanga ukulayisha umlando wengxoxo.",
       "new": "Ingxoxo entsha",
-      "openHint": "Ivula ingxoxo. Cindezela isikhathi eside ukuze usule.",
       "deleteTitle": "Susa le ngxoxo?"
+    },
+    "rename": {
+      "title": "Qamba kabusha ingxoxo",
+      "accessibility": "Qamba kabusha ingxoxo: {{title}}",
+      "openHint": "Ivula ingxoxo. Cindezela isikhathi eside ukuze uqambe kabusha noma usule."
     },
     "beta": "Beta",
     "mcp": {

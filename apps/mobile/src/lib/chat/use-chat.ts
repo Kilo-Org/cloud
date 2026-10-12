@@ -15,7 +15,7 @@ import {
 } from './registry';
 import { type ChatState, snapshotOf, watch, watchChats } from './state';
 import { forgetAsked } from './pending';
-import { type ChatSummary, deleteChat, listChats } from './store';
+import { type ChatSummary, deleteChat, listChats, renameChat } from './store';
 
 /**
  * The chat surface, as React sees it.
@@ -38,6 +38,7 @@ export type ChatList = {
   readonly isError: boolean;
   readonly refetch: () => void;
   readonly remove: (sessionId: string) => Promise<void>;
+  readonly rename: (sessionId: string, title: string) => Promise<void>;
 };
 
 export function useChatList(place: ChatPlace | null): ChatList {
@@ -75,6 +76,13 @@ export function useChatList(place: ChatPlace | null): ChatList {
     },
     [client, scope]
   );
+  const rename = useCallback(
+    async (sessionId: string, title: string) => {
+      renameChat(await encryptedDatabase(), snapshotOf(sessionId).sessionId, title);
+      await client.invalidateQueries({ queryKey: listKey(scope ?? '') });
+    },
+    [client, scope]
+  );
   return {
     chats: query.data ?? [],
     isLoading: query.isLoading,
@@ -83,6 +91,7 @@ export function useChatList(place: ChatPlace | null): ChatList {
       void query.refetch();
     },
     remove,
+    rename,
   };
 }
 

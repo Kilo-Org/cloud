@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Nuk u arrit të ngarkohej historia e bisedës.",
       "new": "Bisedë e re",
-      "openHint": "Hap bisedën. Shtypni gjatë për ta fshirë.",
       "deleteTitle": "Ta fshini këtë bisedë?"
+    },
+    "rename": {
+      "title": "Riemërto bisedën",
+      "accessibility": "Riemërto bisedën: {{title}}",
+      "openHint": "Hap bisedën. Shtypni gjatë për ta riemërtuar ose fshirë."
     },
     "beta": "Beta",
     "mcp": {

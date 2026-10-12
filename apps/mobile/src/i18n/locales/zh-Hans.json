@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "无法加载聊天历史。",
       "new": "新对话",
-      "openHint": "打开对话。长按可删除。",
       "deleteTitle": "删除这个对话？"
+    },
+    "rename": {
+      "title": "重命名聊天",
+      "accessibility": "重命名聊天：{{title}}",
+      "openHint": "打开对话。长按可重命名或删除。"
     },
     "beta": "测试版",
     "mcp": {

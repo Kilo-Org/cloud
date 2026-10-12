@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Pa t ka chaje istwa chat la.",
       "new": "Nouvo chat",
-      "openHint": "Louvri chat la. Peze lontan pou efase.",
       "deleteTitle": "Efase chat sa a?"
+    },
+    "rename": {
+      "title": "Chanje non chat la",
+      "accessibility": "Chanje non chat la: {{title}}",
+      "openHint": "Louvri chat la. Peze lontan pou chanje non an oswa pou efase."
     },
     "beta": "Beta",
     "mcp": {

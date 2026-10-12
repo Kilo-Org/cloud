@@ -3196,8 +3196,12 @@
     "list": {
       "loadFailed": "Không thể tải lịch sử trò chuyện.",
       "new": "Cuộc trò chuyện mới",
-      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để xóa.",
       "deleteTitle": "Xóa cuộc trò chuyện này?"
+    },
+    "rename": {
+      "title": "Đổi tên cuộc trò chuyện",
+      "accessibility": "Đổi tên cuộc trò chuyện: {{title}}",
+      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để đổi tên hoặc xóa."
     },
     "beta": "Beta",
     "mcp": {

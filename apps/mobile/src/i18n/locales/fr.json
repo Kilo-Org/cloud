@@ -3237,8 +3237,12 @@
     "list": {
       "loadFailed": "Impossible de charger l'historique de la conversation.",
       "new": "Nouvelle discussion",
-      "openHint": "Ouvre la discussion. Appui long pour supprimer.",
       "deleteTitle": "Supprimer cette discussion ?"
+    },
+    "rename": {
+      "title": "Renommer la discussion",
+      "accessibility": "Renommer la discussion : {{title}}",
+      "openHint": "Ouvre la discussion. Appui long pour renommer ou supprimer."
     },
     "beta": "Bêta",
     "mcp": {

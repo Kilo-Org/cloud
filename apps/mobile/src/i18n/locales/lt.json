@@ -3278,8 +3278,12 @@
     "list": {
       "loadFailed": "Nepavyko įkelti pokalbio istorijos.",
       "new": "Naujas pokalbis",
-      "openHint": "Atidaro pokalbį. Palaikykite, kad ištrintumėte.",
       "deleteTitle": "Ištrinti šį pokalbį?"
+    },
+    "rename": {
+      "title": "Pervadinti pokalbį",
+      "accessibility": "Pervadinti pokalbį: {{title}}",
+      "openHint": "Atidaro pokalbį. Palaikykite, kad pervadintumėte arba ištrintumėte."
     },
     "beta": "Beta",
     "mcp": {

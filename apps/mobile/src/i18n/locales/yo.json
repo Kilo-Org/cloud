@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Ìtọ́sọ́nà"
   },
   "modelChat": {
+    "offlineFailure": "Awoṣe yìí nílò ìsopọ̀ íntánẹ́ẹ̀tì. Sopọ̀ kí o sì gbìyànjú lẹ́ẹ̀kan sí i, tàbí yí padà sí awoṣe kan tó wà lórí ẹ̀rọ yìí.",
     "empty": {
       "title": "Bẹ̀rẹ̀ iwiregbe kan",
       "description": "Fi ifiranṣẹ ranṣẹ láti bá awoṣe kan sọ̀rọ̀."

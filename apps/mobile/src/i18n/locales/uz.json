@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Qo'llanma"
   },
   "modelChat": {
+    "offlineFailure": "Bu model internet aloqasini talab qiladi. Ulaning va qaytadan urinib ko'ring yoki ushbu qurilmadagi modelga o'ting.",
     "empty": {
       "title": "Suhbatni boshlang",
       "description": "Model bilan gaplashish uchun xabar yuboring."

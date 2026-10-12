@@ -3271,6 +3271,7 @@
     "tutorialLabel": "Vodič"
   },
   "modelChat": {
+    "offlineFailure": "Ta model potrebuje internetno povezavo. Poveži se in poskusi znova ali preklopi na model v tej napravi.",
     "empty": {
       "title": "Začni klepet",
       "description": "Pošlji sporočilo za pogovor z modelom."

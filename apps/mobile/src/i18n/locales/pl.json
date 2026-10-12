@@ -3271,6 +3271,7 @@
     "tutorialLabel": "Samouczek"
   },
   "modelChat": {
+    "offlineFailure": "Ten model wymaga połączenia z internetem. Połącz się i spróbuj ponownie lub przełącz się na model na tym urządzeniu.",
     "empty": {
       "title": "Rozpocznij czat",
       "description": "Wyślij wiadomość, aby porozmawiać z modelem."

@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Titorial"
   },
   "modelChat": {
+    "offlineFailure": "Este modelo necesita conexión a internet. Conéctate e téntao de novo, ou cambia a un modelo deste dispositivo.",
     "empty": {
       "title": "Inicia un chat",
       "description": "Envía unha mensaxe para falar cun modelo."

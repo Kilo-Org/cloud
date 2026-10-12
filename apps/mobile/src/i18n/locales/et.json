@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Õpetus"
   },
   "modelChat": {
+    "offlineFailure": "See mudel vajab internetiühendust. Loo ühendus ja proovi uuesti või lülitu selle seadme mudelile.",
     "empty": {
       "title": "Alusta vestlust",
       "description": "Mudeliga vestlemiseks saada sõnum."

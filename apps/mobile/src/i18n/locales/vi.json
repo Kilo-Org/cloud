@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Hướng dẫn"
   },
   "modelChat": {
+    "offlineFailure": "Mô hình này cần kết nối internet. Hãy kết nối và thử lại, hoặc chuyển sang một mô hình trên thiết bị này.",
     "empty": {
       "title": "Bắt đầu trò chuyện",
       "description": "Gửi tin nhắn để trò chuyện với mô hình."

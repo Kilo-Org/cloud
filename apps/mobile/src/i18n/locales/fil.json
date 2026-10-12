@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Kailangan ng modelong ito ng koneksyon sa internet. Kumonekta at subukang muli, o lumipat sa isang modelo sa device na ito.",
     "empty": {
       "title": "Magsimula ng chat",
       "description": "Magpadala ng mensahe para makipag-usap sa isang modelo."

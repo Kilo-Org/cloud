@@ -3230,6 +3230,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Aquest model necessita connexió a internet. Connecta't i torna-ho a provar, o canvia a un model d'aquest dispositiu.",
     "empty": {
       "title": "Comença un xat",
       "description": "Envia un missatge per parlar amb un model."

@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Mafunzo"
   },
   "modelChat": {
+    "offlineFailure": "Mfano huu unahitaji muunganisho wa intaneti. Unganisha kisha ujaribu tena, au ubadilishe utumie mfano ulio kwenye kifaa hiki.",
     "empty": {
       "title": "Anza mazungumzo",
       "description": "Tuma ujumbe ili uongee na mfano."

@@ -3189,6 +3189,7 @@
     "tutorialLabel": "튜토리얼"
   },
   "modelChat": {
+    "offlineFailure": "이 모델은 인터넷 연결이 필요합니다. 연결한 후 다시 시도하거나 이 기기의 모델로 전환하세요.",
     "empty": {
       "title": "채팅 시작하기",
       "description": "모델과 대화하려면 메시지를 보내세요."

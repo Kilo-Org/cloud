@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Akoranga"
   },
   "modelChat": {
+    "offlineFailure": "Me whai hononga ipurangi tēnei tauira. Tūhono, ka ngana anō, kia huri rānei ki tētahi tauira i tēnei pūrere.",
     "empty": {
       "title": "Tīmata he kōrero",
       "description": "Tukuna he karere hei kōrero ki tētahi tauira."

@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Gid"
   },
   "modelChat": {
+    "offlineFailure": "Modèl sa a bezwen yon koneksyon entènèt. Konekte epi eseye ankò, oswa chanje pou yon modèl ki sou aparèy sa a.",
     "empty": {
       "title": "Kòmanse yon chat",
       "description": "Voye yon mesaj pou pale ak yon modèl."

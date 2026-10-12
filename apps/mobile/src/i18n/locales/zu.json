@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Uqeqesho"
   },
   "modelChat": {
+    "offlineFailure": "Le modeli idinga ukuxhumeka ku-inthanethi. Xhuma bese uzama futhi, noma ushintshele kumodeli ekule divayisi.",
     "empty": {
       "title": "Qala ingxoxo",
       "description": "Thumela umlayezo ukuze uxoxe nomodeli."

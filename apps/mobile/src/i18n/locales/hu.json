@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Oktatóprogram"
   },
   "modelChat": {
+    "offlineFailure": "Ehhez a modellhez internetkapcsolat szükséges. Csatlakozzon, és próbálja újra, vagy váltson egy ezen az eszközön lévő modellre.",
     "empty": {
       "title": "Kezdjen csevegést",
       "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."

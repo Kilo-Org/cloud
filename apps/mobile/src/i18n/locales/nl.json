@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Zelfstudie"
   },
   "modelChat": {
+    "offlineFailure": "Dit model heeft een internetverbinding nodig. Maak verbinding en probeer het opnieuw, of schakel over naar een model op dit apparaat.",
     "empty": {
       "title": "Start een chat",
       "description": "Stuur een bericht om met een model te praten."

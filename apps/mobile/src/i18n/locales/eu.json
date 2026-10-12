@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Tutorial-a"
   },
   "modelChat": {
+    "offlineFailure": "Modelo honek interneteko konexioa behar du. Konektatu eta saiatu berriro, edo aldatu gailu honetako modelo batera.",
     "empty": {
       "title": "Hasi txat bat",
       "description": "Bidali mezu bat modelo batekin hitz egiteko."

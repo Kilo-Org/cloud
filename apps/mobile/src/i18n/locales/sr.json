@@ -3230,6 +3230,7 @@
     "tutorialLabel": "Tutorijal"
   },
   "modelChat": {
+    "offlineFailure": "Ovaj model zahteva internet vezu. Povežite se i pokušajte ponovo ili pređite na model na ovom uređaju.",
     "empty": {
       "title": "Započnite ćaskanje",
       "description": "Pošaljite poruku da razgovarate sa modelom."

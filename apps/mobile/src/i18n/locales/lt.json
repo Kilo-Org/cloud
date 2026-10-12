@@ -3271,6 +3271,7 @@
     "tutorialLabel": "Pamoka"
   },
   "modelChat": {
+    "offlineFailure": "Šiam modeliui reikalingas interneto ryšys. Prisijunkite ir bandykite dar kartą arba perjunkite į šio įrenginio modelį.",
     "empty": {
       "title": "Pradėti pokalbį",
       "description": "Siųskite žinutę, kad pakalbėtumėte su modeliu."

@@ -3271,6 +3271,7 @@
     "tutorialLabel": "Sprievodca"
   },
   "modelChat": {
+    "offlineFailure": "Tento model vyžaduje pripojenie na internet. Pripojte sa a skúste to znova alebo prepnite na model v tomto zariadení.",
     "empty": {
       "title": "Začať chat",
       "description": "Pošlite správu a porozprávajte sa s modelom."

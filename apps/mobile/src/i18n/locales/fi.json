@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Käyttöopas"
   },
   "modelChat": {
+    "offlineFailure": "Tämä malli tarvitsee internetyhteyden. Muodosta yhteys ja yritä uudelleen tai vaihda tämän laitteen malliin.",
     "empty": {
       "title": "Aloita keskustelu",
       "description": "Lähetä viesti keskustellaksesi mallin kanssa."

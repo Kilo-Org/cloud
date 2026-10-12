@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "This model needs an internet connection. Connect and try again, or switch to a model on this device.",
     "empty": {
       "title": "Start a chat",
       "description": "Send a message to talk to a model."

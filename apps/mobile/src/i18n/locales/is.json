@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Leiðbeiningar"
   },
   "modelChat": {
+    "offlineFailure": "Þetta líkan þarf nettengingu. Tengstu og reyndu aftur, eða skiptu yfir í líkan á þessu tæki.",
     "empty": {
       "title": "Byrjaðu spjall",
       "description": "Sendu skilaboð til að tala við líkan."

@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Vejledning"
   },
   "modelChat": {
+    "offlineFailure": "Denne model kræver en internetforbindelse. Opret forbindelse, og prøv igen, eller skift til en model på denne enhed.",
     "empty": {
       "title": "Start en chat",
       "description": "Send en besked for at tale med en model."

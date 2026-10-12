@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Təlimat"
   },
   "modelChat": {
+    "offlineFailure": "Bu model internet bağlantısı tələb edir. Qoşulun və yenidən cəhd edin və ya bu cihazdakı modelə keçin.",
     "empty": {
       "title": "Söhbətə başlayın",
       "description": "Bir modellə danışmaq üçün mesaj göndərin."

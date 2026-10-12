@@ -3189,6 +3189,7 @@
     "tutorialLabel": "Torolàlana"
   },
   "modelChat": {
+    "offlineFailure": "Mila fifandraisana amin'ny Internet ity Modely ity. Mifandraisa ary andramo indray, na mifindra amin'ny Modely ao amin'ity fitaovana ity.",
     "empty": {
       "title": "Atombohy resaka",
       "description": "Mandefasa hafatra mba hiresaka amin'ny Modely."

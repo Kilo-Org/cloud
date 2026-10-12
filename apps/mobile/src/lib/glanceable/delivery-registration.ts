@@ -24,7 +24,6 @@ import {
   deleteActivityTokens,
   readUnregisterAuthToken,
 } from './unregister-session';
-
 import { canRegisterActivityTokenKind } from './live-activity-switch';
 import {
   type GlanceableActivity,
@@ -293,19 +292,15 @@ const delivery: GlanceableDelivery = {
       }
       await sessionScope;
       // Read the sets inside the FIFO so an already-running upsert is included.
+      const records = [scopeTokens, activityTokens, sessionActivityTokens];
       const tokens = [
-        ...new Set(
-          includeScope
-            ? [...scopeTokens, ...activityTokens, ...sessionActivityTokens]
-            : activityTokens
-        ),
+        ...new Set((includeScope ? records : [activityTokens]).flatMap(set => [...set])),
       ];
       // Without a session the delete can only answer 401: keep the tokens for an authorized cleanup.
       const authToken = tokens.length > 0 ? await readUnregisterAuthToken() : null;
       if (authToken === null) {
         return { ok: tokens.length === 0, tokens };
       }
-      const records = [scopeTokens, activityTokens, sessionActivityTokens];
       const failed = await deleteActivityTokens(tokens, authToken, records);
       // Keep Android's existing successful-cleanup result contract.
       return {

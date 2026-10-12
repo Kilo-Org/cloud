@@ -24,7 +24,11 @@ import {
   syncFollowedSessionCards,
   unfollowSession,
 } from './session-follow';
-import { renderSessionCardPress, sessionCardPress } from './session-card-press';
+import {
+  renderSessionCardPress,
+  type SessionActivity,
+  sessionCardPress,
+} from './session-card-press';
 
 type Props = Record<string, unknown>;
 type FakeActivity = {
@@ -333,7 +337,7 @@ describe('dismissFinishedSessionCard', () => {
     const card = fakeActivity('native-3', { sessionId: 'session-3', statusKind: 'needsInput' });
     mocks.instances = [card];
     discoverSessionCards();
-    await renderSessionCardPress(card, { notice: 'Approve failed' });
+    await renderSessionCardPress(card as unknown as SessionActivity, { notice: 'Approve failed' });
     expect(sessionCardPress('session-3')).toEqual({ notice: 'Approve failed' });
     card.props = { ...card.props, statusKind: 'idle' };
 

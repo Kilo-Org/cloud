@@ -161,6 +161,7 @@ const DIRECT_INTL_DIR = join(ROOT, 'apps/mobile/src');
 const WIDGET_PROCESS_LAYOUTS = new Set([
   'apps/mobile/src/glanceable-ios/active-agents-widget.tsx',
   'apps/mobile/src/glanceable-ios/active-agents-live-activity.tsx',
+  'apps/mobile/src/glanceable-ios/session-live-activity.tsx',
 ]);
 
 function checkDirectIntl(relative, absolute, text) {

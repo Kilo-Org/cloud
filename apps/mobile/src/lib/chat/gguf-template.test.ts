@@ -1,4 +1,6 @@
 import { type ModelRequest } from '@kilocode/harness-sdk';
+import { asOffered } from '@kilocode/harness-sdk/core';
+import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -130,24 +132,24 @@ describe('the llama.rn call', () => {
     ]);
   });
 
-  it('keeps the harness wait field out of the tool schema so no call goes to the background', () => {
-    const waited = {
-      type: 'object' as const,
-      properties: { zone: { type: 'string' }, wait: { type: 'boolean', default: true } },
-      required: ['zone'],
-    };
+  it('sends the tool list without the harness wait field, so no call goes to the background', () => {
+    const offered = asOffered({
+      definition: {
+        name: 'time',
+        description: 'now',
+        parameters: { type: 'object', properties: {} },
+      },
+      run: () => Effect.succeed('now'),
+    });
+    expect(Object.keys(offered.parameters.properties)).toEqual(['wait']);
     const params = paramsOf(
-      { ...request, tools: [{ name: 'time', description: 'now', parameters: waited }] },
+      { ...request, tools: [offered] },
       { path: '/m/a.gguf', contextWindow: 4096, tools: true, projector: undefined }
     );
     const sent = params.tools as unknown as readonly {
       function: { parameters: Record<string, unknown> };
     }[];
-    expect(sent.at(0)?.function.parameters).toEqual({
-      type: 'object',
-      properties: { zone: { type: 'string' } },
-      required: ['zone'],
-    });
+    expect(sent.at(0)?.function.parameters).toEqual({ type: 'object', properties: {} });
   });
 
   const imageRequest: ModelRequest = {

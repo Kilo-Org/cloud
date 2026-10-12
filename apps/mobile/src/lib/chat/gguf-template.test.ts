@@ -130,6 +130,26 @@ describe('the llama.rn call', () => {
     ]);
   });
 
+  it('keeps the harness wait field out of the tool schema so no call goes to the background', () => {
+    const waited = {
+      type: 'object' as const,
+      properties: { zone: { type: 'string' }, wait: { type: 'boolean', default: true } },
+      required: ['zone'],
+    };
+    const params = paramsOf(
+      { ...request, tools: [{ name: 'time', description: 'now', parameters: waited }] },
+      { path: '/m/a.gguf', contextWindow: 4096, tools: true, projector: undefined }
+    );
+    const sent = params.tools as unknown as readonly {
+      function: { parameters: Record<string, unknown> };
+    }[];
+    expect(sent.at(0)?.function.parameters).toEqual({
+      type: 'object',
+      properties: { zone: { type: 'string' } },
+      required: ['zone'],
+    });
+  });
+
   const imageRequest: ModelRequest = {
     model: 'file-a',
     maxTokens: 512,

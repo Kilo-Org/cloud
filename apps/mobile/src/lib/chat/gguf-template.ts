@@ -1,4 +1,10 @@
-import { type ModelRequest, type PromptPart, type StopReason } from '@kilocode/harness-sdk';
+import {
+  type JsonSchema,
+  type ModelRequest,
+  type PromptPart,
+  type StopReason,
+} from '@kilocode/harness-sdk';
+import { waitField } from '@kilocode/harness-sdk/core';
 import { type CompletionParams, type LlamaContext } from 'llama.rn';
 import { z } from 'zod';
 
@@ -142,6 +148,17 @@ function messagesOf(request: ModelRequest, file: GgufModelFile): LlamaMessage[] 
   return messages;
 }
 
+/**
+ * A tool's arguments without the harness's `wait` field. A small model reads
+ * that field as an invitation and sets it false, which sends the call to the
+ * background and leaves the model a note in place of the answer. Without it,
+ * every call gets what its tool expects.
+ */
+function argumentsOf(parameters: JsonSchema): JsonSchema {
+  const { [waitField]: _wait, ...properties } = parameters.properties;
+  return { ...parameters, properties };
+}
+
 /** One llama.rn call: the model's own template renders it, so nothing is pre-formatted here. */
 export function paramsOf(request: ModelRequest, file: GgufModelFile): CompletionParams {
   const tools = file.tools && request.tools !== undefined && request.tools.length > 0;
@@ -159,7 +176,7 @@ export function paramsOf(request: ModelRequest, file: GgufModelFile): Completion
             function: {
               name: tool.name,
               description: tool.description,
-              parameters: tool.parameters,
+              parameters: argumentsOf(tool.parameters),
             },
           })),
         }

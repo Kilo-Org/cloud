@@ -57,7 +57,7 @@ type UseNewSessionShareRemoteArgs = {
    * `useRemoteSpawnDispatch`; the new-session screen links a to-do start.
    */
   onSpawnSucceeded?: (sessionId: string) => void;
- };
+};
 
 /**
  * Wires remote spawn dispatch for the new-session screen and gives it a
@@ -81,7 +81,7 @@ export function useNewSessionShareRemote({
   onCloneImportFailure,
   onSpawnReady,
   onSpawnSucceeded,
- }: UseNewSessionShareRemoteArgs) {
+}: UseNewSessionShareRemoteArgs) {
   // Render-time ref assignment, the same pattern `share-prefill.ts:80` and
   // `share-gate-sheet.tsx:91` use, so the snapshot callback stays stable
   // while always reading the current list.

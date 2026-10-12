@@ -200,7 +200,6 @@ describe('todos ordering', () => {
     expect(new Set(positions.map(row => row.position)).size).toEqual(positions.length);
   });
 
-
   it('rejects neighbours from another organization context', async () => {
     const caller = callerFor();
     const personal = await caller.lists.create({ name: 'Personal' });

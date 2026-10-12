@@ -182,7 +182,7 @@ export function useRemoteSpawnDispatch({
   onSpawnFailed,
   onSpawnReady,
   onSpawnSucceeded,
- }: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
+}: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
   const router = useStackSafeReplace();
   // Route param is frozen at navigation: missing param means personal, not
   // "inherit live context". `?? null` so undefined does not fall through to

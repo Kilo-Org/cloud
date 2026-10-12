@@ -181,6 +181,13 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: vi.fn(), error: vi.fn() },
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+// The to-do chip's link sheet pulls the bottom-sheet and organization
+// providers, which reach native modules the pure node project cannot load.
+// The chip's own behavior is covered in session-detail-content.test.ts.
+vi.mock('@/components/todos/session-todo-link', () => ({
+  SessionTodoChip: () => null,
+  SessionTodoLinkRow: () => null,
+}));
 vi.mock('@/components/agents/message-text-select-sheet', () => ({
   MessageTextSelectSheet: 'MessageTextSelectSheet',
 }));

@@ -16,6 +16,7 @@ export function backendModelOptions(backends: readonly StoredChatBackend[]): Ses
       isPreferred: false,
       showGatewayMetadata: false,
       provider: { id: backend.id, name: backend.name },
+      capabilities: { tools: model.tools, images: model.images },
       ...(model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow }),
     }))
   );
@@ -36,6 +37,10 @@ export function localModelOptions(
             variants: [],
             isPreferred: false,
             showGatewayMetadata: false,
+            capabilities: {
+              tools: availability.tools === true,
+              images: availability.images === true,
+            },
             ...(availability.contextWindow > 0
               ? { contextWindow: availability.contextWindow }
               : {}),

@@ -15,7 +15,7 @@ import {
 } from '@/lib/chat/gguf-records';
 import { formatFileSize } from '@/lib/format';
 
-import { modelCapabilityKey } from './model-tools-hint';
+import { modelCapabilityKey } from './model-capability';
 
 const FAILURE_KEYS = {
   space: 'modelChat.gguf.errors.space',

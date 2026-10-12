@@ -6789,6 +6789,7 @@
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 },
                 "cloneFromKiloSessionId": {},
+                "cloneUpToMessageId": {},
                 "githubRepo": {
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -7264,6 +7265,10 @@
                   "minLength": 30,
                   "maxLength": 30,
                   "pattern": "^ses_.*"
+                },
+                "cloneUpToMessageId": {
+                  "type": "string",
+                  "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
                 },
                 "autoInitiate": {
                   "type": "boolean",
@@ -19384,6 +19389,7 @@
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
                     "cloneFromKiloSessionId": {},
+                    "cloneUpToMessageId": {},
                     "githubRepo": {
                       "type": "string",
                       "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -19859,6 +19865,10 @@
                       "minLength": 30,
                       "maxLength": 30,
                       "pattern": "^ses_.*"
+                    },
+                    "cloneUpToMessageId": {
+                      "type": "string",
+                      "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
                     },
                     "autoInitiate": {
                       "type": "boolean",

@@ -123,6 +123,9 @@ vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 vi.stubGlobal('__DEV__', false);
 
+/** Gate inputs for a session, user id, and consent read that have all loaded. */
+const SETTLED = { authLoading: false, userIdLoading: false, consentCheckFailed: false };
+
 // ---- shared loaders ----
 
 // oxlint-disable-next-line require-await -- async required by promise-function-async
@@ -174,6 +177,7 @@ describe('buffer isolation between accounts', () => {
     const rendererA = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'account-a@test.com',
@@ -212,6 +216,7 @@ describe('buffer isolation between accounts', () => {
     const rendererB = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'account-b@test.com',
@@ -315,6 +320,7 @@ describe('optional telemetry lifecycle', () => {
     const renderer = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'test@test.com',
@@ -362,6 +368,7 @@ describe('optional telemetry lifecycle', () => {
     const renderer = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'test@test.com',
@@ -401,6 +408,7 @@ describe('optional telemetry lifecycle', () => {
     const renderer = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'test@example.com',
@@ -462,6 +470,7 @@ describe('needsConsent gate teardown', () => {
       rendererRef.current = TestRenderer.create(
         createElement(GateWrapper, {
           hasToken: true,
+          ...SETTLED,
           consentChecked: true,
           needsConsent: true,
           email: 'test@test.com',
@@ -527,6 +536,7 @@ describe('unsettled consent teardown', () => {
       rendererRef.current = TestRenderer.create(
         createElement(GateWrapper, {
           hasToken: false,
+          ...SETTLED,
           consentChecked: true,
           needsConsent: false,
           email: 'test@test.com',
@@ -575,6 +585,7 @@ describe('unsettled consent teardown', () => {
       rendererRef.current = TestRenderer.create(
         createElement(GateWrapper, {
           hasToken: true,
+          ...SETTLED,
           consentChecked: false,
           needsConsent: false,
           email: 'test@test.com',
@@ -617,6 +628,7 @@ describe('unsettled consent teardown', () => {
       rendererRef.current = TestRenderer.create(
         createElement(GateWrapper, {
           hasToken: true,
+          ...SETTLED,
           consentChecked: true,
           needsConsent: false,
           email: 'test@test.com',
@@ -663,6 +675,7 @@ describe('unsettled consent teardown', () => {
       renderer1Ref.current = TestRenderer.create(
         createElement(GateWrapper, {
           hasToken: false,
+          ...SETTLED,
           consentChecked: true,
           needsConsent: false,
           email: 'test@test.com',
@@ -696,6 +709,7 @@ describe('unsettled consent teardown', () => {
       renderer2Ref.current = TestRenderer.create(
         createElement(GateWrapper, {
           hasToken: true,
+          ...SETTLED,
           consentChecked: true,
           needsConsent: false,
           email: 'test@test.com',
@@ -744,6 +758,7 @@ describe('unsettled consent teardown', () => {
     const rendererOff = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'test@test.com',
@@ -771,6 +786,7 @@ describe('unsettled consent teardown', () => {
     const rendererOn = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'test@test.com',
@@ -797,5 +813,89 @@ describe('unsettled consent teardown', () => {
 
     rendererOn.unmount();
     vi.useRealTimers();
+  });
+});
+
+describe('cold start keeps SDK storage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.device.deviceType = 1;
+    hoisted.appsFlyer.create.mockResolvedValue(undefined);
+  });
+
+  it('does not seal or purge storage while auth, user id, and consent load', async () => {
+    vi.useFakeTimers();
+    const mod = await loadPostHogWithGate();
+
+    type GateState = Parameters<typeof mod.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      mod.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    const base: GateState = {
+      ...SETTLED,
+      hasToken: false,
+      consentChecked: false,
+      needsConsent: false,
+      email: undefined,
+      accountId: undefined,
+      optionalConsent: false,
+    };
+    const signedIn = { ...base, hasToken: true, email: 'test@test.com', accountId: 'test-account' };
+
+    // The order the root layout passes through on every cold start.
+    const renderer = TestRenderer.create(
+      createElement(GateWrapper, { ...base, authLoading: true })
+    );
+    async function show(step: GateState): Promise<void> {
+      await act(async () => {
+        renderer.update(createElement(GateWrapper, step));
+        await Promise.resolve();
+      });
+    }
+    await show({ ...base, hasToken: true, userIdLoading: true });
+    await show(signedIn);
+    await show({ ...signedIn, consentChecked: true, optionalConsent: true });
+    await vi.advanceTimersByTimeAsync(120);
+
+    // A seal is what lets the purge delete the files the SDK reads at init.
+    expect(hoisted.storage.sealPostHogStorage).not.toHaveBeenCalled();
+    expect(hoisted.storage.isPostHogStorageSealed()).toBe(false);
+    expect(hoisted.holder.options?.customStorage).toBe(hoisted.storage.posthogCustomStorage);
+    expect(mod.ctrl.allowsOptional()).toBe(true);
+
+    renderer.unmount();
+    vi.useRealTimers();
+  });
+
+  it('still discards when the restored session has no token', async () => {
+    const mod = await loadPostHogWithGate();
+
+    type GateState = Parameters<typeof mod.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      mod.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    const renderer = TestRenderer.create(
+      createElement(GateWrapper, {
+        ...SETTLED,
+        hasToken: false,
+        consentChecked: false,
+        needsConsent: false,
+        email: undefined,
+        accountId: undefined,
+        optionalConsent: false,
+      })
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
   });
 });

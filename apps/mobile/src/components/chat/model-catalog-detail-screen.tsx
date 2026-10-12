@@ -22,7 +22,7 @@ import { Text } from '@/components/ui/text';
 import { type DeviceBudget, deviceFit, estimatedMemoryBytes } from '@/lib/chat/device-fit';
 import { useGgufModels } from '@/lib/chat/gguf-models';
 import { type HfModelDetail, hfModelName, type HfQuant, isHfRepoId } from '@/lib/chat/hf-catalog';
-import { deviceBudget, HfRequestError, useHfModelDetail } from '@/lib/chat/use-hf-catalog';
+import { HfRequestError, useDeviceBudget, useHfModelDetail } from '@/lib/chat/use-hf-catalog';
 import { formatFileSize } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -168,7 +168,7 @@ function LoadingDetail() {
 function DetailBody({ id }: Readonly<{ id: string }>) {
   const { t } = useTranslation();
   const query = useHfModelDetail(id);
-  const budget = deviceBudget();
+  const budget = useDeviceBudget();
   if (query.isPending) {
     return <LoadingDetail />;
   }

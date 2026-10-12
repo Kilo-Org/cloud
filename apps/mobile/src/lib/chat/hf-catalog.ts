@@ -176,6 +176,7 @@ function quantLabel(path: string): string {
   return QUANT.exec(stem)?.[1] ?? stem;
 }
 
+/** Smallest first. */
 function ggufFiles(tree: unknown): readonly HfFile[] {
   const files: HfFile[] = [];
   for (const entry of entries.parse(tree)) {
@@ -184,7 +185,8 @@ function ggufFiles(tree: unknown): readonly HfFile[] {
       files.push({ path: file.data.path, sizeBytes: file.data.size, sha256: file.data.lfs.oid });
     }
   }
-  return files;
+  // eslint-disable-next-line unicorn/no-array-sort -- Hermes ships no Array.prototype.toSorted; the list is local
+  return files.sort((a, b) => a.sizeBytes - b.sizeBytes);
 }
 
 /** The projector with the model's own quantization, else the smallest one. */
@@ -193,7 +195,7 @@ function projectorFor(label: string, projectors: readonly HfFile[]): HfFile | un
     projectors.find(
       projector =>
         quantLabel(projector.path).localeCompare(label, 'en', { sensitivity: 'accent' }) === 0
-    ) ?? projectors.toSorted((a, b) => a.sizeBytes - b.sizeBytes)[0]
+    ) ?? projectors[0]
   );
 }
 
@@ -218,7 +220,6 @@ export function readModelDetail(info: HfRepoInfo, tree: unknown): HfModelDetail 
   const name = hfModelName(info.id);
   const quants = files
     .filter(file => !PROJECTOR_FILE.test(file.path))
-    .toSorted((a, b) => a.sizeBytes - b.sizeBytes)
     .map((file): HfQuant => {
       const label = quantLabel(file.path);
       const curated = CURATED.get(file.sha256);

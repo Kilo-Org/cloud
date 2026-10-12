@@ -1,8 +1,10 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import * as Device from 'expo-device';
 import { Paths } from 'expo-file-system';
+import { useEffect, useState } from 'react';
 
 import { type DeviceBudget, maxParametersFor } from './device-fit';
+import { useGgufModels } from './gguf-models';
 import {
   hfListUrl,
   type HfModelDetail,
@@ -36,9 +38,15 @@ async function hfGet(url: string, signal: AbortSignal) {
   return { body, link: response.headers.get('link') };
 }
 
-/** Read on every render: storage changes as models download and as other apps write. */
-export function deviceBudget(): DeviceBudget {
-  return { memoryBytes: Device.totalMemory, freeBytes: Paths.availableDiskSpace };
+/** Free storage is read again when a model lands, goes, or a download starts or ends. */
+export function useDeviceBudget(): DeviceBudget {
+  const { models, download } = useGgufModels();
+  const downloading = download !== null;
+  const [freeBytes, setFreeBytes] = useState(() => Paths.availableDiskSpace);
+  useEffect(() => {
+    setFreeBytes(Paths.availableDiskSpace);
+  }, [models, downloading]);
+  return { memoryBytes: Device.totalMemory, freeBytes };
 }
 
 /** A missing repository does not appear on a retry. */

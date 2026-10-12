@@ -19,7 +19,7 @@ import { type DeviceBudget, deviceFit, parameterFit } from '@/lib/chat/device-fi
 import { type CatalogModel, GGUF_CATALOG } from '@/lib/chat/gguf-catalog';
 import { useGgufModels } from '@/lib/chat/gguf-models';
 import { type HfListedModel, hfModelName } from '@/lib/chat/hf-catalog';
-import { deviceBudget, useHfModelSearch } from '@/lib/chat/use-hf-catalog';
+import { useDeviceBudget, useHfModelSearch } from '@/lib/chat/use-hf-catalog';
 import { formatFileSize } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -57,9 +57,13 @@ function RecommendedRow({
         fileId={model.fileId}
         name={model.name}
         snapshot={snapshot}
-        onDownload={() => {
-          download(model, fit);
-        }}
+        onDownload={
+          fit === 'noStorage'
+            ? undefined
+            : () => {
+                download(model, fit);
+              }
+        }
       />
     </View>
   );
@@ -149,7 +153,7 @@ function LoadingRows() {
 export function ModelCatalogScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const budget = deviceBudget();
+  const budget = useDeviceBudget();
   const [tab, setTab] = useState<Tab>('fits');
   const search = useModelSearch();
   const models = useHfModelSearch({

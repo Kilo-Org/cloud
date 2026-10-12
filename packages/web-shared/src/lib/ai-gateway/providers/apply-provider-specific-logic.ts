@@ -224,6 +224,10 @@ export function applyPreferredProvider(
   requestToMutate.provider = withIgnoredProviders(provider, ignoredProviders);
 }
 
+/**
+ * Fallback models are not supported: a request for a free model could fall
+ * back to a paid model and be served without being charged.
+ */
 export function removeModelsFallback(requestToMutate: GatewayRequest) {
   delete requestToMutate.body.models;
 }

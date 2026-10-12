@@ -254,21 +254,75 @@ describe('finding dismissal integration resolution in PostgreSQL', () => {
       expect(fixture.fetchSpy).not.toHaveBeenCalled();
     }));
 
-  it('fails closed for multiple writable integrations for the same repository', () =>
+  it('uses sync ordering for an unlinked finding with multiple writable integrations', () =>
     withFixture(async fixture => {
-      await fixture.insertIntegration();
-      await fixture.insertIntegration();
+      const newer = await fixture.insertIntegration({ created_at: '2026-02-02T00:00:00Z' });
+      const older = await fixture.insertIntegration(
+        { github_app_type: 'lite', created_at: '2026-02-01T00:00:00Z' },
+        { github_app_type: 'lite' }
+      );
       await expect(fixture.process()).resolves.toMatchObject({
-        commandStatus: 'failed',
-        resultCode: 'GITHUB_INTEGRATION_AMBIGUOUS',
+        commandStatus: 'succeeded',
       });
-      expect(fixture.getToken).not.toHaveBeenCalled();
-      expect(fixture.fetchSpy).not.toHaveBeenCalled();
+      expect(fixture.getToken).toHaveBeenCalledWith(
+        older.platform_installation_id,
+        'lite',
+        older.id
+      );
+      expect(fixture.getToken).not.toHaveBeenCalledWith(
+        newer.platform_installation_id,
+        'standard',
+        newer.id
+      );
       expect(await fixture.readFinding()).toMatchObject({
-        status: 'open',
-        platform_integration_id: null,
+        status: 'ignored',
+        platform_integration_id: older.id,
       });
-      expect(await fixture.readAudit()).toHaveLength(0);
+      expect(await fixture.readAudit()).toHaveLength(1);
+    }));
+
+  it('prefers an authorized finding link over an older writable alternative', () =>
+    withFixture(async fixture => {
+      await fixture.insertIntegration({ created_at: '2026-02-01T00:00:00Z' });
+      const linked = await fixture.insertIntegration(
+        { github_app_type: 'lite', created_at: '2026-02-02T00:00:00Z' },
+        { github_app_type: 'lite' }
+      );
+      await fixture.db
+        .update(security_findings)
+        .set({ platform_integration_id: linked.id })
+        .where(eq(security_findings.id, fixture.findingId));
+
+      await expect(fixture.process()).resolves.toMatchObject({ commandStatus: 'succeeded' });
+      expect(fixture.getToken).toHaveBeenCalledWith(
+        linked.platform_installation_id,
+        'lite',
+        linked.id
+      );
+      expect(await fixture.readFinding()).toMatchObject({ platform_integration_id: linked.id });
+    }));
+
+  it('does not prefer a finding link whose canonical write permission was revoked', () =>
+    withFixture(async fixture => {
+      const old = await fixture.insertIntegration(
+        {},
+        { permissions: { vulnerability_alerts: 'read' } }
+      );
+      await fixture.db
+        .update(security_findings)
+        .set({ platform_integration_id: old.id })
+        .where(eq(security_findings.id, fixture.findingId));
+      const replacement = await fixture.insertIntegration();
+
+      await expect(fixture.process()).resolves.toMatchObject({ commandStatus: 'succeeded' });
+      expect(fixture.getToken).toHaveBeenCalledWith(
+        replacement.platform_installation_id,
+        'standard',
+        replacement.id
+      );
+      expect(await fixture.readFinding()).toMatchObject({
+        platform_integration_id: replacement.id,
+      });
     }));
 
   it.each([

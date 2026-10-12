@@ -17,7 +17,7 @@ import {
   type SecurityFindingAuditHumanActor,
   type SecurityFindingAuditOwner,
 } from '@kilocode/worker-utils/security-finding-audit';
-import { and, eq, isNotNull, isNull, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, notExists, or, sql } from 'drizzle-orm';
 import type { SecurityDismissMessage } from './index.js';
 
 type FindingDismissalResult = {
@@ -285,6 +285,7 @@ export async function processSecurityFindingDismissal(params: {
                 )
           )
         )
+        .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id))
     );
     const repositoryIntegrations = integrations.filter(
       integration => integration.hasRepositoryAccess
@@ -292,8 +293,10 @@ export async function processSecurityFindingDismissal(params: {
     const writableIntegrations = repositoryIntegrations.filter(
       integration => integration.hasWritePermission
     );
-    const integration = writableIntegrations[0];
-    if (writableIntegrations.length !== 1 || !integration?.installationId) {
+    const integration =
+      writableIntegrations.find(candidate => candidate.id === finding.platform_integration_id) ??
+      writableIntegrations[0];
+    if (!integration?.installationId) {
       const failure =
         integrations.length === 0
           ? {
@@ -307,17 +310,11 @@ export async function processSecurityFindingDismissal(params: {
                 lastErrorRedacted:
                   'GitHub App no longer has access to this repository. Refresh repository access, then retry.',
               }
-            : writableIntegrations.length === 0
-              ? {
-                  resultCode: 'GITHUB_DISMISSAL_PERMISSION_REQUIRED',
-                  lastErrorRedacted:
-                    'GitHub App needs write access to Dependabot alerts to dismiss this finding. Update its permissions, then retry.',
-                }
-              : {
-                  resultCode: 'GITHUB_INTEGRATION_AMBIGUOUS',
-                  lastErrorRedacted:
-                    'Multiple GitHub workflow integrations can dismiss this finding. Disconnect the obsolete integration, then retry.',
-                };
+            : {
+                resultCode: 'GITHUB_DISMISSAL_PERMISSION_REQUIRED',
+                lastErrorRedacted:
+                  'GitHub App needs write access to Dependabot alerts to dismiss this finding. Update its permissions, then retry.',
+              };
       return {
         dismissed: false,
         findingSource: finding.source,

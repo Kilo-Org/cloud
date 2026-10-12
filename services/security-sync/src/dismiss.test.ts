@@ -84,20 +84,22 @@ function createDb(
     select: () => ({
       from: () => ({
         leftJoin: () => ({
-          where: async () => {
-            selectCount++;
-            return (
-              options.integrations ?? [
-                {
-                  id: finding.platform_integration_id,
-                  installationId: 'installation-123',
-                  githubAppType: 'standard',
-                  hasRepositoryAccess: true,
-                  hasWritePermission: true,
-                },
-              ]
-            );
-          },
+          where: () => ({
+            orderBy: async () => {
+              selectCount++;
+              return (
+                options.integrations ?? [
+                  {
+                    id: finding.platform_integration_id,
+                    installationId: 'installation-123',
+                    githubAppType: 'standard',
+                    hasRepositoryAccess: true,
+                    hasWritePermission: true,
+                  },
+                ]
+              );
+            },
+          }),
         }),
         where: () => ({
           limit: async () => {

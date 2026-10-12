@@ -101,13 +101,26 @@ const HTTP_URL_PATTERN = /^https?:\/\//iu;
  * - 401: the auth layer refreshes or signs out, and reports a terminal refusal
  *   itself (`reportAuthTerminalFailure`).
  * - 402: no credits; the paywall owns it.
- * - 403: production 403s are the edge firewall (OFAC-sanctioned regions, IP
- *   blocks) and the minimum-version gate, not app code.
  * - 404: a stale ID for a deleted object; screens show "not found".
  * - 409: a duplicate of an operation already in progress.
  * - 429: a rate limit the caller backs off from.
  */
-const EXPECTED_HTTP_STATUSES: ReadonlySet<number> = new Set([401, 402, 403, 404, 409, 429]);
+const EXPECTED_HTTP_STATUSES: ReadonlySet<number> = new Set([401, 402, 404, 409, 429]);
+
+const FORBIDDEN_STATUS = 403;
+
+/**
+ * True when a status is an expected answer: one of
+ * {@link EXPECTED_HTTP_STATUSES}, or a 403 with no tRPC error code. Production
+ * 403s come from the edge firewall (OFAC-sanctioned regions, IP blocks), whose
+ * body is not a tRPC error. A 403 from a tRPC procedure carries its code
+ * (`FORBIDDEN`) and names app code, so it is still reported.
+ */
+function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
+  return (
+    EXPECTED_HTTP_STATUSES.has(status) || (status === FORBIDDEN_STATUS && trpc.code === undefined)
+  );
+}
 
 /** Strip the query string from a URL. Returns empty string on a non-string. */
 export function stripQueryString(url: string): string {
@@ -190,9 +203,9 @@ export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
  * original: the clone is parsed, so the caller still owns `response`. A
  * batched (HTTP 207) body is an array of `{ result } | { error }`; a plain
  * failure body is `{ error }`. A batch yields its first error whose status is
- * not in {@link EXPECTED_HTTP_STATUSES}, else its first error, so an expected
- * 404 ahead of a 500 cannot hide the 500. Total: a success-only, non-JSON, or
- * otherwise unreadable body yields `undefined` and never throws.
+ * not expected ({@link isExpectedStatus}), else its first error, so an
+ * expected 404 ahead of a 500 cannot hide the 500. Total: a success-only,
+ * non-JSON, or otherwise unreadable body yields `undefined` and never throws.
  */
 export async function readTrpcResponseError(
   response: Response
@@ -204,8 +217,8 @@ export async function readTrpcResponseError(
         .map(item => errorPropertyOf(item))
         .filter((error): error is TrpcResponseError => error !== undefined);
       const reportable = errors.find(error => {
-        const status = readTrpcErrorContext(error).httpStatus;
-        return status === undefined || !EXPECTED_HTTP_STATUSES.has(status);
+        const trpc = readTrpcErrorContext(error);
+        return trpc.httpStatus === undefined || !isExpectedStatus(trpc.httpStatus, trpc);
       });
       return reportable ?? errors[0];
     }
@@ -364,16 +377,17 @@ export function reportNetworkError(context: NetworkErrorContext): void {
 }
 
 /**
- * True when a failed response is an expected answer: one of
- * {@link EXPECTED_HTTP_STATUSES} (for a tRPC batch, the inner status), or a
- * terminal refusal on a sign-in route, which the auth layer reports once.
+ * True when a failed response is an expected answer ({@link isExpectedStatus};
+ * for a tRPC batch, the inner status), or a terminal refusal on a sign-in
+ * route, which the auth layer reports once.
  */
 function isExpectedResponse(context: NetworkErrorContext): boolean {
-  const status = effectiveHttpStatus(context, readTrpcErrorContext(context.error));
+  const trpc = readTrpcErrorContext(context.error);
+  const status = effectiveHttpStatus(context, trpc);
   if (status === undefined) {
     return false;
   }
-  if (EXPECTED_HTTP_STATUSES.has(status)) {
+  if (isExpectedStatus(status, trpc)) {
     return true;
   }
   const path = normalizeUrlPath(context.url);

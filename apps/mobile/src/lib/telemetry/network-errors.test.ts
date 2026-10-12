@@ -598,19 +598,6 @@ describe('createNetworkErrorFetch', () => {
 });
 
 describe('createNetworkErrorFetch status policy', () => {
-  let breadcrumbs: TelemetryBreadcrumb[] = [];
-
-  beforeEach(() => {
-    breadcrumbs = [];
-    setBreadcrumbSink(breadcrumb => {
-      breadcrumbs.push(breadcrumb);
-    });
-  });
-
-  afterEach(() => {
-    setBreadcrumbSink(null);
-  });
-
   const trpcOptions = {
     source: 'trpc',
     isResponseError: (status: number) => status >= 400 || status === 207,
@@ -647,7 +634,7 @@ describe('createNetworkErrorFetch status policy', () => {
     }
   );
 
-  it.each([401, 402, 403, 404, 409, 429])(
+  it.each([401, 402, 404, 409, 429])(
     'records a 207 batch whose inner status is %i as a breadcrumb',
     async status => {
       await respond(
@@ -660,6 +647,42 @@ describe('createNetworkErrorFetch status policy', () => {
       expect(breadcrumbs[0]?.message).toBe(`POST /api/trpc/user.getMe -> ${status}`);
     }
   );
+
+  it('records an edge-firewall 403 as a breadcrumb', async () => {
+    await respond(
+      'https://example.com/api/trpc/user.getMe?batch=1',
+      Response.json({ code: '403', id: 'arn1::abc', message: 'Forbidden' }, { status: 403 })
+    );
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      'POST /api/trpc/user.getMe -> 403',
+    ]);
+  });
+
+  it('reports a 403 that a tRPC procedure returned, direct or batched', async () => {
+    const forbidden = {
+      error: {
+        message: 'denied',
+        code: -32_003,
+        data: { code: 'FORBIDDEN', httpStatus: 403, path: 'user.getMe' },
+      },
+    };
+    await respond(
+      'https://example.com/api/trpc/user.getMe',
+      Response.json(forbidden, { status: 403 })
+    );
+    await respond(
+      'https://example.com/api/trpc/user.getMe?batch=1',
+      Response.json([batchErrorItem(404), forbidden], { status: 207 })
+    );
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'trpc', 'user.getMe', 'http.403'],
+      ['network-error', 'trpc', 'user.getMe', 'http.403'],
+    ]);
+    expect(breadcrumbs).toHaveLength(0);
+  });
 
   it.each([400, 500])('still reports a %i exactly once', async status => {
     await respond('https://example.com/api/trpc/user.getMe', new Response('', { status }));

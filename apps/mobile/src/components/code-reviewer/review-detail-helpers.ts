@@ -39,3 +39,25 @@ export function councilVoteLabel(vote: 'pass' | 'block' | null | undefined): str
   }
   return i18n.t('codeReviewer.decision.noResult');
 }
+
+// The retry control for a terminal review. The server rejects a retry of an
+// automatic review (no `manual_config`) while Code Reviewer is off or its
+// configuration needs attention, so the screen links to the settings instead.
+// Null hides both while the config loads. An unknown config (no query, or a
+// failed one) keeps Retry, because the server is the authority.
+export function selectRetryAction(args: {
+  hasManualConfig: boolean;
+  configPending: boolean;
+  config: { isEnabled: boolean; actionRequired: unknown } | undefined;
+}): 'retry' | 'fix-settings' | null {
+  if (args.hasManualConfig) {
+    return 'retry';
+  }
+  if (args.configPending) {
+    return null;
+  }
+  if (args.config === undefined) {
+    return 'retry';
+  }
+  return args.config.isEnabled && args.config.actionRequired == null ? 'retry' : 'fix-settings';
+}

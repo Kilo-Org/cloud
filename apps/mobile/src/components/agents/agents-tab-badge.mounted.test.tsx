@@ -50,7 +50,7 @@ function expectCounts(renderer: Mount['renderer'], count?: number, liveCount?: n
   expect(options.tabBarBadge).toBe(count);
   expect(options.title).toBe('Agents');
   expect(options.tabBarAccessibilityLabel).toBe(
-    count ? `Agents, ${count} needs input, tab, 2 of 3` : 'Agents, tab, 2 of 3'
+    count ? `Agents, ${count} needs input, tab, 2 of 4` : 'Agents, tab, 2 of 4'
   );
 }
 

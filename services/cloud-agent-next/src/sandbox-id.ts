@@ -93,6 +93,7 @@ function sandboxIdMatchesAllocation(sandboxId: string, allocation: SandboxAlloca
 }
 
 export type SandboxIdClass =
+  | 'placed'
   | 'shared'
   | 'legacy-shared'
   | 'isolated-small'
@@ -101,7 +102,17 @@ export type SandboxIdClass =
   | 'devcontainer'
   | 'unknown';
 
+/**
+ * Neutral control-plane sandbox key. The prefix carries no routing meaning: a
+ * placed key routes only through its stored kind (`sandbox-placement.ts`),
+ * so prefix routing must reject it rather than fall through to a default pool.
+ */
+export function isPlacedSandboxKey(sandboxId: string): boolean {
+  return /^sbx-[0-9a-f]{48}$/.test(sandboxId);
+}
+
 export function classifySandboxId(sandboxId: string): SandboxIdClass {
+  if (isPlacedSandboxKey(sandboxId)) return 'placed';
   if (/^istd-[0-9a-f]+$/.test(sandboxId)) return 'isolated-standard';
   if (/^ses-[0-9a-f]+$/.test(sandboxId)) return 'isolated-small';
   if (/^crv-[0-9a-f]+$/.test(sandboxId)) return 'code-review';
@@ -165,6 +176,9 @@ export function getSandboxNamespace(
   sandboxId: string,
   options: SandboxNamespaceOptions = {}
 ): DurableObjectNamespace<Sandbox> {
+  if (isPlacedSandboxKey(sandboxId)) {
+    throw new Error('A placed sandbox key routes only through its stored kind');
+  }
   // Persisted DIND sessions retain their namespace until operator-verified retirement.
   if (sandboxId.startsWith('dind-')) return env.SandboxDIND;
   // Every non-contained sandbox runs in the standard pool; SandboxSmall and

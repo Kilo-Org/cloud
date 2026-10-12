@@ -86,6 +86,19 @@ describe('resolveLiveWrapperTarget billing admission', () => {
     expect(mocks.findWrapperForSession).not.toHaveBeenCalled();
   });
 
+  it('answers a control-plane session as unavailable without waking its sandbox', async () => {
+    await expect(
+      resolveLiveWrapperTarget({
+        env: {} as Env,
+        userId: 'user_facade',
+        cloudAgentSessionId: 'workspace_facade',
+      })
+    ).resolves.toEqual({ kind: 'unavailable' });
+    expect(mocks.fetchSessionMetadata).not.toHaveBeenCalled();
+    expect(mocks.getSandbox).not.toHaveBeenCalled();
+    expect(mocks.findWrapperForSession).not.toHaveBeenCalled();
+  });
+
   it('allows shadow acquisition when the billing block method is unavailable', async () => {
     mocks.getSandbox.mockReturnValue({});
     mocks.findWrapperForSession.mockResolvedValue({ port: 5000 });

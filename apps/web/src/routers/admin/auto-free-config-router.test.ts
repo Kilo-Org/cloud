@@ -114,7 +114,9 @@ describe('adminAutoFreeConfigRouter', () => {
     await caller.admin.autoFreeConfig.set({ config });
 
     const rows = await db.select().from(ai_gateway_config);
-    expect(rows).toEqual([{ id: 1, config: {}, auto_free: config }]);
+    expect(rows).toEqual([
+      { id: 1, config: {}, auto_free: config, preferred_models: null, unavailable_models: null },
+    ]);
   });
 
   it('rejects invalid config', async () => {

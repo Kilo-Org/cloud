@@ -119,12 +119,15 @@ rewrite terminal message outcomes or prepare/wake a stopped sandbox.
 
 Late outcomes and notifications for terminal messages are ignored. The backstop exists only for
 lost notifications; the Sandbox DO and the wrapper settle every normal case earlier. Both values
-are derived from the owners' timers so the backstop never ends work that its owner still runs:
+are derived from the owners' timers so the backstop does not end work within its owner's bound:
 queued = reconnect window (90 s) + one preparation attempt (12 min) + 3 min, which covers the
 longest normal wait (a message sent while the socket is down, then a fresh attempt on a new
-sandbox); accepted = turn hard cap (120 min) + 5 min. After every message change the Session DO sets
-the alarm to the earliest backstop, transport-recovery, report or callback obligation, and clears it
-when none remains (for example after Stop and successful terminal reporting).
+sandbox); accepted = turn hard cap (120 min) + 5 min. The hard cap bounds one native execution, not
+an accepted message, so a batch whose follow-up waits behind a serialized command spans several
+executions and can outlive the accepted backstop (see "Prompts and turn outcome" in section 7).
+After every message change the Session DO sets the alarm to the earliest backstop,
+transport-recovery, report or callback obligation, and clears it when none remains (for example
+after Stop and successful terminal reporting).
 
 ### Queued transport recovery
 
@@ -304,8 +307,10 @@ The wrapper heartbeat (every 5 s) carries `active`. Each Kilo process owns a nat
 session supervisor that observes every session before Cloud route filtering, including
 unrouted sessions, subagents and autonomous continuations. Its running or stopping
 executions keep compute active independently of accepted Cloud messages and UI selection.
-Preparation, pending prompt delivery (bounded to 2 minutes), finalization and recent terminal
-input also contribute. An accepted UI turn alone is not activity.
+Preparation, bounded prompt delivery, finalization and recent terminal input also contribute.
+The 2-minute delivery budget excludes legitimate serialized command/summarization waits
+described below. A follow-up waiting behind a serialized command adds no compute activity of
+its own; the command's live native execution decides it. An accepted UI turn alone is not activity.
 
 A session blocked only on questions or permissions does not need compute. Pending requests
 are tracked separately; answering one does not clear another, and an independent runnable
@@ -383,11 +388,20 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
 - **Start.** `launch` receives the key of the routes waiting for the allocation: exactly one key,
   else none. `SandboxContainers` appends the image, and starts from the
   repository snapshot in the `REPO_SNAPSHOTS` KV index when it has one for that digest, else from
-  the image. `launch` returns `startSource`. A failed repository start removes the index entry.
+   the image. `launch` returns `startSource`. A failed repository start retains the index entry
+   and asks the Sandbox DO to clean up the failed container and launch the image for the same
+   allocation. Cleanup and fallback only run while that allocation is still creating; a wrapper
+   that already connected is never destroyed by fallback. Before cleanup, the Sandbox DO rotates
+   the launch credential so a late wrapper from the failed snapshot cannot connect. The snapshot attempt uses half the
+   remaining launch budget, reserving time for cleanup and the image within the original deadline.
+   Each later sandbox start retries the snapshot once, up to ten failed starts per snapshot ID
+   in that sandbox's durable record. After that it uses the image; a replacement snapshot gets
+   its own failure budget. Failure never deletes or changes the shared snapshot index.
 - **First start only.** The Sandbox DO remembers how the previous allocation started and whether its
   wrapper connected. When a repository start never connected (for example the first-connect timeout
-  stopped it), the next launch discards the entry and starts from the image. A broken snapshot
-  costs one attempt.
+   stopped it), the next launch skips the snapshot and starts from the image without deleting
+   the entry. A completed image fallback records `image`, so the next start tries the retained
+   snapshot again unless its failure budget is exhausted.
 - **Capture.** `session.prepare` carries `capture: true` when the route has a key and the provider
   can capture. A route with setup commands has no key: capture runs after setup, so the snapshot
   would publish the whole container under a key that names only the user and the repository. The
@@ -543,9 +557,23 @@ has no key, so it restores and captures nothing: setup output is never published
   received after reservation waits for the replacement rather than receiving a retiring client.
 - Commands and summarization keep sequential wrapper submission: later messages may wait for the
   current command/summary HTTP response before reaching Kilo. This wait is accepted and is not a
-  remediation blocker or a requirement for a Kilo/SDK change. Ordinary prompts still reach Kilo
-  during model execution through `prompt_async`. Kilo owns its native queue and execution; the
-  wrapper must not add a shadow native queue or concurrent HTTP to bypass command ordering.
+  remediation blocker or a requirement for a Kilo/SDK change. A later message waiting behind a
+  dispatched command/summary Kilo has already observed and still supervises does not consume its
+  2-minute prompt-delivery budget; that budget stays current while the wait holds, so it does not
+  expire the instant the response clears. The native 20-minute no-progress bound applies while
+  executing; its clock pauses during user waits, and the 120-minute wall-clock cap still bounds
+  the wait, not the batch: the follower starts a new native execution once the response clears, so a
+  batch spanning several executions can outlive the accepted backstop and fail `no_outcome`. A command
+  that is not currently observed, or a plain prompt, still expires as a stuck intake.
+  Ordinary prompts still reach Kilo during model execution through `prompt_async`. Kilo owns its
+  native queue and execution; the wrapper must not add a shadow native queue or concurrent HTTP to
+  bypass command ordering.
+- A summary's HTTP response can overtake its `session.turn.close` on the feed. Later messages
+  therefore also wait until the summary's completed close is processed, directly or through a
+  reconciled idle, so that close cannot complete newer work. The wait adds no compute activity.
+  While the summary's native execution is live, its supervisor bounds the wait. After that, the
+  2-minute delivery deadline bounds it, paused and refreshed by a memory hold like any delivery
+  wait. A close that does not arrive in time fails `prompt_failed`.
 - The wrapper tracks each Kilo root session through Kilo's status, idle, turn-close and error events,
   and remembers the last submitted `messageId`.
 - Outcome frame: `sessionId`, `status`, optional `reason`, `lastMessageId`.
@@ -556,9 +584,18 @@ has no key, so it restores and captures nothing: setup output is never published
     progress or the separate 120-minute wall-clock cap; Kilo restarts after real progress or
     a second time; prompt delivery fails. The native supervisor chooses `no_progress` or
     `execution_limit` once, settles accepted messages with that reason, then performs a
-    bounded tree abort. Stopping remains compute activity until cancellation is confirmed;
-    unconfirmed cancellation uses the existing runtime restart owner. A later native abort
+    bounded tree abort. A `no_progress` stall in Kilo's model retry loop (a `retry` status
+    since the last progress, in the execution or a descendant it stops) settles as the
+    assistant failure Kilo was retrying, such as a rate limit, not as `no_progress`. Kilo
+    sets `retry` only from its model-provider retry policy, so retry text the classifier does
+    not recognize settles as `provider_unavailable`, never `unknown`. Stopping remains compute
+    activity until cancellation is confirmed; unconfirmed cancellation uses the existing
+    runtime restart owner. A later native abort
     event cannot overwrite the outcome or settle a newly queued message.
+    A `superseded` turn-close is Kilo handing off to a queued follow-up, so the native
+    execution and both of its clocks continue into the next turn. Follow-ups therefore cannot
+    extend a run past 120 minutes from its start; if no turn follows, the next idle snapshot
+    finishes the execution.
     Assistant text/reasoning changes and actual tool output/state changes are progress.
     User input, repeated parts, metadata, busy/retry status and transport heartbeats are not.
     Useful descendant progress advances its ancestors, never unrelated roots. User waits and a
@@ -645,7 +682,12 @@ native activity plus the existing Cloud-work and PTY protections.
 ### Crash resistance
 
 - The wrapper does not exit on disconnect, reconnect failure, Kilo failure or unhandled promise
-  rejection; it logs them. It exits only on `shutdown`, SIGTERM or an uncaught exception.
+  rejection; it logs them. It exits only on `shutdown` (exit 0, terminal), SIGTERM (exit 1) or an
+  uncaught exception (exit 1).
+- The wrapper cannot tell a stray SIGTERM from one the supervisor forwards, so it always exits 1 and
+  records `wrapper.lifecycle` `stopping`, not `failed`. The supervisor owns the outcome: a SIGTERM
+  sent to the wrapper alone restarts it within the existing budget, while the supervisor's own
+  TERM/INT trap forwards SIGTERM and then exits terminally.
 - Each Kilo spawn writes a pidfile with PID and process start time. At startup the wrapper kills the
   process groups of stale pidfiles whose PID and start time still match, before it starts Kilo.
 
@@ -653,8 +695,9 @@ native activity plus the existing Cloud-work and PTY protections.
 
 The provider launch command starts a small supervisor loop that runs the wrapper. After a non-zero
 exit it restarts the wrapper with 1 s to 30 s backoff, at most 5 times in 10 minutes. Exit code 0
-ends the loop. If the loop gives up, the Sandbox DO `starting` or `disconnected` timer stops the
-sandbox.
+ends the loop; that is the wrapper's terminal `shutdown` path, while a SIGTERM sent to the wrapper
+alone is non-zero and restarts. If the loop gives up, the Sandbox DO `starting` or `disconnected`
+timer stops the sandbox.
 
 The provider launch command is not the only starter. On the native Cloudflare Containers runtime the
 container main process is the supervisor: `start()` is issued with `['/bin/sh', supervisor-path]` as
@@ -702,7 +745,7 @@ them through one development-only override.
 | Wrapper | Kilo health request | 5 s | Restart Kilo |
 | Wrapper | SSE reconnects | 6 in 2 min | Restart Kilo |
 | Wrapper | Kilo restart budget | 3 in 10 min | Routes `failed` (`agent_unavailable`) |
-| Wrapper | Native execution without real progress, including silent tools | 20 min excluding user waits | Bounded tree abort; `no_progress` outcome or routed error |
+| Wrapper | Native execution without real progress, including silent tools | 20 min excluding user waits | Bounded tree abort; `no_progress` outcome or routed error, or the retried assistant failure when Kilo is retrying the model request |
 | Wrapper | Native execution hard cap | 120 min including user waits | Bounded tree abort; `execution_limit` outcome or routed error |
 | Wrapper | Reconnect backoff | 1 s to 30 s, forever | — |
 | Supervisor | Wrapper restarts | 5 in 10 min | Stop restarting |
@@ -727,7 +770,7 @@ them through one development-only override.
 | Dead event stream (Kilo still answers health) | Wrapper, after 6 reconnects in 2 min | Restart Kilo, at most 3 in 10 min | Same as Kilo hang (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
 | Kilo restart budget used up | Wrapper | None until the next message | Queued and accepted fail (`agent_unavailable`) |
 | Kilo final error | Wrapper | None (Kilo already retried) | Accepted fail with Kilo's reason |
-| No real progress for 20 min, including silent tools | Native session supervisor | Bounded tree abort; runtime recovery if unconfirmed | Accepted fail (`no_progress`), or routed error without a current turn |
+| No real progress for 20 min, including silent tools | Native session supervisor | Bounded tree abort; runtime recovery if unconfirmed | Accepted fail (`no_progress`, or the retried assistant failure during a Kilo model retry), or routed error without a current turn |
 | Native execution over 120 min | Native session supervisor | Bounded tree abort | Accepted fail (`execution_limit`), or routed error without a current turn |
 | Idle 10 min, question pending | Sandbox DO | Stop the sandbox | Accepted fail (`sandbox_stopped`); a later answer is a new message |
 | Sandbox gone | Provider via Sandbox DO | New allocation on next `prepare` | Accepted fail (`sandbox_lost`); queued re-prepare |
@@ -815,7 +858,7 @@ failure monitors keep working.
 | `no_progress`, `no_outcome` | `post_dispatch_no_activity` / `wrapper_no_output` |
 | `prompt_failed` | `post_dispatch_no_activity` / `wrapper_error_before_activity` |
 | `sandbox_stopped` (idle while waiting on the user), `execution_limit` | `interruption` / `system_interrupt` |
-| Kilo final error | `agent_activity` / `assistant_error`; responsibility from the existing assistant-failure helpers, so Kilo and provider errors stay attributed to them |
+| Kilo final error, or `no_progress` during a Kilo model retry | `agent_activity` / `assistant_error`; responsibility from the existing assistant-failure helpers, so Kilo and provider errors stay attributed to them |
 | Stop | `interruption` / `user_interrupt` |
 | `missing_metadata`, `invalid_model`, payment required | Unchanged |
 
@@ -876,7 +919,9 @@ counts.
 16. **No progress.** Every native execution, including autonomous work without a Cloud turn,
     is interrupted after 20 minutes without real progress (`no_progress`). A silent running
     tool gets the same bound. User waits pause no-progress time; the separate 120-minute
-    wall-clock cap (`execution_limit`) remains in force. After confirmed interruption, an
+    wall-clock cap (`execution_limit`) remains in force. A stall while Kilo retries the model
+    request fails as the retried assistant failure, for example `rate_limited`, so a provider
+    condition is not counted as a platform failure. After confirmed interruption, an
     otherwise idle sandbox stops after its normal 10-minute grace; active siblings retain it.
 17. **Auto-commit fails.** The turn completes with a visible warning.
 18. **Question answered live.** A question during a turn is answered; the same turn continues and

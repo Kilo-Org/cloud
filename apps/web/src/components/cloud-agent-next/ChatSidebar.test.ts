@@ -264,6 +264,112 @@ describe('ChatSidebar row rendering', () => {
     });
   }
 
+  function folderDragFixture() {
+    const ids = [
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    ];
+    const sessions = ids.map((id, index) =>
+      makeSession(index, {
+        worktreeId: `worktree_${id}`,
+        cloudAgentSessionId: `workspace_${id}`,
+      })
+    );
+    const workspaceFolders = {
+      folders: [
+        { id: ids[0], name: 'Product', color: 'blue' as const, worktreeIds: [] as string[] },
+      ],
+      isLoading: false,
+      isError: false,
+      isSaving: false,
+      collapsedFolderIds: [],
+      toggleFolder: jest.fn(),
+      saveFolder: jest.fn(async () => true),
+      setFolderColor: jest.fn(async () => true),
+      deleteFolder: jest.fn(async () => true),
+      moveWorktree: jest.fn(async () => false),
+      reorderFolders: jest.fn(async () => true),
+      refresh: jest.fn(async () => undefined),
+    } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
+    const dataTransfer = {
+      setData: jest.fn(),
+      setDragImage: jest.fn(),
+      effectAllowed: '',
+      dropEffect: '',
+    };
+    const dragEvent = (target: Element, type: string) => {
+      const event = new window.Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperties(event, {
+        dataTransfer: { value: dataTransfer },
+        clientX: { value: 30 },
+        clientY: { value: 45 },
+      });
+      act(() => {
+        target.dispatchEvent(event);
+      });
+    };
+    return { sessions, workspaceFolders, dataTransfer, dragEvent };
+  }
+
+  it.each([0, 1])('drags only ungrouped workspace row %i from its title into a folder', index => {
+    const { sessions, workspaceFolders, dataTransfer, dragEvent } = folderDragFixture();
+    const onOpenSession = jest.fn();
+    renderSidebar({ sessions, workspaceFolders, onOpenSession });
+    const session = sessions[index];
+    const row = dom.container.querySelector<HTMLElement>(
+      `[data-worktree-id="${session.worktreeId}"]`
+    );
+    const title = row?.querySelector('button span');
+    const folder = dom.container.querySelector('[data-folder-id]');
+    if (!row || !title || !folder) throw new Error('Drag source or target missing');
+    row.getBoundingClientRect = () => ({ left: 10, top: 20, width: 200, height: 36 }) as DOMRect;
+
+    expect(row.getAttribute('draggable')).toBe('true');
+    expect(dom.container.querySelector('.overflow-y-auto')?.classList.contains('select-none')).toBe(
+      true
+    );
+    dragEvent(title, 'dragstart');
+
+    expect(dataTransfer.effectAllowed).toBe('move');
+    expect(dataTransfer.setData).toHaveBeenCalledTimes(1);
+    expect(dataTransfer.setData).toHaveBeenCalledWith(
+      'application/x-kilo-workspace-folder',
+      JSON.stringify({ type: 'worktree', id: session.worktreeId })
+    );
+    expect(dataTransfer.setDragImage).toHaveBeenCalledWith(row, 20, 25);
+    expect(dom.container.querySelectorAll('[data-worktree-id].opacity-50')).toHaveLength(1);
+
+    dragEvent(folder, 'dragover');
+    expect(dataTransfer.dropEffect).toBe('move');
+    dragEvent(folder, 'drop');
+
+    expect(workspaceFolders.moveWorktree).toHaveBeenCalledTimes(1);
+    expect(workspaceFolders.moveWorktree).toHaveBeenCalledWith(
+      session.worktreeId,
+      workspaceFolders.folders[0].id
+    );
+    expect(onOpenSession).not.toHaveBeenCalled();
+    expect(dom.container.querySelectorAll('[data-worktree-id].opacity-50')).toHaveLength(0);
+  });
+
+  it('uses only the folder header as its drag image and clears cancelled drags', () => {
+    const { sessions, workspaceFolders, dataTransfer, dragEvent } = folderDragFixture();
+    workspaceFolders.folders[0].worktreeIds.push(sessions[0].worktreeId!);
+    renderSidebar({ sessions, workspaceFolders });
+    const header = dom.container.querySelector<HTMLElement>('[data-folder-id] > div');
+    if (!header) throw new Error('Folder header missing');
+    header.getBoundingClientRect = () => ({ left: 10, top: 20, width: 200, height: 36 }) as DOMRect;
+
+    dragEvent(header, 'dragstart');
+    expect(dataTransfer.setDragImage).toHaveBeenCalledWith(header, 20, 25);
+    expect(header.querySelector('[data-worktree-id]')).toBeNull();
+    dragEvent(header, 'dragend');
+    expect(dom.container.querySelector('[data-folder-id].opacity-50')).toBeNull();
+    expect(workspaceFolders.moveWorktree).not.toHaveBeenCalled();
+    expect(workspaceFolders.reorderFolders).not.toHaveBeenCalled();
+  });
+
   it('keeps immutable standalone rows flat when live inputs churn with stable callbacks', () => {
     const sessions = makeSessions(SESSION_COUNT);
     const onOpenSession = jest.fn();

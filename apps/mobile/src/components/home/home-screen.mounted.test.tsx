@@ -31,7 +31,6 @@ const state = vi.hoisted(() => ({
   },
   internet: 'online' as BannerState,
   connection: { isConnected: true, reconnectExhausted: false },
-  prReviewEnabled: true,
   /** Landscape side safe areas (notch/sensor); portrait is all zeros. */
   insets: { top: 0, bottom: 0, left: 0, right: 0 },
   /** The platform value the safe-area layout must be identical under. */
@@ -131,11 +130,6 @@ vi.mock('@/components/ui/icons', () => ({
   WifiOff: 'WifiOff',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'mobile-pr-review',
-  useFeatureFlag: (flag: string, fallback: boolean) =>
-    flag === 'mobile-pr-review' ? state.prReviewEnabled : fallback,
-}));
 vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
 vi.mock('@/components/agents/use-agent-session-navigator', () => ({
   useAgentSessionNavigator: () => vi.fn(),
@@ -271,7 +265,6 @@ beforeEach(() => {
   Object.assign(state.insets, { top: 0, bottom: 0, left: 0, right: 0 });
   state.platformOS = 'ios';
   state.internet = 'online';
-  state.prReviewEnabled = true;
   state.destination = '';
   state.announcements = [];
   state.refetch.mockReset().mockResolvedValue(true);
@@ -735,7 +728,7 @@ describe('Home admission', () => {
   });
 
   it.each(['unresolved', 'failed', 'missing'] as const)(
-    'keeps PR Review behind its own flag and route while membership is %s',
+    'keeps PR Review available on its own route while membership is %s',
     async mode => {
       state.organization.organizationId = 'org-1';
       state.boundary.isResolving = mode === 'unresolved';
@@ -747,11 +740,6 @@ describe('Home admission', () => {
       expect(text()).not.toContain('Security Agent');
       press('PR Review');
       expect(state.destination).toBe('/(app)/pr-review');
-
-      state.prReviewEnabled = false;
-      await renderHome();
-      expect(text()).not.toContain('PR Review');
-      expect(nodes('SectionHeader').some(node => node.props.label === 'Explore')).toBe(false);
     }
   );
   it.each(['pending', 'failed'] as const)(
@@ -848,7 +836,7 @@ describe('Home admission', () => {
   });
 
   it.each(['unavailable', 'error'] as const)(
-    'centers %s feedback only without remaining product choices',
+    'keeps %s feedback inline alongside PR Review',
     async mode => {
       state.organization.organizationId = 'org-1';
       state.boundary.orgs = [];
@@ -857,68 +845,52 @@ describe('Home admission', () => {
       expect(nodes('CenteredState')).toHaveLength(0);
       expect(nodes('ScrollView')).toHaveLength(1);
       expect(text()).toContain('PR Review');
-
-      state.prReviewEnabled = false;
-      await renderHome();
-      expect(nodes('CenteredState')).toHaveLength(1);
-      expect(nodes('CenteredState')[0]?.props.refreshControl).toBeDefined();
-      expect(nodes('ScrollView')).toHaveLength(0);
-      expect(nodes('NewTaskButton')).toHaveLength(0);
-      expect(text()).not.toContain('PR Review');
-      expect(text()).toContain(
-        mode === 'error' ? "Couldn't load your organizations" : 'Organization unavailable'
-      );
     }
   );
 
   it('keeps session failures inline when the new task choice remains', async () => {
     state.live.terminalError = failure;
-    state.prReviewEnabled = false;
     await renderHome();
     expect(nodes('CenteredState')).toHaveLength(0);
     expect(nodes('ScrollView')).toHaveLength(1);
     expect(nodes('NewTaskButton')).toHaveLength(1);
   });
 
-  it.each([false, true])(
-    'refreshes organization errors through the context with product choices=%s',
-    async prReviewEnabled => {
-      state.organization.organizationId = 'org-1';
-      state.boundary.isError = true;
-      state.prReviewEnabled = prReviewEnabled;
-      const pending = Promise.withResolvers<undefined>();
-      state.boundaryRefetch.mockReturnValue(pending.promise);
-      await renderHome();
-      const refresh = () =>
-        nodes(prReviewEnabled ? 'ScrollView' : 'CenteredState')[0]?.props.refreshControl as {
-          props: { refreshing: boolean; onRefresh: () => void };
-        };
-      act(() => {
-        refresh().props.onRefresh();
-      });
-      expect(state.boundaryRefetch).toHaveBeenCalledOnce();
-      expect(state.refetch).not.toHaveBeenCalled();
-      expect(refresh().props.refreshing).toBe(true);
-      await act(async () => {
-        pending.resolve(undefined);
-        await pending.promise;
-      });
-      expect(refresh().props.refreshing).toBe(false);
-
-      state.organization.organizationId = null;
-      state.live.activeSessions = [row];
-      await renderHome();
-      const readyRefresh = nodes('ScrollView')[0]?.props.refreshControl as {
-        props: { onRefresh: () => void };
+  it('refreshes organization errors through the context', async () => {
+    state.organization.organizationId = 'org-1';
+    state.boundary.isError = true;
+    const pending = Promise.withResolvers<undefined>();
+    state.boundaryRefetch.mockReturnValue(pending.promise);
+    await renderHome();
+    const refresh = () =>
+      nodes('ScrollView')[0]?.props.refreshControl as {
+        props: { refreshing: boolean; onRefresh: () => void };
       };
-      await act(async () => {
-        readyRefresh.props.onRefresh();
-        await Promise.resolve();
-      });
-      expect(state.refetch).toHaveBeenCalledOnce();
-      expect(state.boundaryRefetch).toHaveBeenCalledOnce();
-    }
-  );
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    expect(state.boundaryRefetch).toHaveBeenCalledOnce();
+    expect(state.refetch).not.toHaveBeenCalled();
+    expect(refresh().props.refreshing).toBe(true);
+    await act(async () => {
+      pending.resolve(undefined);
+      await pending.promise;
+    });
+    expect(refresh().props.refreshing).toBe(false);
+
+    state.organization.organizationId = null;
+    state.live.activeSessions = [row];
+    await renderHome();
+    const readyRefresh = nodes('ScrollView')[0]?.props.refreshControl as {
+      props: { onRefresh: () => void };
+    };
+    await act(async () => {
+      readyRefresh.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(state.refetch).toHaveBeenCalledOnce();
+    expect(state.boundaryRefetch).toHaveBeenCalledOnce();
+  });
 
   it('recovers membership through boundary Retry and revokes admission on an unresolved organization change', async () => {
     state.organization.organizationId = 'org-1';

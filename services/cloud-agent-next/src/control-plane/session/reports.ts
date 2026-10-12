@@ -37,6 +37,7 @@ export type ControlPlaneReportFacts = {
   assistantReason?: CloudAgentAssistantFailureReason;
   providerOwnership?: CloudAgentProviderOwnership;
   workspaceSubtype?: WorkspaceFailureSubtype;
+  gateResult?: 'pass' | 'fail';
 };
 
 /** The message state vocabulary maps onto the report `run.status` (spec §10). */

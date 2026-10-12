@@ -16,7 +16,6 @@ import { createHash } from 'crypto';
 
 export const DEFAULT_COLLECTION_NAME = 'org_code_indexing';
 
-// Helper to escape string values for Milvus filter expressions
 function escapeFilterValue(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
@@ -34,11 +33,9 @@ export class MilvusIndexStorage {
   }
 
   async deleteByFilePath(params: DeleteByFilePathParams): Promise<void> {
-    // Build filter expression for Milvus
     const filter = `organization_id == "${escapeFilterValue(params.organizationId)}" && project_id == "${escapeFilterValue(params.projectId)}" && git_branch == "${escapeFilterValue(params.gitBranch)}" && file_path == "${escapeFilterValue(params.filePath)}"`;
 
     const start = Date.now();
-    // Delete points matching the file path
     await getMilvusClient().delete({
       collection_name: this.collectionName,
       filter,
@@ -46,7 +43,6 @@ export class MilvusIndexStorage {
 
     console.log(`[milvus] - deleted file ${params.filePath} in ${Date.now() - start}ms`);
 
-    // Delete from manifest table
     await db
       .delete(code_indexing_manifest)
       .where(
@@ -62,7 +58,6 @@ export class MilvusIndexStorage {
   }
 
   async delete(params: DeleteParams): Promise<number> {
-    // Build filter expression parts
     const filterParts: string[] = [
       `organization_id == "${escapeFilterValue(params.organizationId)}"`,
       `project_id == "${escapeFilterValue(params.projectId)}"`,
@@ -73,7 +68,6 @@ export class MilvusIndexStorage {
     }
 
     if (params.filePaths && params.filePaths.length > 0) {
-      // Build IN clause for file paths
       const escapedPaths = params.filePaths.map(p => `"${escapeFilterValue(p)}"`).join(', ');
       filterParts.push(`file_path in [${escapedPaths}]`);
     }
@@ -90,7 +84,6 @@ export class MilvusIndexStorage {
       `[milvus] - deleted ${params.filePaths?.length || 0} files in ${Date.now() - start}ms`
     );
 
-    // Delete from manifest table
     const manifestConditions = [
       params.organizationId
         ? eq(code_indexing_manifest.organization_id, params.organizationId)
@@ -115,18 +108,15 @@ export class MilvusIndexStorage {
     organizationId: string;
     beforeDate: Date;
   }): Promise<void> {
-    // Build filter expression for Milvus
     // created_at is stored as unix timestamp (milliseconds)
     const beforeTimestamp = params.beforeDate.getTime();
     const filter = `organization_id == "${escapeFilterValue(params.organizationId)}" && created_at < ${beforeTimestamp}`;
 
-    // Delete points from Milvus where organization_id matches and created_at is before the supplied date
     await getMilvusClient().delete({
       collection_name: this.collectionName,
       filter,
     });
 
-    // Delete from manifest table where created_at is before the supplied date
     await db
       .delete(code_indexing_manifest)
       .where(
@@ -141,15 +131,11 @@ export class MilvusIndexStorage {
     if (chunks.length === 0) return 0;
     const created_at = Date.now();
 
-    // Extract texts for embedding
     const texts = chunks.map(chunk => chunk.text);
 
-    // Generate embeddings for the entire batch
     const { embeddings } = await this.embeddingService.embedMany(texts);
 
-    // Prepare data for Milvus upsert
     const data = chunks.map((chunk, index) => {
-      // Generate deterministic ID using MD5 hash of organization_id + file_path + text + branch
       const idString = `${chunk.organizationId}|${chunk.projectId}|${chunk.filePath}|${chunk.text}|${chunk.gitBranch}`;
       const id = createHash('md5').update(idString).digest('hex');
 
@@ -168,7 +154,6 @@ export class MilvusIndexStorage {
     });
 
     const start = Date.now();
-    // Upsert data to Milvus
     await getMilvusClient().upsert({
       collection_name: this.collectionName,
       data,
@@ -180,16 +165,13 @@ export class MilvusIndexStorage {
   }
 
   async search(params: SearchParams): Promise<SearchResult[]> {
-    // Create embedding from search query
     const { embedding } = await this.embeddingService.embedSingle(params.query);
 
-    // Build filter expression parts
     const filterParts: string[] = [
       `organization_id == "${escapeFilterValue(params.organizationId)}"`,
       `project_id == "${escapeFilterValue(params.projectId)}"`,
     ];
 
-    // Add branch filter: use OR condition if preferBranch is specified, otherwise just fallbackBranch
     if (params.preferBranch) {
       filterParts.push(
         `(git_branch == "${escapeFilterValue(params.preferBranch)}" || git_branch == "${escapeFilterValue(params.fallbackBranch)}")`
@@ -200,7 +182,6 @@ export class MilvusIndexStorage {
 
     const filter = filterParts.join(' && ');
 
-    // Perform search query
     // Fetch more results than needed to allow for grouping by file_path
     const start = Date.now();
     const searchResults = await getMilvusClient().search({
@@ -210,7 +191,6 @@ export class MilvusIndexStorage {
       filter,
       output_fields: ['file_path', 'start_line', 'end_line', 'git_branch'],
     });
-    // Process results and deduplicate by file path with preference logic
     const resultMap = new Map<string, SearchResult>();
     const preferBranch = params.preferBranch;
 
@@ -220,17 +200,14 @@ export class MilvusIndexStorage {
       const score = point.score ?? 0;
       const fromPreferredBranch = preferBranch ? gitBranch === preferBranch : false;
 
-      // Skip results below score threshold
       if (score < this.scoreThreshold) {
         continue;
       }
 
-      // Skip if file is in excludeFiles list
       if (params.excludeFiles.includes(filePath)) {
         continue;
       }
 
-      // Apply path filter if provided
       if (params.path && params.path !== 'all' && params.path !== '/') {
         const pathLower = params.path.toLowerCase();
         if (!filePath.toLowerCase().startsWith(pathLower)) {
@@ -253,7 +230,6 @@ export class MilvusIndexStorage {
           fromPreferredBranch,
         });
       } else {
-        // Prefer results from preferred branch, or higher score if same branch preference
         const shouldReplace =
           (fromPreferredBranch && !existing.fromPreferredBranch) ||
           (fromPreferredBranch === existing.fromPreferredBranch && score > existing.score);
@@ -272,7 +248,6 @@ export class MilvusIndexStorage {
       }
     }
 
-    // Sort by score and return top 50
     const finalResults = Array.from(resultMap.values())
       .sort((a, b) => b.score - a.score)
       .slice(0, 50);
@@ -285,7 +260,6 @@ export class MilvusIndexStorage {
   }
 
   async getManifest(params: GetManifestParams): Promise<ManifestResult> {
-    // Query the code_indexing_manifest table to get file_hash -> file_path mapping and AI line stats
     const result = await db.execute(sql`
       SELECT
         json_object_agg(file_hash, file_path) as files,
@@ -311,16 +285,13 @@ export class MilvusIndexStorage {
       ) AS distinct_files
     `);
 
-    // Extract files from the result
     const files: Record<string, string> = (result.rows[0]?.files as Record<string, string>) ?? {};
 
-    // Calculate totals
     const totalFiles = Object.keys(files).length;
     const totalLines = Number(result.rows[0]?.total_lines ?? 0);
     const totalAILines = Number(result.rows[0]?.total_ai_lines ?? 0);
     const percentageOfAILines = totalLines > 0 ? (totalAILines / totalLines) * 100 : 0;
 
-    // Find most recent update
     const lastUpdated = new Date().toISOString();
 
     return {

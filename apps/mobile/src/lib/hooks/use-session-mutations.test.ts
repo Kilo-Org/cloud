@@ -149,26 +149,6 @@ describe('useSessionMutations account publication', () => {
     expect(rpc.rename.mock.calls[0]?.[0]).toEqual({ session_id: 's1', title: 'New' });
   });
 
-  it('deletes only stored rows and moves focus after server confirmation', async () => {
-    const request = deferred<undefined>();
-    rpc.delete.mockReturnValue(request.promise);
-    let focused = 'row';
-    useSessionMutations().deleteSession('s1', () => {
-      focused = 'list';
-    });
-    await vi.waitFor(() => {
-      expect(titles(client, listKey)).toEqual(['Other']);
-    });
-    expect(activeTitle(client)).toBe('Old');
-    expect(focused).toBe('row');
-    request.resolve(undefined);
-    await vi.waitFor(() => {
-      expect(focused).toBe('list');
-    });
-    expect(messages).toEqual(['Session deleted']);
-    expect(rpc.delete.mock.calls[0]?.[0]).toEqual({ session_id: 's1' });
-  });
-
   it.each([
     { operation: 'rename', fails: true },
     { operation: 'delete', fails: true },

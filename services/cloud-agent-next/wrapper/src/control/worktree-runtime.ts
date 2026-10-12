@@ -5,6 +5,14 @@ import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk';
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
+import type { ControlPlaneRouteSpec } from '../../../src/shared/control-plane-protocol.js';
+import {
+  GITHUB_REVIEW_MCP_BINARY,
+  GITHUB_REVIEW_MCP_SERVER_NAME,
+  GITHUB_REVIEW_TARGET_ENV,
+  serializeGitHubReviewTarget,
+} from '../../../src/shared/github-review-target.js';
+import { buildGitHubReviewPublishConfigContent } from '../github-review-publish-config.js';
 import type {
   ControlDiagnosticFields,
   ControlDiagnosticReporter,
@@ -303,7 +311,8 @@ export function buildWorktreeKiloEnvironment(
   kilo: WorktreeKiloAuth,
   environment: Record<string, string> = {},
   inherited: NodeJS.ProcessEnv = process.env,
-  mcp?: SessionAttachPayload['mcp']
+  mcp?: SessionAttachPayload['mcp'],
+  runtimeConfig?: Pick<ControlPlaneRouteSpec, 'permission' | 'githubReviewTarget'>
 ): Record<string, string> {
   const env: Record<string, string> = {};
   const reserved = new Set<string>(CONTROL_RUNTIME_RESERVED_ENV_VARS);
@@ -323,10 +332,10 @@ export function buildWorktreeKiloEnvironment(
     if (!isRuntimeOwned(name) || BITBUCKET_METADATA_ENV_VARS.has(name)) env[name] = value;
   }
 
-  const config = JSON.stringify({
+  let config = JSON.stringify({
     autoupdate: false,
     snapshot: false,
-    permission: CONTROL_PLANE_SANDBOX_PERMISSION,
+    permission: { ...CONTROL_PLANE_SANDBOX_PERMISSION, ...runtimeConfig?.permission },
     provider: {
       kilo: {
         options: {
@@ -337,8 +346,27 @@ export function buildWorktreeKiloEnvironment(
         },
       },
     },
-    ...(mcp ? { mcp } : {}),
+    ...(mcp
+      ? {
+          mcp: Object.fromEntries(
+            Object.entries(mcp).filter(([name]) => name !== GITHUB_REVIEW_MCP_SERVER_NAME)
+          ),
+        }
+      : {}),
   });
+  if (runtimeConfig?.githubReviewTarget) {
+    const amended = buildGitHubReviewPublishConfigContent({
+      configContentJson: config,
+      binaryPath: GITHUB_REVIEW_MCP_BINARY,
+    });
+    if (amended === null)
+      throw new WorktreeKiloRuntimeError(
+        'protocol_error',
+        'GitHub review publisher configuration is invalid',
+        false
+      );
+    config = amended;
+  }
   if (Buffer.byteLength(config, 'utf8') > MAX_KILO_CONFIG_BYTES) {
     throw new WorktreeKiloRuntimeError('protocol_error', 'Kilo configuration is too large', false);
   }
@@ -353,6 +381,11 @@ export function buildWorktreeKiloEnvironment(
     XDG_STATE_HOME: path.join(home, '.local', 'state'),
     XDG_RUNTIME_DIR: path.join(home, '.run'),
     KILO_PLATFORM: 'cloud-agent',
+    ...(runtimeConfig?.githubReviewTarget
+      ? {
+          [GITHUB_REVIEW_TARGET_ENV]: serializeGitHubReviewTarget(runtimeConfig.githubReviewTarget),
+        }
+      : {}),
     KILO_DISABLE_AUTOUPDATE: 'true',
     KILO_DISABLE_CODEBASE_INDEXING: 'vscode-no-workspace',
     KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false',

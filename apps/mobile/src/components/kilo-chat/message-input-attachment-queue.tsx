@@ -4,6 +4,7 @@ import { toast } from 'sonner-native';
 import { type AddFileInput, useAttachmentQueue } from '@kilocode/kilo-chat-hooks';
 
 import { i18n } from '@/i18n';
+import { waitForActionSheetDismissal } from '@/lib/action-sheet-dismissal';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import {
   buildAttachmentSizeRejectionToast,
@@ -94,6 +95,9 @@ export function MessageInputWithAttachmentQueue({
   const pickFromSource = useCallback(
     async (source: 'camera' | 'library' | 'files') => {
       try {
+        // Present the picker only after the sheet's modal is gone; otherwise
+        // iOS dismisses the picker with the modal (KILO-APP-3BF).
+        await waitForActionSheetDismissal();
         const selected = await pickAttachmentsFromSource(source);
         await addSelectedAttachments(selected);
       } catch (error) {

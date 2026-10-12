@@ -273,6 +273,7 @@ export function dismissFinishedSessionCard(sessionId: string): void {
         cards.delete(sessionId);
         emit();
       }
+      clearSessionCardPress(sessionId);
       endCard(activity, 'immediate');
     }
   }

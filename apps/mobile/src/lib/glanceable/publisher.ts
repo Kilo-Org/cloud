@@ -16,7 +16,7 @@ import {
 } from '@kilocode/app-shared/home-widget';
 
 import { isGlanceableFixtureHeld } from './fixture-hold';
-import { getFollowedSessionIds } from './followed-sessions';
+import { getFollowedSessionIds, rememberSnapshotRows } from './followed-sessions';
 import {
   getLastHomeWidgetData,
   hasSameHomeWidgetDetails,
@@ -229,6 +229,7 @@ export class GlanceablePublisher {
       now,
       previousRevision: this.current?.revision ?? 0,
     });
+    rememberSnapshotRows(snapshot.scopeKey, sessions);
 
     // The rows are the only place the session id exists, so the ask is selected
     // here, on every heartbeat, before the unchanged-content gate below: that

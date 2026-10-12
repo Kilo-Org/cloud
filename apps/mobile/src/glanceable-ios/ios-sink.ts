@@ -1,15 +1,26 @@
 /* eslint-disable max-lines -- one ActivityKit sink: adopt, start, update, and end */
 import {
+  countGlanceableApprovals,
+  countGlanceableSessions,
   GLANCEABLE_STALE_MS,
   GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
   isStartableGlanceableWork,
+  newestGlanceableResult,
+  oldestNeedsInputSince,
+  soonestScheduledAt,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { aggregateLiveActivityRelevance } from '@kilocode/notifications';
 
 import { i18n } from '@/i18n';
-import { getFollowedSessionCounts } from '@/lib/glanceable/followed-sessions';
+import {
+  type FollowableSessionRow,
+  type FollowedSessionCounts,
+  getFollowedSessionCounts,
+  getFollowedSessionIds,
+  getSnapshotRows,
+} from '@/lib/glanceable/followed-sessions';
 import { getHomeWidgetDataForSnapshot } from '@/lib/glanceable/home-widget-data';
 import {
   getLastGlanceableSnapshot,
@@ -65,26 +76,74 @@ function aggregateRelevance(snapshot: GlanceableAgentsSnapshot): number {
  * The snapshot the aggregate card counts: the scope's work without the
  * sessions this device follows (spec "Aggregate card coexistence"). Every
  * followed session has its own card, so the aggregate card ends when no other
- * startable work is left, as the server's card does. A followed session the
- * tray no longer lists cannot push a count below zero. Only the Live Activity
+ * startable work is left, as the server's card does. Only the Live Activity
  * reads this; the Home widget keeps every session.
+ *
+ * The counts and times come from the tray rows the publisher built the
+ * snapshot from, without the followed rows, so the card never shows a
+ * followed session's wait or wake time. The rows describe the snapshot only
+ * when their counts match it; otherwise (a pushed or a stale snapshot) the
+ * followed counts are subtracted and a time stays only while its count does.
  */
 function withoutFollowedSessions(snapshot: GlanceableAgentsSnapshot): GlanceableAgentsSnapshot {
   const followed = getFollowedSessionCounts();
   if (followed.running + followed.needsInput + followed.idle + followed.scheduled === 0) {
     return snapshot;
   }
-  const running = Math.max(0, snapshot.running - followed.running);
-  const needsInput = Math.max(0, snapshot.needsInput - followed.needsInput);
-  const scheduled = Math.max(0, snapshot.scheduled - followed.scheduled);
-  const startable = running + needsInput + scheduled > 0;
+  const remaining = remainingRows(snapshot);
+  const card =
+    remaining === null ? subtractFollowed(snapshot, followed) : fromRows(snapshot, remaining);
+  // While a session is followed, idle work alone does not keep the card.
+  return isStartableGlanceableWork(card) ? card : { ...card, idle: 0 };
+}
+
+/** The snapshot's own rows without the followed sessions, or null when unknown. */
+function remainingRows(snapshot: GlanceableAgentsSnapshot): FollowableSessionRow[] | null {
+  const rows = getSnapshotRows(snapshot.scopeKey);
+  if (rows === null) {
+    return null;
+  }
+  const counts = countGlanceableSessions(rows);
+  const describes =
+    counts.running === snapshot.running &&
+    counts.needsInput === snapshot.needsInput &&
+    counts.idle === snapshot.idle &&
+    counts.scheduled === snapshot.scheduled;
+  if (!describes) {
+    return null;
+  }
+  const followedIds = getFollowedSessionIds();
+  return rows.filter(row => row.id === undefined || !followedIds.has(row.id));
+}
+
+function fromRows(
+  snapshot: GlanceableAgentsSnapshot,
+  rows: readonly FollowableSessionRow[]
+): GlanceableAgentsSnapshot {
+  const newest = newestGlanceableResult(rows);
   return {
     ...snapshot,
-    running,
+    ...countGlanceableSessions(rows),
+    needsApproval: countGlanceableApprovals(rows),
+    needsInputSince: oldestNeedsInputSince(rows),
+    scheduledAt: soonestScheduledAt(rows),
+    newestResultKind: newest?.kind ?? null,
+    newestResultAt: newest?.at ?? null,
+  };
+}
+
+function subtractFollowed(
+  snapshot: GlanceableAgentsSnapshot,
+  followed: FollowedSessionCounts
+): GlanceableAgentsSnapshot {
+  const needsInput = Math.max(0, snapshot.needsInput - followed.needsInput);
+  const scheduled = Math.max(0, snapshot.scheduled - followed.scheduled);
+  return {
+    ...snapshot,
+    running: Math.max(0, snapshot.running - followed.running),
     needsInput,
     needsApproval: Math.max(0, (snapshot.needsApproval ?? 0) - followed.needsApproval),
-    // While a session is followed, idle work alone does not keep the card.
-    idle: startable ? Math.max(0, snapshot.idle - followed.idle) : 0,
+    idle: Math.max(0, snapshot.idle - followed.idle),
     scheduled,
     needsInputSince: needsInput === 0 ? null : snapshot.needsInputSince,
     scheduledAt: scheduled === 0 ? null : snapshot.scheduledAt,

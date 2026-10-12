@@ -424,6 +424,26 @@ describe('locked device', () => {
     expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(2);
     expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
   });
+
+  it('opens again after unlock when the key read rejects because the device locked', async () => {
+    const storedKey = 'a'.repeat(64);
+    store.set(PERSIST_DB_KEY, storedKey);
+    const refusal = new Error('keychain refused: device locked');
+    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(async () => {
+      setProtectedDataAvailable(false);
+      throw refusal;
+    });
+
+    await expect(getItem('s', 'k')).rejects.toBe(refusal);
+    expect(SQLite.openDatabaseSync).not.toHaveBeenCalled();
+
+    // The raw native refusal must not keep the open memo rejected until relaunch.
+    setProtectedDataAvailable(true);
+    await expect(getItem('s', 'k')).resolves.toBeNull();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+  });
 });
 
 describe('connection configuration', () => {

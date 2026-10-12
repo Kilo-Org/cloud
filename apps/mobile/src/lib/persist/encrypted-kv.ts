@@ -312,7 +312,10 @@ async function openWhenProtectedDataAvailable(): Promise<KVDatabase> {
   try {
     return await openEncryptedDatabase();
   } catch (error) {
-    if (error instanceof ProtectedDataUnavailableError) {
+    // The key read and write sit outside the open's own lock check, and the
+    // keychain refuses them with a raw native error, not the typed one. Any
+    // failure while locked drops the memo.
+    if (error instanceof ProtectedDataUnavailableError || !isProtectedDataAvailable()) {
       openPromise = null;
     }
     throw error;

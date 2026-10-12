@@ -36632,6 +36632,7 @@
           "enum": [
             "ios_push_to_start",
             "ios_activity",
+            "ios_session_activity",
             "android_ongoing"
           ]
         },
@@ -36652,6 +36653,10 @@
               "type": "null"
             }
           ]
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -36667,9 +36672,10 @@
       "token",
       "kind",
       "platform",
-      "organizationid"
+      "organizationid",
+      "sessionid"
     ],
-    "searchBlob": "user.registerActivityToken Register an iOS Live Activity or Android ongoing notification token for the user. user registeractivitytoken token kind platform organizationid token kind platform organizationId"
+    "searchBlob": "user.registerActivityToken Register an iOS Live Activity or Android ongoing notification token for the user. user registeractivitytoken token kind platform organizationid sessionid token kind platform organizationId sessionId"
   },
   "user.registerPushToken": {
     "path": "user.registerPushToken",

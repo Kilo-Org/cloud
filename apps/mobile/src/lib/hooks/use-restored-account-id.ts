@@ -30,7 +30,9 @@ import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
  * account's local data.
  */
 export function useRestoredAccountId(fence: number, restoredFromStorage: boolean): string | null {
-  const { userId } = useCurrentUserId();
+  // Only a restored session reads the hint, so only one asks for `user.getMe`
+  // here. A signed-out launch must not start that request from the root layout.
+  const { userId } = useCurrentUserId({ enabled: restoredFromStorage });
   const [hintedUserId, setHintedUserId] = useState<string | null>(null);
 
   useEffect(() => {

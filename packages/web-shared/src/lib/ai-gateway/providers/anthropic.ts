@@ -2,7 +2,7 @@ import { addCacheBreakpoints } from '@kilocode/web-shared/lib/ai-gateway/provide
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { normalizeToolCallIds } from '@kilocode/web-shared/lib/ai-gateway/tool-calling';
 
-const ANTHROPIC_TOOL_CALL_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const ANTHROPIC_TOOL_CALL_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
 
 function appendAnthropicBetaHeader(extraHeaders: Record<string, string>, betaFlag: string) {
   for (const header of ['anthropic-beta', 'x-anthropic-beta']) {

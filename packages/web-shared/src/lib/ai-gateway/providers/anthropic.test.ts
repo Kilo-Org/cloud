@@ -5,7 +5,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { applyAnthropicModelSettings } from './anthropic';
 
-const VALID_ID = /^[a-zA-Z0-9_-]+$/;
+const VALID_ID = /^[a-zA-Z0-9_-]{1,128}$/;
 
 function apply(request: GatewayRequest) {
   applyAnthropicModelSettings(request, {});
@@ -46,6 +46,43 @@ describe('applyAnthropicModelSettings tool call ids', () => {
     expect(firstResult.tool_call_id).toBe(firstCall.id);
     expect(secondCall.id).toBe('call_2-ok');
     expect(secondResult.tool_call_id).toBe('call_2-ok');
+  });
+
+  it('normalizes tool call ids longer than 128 characters', () => {
+    const maxLengthId = 'a'.repeat(128);
+    const tooLongId = 'a'.repeat(129);
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [
+          {
+            role: 'assistant',
+            content: '',
+            tool_calls: [
+              { id: maxLengthId, type: 'function', function: { name: 'read', arguments: '{}' } },
+              { id: tooLongId, type: 'function', function: { name: 'read', arguments: '{}' } },
+            ],
+          },
+          { role: 'tool', tool_call_id: maxLengthId, content: 'one' },
+          { role: 'tool', tool_call_id: tooLongId, content: 'two' },
+        ],
+      },
+    };
+
+    apply(request);
+
+    const [assistant, firstResult, secondResult] = request.body.messages;
+    if (assistant.role !== 'assistant' || firstResult.role !== 'tool') {
+      throw new Error('unexpected message shape');
+    }
+    if (secondResult.role !== 'tool') throw new Error('unexpected message shape');
+    const [firstCall, secondCall] = assistant.tool_calls ?? [];
+    expect(firstCall.id).toBe(maxLengthId);
+    expect(firstResult.tool_call_id).toBe(maxLengthId);
+    expect(secondCall.id).toMatch(VALID_ID);
+    expect(secondCall.id).not.toBe(tooLongId);
+    expect(secondResult.tool_call_id).toBe(secondCall.id);
   });
 
   it('normalizes invalid responses call ids consistently', () => {

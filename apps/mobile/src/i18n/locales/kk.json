@@ -2152,6 +2152,11 @@
       "collapse": "Мақсатты жию",
       "expand": "Мақсатты ашу"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Тапсырмалар, {{total}} ішінен {{completed}} орындалды",
+      "rowAccessibility": "Тапсырмалар, {{total}} ішінен {{completed}} орындалды. Ағымдағы тапсырма: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Жақында қолданылған",
       "couldNotLoadGithubRepositories": "GitHub репозиторийлерін жүктеу мүмкін болмады.",

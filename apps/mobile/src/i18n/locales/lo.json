@@ -2152,6 +2152,11 @@
       "collapse": "ຍຸບເປົ້າໝາຍ",
       "expand": "ຂະຫຍາຍເປົ້າໝາຍ"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "ເປົ້າໝາຍ, ສຳເລັດ {{completed}} ໃນ {{total}}",
+      "rowAccessibility": "ເປົ້າໝາຍ, ສຳເລັດ {{completed}} ໃນ {{total}}. ເປົ້າໝາຍປັດຈຸບັນ: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "ໃຊ້ຫຼ້າສຸດ",
       "couldNotLoadGithubRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ GitHub ໄດ້.",

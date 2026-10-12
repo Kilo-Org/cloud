@@ -1665,6 +1665,11 @@
       "collapse": "Свернуть цель",
       "expand": "Развернуть цель"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Задачи: выполнено {{completed}} из {{total}}",
+      "rowAccessibility": "Задачи: выполнено {{completed}} из {{total}}. Текущая задача: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Недавно использованные",
       "couldNotLoadGithubRepositories": "Не удалось загрузить репозитории GitHub.",

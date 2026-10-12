@@ -1653,6 +1653,11 @@
       "collapse": "כיווץ המטרה",
       "expand": "הרחבת המטרה"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "משימות, {{completed}} מתוך {{total}} הושלמו",
+      "rowAccessibility": "משימות, {{completed}} מתוך {{total}} הושלמו. המשימה הנוכחית: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "בשימוש לאחרונה",
       "couldNotLoadGithubRepositories": "לא ניתן היה לטעון את המאגרים מ-GitHub.",

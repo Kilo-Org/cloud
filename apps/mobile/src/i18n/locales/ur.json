@@ -2152,6 +2152,11 @@
       "collapse": "ہدف چھپائیں",
       "expand": "ہدف دکھائیں"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "اہداف، {{total}} میں سے {{completed}} مکمل",
+      "rowAccessibility": "اہداف، {{total}} میں سے {{completed}} مکمل۔ موجودہ ہدف: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "حال ہی میں استعمال شدہ",
       "couldNotLoadGithubRepositories": "GitHub کی ریپوزٹریاں لوڈ نہیں ہو سکیں۔",

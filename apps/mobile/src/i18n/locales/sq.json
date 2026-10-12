@@ -2152,6 +2152,11 @@
       "collapse": "Palos qëllimin",
       "expand": "Shfaq qëllimin"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Qëllimet, {{completed}} nga {{total}} të përfunduara",
+      "rowAccessibility": "Qëllimet, {{completed}} nga {{total}} të përfunduara. Qëllimi aktual: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Të përdorura së fundmi",
       "couldNotLoadGithubRepositories": "Nuk u ngarkuan depot nga GitHub.",

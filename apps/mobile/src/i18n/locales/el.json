@@ -2152,6 +2152,11 @@
       "collapse": "Σύμπτυξη στόχου",
       "expand": "Επέκταση στόχου"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Εργασίες, {{completed}} από {{total}} ολοκληρωμένες",
+      "rowAccessibility": "Εργασίες, {{completed}} από {{total}} ολοκληρωμένες. Τρέχουσα εργασία: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Πρόσφατη χρήση",
       "couldNotLoadGithubRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων του GitHub.",

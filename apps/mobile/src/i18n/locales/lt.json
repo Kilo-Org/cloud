@@ -2208,6 +2208,11 @@
       "collapse": "Sutraukti tikslą",
       "expand": "Išskleisti tikslą"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Užduotys, atlikta {{completed}} iš {{total}}",
+      "rowAccessibility": "Užduotys, atlikta {{completed}} iš {{total}}. Dabartinė užduotis: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Neseniai naudota",
       "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų.",

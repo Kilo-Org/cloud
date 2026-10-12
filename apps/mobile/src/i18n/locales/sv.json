@@ -2152,6 +2152,11 @@
       "collapse": "Fäll ihop målet",
       "expand": "Fäll ut målet"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Uppgifter, {{completed}} av {{total}} klara",
+      "rowAccessibility": "Uppgifter, {{completed}} av {{total}} klara. Aktuell uppgift: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nyligen använda",
       "couldNotLoadGithubRepositories": "Det gick inte att läsa in kodarkiven från GitHub.",

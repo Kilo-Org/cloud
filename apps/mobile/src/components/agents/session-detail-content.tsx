@@ -79,6 +79,8 @@ import {
   useSessionAutoApproveEnabled,
 } from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
+import { SessionTasksChip, SessionTasksRow } from '@/components/agents/session-tasks-indicator';
+import { selectSessionTodoSummary } from '@/components/agents/session-todo-summary';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
@@ -1848,7 +1850,17 @@ export function SessionDetailContent({
     </View>
   );
   const associatedPr = fetchedData?.associatedPr ?? null;
-  const prBadge = associatedPr ? <SessionPrBadge pr={associatedPr} loading={false} /> : undefined;
+  const prBadge = associatedPr ? <SessionPrBadge pr={associatedPr} loading={false} /> : null;
+  // The model's latest todo list. With a goal it is a chip under the PR pill;
+  // without one it is a one-line row under the header.
+  const todoSummary = useMemo(() => selectSessionTodoSummary(messages), [messages]);
+  const goalTrailing =
+    prBadge || todoSummary ? (
+      <>
+        {prBadge}
+        {todoSummary ? <SessionTasksChip summary={todoSummary} /> : null}
+      </>
+    ) : undefined;
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   // A pending permission ask that the auto-reply is already answering is
   // suppressed: the card is gated out below (`suppressedRequestId`). Blocking
@@ -2251,12 +2263,21 @@ export function SessionDetailContent({
               <SessionGoalSection
                 goal={sessionGoal}
                 collapsed={goalCollapsed}
-                trailing={prBadge}
+                trailing={goalTrailing}
                 onToggleCollapsed={() => {
                   toggleSessionGoalCollapsed(sessionId);
                 }}
                 onPress={handleOpenGoalActions}
               />
+            </Animated.View>
+          ) : null}
+          {sessionGoal === null && todoSummary ? (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(150)}
+            >
+              <SessionTasksRow summary={todoSummary} />
             </Animated.View>
           ) : null}
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}

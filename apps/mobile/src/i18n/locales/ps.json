@@ -2152,6 +2152,11 @@
       "collapse": "هدف پټ کړئ",
       "expand": "هدف ښکاره کړئ"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "دندې، له {{total}} څخه {{completed}} بشپړې شوې",
+      "rowAccessibility": "دندې، له {{total}} څخه {{completed}} بشپړې شوې. اوسنۍ دنده: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "په دې وروستیو کې کارول شوي",
       "couldNotLoadGithubRepositories": "د GitHub زېرمتونونه بار نه شول.",

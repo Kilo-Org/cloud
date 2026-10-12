@@ -1641,6 +1641,11 @@
       "collapse": "折叠目标",
       "expand": "展开目标"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "任务，已完成 {{completed}}/{{total}}",
+      "rowAccessibility": "任务，已完成 {{completed}}/{{total}}。当前任务：{{task}}"
+    },
     "newSession": {
       "recentlyUsed": "最近使用",
       "couldNotLoadGithubRepositories": "无法加载 GitHub 仓库。",

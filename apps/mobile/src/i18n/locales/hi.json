@@ -1629,6 +1629,11 @@
       "collapse": "लक्ष्य समेटें",
       "expand": "लक्ष्य फैलाएँ"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "कार्य, {{total}} में से {{completed}} पूर्ण",
+      "rowAccessibility": "कार्य, {{total}} में से {{completed}} पूर्ण। वर्तमान कार्य: {{task}}"
+    },
     "remoteSession": {
       "failedToCreate": "रिमोट सत्र नहीं बन सका।",
       "failedToExit": "सत्र से बाहर नहीं निकल सके।",

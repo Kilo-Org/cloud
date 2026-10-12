@@ -2208,6 +2208,11 @@
       "collapse": "Згарнуць мэту",
       "expand": "Разгарнуць мэту"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Мэты, {{completed}} з {{total}} выканана",
+      "rowAccessibility": "Мэты, {{completed}} з {{total}} выканана. Бягучая мэта: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Нядаўна выкарыстаныя",
       "couldNotLoadGithubRepositories": "Не ўдалося загрузіць рэпазіторыі GitHub.",

@@ -2152,6 +2152,11 @@
       "collapse": "Sembunyikan matlamat",
       "expand": "Paparkan matlamat"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tugasan, {{completed}} daripada {{total}} selesai",
+      "rowAccessibility": "Tugasan, {{completed}} daripada {{total}} selesai. Tugasan semasa: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Digunakan baru-baru ini",
       "couldNotLoadGithubRepositories": "Tidak dapat memuatkan repositori GitHub.",

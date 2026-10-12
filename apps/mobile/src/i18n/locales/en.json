@@ -2152,6 +2152,11 @@
       "collapse": "Collapse goal",
       "expand": "Expand goal"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tasks, {{completed}} of {{total}} done",
+      "rowAccessibility": "Tasks, {{completed}} of {{total}} done. Current task: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Recently used",
       "couldNotLoadGithubRepositories": "Couldn't load GitHub repositories",

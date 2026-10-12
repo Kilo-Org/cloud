@@ -2208,6 +2208,11 @@
       "collapse": "Strni cilj",
       "expand": "Razširi cilj"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Opravila, {{completed}} od {{total}} dokončanih",
+      "rowAccessibility": "Opravila, {{completed}} od {{total}} dokončanih. Trenutno opravilo: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nedavno uporabljeno",
       "couldNotLoadGithubRepositories": "Skladišč na GitHub ni bilo mogoče naložiti.",

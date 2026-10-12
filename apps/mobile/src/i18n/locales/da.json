@@ -2152,6 +2152,11 @@
       "collapse": "Fold målet sammen",
       "expand": "Fold målet ud"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Opgaver, {{completed}} af {{total}} fuldført",
+      "rowAccessibility": "Opgaver, {{completed}} af {{total}} fuldført. Aktuel opgave: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Senest brugt",
       "couldNotLoadGithubRepositories": "Kunne ikke indlæse kodelagre fra GitHub.",

@@ -2152,6 +2152,11 @@
       "collapse": "ਟੀਚਾ ਸਮੇਟੋ",
       "expand": "ਟੀਚਾ ਫੈਲਾਓ"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "ਟਾਸਕ, {{total}} ਵਿੱਚੋਂ {{completed}} ਪੂਰੇ ਹੋਏ",
+      "rowAccessibility": "ਟਾਸਕ, {{total}} ਵਿੱਚੋਂ {{completed}} ਪੂਰੇ ਹੋਏ। ਮੌਜੂਦਾ ਟਾਸਕ: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "ਹਾਲ ਹੀ ਵਿੱਚ ਵਰਤੇ ਗਏ",
       "couldNotLoadGithubRepositories": "GitHub ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",

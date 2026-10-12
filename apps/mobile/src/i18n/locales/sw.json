@@ -2152,6 +2152,11 @@
       "collapse": "Kunja lengo",
       "expand": "Panua lengo"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Malengo, {{completed}} kati ya {{total}} yamekamilika",
+      "rowAccessibility": "Malengo, {{completed}} kati ya {{total}} yamekamilika. Lengo la sasa: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Zilizotumika hivi karibuni",
       "couldNotLoadGithubRepositories": "Imeshindikana kupakia hazina za GitHub.",

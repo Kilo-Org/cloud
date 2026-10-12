@@ -2152,6 +2152,11 @@
       "collapse": "Məqsədi yığ",
       "expand": "Məqsədi göstər"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tapşırıqlar, {{total}} tapşırıqdan {{completed}} tamamlandı",
+      "rowAccessibility": "Tapşırıqlar, {{total}} tapşırıqdan {{completed}} tamamlandı. Cari tapşırıq: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Son istifadə edilənlər",
       "couldNotLoadGithubRepositories": "GitHub repozitoriyalarını yükləmək mümkün olmadı.",

@@ -2152,6 +2152,11 @@
       "collapse": "লক্ষ্য গুটিয়ে নিন",
       "expand": "লক্ষ্য মেলে ধরুন"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "কাজসমূহ, {{total}}টির মধ্যে {{completed}}টি সম্পন্ন",
+      "rowAccessibility": "কাজসমূহ, {{total}}টির মধ্যে {{completed}}টি সম্পন্ন। বর্তমান কাজ: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "সম্প্রতি ব্যবহৃত",
       "couldNotLoadGithubRepositories": "GitHub রিপোজিটরি লোড করা যায়নি।",

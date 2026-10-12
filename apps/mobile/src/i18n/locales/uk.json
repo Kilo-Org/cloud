@@ -1665,6 +1665,11 @@
       "collapse": "Згорнути ціль",
       "expand": "Розгорнути ціль"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Завдання: виконано {{completed}} з {{total}}",
+      "rowAccessibility": "Завдання: виконано {{completed}} з {{total}}. Поточне завдання: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Нещодавно використані",
       "couldNotLoadGithubRepositories": "Не вдалося завантажити репозиторії GitHub.",

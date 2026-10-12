@@ -1689,6 +1689,11 @@
       "collapse": "طي الهدف",
       "expand": "توسيع الهدف"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "المهام، اكتمل {{completed}} من {{total}}",
+      "rowAccessibility": "المهام، اكتمل {{completed}} من {{total}}. المهمة الحالية: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "المستخدمة مؤخرًا",
       "couldNotLoadGithubRepositories": "تعذّر تحميل مستودعات GitHub.",

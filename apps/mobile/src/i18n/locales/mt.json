@@ -2236,6 +2236,11 @@
       "collapse": "Aħbi l-għan",
       "expand": "Uri l-għan"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Kompiti, {{completed}} minn {{total}} kompluti",
+      "rowAccessibility": "Kompiti, {{completed}} minn {{total}} kompluti. Kompitu attwali: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Użati reċentement",
       "couldNotLoadGithubRepositories": "Ma setgħux jitgħabbew ir-repożitorji ta' GitHub.",

@@ -2152,6 +2152,11 @@
       "collapse": "ግብን ሰብስብ",
       "expand": "ግብን ዘርጋ"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "ግቦች፣ {{completed}} ከ{{total}} ተጠናቅቋል",
+      "rowAccessibility": "ግቦች፣ {{completed}} ከ{{total}} ተጠናቅቋል። የአሁኑ ግብ፦ {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "በቅርቡ ጥቅም ላይ የዋሉ",
       "couldNotLoadGithubRepositories": "የGitHub ማከማቻዎችን መጫን አልተቻለም።",

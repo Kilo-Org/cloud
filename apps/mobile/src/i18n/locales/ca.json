@@ -2180,6 +2180,11 @@
       "collapse": "Plega l'objectiu",
       "expand": "Desplega l'objectiu"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Objectius, {{completed}} de {{total}} completats",
+      "rowAccessibility": "Objectius, {{completed}} de {{total}} completats. Objectiu actual: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Utilitzats recentment",
       "couldNotLoadGithubRepositories": "No s'han pogut carregar els repositoris de GitHub.",

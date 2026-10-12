@@ -2152,6 +2152,11 @@
       "collapse": "Maqsadni yig'ish",
       "expand": "Maqsadni yoyish"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Vazifalar, {{total}} tadan {{completed}} tasi bajarildi",
+      "rowAccessibility": "Vazifalar, {{total}} tadan {{completed}} tasi bajarildi. Joriy vazifa: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Yaqinda ishlatilgan",
       "couldNotLoadGithubRepositories": "GitHub repozitoriyalarini yuklab bo'lmadi.",

@@ -2152,6 +2152,11 @@
       "collapse": "លាក់គោលដៅ",
       "expand": "បង្ហាញគោលដៅ"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "គោលដៅ៖ បានបញ្ចប់ {{completed}} ក្នុងចំណោម {{total}}",
+      "rowAccessibility": "គោលដៅ៖ បានបញ្ចប់ {{completed}} ក្នុងចំណោម {{total}}។ គោលដៅបច្ចុប្បន្ន៖ {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "បានប្រើថ្មីៗនេះ",
       "couldNotLoadGithubRepositories": "មិនអាចផ្ទុកឃ្លាំងកូដពី GitHub បានទេ។",

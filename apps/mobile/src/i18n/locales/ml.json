@@ -2152,6 +2152,11 @@
       "collapse": "ലക്ഷ്യം ചുരുക്കുക",
       "expand": "ലക്ഷ്യം വിരിക്കുക"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "ടാസ്കുകൾ, {{total}} എണ്ണത്തിൽ {{completed}} പൂർത്തിയായി",
+      "rowAccessibility": "ടാസ്കുകൾ, {{total}} എണ്ണത്തിൽ {{completed}} പൂർത്തിയായി. നിലവിലെ ടാസ്ക്: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "അടുത്തിടെ ഉപയോഗിച്ചവ",
       "couldNotLoadGithubRepositories": "GitHub റിപ്പോസിറ്ററികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",

@@ -1641,6 +1641,11 @@
       "collapse": "Ziel einklappen",
       "expand": "Ziel ausklappen"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Aufgaben, {{completed}} von {{total}} erledigt",
+      "rowAccessibility": "Aufgaben, {{completed}} von {{total}} erledigt. Aktuelle Aufgabe: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Zuletzt verwendet",
       "couldNotLoadGithubRepositories": "Die GitHub-Repositorys konnten nicht geladen werden.",

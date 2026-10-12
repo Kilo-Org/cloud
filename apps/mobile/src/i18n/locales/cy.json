@@ -2264,6 +2264,11 @@
       "collapse": "Cwympo'r nod",
       "expand": "Ehangu'r nod"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Nodau, {{completed}} o {{total}} wedi'u cwblhau",
+      "rowAccessibility": "Nodau, {{completed}} o {{total}} wedi'u cwblhau. Y nod cyfredol: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Defnyddiwyd yn ddiweddar",
       "couldNotLoadGithubRepositories": "Methu llwytho ystorfeydd GitHub.",

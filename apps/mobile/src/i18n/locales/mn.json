@@ -2152,6 +2152,11 @@
       "collapse": "Зорилгыг хураах",
       "expand": "Зорилгыг дэлгэх"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Даалгаварууд, {{total}}-аас {{completed}} нь дууссан",
+      "rowAccessibility": "Даалгаварууд, {{total}}-аас {{completed}} нь дууссан. Одоогийн даалгавар: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Сүүлд ашигласан",
       "couldNotLoadGithubRepositories": "GitHub-ийн кодын сангуудыг ачаалж чадсангүй.",

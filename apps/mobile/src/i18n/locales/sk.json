@@ -2208,6 +2208,11 @@
       "collapse": "Zbaliť cieľ",
       "expand": "Rozbaliť cieľ"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Úlohy, dokončené {{completed}} z {{total}}",
+      "rowAccessibility": "Úlohy, dokončené {{completed}} z {{total}}. Aktuálna úloha: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Naposledy použité",
       "couldNotLoadGithubRepositories": "Repozitáre zo služby GitHub sa nepodarilo načítať.",

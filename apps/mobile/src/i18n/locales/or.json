@@ -2152,6 +2152,11 @@
       "collapse": "ଲକ୍ଷ୍ୟ ଲୁଚାନ୍ତୁ",
       "expand": "ଲକ୍ଷ୍ୟ ଦେଖାନ୍ତୁ"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "ଲକ୍ଷ୍ୟ, {{total}} ମଧ୍ୟରୁ {{completed}} ସମ୍ପୂର୍ଣ୍ଣ",
+      "rowAccessibility": "ଲକ୍ଷ୍ୟ, {{total}} ମଧ୍ୟରୁ {{completed}} ସମ୍ପୂର୍ଣ୍ଣ। ବର୍ତ୍ତମାନର ଲକ୍ଷ୍ୟ: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "ନିକଟରେ ବ୍ୟବହୃତ",
       "couldNotLoadGithubRepositories": "GitHub ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",

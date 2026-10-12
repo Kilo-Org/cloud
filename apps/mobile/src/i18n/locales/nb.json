@@ -2152,6 +2152,11 @@
       "collapse": "Skjul målet",
       "expand": "Vis målet"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Oppgaver, {{completed}} av {{total}} fullført",
+      "rowAccessibility": "Oppgaver, {{completed}} av {{total}} fullført. Gjeldende oppgave: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nylig brukt",
       "couldNotLoadGithubRepositories": "Kunne ikke laste inn kodelagre fra GitHub.",

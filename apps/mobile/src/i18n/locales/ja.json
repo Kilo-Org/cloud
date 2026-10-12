@@ -1641,6 +1641,11 @@
       "collapse": "ゴールを折りたたむ",
       "expand": "ゴールを展開"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "タスク、{{total}} 件中 {{completed}} 件完了",
+      "rowAccessibility": "タスク、{{total}} 件中 {{completed}} 件完了。現在のタスク: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "最近使用した項目",
       "couldNotLoadGithubRepositories": "GitHubのリポジトリを読み込めませんでした。",

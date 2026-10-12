@@ -2236,6 +2236,11 @@
       "collapse": "Fill an sprioc",
       "expand": "Leathnaigh an sprioc"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Spriocanna, {{completed}} as {{total}} déanta",
+      "rowAccessibility": "Spriocanna, {{completed}} as {{total}} déanta. Sprioc reatha: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "A úsáideadh le déanaí",
       "couldNotLoadGithubRepositories": "Níorbh fhéidir stórtha GitHub a lódáil.",

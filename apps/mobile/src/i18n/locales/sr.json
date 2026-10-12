@@ -2180,6 +2180,11 @@
       "collapse": "Skupi cilj",
       "expand": "Proširi cilj"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Zadaci, {{completed}} od {{total}} završeno",
+      "rowAccessibility": "Zadaci, {{completed}} od {{total}} završeno. Trenutni zadatak: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nedavno korišćeno",
       "couldNotLoadGithubRepositories": "Učitavanje GitHub repozitorijuma nije uspelo.",

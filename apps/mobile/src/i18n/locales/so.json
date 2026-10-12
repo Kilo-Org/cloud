@@ -2152,6 +2152,11 @@
       "collapse": "Isku laab hadafka",
       "expand": "Ballaarso hadafka"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Hawlo, {{completed}} ka mid ah {{total}} ayaa dhammaaday",
+      "rowAccessibility": "Hawlo, {{completed}} ka mid ah {{total}} ayaa dhammaaday. Hawsha hadda: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Dhawaan la isticmaalay",
       "couldNotLoadGithubRepositories": "Kaydadka GitHub lama soo shubi karin.",

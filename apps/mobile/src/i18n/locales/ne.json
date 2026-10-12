@@ -2152,6 +2152,11 @@
       "collapse": "लक्ष्य लुकाउनुहोस्",
       "expand": "लक्ष्य देखाउनुहोस्"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "कार्यहरू, {{total}} मध्ये {{completed}} सम्पन्न",
+      "rowAccessibility": "कार्यहरू, {{total}} मध्ये {{completed}} सम्पन्न। हालको कार्य: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "हालै प्रयोग गरिएका",
       "couldNotLoadGithubRepositories": "GitHub रिपोजिटरीहरू लोड गर्न सकिएन।",

@@ -2152,6 +2152,11 @@
       "collapse": "Kaayyoo cufi",
       "expand": "Kaayyoo bal'isi"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Kaayyoo, {{total}} keessaa {{completed}} xumurame",
+      "rowAccessibility": "Kaayyoo, {{total}} keessaa {{completed}} xumurame. Kaayyoo ammaa: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Dhiheenya itti fayyadamte",
       "couldNotLoadGithubRepositories": "Kuusaawwan koodii GitHub fe'uu hin danda'amne.",

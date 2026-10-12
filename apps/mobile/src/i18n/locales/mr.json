@@ -2152,6 +2152,11 @@
       "collapse": "ध्येय लपवा",
       "expand": "ध्येय दाखवा"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "ध्येये, {{total}} पैकी {{completed}} पूर्ण",
+      "rowAccessibility": "ध्येये, {{total}} पैकी {{completed}} पूर्ण. सध्याचे ध्येय: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "अलीकडे वापरलेले",
       "couldNotLoadGithubRepositories": "GitHub रिपॉझिटरी लोड करता आल्या नाहीत.",

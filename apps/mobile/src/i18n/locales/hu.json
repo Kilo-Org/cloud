@@ -2152,6 +2152,11 @@
       "collapse": "Cél összecsukása",
       "expand": "Cél kibontása"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Feladatok, {{total}}ból {{completed}} kész",
+      "rowAccessibility": "Feladatok, {{total}}ból {{completed}} kész. Jelenlegi feladat: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Legutóbb használt",
       "couldNotLoadGithubRepositories": "Nem sikerült betölteni a GitHub-tárolókat.",

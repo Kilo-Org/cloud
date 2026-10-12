@@ -2152,6 +2152,11 @@
       "collapse": "ئامانجەکە کۆ بکەرەوە",
       "expand": "ئامانجەکە پیشان بدە"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "ئەرکەکان، {{completed}} لە {{total}} تەواو بووە",
+      "rowAccessibility": "ئەرکەکان، {{completed}} لە {{total}} تەواو بووە. ئەرکی ئێستا: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "تازە بەکارهاتووەکان",
       "couldNotLoadGithubRepositories": "نەتوانرا کۆگاکانی GitHub بار بکرێن.",

@@ -1622,6 +1622,11 @@
       "collapse": "Comprimi obiettivo",
       "expand": "Espandi obiettivo"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Attività, {{completed}} di {{total}} completate",
+      "rowAccessibility": "Attività, {{completed}} di {{total}} completate. Attività corrente: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Usati di recente",
       "couldNotLoadGithubRepositories": "Impossibile caricare i repository GitHub.",

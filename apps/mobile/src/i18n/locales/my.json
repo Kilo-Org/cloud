@@ -2152,6 +2152,11 @@
       "collapse": "ပန်းတိုင် ခေါက်သိမ်းရန်",
       "expand": "ပန်းတိုင် ဖြန့်ပြရန်"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "ပန်းတိုင်၊ {{total}} ခုအနက် {{completed}} ခု ပြီးမြောက်ပါပြီ",
+      "rowAccessibility": "ပန်းတိုင်၊ {{total}} ခုအနက် {{completed}} ခု ပြီးမြောက်ပါပြီ။ လက်ရှိ ပန်းတိုင်: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "မကြာသေးမီက အသုံးပြုထားသည့်အရာများ",
       "couldNotLoadGithubRepositories": "GitHub ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",

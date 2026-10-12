@@ -2152,6 +2152,11 @@
       "collapse": "Kache objektif la",
       "expand": "Montre objektif la"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tach, {{completed}} sou {{total}} fini",
+      "rowAccessibility": "Tach, {{completed}} sou {{total}} fini. Tach aktyèl la: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Itilize dènyèman",
       "couldNotLoadGithubRepositories": "Nou pa t ka chaje depo GitHub yo.",

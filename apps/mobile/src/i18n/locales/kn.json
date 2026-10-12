@@ -2152,6 +2152,11 @@
       "collapse": "ಗುರಿ ಮಡಚಿ",
       "expand": "ಗುರಿ ವಿಸ್ತರಿಸಿ"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "ಕಾರ್ಯಗಳು, {{total}} ರಲ್ಲಿ {{completed}} ಪೂರ್ಣಗೊಂಡಿವೆ",
+      "rowAccessibility": "ಕಾರ್ಯಗಳು, {{total}} ರಲ್ಲಿ {{completed}} ಪೂರ್ಣಗೊಂಡಿವೆ. ಪ್ರಸ್ತುತ ಕಾರ್ಯ: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "ಇತ್ತೀಚೆಗೆ ಬಳಸಿದವು",
       "couldNotLoadGithubRepositories": "GitHub ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",

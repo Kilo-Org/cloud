@@ -2152,6 +2152,11 @@
       "collapse": "Ɓoye manufa",
       "expand": "Nuna manufa"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Manufofi, an kammala {{completed}} cikin {{total}}",
+      "rowAccessibility": "Manufofi, an kammala {{completed}} cikin {{total}}. Manufar yanzu: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "An yi amfani da su kwanan nan",
       "couldNotLoadGithubRepositories": "An kasa loda ma'ajiyoyin GitHub.",

@@ -2152,6 +2152,11 @@
       "collapse": "Itago ang layunin",
       "expand": "Ipakita ang layunin"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Layunin, {{completed}} sa {{total}} ang natapos",
+      "rowAccessibility": "Layunin, {{completed}} sa {{total}} ang natapos. Kasalukuyang layunin: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Mga ginamit kamakailan",
       "couldNotLoadGithubRepositories": "Hindi ma-load ang mga imbakan ng code sa GitHub.",

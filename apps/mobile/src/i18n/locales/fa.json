@@ -2152,6 +2152,11 @@
       "collapse": "جمع کردن هدف",
       "expand": "باز کردن هدف"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "کارها، {{completed}} از {{total}} انجام شده",
+      "rowAccessibility": "کارها، {{completed}} از {{total}} انجام شده. کار فعلی: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "موارد استفاده‌شدهٔ اخیر",
       "couldNotLoadGithubRepositories": "بارگذاری مخزن‌های GitHub ممکن نشد.",

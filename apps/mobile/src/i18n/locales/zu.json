@@ -2152,6 +2152,11 @@
       "collapse": "Goqa umgomo",
       "expand": "Nweba umgomo"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Imigomo, {{completed}} kwezi {{total}} kuqediwe",
+      "rowAccessibility": "Imigomo, {{completed}} kwezi {{total}} kuqediwe. Umgomo wamanje: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Okusetshenziswe muva nje",
       "couldNotLoadGithubRepositories": "Asikwazanga ukulayisha izinqolobane zekhodi ze-GitHub.",

@@ -2152,6 +2152,11 @@
       "collapse": "Ahenda eesmärk",
       "expand": "Laienda eesmärk"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Ülesanded, {{completed}}/{{total}} tehtud",
+      "rowAccessibility": "Ülesanded, {{completed}}/{{total}} tehtud. Praegune ülesanne: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Hiljuti kasutatud",
       "couldNotLoadGithubRepositories": "GitHubi hoidlate laadimine ebaõnnestus.",

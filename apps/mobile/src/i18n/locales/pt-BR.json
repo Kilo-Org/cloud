@@ -1622,6 +1622,11 @@
       "collapse": "Recolher meta",
       "expand": "Expandir meta"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tarefas, {{completed}} de {{total}} concluídas",
+      "rowAccessibility": "Tarefas, {{completed}} de {{total}} concluídas. Tarefa atual: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Usados recentemente",
       "couldNotLoadGithubRepositories": "Não foi possível carregar os repositórios do GitHub.",

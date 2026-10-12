@@ -2152,6 +2152,11 @@
       "collapse": "Собери ја целта",
       "expand": "Прошири ја целта"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Задачи, {{completed}} од {{total}} завршени",
+      "rowAccessibility": "Задачи, {{completed}} од {{total}} завршени. Тековна задача: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Неодамна користени",
       "couldNotLoadGithubRepositories": "Не успеа вчитувањето на репозиториумите од GitHub.",

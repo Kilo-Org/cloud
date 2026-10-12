@@ -2180,6 +2180,11 @@
       "collapse": "Restrânge obiectivul",
       "expand": "Extinde obiectivul"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Obiective, {{completed}} din {{total}} finalizate",
+      "rowAccessibility": "Obiective, {{completed}} din {{total}} finalizate. Obiectiv curent: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Folosite recent",
       "couldNotLoadGithubRepositories": "Nu s-au putut încărca depozitele GitHub.",

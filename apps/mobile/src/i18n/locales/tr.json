@@ -1641,6 +1641,11 @@
       "collapse": "Hedefi daralt",
       "expand": "Hedefi genişlet"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Görevler, {{total}} görevin {{completed}} tanesi tamamlandı",
+      "rowAccessibility": "Görevler, {{total}} görevin {{completed}} tanesi tamamlandı. Geçerli görev: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Son kullanılanlar",
       "couldNotLoadGithubRepositories": "GitHub depoları yüklenemedi.",

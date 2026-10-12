@@ -2152,6 +2152,11 @@
       "collapse": "Aforeto ny tanjona",
       "expand": "Avelaro ny tanjona"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tanjona, {{completed}} amin'ny {{total}} vita",
+      "rowAccessibility": "Tanjona, {{completed}} amin'ny {{total}} vita. Tanjona ankehitriny: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nampiasaina vao haingana",
       "couldNotLoadGithubRepositories": "Tsy voaray ny tahirin-kaody ao amin'ny GitHub.",

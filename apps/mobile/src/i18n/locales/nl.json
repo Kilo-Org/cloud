@@ -1641,6 +1641,11 @@
       "collapse": "Doel inklappen",
       "expand": "Doel uitklappen"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Taken, {{completed}} van {{total}} voltooid",
+      "rowAccessibility": "Taken, {{completed}} van {{total}} voltooid. Huidige taak: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Recent gebruikt",
       "couldNotLoadGithubRepositories": "De GitHub-repositories konden niet worden geladen.",

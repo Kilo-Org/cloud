@@ -2152,6 +2152,11 @@
       "collapse": "მიზნის ჩაკეცვა",
       "expand": "მიზნის გაშლა"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "ამოცანები, შესრულებულია {{total}}-დან {{completed}}",
+      "rowAccessibility": "ამოცანები, შესრულებულია {{total}}-დან {{completed}}. მიმდინარე ამოცანა: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "ბოლოს გამოყენებული",
       "couldNotLoadGithubRepositories": "GitHub-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",

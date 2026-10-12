@@ -2152,6 +2152,11 @@
       "collapse": "Свий целта",
       "expand": "Разгъни целта"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Задачи, {{completed}} от {{total}} изпълнени",
+      "rowAccessibility": "Задачи, {{completed}} от {{total}} изпълнени. Текуща задача: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Наскоро използвани",
       "couldNotLoadGithubRepositories": "Не успяхме да заредим хранилищата в GitHub.",

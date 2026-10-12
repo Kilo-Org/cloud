@@ -2152,6 +2152,11 @@
       "collapse": "Vou doel toe",
       "expand": "Vou doel uit"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Take, {{completed}} van {{total}} voltooi",
+      "rowAccessibility": "Take, {{completed}} van {{total}} voltooi. Huidige taak: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Onlangs gebruik",
       "couldNotLoadGithubRepositories": "Die GitHub-bewaarplekke kon nie gelaai word nie.",

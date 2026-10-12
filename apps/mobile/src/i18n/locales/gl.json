@@ -2152,6 +2152,11 @@
       "collapse": "Contraer o obxectivo",
       "expand": "Expandir o obxectivo"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tarefas, {{completed}} de {{total}} completadas",
+      "rowAccessibility": "Tarefas, {{completed}} de {{total}} completadas. Tarefa actual: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Usados recentemente",
       "couldNotLoadGithubRepositories": "Non se puideron cargar os repositorios de GitHub.",

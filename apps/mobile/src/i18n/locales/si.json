@@ -2152,6 +2152,11 @@
       "collapse": "ඉලක්කය හකුළන්න",
       "expand": "ඉලක්කය පුළුල් කරන්න"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "කාර්යයන්, {{total}} න් {{completed}} ක් සම්පූර්ණයි",
+      "rowAccessibility": "කාර්යයන්, {{total}} න් {{completed}} ක් සම්පූර්ණයි. වත්මන් කාර්යය: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "මෑතකදී භාවිතා කළ",
       "couldNotLoadGithubRepositories": "GitHub ගබඩා පූරණය කළ නොහැකි විය.",

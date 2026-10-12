@@ -2152,6 +2152,11 @@
       "collapse": "Kutista tavoite",
       "expand": "Laajenna tavoite"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tehtävät, {{completed}}/{{total}} valmiina",
+      "rowAccessibility": "Tehtävät, {{completed}}/{{total}} valmiina. Nykyinen tehtävä: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Äskettäin käytetyt",
       "couldNotLoadGithubRepositories": "GitHub-repositorioiden lataus epäonnistui.",

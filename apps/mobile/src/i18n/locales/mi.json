@@ -2152,6 +2152,11 @@
       "collapse": "Whakaitihia te whāinga",
       "expand": "Whakawhānuitia te whāinga"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Ngā mahi, {{completed}} o {{total}} kua oti",
+      "rowAccessibility": "Ngā mahi, {{completed}} o {{total}} kua oti. Mahi o nāianei: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Ngā mea i whakamahia tata nei",
       "couldNotLoadGithubRepositories": "Kāore i taea te uta i ngā putunga waehere GitHub.",

@@ -2180,6 +2180,11 @@
       "collapse": "Sakļaut mērķi",
       "expand": "Izvērst mērķi"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Uzdevumi, {{completed}} no {{total}} izpildīti",
+      "rowAccessibility": "Uzdevumi, {{completed}} no {{total}} izpildīti. Pašreizējais uzdevums: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nesen lietotie",
       "couldNotLoadGithubRepositories": "Neizdevās ielādēt GitHub repozitorijus.",

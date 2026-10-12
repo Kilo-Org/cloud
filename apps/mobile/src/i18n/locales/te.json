@@ -2152,6 +2152,11 @@
       "collapse": "లక్ష్యాన్ని కుదించండి",
       "expand": "లక్ష్యాన్ని విస్తరించండి"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "టాస్క్లు, {{total}}లో {{completed}} పూర్తయ్యాయి",
+      "rowAccessibility": "టాస్క్లు, {{total}}లో {{completed}} పూర్తయ్యాయి. ప్రస్తుత టాస్క్: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "ఇటీవల ఉపయోగించినవి",
       "couldNotLoadGithubRepositories": "GitHub రిపోజిటరీలను లోడ్ చేయలేకపోయాము.",

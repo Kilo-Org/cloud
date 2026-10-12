@@ -2152,6 +2152,11 @@
       "collapse": "ย่อเป้าหมาย",
       "expand": "ขยายเป้าหมาย"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "งาน เสร็จแล้ว {{completed}} จาก {{total}}",
+      "rowAccessibility": "งาน เสร็จแล้ว {{completed}} จาก {{total}} งานปัจจุบัน: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "ที่ใช้ล่าสุด",
       "couldNotLoadGithubRepositories": "ไม่สามารถโหลดคลังโค้ดจาก GitHub ได้",

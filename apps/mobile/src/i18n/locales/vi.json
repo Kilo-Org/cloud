@@ -1641,6 +1641,11 @@
       "collapse": "Thu gọn mục tiêu",
       "expand": "Mở rộng mục tiêu"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Nhiệm vụ, đã xong {{completed}} trên {{total}}",
+      "rowAccessibility": "Nhiệm vụ, đã xong {{completed}} trên {{total}}. Nhiệm vụ hiện tại: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Đã dùng gần đây",
       "couldNotLoadGithubRepositories": "Không thể tải danh sách kho mã GitHub.",

@@ -2152,6 +2152,11 @@
       "collapse": "Fella markmið saman",
       "expand": "Fella markmið út"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Verkefni, {{completed}} af {{total}} lokið",
+      "rowAccessibility": "Verkefni, {{completed}} af {{total}} lokið. Núverandi verkefni: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nýlega notað",
       "couldNotLoadGithubRepositories": "Ekki tókst að hlaða kóðasöfnum frá GitHub.",

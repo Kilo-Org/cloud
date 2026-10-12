@@ -2152,6 +2152,11 @@
       "collapse": "Zoo ebumnuche",
       "expand": "Gosi ebumnuche"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Ebumnuche, emechara {{completed}} n'ime {{total}}",
+      "rowAccessibility": "Ebumnuche, emechara {{completed}} n'ime {{total}}. Ebumnuche ugbu a: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Ndị e ji mee ihe nso nso a",
       "couldNotLoadGithubRepositories": "Enweghị ike ibudata ebe nchekwa koodu GitHub.",

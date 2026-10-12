@@ -2152,6 +2152,11 @@
       "collapse": "இலக்கைச் சுருக்கவும்",
       "expand": "இலக்கை விரிக்கவும்"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "பணிகள், {{total}} இல் {{completed}} முடிந்தது",
+      "rowAccessibility": "பணிகள், {{total}} இல் {{completed}} முடிந்தது. தற்போதைய பணி: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "சமீபத்தில் பயன்படுத்தியவை",
       "couldNotLoadGithubRepositories": "GitHub களஞ்சியங்களை ஏற்ற முடியவில்லை.",

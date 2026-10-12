@@ -2152,6 +2152,11 @@
       "collapse": "Ծալել նպատակը",
       "expand": "Բացել նպատակը"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Առաջադրանքներ՝ {{total}}-ից {{completed}}-ը ավարտված է",
+      "rowAccessibility": "Առաջադրանքներ՝ {{total}}-ից {{completed}}-ը ավարտված է։ Ընթացիկ առաջադրանքը՝ {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Վերջերս օգտագործված",
       "couldNotLoadGithubRepositories": "Չհաջողվեց բեռնել GitHub-ի պահոցները։",

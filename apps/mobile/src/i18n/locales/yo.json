@@ -2152,6 +2152,11 @@
       "collapse": "Fi àfojúsùn pamọ́",
       "expand": "Fi àfojúsùn hàn"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Àwọn iṣẹ́, {{completed}} nínú {{total}} ti parí",
+      "rowAccessibility": "Àwọn iṣẹ́, {{completed}} nínú {{total}} ti parí. Iṣẹ́ lọ́wọ́lọ́wọ́: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Tí a lò láìpẹ́",
       "couldNotLoadGithubRepositories": "A kò lè gbé àwọn ibi ìpamọ́ kóòdù GitHub wọlé.",

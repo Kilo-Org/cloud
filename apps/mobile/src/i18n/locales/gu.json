@@ -2152,6 +2152,11 @@
       "collapse": "ધ્યેય છુપાવો",
       "expand": "ધ્યેય બતાવો"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "કાર્યો, {{total}}માંથી {{completed}} પૂર્ણ",
+      "rowAccessibility": "કાર્યો, {{total}}માંથી {{completed}} પૂર્ણ. વર્તમાન કાર્ય: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું",
       "couldNotLoadGithubRepositories": "GitHub રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં.",

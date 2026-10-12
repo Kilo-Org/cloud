@@ -1641,6 +1641,11 @@
       "collapse": "Ciutkan tujuan",
       "expand": "Bentangkan tujuan"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tugas, {{completed}} dari {{total}} selesai",
+      "rowAccessibility": "Tugas, {{completed}} dari {{total}} selesai. Tugas saat ini: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Terakhir digunakan",
       "couldNotLoadGithubRepositories": "Tidak dapat memuat repositori GitHub.",

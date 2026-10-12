@@ -10089,7 +10089,11 @@ export const user_activity_tokens = pgTable(
     token: text().notNull(),
     kind: text()
       .$type<
-        'ios_push_to_start' | 'ios_activity' | 'ios_session_activity' | 'ios_widget' | 'android_ongoing'
+        | 'ios_push_to_start'
+        | 'ios_activity'
+        | 'ios_session_activity'
+        | 'ios_widget'
+        | 'android_ongoing'
       >()
       .notNull(),
     platform: text().$type<'ios' | 'android'>().notNull(),

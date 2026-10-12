@@ -143,8 +143,7 @@ export function planSessionCardSend(params: {
       updatedAt,
       // Keep the shown timer when the row carries no status time and the kind
       // did not change; a fresh time on every build would restart it.
-      statusSinceFallback:
-        previous?.statusKind === statusKind ? previous.statusSince : updatedAt,
+      statusSinceFallback: previous?.statusKind === statusKind ? previous.statusSince : updatedAt,
     }
   );
   if (statusKind === 'idle') {
@@ -191,7 +190,8 @@ export async function deliverSessionCards(
   deps: SessionCardDeliveryDeps
 ): Promise<void> {
   const tokens = await deps.listIosSessionActivityTokens(params.userId, params.organizationId);
-  const memory = (await deps.sessionCardMemory?.list()) ?? new Map();
+  const memory =
+    (await deps.sessionCardMemory?.list()) ?? new Map<string, SessionLiveActivityContentState>();
   const live = new Set(tokens.map(({ token }) => token));
   const forgotten = [...memory.keys()].filter(token => !live.has(token));
   if (forgotten.length > 0) await deps.sessionCardMemory?.delete(forgotten);

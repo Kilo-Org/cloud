@@ -30,7 +30,12 @@ describe('sessionLiveActivityTitle', () => {
 describe('buildSessionLiveActivityContentState', () => {
   it('keeps the approval key only for a permission wait', () => {
     const permission = buildSessionLiveActivityContentState(
-      { id: 'ses_1', title: 'Deploy', status: 'permission', statusUpdatedAt: '2026-10-12 09:30:00+00' },
+      {
+        id: 'ses_1',
+        title: 'Deploy',
+        status: 'permission',
+        statusUpdatedAt: '2026-10-12 09:30:00+00',
+      },
       options
     );
     expect(permission).toEqual({
@@ -75,7 +80,9 @@ describe('buildSessionLiveActivityContentState', () => {
 
 describe('sessionLiveActivityRelevance', () => {
   it('orders needs input over work over finished', () => {
-    expect(sessionLiveActivityRelevance('needsInput')).toBe(LIVE_ACTIVITY_RELEVANCE.sessionNeedsInput);
+    expect(sessionLiveActivityRelevance('needsInput')).toBe(
+      LIVE_ACTIVITY_RELEVANCE.sessionNeedsInput
+    );
     expect(sessionLiveActivityRelevance('running')).toBe(LIVE_ACTIVITY_RELEVANCE.sessionActive);
     expect(sessionLiveActivityRelevance('scheduled')).toBe(LIVE_ACTIVITY_RELEVANCE.sessionActive);
     expect(sessionLiveActivityRelevance('idle')).toBe(LIVE_ACTIVITY_RELEVANCE.sessionIdle);

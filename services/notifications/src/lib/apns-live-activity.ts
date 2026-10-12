@@ -142,7 +142,9 @@ export function buildLiveActivityApnsRequest(
           ? { 'stale-date': params.staleDateSeconds }
           : {}),
         ...(params.event === 'end' ? { 'dismissal-date': params.dismissalDateSeconds } : {}),
-        ...(params.relevanceScore !== undefined ? { 'relevance-score': params.relevanceScore } : {}),
+        ...(params.relevanceScore !== undefined
+          ? { 'relevance-score': params.relevanceScore }
+          : {}),
       },
     }),
   };

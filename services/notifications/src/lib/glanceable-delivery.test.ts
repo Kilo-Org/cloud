@@ -219,7 +219,13 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
                 matches('user_id', row.userId ?? 'usr_1') &&
                 matches('organization_id', row.organizationId ?? null)
             )
-            .map(([token, row]) => [token, row.sessionId ?? null, row.kind, row.id, row.updated_at]),
+            .map(([token, row]) => [
+              token,
+              row.sessionId ?? null,
+              row.kind,
+              row.id,
+              row.updated_at,
+            ]),
         };
       }
       if (sql.includes('from "user_activity_tokens"')) {

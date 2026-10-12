@@ -82,16 +82,19 @@ describe('planSessionCardSend', () => {
   });
 
   it('skips a push that does not change what the card shows', () => {
-    const previous = { ...shown(source({ status: 'busy' })), updatedAt: '2026-10-12T09:59:00.000Z' };
+    const previous = {
+      ...shown(source({ status: 'busy' })),
+      updatedAt: '2026-10-12T09:59:00.000Z',
+    };
     expect(plan(source({ status: 'busy' }), previous)).toBeNull();
   });
 
   it('keeps the shown timer when the row has no status time and the kind holds', () => {
     const previous = shown(source({ status: 'busy' }));
     expect(plan(source({ status: 'busy', statusUpdatedAt: null }), previous)).toBeNull();
-    expect(plan(source({ status: 'question', statusUpdatedAt: null }), previous)?.content).toMatchObject(
-      { statusSince: updatedAt }
-    );
+    expect(
+      plan(source({ status: 'question', statusUpdatedAt: null }), previous)?.content
+    ).toMatchObject({ statusSince: updatedAt });
   });
 
   it('ends a finished session with the Finished content and a 15 minute dismissal', () => {
@@ -115,7 +118,11 @@ describe('planSessionCardSend', () => {
   it('ends a deleted or out-of-scope session at once', () => {
     const previous = shown(source({ status: 'busy' }));
     const gone = plan({ sessionId: 'ses_1', row: null }, previous);
-    expect(gone?.send).toMatchObject({ event: 'end', priority: 10, dismissalDateSeconds: nowSeconds });
+    expect(gone?.send).toMatchObject({
+      event: 'end',
+      priority: 10,
+      dismissalDateSeconds: nowSeconds,
+    });
     expect(gone?.content).toEqual(previous);
   });
 });
@@ -185,7 +192,9 @@ describe('deliverSessionCards', () => {
       { token: 'b', sessionId: 'ses_2' },
     ]);
     await deliver(deps, 'end_all');
-    expect(sends.map(({ token, event, dismissalDateSeconds }) => [token, event, dismissalDateSeconds])).toEqual([
+    expect(
+      sends.map(({ token, event, dismissalDateSeconds }) => [token, event, dismissalDateSeconds])
+    ).toEqual([
       ['a', 'end', nowSeconds],
       ['b', 'end', nowSeconds],
     ]);

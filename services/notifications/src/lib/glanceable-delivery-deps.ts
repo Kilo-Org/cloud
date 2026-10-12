@@ -109,7 +109,9 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
         ...(liveActivity?.success && liveActivity.data.type === 'active_agents_glanceable'
           ? { liveActivitySnapshot: liveActivity.data }
           : {}),
-        ...(extras.data.sessionCards === undefined ? {} : { sessionCards: extras.data.sessionCards }),
+        ...(extras.data.sessionCards === undefined
+          ? {}
+          : { sessionCards: extras.data.sessionCards }),
       };
     },
     listIosSessionActivityTokens: async (userId, organizationId) => {

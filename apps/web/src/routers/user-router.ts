@@ -1390,16 +1390,24 @@ export const userRouter = createTRPCRouter({
       z
         .object({
           token: z.string().min(1),
-          kind: z.enum(['ios_push_to_start', 'ios_activity', 'ios_session_activity', 'android_ongoing']),
+          kind: z.enum([
+            'ios_push_to_start',
+            'ios_activity',
+            'ios_session_activity',
+            'android_ongoing',
+          ]),
           platform: z.enum(['ios', 'android']),
           organizationId: z.string().min(1).nullable(),
           /** The followed session; required for `ios_session_activity`, rejected for every other kind. */
           sessionId: z.string().min(1).optional(),
         })
-        .refine(input => (input.kind === 'ios_session_activity') === (input.sessionId !== undefined), {
-          message: 'sessionId is required for a session card and rejected for every other kind',
-          path: ['sessionId'],
-        })
+        .refine(
+          input => (input.kind === 'ios_session_activity') === (input.sessionId !== undefined),
+          {
+            message: 'sessionId is required for a session card and rejected for every other kind',
+            path: ['sessionId'],
+          }
+        )
     )
     .mutation(async ({ ctx, input }) => {
       const sessionId = input.kind === 'ios_session_activity' ? (input.sessionId ?? null) : null;

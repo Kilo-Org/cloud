@@ -1769,9 +1769,7 @@ describe('user router - register activity token', () => {
       await db
         .delete(organization_memberships)
         .where(eq(organization_memberships.kilo_user_id, tokenUser.id));
-      await db
-        .delete(organizations)
-        .where(eq(organizations.created_by_kilo_user_id, tokenUser.id));
+      await db.delete(organizations).where(eq(organizations.created_by_kilo_user_id, tokenUser.id));
     });
 
     it('requires sessionId for a session card and rejects it for every other kind', async () => {

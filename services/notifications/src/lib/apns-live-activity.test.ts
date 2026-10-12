@@ -116,9 +116,9 @@ describe('buildLiveActivityApnsRequest', () => {
 describe('sendLiveActivityApns session card options', () => {
   it('uses the caller dismissal date on an end and rejects a start without an alert', async () => {
     const privateKeyPem = await generateTestPrivateKeyPem();
-    const requests: { url: string; body: { aps: Record<string, unknown> } }[] = [];
+    const requests: { url: string; body: unknown }[] = [];
     const fetchFn = vi.fn(async (url: string, init: RequestInit) => {
-      requests.push({ url, body: JSON.parse(String(init.body)) as { aps: Record<string, unknown> } });
+      requests.push({ url, body: typeof init.body === 'string' ? JSON.parse(init.body) : null });
       return new Response(null, { status: 200 });
     });
 
@@ -137,10 +137,8 @@ describe('sendLiveActivityApns session card options', () => {
 
     expect(result).toEqual({ attempted: 2, ok: 1, failed: 1 });
     expect(requests).toHaveLength(1);
-    expect(requests[0].body.aps).toMatchObject({
-      event: 'end',
-      'dismissal-date': 1_750_000_900,
-      'relevance-score': 20,
+    expect(requests[0].body).toMatchObject({
+      aps: { event: 'end', 'dismissal-date': 1_750_000_900, 'relevance-score': 20 },
     });
   });
 });

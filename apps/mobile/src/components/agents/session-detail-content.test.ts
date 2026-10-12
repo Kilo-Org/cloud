@@ -3452,7 +3452,7 @@ describe('SessionDetailContent goal visibility', () => {
     expect(withGoal.renderer.root.findAllByType('SessionTasksRow' as ElementType)).toHaveLength(0);
     withGoal.renderer.unmount();
 
-    goalMountOptions = { goal: null, resolvedType: 'remote' };
+    goalMountOptions = { resolvedType: 'remote' };
     const withoutGoal = await mountDetails([todoMessage], { displayScope: PERSONAL_DISPLAY_SCOPE });
     expect(
       withoutGoal.renderer.root.findByType('SessionTasksRow' as ElementType).props.summary

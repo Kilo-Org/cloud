@@ -189,8 +189,10 @@ its turn, or when the user loses access to the session.
    card with the "Finished" content and dismiss it from the Lock Screen
    after 15 minutes. A tap that opens the session MUST dismiss it at once.
 2. When the session's status kind becomes `failed`, the system MUST keep
-   the card visible with the stop reason until the user opens the session
-   or unfollows. It MUST NOT dismiss a failed card on a timer.
+   the card visible with the stop reason, and dismiss it from the Lock
+   Screen after the same 15 minutes. A `failed` card MUST NOT dismiss
+   because the user merely looked at it: only opening the session or
+   unfollowing ends it sooner.
 3. When the session is deleted, or the user loses access to it, the
    system MUST end the card immediately with no content.
 4. Sign-out, an account change, an organization switch that leaves the

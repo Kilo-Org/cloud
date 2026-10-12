@@ -10088,12 +10088,17 @@ export const user_activity_tokens = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     token: text().notNull(),
     kind: text()
-      .$type<'ios_push_to_start' | 'ios_activity' | 'ios_widget' | 'android_ongoing'>()
+      .$type<
+        'ios_push_to_start' | 'ios_activity' | 'ios_session_activity' | 'ios_widget' | 'android_ongoing'
+      >()
       .notNull(),
     platform: text().$type<'ios' | 'android'>().notNull(),
     // Null means the personal surface. Server-only lookup key; never sent in a
     // glanceable payload.
     organization_id: text(),
+    // The followed session of an `ios_session_activity` card; null for every
+    // other kind. Server-only lookup key; never sent in an aggregate payload.
+    session_id: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -10113,6 +10118,12 @@ export const user_activity_tokens = pgTable(
       .concurrently()
       .where(sql`${table.kind} = 'ios_activity' AND ${table.superseded_at} IS NULL`),
     index('IDX_user_activity_tokens_user_org').on(table.user_id, table.organization_id),
+    // Live session cards of one user, read by the aggregate exclusion and the
+    // session card delivery.
+    index('IDX_user_activity_tokens_live_session')
+      .on(table.user_id, table.session_id)
+      .concurrently()
+      .where(sql`${table.kind} = 'ios_session_activity' AND ${table.superseded_at} IS NULL`),
   ]
 );
 

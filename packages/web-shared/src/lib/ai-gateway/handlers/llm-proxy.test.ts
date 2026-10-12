@@ -86,6 +86,13 @@ jest.mock('@kilocode/web-shared/lib/creditTransactions', () => ({
   })),
 }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-model-lists', () => ({
+  readGatewayModelList: jest.fn(async (list: string) =>
+    list === 'unavailable_models'
+      ? ['google/gemma-4-31b-it:free', 'thinkingmachines/inkling:free']
+      : []
+  ),
+}));
 jest.mock('@kilocode/web-shared/lib/free-model-rate-limiter');
 jest.mock(
   '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server',

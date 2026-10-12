@@ -6,8 +6,6 @@ import {
   GatewayModelListConfigSchema,
   type GatewayModelListConfig,
 } from '@kilocode/db/schema-types';
-import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
-import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import type { GatewayModelList } from '@/routers/admin/gateway-model-lists-router';
@@ -71,18 +69,9 @@ describe('adminGatewayModelListsRouter', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('returns the currently served preferred models when unset', async () => {
+  it.each(lists)('returns no stored config for %s when unset', async list => {
     const caller = await createCallerForUser(admin.id);
-    await expect(caller.admin.gatewayModelLists.get({ list: 'preferred_models' })).resolves.toEqual(
-      { config: null, current: await getPreferredModels() }
-    );
-  });
-
-  it('returns the hardcoded unavailable models when unset', async () => {
-    const caller = await createCallerForUser(admin.id);
-    const result = await caller.admin.gatewayModelLists.get({ list: 'unavailable_models' });
-    expect(result).toEqual({ config: null, current: getUnavailableModelIds() });
-    expect(result.current.length).toBeGreaterThan(0);
+    await expect(caller.admin.gatewayModelLists.get({ list })).resolves.toEqual({ config: null });
   });
 
   it.each(lists)(

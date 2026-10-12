@@ -1,23 +1,17 @@
+import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
+import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
-  AUTO_FREE_FALLBACK_MODEL,
-  getConfiguredAutoFreeModels,
-} from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
-import {
-  buildMonitoredModels,
-  buildPreferredModels,
-} from '@kilocode/web-shared/lib/ai-gateway/models';
+  GATEWAY_MODEL_LIST_CACHE_TTL_MS,
+  readGatewayModelList,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-model-lists';
 
-async function getPreferredFreeModels(): Promise<string[]> {
-  const autoFreeModels = await getConfiguredAutoFreeModels();
-  return (autoFreeModels ?? [])
-    .map(({ model }) => model)
-    .filter(model => model !== AUTO_FREE_FALLBACK_MODEL.model);
-}
+export const getPreferredModels: () => Promise<ReadonlyArray<string>> = createCachedFetch(
+  () => readGatewayModelList('preferred_models'),
+  GATEWAY_MODEL_LIST_CACHE_TTL_MS,
+  []
+);
 
-export async function getPreferredModels(): Promise<string[]> {
-  return buildPreferredModels(await getPreferredFreeModels());
-}
-
+/** The concrete models in the preferred list; auto models route elsewhere and are not monitored. */
 export async function getMonitoredModels(): Promise<string[]> {
-  return buildMonitoredModels(await getPreferredFreeModels());
+  return (await getPreferredModels()).filter(model => !isKiloAutoModel(model));
 }

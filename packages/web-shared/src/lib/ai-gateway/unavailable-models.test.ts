@@ -1,30 +1,62 @@
-import { describe, expect, test } from '@jest/globals';
+import { beforeAll, describe, expect, test } from '@jest/globals';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { ai_gateway_config } from '@kilocode/db/schema';
 import {
   familyHasUnavailableFreeModel,
+  getUnavailableModelIds,
   isUnavailableModel,
 } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 
+beforeAll(async () => {
+  await cleanupDbForTest();
+  await db.insert(ai_gateway_config).values({
+    unavailable_models: {
+      models: ['apodex/apodex-1.1-mini:free', 'google/gemma-4-31b-it:free', 'qwen/qwen3.8-27b'],
+    },
+  });
+});
+
 describe('unavailable models', () => {
-  test('keeps exact matching for request rejection', () => {
-    expect(isUnavailableModel('apodex/apodex-1.1-mini:free')).toBe(true);
-    expect(isUnavailableModel('apodex/apodex-1.1-mini')).toBe(false);
-    expect(isUnavailableModel('google/gemma-4-26b-a4b-it:free')).toBe(true);
-    expect(isUnavailableModel('google/gemma-4-31b-it:free')).toBe(true);
-    expect(isUnavailableModel('google/gemma-4-31b-it')).toBe(false);
-    expect(isUnavailableModel('qwen/qwen3.8-27b:free')).toBe(true);
-    expect(isUnavailableModel('qwen/qwen3.8-27b')).toBe(false);
-    expect(isUnavailableModel('openai/gpt-oss-20b:free')).toBe(false);
+  test('combines the stored list with the hardcoded gemma free model', async () => {
+    expect([...(await getUnavailableModelIds())]).toEqual([
+      'google/gemma-4-26b-a4b-it:free',
+      'apodex/apodex-1.1-mini:free',
+      'google/gemma-4-31b-it:free',
+      'qwen/qwen3.8-27b',
+    ]);
   });
 
-  test('matches normalized families for provider metadata', () => {
-    expect(familyHasUnavailableFreeModel('apodex/apodex-1.1-mini:free')).toBe(true);
-    expect(familyHasUnavailableFreeModel('apodex/apodex-1.1-mini')).toBe(true);
-    expect(familyHasUnavailableFreeModel('google/gemma-4-26b-a4b-it:free')).toBe(true);
-    expect(familyHasUnavailableFreeModel('google/gemma-4-26b-a4b-it')).toBe(true);
-    expect(familyHasUnavailableFreeModel('google/gemma-4-31b-it:free')).toBe(true);
-    expect(familyHasUnavailableFreeModel('google/gemma-4-31b-it')).toBe(true);
-    expect(familyHasUnavailableFreeModel('qwen/qwen3.8-27b:free')).toBe(true);
-    expect(familyHasUnavailableFreeModel('qwen/qwen3.8-27b')).toBe(true);
-    expect(familyHasUnavailableFreeModel('cohere/north-mini-code')).toBe(false);
+  test('keeps exact matching for request rejection', async () => {
+    expect(await isUnavailableModel('apodex/apodex-1.1-mini:free')).toBe(true);
+    expect(await isUnavailableModel('apodex/apodex-1.1-mini')).toBe(false);
+    expect(await isUnavailableModel('google/gemma-4-26b-a4b-it:free')).toBe(true);
+    expect(await isUnavailableModel('google/gemma-4-26b-a4b-it')).toBe(false);
+    expect(await isUnavailableModel('google/gemma-4-31b-it:free')).toBe(true);
+    expect(await isUnavailableModel('google/gemma-4-31b-it')).toBe(false);
+    expect(await isUnavailableModel('openai/gpt-oss-20b:free')).toBe(false);
   });
+});
+
+describe('familyHasUnavailableFreeModel', () => {
+  const unavailableModelIds = new Set([
+    'apodex/apodex-1.1-mini:free',
+    'google/gemma-4-31b-it:free',
+    'qwen/qwen3.8-27b',
+  ]);
+
+  test.each([
+    'apodex/apodex-1.1-mini:free',
+    'apodex/apodex-1.1-mini',
+    'google/gemma-4-31b-it:free',
+    'google/gemma-4-31b-it',
+  ])('matches the normalized family of %s', modelId => {
+    expect(familyHasUnavailableFreeModel(unavailableModelIds, modelId)).toBe(true);
+  });
+
+  test.each(['qwen/qwen3.8-27b', 'qwen/qwen3.8-27b:free', 'cohere/north-mini-code'])(
+    'does not match %s, which has no unavailable free model',
+    modelId => {
+      expect(familyHasUnavailableFreeModel(unavailableModelIds, modelId)).toBe(false);
+    }
+  );
 });

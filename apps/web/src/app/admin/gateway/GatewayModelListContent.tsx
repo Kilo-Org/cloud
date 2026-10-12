@@ -27,7 +27,6 @@ type GatewayModelListContentProps = {
   list: GatewayModelList;
   title: string;
   description: ReactNode;
-  currentLabel: string;
   ordered: boolean;
 };
 
@@ -46,7 +45,6 @@ export function GatewayModelListContent({
   list,
   title,
   description,
-  currentLabel,
   ordered,
 }: GatewayModelListContentProps) {
   const trpc = useTRPC();
@@ -54,7 +52,7 @@ export function GatewayModelListContent({
   const { data, isLoading } = useQuery(trpc.admin.gatewayModelLists.get.queryOptions({ list }));
   const catalogQuery = useQuery(trpc.models.list.queryOptions());
 
-  const savedModels = useMemo(() => data?.config?.models ?? data?.current ?? [], [data]);
+  const savedModels = useMemo(() => data?.config?.models ?? [], [data]);
   const [models, setModels] = useState<string[]>([]);
   const [customModelId, setCustomModelId] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -137,7 +135,9 @@ export function GatewayModelListContent({
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <p className="text-muted-foreground text-sm">
-            {hasStoredConfig ? 'Showing the stored list.' : `No list stored. ${currentLabel}`}
+            {hasStoredConfig
+              ? 'Showing the stored list. Changes take effect within one minute on warm instances.'
+              : 'No list stored. The gateway treats this as an empty list.'}
           </p>
 
           <Table>

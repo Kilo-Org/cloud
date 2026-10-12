@@ -1,27 +1,40 @@
+import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import {
+  GATEWAY_MODEL_LIST_CACHE_TTL_MS,
+  readGatewayModelList,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-model-lists';
 
-const unavailableModelIds: ReadonlySet<string> = new Set([
-  'apodex/apodex-1.1-mini:free',
-  'google/gemma-4-26b-a4b-it:free', // usable through kilo-auto
-  'google/gemma-4-31b-it:free',
-  'qwen/qwen3.8-27b:free',
-  'thinkingmachines/inkling:free',
-]);
+// Direct requests are rejected, but kilo-auto still routes to it.
+const HARDCODED_UNAVAILABLE_MODEL_IDS = [GEMMA_4_26B_A4B_IT_FREE_ID];
 
-export function isUnavailableModel(modelId: string): boolean {
-  return unavailableModelIds.has(modelId);
+const getConfiguredUnavailableModelIds = createCachedFetch(
+  () => readGatewayModelList('unavailable_models'),
+  GATEWAY_MODEL_LIST_CACHE_TTL_MS,
+  []
+);
+
+export async function getUnavailableModelIds(): Promise<ReadonlySet<string>> {
+  return new Set([
+    ...HARDCODED_UNAVAILABLE_MODEL_IDS,
+    ...(await getConfiguredUnavailableModelIds()),
+  ]);
 }
 
-export function getUnavailableModelIds(): string[] {
-  return [...unavailableModelIds];
+export async function isUnavailableModel(modelId: string): Promise<boolean> {
+  return (await getUnavailableModelIds()).has(modelId);
 }
 
 // Only free-model families gate free endpoints; non-free unavailable models
 // (e.g. region-restricted) must not suppress a family's free endpoints.
-const unavailableFreeModelFamilies: ReadonlySet<string> = new Set(
-  [...unavailableModelIds].filter(modelId => modelId.endsWith(':free')).map(normalizeModelId)
-);
-
-export function familyHasUnavailableFreeModel(modelId: string): boolean {
-  return unavailableFreeModelFamilies.has(normalizeModelId(modelId));
+export function familyHasUnavailableFreeModel(
+  unavailableModelIds: ReadonlySet<string>,
+  modelId: string
+): boolean {
+  const family = normalizeModelId(modelId);
+  return [...unavailableModelIds].some(
+    unavailableModelId =>
+      unavailableModelId.endsWith(':free') && normalizeModelId(unavailableModelId) === family
+  );
 }

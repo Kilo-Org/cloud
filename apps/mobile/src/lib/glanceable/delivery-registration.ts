@@ -23,6 +23,7 @@ import {
   _resetUnregisterSessionForTests,
   deleteActivityTokens,
   readUnregisterAuthToken,
+  unionTokens,
 } from './unregister-session';
 import { canRegisterActivityTokenKind } from './live-activity-switch';
 import {
@@ -293,9 +294,7 @@ const delivery: GlanceableDelivery = {
       await sessionScope;
       // Read the sets inside the FIFO so an already-running upsert is included.
       const records = [scopeTokens, activityTokens, sessionActivityTokens];
-      const tokens = [
-        ...new Set((includeScope ? records : [activityTokens]).flatMap(set => Array.from(set))),
-      ];
+      const tokens = unionTokens(includeScope ? records : [activityTokens]);
       // Without a session the delete can only answer 401: keep the tokens for an authorized cleanup.
       const authToken = tokens.length > 0 ? await readUnregisterAuthToken() : null;
       if (authToken === null) {

@@ -36,6 +36,17 @@ export function _resetUnregisterSessionForTests(): void {
   refusedToken = null;
 }
 
+/** Every token in the given record sets, once, in first-seen order. */
+export function unionTokens(records: readonly Set<string>[]): string[] {
+  const merged = new Set<string>();
+  for (const record of records) {
+    for (const token of record) {
+      merged.add(token);
+    }
+  }
+  return [...merged];
+}
+
 /**
  * Delete each token for the authenticated owner and drop every deleted token
  * from the given record sets. Returns the tokens whose delete failed, so the

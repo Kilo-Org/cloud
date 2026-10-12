@@ -194,7 +194,7 @@ export function releaseSessionActivity(activityId: string): string | null {
  * Stop observing every card: the scope is torn down and its tokens are deleted
  * with it. Returns every token the cards reported, registered or not.
  */
-export function releaseAllSessionActivities(): string[] {
+function releaseAllSessionActivities(): string[] {
   epoch += 1;
   const tokens: string[] = [];
   for (const registration of registrations.values()) {

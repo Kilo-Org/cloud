@@ -26,7 +26,7 @@ export async function readUnregisterAuthToken(): Promise<string | null> {
 }
 
 /** Blocks further deletes with `token` when the server refused its session. */
-export function noteUnregisterFailure(token: string, error: unknown): void {
+function noteUnregisterFailure(token: string, error: unknown): void {
   if (isUnauthorizedTrpcError(error)) {
     refusedToken = token;
   }

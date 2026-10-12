@@ -405,9 +405,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
  * layout is stored under. One factory serves every followed session; each
  * card's content state carries its session id.
  */
-export const SESSION_LIVE_ACTIVITY_NAME = 'SessionLiveActivity';
+const SESSION_LIVE_ACTIVITY_NAME = 'SessionLiveActivity';
 
-export const sessionLiveActivityLayout = layout;
 const registerLayout = () =>
   createLiveActivity<ContentState>(
     SESSION_LIVE_ACTIVITY_NAME,

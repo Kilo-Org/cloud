@@ -3356,6 +3356,9 @@
       "downloading": "Laster ned …",
       "downloadProgress": "Laster ned … {{percent}} %",
       "downloadFailed": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen og ledig lagringsplass, og prøv igjen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Denne modellen støtter resonneringsinnsats"
     }
   },
   "settingsTools": {

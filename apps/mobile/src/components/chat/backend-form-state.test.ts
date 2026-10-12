@@ -31,6 +31,7 @@ const fields: BackendFormFields = {
       maxOutputTokens: '',
       tools: false,
       images: false,
+      reasoning: false,
     },
   ],
 };

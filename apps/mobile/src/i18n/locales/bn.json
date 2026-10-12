@@ -3356,6 +3356,9 @@
       "downloading": "ডাউনলোড হচ্ছে…",
       "downloadProgress": "ডাউনলোড হচ্ছে… {{percent}}%",
       "downloadFailed": "ডাউনলোড শেষ হয়নি। আপনার কানেকশন ও খালি স্টোরেজ দেখে নিয়ে আবার চেষ্টা করুন।"
+    },
+    "reasoningEffort": {
+      "modelFlag": "এই মডেল চিন্তার মাত্রা সমর্থন করে"
     }
   },
   "settingsTools": {

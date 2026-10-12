@@ -3356,6 +3356,9 @@
       "downloading": "Đang tải xuống…",
       "downloadProgress": "Đang tải xuống… {{percent}}%",
       "downloadFailed": "Quá trình tải xuống chưa hoàn tất. Hãy kiểm tra kết nối và dung lượng trống, sau đó thử lại."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"
     }
   },
   "settingsTools": {

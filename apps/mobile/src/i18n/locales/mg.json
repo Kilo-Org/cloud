@@ -3356,6 +3356,9 @@
       "downloading": "Misintona…",
       "downloadProgress": "Misintona… {{percent}}%",
       "downloadFailed": "Tsy vita ny fisintonana. Hamarino ny fifandraisanao sy ny toerana malalaka amin'ny fitahirizana, dia andramo indray."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Manohana ezaka amin'ny fisainana ity modely ity"
     }
   },
   "settingsTools": {

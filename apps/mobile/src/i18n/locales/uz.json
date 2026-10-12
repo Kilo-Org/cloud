@@ -3356,6 +3356,9 @@
       "downloading": "Yuklab olinmoqda…",
       "downloadProgress": "Yuklab olinmoqda… {{percent}}%",
       "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"
     }
   },
   "settingsTools": {

@@ -3356,6 +3356,9 @@
       "downloading": "ښکته کېږي…",
       "downloadProgress": "ښکته کېږي… {{percent}}%",
       "downloadFailed": "ښکته کول بشپړ نه شول. خپل اتصال او خالي ځای وګورئ، بیا هڅه وکړئ."
+    },
+    "reasoningEffort": {
+      "modelFlag": "دا ماډل د فکر کچه ملاتړ کوي"
     }
   },
   "settingsTools": {

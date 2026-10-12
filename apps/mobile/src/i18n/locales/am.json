@@ -3356,6 +3356,9 @@
       "downloading": "በመውረድ ላይ…",
       "downloadProgress": "በመውረድ ላይ… {{percent}}%",
       "downloadFailed": "ማውረዱ አልተጠናቀቀም። ግንኙነትዎን እና ነፃ የማከማቻ ቦታዎን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"
+    },
+    "reasoningEffort": {
+      "modelFlag": "ይህ ሞዴል የማሰብ ጥረትን ይደግፋል"
     }
   },
   "settingsTools": {

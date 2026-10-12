@@ -3438,6 +3438,9 @@
       "downloading": "Stahování…",
       "downloadProgress": "Stahování… {{percent}} %",
       "downloadFailed": "Stahování se nedokončilo. Zkontrolujte připojení a volné místo v úložišti a zkuste to znovu."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tento model podporuje úroveň uvažování"
     }
   },
   "settingsTools": {

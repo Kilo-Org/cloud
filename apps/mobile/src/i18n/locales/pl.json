@@ -3438,6 +3438,9 @@
       "downloading": "Pobieranie…",
       "downloadProgress": "Pobieranie… {{percent}}%",
       "downloadFailed": "Pobieranie nie zostało ukończone. Sprawdź połączenie i wolne miejsce w pamięci, a potem spróbuj ponownie."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ten model obsługuje poziom rozumowania"
     }
   },
   "settingsTools": {

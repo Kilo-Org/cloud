@@ -3356,6 +3356,9 @@
       "downloading": "Ó ń gbà sílẹ̀…",
       "downloadProgress": "Ó ń gbà sílẹ̀… {{percent}}%",
       "downloadFailed": "Ìgbàsílẹ̀ náà kò parí. Ṣàyẹ̀wò ìsopọ̀ rẹ àti àyè ìpamọ́ tó ṣófo, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Awoṣe yìí ṣe àtìlẹ́yìn fún ìwọ̀n ìrònú"
     }
   },
   "settingsTools": {

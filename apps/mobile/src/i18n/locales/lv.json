@@ -3397,6 +3397,9 @@
       "downloading": "Notiek lejupielāde…",
       "downloadProgress": "Notiek lejupielāde… {{percent}}%",
       "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"
     }
   },
   "settingsTools": {

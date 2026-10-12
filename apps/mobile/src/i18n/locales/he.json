@@ -3397,6 +3397,9 @@
       "downloading": "מתבצעת הורדה…",
       "downloadProgress": "מתבצעת הורדה… {{percent}}%",
       "downloadFailed": "ההורדה לא הושלמה. יש לבדוק את החיבור לאינטרנט ואת שטח האחסון הפנוי, ולנסות שוב."
+    },
+    "reasoningEffort": {
+      "modelFlag": "המודל הזה תומך במאמץ חשיבה"
     }
   },
   "settingsTools": {

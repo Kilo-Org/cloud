@@ -3356,6 +3356,9 @@
       "downloading": "ڈاؤن لوڈ ہو رہا ہے…",
       "downloadProgress": "ڈاؤن لوڈ ہو رہا ہے… {{percent}}%",
       "downloadFailed": "ڈاؤن لوڈ مکمل نہیں ہوا۔ اپنا کنکشن اور خالی اسٹوریج چیک کریں، پھر دوبارہ کوشش کریں۔"
+    },
+    "reasoningEffort": {
+      "modelFlag": "یہ ماڈل غور کی سطح کو سپورٹ کرتا ہے"
     }
   },
   "settingsTools": {

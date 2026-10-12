@@ -3356,6 +3356,9 @@
       "downloading": "Kei te tikiake…",
       "downloadProgress": "Kei te tikiake… {{percent}}%",
       "downloadFailed": "Kāore i oti te tikiake. Tirohia tō hononga me te wāhi rokiroki wātea, kātahi ka ngana anō."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ka tautoko tēnei tauira i te kaha whakaaro"
     }
   },
   "settingsTools": {

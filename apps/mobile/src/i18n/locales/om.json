@@ -3356,6 +3356,9 @@
       "downloading": "Buufamaa jira…",
       "downloadProgress": "Buufamaa jira… {{percent}}%",
       "downloadFailed": "Buufachuun hin xumuramne. Walqunnamtii keessanii fi kuusaa duwwaa mirkaneessii irra deebi'ii yaali."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Moodeelli kun sadarkaa xiinxalaa ni deeggara"
     }
   },
   "settingsTools": {

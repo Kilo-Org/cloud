@@ -3356,6 +3356,9 @@
       "downloading": "Ana saukewa…",
       "downloadProgress": "Ana saukewa… {{percent}}%",
       "downloadFailed": "Saukewar ba ta kammala ba. Duba haɗin intanet ɗinka da sararin ajiya, sannan ka sake gwadawa."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Wannan samfurin yana goyon bayan matakin tunani"
     }
   },
   "settingsTools": {

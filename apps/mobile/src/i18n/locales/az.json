@@ -3356,6 +3356,9 @@
       "downloading": "Endirilir…",
       "downloadProgress": "Endirilir… {{percent}}%",
       "downloadFailed": "Endirmə tamamlanmadı. İnternet bağlantınızı və boş yaddaşı yoxlayın, sonra yenidən cəhd edin."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Bu model düşünmə səviyyəsini dəstəkləyir"
     }
   },
   "settingsTools": {

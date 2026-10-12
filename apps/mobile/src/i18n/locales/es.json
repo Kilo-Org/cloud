@@ -3397,6 +3397,9 @@
       "downloading": "Descargando…",
       "downloadProgress": "Descargando… {{percent}}%",
       "downloadFailed": "La descarga no se completó. Revisa tu conexión y el espacio libre, y vuelve a intentarlo."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Este modelo admite esfuerzo de razonamiento"
     }
   },
   "settingsTools": {

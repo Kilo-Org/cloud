@@ -3438,6 +3438,9 @@
       "downloading": "Prenašanje …",
       "downloadProgress": "Prenašanje … {{percent}} %",
       "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ta model podpira stopnjo razmišljanja"
     }
   },
   "settingsTools": {

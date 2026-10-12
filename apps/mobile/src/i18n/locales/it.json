@@ -3397,6 +3397,9 @@
       "downloading": "Download in corso…",
       "downloadProgress": "Download in corso… {{percent}}%",
       "downloadFailed": "Il download non è stato completato. Controlla la connessione e lo spazio libero, poi riprova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Questo modello supporta il livello di ragionamento"
     }
   },
   "settingsTools": {

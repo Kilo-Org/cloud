@@ -3356,6 +3356,9 @@
       "downloading": "බාගත වෙමින්…",
       "downloadProgress": "බාගත වෙමින්… {{percent}}%",
       "downloadFailed": "බාගැනීම සම්පූර්ණ නොවීය. ඔබගේ සම්බන්ධතාවය සහ නිදහස් ආචයනය පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+    },
+    "reasoningEffort": {
+      "modelFlag": "මෙම ආකෘතිය සිතීමේ මට්ටමට සහාය දක්වයි"
     }
   },
   "settingsTools": {

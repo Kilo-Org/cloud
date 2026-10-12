@@ -3356,6 +3356,9 @@
       "downloading": "در حال بارگیری…",
       "downloadProgress": "در حال بارگیری… {{percent}}%",
       "downloadFailed": "بارگیری کامل نشد. اتصال اینترنت و فضای خالی دستگاه را بررسی کنید و دوباره امتحان کنید."
+    },
+    "reasoningEffort": {
+      "modelFlag": "این مدل از میزان تفکر پشتیبانی می‌کند"
     }
   },
   "settingsTools": {

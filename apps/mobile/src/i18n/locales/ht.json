@@ -3356,6 +3356,9 @@
       "downloading": "Ap telechaje…",
       "downloadProgress": "Ap telechaje… {{percent}}%",
       "downloadFailed": "Telechajman an pa t fini. Verifye koneksyon w ak espas ki lib sou aparèy la, epi eseye ankò."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Modèl sa a sipòte efò refleksyon"
     }
   },
   "settingsTools": {

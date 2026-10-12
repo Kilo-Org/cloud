@@ -3356,6 +3356,9 @@
       "downloading": "다운로드 중…",
       "downloadProgress": "다운로드 중… {{percent}}%",
       "downloadFailed": "다운로드를 완료하지 못했습니다. 네트워크 연결과 저장 공간을 확인한 후 다시 시도하세요."
+    },
+    "reasoningEffort": {
+      "modelFlag": "이 모델은 추론 강도를 지원합니다"
     }
   },
   "settingsTools": {

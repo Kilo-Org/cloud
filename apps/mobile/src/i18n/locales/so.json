@@ -3356,6 +3356,9 @@
       "downloading": "Waa la soo dejinayaa…",
       "downloadProgress": "Waa la soo dejinayaa… {{percent}}%",
       "downloadFailed": "Soo dejintu ma dhammaan. Hubi xiriirkaaga iyo meesha bannaan ee kaydka, kadibna isku day mar kale."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Moodeelkani wuxuu taageeraa heerka fikirka"
     }
   },
   "settingsTools": {

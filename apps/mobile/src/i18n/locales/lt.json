@@ -3438,6 +3438,9 @@
       "downloading": "Atsisiunčiama…",
       "downloadProgress": "Atsisiunčiama… {{percent}}%",
       "downloadFailed": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir laisvą vietą saugykloje, tada bandykite dar kartą."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
     }
   },
   "settingsTools": {

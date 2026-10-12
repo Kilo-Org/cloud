@@ -3356,6 +3356,9 @@
       "downloading": "Жүктеп алынуда…",
       "downloadProgress": "Жүктеп алынуда… {{percent}}%",
       "downloadFailed": "Жүктеп алу аяқталмады. Интернет байланысын және бос жадты тексеріп, қайталап көріңіз."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Бұл модель ойлау деңгейін қолдайды"
     }
   },
   "settingsTools": {

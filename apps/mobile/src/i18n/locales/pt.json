@@ -3397,6 +3397,9 @@
       "downloading": "A descarregar…",
       "downloadProgress": "A descarregar… {{percent}}%",
       "downloadFailed": "A transferência não foi concluída. Verifique a ligação e o armazenamento livre e tente novamente."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Este modelo suporta esforço de raciocínio"
     }
   },
   "settingsTools": {

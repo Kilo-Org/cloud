@@ -3356,6 +3356,9 @@
       "downloading": "Po shkarkohet…",
       "downloadProgress": "Po shkarkohet… {{percent}}%",
       "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ky model mbështet nivelin e arsyetimit"
     }
   },
   "settingsTools": {

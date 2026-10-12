@@ -3356,6 +3356,9 @@
       "downloading": "Laai tans af…",
       "downloadProgress": "Laai tans af… {{percent}}%",
       "downloadFailed": "Die aflaai is nie voltooi nie. Kontroleer jou verbinding en vrye berging, en probeer dan weer."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Hierdie model ondersteun denkinspanning"
     }
   },
   "settingsTools": {

@@ -3356,6 +3356,9 @@
       "downloading": "下載中…",
       "downloadProgress": "下載中… {{percent}}%",
       "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。"
+    },
+    "reasoningEffort": {
+      "modelFlag": "此模型支援思考程度"
     }
   },
   "settingsTools": {

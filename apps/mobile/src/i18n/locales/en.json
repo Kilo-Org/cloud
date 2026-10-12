@@ -3356,6 +3356,9 @@
       "serverToolCount": "{{count}} tools",
       "serverUnreachable": "Couldn't reach this server",
       "serverOff": "This server is off"
+    },
+    "reasoningEffort": {
+      "modelFlag": "This model supports thinking effort"
     }
   },
   "settingsTools": {

@@ -255,7 +255,15 @@ describe('starting a chat from the list', () => {
         apiKind: 'chat_completions',
         apiKey: '',
         headers: {},
-        models: [{ id: 'custom-model', name: 'Custom model', tools: false, images: false }],
+        models: [
+          {
+            id: 'custom-model',
+            name: 'Custom model',
+            tools: false,
+            images: false,
+            reasoning: false,
+          },
+        ],
         allowLocalHttp: false,
       };
       state.backends = [backend];

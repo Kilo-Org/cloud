@@ -3356,6 +3356,9 @@
       "downloading": "Mengunduh…",
       "downloadProgress": "Mengunduh… {{percent}}%",
       "downloadFailed": "Unduhan tidak selesai. Periksa koneksi dan ruang penyimpanan Anda, lalu coba lagi."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Model ini mendukung tingkat penalaran"
     }
   },
   "settingsTools": {

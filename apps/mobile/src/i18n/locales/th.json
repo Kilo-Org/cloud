@@ -3356,6 +3356,9 @@
       "downloading": "กำลังดาวน์โหลด…",
       "downloadProgress": "กำลังดาวน์โหลด… {{percent}}%",
       "downloadFailed": "ดาวน์โหลดไม่สำเร็จ ตรวจสอบการเชื่อมต่อและพื้นที่ว่าง แล้วลองอีกครั้ง"
+    },
+    "reasoningEffort": {
+      "modelFlag": "โมเดลนี้รองรับระดับการใช้เหตุผล"
     }
   },
   "settingsTools": {

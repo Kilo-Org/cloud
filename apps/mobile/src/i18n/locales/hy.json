@@ -3356,6 +3356,9 @@
       "downloading": "Ներբեռնվում է…",
       "downloadProgress": "Ներբեռնվում է… {{percent}}%",
       "downloadFailed": "Ներբեռնումը չավարտվեց։ Ստուգեք կապը և ազատ հիշողությունը, ապա փորձեք կրկին։"
+    },
+    "reasoningEffort": {
+      "modelFlag": "Այս մոդելն աջակցում է մտածելու խորությունը"
     }
   },
   "settingsTools": {

@@ -3356,6 +3356,9 @@
       "downloading": "Ladataan…",
       "downloadProgress": "Ladataan… {{percent}} %",
       "downloadFailed": "Lataus ei valmistunut. Tarkista verkkoyhteys ja vapaa tallennustila ja yritä sitten uudelleen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tämä malli tukee päättelyn tasoa"
     }
   },
   "settingsTools": {

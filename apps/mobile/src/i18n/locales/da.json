@@ -3356,6 +3356,9 @@
       "downloading": "Downloader…",
       "downloadProgress": "Downloader… {{percent}}%",
       "downloadFailed": "Downloaden blev ikke fuldført. Tjek din forbindelse og ledig lagerplads, og prøv igen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Denne model understøtter ræsonnementsniveau"
     }
   },
   "settingsTools": {

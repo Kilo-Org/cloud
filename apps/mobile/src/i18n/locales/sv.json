@@ -3356,6 +3356,9 @@
       "downloading": "Laddar ned…",
       "downloadProgress": "Laddar ned… {{percent}} %",
       "downloadFailed": "Nedladdningen slutfördes inte. Kontrollera anslutningen och ledigt lagringsutrymme och försök sedan igen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Den här modellen stöder resonemangsnivå"
     }
   },
   "settingsTools": {

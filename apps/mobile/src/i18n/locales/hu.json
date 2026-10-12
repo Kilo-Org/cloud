@@ -3356,6 +3356,9 @@
       "downloading": "Letöltés…",
       "downloadProgress": "Letöltés… {{percent}}%",
       "downloadFailed": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot és a szabad tárhelyet, majd próbálja újra."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ez a modell támogatja a gondolkodás szintjét"
     }
   },
   "settingsTools": {

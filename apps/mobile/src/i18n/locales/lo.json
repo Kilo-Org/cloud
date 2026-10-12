@@ -3356,6 +3356,9 @@
       "downloading": "ກຳລັງດາວໂຫຼດ…",
       "downloadProgress": "ກຳລັງດາວໂຫຼດ… {{percent}}%",
       "downloadFailed": "ການດາວໂຫຼດບໍ່ສຳເລັດ. ກວດສອບການເຊື່ອມຕໍ່ ແລະ ພື້ນທີ່ຈັດເກັບທີ່ຫວ່າງ, ແລ້ວລອງໃໝ່."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ໂມເດວນີ້ຮອງຮັບລະດັບການຄິດ"
     }
   },
   "settingsTools": {

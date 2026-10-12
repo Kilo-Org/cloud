@@ -3479,6 +3479,9 @@
       "downloading": "Á híoslódáil…",
       "downloadProgress": "Á híoslódáil… {{percent}}%",
       "downloadFailed": "Níor críochnaíodh an íoslódáil. Seiceáil do nasc agus an spás stórála atá saor, agus bain triail eile as."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tacaíonn an tsamhail seo le leibhéal machnaimh"
     }
   },
   "settingsTools": {

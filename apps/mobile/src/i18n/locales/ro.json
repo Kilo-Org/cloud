@@ -3397,6 +3397,9 @@
       "downloading": "Se descarcă…",
       "downloadProgress": "Se descarcă… {{percent}}%",
       "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Acest model acceptă efort de raționament"
     }
   },
   "settingsTools": {

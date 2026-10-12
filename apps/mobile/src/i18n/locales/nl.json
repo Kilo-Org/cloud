@@ -3356,6 +3356,9 @@
       "downloading": "Downloaden…",
       "downloadProgress": "Downloaden… {{percent}}%",
       "downloadFailed": "Het downloaden is niet voltooid. Controleer je verbinding en vrije opslagruimte en probeer het opnieuw."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Dit model ondersteunt denkinspanning"
     }
   },
   "settingsTools": {

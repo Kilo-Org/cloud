@@ -3356,6 +3356,9 @@
       "downloading": "Wird heruntergeladen…",
       "downloadProgress": "Wird heruntergeladen… {{percent}} %",
       "downloadFailed": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und den freien Speicherplatz und versuche es dann erneut."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Dieses Modell unterstützt Denkaufwand"
     }
   },
   "settingsTools": {

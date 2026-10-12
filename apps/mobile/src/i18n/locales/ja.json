@@ -3356,6 +3356,9 @@
       "downloading": "ダウンロード中…",
       "downloadProgress": "ダウンロード中… {{percent}}%",
       "downloadFailed": "ダウンロードが完了しませんでした。接続と空き容量を確認してから、もう一度お試しください。"
+    },
+    "reasoningEffort": {
+      "modelFlag": "このモデルは思考量の指定に対応しています"
     }
   },
   "settingsTools": {

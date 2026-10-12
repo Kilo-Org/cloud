@@ -24,6 +24,7 @@ export type BackendModelFields = {
   maxOutputTokens: string;
   tools: boolean;
   images: boolean;
+  reasoning: boolean;
 };
 export type BackendFormFields = {
   name: string;
@@ -44,6 +45,7 @@ export function modelFields(model?: BackendModel): BackendModelFields {
     maxOutputTokens: model?.maxOutputTokens?.toString() ?? '',
     tools: model?.tools ?? false,
     images: model?.images ?? false,
+    reasoning: model?.reasoning ?? false,
   };
 }
 
@@ -65,6 +67,7 @@ export function backendDraftFromFields(
     name: model.name,
     tools: model.tools,
     images: model.images,
+    reasoning: model.reasoning,
     contextWindow: optionalTokenLimit(model.contextWindow),
     maxOutputTokens: optionalTokenLimit(model.maxOutputTokens),
   }));

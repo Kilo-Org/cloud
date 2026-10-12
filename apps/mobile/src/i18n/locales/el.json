@@ -3356,6 +3356,9 @@
       "downloading": "Λήψη…",
       "downloadProgress": "Λήψη… {{percent}}%",
       "downloadFailed": "Η λήψη δεν ολοκληρώθηκε. Ελέγξτε τη σύνδεσή σας και τον ελεύθερο χώρο αποθήκευσης και δοκιμάστε ξανά."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Αυτό το μοντέλο υποστηρίζει ένταση σκέψης"
     }
   },
   "settingsTools": {

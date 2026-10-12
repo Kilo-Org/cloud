@@ -3356,6 +3356,9 @@
       "downloading": "Се презема…",
       "downloadProgress": "Се презема… {{percent}}%",
       "downloadFailed": "Преземањето не заврши. Проверете ја врската и слободниот простор, па обидете се повторно."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Овој модел поддржува ниво на размислување"
     }
   },
   "settingsTools": {

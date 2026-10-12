@@ -3356,6 +3356,9 @@
       "downloading": "Inapakua…",
       "downloadProgress": "Inapakua… {{percent}}%",
       "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
     }
   },
   "settingsTools": {

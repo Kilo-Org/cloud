@@ -4,6 +4,7 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { type StoredChatBackend } from './backend-store';
 import { backendTargetId, decodeBackendTarget, decodeLocalTarget } from './backend-target';
+import { BACKEND_EFFORT_VARIANTS } from './effort';
 import { type LocalModelStatus } from './local-models';
 
 export function backendModelOptions(backends: readonly StoredChatBackend[]): SessionModelOption[] {
@@ -12,7 +13,7 @@ export function backendModelOptions(backends: readonly StoredChatBackend[]): Ses
       id: backendTargetId(backend, model.id),
       name: `${backend.name} · ${model.name}`,
       displayId: model.id,
-      variants: [],
+      variants: model.reasoning ? [...BACKEND_EFFORT_VARIANTS] : [],
       isPreferred: false,
       showGatewayMetadata: false,
       provider: { id: backend.id, name: backend.name },

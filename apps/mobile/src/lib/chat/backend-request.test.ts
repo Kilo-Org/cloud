@@ -26,7 +26,7 @@ const profile: ChatBackendDraft = {
   apiKind: 'chat_completions',
   apiKey: 'private-key',
   headers: { 'X-Custom': 'private-header' },
-  models: [{ id: 'manual-model', name: 'Manual', tools: false, images: false }],
+  models: [{ id: 'manual-model', name: 'Manual', tools: false, images: false, reasoning: false }],
   allowLocalHttp: false,
 };
 
@@ -80,11 +80,11 @@ describe('remote backend requests', () => {
     const signal = new AbortController().signal;
     const found = await discoverBackendModels(profile, signal, transport);
     expect(found).toEqual([
-      { id: 'found', name: 'found', tools: false, images: false },
-      { id: 'other', name: 'Other', tools: false, images: false },
+      { id: 'found', name: 'found', tools: false, images: false, reasoning: false },
+      { id: 'other', name: 'Other', tools: false, images: false, reasoning: false },
     ]);
     expect(profile.models).toEqual([
-      { id: 'manual-model', name: 'Manual', tools: false, images: false },
+      { id: 'manual-model', name: 'Manual', tools: false, images: false, reasoning: false },
     ]);
     expect(transport).toHaveBeenCalledWith(
       'https://remote.example/v1/models',

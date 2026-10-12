@@ -3356,6 +3356,9 @@
       "downloading": "डाउनलोड हो रहा है…",
       "downloadProgress": "डाउनलोड हो रहा है… {{percent}}%",
       "downloadFailed": "डाउनलोड पूरा नहीं हो सका। अपना कनेक्शन और खाली स्टोरेज जांचें, फिर से कोशिश करें।"
+    },
+    "reasoningEffort": {
+      "modelFlag": "यह मॉडल सोचने के स्तर का समर्थन करता है"
     }
   },
   "settingsTools": {

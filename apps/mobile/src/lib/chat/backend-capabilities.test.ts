@@ -35,8 +35,8 @@ const backend: StoredChatBackend = {
   apiKey: '',
   headers: {},
   models: [
-    { id: 'reads', name: 'Reads', tools: false, images: true },
-    { id: 'text', name: 'Text', tools: true, images: false },
+    { id: 'reads', name: 'Reads', tools: false, images: true, reasoning: false },
+    { id: 'text', name: 'Text', tools: true, images: false, reasoning: false },
   ],
   allowLocalHttp: false,
 };

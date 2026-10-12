@@ -3397,6 +3397,9 @@
       "downloading": "S'està baixant…",
       "downloadProgress": "S'està baixant… {{percent}}%",
       "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Aquest model admet l'esforç de raonament"
     }
   },
   "settingsTools": {

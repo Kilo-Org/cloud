@@ -3356,6 +3356,9 @@
       "downloading": "Allalaadimine…",
       "downloadProgress": "Allalaadimine… {{percent}}%",
       "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti."
+    },
+    "reasoningEffort": {
+      "modelFlag": "See mudel toetab mõtlemise põhjalikkust"
     }
   },
   "settingsTools": {

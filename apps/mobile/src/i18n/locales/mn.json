@@ -3356,6 +3356,9 @@
       "downloading": "Татаж байна…",
       "downloadProgress": "Татаж байна… {{percent}}%",
       "downloadFailed": "Татаж дуусгаж чадсангүй. Интернэт холболт болон сул санах ойгоо шалгаад дахин оролдоно уу."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Энэ загвар бодох түвшинг дэмждэг"
     }
   },
   "settingsTools": {

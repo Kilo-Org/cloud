@@ -3356,6 +3356,9 @@
       "downloading": "Nagda-download…",
       "downloadProgress": "Nagda-download… {{percent}}%",
       "downloadFailed": "Hindi natapos ang pag-download. Tingnan ang iyong koneksyon at bakanteng storage, pagkatapos ay subukang muli."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Sinusuportahan ng modelong ito ang antas ng pag-iisip"
     }
   },
   "settingsTools": {

@@ -171,7 +171,7 @@ it.each(['max_completion_tokens', 'max_tokens'] as const)(
       completionTokenField,
       apiKey: 'custom-key',
       headers: {},
-      models: [{ id: 'upstream', name: 'Upstream', tools: false, images: false }],
+      models: [{ id: 'upstream', name: 'Upstream', tools: false, images: false, reasoning: false }],
       allowLocalHttp: false,
     };
     const fetch = vi.fn<FetchLike>().mockResolvedValue({
@@ -276,7 +276,7 @@ it.each([
     apiKind: 'chat_completions',
     apiKey: '',
     headers: {},
-    models: [{ id: 'upstream', name: 'Upstream', tools: false, images }],
+    models: [{ id: 'upstream', name: 'Upstream', tools: false, images, reasoning: false }],
     allowLocalHttp: false,
   };
   const fetch = vi.fn<FetchLike>().mockResolvedValue({

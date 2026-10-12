@@ -3479,6 +3479,9 @@
       "downloading": "Qed jitniżżel…",
       "downloadProgress": "Qed jitniżżel… {{percent}}%",
       "downloadFailed": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni u l-ispazju ħieles, imbagħad erġa' pprova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"
     }
   },
   "settingsTools": {

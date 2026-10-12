@@ -2153,9 +2153,9 @@
       "expand": "Zabaldu helburua"
     },
     "tasks": {
-      "progress": "\"{{completed}}/{{total}}\"",
-      "progressAccessibility": "\"Zereginak, {{total}} zereginetatik {{completed}} eginda\"",
-      "rowAccessibility": "\"Zereginak, {{total}} zereginetatik {{completed}} eginda. Uneko zeregina: {{task}}\""
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Zereginak, {{total}} zereginetatik {{completed}} eginda",
+      "rowAccessibility": "Zereginak, {{total}} zereginetatik {{completed}} eginda. Uneko zeregina: {{task}}"
     },
     "newSession": {
       "recentlyUsed": "Duela gutxi erabiliak",

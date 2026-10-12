@@ -155,6 +155,7 @@ export async function runControlPlaneSmoke(
   await mkdir(home, { recursive: true });
 
   let hello: ControlPlaneSmokeHello | undefined;
+  let helloError: Error | undefined;
   let connected = false;
   let authenticated = false;
   const sockets = new Set<Bun.ServerWebSocket<undefined>>();
@@ -181,7 +182,12 @@ export async function runControlPlaneSmoke(
         }
         if (frame.type === 'hello') {
           if (!hello) {
-            hello = validateSmokeHello(frame, options);
+            try {
+              hello = validateSmokeHello(frame, options);
+            } catch (error) {
+              helloError = error instanceof Error ? error : new Error(String(error));
+              return;
+            }
             socket.send(JSON.stringify(smokeWelcomeFrame(options.protocolVersion)));
           }
           return;
@@ -206,9 +212,10 @@ export async function runControlPlaneSmoke(
       stderr: 'pipe',
     });
 
-    while (!connected && proc.exitCode === null && remaining() > 0) {
+    while (!connected && !helloError && proc.exitCode === null && remaining() > 0) {
       await Bun.sleep(20);
     }
+    if (helloError) throw helloError;
     if (!connected || !hello) throw new Error('control-plane did not connect and send a heartbeat');
 
     for (const socket of sockets) {

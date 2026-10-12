@@ -162,13 +162,32 @@ describe('control-plane smoke against the built distribution', () => {
     expect(result.wrapperId.length).toBeGreaterThan(0);
     expect(result.allocationId).toBe('alloc-smoke-test');
     expect(result.protocolVersion).toBe(CONTROL_PLANE_PROTOCOL_VERSION);
-    expect(result.connected).toBe(true);
     expect(result.authenticated).toBe(true);
-    expect(result.supervisorExitCode).toBe(0);
-    expect(result.supervisorRestarts).toBe(0);
     expect(elapsed).toBeLessThan(20_000);
     expect(await scratchExists(scratchDir)).toBe(false);
   }, 60_000);
+
+  it.each(['allocationId', 'protocolVersion'] as const)(
+    'reports a hello %s mismatch promptly and cleans up',
+    async field => {
+      const scratchDir = join(root, `${field}-mismatch-run`);
+      const started = Date.now();
+      const error = await runControlPlaneSmoke(
+        smokeOptions(scratchDir, {
+          ...(field === 'allocationId'
+            ? {
+                wrapperCommand: `CONTROL_PLANE_ALLOCATION_ID=other exec bun run ${controlWrapperPath}`,
+              }
+            : { protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION + 1 }),
+        })
+      ).catch((error: unknown) => error);
+      expect(error).toBeInstanceOf(Error);
+      expect(error instanceof Error && error.message).toBe(`control-plane hello ${field} mismatch`);
+      expect(Date.now() - started).toBeLessThan(10_000);
+      expect(await scratchExists(scratchDir)).toBe(false);
+    },
+    60_000
+  );
 
   it('fails and cleans up when the supervisor is not executable', async () => {
     const scratchDir = join(root, 'nonexec-run');

@@ -331,11 +331,12 @@ describe('Vercel contained-credential policy wiring', () => {
     expect(JSON.stringify(body.networkPolicy)).toContain('handle_test');
   });
 
-  it('applies an empty grant set as a deny-by-default policy, before any REST create', async () => {
+  it('creates with unrestricted egress and no credential injections for an empty grant set', async () => {
     const body = (await createBodyFor([])) as {
       networkPolicy: { allowedDomains: string[]; injectionRules: unknown[] };
     };
     expect(body.networkPolicy).toEqual(buildControlNetworkPolicy([]));
+    expect(body.networkPolicy.allowedDomains).toEqual(['*']);
     expect(body.networkPolicy.injectionRules).toEqual([]);
   });
 

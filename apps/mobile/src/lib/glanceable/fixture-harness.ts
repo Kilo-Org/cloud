@@ -117,12 +117,42 @@ function applySessionCardFixture(input: {
     syncFollowedSessionCards([{ ...row, statusUpdatedAt: at }], now);
   }
   const card = discoverSessionCards().find(activity => activity.getProps()?.sessionId === row.id);
-  if (follow.approvalKey === true && card !== undefined) {
-    const content = buildSessionLiveActivityContentState(row, {
-      approvalKey: FIXTURE_APPROVAL_KEY,
-      updatedAt: at,
-      statusSinceFallback: at,
-    });
+  const facts = follow.card;
+  if ((follow.approvalKey === true || facts !== undefined) && card !== undefined) {
+    // The richer facts a server push carries, applied through the production
+    // builder, so no fixture ever hands the card hand-made props. A quiet
+    // fixture moves the last activity past the quiet window, which is what the
+    // card reaches its warning from.
+    const content = buildSessionLiveActivityContentState(
+      {
+        ...row,
+        statusUpdatedAt:
+          facts?.activityAgo === undefined
+            ? row.statusUpdatedAt
+            : new Date(now - facts.activityAgo * 60_000).toISOString(),
+        currentStep: facts?.step ?? null,
+        plan: facts?.plan ?? null,
+        changes: facts?.changes ?? null,
+        permissionCommand: facts?.permissionCommand ?? null,
+        lastActivityAt:
+          facts?.activityAgo === undefined
+            ? null
+            : new Date(now - facts.activityAgo * 60_000).toISOString(),
+        costMicrodollars: facts?.costMicrodollars ?? null,
+        outcome: facts?.outcome ?? null,
+        failure: facts?.failure ?? null,
+        prOpened: facts?.outcome === 'pr_opened',
+        startedAt:
+          facts?.startedAgo === undefined
+            ? null
+            : new Date(now - facts.startedAgo * 60_000).toISOString(),
+      },
+      {
+        approvalKey: follow.approvalKey === true ? FIXTURE_APPROVAL_KEY : null,
+        updatedAt: at,
+        statusSinceFallback: row.statusUpdatedAt ?? at,
+      }
+    );
     void settleCardWork(
       card.update(content, SESSION_CARD_STALE_AFTER_SECONDS, sessionCardRelevance(content))
     );

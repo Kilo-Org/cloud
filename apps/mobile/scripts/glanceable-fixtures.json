@@ -165,6 +165,18 @@
     {
       "name": "session-card-rtl-title",
       "description": "Session card: Working with a right-to-left title. Launch the app in Arabic to mirror the card."
+    },
+    {
+      "name": "session-card-quiet",
+      "description": "Session card: Working with no activity past the quiet window."
+    },
+    {
+      "name": "session-card-question",
+      "description": "Session card: Waiting for an answer, with the step count and Open."
+    },
+    {
+      "name": "session-card-failed",
+      "description": "Session card: a finished turn that failed, with the stop reason."
     }
   ]
 }

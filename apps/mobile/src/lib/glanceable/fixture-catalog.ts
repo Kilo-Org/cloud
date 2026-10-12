@@ -14,6 +14,23 @@ import { type GlanceableActionFeedback } from './surface-extras';
  * descriptions for capture scripts; regenerate it after a catalog change.
  */
 
+/** The richer session card facts a fixture applies, as a server push would. */
+export type SessionCardFacts = {
+  step?: {
+    verb: 'editing' | 'reading' | 'running' | 'searching' | 'thinking' | 'other';
+    target: string | null;
+  };
+  plan?: { done: number; total: number; current: string | null };
+  changes?: { files: number; added: number; removed: number };
+  permissionCommand?: string;
+  outcome?: 'pr_opened' | 'changes' | 'none';
+  failure?: 'provider' | 'tool' | 'cancelled' | 'other';
+  /** Minutes since the last activity the server saw. */
+  activityAgo?: number;
+  costMicrodollars?: number;
+  startedAgo?: number;
+};
+
 export type GlanceableFixtureRow = {
   /** Tray status: `permission`/`question` (needs input), `busy`, `scheduled`, `idle`. */
   status: string;
@@ -33,11 +50,17 @@ export type GlanceableFixture = {
   rows?: (now: number) => GlanceableFixtureRow[];
   actionFeedback?: Exclude<GlanceableActionFeedback, null>;
   /**
-   * iOS: follow one row with a session card. `approvalKey` adds the key a
-   * server push carries for a permission wait; `finish` follows the row while
-   * it works, then reports it finished.
+   * Follow one row with a session card. `approvalKey` adds the key a server
+   * push carries for a permission wait; `finish` follows the row while it
+   * works, then reports it finished; `card` applies the richer facts a server
+   * push carries (the step, the plan, the diff, the outcome, the stop reason).
    */
-  follow?: { index: number; approvalKey?: boolean; finish?: boolean };
+  follow?: {
+    index: number;
+    approvalKey?: boolean;
+    finish?: boolean;
+    card?: SessionCardFacts;
+  };
 };
 
 const MINUTE_MS = 60_000;

@@ -17,9 +17,56 @@ const MINUTE_MS = 60_000;
 
 export const SESSION_CARD_FIXTURES = {
   'session-card-running': {
-    description: 'Session card: Working, with the elapsed time since the last change.',
+    description:
+      'Session card: Working, with the step, the plan progress and the elapsed time since the last change.',
     rows: () => [{ status: 'busy', ago: 12, title: 'Migrate the billing webhooks' }],
-    follow: { index: 0 },
+    follow: {
+      index: 0,
+      card: {
+        step: { verb: 'editing', target: 'auth.ts' },
+        plan: { done: 3, total: 7, current: 'Write tests' },
+        changes: { files: 4, added: 120, removed: 30 },
+        activityAgo: 1,
+        costMicrodollars: 84_000,
+        startedAgo: 38,
+      },
+    },
+  },
+  'session-card-quiet': {
+    description:
+      'Session card: Working with no activity past the quiet window, so it shows the quiet warning.',
+    rows: () => [{ status: 'busy', ago: 21, title: 'Refactor the settle path' }],
+    follow: {
+      index: 0,
+      card: {
+        step: { verb: 'searching', target: 'settle' },
+        activityAgo: 9,
+        startedAgo: 25,
+      },
+    },
+  },
+  'session-card-question': {
+    description: 'Session card: Waiting for an answer, with the step count and Open.',
+    rows: () => [{ status: 'question', ago: 6, title: 'Pick the migration order' }],
+    follow: {
+      index: 0,
+      card: { plan: { done: 2, total: 5, current: null }, activityAgo: 6 },
+    },
+  },
+  'session-card-failed': {
+    description:
+      'Session card: a finished turn that failed, with the stop reason and the files changed.',
+    rows: () => [{ status: 'idle', ago: 1, title: 'Ship the release build' }],
+    follow: {
+      index: 0,
+      finish: true,
+      card: {
+        failure: 'provider',
+        changes: { files: 3, added: 12, removed: 4 },
+        plan: { done: 2, total: 5, current: null },
+        activityAgo: 1,
+      },
+    },
   },
   'session-card-permission': {
     description:

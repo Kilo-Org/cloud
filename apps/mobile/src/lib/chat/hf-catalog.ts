@@ -173,18 +173,14 @@ function licenseOf(card: HfRepoInfo['cardData']): string | undefined {
 function quantLabel(path: string): string {
   const name = path.split('/').pop() ?? path;
   const stem = name.slice(0, -'.gguf'.length);
-  return QUANT.exec(stem)?.[1]?.toUpperCase() ?? stem;
+  return QUANT.exec(stem)?.[1] ?? stem;
 }
 
 function ggufFiles(tree: unknown): readonly HfFile[] {
   const files: HfFile[] = [];
   for (const entry of entries.parse(tree)) {
     const file = treeEntry.safeParse(entry);
-    if (
-      file.success &&
-      file.data.path.toLowerCase().endsWith('.gguf') &&
-      !SPLIT_FILE.test(file.data.path)
-    ) {
+    if (file.success && /\.gguf$/i.test(file.data.path) && !SPLIT_FILE.test(file.data.path)) {
       files.push({ path: file.data.path, sizeBytes: file.data.size, sha256: file.data.lfs.oid });
     }
   }
@@ -194,8 +190,10 @@ function ggufFiles(tree: unknown): readonly HfFile[] {
 /** The projector with the model's own quantization, else the smallest one. */
 function projectorFor(label: string, projectors: readonly HfFile[]): HfFile | undefined {
   return (
-    projectors.find(projector => quantLabel(projector.path) === label) ??
-    projectors.toSorted((a, b) => a.sizeBytes - b.sizeBytes)[0]
+    projectors.find(
+      projector =>
+        quantLabel(projector.path).localeCompare(label, 'en', { sensitivity: 'accent' }) === 0
+    ) ?? projectors.toSorted((a, b) => a.sizeBytes - b.sizeBytes)[0]
   );
 }
 

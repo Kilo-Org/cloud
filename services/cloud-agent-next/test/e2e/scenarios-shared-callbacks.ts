@@ -241,8 +241,12 @@ async function runCallbackCompletion(
   env: ScenarioEnvironment
 ): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = CALLBACK_COMPLETION_TIMEOUT_MS, api = 'unified' } =
-    args;
+  const {
+    config,
+    conversation,
+    timeoutMs = CALLBACK_COMPLETION_TIMEOUT_MS,
+    api = 'unified',
+  } = args;
   const scenarioName = 'callback-completion';
   const directive = conversation || 'echo:done';
   const expectedText = directive.startsWith('echo:') ? directive.slice('echo:'.length) : undefined;

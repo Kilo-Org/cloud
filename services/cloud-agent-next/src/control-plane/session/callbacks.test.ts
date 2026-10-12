@@ -118,9 +118,7 @@ describe('control-plane callback recent activity', () => {
       eventId: 2 as LatestAssistantMessage['eventId'],
       timestamp: 20,
       info: { id: 'batch_reply', role: 'assistant' },
-      parts: [
-        { id: 'batch_text', messageID: 'batch_reply', type: 'text', text: 'batched answer' },
-      ],
+      parts: [{ id: 'batch_text', messageID: 'batch_reply', type: 'text', text: 'batched answer' }],
     } as LatestAssistantMessage;
     // A drained batch coalesces into one Kilo turn: the assistant reply is keyed
     // to the batch head, so the representative (last) message has no reply of its

@@ -1554,7 +1554,10 @@ describe('shared dispatch API resolution', () => {
     );
 
     expect(result.ok).toBe(true);
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({ api: 'unified' }), expect.anything());
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({ api: 'unified' }),
+      expect.anything()
+    );
   });
 
   it('fails clearly and runs nothing when an explicit API conflicts with the callback surface', async () => {

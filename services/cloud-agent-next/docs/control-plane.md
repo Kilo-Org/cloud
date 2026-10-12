@@ -556,9 +556,18 @@ has no key, so it restores and captures nothing: setup output is never published
     progress or the separate 120-minute wall-clock cap; Kilo restarts after real progress or
     a second time; prompt delivery fails. The native supervisor chooses `no_progress` or
     `execution_limit` once, settles accepted messages with that reason, then performs a
-    bounded tree abort. Stopping remains compute activity until cancellation is confirmed;
-    unconfirmed cancellation uses the existing runtime restart owner. A later native abort
+    bounded tree abort. A `no_progress` stall in Kilo's model retry loop (a `retry` status
+    since the last progress, in the execution or a descendant it stops) settles as the
+    assistant failure Kilo was retrying, such as a rate limit, not as `no_progress`. Kilo
+    sets `retry` only from its model-provider retry policy, so retry text the classifier does
+    not recognize settles as `provider_unavailable`, never `unknown`. Stopping remains compute
+    activity until cancellation is confirmed; unconfirmed cancellation uses the existing
+    runtime restart owner. A later native abort
     event cannot overwrite the outcome or settle a newly queued message.
+    A `superseded` turn-close is Kilo handing off to a queued follow-up, so the native
+    execution and both of its clocks continue into the next turn. Follow-ups therefore cannot
+    extend a run past 120 minutes from its start; if no turn follows, the next idle snapshot
+    finishes the execution.
     Assistant text/reasoning changes and actual tool output/state changes are progress.
     User input, repeated parts, metadata, busy/retry status and transport heartbeats are not.
     Useful descendant progress advances its ancestors, never unrelated roots. User waits and a
@@ -708,7 +717,7 @@ them through one development-only override.
 | Wrapper | Kilo health request | 5 s | Restart Kilo |
 | Wrapper | SSE reconnects | 6 in 2 min | Restart Kilo |
 | Wrapper | Kilo restart budget | 3 in 10 min | Routes `failed` (`agent_unavailable`) |
-| Wrapper | Native execution without real progress, including silent tools | 20 min excluding user waits | Bounded tree abort; `no_progress` outcome or routed error |
+| Wrapper | Native execution without real progress, including silent tools | 20 min excluding user waits | Bounded tree abort; `no_progress` outcome or routed error, or the retried assistant failure when Kilo is retrying the model request |
 | Wrapper | Native execution hard cap | 120 min including user waits | Bounded tree abort; `execution_limit` outcome or routed error |
 | Wrapper | Reconnect backoff | 1 s to 30 s, forever | — |
 | Supervisor | Wrapper restarts | 5 in 10 min | Stop restarting |
@@ -733,7 +742,7 @@ them through one development-only override.
 | Dead event stream (Kilo still answers health) | Wrapper, after 6 reconnects in 2 min | Restart Kilo, at most 3 in 10 min | Same as Kilo hang (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
 | Kilo restart budget used up | Wrapper | None until the next message | Queued and accepted fail (`agent_unavailable`) |
 | Kilo final error | Wrapper | None (Kilo already retried) | Accepted fail with Kilo's reason |
-| No real progress for 20 min, including silent tools | Native session supervisor | Bounded tree abort; runtime recovery if unconfirmed | Accepted fail (`no_progress`), or routed error without a current turn |
+| No real progress for 20 min, including silent tools | Native session supervisor | Bounded tree abort; runtime recovery if unconfirmed | Accepted fail (`no_progress`, or the retried assistant failure during a Kilo model retry), or routed error without a current turn |
 | Native execution over 120 min | Native session supervisor | Bounded tree abort | Accepted fail (`execution_limit`), or routed error without a current turn |
 | Idle 10 min, question pending | Sandbox DO | Stop the sandbox | Accepted fail (`sandbox_stopped`); a later answer is a new message |
 | Sandbox gone | Provider via Sandbox DO | New allocation on next `prepare` | Accepted fail (`sandbox_lost`); queued re-prepare |
@@ -821,7 +830,7 @@ failure monitors keep working.
 | `no_progress`, `no_outcome` | `post_dispatch_no_activity` / `wrapper_no_output` |
 | `prompt_failed` | `post_dispatch_no_activity` / `wrapper_error_before_activity` |
 | `sandbox_stopped` (idle while waiting on the user), `execution_limit` | `interruption` / `system_interrupt` |
-| Kilo final error | `agent_activity` / `assistant_error`; responsibility from the existing assistant-failure helpers, so Kilo and provider errors stay attributed to them |
+| Kilo final error, or `no_progress` during a Kilo model retry | `agent_activity` / `assistant_error`; responsibility from the existing assistant-failure helpers, so Kilo and provider errors stay attributed to them |
 | Stop | `interruption` / `user_interrupt` |
 | `missing_metadata`, `invalid_model`, payment required | Unchanged |
 
@@ -882,7 +891,9 @@ counts.
 16. **No progress.** Every native execution, including autonomous work without a Cloud turn,
     is interrupted after 20 minutes without real progress (`no_progress`). A silent running
     tool gets the same bound. User waits pause no-progress time; the separate 120-minute
-    wall-clock cap (`execution_limit`) remains in force. After confirmed interruption, an
+    wall-clock cap (`execution_limit`) remains in force. A stall while Kilo retries the model
+    request fails as the retried assistant failure, for example `rate_limited`, so a provider
+    condition is not counted as a platform failure. After confirmed interruption, an
     otherwise idle sandbox stops after its normal 10-minute grace; active siblings retain it.
 17. **Auto-commit fails.** The turn completes with a visible warning.
 18. **Question answered live.** A question during a turn is answered; the same turn continues and

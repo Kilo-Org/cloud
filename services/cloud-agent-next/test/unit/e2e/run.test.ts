@@ -7,7 +7,6 @@ import {
   parseArgs,
   requireScenarioApi,
   resultOutcome,
-  WORKTREE_ENROLLMENT_SCENARIOS,
 } from '../../e2e/run.js';
 import type { LifecycleResult } from '../../e2e/lifecycle.js';
 import { SHARED_SCENARIOS } from '../../e2e/scenarios-shared.js';
@@ -86,32 +85,6 @@ describe('requireScenarioApi (matrix fail-fast contract)', () => {
 
     expect(exit).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
-  });
-});
-
-describe('worktree enrollment derivation', () => {
-  it('enrolls scenarios that declare requiresWorktreeCreation', () => {
-    for (const name of [
-      'worktree-chat',
-      'worktree-multi-chat',
-      'long-conversation',
-      'leave-and-return',
-    ]) {
-      expect(WORKTREE_ENROLLMENT_SCENARIOS.has(name)).toBe(true);
-    }
-  });
-
-  it('does not enroll a scenario that creates no worktree session', () => {
-    expect(WORKTREE_ENROLLMENT_SCENARIOS.has('cold-hot')).toBe(false);
-    expect(WORKTREE_ENROLLMENT_SCENARIOS.has('hot')).toBe(false);
-  });
-
-  it('matches exactly the shared definitions that declare the flag', () => {
-    const declared = Object.values(SHARED_SCENARIOS)
-      .filter(definition => definition.requiresWorktreeCreation === true)
-      .map(definition => definition.name)
-      .sort();
-    expect([...WORKTREE_ENROLLMENT_SCENARIOS].sort()).toEqual(declared);
   });
 });
 

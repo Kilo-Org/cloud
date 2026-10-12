@@ -243,6 +243,24 @@ export const controlPlaneRouteSpecSchema = z
     kiloSessionId: z.string().min(1),
     directory: z.string().min(1).max(1024),
     createdOnPlatform: z.string().max(256).optional(),
+    githubReviewTarget: z
+      .object({
+        repo: z.string().min(1).max(256),
+        pullRequestNumber: z.number().int().positive(),
+        appType: z.enum(['standard', 'lite']),
+        botUserId: z.string().min(1).max(256),
+      })
+      .strict()
+      .optional(),
+    permission: z
+      .record(
+        z.string().min(1).max(256),
+        z.union([
+          z.enum(['allow', 'deny', 'ask']),
+          z.record(z.string().min(1).max(1024), z.enum(['allow', 'deny', 'ask'])),
+        ])
+      )
+      .optional(),
     branch: z.string().min(1).max(256).optional(),
     branchMode: z.literal('working').optional(),
     worktreeRecovery: worktreeRecoverySchema.optional(),
@@ -279,13 +297,17 @@ export const controlPlaneRouteSpecSchema = z
   .strict()
   .superRefine((spec, context) => {
     if (
-      (spec.runtimeSkills?.length || spec.runtimeAgents?.length || spec.kiloCommands?.length) &&
+      (spec.permission ||
+        spec.githubReviewTarget ||
+        spec.runtimeSkills?.length ||
+        spec.runtimeAgents?.length ||
+        spec.kiloCommands?.length) &&
       spec.runtimeIsolation !== 'per-session'
     ) {
       context.addIssue({
         code: 'custom',
         path: ['runtimeIsolation'],
-        message: 'Runtime profiles require per-session isolation',
+        message: 'Runtime permissions and profiles require per-session isolation',
       });
     }
   });
@@ -319,6 +341,7 @@ export const controlPlaneCredentialRepositorySchema = z.discriminatedUnion('type
     .object({
       type: z.literal('github'),
       repo: z.string().min(1),
+      pullRequestNumber: z.number().int().positive().optional(),
       token: z.string().min(1).optional(),
       githubIntegrationId: z.string().uuid().optional(),
       githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
@@ -584,9 +607,18 @@ export const controlPlaneOutcomeSchema = z
     reason: controlPlaneOutcomeReasonSchema.optional(),
     assistantReason: controlPlaneAssistantFailureReasonSchema.optional(),
     providerOwnership: controlPlaneProviderOwnershipSchema.optional(),
+    gateResult: z.enum(['pass', 'fail']).optional(),
     lastMessageId: z.string().min(1).max(128),
   })
-  .strict();
+  .strict()
+  .superRefine((outcome, context) => {
+    if (outcome.status !== 'completed' && outcome.gateResult !== undefined)
+      context.addIssue({
+        code: 'custom',
+        path: ['gateResult'],
+        message: 'Only completed results can include gateResult',
+      });
+  });
 
 export const controlPlaneDeliverPayloadSchema = z
   .object({
@@ -803,7 +835,7 @@ const controlPlaneSessionEventsFrameSchema = z
   })
   .strict();
 
-const controlPlaneSessionOutcomeFrameSchema = controlPlaneOutcomeSchema.extend({
+const controlPlaneSessionOutcomeFrameSchema = controlPlaneOutcomeSchema.safeExtend({
   type: z.literal('session.outcome'),
 });
 

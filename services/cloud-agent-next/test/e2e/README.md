@@ -13,21 +13,13 @@ cloud-agent-next refactor.
 
 1. Copy `.dev.vars.example` → `.dev.vars` and fill in local values.
    Leave `KILO_OPENROUTER_BASE` pointed at local Next.js (`@url nextjs/api`).
-   For control-plane scenarios, enroll the E2E user in `CONTROL_PLANE_IDS`.
-   The worktree-creating scenarios (`worktree-chat`, `worktree-multi-chat`,
-   `long-conversation`, `leave-and-return`, `large-stream`, `concurrent-chats`,
-   `interrupt-then-continue`, `question-idle-resume`, and the five `sandboxFaults`
-   scenarios) additionally
-   require `WORKTREE_CREATION_ENABLED_IDS`; use the seeded enrolled user
-   (`E2E_USER_EMAIL`) rather than a fresh per-run user.
-   Both accept comma-separated user or org IDs or `*`. Production defaults to empty/off;
-   wrangler `dev` and `.dev.vars.example` default to `*`.
-   Ordinary control-plane scenarios do not require `WORKTREE_CREATION_ENABLED_IDS`.
-   These are Worker settings read by `auth.ts` from this service's `.dev.vars`,
-   not driver environment overrides: prefixing the driver command with either
-   flag does not configure the Worker. The unannotated template entries pass
-   through matching root `.env.local` values during `pnpm dev:env`. Configure
-   the Worker before starting it, or restart it after changing these values.
+   Control-plane scenarios need no extra enrollment: interactive
+   `cloud-agent-web` creates always route to the control plane, and
+   control-plane browser creates always create a worktree. Worker settings come
+   from this service's `.dev.vars`, not driver environment overrides; the
+   unannotated template entries pass through matching root `.env.local` values
+   during `pnpm dev:env`. Configure the Worker before starting it, or restart it
+   after changing these values.
 2. Ensure local Postgres is up and root `.env.local` defines `POSTGRES_URL`
    (or export `DATABASE_URL`) — the driver inserts a test user row via
    `@kilocode/db`.
@@ -149,11 +141,12 @@ pnpm exec tsx services/cloud-agent-next/test/e2e/multichat-real.ts \
 ```
 
 This driver discovers the existing local stack's ports and requires an already
-funded test user enrolled for control-plane and worktree creation. Pass credentials
-only through an owned mode-600 auth file, never as a command-line token. The output
-directory must not already exist. Bootstrap is API-assisted; sibling creation,
-sends, and Stop use the real web endpoints. Three chats exercise repeated shared
-file writes/reads, native tool overlap, Stop isolation, and post-Stop follow-ups.
+funded test user; control-plane and worktree creation need no enrollment. Pass
+credentials only through an owned mode-600 auth file, never as a command-line
+token. The output directory must not already exist. Bootstrap is API-assisted;
+sibling creation, sends, and Stop use the real web endpoints. Three chats
+exercise repeated shared file writes/reads, native tool overlap, Stop isolation,
+and post-Stop follow-ups.
 Private reports and transcripts are retained; chats and sandboxes are not deleted
 automatically. See the known CLI 7.4.20 limitation under Troubleshooting.
 
@@ -238,15 +231,13 @@ Every scenario is now a shared definition. The long scenarios (`worktree-chat`,
 (`external-kill`, `kill-mid-flight`, `wrapper-freeze-settled-reap`,
 `wrapper-freeze-inflight-reap`, `control-socket-recycle-boot`) are all in the
 registry, so the matrix runs them:
-the worktree flows need an enrolled driver user, and the fault flows stop or
-freeze a real container, so they run last. They stay name-runnable
-(`run.ts <name> _`) for focused runs; the matrix marks the capability-gated
-ones `unsupported`. Long scenarios take
+the fault flows stop or freeze a real container, so they run last. They stay
+name-runnable (`run.ts <name> _`) for focused runs; the matrix marks the
+capability-gated ones `unsupported`. Long scenarios take
 6–30 minutes and require the funded seeded user
 (`E2E_USER_EMAIL=evgeny@kilocode.ai`), the offset-prefixed `WORKER_URL` and
 `FAKE_LLM_URL`, and `E2E_MODEL=kilo/fake-deterministic`; the new scenarios reject
-other models. They use the unified API and require control-plane/worktree
-enrollment.
+other models. They use the unified API and run on the control plane.
 
 Matrix (runs the default regression suite):
 
@@ -363,7 +354,7 @@ Two Workers, in deploy order:
    `test/e2e/deploy/deploy-fake-llm.sh deploy`.
 2. `cloud-agent-e2e-test` — private render of this package's Worker;
    deploy second with
-   `E2E_USER_ID=<id> FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy`.
+   `FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy`.
    Add `E2E_INTERNAL_API_SECRET=<secret>` on the first deploy or to rotate it; a
    redeploy without it keeps the deployed Worker secret.
 
@@ -811,9 +802,8 @@ wrapper (`kilocode-control-plane-wrapper.js`) uniquely in the owned container an
 returns its identity; a legacy container has no such process, so `proveNewPlane`
 throws and an opted-in run against a still-legacy plane fails loudly instead of
 false-passing. `prepareBrowserSession` already sets `createdOnPlatform:
-'cloud-agent-web'`, so once the driver is enrolled in `CONTROL_PLANE_IDS` and C1
-lands, the cutover routes these sessions to the new plane; the scenario does not
-need a separate create path.
+'cloud-agent-web'`, so once C1 lands, the cutover routes these sessions to the
+new plane; the scenario does not need a separate create path.
 
 | Lifecycle | What it does |
 |---|---|

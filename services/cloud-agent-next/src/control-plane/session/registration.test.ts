@@ -50,6 +50,97 @@ function metadata(overrides: Record<string, unknown> = {}) {
 
 const selection = { provider: 'cloudflare' as const };
 
+describe('migrated origin permissions', () => {
+  it.each(['standard', 'lite', undefined] as const)(
+    'defers GitHub publisher identity %s to credential resolution',
+    appType => {
+      const input = metadata({
+        repository: {
+          type: 'github',
+          repo: 'acme/widgets',
+          githubAppType: appType,
+          pullRequestNumber: 42,
+        },
+        profile: {
+          envVars: {
+            KILO_GITHUB_REVIEW_TARGET: '{"forged":true}',
+            KILO_GITHUB_REVIEW_API_BASE: 'https://evil.test',
+          },
+        },
+      });
+      input.identity.createdOnPlatform = 'code-review';
+      const { spec } = buildControlPlaneSessionRegistration(input, selection, undefined, {
+        containmentEnabled: true,
+        workerUrl: 'https://worker.test',
+      });
+      expect(spec.githubReviewTarget).toBeUndefined();
+      expect(
+        buildControlPlaneSessionRegistration(input, selection).credentials.repository
+      ).toMatchObject({ repo: 'acme/widgets', pullRequestNumber: 42 });
+      expect(spec.runtimeIsolation).toBe('per-session');
+    }
+  );
+
+  it.each(['slack', 'github', 'linear', 'discord', 'security-agent', 'webhook', 'scheduled'])(
+    'preserves non-interactive question denial for %s',
+    createdOnPlatform => {
+      const input = metadata();
+      input.identity.createdOnPlatform = createdOnPlatform;
+      const { spec } = buildControlPlaneSessionRegistration(input, selection);
+      expect(spec.permission).toEqual({ question: 'deny' });
+      expect(spec.runtimeIsolation).toBe('per-session');
+    }
+  );
+
+  it('keeps interactive web permissions unchanged', () => {
+    const input = metadata();
+    input.identity.createdOnPlatform = 'cloud-agent-web';
+    const { spec } = buildControlPlaneSessionRegistration(input, selection);
+    expect(spec.permission).toBeUndefined();
+  });
+
+  it.each(['security-remediation', 'code-review'])(
+    'preserves the %s command guard',
+    createdOnPlatform => {
+      const input = metadata();
+      input.identity.createdOnPlatform = createdOnPlatform;
+      const { spec } = buildControlPlaneSessionRegistration(input, selection);
+      expect(spec.permission).toMatchObject({
+        question: 'deny',
+        edit: createdOnPlatform === 'security-remediation' ? 'allow' : 'deny',
+        webfetch: 'deny',
+        websearch: 'deny',
+        codesearch: 'deny',
+        bash: { git: 'allow' },
+      });
+      expect(spec.permission?.bash).toMatchObject(
+        createdOnPlatform === 'security-remediation'
+          ? {
+              'git push': 'allow',
+              'gh pr create': 'allow',
+              'git push --force': 'deny',
+              curl: 'deny',
+            }
+          : {
+              'git push': 'deny',
+              'gh pr create': 'deny',
+              'gh api repos/*/issues/*/comments --input*': 'allow',
+              'gh api repos/*/issues/comments/* -X PATCH*': 'allow',
+            }
+      );
+      expect(spec.env).toMatchObject({
+        CI: 'true',
+        GIT_TERMINAL_PROMPT: '0',
+        GH_PROMPT_DISABLED: '1',
+      });
+      expect(spec.runtimeIsolation).toBe('per-session');
+      expect(
+        controlPlaneRouteSpecSchema.safeParse({ ...spec, runtimeIsolation: undefined }).success
+      ).toBe(false);
+    }
+  );
+});
+
 describe('runtime authorization admission', () => {
   it.each(['cloudflare', 'cloudflare-containers', 'vercel'] as const)(
     'isolates modern %s runtimes and freezes the admission containment selection',
@@ -293,7 +384,7 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
     expect(JSON.stringify(registration)).not.toContain('secret-value');
   });
 
-  it('withholds profile env and secrets from a read-only Bitbucket review', () => {
+  it('withholds profile env, secrets, agents and commands but keeps skills for a read-only Bitbucket review', () => {
     const envelope = encryptWithPublicKey('secret-value', publicKey);
     const registration = buildControlPlaneSessionRegistration(
       metadata({
@@ -314,7 +405,7 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
         profile: {
           envVars: { USER_SETTING: 'private-profile-env' },
           encryptedSecrets: { DATABASE_URL: envelope },
-          runtimeSkills: [{ name: 'review', rawMarkdown: 'Review' }],
+          runtimeSkills: [{ name: 'bitbucket-cloud-review', rawMarkdown: 'Review' }],
           runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: {} }],
           kiloCommands: [{ name: 'review-now', template: 'Review' }],
         },
@@ -325,10 +416,19 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
     expect(registration.spec.env?.USER_SETTING).toBeUndefined();
     expect(registration.credentials.kiloToken).toBe('native-kilo-token');
     expect(registration.credentials.encryptedSecrets).toBeUndefined();
-    expect(registration.spec.runtimeSkills).toBeUndefined();
+    expect(registration.spec.runtimeSkills).toEqual([
+      { name: 'bitbucket-cloud-review', rawMarkdown: 'Review' },
+    ]);
     expect(registration.spec.runtimeAgents).toBeUndefined();
     expect(registration.spec.kiloCommands).toBeUndefined();
-    expect(registration.spec.runtimeIsolation).toBeUndefined();
+    expect(registration.spec.runtimeIsolation).toBe('per-session');
+    expect(registration.spec.permission).toMatchObject({
+      question: 'deny',
+      task: 'deny',
+      lsp: 'deny',
+      bash: { '*': 'deny', 'bb pr current': 'allow', '*;*': 'deny' },
+      edit: { '*': 'deny' },
+    });
   });
 
   it('accepts a stored credential source that predates the encryptedSecrets field', () => {

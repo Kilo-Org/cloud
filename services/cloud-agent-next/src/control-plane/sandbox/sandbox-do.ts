@@ -1985,6 +1985,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       setupCommands?: string[] | undefined;
       git?: SessionAttachPayload['git'];
       kilo: NonNullable<SessionAttachPayload['kilo']>;
+      githubReviewTarget?: ControlPlaneRouteSpec['githubReviewTarget'];
     }
   ): ControlPlaneRouteSpec {
     // Explicit projection: token-bearing fields come only from the issued grant,
@@ -2001,6 +2002,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.runtimeSkills === undefined ? {} : { runtimeSkills: spec.runtimeSkills }),
       ...(spec.runtimeAgents === undefined ? {} : { runtimeAgents: spec.runtimeAgents }),
       ...(spec.kiloCommands === undefined ? {} : { kiloCommands: spec.kiloCommands }),
+      ...(spec.permission === undefined ? {} : { permission: spec.permission }),
+      ...(payload.githubReviewTarget === undefined
+        ? {}
+        : { githubReviewTarget: payload.githubReviewTarget }),
       env: payload.env ?? {},
       ...(payload.setupCommands === undefined ? {} : { setupCommands: payload.setupCommands }),
       ...(spec.runtimeIsolation === undefined ? {} : { runtimeIsolation: spec.runtimeIsolation }),

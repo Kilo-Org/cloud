@@ -1214,6 +1214,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           ...(parsed.providerOwnership === undefined
             ? {}
             : { providerOwnership: parsed.providerOwnership }),
+          ...(parsed.gateResult === undefined ? {} : { gateResult: parsed.gateResult }),
         },
         'wrapper_outcome'
       );

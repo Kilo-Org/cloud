@@ -10,10 +10,14 @@ export const REPO_SNAPSHOT_INDEX_TTL_SECONDS = 10 * 24 * 60 * 60;
 
 const KEY_PREFIX = 'repo-snapshot:v1:';
 
+// `capturedAt` (epoch ms) and `size` are diagnostics only; entries written before
+// them lack both, so they stay optional.
 const repoSnapshotEntrySchema = z
   .object({
     snapshotId: z.string().min(1),
     commit: z.string().min(1).optional(),
+    capturedAt: z.number().optional(),
+    size: z.number().optional(),
   })
   .strict();
 

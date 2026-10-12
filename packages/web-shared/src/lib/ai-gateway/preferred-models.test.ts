@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import { getMonitoredModels, getPreferredModels } from './preferred-models';
 
 const storedModels = [
@@ -29,5 +30,19 @@ describe('getMonitoredModels', () => {
       'provider/b:free',
       'anthropic/claude-opus-5.5',
     ]);
+  });
+
+  it.each([
+    ['only auto models are stored', { models: ['kilo-auto/efficient', 'kilo-auto/free'] }],
+    ['no list is stored', null],
+  ])('throws when %s', async (_case, preferredModels) => {
+    await db
+      .update(ai_gateway_config)
+      .set({ preferred_models: preferredModels })
+      .where(eq(ai_gateway_config.id, 1));
+    await jest.isolateModulesAsync(async () => {
+      const isolated = await import('./preferred-models');
+      await expect(isolated.getMonitoredModels()).rejects.toThrow('No monitored models');
+    });
   });
 });

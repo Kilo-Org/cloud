@@ -11,7 +11,17 @@ export const getPreferredModels: () => Promise<ReadonlyArray<string>> = createCa
   []
 );
 
-/** The concrete models in the preferred list; auto models route elsewhere and are not monitored. */
+/**
+ * The concrete models in the preferred list; auto models route elsewhere and are not monitored.
+ * Throws when the list is empty, so health checks and stats syncs fail instead of silently
+ * monitoring nothing.
+ */
 export async function getMonitoredModels(): Promise<string[]> {
-  return (await getPreferredModels()).filter(model => !isKiloAutoModel(model));
+  const monitoredModels = (await getPreferredModels()).filter(model => !isKiloAutoModel(model));
+  if (monitoredModels.length === 0) {
+    throw new Error(
+      'No monitored models: ai_gateway_config.preferred_models has no concrete models or could not be read'
+    );
+  }
+  return monitoredModels;
 }

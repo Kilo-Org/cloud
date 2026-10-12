@@ -89,15 +89,14 @@ export async function readRemoteMcpOAuth(
  * land between them.
  */
 export async function writeRemoteMcpOAuth(
-  id: string,
-  url: string,
-  patch: Omit<Partial<RemoteMcpOAuthState>, 'url'>,
-  epoch: number
+  owner: { readonly id: string; readonly url: string; readonly epoch: number },
+  patch: Omit<Partial<RemoteMcpOAuthState>, 'url'>
 ): Promise<void> {
   await store.whenLoaded();
-  if (!isCurrentAuthEpoch(epoch)) {
+  if (!isCurrentAuthEpoch(owner.epoch)) {
     return;
   }
+  const { id, url } = owner;
   const current = store.get();
   const existing = current[id]?.url === url ? current[id] : undefined;
   store.set({ ...current, [id]: { ...existing, ...patch, url } });

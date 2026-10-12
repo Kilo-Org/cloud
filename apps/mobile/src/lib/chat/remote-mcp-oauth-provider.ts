@@ -67,7 +67,7 @@ export function remoteMcpOAuthProvider(
   let code: string | undefined = undefined;
   let turnedBack = false;
   const save = async (patch: OAuthPatch) => {
-    await writeRemoteMcpOAuth(server.id, server.url, patch, epoch);
+    await writeRemoteMcpOAuth({ id: server.id, url: server.url, epoch }, patch);
   };
   return {
     redirectUrl: REMOTE_MCP_REDIRECT_URL,

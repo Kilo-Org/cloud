@@ -1187,6 +1187,55 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     stream.close();
   });
 
+  it('connects idle with readable failure text after Kilo was restarted while busy', async () => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = peer.view('ready');
+    await stub.send(promptPayload('m1'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
+    const rootKiloSessionId = await runInDurableObject(
+      stub,
+      instance =>
+        (instance as unknown as { registration: { spec: { kiloSessionId: string } } }).registration
+          .spec.kiloSessionId
+    );
+    const busy = {
+      type: 'session.status',
+      properties: { sessionID: rootKiloSessionId, status: { type: 'busy' } },
+    };
+    await stub.onEvents({ events: [busy] });
+
+    const running = await connectStream(sessionId);
+    const runningConnected = await waitForStreamEvent(running, 'connected');
+    expect(runningConnected.data).not.toHaveProperty('sessionStatus');
+    running.close();
+
+    await stub.onOutcome({
+      sessionId,
+      status: 'failed',
+      reason: 'agent_unresponsive',
+      lastMessageId: 'm1',
+    });
+    const stream = await connectStream(sessionId);
+    const replayed = await drainStream(stream);
+    const connected = replayed.find(message => message.streamEventType === 'connected');
+    expect(connected?.data).toMatchObject({ sessionStatus: { type: 'idle' } });
+    expect(
+      replayed.find(message => message.streamEventType === 'cloud.message.failed')?.data
+    ).toMatchObject({
+      messageId: 'm1',
+      reason: 'agent_unresponsive',
+      error: 'Kilo was not responding and was restarted',
+    });
+    stream.close();
+
+    // Kilo busy again after the settlement is native work without a Cloud message: keep it.
+    await stub.onEvents({ events: [busy] });
+    const native = await connectStream(sessionId);
+    const nativeConnected = await waitForStreamEvent(native, 'connected');
+    expect(nativeConnected.data).not.toHaveProperty('sessionStatus');
+    native.close();
+  });
+
   it('replays the stored command catalog on connect', async () => {
     const { sessionId, stub } = await setup();
     await stub.onEvents({
@@ -1697,11 +1746,21 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
   );
 
   it.each([
-    ['insufficient_credits', 'billing_blocked', 'payment_required'],
-    ['invalid_configuration', 'invalid_configuration', 'sandbox_connect_failed'],
+    [
+      'insufficient_credits',
+      'billing_blocked',
+      'payment_required',
+      'Sandbox billing requires additional credits',
+    ],
+    [
+      'invalid_configuration',
+      'invalid_configuration',
+      'sandbox_connect_failed',
+      'Sandbox configuration is invalid or unsupported',
+    ],
   ] as const)(
     'settles known permanent %s promptly and recovers the next message',
-    async (cause, reason, code) => {
+    async (cause, reason, code, error) => {
       const sessionId = newSessionId();
       const sandboxId = unique('sbx__permanent');
       const provider = createFakeProvider();
@@ -1759,7 +1818,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         messageId: 'm1',
         status: 'failed',
         reason,
-        error: reason,
+        error,
         accepted: false,
       });
       await runSessionAlarm(sessionStub);

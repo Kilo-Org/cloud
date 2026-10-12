@@ -183,7 +183,10 @@ suite('pinned Kilo 7.8.1 native activity contract', () => {
         timers: CONTROL_PLANE_TIMERS.wrapper,
         now: Date.now,
         onDeadline: (_identity, reason) => faults.push(reason),
-        onFault: reason => faults.push(reason),
+        onFault: reason => {
+          faults.push(reason);
+          return true;
+        },
         onChange() {},
       });
       try {

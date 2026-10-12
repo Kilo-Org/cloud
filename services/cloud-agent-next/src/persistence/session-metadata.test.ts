@@ -453,6 +453,85 @@ describe('session metadata boundary', () => {
     expect(parseSessionMetadata(current)).not.toHaveProperty('clone');
   });
 
+  describe('placed sandbox metadata', () => {
+    const placedId = `sbx-${'a'.repeat(48)}`;
+    const base = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'workspace_placed', userId: 'user_placed', orgId: 'org-id' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+    const withWorkspace = (workspace: Record<string, unknown>) => ({ ...base, workspace });
+
+    it.each([
+      ['isolated Cloudflare', 'cloudflare', 'isolated'],
+      ['code-review Cloudflare', 'cloudflare', 'code-review'],
+      ['shared Cloudflare', 'cloudflare', 'shared'],
+      ['isolated Vercel', 'vercel', 'isolated'],
+      ['isolated Containers', 'cloudflare-containers', 'isolated'],
+    ] as const)('round-trips a placed %s sandbox', (_label, sandboxProvider, sandboxKind) => {
+      const current = withWorkspace({ sandboxId: placedId, sandboxProvider, sandboxKind });
+
+      expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
+    });
+
+    it.each([
+      ['a placed key without its kind', { sandboxId: placedId }],
+      [
+        'a kind on a legacy prefixed key',
+        { sandboxId: `ses-${'a'.repeat(48)}`, sandboxKind: 'isolated' },
+      ],
+      ['a kind without a key', { sandboxKind: 'isolated' }],
+      [
+        'a shared Vercel sandbox',
+        { sandboxId: placedId, sandboxProvider: 'vercel', sandboxKind: 'shared' },
+      ],
+      [
+        'a shared failover route on a placed key',
+        {
+          sandboxId: placedId,
+          sandboxKind: 'shared',
+          sandboxRoute: { kind: 'shared', routeKey: `usr-${'a'.repeat(48)}` },
+        },
+      ],
+      ['an unknown kind', { sandboxId: placedId, sandboxKind: 'devcontainer' }],
+    ])('rejects %s', (_label, workspace) => {
+      expect(() => parseSessionMetadata(withWorkspace(workspace))).toThrow();
+    });
+
+    it('rejects a kind on a legacy-plane session', () => {
+      expect(() =>
+        parseSessionMetadata({
+          ...withWorkspace({ sandboxId: placedId, sandboxKind: 'isolated' }),
+          identity: { sessionId: 'agent_placed', userId: 'user_placed' },
+        })
+      ).toThrow();
+    });
+
+    it.each([
+      ['cloudflare-single', 'isolated', true],
+      ['cloudflare-single', 'shared', false],
+      ['cloudflare-single', 'code-review', false],
+      ['cloudflare-shared', 'shared', true],
+      ['cloudflare-shared', 'isolated', false],
+    ] as const)(
+      'checks a %s allocation against kind %s',
+      (sandboxAllocation, sandboxKind, valid) => {
+        const current = withWorkspace({
+          sandboxId: placedId,
+          sandboxProvider: 'cloudflare',
+          sandboxAllocation,
+          sandboxKind,
+        });
+        if (valid) {
+          expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
+        } else {
+          expect(() => parseSessionMetadata(current)).toThrow();
+        }
+      }
+    );
+  });
+
   it('rejects shared route metadata without a compatible assigned sandbox', () => {
     const base = {
       metadataSchemaVersion: 2 as const,

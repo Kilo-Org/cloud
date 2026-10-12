@@ -20,6 +20,7 @@
     "./kilo-auth-middleware": "./src/kilo-auth-middleware.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./sandbox-allocation": "./src/sandbox-allocation.ts",
+    "./sha256": "./src/sha256.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./deployment-slug": "./src/deployment-slug.ts",
     "./redact-headers": "./src/redact-headers.ts",

@@ -27,6 +27,176 @@ import {
 
 const NOW = 1_800_000_000_000;
 import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
+import type { restoreWorktreeRecovery } from './worktree-recovery.js';
+import { restoreSession } from '../restore-session.js';
+
+describe('replacement workspace local recovery', () => {
+  const recovery = {
+    files: [{ path: 'lost.txt', status: 'added' as const, patch: 'saved patch' }],
+  };
+
+  it('recovers a new clone with no ingest diffs before reporting ready', async () => {
+    let calls = 0;
+    const harness = createHarness(FAST_TIMERS, {
+      recoverWorktree: async (_directory, saved) => {
+        expect(saved).toEqual(recovery);
+        expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(false);
+        calls++;
+        return { applied: 1, skipped: 0, total: 1, skippedDiffs: [] };
+      },
+    });
+    harness.setSessionExists(false);
+    await harness.manager.prepare(
+      routeSpec({ git: { url: 'https://github.com/acme/repo.git' }, worktreeRecovery: recovery })
+    );
+    expect(calls).toBe(1);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+  });
+
+  it.each(['surviving', 'ingest', 'existing_session'])(
+    'restores local patches for replacement workspaces with %s state only',
+    async kind => {
+      let calls = 0;
+      const harness = createHarness(FAST_TIMERS, {
+        hasGit: kind === 'surviving',
+        recoverWorktree: async () => {
+          calls++;
+          return { applied: 1, skipped: 0, total: 1, skippedDiffs: [] };
+        },
+      });
+      harness.setSessionExists(kind === 'existing_session');
+      if (kind === 'ingest')
+        harness.setRestore(async () => ({
+          ok: true,
+          downloaded: true,
+          imported: true,
+          diffs: { applied: 1, skipped: 0, total: 1 },
+        }));
+      await harness.manager.prepare(
+        routeSpec({ git: { url: 'https://github.com/acme/repo.git' }, worktreeRecovery: recovery })
+      );
+      expect(calls).toBe(kind === 'surviving' ? 0 : 1);
+      if (kind === 'ingest') expect(harness.restoreOptions()[0]?.restoreFiles).toBe(false);
+      if (kind === 'surviving') expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    }
+  );
+
+  it('imports nonempty ingest history but recovers the newer local file before snapshot upload', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-local-precedence-'));
+    const directory = path.join(root, 'workspace');
+    const imported = path.join(root, 'imported.json');
+    const bin = path.join(root, 'bin');
+    const snapshot = {
+      info: { id: routeSpec().kiloSessionId, version: '2' },
+      messages: [],
+      sessionDiff: [{ file: 'lost.txt', status: 'modified', after: 'older ingest\n' }],
+    };
+    const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(snapshot), { status: 200 })
+    );
+    try {
+      await fs.mkdir(directory);
+      await fs.mkdir(bin);
+      expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+      await fs.writeFile(path.join(directory, 'lost.txt'), 'base\n');
+      await fs.writeFile(path.join(bin, 'kilo'), `#!/bin/sh\ncp "$2" "${imported}"\n`, {
+        mode: 0o755,
+      });
+      const newer = {
+        files: [
+          {
+            path: 'lost.txt',
+            status: 'modified' as const,
+            patch:
+              'diff --git a/lost.txt b/lost.txt\n--- a/lost.txt\n+++ b/lost.txt\n@@ -1 +1 @@\n-base\n+newer local\n',
+          },
+        ],
+      };
+      const harness = createHarness(FAST_TIMERS, {
+        capture: true,
+        beforeCapture: async () => {
+          expect(await fs.readFile(path.join(directory, 'lost.txt'), 'utf8')).toBe('newer local\n');
+          expect(harness.ensureCalls()).toBe(0);
+        },
+      });
+      harness.setSessionExists(false);
+      harness.setRestore(async () =>
+        restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+          restoreFiles: harness.restoreOptions()[0]?.restoreFiles !== false,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            KILO_SESSION_INGEST_URL: 'https://ingest.test',
+            KILOCODE_TOKEN: 'test-token',
+          },
+        })
+      );
+      await harness.manager.prepare(
+        routeSpec({
+          directory,
+          git: { url: 'https://github.com/acme/repo.git' },
+          capture: true,
+          worktreeRecovery: newer,
+        })
+      );
+      expect(await fs.readFile(path.join(directory, 'lost.txt'), 'utf8')).toBe('newer local\n');
+      expect(harness.captureRequests).toHaveLength(1);
+      expect(JSON.parse(await fs.readFile(imported, 'utf8')).sessionDiff).toEqual(
+        snapshot.sessionDiff
+      );
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not fail preparation when local recovery fails', async () => {
+    const harness = createHarness(FAST_TIMERS, {
+      recoverWorktree: async () => {
+        throw new Error('conflicting patch');
+      },
+    });
+    harness.setSessionExists(false);
+    await harness.manager.prepare(
+      routeSpec({ git: { url: 'https://github.com/acme/repo.git' }, worktreeRecovery: recovery })
+    );
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    expect(harness.logs.some(line => line.includes('failed; continuing'))).toBe(true);
+    expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
+  });
+
+  it('reports skipped files without failing session readiness', async () => {
+    const skippedDiffs = Array.from({ length: 20 }, (_, index) => ({
+      file: `src/some/deeply/nested/lost-${index}.txt`,
+      reason: 'patch_apply_failed' as const,
+    }));
+    const harness = createHarness(FAST_TIMERS, {
+      recoverWorktree: async () => ({
+        applied: 0,
+        skipped: skippedDiffs.length,
+        total: skippedDiffs.length,
+        skippedDiffs,
+      }),
+    });
+    harness.setSessionExists(false);
+    await harness.manager.prepare(
+      routeSpec({ git: { url: 'https://github.com/acme/repo.git' }, worktreeRecovery: recovery })
+    );
+    expect(
+      harness.logs.some(line => line.includes('restore incomplete') && line.includes('lost-0.txt'))
+    ).toBe(true);
+    const detail = harness.frames.find(
+      frame => frame.type === 'session.progress' && frame.detail?.includes('incomplete')
+    );
+    expect(detail).toBeDefined();
+    expect(controlPlaneWrapperFrameSchema.safeParse(detail).success).toBe(true);
+    expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(false);
+  });
+});
 
 function timers(overrides: Partial<ControlPlaneTimers['wrapper']> = {}): ControlPlaneTimers {
   return {
@@ -113,6 +283,8 @@ function createHarness(
     beforeEnsure?: () => Promise<void>;
     homeRoot?: string;
     beforeInstall?: () => Promise<void>;
+    recoverWorktree?: typeof restoreWorktreeRecovery;
+    beforeCapture?: () => Promise<void>;
   } = {}
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -199,6 +371,7 @@ function createHarness(
       ? {
           capture: {
             request: async (sessionId: string, commit: string | undefined, timeoutMs: number) => {
+              await options.beforeCapture?.();
               captureRequests.push({ sessionId, commit, timeoutMs });
               if (captureResult === 'throw') throw new Error('capture channel failed');
               return captureResult;
@@ -250,6 +423,7 @@ function createHarness(
       return restore();
     }) as never,
     seedRegistration: async () => undefined,
+    recoverWorktree: options.recoverWorktree,
     sessionExists: async () => {
       if (sessionExistsHung) return new Promise<boolean>(() => undefined);
       return sessionExists;

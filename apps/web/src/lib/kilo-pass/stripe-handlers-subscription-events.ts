@@ -138,7 +138,7 @@ export async function handleKiloPassSubscriptionEvent(params: {
         throw new Error(`Failed to reconcile Kilo Pass subscription ${eventSubscription.id}`);
 
       const pauseCollection = currentSubscription.pause_collection;
-      if (pauseCollection?.behavior) {
+      if (!isNowEnded && pauseCollection?.behavior) {
         await openPauseEvent(tx, {
           kiloPassSubscriptionId: row.id,
           pausedAt: dayjs().utc().toISOString(),

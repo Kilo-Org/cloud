@@ -4,10 +4,6 @@ import { HomeScreen } from '@/components/home/home-screen';
 
 vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'pr-review',
-  useFeatureFlag: () => true,
-}));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   RefreshControl: 'RefreshControl',

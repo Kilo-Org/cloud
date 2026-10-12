@@ -1210,6 +1210,111 @@ describe('handleKiloPassInvoicePaid', () => {
     }
   );
 
+  test('duplicate-card cancellation closes an existing open pause event', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const firstClaimant = await insertTestUser();
+    const fingerprint = `fp_paused_blocked_${Math.random()}`;
+    const [firstClaimantSubscription] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: firstClaimant.id,
+        payment_provider: KiloPassPaymentProvider.Stripe,
+        provider_subscription_id: 'sub_existing_winner',
+        stripe_subscription_id: 'sub_existing_winner',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    await db.insert(kilo_pass_issuances).values({
+      kilo_pass_subscription_id: firstClaimantSubscription.id,
+      issue_month: '2026-06-01',
+      source: KiloPassIssuanceSource.StripeInvoice,
+      stripe_invoice_id: 'in_existing_winner',
+    });
+    await db.insert(kilo_pass_welcome_promo_payment_fingerprint_claims).values({
+      stripe_payment_method_type: KiloPassWelcomePromoPaymentFingerprintType.Card,
+      stripe_fingerprint: fingerprint,
+      source_stripe_invoice_id: 'in_existing_winner',
+    });
+    const stripeSubscriptionId = `sub_paused_blocked_${Math.random()}`;
+    const stripeInvoiceId = `in_paused_blocked_${Math.random()}`;
+    const [pausedSubscription] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        payment_provider: KiloPassPaymentProvider.Stripe,
+        provider_subscription_id: stripeSubscriptionId,
+        stripe_subscription_id: stripeSubscriptionId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    await db.insert(kilo_pass_pause_events).values({
+      kilo_pass_subscription_id: pausedSubscription.id,
+      paused_at: '2026-06-01T00:00:00.000Z',
+      resumes_at: null,
+    });
+    const metadata = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+
+    await handleKiloPassInvoicePaid({
+      eventId: 'evt_paused_blocked_initial',
+      invoice: makeStripeInvoice({
+        id: stripeInvoiceId,
+        amount_paid_cents: 1900,
+        created_seconds: 1_780_272_000,
+        paid_seconds: 1_780_272_000,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubscriptionId,
+        metadata,
+        invoicePaymentId: 'inpay_paused_blocked',
+        invoicePayment: {
+          type: 'charge',
+          charge: makeFingerprintCharge('ch_paused_blocked', 'card', fingerprint),
+        },
+        billingReason: 'subscription_create',
+      }),
+      stripe: {
+        subscriptions: {
+          retrieve: jest.fn(async () =>
+            makeStripeSubscription({
+              id: stripeSubscriptionId,
+              start_date_seconds: 1_780_272_000,
+              metadata,
+            })
+          ),
+          cancel: jest.fn(async () => ({ id: stripeSubscriptionId })),
+        },
+        refunds: { create: jest.fn(async () => ({ id: 're_paused_blocked' })) },
+      } as unknown as Stripe,
+    });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.id, pausedSubscription.id),
+    });
+    expect(subscription?.status).toBe('canceled');
+    const pauseEvents = await db
+      .select({ resumedAt: kilo_pass_pause_events.resumed_at })
+      .from(kilo_pass_pause_events)
+      .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, pausedSubscription.id));
+    expect(pauseEvents).toHaveLength(1);
+    expect(pauseEvents[0]?.resumedAt).not.toBeNull();
+    expect(new Date(pauseEvents[0]!.resumedAt!).toISOString()).toBe(
+      new Date(subscription!.ended_at!).toISOString()
+    );
+  });
+
   test('duplicate-card replay retries refund when cancellation audit exists without refund audit', async () => {
     const { handleKiloPassInvoicePaid } =
       await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
@@ -4368,6 +4473,171 @@ describe('handleKiloPassInvoicePaid', () => {
     expect(subRow).toBeTruthy();
     expect(subRow?.status).toBe('canceled');
     expect(subRow?.ended_at).not.toBeNull();
+  });
+
+  test.each(['canceled', 'unpaid', 'incomplete_expired'] as const)(
+    'invoice.paid reconciling a %s Stripe subscription closes its open pause event',
+    async status => {
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const stripeSubId = `sub_ended_paused_${Math.random()}`;
+      const endedAtSeconds = 1_767_312_000;
+      const [existing] = await db
+        .insert(kilo_pass_subscriptions)
+        .values({
+          kilo_user_id: user.id,
+          provider_subscription_id: stripeSubId,
+          stripe_subscription_id: stripeSubId,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+          started_at: new Date(1_735_689_600 * 1000).toISOString(),
+          current_streak_months: 1,
+        })
+        .returning({ id: kilo_pass_subscriptions.id });
+      await db.insert(kilo_pass_pause_events).values({
+        kilo_pass_subscription_id: existing.id,
+        paused_at: '2025-12-15T00:00:00.000Z',
+        resumes_at: null,
+      });
+
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_735_689_600,
+        metadata: meta,
+        status,
+        ended_at: endedAtSeconds,
+      });
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_ended_paused_${status}`,
+        invoice: makeStripeInvoice({
+          id: `inv_ended_paused_${Math.random()}`,
+          amount_paid_cents: 1900,
+          period_start_seconds: 1_767_225_600,
+          created_seconds: 1_767_225_600,
+          priceId,
+          subscriptionIdOrExpanded: stripeSubId,
+          metadata: meta,
+        }),
+        stripe: {
+          subscriptions: { retrieve: jest.fn(async () => subscription) },
+        } as unknown as Stripe,
+      });
+
+      const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.id, existing.id),
+      });
+      expect(subRow?.status).toBe(status);
+      const pauseEvents = await db
+        .select({ resumedAt: kilo_pass_pause_events.resumed_at })
+        .from(kilo_pass_pause_events)
+        .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, existing.id));
+      expect(pauseEvents).toHaveLength(1);
+      expect(pauseEvents[0]?.resumedAt).not.toBeNull();
+    }
+  );
+
+  test('invoice.paid closes a pause opened after the Stripe subscription ended at reconciliation time', async () => {
+    const { handleKiloPassInvoicePaid } =
+      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const stripeSubId = `sub_ended_before_pause_${Math.random()}`;
+    const endedAtSeconds = 1_767_312_000;
+    const pausedAt = '2026-01-03T00:00:00.000Z';
+    const [existing] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        provider_subscription_id: stripeSubId,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'canceled',
+        started_at: new Date(1_735_689_600 * 1000).toISOString(),
+        ended_at: new Date(endedAtSeconds * 1000).toISOString(),
+        current_streak_months: 1,
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    await db.insert(kilo_pass_pause_events).values({
+      kilo_pass_subscription_id: existing.id,
+      paused_at: pausedAt,
+      resumes_at: null,
+    });
+
+    const meta = kiloPassMetadata({
+      kiloUserId: user.id,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const priceId = await getKiloPassPriceId({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+    });
+    const handlerStartedAtMs = Date.now();
+
+    await expect(
+      handleKiloPassInvoicePaid({
+        eventId: 'evt_ended_before_pause',
+        invoice: makeStripeInvoice({
+          id: `inv_ended_before_pause_${Math.random()}`,
+          amount_paid_cents: 1900,
+          period_start_seconds: 1_767_225_600,
+          created_seconds: 1_767_225_600,
+          priceId,
+          subscriptionIdOrExpanded: stripeSubId,
+          metadata: meta,
+        }),
+        stripe: {
+          subscriptions: {
+            retrieve: jest.fn(async () =>
+              makeStripeSubscription({
+                id: stripeSubId,
+                start_date_seconds: 1_735_689_600,
+                metadata: meta,
+                status: 'canceled',
+                ended_at: endedAtSeconds,
+              })
+            ),
+          },
+        } as unknown as Stripe,
+      })
+    ).resolves.toBeUndefined();
+    const handlerFinishedAtMs = Date.now();
+
+    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.id, existing.id),
+    });
+    expect(subRow?.status).toBe('canceled');
+    expect(new Date(subRow!.ended_at!).toISOString()).toBe(
+      new Date(endedAtSeconds * 1000).toISOString()
+    );
+    const pauseEvents = await db
+      .select({ resumedAt: kilo_pass_pause_events.resumed_at })
+      .from(kilo_pass_pause_events)
+      .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, existing.id));
+    expect(pauseEvents).toHaveLength(1);
+    const resumedAtMs = new Date(pauseEvents[0]!.resumedAt!).getTime();
+    expect(resumedAtMs).toBeGreaterThanOrEqual(new Date(pausedAt).getTime());
+    expect(resumedAtMs).toBeGreaterThanOrEqual(handlerStartedAtMs);
+    expect(resumedAtMs).toBeLessThanOrEqual(handlerFinishedAtMs);
+    const issuances = await db
+      .select({ id: kilo_pass_issuances.id })
+      .from(kilo_pass_issuances)
+      .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, existing.id));
+    expect(issuances).toHaveLength(1);
   });
 
   describe('streak across pauses', () => {

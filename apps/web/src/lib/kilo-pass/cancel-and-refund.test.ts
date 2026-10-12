@@ -2,7 +2,11 @@ import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals
 import type Stripe from 'stripe';
 
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
-import { kilo_pass_store_purchases, kilo_pass_subscriptions } from '@kilocode/db/schema';
+import {
+  kilo_pass_pause_events,
+  kilo_pass_store_purchases,
+  kilo_pass_subscriptions,
+} from '@kilocode/db/schema';
 import {
   KiloPassCadence,
   KiloPassPaymentProvider,
@@ -11,6 +15,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
+import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
 
 // ── Stripe mock ───────────────────────────────────────────────────────────────
 
@@ -156,5 +161,63 @@ describe('cancelAndRefundKiloPassForUser', () => {
     });
     expect(subRow?.status).toBe('active');
     expect(subRow?.ended_at).toBeNull();
+  });
+
+  it('closes the open pause event when cancelling and refunding a paused Stripe subscription', async () => {
+    const stripeMock = getStripeMock();
+    stripeMock.subscriptions.cancel.mockResolvedValue({});
+    stripeMock.invoices.list.mockResolvedValue({ data: [{ id: 'in_paused_paid' }] });
+    stripeMock.invoicePayments.list.mockResolvedValue({
+      data: [{ payment: { payment_intent: 'pi_paused_paid' } }],
+    });
+    stripeMock.refunds.create.mockResolvedValue({ amount: 1900 });
+    const user = await insertTestUser();
+    const stripeSubscriptionId = `sub_paused_${crypto.randomUUID()}`;
+    const [subscription] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        provider_subscription_id: stripeSubscriptionId,
+        stripe_subscription_id: stripeSubscriptionId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        started_at: '2026-01-01T00:00:00.000Z',
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+    await db.insert(kilo_pass_pause_events).values({
+      kilo_pass_subscription_id: subscription!.id,
+      paused_at: '2026-02-01T00:00:00.000Z',
+      resumes_at: null,
+    });
+
+    const result = await cancelAndRefundKiloPassForUser({
+      db,
+      stripe: stripeMock as unknown as Parameters<
+        typeof cancelAndRefundKiloPassForUser
+      >[0]['stripe'],
+      userId: user.id,
+      reason: 'test-reason',
+      adminKiloUserId: user.id,
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({ status: 'cancelled_and_refunded', refundedAmountCents: 1900 })
+    );
+    expect(stripeMock.subscriptions.cancel).toHaveBeenCalledWith(stripeSubscriptionId);
+    expect(stripeMock.invoices.list).toHaveBeenCalledWith({
+      subscription: stripeSubscriptionId,
+      status: 'paid',
+      limit: 1,
+    });
+    expect(stripeMock.refunds.create).toHaveBeenCalledWith({ payment_intent: 'pi_paused_paid' });
+    const pauseEvents = await db
+      .select({ resumedAt: kilo_pass_pause_events.resumed_at })
+      .from(kilo_pass_pause_events)
+      .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, subscription!.id));
+    expect(pauseEvents).toEqual([{ resumedAt: expect.any(String) }]);
+    expect(await getKiloPassStateForUser(db, user.id)).toEqual(
+      expect.objectContaining({ status: 'canceled', resumesAt: null })
+    );
   });
 });

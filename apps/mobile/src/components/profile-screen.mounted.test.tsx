@@ -77,10 +77,6 @@ vi.mock('expo-application', () => ({
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
 }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'mobile-pr-review',
-  useFeatureFlag: () => true,
-}));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1' }),
 }));

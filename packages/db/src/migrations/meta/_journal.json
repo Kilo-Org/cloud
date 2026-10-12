@@ -1919,6 +1919,13 @@
       "when": 1791468981098,
       "tag": "0273_fast_sandman",
       "breakpoints": true
+    },
+    {
+      "idx": 274,
+      "version": "7",
+      "when": 1791665999549,
+      "tag": "0274_drop_quick_chat",
+      "breakpoints": true
     }
   ]
 }

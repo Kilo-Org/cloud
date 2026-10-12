@@ -247,6 +247,20 @@ describe('signupDecide', () => {
     expect((await signupDecide(request))?.enforced).toBe(true);
   });
 
+  it('accepts a manual ban rejection', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({
+        enforced: true,
+        code: 'signup_rate_limited',
+        retryAfterMs: 30 * 24 * 60 * 60 * 1000,
+        flags: [
+          { name: 'signup:banned', decision: 'block', enforced: true, until: null, source: 'ja4' },
+        ],
+      })
+    );
+    expect((await signupDecide(request))?.enforced).toBe(true);
+  });
+
   it('preserves shadow flags without manufacturing enforcement', async () => {
     const verdict = { enforced: false, flags: [{ ...flag, enforced: false, decision: 'review' }] };
     mockFetch.mockResolvedValue(Response.json(verdict));

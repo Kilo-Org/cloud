@@ -15,7 +15,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { resolveSessionPrPressTarget } from '@/lib/session-pr-navigation';
+import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
@@ -44,13 +44,13 @@ import {
 export type RowVariant = 'list' | 'card';
 
 /**
- * Opens a session's associated PR through the provider-aware, flag-aware route.
+ * Opens a session's associated PR through the provider-aware route.
  * The native router and browser imports are lazy: they cannot load under the
  * mounted row tests' node environment, and only the long-press entry reaches
  * them.
  */
 async function openSessionPr(url: string | null | undefined, label: string): Promise<void> {
-  const target = await resolveSessionPrPressTarget({ url });
+  const target = resolveSessionPrTapTarget({ url });
   if (target.kind === 'in-app') {
     const { router } = await import('expo-router');
     router.push(target.href);

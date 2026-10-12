@@ -1,0 +1,29 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.kiloandroidmodel'
+version = '1.0.0'
+
+android {
+  namespace 'expo.modules.kiloandroidmodel'
+
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+    consumerProguardFiles 'consumer-rules.pro'
+  }
+}
+
+dependencies {
+  // beta3/beta4 are published with Kotlin 2.3 metadata and stdlib 2.3.21.
+  // beta2 supplies the complete text API with metadata 2.2 and stdlib 1.8.0.
+  implementation('com.google.mlkit:genai-prompt') {
+    version { strictly '1.0.0-beta2' }
+  }
+  implementation('com.google.mlkit:genai-common') {
+    version { strictly '1.0.0-beta3' }
+  }
+  implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+}

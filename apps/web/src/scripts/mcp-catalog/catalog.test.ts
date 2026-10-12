@@ -130,6 +130,9 @@ describe('mcp-catalog catalog', () => {
       expect(isDenylistedPath('slack.testConnection')).toBe(false);
       // `debug` is published and carries the guard marker, so it is not internal.
       expect(isDenylistedPath('debug.ping')).toBe(false);
+      // Native-only credential issuers are withheld by exact path.
+      expect(isDenylistedPath('activeSessions.widgetCredential')).toBe(true);
+      expect(isDenylistedPath('activeSessions.getToken')).toBe(false);
     });
 
     it('fails on a zero-row catalog instead of emitting an empty one', () => {

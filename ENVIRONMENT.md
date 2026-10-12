@@ -285,6 +285,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
   - Bouncer defaults to 3 admissions per canonical IP per rolling 30 days. The shorter 24-hour limit is also 3.
   - JA4 defaults to 10 admissions per fingerprint per rolling 720 hours (30 days), independently of the IP limits. A shared TLS/HTTP fingerprint can cover unrelated people behind proxies or common clients: JA4 throttling risks false positives and must be evaluated separately from IP enforcement.
   - The Bouncer Exemptions tab accepts user IDs and IPs. Exempt requests bypass all Bouncer rules, not Cloud authentication or billing.
+  - The Bouncer Bans tab bans an IP or an exact JA4 digest from signup. A ban returns an enforced `signup_rate_limited` verdict with one `signup:banned` flag and `until: null`. Cloud maps it to `SIGNUP-RATE-LIMITED`.
   - Signed-in decisions carry the actual actor's `userId` separately from the payer's `accountId`, including organization-paid requests.
   - IP exemptions cover signup and inference; IPv6 covers the whole /64. An exempt signup IP bypasses both IP and JA4 counters. Signup has no user ID before account creation; no JA4 exemption or user fingerprint field is added.
   - Admission and creation logs share the operation ID. They exclude raw email and distinguish completed creation, rejection, and Stripe or transaction failure.

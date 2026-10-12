@@ -70,11 +70,15 @@ const fakeFs = vi.hoisted(() => {
 
 const mocks = vi.hoisted(() => ({
   clearClipboardImages: vi.fn(),
+  clearChatBackends: vi.fn(),
   clearFilePartCache: vi.fn(),
   clearMarkdownImageConfirmMemory: vi.fn(),
   clearSessionAutoApprove: vi.fn(),
   clearToolCardImageCache: vi.fn(),
+  clearRemoteMcpServers: vi.fn(),
+  clearSettingsToolsEnabled: vi.fn(),
   clearTrustedHosts: vi.fn(),
+  forgetRemoteMcp: vi.fn(),
   clearTrustedImageHosts: vi.fn(),
   notifyArtifactsChanged: vi.fn(),
   reapTempFiles: vi.fn(),
@@ -116,6 +120,18 @@ vi.mock('@/lib/hooks/use-trusted-image-hosts', () => ({
   clearTrustedImageHosts: mocks.clearTrustedImageHosts,
 }));
 vi.mock('@/lib/temp-file-registry', () => ({ reapTempFiles: mocks.reapTempFiles }));
+// The remote MCP connection, its stored servers and the settings-tools group
+// switch are account-scoped; their own suites cover what each clear resets.
+vi.mock('@/lib/chat/remote-mcp', () => ({ forgetRemoteMcp: mocks.forgetRemoteMcp }));
+vi.mock('@/lib/chat/remote-mcp-store', () => ({
+  clearRemoteMcpServers: mocks.clearRemoteMcpServers,
+}));
+// The backend store reaches native crypto and SecureStore. Its own tests cover
+// credential removal across account changes.
+vi.mock('@/lib/chat/backend-store', () => ({ clearChatBackends: mocks.clearChatBackends }));
+vi.mock('@/lib/chat/settings-tools-switch', () => ({
+  clearSettingsToolsEnabled: mocks.clearSettingsToolsEnabled,
+}));
 // The platform provider bridge: sign-out has to tell an open Files app the tree
 // changed, or it keeps the listing it read before the wipe.
 vi.mock('@/lib/artifacts/artifact-provider-native', () => ({
@@ -136,6 +152,10 @@ const SESSION_MEMBERS = [
   mocks.clearFilePartCache,
   mocks.clearClipboardImages,
   mocks.clearSessionAutoApprove,
+  mocks.forgetRemoteMcp,
+  mocks.clearRemoteMcpServers,
+  mocks.clearChatBackends,
+  mocks.clearSettingsToolsEnabled,
 ];
 
 /** Android mirror root: `Paths.document` plus the mirror folder name. */

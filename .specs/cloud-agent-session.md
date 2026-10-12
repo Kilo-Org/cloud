@@ -116,6 +116,13 @@ repository.
    descendant progress MUST count for its ancestors, never unrelated roots.
    Requests waiting on the user MUST pause only the no-progress clock when no
    independent work is runnable. Resolving one request MUST NOT clear another.
+   A Kilo that stops answering while the sandbox reclaims at its memory cap
+   MUST be held instead of restarted, for at most ten minutes; the hold MUST
+   pause the no-progress clock and post a non-fatal notice. A turn failed by the
+   hang restart that ends an expired hold MUST say that the sandbox ran out of
+   memory. A turn failed by another hang restart MUST say that Kilo was not
+   responding, unless the restart was for exhausted activity-tracking capacity
+   while Kilo still answered.
    The separate 120-minute execution cap MUST include user waits. Native
    cancellation MUST be bounded and confirmed; unconfirmed cancellation MUST
    use bounded runtime recovery. Accepted Cloud messages MUST settle once;

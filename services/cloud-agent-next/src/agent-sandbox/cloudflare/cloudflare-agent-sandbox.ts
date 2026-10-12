@@ -21,9 +21,9 @@ import { SANDBOX_SLEEP_AFTER_SECONDS } from '../../core/lease.js';
 import {
   generateSandboxId,
   deriveRetiredDindSandboxId,
-  getSandboxNamespace,
   MANAGED_SCM_OUTBOUND_HANDLER,
 } from '../../sandbox-id.js';
+import { resolveSandboxNamespace } from '../../sandbox-placement.js';
 import { SessionService } from '../../session-service.js';
 import { logger } from '../../logger.js';
 import { WrapperClient, WrapperContainerClient } from '../../kilo/wrapper-client.js';
@@ -158,8 +158,10 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     this.resolveSandbox =
       dependencies.resolveSandbox ??
       ((sandboxId, options) => {
-        const namespace = getSandboxNamespace(this.env, sandboxId, {
-          managedScmContainment: requiresContainmentSandbox(this.metadata),
+        const namespace = resolveSandboxNamespace(this.env, {
+          sandboxId,
+          sandboxKind: this.metadata.workspace?.sandboxKind,
+          contained: requiresContainmentSandbox(this.metadata),
         });
         return options
           ? getSandbox(namespace, sandboxId, options)

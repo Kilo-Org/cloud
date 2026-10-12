@@ -12,6 +12,7 @@ import { dismissNeedsInputNotification } from '@/lib/needs-input-notification';
 import {
   androidSink,
   renderStoredSnapshotWithNotice,
+  setGlanceableActionApproving,
   setGlanceableActionNotice,
 } from './android-sink';
 
@@ -19,24 +20,21 @@ import {
  * The JS bodies the ongoing notification's Approve action runs headless.
  *
  * Two registrations share this module. `handleApproveTask` answers the ask the
- * app recorded, and the entry registers it under `APPROVE_HEADLESS_TASK_KEY`
- * via the Kotlin worker; `runApproveTask` runs the front-approval service and
- * is registered under `APPROVE_AGENT_TASK_KEY` by `registerApproveTask`, the
- * key the `ActiveAgentsApproveTaskService` chain starts. Only the strings cross
- * the native boundary, so they are asserted equal in `approve-task.test.ts`.
+ * app recorded, and the entry registers it under `KiloActiveAgentsApprove`,
+ * the Kotlin worker's `TASK_NAME`; `runApproveTask` runs the front-approval
+ * service and is registered under `APPROVE_AGENT_TASK_KEY` by
+ * `registerApproveTask`, the key the `ActiveAgentsApproveTaskService` chain
+ * starts. Only the strings cross the native boundary.
  *
  * The recorded waiting ask is the only thing `handleApproveTask` answers —
  * never the snapshot's counts — and it also names the ids the republish below
  * needs.
- */
-export const APPROVE_HEADLESS_TASK_KEY = 'KiloActiveAgentsApprove';
-
-/**
+ *
  * The key the `ActiveAgentsApproveTaskService` chain starts. One literal,
  * shared by the Kotlin service and this registration: a mismatch would leave
  * that notification action with no task.
  */
-export const APPROVE_AGENT_TASK_KEY = 'ActiveAgentsApprove';
+const APPROVE_AGENT_TASK_KEY = 'ActiveAgentsApprove';
 
 /** The approval the task runs. Injected so the flow is unit-testable. */
 export type ApproveRunner = () => Promise<void>;
@@ -76,6 +74,22 @@ async function showApproveFailed(ask: WaitingAsk): Promise<void> {
 }
 
 /**
+ * Show the answer in flight: the card reads "Approving…" and drops Approve until
+ * the answer settles. Best-effort: the republish after the answer redraws it.
+ */
+async function showApproving(ask: WaitingAsk): Promise<void> {
+  setGlanceableActionApproving(true);
+  try {
+    await renderStoredSnapshotWithNotice({
+      userId: ask.userId,
+      organizationId: ask.organizationId,
+    });
+  } catch {
+    // The answer still runs; the republish below corrects the surface.
+  }
+}
+
+/**
  * Answer the recorded ask and update the notification in place. Never throws:
  * the worker completes from the headless task's finish, so a rejection would
  * only lose the failure state the user needs to see. A thrown error is a
@@ -111,6 +125,7 @@ export async function handleApproveTask(): Promise<void> {
       // Nothing is recorded, so there is no ask to answer and no action to drop.
       return;
     }
+    await showApproving(ask);
     const result = await runGlanceableApprove({ now: () => Date.now() });
     askEnded = result.kind === 'approved' || result.kind === 'gone';
     if (result.kind === 'gone') {
@@ -124,6 +139,8 @@ export async function handleApproveTask(): Promise<void> {
     // Keep the recorded ask and its Approve; only the failure line is needed.
     failed = ask !== null;
   }
+  // Settled either way: the next draw shows the answer, the failure, or Approve again.
+  setGlanceableActionApproving(false);
   if (ask === null) {
     return;
   }

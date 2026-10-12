@@ -16,7 +16,7 @@ import {
   sessionTerminalCreatePayloadSchema,
   sessionTerminalResizePayloadSchema,
 } from './sandbox-control-protocol.js';
-import { sessionGitSummaryPayloadSchema } from './worktree-changes-wire.js';
+import { sessionGitSummaryPayloadSchema, worktreeRecoverySchema } from './worktree-changes-wire.js';
 
 export const CONTROL_PLANE_PROTOCOL_VERSION = 3;
 
@@ -108,6 +108,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'sandbox_lost',
   'agent_restarted',
   'sandbox_out_of_memory',
+  'agent_unresponsive',
   'no_progress',
   'no_outcome',
   'prompt_failed',
@@ -244,6 +245,7 @@ export const controlPlaneRouteSpecSchema = z
     createdOnPlatform: z.string().max(256).optional(),
     branch: z.string().min(1).max(256).optional(),
     branchMode: z.literal('working').optional(),
+    worktreeRecovery: worktreeRecoverySchema.optional(),
     git: controlPlaneRouteGitSchema.optional(),
     kilo: controlPlaneRouteKiloSchema.optional(),
     env: z.record(z.string().max(256), z.string().max(10000)).optional(),

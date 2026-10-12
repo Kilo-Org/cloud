@@ -611,7 +611,7 @@ describe('default SDK health diagnostics', () => {
     }
   });
 
-  it('attaches the latest workload snapshot and names memory exhaustion on a health restart', async () => {
+  it('attaches the latest workload snapshot to a health restart without naming memory exhaustion', async () => {
     const gib = 1024 ** 3;
     const snapshot: WorkloadSnapshot = {
       aggregateMaxBytes: 11 * gib,
@@ -662,9 +662,8 @@ describe('default SDK health diagnostics', () => {
         serverCurrentBytes: 7 * gib,
         pressureAvailable: true,
       });
-      expect(test.restartInfos).toEqual([
-        { reason: 'hang', outcomeReason: 'sandbox_out_of_memory' },
-      ]);
+      // A full cap can be reclaimable page cache; only an expired memory hold names it.
+      expect(test.restartInfos).toEqual([{ reason: 'hang' }]);
     } finally {
       await test.runtime.shutdown();
       await server.stop(true);

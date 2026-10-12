@@ -1,4 +1,5 @@
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { captureException } from '@sentry/nextjs';
 
 import {
@@ -236,22 +237,27 @@ async function markGooglePlayStoreEventProcessed(
 }
 
 async function markGooglePlaySubscriptionEnded(
-  dbOrTx: DbOrTx,
+  tx: DrizzleTransaction,
   purchaseToken: string
 ): Promise<void> {
-  await dbOrTx
+  const endedAt = new Date().toISOString();
+  const endedRows = await tx
     .update(kilo_pass_subscriptions)
     .set({
       status: 'canceled',
       cancel_at_period_end: false,
-      ended_at: new Date().toISOString(),
+      ended_at: endedAt,
     })
     .where(
       and(
         eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.GooglePlay),
         eq(kilo_pass_subscriptions.provider_subscription_id, purchaseToken)
       )
-    );
+    )
+    .returning({ id: kilo_pass_subscriptions.id });
+  for (const row of endedRows) {
+    await closePauseEvent(tx, { kiloPassSubscriptionId: row.id, resumedAt: endedAt });
+  }
 }
 
 async function getUserForGooglePlayRenewal(params: {
@@ -1146,7 +1152,7 @@ export async function processGooglePlayKiloPassNotification(params: {
       await markGooglePlayStoreEventProcessed(eventId);
       return { processed: true };
     }
-    await markGooglePlaySubscriptionEnded(db, purchaseToken);
+    await db.transaction(tx => markGooglePlaySubscriptionEnded(tx, purchaseToken));
     await appendKiloPassAuditLog(db, {
       action: KiloPassAuditLogAction.StoreSubscriptionExpired,
       result: KiloPassAuditLogResult.Success,

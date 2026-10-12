@@ -11,6 +11,7 @@ import type { KiloFeedEvent } from '../control/worktree-feed.js';
 import { runtimeKey } from './prepare.js';
 import {
   createTurnManager,
+  MEMORY_HOLD_WARNING,
   type TurnKiloRuntime,
   type TurnManagerDeps,
   type TurnScheduler,
@@ -391,6 +392,51 @@ describe('turn manager submission', () => {
     expect(h.client(routeSpec()).aborts).toEqual([]);
     expect(outcomeFrames(h.frames)).toHaveLength(1);
   });
+  it('warns and holds the prompt delivery deadline while the runtime is memory-held', async () => {
+    // Kilo never observes the prompt: its attachment materialization does not finish.
+    const h = createHarness({ materializeAttachments: () => new Promise(() => undefined) });
+    const key = runtimeKey(routeSpec());
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.advance(60_000);
+    h.manager.onRuntimeMemoryHold({ directory: DIRECTORY, held: true, key });
+    expect(eventFrames(h.frames).filter(event => event.type === 'error')).toEqual([
+      { type: 'error', properties: { error: MEMORY_HOLD_WARNING, fatal: false } },
+    ]);
+    h.advance(10 * 60_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    expect(h.manager.hasPendingWork()).toBe(true);
+
+    // The deadline starts again when the hold ends.
+    h.manager.onRuntimeMemoryHold({ directory: DIRECTORY, held: false, key });
+    h.advance(120_000 - 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+  });
+
+  it('warns a turn that starts while its runtime is memory-held', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.onRuntimeMemoryHold({
+      directory: DIRECTORY,
+      held: true,
+      key: runtimeKey(routeSpec()),
+    });
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    expect(eventFrames(h.frames)).toContainEqual({
+      type: 'error',
+      properties: { error: MEMORY_HOLD_WARNING, fatal: false },
+    });
+  });
+
   it('submits a prompt with its messageId and completes on a completed turn-close', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());
@@ -577,7 +623,7 @@ describe('turn resubmission', () => {
     result.reject(Object.assign(new Error('socket closed'), { code: 'ECONNRESET' }));
     await settle();
     expect(outcomeFrames(h.frames)).toEqual([]);
-    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'exit', key: DIRECTORY });
     await settle();
     expect(h.client(spec).prompts).toEqual([]);
     expect(outcomeFrames(h.frames)[0]).toMatchObject({
@@ -698,7 +744,7 @@ describe('turn resubmission', () => {
           type: 'session.outcome',
           sessionId: SESSION_ID,
           status: 'failed',
-          reason: 'agent_restarted',
+          reason: 'agent_unresponsive',
           lastMessageId: 'm1',
         },
       ]);
@@ -751,7 +797,7 @@ describe('turn resubmission', () => {
     expect(outcomeFrames(h.frames)).toHaveLength(1);
     expect(outcomeFrames(h.frames)[0]).toMatchObject({
       status: 'failed',
-      reason: 'agent_restarted',
+      reason: 'agent_unresponsive',
       lastMessageId: 'm2',
     });
   });
@@ -1025,7 +1071,7 @@ describe('turn resubmission', () => {
         part: { sessionID: KILO_SESSION, messageID: 'assistant-1', type: 'tool', tool: 'bash' },
       })
     );
-    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'exit', key: DIRECTORY });
     await settle();
     expect(client.prompts).toHaveLength(1);
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'agent_restarted' });
@@ -1704,7 +1750,7 @@ describe('turn finalization', () => {
     h.setFlags(routeSpec(), { restarting: true, suspected: true });
     h.manager.submit(SESSION_ID, promptPayload('m2'));
     await settle();
-    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'exit', key: DIRECTORY });
     await settle();
     const outcomes = outcomeFrames(h.frames);
     expect(outcomes).toHaveLength(1);
@@ -1749,7 +1795,7 @@ describe('turn finalization', () => {
     await settle();
     h.manager.submit(SESSION_ID, promptPayload('m2'));
     await settle();
-    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'exit', key: DIRECTORY });
     await settle();
     const outcomes = outcomeFrames(h.frames);
     expect(outcomes).toHaveLength(1);
@@ -2143,6 +2189,31 @@ describe('native session outcome transitions', () => {
     ]);
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'cancelled' });
   });
+
+  it.each([
+    ['hang', undefined, 'agent_unresponsive', 'Kilo was not responding and was restarted'],
+    ['hang', 'activity_capacity', 'agent_restarted', 'the agent restarted'],
+    ['exit', undefined, 'agent_restarted', 'the agent restarted'],
+  ] as const)(
+    'reports a %s (%s) restart of native work without a Cloud turn as %s',
+    async (reason, trigger, expected, text) => {
+      const h = createHarness();
+      h.registerRoute(routeSpec());
+      h.manager.onRuntimeRestart({
+        directory: DIRECTORY,
+        reason,
+        ...(trigger === undefined ? {} : { trigger }),
+        key: runtimeKey(routeSpec()),
+        interruptedExecutions: [
+          { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
+        ],
+      });
+      await settle();
+      const error = eventFrames(h.frames).find(event => event.type === 'session.error');
+      expect(error?.properties).toMatchObject({ sessionID: KILO_SESSION, reason: expected });
+      expect(String(error?.properties.error)).toContain(text);
+    }
+  );
 
   it('projects a no_progress failure with the parsed outcomeReason', async () => {
     const h = createHarness();

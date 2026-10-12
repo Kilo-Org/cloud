@@ -1722,8 +1722,8 @@
       "toolList": "listar",
       "toolPatch": "aplicar alterações",
       "toolTask": "tarefa",
-      "readTodos": "Ler tarefas",
-      "updateTodos": "Atualizar tarefas",
+      "readTodos": "Ler plano",
+      "updateTodos": "Atualizar plano",
       "linesBadge": "{{displayCount}} linhas",
       "filesBadge": "{{displayCount}} arquivos",
       "matchesBadge": "{{displayCount}} resultados",
@@ -3619,5 +3619,82 @@
     "noMatchingProductsPlay": "O Google Play não retornou nenhum pacote de créditos correspondente.",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Conta Apple pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos nesta conta do Google Play pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los."
+  },
+  "todos": {
+    "saveAsTodo": "Salvar como tarefa",
+    "segment": {
+      "label": "Visão de agentes",
+      "sessions": "Sessões",
+      "todos": "Tarefas"
+    },
+    "lists": {
+      "newList": "Nova lista",
+      "empty": "Ainda não há listas",
+      "couldNotLoad": "Não foi possível carregar as listas",
+      "noRepository": "Sem repositório",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} abertas",
+      "openCount_other": "{{count}} abertas",
+      "openCount_many": "{{count}} abertas",
+      "archived_one": "Arquivadas ({{count}})",
+      "archived_other": "Arquivadas ({{count}})",
+      "archived_many": "Arquivadas ({{count}})",
+      "archive": "Arquivar",
+      "unarchive": "Desarquivar",
+      "deleteTitle": "Excluir {{name}}?",
+      "deleteMessage": "As tarefas dela também são excluídas. As sessões permanecem."
+    },
+    "listSettings": {
+      "title": "Configurações da lista",
+      "name": "Nome",
+      "namePlaceholder": "Bugs, Ideias, Versão…",
+      "emoji": "Emoji",
+      "mode": "Modo",
+      "defaultsHint": "As sessões iniciadas a partir desta lista usam estes padrões."
+    },
+    "list": {
+      "addPlaceholder": "Adicionar uma tarefa",
+      "add": "Adicionar tarefa",
+      "empty": "Ainda não há tarefas",
+      "setDefaults": "Definir repositório, modo e modelo",
+      "completed_one": "Concluídas ({{count}})",
+      "completed_other": "Concluídas ({{count}})",
+      "completed_many": "Concluídas ({{count}})"
+    },
+    "item": {
+      "markDone": "Marcar como concluída",
+      "markOpen": "Marcar como não concluída",
+      "markDonePrompt": "Marcar como concluída?",
+      "deleted": "Tarefa excluída",
+      "undo": "Desfazer",
+      "runCount_one": "{{count}} execução",
+      "runCount_other": "{{count}} execuções",
+      "runCount_many": "{{count}} execuções",
+      "startNow": "Iniciar sem revisão",
+      "startNowHint": "Pressione e segure para iniciar sem revisão",
+      "titleLabel": "Título da tarefa",
+      "notes": "Notas",
+      "notesPlaceholder": "Adicionar notas em Markdown",
+      "sessions": "Sessões vinculadas",
+      "noSessions": "Ainda não há sessões",
+      "linkSession": "Vincular sessão",
+      "unlinkSession": "Desvincular {{title}}",
+      "linkFailed": "Não foi possível vincular a sessão à tarefa"
+    },
+    "linkSession": {
+      "title": "Vincular uma sessão",
+      "empty": "Ainda não há sessões recentes",
+      "emptyInRepository": "Ainda não há sessões recentes em {{repository}}"
+    },
+    "upNext": "A seguir",
+    "sessionTodo": "Tarefa: {{title}}",
+    "linkToTodo": "Vincular a uma tarefa",
+    "candidates": {
+      "empty": "Não há tarefas abertas"
+    },
+    "saveSheet": {
+      "title": "Salvar em uma lista",
+      "saved": "Salvo em {{list}}"
+    }
   }
 }

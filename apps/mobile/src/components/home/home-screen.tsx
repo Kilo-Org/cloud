@@ -17,6 +17,7 @@ import { NewTaskButton } from '@/components/home/new-task-button';
 import { NewTaskFromPictureButton } from '@/components/home/new-task-from-picture-button';
 import { ProductChoices } from '@/components/home/product-choices';
 import { ScreenHeader } from '@/components/screen-header';
+import { UpNextSection } from '@/components/todos/up-next-section';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 
@@ -91,6 +92,7 @@ export function HomeScreen() {
           >
             <Animated.View layout={LinearTransition} className="gap-2">
               <AgentSessionsSection context={context} sessions={sessions} />
+              <UpNextSection organizationId={context.organizationId} enabled={context.isReady} />
               {context.isReady && (
                 <View className="gap-2 pt-4">
                   <NewTaskButton organizationId={context.organizationId} />

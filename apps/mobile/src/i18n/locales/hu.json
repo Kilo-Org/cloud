@@ -2251,8 +2251,8 @@
       "toolList": "listázás",
       "toolPatch": "módosítás",
       "toolTask": "feladat",
-      "readTodos": "Teendők olvasása",
-      "updateTodos": "Teendők frissítése",
+      "readTodos": "Terv olvasása",
+      "updateTodos": "Terv frissítése",
       "linesBadge": "{{displayCount}} sor",
       "filesBadge": "{{displayCount}} fájl",
       "matchesBadge": "{{displayCount}} találat",
@@ -3578,5 +3578,78 @@
     "noMatchingProductsPlay": "A Google Play nem adott vissza megfelelő kreditcsomagot.",
     "purchaseOwnedByAnotherAccount": "Az ehhez az Apple Account-fiókhoz tartozó kreditek egy másik Kilo-fiókhoz kapcsolódnak. A használatukhoz jelentkezz be abba a Kilo-fiókba.",
     "purchaseOwnedByAnotherAccountPlay": "Az ezen Google Play-fiókon lévő kreditek egy másik Kilo-fiókhoz tartoznak. A használatukhoz jelentkezz be abba a Kilo-fiókba."
+  },
+  "todos": {
+    "saveAsTodo": "Mentés teendőként",
+    "segment": {
+      "label": "Ügynöknézet",
+      "sessions": "Munkamenetek",
+      "todos": "Teendők"
+    },
+    "lists": {
+      "newList": "Új lista",
+      "empty": "Még nincsenek listák",
+      "couldNotLoad": "Nem sikerült betölteni a listákat.",
+      "noRepository": "Nincs adattár",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} nyitott",
+      "openCount_other": "{{count}} nyitott",
+      "archived_one": "Archivált ({{count}})",
+      "archived_other": "Archivált ({{count}})",
+      "archive": "Archiválás",
+      "unarchive": "Archiválás visszavonása",
+      "deleteTitle": "Törlöd ezt a listát: {{name}}?",
+      "deleteMessage": "A teendői is törlődnek. A munkamenetei megmaradnak."
+    },
+    "listSettings": {
+      "title": "Listabeállítások",
+      "name": "Név",
+      "namePlaceholder": "Hibák, ötletek, kiadás…",
+      "emoji": "Emodzsi",
+      "mode": "Mód",
+      "defaultsHint": "Az ebből a listából indított munkamenetek ezeket az alapértékeket használják."
+    },
+    "list": {
+      "addPlaceholder": "Írj be egy teendőt",
+      "add": "Teendő hozzáadása",
+      "empty": "Még nincsenek teendők",
+      "setDefaults": "Adattár, mód és modell beállítása",
+      "completed_one": "Befejezve ({{count}})",
+      "completed_other": "Befejezve ({{count}})"
+    },
+    "item": {
+      "markDone": "Késznek jelölése",
+      "markOpen": "Nem késznek jelölése",
+      "markDonePrompt": "Késznek jelölöd?",
+      "deleted": "Teendő törölve",
+      "undo": "Visszavonás",
+      "runCount_one": "{{count}} futás",
+      "runCount_other": "{{count}} futás",
+      "startNow": "Indítás ellenőrzés nélkül",
+      "startNowHint": "Hosszú nyomás az ellenőrzés nélküli indításhoz",
+      "titleLabel": "Teendő címe",
+      "notes": "Jegyzetek",
+      "notesPlaceholder": "Jegyzetek hozzáadása Markdownban",
+      "sessions": "Hozzákapcsolt munkamenetek",
+      "noSessions": "Még nincsenek munkamenetek",
+      "linkSession": "Munkamenet társítása",
+      "unlinkSession": "{{title}} leválasztása",
+      "linkFailed": "Nem sikerült a munkamenetet a teendőhöz kapcsolni."
+    },
+    "linkSession": {
+      "title": "Munkamenet hozzákapcsolása",
+      "empty": "Nincsenek legutóbbi munkamenetek",
+      "emptyInRepository": "Nincsenek legutóbbi munkamenetek itt: {{repository}}"
+    },
+    "upNext": "Következő",
+    "sessionTodo": "Teendő: {{title}}",
+    "linkToTodo": "Teendőhöz kapcsolás",
+    "candidates": {
+      "empty": "Nincsenek nyitott teendők"
+    },
+    "saveSheet": {
+      "title": "Mentés listába",
+      "saved": "Elmentve a listába: {{list}}"
+    }
   }
 }

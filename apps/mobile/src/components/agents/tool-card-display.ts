@@ -17,7 +17,7 @@ export type ToolDisplay = {
   /**
    * Whether the shown label (`subtitle ?? title`) carries tool content worth
    * translating. The fallback labels are either already-localized UI copy
-   * (`read`, `Read todos`) or raw tool ids (`websearch`); sending those to the
+   * (`read`, `Read plan`) or raw tool ids (`websearch`); sending those to the
    * gateway would translate text that is already in the app language, so the
    * transcript row skips them.
    */

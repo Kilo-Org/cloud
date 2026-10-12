@@ -29,7 +29,7 @@ import { trpcClient } from '@/lib/trpc';
 /**
  * One intent to prepare: the new-session form's draft, or the Continue
  * control's clone. `organizationId` scopes the create to the screen's
- * organization; the action path never carries one.
+ * organization; an OS-surface run never carries one.
  */
 export type PrepareAgentSessionInput =
   | {

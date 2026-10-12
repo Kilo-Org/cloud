@@ -2251,8 +2251,8 @@
       "toolList": "zerrendatu",
       "toolPatch": "aplikatu adabakia",
       "toolTask": "zeregina",
-      "readTodos": "Irakurri zereginak",
-      "updateTodos": "Eguneratu zereginak",
+      "readTodos": "Irakurri plana",
+      "updateTodos": "Eguneratu plana",
       "linesBadge": "{{displayCount}} lerro",
       "filesBadge": "{{displayCount}} fitxategi",
       "matchesBadge": "{{displayCount}} bat etortze",
@@ -3578,5 +3578,78 @@
     "noMatchingProductsPlay": "Google Play-k ez du bat datorren kreditu-paketerik itzuli.",
     "purchaseOwnedByAnotherAccount": "Apple Account honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan.",
     "purchaseOwnedByAnotherAccountPlay": "Google Play kontu honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan."
+  },
+  "todos": {
+    "saveAsTodo": "Gorde zeregin gisa",
+    "segment": {
+      "label": "Agenteen ikuspegia",
+      "sessions": "Saioak",
+      "todos": "Zereginak"
+    },
+    "lists": {
+      "newList": "Zerrenda berria",
+      "empty": "Oraindik ez dago zerrendarik",
+      "couldNotLoad": "Ezin izan dira zerrendak kargatu",
+      "noRepository": "Ez dago biltegirik",
+      "rowA11y": "{{name}} — {{openCount}}",
+      "openCount_one": "{{count}} irekita",
+      "openCount_other": "{{count}} irekita",
+      "archived_one": "Artxibatuta ({{count}})",
+      "archived_other": "Artxibatuta ({{count}})",
+      "archive": "Artxibatu",
+      "unarchive": "Desartxibatu",
+      "deleteTitle": "Ezabatu {{name}}?",
+      "deleteMessage": "Bere zereginak ere ezabatzen dira. Saioak mantendu egiten dira."
+    },
+    "listSettings": {
+      "title": "Zerrendaren ezarpenak",
+      "name": "Izena",
+      "namePlaceholder": "Akatsak, ideiak, argitalpena…",
+      "emoji": "Emojia",
+      "mode": "Modua",
+      "defaultsHint": "Zerrenda honetatik hasitako saioek balio lehenetsi hauek erabiltzen dituzte."
+    },
+    "list": {
+      "addPlaceholder": "Gehitu zeregin bat",
+      "add": "Zeregina gehitu",
+      "empty": "Oraindik ez dago zereginik",
+      "setDefaults": "Ezarri biltegia, modua eta eredua",
+      "completed_one": "Amaituta ({{count}})",
+      "completed_other": "Amaituta ({{count}})"
+    },
+    "item": {
+      "markDone": "Markatu eginda",
+      "markOpen": "Markatu eginda gabe",
+      "markDonePrompt": "Eginda markatu?",
+      "deleted": "Zeregina ezabatuta",
+      "undo": "Desegin",
+      "runCount_one": "{{count}} exekuzio",
+      "runCount_other": "{{count}} exekuzio",
+      "startNow": "Hasi berrikuspenik gabe",
+      "startNowHint": "Eduki sakatuta berrikuspenik gabe hasteko",
+      "titleLabel": "Zereginaren izenburua",
+      "notes": "Oharrak",
+      "notesPlaceholder": "Gehitu oharrak Markdown erabiliz",
+      "sessions": "Lotutako saioak",
+      "noSessions": "Oraindik ez dago saiorik",
+      "linkSession": "Lotu saioa",
+      "unlinkSession": "Kendu {{title}} esteka",
+      "linkFailed": "Ezin izan da saioa zereginarekin lotu"
+    },
+    "linkSession": {
+      "title": "Lotu saio bat",
+      "empty": "Ez dago azkenaldiko saiorik",
+      "emptyInRepository": "Ez dago azkenaldiko saiorik {{repository}} biltegian"
+    },
+    "upNext": "Hurrengoa",
+    "sessionTodo": "Zeregina: {{title}}",
+    "linkToTodo": "Lotu zereginarekin",
+    "candidates": {
+      "empty": "Ez dago zeregin irekirik"
+    },
+    "saveSheet": {
+      "title": "Gorde zerrendan",
+      "saved": "{{list}} zerrendan gordeta"
+    }
   }
 }

@@ -2251,8 +2251,8 @@
       "toolList": "ତାଲିକା",
       "toolPatch": "ପ୍ୟାଚ୍",
       "toolTask": "କାର୍ଯ୍ୟ",
-      "readTodos": "କାମ ତାଲିକା ପଢ଼ନ୍ତୁ",
-      "updateTodos": "କାମ ତାଲିକା ଅଦ୍ୟତନ କରନ୍ତୁ",
+      "readTodos": "ଯୋଜନା ପଢ଼ନ୍ତୁ",
+      "updateTodos": "ଯୋଜନା ଅଦ୍ୟତନ କରନ୍ତୁ",
       "linesBadge": "{{displayCount}}ଟି ଧାଡ଼ି",
       "filesBadge": "{{displayCount}}ଟି ଫାଇଲ୍",
       "matchesBadge": "{{displayCount}}ଟି ମେଳ",
@@ -3578,5 +3578,78 @@
     "noMatchingProductsPlay": "Google Play କୌଣସି ମେଳ ଖାଉଥିବା କ୍ରେଡିଟ୍ ପ୍ୟାକ୍ ଫେରାଇ ନାହିଁ।",
     "purchaseOwnedByAnotherAccount": "ଏହି Apple Account ରେ ଥିବା କ୍ରେଡିଟ୍ ଅନ୍ୟ ଏକ Kilo ଆକାଉଣ୍ଟର। ଏହାକୁ ବ୍ୟବହାର କରିବାକୁ ସେହି Kilo ଆକାଉଣ୍ଟରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
     "purchaseOwnedByAnotherAccountPlay": "ଏହି Google Play ଆକାଉଣ୍ଟରେ ଥିବା କ୍ରେଡିଟ୍ ଅନ୍ୟ ଏକ Kilo ଆକାଉଣ୍ଟର ଅଟେ। ଏହାକୁ ବ୍ୟବହାର କରିବାକୁ ସେହି Kilo ଆକାଉଣ୍ଟରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।"
+  },
+  "todos": {
+    "saveAsTodo": "କାମ ଭାବେ ସଂରକ୍ଷଣ କରନ୍ତୁ",
+    "segment": {
+      "label": "ଏଜେଣ୍ଟ ଦୃଶ୍ୟ",
+      "sessions": "ସେସନ୍",
+      "todos": "କାମ"
+    },
+    "lists": {
+      "newList": "ନୂଆ ତାଲିକା",
+      "empty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ତାଲିକା ନାହିଁ",
+      "couldNotLoad": "ତାଲିକାଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
+      "noRepository": "କୌଣସି ରିପୋଜିଟୋରୀ ନାହିଁ",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} ଖୋଲା",
+      "openCount_other": "{{count}} ଖୋଲା",
+      "archived_one": "ଅଭିଲେଖିତ ({{count}})",
+      "archived_other": "ଅଭିଲେଖିତ ({{count}})",
+      "archive": "ଅଭିଲେଖ କରନ୍ତୁ",
+      "unarchive": "ଅଭିଲେଖରୁ ବାହାର କରନ୍ତୁ",
+      "deleteTitle": "{{name}} ବିଲୋପ କରିବେ?",
+      "deleteMessage": "ଏହାର କାମଗୁଡ଼ିକ ମଧ୍ୟ ବିଲୋପ ହେବ। ସେମାନଙ୍କ ସେସନ୍ ରହିବ।"
+    },
+    "listSettings": {
+      "title": "ତାଲିକା ସେଟିଂସ୍",
+      "name": "ନାମ",
+      "namePlaceholder": "ତ୍ରୁଟି, ଧାରଣା, ରିଲିଜ୍…",
+      "emoji": "ଇମୋଜି",
+      "mode": "ମୋଡ୍",
+      "defaultsHint": "ଏହି ତାଲିକାରୁ ଆରମ୍ଭ ହେଉଥିବା ସେସନ୍ ଏହି ପୂର୍ବନିର୍ଦ୍ଧାରିତ ମୂଲ୍ୟ ବ୍ୟବହାର କରନ୍ତି।"
+    },
+    "list": {
+      "addPlaceholder": "ଏକ କାମ ଯୋଡ଼ନ୍ତୁ",
+      "add": "କାମ ଯୋଡ଼ନ୍ତୁ",
+      "empty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି କାମ ନାହିଁ",
+      "setDefaults": "ରିପୋଜିଟୋରୀ, ମୋଡ୍ ଏବଂ ମଡେଲ୍ ସେଟ୍ କରନ୍ତୁ",
+      "completed_one": "ସମାପ୍ତ ({{count}})",
+      "completed_other": "ସମାପ୍ତ ({{count}})"
+    },
+    "item": {
+      "markDone": "ସମାପ୍ତ ଭାବେ ଚିହ୍ନିତ କରନ୍ତୁ",
+      "markOpen": "ଅସମାପ୍ତ ଭାବେ ଚିହ୍ନିତ କରନ୍ତୁ",
+      "markDonePrompt": "ସମାପ୍ତ ଭାବେ ଚିହ୍ନିତ କରିବେ?",
+      "deleted": "କାମ ବିଲୋପ ହୋଇଛି",
+      "undo": "ପୂର୍ବବତ୍ କରନ୍ତୁ",
+      "runCount_one": "{{count}} ରନ୍",
+      "runCount_other": "{{count}} ରନ୍",
+      "startNow": "ସମୀକ୍ଷା ବିନା ଆରମ୍ଭ କରନ୍ତୁ",
+      "startNowHint": "ସମୀକ୍ଷା ବିନା ଆରମ୍ଭ କରିବାକୁ ଦବାଇ ଧରନ୍ତୁ",
+      "titleLabel": "କାମର ନାମ",
+      "notes": "ଟିପ୍ପଣୀ",
+      "notesPlaceholder": "Markdownରେ ଟିପ୍ପଣୀ ଯୋଡ଼ନ୍ତୁ",
+      "sessions": "ସଂଯୁକ୍ତ ସେସନ୍",
+      "noSessions": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସେସନ୍ ନାହିଁ",
+      "linkSession": "ସେସନ୍ ଲିଙ୍କ୍ କରନ୍ତୁ",
+      "unlinkSession": "{{title}}କୁ ଅନଲିଙ୍କ୍ କରନ୍ତୁ",
+      "linkFailed": "ସେସନ୍କୁ କାମ ସହିତ ଲିଙ୍କ୍ କରାଯାଇପାରିଲା ନାହିଁ"
+    },
+    "linkSession": {
+      "title": "ଏକ ସେସନ୍ ଲିଙ୍କ୍ କରନ୍ତୁ",
+      "empty": "କୌଣସି ସାମ୍ପ୍ରତିକ ସେସନ୍ ନାହିଁ",
+      "emptyInRepository": "{{repository}}ରେ କୌଣସି ସାମ୍ପ୍ରତିକ ସେସନ୍ ନାହିଁ"
+    },
+    "upNext": "ପରବର୍ତ୍ତୀ",
+    "sessionTodo": "କାମ: {{title}}",
+    "linkToTodo": "କାମ ସହିତ ଲିଙ୍କ୍ କରନ୍ତୁ",
+    "candidates": {
+      "empty": "କୌଣସି ଖୋଲା କାମ ନାହିଁ"
+    },
+    "saveSheet": {
+      "title": "ତାଲିକାରେ ସଂରକ୍ଷଣ କରନ୍ତୁ",
+      "saved": "{{list}}ରେ ସଂରକ୍ଷିତ"
+    }
   }
 }

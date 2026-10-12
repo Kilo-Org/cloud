@@ -12,7 +12,7 @@ import {
 
 /**
  * Read prefill values from the current route's search params. Memoized on
- * the four raw param values.
+ * the raw param values.
  */
 export function useNewSessionPrefill(): NewSessionPrefill {
   const raw = useLocalSearchParams<{
@@ -20,13 +20,23 @@ export function useNewSessionPrefill(): NewSessionPrefill {
     prefillMode?: string | string[];
     prefillModel?: string | string[];
     prefillVariant?: string | string[];
+    prefillPrompt?: string | string[];
+    todoId?: string | string[];
   }>();
 
-  const { prefillRepo, prefillMode, prefillModel, prefillVariant } = raw;
+  const { prefillRepo, prefillMode, prefillModel, prefillVariant, prefillPrompt, todoId } = raw;
 
   const prefill = useMemo(
-    () => readNewSessionPrefill({ prefillRepo, prefillMode, prefillModel, prefillVariant }),
-    [prefillRepo, prefillMode, prefillModel, prefillVariant]
+    () =>
+      readNewSessionPrefill({
+        prefillRepo,
+        prefillMode,
+        prefillModel,
+        prefillVariant,
+        prefillPrompt,
+        todoId,
+      }),
+    [prefillRepo, prefillMode, prefillModel, prefillVariant, prefillPrompt, todoId]
   );
 
   return prefill;

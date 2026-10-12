@@ -2251,8 +2251,8 @@
       "toolList": "பட்டியலிடுதல்",
       "toolPatch": "திருத்துதல்",
       "toolTask": "பணி",
-      "readTodos": "பணிப் பட்டியலைப் படிக்கவும்",
-      "updateTodos": "பணிப் பட்டியலைப் புதுப்பிக்கவும்",
+      "readTodos": "திட்டத்தைப் படிக்கவும்",
+      "updateTodos": "திட்டத்தைப் புதுப்பிக்கவும்",
       "linesBadge": "{{displayCount}} வரிகள்",
       "filesBadge": "{{displayCount}} கோப்புகள்",
       "matchesBadge": "{{displayCount}} பொருத்தங்கள்",
@@ -3578,5 +3578,78 @@
     "noMatchingProductsPlay": "Google Play பொருந்தும் கிரெடிட் பேக்குகளை வழங்கவில்லை.",
     "purchaseOwnedByAnotherAccount": "இந்த Apple Account-இல் உள்ள கிரெடிட்கள் வேறொரு Kilo கணக்கைச் சேர்ந்தவை. அவற்றைப் பயன்படுத்த அந்த Kilo கணக்கில் உள்நுழையவும்.",
     "purchaseOwnedByAnotherAccountPlay": "இந்த Google Play கணக்கில் உள்ள கிரெடிட்கள் வேறொரு Kilo கணக்கைச் சேர்ந்தவை. அவற்றைப் பயன்படுத்த அந்த Kilo கணக்கில் உள்நுழையவும்."
+  },
+  "todos": {
+    "saveAsTodo": "பணியாகச் சேமிக்கவும்",
+    "segment": {
+      "label": "முகவர்கள் காட்சி",
+      "sessions": "அமர்வுகள்",
+      "todos": "பணிகள்"
+    },
+    "lists": {
+      "newList": "புதிய பட்டியல்",
+      "empty": "இன்னும் பட்டியல்கள் இல்லை",
+      "couldNotLoad": "பட்டியல்களை ஏற்ற முடியவில்லை",
+      "noRepository": "களஞ்சியம் இல்லை",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} திறந்தவை",
+      "openCount_other": "{{count}} திறந்தவை",
+      "archived_one": "காப்பகப்படுத்தப்பட்டவை ({{count}})",
+      "archived_other": "காப்பகப்படுத்தப்பட்டவை ({{count}})",
+      "archive": "காப்பகப்படுத்தவும்",
+      "unarchive": "காப்பகத்திலிருந்து மீட்டெடுக்கவும்",
+      "deleteTitle": "{{name}} நீக்கவா?",
+      "deleteMessage": "அதன் பணிகளும் நீக்கப்படும். அவற்றின் அமர்வுகள் இருக்கும்."
+    },
+    "listSettings": {
+      "title": "பட்டியல் அமைப்புகள்",
+      "name": "பெயர்",
+      "namePlaceholder": "பிழைகள், யோசனைகள், வெளியீடு…",
+      "emoji": "ஈமோஜி",
+      "mode": "முறை",
+      "defaultsHint": "இந்தப் பட்டியலிலிருந்து தொடங்கும் அமர்வுகள் இந்த இயல்புநிலைகளைப் பயன்படுத்தும்."
+    },
+    "list": {
+      "addPlaceholder": "ஒரு பணியைச் சேர்க்கவும்",
+      "add": "பணியைச் சேர்",
+      "empty": "இன்னும் பணிகள் இல்லை",
+      "setDefaults": "களஞ்சியம், முறை மற்றும் மாதிரியை அமைக்கவும்",
+      "completed_one": "நிறைவடைந்தவை ({{count}})",
+      "completed_other": "நிறைவடைந்தவை ({{count}})"
+    },
+    "item": {
+      "markDone": "முடிந்ததாகக் குறிக்கவும்",
+      "markOpen": "முடிந்ததாக இல்லை எனக் குறிக்கவும்",
+      "markDonePrompt": "முடிந்ததாகக் குறிக்கவா?",
+      "deleted": "பணி நீக்கப்பட்டது",
+      "undo": "செயல்தவிர்",
+      "runCount_one": "{{count}} இயக்கம்",
+      "runCount_other": "{{count}} இயக்கங்கள்",
+      "startNow": "மதிப்பாய்வு இல்லாமல் தொடங்கவும்",
+      "startNowHint": "மதிப்பாய்வு இல்லாமல் தொடங்க நீண்ட நேரம் அழுத்தவும்",
+      "titleLabel": "பணியின் தலைப்பு",
+      "notes": "குறிப்புகள்",
+      "notesPlaceholder": "Markdown-இல் குறிப்புகளைச் சேர்க்கவும்",
+      "sessions": "இணைக்கப்பட்ட அமர்வுகள்",
+      "noSessions": "இன்னும் அமர்வுகள் இல்லை",
+      "linkSession": "அமர்வை இணைக்கவும்",
+      "unlinkSession": "{{title}} இணைப்பை நீக்கவும்",
+      "linkFailed": "அமர்வைப் பணியுடன் இணைக்க முடியவில்லை"
+    },
+    "linkSession": {
+      "title": "அமர்வுடன் இணைக்கவும்",
+      "empty": "சமீபத்திய அமர்வுகள் இல்லை",
+      "emptyInRepository": "{{repository}}-இல் சமீபத்திய அமர்வுகள் இல்லை"
+    },
+    "upNext": "அடுத்து வருவது",
+    "sessionTodo": "பணி: {{title}}",
+    "linkToTodo": "பணியுடன் இணைக்கவும்",
+    "candidates": {
+      "empty": "திறந்த பணிகள் இல்லை"
+    },
+    "saveSheet": {
+      "title": "பட்டியலில் சேமிக்கவும்",
+      "saved": "{{list}}-இல் சேமிக்கப்பட்டது"
+    }
   }
 }

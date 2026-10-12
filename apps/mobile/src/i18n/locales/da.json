@@ -2251,8 +2251,8 @@
       "toolList": "vis liste",
       "toolPatch": "anvend rettelse",
       "toolTask": "opgave",
-      "readTodos": "Læs opgavelisten",
-      "updateTodos": "Opdatér opgavelisten",
+      "readTodos": "Læs planen",
+      "updateTodos": "Opdatér planen",
       "linesBadge": "{{displayCount}} linjer",
       "filesBadge": "{{displayCount}} filer",
       "matchesBadge": "{{displayCount}} resultater",
@@ -3578,5 +3578,78 @@
     "noMatchingProductsPlay": "Google Play returnerede ingen matchende kreditpakker.",
     "purchaseOwnedByAnotherAccount": "Kreditterne på denne Apple-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditterne på denne Google Play-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem."
+  },
+  "todos": {
+    "saveAsTodo": "Gem som opgave",
+    "segment": {
+      "label": "Agentvisning",
+      "sessions": "Sessioner",
+      "todos": "Opgaver"
+    },
+    "lists": {
+      "newList": "Ny liste",
+      "empty": "Ingen lister endnu",
+      "couldNotLoad": "Kunne ikke indlæse lister",
+      "noRepository": "Intet kodelager",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} åbne",
+      "openCount_other": "{{count}} åbne",
+      "archived_one": "Arkiveret ({{count}})",
+      "archived_other": "Arkiveret ({{count}})",
+      "archive": "Arkivér",
+      "unarchive": "Fjern fra arkiv",
+      "deleteTitle": "Slet {{name}}?",
+      "deleteMessage": "Dens opgaver slettes også. Sessionerne bevares."
+    },
+    "listSettings": {
+      "title": "Listeindstillinger",
+      "name": "Navn",
+      "namePlaceholder": "Fejl, Idéer, Udgivelse…",
+      "emoji": "Emoji",
+      "mode": "Tilstand",
+      "defaultsHint": "Sessioner, der startes fra denne liste, bruger disse standardindstillinger."
+    },
+    "list": {
+      "addPlaceholder": "Tilføj en opgave",
+      "add": "Tilføj opgave",
+      "empty": "Ingen opgaver endnu",
+      "setDefaults": "Angiv kodelager, tilstand og model",
+      "completed_one": "Afsluttet ({{count}})",
+      "completed_other": "Afsluttet ({{count}})"
+    },
+    "item": {
+      "markDone": "Markér som færdig",
+      "markOpen": "Markér som ikke færdig",
+      "markDonePrompt": "Markér som færdig?",
+      "deleted": "Opgave slettet",
+      "undo": "Fortryd",
+      "runCount_one": "{{count}} kørsel",
+      "runCount_other": "{{count}} kørsler",
+      "startNow": "Start uden gennemgang",
+      "startNowHint": "Hold nede for at starte uden gennemgang",
+      "titleLabel": "Opgavetitel",
+      "notes": "Noter",
+      "notesPlaceholder": "Tilføj noter i Markdown",
+      "sessions": "Sessioner tilknyttet",
+      "noSessions": "Ingen sessioner endnu",
+      "linkSession": "Tilknyt session",
+      "unlinkSession": "Fjern tilknytning til {{title}}",
+      "linkFailed": "Kunne ikke tilknytte sessionen til opgaven"
+    },
+    "linkSession": {
+      "title": "Tilknyt en session",
+      "empty": "Ingen seneste sessioner",
+      "emptyInRepository": "Ingen seneste sessioner i {{repository}}"
+    },
+    "upNext": "Næste",
+    "sessionTodo": "Opgave: {{title}}",
+    "linkToTodo": "Tilknyt til opgave",
+    "candidates": {
+      "empty": "Ingen åbne opgaver"
+    },
+    "saveSheet": {
+      "title": "Gem på liste",
+      "saved": "Gemt på {{list}}"
+    }
   }
 }

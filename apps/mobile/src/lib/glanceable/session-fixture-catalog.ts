@@ -7,8 +7,10 @@ import { type GlanceableFixture } from './fixture-catalog';
  * and updated by production code. Open one with
  * `kiloapp:///dev/glanceable-fixture/<name>`; `.../release` ends the card.
  *
- * Android draws no session card, so these fixtures show only the Home widget
- * and the ongoing notification there.
+ * The same fixtures drive Android, where the session card is an ongoing
+ * notification instead of a Live Activity. The harness follows the fixture's
+ * row through the platform's own `followSession`, so both platforms exercise
+ * production code.
  */
 
 const MINUTE_MS = 60_000;
@@ -48,5 +50,38 @@ export const SESSION_CARD_FIXTURES = {
       'Session card: Working with a right-to-left title. Launch the app in Arabic to mirror the card.',
     rows: () => [{ status: 'busy', ago: 7, title: 'ترحيل خطافات الفوترة' }],
     follow: { index: 0 },
+  },
+  // Android-only twins: the Android session card is an ongoing notification,
+  // so the states the notification has and the Live Activity does not need
+  // their own names. The rows are the same facts.
+  'session-card-android-working': {
+    description:
+      'Android session notification: Working, with the system counting-up timer since the last change.',
+    rows: () => [{ status: 'busy', ago: 12, title: 'Migrate the billing webhooks' }],
+    follow: { index: 0 },
+  },
+  'session-card-android-permission': {
+    description:
+      'Android session notification: Needs approval, with the command and Approve (the key matches no live request).',
+    rows: () => [{ status: 'permission', ago: 4, title: 'Bump the Expo SDK' }],
+    follow: { index: 0, approvalKey: true },
+  },
+  'session-card-android-scheduled': {
+    description: 'Android session notification: Scheduled, with the wake time.',
+    rows: now => [
+      {
+        status: 'scheduled',
+        ago: 30,
+        title: 'Nightly dependency audit',
+        scheduledAt: new Date(now + 90 * MINUTE_MS).toISOString(),
+      },
+    ],
+    follow: { index: 0 },
+  },
+  'session-card-android-finished': {
+    description:
+      'Android session notification: followed while Working, then Finished with the finish time; it leaves the shade after 15 minutes.',
+    rows: () => [{ status: 'idle', ago: 0, title: 'Write the release notes' }],
+    follow: { index: 0, finish: true },
   },
 } satisfies Record<string, GlanceableFixture>;

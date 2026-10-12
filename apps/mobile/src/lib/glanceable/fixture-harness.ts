@@ -14,13 +14,13 @@ import {
   discoverSessionCards,
   endAllSessionCards,
   followSession,
-  syncFollowedSessionCards,
 } from '@/glanceable-ios/session-follow';
 import {
   SESSION_CARD_STALE_AFTER_SECONDS,
   sessionCardRelevance,
   settleCardWork,
 } from '@/glanceable-ios/session-card-press';
+import { syncFollowedSessionCards } from '@/lib/glanceable/session-follow';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 
@@ -213,7 +213,7 @@ async function apply(name: GlanceableFixtureName, ctx: GlanceablePublisherContex
   });
   recordWaitingAsk(eligible ? selectWaitingAsk(rows, ctx, now) : null);
   // Before the frame: the aggregate card counts a followed row out.
-  if (Platform.OS === 'ios') {
+  if (Platform.OS === 'ios' || Platform.OS === 'android') {
     applySessionCardFixture({ fixture, rows, ctx, now });
   }
   writeGlanceableFrame(getGlanceableSinks(), snapshot, ctx);
@@ -250,7 +250,7 @@ async function release(): Promise<void> {
   // feedback must not survive into the live surface.
   setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
   recordWaitingAsk(null);
-  if (Platform.OS === 'ios') {
+  if (Platform.OS === 'ios' || Platform.OS === 'android') {
     endAllSessionCards();
   }
   releaseGlanceableFixtureHold();

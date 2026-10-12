@@ -136,7 +136,9 @@
     "updated": "Updated",
     "working": "Working",
     "yourOwnRepositories": "Your own repositories",
-    "dismissed": "Dismissed"
+    "dismissed": "Dismissed",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h"
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -831,7 +833,8 @@
       "kiloclaw": "KiloClaw activity",
       "balance": "Balance alerts",
       "security": "Security findings",
-      "spend": "Spend alerts"
+      "spend": "Spend alerts",
+      "followedSessions": "Followed sessions"
     },
     "category": {
       "chatMessagesSubtitle": "replies in your conversations",
@@ -3165,7 +3168,27 @@
     "waitingForYou": "Waiting for you",
     "nextScheduled": "Next scheduled",
     "answerNeeded": "Answer needed",
-    "waitingToRetry": "Waiting to retry"
+    "waitingToRetry": "Waiting to retry",
+    "step": {
+      "editing": "Editing",
+      "reading": "Reading",
+      "running": "Run",
+      "searching": "Web search",
+      "thinking": "Thinking it through"
+    },
+    "planOf": "of",
+    "filesChanged": "files changed",
+    "finishedIn": "Finished in",
+    "noActivityFor": "No activity for",
+    "prOpened": "Pull request opened",
+    "permissionWants": "Wants to run",
+    "failure": {
+      "provider": "Stopped: provider error",
+      "tool": "Stopped: tool error",
+      "cancelled": "Stopped: cancelled",
+      "other": "Stopped"
+    },
+    "followFailedDevice": "Couldn't follow this agent on this device."
   },
   "transcriptionModel": {
     "title": "Transcription model",

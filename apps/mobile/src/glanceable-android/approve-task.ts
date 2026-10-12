@@ -1,7 +1,9 @@
 import { AppRegistry } from 'react-native';
+import { z } from 'zod';
 
 import { i18n } from '@/i18n';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
+import { approveFollowedSession } from '@/lib/glanceable/session-follow';
 import { runGlanceableApprove } from '@/lib/glanceable/approve-ask';
 import { restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
@@ -38,6 +40,26 @@ const APPROVE_AGENT_TASK_KEY = 'ActiveAgentsApprove';
 
 /** The approval the task runs. Injected so the flow is unit-testable. */
 export type ApproveRunner = () => Promise<void>;
+
+/**
+ * The session and request a session notification's Approve names, or null for
+ * the aggregate card's tap (which carries an action but no session). The Kotlin
+ * worker passes the extras as task data.
+ */
+const sessionApproveTargetSchema = z.object({
+  session_id: z.string().min(1),
+  approval_key: z.string().min(1),
+});
+
+function readSessionApproveTarget(
+  input: unknown
+): { sessionId: string; approvalKey: string } | null {
+  const parsed = sessionApproveTargetSchema.safeParse(input);
+  if (!parsed.success) {
+    return null;
+  }
+  return { sessionId: parsed.data.session_id, approvalKey: parsed.data.approval_key };
+}
 
 // A headless approve run has no Activity and no app root, so nothing else has
 // loaded the Android sink by the time the republish below runs; without the
@@ -103,7 +125,15 @@ async function showApproving(ask: WaitingAsk): Promise<void> {
  * task resolves once the last render has reached the notification, so a headless
  * process cannot exit with the update still in flight.
  */
-export async function handleApproveTask(): Promise<void> {
+export async function handleApproveTask(input?: unknown): Promise<void> {
+  // A session notification's Approve names its own session and request: the
+  // same revalidating answer the aggregate card runs, for that exact session.
+  const sessionTarget = readSessionApproveTarget(input);
+  if (sessionTarget !== null) {
+    await applyLanguageBestEffort();
+    await approveFollowedSession(sessionTarget.sessionId, sessionTarget.approvalKey);
+    return;
+  }
   let ask: WaitingAsk | null = null;
   let failed = false;
   // Only an ask the answer ended leaves a stale tray row to skip. A retryable

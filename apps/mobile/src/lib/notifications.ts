@@ -30,6 +30,8 @@ import { captureEvent } from '@/lib/analytics/posthog';
 import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
+import { dropAndroidSessionRow } from '@/lib/glanceable/session-activity-tokens-android';
+import { applySessionLiveUpdate } from '@/lib/glanceable/session-follow';
 import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
 import {
   rememberHomeWidgetSnapshot,
@@ -299,6 +301,12 @@ export function setupNotificationHandler() {
     handleNotification: async notification => {
       const data = parseNotificationData(notification.request.content.data);
 
+      if (data?.type === 'session_live_update') {
+        // The session carrier is data-only: the app draws the ongoing
+        // notification itself, so this message never becomes a banner.
+        return suppressed;
+      }
+
       if (data?.type === 'active_agents_glanceable') {
         // The aggregate glanceable push is a data carrier for the ongoing
         // notification/widgets, never a visible banner: the local ongoing owns
@@ -452,6 +460,24 @@ async function handleBackgroundNotificationTask(
   }
 
   const pushData = parseHeadlessPushData(data.data);
+  if (pushData?.type === 'session_live_update') {
+    // One followed session's Android notification
+    // (`.specs/mobile-session-live-activity.md` "Android"). A push for a
+    // session this device no longer follows renders nothing; the app drops
+    // that server row so no later update reaches a stale token.
+    await restorePersistedGlanceable();
+    const applied = applySessionLiveUpdate(
+      pushData.event,
+      pushData.content,
+      pushData.dismissAfterMs
+    );
+    if (!applied) {
+      dropUnfollowedSessionRow(pushData.content.sessionId);
+    }
+    return applied
+      ? Notifications.BackgroundNotificationTaskResult.NewData
+      : Notifications.BackgroundNotificationTaskResult.NoData;
+  }
   if (pushData?.type !== 'active_agents_glanceable') {
     return Notifications.BackgroundNotificationTaskResult.NoData;
   }
@@ -470,6 +496,15 @@ async function handleBackgroundNotificationTask(
   return applied
     ? Notifications.BackgroundNotificationTaskResult.NewData
     : Notifications.BackgroundNotificationTaskResult.NoData;
+}
+
+/**
+ * A push named a session this device no longer follows (a dismissal, or a
+ * follow cleared on another surface). Nothing renders; the row is dropped so
+ * the server stops addressing this token for that session.
+ */
+function dropUnfollowedSessionRow(sessionId: string): void {
+  dropAndroidSessionRow(sessionId);
 }
 
 /**
@@ -633,6 +668,7 @@ const LEGACY_ANDROID_NOTIFICATION_CHANNELS = ['agent', 'chat', 'active-agents'] 
 // enabled, so silence also has to disable it explicitly.
 const SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS = new Set<AndroidNotificationChannelId>([
   'agent-progress',
+  'followed-sessions',
 ]);
 
 /** What one Android channel write asks the framework for. */
@@ -677,10 +713,11 @@ function androidChannelConfiguration(
 ): Notifications.NotificationChannelInput {
   return {
     name,
-    importance:
-      channel.importance === 'high'
-        ? Notifications.AndroidImportance.HIGH
-        : Notifications.AndroidImportance.DEFAULT,
+    importance: {
+      high: Notifications.AndroidImportance.HIGH,
+      default: Notifications.AndroidImportance.DEFAULT,
+      low: Notifications.AndroidImportance.LOW,
+    }[channel.importance],
     bypassDnd,
     // An absent sound is the system default; an explicit null is silence, and a
     // silent channel must not vibrate either (the default is enabled).
@@ -756,6 +793,7 @@ const CHANNEL_NAME_KEYS = {
   kiloclaw: 'notifications.channel.kiloclaw',
   balance: 'notifications.channel.balance',
   security: 'notifications.channel.security',
+  'followed-sessions': 'notifications.channel.followedSessions',
 } as const satisfies Record<AndroidNotificationChannelId, string>;
 
 /**

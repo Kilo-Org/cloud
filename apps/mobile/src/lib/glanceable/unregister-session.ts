@@ -52,15 +52,17 @@ export function unionTokens(records: readonly Set<string>[]): string[] {
  * from the given record sets. Returns the tokens whose delete failed, so the
  * caller keeps them for a later cleanup.
  */
+// eslint-disable-next-line max-params -- the token, the session gate, and the record sets a delete reconciles
 export async function deleteActivityTokens(
   tokens: readonly string[],
   authToken: string,
-  records: readonly Set<string>[]
+  records: readonly Set<string>[],
+  sessionId?: string
 ): Promise<string[]> {
   const results = await Promise.all(
     tokens.map(async token => {
       try {
-        await trpcClient.user.unregisterActivityToken.mutate({ token });
+        await trpcClient.user.unregisterActivityToken.mutate({ token, sessionId });
         for (const record of records) {
           record.delete(token);
         }

@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 
 import { IconButton } from '@/components/ui/icon-button';
 import { Bell, BellOff } from '@/components/ui/icons';
+import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
 import {
   dismissFinishedSessionCard,
   followSession,
@@ -14,8 +15,7 @@ import {
   isSessionFollowed,
   subscribeSessionFollows,
   unfollowSession,
-} from '@/glanceable-ios/session-follow';
-import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
+} from '@/lib/glanceable/session-follow';
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import {
   getNotificationPermissionGranted,
@@ -30,18 +30,24 @@ import { useTRPC } from '@/lib/trpc';
 type SessionFollowButtonProps = { sessionId: string };
 
 /**
- * Follow and Unfollow for one session's Lock Screen card
- * (`.specs/mobile-session-live-activity.md`). iOS only: Android has no session
- * card yet. Follow shows only for a live session the tray counts as working,
- * waiting, or scheduled, and only while the in-app switch, the notification
- * permission, and the system switch allow Live Activities. Unfollow shows
- * whenever this device follows the session.
+ * Follow and Unfollow for one session's card
+ * (`.specs/mobile-session-live-activity.md`). One session card per platform: a
+ * Lock Screen Live Activity on iOS, an ongoing notification on Android, both
+ * through `@/lib/glanceable/session-follow`. Follow shows only for a live
+ * session the tray counts as working, waiting, or scheduled, and only while the
+ * in-app switch, the notification permission, and the system switch allow the
+ * surface. Unfollow shows whenever this device follows the session.
+ *
+ * Android has no system Live Activity switch, so its allowance is always true;
+ * iOS reads the real one.
  */
 export function SessionFollowButton({ sessionId }: Readonly<SessionFollowButtonProps>) {
-  return Platform.OS === 'ios' ? <IosSessionFollowButton sessionId={sessionId} /> : null;
+  return Platform.OS === 'ios' || Platform.OS === 'android' ? (
+    <SessionFollowControl sessionId={sessionId} />
+  ) : null;
 }
 
-function IosSessionFollowButton({ sessionId }: Readonly<SessionFollowButtonProps>) {
+function SessionFollowControl({ sessionId }: Readonly<SessionFollowButtonProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const trpc = useTRPC();
@@ -84,7 +90,7 @@ function IosSessionFollowButton({ sessionId }: Readonly<SessionFollowButtonProps
     glanceableStatusKind(row.status) === 'idle' ||
     !liveActivityEnabled ||
     !permissionGranted ||
-    !liveActivitiesAllowedBySystem()
+    !(Platform.OS === 'android' || liveActivitiesAllowedBySystem())
   ) {
     return null;
   }

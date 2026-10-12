@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { i18n } from '@/i18n';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
-import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
+import { getTerminalBlankEpoch, subscribeGlanceableTerminalEnd } from '@/lib/glanceable/cleanup';
 import {
   getHomeWidgetDataForSnapshot,
   getLastHomeWidgetData,
@@ -28,6 +28,8 @@ import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/gla
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
+
+import { endAllSessionCards, restoreFollowedSessionCardsFromStorage } from './session-follow';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
 import {
@@ -54,11 +56,19 @@ import {
 // render. No React dependency here: the publisher is plain state.
 registerGlanceableSink(androidSink);
 
+// A sign-out, an account change, or a privacy lock blanks every surface; the
+// followed session notifications are not snapshot sinks, so they end here.
+subscribeGlanceableTerminalEnd(endAllSessionCards);
+
 // A Live Update the permission blocked starts once the user grants it, which
 // can happen in Settings while the app is away.
 AppState.addEventListener('change', state => {
   if (state === 'active') {
     void handleAppStateActive();
+    // Rebuild the followed session notifications from native truth: a push may
+    // have updated them while no process ran, and a dismissal the receiver
+    // missed leaves a stored card for a session the app no longer follows.
+    void restoreFollowedSessionCardsFromStorage();
   }
 });
 

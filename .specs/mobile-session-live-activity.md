@@ -1,9 +1,10 @@
-# Mobile Session Live Activity (iOS)
+# Mobile Session Live Activity (iOS and Android)
 
 ## Role of This Document
 
 This spec defines the business rules and invariants for the per-session
-Live Activity on iOS. It is the source of truth for _what_ the system
+session card on iOS (an ActivityKit Live Activity) and on Android (an ongoing
+notification). It is the source of truth for _what_ the system
 must guarantee — valid states, ownership boundaries, privacy, and
 user-facing behavior. It deliberately does not prescribe _how_ to
 implement those guarantees: handler names, column layouts, and other
@@ -25,11 +26,15 @@ capitals, as shown here.
 
 - **Aggregate card**: The existing Active Agents Live Activity. It shows
   counts for one scope (personal or one organization).
-- **Session card**: A Live Activity for exactly one Cloud Agent session.
+- **Session card**: The surface for exactly one Cloud Agent session: a Live
+  Activity on iOS, an ongoing notification on Android. Both render the one
+  content contract, so a rule about the card holds on both platforms unless it
+  names one.
 - **Follow**: The user action that starts a session card on this device.
-- **Unfollow**: The user action that ends a session card on this device.
+- **Unfollow**: The user action that ends a session card on this device. On
+  Android, dismissing the notification is also an unfollow.
 - **Followed session**: A session that has a live session card on any of
-  the user's iOS devices in the current scope.
+  the user's devices in the current scope.
 - **Scope**: The personal surface or one organization, as for the
   aggregate card.
 - **Status kind**: The shared glanceable vocabulary from
@@ -38,8 +43,9 @@ capitals, as shown here.
 ## Overview
 
 A user who wants to watch one session taps Follow in that session's
-screen. The device starts a session card on the Lock Screen and in the
-Dynamic Island. The card shows the session title, its state, and how long
+screen. On iOS the device starts a session card on the Lock Screen and in the
+Dynamic Island; on Android it posts one silent ongoing notification in its own
+notification group and channel. The card shows the session title, its state, and how long
 it has been in that state. When the agent needs a permission, the card
 offers Approve. A tap on the card opens that session.
 
@@ -203,17 +209,81 @@ The session card data MUST hold exactly these facts, and nothing else:
    stay visible with local content, and the app MUST retry the
    registration at the next foreground.
 
-## Not Yet Implemented
+## Android
 
-The following rules use SHOULD and reflect intended behavior that is
-not yet enforced in the current codebase:
+The rules above hold on Android with the platform facts below. Where a rule
+names APNs or ActivityKit it is the iOS mechanism; Android has its own, and the
+observable behavior is the same.
 
-1. The system SHOULD let the user follow a session from the web, with a
-   push-to-start of the session card. (Currently out of scope.)
-2. Android SHOULD show one ongoing notification per followed session in a
-   notification group. (Currently out of scope.)
-3. The system SHOULD offer Follow automatically for a session started on
-   the phone. (Currently out of scope.)
+### Android: the notification
+
+1. The system MUST post one ongoing notification per followed session, in its
+   own notification group, on a dedicated silent channel. The notification MUST
+   NOT make a sound or vibrate, and it MUST use the platform's
+   alert-once behavior, so an update never re-alerts.
+2. The system MUST key the notification by the session id, through a stable
+   notification id derived from it, so an update replaces that session's
+   notification and never another session's.
+3. The system MUST request the promoted-ongoing Live Update where the platform
+   allows it (Android 16.1 or later, with the user's Live Updates setting on),
+   and MUST fall back to an ordinary ongoing notification everywhere else. It
+   MUST NOT draw a custom content view, colorize, or set the card as a group
+   summary: the platform refuses to promote such a card.
+4. The notification MUST show the session title, the status label, and the time
+   in that state. A `running` card MUST show the elapsed time as the platform's
+   own counting-up timer, so it stays right while no process runs; every other
+   card MUST show the absolute time the rules above define.
+5. The system MAY draw extra detail the platform can show: plan progress, the
+   permission command, the diff size, and the cost so far. The cost MUST appear
+   only in the expanded part of the notification.
+6. The system MUST create the channel before the first post and MUST carry a
+   translated channel name, as the other Android channels do.
+
+### Android: actions
+
+1. A tap on the card MUST open the session, as the rules above require.
+2. Approve MUST appear only for a permission wait that carries an approval key,
+   and it MUST run the same revalidating approval the iOS card runs, for the
+   explicit session and the exact request the card shows.
+3. A user dismissal of the notification MUST count as Unfollow: the app MUST
+   stop following that session, MUST delete the session's server row, and MUST
+   NOT re-post the notification for a later update of that session.
+
+### Android: updates and ending
+
+1. The server MUST reach a followed Android session through a high-priority
+   data-only push that carries the same content contract as the iOS card, on
+   the same transitions, with the same unchanged-content skip. The message MUST
+   carry a schema version, so a client that does not know a later version
+   ignores it instead of failing.
+2. An Android follow MUST NOT expire on its own: the notification has no system
+   time limit, so the follow lasts until the user unfollows or dismisses it, or
+   the card ends. The iOS card's maximum-lifetime rule does not apply.
+3. When the session finishes, the notification MUST show the Finished content
+   and MUST leave the shade after the same 15 minutes as the iOS card.
+4. Sign-out, an account change, an organization switch that leaves the card's
+   scope, a privacy lock, and the in-app switch turned off MUST cancel every
+   session notification and unregister every session row, exactly as they end
+   the iOS cards.
+5. A push for a session this device no longer follows MUST render nothing, and
+   the app MUST delete that session's row for this device.
+
+### Android: aggregate card coexistence
+
+1. The Android aggregate ongoing notification MUST leave out the sessions this
+   device follows, as the aggregate Live Activity does on iOS. The Android Home
+   widget is unchanged: it keeps every session, as the iOS Home widget does.
+2. The aggregate exclusion MUST count both platforms' session rows: a session
+   followed on any of the user's devices counts as followed for the aggregate
+   card on either platform.
+
+### Android: privacy
+
+1. A session notification MAY show the session title, for the reason a session
+   card may: the user started it with Follow.
+2. The notification MUST NOT show the organization name, the repository,
+   generated text, the session id, or an account id. The session id travels in
+   the notification's data for routing and approval only.
 
 ## Changelog
 
@@ -222,3 +292,12 @@ not yet enforced in the current codebase:
 - Created from the per-session Live Activity design decisions: start by
   Follow, show titles on followed cards, and count only unfollowed
   sessions on the aggregate card.
+
+### 2026-10-12 -- Android
+
+- Added the Android session card: one silent ongoing notification per followed
+  session, promoted as a Live Update where the platform allows it, with the same
+  content, actions, ending rules, privacy, and aggregate exclusion as iOS.
+- The Android Home widget keeps every session, as the iOS one does; only the
+  aggregate card excludes followed sessions.
+- The server's aggregate exclusion counts both platforms' session rows.

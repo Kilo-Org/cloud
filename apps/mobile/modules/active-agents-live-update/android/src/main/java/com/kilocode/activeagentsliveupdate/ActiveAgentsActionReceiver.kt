@@ -25,13 +25,28 @@ import androidx.work.WorkManager
  */
 class ActiveAgentsActionReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
-    if (intent.action != ACTION_APPROVE) {
+    val action = intent.action ?: return
+    if (action != ACTION_APPROVE && action != ACTION_DISMISS) {
+      return
+    }
+    val sessionId = intent.getStringExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID)
+    if (action == ACTION_DISMISS) {
+      // The delete intent fires as the card leaves the shade; dropping the
+      // stored card here keeps a later update from re-posting it.
+      if (sessionId != null) {
+        SessionNotifications.cancel(context, sessionId)
+      }
       return
     }
     val request = OneTimeWorkRequest.Builder(ActiveAgentsApproveWorker::class.java)
       .setInputData(
         Data.Builder()
-          .putString(ActiveAgentsApproveWorker.KEY_ACTION, ACTION_APPROVE)
+          .putString(ActiveAgentsApproveWorker.KEY_ACTION, action)
+          .putString(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId)
+          .putString(
+            ActiveAgentsApproveWorker.KEY_APPROVAL_KEY,
+            intent.getStringExtra(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY)
+          )
           .build()
       )
       .build()
@@ -42,5 +57,11 @@ class ActiveAgentsActionReceiver : BroadcastReceiver() {
   companion object {
     /** Explicit action on the notification's Approve PendingIntent. */
     const val ACTION_APPROVE = "com.kilocode.activeagentsliveupdate.action.APPROVE"
+
+    /**
+     * The user dismissed a session notification (a swipe or a clear-all). The
+     * card is gone either way, so the app stops following that session.
+     */
+    const val ACTION_DISMISS = "com.kilocode.activeagentsliveupdate.action.DISMISS"
   }
 }

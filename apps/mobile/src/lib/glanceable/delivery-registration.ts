@@ -18,6 +18,10 @@ import {
   sessionActivityTokens,
   unregisterSessionActivityToken,
 } from './session-activity-tokens';
+import {
+  _resetAndroidSessionTokensForTests,
+  androidSessionActivityTokens,
+} from './session-activity-tokens-android';
 import { enqueueTokenMutation, resetTokenMutationQueue } from './token-mutation-queue';
 import {
   _resetUnregisterSessionForTests,
@@ -293,7 +297,12 @@ const delivery: GlanceableDelivery = {
       }
       await sessionScope;
       // Read the sets inside the FIFO so an already-running upsert is included.
-      const records = [scopeTokens, activityTokens, sessionActivityTokens];
+      const records = [
+        scopeTokens,
+        activityTokens,
+        sessionActivityTokens,
+        androidSessionActivityTokens,
+      ];
       const tokens = unionTokens(includeScope ? records : [activityTokens]);
       // Without a session the delete can only answer 401: keep the tokens for an authorized cleanup.
       const authToken = tokens.length > 0 ? await readUnregisterAuthToken() : null;
@@ -329,6 +338,7 @@ export function _resetDeliveryRegistrationForTests(): void {
   activityTokens.clear();
   pushToStartToken = null;
   _resetSessionActivityTokensForTests();
+  _resetAndroidSessionTokensForTests();
   resetTokenMutationQueue();
   _resetUnregisterSessionForTests();
   if (Platform.OS === 'ios') {

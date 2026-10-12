@@ -34,6 +34,7 @@ import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import {
   fetchSessionSnapshot,
   fetchSessionMessagesPage,
+  fetchSessionDiff,
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
   unshareSession as unshareSessionIngest,
@@ -45,6 +46,7 @@ import {
   isDefaultSessionTitle,
   projectPrivateWorktreePaths,
   validateKiloSdkMessagesCursor,
+  type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
@@ -1651,6 +1653,42 @@ export const cliSessionsV2Router = createTRPCRouter({
         watermarkEventId,
         ...(sessionGoal === undefined ? {} : { sessionGoal }),
       };
+    }),
+
+  /**
+   * The cumulative file diff for a V2 Kilo session, from session start to its
+   * latest step, as stored by session ingest. File paths are workspace
+   * relative. Read failures surface as INTERNAL_SERVER_ERROR (retryable on the
+   * client); an oversized diff is a typed `too_large` result.
+   */
+  getSessionDiff: baseProcedure
+    .input(z.object({ session_id: sessionIdField }))
+    .query(async ({ ctx, input }) => {
+      await getSessionWithAccessCheck(input.session_id, ctx);
+
+      let diff: SessionDiffRead | null;
+      try {
+        diff = await fetchSessionDiff(input.session_id, ctx.user.id);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session diff',
+          cause: error,
+        });
+      }
+      if (diff === null) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+      }
+      if (diff.kind === 'value') {
+        return { kind: 'files' as const, files: diff.files };
+      }
+      if (diff.kind === 'too_large') {
+        return { kind: 'too_large' as const };
+      }
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: `Session diff read failed: ${diff.kind}`,
+      });
     }),
 
   /**

@@ -43,8 +43,10 @@ import migrations from '../../drizzle/migrations';
 import {
   readKiloSdkMessages,
   readKiloSdkSessionSnapshot,
+  readSessionDiff,
   type KiloSdkSessionSnapshotRead,
 } from './kilo-sdk-materialization';
+import type { SessionDiffRead } from '@kilocode/session-ingest-contracts';
 import { resetAttentionStatusOnCliDisconnect } from '../ingest/metadata';
 
 type LiveThrottleMetaKey =
@@ -868,6 +870,10 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   async readKiloSdkMessages(params: { limit?: number; before?: string }) {
     return readKiloSdkMessages(this.db, this.env.SESSION_INGEST_R2, params);
+  }
+
+  async readSessionDiff(): Promise<SessionDiffRead> {
+    return readSessionDiff(this.db, this.env.SESSION_INGEST_R2);
   }
 
   async getAllStream(): Promise<ReadableStream<Uint8Array>> {

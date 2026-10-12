@@ -18,6 +18,7 @@ import {
   PolicyPill,
   ProviderPolicyTag,
 } from '@/components/organizations/providers-and-models/PolicyPills';
+import { DiscountedPrice } from '@/components/organizations/providers-and-models/DiscountedPrice';
 import type {
   ProviderModelRow,
   ProviderRow,
@@ -142,8 +143,20 @@ export function ProviderDetailsDialog({
                       <div className="font-medium">{model.modelName}</div>
                       <div className="text-muted-foreground mt-0.5 text-xs">{model.modelId}</div>
                     </TableCell>
-                    <TableCell>{formatPriceCompact(model.promptPrice)}</TableCell>
-                    <TableCell>{formatPriceCompact(model.completionPrice)}</TableCell>
+                    <TableCell>
+                      <DiscountedPrice
+                        price={model.promptPrice}
+                        originalPrice={model.originalPromptPrice}
+                        formatPrice={formatPriceCompact}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <DiscountedPrice
+                        price={model.completionPrice}
+                        originalPrice={model.originalCompletionPrice}
+                        formatPrice={formatPriceCompact}
+                      />
+                    </TableCell>
                     <TableCell>
                       <PolicyPill value={model.trains} variant="trains" />
                     </TableCell>

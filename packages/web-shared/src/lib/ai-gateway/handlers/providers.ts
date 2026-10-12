@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { modelsByProvider } from '@kilocode/db';
 import { desc } from 'drizzle-orm';
-import { OpenRouterProvidersResponseSchema } from '@/lib/organizations/organization-types';
-import { createCachedFetch } from '@/lib/cached-fetch';
-import { readDb } from '@/lib/drizzle';
+import { OpenRouterProvidersResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 
 const getProviders = createCachedFetch(
   async () => {

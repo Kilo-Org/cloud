@@ -1,8 +1,9 @@
 import { type Ref, useEffect, useRef } from 'react';
 import { Platform, ScrollView, type ScrollViewProps, View } from 'react-native';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 
-import { useKeyboardOcclusion } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
+import { useScreenInsets } from '@/lib/screen-insets';
 
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
@@ -42,7 +43,9 @@ export function TabScreenScrollView({
   onKeyboardOcclusionChange?: (occlusion: number) => void;
 }) {
   const tabBarHeight = useTabBarHeight();
-  const { keyboardOcclusion } = useKeyboardOcclusion();
+  const { left, right } = useScreenInsets();
+  // The provider's keyboard height reaches the screen bottom on both platforms.
+  const keyboardOcclusion = useKeyboardState(state => state.height);
   const onKeyboardOcclusionChangeRef = useRef(onKeyboardOcclusionChange);
   useEffect(() => {
     onKeyboardOcclusionChangeRef.current = onKeyboardOcclusionChange;
@@ -101,7 +104,14 @@ export function TabScreenScrollView({
       ref={ref}
       refreshControl={refreshControl}
       keyboardShouldPersistTaps={keyboardShouldPersistTaps}
-      style={[style, { marginBottom: frameMargin }]}
+      style={[
+        style,
+        {
+          marginBottom: frameMargin,
+          ...(left > 0 ? { marginLeft: left } : undefined),
+          ...(right > 0 ? { marginRight: right } : undefined),
+        },
+      ]}
     >
       {children}
       <View style={{ height: TAB_SCREEN_BOTTOM_GAP }} pointerEvents="none" />

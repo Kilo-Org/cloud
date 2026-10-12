@@ -1,6 +1,6 @@
 import type { Organization, OrganizationSeatsPurchase } from '@kilocode/db/schema';
 import { organization_seats_purchases } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, desc, eq } from 'drizzle-orm';
 
 /**
@@ -11,9 +11,10 @@ import { and, desc, eq } from 'drizzle-orm';
  * created row therefore always reflects the current subscription state.
  */
 export async function getMostRecentSeatPurchase(
-  organizationId: Organization['id']
+  organizationId: Organization['id'],
+  fromDb: typeof db = db
 ): Promise<OrganizationSeatsPurchase | null> {
-  const [purchase] = await db
+  const [purchase] = await fromDb
     .select()
     .from(organization_seats_purchases)
     .where(eq(organization_seats_purchases.organization_id, organizationId))

@@ -1,16 +1,16 @@
 import { randomUUID } from 'crypto';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
-import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
-import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { getEmbeddingProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { debugSaveProxyRequest } from '@/lib/debugUtils';
+import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
+import { getEmbeddingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { sentryRootSpan } from '@/lib/getRootSpan';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   captureProxyError,
   getOrganizationProviderPrivacy,
@@ -25,43 +25,47 @@ import {
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   wrapInSafeNextResponse,
-} from '@/lib/ai-gateway/llm-proxy-helpers';
-import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { ProxyErrorType } from '@/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import {
+  getBalanceAndOrgSettings,
+  type BalancePayer,
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
   getEffectiveProviderPrivacy,
   providerPrivacySchema,
-} from '@/lib/ai-gateway/provider-privacy';
+} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import {
   createAnonymousContext,
   isAnonymousContext,
   type AnonymousUserContext,
-} from '@/lib/anonymous';
-import { bouncerAccountId, normalizeJa4 } from '@/lib/bouncer/client';
+} from '@kilocode/web-shared/lib/anonymous';
+import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
+  bouncerRejectionResponse,
   payerSharingIp,
   rawClientIp,
-  scheduleBouncerDecide,
-} from '@/lib/bouncer/inference';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+  startBouncerDecide,
+} from '@kilocode/web-shared/lib/bouncer/inference';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
   type EmbeddingProxyRequest,
   validateEmbeddingDimensions,
-} from '@/lib/ai-gateway/embeddings/embedding-request';
-import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
-import type { Provider } from '@/lib/ai-gateway/providers/types';
+} from '@kilocode/web-shared/lib/ai-gateway/embeddings/embedding-request';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
   OrganizationPlan,
   OrganizationSettings,
-} from '@/lib/organizations/organization-types';
-import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
-import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 
@@ -219,6 +223,7 @@ export async function handleEmbeddingsRequest(
     promptInfo,
     max_tokens: null,
     has_middle_out_transform: null,
+    reasoning_setting: null,
     fraudHeaders,
     isStreaming: false,
     organizationId,
@@ -255,13 +260,15 @@ export async function handleEmbeddingsRequest(
   let organizationDataCollection: OrganizationSettings['data_collection'];
   let accountBalance = 0;
   let accountPlan: OrganizationPlan | undefined;
+  let accountPayer: BalancePayer | undefined;
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
-    const { balance, settings, plan, balanceLimitedByUserAllowance } =
+    const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
       await getBalanceAndOrgSettings(organizationId, user);
     accountBalance = balance;
     accountPlan = plan;
+    accountPayer = payer;
     organizationDataCollection = settings?.data_collection;
 
     if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
@@ -314,9 +321,9 @@ export async function handleEmbeddingsRequest(
     );
   }
 
-  // Report-only verdict: registered with after() and never awaited, so it cannot
-  // hold up the upstream call and survives an early return.
-  scheduleBouncerDecide({
+  // The one decide for this request, awaited just before the upstream call within its 500 ms
+  // budget. Only an enforced verdict rejects; every other outcome sends the request.
+  const bouncerVerdictPromise = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
@@ -324,7 +331,9 @@ export async function handleEmbeddingsRequest(
       ? undefined
       : {
           accountId: bouncerAccountId(user.id, organizationId),
+          userId: user.id,
           tier: bouncerDecideTier(organizationId, accountPlan, accountBalance),
+          payer: accountPayer,
         },
   });
 
@@ -372,6 +381,11 @@ export async function handleEmbeddingsRequest(
       },
     };
   }
+
+  const bouncerVerdict = await bouncerVerdictPromise;
+  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  if (bouncerRejection) return bouncerRejection;
+  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   const response = await embeddingProxyRequest({
     body: upstreamBody,

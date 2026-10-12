@@ -15,26 +15,27 @@ import {
   kilo_pass_issuances,
   kilocode_users,
   kilo_pass_audit_log,
+  kilo_pass_pause_events,
   kilo_pass_store_events,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   KiloPassAuditLogAction,
   KiloPassCadence,
   KiloPassIssuanceItemKind,
   KiloPassPaymentProvider,
   KiloPassTier,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type * as AppleStoreNotifications from './apple-store-notifications';
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
 import type * as StoreRefund from '@/lib/credits/store-refund';
-import type * as CreditEventsModule from '@/lib/bouncer/credit-events';
-import { toMicrodollars } from '@/lib/microdollars';
+import type * as CreditEventsModule from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { storeCreditPaymentId } from '@/lib/credits/store-products';
 import { completeStoreCreditPurchase } from '@/lib/credits/store-completion';
 
@@ -50,8 +51,10 @@ jest.mock('@/lib/kilo-pass/posthog-tracking', () => ({
 // The real enqueue writes a real `bouncer_credit_event_outbox` row, so the bouncer tests assert
 // that durable row. One test overrides the enqueue to reject, proving it shares the notification's
 // transaction: a failed enqueue must roll back `processed_at`.
-jest.mock('@/lib/bouncer/credit-events', () => {
-  const actual = jest.requireActual<typeof CreditEventsModule>('@/lib/bouncer/credit-events');
+jest.mock('@kilocode/web-shared/lib/bouncer/credit-events', () => {
+  const actual = jest.requireActual<typeof CreditEventsModule>(
+    '@kilocode/web-shared/lib/bouncer/credit-events'
+  );
   return {
     __esModule: true,
     ...actual,
@@ -61,8 +64,11 @@ jest.mock('@/lib/bouncer/credit-events', () => {
 
 function getEnqueueCreditEventMock() {
   return jest.mocked(
-    (jest.requireMock('@/lib/bouncer/credit-events') as typeof CreditEventsModule)
-      .enqueueCreditEvent
+    (
+      jest.requireMock(
+        '@kilocode/web-shared/lib/bouncer/credit-events'
+      ) as typeof CreditEventsModule
+    ).enqueueCreditEvent
   );
 }
 
@@ -196,6 +202,31 @@ async function insertProviderScopedSubscriptionRows(providerSubscriptionId: stri
   return { stripeUser, appStoreUser, stripeSubscriptionId };
 }
 
+async function insertOpenPauseForAppStoreSubscription(originalTransactionId: string) {
+  const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+    where: eq(kilo_pass_subscriptions.provider_subscription_id, originalTransactionId),
+  });
+  if (!subscription) throw new Error('App Store subscription not found');
+  await db.insert(kilo_pass_pause_events).values({
+    kilo_pass_subscription_id: subscription.id,
+    paused_at: '2026-05-01T00:00:00.000Z',
+    resumes_at: null,
+  });
+  return subscription.id;
+}
+
+async function getOpenPauseCount(subscriptionId: string): Promise<number> {
+  const rows = await db
+    .select({ id: kilo_pass_pause_events.id })
+    .from(kilo_pass_pause_events)
+    .where(
+      and(
+        eq(kilo_pass_pause_events.kilo_pass_subscription_id, subscriptionId),
+        sql`${kilo_pass_pause_events.resumed_at} IS NULL`
+      )
+    );
+  return rows.length;
+}
 describe('processAppStoreKiloPassNotification', () => {
   let dateNowSpy: jest.SpiedFunction<typeof Date.now>;
 
@@ -696,6 +727,9 @@ describe('processAppStoreKiloPassNotification', () => {
       decodeNotification: async () => notification({ notificationUUID: 'renewal' }),
       decodeTransaction: async () => decodedTransaction,
     });
+    const pausedSubscriptionId = await insertOpenPauseForAppStoreSubscription(
+      decodedTransaction.originalTransactionId
+    );
 
     await processAppStoreKiloPassNotification({
       signedPayload: 'expired',
@@ -716,6 +750,7 @@ describe('processAppStoreKiloPassNotification', () => {
     });
     expect(subscription?.status).toBe('canceled');
     expect(subscription?.ended_at).not.toBeNull();
+    expect(await getOpenPauseCount(pausedSubscriptionId)).toBe(0);
   });
 
   it('marks a subscription ended when the expiration notification transaction is expired', async () => {
@@ -2483,6 +2518,9 @@ describe('processAppStoreKiloPassNotification', () => {
         }),
       decodeTransaction: async () => decodedTransaction,
     });
+    const pausedSubscriptionId = await insertOpenPauseForAppStoreSubscription(
+      decodedTransaction.originalTransactionId
+    );
 
     const subscription = await db.query.kilo_pass_subscriptions.findFirst({
       where: eq(
@@ -2554,6 +2592,7 @@ describe('processAppStoreKiloPassNotification', () => {
       ),
     });
     expect(endedSubscription?.status).toBe('canceled');
+    expect(await getOpenPauseCount(pausedSubscriptionId)).toBe(0);
 
     const negativeCreditTransactions = await db
       .select({

@@ -16,6 +16,8 @@ export type ModelOption = {
   unavailable?: boolean;
   /** Ordered list of variant key names (e.g., ["none","low","medium","high","max"]) */
   variants?: string[];
+  /** Reasoning-control variants only; [] is known default-only, absent is unknown. */
+  reasoningVariants?: string[];
 };
 
 export type ModelOptionGroup = {

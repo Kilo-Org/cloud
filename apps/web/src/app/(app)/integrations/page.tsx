@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { IntegrationsPageClient } from './IntegrationsPageClient';
 
 export default async function UserIntegrationsPage() {

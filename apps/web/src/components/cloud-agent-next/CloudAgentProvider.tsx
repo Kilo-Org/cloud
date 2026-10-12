@@ -17,7 +17,7 @@ import {
   type UserWebConnection,
 } from '@kilocode/cloud-agent-sdk';
 import type { SendMessagePayload } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@/lib/constants';
+import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@kilocode/web-shared/lib/constants';
 import { normalizeAlias, selectAssignedSessionBranch } from './session-config';
 import { usePostHog } from 'posthog-js/react';
 import { fetchWebSessionSnapshotPage } from './session-page-adapter';
@@ -347,6 +347,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           isInitiated: Boolean(rs?.initiatedAt),
           needsLegacyPrepare: Boolean(sessionResult.cloud_agent_session_id && !rs),
           isPreparingAsync: Boolean(rs && !rs.preparedAt),
+          routeReady: rs?.routeReady,
           prompt: rs?.prompt ?? null,
           initialMessageId: rs?.initialMessageId ?? null,
           runtimeAgents: rs?.runtimeAgents,

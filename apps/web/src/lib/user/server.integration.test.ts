@@ -6,12 +6,12 @@ jest.mock('next/headers', () => ({
 }));
 
 import { beforeEach, describe, test, expect } from '@jest/globals';
-import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
-import { generateApiToken } from '@/lib/tokens';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { eq } from 'drizzle-orm';
 
 beforeEach(() => {

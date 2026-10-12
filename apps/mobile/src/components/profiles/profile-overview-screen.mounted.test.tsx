@@ -22,7 +22,7 @@ const h = vi.hoisted(() => ({
   push: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
-  alert: vi.fn(),
+  confirm: vi.fn(),
   query: {
     data: undefined as TestProfileDetail | undefined,
     isError: false,
@@ -58,12 +58,19 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
     `/profiles/${id}/agents${org ? `?org=${org}` : ''}`,
 }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  useWindowDimensions: () => ({ width: 402, height: 874, fontScale: 1 }),
   View: 'View',
   ScrollView: 'ScrollView',
-  Alert: { alert: h.alert },
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 62, right: 0, bottom: 34, left: 0 }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ destructiveForeground: '#FFFFFF' }),
+}));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -287,7 +294,7 @@ describe('ProfileOverviewScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
-    await pressDelete(renderer.root, h.alert);
+    await pressDelete(renderer.root, h.confirm);
 
     await waitFor(() => h.mutations.deleteProfile.mutateAsync.mock.calls.length > 0);
     expect(h.mutations.deleteProfile.mutateAsync.mock.calls[0]?.[0]).toEqual({
@@ -309,7 +316,7 @@ describe('ProfileOverviewScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
-    await pressDelete(renderer.root, h.alert);
+    await pressDelete(renderer.root, h.confirm);
 
     await waitFor(() => h.error.mock.calls.length > 0);
     expect(h.error).toHaveBeenCalledWith(
@@ -330,7 +337,7 @@ describe('ProfileOverviewScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
-    await pressDelete(renderer.root, h.alert);
+    await pressDelete(renderer.root, h.confirm);
 
     await waitFor(() => h.error.mock.calls.length > 0);
     expect(h.error).toHaveBeenCalledWith("Couldn't delete profile");

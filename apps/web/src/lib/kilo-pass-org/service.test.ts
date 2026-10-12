@@ -13,12 +13,12 @@ import {
 } from '@kilocode/db/schema';
 import { KiloPassOrgAgreementState } from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
-import { createOrganization } from '@/lib/organizations/organizations';
-import { SEAT_PRODUCT_IDS } from '@/lib/organizations/stripe-seat-line-items';
-import { client as stripeClient } from '@/lib/stripe-client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { SEAT_PRODUCT_IDS } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { handleOrganizationKiloPassSubscriptionEvent } from './stripe-adapter';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { monthlyWindowFromOriginalAnchor } from './calculations';
 import {
   activatePaidAgreement,

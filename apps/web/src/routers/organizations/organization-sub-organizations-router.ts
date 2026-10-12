@@ -18,20 +18,20 @@ import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { and, asc, count, desc, eq, gt, inArray, isNull, ne, or, sql, sum } from 'drizzle-orm';
 import * as z from 'zod';
 
-import { processOrganizationExpirationsBatch } from '@/lib/creditExpiration';
-import { db } from '@/lib/drizzle';
-import { resolveEffectiveOrganizationSsoPolicies } from '@/lib/organizations/organization-sso-policy';
+import { processOrganizationExpirationsBatch } from '@kilocode/web-shared/lib/creditExpiration';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { resolveEffectiveOrganizationSsoPolicies } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import {
   OrganizationPlanSchema,
   OrganizationRoleSchema,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   SubOrganizationModelPolicyOutputSchema,
   summarizeSubOrganizationModelPolicies,
 } from '@/lib/organizations/sub-organizations/model-policy';
-import { toMicrodollars } from '@/lib/microdollars';
-import { createTRPCRouter } from '@/lib/trpc/init';
-import { organizationBillingProcedure } from '@/routers/organizations/utils';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { organizationBillingProcedure } from '@kilocode/web-shared/routers/organizations/utils';
 
 const SeatCountSchema = z.object({
   used: z.number().int().nonnegative(),

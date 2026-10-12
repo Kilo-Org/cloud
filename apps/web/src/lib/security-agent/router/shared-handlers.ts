@@ -1,9 +1,9 @@
-import type { TRPCContext } from '@/lib/trpc/init';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import {
   organizationTarget,
   recordKiloAdminElevation,
   userTarget,
-} from '@/lib/admin/admin-access-log';
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { TRPCError } from '@trpc/server';
 import {
   type getIntegrationForOwner,
@@ -76,7 +76,7 @@ import {
   buildSecurityFindingAuditHumanActor,
   REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS,
 } from '@kilocode/worker-utils/security-finding-audit';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import {
   SaveSecurityConfigInputSchema,

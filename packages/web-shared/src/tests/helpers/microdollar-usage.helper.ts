@@ -4,15 +4,15 @@ import {
   toInsertableDbUsageRecord,
   insertUsageRecord,
   type UsageContextInfo,
-} from '@/lib/ai-gateway/processUsage';
-import { db } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { sql } from 'drizzle-orm';
-import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type {
   CoreUsageWithMetaData,
   MicrodollarUsageContext,
   MicrodollarUsageStats,
-} from '@/lib/ai-gateway/processUsage.types';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 
 function defineDefaultUsageStats(): MicrodollarUsageStats {
   return {
@@ -67,6 +67,7 @@ function defineDefaultContextInfo(): UsageContextInfo {
     session_id: null,
     mode: null,
     auto_model: null,
+    reasoning_setting: null,
     ttfb_ms: null,
     abuse_delay: null,
     abuse_downgraded_from: null,
@@ -124,6 +125,7 @@ export function createMockUsageContext(
     session_id: null,
     mode: null,
     auto_model: null,
+    reasoning_setting: null,
     ttfb_ms: null,
   };
 }

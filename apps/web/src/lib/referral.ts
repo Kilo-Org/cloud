@@ -6,17 +6,17 @@ import {
   referral_codes,
 } from '@kilocode/db/schema';
 import { ImpactReferralProduct } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, and, count, sql, isNull, isNotNull, inArray } from 'drizzle-orm';
 import { captureMessage } from '@sentry/nextjs';
-import { grantCreditForCategory } from '@/lib/promotionalCredits';
+import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 import {
   promoCreditCategoriesByKey,
   referralRedeemingBonus,
   referralReferringBonus,
-} from '@/lib/promoCreditCategories';
-import { findUserById } from '@/lib/user/find-user-by-id';
-import { warnExceptInTest } from '@/lib/utils.server';
+} from '@kilocode/web-shared/lib/promoCreditCategories';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 function getRandomBase64String(): string {
   return crypto.randomUUID();

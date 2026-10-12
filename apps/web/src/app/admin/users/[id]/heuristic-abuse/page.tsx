@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAdminHeuristicAbuse } from '@/app/admin/components/UserAdmin/UserAdminHeuristicAbuse';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { redirect } from 'next/navigation';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
@@ -9,7 +9,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 export default async function UserHeuristicAbusePage({
   params,

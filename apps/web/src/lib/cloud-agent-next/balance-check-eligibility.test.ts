@@ -3,11 +3,11 @@ const mockGetModelUserByokProviders = jest.fn();
 const mockGetUserByokProviderIds = jest.fn();
 const mockGetOrganizationByokProviderIds = jest.fn();
 
-jest.mock('@/lib/ai-gateway/is-free-model', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   isFreeModel: (...args: unknown[]) => mockIsFreeModel(...args),
 }));
 
-jest.mock('@/lib/ai-gateway/byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   getModelUserByokProviders: (...args: unknown[]) => mockGetModelUserByokProviders(...args),
   getUserByokProviderIds: (...args: unknown[]) => mockGetUserByokProviderIds(...args),
   getOrganizationByokProviderIds: (...args: unknown[]) =>
@@ -17,11 +17,11 @@ jest.mock('@/lib/ai-gateway/byok', () => ({
 const mockCanRouteToVercel = jest.fn();
 const mockResolveOrganizationMemberModelDecision = jest.fn();
 
-jest.mock('@/lib/ai-gateway/providers/vercel', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: (...args: unknown[]) => mockCanRouteToVercel(...args),
 }));
 
-jest.mock('@/lib/organizations/effective-model-access.server', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   resolveOrganizationMemberModelDecision: (...args: unknown[]) =>
     mockResolveOrganizationMemberModelDecision(...args),
 }));

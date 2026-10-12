@@ -1,5 +1,5 @@
 import 'server-only';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { organizationsRouter } from '@/routers/organizations/organization-router';
 import { userRouter } from '@/routers/user-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
@@ -19,7 +19,6 @@ import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
 import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
-import { quickChatRouter } from '@/routers/quick-chat-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
 import { agentProfilesMobileRouter } from './agent-profiles-mobile';
 
@@ -50,7 +49,6 @@ const mobileRouter = createTRPCRouter({
   providerReview: providerReviewRouter,
   moderation: moderationRouter,
   kiloChat: kiloChatRouter,
-  quickChat: quickChatRouter,
   spendAlerts: spendAlertRouter,
   agentProfiles: agentProfilesMobileRouter,
 });

@@ -15,8 +15,8 @@ import { goneOrDeletingBlockedReasonSql } from '@kilocode/db/user-soft-delete';
 import { and, eq, isNull, not, or } from 'drizzle-orm';
 import type Stripe from 'stripe';
 
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { client } from '@/lib/stripe-client';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
 
 type StripeReference = string | { id: string } | null | undefined;
 

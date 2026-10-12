@@ -21,7 +21,7 @@ const mockSettleCodeReviewLedgerRowOn = jest.fn() as jest.MockedFunction<
 // this mock swallows the WHERE clauses so the per-row branching can be asserted
 // directly. The update chain is shared by the review claim (awaits .returning())
 // and the attempts close (awaits the .where() thenable itself).
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: () => ({
       from: () => ({

@@ -7,7 +7,7 @@ import type Stripe from 'stripe';
 import {
   sendMissedServiceFeeAlert,
   type MissedServiceFeeAlertInput,
-} from '@/lib/service-fees/alerts';
+} from '@kilocode/web-shared/lib/service-fees/alerts';
 import {
   markServiceFeeAssessmentCharged,
   markServiceFeeAssessmentMissed,
@@ -20,31 +20,31 @@ import {
   type ServiceFeeAssessmentRecord,
   type ServiceFeeAssessmentStore,
   type ServiceFeeStripeIds,
-} from '@/lib/service-fees/assessments';
-import { calculateServiceFeeMinor } from '@/lib/service-fees/calculation';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
+import { calculateServiceFeeMinor } from '@kilocode/web-shared/lib/service-fees/calculation';
 import {
   SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
   SERVICE_FEE_DESCRIPTION,
   SERVICE_FEE_VERSION,
-} from '@/lib/service-fees/constants';
+} from '@kilocode/web-shared/lib/service-fees/constants';
 import {
   buildServiceFeeCommercialMetadata,
   buildServiceFeeLineMetadata,
   isServiceFeeCheckoutLine,
-} from '@/lib/service-fees/stripe-lines';
+} from '@kilocode/web-shared/lib/service-fees/stripe-lines';
 import {
   resolveServiceFeeTaxInput,
   type ServiceFeeTaxInput,
   type ServiceFeeTaxPrincipal,
   type StripePriceTaxReader,
-} from '@/lib/service-fees/tax';
+} from '@kilocode/web-shared/lib/service-fees/tax';
 import {
   SERVICE_FEE_SUPPORTED_CURRENCY,
   type ServiceFeeCommercialMetadata,
   type ServiceFeeFlow,
   type ServiceFeeLineMetadata,
   type ServiceFeeOutcome,
-} from '@/lib/service-fees/types';
+} from '@kilocode/web-shared/lib/service-fees/types';
 
 export const SERVICE_FEE_ACTIVATION_BOUNDARY_WINDOW_SECONDS = 60;
 export const KILO_OWNED_AUTO_TOP_UP_INVOICE_TYPES = ['auto-topup', 'org-auto-topup'] as const;

@@ -6,8 +6,11 @@ import {
   normalizeClassifierInput,
 } from '@kilocode/auto-routing-contracts';
 import type { ClassifierApiKind, MirrorPayload } from '@kilocode/auto-routing-contracts';
-import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
-import { warnExceptInTest } from '@/lib/utils.server';
+import {
+  AUTO_ROUTING_WORKER_URL,
+  INTERNAL_API_SECRET,
+} from '@kilocode/web-shared/lib/config.server';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export const EFFICIENT_DECISION_TIMEOUT_MS = 5_000;
 

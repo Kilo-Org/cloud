@@ -1,11 +1,11 @@
 import { connection, type NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
-import { getApiRequestLogBlob } from '@/lib/r2/api-request-log';
+import { getApiRequestLogBlob } from '@kilocode/web-shared/lib/r2/api-request-log';
 
 // Downloading all logs for a heavy user can take a while. Without a raised
 // maxDuration the Vercel function was killed mid-stream, producing a ZIP

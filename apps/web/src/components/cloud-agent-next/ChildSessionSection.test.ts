@@ -1,14 +1,36 @@
-import React from 'react';
 import { createRequire } from 'node:module';
-import { act, createElement } from 'react';
+import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { atom, createStore, Provider } from 'jotai';
-import type { KiloSessionId, SessionManager } from '@kilocode/cloud-agent-sdk';
+import type {
+  ChildSessionHydrationState,
+  KiloSessionId,
+  SessionManager,
+} from '@kilocode/cloud-agent-sdk';
+import type { ChildSessionDrawerEntry } from './ChildSessionSection';
+import type { ChildSessionDrawer as ChildSessionDrawerComponent } from './ChildSessionDrawer';
 import type { StoredMessage, ToolPart } from './types';
+
+jest.mock('./CloudAgentProvider', () => ({
+  useManager: jest.fn(),
+  useOptionalManager: jest.fn(),
+}));
+jest.mock('./MessageBubble', () => ({ MessageBubble: () => null }));
+jest.mock('@/components/ui/sheet', () => {
+  const stub =
+    (slot: string) =>
+    ({ children }: { children?: React.ReactNode }) =>
+      React.createElement('div', { 'data-slot': slot }, children);
+  return {
+    Sheet: stub('sheet'),
+    SheetContent: stub('sheet-content'),
+    SheetHeader: stub('sheet-header'),
+    SheetTitle: stub('sheet-title'),
+    SheetDescription: stub('sheet-description'),
+  };
+});
+
 import { useOptionalManager } from './CloudAgentProvider';
-
-jest.mock('./CloudAgentProvider', () => ({ useOptionalManager: jest.fn() }));
-
 import { ChildSessionSection } from './ChildSessionSection';
 
 function installDom() {
@@ -102,6 +124,31 @@ const parentPart: ToolPart = {
   },
 };
 
+function click(target: Element) {
+  act(() => {
+    target.dispatchEvent(new Event('click', { bubbles: true, cancelable: true }));
+  });
+}
+
+function taskToolPart(metadata: Record<string, unknown>): ToolPart {
+  return {
+    id: 'task-part',
+    sessionID: 'ses-1',
+    messageID: 'assistant-1',
+    type: 'tool',
+    callID: 'call-1',
+    tool: 'task',
+    state: {
+      status: 'completed',
+      input: { description: 'Inspect the parser', subagent_type: 'explore' },
+      output: 'done',
+      title: 'Inspect the parser',
+      metadata,
+      time: { start: 1, end: 2 },
+    },
+  };
+}
+
 describe('ChildSessionSection live subscription', () => {
   let root: Root | undefined;
   let container: HTMLElement;
@@ -182,5 +229,147 @@ describe('ChildSessionSection live subscription', () => {
       );
     });
     expect(container.textContent).toContain('1 tool call');
+  });
+});
+
+describe('ChildSessionSection drawer entry', () => {
+  let root: Root | undefined;
+  let container: HTMLElement;
+  let cleanup: () => void;
+
+  beforeAll(() => {
+    const dom = installDom();
+    container = dom.container;
+    cleanup = dom.cleanup;
+  });
+
+  afterEach(() => {
+    act(() => root?.unmount());
+    root = undefined;
+  });
+
+  afterAll(() => {
+    cleanup();
+  });
+
+  function renderSection(
+    metadata: Record<string, unknown>,
+    onOpenChildSession: (entry: ChildSessionDrawerEntry) => void
+  ) {
+    const sessionId = `ses_${'a'.repeat(26)}` as KiloSessionId;
+    act(() => {
+      root = createRoot(container);
+      root.render(
+        createElement(ChildSessionSection, {
+          taskToolPart: taskToolPart({ sessionId, ...metadata }),
+          sessionId,
+          onOpenChildSession,
+        })
+      );
+    });
+  }
+
+  it.each([
+    [
+      'with routed model',
+      { model: { providerID: 'kilo', modelID: 'anthropic/claude-opus-4.6' } },
+      'claude-opus-4.6',
+    ],
+    ['without model metadata', {}, undefined],
+    ['with malformed model metadata', { model: { providerID: 'kilo' } }, undefined],
+    ['with empty model fields', { model: { providerID: '', modelID: '' } }, undefined],
+  ])('builds the drawer entry %s', (_name, metadata, expectedModel) => {
+    const onOpenChildSession = jest.fn();
+    renderSection(metadata, onOpenChildSession);
+    const trigger = container.querySelector('button');
+    if (!trigger) throw new Error('child session trigger missing');
+    click(trigger);
+
+    expect(onOpenChildSession).toHaveBeenCalledWith({
+      sessionId: `ses_${'a'.repeat(26)}`,
+      description: 'Inspect the parser',
+      agent: 'explore',
+      model: expectedModel,
+    });
+  });
+});
+
+describe('ChildSessionDrawer header', () => {
+  let ChildSessionDrawer: typeof ChildSessionDrawerComponent;
+  let root: Root | undefined;
+  let container: HTMLElement;
+  let cleanup: () => void;
+  const manager = {
+    atoms: {
+      childMessages: atom(() => (_sessionId: string): StoredMessage[] => []),
+      childSessionHydrationState: atom(
+        () =>
+          (_sessionId: string): ChildSessionHydrationState => ({
+            status: 'ready',
+            cursor: null,
+            hasOlder: false,
+            isLoadingOlder: false,
+            olderError: null,
+            omittedItemCount: 0,
+          })
+      ),
+    },
+    hydrateChildSession: jest.fn(),
+    loadOlderChildMessages: jest.fn(),
+  };
+
+  beforeAll(async () => {
+    const dom = installDom();
+    container = dom.container;
+    cleanup = dom.cleanup;
+    const provider = await import('./CloudAgentProvider');
+    (provider.useManager as unknown as jest.Mock).mockReturnValue(manager);
+    ({ ChildSessionDrawer } = await import('./ChildSessionDrawer'));
+  });
+
+  afterEach(() => {
+    act(() => root?.unmount());
+    root = undefined;
+  });
+
+  afterAll(() => {
+    cleanup();
+  });
+
+  function renderDrawer(entry: ChildSessionDrawerEntry) {
+    act(() => {
+      root = createRoot(container);
+      root.render(
+        createElement(ChildSessionDrawer, {
+          stack: [entry],
+          onBack: () => undefined,
+          onOpenChange: () => undefined,
+          onOpenChildSession: () => undefined,
+        })
+      );
+    });
+  }
+
+  it('shows the routed model next to the agent', () => {
+    renderDrawer({
+      sessionId: `ses_${'b'.repeat(26)}` as KiloSessionId,
+      description: 'Inspect the parser',
+      agent: 'explore',
+      model: 'claude-opus-4.6',
+    });
+
+    expect(container.innerHTML).toContain('Agent: explore');
+    expect(container.innerHTML).toContain('Model: claude-opus-4.6');
+  });
+
+  it('omits the model row when the entry has none', () => {
+    renderDrawer({
+      sessionId: `ses_${'c'.repeat(26)}` as KiloSessionId,
+      description: 'Inspect the parser',
+      agent: 'explore',
+    });
+
+    expect(container.innerHTML).toContain('Agent: explore');
+    expect(container.innerHTML).not.toContain('Model:');
   });
 });

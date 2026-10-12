@@ -14,7 +14,10 @@ import {
   GlanceableActiveCard,
   GlanceableActiveCardSkeleton,
 } from '@/components/home/glanceable-active-card';
-import { LiveSessionHeaderNotice } from '@/components/home/live-session-header-notice';
+import {
+  LiveSessionHeaderNotice,
+  useLiveSessionHeaderNotice,
+} from '@/components/home/live-session-header-notice';
 import {
   liveSessionContent,
   type LiveSessionContext,
@@ -24,11 +27,9 @@ import { SectionHeader } from '@/components/home/section-header';
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
-import { persistLiveShapeHint, readLiveShapeHint } from '@/lib/home-live-shape';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { createSubmitLock } from '@/lib/submit-lock';
@@ -304,80 +305,43 @@ export function LiveSessionFeedback({
   );
 }
 
-/** The `Nothing running` card's frame, shared with its pending placeholder. */
-const EMPTY_CARD_CLASS =
-  'min-h-[72px] items-center justify-center rounded-2xl border border-border bg-card px-4';
-
 export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
   const router = useRouter();
   const { t } = useTranslation();
   const { reducedMotion } = useMotionPolicy();
   const handleRowPress = useSessionRowPress();
   const content = liveSessionContent(context, sessions);
-  // The cold-start placeholder takes the shape this section last settled on,
-  // so the arriving card or `Nothing running` replaces a box of its height.
-  const shapeHint = readLiveShapeHint();
-  useEffect(() => {
-    if (content === 'rows' || content === 'empty') {
-      persistLiveShapeHint(content);
-    }
-  }, [content]);
-  const showsEmptyShape = content === 'empty' || (content === 'pending' && shapeHint === 'empty');
+  const failureLabel = t('home.couldNotLoadActiveSessions');
+  const notice = useLiveSessionHeaderNotice(context, sessions, failureLabel);
 
   return (
     <View>
       {/* The header row stays in every state, so settling never adds or
-          removes it. `See all` hides while nothing runs: it would advertise
-          the Agents live index for sessions that do not exist. */}
+          removes it. `See all` keeps its box but hides while nothing runs: it
+          would advertise the Agents live index for sessions that do not exist. */}
       <SectionHeader
         label={t('home.agentSessions')}
-        actionLabel={showsEmptyShape ? undefined : t('home.seeAll')}
+        actionLabel={t('home.seeAll')}
+        actionHidden={content === 'empty'}
         onActionPress={() => {
           // Switch tabs, then pop a previously pushed history screen to the live index.
           router.navigate(AGENTS_INDEX_HREF as Href);
           router.dismissTo(AGENTS_INDEX_HREF as Href);
         }}
-        notice={
-          <LiveSessionHeaderNotice
-            context={context}
-            sessions={sessions}
-            failureLabel={t('home.couldNotLoadActiveSessions')}
-          />
-        }
+        notice={notice && <LiveSessionHeaderNotice notice={notice} />}
       />
       <View className="mx-4 gap-2">
         <LiveSessionFeedback
           context={context}
           sessions={sessions}
-          failureLabel={t('home.couldNotLoadActiveSessions')}
+          failureLabel={failureLabel}
           inlineNotices={false}
         />
-        {/* One card, not a row per session: its frame and row heights are the
-            same in the pending and rows states (`GlanceableActiveCardSkeleton`
-            repeats `GlanceableActiveCard`'s box, and the empty placeholder
-            repeats the `Nothing running` card), so the swap cannot move the
-            header, feedback or the agent-create actions below. */}
+        {/* One card, not a row per session. The skeleton shares the loaded
+            card's minimum frame; scaled text can grow the loaded content. */}
         <Animated.View layout={LinearTransition}>
-          {content === 'pending' &&
-            (showsEmptyShape ? (
-              <View
-                className={EMPTY_CARD_CLASS}
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-              >
-                <Skeleton className="h-3 w-40 rounded" />
-              </View>
-            ) : (
-              <GlanceableActiveCardSkeleton />
-            ))}
-          {content === 'empty' && (
-            <View className={EMPTY_CARD_CLASS}>
-              <Text variant="muted" className="text-sm">
-                {t('home.noLiveSessions')}
-              </Text>
-            </View>
-          )}
-          {content === 'rows' && (
+          {content === 'pending' && <GlanceableActiveCardSkeleton />}
+          {(content === 'empty' || content === 'rows') && (
             <Animated.View
               entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
             >

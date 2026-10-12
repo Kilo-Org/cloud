@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { buildPreferredModels } from '@/lib/ai-gateway/models';
+import { buildPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/models';
 
 const PREFERRED_MODELS_WITHOUT_FREE_SECTION = buildPreferredModels([]);
 

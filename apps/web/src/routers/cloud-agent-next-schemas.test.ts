@@ -21,6 +21,7 @@ import {
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentRelaxedAttachmentFilenameSchema,
+  baseSendMessageNextSchema,
 } from './cloud-agent-next-schemas';
 
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
@@ -597,6 +598,42 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
   });
 });
 
+describe('send-time attachment filenames', () => {
+  const prepareInput = {
+    githubRepo: 'acme/repo',
+    prompt: 'Read the attachment',
+    mode: 'code',
+    model: 'kilo/test-model',
+  };
+  const sendInput = {
+    cloudAgentSessionId: 'agent_12345678-1234-4234-9234-123456789abc',
+    payload: { type: 'prompt', prompt: '', mode: 'code', model: 'kilo/test-model' },
+  };
+  const attachmentsWith = (extension: string) => ({
+    path: MESSAGE_UUID,
+    files: [`${ATTACHMENT_ID}.${extension}`],
+  });
+
+  it.each(['zip', 'heic', 'json', 'png'])(
+    'accepts a relaxed "%s" upload in prepareSession and sendMessage',
+    extension => {
+      const attachments = attachmentsWith(extension);
+      expect(basePrepareSessionNextSchema.safeParse({ ...prepareInput, attachments }).success).toBe(
+        true
+      );
+      expect(baseSendMessageNextSchema.safeParse({ ...sendInput, attachments }).success).toBe(true);
+    }
+  );
+
+  it('rejects a deny-listed extension in prepareSession and sendMessage', () => {
+    const attachments = attachmentsWith('exe');
+    expect(basePrepareSessionNextSchema.safeParse({ ...prepareInput, attachments }).success).toBe(
+      false
+    );
+    expect(baseSendMessageNextSchema.safeParse({ ...sendInput, attachments }).success).toBe(false);
+  });
+});
+
 describe('createWorktreeChat schemas', () => {
   const operationKey = '12345678-1234-4234-9234-123456789abc';
   const workspaceId = `workspace_${operationKey}`;
@@ -766,14 +803,21 @@ describe('prepare session sandbox selection', () => {
     }
   );
 
-  it('accepts dev containers with Default', () => {
-    expect(
-      organizationPrepareSessionNextSchema.safeParse({ ...organizationInput, devcontainer: true })
-        .success
-    ).toBe(true);
-    expect(
-      personalPrepareSessionNextSchema.safeParse({ ...baseInput, devcontainer: true }).success
-    ).toBe(true);
+  it('rejects retired dev containers even with Default', () => {
+    for (const result of [
+      organizationPrepareSessionNextSchema.safeParse({ ...organizationInput, devcontainer: true }),
+      personalPrepareSessionNextSchema.safeParse({ ...baseInput, devcontainer: true }),
+    ]) {
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues).toContainEqual(
+          expect.objectContaining({
+            path: ['devcontainer'],
+            message: 'Devcontainer support has been retired',
+          })
+        );
+      }
+    }
   });
 
   it('preserves clone-only validation while accepting a preset', () => {

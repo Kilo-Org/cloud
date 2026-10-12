@@ -1,8 +1,8 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   eq,
   and,
@@ -50,8 +50,11 @@ import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { recordKiloAdminElevation, UNSCOPED_TARGET } from '@/lib/admin/admin-access-log';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  recordKiloAdminElevation,
+  UNSCOPED_TARGET,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   fetchPullRequestByNumber,
   fetchPullRequestReviewDecision,
@@ -660,6 +663,7 @@ type WorktreeDetail = {
     sessionId: string;
     sessionStatus: string | null;
     sessionStatusUpdatedAt: string | null;
+    updatedAt: string;
   }[];
   prSession:
     | (Pick<CliSessionV2, keyof typeof commonSessionFields | 'total_cost_microdollars'> & {
@@ -1019,7 +1023,8 @@ export const cliSessionsV2Router = createTRPCRouter({
           sessions: sql<WorktreeDetail['sessions']>`json_agg(json_build_object(
             'sessionId', ${cli_sessions_v2.session_id},
             'sessionStatus', ${cli_sessions_v2.status},
-            'sessionStatusUpdatedAt', ${cli_sessions_v2.status_updated_at}
+            'sessionStatusUpdatedAt', ${cli_sessions_v2.status_updated_at},
+            'updatedAt', ${cli_sessions_v2.updated_at}
           ) ORDER BY ${cli_sessions_v2.session_id})`,
         })
         .from(cli_sessions_v2)
@@ -1033,6 +1038,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         row.worktreeId,
         row.sessions.map(session => ({
           ...session,
+          updatedAt: new Date(session.updatedAt).toISOString(),
           sessionStatusUpdatedAt: session.sessionStatusUpdatedAt
             ? new Date(session.sessionStatusUpdatedAt).toISOString()
             : null,

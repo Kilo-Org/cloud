@@ -8,6 +8,7 @@ export type { KiloFeedEvent };
 export type KiloEventFeedSource = Readonly<{
   directory: string;
   serverUrl: string;
+  nativeRuntimeId: string;
 }>;
 
 export type KiloEventFeed = {
@@ -32,7 +33,7 @@ export type KiloEventFeedOptions = {
  * closing this feed and opening a new one against the same Kilo.
  */
 export function createKiloEventFeed(options: KiloEventFeedOptions): KiloEventFeed {
-  const { directory, serverUrl } = options.source;
+  const { directory, serverUrl, nativeRuntimeId } = options.source;
   const log = options.log ?? logToFile;
   const lifetime = new AbortController();
   const signal = AbortSignal.any([lifetime.signal, options.signal]);
@@ -49,8 +50,7 @@ export function createKiloEventFeed(options: KiloEventFeedOptions): KiloEventFee
     try {
       for await (const event of events) {
         if (closed || signal.aborted) return;
-        // `nativeRuntimeId` is required by the shared event type but unused here.
-        options.onEvent({ ...event, nativeRuntimeId: '' });
+        options.onEvent({ ...event, nativeRuntimeId });
       }
     } catch {
       // Reported as an ended stream below.
@@ -75,7 +75,7 @@ export function createKiloEventFeed(options: KiloEventFeedOptions): KiloEventFee
       }
       opened = true;
       log(`control feed directory=${directory} phase=connected`);
-      options.onEvent({ ...first.value, nativeRuntimeId: '' });
+      options.onEvent({ ...first.value, nativeRuntimeId });
       void consume(events).catch(() => undefined);
     },
     close(): void {

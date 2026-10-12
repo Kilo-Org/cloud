@@ -1,5 +1,5 @@
-import { ENKRYPT_PUBLICATION_ENABLED } from '@/lib/config.server';
-import { KILO_AUTO_MODEL_PREFIX } from '@/lib/ai-gateway/model-utils';
+import { ENKRYPT_PUBLICATION_ENABLED } from '@kilocode/web-shared/lib/config.server';
+import { KILO_AUTO_MODEL_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { isEnkryptPublicModel, publishEnkryptBenchmark } from './enkrypt-publication';
 import {
   getModelStatsSnapshot,

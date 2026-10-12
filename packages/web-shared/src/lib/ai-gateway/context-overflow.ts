@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { getMaxTokens } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { ProxyErrorType } from '@/lib/proxy-error-types';
-import { warnExceptInTest } from '@/lib/utils.server';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { getMaxTokens } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 // Recursively sums the lengths of every string value in a structure. Used by
 // `estimateTokenCount` to get a text-only character count that ignores JSON

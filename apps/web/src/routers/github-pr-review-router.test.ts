@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 import { TRPCError } from '@trpc/server';
-import { createCallerFactory } from '@/lib/trpc/init';
+import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 import { INBOX_SEARCH_QUERY, prLedgerResourceKey } from './github-pr-review-router';
 
@@ -14,7 +14,7 @@ jest.mock('@/lib/integrations/platforms/github/user-token-client', () => ({
 
 // P1-A-08c: the PR operation ledger. The router admits / settles /
 // marks-reconcile-pending through `@kilocode/db/operation-ledger`. Both it and
-// `@/lib/drizzle` are mocked so the ledger tests can assert admission, settle,
+// `@kilocode/web-shared/lib/drizzle` are mocked so the ledger tests can assert admission, settle,
 // replay, and reconcile orchestration without a database. The analytics
 // identity comes from `ctx.user`, which carries no email here, so it falls
 // back to the user id.
@@ -36,7 +36,7 @@ jest.mock('@kilocode/db/operation-ledger', () => ({
 // tests that assert the missing-terms rejection override it to resolve [].
 const mockTermsLookup = jest.fn();
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: () => ({
       from: () => ({

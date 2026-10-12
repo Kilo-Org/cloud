@@ -1,10 +1,10 @@
 import 'server-only';
 
 import { TRPCError } from '@trpc/server';
-import { getOrganizationById } from '@/lib/organizations/organizations';
-import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seat-purchases';
-import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';
-import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
+import { getMostRecentSeatPurchase } from '@kilocode/web-shared/lib/organizations/organization-seat-purchases';
+import { classifyOrganizationEntitlement } from '@kilocode/web-shared/lib/organizations/trial-utils';
+import { isLocalCodeReviewDevelopmentEnabled } from '@kilocode/web-shared/lib/config.server';
 import type { CodeReviewType } from '@kilocode/db/schema-types';
 import type { Owner } from './schemas';
 

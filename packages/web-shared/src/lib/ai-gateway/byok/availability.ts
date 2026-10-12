@@ -1,6 +1,6 @@
-import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
-import { canRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
+import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+import { canRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 
 /**
  * Whether an enabled key among `modelProviders` serves `modelId` with the

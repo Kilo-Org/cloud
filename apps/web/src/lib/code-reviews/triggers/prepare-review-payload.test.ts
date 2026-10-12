@@ -64,8 +64,8 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   cloud_agent_code_reviews,
   kilocode_users,
@@ -1108,8 +1108,9 @@ describe('prepareReviewPayload', () => {
       githubRepo: REPO,
       platform: 'github',
       upstreamBranch: 'refs/pull/1234/head',
-      envVars: { KILO_CODE_REVIEW_PUBLICATION_SELF_CHECK: '1' },
+      githubPullRequestNumber: 1234,
     });
+    expect(payload.sessionInput).not.toHaveProperty('envVars');
     expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
   });
 

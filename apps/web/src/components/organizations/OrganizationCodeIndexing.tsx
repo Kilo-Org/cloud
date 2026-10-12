@@ -1,7 +1,7 @@
 'use client';
 
 import { OrganizationPageHeader } from '@/components/organizations/OrganizationPageHeader';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { CodeIndexingView } from '@/components/code-indexing/CodeIndexingView';
@@ -22,11 +22,9 @@ export function OrganizationCodeIndexing({
   isAdminView = false,
   hideHeader = false,
 }: OrganizationCodebaseIndexingProps) {
-  // Fetch organization data to check if code indexing is enabled (only for non-admin view)
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
   const isEnabled = organizationData?.settings?.code_indexing_enabled;
 
-  // Check if code indexing is enabled (skip check for admin view)
   const isCodeIndexingEnabled = isAdminView || !!isEnabled;
 
   if (!isAdminView && !isCodeIndexingEnabled) {
@@ -59,7 +57,6 @@ export function OrganizationCodeIndexing({
     );
   }
 
-  // Determine if user can delete branches
   const canDelete = isAdminView || canManageOrganization(role);
 
   return (

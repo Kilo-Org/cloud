@@ -35,6 +35,7 @@ import {
   ROOT_READ_PART_ID,
   ROOT_SESSION_ID,
   ROOT_SESSION_TITLE,
+  ROOT_SUGGEST_PART_ID,
   ROOT_TASK_PART_ID,
   ROOT_USER_MESSAGE_ID,
   SELECTED_CHILD_SESSION_ID,
@@ -94,7 +95,7 @@ void test('cleanup scope is exactly the four fixture session IDs', () => {
 
 void test('root fixture items match the session-ingest schemas', () => {
   const items = buildRootIngestItems();
-  assert.equal(items.length, 7);
+  assert.equal(items.length, 8);
 
   const session = parseSessionData(singleItemOfType(items, 'session').data);
   assert.equal(session.id, ROOT_SESSION_ID);
@@ -137,7 +138,7 @@ void test('root fixture items match the session-ingest schemas', () => {
   });
 
   const parts = itemsOfType(items, 'part').map(item => parsePartData(item.data));
-  assert.equal(parts.length, 3);
+  assert.equal(parts.length, 4);
 
   const readPart = parts.find(part => part.id === ROOT_READ_PART_ID);
   assert.ok(readPart);
@@ -172,6 +173,15 @@ void test('root fixture items match the session-ingest schemas', () => {
     assert.equal(filePart.mime, 'text/plain');
     assert.equal(filePart.filename, 'fixture-notes.txt');
     assert.equal(filePart.url, 'data:text/plain;base64,Zml4dHVyZSBub3RlcyBjb250ZW50');
+  }
+
+  const suggestPart = parts.find(part => part.id === ROOT_SUGGEST_PART_ID);
+  assert.ok(suggestPart);
+  assert.equal(suggestPart.type, 'tool');
+  if (suggestPart.type === 'tool') {
+    assert.equal(suggestPart.tool, 'suggest');
+    assert.equal(suggestPart.messageID, ROOT_ASSISTANT_MESSAGE_ID);
+    assert.equal(suggestPart.state.status, 'completed');
   }
 
   const sessionDiff = singleItemOfType(items, 'session_diff');
@@ -238,6 +248,7 @@ void test('child fixture items match the session-ingest schemas', () => {
     ROOT_READ_PART_ID,
     ROOT_TASK_PART_ID,
     ROOT_FILE_PART_ID,
+    ROOT_SUGGEST_PART_ID,
   ]);
   assert.deepEqual(expectedPartIdsFor(CHILD_SESSION_ID), [CHILD_BASH_PART_ID]);
   assert.throws(() => expectedPartIdsFor('ses_unknown'), /Unknown fixture session id/);

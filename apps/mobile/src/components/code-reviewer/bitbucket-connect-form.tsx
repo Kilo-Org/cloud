@@ -45,7 +45,7 @@ export function BitbucketConnectForm({ scope }: Readonly<{ scope: string }>) {
         // The shared single-line box supplies the touch floor
         // (`min-h-[44px]`, never a fixed height or `py-*`); the field keeps
         // its own chrome, horizontal inset and line box.
-        className="rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground"
+        className="rounded-md border border-input bg-background pl-3 pr-3 text-sm leading-[normal] text-foreground"
         placeholder={t('codeReviewer.bitbucketConnect.tokenPlaceholder')}
         placeholderTextColor={colors.mutedForeground}
         autoCapitalize="none"

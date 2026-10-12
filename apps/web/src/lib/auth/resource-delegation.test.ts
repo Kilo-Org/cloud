@@ -1,4 +1,4 @@
-import { isResourceTokenIssuanceEnabled } from '@/lib/config.server';
+import { isResourceTokenIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
 import { afterEach, describe, expect, test } from '@jest/globals';
 import {
   device_sessions,
@@ -15,18 +15,20 @@ import { POST as organizationResourcePost } from '@/app/api/organizations/[id]/u
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 
 const shared = { enabled: true, family: '' };
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'resource-delegation-test-secret',
   isResourceTokenIssuanceEnabled: jest.fn(
     (family: string) => shared.enabled && (!shared.family || shared.family === family)
   ),
 }));
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuance: jest.fn(),
   getUserFromAuth: jest.fn(),
 }));
 jest.mock('@/lib/organizations/organization-auth', () => ({ getAuthorizedOrgContext: jest.fn() }));
-jest.mock('@/lib/organizations/organization-audit-logs', () => ({ createAuditLog: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/organizations/organization-audit-logs', () => ({
+  createAuditLog: jest.fn(),
+}));
 jest.mock('../../../../../services/ai-attribution/src/util/logger', () => ({ logger: {} }));
 
 import {
@@ -35,9 +37,12 @@ import {
   createDelegatedResourceToken,
   getResourceDelegationAuthority,
 } from './resource-delegation';
-import { db } from '@/lib/drizzle';
-import { getUserFromAuth, getUserFromSessionForCredentialIssuance } from '@/lib/user/server';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  getUserFromAuth,
+  getUserFromSessionForCredentialIssuance,
+} from '@kilocode/web-shared/lib/user/server';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const secret = 'resource-delegation-test-secret';
 const cleanups: string[] = [];
@@ -286,6 +291,30 @@ describe('resource delegation authority', () => {
       credentialKind: 'human-api',
       isModern: true,
       runtimeAdmission: { source: 'user', authorizationUserId: current.id },
+    });
+  });
+
+  test('preserves verified legacy device sid for separately scoped widget issuance', async () => {
+    const current = await user();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: current.id, user_agent: 'widget-delegation-test' })
+      .returning({ id: device_sessions.id });
+    const token = jwt.sign(
+      {
+        version: 3,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        deviceSessionId: session.id,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 60 * 60 }
+    );
+    const authority = await getResourceDelegationAuthority(current, { headers: bearer(token) });
+    expect(authority).toMatchObject({
+      credentialKind: 'device-access',
+      deviceSessionId: session.id,
     });
   });
 

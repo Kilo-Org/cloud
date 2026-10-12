@@ -1,10 +1,10 @@
 import 'server-only';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { branchSchema, repoNameSchema, slugSchema } from '@/lib/user-deployments/validation';
 import * as deploymentsService from '@/lib/user-deployments/deployments-service';
 import * as envVarsService from '@/lib/user-deployments/env-vars-service';
@@ -15,7 +15,7 @@ import {
   baseEnvVarSchema,
   markAsPlaintext,
 } from '@/lib/user-deployments/env-vars-validation';
-import { hasOrganizationEverPaid } from '@/lib/creditTransactions';
+import { hasOrganizationEverPaid } from '@kilocode/web-shared/lib/creditTransactions';
 
 export const organizationDeploymentsRouter = createTRPCRouter({
   checkDeploymentEligibility: organizationMemberProcedure.query(async ({ input }) => {

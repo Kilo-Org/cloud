@@ -1,6 +1,6 @@
-import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
-import { createCachedFetch } from '@/lib/cached-fetch';
-import { readDb } from '@/lib/drizzle';
+import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { ModelStatsBenchmarksSchema, modelStats } from '@kilocode/db/schema';
 import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
 import { and, eq, notLike } from 'drizzle-orm';

@@ -1249,31 +1249,6 @@ export type AuthProviderId =
   | 'fake-login'
   | 'workos';
 
-// --- AbuseClassification ---
-
-export type AbuseClassification = (typeof ABUSE_CLASSIFICATION)[keyof typeof ABUSE_CLASSIFICATION];
-export const ABUSE_CLASSIFICATION = {
-  NOT_ABUSE: -100,
-  CLASSIFICATION_ERROR: -50,
-  NOT_CLASSIFIED: 0,
-  LIKELY_ABUSE: 200,
-} as const;
-
-// --- Microdollar Usage --
-
-export const GatewayApiKindSchema = z.enum([
-  'chat_completions',
-  'embeddings',
-  'fim_completions',
-  'edit_completions',
-  'messages',
-  'responses',
-  'audio_transcriptions',
-  'systemone',
-]);
-
-export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
-
 // --- Integration types ---
 
 export type IntegrationPermissions = Record<string, string>;
@@ -2266,14 +2241,13 @@ export const CustomLlmDefinitionSchema = z.object({
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
+const GatewayModelIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9./:~-]+$/, 'Model IDs may only contain lowercase letters, digits, and . / : ~ -');
+
 export const AutoFreeModelSchema = z.object({
-  model: z
-    .string()
-    .trim()
-    .regex(
-      /^[a-z0-9./:~-]+$/,
-      'Model IDs may only contain lowercase letters, digits, and . / : ~ -'
-    ),
+  model: GatewayModelIdSchema,
   weight: z.number().int().positive(),
   reasoning: z.object({
     enabled: z.boolean().optional(),
@@ -2300,6 +2274,25 @@ export const AutoFreeConfigSchema = z.object({
 });
 
 export type AutoFreeConfig = z.infer<typeof AutoFreeConfigSchema>;
+
+export const GATEWAY_MODEL_LIST_MAX_COUNT = 200;
+
+export const GatewayModelListConfigSchema = z.object({
+  models: z
+    .array(GatewayModelIdSchema)
+    .max(GATEWAY_MODEL_LIST_MAX_COUNT)
+    .superRefine((models, ctx) => {
+      const seen = new Set<string>();
+      for (const [index, model] of models.entries()) {
+        if (seen.has(model)) {
+          ctx.addIssue({ code: 'custom', message: `Duplicate model "${model}"`, path: [index] });
+        }
+        seen.add(model);
+      }
+    }),
+});
+
+export type GatewayModelListConfig = z.infer<typeof GatewayModelListConfigSchema>;
 
 // --- StoredModel ---
 

@@ -26,10 +26,13 @@ import {
   verifyKiloTokenForPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
 import type { RuntimeAdmission } from '@kilocode/worker-utils/runtime-authorization-contract';
-import { isResourceTokenIssuanceEnabled, NEXTAUTH_SECRET } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
-import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
-import { getUserFromSessionForCredentialIssuance } from '@/lib/user/server';
+import {
+  isResourceTokenIssuanceEnabled,
+  NEXTAUTH_SECRET,
+} from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 
 const ONE_HOUR_SECONDS = 60 * 60;
@@ -331,6 +334,7 @@ export async function getResourceDelegationAuthority(
     credentialKind: isLegacyDevice ? 'device-access' : 'human-api',
     expiresAt: claims.exp,
     isModern: false,
+    deviceSessionId: claims.deviceSessionId,
     runtimeAdmission: {
       source: 'user',
       authorizationUserId: user.id,

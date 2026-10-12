@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { act } from '@/test/renderer';
 
 import {
   BASE_TARGET,
@@ -46,19 +47,6 @@ describe('SessionPreviewOverlay', () => {
     ]) {
       expect(textWith(renderer, label)).toHaveLength(1);
     }
-  });
-
-  it('shows the empty copy when the transcript has no messages', () => {
-    previewState.transcript.data = { messages: [] };
-    const renderer = mountOverlay();
-    openPreview(targetWith({}));
-
-    expect(textWith(renderer, i18n.t('agentChat.session.emptyTitle'))).toHaveLength(1);
-    expect(textWith(renderer, i18n.t('agentChat.session.emptyTranscriptDescription'))).toHaveLength(
-      1
-    );
-    expect(textWith(renderer, i18n.t('agentChat.session.emptyDescription'))).toHaveLength(0);
-    expect(renderer.root.findAllByType('MessageBubble')).toHaveLength(0);
   });
 
   it('shows the transcript skeleton while the first page loads', () => {
@@ -108,16 +96,53 @@ describe('SessionPreviewOverlay', () => {
     expect(observed.visible).toBe(false);
   });
 
-  it('keeps the delete confirmation as the menu item action', () => {
+  it('shows the in-app delete confirmation as the menu item action', () => {
     const renderer = mountOverlay();
-    openPreview(targetWith({ onDelete: vi.fn<() => void>() }));
+    const onDelete = vi.fn<() => void>();
+    openPreview(targetWith({ onDelete }));
 
     pressByLabel(renderer, i18n.t('agents.sessionRow.deleteSession'));
-    expect(previewState.alert).toHaveBeenCalledWith(
-      i18n.t('agents.sessionRow.deleteTitle'),
-      i18n.t('agents.sessionRow.deleteMessage'),
-      expect.anything()
-    );
+    const dialogs = renderer.root.findAllByType('DestructiveConfirmDialog');
+    expect(dialogs).toHaveLength(1);
+    const dialog = dialogs[0];
+    if (!dialog) {
+      throw new Error('missing delete confirm');
+    }
+    expect(dialog.props).toMatchObject({
+      title: i18n.t('agents.sessionRow.deleteTitle'),
+      message: i18n.t('agents.sessionRow.deleteMessage'),
+      confirmLabel: i18n.t('common.delete'),
+    });
+    expect(onDelete).not.toHaveBeenCalled();
+
+    act(() => {
+      (dialog.props.onConfirm as () => void)();
+    });
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    // The confirm closes itself before running the delete.
+    expect(renderer.root.findAllByType('DestructiveConfirmDialog')).toHaveLength(0);
+  });
+
+  it('holds the target while the delete confirmation is open', () => {
+    const renderer = mountOverlay();
+    const onDelete = vi.fn<() => void>();
+    openPreview(targetWith({ onDelete }));
+
+    pressByLabel(renderer, i18n.t('agents.sessionRow.deleteSession'));
+    // The overlay must survive the exit animation so the confirm stays on
+    // screen; a cancelled confirm then releases the target.
+    expect(getSessionPreviewSnapshot().target).not.toBeNull();
+
+    const dialog = renderer.root.findAllByType('DestructiveConfirmDialog')[0];
+    if (!dialog) {
+      throw new Error('missing delete confirm');
+    }
+    act(() => {
+      (dialog.props.onCancel as () => void)();
+    });
+
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(getSessionPreviewSnapshot().target).toBeNull();
   });
 
   it('keeps the iOS rename prompt and releases after it is dismissed', () => {

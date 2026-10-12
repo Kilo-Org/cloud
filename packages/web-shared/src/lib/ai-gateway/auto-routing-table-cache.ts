@@ -1,5 +1,5 @@
-import { getBenchmarkRoutingTable } from '@/lib/ai-gateway/auto-routing-benchmark-admin-client';
-import { createCachedFetch } from '@/lib/cached-fetch';
+import { getBenchmarkRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
+import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 
 const ROUTING_TABLE_TTL_MS = 5 * 60 * 1000;
 

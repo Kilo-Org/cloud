@@ -11,7 +11,7 @@ const mockDeleteObjectCommand = jest.fn<(input: unknown) => { input: unknown; na
   input => ({ input, name: 'DeleteObjectCommand' })
 );
 
-jest.mock('@/lib/r2/client', () => ({
+jest.mock('@kilocode/web-shared/lib/r2/client', () => ({
   r2Client: { send: mockSend },
   r2CloudAgentAttachmentsBucketName: 'attachment-bucket',
 }));
@@ -25,7 +25,7 @@ import {
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
 } from '@/lib/cloud-agent/constants';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_pending_uploads } from '@kilocode/db/schema';
 
 let admitPendingUpload: typeof AdmitPendingUpload;

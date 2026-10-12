@@ -38,10 +38,8 @@ type SandboxNamespaceEnv = Pick<
   Env,
   | 'Sandbox'
   | 'SandboxContainment'
-  | 'SandboxSmall'
   | 'SandboxSmallContainment'
   | 'SandboxDIND'
-  | 'SandboxCodeReview'
   | 'SandboxCodeReviewContainment'
 >;
 
@@ -63,8 +61,14 @@ export type SandboxRoutingTarget =
 
 export type SandboxRoutingOptions = {
   sandboxAllocation?: SandboxAllocation;
-  devcontainer?: boolean;
   createdOnPlatform?: string;
+  /**
+   * Marks a fallback for a session that predates `workspace.sandboxId` storage.
+   * Such a session must regenerate the identity it originally used, which
+   * predates the isolated-by-default routing, so honor the per-session org
+   * allowlist and otherwise fall back to the owner-scoped shared identity.
+   */
+  legacyFallback?: boolean;
 };
 
 /**
@@ -89,6 +93,7 @@ function sandboxIdMatchesAllocation(sandboxId: string, allocation: SandboxAlloca
 }
 
 export type SandboxIdClass =
+  | 'placed'
   | 'shared'
   | 'legacy-shared'
   | 'isolated-small'
@@ -97,7 +102,17 @@ export type SandboxIdClass =
   | 'devcontainer'
   | 'unknown';
 
+/**
+ * Neutral control-plane sandbox key. The prefix carries no routing meaning: a
+ * placed key routes only through its stored kind (`sandbox-placement.ts`),
+ * so prefix routing must reject it rather than fall through to a default pool.
+ */
+export function isPlacedSandboxKey(sandboxId: string): boolean {
+  return /^sbx-[0-9a-f]{48}$/.test(sandboxId);
+}
+
 export function classifySandboxId(sandboxId: string): SandboxIdClass {
+  if (isPlacedSandboxKey(sandboxId)) return 'placed';
   if (/^istd-[0-9a-f]+$/.test(sandboxId)) return 'isolated-standard';
   if (/^ses-[0-9a-f]+$/.test(sandboxId)) return 'isolated-small';
   if (/^crv-[0-9a-f]+$/.test(sandboxId)) return 'code-review';
@@ -156,32 +171,22 @@ export function isOrgInList(raw: string | undefined, orgId: string | undefined):
   return orgId !== undefined && orgs.has(orgId);
 }
 
-/**
- * Returns the correct DurableObjectNamespace for the given sandbox ID.
- * - Docker-in-Docker sandboxes (dind-* prefix) use SandboxDIND
- * - Code Reviewer ephemeral sandboxes (crv-* prefix) use SandboxCodeReview
- * - Per-session Small sandboxes (ses-* prefix) use SandboxSmall
- * - Per-session Standard sandboxes (istd-* prefix) use Sandbox
- * - Shared and legacy shared sandboxes use Sandbox
- */
 export function getSandboxNamespace(
   env: SandboxNamespaceEnv,
   sandboxId: string,
   options: SandboxNamespaceOptions = {}
 ): DurableObjectNamespace<Sandbox> {
+  if (isPlacedSandboxKey(sandboxId)) {
+    throw new Error('A placed sandbox key routes only through its stored kind');
+  }
+  // Persisted DIND sessions retain their namespace until operator-verified retirement.
   if (sandboxId.startsWith('dind-')) return env.SandboxDIND;
-  if (sandboxId.startsWith('crv-')) {
-    return options.managedScmContainment === true
-      ? env.SandboxCodeReviewContainment
-      : env.SandboxCodeReview;
-  }
-  if (sandboxId.startsWith('ses-')) {
-    return options.managedScmContainment === true ? env.SandboxSmallContainment : env.SandboxSmall;
-  }
-  if (sandboxId.startsWith('istd-')) {
-    return options.managedScmContainment === true ? env.SandboxContainment : env.Sandbox;
-  }
-  return options.managedScmContainment === true ? env.SandboxContainment : env.Sandbox;
+  // Every non-contained sandbox runs in the standard pool; SandboxSmall and
+  // SandboxCodeReview are retired and receive no traffic.
+  if (options.managedScmContainment !== true) return env.Sandbox;
+  if (sandboxId.startsWith('crv-')) return env.SandboxCodeReviewContainment;
+  if (sandboxId.startsWith('ses-')) return env.SandboxSmallContainment;
+  return env.SandboxContainment;
 }
 
 export function getManagedOutboundContainerId(
@@ -213,16 +218,8 @@ async function hashToSandboxId(input: string, prefix: string): Promise<SandboxId
   return `${prefix}-${hashHex.substring(0, 48)}` as SandboxId;
 }
 
-export async function deriveSandboxAllocationId(
-  sandboxId: string,
-  intentId: string
-): Promise<SandboxId> {
-  const classification = classifySandboxId(sandboxId);
-  if (classification === 'unknown' || classification === 'legacy-shared' || !intentId) {
-    throw new Error('Sandbox allocation requires a generated sandbox ID and create intent');
-  }
-  const prefix = sandboxId.slice(0, sandboxId.indexOf('-'));
-  return hashToSandboxId(`control-allocation-v1:${sandboxId}:${intentId}`, prefix);
+export function deriveRetiredDindSandboxId(sessionId: string): Promise<SandboxId> {
+  return hashToSandboxId(sessionId, 'dind');
 }
 
 export async function deriveSharedSandboxId(
@@ -258,7 +255,6 @@ type SelectSandboxForNewSessionInput = {
   userId: string;
   sessionId: string;
   botId?: string;
-  devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocation;
 };
 
@@ -274,14 +270,10 @@ export function selectSandboxProvider(input: {
   userId: string;
   sandboxId: SandboxId;
   sessionId: string;
-  devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocation;
 }): AgentSandboxProvider {
   const allocation = input.sandboxAllocation;
   if (allocation !== undefined) {
-    if (input.devcontainer) {
-      throw new Error('Sandbox allocations cannot be combined with specialized sandbox routing');
-    }
     if (
       sandboxAllocationRequiresControlPlane(allocation) &&
       sessionPlaneFromId(input.sessionId) !== 'control'
@@ -299,7 +291,6 @@ export function selectSandboxProvider(input: {
     userId: input.userId,
     plane: sessionPlaneFromId(input.sessionId),
     isolated: input.sandboxId.startsWith('ses-'),
-    devcontainer: input.devcontainer,
   });
 }
 
@@ -309,7 +300,6 @@ function selectDefaultSandboxProvider(input: {
   userId: string;
   plane: SessionPlane;
   isolated: boolean;
-  devcontainer?: boolean;
 }): AgentSandboxProvider {
   const enforced = isCloudAgentContainerBillingEnabled(input.env, {
     userId: input.userId,
@@ -327,7 +317,6 @@ function selectDefaultSandboxProvider(input: {
   const useVercel =
     eligible('vercel') &&
     input.plane === 'control' &&
-    !input.devcontainer &&
     input.isolated &&
     enrollment.enabled &&
     enrolled &&
@@ -338,7 +327,6 @@ function selectDefaultSandboxProvider(input: {
   const useContainers =
     eligible('cloudflare-containers') &&
     input.plane === 'control' &&
-    !input.devcontainer &&
     input.isolated &&
     isCloudflareContainersEnrolled(input.env, { orgId: input.orgId });
 
@@ -347,22 +335,14 @@ function selectDefaultSandboxProvider(input: {
 
 export function getDefaultSandboxDestination(
   env: SandboxSelectionEnv & ControlPlaneOwnerEnv,
-  owner: { userId: string; orgId?: string },
-  devcontainer = false
+  owner: { userId: string; orgId?: string }
 ): SandboxDestination {
-  if (devcontainer) {
-    return {
-      provider: { id: 'cloudflare', account: 'kilo' },
-      instanceType: 'devcontainer',
-    };
-  }
-  const isolated = isOrgInList(env.PER_SESSION_SANDBOX_ORG_IDS, owner.orgId);
   const provider = selectDefaultSandboxProvider({
     env,
     orgId: owner.orgId,
     userId: owner.userId,
     plane: sessionPlaneForNewOwner(env, owner, { createdOnPlatform: 'cloud-agent-web' }),
-    isolated,
+    isolated: true,
   });
   if (provider === 'vercel') {
     return { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' };
@@ -370,7 +350,7 @@ export function getDefaultSandboxDestination(
   if (provider === 'cloudflare-containers') {
     return getSandboxAllocationRequest(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION);
   }
-  return getSandboxAllocationRequest(isolated ? 'cloudflare-single' : 'cloudflare-shared');
+  return getSandboxAllocationRequest('cloudflare-single');
 }
 
 export async function selectSandboxForNewSession(
@@ -382,7 +362,7 @@ export async function selectSandboxForNewSession(
     input.userId,
     input.sessionId,
     input.botId,
-    { devcontainer: input.devcontainer, sandboxAllocation: input.sandboxAllocation }
+    { sandboxAllocation: input.sandboxAllocation }
   );
   const provider = selectSandboxProvider({
     env: input.env,
@@ -390,7 +370,6 @@ export async function selectSandboxForNewSession(
     userId: input.userId,
     sandboxId,
     sessionId: input.sessionId,
-    devcontainer: input.devcontainer,
     sandboxAllocation: input.sandboxAllocation,
   });
 
@@ -400,19 +379,9 @@ export async function selectSandboxForNewSession(
 /**
  * Generate a deterministic, Cloudflare-compatible sandboxId (≤63 chars).
  *
- * Code Reviewer sessions (createdOnPlatform === 'code-review') always get an
- * ephemeral, isolated sandbox (crv-{hash}, using SandboxCodeReview). Otherwise,
- * when the org is in PER_SESSION_SANDBOX_ORG_IDS the sandbox is isolated
- * per session (ses-{hash}, using SandboxSmall) or when devcontainer mode
- * is requested (dind-{hash}, using SandboxDIND). Otherwise it is shared
- * per org/user/bot (org-|usr-|bot-|ubt-{hash}, using Sandbox).
- *
- * @param perSessionOrgIds - Comma-separated org IDs that get per-session sandboxes (env var value)
- * @param orgId    - Organization ID (undefined for personal accounts)
- * @param userId   - User ID (required)
- * @param sessionId - Cloud-agent session ID (used for per-session sandboxes)
- * @param botId    - Bot ID (optional)
- * @returns Deterministic sandboxId string (52 characters)
+ * Normal sessions default to isolated `ses-` identities. Explicit shared
+ * allocations retain per-owner routing; trusted Code Reviewer sessions retain
+ * their dedicated namespace.
  */
 export async function generateSandboxRoutingTarget(
   perSessionOrgIds: string | undefined,
@@ -420,12 +389,12 @@ export async function generateSandboxRoutingTarget(
   userId: string,
   sessionId: string,
   botId?: string,
-  options?: boolean | SandboxRoutingOptions
+  options?: SandboxRoutingOptions
 ): Promise<SandboxRoutingTarget> {
-  const routingOptions = typeof options === 'boolean' ? { devcontainer: options } : (options ?? {});
+  const routingOptions = options ?? {};
   const allocation = routingOptions.sandboxAllocation;
   if (allocation !== undefined) {
-    if (routingOptions.devcontainer || routingOptions.createdOnPlatform === 'code-review') {
+    if (routingOptions.createdOnPlatform === 'code-review') {
       throw new Error('Sandbox allocations cannot be combined with specialized sandbox routing');
     }
     if (
@@ -438,14 +407,15 @@ export async function generateSandboxRoutingTarget(
     // `cloudflare-shared` has no isolated prefix: it falls through to the shared route.
     if (prefix) return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, prefix) };
   }
-  if (routingOptions.devcontainer) {
-    return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'dind') };
-  }
   if (routingOptions.createdOnPlatform === 'code-review') {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'crv') };
   }
-  if (allocation !== 'cloudflare-shared' && isOrgInList(perSessionOrgIds, orgId)) {
-    return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };
+  if (allocation !== 'cloudflare-shared') {
+    const preserveLegacySharedRouting =
+      routingOptions.legacyFallback === true && !isOrgInList(perSessionOrgIds, orgId);
+    if (!preserveLegacySharedRouting) {
+      return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };
+    }
   }
 
   const sandboxOrgSegment = orgId ?? `user:${userId}`;
@@ -471,7 +441,7 @@ export async function generateSandboxId(
   userId: string,
   sessionId: string,
   botId?: string,
-  options?: boolean | SandboxRoutingOptions
+  options?: SandboxRoutingOptions
 ): Promise<SandboxId> {
   const target = await generateSandboxRoutingTarget(
     perSessionOrgIds,

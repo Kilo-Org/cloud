@@ -3,7 +3,7 @@ import type {
   GatewayRequest,
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import crypto from 'crypto';
 import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';

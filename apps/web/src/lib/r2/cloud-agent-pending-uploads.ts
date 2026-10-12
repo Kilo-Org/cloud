@@ -1,8 +1,8 @@
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
 import { and, count, eq, inArray, sql, type SQL } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
-import { r2Client, r2CloudAgentAttachmentsBucketName } from '@/lib/r2/client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { r2Client, r2CloudAgentAttachmentsBucketName } from '@kilocode/web-shared/lib/r2/client';
 import {
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,

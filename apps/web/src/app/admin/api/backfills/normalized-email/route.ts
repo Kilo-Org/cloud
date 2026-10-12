@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
 import { isNull, count, sql } from 'drizzle-orm';
-import { normalizeEmail } from '@/lib/email-address';
+import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 
 export type NormalizedEmailCountsResponse = {
   missing: number;

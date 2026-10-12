@@ -9,8 +9,6 @@ function rpcSafe<T extends z.ZodTypeAny>(schema: T): z.ZodPipe<z.ZodAny, T> {
   return z.any().pipe(schema);
 }
 
-// ── Wasteland (config output for API consumers) ─────────────────────────
-
 export const WastelandOutput = z.object({
   wasteland_id: z.string(),
   name: z.string(),
@@ -23,8 +21,6 @@ export const WastelandOutput = z.object({
   created_at: z.string(),
   updated_at: z.string(),
 });
-
-// ── Wasteland Member ────────────────────────────────────────────────────
 
 export const WastelandMemberOutput = z.object({
   member_id: z.string(),
@@ -44,8 +40,6 @@ export const WastelandCredentialStatusOutput = z.object({
   connected_at: z.string(),
 });
 
-// ── Full Config (same shape as WastelandOutput for now) ─────────────────
-
 export const WastelandConfigOutput = z.object({
   wasteland_id: z.string(),
   name: z.string(),
@@ -59,16 +53,12 @@ export const WastelandConfigOutput = z.object({
   updated_at: z.string(),
 });
 
-// ── Connected Town ──────────────────────────────────────────────────────
-
 export const ConnectedTownOutput = z.object({
   town_id: z.string(),
   wasteland_id: z.string(),
   connected_by: z.string(),
   connected_at: z.string(),
 });
-
-// ── Wanted Board Item ───────────────────────────────────────────────────
 
 export const WantedItemOutput = z.object({
   item_id: z.string(),
@@ -144,14 +134,11 @@ export const WastelandRpcBrowseWantedBoardInput = WantedBoardBrowseInput.extend(
   userId: z.string().min(1),
 });
 
-// ── Admin: mergeUpstreamPR result ───────────────────────────────────────
-
 export const MergePullOutput = z.object({
   pull_id: z.string(),
   state: z.string(),
 });
 
-// ── A pending claim PR owned by the current user ────────────────────────
 // One row per open pull on upstream whose fork branch matches
 // `wl/<rigHandle>/<itemId>`. The UI uses this to render a "Pending review"
 // badge on the corresponding wanted item until an admin merges the PR.
@@ -165,14 +152,10 @@ export const PendingClaimOutput = z.object({
   updated_at: z.string().nullable(),
 });
 
-// ── Admin: verifyUpstreamAdmin ─────────────────────────────────────────
-
 export const UpstreamAdminVerifyOutput = z.object({
   hasWriteAccess: z.boolean(),
   error: z.string().nullable(),
 });
-
-// ── Admin: upstream rigs row ────────────────────────────────────────────
 
 export const UpstreamRigOutput = z.object({
   rig_handle: z.string(),
@@ -238,7 +221,6 @@ export const RigActivityOutput = z.object({
   stamps_received: z.array(StampOutput),
 });
 
-// ── Workshop: fork branch entry ────────────────────────────────────────
 // Powers the fork (workshop) view at /wasteland/:owner/:repo/fork.
 // One row per `wl/<any-rig>/<wantedId>` branch on the user's fork,
 // cross-referenced with upstream `main` and the branch tip.
@@ -257,7 +239,6 @@ export const ForkBranchOutput = z.object({
   lastCommitAt: z.string().nullable(),
 });
 
-// ── Pulls: a PR the caller authored against upstream ───────────────────
 // Powers the "Mine" tab on /wasteland/:owner/:repo/pulls.
 
 export const MyPullOutput = z.object({
@@ -272,14 +253,11 @@ export const MyPullOutput = z.object({
   dolthubUrl: z.string(),
 });
 
-// ── Publish (open or update PR) result ─────────────────────────────────
-
 export const PublishBranchOutput = z.object({
   prUrl: z.string(),
   prId: z.string(),
 });
 
-// ── Admin: Review inbox items ──────────────────────────────────────────
 // Discriminated union matching the `InboxItem` type from
 // `../inbox/inbox-classifier`. Each kind renders as a distinct card in
 // the Review page UI.
@@ -365,7 +343,6 @@ export const InboxItemOutput = z.discriminatedUnion('kind', [
   }),
 ]);
 
-// ── rpcSafe wrappers ────────────────────────────────────────────────────
 // tRPC's .output() forces TypeScript to check that the handler return type
 // is assignable to the schema's input type. When handlers return values from
 // Cloudflare Rpc.Promisified DO stubs, the deeply recursive proxy types

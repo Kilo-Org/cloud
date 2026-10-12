@@ -14,10 +14,10 @@ const STORE_CALL_DEADLINE_MS = 15_000;
  * The store did not answer inside the deadline. Distinct from a store that
  * answered with a failure: a hung SDK stays hung for every further call, so a
  * caller must not follow a deadline with more calls to the same store (the
- * Kilo Pass loader would otherwise spend another deadline per product id).
+ * credit-product loader would otherwise spend another deadline per product id).
  * Carries only the label; the message never reaches the screen.
  */
-export class StoreDeadlineError extends Error {
+class StoreDeadlineError extends Error {
   constructor(label: string) {
     super(`${label} did not answer within ${STORE_CALL_DEADLINE_MS} ms`);
     this.name = 'StoreDeadlineError';

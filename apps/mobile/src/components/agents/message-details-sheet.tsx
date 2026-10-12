@@ -1,7 +1,7 @@
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { useTRPC } from '@/lib/trpc';
 import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -58,6 +59,7 @@ export function MessageDetailsSheet({
   const colors = useThemeColors();
   const trpc = useTRPC();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const [reportedMessageId, setReportedMessageId] = useState<string | null>(null);
   const [selectVisible, setSelectVisible] = useState(false);
   const content = useMemo(
@@ -108,20 +110,14 @@ export function MessageDetailsSheet({
     if (!input) {
       return;
     }
-    Alert.alert(
-      t('agentChat.messageDetails.reportAiResponse'),
-      t('agentChat.messageDetails.reportAiResponseConfirm'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('agentChat.messageDetails.report'),
-          style: 'destructive',
-          onPress: () => {
-            reportMutation.mutate(input);
-          },
-        },
-      ]
-    );
+    confirm({
+      title: t('agentChat.messageDetails.reportAiResponse'),
+      message: t('agentChat.messageDetails.reportAiResponseConfirm'),
+      confirmLabel: t('agentChat.messageDetails.report'),
+      onConfirm: () => {
+        reportMutation.mutate(input);
+      },
+    });
   };
 
   return (
@@ -302,6 +298,7 @@ export function MessageDetailsSheet({
           <View style={{ height: insets.bottom }} className="bg-background" />
         </>
       )}
+      {dialog}
     </SessionPageSheet>
   );
 }

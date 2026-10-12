@@ -26,12 +26,12 @@ jest.mock('next/headers', () => {
 });
 
 // Mock config
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'test-secret-key-for-testing-purposes-only',
 }));
 
 // Mock sentry logger
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: jest.fn(() => jest.fn()),
 }));
 

@@ -262,7 +262,6 @@ export const AutoRoutingClassifierAnalyticsResponseSchema = z.object({
     totalRequests: z.number(),
     classifiedRequests: z.number(),
     cachedRequests: z.number(),
-    fallbackRequests: z.number(),
     classifierErrors: z.number(),
     invalidRequests: z.number(),
     totalCostCredits: z.number(),
@@ -298,6 +297,7 @@ export {
 } from './normalize';
 
 export * from './reasoning';
+export * from './reasoning-variants';
 export * from './taxonomy';
 export * from './routing-table';
 export * from './benchmark';

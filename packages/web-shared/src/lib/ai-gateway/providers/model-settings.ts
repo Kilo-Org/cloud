@@ -1,7 +1,7 @@
-import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { isQwenModel } from '@/lib/ai-gateway/providers/qwen';
-import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import { isQwenModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
+import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';
 import type {
   CustomLlmProvider,
   OpenCodePrompt,
@@ -9,16 +9,16 @@ import type {
   OpenCodeVariant,
 } from '@kilocode/db/schema-types';
 import { VerbositySchema } from '@kilocode/db/schema-types';
-import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
-import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
-import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
+import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   getFallbackModelVariants,
   REASONING_VARIANTS_THINKING_ONLY,
   REASONING_VARIANTS_BINARY,
-} from '@/lib/ai-gateway/providers/variants';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/variants';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 export async function getOpenRouterDerivedModelVariants(
   model: string

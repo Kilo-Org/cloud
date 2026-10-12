@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
 import { eq, inArray, sql as drizzleSql } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { spend_alert_hourly } from '@kilocode/db/schema';
 import {
   pruneSpendAlertHourly,

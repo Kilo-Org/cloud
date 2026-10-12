@@ -1,4 +1,4 @@
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get CRON_SECRET() {
     return mockCronSecret;
   },
@@ -8,7 +8,7 @@ jest.mock('@/lib/config.server', () => ({
   ENKRYPT_API_KEY: 'test-key',
 }));
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(() => ({ from: jest.fn(() => ({ where: mockRead })) })),
     insert: jest.fn(),
@@ -26,7 +26,9 @@ jest.mock('@/lib/model-stats/enkrypt-status', () => {
   const actual = jest.requireActual<typeof EnkryptStatus>('@/lib/model-stats/enkrypt-status');
   return { ...actual, getEnkryptSyncHealth: jest.fn(actual.getEnkryptSyncHealth) };
 });
-jest.mock('@/lib/slack/admin-notifications', () => ({ sendAdminSlackNotification: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/slack/admin-notifications', () => ({
+  sendAdminSlackNotification: jest.fn(),
+}));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 import { NextRequest } from 'next/server';
@@ -36,10 +38,10 @@ import {
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { EnkryptFailureCategorySchema } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getEnkryptSyncHealth } from '@/lib/model-stats/enkrypt-status';
 import type * as EnkryptStatus from '@/lib/model-stats/enkrypt-status';
-import { sendAdminSlackNotification } from '@/lib/slack/admin-notifications';
+import { sendAdminSlackNotification } from '@kilocode/web-shared/lib/slack/admin-notifications';
 import vercelConfig from '../../../../../vercel.json';
 import { GET, maxDuration } from './route';
 

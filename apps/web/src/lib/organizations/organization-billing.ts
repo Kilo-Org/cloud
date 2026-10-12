@@ -1,22 +1,25 @@
 import type { Organization, User } from '@kilocode/db/schema';
 import { organizations, credit_transactions, transactional_email_log } from '@kilocode/db/schema';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { db } from '@/lib/drizzle';
-import { getOrganizationById, getOrganizationMembers } from '@/lib/organizations/organizations';
-import { createStripeCustomer } from '@/lib/stripe-client';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  getOrganizationById,
+  getOrganizationMembers,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { createStripeCustomer } from '@kilocode/web-shared/lib/stripe-client';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
-import { resolveStripeReceiptUrl, type StripeConfig } from '@/lib/credits';
-import { toMicrodollars } from '@/lib/microdollars';
-import { logExceptInTest } from '@/lib/utils.server';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
-import { findUserById } from '@/lib/user/find-user-by-id';
-import { SYSTEM_AUTO_TOP_UP_USER_ID } from '@/lib/autoTopUpConstants';
+import { resolveStripeReceiptUrl, type StripeConfig } from '@kilocode/web-shared/lib/credits';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { grantEntityCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { SYSTEM_AUTO_TOP_UP_USER_ID } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { sendCreditsTopUpEmail } from '@/lib/email';
-import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
+import { sendCreditsTopUpEmail } from '@kilocode/web-shared/lib/email';
+import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
 import { after } from 'next/server';
 
 export async function getOrCreateStripeCustomerIdForOrganization(

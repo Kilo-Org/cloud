@@ -3,8 +3,8 @@ import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integ
 import { optionalOrgInput, resolveOwner } from '@/lib/integrations/resolve-owner';
 import { summarizePlatformIntegrationsForSetupStatus } from '@/lib/integrations/platform-integration-setup-status';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 export const platformIntegrationsRouter = createTRPCRouter({
   listSetupStatus: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {

@@ -5,13 +5,13 @@
  * Supports both organization and personal user code reviews.
  */
 
-import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
+import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import {
   organizationMemberProcedure,
   ensureOrganizationAccess,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
-import { successResult, failureResult } from '@/lib/maybe-result';
+import { successResult, failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import * as z from 'zod';
 import {
   listCodeReviews,
@@ -37,9 +37,9 @@ import {
 } from '@/lib/integrations/gitlab-service';
 import type { GitLabCredentialActor } from '@/lib/integrations/platforms/gitlab/credential-broker-client';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { CodeReviewPlatformSchema } from '@/lib/code-reviews/core/schemas';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   ListCodeReviewsInputSchema,
   ListCodeReviewsForUserInputSchema,
@@ -61,7 +61,7 @@ import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, isNull } from 'drizzle-orm';
 import { v2SnapshotToLogEntries, v1BlobToLogEntries } from '@/lib/code-reviews/session-log';
 import { codeReviewAnalyticsRouter } from './code-review-analytics-router';
@@ -70,7 +70,7 @@ import {
   isLocalKiloCodeReview,
   shouldPublishCodeReviewToProvider,
 } from '@/lib/code-reviews/manual-config';
-import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
+import { isLocalCodeReviewDevelopmentEnabled } from '@kilocode/web-shared/lib/config.server';
 import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 
 /**

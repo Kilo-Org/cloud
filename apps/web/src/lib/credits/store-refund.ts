@@ -2,8 +2,8 @@ import { NotificationTypeV2 } from '@apple/app-store-server-library';
 import { and, desc, eq, or, sql } from 'drizzle-orm';
 
 import { credit_transactions, kilocode_users, kilo_pass_store_events } from '@kilocode/db/schema';
-import type { db, DrizzleTransaction } from '@/lib/drizzle';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import type { db, DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 import { storeCreditPaymentId } from './store-products';
 

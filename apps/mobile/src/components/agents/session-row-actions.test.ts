@@ -18,6 +18,12 @@ const reactNativeMock = vi.hoisted(() => ({
 vi.mock('react-native', () => ({
   Alert: { alert: reactNativeMock.alert, prompt: reactNativeMock.prompt },
 }));
+// `useSessionDeleteConfirm` builds the in-app dialog, whose tree pulls the real
+// react-native Flow source this node project cannot parse; no suite here covers
+// that surface.
+vi.mock('@/components/destructive-confirm-dialog', () => ({
+  DestructiveConfirmDialog: 'DestructiveConfirmDialog',
+}));
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),

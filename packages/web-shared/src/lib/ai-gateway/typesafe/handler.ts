@@ -2,13 +2,13 @@ import { randomUUID } from 'crypto';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
-} from '@/lib/ai-gateway/gateway-account-rate-limit';
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import {
   getOrganizationProviderPrivacy,
   creditsBlockedResponse,
@@ -16,33 +16,37 @@ import {
   extractHeaderAndLimitLength,
   modelNotAllowedResponse,
   wrapInSafeNextResponse,
-} from '@/lib/ai-gateway/llm-proxy-helpers';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
-import { logMicrodollarUsageAndReportToBouncer } from '@/lib/ai-gateway/processUsage';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { emitGatewayApiMetrics } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { systemOneRequestSchema, systemOneResponseSchema } from '@/lib/ai-gateway/typesafe/schemas';
-import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
-import { toMicrodollars } from '@/lib/microdollars';
-import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
-import type { ProxyErrorType } from '@/lib/proxy-error-types';
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { logMicrodollarUsageAndReportToBouncer } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  systemOneRequestSchema,
+  systemOneResponseSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/typesafe/schemas';
+import { FEATURE_HEADER, validateFeatureHeader } from '@kilocode/web-shared/lib/feature-detection';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import type { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getEffectiveProviderPrivacy } from '../provider-privacy';
-import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
-import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   getOpenRouterSystemOneModelsFromDatabase,
   resolveOpenRouterModelAlias,
-} from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { bouncerAccountId, normalizeJa4 } from '@/lib/bouncer/client';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
+  bouncerRejectionResponse,
   payerSharingIp,
   rawClientIp,
-  scheduleBouncerDecide,
-} from '@/lib/bouncer/inference';
+  startBouncerDecide,
+} from '@kilocode/web-shared/lib/bouncer/inference';
 
 function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
   return NextResponse.json({ message, error_type }, { status });
@@ -91,10 +95,8 @@ export async function handleSystemOneRequest(request: NextRequest) {
     );
   }
 
-  const { balance, settings, plan, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
-    organizationId,
-    user
-  );
+  const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
+    await getBalanceAndOrgSettings(organizationId, user);
   if (balance <= 0) {
     return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
   }
@@ -131,15 +133,17 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const bouncerIp = bareIpLiteral(ipAddress);
   const bouncerRequestId = randomUUID();
 
-  // Report-only verdict: registered with after() and never awaited, so it cannot
-  // hold up the upstream call and survives an early return.
-  scheduleBouncerDecide({
+  // The one decide for this request, awaited just before the upstream call within its 500 ms
+  // budget. Only an enforced verdict rejects; every other outcome sends the request.
+  const bouncerVerdictPromise = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
+      userId: user.id,
       tier: bouncerDecideTier(organizationId, plan, balance),
+      payer,
     },
   });
 
@@ -164,6 +168,10 @@ export async function handleSystemOneRequest(request: NextRequest) {
       statusCode,
     });
   }
+
+  const bouncerVerdict = await bouncerVerdictPromise;
+  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  if (bouncerRejection) return bouncerRejection;
 
   let response: Response;
   let responseBody: unknown;
@@ -241,6 +249,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
         promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
         max_tokens: null,
         has_middle_out_transform: null,
+        reasoning_setting: null,
         fraudHeaders,
         isStreaming: false,
         organizationId,
@@ -270,6 +279,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
           // System One input is a typed classification payload, not a conversation,
           // so there is no prompt text to hash (and no raw state leaves the gateway).
           promptSimHash: null,
+          spendWatch: bouncerVerdict?.spendWatch === true,
         },
       }
     );

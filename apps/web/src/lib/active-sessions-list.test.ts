@@ -21,7 +21,7 @@ const chain: Record<string, jest.Mock> = {
 const selectMock = jest.fn((): unknown => chain);
 const dbMock = { select: selectMock };
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   get db() {
     return dbMock;
   },
@@ -29,11 +29,11 @@ jest.mock('@/lib/drizzle', () => ({
 
 // Undefined skips phase 1 (the worker fetch), leaving the cloud-candidate
 // query as the only db read this test drives.
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   SESSION_INGEST_WORKER_URL: undefined,
 }));
 
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateBoundedInternalServiceToken: () => 'test-token',
 }));
 
@@ -68,6 +68,17 @@ beforeEach(() => {
 });
 
 describe('listActiveSessions cloud candidates', () => {
+  it('rejects an unconfigured source instead of confirming empty Home work', async () => {
+    await expect(
+      listActiveSessions({
+        userId: 'user-1',
+        organizationId: null,
+        includeCloudAgentSessions: true,
+        requireCompleteSnapshot: true,
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    expect(selectMock).not.toHaveBeenCalled();
+  });
   it('applies a hard ceiling far above the live-agent target', async () => {
     const result = await listActiveSessions({
       userId: 'user-1',

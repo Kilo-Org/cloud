@@ -42,6 +42,13 @@ describe('control diagnostic schema compatibility', () => {
         toolCpuUsageUsec: 800,
         serverCpuUsageUsec: 100,
         toolIoReadBytes: 120,
+        toolOomKills: 3,
+        serverOomKills: 0,
+        toolCurrentBytes: 9_000,
+        toolFileBytes: 3_500,
+        toolShmemBytes: 1_200,
+        serverCurrentBytes: 2_000,
+        serverAnonBytes: 1_700,
       },
       21
     );
@@ -58,8 +65,83 @@ describe('control diagnostic schema compatibility', () => {
       toolCpuUsageUsec: 800,
       serverCpuUsageUsec: 100,
       toolIoReadBytes: 120,
+      toolOomKills: 3,
+      serverOomKills: 0,
+      toolCurrentBytes: 9_000,
+      toolFileBytes: 3_500,
+      toolShmemBytes: 1_200,
+      serverCurrentBytes: 2_000,
+      serverAnonBytes: 1_700,
     });
     expect(JSON.stringify(records)).not.toContain('secret');
+  });
+
+  it('keeps memory protection and hold records whole and projects them to native logs', () => {
+    const records = [
+      createControlDiagnosticRecord(
+        'control.workload',
+        {
+          phase: 'failed',
+          workloadPhase: 'protection',
+          workloadFailure: 'write_failed',
+          scopeId: 'scope_1',
+        },
+        1
+      ),
+      createControlDiagnosticRecord(
+        'control.workload',
+        { phase: 'completed', workloadPhase: 'protection', serverMinBytes: 1_073_741_824 },
+        2
+      ),
+      createControlDiagnosticRecord(
+        'wrapper.lifecycle',
+        {
+          phase: 'kilo_memory_hold_started',
+          currentBytes: 11_810_496_512,
+          aggregateMaxBytes: 11_811_160_064,
+          memoryMaxEvents: 42,
+        },
+        3
+      ),
+      createControlDiagnosticRecord(
+        'wrapper.lifecycle',
+        {
+          phase: 'kilo_memory_hold_ended',
+          memoryHoldOutcome: 'expired',
+          elapsedMs: 600_000,
+          currentBytes: 11_810_496_512,
+          aggregateMaxBytes: 11_811_160_064,
+          memoryMaxEvents: 90,
+        },
+        4
+      ),
+    ];
+    expect(records.map(record => record?.fields)).toEqual([
+      {
+        phase: 'failed',
+        workloadPhase: 'protection',
+        workloadFailure: 'write_failed',
+        scopeId: 'scope_1',
+      },
+      { phase: 'completed', workloadPhase: 'protection', serverMinBytes: 1_073_741_824 },
+      {
+        phase: 'kilo_memory_hold_started',
+        currentBytes: 11_810_496_512,
+        aggregateMaxBytes: 11_811_160_064,
+        memoryMaxEvents: 42,
+      },
+      {
+        phase: 'kilo_memory_hold_ended',
+        memoryHoldOutcome: 'expired',
+        elapsedMs: 600_000,
+        currentBytes: 11_810_496_512,
+        aggregateMaxBytes: 11_811_160_064,
+        memoryMaxEvents: 90,
+      },
+    ]);
+    expect(
+      records.map(record => isProjectableControlDiagnostic(record!.event, record!.fields))
+    ).toEqual([true, false, true, true]);
   });
 
   it('accepts records written before publication diagnostics were extended', () => {
@@ -397,6 +479,7 @@ describe('native diagnostic projector', () => {
       workloadPhase: 'applied',
       containerLimitBytes: 4_000,
       aggregateMaxBytes: 3_000,
+      toolsMaxBytes: 1_500,
       reserveBytes: 1_000,
       appliedMaxBytes: 3_000,
       readbackMaxBytes: 3_000,
@@ -427,6 +510,7 @@ describe('native diagnostic projector', () => {
     });
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain('"workloadPhase":"applied"');
+    expect(lines[0]).toContain('"toolsMaxBytes":1500');
     expect(lines[1]).toContain('"workloadFailure":"flag_off"');
     expect(lines.join('\n')).not.toContain('oomKills');
   });

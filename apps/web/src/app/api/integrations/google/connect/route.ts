@@ -1,11 +1,11 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getUserFromAuth } from '@/lib/user/server';
-import { APP_URL } from '@/lib/constants';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
-import { requireOrganizationKiloClawComputeEntitlement } from '@/lib/organizations/trial-middleware';
+import { requireOrganizationKiloClawComputeEntitlement } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import { buildGoogleOAuthUrl } from '@/lib/integrations/google-service';
 import {

@@ -23,6 +23,7 @@ import { useCloudAgent, useManager } from './CloudAgentProvider';
 import { useWorktreeChatCreation, useWorktreeChatTabs } from './CloudSidebarLayout';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
+import { getWorkspaceControlSession } from './worktree-chat-tabs';
 import { isSandboxStatusEligible } from './sandbox-status';
 import { resolveSessionBranchDisplay } from './session-context-display';
 import { ChatInput } from './ChatInput';
@@ -66,13 +67,14 @@ import {
   useOlderMessagesPagination,
 } from './older-messages-scroll';
 import { billingPayerPresentation } from './billing-payer-presentation';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
 import { WorktreeChangesView } from './WorktreeChanges';
 import { WorktreeFilePane } from './WorktreeFilePane';
 import { commitsByMessageAnchor, isCommitSummaryRepresented } from './message-presentation';
 import { WorktreeReviewDialog } from './WorktreeReviewDialog';
 import { useWorktreeReview } from './useWorktreeReview';
+import { selectTerminalOwner } from './terminal-owner';
 import type { WorktreeReviewComment } from './worktree-review';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { canOpenWorktreeChanges } from './worktree-changes';
@@ -82,16 +84,16 @@ import {
   clearFileTabs,
   closeFileTab,
   closeTerminalTab,
-  createWorkspaceTabsState,
   fileTabId,
   getWorkspaceTabScope,
   openFileTab,
-  resetWorkspaceTabs,
   selectWorkspaceTab,
   setFileTabMode,
   terminalIdFromTabId,
   terminalTabId,
 } from './workspace-tabs';
+import { getWorkspaceTabsStorageKey } from './workspace-tabs-storage';
+import { usePersistedWorkspaceTabs } from './hooks/usePersistedWorkspaceTabs';
 import {
   createRemoteModelOverride,
   useSessionModels,
@@ -265,6 +267,7 @@ export default function CloudChatPage({
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const canSend = useAtomValue(manager.atoms.canSend);
+  const canInterrupt = useAtomValue(manager.atoms.canInterrupt);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
   const billingFailure = useAtomValue(manager.atoms.billingFailure);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
@@ -345,11 +348,17 @@ export default function CloudChatPage({
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
 
   const [attachmentMessageUuid] = useState(() => uuidv4());
-  const [workspaceTabs, setWorkspaceTabs] = useState(createWorkspaceTabsState);
   const [terminalStatuses, setTerminalStatuses] = useState<
     Record<string, TerminalStatusSummary | undefined>
   >({});
   const preserveTerminalSelectionRef = useRef(false);
+  const previousSessionIdRef = useRef<string | null>(sessionIdFromParams);
+  const fileTabClearRef = useRef<{
+    fileScope: string;
+    currentUserId?: string;
+    organizationId?: string;
+    scope: string | null;
+  } | null>(null);
   const workspaceTabScope = getWorkspaceTabScope(selectedWorktreeId, sessionIdFromParams);
   const workspaceIdentityResolved =
     !sessionIdFromParams ||
@@ -361,13 +370,31 @@ export default function CloudChatPage({
     organizationId,
     scope: workspaceTabScope,
   });
-  const canOpenChanges =
-    sessionIdFromParams !== null &&
-    isCurrentSession &&
-    canOpenWorktreeChanges(sessionId, isReadOnly) &&
-    fetchedSessionData?.organizationId === (organizationId ?? null);
-  const changesViewOpen = canOpenChanges && changesViewSessionId === sessionId;
-  const fileScope = JSON.stringify([currentUserId, organizationId, sessionIdFromParams, sessionId]);
+  const [workspaceTabs, setWorkspaceTabs] = usePersistedWorkspaceTabs(
+    getWorkspaceTabsStorageKey(
+      resolvedWorkspaceScope.currentUserId,
+      resolvedWorkspaceScope.organizationId
+    ),
+    resolvedWorkspaceScope.scope
+  );
+  const workspaceControlSession = sessionIdFromParams
+    ? null
+    : getWorkspaceControlSession(selectedWorktreeId, worktreeChats, deletingSessionIds);
+  const workspaceCloudSessionId = workspaceControlSession?.cloudAgentSessionId ?? sessionId;
+  const canOpenChanges = workspaceControlSession
+    ? Boolean(currentUserId) && canOpenWorktreeChanges(workspaceCloudSessionId, false)
+    : sessionIdFromParams !== null &&
+      isCurrentSession &&
+      canOpenWorktreeChanges(sessionId, isReadOnly) &&
+      fetchedSessionData?.organizationId === (organizationId ?? null);
+  const changesViewOpen = canOpenChanges && changesViewSessionId === workspaceCloudSessionId;
+  const fileScope = JSON.stringify([
+    currentUserId,
+    organizationId,
+    sessionIdFromParams,
+    selectedWorktreeId,
+    workspaceCloudSessionId,
+  ]);
   const [resolvedFileScope, setResolvedFileScope] = useState(fileScope);
   const filesVisible = canOpenChanges && resolvedFileScope === fileScope;
   const [commitsCache, setCommitsCache] = useState<{
@@ -417,7 +444,6 @@ export default function CloudChatPage({
 
   if (resolvedFileScope !== fileScope) {
     setResolvedFileScope(fileScope);
-    setWorkspaceTabs(clearFileTabs);
   }
 
   if (
@@ -430,11 +456,32 @@ export default function CloudChatPage({
       organizationId,
       scope: workspaceIdentityResolved ? workspaceTabScope : null,
     });
-    setWorkspaceTabs(resetWorkspaceTabs);
     setTerminalStatuses({});
   }
 
   useEffect(() => {
+    const previous = fileTabClearRef.current;
+    fileTabClearRef.current = {
+      fileScope,
+      currentUserId,
+      organizationId,
+      scope: workspaceTabScope,
+    };
+    if (previous === null || previous.fileScope === fileScope) return;
+    if (
+      previous.currentUserId !== currentUserId ||
+      previous.organizationId !== organizationId ||
+      previous.scope !== workspaceTabScope
+    ) {
+      return;
+    }
+    setWorkspaceTabs(clearFileTabs);
+  }, [fileScope, currentUserId, organizationId, workspaceTabScope, setWorkspaceTabs]);
+
+  useEffect(() => {
+    const previousSessionId = previousSessionIdRef.current;
+    previousSessionIdRef.current = sessionIdFromParams;
+    if (previousSessionId === sessionIdFromParams) return;
     if (preserveTerminalSelectionRef.current) {
       preserveTerminalSelectionRef.current = false;
       return;
@@ -442,11 +489,11 @@ export default function CloudChatPage({
     if (sessionIdFromParams) {
       setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
     }
-  }, [sessionIdFromParams]);
+  }, [sessionIdFromParams, setWorkspaceTabs]);
 
   useEffect(() => {
     closeChangesView();
-  }, [sessionId, currentUserId, organizationId, canOpenChanges, closeChangesView]);
+  }, [workspaceCloudSessionId, currentUserId, organizationId, canOpenChanges, closeChangesView]);
 
   useEffect(() => {
     const openedTab = changesViewOpenedTabRef.current;
@@ -852,31 +899,109 @@ export default function CloudChatPage({
     setSoundEnabled(prev => !prev);
   }, [setSoundEnabled]);
 
-  const handleCreateTerminalTab = useCallback(() => {
-    const preparedSiblingSessionId =
-      selectedWorktreeId && fetchedSessionData?.isInitiated === false
-        ? worktreeChats.find(
-            chat => chat.sessionId !== sessionIdFromParams && chat.cloudAgentSessionId
-          )?.cloudAgentSessionId
-        : null;
-    const terminalSessionId = sessionIdFromParams
-      ? (preparedSiblingSessionId ?? sessionId)
-      : worktreeChats.find(chat => chat.cloudAgentSessionId)?.cloudAgentSessionId;
-    if (!terminalSessionId) return;
+  const fetchRouteReady = useCallback(
+    async (kiloSessionId: string): Promise<boolean | undefined> => {
+      try {
+        const data = await queryClient.fetchQuery(
+          trpc.cliSessionsV2.getWithRuntimeState.queryOptions({ session_id: kiloSessionId })
+        );
+        return data.runtimeState?.routeReady;
+      } catch {
+        return undefined;
+      }
+    },
+    [queryClient, trpc]
+  );
 
-    const terminalId = uuidv4();
-    setWorkspaceTabs(state => addTerminalTab(state, terminalId, terminalSessionId));
+  const resolveTerminalOwner = useCallback(async (): Promise<string | null> => {
+    const loadedIsCurrent =
+      sessionIdFromParams !== null && fetchedSessionData?.kiloSessionId === sessionIdFromParams;
+    const loadedRouteReady = loadedIsCurrent ? fetchedSessionData?.routeReady : undefined;
+
+    const candidates = worktreeChats.flatMap(chat =>
+      chat.cloudAgentSessionId
+        ? [
+            {
+              kiloSessionId: chat.sessionId,
+              cloudAgentSessionId: chat.cloudAgentSessionId,
+              routeReady: chat.sessionId === sessionIdFromParams ? loadedRouteReady : undefined,
+            },
+          ]
+        : []
+    );
+    if (candidates.length === 0) return null;
+
+    // Only the viewed session's route is known without a read; resolve the
+    // siblings' routes before choosing so a stopped sibling is never picked
+    // ahead of a ready one.
+    if (candidates.some(candidate => candidate.routeReady === undefined)) {
+      await Promise.all(
+        candidates.map(async candidate => {
+          if (candidate.routeReady === undefined) {
+            candidate.routeReady = await fetchRouteReady(candidate.kiloSessionId);
+          }
+        })
+      );
+    }
+
+    return selectTerminalOwner({
+      loadedKiloSessionId: sessionIdFromParams,
+      candidates,
+    });
   }, [
-    fetchedSessionData?.isInitiated,
-    selectedWorktreeId,
-    sessionId,
+    fetchRouteReady,
+    fetchedSessionData?.kiloSessionId,
+    fetchedSessionData?.routeReady,
     sessionIdFromParams,
     worktreeChats,
   ]);
 
-  const handleSelectWorkspaceTab = useCallback((tabId: WorkspaceTabId) => {
-    setWorkspaceTabs(state => selectWorkspaceTab(state, tabId));
-  }, []);
+  const openTerminalTabForSession = useCallback(
+    (cloudAgentSessionId: string) => {
+      const terminalId = uuidv4();
+      setWorkspaceTabs(state => addTerminalTab(state, terminalId, cloudAgentSessionId));
+    },
+    [setWorkspaceTabs]
+  );
+
+  const handleCreateTerminalTab = useCallback(() => {
+    // Standalone sessions own their own route; the server reports readiness.
+    if (!selectedWorktreeId) {
+      if (sessionId) openTerminalTabForSession(sessionId);
+      return;
+    }
+
+    const loadedIsCurrent =
+      sessionIdFromParams !== null && fetchedSessionData?.kiloSessionId === sessionIdFromParams;
+    const loadedRouteReady = loadedIsCurrent ? fetchedSessionData?.routeReady : undefined;
+
+    // Any session with a ready route can own the worktree terminal. Prefer the
+    // viewed session while its route is not known to be unready; otherwise
+    // resolve the sibling whose route is ready.
+    if (sessionId && loadedRouteReady !== false) {
+      openTerminalTabForSession(sessionId);
+      return;
+    }
+
+    void resolveTerminalOwner().then(owner => {
+      if (owner) openTerminalTabForSession(owner);
+    });
+  }, [
+    fetchedSessionData?.kiloSessionId,
+    fetchedSessionData?.routeReady,
+    openTerminalTabForSession,
+    resolveTerminalOwner,
+    selectedWorktreeId,
+    sessionId,
+    sessionIdFromParams,
+  ]);
+
+  const handleSelectWorkspaceTab = useCallback(
+    (tabId: WorkspaceTabId) => {
+      setWorkspaceTabs(state => selectWorkspaceTab(state, tabId));
+    },
+    [setWorkspaceTabs]
+  );
 
   const handleWorkspaceValueChange = (value: string) => {
     const chat = openWorktreeChats.find(chat => value === `chat:${chat.sessionId}`);
@@ -894,7 +1019,7 @@ export default function CloudChatPage({
       setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
       openSession(destinationKiloSessionId);
     },
-    [closeChangesView, openSession]
+    [closeChangesView, openSession, setWorkspaceTabs]
   );
   const review = useWorktreeReview({
     userId: currentUserId,
@@ -923,13 +1048,13 @@ export default function CloudChatPage({
   });
   const reviewCommentCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    if (!sessionId) return counts;
+    if (!workspaceCloudSessionId) return counts;
     for (const comment of review.draft?.comments ?? []) {
-      if (comment.anchor.capture.sourceCloudAgentSessionId !== sessionId) continue;
+      if (comment.anchor.capture.sourceCloudAgentSessionId !== workspaceCloudSessionId) continue;
       counts.set(comment.anchor.path, (counts.get(comment.anchor.path) ?? 0) + 1);
     }
     return counts;
-  }, [review.draft?.comments, sessionId]);
+  }, [review.draft?.comments, workspaceCloudSessionId]);
   const reviewAgainFile = useRef<{
     userId: string;
     organizationId?: string;
@@ -986,12 +1111,16 @@ export default function CloudChatPage({
     organizationId,
     sessionId,
     sessionIdFromParams,
+    setWorkspaceTabs,
     workspaceTabScope,
   ]);
 
-  const handleCloseFileTab = useCallback((path: string) => {
-    setWorkspaceTabs(state => closeFileTab(state, path));
-  }, []);
+  const handleCloseFileTab = useCallback(
+    (path: string) => {
+      setWorkspaceTabs(state => closeFileTab(state, path));
+    },
+    [setWorkspaceTabs]
+  );
 
   const handleCloseChat = useCallback(
     (closingSessionId: string) => {
@@ -1009,18 +1138,22 @@ export default function CloudChatPage({
       closeSession,
       openWorktreeChats.length,
       sessionIdFromParams,
+      setWorkspaceTabs,
       workspaceTabs.terminals,
     ]
   );
 
-  const handleCloseTerminalTab = useCallback((terminalId: string) => {
-    setWorkspaceTabs(state => closeTerminalTab(state, terminalId));
-    setTerminalStatuses(current => {
-      const next = { ...current };
-      delete next[terminalId];
-      return next;
-    });
-  }, []);
+  const handleCloseTerminalTab = useCallback(
+    (terminalId: string) => {
+      setWorkspaceTabs(state => closeTerminalTab(state, terminalId));
+      setTerminalStatuses(current => {
+        const next = { ...current };
+        delete next[terminalId];
+        return next;
+      });
+    },
+    [setWorkspaceTabs]
+  );
 
   const handleTerminalStatusChange = useCallback(
     (terminalId: string, status: TerminalStatusSummary) => {
@@ -1139,10 +1272,10 @@ export default function CloudChatPage({
         setChangesViewSessionId(null);
       } else {
         changesViewOpenedTabRef.current = activeWorkspaceTabId;
-        setChangesViewSessionId(sessionId);
+        setChangesViewSessionId(workspaceCloudSessionId);
       }
     },
-    [activeWorkspaceTabId, changesViewOpen, sessionId]
+    [activeWorkspaceTabId, changesViewOpen, workspaceCloudSessionId]
   );
 
   // Surface the session's custom agents plus the current visible profile
@@ -1465,15 +1598,21 @@ export default function CloudChatPage({
 
   const sessionActions = (
     <ChatHeader
-      cloudAgentSessionId={sessionId ?? 'Starting session…'}
-      kiloSessionId={sessionIdFromParams ?? undefined}
+      cloudAgentSessionId={workspaceCloudSessionId ?? 'Starting session…'}
+      kiloSessionId={sessionIdFromParams ?? workspaceControlSession?.sessionId}
       organizationId={organizationId}
-      repository={sessionConfig?.repository ?? ''}
-      branch={sessionBranchDisplay.kind === 'branch' ? sessionBranchDisplay.branch : undefined}
-      gitUrl={fetchedSessionData?.gitUrl}
-      model={sessionConfig?.model}
-      modelDisplayName={modelDisplayName}
-      getSessionCostBreakdown={getCurrentSessionCostBreakdown}
+      repository={workspaceControlSession?.repository ?? sessionConfig?.repository ?? ''}
+      branch={
+        workspaceControlSession
+          ? (workspaceControlSession.branch ?? undefined)
+          : sessionBranchDisplay.kind === 'branch'
+            ? sessionBranchDisplay.branch
+            : undefined
+      }
+      gitUrl={workspaceControlSession ? undefined : fetchedSessionData?.gitUrl}
+      model={workspaceControlSession?.model ?? sessionConfig?.model}
+      modelDisplayName={workspaceControlSession ? undefined : modelDisplayName}
+      getSessionCostBreakdown={workspaceControlSession ? undefined : getCurrentSessionCostBreakdown}
       sessionInfoOpen={sessionInfoOpen}
       onSessionInfoOpenChange={setSessionInfoOpen}
       sessionInfoTriggerRef={sessionInfoTriggerRef}
@@ -1481,16 +1620,28 @@ export default function CloudChatPage({
       onToggleSound={handleToggleSound}
       changesOpen={changesViewOpen}
       onToggleChanges={canOpenChanges ? handleToggleChanges : undefined}
-      sessionActive={isStreaming || activity.type === 'busy' || activity.type === 'retrying'}
-      canForkToCloud={!isReadOnly && Boolean(fetchedSessionData?.cloudAgentSessionId)}
+      sessionActive={
+        !workspaceControlSession &&
+        (isStreaming || activity.type === 'busy' || activity.type === 'retrying')
+      }
+      canForkToCloud={
+        Boolean(workspaceControlSession) ||
+        (!isReadOnly && Boolean(fetchedSessionData?.cloudAgentSessionId))
+      }
       sandboxStatusEligible={isSandboxStatusEligible({
         currentUserId,
-        sessionId,
-        sessionIdFromParams,
+        sessionId: workspaceCloudSessionId,
+        sessionIdFromParams: workspaceControlSession?.sessionId ?? sessionIdFromParams,
         organizationId,
-        activeSessionType,
-        isReadOnly,
-        fetchedSessionData,
+        activeSessionType: workspaceControlSession ? 'cloud-agent' : activeSessionType,
+        isReadOnly: workspaceControlSession ? false : isReadOnly,
+        fetchedSessionData: workspaceControlSession
+          ? {
+              kiloSessionId: workspaceControlSession.sessionId,
+              cloudAgentSessionId: workspaceCloudSessionId,
+              organizationId: organizationId ?? null,
+            }
+          : fetchedSessionData,
       })}
     />
   );
@@ -1588,7 +1739,9 @@ export default function CloudChatPage({
                     )}
                   </div>
                   <WorktreeReviewDialog review={review} onOpenComment={handleOpenReviewComment} />
-                  {sessionIdFromParams && <div className="ml-auto shrink-0">{sessionActions}</div>}
+                  {(sessionIdFromParams || workspaceControlSession) && (
+                    <div className="ml-auto shrink-0">{sessionActions}</div>
+                  )}
                 </div>
 
                 <div
@@ -1643,7 +1796,7 @@ export default function CloudChatPage({
                           <div
                             ref={scrollContainerRef}
                             hidden={!chatTabActive}
-                            className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2 transition-opacity duration-150 ${showLoadingIndicator && transcriptPhase === 'live' ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+                            className={`absolute inset-0 overflow-x-hidden overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2 transition-opacity duration-150 ${showLoadingIndicator && transcriptPhase === 'live' ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
                             onScroll={handleScroll}
                           >
                             <div ref={messagesContentRef}>
@@ -1775,6 +1928,7 @@ export default function CloudChatPage({
                                   canCreateWorktreeChat ? handleReplaceWorktreeChat : undefined
                                 }
                                 onStop={handleStopExecution}
+                                canInterrupt={canInterrupt}
                                 disabled={
                                   !canSend ||
                                   isLoading ||
@@ -1782,7 +1936,9 @@ export default function CloudChatPage({
                                   activeSessionType === null
                                 }
                                 textareaDisabled={composerTextareaDisabled}
-                                isStreaming={isStreaming && !activeSuggestion}
+                                isStreaming={
+                                  (isStreaming || activity.type === 'retrying') && !activeSuggestion
+                                }
                                 placeholder={placeholder}
                                 slashCommands={availableCommands}
                                 mode={modeControlValue(sessionConfig?.mode ?? null)}
@@ -1876,7 +2032,7 @@ export default function CloudChatPage({
                       {terminalPaneMap}
                     </div>
                     {filesVisible &&
-                      sessionId &&
+                      workspaceCloudSessionId &&
                       workspaceTabs.files.map(tab => {
                         const tabId = fileTabId(tab.path);
                         const active = activeWorkspaceTabId === tabId;
@@ -1884,7 +2040,7 @@ export default function CloudChatPage({
                           <TabsContent key={tabId} value={tabId} className="m-0 min-h-0 flex-1">
                             {active && !changesViewOpen && (
                               <WorktreeFilePane
-                                cloudAgentSessionId={sessionId}
+                                cloudAgentSessionId={workspaceCloudSessionId}
                                 organizationId={organizationId}
                                 path={tab.path}
                                 mode={tab.mode}
@@ -1899,10 +2055,10 @@ export default function CloudChatPage({
                         );
                       })}
                   </div>
-                  {canOpenChanges && sessionId && (
+                  {canOpenChanges && workspaceCloudSessionId && (
                     <WorktreeChangesView
-                      key={`${currentUserId}:${organizationId ?? 'personal'}:${sessionId}`}
-                      cloudAgentSessionId={sessionId}
+                      key={`${currentUserId}:${organizationId ?? 'personal'}:${workspaceCloudSessionId}`}
+                      cloudAgentSessionId={workspaceCloudSessionId}
                       organizationId={organizationId}
                       open={changesViewOpen}
                       commentCounts={reviewCommentCounts}

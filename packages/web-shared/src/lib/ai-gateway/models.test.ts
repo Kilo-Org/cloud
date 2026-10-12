@@ -15,7 +15,10 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './kilo-exclusive-models';
-import { gemma_4_26b_a4b_it_free_model } from './kilo-exclusive-models';
+import {
+  gemma_4_26b_a4b_it_free_model,
+  glyph_cluster_stealth_free_model,
+} from './kilo-exclusive-models';
 import { isUnavailableModel } from './unavailable-models';
 import { getRandomNumber } from './getRandomNumber';
 
@@ -26,6 +29,40 @@ describe('rate-limited Kilo-exclusive models', () => {
     ]);
     expect(isKiloExclusiveRateLimitedModel(gemma_4_26b_a4b_it_free_model.public_id)).toBe(true);
     expect(isKiloExclusiveRateLimitedModel('tencent/hy3:free')).toBe(false);
+  });
+});
+
+describe('Step 5 Preview', () => {
+  test('registers the free model with its upstream id, limits, and OpenRouter routing', () => {
+    expect(findKiloExclusiveModel('stepfun/step-5-preview-free')).toMatchObject({
+      public_id: 'stepfun/step-5-preview-free',
+      internal_id: 'stepfun/step-5-preview',
+      display_name: 'StepFun: Step 5 Preview (free)',
+      context_length: 1_000_000,
+      max_completion_tokens: 64_000,
+      status: 'public',
+      provider: { id: 'openrouter' },
+      flags: ['reasoning', 'vision'],
+      pricing: null,
+      inference_provider_restriction: ['stepfun'],
+    });
+    expect(isFreeModel('stepfun/step-5-preview-free')).toBe(true);
+    expect(findKiloExclusiveModel('stepfun/step-3.7-flash:free')).toBeNull();
+  });
+});
+
+describe('Glyph Cluster stealth model', () => {
+  test('is free, stealth, and requires data collection', () => {
+    expect(isFreeModel('stealth/glyph-cluster')).toBe(true);
+    expect(hasBestEffortGuessDataCollectionRequirement('stealth/glyph-cluster')).toBe(true);
+    expect(shouldRedactModelNameInMicrodollarUsage('vercel', 'stealth/glyph-cluster')).toBe(true);
+    expect(shouldRedactErrorResponse('vercel', 'stealth/glyph-cluster')).toBe(true);
+    expect(getInferenceProvider(glyph_cluster_stealth_free_model)).toEqual({
+      slug: 'stealth',
+      name: 'Stealth',
+      training: true,
+      retainsPrompts: true,
+    });
   });
 });
 
@@ -88,6 +125,36 @@ describe('isFreeModel', () => {
 
       for (const model of pricedModels) {
         expect(await isFreeModel(model.public_id)).toBe(false);
+      }
+    });
+
+    test.each(['vendor/priced-exclusive:free', 'stealth/priced-exclusive-alpha'])(
+      'returns false for priced Kilo exclusive model %s even when its id matches a free pattern',
+      modelId => {
+        const pricedModel = {
+          ...claude_opus_4_7_stealth_model,
+          public_id: modelId,
+        };
+        kiloExclusiveModels.push(pricedModel);
+        try {
+          expect(isFreeModel(modelId)).toBe(false);
+        } finally {
+          kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(pricedModel), 1);
+        }
+      }
+    );
+
+    test('ignores pricing on disabled Kilo exclusive models', () => {
+      const disabledModel = {
+        ...claude_opus_4_7_stealth_model,
+        public_id: 'vendor/disabled-priced-exclusive:free',
+        status: 'disabled' as const,
+      };
+      kiloExclusiveModels.push(disabledModel);
+      try {
+        expect(isFreeModel(disabledModel.public_id)).toBe(true);
+      } finally {
+        kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(disabledModel), 1);
       }
     });
 
@@ -287,7 +354,7 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
 
 describe('getKiloExclusiveInferenceProviderRestriction', () => {
   test('returns the routing allow-list for restricted exclusive models', () => {
-    expect(getKiloExclusiveInferenceProviderRestriction('stepfun/step-3.7-flash:free')).toEqual(
+    expect(getKiloExclusiveInferenceProviderRestriction('stepfun/step-5-preview-free')).toEqual(
       new Set(['stepfun'])
     );
   });

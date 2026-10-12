@@ -2,9 +2,13 @@ import 'server-only';
 
 import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { decryptApiKey, encryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import {
+  decryptApiKey,
+  encryptApiKey,
+  type EncryptedData,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './types';
 import { isChatGptUsageLimitCurrent, type ChatGptUsageLimit } from './usage-limit';
 
@@ -331,4 +335,24 @@ export async function markOpenAiChatGptError(
   if (!connection) return;
 
   await markOpenAiChatGptConnectionErrored(db, owner, connection, message);
+}
+
+/**
+ * Records OpenAI's refusal of the connected account. Only the connection whose
+ * access token served the refused request is marked: a reconnect that landed
+ * while the request was in flight can hold a different, eligible account, and
+ * must not be erased by a stale refusal. A missing row is a no-op.
+ */
+export async function markOpenAiChatGptNotEligible(
+  owner: OpenAiChatGptOwner,
+  refusedAccessToken: string,
+  message: string
+): Promise<void> {
+  await db.transaction(async tx => {
+    const row = await readOpenAiChatGptConnectionRow(tx, owner, { forUpdate: true });
+    if (!row) return;
+    const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
+    if (!connection || connection.access_token !== refusedAccessToken) return;
+    await markOpenAiChatGptConnectionErrored(tx, owner, connection, message);
+  });
 }

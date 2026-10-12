@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { isGptOssModel } from '@/lib/ai-gateway/providers/openai';
+import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
   'ai21',

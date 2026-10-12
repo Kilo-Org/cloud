@@ -17,10 +17,10 @@ import 'server-only';
 
 import { eq } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
-import { deliverCreditEventWireBody } from '@/lib/bouncer/client';
-import { parseBouncerCreditEventBody } from '@/lib/bouncer/credit-event-schema';
-import { sentryLogger } from '@/lib/utils.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { deliverCreditEventWireBody } from '@kilocode/web-shared/lib/bouncer/client';
+import { parseBouncerCreditEventBody } from '@kilocode/web-shared/lib/bouncer/credit-event-schema';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   claimDueBouncerCreditEvents,
   deleteBouncerCreditEvent,

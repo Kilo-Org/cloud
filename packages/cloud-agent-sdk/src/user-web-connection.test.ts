@@ -404,6 +404,63 @@ describe('createUserWebConnection', () => {
     client.destroy();
   });
 
+  it('closes the socket, stops pings and mints no ticket while hidden past hiddenPauseDelayMs', async () => {
+    jest.useFakeTimers();
+    try {
+      const visibility: { resume: (() => void) | null; hide: (() => void) | null } = {
+        resume: null,
+        hide: null,
+      };
+      const getAuthToken = jest
+        .fn()
+        .mockReturnValueOnce('old-token')
+        .mockResolvedValue('new-token');
+      const client = createUserWebConnection({
+        websocketUrl: WS_URL,
+        getAuthToken,
+        lifecycleHooks: {
+          hiddenPauseDelayMs: 15_000,
+          onVisibilityChange: (onResume, onHidden) => {
+            visibility.resume = onResume;
+            visibility.hide = onHidden;
+            return jest.fn();
+          },
+        },
+      });
+      const release = client.subscribeToCliSession('ses-1');
+      open();
+      inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+      expect(client.isConnected()).toBe(true);
+
+      visibility.hide?.();
+      jest.advanceTimersByTime(15_000);
+      expect(sockets[0].close).toHaveBeenCalledTimes(1);
+      expect(client.isConnected()).toBe(false);
+
+      sockets[0].onclose?.({ code: 1006 } as CloseEvent);
+      const sendsAfterPause = sockets[0].send.mock.calls.length;
+      jest.advanceTimersByTime(10 * VIEWER_PING_INTERVAL_MS);
+      await Promise.resolve();
+      expect(sockets).toHaveLength(1);
+      expect(sockets[0].send).toHaveBeenCalledTimes(sendsAfterPause);
+      expect(getAuthToken).toHaveBeenCalledTimes(1);
+
+      visibility.resume?.();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(getAuthToken).toHaveBeenCalledTimes(2);
+      expect(sockets).toHaveLength(2);
+      open(sockets[1]);
+      expect(sockets[1].send).toHaveBeenCalledWith(
+        JSON.stringify({ type: 'subscribe', sessionId: 'ses-1' })
+      );
+      release();
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('promptly rejects an in-flight command when its socket unexpectedly disconnects', async () => {
     const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
     const release = client.subscribeToCliSession('ses-1');

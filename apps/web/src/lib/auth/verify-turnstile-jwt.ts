@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 import jwt from 'jsonwebtoken';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import type { TurnstileJwtPayload } from '@/lib/user/next-auth-options';
-import { sentryLogger } from '@/lib/utils.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * Verify Turnstile JWT cookie and validate IP address.

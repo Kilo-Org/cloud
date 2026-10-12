@@ -4,7 +4,7 @@ import type {
   SERVICE_FEE_METADATA_TYPE,
   SERVICE_FEE_RATE_BASIS_POINTS,
   SERVICE_FEE_VERSION,
-} from '@/lib/service-fees/constants';
+} from '@kilocode/web-shared/lib/service-fees/constants';
 
 export const SERVICE_FEE_FLOWS = [
   'personal_top_up',

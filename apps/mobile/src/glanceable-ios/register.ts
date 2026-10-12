@@ -8,9 +8,12 @@ import { addUserInteractionListener } from 'expo-widgets';
 
 import { i18n } from '@/i18n';
 import { getGlanceableDelivery, registerGlanceableSink } from '@/lib/glanceable/sink-registry';
+import { replayGlanceableLiveActivity } from '@/lib/glanceable/activity-kit-prompt';
 import {
   getLiveActivityEnabled,
+  getNotificationPermissionGranted,
   subscribeLiveActivityEnabled,
+  subscribeNotificationPermissionGranted,
 } from '@/lib/glanceable/live-activity-switch';
 
 import { adoptPushStartedActivity } from './adopt-activity';
@@ -72,10 +75,15 @@ if (Platform.OS === 'ios') {
   // `approve` and `open` targets, so a press is answered by exactly one of them.
   registerWidgetActionHandling();
 
-  // Copy the Kilo mark into the shared app group so the widget extension can read
-  // it. Fire and forget: it lands long before the first snapshot arrives, and a
-  // failure only costs the logo.
+  // Copy the Kilo mark and its monochrome glyph into the shared app group so
+  // the widget extension can read them. Fire and forget: it lands long before
+  // the first snapshot arrives, and a failure only costs the logo.
   void ensureWidgetLogo();
+
+  // The widget gallery shows the approved Needs input layouts with sample
+  // agents; this writes that preview in the language i18n holds now, and the
+  // language listener below re-writes it once the stored language applies.
+  refreshActiveAgentsWidgetCopy();
 
   // Claim a card raised by a push-to-start before anything else runs. iOS grants
   // this process background run time for exactly that, and the server cannot
@@ -117,5 +125,13 @@ if (Platform.OS === 'ios') {
       getGlanceableDelivery().cleanupTokens('scope');
     }
     liveActivityAllowed = next;
+  });
+
+  // The sink starts no card before the user grants notification permission
+  // (see `startCard`). Work that was live at the grant starts its card now.
+  subscribeNotificationPermissionGranted(() => {
+    if (getNotificationPermissionGranted()) {
+      void replayGlanceableLiveActivity();
+    }
   });
 }

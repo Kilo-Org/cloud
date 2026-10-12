@@ -1,10 +1,10 @@
-import { createCachedFetch } from '@/lib/cached-fetch';
+import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import {
   DEFAULT_VERCEL_PERCENTAGE,
   DEFAULT_VERCEL_PERCENTAGE_FREE,
   GatewayRoutingConfigSchema,
-} from '@/lib/ai-gateway/gateway-config';
-import { db } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 

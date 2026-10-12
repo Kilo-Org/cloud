@@ -3,8 +3,8 @@ import type Stripe from 'stripe';
 import {
   SERVICE_FEE_RATE_BASIS_POINTS,
   SERVICE_FEE_RATE_DENOMINATOR,
-} from '@/lib/service-fees/constants';
-import type { CalculateCumulativeFeeRefundInput } from '@/lib/service-fees/types';
+} from '@kilocode/web-shared/lib/service-fees/constants';
+import type { CalculateCumulativeFeeRefundInput } from '@kilocode/web-shared/lib/service-fees/types';
 
 const ISO_CURRENCY_PATTERN = /^[a-z]{3}$/;
 const ROUND_HALF_UP_OFFSET = BigInt(SERVICE_FEE_RATE_DENOMINATOR / 2);

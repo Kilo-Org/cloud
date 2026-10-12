@@ -18,14 +18,14 @@ import {
   isKiloResourceAudienceAllowed,
 } from '@kilocode/worker-utils/kilo-token-policy';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from '@kilocode/worker-utils/runtime-proxy-attestation';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import jwt from 'jsonwebtoken';
-import { warnExceptInTest } from '@/lib/utils.server';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   isBoundedInternalServiceTokenIssuanceEnabled,
   isResourceTokenIssuanceEnabled,
   NEXTAUTH_SECRET,
-} from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/config.server';
 
 export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 

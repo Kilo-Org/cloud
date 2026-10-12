@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
-import { getOpenRouterTranscriptionModels } from '@/lib/ai-gateway/providers/openrouter';
-import { getUserFromAuth } from '@/lib/user/server';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { getOpenRouterTranscriptionModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
-} from '@/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 
 /**
  * Test using:

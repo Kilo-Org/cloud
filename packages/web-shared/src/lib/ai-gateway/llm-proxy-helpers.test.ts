@@ -32,6 +32,7 @@ import {
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
+  extractReasoningSetting,
   getOrganizationProviderPrivacy,
   lastUserPromptText,
   makeErrorReadable,
@@ -41,6 +42,125 @@ import {
   requestedLogprobs,
   requestedSamples,
 } from './llm-proxy-helpers';
+
+describe('extractReasoningSetting', () => {
+  it.each<{ name: string; body: unknown; expected: string | null }>([
+    { name: 'absent fields', body: {}, expected: null },
+    { name: 'null body', body: null, expected: null },
+    { name: 'undefined body', body: undefined, expected: null },
+    { name: 'primitive body', body: 'high', expected: null },
+    { name: 'array body', body: [], expected: null },
+    {
+      name: 'enabled thinking',
+      body: { thinking: { type: 'enabled' } },
+      expected: 'thinking:enabled',
+    },
+    {
+      name: 'adaptive thinking',
+      body: { thinking: { type: 'adaptive' } },
+      expected: 'thinking:adaptive',
+    },
+    {
+      name: 'disabled thinking',
+      body: { thinking: { type: 'disabled' } },
+      expected: 'thinking:disabled',
+    },
+    ...[
+      [0, 'le1k'],
+      [1_000, 'le1k'],
+      [1_001, 'le4k'],
+      [4_000, 'le4k'],
+      [4_001, 'le16k'],
+      [16_000, 'le16k'],
+      [16_001, 'le64k'],
+      [32_000, 'le64k'],
+      [64_000, 'le64k'],
+      [64_001, 'gt64k'],
+    ].flatMap(([budget, bucket]) => [
+      {
+        name: `thinking budget ${budget}`,
+        body: { thinking: { type: 'enabled', budget_tokens: budget } },
+        expected: `thinking:enabled:${bucket}`,
+      },
+      {
+        name: `reasoning budget ${budget}`,
+        body: { reasoning: { max_tokens: budget } },
+        expected: `reasoning:budget:${bucket}`,
+      },
+    ]),
+    ...['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].flatMap(effort => [
+      {
+        name: `chat effort ${effort}`,
+        body: { reasoning_effort: effort },
+        expected: `effort:${effort}`,
+      },
+      {
+        name: `messages effort ${effort}`,
+        body: { output_config: { effort } },
+        expected: `effort:${effort}`,
+      },
+      {
+        name: `responses effort ${effort}`,
+        body: { reasoning: { effort } },
+        expected: `effort:${effort}`,
+      },
+    ]),
+    ...['HIGH', '', 'unbounded-client-label'.repeat(100)].flatMap(effort => [
+      { name: 'unknown chat effort', body: { reasoning_effort: effort }, expected: 'effort:other' },
+      {
+        name: 'unknown messages effort',
+        body: { output_config: { effort } },
+        expected: 'effort:other',
+      },
+      {
+        name: 'unknown reasoning effort',
+        body: { reasoning: { effort } },
+        expected: 'effort:other',
+      },
+    ]),
+    {
+      name: 'reasoning disabled',
+      body: { reasoning: { enabled: false } },
+      expected: 'reasoning:disabled',
+    },
+    { name: 'reasoning exclude ignored', body: { reasoning: { exclude: true } }, expected: null },
+    { name: 'reasoning enabled ignored', body: { reasoning: { enabled: true } }, expected: null },
+    {
+      name: 'fixed label order',
+      body: {
+        reasoning: { effort: 'high', enabled: false, max_tokens: 4_000, exclude: true },
+        thinking: { type: 'adaptive', budget_tokens: 32_000 },
+      },
+      expected: 'thinking:adaptive:le64k+effort:high+reasoning:disabled+reasoning:budget:le4k',
+    },
+    {
+      name: 'effort alias precedence',
+      body: {
+        output_config: { effort: 'low' },
+        reasoning_effort: 'medium',
+        reasoning: { effort: 'high' },
+      },
+      expected: 'effort:low',
+    },
+    ...[
+      { thinking: { type: 'client-supplied', budget_tokens: 32_000 } },
+      { thinking: 'enabled', reasoning: 'high', output_config: 'high' },
+      { thinking: [], reasoning: [], output_config: [] },
+      { thinking: null, reasoning: null, output_config: null },
+      { thinking: { type: 123 }, reasoning: { enabled: 'false', max_tokens: '1000' } },
+      { reasoning_effort: 123, output_config: { effort: {} }, reasoning: { effort: false } },
+      { reasoning: { max_tokens: NaN } },
+      { reasoning: { max_tokens: Infinity } },
+    ].map(body => ({ name: 'malformed input', body, expected: null })),
+    {
+      name: 'malformed budget does not discard known thinking type',
+      body: { thinking: { type: 'enabled', budget_tokens: '32000' } },
+      expected: 'thinking:enabled',
+    },
+  ])('$name', ({ body, expected }) => {
+    expect(extractReasoningSetting(body)).toBe(expected);
+  });
+});
 
 describe('getOrganizationProviderPrivacy', () => {
   it.each(['allow', 'deny'] as const)('returns data_collection=%s', dataCollection => {
@@ -269,6 +389,7 @@ describe('countAndStoreFimUsage', () => {
       session_id: null,
       mode: null,
       auto_model: null,
+      reasoning_setting: null,
       ttfb_ms: null,
       ...overrides,
     } as MicrodollarUsageContext;
@@ -365,6 +486,7 @@ describe('countAndStoreEditUsage', () => {
       session_id: null,
       mode: null,
       auto_model: null,
+      reasoning_setting: null,
       ttfb_ms: null,
       ...overrides,
     } as MicrodollarUsageContext;

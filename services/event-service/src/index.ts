@@ -85,25 +85,33 @@ function acceptsWebSocketProtocol(header: string | undefined): boolean {
   return false;
 }
 
+/**
+ * A ticket is `<object id>.<secret>`. The object id comes from `newUniqueId()`:
+ * the first use of an `idFromName()` id waits on a worldwide check that no
+ * other colo created the same name, and every ticket is a first use. That
+ * extra hop is where production mints missed the 8s budget (KILO-APP-2NH).
+ */
 async function mintConnectionTicket(env: Env, userId: string): Promise<string | null> {
-  const ticket = crypto.randomUUID();
-  const stub = env.CONNECTION_TICKET_DO.get(env.CONNECTION_TICKET_DO.idFromName(ticket));
+  const id = env.CONNECTION_TICKET_DO.newUniqueId();
   const body = {
     userId,
+    secret: crypto.randomUUID(),
     expiresAt: Date.now() + CONNECTION_TICKET_TTL_MS,
   } satisfies TicketMintRequest;
   try {
-    await stub.mint(body);
-    return ticket;
+    await env.CONNECTION_TICKET_DO.get(id).mint(body);
+    return `${id.toString()}.${body.secret}`;
   } catch {
     return null;
   }
 }
 
 async function consumeConnectionTicket(env: Env, ticket: string): Promise<string | null> {
-  const stub = env.CONNECTION_TICKET_DO.get(env.CONNECTION_TICKET_DO.idFromName(ticket));
+  const [objectId, secret, ...rest] = ticket.split('.');
+  if (!objectId || !secret || rest.length > 0) return null;
   try {
-    return (await stub.consume())?.userId ?? null;
+    const stub = env.CONNECTION_TICKET_DO.get(env.CONNECTION_TICKET_DO.idFromString(objectId));
+    return (await stub.consume(secret))?.userId ?? null;
   } catch {
     return null;
   }

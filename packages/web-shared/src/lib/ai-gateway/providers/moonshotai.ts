@@ -1,4 +1,4 @@
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 export function isKimiModel(model: string) {
   return model.includes('kimi');

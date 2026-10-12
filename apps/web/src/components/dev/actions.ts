@@ -1,10 +1,10 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { IS_DEVELOPMENT } from '@/lib/constants';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { softDeleteUser } from '@/lib/user';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { captureException } from '@sentry/nextjs';
 
 export async function nuke() {

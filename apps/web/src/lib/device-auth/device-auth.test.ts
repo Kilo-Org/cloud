@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import {
@@ -19,7 +19,7 @@ import {
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
 } from './device-auth';
 import { issueSessionCredentials } from '@/lib/auth/device-sessions';
-import { generateApiToken } from '@/lib/tokens';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 
 // Capture real implementations for pass-through default behaviour.
 // Must use var declarations — jest.mock factories are hoisted and run before
@@ -41,8 +41,8 @@ jest.mock('@/lib/auth/device-sessions', () => {
   };
 });
 
-jest.mock('@/lib/tokens', () => {
-  const actual = jest.requireActual('@/lib/tokens') as any;
+jest.mock('@kilocode/web-shared/lib/tokens', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/tokens') as any;
   _realGenerateApiToken = actual.generateApiToken;
   return {
     ...actual,

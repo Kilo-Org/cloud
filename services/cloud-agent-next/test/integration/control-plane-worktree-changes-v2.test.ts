@@ -7,9 +7,10 @@ import { events } from '../../src/db/sqlite-schema.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-plane.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
-import type {
-  ControlPlanePromptPayload,
-  ControlPlaneWrapperFrame,
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+  type ControlPlaneWrapperFrame,
 } from '../../src/shared/control-plane-protocol.js';
 import type {
   ProviderAdapter,
@@ -22,6 +23,10 @@ import {
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import {
+  WORKTREE_CHANGES_KEY,
+  WORKTREE_FILE_PREFIX,
+} from '../../src/sandbox-session/worktree-changes.js';
 import { waitFor } from './wait-for.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -93,15 +98,13 @@ type FakeProvider = { adapter: ProviderAdapter; launchEnvs: Record<string, strin
 function createFakeProvider(): FakeProvider {
   const provider: FakeProvider = { adapter: null as unknown as ProviderAdapter, launchEnvs: [] };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
@@ -158,7 +161,7 @@ async function connectAndHello(
   const { credential, allocationId } = launchIdentity(provider);
   const wrapper = await FakeWrapper.connect({ sandboxId, credential });
   const reply = await wrapper.hello({ wrapperId, allocationId });
-  expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   return wrapper;
 }
 
@@ -186,9 +189,40 @@ async function startSessionWithSandbox(input: {
   sessionId: string;
   sandboxId: string;
   provider: FakeProvider;
+  savedPatch?: string;
 }): Promise<DurableObjectStub<SandboxSessionV2>> {
   await injectProvider(input.sandboxId, input.provider);
   const sessionStub = sessions.getByName(sessionDoName(USER_ID, input.sessionId));
+  if (input.savedPatch) {
+    await sessionStub.getSession();
+    const patch = input.savedPatch;
+    await runInDurableObject(sessionStub, async (_instance, state) => {
+      state.storage.kv.put(WORKTREE_CHANGES_KEY, {
+        ...SNAPSHOT_SUMMARY,
+        schemaVersion: 2,
+        capturedAt: new Date().toISOString(),
+        files: [
+          {
+            path: 'lost.txt',
+            status: 'added',
+            additions: 1,
+            deletions: 0,
+            tracked: false,
+            binary: false,
+            countsComplete: true,
+            revision: 1,
+          },
+        ],
+      });
+      state.storage.kv.put(`${WORKTREE_FILE_PREFIX}lost.txt`, {
+        schemaVersion: 1,
+        revision: 1,
+        path: 'lost.txt',
+        diff: { status: 'available', patch },
+        content: { status: 'available', source: 'current', text: 'lost\n' },
+      });
+    });
+  }
   await sessionStub.createSessionWithInitialAdmission({
     metadata: metadata({
       sessionId: input.sessionId,
@@ -261,6 +295,36 @@ afterEach(async () => {
 });
 
 describe('control-plane worktree changes (B10)', () => {
+  it('carries saved DO patches through credential projection to session.prepare without consuming them', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createFakeProvider();
+    const patch =
+      'diff --git a/lost.txt b/lost.txt\nnew file mode 100644\n--- /dev/null\n+++ b/lost.txt\n@@ -0,0 +1 @@\n+lost\n';
+    const stub = await startSessionWithSandbox({
+      sessionId,
+      sandboxId,
+      provider,
+      savedPatch: patch,
+    });
+    const wrapper = await connectAndHello(provider, sandboxId, 'wr_recovery');
+    const frame = await awaitFrame(wrapper, 'session.prepare');
+    expect(frame.spec.worktreeRecovery).toEqual({
+      files: [{ path: 'lost.txt', status: 'added', patch }],
+    });
+    expect((await stub.getWorktreeChanges()).snapshot?.files[0]?.path).toBe('lost.txt');
+    wrapper.send({ type: 'session.failed', sessionId, reason: 'workspace_setup_failed' });
+    await waitFor(async () => {
+      const session = await stub.getSession();
+      expect(session.type === 'found' && session.route.state === 'failed').toBe(true);
+    });
+    await stub.send(promptPayload(messageId()));
+    const replacement = await awaitFrame(wrapper, 'session.prepare');
+    expect(replacement.spec.attemptId).not.toBe(frame.spec.attemptId);
+    expect(replacement.spec.worktreeRecovery).toEqual(frame.spec.worktreeRecovery);
+    expect((await stub.getWorktreeChanges()).snapshot?.files[0]?.path).toBe('lost.txt');
+    wrapper.close();
+  });
   it('forwards a snapshot request to the wrapper and returns its result', async () => {
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
     const provider = createFakeProvider();

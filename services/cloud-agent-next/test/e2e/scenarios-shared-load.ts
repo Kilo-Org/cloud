@@ -445,7 +445,6 @@ export const LOAD_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: LARGE_STREAM_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runLargeStream,
   },
   'concurrent-chats': {
@@ -454,7 +453,6 @@ export const LOAD_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: CONCURRENT_CHATS_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runConcurrentChats,
   },
 };

@@ -22,7 +22,7 @@ import {
   type ReviewWindow,
 } from './review-health-aggregate';
 
-jest.mock('@/lib/drizzle', () => ({ db: {} }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: {} }));
 
 const window: ReviewWindow = {
   start: '2026-02-01T00:05:00.000Z',

@@ -1,23 +1,26 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
-import { addUserByokAvailability, getModelUserByokProviders } from '@/lib/ai-gateway/byok';
-import { canRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+import {
+  addUserByokAvailability,
+  getModelUserByokProviders,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { canRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
-} from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type { StoredModel } from '@kilocode/db';
 
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getVercelModelsMetadataFromDatabase: jest.fn(),
   getVercelModelsFromDatabase: jest.fn(),
   isValidOpenRouterModelId: jest.fn(),
   resolveOpenRouterModelAlias: jest.fn(async (modelId: string) => modelId),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/vercel', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: jest.fn(),
 }));
 

@@ -3,15 +3,15 @@ import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
   OpenRouterProvider,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import {
   CODESTRAL_FIM_MODEL_ID,
   findSupportedFimModel,
   injectSupportedFimModels,
   MERCURY_EDIT_FIM_MODEL_ID,
-} from '@/lib/ai-gateway/supported-fim-models';
-import { buildModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { createAllowPredicateFromProviderAllowList } from '@/lib/model-allow.server';
+} from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
+import { buildModelIdToProviderSlugsIndex } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { createAllowPredicateFromProviderAllowList } from '@kilocode/web-shared/lib/model-allow.server';
 
 function provider(slug: string): OpenRouterProvider {
   return {

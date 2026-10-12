@@ -21,7 +21,7 @@ let mockCaptureMessage: jest.Mock;
 async function loadStripeClient() {
   process.env.SKIP_STRIPE_API = 'false';
   jest.resetModules();
-  const stripeModule = await import('@/lib/stripe-client');
+  const stripeModule = await import('@kilocode/web-shared/lib/stripe-client');
   ({ list: mockList, del: mockDel } = (
     jest.requireMock('stripe') as { __mock: { list: jest.Mock; del: jest.Mock } }
   ).__mock);

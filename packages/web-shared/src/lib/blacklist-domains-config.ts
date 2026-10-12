@@ -1,9 +1,9 @@
 import 'server-only';
 import * as z from 'zod';
-import { redisClient } from '@/lib/redis';
-import { getEnvVariable } from '@/lib/dotenvx';
-import { createCachedFetch } from '@/lib/cached-fetch';
-import { BLACKLIST_DOMAINS_REDIS_KEY } from '@/lib/redis-keys';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
+import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 
 export const BlacklistDomainsConfigSchema = z.object({
   domains: z.array(z.string()),

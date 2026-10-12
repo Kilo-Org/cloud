@@ -1,9 +1,9 @@
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 
-import { readDb } from '@/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { app_min_versions } from '@kilocode/db/schema';
-import { UpstreamApiError } from '@/lib/trpc/transport';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import { isVersionBelow } from '@kilocode/app-shared/app-version';
 
 export type MinimumVersionHeaders = { get(name: string): string | null };

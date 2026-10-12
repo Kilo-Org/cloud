@@ -8,6 +8,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { i18n } from '@/i18n';
+import { getHomeWidgetDataForSnapshot } from '@/lib/glanceable/home-widget-data';
 import {
   getLastGlanceableSnapshot,
   isGlanceableRestoreSettled,
@@ -20,7 +21,10 @@ import {
   type GlanceableSink,
   type GlanceableSinkContext,
 } from '@/lib/glanceable/sink-registry';
-import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
+import {
+  getLiveActivityEnabled,
+  getNotificationPermissionGranted,
+} from '@/lib/glanceable/live-activity-switch';
 import { getWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 
 import { ActiveAgentsLiveActivity, OPEN_AGENTS_URL } from './active-agents-live-activity';
@@ -101,17 +105,30 @@ function pruneActionNotice(snapshot: GlanceableAgentsSnapshot): void {
 }
 
 /**
+ * Whether an Approve pressed on the card is in flight. The card swaps Approve
+ * for a muted Approving… pill until the press resolves; the interaction clears
+ * it on every outcome, so it can never stick.
+ */
+let approving = false;
+
+/** Mark (or clear) the in-flight Approve the next Live Activity update draws. */
+export function setGlanceableActionApproving(value: boolean): void {
+  approving = value;
+}
+
+/**
  * The content-state one update carries: the counts, the Approve gate, and the
  * pending notice when there is one. Every Live Activity update goes through
  * this, so the notice cannot be dropped by one path and kept by another.
  */
 function liveActivityContentState(snapshot: GlanceableAgentsSnapshot): GlanceableLiveActivityProps {
   pruneActionNotice(snapshot);
-  return buildGlanceableLiveActivityContentState(
+  const contentState = buildGlanceableLiveActivityContentState(
     snapshot,
     isApprovableAskRecorded(),
     actionNotice ?? undefined
   );
+  return approving ? { ...contentState, approving: true } : contentState;
 }
 
 /**
@@ -159,6 +176,11 @@ function startCard(
       instance => instance.getInfo().state !== 'dismissed'
     );
     if (remaining.length > 0) {
+      return;
+    }
+    // The first start raises iOS's "Allow Live Activities?" prompt. Wait for the
+    // user's notification opt-in; the grant replays eligible work (see register).
+    if (!getNotificationPermissionGranted()) {
       return;
     }
     const started = ActiveAgentsLiveActivity.start(
@@ -453,6 +475,7 @@ export function _resetIosSinkForTests(): void {
   pendingStartAt = 0;
   actionNotice = null;
   noticeAskKey = null;
+  approving = false;
 }
 
 export const iosSink: GlanceableSink = {
@@ -465,13 +488,14 @@ export const iosSink: GlanceableSink = {
   },
 
   publish(snapshot) {
-    const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate));
+    const homeData = getHomeWidgetDataForSnapshot(snapshot);
+    const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate, homeData));
     ActiveAgentsWidget.updateSnapshot(props);
     // updateSnapshot leaves a single frame behind, so the shared builder adds
     // the delayed and expiry frames every timeline writer owes WidgetKit (see
     // `widgetTimelineFrames`). Null means a terminal blank, whose copy needs no
     // further frame.
-    const frames = widgetTimelineFrames(snapshot, props, translate);
+    const frames = widgetTimelineFrames(snapshot, props, translate, homeData);
     if (frames !== null) {
       ActiveAgentsWidget.updateTimeline(frames);
     }

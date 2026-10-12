@@ -1,8 +1,8 @@
 import { expect, test } from '@jest/globals';
 
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import {
   credit_transactions,
   impact_referral_conversions,
@@ -18,7 +18,7 @@ import { KiloPassAuditLogAction } from './enums';
 import { KiloPassIssuanceItemKind } from './enums';
 import { KiloPassIssuanceSource } from './enums';
 import { KiloPassCadence } from './enums';
-import { KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   ImpactReferralBeneficiaryRole,
   ImpactReferralDecisionOutcome,
@@ -29,7 +29,7 @@ import {
   ImpactReferralWinningTouchType,
 } from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
-import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
+import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
 
 import {
   applyPendingKiloPassReferralBonusForIssuance,

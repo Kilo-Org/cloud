@@ -1,8 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { trackKiloPassPurchaseCompleted as trackKiloPassPurchaseCompletedType } from './posthog-tracking';
-import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
-jest.mock('@/lib/posthog', () => {
+jest.mock('@kilocode/web-shared/lib/posthog', () => {
   const mockCapture = jest.fn();
   return {
     __esModule: true,
@@ -23,13 +23,15 @@ jest.mock('next/server', () => ({
   after: jest.fn(),
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   IS_IN_AUTOMATED_TEST: true,
 }));
 
 let trackKiloPassPurchaseCompleted: typeof trackKiloPassPurchaseCompletedType;
 
-const posthogMock: { mockCapture: jest.Mock } = jest.requireMock('@/lib/posthog');
+const posthogMock: { mockCapture: jest.Mock } = jest.requireMock(
+  '@kilocode/web-shared/lib/posthog'
+);
 const sentryMock: { mockCaptureException: jest.Mock } = jest.requireMock('@sentry/nextjs');
 const { mockCapture } = posthogMock;
 const { mockCaptureException } = sentryMock;

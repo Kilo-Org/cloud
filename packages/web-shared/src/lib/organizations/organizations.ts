@@ -11,7 +11,7 @@ import {
   type AcceptInviteResult,
   type OrganizationSettings,
   OrganizationSettingsSchema,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   kilocode_users,
   organization_invitations,
@@ -24,21 +24,21 @@ import {
   provider_oauth_attempts,
   external_side_effect_outbox,
 } from '@kilocode/db/schema';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { auto_deleted_at, db, sql } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { auto_deleted_at, db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, desc, eq, isNull, gt } from 'drizzle-orm';
-import { TRIAL_DURATION_DAYS } from '@/lib/constants';
+import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
 import { randomUUID } from 'crypto';
-import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/email-address';
+import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
 import { classifyOrganizationEntitlement } from './trial-utils';
-import { logExceptInTest } from '@/lib/utils.server';
-import { APP_URL } from '@/lib/constants';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { captureOrganizationMemberJoined } from '@/lib/organizations/organization-member-analytics';
-import { failureResult, successResult } from '@/lib/maybe-result';
-import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { captureOrganizationMemberJoined } from '@kilocode/web-shared/lib/organizations/organization-member-analytics';
+import { failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 
 export async function getOrganizationById(
   id: Organization['id'],

@@ -5,6 +5,7 @@ import {
 } from '@kilocode/cloud-agent-sdk/instance-model-catalog';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import { cliCommandUnavailableError } from '@/lib/hooks/cli-command-unavailable-error';
 
 /**
  * Fetch the model catalog of one selected CLI instance before a session
@@ -13,8 +14,9 @@ import { useUserWebConnection } from '@/components/agents/user-web-connection-pr
  *
  * Retry design lives here: only the retryable `transport` outcome is turned
  * into a rejection so React Query owns the retry (1 attempt) and the
- * refetch-on-mount. The permanent `unsupported` (old CLI) and `invalid`
- * outcomes resolve and cache; retrying them would be pure waste.
+ * refetch-on-mount; the app reports it only when the retry also fails (see
+ * `cliCommandUnavailableError`). The permanent `unsupported` (old CLI) and
+ * `invalid` outcomes resolve and cache; retrying them would be pure waste.
  *
  * React Query keeps the last successful `data` for a key when a later
  * refetch fails, so once an instance has answered, a transient failure keeps
@@ -35,7 +37,11 @@ export function useInstanceModelCatalog(connectionId: string | null) {
       const result = await listInstanceModels(connection, connectionId);
       if (!result.ok && result.reason === 'transport') {
         // Retryable: let React Query own the retry and the refetch-on-mount.
-        throw new Error('instance catalog unavailable');
+        throw cliCommandUnavailableError(
+          'list_models',
+          'instance catalog unavailable',
+          result.cause
+        );
       }
       return result;
     },

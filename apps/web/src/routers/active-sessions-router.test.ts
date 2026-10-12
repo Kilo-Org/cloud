@@ -2,8 +2,8 @@ import { describe, expect, it, jest, beforeAll, afterEach } from '@jest/globals'
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cli_sessions_v2,
   github_branch_pull_requests,
@@ -12,6 +12,7 @@ import {
 } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
 import type { createCallerForUser as CreateCallerForUser } from '@/routers/test-utils';
+import { CONTROL_PLANE_UPSTREAM_BUDGET_MS } from '@/lib/bounded-service-fetch';
 
 // NOTE: `activeSessionSchema` validation is covered in the sibling
 // `active-sessions-router.schema.test.ts`. It is deliberately NOT imported
@@ -23,12 +24,12 @@ import type { createCallerForUser as CreateCallerForUser } from '@/routers/test-
 // `.env.test` sets SESSION_INGEST_WORKER_URL to '' (shared fixture used by
 // other test files too — do not change it here). `createCallerForUser`'s
 // import chain (test-utils -> trpc/init -> ...) transitively loads
-// `@/lib/config.server`, whose `SESSION_INGEST_WORKER_URL` export is a plain
+// `@kilocode/web-shared/lib/config.server`, whose `SESSION_INGEST_WORKER_URL` export is a plain
 // `const` computed once, the first time that module is evaluated. Static
 // ES `import` statements are always hoisted above every other statement by
 // the transform, so a statically-imported `createCallerForUser` would pull
 // in the real ('') value before any `process.env` assignment written below
-// it could run — and a `jest.mock('@/lib/config.server', ...)` registered
+// it could run — and a `jest.mock('@kilocode/web-shared/lib/config.server', ...)` registered
 // after that first (real) load cannot retroactively change the value
 // active-sessions-router.ts already captured. A dynamic `import()` executes
 // exactly where it is awaited (not hoisted), so resolving it in `beforeAll`
@@ -58,6 +59,19 @@ function authorizationToken(fetchSpy: jest.SpiedFunction<typeof fetch>): string 
   expect(authorization).toMatch(/^Bearer .+$/);
   if (!authorization) throw new Error('expected authorization header');
   return authorization.slice('Bearer '.length);
+}
+
+async function expectMintFailure(
+  mint: Promise<unknown>,
+  code: TRPCError['code'],
+  message: string
+): Promise<void> {
+  const error = await mint.then(
+    () => undefined,
+    (rejection: unknown) => rejection
+  );
+  expect(error).toBeInstanceOf(TRPCError);
+  expect(error).toMatchObject({ code, message });
 }
 
 function expectSessionIngestAssertion(
@@ -166,7 +180,7 @@ describe('active-sessions-router', () => {
           headers: { 'Content-Type': 'application/json' },
         })
       );
-      const { NEXTAUTH_SECRET } = await import('@/lib/config.server');
+      const { NEXTAUTH_SECRET } = await import('@kilocode/web-shared/lib/config.server');
       const caller = await createCallerForUser(regularUser.id);
 
       const result = await invoke(caller);
@@ -217,56 +231,75 @@ describe('active-sessions-router', () => {
       });
     });
 
-    it('throws PRECONDITION_FAILED when the worker returns a non-2xx response', async () => {
-      jest
-        .spyOn(global, 'fetch')
-        .mockResolvedValue(new Response('upstream failed', { status: 502 }));
-
-      const caller = await createCallerForUser(regularUser.id);
-      const rejection = caller.activeSessions.getToken();
-      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
-      try {
-        await rejection;
-      } catch (err) {
-        if (!(err instanceof TRPCError)) throw err;
-        expect(err.code).toBe('PRECONDITION_FAILED');
-        expect(err.message).toBe('Session ingest is not configured');
-      }
-    });
-
-    it('throws PRECONDITION_FAILED when fetch itself fails (network error)', async () => {
+    it('throws SERVICE_UNAVAILABLE when fetch itself fails (network error)', async () => {
       jest.spyOn(global, 'fetch').mockRejectedValue(new Error('socket hang up'));
 
       const caller = await createCallerForUser(regularUser.id);
-      const rejection = caller.activeSessions.getToken();
-      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
+
+      await expectMintFailure(
+        caller.activeSessions.createWebTicket(),
+        'SERVICE_UNAVAILABLE',
+        'Session ingest is unavailable'
+      );
+    });
+
+    it('throws SERVICE_UNAVAILABLE when the worker does not answer inside the budget', async () => {
+      let fetchCalled: () => void = () => {};
+      const fetchStarted = new Promise<void>(resolve => {
+        fetchCalled = resolve;
+      });
+      jest.spyOn(global, 'fetch').mockImplementation(() => {
+        fetchCalled();
+        return new Promise<Response>(() => {});
+      });
+      const caller = await createCallerForUser(regularUser.id);
+
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
       try {
-        await rejection;
-      } catch (err) {
-        if (!(err instanceof TRPCError)) throw err;
-        expect(err.code).toBe('PRECONDITION_FAILED');
-        expect(err.message).toBe('Session ingest is not configured');
+        const rejection = caller.activeSessions.createWebTicket();
+        const failure = expectMintFailure(
+          rejection,
+          'SERVICE_UNAVAILABLE',
+          'Session ingest is unavailable'
+        );
+        await fetchStarted;
+        await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
+        await failure;
+      } finally {
+        jest.useRealTimers();
       }
     });
 
-    it('throws PRECONDITION_FAILED when the worker returns a malformed 200 body', async () => {
+    it.each([500, 503, 401])('throws BAD_GATEWAY when the worker answers %i', async status => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(new Response('upstream failed', { status }));
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expectMintFailure(
+        caller.activeSessions.createWebTicket(),
+        'BAD_GATEWAY',
+        `Session ingest failed to mint a ticket (status ${status})`
+      );
+    });
+
+    it.each([
+      ['a malformed', JSON.stringify({ ticket: '', expiresAt: 'not-a-number' })],
+      ['a non-JSON', '<html>gateway</html>'],
+    ])('throws BAD_GATEWAY when the worker returns %s 200 body', async (_label, body) => {
       jest.spyOn(global, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ ticket: '', expiresAt: 'not-a-number' }), {
+        new Response(body, {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
       );
 
       const caller = await createCallerForUser(regularUser.id);
-      const rejection = caller.activeSessions.getToken();
-      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
-      try {
-        await rejection;
-      } catch (err) {
-        if (!(err instanceof TRPCError)) throw err;
-        expect(err.code).toBe('PRECONDITION_FAILED');
-        expect(err.message).toBe('Invalid ticket response from session ingest');
-      }
+
+      await expectMintFailure(
+        caller.activeSessions.createWebTicket(),
+        'BAD_GATEWAY',
+        'Invalid ticket response from session ingest'
+      );
     });
   });
 

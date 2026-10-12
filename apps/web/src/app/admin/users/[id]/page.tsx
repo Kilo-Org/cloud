@@ -1,9 +1,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAdminDashboard } from '@/app/admin/components/UserAdmin/UserAdminDashboard';
 import type { UserDetailProps } from '@/types/admin';
-import { getUserFromAuth, isUserBlacklistedByDomain } from '@/lib/user/server';
-import { getPaymentStatusByUserIds, describePaymentMethods } from '@/lib/admin-utils-serverside';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth, isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
+import {
+  getPaymentStatusByUserIds,
+  describePaymentMethods,
+} from '@kilocode/web-shared/lib/admin-utils-serverside';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PaymentMethod } from '@kilocode/db/schema';
 import {
   kilocode_users,
@@ -14,13 +17,13 @@ import {
   user_auth_provider,
 } from '@kilocode/db/schema';
 import { eq, inArray, desc } from 'drizzle-orm';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { getCrossAccountEmailConflicts, inferRowlessAuthProviders } from '@/lib/user';
-import { getBalanceForUser } from '@/lib/user/balance';
-import { hasReceivedAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';
+import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
+import { hasReceivedAnyFreeWelcomeCredits } from '@kilocode/web-shared/lib/welcomeCredits';
 import { redirect } from 'next/navigation';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/email-address';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 
 async function getUserData(userId: string): Promise<UserDetailProps | null> {
   const user = await findUserById(userId);

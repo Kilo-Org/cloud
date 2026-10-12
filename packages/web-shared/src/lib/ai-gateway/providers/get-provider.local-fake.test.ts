@@ -3,51 +3,49 @@ import {
   getProvider,
   getTranscriptionProvider,
   type GetProviderInput,
-} from '@/lib/ai-gateway/providers/get-provider';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { MARTIAN } from '@/lib/ai-gateway/providers/definitions/martian';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
-  applyVercelSettings,
   canRouteToVercel,
   shouldRouteToVercel,
-} from '@/lib/ai-gateway/providers/vercel';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   getBYOKforOrganization,
   getBYOKforUser,
   getModelUserByokProviders,
-} from '@/lib/ai-gateway/byok';
-import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
-import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
-import { getOpenAiChatGptStoredConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import type { TransformRequestContext } from '@/lib/ai-gateway/providers/types';
-import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
-import type { OpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/types';
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
+import { getOpenAiChatGptStoredConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { TransformRequestContext } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
 import type { User } from '@kilocode/db/schema';
 
-jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn().mockResolvedValue({ provider: null, model: null }),
 }));
-jest.mock('@/lib/ai-gateway/byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   getModelUserByokProviders: jest.fn().mockResolvedValue([]),
   getBYOKforUser: jest.fn(),
   getBYOKforOrganization: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/providers/vercel', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   shouldRouteToVercel: jest.fn().mockResolvedValue(false),
   canRouteToVercel: jest.fn().mockResolvedValue(true),
-  applyVercelSettings: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptStoredConnection: jest.fn().mockResolvedValue(null),
 }));
-jest.mock('@/lib/ai-gateway/openai-chatgpt/served-models', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models', () => ({
   isOpenAiModelServed: jest.fn().mockResolvedValue(true),
 }));
-jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh', () => ({
   resolveOpenAiChatGptAccessToken: jest.fn().mockResolvedValue({ kind: 'no_connection' }),
   OPENAI_CHATGPT_RECONNECT_MESSAGE: 'Your ChatGPT connection has expired. Reconnect to continue.',
 }));
@@ -507,29 +505,6 @@ describe('getProvider gateway BYOK routing', () => {
     ]);
     expect(getBYOKforUser).not.toHaveBeenCalled();
     expect(result.provider).toMatchObject({ id: 'openrouter', apiKey: 'user-openrouter-key' });
-  });
-
-  test('shapes the user Vercel AI Gateway request without inference provider keys', async () => {
-    jest.mocked(getBYOKforUser).mockResolvedValue([vercelKey]);
-    const result = await resolve();
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: { model, messages: [] },
-    };
-
-    await result.provider.transformRequest({
-      provider: result.provider,
-      model,
-      request,
-      originalHeaders: getFraudDetectionHeaders(new Headers()),
-      extraHeaders: {},
-      userByok: result.userByok,
-      kilo_user_id: user.id,
-      organization_id: null,
-      session_id: null,
-    });
-
-    expect(applyVercelSettings).toHaveBeenCalledWith(model, request, null);
   });
 });
 

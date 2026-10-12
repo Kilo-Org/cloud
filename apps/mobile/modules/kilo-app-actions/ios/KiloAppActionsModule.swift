@@ -15,24 +15,23 @@ public final class KiloAppActionsModule: Module {
     /// the `AppActionResult`. The return value is the payloads that arrived
     /// before this call, so the pipeline can run them; on iOS it is always
     /// empty, because a native run waits for registration instead of parking.
-    AsyncFunction("registerAppActionDispatcher") { (dispatcher: JavaScriptValue) throws -> [[String: String]] in
+    ///
+    /// A synchronous `Function`, like Android's, so it runs on the JS thread:
+    /// the bridge hands the dispatcher to the runtime's long-lived objects,
+    /// and the runtime's teardown releases it there. An `AsyncFunction` runs
+    /// on a background queue, where replacing the previous dispatcher
+    /// destroyed a JSI value of a runtime that a reload had already freed.
+    Function("registerAppActionDispatcher") { (dispatcher: JavaScriptValue) throws -> [[String: String]] in
       // `AppContext.runtime` is a throwing property: it raises `RuntimeLost`
       // until the runtime exists, which is the same condition as the module
       // having no app context at all.
       guard let appContext = self.appContext, let runtime = try? appContext.runtime else {
         throw ActionDispatcherNotReadyException()
       }
-      KiloAppActionBridge.shared.register(dispatcher: dispatcher, runtime: runtime)
+      JavaScriptActor.assumeIsolated {
+        KiloAppActionBridge.shared.register(dispatcher: dispatcher, runtime: runtime)
+      }
       return KiloAppActionBridge.shared.drainParkedPayloads()
-    }
-
-    /// The bridge outlives the module (an App Intent reaches it before, or
-    /// without, one), so the runtime's teardown has to drop what it registered:
-    /// the mirror of the Android module's `OnDestroy` clear. A later run then
-    /// waits for the replacement registration instead of executing on a dead
-    /// runtime.
-    OnDestroy {
-      KiloAppActionBridge.shared.unregister()
     }
   }
 }

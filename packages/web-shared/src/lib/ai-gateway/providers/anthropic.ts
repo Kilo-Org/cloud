@@ -1,6 +1,6 @@
-import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { normalizeToolCallIds } from '@/lib/ai-gateway/tool-calling';
+import { addCacheBreakpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { normalizeToolCallIds } from '@kilocode/web-shared/lib/ai-gateway/tool-calling';
 
 function appendAnthropicBetaHeader(extraHeaders: Record<string, string>, betaFlag: string) {
   for (const header of ['anthropic-beta', 'x-anthropic-beta']) {

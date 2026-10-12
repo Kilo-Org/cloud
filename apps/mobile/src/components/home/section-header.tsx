@@ -13,9 +13,17 @@ type SectionHeaderProps = {
   actionLabel?: string;
   onActionPress?: () => void;
   /**
+   * Keeps the action's box but makes it invisible, inert and hidden from
+   * screen readers, so hiding it cannot change the header's size. Beside a
+   * notice the hidden box is dropped instead: it would hold the notice off the
+   * row edge, over empty space.
+   */
+  actionHidden?: boolean;
+  /**
    * Optional one-line status between the label and the action. It takes only
    * the free space on the label's line (zero basis), so it can never wrap the
-   * row or change the header's height when it appears.
+   * row or change the header's height when it appears. A divider separates it
+   * from a visible action. Pass null while there is nothing to report.
    */
   notice?: ReactNode;
 };
@@ -24,8 +32,10 @@ export function SectionHeader({
   label,
   actionLabel,
   onActionPress,
+  actionHidden = false,
   notice,
 }: Readonly<SectionHeaderProps>) {
+  const hasAction = Boolean(actionLabel && onActionPress) && !(actionHidden && notice);
   return (
     <View className="flex-row flex-wrap items-center justify-end gap-2 px-4 pb-2 pt-2">
       {/* With a notice the label keeps its own width, so the notice takes all
@@ -38,12 +48,16 @@ export function SectionHeader({
           {notice}
         </View>
       ) : null}
-      {actionLabel && onActionPress ? (
+      {notice && hasAction ? <View className="h-3 w-px bg-border" /> : null}
+      {hasAction ? (
         <Pressable
           onPress={onActionPress}
+          disabled={actionHidden}
           hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={actionLabel}
+          accessibilityRole={actionHidden ? undefined : 'button'}
+          accessibilityLabel={actionHidden ? undefined : actionLabel}
+          accessibilityElementsHidden={actionHidden}
+          importantForAccessibility={actionHidden ? 'no-hide-descendants' : undefined}
           // The row packs each flex line to its end (`justify-end`) and only the
           // label grows, so this box lands on the row's outer edge: the physical
           // right in LTR, the physical left in RTL. `justify-between` would put a
@@ -57,7 +71,10 @@ export function SectionHeader({
           // `text-left`/`text-right`: React Native swaps those two under RTL
           // (Android maps `textAlign: 'left'` to `Gravity.RIGHT` when the layout
           // is RTL).
-          className="max-w-full shrink-0 flex-row active:opacity-70"
+          className={cn(
+            'max-w-full shrink-0 flex-row active:opacity-70',
+            actionHidden && 'opacity-0'
+          )}
         >
           <Text
             className={cn(

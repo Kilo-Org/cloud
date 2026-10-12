@@ -18,7 +18,7 @@ const mockSelect = jest.fn(() => ({
 }));
 const mockReplicaSelect = jest.fn();
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {
     return mockPublicationEnabled;
   },
@@ -26,7 +26,7 @@ jest.mock('@/lib/config.server', () => ({
     return mockSyncEnabled;
   },
 }));
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { select: mockSelect },
   readDb: { select: mockReplicaSelect },
 }));

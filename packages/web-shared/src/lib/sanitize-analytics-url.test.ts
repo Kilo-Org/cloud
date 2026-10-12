@@ -1,4 +1,7 @@
-import { sanitizeAnalyticsUrl, sanitizeAnalyticsUrlValue } from '@/lib/sanitize-analytics-url';
+import {
+  sanitizeAnalyticsUrl,
+  sanitizeAnalyticsUrlValue,
+} from '@kilocode/web-shared/lib/sanitize-analytics-url';
 
 describe('sanitizeAnalyticsUrl', () => {
   it('drops all query params from magic link verification URLs', () => {

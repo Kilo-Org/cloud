@@ -1,9 +1,9 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   AUTO_FREE_FALLBACK_CONFIG,
   getIneligibleAutoFreeModelIds,
-} from '@/lib/ai-gateway/auto-model/auto-free-config';
-import { db } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { AutoFreeConfigSchema } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';

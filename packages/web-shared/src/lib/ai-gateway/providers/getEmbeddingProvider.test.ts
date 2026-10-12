@@ -2,19 +2,19 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import {
   getEmbeddingProvider,
   getTranscriptionProvider,
-} from '@/lib/ai-gateway/providers/get-provider';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
-import { createAnonymousContext } from '@/lib/anonymous';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
   getModelUserByokProviders,
   getBYOKforUser,
   getBYOKforOrganization,
-} from '@/lib/ai-gateway/byok';
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { User } from '@kilocode/db/schema';
-import { readDb } from '@/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 
-jest.mock('@/lib/ai-gateway/byok');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok');
 
 const mockedGetModelUserByokProviders = getModelUserByokProviders as jest.Mock;
 const mockedGetBYOKforUser = getBYOKforUser as jest.Mock;

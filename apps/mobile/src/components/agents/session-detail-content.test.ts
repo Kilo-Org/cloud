@@ -200,7 +200,7 @@ vi.mock('@/lib/navigation/stack-safe-replace', () => ({
     },
   }),
 }));
-vi.mock('expo-keep-awake', () => ({ useKeepAwake: vi.fn() }));
+vi.mock('@/lib/keep-awake', () => ({ useKeepAwake: vi.fn() }));
 const hapticsSelection = vi.hoisted(() => vi.fn());
 vi.mock('expo-haptics', () => ({
   selectionAsync: hapticsSelection,
@@ -235,6 +235,12 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
+// The goal-removal confirm renders through this surface; the stub keeps the
+// destructive variant out of this suite's react-native stub while still letting
+// the test read the request it carries.
+vi.mock('@/components/destructive-confirm-dialog', () => ({
+  DestructiveConfirmDialog: 'DestructiveConfirmDialog',
+}));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/agents/part-detail-sheet-host', () => ({
@@ -326,9 +332,6 @@ vi.mock('@/components/agents/session-message-list', () => ({
       props.ListFooterComponent as ReactNode
     );
   },
-}));
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
-  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
 vi.mock('@/components/kilo-chat/hooks/use-cli-session-presence', () => ({
   resolveLoadedCliSessionPresenceId: vi.fn(),
@@ -1263,9 +1266,10 @@ function roleAgent(slug: string, name: string) {
 
 function composerCustomValues(renderer: ReactTestRenderer): string[] {
   const composer = renderer.root.findByType('ChatComposer');
-  return (composer.props as { customOptions: { value: string }[] }).customOptions.map(
-    option => option.value
-  );
+  const { modeControl } = composer.props as {
+    modeControl?: { customOptions?: { value: string }[] };
+  };
+  return (modeControl?.customOptions ?? []).map(option => option.value);
 }
 
 describe('session detail role picker profile source', () => {
@@ -3586,6 +3590,39 @@ describe('SessionDetailContent goal edit dialog', () => {
   });
 });
 
+describe('SessionDetailContent goal removal', () => {
+  it('confirms the removal in the in-app dialog', async () => {
+    goalMountOptions = {
+      goal: { text: 'Ship the release', status: 'active' },
+      resolvedType: 'remote',
+    };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const section = view.renderer.root.findAllByType(SessionGoalSection)[0];
+    if (!section) {
+      throw new Error('goal section did not render');
+    }
+    const { onPress } = section.props as { onPress: () => void };
+    act(onPress);
+
+    // Pick "Remove goal" out of the goal action sheet.
+    const sheetCall = showActionSheetWithOptions.mock.calls.at(-1);
+    const sheet = sheetCall?.[0] as { options: string[] } | undefined;
+    const onSelect = sheetCall?.[1];
+    const removeIndex = sheet?.options.indexOf(i18n.t('agentChat.goal.remove')) ?? -1;
+    expect(removeIndex).toBeGreaterThanOrEqual(0);
+    act(() => {
+      onSelect?.(removeIndex);
+    });
+
+    const confirmation = view.renderer.root.findAllByType('DestructiveConfirmDialog')[0];
+    expect(confirmation?.props).toMatchObject({
+      title: i18n.t('agentChat.goal.removeConfirmTitle'),
+      message: i18n.t('agentChat.goal.removeConfirmMessage'),
+      confirmLabel: i18n.t('agentChat.goal.remove'),
+    });
+  });
+});
+
 // The screen's live position: the transcript list reports the topmost visible
 // message, and the screen publishes it to the OS handoff and the route's
 // search params.
@@ -3918,6 +3955,17 @@ describe('session detail composer placeholder (explorer session-detail)', () => 
       expect(copy).not.toBe('undefined');
       expect(copy.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('session detail composer mode chip', () => {
+  it('hands the composer a mode control, because a session has modes', async () => {
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer.props.modeControl).toMatchObject({
+      mode: expect.any(String),
+      onModeChange: expect.any(Function),
+    });
   });
 });
 

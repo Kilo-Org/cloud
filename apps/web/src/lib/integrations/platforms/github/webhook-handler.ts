@@ -38,7 +38,7 @@ import {
 } from '@/lib/integrations/platforms/github/webhook-handlers';
 import { PLATFORM, GITHUB_EVENT, GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { handleGitHubReviewCommentReply } from '@/lib/code-reviews/review-memory/github-feedback';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { logWebhookEvent, updateWebhookEvent } from '@/lib/integrations/db/webhook-events';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from './app-selector';

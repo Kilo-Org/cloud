@@ -15,7 +15,7 @@ import type * as manualAnalysisClientModule from './services/manual-analysis-cli
 import type * as manualRemediationClientModule from './services/manual-remediation-client';
 import { randomUUID } from 'crypto';
 import { sql } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { operation_ledgers, type OperationLedgerRow } from '@kilocode/db/schema';
 
 const mockSubmitManualAnalysisStart = jest.fn() as jest.MockedFunction<

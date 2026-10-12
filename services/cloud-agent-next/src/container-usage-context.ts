@@ -6,6 +6,7 @@ import {
   type UsageContext,
 } from '@kilocode/container-usage';
 import { z } from 'zod';
+import { isContainerConcurrencyLimitError } from './container-concurrency.js';
 import {
   getSandboxAllocationResources,
   type CloudflareContainersInstance,
@@ -13,7 +14,8 @@ import {
   type VercelSandboxResources,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { logger } from './logger.js';
-import { classifySandboxId, isIsolatedSandboxId, isValidSandboxId } from './sandbox-id.js';
+import { isIsolatedSandboxId, isValidSandboxId, type SandboxIdClass } from './sandbox-id.js';
+import { resolveSandboxIdClass, sandboxKindSchema, type SandboxKind } from './sandbox-placement.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import type { SandboxId, SandboxInstance } from './types.js';
 import type { BillingContext } from '@kilocode/container-usage';
@@ -174,6 +176,8 @@ export function vercelBillingIdentity(resources: VercelSandboxResources): Vercel
 export type SandboxBillingInput = Omit<UsageContext, 'service' | 'instanceId' | 'sku'> & {
   sandboxId: SandboxId;
   enforcementRequested?: boolean;
+  /** Present for a placed key, whose prefix does not say which pool may bill it. */
+  sandboxKind?: SandboxKind;
 };
 export type SandboxBillingAdmissionResult =
   | { success: true }
@@ -222,6 +226,7 @@ export const sandboxBillingInputEnvelopeSchema = z
       })
       .optional(),
     enforcementRequested: z.boolean().default(false),
+    sandboxKind: sandboxKindSchema.optional(),
   })
   .strict();
 
@@ -258,11 +263,13 @@ export function buildSandboxBillingInput(
   const actor = metadata.identity.botId
     ? { type: 'bot' as const, id: metadata.identity.botId }
     : { type: 'user' as const, id: metadata.identity.userId };
-  const isolated = isIsolatedSandboxId(sandboxId);
+  const sandboxKind = metadata.workspace?.sandboxKind;
+  const isolated = sandboxKind ? sandboxKind !== 'shared' : isIsolatedSandboxId(sandboxId);
 
   return {
     sandboxId,
     ...(enforcementRequested ? { enforcementRequested: true } : {}),
+    ...(sandboxKind ? { sandboxKind } : {}),
     subject,
     actor,
     ...(actor.type === 'bot' ? { onBehalfOf: subject } : {}),
@@ -275,7 +282,7 @@ export function buildSandboxBillingInput(
 
 export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
   const parsed = sandboxBillingInputEnvelopeSchema.parse(input);
-  const { sandboxId, enforcementRequested, ...usageInput } = parsed;
+  const { sandboxId, enforcementRequested, sandboxKind, ...usageInput } = parsed;
   const validated = usageContextSchema.parse({
     service: USAGE_SERVICE_ROOT,
     instanceId: 'validation',
@@ -283,14 +290,40 @@ export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
     ...usageInput,
   });
   const { service: _service, instanceId: _instanceId, sku: _sku, ...billingInput } = validated;
-  return { sandboxId, enforcementRequested, ...billingInput };
+  return {
+    sandboxId,
+    enforcementRequested,
+    ...(sandboxKind ? { sandboxKind } : {}),
+    ...billingInput,
+  };
+}
+
+/**
+ * Isolated sandbox-ID classes each container class may bill. Non-contained
+ * `ses-` and `crv-` sandboxes run in the standard `Sandbox` pool
+ * (`getSandboxNamespace`), so it accepts every non-devcontainer isolated class.
+ */
+function expectedIsolatedSandboxIdClasses(
+  sandboxClassName: SandboxClassName
+): readonly SandboxIdClass[] {
+  if (sandboxClassName === 'Sandbox') return ['isolated-standard', 'isolated-small', 'code-review'];
+  if (sandboxClassName === 'SandboxContainment') return ['isolated-standard'];
+  if (
+    isContainersBillingClassName(sandboxClassName) ||
+    isVercelBillingClassName(sandboxClassName) ||
+    sandboxClassName === 'SandboxSmall' ||
+    sandboxClassName === 'SandboxSmallContainment'
+  ) {
+    return ['isolated-small'];
+  }
+  return sandboxClassName === 'SandboxDIND' ? ['devcontainer'] : ['code-review'];
 }
 
 export function assertSandboxBillingAllocation(
   sandboxClassName: SandboxClassName,
   input: SandboxBillingInput
 ): void {
-  const sandboxIdClass = classifySandboxId(input.sandboxId);
+  const sandboxIdClass = resolveSandboxIdClass(input);
   const standardClass = sandboxClassName === 'Sandbox' || sandboxClassName === 'SandboxContainment';
   const isolatedPrefixedLegacyId =
     /^(ses|istd|crv|dind)-/.test(input.sandboxId) && input.sandboxId.includes('__');
@@ -309,17 +342,7 @@ export function assertSandboxBillingAllocation(
     return;
   }
 
-  const expectedSandboxIdClass = standardClass
-    ? 'isolated-standard'
-    : isContainersBillingClassName(sandboxClassName) ||
-        isVercelBillingClassName(sandboxClassName) ||
-        sandboxClassName === 'SandboxSmall' ||
-        sandboxClassName === 'SandboxSmallContainment'
-      ? 'isolated-small'
-      : sandboxClassName === 'SandboxDIND'
-        ? 'devcontainer'
-        : 'code-review';
-  if (sandboxIdClass !== expectedSandboxIdClass) {
+  if (!expectedIsolatedSandboxIdClasses(sandboxClassName).includes(sandboxIdClass)) {
     throw new Error(`${sandboxClassName} billing received an incompatible sandbox ID`);
   }
   if (!input.sessionId) {
@@ -365,6 +388,7 @@ export async function ensureSandboxBillingAdmissionInput(
   try {
     return await (sandbox as MeteredSandboxInstance).ensureBillingAdmission(input);
   } catch (error) {
+    if (isContainerConcurrencyLimitError(error)) throw error;
     return {
       success: false,
       code: 'meter_unavailable',
@@ -478,11 +502,5 @@ export async function configureSandboxBillingInput(
     logger.warn('Container usage shadow metering is unavailable for sandbox');
     return;
   }
-  try {
-    await (sandbox as MeteredSandboxInstance).configureBilling(input);
-  } catch (error) {
-    logger
-      .withFields({ error: error instanceof Error ? error.message : String(error) })
-      .warn('Container usage shadow configuration deferred');
-  }
+  await (sandbox as MeteredSandboxInstance).configureBilling(input);
 }

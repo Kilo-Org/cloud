@@ -101,7 +101,7 @@ jest.mock(
   { virtual: true }
 );
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   SLACK_CLIENT_ID: 'slack-client-id',
   SLACK_CLIENT_SECRET: 'slack-client-secret',
   SLACK_SIGNING_SECRET: 'slack-signing-secret',
@@ -146,7 +146,7 @@ jest.mock('@/lib/bot/platforms/linear-webhook', () => ({
   createLinearWebhookHandler: jest.fn(() => async () => new Response('ok')),
 }));
 
-jest.mock('@/lib/user/find-user-by-id', () => ({
+jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
   findUserById: jest.fn(),
 }));
 
@@ -176,7 +176,7 @@ import {
   canKiloUserAccessPlatformIntegration,
   getPlatformIntegration,
 } from '@/lib/bot/platform-helpers';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { processLinkedMessage } from '@/lib/bot/run';
 import { bot } from './bot';
 

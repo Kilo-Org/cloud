@@ -2,7 +2,7 @@ import { type JWSTransactionDecodedPayload } from '@apple/app-store-server-libra
 import * as z from 'zod';
 
 import type { ValidatedStoreKiloPassPurchase } from './store-subscription-completion';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { getMobileStoreKiloPassProductByAppleProductId } from './mobile-store-products';
 import { APPLE_STORE_BUNDLE_ID, createAppleStoreSignedDataVerifier } from './apple-store-sdk';
 

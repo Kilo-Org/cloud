@@ -1,28 +1,28 @@
-import { type db, type DrizzleTransaction } from '@/lib/drizzle';
+import { type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
-import type { EncryptedData } from '@/lib/ai-gateway/byok/encryption';
-import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import type { EncryptedData } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
   GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
   type GatewayUserByokProviderId,
   type UserByokProviderId,
-} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
-import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { isCodestralModel } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
-} from '@/lib/ai-gateway/providers/gateway-models-cache';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { isKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { hasEnabledUserByokForModel } from '@/lib/ai-gateway/byok/availability';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
 
 /**
  * Returns every user BYOK provider whose key can serve `modelId`: first the

@@ -2,16 +2,16 @@ import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { db } from '@/lib/drizzle';
-import { redisClient } from '@/lib/redis';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { cachedEnhancedDirectByokModelList } from './model-list';
 import type { DirectByokModel } from './types';
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { select: jest.fn() },
   readDb: { select: jest.fn() },
 }));
-jest.mock('@/lib/redis', () => ({ redisClient: { get: jest.fn() } }));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({ redisClient: { get: jest.fn() } }));
 
 const mockLimit = jest.fn<Promise<{ models: unknown }[]>, [limit: number]>();
 const mockWhere = jest.fn<{ limit: typeof mockLimit }, [condition: SQL]>();
@@ -23,7 +23,7 @@ const { readDb: mockReadDb } = jest.requireMock<{
       [fields: { models: typeof direct_byok_model_lists.models }]
     >;
   };
-}>('@/lib/drizzle');
+}>('@kilocode/web-shared/lib/drizzle');
 const mockReplicaSelect = mockReadDb.select;
 const ttl = 600_000;
 

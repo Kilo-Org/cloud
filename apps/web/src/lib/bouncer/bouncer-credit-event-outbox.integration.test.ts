@@ -6,9 +6,9 @@
 import { randomUUID } from 'crypto';
 import { eq, sql } from 'drizzle-orm';
 
-import { enqueueCreditEvent } from '@/lib/bouncer/credit-events';
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { enqueueCreditEvent } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { bouncer_credit_event_outbox, type BouncerCreditEventOutboxRow } from '@kilocode/db/schema';
 import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete-reasons';
 import {

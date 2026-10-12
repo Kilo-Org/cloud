@@ -10,7 +10,7 @@ import {
   type BenchmarkQueueSelector,
   type BenchmarkRunPurpose,
 } from '@kilocode/auto-routing-contracts';
-import { AUTO_ROUTING_BENCHMARK_WORKER_URL } from '@/lib/config.server';
+import { AUTO_ROUTING_BENCHMARK_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
 import { createWorkerAdminFetch } from './worker-admin-fetch';
 
 const fetchBenchmarkAdmin = createWorkerAdminFetch({

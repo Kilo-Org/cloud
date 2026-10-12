@@ -11,7 +11,7 @@ jest.mock('@workos-inc/node', () => {
   };
 });
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   WORKOS_API_KEY: 'workos-test-key',
 }));
 
@@ -19,14 +19,14 @@ jest.mock('@/lib/user', () => ({
   createOrUpdateUser: jest.fn(),
 }));
 
-jest.mock('@/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   addSsoUserToOrganization: jest.fn(async () => false),
   getOrganizationById: jest.fn(async () => ({ id: 'org-local' })),
   getOrganizationMembers: jest.fn(async () => []),
   skipCustomerSourceSurveyForOrgJoin: jest.fn(async () => {}),
 }));
 
-jest.mock('@/lib/organizations/organization-sso-policy', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({
   resolveSsoAuthorityForDomain: jest.fn(async () => ({
     status: 'required',
     domain: 'example.com',
@@ -34,11 +34,11 @@ jest.mock('@/lib/organizations/organization-sso-policy', () => ({
   })),
 }));
 
-jest.mock('@/lib/organizations/organization-audit-logs', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-audit-logs', () => ({
   createAuditLog: jest.fn(async () => {}),
 }));
 
-jest.mock('@/lib/email', () => ({
+jest.mock('@kilocode/web-shared/lib/email', () => ({
   sendOrgSSOUserJoinedEmail: jest.fn(async () => {}),
 }));
 
@@ -50,7 +50,7 @@ import { createOrUpdateUser } from '@/lib/user';
 import {
   addSsoUserToOrganization,
   skipCustomerSourceSurveyForOrgJoin,
-} from '@/lib/organizations/organizations';
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { processSSOUserLogin } from './sso';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);

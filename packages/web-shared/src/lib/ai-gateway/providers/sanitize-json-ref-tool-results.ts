@@ -1,4 +1,4 @@
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

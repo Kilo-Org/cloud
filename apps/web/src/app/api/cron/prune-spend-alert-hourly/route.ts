@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 
-import { db } from '@/lib/drizzle';
-import { CRON_SECRET } from '@/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   pruneSpendAlertHourly,
   SPEND_ALERT_HOURLY_RETENTION_DAYS,
 } from '@/lib/spend-alerts/retention';
 import { isCronAuthorizationValid } from '@/lib/cron-auth';
-import { sentryLogger } from '@/lib/utils.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 if (!CRON_SECRET) {
   throw new Error('CRON_SECRET is not configured in environment variables');

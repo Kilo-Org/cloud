@@ -1,45 +1,56 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { handleModelsRequest } from './models';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
-jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
-jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   addUserByokAvailability: jest.fn(),
   getUserByokProviderIds: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/openai-chatgpt/routing', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: jest.fn((_userId: string, models: unknown[]) => models),
 }));
-jest.mock('@/lib/organizations/organization-models', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/auto-model/resolution', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/resolution', () => ({
   getAutoFreeCandidates: jest.fn(),
 }));
-jest.mock('@/lib/drizzle', () => ({ readDb: {} }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
 
-const { getUserFromAuth } = jest.requireMock('@/lib/user/server');
-const { getEnhancedOpenRouterModels } = jest.requireMock('@/lib/ai-gateway/providers/openrouter');
-const { getDirectByokModelsForUser } = jest.requireMock('@/lib/ai-gateway/providers/direct-byok');
-const { addUserByokAvailability, getUserByokProviderIds } =
-  jest.requireMock('@/lib/ai-gateway/byok');
-const { tagOpenAiChatGptByokModels } = jest.requireMock('@/lib/ai-gateway/openai-chatgpt/routing');
-const { getAvailableModelsForOrganization } = jest.requireMock(
-  '@/lib/organizations/organization-models'
+const { getUserFromAuth } = jest.requireMock('@kilocode/web-shared/lib/user/server');
+const { getEnhancedOpenRouterModels } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter'
 );
-const { getCachedRoutingTable } = jest.requireMock('@/lib/ai-gateway/auto-routing-table-cache');
-const { getAutoFreeCandidates } = jest.requireMock('@/lib/ai-gateway/auto-model/resolution');
+const { getDirectByokModelsForUser } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
+);
+const { addUserByokAvailability, getUserByokProviderIds } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/byok'
+);
+const { tagOpenAiChatGptByokModels } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing'
+);
+const { getAvailableModelsForOrganization } = jest.requireMock(
+  '@kilocode/web-shared/lib/organizations/organization-models'
+);
+const { getCachedRoutingTable } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache'
+);
+const { getAutoFreeCandidates } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution'
+);
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);

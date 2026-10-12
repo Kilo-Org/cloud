@@ -5,7 +5,7 @@ describe('getOpenRouterDerivedModelVariants', () => {
   test('reverses OpenRouter efforts and places none first', async () => {
     const supportedEfforts: ReasoningEffort[] = ['max', 'high', 'medium', 'low', 'minimal'];
     jest.resetModules();
-    jest.doMock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getOpenRouterModelsMetadataFromDatabase: jest.fn(async () => ({
         'vendor/model': {
           id: 'vendor/model',
@@ -22,7 +22,7 @@ describe('getOpenRouterDerivedModelVariants', () => {
       })),
     }));
     const { getOpenRouterDerivedModelVariants } =
-      await import('@/lib/ai-gateway/providers/model-settings');
+      await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
 
     const variants = await getOpenRouterDerivedModelVariants('vendor/model');
 

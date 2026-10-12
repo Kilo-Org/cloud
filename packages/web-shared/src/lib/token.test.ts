@@ -1,4 +1,4 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { afterEach, describe, it, expect } from '@jest/globals';
 import jwt from 'jsonwebtoken';
 import type { User } from '@kilocode/db/schema';
@@ -14,7 +14,7 @@ import {
   verifyKiloTokenForPolicy,
   verifyKiloTokenForResource,
 } from '@kilocode/worker-utils/kilo-token-policy';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   generateApiToken,
   generateBoundedInternalServiceToken,

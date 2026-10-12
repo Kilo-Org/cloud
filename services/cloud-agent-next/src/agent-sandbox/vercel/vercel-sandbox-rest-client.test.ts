@@ -222,6 +222,29 @@ describe('VercelSandboxRestClient', () => {
     );
   });
 
+  it.each([
+    [`sbx-${'a'.repeat(48)}`, true],
+    ['ses-legacy', true],
+    ['org-shared', false],
+    ['sbx', false],
+  ])('validates sandbox name %s before provider I/O', async (name, accepted) => {
+    const providerFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        sandbox: sandbox({ name }),
+        session: session({ sourceSandboxName: name }),
+        routes: [],
+      })
+    );
+    const result = clientFor(providerFetch).createSandbox({ ...createInput(), name });
+
+    if (accepted) {
+      await expect(result).resolves.toBeDefined();
+    } else {
+      await expect(result).rejects.toMatchObject({ kind: 'invalid_request' });
+      expect(providerFetch).not.toHaveBeenCalled();
+    }
+  });
+
   it('creates a contained sandbox with a nested REST-native policy and redirects disabled', async () => {
     const providerFetch = vi
       .fn()

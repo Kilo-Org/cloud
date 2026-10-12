@@ -1,5 +1,5 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { Deployment } from '@kilocode/db/schema';
 import {
   deployments,
@@ -33,7 +33,10 @@ import * as envVarsService from '@/lib/user-deployments/env-vars-service';
 import { encryptEnvVars } from '@/lib/user-deployments/env-vars-service';
 import { isHTTPsUrl, extractRepoNameFromUrl } from './git-url-utils';
 import { encryptAuthToken, decryptAuthToken } from './auth-token-encryption';
-import { hasUserEverPaid, hasOrganizationEverPaid } from '@/lib/creditTransactions';
+import {
+  hasUserEverPaid,
+  hasOrganizationEverPaid,
+} from '@kilocode/web-shared/lib/creditTransactions';
 import { slugSchema } from './validation';
 import { DispatcherSlugTakenError, dispatcherClient } from './dispatcher-client';
 

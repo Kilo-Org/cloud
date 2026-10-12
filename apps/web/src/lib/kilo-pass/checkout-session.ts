@@ -1,8 +1,8 @@
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
-import { client as stripe } from '@/lib/stripe-client';
-import type { CheckoutSessionLike } from '@/lib/service-fees/checkout';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
+import type { CheckoutSessionLike } from '@kilocode/web-shared/lib/service-fees/checkout';
 import { TRPCError } from '@trpc/server';
 import { sql } from 'drizzle-orm';
 import type Stripe from 'stripe';

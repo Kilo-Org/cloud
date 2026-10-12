@@ -54,6 +54,7 @@ import { agentSandboxProviderSchema, type Env, type SandboxId } from '../types.j
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import {
   getControlPlaneCredentialContainment,
+  DEVCONTAINER_RETIRED_MESSAGE,
   CurrentSessionMetadataSchema,
   type CredentialContainment,
   type SessionMetadata,
@@ -77,7 +78,6 @@ import type { GroupedRegisterSessionInput } from './session-registration-metadat
 import { getPgDb } from '../db/pg.js';
 import { generateSessionId, SessionService } from '../session-service.js';
 import {
-  isWorktreeOwner,
   sessionPlaneForNewOwner,
   sessionPlaneFromId,
   type SessionPlane,
@@ -93,9 +93,14 @@ import {
   selectSandboxProvider,
   type SandboxSelection,
 } from '../sandbox-id.js';
+import {
+  sandboxKindMatchesKey,
+  sandboxKindSchema,
+  type SandboxKind,
+} from '../sandbox-placement.js';
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
-import { sha256Hex } from '../utils/sha256.js';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import { initialAdmissionFailure } from './admission-failure.js';
 import { createMessageId } from './message-id.js';
@@ -124,7 +129,8 @@ type SharedSandboxRouteMetadata = NonNullable<
  */
 function sessionPlaneForCreate(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
 ): SessionPlane {
   return sandboxAllocationRequiresControlPlane(input.runtime?.sandboxAllocation)
     ? 'control'
@@ -134,35 +140,32 @@ function sessionPlaneForCreate(
           userId: ctx.userId,
           orgId: input.options?.kilocodeOrganizationId,
         },
-        { createdOnPlatform: input.options?.createdOnPlatform }
+        {
+          createdOnPlatform: input.options?.createdOnPlatform,
+          billingOrigin: options?.billingOrigin,
+        }
       );
 }
 
 function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): void {
+  if (input.runtime && 'devcontainer' in input.runtime && input.runtime.devcontainer === true) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: DEVCONTAINER_RETIRED_MESSAGE });
+  }
   const allocation = input.runtime?.sandboxAllocation;
   if (allocation === undefined) return;
   if (!sandboxAllocationSchema.safeParse(allocation).success) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid sandbox allocation' });
   }
   if (
-    input.runtime?.devcontainer === true ||
     options?.billingOrigin === 'code-review' ||
     input.options?.createdOnPlatform === 'code-review'
   ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Sandbox allocations cannot be combined with specialized sandbox routing',
-    });
-  }
-  // Isolated Standard predates the selectable allocations and remains legacy-plane only.
-  if (allocation === 'isolated-standard' && sessionPlaneForCreate(input, ctx) === 'control') {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Isolated Standard allocation is not supported for control-plane sessions',
     });
   }
 }
@@ -179,6 +182,7 @@ export type SessionRegistrationResult = {
   kiloSessionId: string;
   sandboxId: SandboxId;
   sandboxRoute?: SharedSandboxRouteMetadata;
+  sandboxKind?: SandboxKind;
   sandboxProvider: SandboxSelection['provider'];
   worktreeId?: CloudAgentWorktreeId;
   sandboxAllocation?: SandboxAllocation;
@@ -494,8 +498,7 @@ function computeCredentialContainment(
     env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
   );
   if (controlPlaneContainment) return controlPlaneContainment;
-  const containmentEnabled =
-    env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false' && input.runtime?.devcontainer !== true;
+  const containmentEnabled = env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false';
   return {
     github: containmentEnabled && input.repository.type === 'github',
     gitlab: containmentEnabled && input.repository.type === 'gitlab',
@@ -514,7 +517,6 @@ function isEligibleFirstWorktreeSession(
     input.options.operationKey !== undefined &&
     input.initialTurn !== undefined &&
     input.clone === undefined &&
-    input.runtime?.devcontainer !== true &&
     ctx.botId === undefined
   );
 }
@@ -541,8 +543,7 @@ function worktreeEnabledForCreate(
   const recordedIds = canonicalSessionIds(row);
   if (recordedIds) return recordedIds.cloudAgentSessionId.startsWith('workspace_');
 
-  const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
-  return sessionPlaneForCreate(input, ctx) === 'control' && isWorktreeOwner(ctx.env, owner);
+  return sessionPlaneForCreate(input, ctx) === 'control';
 }
 
 export function assertRuntimeIsolationAdmission(env: Pick<Env, 'RUNTIME_ISOLATION_ENABLED'>): void {
@@ -636,7 +637,7 @@ async function allocateNewSession(
   }
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
-  const cloudAgentSessionId = generateSessionId(sessionPlaneForCreate(input, ctx));
+  const cloudAgentSessionId = generateSessionId(sessionPlaneForCreate(input, ctx, options));
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =
     input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
@@ -704,7 +705,6 @@ async function allocateNewSession(
       cloudAgentSessionId,
       ctx.botId,
       {
-        devcontainer: input.runtime?.devcontainer,
         createdOnPlatform: options?.billingOrigin === 'code-review' ? 'code-review' : undefined,
         sandboxAllocation,
       }
@@ -728,7 +728,6 @@ async function allocateNewSession(
         userId: ctx.userId,
         sandboxId,
         sessionId: cloudAgentSessionId,
-        devcontainer: input.runtime?.devcontainer,
         sandboxAllocation,
       });
     }
@@ -915,6 +914,16 @@ function rebuildRecordedSessionAllocation(
   const sandboxId = canonical.sandboxId;
   const sandboxProvider = canonical.sandboxProvider;
   const sandboxRoute = canonical.sandboxRoute;
+  // A legacy prefixed key recorded no kind; a placed key never rebuilds without one.
+  const recordedKind = sandboxKindSchema.optional().safeParse(canonical.sandboxKind);
+  if (
+    !recordedKind.success ||
+    typeof sandboxId !== 'string' ||
+    !sandboxKindMatchesKey(sandboxId, recordedKind.data)
+  ) {
+    throw creationInProgressError();
+  }
+  const sandboxKind = recordedKind.data;
   const requested = isSelectableSandboxAllocation(input.runtime?.sandboxAllocation)
     ? input.runtime?.sandboxAllocation
     : undefined;
@@ -931,7 +940,13 @@ function rebuildRecordedSessionAllocation(
         orgId: input.options?.kilocodeOrganizationId,
       },
       auth: {},
-      workspace: { sandboxId, sandboxProvider, sandboxRoute, sandboxAllocation: recorded.data },
+      workspace: {
+        sandboxId,
+        sandboxProvider,
+        sandboxRoute,
+        sandboxKind,
+        sandboxAllocation: recorded.data,
+      },
       lifecycle: { version: 1, timestamp: Date.now() },
     });
     if (!metadata.success) throw creationInProgressError();
@@ -1001,6 +1016,7 @@ function rebuildRecordedSessionAllocation(
     kiloSessionId,
     sandboxId: sandboxId as SandboxId,
     sandboxRoute: route,
+    ...(sandboxKind ? { sandboxKind } : {}),
     sandboxProvider: recordedProvider.data,
     ...(worktreeId ? { worktreeId } : {}),
     ...(recorded.data ? { sandboxAllocation: recorded.data } : {}),
@@ -1094,8 +1110,8 @@ function buildSessionRegistrationCommand(
           }
         : {}),
       ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
+      ...(allocation.sandboxKind ? { sandboxKind: allocation.sandboxKind } : {}),
       credentialContainment: allocation.credentialContainment,
-      ...(input.runtime?.devcontainer ? { devcontainerRequested: true } : {}),
       ...(input.runtime?.sandboxAllocation
         ? { sandboxAllocation: input.runtime.sandboxAllocation }
         : {}),
@@ -1143,7 +1159,7 @@ export async function registerNewSession(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): Promise<SessionRegistrationResult> {
-  assertSupportedSandboxAllocation(input, ctx, options);
+  assertSupportedSandboxAllocation(input, options);
   const allocation = await allocateNewSession(input, ctx, options);
   const stub = resolveLegacySessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId);
   let registerResult: { success: boolean; error?: string };
@@ -1458,7 +1474,7 @@ export async function startNewSession(
   options?: { billingOrigin?: string },
   ledger?: SessionCreationLedgerHooks
 ): Promise<StartedSessionResult> {
-  assertSupportedSandboxAllocation(input, ctx, options);
+  assertSupportedSandboxAllocation(input, options);
   const allocation = await allocateSessionForCreate(input, ctx, options, ledger);
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
@@ -1479,12 +1495,6 @@ export const SESSION_CREATE_FINALIZATION_VERSION_KEY = 'finalizationVersion';
  * Deterministic JSON serialization: object keys are sorted and undefined
  * values are dropped (JSON semantics), so field order or an explicit
  * `undefined` never changes a fingerprint.
- *
- * Deliberately not shared with the stricter `canonicalJson` in
- * `workspace-backup-cache.ts`: that one rejects (returns null) where this one
- * serializes — a top-level `undefined`, an `undefined` array element, a
- * non-finite number, or an exotic object. Swapping it in here rotates every
- * live create-intent fingerprint, so the two stay separate.
  */
 function canonicalJson(value: unknown): string {
   if (value === undefined || value === null) {
@@ -1516,6 +1526,7 @@ function repositoryCreateIntent(repository: SessionRepositoryRequest): Record<st
         repo: repository.repo,
         githubIntegrationId: repository.githubIntegrationId,
         githubAccessPurpose: repository.githubAccessPurpose === 'agent' ? 'agent' : undefined,
+        pullRequestNumber: repository.pullRequestNumber,
         branch: repository.branch,
       };
     case 'gitlab':
@@ -1623,7 +1634,6 @@ export async function sessionCreateIntentFingerprint(
       finalization: input.finalization,
       runtime: input.runtime
         ? {
-            ...(input.runtime.devcontainer ? { devcontainer: true } : {}),
             ...(input.runtime.sandboxAllocation
               ? { sandboxAllocation: input.runtime.sandboxAllocation }
               : {}),
@@ -1683,7 +1693,7 @@ export async function createSessionWithLedger(
   ctx: SessionRegistrationContext,
   options: SessionLedgerCreateOptions
 ): Promise<LedgerSessionCreateResult> {
-  assertSupportedSandboxAllocation(input, ctx, { billingOrigin: options.billingOrigin });
+  assertSupportedSandboxAllocation(input, { billingOrigin: options.billingOrigin });
   await assertSandboxAllocationMembership(input, ctx);
   const db = getPgDb(ctx.env);
   const allocation = input.runtime?.sandboxAllocation;

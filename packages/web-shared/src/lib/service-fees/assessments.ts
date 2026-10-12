@@ -1,18 +1,18 @@
 import 'server-only';
 
-import { calculateServiceFeeMinor } from '@/lib/service-fees/calculation';
+import { calculateServiceFeeMinor } from '@kilocode/web-shared/lib/service-fees/calculation';
 import {
   SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
   SERVICE_FEE_VERSION,
-} from '@/lib/service-fees/constants';
-import type { OrganizationServiceFeeExemptionRecord } from '@/lib/service-fees/organization-exemptions';
+} from '@kilocode/web-shared/lib/service-fees/constants';
+import type { OrganizationServiceFeeExemptionRecord } from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
 import {
   getServiceFeeOwner,
   isSupportedServiceFeeCurrency,
   type PrepareAssessmentInput,
   type ServiceFeeFlow,
   type ServiceFeeOutcome,
-} from '@/lib/service-fees/types';
+} from '@kilocode/web-shared/lib/service-fees/types';
 
 export const SERVICE_FEE_TERMINAL_OMITTED_OUTCOMES = [
   'exempt',

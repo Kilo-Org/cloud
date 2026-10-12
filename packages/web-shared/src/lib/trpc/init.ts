@@ -1,6 +1,6 @@
 import 'server-only';
 import { headers } from 'next/headers';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
@@ -8,28 +8,28 @@ import {
   authViaTokenFromHeaders,
   clientIpFromHeaders,
   emitAdminAccessEvent,
-} from '@/lib/admin/admin-access-log';
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
-import { AuthContextError, trpcErrorFormatter } from '@/lib/trpc/transport';
+import { AuthContextError, trpcErrorFormatter } from '@kilocode/web-shared/lib/trpc/transport';
 import {
   appUpdateRequiredError,
   enforceMinimumVersion,
   getMinimumVersions,
   isMobileClient,
-} from '@/lib/trpc/min-version';
+} from '@kilocode/web-shared/lib/trpc/min-version';
 import {
   buildTimingLine,
   readClientDimensions,
   shouldLogTiming,
-} from '@/lib/observability/request-timing';
+} from '@kilocode/web-shared/lib/observability/request-timing';
 import {
   controlPlanePathFromInfo,
   controlPlaneTypeFromInfo,
   withControlPlaneBudget,
   type ControlPlaneRequestInfo,
-} from '@/lib/trpc/control-plane-budget';
+} from '@kilocode/web-shared/lib/trpc/control-plane-budget';
 
-export { UpstreamApiError } from '@/lib/trpc/transport';
+export { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 // Define the context type
 export type TRPCContext = {
   user: User;

@@ -2,24 +2,24 @@ import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globa
 import { generateText } from 'ai';
 import { COMPATIBLE_USER_AGENT } from './types';
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {},
 }));
 
-jest.mock('@/lib/ai-gateway/byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   getBYOKforOrganization: jest.fn(),
   getBYOKforUser: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/preferred-models', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
   getPreferredModels: jest.fn(async () => []),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/model-settings', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/model-settings', () => ({
   getAiSdkProvider: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/variants', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/variants', () => ({
   getFallbackModelVariants: jest.fn(),
 }));
 
@@ -173,7 +173,7 @@ describe('getDirectByokModel', () => {
 
   test('advertises only the reasoning parameter for reasoning models', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getBYOKforUser } = await import('@/lib/ai-gateway/byok');
+    const { getBYOKforUser } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
     jest
       .mocked(getBYOKforUser)
       .mockResolvedValueOnce([{ providerId: 'chutes-byok', decryptedAPIKey: 'test-key' }]);
@@ -195,8 +195,9 @@ describe('getDirectByokModel', () => {
 
   test('does not fall back to model-name variants when reasoning is unsupported', async () => {
     const { getDirectByokModelsForUser } = await loadDirectByokModule();
-    const { getBYOKforUser } = await import('@/lib/ai-gateway/byok');
-    const { getFallbackModelVariants } = await import('@/lib/ai-gateway/providers/variants');
+    const { getBYOKforUser } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getFallbackModelVariants } =
+      await import('@kilocode/web-shared/lib/ai-gateway/providers/variants');
     const fallback = { thinking: { reasoning: { enabled: true, effort: 'high' as const } } };
     jest
       .mocked(getBYOKforUser)

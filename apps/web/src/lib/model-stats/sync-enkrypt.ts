@@ -2,9 +2,9 @@ import 'server-only';
 
 import { randomUUID } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
-import { ENKRYPT_API_KEY, ENKRYPT_SYNC_ENABLED } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
-import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
+import { ENKRYPT_API_KEY, ENKRYPT_SYNC_ENABLED } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { invalidateModelStatsCache } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import { enkrypt_sync_state, modelStats } from '@kilocode/db/schema';
 import { EnkryptBenchmarkSchema, EnkryptVerificationsSchema } from '@kilocode/db/schema-types';
 import type {
@@ -14,7 +14,7 @@ import type {
 } from '@kilocode/db/schema-types';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { EnkryptSyncError } from './enkrypt-errors';
-import { fingerprintEnkryptScore } from '@/lib/model-stats/enkrypt-fingerprint';
+import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
 import { ENKRYPT_MODEL_MAPPINGS, matchEnkryptScores, parseEnkryptScores } from './enkrypt-identity';
 
 export { matchEnkryptScores, parseEnkryptScores } from './enkrypt-identity';

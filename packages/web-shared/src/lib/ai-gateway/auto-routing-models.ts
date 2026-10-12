@@ -1,4 +1,4 @@
-import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   AUTO_SMALL_TARGET_MODELS,
   FRONTIER_MODE_TO_MODEL,
@@ -7,10 +7,10 @@ import {
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
   KILO_AUTO_SMALL_MODEL,
-} from '@/lib/ai-gateway/auto-model';
-import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { getAutoFreeCandidates } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
-import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
+import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 
 function visibleConcreteModelIds(models: Iterable<string>, availableModelIds: ReadonlySet<string>) {
   return [

@@ -7,9 +7,9 @@ import {
   getCodingPlanUsageResponse,
 } from '@/lib/coding-plans/usage';
 import { CodingPlanUsageError, type CodingPlanUsageSnapshot } from './usage-contract';
-import { redisClient } from '@/lib/redis';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID: 'test-byteplus-access',
   BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY: 'test-byteplus-secret',
 }));
@@ -23,14 +23,14 @@ jest.mock('@/lib/coding-plans/byteplus-usage', () => ({
 jest.mock('@/lib/coding-plans/minimax-usage', () => ({
   getMiniMaxUsage: jest.fn(),
 }));
-jest.mock('@/lib/redis', () => ({
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: {
     get: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
   },
 }));
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: jest.fn(() => jest.fn()),
 }));
 

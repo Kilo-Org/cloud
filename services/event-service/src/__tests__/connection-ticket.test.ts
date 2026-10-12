@@ -13,8 +13,19 @@ function ticketNamespace(): DurableObjectNamespace<ConnectionTicketDO> {
     .CONNECTION_TICKET_DO;
 }
 
-function ticketStub(ticket: string): DurableObjectStub<ConnectionTicketDO> {
-  return ticketNamespace().get(ticketNamespace().idFromName(ticket));
+type StoredTicket = { userId: string; expiresAt: number };
+
+/** Stores a ticket the way `/connect-ticket` does and returns its wire form. */
+async function storeTicket(state: StoredTicket): Promise<{
+  ticket: string;
+  secret: string;
+  stub: DurableObjectStub<ConnectionTicketDO>;
+}> {
+  const id = ticketNamespace().newUniqueId();
+  const stub = ticketNamespace().get(id);
+  const secret = crypto.randomUUID();
+  await stub.mint({ ...state, secret });
+  return { ticket: `${id.toString()}.${secret}`, secret, stub };
 }
 
 function workerEnv(): string {
@@ -102,8 +113,7 @@ describe('event-service WebSocket connection tickets', () => {
   });
 
   it('rejects stale tickets', async () => {
-    const ticket = crypto.randomUUID();
-    await ticketStub(ticket).mint({
+    const { ticket } = await storeTicket({
       userId: 'user-ticket-stale',
       expiresAt: Date.now() - 1,
     });
@@ -113,23 +123,64 @@ describe('event-service WebSocket connection tickets', () => {
     expect(res.status).toBe(401);
   });
 
-  it('deletes ticket storage and alarm after a successful consume', async () => {
-    const ticket = crypto.randomUUID();
-    const stub = ticketStub(ticket);
-    const expiresAt = Date.now() + 30_000;
+  it('rejects a ticket whose secret does not match, and burns it', async () => {
+    const { ticket } = await storeTicket({
+      userId: 'user-ticket-wrong-secret',
+      expiresAt: Date.now() + 30_000,
+    });
+    const [objectId] = ticket.split('.');
 
-    await stub.mint({ userId: 'user-ticket-consume-cleanup', expiresAt });
+    const forged = await connect(`${objectId}.${crypto.randomUUID()}`);
+    expect(forged.status).toBe(401);
+
+    const genuine = await connect(ticket);
+    expect(genuine.status).toBe(401);
+  });
+
+  it('mints the ticket when the first use of a named object stalls', async () => {
+    // KILO-APP-2NH: the first use of an `idFromName()` id waits on a worldwide
+    // uniqueness check, and every ticket used a fresh name. When that check
+    // stalls past the budget, the route answered 500. Stall every named object
+    // here: the mint must not depend on one.
+    const namespace = ticketNamespace();
+    const realGet = namespace.get.bind(namespace);
+    const get = vi.spyOn(namespace, 'get').mockImplementation((id, options) =>
+      id.name === undefined
+        ? realGet(id, options)
+        : ({
+            mint: () => new Promise<never>(() => {}),
+          } as unknown as DurableObjectStub<ConnectionTicketDO>)
+    );
+    let ticket: string;
+    try {
+      ticket = await mintTicket('user-ticket-named-stall');
+    } finally {
+      get.mockRestore();
+    }
+
+    const res = await connect(ticket);
+    expect(res.status).toBe(101);
+    res.webSocket?.accept();
+    res.webSocket?.close();
+  }, 20_000);
+
+  it('deletes ticket storage and alarm after a successful consume', async () => {
+    const expiresAt = Date.now() + 30_000;
+    const { stub, secret } = await storeTicket({
+      userId: 'user-ticket-consume-cleanup',
+      expiresAt,
+    });
     await expect(
       runInDurableObject(stub, async (_instance: ConnectionTicketDO, state) => ({
         ticket: await state.storage.get('ticket'),
         alarm: await state.storage.getAlarm(),
       }))
     ).resolves.toEqual({
-      ticket: { userId: 'user-ticket-consume-cleanup', expiresAt },
+      ticket: { userId: 'user-ticket-consume-cleanup', secret, expiresAt },
       alarm: expiresAt,
     });
 
-    await expect(stub.consume()).resolves.toEqual({ userId: 'user-ticket-consume-cleanup' });
+    await expect(stub.consume(secret)).resolves.toEqual({ userId: 'user-ticket-consume-cleanup' });
 
     await expect(
       runInDurableObject(stub, async (_instance: ConnectionTicketDO, state) => ({
@@ -143,14 +194,14 @@ describe('event-service WebSocket connection tickets', () => {
   });
 
   it('deletes unconsumed expired ticket storage when the alarm runs', async () => {
-    const ticket = crypto.randomUUID();
-    const stub = ticketStub(ticket);
-    const expiresAt = Date.now() + 30_000;
-
-    await stub.mint({ userId: 'user-ticket-alarm-cleanup', expiresAt });
+    const { stub, secret } = await storeTicket({
+      userId: 'user-ticket-alarm-cleanup',
+      expiresAt: Date.now() + 30_000,
+    });
     await runInDurableObject(stub, async (_instance: ConnectionTicketDO, state) => {
       await state.storage.put('ticket', {
         userId: 'user-ticket-alarm-cleanup',
+        secret,
         expiresAt: Date.now() - 1,
       });
     });

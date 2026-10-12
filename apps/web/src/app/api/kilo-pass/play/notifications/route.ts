@@ -2,7 +2,7 @@ import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
 import { OAuth2Client } from 'google-auth-library';
 
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { processGooglePlayKiloPassNotification } from '@/lib/kilo-pass/google-play-notifications';
 import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 

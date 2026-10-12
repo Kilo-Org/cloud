@@ -16,11 +16,13 @@ const hoisted = vi.hoisted(() => ({
   insetsState: { top: 0, bottom: 0, left: 0, right: 0 },
   pushMock: vi.fn(),
   // The tab's own-comment delete confirmation (s4). Plain array so a test can
-  // read the exact Alert.alert(title, message, buttons) triple.
-  alertCalls: [] as {
+  // read the request `useConfirmDialog().confirm` was handed.
+  confirmRequests: [] as {
     title: string;
     message: string;
-    buttons: { text?: string; onPress?: () => void }[];
+    confirmLabel: string;
+    cancelLabel?: string;
+    onConfirm: () => void;
   }[],
   deleteMutate: vi.fn(),
   // The delete confirmation's submit gate reads the committed connectivity
@@ -58,7 +60,7 @@ const hoisted = vi.hoisted(() => ({
 
 export const insetsState = hoisted.insetsState;
 export const pushMock = hoisted.pushMock;
-export const alertCalls = hoisted.alertCalls;
+export const confirmRequests = hoisted.confirmRequests;
 export const deleteMutate = hoisted.deleteMutate;
 export const connectivity = hoisted.connectivity;
 export const toastError = hoisted.toastError;
@@ -69,11 +71,16 @@ export const discussionState = hoisted.discussionState;
 vi.mock('react-native', () => ({
   View: 'View',
   Platform: { OS: 'ios' },
-  Alert: {
-    alert: (title: string, message: string, buttons: { text?: string; onPress?: () => void }[]) => {
-      hoisted.alertCalls.push({ title, message, buttons });
+}));
+// The tab renders `{dialog}` from `useConfirmDialog`; stub the hook so the
+// test reads the request it was handed and drives its confirm.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: (typeof hoisted.confirmRequests)[number]) => {
+      hoisted.confirmRequests.push(request);
     },
-  },
+    dialog: null,
+  }),
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: pushMock }),

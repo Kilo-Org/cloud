@@ -1,8 +1,8 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cli_sessions_v2, github_branch_pull_requests, organizations } from '@kilocode/db/schema';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import type { PullRequestPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 import {
   upsertCliSessionPullRequestsFromWebhook,

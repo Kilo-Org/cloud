@@ -6,10 +6,10 @@ const mockReadDb = {
 const mockCaptureException = jest.fn();
 const limitMock = jest.fn<() => Promise<unknown>>();
 
-jest.mock('@/lib/drizzle', () => ({ readDb: mockReadDb }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: mockReadDb }));
 jest.mock('@sentry/nextjs', () => ({ captureException: mockCaptureException }));
 
-import { UpstreamApiError } from '@/lib/trpc/transport';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 import {
   appUpdateRequiredError,
   enforceMinimumVersion,

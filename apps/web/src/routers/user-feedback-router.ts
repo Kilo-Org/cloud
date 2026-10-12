@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { TRPCError } from '@trpc/server';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
 import { isFeedbackRateLimitError, submitUserFeedback } from '@/lib/feedback/submit';
 import * as z from 'zod';

@@ -16,6 +16,7 @@
 import { createHash } from 'node:crypto';
 
 import { isAdminAuthorized } from './fake-llm-admin.js';
+import { supervisionScenario } from './fake-llm-supervision.js';
 
 /** Runtime-neutral view of one inbound request. `url` is path + query. */
 export type FakeLlmRequest = {
@@ -702,6 +703,7 @@ function directiveTag(directive: Directive | null): string | undefined {
       'tool-stream',
       'question',
       'first-token',
+      'supervision',
     ].includes(directive.scenario)
   ) {
     return undefined;
@@ -1241,6 +1243,7 @@ function runToolScenario(
  * responsible for closing the response (or leaving it open for `hang`/`gate`).
  */
 export const scenarioRegistry: Record<string, ScenarioHandler> = {
+  supervision: supervisionScenario,
   echo(args, ctx) {
     // Harness `echo:<token>` only takes the first identifier so kilo's
     // appended `<environment_details>` cannot leak into the transcript.

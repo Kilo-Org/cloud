@@ -1,6 +1,6 @@
-import type { OptionalError } from '@/lib/maybe-result';
+import type { OptionalError } from '@kilocode/web-shared/lib/maybe-result';
 import type { Awaitable } from 'next-auth';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   credit_transactions,
   organization_memberships,

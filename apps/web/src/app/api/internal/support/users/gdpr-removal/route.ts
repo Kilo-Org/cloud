@@ -9,8 +9,8 @@ import {
   routeFromHeaders,
   userTarget,
   type SupportServiceOutcome,
-} from '@/lib/admin/admin-access-log';
-import { findUserById } from '@/lib/user/find-user-by-id';
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { getUserDeletionRequestById } from '@/lib/user/deletion';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { DeletionRefusalCode } from '@/lib/user/deletion-queue/deletion-intake';

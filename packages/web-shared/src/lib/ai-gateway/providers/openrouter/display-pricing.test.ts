@@ -2,7 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   getModelDisplayPricing,
   undoPricingDiscount,
-} from '@/lib/ai-gateway/providers/openrouter/display-pricing';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
 describe('undoPricingDiscount', () => {
   it('reverses the discount and drops the field without exponential output', () => {

@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import pLimit from 'p-limit';
 
-import type { db, DrizzleTransaction } from '@/lib/drizzle';
+import type { db, DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 const REPAIR_CLAIM_LEASE_MINUTES = 5;

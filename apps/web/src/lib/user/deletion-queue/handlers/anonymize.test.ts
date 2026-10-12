@@ -16,10 +16,10 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { anonymizeCloudUserData } from '@/lib/user';
 import { catalogForVersion, teardownStepKeys } from '@/lib/user/deletion-queue/deletion-catalog';
-import { USER_DELETION_CATALOG_VERSION } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_CATALOG_VERSION } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   deleteOwnedByUserIdPage,
   OWNED_BY_USER_DELETE_PAGE_SIZE,
@@ -31,7 +31,7 @@ import { persistHandlerOutcome } from '@/lib/user/deletion-queue/deletion-outcom
 import { runClaimedDeletionTask } from '@/lib/user/deletion-queue/deletion-task-runner';
 import { handleAnonymize } from '@/lib/user/deletion-queue/handlers/anonymize';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 jest.mock('@/lib/user', () => ({
   anonymizeCloudUserData: jest.fn(async () => undefined),

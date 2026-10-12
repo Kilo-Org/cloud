@@ -1,5 +1,3 @@
-import { requireEnv } from '@/lib/dotenvx';
-
 export const FIRST_TOPUP_BONUS_AMOUNT: number = 0;
 
 export const REFERRAL_BONUS_AMOUNT = 10;
@@ -64,34 +62,6 @@ export const CLOUD_AGENT_NEXT_WS_URL = process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_
 // Session Ingest WebSocket URL (client-side, inlined at build time)
 // Used by the CLI live transport for real-time event streaming
 export const SESSION_INGEST_WS_URL = process.env.NEXT_PUBLIC_SESSION_INGEST_WS_URL ?? '';
-
-// Gastown worker URL (client-side, inlined at build time)
-// The browser talks directly to the gastown Cloudflare Worker for tRPC + WS.
-// Must use NEXT_PUBLIC_ prefix so Next.js exposes it to the browser bundle.
-export const GASTOWN_URL = requireEnv(
-  'NEXT_PUBLIC_GASTOWN_URL',
-  process.env.NEXT_PUBLIC_GASTOWN_URL
-);
-
-// Kilo Chat worker URL (client-side, inlined at build time)
-export const KILO_CHAT_URL = requireEnv(
-  'NEXT_PUBLIC_KILO_CHAT_URL',
-  process.env.NEXT_PUBLIC_KILO_CHAT_URL
-);
-
-// Event Service WebSocket URL (client-side, inlined at build time)
-export const EVENT_SERVICE_URL = requireEnv(
-  'NEXT_PUBLIC_EVENT_SERVICE_URL',
-  process.env.NEXT_PUBLIC_EVENT_SERVICE_URL
-);
-
-// Wasteland worker URL (client-side, inlined at build time)
-// The browser talks directly to the Wasteland Cloudflare Worker for tRPC.
-// Must use NEXT_PUBLIC_ prefix so Next.js exposes it to the browser bundle.
-export const WASTELAND_URL = requireEnv(
-  'NEXT_PUBLIC_WASTELAND_URL',
-  process.env.NEXT_PUBLIC_WASTELAND_URL
-);
 
 // Free model rate limits: per-IP for client-side products, per-user for server-side products
 export const FREE_MODEL_RATE_LIMIT_WINDOW_HOURS = 1;

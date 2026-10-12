@@ -106,6 +106,7 @@ import {
   renameAndroidNotificationChannels,
   setupNotificationBackgroundHandler,
   setupNotificationHandler,
+  setupNotificationPermissionGate,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
 import { restorePersistedCacheOnColdStart } from '@/lib/persist/read-cache';
@@ -174,6 +175,9 @@ void ensureAndroidNotificationChannels();
 // notification carries; idempotent, one pass per launch.
 void registerNeedsInputCategories();
 setupNotificationHandler();
+// The Live Activity waits for the notification grant, so a fresh install never
+// meets iOS's "Allow Live Activities?" prompt before the user asked for alerts.
+setupNotificationPermissionGate();
 // Applies the aggregate glanceable push while backgrounded/killed via a
 // headless expo-notifications task; see setupNotificationBackgroundHandler.
 setupNotificationBackgroundHandler();

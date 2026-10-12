@@ -9,8 +9,8 @@ import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
 
-import PostHogClient from '@/lib/posthog';
-import type { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
+import type { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 export type KiloPassPurchaseKind = 'initial' | 'renewal' | 'upgrade' | 'unknown';
 

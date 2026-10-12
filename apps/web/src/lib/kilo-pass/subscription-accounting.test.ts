@@ -2,12 +2,16 @@ import { expect, test } from '@jest/globals';
 import { kilo_pass_subscriptions, kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
-import { KiloPassCadence, KiloPassIssuanceSource, KiloPassTier } from '@/lib/kilo-pass/enums';
-import { createOrGetIssuanceHeader } from '@/lib/kilo-pass/issuance';
-import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
+import {
+  KiloPassCadence,
+  KiloPassIssuanceSource,
+  KiloPassTier,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { createOrGetIssuanceHeader } from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
 import {
   computeMonthlyKiloPassStreak,
   updateKiloPassThresholdAfterBaseCredits,

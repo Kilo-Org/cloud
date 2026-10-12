@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { sentryLogger } from '@/lib/utils.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
-import { getLowerDomainFromEmail } from '@/lib/email-address';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { getAllUserProviders, getWorkOSOrganization } from '@/lib/user';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import {
   SignInDiscoveryRequestSchema,
   SignInDiscoveryResponseSchema,

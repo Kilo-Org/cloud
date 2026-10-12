@@ -7,13 +7,13 @@ import { randomUUID } from 'crypto';
 import { eq, sql } from 'drizzle-orm';
 
 import { dispatchQueuedBouncerCreditEvents } from '@/lib/bouncer/dispatch-credit-event-outbox';
-import { deliverCreditEventWireBody } from '@/lib/bouncer/client';
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { deliverCreditEventWireBody } from '@kilocode/web-shared/lib/bouncer/client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { bouncer_credit_event_outbox } from '@kilocode/db/schema';
 import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete-reasons';
 
-jest.mock('@/lib/bouncer/client', () => ({
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   __esModule: true,
   deliverCreditEventWireBody: jest.fn(),
 }));

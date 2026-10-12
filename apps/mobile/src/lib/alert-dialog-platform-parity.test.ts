@@ -1,16 +1,19 @@
 // One implementation for both platforms on the alert dialog path.
 //
-// `Alert.alert()` is the app's one confirmation implementation: the same call
-// renders the platform's native alert on iOS and Android, and no shared module
-// picks a platform to choose behaviour. Each platform only contributes the
-// capability the other lacks — Android's AppCompat alert resolves its panel and
-// accent from the activity theme, so the prebuild overlay points them at the
-// app tokens, while iOS's `UIAlertController` already follows the device's
-// light/dark appearance and exposes no app-token override, so there is no iOS
-// half to write. This suite runs the plugin's mods in node and holds the path
-// to that: the one platform-specific module is the Android plugin, it writes
-// the app tokens for day and night, it adds nothing on iOS, and neither the
-// delete-account native alert nor the sign-out dialog branches on a platform.
+// `Alert.alert()` is the app's confirmation implementation for a
+// non-destructive confirm: the same call renders the platform's native alert on
+// iOS and Android, and no shared module picks a platform to choose behaviour.
+// Each platform only contributes the capability the other lacks — Android's
+// AppCompat alert resolves its panel and accent from the activity theme, so the
+// prebuild overlay points them at the app tokens, while iOS's
+// `UIAlertController` already follows the device's light/dark appearance and
+// exposes no app-token override, so there is no iOS half to write. A confirm
+// that needs the destructive (red) affordance uses the app's own dialog
+// instead, because Android's `AlertDialog` paints every button with the theme
+// accent. This suite runs the plugin's mods in node and holds the path to that:
+// the one platform-specific module is the Android plugin, it writes the app
+// tokens for day and night, it adds nothing on iOS, and the Profile screen's
+// two destructive confirms branch on no platform.
 
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
 import { readFileSync } from 'node:fs';
@@ -174,17 +177,26 @@ describe('one implementation for both platforms on the alert dialog path', () =>
     );
   });
 
-  it('runs the shared native alert on both platforms', () => {
+  it('runs the shared in-app confirm on both platforms', () => {
     expect(
       readFileSync(CONFIG_PATH, 'utf8').match(/withAndroidAlertDialogTheme/g) ?? []
     ).toHaveLength(1);
     const profile = readFileSync(PROFILE_PATH, 'utf8');
-    // Signing out is the in-app `DestructiveConfirmDialog` (see
-    // `use-sign-out-confirmation.ts`), so `Alert.alert` is not on that path;
-    // deleting the account still confirms through the shared native alert this
-    // plugin restyles, on both platforms.
-    expect(profile, 'the delete-account confirmation is the shared native alert').toMatch(
-      /Alert\.alert\(t\('profile\.deleteAccountTitle'\)/
+    // Both confirmations on the Profile screen are the app's own dialog, which
+    // carries the destructive (red) affordance on iOS and Android alike: the
+    // sign-out confirm and the delete-account confirm. The native alert keeps
+    // the non-destructive confirms, and this plugin keeps its panel and accent
+    // on the app tokens.
+    expect(profile, 'the delete-account confirmation is the shared in-app dialog').toMatch(
+      /confirm\(\{\s*\n\s*title: t\('profile\.deleteAccountTitle'\)/
+    );
+    expect(profile, 'the sign-out confirmation is the shared in-app dialog').toMatch(
+      /confirm\(\{\s*\n\s*title: t\('profile\.signOutTitle'\)/
+    );
+    // Both destructive confirms on the Profile screen go through the app's own
+    // dialog; no path falls back to the native alert.
+    expect(profile, 'no native Alert.alert remains on the profile path').not.toMatch(
+      /Alert\.alert/
     );
     expect(PLATFORM_BRANCH.test(profile), 'profile-screen.tsx carries a per-platform branch').toBe(
       false

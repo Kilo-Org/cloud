@@ -2,13 +2,13 @@ import {
   KiloPassCadence,
   type KiloPassTier,
   KiloPassWelcomePromoEligibilityReason,
-} from '@/lib/kilo-pass/enums';
-import type { KiloPassWelcomePromoPolicy } from '@/lib/kilo-pass/welcome-promo-context';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import type { KiloPassWelcomePromoPolicy } from '@kilocode/web-shared/lib/kilo-pass/welcome-promo-context';
 import {
   computeMonthlyCadenceBonusPercent,
   computeYearlyCadenceMonthlyBonusUsd,
   getMonthlyPriceUsd,
-} from '@/lib/kilo-pass/bonus';
+} from '@kilocode/web-shared/lib/kilo-pass/bonus';
 
 export type KiloPassMonthlyBonusKind = 'promo-50pct' | 'monthly-ramp';
 

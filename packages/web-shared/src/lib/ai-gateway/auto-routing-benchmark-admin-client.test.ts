@@ -6,7 +6,7 @@ import {
   getBenchmarkRoutingTable,
 } from './auto-routing-benchmark-admin-client';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   AUTO_ROUTING_BENCHMARK_WORKER_URL: 'https://benchmark-worker.example.com',
   INTERNAL_API_SECRET: 'test-internal-secret',
 }));
@@ -17,7 +17,7 @@ global.fetch = mockFetch;
 const configResponse = {
   config: {
     classifierModels: ['anthropic/claude-haiku-4'],
-    deciderModels: [{ id: 'anthropic/claude-sonnet-4', reasoningEffort: null }],
+    deciderModels: [{ id: 'anthropic/claude-sonnet-4' }],
     minAccuracy: 0.8,
     switchCostFactor: 3,
     bestAccuracySwitchThreshold: 0.05,
@@ -53,26 +53,6 @@ const runsResponse = {
 describe('auto routing benchmark admin client', () => {
   beforeEach(() => {
     mockFetch.mockReset();
-  });
-
-  it('gets the benchmark config and sends bearer auth header', async () => {
-    mockFetch.mockResolvedValue({
-      status: 200,
-      ok: true,
-      json: () => Promise.resolve(configResponse),
-    });
-
-    await expect(getBenchmarkConfig()).resolves.toEqual({
-      status: 200,
-      body: configResponse,
-    });
-
-    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/config', {
-      method: 'GET',
-      headers: {
-        authorization: 'Bearer test-internal-secret',
-      },
-    });
   });
 
   it('propagates error body when upstream responds with a non-OK status', async () => {

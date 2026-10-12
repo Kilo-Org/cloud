@@ -1,8 +1,11 @@
 import {
   AUTO_FREE_FALLBACK_MODEL,
   getConfiguredAutoFreeModels,
-} from '@/lib/ai-gateway/auto-model/auto-free-config';
-import { buildMonitoredModels, buildPreferredModels } from '@/lib/ai-gateway/models';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
+import {
+  buildMonitoredModels,
+  buildPreferredModels,
+} from '@kilocode/web-shared/lib/ai-gateway/models';
 
 async function getPreferredFreeModels(): Promise<string[]> {
   const autoFreeModels = await getConfiguredAutoFreeModels();

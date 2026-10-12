@@ -2,13 +2,13 @@ import { describe, expect, test } from '@jest/globals';
 import {
   injectVirtualModels,
   VIRTUAL_PROVIDER,
-} from '@/lib/ai-gateway/providers/openrouter/virtual-models';
-import { buildModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+import { buildModelIdToProviderSlugsIndex } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import type {
   OpenRouterModel,
   OpenRouterProvider,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
-import type { OpenRouterModel as CatalogModel } from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
+import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 
 const SONNET = 'anthropic/claude-sonnet-5';

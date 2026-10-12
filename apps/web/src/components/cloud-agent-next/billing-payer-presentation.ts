@@ -1,5 +1,5 @@
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { CustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 
 export type BillingPayerPresentation = {

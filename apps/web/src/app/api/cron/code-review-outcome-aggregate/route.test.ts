@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
 }));
 
@@ -74,7 +74,7 @@ describe('route module without CRON_SECRET', () => {
 
   it('imports and returns 401 without collecting', async () => {
     jest.resetModules();
-    jest.doMock('@/lib/config.server', () => ({ CRON_SECRET: '' }));
+    jest.doMock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: '' }));
     jest.doMock('@/lib/code-reviews/telemetry/review-health-aggregate', () => ({
       collectCodeReviewOutcome: isolatedOutcomeMock,
       collectCodeReviewOpenStock: isolatedOpenStockMock,

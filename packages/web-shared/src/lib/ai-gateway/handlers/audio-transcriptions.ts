@@ -1,16 +1,16 @@
 import { randomUUID } from 'crypto';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
-import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
-import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { getTranscriptionProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { debugSaveLog, debugSaveProxyRequest } from '@/lib/debugUtils';
+import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
+import { getTranscriptionProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { debugSaveLog, debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { sentryRootSpan } from '@/lib/getRootSpan';
-import { errorExceptInTest } from '@/lib/utils.server';
+import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   captureProxyError,
   countAndStoreTranscriptionUsage,
@@ -21,30 +21,31 @@ import {
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   wrapInSafeNextResponse,
-} from '@/lib/ai-gateway/llm-proxy-helpers';
-import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { ProxyErrorType } from '@/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
   extractTranscriptionPromptInfo,
   TranscriptionRequestSchema,
   type TranscriptionRequest,
-} from '@/lib/ai-gateway/transcriptions/transcription-request';
-import type { PromptInfo } from '@/lib/ai-gateway/processUsage.types';
-import type { Provider } from '@/lib/ai-gateway/providers/types';
-import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
-import { bouncerAccountId, normalizeJa4 } from '@/lib/bouncer/client';
+} from '@kilocode/web-shared/lib/ai-gateway/transcriptions/transcription-request';
+import type { PromptInfo } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
+  bouncerRejectionResponse,
   payerSharingIp,
   rawClientIp,
-  scheduleBouncerDecide,
-} from '@/lib/bouncer/inference';
+  startBouncerDecide,
+} from '@kilocode/web-shared/lib/bouncer/inference';
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 
@@ -244,6 +245,7 @@ export async function handleAudioTranscriptionsRequest(
     promptInfo,
     max_tokens: null,
     has_middle_out_transform: null,
+    reasoning_setting: null,
     fraudHeaders,
     isStreaming: false,
     organizationId,
@@ -277,7 +279,7 @@ export async function handleAudioTranscriptionsRequest(
 
   setTag('ui.ai_model', requestedModel);
 
-  const { balance, plan, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
+  const { balance, plan, balanceLimitedByUserAllowance, payer } = await getBalanceAndOrgSettings(
     organizationId,
     user
   );
@@ -302,15 +304,17 @@ export async function handleAudioTranscriptionsRequest(
     if (!decision.allowed) return modelNotAllowedResponse();
   }
 
-  // Report-only verdict: registered with after() and never awaited, so it cannot
-  // hold up the upstream call and survives an early return.
-  scheduleBouncerDecide({
+  // The one decide for this request, awaited just before the upstream call within its 500 ms
+  // budget. Only an enforced verdict rejects; every other outcome sends the request.
+  const bouncerVerdictPromise = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
+      userId: user.id,
       tier: bouncerDecideTier(organizationId, plan, balance),
+      payer,
     },
   });
 
@@ -336,6 +340,11 @@ export async function handleAudioTranscriptionsRequest(
     parsedRequest.body.user = parsedRequest.body.safety_identifier;
     upstreamBody = buildUpstreamBody(parsedRequest.body);
   }
+
+  const bouncerVerdict = await bouncerVerdictPromise;
+  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  if (bouncerRejection) return bouncerRejection;
+  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   const response = await transcriptionProxyRequest({
     body: upstreamBody,

@@ -2,8 +2,8 @@ import 'server-only';
 
 import { sql } from 'drizzle-orm';
 
-import { sentryLogger } from '@/lib/utils.server';
-import type { db as defaultDb } from '@/lib/drizzle';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 
 /**
  * Retention for the `spend_alert_hourly` rollup.

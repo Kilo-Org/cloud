@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one cohesive sweep + widget-layout suite sharing the expo-widgets/@expo/ui mock harness */
+/* eslint-disable max-lines -- one cohesive sweep suite sharing the expo-widgets mock harness */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -6,29 +6,31 @@ import {
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  EMPTY_HOME_WIDGET_DETAILS,
+  type HomeWidgetDetails,
+} from '@kilocode/app-shared/home-widget';
 
+import { setHomeWidgetDetails } from '@/lib/glanceable/home-widget-data';
 import { _setLastGlanceableSnapshotForTests } from '@/lib/glanceable/persist';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 
-import { type UserInteractionEvent, type WidgetFamily } from 'expo-widgets';
+import { type UserInteractionEvent } from 'expo-widgets';
 
-import { activeAgentsWidgetLayout, WIDGET_NAME } from './active-agents-widget';
+import { WIDGET_NAME } from './active-agents-widget';
 import {
+  PENDING_ACTION_TTL_MS,
   pendingActionForEvent,
   pendingActionOf,
   registerWidgetActionHandling,
   runPendingWidgetActions,
 } from './widget-actions';
-import {
-  buildGlanceableViewProps,
-  type GlanceableViewProps,
-  type GlanceableWidgetProps,
-} from './view-props';
+import { buildGlanceableViewProps } from './view-props';
 
 // The widget surfaces are unreachable under vitest: the swift-ui primitives are
 // recording stubs, react-native is stubbed, and expo-widgets' factories are
-// stubs with a controllable timeline — so the sweep and the stringified layout
-// are the real logic under test.
+// stubs with a controllable timeline — so the sweep is the real logic under
+// test. The layout has its own suite in active-agents-widget.test.ts.
 const widgetState = vi.hoisted(() => ({
   timeline: [] as { date: Date; props: Record<string, unknown> }[],
   snapshots: [] as unknown[],
@@ -120,22 +122,19 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   lineLimit: mockModifier('lineLimit'),
   minimumScaleFactor: mockModifier('minimumScaleFactor'),
   monospacedDigit: mockModifier('monospacedDigit'),
+  multilineTextAlignment: mockModifier('multilineTextAlignment'),
   resizable: mockModifier('resizable'),
   widgetURL: mockModifier('widgetURL'),
 }));
 
 const mocks = vi.hoisted(() => ({
-  runWidgetAction: vi.fn<() => Promise<{ kind: string }>>(),
+  runWidgetApprove: vi.fn<() => Promise<{ kind: string }>>(),
   linkingOpenURL: vi.fn<() => Promise<void>>(),
   lastSnapshot: null as GlanceableAgentsSnapshot | null,
 }));
 
-// `performWidgetAction` reads the shared failure mapper, so this mock names it
-// exactly as the Android suite does (`glanceable-android/register.test.ts`);
-// `lib/glanceable/widget-actions.test.ts` proves the real pair.
 vi.mock('@/lib/glanceable/widget-actions', () => ({
-  runWidgetAction: mocks.runWidgetAction,
-  failureFeedback: (action: string) => (action === 'approve' ? 'couldNotApprove' : 'couldNotStart'),
+  runWidgetApprove: mocks.runWidgetApprove,
 }));
 vi.mock('@/lib/glanceable/persist', () => ({
   getLastGlanceableSnapshot: () => mocks.lastSnapshot,
@@ -159,142 +158,8 @@ function snapshotFor(sessions: { status: string }[], now = NOW): GlanceableAgent
   });
 }
 
-// ── widget-prop fixtures ────────────────────────────────────────────────────
-
-const HAPPY_WAITING_PROPS: Partial<GlanceableViewProps> = {
-  statusLine: null,
-  countLines: [
-    { label: 'Needs input', kind: 'needsInput', count: 1 },
-    { label: 'Working', kind: 'running', count: 1 },
-    { label: 'Idle', kind: 'idle', count: 0 },
-  ],
-  primaryLabel: 'Needs input',
-  primaryKind: 'needsInput',
-  primaryCount: 1,
-  newestTitle: 'Newest: Fix the flaky test',
-  actions: { approve: true, newAgent: false },
-  needsInputSince: null,
-  accessibilityLabel: 'spoken label',
-};
-
-const EMPTY_WIDGET_PROPS: Partial<GlanceableViewProps> = {
-  statusLine: 'No agents waiting',
-  countLines: [],
-  primaryLabel: null,
-  primaryKind: null,
-  primaryCount: 0,
-  newestTitle: null,
-  actions: { approve: false, newAgent: true },
-  needsInputSince: null,
-  accessibilityLabel: 'spoken label',
-};
-
-const SIGNED_OUT_PROPS: Partial<GlanceableViewProps> = {
-  statusLine: 'Sign in to see agents',
-  countLines: [],
-  primaryLabel: null,
-  primaryKind: null,
-  primaryCount: 0,
-  newestTitle: null,
-  actions: { approve: false, newAgent: false },
-  needsInputSince: null,
-  accessibilityLabel: 'spoken label',
-};
-
-/** One scheduled session and nothing else: the wake rides beside its row. */
-const SCHEDULED_WAKE = '2026-09-24T09:00:00.000Z';
-
-const SCHEDULED_PROPS: Partial<GlanceableViewProps> = {
-  statusLine: null,
-  countLines: [
-    { label: 'Needs input', kind: 'needsInput', count: 0 },
-    { label: 'Working', kind: 'running', count: 0 },
-    { label: 'Scheduled', kind: 'scheduled', count: 1 },
-    { label: 'Idle', kind: 'idle', count: 0 },
-  ],
-  primaryLabel: 'Scheduled',
-  primaryKind: 'scheduled',
-  primaryCount: 1,
-  newestTitle: null,
-  actions: { approve: false, newAgent: false },
-  needsInputSince: null,
-  scheduledAt: SCHEDULED_WAKE,
-  accessibilityLabel: 'spoken label',
-};
-
-// ── mock-element tree helpers, shared with the render suite ─────────────────
-
-type MockElement = { kind: string; props: Record<string, unknown> };
-
-function collect(node: unknown): MockElement[] {
-  if (node == null || typeof node !== 'object' || Array.isArray(node)) {
-    return Array.isArray(node) ? node.flatMap(item => collect(item)) : [];
-  }
-  const kind = (node as { type?: { kind?: string } }).type?.kind;
-  const props = (node as { props?: Record<string, unknown> }).props;
-  if (kind === undefined || props === undefined) {
-    return [];
-  }
-  return [{ kind, props }, ...collect(props.children)];
-}
-
-function collectText(node: unknown): string[] {
-  return collect(node)
-    .filter(element => element.kind === 'Text' && typeof element.props.children === 'string')
-    .map(element => element.props.children as string);
-}
-
-function collectOfKind(node: unknown, kind: string): MockElement[] {
-  return collect(node).filter(element => element.kind === kind);
-}
-
-/**
- * The scheduled wake: the one `Text` the layout draws as an absolute clock
- * time (`dateStyle="time"`). The needs-input wait and the newest-result age are
- * relative durations, so the style is what tells the wake apart.
- */
-function wakeTexts(node: unknown): MockElement[] {
-  return collect(node).filter(
-    element => element.kind === 'Text' && element.props.dateStyle === 'time'
-  );
-}
-
-/** The count row whose own label is `label`, found through its direct children. */
-function countRowFor(node: unknown, label: string): MockElement | undefined {
-  return collect(node).find(element => {
-    const children = element.props.children;
-    return (
-      element.kind === 'HStack' &&
-      Array.isArray(children) &&
-      children.some(
-        child => (child as { props?: { children?: unknown } } | null)?.props?.children === label
-      )
-    );
-  });
-}
-
-/** Every `widgetURL` modifier argument anywhere in the tree. */
-function widgetURLs(node: unknown): unknown[] {
-  return collect(node).flatMap(element => {
-    const modifiers = element.props.modifiers;
-    if (!Array.isArray(modifiers)) {
-      return [];
-    }
-    return modifiers
-      .filter((modifier: { $type?: string }) => modifier.$type === 'widgetURL')
-      .map((modifier: { args?: unknown }) => modifier.args);
-  });
-}
-
-function pressButton(tree: unknown, patch: { pendingAction: string }): MockElement | undefined {
-  return collect(tree).find(
-    element =>
-      element.kind === 'Button' &&
-      typeof element.props.onPress === 'function' &&
-      (element.props.onPress as () => { pendingAction: string })().pendingAction ===
-        patch.pendingAction
-  );
-}
+const APPROVAL_KEY = 'a'.repeat(64);
+const APPROVABLE: HomeWidgetDetails = { ...EMPTY_HOME_WIDGET_DETAILS, approvalKey: APPROVAL_KEY };
 
 // ── marker mapping ──────────────────────────────────────────────────────────
 
@@ -311,6 +176,24 @@ describe('pendingActionOf', () => {
     expect(pendingActionOf({ pendingAction: undefined })).toBeNull();
     expect(pendingActionOf(null)).toBeNull();
     expect(pendingActionOf(undefined)).toBeNull();
+  });
+
+  it('keeps a carried marker inside the TTL and refuses one past it', () => {
+    // The first rebuild records the press; a marker read straight after the
+    // press carries no time yet and is never refused for age.
+    expect(pendingActionOf({ pendingAction: 'new-agent' }, NOW)).toBe('new-agent');
+    expect(
+      pendingActionOf(
+        { pendingAction: 'approve', pendingActionAt: NOW - PENDING_ACTION_TTL_MS },
+        NOW
+      )
+    ).toBe('approve');
+    expect(
+      pendingActionOf(
+        { pendingAction: 'approve', pendingActionAt: NOW - PENDING_ACTION_TTL_MS - 1 },
+        NOW
+      )
+    ).toBeNull();
   });
 });
 
@@ -340,6 +223,19 @@ describe('pendingActionForEvent', () => {
     expect(pendingActionForEvent(event(), [{ props: { primaryCount: 1 } }])).toBeNull();
     expect(pendingActionForEvent(event(), [])).toBeNull();
   });
+
+  it('ignores a carried marker past its TTL', () => {
+    expect(
+      pendingActionForEvent(event(), [
+        {
+          props: {
+            pendingAction: 'new-agent',
+            pendingActionAt: Date.now() - PENDING_ACTION_TTL_MS - 1,
+          },
+        },
+      ])
+    ).toBeNull();
+  });
 });
 
 // ── the sweep ───────────────────────────────────────────────────────────────
@@ -351,7 +247,7 @@ describe('runPendingWidgetActions', () => {
     widgetState.listeners = [];
     widgetState.removals = 0;
     widgetState.timelineReadGate = null;
-    mocks.runWidgetAction.mockReset();
+    mocks.runWidgetApprove.mockReset();
     mocks.linkingOpenURL.mockReset();
     mocks.lastSnapshot = null;
     setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
@@ -365,13 +261,13 @@ describe('runPendingWidgetActions', () => {
     widgetState.timeline = [
       {
         date: new Date(1),
-        props: { primaryCount: 1, pendingAction: 'approve', pendingActionVisible: true },
+        props: { primaryCount: 1, pendingAction: 'approve' },
       },
     ];
     // Hold the action in flight so the test can inspect the stored timeline
     // while the action is running.
     const gate = Promise.withResolvers<{ kind: string }>();
-    mocks.runWidgetAction.mockImplementation(async () => {
+    mocks.runWidgetApprove.mockImplementation(async () => {
       await gate.promise;
       return { kind: 'approved' };
     });
@@ -382,21 +278,20 @@ describe('runPendingWidgetActions', () => {
     // repeated one.
     await vi.waitFor(() => {
       expect(widgetState.timeline[0]?.props).not.toHaveProperty('pendingAction');
-      expect(widgetState.timeline[0]?.props).not.toHaveProperty('pendingActionVisible');
     });
     gate.resolve({ kind: 'approved' });
     await sweep;
 
-    expect(mocks.runWidgetAction).toHaveBeenCalledWith('approve');
+    expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
     expect(widgetState.timeline[0]?.props).toMatchObject({ primaryCount: 1 });
   });
 
   it('strips the marker only from pressed entries and keeps every frame', async () => {
     widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'new-agent', pendingActionVisible: true } },
+      { date: new Date(1), props: { pendingAction: 'approve' } },
       { date: new Date(2), props: { statusLine: 'Updates delayed' } },
     ];
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'created' });
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'approved' });
 
     await runPendingWidgetActions();
 
@@ -404,27 +299,58 @@ describe('runPendingWidgetActions', () => {
       { date: new Date(1), props: {} },
       { date: new Date(2), props: { statusLine: 'Updates delayed' } },
     ]);
-    expect(mocks.runWidgetAction).toHaveBeenCalledWith('new-agent');
+    expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a carried press older than the TTL without running it', async () => {
+    widgetState.timeline = [
+      {
+        date: new Date(1),
+        props: {
+          pendingAction: 'new-agent',
+          pendingActionAt: Date.now() - PENDING_ACTION_TTL_MS - 1,
+        },
+      },
+    ];
+
+    await runPendingWidgetActions();
+
+    // A press from a previous session is never answered late, and the stale
+    // marker is cleared so it cannot linger in the stored timeline.
+    expect(mocks.linkingOpenURL).not.toHaveBeenCalled();
+    expect(widgetState.timeline).toEqual([{ date: new Date(1), props: {} }]);
+  });
+
+  it('runs a carried press inside the TTL and clears its recorded time', async () => {
+    widgetState.timeline = [
+      {
+        date: new Date(1),
+        props: { pendingAction: 'new-agent', pendingActionAt: Date.now() - 1000 },
+      },
+    ];
+
+    await runPendingWidgetActions();
+
+    expect(mocks.linkingOpenURL).toHaveBeenCalledWith('kiloapp:///cloud/sessions/new');
+    // Stripping the recorded time is the explicit clear: the extension finds no
+    // marker left to carry forward, so the press cannot run twice.
+    expect(widgetState.timeline).toEqual([{ date: new Date(1), props: {} }]);
   });
 
   it('never runs the same press twice on a second sweep', async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'approved' });
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'approved' });
 
     await runPendingWidgetActions();
     await runPendingWidgetActions();
 
-    expect(mocks.runWidgetAction).toHaveBeenCalledTimes(1);
+    expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
   });
 
   it('never runs the same press twice on overlapping sweeps', async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
     const gate = Promise.withResolvers<{ kind: string }>();
-    mocks.runWidgetAction.mockImplementation(async () => {
+    mocks.runWidgetApprove.mockImplementation(async () => {
       await gate.promise;
       return { kind: 'approved' };
     });
@@ -433,75 +359,59 @@ describe('runPendingWidgetActions', () => {
     gate.resolve({ kind: 'approved' });
     await Promise.all([first, second]);
 
-    expect(mocks.runWidgetAction).toHaveBeenCalledTimes(1);
+    expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
   });
 
   it('answers a press that lands while a sweep is running instead of dropping it', async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
     const gate = Promise.withResolvers<{ kind: string }>();
-    let calls = 0;
-    mocks.runWidgetAction.mockImplementation(async () => {
-      calls += 1;
-      if (calls === 1) {
-        await gate.promise;
-      }
+    mocks.runWidgetApprove.mockImplementation(async () => {
+      await gate.promise;
       return { kind: 'approved' };
     });
     const sweep = runPendingWidgetActions();
     await vi.waitFor(() => {
-      expect(mocks.runWidgetAction).toHaveBeenCalledTimes(1);
+      expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
     });
 
     // The second press lands mid-sweep: the intent patched its marker into the
     // stored timeline and the live listener delivered the event while the first
     // action was still in flight. The running sweep owes it a pass, or the tap
     // would only be answered at the next launch or foreground.
-    widgetState.timeline = [
-      { date: new Date(2), props: { pendingAction: 'new-agent', pendingActionVisible: true } },
-    ];
+    widgetState.timeline = [{ date: new Date(2), props: { pendingAction: 'new-agent' } }];
     const live = runPendingWidgetActions({ source: WIDGET_NAME });
     gate.resolve({ kind: 'approved' });
     await Promise.all([sweep, live]);
 
-    expect(mocks.runWidgetAction).toHaveBeenCalledTimes(2);
-    expect(mocks.runWidgetAction).toHaveBeenLastCalledWith('new-agent');
+    expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
+    expect(mocks.linkingOpenURL).toHaveBeenCalledWith('kiloapp:///cloud/sessions/new');
     // The follow-up pass cleared the marker it ran, so a later sweep cannot
     // repeat the press it already answered.
     expect(widgetState.timeline[0]?.props).not.toHaveProperty('pendingAction');
     await runPendingWidgetActions();
-    expect(mocks.runWidgetAction).toHaveBeenCalledTimes(2);
+    expect(mocks.linkingOpenURL).toHaveBeenCalledTimes(1);
   });
 
   it("answers a press whose marker the running action's republish erased", async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
     const gate = Promise.withResolvers<{ kind: string }>();
-    let calls = 0;
-    mocks.runWidgetAction.mockImplementation(async () => {
-      calls += 1;
-      if (calls === 1) {
-        await gate.promise;
-        // The answered action republishes the tray: the sink builds fresh props
-        // from the snapshot and writes the whole timeline, which is what takes
-        // the mid-sweep press's marker with it.
-        widgetState.timeline = [{ date: new Date(3), props: { primaryCount: 1 } }];
-      }
+    mocks.runWidgetApprove.mockImplementation(async () => {
+      await gate.promise;
+      // The answered approve republishes the tray: the sink builds fresh props
+      // from the snapshot and writes the whole timeline, which is what takes
+      // the mid-sweep press's marker with it.
+      widgetState.timeline = [{ date: new Date(3), props: { primaryCount: 1 } }];
       return { kind: 'approved' };
     });
     const sweep = runPendingWidgetActions();
     await vi.waitFor(() => {
-      expect(mocks.runWidgetAction).toHaveBeenCalledTimes(1);
+      expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
     });
 
     // The press lands while the first action runs, so the live listener reads
     // its marker out of the stored timeline at delivery — the last moment the
     // marker exists, because the republish replaces the whole timeline.
-    widgetState.timeline = [
-      { date: new Date(2), props: { pendingAction: 'new-agent', pendingActionVisible: true } },
-    ];
+    widgetState.timeline = [{ date: new Date(2), props: { pendingAction: 'new-agent' } }];
     const live = runPendingWidgetActions({ source: WIDGET_NAME });
     // Wait for the delivery read before the republish lands: the press is held
     // as an action, not as a marker a later pass could re-read.
@@ -511,38 +421,30 @@ describe('runPendingWidgetActions', () => {
 
     // The follow-up pass answers the held press. Re-reading the timeline after
     // the republish finds no marker, which is the drop this covers.
-    expect(mocks.runWidgetAction).toHaveBeenCalledTimes(2);
-    expect(mocks.runWidgetAction).toHaveBeenLastCalledWith('new-agent');
+    expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
+    expect(mocks.linkingOpenURL).toHaveBeenCalledWith('kiloapp:///cloud/sessions/new');
   });
 
   it('waits for the held press read before the sweep decides to stop', async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
     const gate = Promise.withResolvers<{ kind: string }>();
-    let calls = 0;
-    mocks.runWidgetAction.mockImplementation(async () => {
-      calls += 1;
-      if (calls === 1) {
-        await gate.promise;
-        // The answered action republishes the tray, which takes the mid-sweep
-        // press's marker with it.
-        widgetState.timeline = [{ date: new Date(3), props: { primaryCount: 1 } }];
-      }
+    mocks.runWidgetApprove.mockImplementation(async () => {
+      await gate.promise;
+      // The answered approve republishes the tray, which takes the mid-sweep
+      // press's marker with it.
+      widgetState.timeline = [{ date: new Date(3), props: { primaryCount: 1 } }];
       return { kind: 'approved' };
     });
     const sweep = runPendingWidgetActions();
     await vi.waitFor(() => {
-      expect(mocks.runWidgetAction).toHaveBeenCalledTimes(1);
+      expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
     });
 
     // The second press lands mid-sweep and its delivery read is still in
     // flight when the first action ends. A queued pass that runs before that
     // read settles reads no marker and holds no press, so the tap would only
     // be answered at the next launch or foreground.
-    widgetState.timeline = [
-      { date: new Date(2), props: { pendingAction: 'new-agent', pendingActionVisible: true } },
-    ];
+    widgetState.timeline = [{ date: new Date(2), props: { pendingAction: 'new-agent' } }];
     const heldRead = Promise.withResolvers<null>();
     widgetState.timelineReadGate = heldRead.promise;
     const live = runPendingWidgetActions({ source: WIDGET_NAME });
@@ -556,31 +458,27 @@ describe('runPendingWidgetActions', () => {
     heldRead.resolve(null);
     await Promise.all([sweep, live]);
 
-    expect(mocks.runWidgetAction).toHaveBeenCalledTimes(2);
-    expect(mocks.runWidgetAction).toHaveBeenLastCalledWith('new-agent');
+    expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
+    expect(mocks.linkingOpenURL).toHaveBeenCalledWith('kiloapp:///cloud/sessions/new');
   });
 
   it('maps a live interaction event through the marker and runs it once', async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'approved' });
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'approved' });
     registerWidgetActionHandling();
     // The launch sweep already picked the cold-start press up.
     await vi.waitFor(() => {
-      expect(mocks.runWidgetAction).toHaveBeenCalledTimes(1);
+      expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
     });
 
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
     widgetState.listeners[0]?.({
       source: WIDGET_NAME,
       target: '__expo_widgets_target_0',
       timestamp: NOW,
     });
     await vi.waitFor(() => {
-      expect(mocks.runWidgetAction).toHaveBeenCalledTimes(2);
+      expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(2);
     });
 
     // Another widget kind's press owns no marker here, and this sweep must not
@@ -590,32 +488,34 @@ describe('runPendingWidgetActions', () => {
       target: '__expo_widgets_target_0',
       timestamp: NOW,
     });
-    expect(mocks.runWidgetAction).toHaveBeenCalledTimes(2);
+    expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(2);
   });
 
   it("pushes the couldn't-approve feedback and fresh props when the approve fails", async () => {
     widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
+      { date: new Date(1), props: { pendingAction: 'approve', pendingApprovalKey: APPROVAL_KEY } },
     ];
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'failed' });
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'failed' });
     _setLastGlanceableSnapshotForTests(snapshotFor([{ status: 'permission' }]));
+    setHomeWidgetDetails(APPROVABLE);
 
     await runPendingWidgetActions();
+    setHomeWidgetDetails(EMPTY_HOME_WIDGET_DETAILS);
+
+    expect(mocks.runWidgetApprove).toHaveBeenCalledExactlyOnceWith(APPROVAL_KEY);
 
     expect(getSurfaceExtras().actionFeedback).toBe('couldNotApprove');
     expect(widgetState.snapshots).toHaveLength(1);
     expect(widgetState.snapshots[0]).toMatchObject({
       newestTitle: 'glanceable.couldNotApprove',
       // Approve is still available: the call failed, not the work.
-      actions: { approve: true, newAgent: false },
+      actions: { approve: true, newAgent: true },
     });
   });
 
   it('keeps the delayed and expiry frames on the failure republish', async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'failed' });
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'failed' });
     // Built against the wall clock, unlike this suite's fixed `NOW` snapshots:
     // the two trailing frames have to still be ahead of `now` to be written.
     const snapshot = snapshotFor([{ status: 'permission' }], Date.now());
@@ -634,10 +534,8 @@ describe('runPendingWidgetActions', () => {
   });
 
   it('writes one frame when the last snapshot already lapsed', async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'failed' });
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'failed' });
     // A snapshot that lapsed while the app was away: both trailing frames would
     // land behind the current one, and WidgetKit never rewinds to an entry it
     // has already passed, so the failure line keeps the timeline to itself.
@@ -657,13 +555,11 @@ describe('runPendingWidgetActions', () => {
       newestSessionTitle: 'Fix the flaky test',
       actionFeedback: 'couldNotApprove',
     });
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
     let feedbackDuringRun: string | null = 'not captured';
     let newestDuringRun: string | null = 'not captured';
     const gate = Promise.withResolvers<{ kind: string }>();
-    mocks.runWidgetAction.mockImplementation(async () => {
+    mocks.runWidgetApprove.mockImplementation(async () => {
       // A success republishes the tray from inside the action, so the props
       // must already be free of the stale failure line at this moment.
       feedbackDuringRun = getSurfaceExtras().actionFeedback;
@@ -688,28 +584,24 @@ describe('runPendingWidgetActions', () => {
     expect(getSurfaceExtras().actionFeedback).toBeNull();
   });
 
-  it('pushes fresh props and hands a create with nothing to start from to the app', async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'new-agent', pendingActionVisible: true } },
-    ];
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'none' });
-    _setLastGlanceableSnapshotForTests(snapshotFor([{ status: 'question' }]));
+  it('opens the new-session screen for a New agent press without running Approve', async () => {
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'new-agent' } }];
+    _setLastGlanceableSnapshotForTests(snapshotFor([{ status: 'idle' }]));
 
     await runPendingWidgetActions();
 
-    expect(getSurfaceExtras().actionFeedback).toBeNull();
-    expect(widgetState.snapshots).toHaveLength(1);
-    // `none` is the shared contract's "caller opens the app instead": the
-    // create had no draft, model, or repository, so the press lands on the
-    // new-session screen — the same destination the Android twin opens.
+    // Starting an agent needs the composer, so the press only lands on the
+    // new-session screen: nothing runs in place and the widget is not redrawn.
+    expect(mocks.linkingOpenURL).toHaveBeenCalledTimes(1);
     expect(mocks.linkingOpenURL).toHaveBeenCalledWith('kiloapp:///cloud/sessions/new');
+    expect(mocks.runWidgetApprove).not.toHaveBeenCalled();
+    expect(widgetState.snapshots).toEqual([]);
+    expect(widgetState.timeline).toEqual([{ date: new Date(1), props: {} }]);
   });
 
   it('hands an approve with nothing to act on to the agents list', async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'none' });
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'none' });
 
     await runPendingWidgetActions();
 
@@ -717,10 +609,8 @@ describe('runPendingWidgetActions', () => {
   });
 
   it('hands a question-waiting approve to the app instead of inventing an answer', async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'no-permission' });
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'no-permission' });
 
     await runPendingWidgetActions();
 
@@ -728,10 +618,8 @@ describe('runPendingWidgetActions', () => {
   });
 
   it('keeps a failed press on the widget without opening the app', async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'failed' });
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'failed' });
 
     await runPendingWidgetActions();
 
@@ -739,10 +627,8 @@ describe('runPendingWidgetActions', () => {
   });
 
   it('leaves the answering to the republishing sink on a successful action', async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'approved' });
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'approved' });
     _setLastGlanceableSnapshotForTests(snapshotFor([{ status: 'busy' }]));
 
     await runPendingWidgetActions();
@@ -756,15 +642,13 @@ describe('runPendingWidgetActions', () => {
 
     await runPendingWidgetActions();
 
-    expect(mocks.runWidgetAction).not.toHaveBeenCalled();
+    expect(mocks.runWidgetApprove).not.toHaveBeenCalled();
     expect(widgetState.timeline).toEqual([{ date: new Date(1), props: { primaryCount: 1 } }]);
   });
 
   it('sweeps a cold-start press without a snapshot to rebuild from', async () => {
-    widgetState.timeline = [
-      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
-    ];
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'none' });
+    widgetState.timeline = [{ date: new Date(1), props: { pendingAction: 'approve' } }];
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'none' });
 
     await runPendingWidgetActions();
 
@@ -789,7 +673,7 @@ describe('registerWidgetActionHandling', () => {
     widgetState.listeners = [];
     widgetState.removals = 0;
     widgetState.timelineReadGate = null;
-    mocks.runWidgetAction.mockReset();
+    mocks.runWidgetApprove.mockReset();
     mocks.lastSnapshot = null;
     const widgetActions = await import('./widget-actions');
     return widgetActions;
@@ -819,217 +703,5 @@ describe('registerWidgetActionHandling', () => {
     unsubscribeFirst();
     expect(widgetState.removals).toBe(0);
     expect(widgetState.listeners).toHaveLength(1);
-  });
-});
-
-// ── the stringified layout ──────────────────────────────────────────────────
-
-function renderWidget(props: GlanceableWidgetProps, family: WidgetFamily): MockElement {
-  return activeAgentsWidgetLayout(props, {
-    widgetFamily: family,
-    date: new Date(0),
-    configuration: undefined,
-  }) as unknown as MockElement;
-}
-
-/** A recorded swift-ui modifier, typed the way the mock stubs record it. */
-type MockModifier = { $type?: string; args?: Record<string, unknown> };
-
-/** The recorded modifiers on an element, never any other prop. */
-function mockModifiers(element: MockElement | undefined): MockModifier[] {
-  const modifiers = element?.props.modifiers;
-  return Array.isArray(modifiers) ? (modifiers as MockModifier[]) : [];
-}
-
-/**
- * The reserved newest-session slot: the one container whose `frame` pins a
- * height and nothing else. The mark's own frame pins both a width and a
- * height, so this finds the slot by shape rather than by position.
- */
-function reservedSlot(tree: unknown): MockElement | undefined {
-  return collect(tree).find(element =>
-    mockModifiers(element).some(
-      modifier =>
-        modifier.$type === 'frame' &&
-        modifier.args !== undefined &&
-        'height' in modifier.args &&
-        !('width' in modifier.args)
-    )
-  );
-}
-
-/** The height the slot's frame pins, or undefined when it pins none. */
-function slotHeight(element: MockElement | undefined): number | undefined {
-  const frameModifier = mockModifiers(element).find(modifier => modifier.$type === 'frame');
-  return frameModifier?.args?.height as number | undefined;
-}
-
-describe('activeAgentsWidgetLayout', () => {
-  it('keeps the Lock Screen families generic: no title and no buttons', () => {
-    const lockScreenFamilies: WidgetFamily[] = [
-      'accessoryCircular',
-      'accessoryInline',
-      'accessoryRectangular',
-    ];
-    for (const family of lockScreenFamilies) {
-      const tree = renderWidget(HAPPY_WAITING_PROPS, family);
-      expect(collectOfKind(tree, 'Button')).toEqual([]);
-      expect(collectText(tree)).not.toContain('Newest: Fix the flaky test');
-      expect(widgetURLs(tree)).toEqual(['kiloapp:///cloud/sessions']);
-    }
-  });
-
-  it('draws the newest-session line and the Approve button in the small family', () => {
-    const tree = renderWidget(HAPPY_WAITING_PROPS, 'systemSmall');
-
-    const button = pressButton(tree, { pendingAction: 'approve' });
-    expect(button).toBeDefined();
-    const pressApprove = button?.props.onPress as (() => unknown) | undefined;
-    expect(pressApprove?.()).toEqual({
-      pendingAction: 'approve',
-      pendingActionVisible: true,
-    });
-    expect(collectText(tree)).toContain('Newest: Fix the flaky test');
-    // The body keeps its own deep link: a tap beside the buttons opens Kilo.
-    expect(widgetURLs(tree)).toEqual(['kiloapp:///cloud/sessions']);
-  });
-
-  it('reserves the newest-session slot with and without a line in both Home Screen families', () => {
-    for (const family of ['systemSmall', 'systemMedium'] as WidgetFamily[]) {
-      const filled = renderWidget(HAPPY_WAITING_PROPS, family);
-      // The same props with no title: the state a process restart starts from,
-      // before the first snapshot answers with a session.
-      const blank = renderWidget({ ...HAPPY_WAITING_PROPS, newestTitle: null }, family);
-
-      const filledSlot = reservedSlot(filled);
-      const blankSlot = reservedSlot(blank);
-      // The slot is its own container with a fixed height in every state, so a
-      // title arriving late, the press line taking the slot, and the answer
-      // replacing it move neither the count rows above nor the action row below.
-      expect(filledSlot?.kind).toBe('VStack');
-      expect(blankSlot?.kind).toBe('VStack');
-      expect(slotHeight(filledSlot)).toBe(slotHeight(blankSlot));
-      expect(slotHeight(filledSlot)).toBeGreaterThan(0);
-
-      // Only the line differs, never the space reserved around it.
-      expect(collectText(filled)).toContain('Newest: Fix the flaky test');
-      expect(collectText(blank)).not.toContain('Newest: Fix the flaky test');
-    }
-  });
-
-  it('names the pressed action in the reserved slot while the press is unanswered', () => {
-    const approving = renderWidget(
-      { ...EMPTY_WIDGET_PROPS, pendingAction: 'approve', pendingActionVisible: true },
-      'systemSmall'
-    );
-    const starting = renderWidget(
-      { ...EMPTY_WIDGET_PROPS, pendingAction: 'new-agent', pendingActionVisible: true },
-      'systemSmall'
-    );
-
-    // The patch carries which button was pressed, so a New agent tap reads its
-    // own line instead of the approving one, in the same reserved slot.
-    expect(collectText(approving)).toContain('Approving…');
-    expect(collectText(starting)).toContain('Starting…');
-    // One ellipsis style for the two lines that share the slot: both carry the
-    // typographic ellipsis (`common.starting`, `glanceable.approving`), never
-    // three ASCII dots. The baked fallbacks above are what this layout renders
-    // with no injected copy, so the style is pinned where it lives.
-    for (const drawn of [approving, starting]) {
-      const text = collectText(drawn);
-      expect(text.some(line => line.endsWith('…'))).toBe(true);
-      expect(text.some(line => line.endsWith('...'))).toBe(false);
-    }
-    expect(slotHeight(reservedSlot(starting))).toBe(slotHeight(reservedSlot(approving)));
-  });
-
-  // The owner's reported defect: a stored marker with a recognized action that
-  // the app never ran (the App Intent does not foreground the app) held
-  // "Starting…" on a settled idle-only tray. A settled surface must never draw
-  // the press line, whatever action the marker names.
-  it('never draws the press line on a settled, populated widget', () => {
-    const idleOnly: GlanceableWidgetProps = {
-      ...HAPPY_WAITING_PROPS,
-      countLines: [
-        { label: 'Needs input', kind: 'needsInput', count: 0 },
-        { label: 'Working', kind: 'running', count: 0 },
-        { label: 'Idle', kind: 'idle', count: 1 },
-      ],
-      primaryLabel: 'Idle',
-      primaryKind: 'idle',
-      primaryCount: 1,
-      pendingAction: 'new-agent',
-      pendingActionVisible: true,
-    };
-
-    for (const family of ['systemSmall', 'systemMedium', 'systemLarge'] as WidgetFamily[]) {
-      const text = collectText(renderWidget(idleOnly, family));
-      expect(text).not.toContain('Starting…');
-      expect(text).not.toContain('Approving…');
-    }
-    // The app's own newest line still reaches the reserved slot on the Home
-    // Screen families: only the transient press line is suppressed.
-    expect(collectText(renderWidget(idleOnly, 'systemMedium'))).toContain(
-      'Newest: Fix the flaky test'
-    );
-  });
-
-  it('draws the New agent button for the empty state and no Approve button', () => {
-    const tree = renderWidget(EMPTY_WIDGET_PROPS, 'systemSmall');
-
-    const button = pressButton(tree, { pendingAction: 'new-agent' });
-    expect(button).toBeDefined();
-    const pressNewAgent = button?.props.onPress as (() => unknown) | undefined;
-    expect(pressNewAgent?.()).toEqual({
-      pendingAction: 'new-agent',
-      pendingActionVisible: true,
-    });
-    expect(pressButton(tree, { pendingAction: 'approve' })).toBeUndefined();
-    expect(collectText(tree)).toContain('No agents waiting');
-  });
-
-  it('draws no button for a signed-out surface', () => {
-    const tree = renderWidget(SIGNED_OUT_PROPS, 'systemMedium');
-
-    expect(collectOfKind(tree, 'Button')).toEqual([]);
-    expect(collectText(tree)).toContain('Sign in to see agents');
-  });
-
-  it('styles the widget buttons as small bordered actions', () => {
-    const tree = renderWidget(HAPPY_WAITING_PROPS, 'systemSmall');
-
-    const button = pressButton(tree, { pendingAction: 'approve' });
-    const styles = (button?.props.modifiers as { $type: string }[] | undefined)?.map(
-      modifier => modifier.$type
-    );
-    expect(styles).toContain('buttonStyle');
-    expect(styles).toContain('controlSize');
-  });
-
-  // The large card is a wide card with a footer, so it draws the scheduled
-  // wake beside its row exactly as the medium card does — the same information
-  // the Android widget of that size shows. The small square has no room.
-  it('draws the scheduled wake in the large card, the same as the medium one', () => {
-    for (const family of ['systemMedium', 'systemLarge'] as WidgetFamily[]) {
-      const wake = wakeTexts(renderWidget(SCHEDULED_PROPS, family));
-
-      expect(wake).toHaveLength(1);
-      expect(wake[0]?.props.date).toEqual(new Date(SCHEDULED_WAKE));
-    }
-    expect(wakeTexts(renderWidget(SCHEDULED_PROPS, 'systemSmall'))).toEqual([]);
-  });
-
-  it('reserves the wake slot beside the scheduled row in the medium and large cards', () => {
-    for (const family of ['systemMedium', 'systemLarge'] as WidgetFamily[]) {
-      const row = countRowFor(renderWidget(SCHEDULED_PROPS, family), 'Scheduled');
-
-      // The trailing slot is laid out whether or not a wake is known, so a
-      // wake the CLI reports later cannot move the row.
-      expect(collect(row?.props.children).some(element => element.kind === 'Spacer')).toBe(true);
-    }
-    const smallRow = countRowFor(renderWidget(SCHEDULED_PROPS, 'systemSmall'), 'Scheduled');
-    expect(collect(smallRow?.props.children).some(element => element.kind === 'Spacer')).toBe(
-      false
-    );
   });
 });

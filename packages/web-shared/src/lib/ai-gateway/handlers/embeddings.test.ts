@@ -1,35 +1,35 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import type { User } from '@kilocode/db/schema';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
-import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
-import { getEmbeddingProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
-import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { getEmbeddingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
   after: jest.fn(),
 }));
-jest.mock('@/lib/user/server');
-jest.mock('@/lib/organizations/organization-usage');
-jest.mock('@/lib/organizations/effective-model-access.server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
+jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   resolveOrganizationMemberModelDecision: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/providers/get-provider', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider', () => ({
   getEmbeddingProvider: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/is-free-model', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   isFreeModel: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
   mapModelIdToVercel: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => ({
-  ...jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers'),
+jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'),
   countAndStoreEmbeddingUsage: jest.fn(),
 }));
 

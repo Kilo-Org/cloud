@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { createTRPCContext } from '@/lib/trpc/init';
-import { ensureOrganizationAccessAndFetchOrg } from '@/routers/organizations/utils';
-import { getUserFromAuth } from '@/lib/user/server';
+import { createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
+import { ensureOrganizationAccessAndFetchOrg } from '@kilocode/web-shared/routers/organizations/utils';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
 
 type EnabledResponse = { enabled: boolean };
@@ -27,22 +27,17 @@ export async function GET(
     return res.authFailedResponse;
   }
 
-  // Get organizationId from query params
   const { searchParams } = new URL(request.url);
   const organizationId = searchParams.get('organizationId');
 
-  // If no organizationId provided, return false
   if (!organizationId) {
     return NextResponse.json({ enabled: isEnabledForUser(res.user) });
   }
 
-  // Check if user has access to the organization and fetch it
   try {
-    // Create tRPC context for authentication
     const ctx = await createTRPCContext();
     const org = await ensureOrganizationAccessAndFetchOrg(ctx, organizationId);
 
-    // Check if code indexing is enabled in organization settings
     const enabled = org.settings?.code_indexing_enabled === true;
 
     return NextResponse.json({ enabled });

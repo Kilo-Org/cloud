@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, type ChildProcess, type SpawnOptions } from 'child_process';
 import { appendFileSync } from 'fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { currentOwnedProcessScope, type OwnedProcessScope } from './control/owned-processes.js';
@@ -17,7 +17,11 @@ export type ExecResult = {
 
 export type ProcessOutputStream = 'stdout' | 'stderr';
 
+/** Starts the child in place of `spawn`; it must keep the given `detached` and `stdio`. */
+export type ProcessSpawn = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
+
 export type ProcessOptions = {
+  spawn?: ProcessSpawn;
   cwd?: string;
   stdinFd?: number;
   env?: NodeJS.ProcessEnv;
@@ -146,10 +150,10 @@ export function runProcess(
           ? { env: { ...process.env, ...opts.env } }
           : {}),
     };
-    const owned = currentOwnedProcessScope();
+    const owned = opts?.spawn ? undefined : currentOwnedProcessScope();
     const proc =
       owned?.spawn(command, args, options) ??
-      spawn(command, args, {
+      (opts?.spawn ?? spawn)(command, args, {
         ...options,
         detached: true,
         stdio: [opts?.stdinFd ?? 'ignore', 'pipe', 'pipe'],

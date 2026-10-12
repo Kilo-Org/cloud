@@ -9,7 +9,7 @@ import { usePostHog } from 'posthog-js/react';
 import type {
   OrganizationRole,
   OrganizationWithMembersResponse,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type SSOSignupCardProps = {

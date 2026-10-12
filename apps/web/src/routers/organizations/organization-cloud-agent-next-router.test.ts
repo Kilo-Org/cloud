@@ -1,11 +1,12 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
 import { inspect } from 'node:util';
 import { DrizzleQueryError } from 'drizzle-orm';
-import type * as TrpcInitModule from '@/lib/trpc/init';
+import type * as TrpcInitModule from '@kilocode/web-shared/lib/trpc/init';
 import type { createWorktreeChat as CreateWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
+import type * as CloudAgentClientModule from '@/lib/cloud-agent-next/cloud-agent-client';
 import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import type * as MinimumVersionModule from '@/lib/trpc/min-version';
-import type * as OrganizationUtilsModule from '@/routers/organizations/utils';
+import type * as MinimumVersionModule from '@kilocode/web-shared/lib/trpc/min-version';
+import type * as OrganizationUtilsModule from '@kilocode/web-shared/routers/organizations/utils';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import type * as ZodModule from 'zod';
 import type { z } from 'zod';
@@ -16,8 +17,8 @@ import {
   type Organization,
   type User,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq } from 'drizzle-orm';
 import type * as SessionOwnership from '@/lib/cloud-agent/session-ownership';
 import type {
@@ -28,7 +29,9 @@ import type {
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type * as BitbucketIntegrationHelpers from '@/lib/cloud-agent/bitbucket-integration-helpers';
 import type { BitbucketOrganizationRepositoryListResult } from '@/lib/cloud-agent/bitbucket-integration-helpers';
+import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
+import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import type { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import type {
   organizationPrepareSessionNextSchema,
@@ -82,6 +85,8 @@ const mockSendMessage = jest.fn<
     delivery: 'sent',
   })
 );
+const mockInitiateFromPreparedSession =
+  jest.fn<(input: { cloudAgentSessionId: string }) => Promise<unknown>>();
 const mockGenerateCloudAgentAttachmentUploadUrl = jest.fn<
   (input: {
     userId: string;
@@ -119,6 +124,7 @@ const mockGetSandboxSelectionOptions =
 const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   getSandboxSelectionOptions: mockGetSandboxSelectionOptions,
   prepareSession: mockPrepareSession,
+  initiateFromPreparedSession: mockInitiateFromPreparedSession,
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
   getMessageResult: mockGetMessageResult,
@@ -202,15 +208,17 @@ jest.mock('@/lib/auth/resource-delegation', () => ({
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: mockCreateCloudAgentNextClient,
   createCloudAgentNextClientForModel: mockCreateCloudAgentNextClientForModel,
-  rethrowAsPaymentRequired: jest.fn(),
+  rethrowCloudAgentError: jest.requireActual<typeof CloudAgentClientModule>(
+    '@/lib/cloud-agent-next/cloud-agent-client'
+  ).rethrowCloudAgentError,
 }));
 
 jest.mock('@/lib/cloud-agent-next/worktree-chat', () => ({
   createWorktreeChat: mockCreateWorktreeChat,
 }));
 
-jest.mock('@/lib/trpc/min-version', () => ({
-  ...jest.requireActual<typeof MinimumVersionModule>('@/lib/trpc/min-version'),
+jest.mock('@kilocode/web-shared/lib/trpc/min-version', () => ({
+  ...jest.requireActual<typeof MinimumVersionModule>('@kilocode/web-shared/lib/trpc/min-version'),
   getMinimumVersions: jest.fn(async () => ({ ios: '0.0.0', android: '0.0.0' })),
   enforceMinimumVersion: jest.fn(() => ({ pass: true })),
 }));
@@ -219,7 +227,7 @@ jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
   computeCloudAgentNextBalanceCheckEligibility: mockComputeCloudAgentNextBalanceCheckEligibility,
 }));
 
-jest.mock('@/lib/posthog-feature-flags', () => ({
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isFeatureFlagEnabledOrDevelopment: mockIsFeatureFlagEnabledOrDevelopment,
 }));
 
@@ -230,7 +238,7 @@ jest.mock('@/lib/cloud-agent/bitbucket-integration-helpers', () => ({
   fetchBitbucketRepositoriesForOrganization: mockFetchBitbucketRepositoriesForOrganization,
 }));
 
-jest.mock('@/lib/organizations/organization-usage', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceForOrganizationUser: mockGetBalanceForOrganizationUser,
 }));
 
@@ -263,8 +271,8 @@ jest.mock('@/lib/r2/cloud-agent-pending-uploads', () => ({
   releasePendingUploads: jest.fn(),
 }));
 
-jest.mock('@/routers/organizations/utils', () => {
-  const trpcInit = jest.requireActual<typeof TrpcInitModule>('@/lib/trpc/init');
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => {
+  const trpcInit = jest.requireActual<typeof TrpcInitModule>('@kilocode/web-shared/lib/trpc/init');
   const zod = jest.requireActual<typeof ZodModule>('zod');
   const organizationProcedure = trpcInit.baseProcedure
     .input(zod.object({ organizationId: zod.uuid() }))
@@ -292,6 +300,10 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     cloudAgentSessionId: string;
     kiloSessionId: string;
   }>;
+  initiateFromPreparedSession: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+  }) => Promise<unknown>;
   createWorktreeChat: (input: {
     organizationId: string;
     sourceKiloSessionId: string;
@@ -392,7 +404,7 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
 };
 
 beforeAll(async () => {
-  const { createCallerFactory } = await import('@/lib/trpc/init');
+  const { createCallerFactory } = await import('@kilocode/web-shared/lib/trpc/init');
   const mod = await import('./organization-cloud-agent-next-router');
   createCaller = createCallerFactory(mod.organizationCloudAgentNextRouter);
 });
@@ -510,7 +522,7 @@ describe('organizationCloudAgentNextRouter.getSandboxStatus', () => {
     'sanitizes early membership failures in %s responses and error reporting',
     async nodeEnv => {
       const { ensureOrganizationAccess } = jest.requireActual<typeof OrganizationUtilsModule>(
-        '@/routers/organizations/utils'
+        '@kilocode/web-shared/routers/organizations/utils'
       );
       const { organizationCloudAgentNextRouter } =
         await import('./organization-cloud-agent-next-router');
@@ -1511,12 +1523,10 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
     expect(mockCreateCloudAgentNextClientForModel).not.toHaveBeenCalled();
   });
 
-  it.each([false, true])('forwards explicit devcontainer context %s', async devcontainer => {
+  it.each([false, true])('ignores retired devcontainer context %s', async devcontainer => {
     const capabilities: SandboxSelectionCapabilities = {
       enabled: true,
-      defaultDestination: devcontainer
-        ? { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' }
-        : getSandboxAllocationRequest('cloudflare-shared'),
+      defaultDestination: getSandboxAllocationRequest('cloudflare-shared'),
       options: [],
     };
     mockGetSandboxSelectionOptions.mockResolvedValueOnce(capabilities);
@@ -1527,7 +1537,6 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
     ).resolves.toEqual(capabilities);
     expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
       kilocodeOrganizationId: ORGANIZATION_ID,
-      devcontainer,
     });
   });
 
@@ -1780,11 +1789,8 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
         autoInitiate: true,
         devcontainer: true,
       })
-    ).rejects.toThrow('Dev container sessions are not available');
-    expect(mockIsFeatureFlagEnabledOrDevelopment).toHaveBeenCalledWith(
-      'cloud-agent-devcontainer',
-      ORGANIZATION_ID
-    );
+    ).rejects.toThrow('Devcontainer support has been retired');
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
 
@@ -1846,7 +1852,7 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     );
   });
 
-  it('forwards devcontainer sessions when the feature flag is enabled', async () => {
+  it('rejects retired devcontainer sessions even when the feature flag is enabled', async () => {
     mockIsFeatureFlagEnabledOrDevelopment.mockResolvedValue(true);
     const caller = createCaller({
       user: { id: 'user-2', is_admin: false } as User,
@@ -1862,21 +1868,9 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
         autoInitiate: true,
         devcontainer: true,
       })
-    ).resolves.toEqual({
-      cloudAgentSessionId: 'agent_123',
-      kiloSessionId: 'ses_12345678901234567890123456',
-    });
-    expect(mockIsFeatureFlagEnabledOrDevelopment).toHaveBeenCalledWith(
-      'cloud-agent-devcontainer',
-      ORGANIZATION_ID
-    );
-    expect(mockPrepareSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        githubRepo: 'acme/repo',
-        devcontainer: true,
-        kilocodeOrganizationId: ORGANIZATION_ID,
-      })
-    );
+    ).rejects.toThrow('Devcontainer support has been retired');
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
   it('routes free models through the AppBuilder client so the worker skips the balance minimum', async () => {
@@ -1970,6 +1964,85 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({ cloneFromKiloSessionId })
     );
+  });
+});
+
+describe('organizationCloudAgentNextRouter Worker error codes', () => {
+  const procedures = ['prepareSession', 'initiateFromPreparedSession', 'sendMessage'] as const;
+
+  function workerError(code: string, httpStatus: number, message: string) {
+    return new TRPCClientError(message, {
+      result: { error: { code: -32000, message, data: { code, httpStatus } } },
+    });
+  }
+
+  async function callWithWorkerError(
+    procedure: (typeof procedures)[number],
+    error: Error
+  ): Promise<unknown> {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+    switch (procedure) {
+      case 'prepareSession':
+        mockPrepareSession.mockRejectedValueOnce(error);
+        return caller.prepareSession({
+          organizationId: ORGANIZATION_ID,
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'kilo/test-model',
+          githubRepo: 'acme/repo',
+          autoInitiate: true,
+        });
+      case 'initiateFromPreparedSession':
+        mockInitiateFromPreparedSession.mockRejectedValueOnce(error);
+        return caller.initiateFromPreparedSession({
+          organizationId: ORGANIZATION_ID,
+          cloudAgentSessionId: 'agent_123',
+        });
+      case 'sendMessage':
+        mockSendMessage.mockRejectedValueOnce(error);
+        return caller.sendMessage({
+          organizationId: ORGANIZATION_ID,
+          cloudAgentSessionId: 'agent_123',
+          payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'kilo/test-model' },
+        });
+    }
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValue({
+      isFree: false,
+      hasUserByokAvailable: false,
+    });
+  });
+
+  describe.each(procedures)('%s', procedure => {
+    it.each([
+      ['BAD_REQUEST', 400, 'Session sandbox cleanup is scheduled'],
+      ['NOT_FOUND', 404, 'Session not found'],
+      ['CONFLICT', 409, 'creation_in_progress'],
+    ])('keeps Worker %s as HTTP %i', async (code, httpStatus, message) => {
+      const error = workerError(code, httpStatus, message);
+
+      const thrown = await callWithWorkerError(procedure, error).catch((e: unknown) => e);
+
+      expect(thrown).toBeInstanceOf(TRPCError);
+      expect(thrown).toMatchObject({ code, message, cause: error });
+      expect(getHTTPStatusCodeFromError(thrown as TRPCError)).toBe(httpStatus);
+    });
+
+    it('keeps a Worker INTERNAL_SERVER_ERROR as HTTP 500', async () => {
+      const error = workerError('INTERNAL_SERVER_ERROR', 500, 'Worker failed');
+
+      const thrown = await callWithWorkerError(procedure, error).catch((e: unknown) => e);
+
+      expect(thrown).toBeInstanceOf(TRPCError);
+      expect(thrown).toMatchObject({ code: 'INTERNAL_SERVER_ERROR', cause: error });
+      expect(getHTTPStatusCodeFromError(thrown as TRPCError)).toBe(500);
+    });
   });
 });
 

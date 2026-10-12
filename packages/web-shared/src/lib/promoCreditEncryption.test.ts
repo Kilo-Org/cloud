@@ -20,7 +20,7 @@ function loadModule(
 ): PromoEncryptionModule {
   jest.resetModules();
   jest.replaceProperty(process, 'env', { ...process.env, NODE_ENV: nodeEnv });
-  jest.doMock('@/lib/config.server', () => ({
+  jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
     CREDIT_CATEGORIES_ENCRYPTION_KEY_V2: '',
     CREDIT_CATEGORIES_ENCRYPTION_KEY: key,
   }));
@@ -30,7 +30,7 @@ function loadModule(
 
 describe('decryptPromoCode', () => {
   afterEach(() => {
-    jest.dontMock('@/lib/config.server');
+    jest.dontMock('@kilocode/web-shared/lib/config.server');
     jest.restoreAllMocks();
     jest.resetModules();
   });

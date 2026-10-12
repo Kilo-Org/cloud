@@ -21,24 +21,30 @@ function sandboxAllocationUnavailableReason(
   allocation: SandboxAllocation
 ): string | undefined {
   const provider = getSandboxAllocationProvider(allocation);
-  if (provider === 'cloudflare') return undefined;
-  if (provider === 'vercel') {
-    if (!parseVercelSandboxRuntimeConfig(env)) return 'Vercel sandboxes are not configured';
-    if (isCloudAgentContainerBillingEnabled(env, owner)) {
-      return 'Vercel sandboxes do not support enforced compute billing';
+  switch (provider) {
+    case 'cloudflare':
+      return undefined;
+    case 'vercel':
+      if (!parseVercelSandboxRuntimeConfig(env)) return 'Vercel sandboxes are not configured';
+      if (isCloudAgentContainerBillingEnabled(env, owner)) {
+        return 'Vercel sandboxes do not support enforced compute billing';
+      }
+      return undefined;
+    case 'cloudflare-containers':
+      if (!isCloudflareContainersEnrolled(env, { orgId: owner.orgId })) {
+        return 'Cloudflare containers are not enabled for this account';
+      }
+      return undefined;
+    default: {
+      const exhaustive: never = provider;
+      return `Sandbox allocation provider ${String(exhaustive)} is not supported`;
     }
-    return undefined;
   }
-  if (!isCloudflareContainersEnrolled(env, { orgId: owner.orgId })) {
-    return 'Cloudflare containers are not enabled for this account';
-  }
-  return undefined;
 }
 
 export function getSandboxSelectionCapabilities(
   env: Env,
-  owner: SelectionOwner,
-  devcontainer = false
+  owner: SelectionOwner
 ): SandboxSelectionCapabilities {
   if (
     !isOrgInList(env.SANDBOX_SELECTION_IDS, owner.userId) &&
@@ -49,7 +55,7 @@ export function getSandboxSelectionCapabilities(
 
   return {
     enabled: true,
-    defaultDestination: getDefaultSandboxDestination(env, owner, devcontainer),
+    defaultDestination: getDefaultSandboxDestination(env, owner),
     options: SELECTABLE_SANDBOX_ALLOCATIONS.filter(
       allocation => sandboxAllocationUnavailableReason(env, owner, allocation) === undefined
     ).map(allocation => ({ allocation: getSandboxAllocationRequest(allocation) })),

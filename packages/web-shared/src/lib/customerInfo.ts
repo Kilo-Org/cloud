@@ -1,10 +1,13 @@
-import { summarizeUserPayments, type UserPaymentsSummary } from '@/lib/creditTransactions';
-import { hasPaymentMethodInStripe } from '@/lib/stripe-client';
-import { db } from '@/lib/drizzle';
+import {
+  summarizeUserPayments,
+  type UserPaymentsSummary,
+} from '@kilocode/web-shared/lib/creditTransactions';
+import { hasPaymentMethodInStripe } from '@kilocode/web-shared/lib/stripe-client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { payment_methods, kilocode_users, type User } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { userHasOrganizations } from '@/lib/organizations/organizations';
-import { hasReceivedAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';
+import { userHasOrganizations } from '@kilocode/web-shared/lib/organizations/organizations';
+import { hasReceivedAnyFreeWelcomeCredits } from '@kilocode/web-shared/lib/welcomeCredits';
 
 export type CustomerInfo = {
   hasPaid: boolean;

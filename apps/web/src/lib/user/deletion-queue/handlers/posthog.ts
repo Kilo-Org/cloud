@@ -2,14 +2,14 @@ import { and, eq, sql } from 'drizzle-orm';
 import { kilocode_users, user_deletion_steps } from '@kilocode/db/schema';
 import { UserDeletionStepKey, type UserDeletionTaskProgress } from '@kilocode/db/schema-types';
 import { isSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
-import { getEnvVariable } from '@/lib/dotenvx';
-import { db } from '@/lib/drizzle';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { writeDeletionActivity } from '@/lib/user/deletion-queue/deletion-audit';
 import {
   USER_DELETION_DEFAULT_POSTHOG_HOST,
   USER_DELETION_ID_ONLY_CATALOG_VERSION,
   USER_DELETION_POSTHOG_MAX_VERIFY_ATTEMPTS,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   decryptDeletionResourceIds,
   encryptDeletionResourceIds,

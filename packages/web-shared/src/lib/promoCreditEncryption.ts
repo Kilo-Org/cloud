@@ -4,11 +4,11 @@ import {
   decryptWithSymmetricKey,
   EncryptionConfigurationError,
   EncryptionFormatError,
-} from '@/lib/encryption';
+} from '@kilocode/web-shared/lib/encryption';
 import {
   CREDIT_CATEGORIES_ENCRYPTION_KEY,
   CREDIT_CATEGORIES_ENCRYPTION_KEY_V2,
-} from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/config.server';
 
 const getEncryptionKey = () => {
   const encryptionKey = CREDIT_CATEGORIES_ENCRYPTION_KEY_V2 || CREDIT_CATEGORIES_ENCRYPTION_KEY;

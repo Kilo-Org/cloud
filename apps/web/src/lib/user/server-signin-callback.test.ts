@@ -11,8 +11,8 @@ jest.mock('next/headers', () => ({
     getAll: () => [...cookieStore.values()],
   }),
 }));
-jest.mock('@/lib/constants', () => ({
-  ...(jest.requireActual('@/lib/constants') as object),
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/constants') as object),
   allow_fake_login: true,
 }));
 jest.mock('@/lib/user', () => ({
@@ -23,15 +23,15 @@ jest.mock('@/lib/user', () => ({
 jest.mock('@/lib/account-linking-session', () => ({
   getAccountLinkingSession: jest.fn(),
 }));
-jest.mock('@/lib/organizations/organization-sso-policy', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({
   resolveSsoAuthorityForDomain: jest.fn(),
 }));
-jest.mock('@/lib/organizations/organizations', () => ({
-  ...(jest.requireActual('@/lib/organizations/organizations') as object),
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/organizations/organizations') as object),
   getUserOrgMemberships: jest.fn(),
   getOrganizationById: jest.fn(),
 }));
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async () => ({ id: 'cus_test' })),
   deleteStripeCustomer: jest.fn(async () => {}),
 }));
@@ -39,10 +39,13 @@ jest.mock('@/lib/stripe-client', () => ({
 import jwt from 'jsonwebtoken';
 import { authOptions } from '@/lib/user/next-auth-options';
 import { createOrUpdateUser, linkAccountToExistingUser } from '@/lib/user';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { getOrganizationById, getUserOrgMemberships } from '@/lib/organizations/organizations';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import {
+  getOrganizationById,
+  getUserOrgMemberships,
+} from '@kilocode/web-shared/lib/organizations/organizations';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockLinkAccountToExistingUser = jest.mocked(linkAccountToExistingUser);

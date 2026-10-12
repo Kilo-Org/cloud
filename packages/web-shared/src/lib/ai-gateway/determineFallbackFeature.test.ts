@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { determineFallbackFeature } from '@/lib/ai-gateway/determineFallbackFeature';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
 
 const request: GatewayRequest = {
   kind: 'chat_completions',

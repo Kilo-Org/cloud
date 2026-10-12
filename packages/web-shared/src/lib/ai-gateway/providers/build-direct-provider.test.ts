@@ -1,9 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 import { CustomLlmApiConfigSchema, type CustomLlmApiConfig } from '@kilocode/db';
-import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { ReasoningDetailsTransform } from '@/lib/ai-gateway/providers/types';
-import { applyReasoningDetailsTransform } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { applyReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { buildDirectProvider } from './build-direct-provider';
 
 type ChatCompletionRequest = Extract<GatewayRequest, { kind: 'chat_completions' }>;

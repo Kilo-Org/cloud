@@ -7,7 +7,7 @@ import { describe, expect, it, beforeAll, beforeEach } from '@jest/globals';
 // mocked modules load for real before registration. Same pattern as
 // github-pr-review-router.test.ts.
 import { TRPCError } from '@trpc/server';
-import { createCallerFactory } from '@/lib/trpc/init';
+import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User, OperationLedgerRow } from '@kilocode/db/schema';
 import { providerPrRefKey } from '@kilocode/app-shared/provider-review';
 import { GitLabReviewError } from '@/lib/provider-review/gitlab-authorization';
@@ -43,10 +43,10 @@ jest.mock('@kilocode/db/operation-ledger', () => ({
 }));
 
 // The router passes `db` to the (mocked) ledger only.
-jest.mock('@/lib/drizzle', () => ({ db: {} }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: {} }));
 
 const mockEnsureOrganizationAccess = jest.fn();
-jest.mock('@/routers/organizations/utils', () => ({
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: (...args: unknown[]) => mockEnsureOrganizationAccess(...args),
 }));
 

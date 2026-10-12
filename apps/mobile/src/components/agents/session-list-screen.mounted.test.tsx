@@ -108,6 +108,44 @@ vi.mock('@shopify/flash-list', () => ({
       )
     ),
 }));
+// The screen reads the keyboard from `react-native-keyboard-controller`'s
+// provider, so the tests drive that store instead of React Native's `Keyboard`
+// events. `useKeyboardState` is selector-aware, as the real hook is.
+const keyboardStore = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  return {
+    state: { height: 0 },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setHeight: (height: number) => {
+      keyboardStore.state.height = height;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
+});
+vi.mock('react-native-keyboard-controller', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so `react`
+  // must be pulled in here.
+  const React = await import('react');
+  const heightOf = () => keyboardStore.state.height;
+  return {
+    KeyboardProvider: 'KeyboardProvider',
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    KeyboardChatScrollView: 'KeyboardChatScrollView',
+    useKeyboardState: (selector?: (snapshot: Record<string, unknown>) => unknown) => {
+      const height = React.useSyncExternalStore(keyboardStore.subscribe, heightOf, heightOf);
+      const snapshot = { height, isVisible: height > 0, progress: height > 0 ? 1 : 0, duration: 0 };
+      return selector ? selector(snapshot) : snapshot;
+    },
+  };
+});
+
 vi.mock('react-native', () => ({
   I18nManager: i18nManager,
   Platform: state.platform,
@@ -467,36 +505,13 @@ function keyboardListeners(event: string) {
   return state.keyboard.get(event) ?? new Set();
 }
 function showKeyboard(height: number) {
-  for (const listener of keyboardListeners('keyboardDidShow')) {
-    listener({ endCoordinates: { height } });
-  }
+  keyboardStore.setHeight(height);
 }
 function hideKeyboard() {
-  for (const listener of keyboardListeners('keyboardDidHide')) {
-    listener({ endCoordinates: { height: 0 } });
-  }
+  keyboardStore.setHeight(0);
 }
 function surfaceBottomInset() {
   return root().findByType(StateSurfaceInsets).props.bottomInset as number;
-}
-/**
- * The padding the keyboard container applies to the region. The container
- * (`AppAwareKeyboardPaddingView` on Android, `KeyboardAvoidingView` on iOS)
- * already clears the IME, so the rows frame adds only the part of the rows band
- * the container does not cover; a case that asserts the rows viewport reads both
- * halves of that composition rather than the frame alone.
- */
-function keyboardContainerPadding() {
-  let padding = 0;
-  for (const node of nodes('View')) {
-    const styles = node.props.style as unknown;
-    if (Array.isArray(styles)) {
-      for (const style of styles as ({ paddingBottom?: number } | undefined)[]) {
-        padding = Math.max(padding, style?.paddingBottom ?? 0);
-      }
-    }
-  }
-  return padding;
 }
 /**
  * The band the composed app observes. The real `StateSurfaceInsets` resolves
@@ -522,6 +537,7 @@ beforeEach(() => {
   state.tabBarHeight = 60;
   state.focusCallbacks.clear();
   state.keyboard.clear();
+  keyboardStore.setHeight(0);
   state.destination = '';
   state.sessionId = '';
   state.announcements = [];
@@ -551,6 +567,7 @@ afterEach(async () => {
   mountedRenderer = undefined;
   state.listeners.clear();
   state.keyboard.clear();
+  keyboardStore.setHeight(0);
   await i18n.changeLanguage('en');
 });
 
@@ -1642,27 +1659,18 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(descendantsOf(container, 'CenteredState')).toHaveLength(1);
     expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
 
-    // Android: edge-to-edge never resizes the window for the IME, so the
-    // app-aware container follows the keyboard events and pads its frame; the
-    // body re-centers inside the shrunken viewport.
+    // Android: edge-to-edge never resizes the window for the IME either, and the
+    // same native container owns the lift. The tree carries no JS padding, so
+    // the body stays inside the one container instead of a per-platform fork.
     state.platform.OS = 'android';
     await renderScreen();
     act(() => {
       showKeyboard(320);
     });
-    const padded = nodes('View').find(
-      node =>
-        Array.isArray(node.props.style) &&
-        node.props.style.some(
-          (part: { paddingBottom?: number } | undefined) => part?.paddingBottom === 320
-        )
-    );
-    expect(padded).toBeDefined();
-    if (!padded) {
-      throw new Error('Missing app-aware padding container');
-    }
-    expect(descendantsOf(padded, 'CenteredState')).toHaveLength(1);
-    expect(nodes('KeyboardAvoidingView')).toHaveLength(0);
+    const androidContainer = requireNode('KeyboardAvoidingView');
+    expect(androidContainer.props.behavior).toBe('padding');
+    expect(descendantsOf(androidContainer, 'CenteredState')).toHaveLength(1);
+    expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
   });
 
   it('reserves the keyboard height for the no-match body so its second line stays readable', async () => {
@@ -1695,9 +1703,7 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(surfaceBottomInset()).toBe(320);
 
     act(() => {
-      for (const listener of keyboardListeners('keyboardDidHide')) {
-        listener({ endCoordinates: { height: 0 } });
-      }
+      hideKeyboard();
     });
     expect(surfaceBottomInset()).toBe(state.tabBarHeight);
   });
@@ -1765,26 +1771,24 @@ describe('AgentSessionListScreen live filtering', () => {
     state.live.activeSessions = [row];
     await renderScreen();
     const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
-    // Keyboard down the container pads nothing and the frame ends at the tab
-    // bar: the FAB clearance rides on the content, not the frame.
+    // Keyboard down the native container lifts nothing and the frame ends at the
+    // tab bar: the FAB clearance rides on the content, not the frame.
+    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
-    expect(keyboardContainerPadding()).toBe(0);
 
     act(() => {
       showKeyboard(320);
     });
-    // The container already pads the IME's occlusion and the frame adds only the
-    // part it does not cover, so the two together end the viewport at the IME's
-    // top edge instead of a whole keyboard height above it. The IME is taller
-    // than the FAB band, so the frame contributes nothing.
-    expect(keyboardContainerPadding()).toBe(320);
+    // The native container owns the whole IME lift, so the frame adds nothing and
+    // the viewport ends at the IME's top edge instead of a whole keyboard height
+    // above it. The IME is taller than the FAB band, so the frame contributes
+    // nothing.
+    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
     expect(listStyle()).toEqual({ marginBottom: 0 });
-    expect(keyboardContainerPadding() + listStyle().marginBottom).toBe(320);
 
     act(() => {
       hideKeyboard();
     });
-    expect(keyboardContainerPadding()).toBe(0);
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
   });
 
@@ -1806,11 +1810,11 @@ describe('AgentSessionListScreen live filtering', () => {
     // The centered states still take the shorter IME band, so their copy clears
     // the keyboard rather than a phantom tab-bar band.
     expect(surfaceBottomInset()).toBe(100);
-    // The rows list cannot: the container covers the IME and the frame adds the
-    // rest of the FAB band, so a shorter frame never parks rows under the button.
-    expect(keyboardContainerPadding()).toBe(100);
+    // The rows list cannot: the native container lifts the IME's 100 and the
+    // frame adds the rest of the FAB band, so a shorter frame never parks rows
+    // under the button.
+    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
     expect(listStyle()).toEqual({ marginBottom: fabBand - 100 });
-    expect(keyboardContainerPadding() + listStyle().marginBottom).toBe(fabBand);
 
     act(() => {
       hideKeyboard();
@@ -1819,18 +1823,18 @@ describe('AgentSessionListScreen live filtering', () => {
   });
 
   it('subscribes to the keyboard once for the bands, not once per band consumer', async () => {
-    // Review finding (session-list-screen.tsx:101): the screen called
-    // `useKeyboardOcclusion` directly while `useAgentsBottomBands` already
-    // subscribes to the same events, so every band consumer added a third
-    // listener beside the app-aware container's own. Both bands — including the
-    // rows frame band — now come out of that one hook call.
+    // Review finding (session-list-screen.tsx:101): the screen read the
+    // keyboard twice, once through the band hook and once through the container
+    // beside it. Both bands — including the rows frame band — come out of the
+    // one band hook call, and both the container and the band hook read the
+    // provider, so the screen registers no React Native keyboard listener at
+    // all.
     state.platform.OS = 'android';
     state.live.activeSessions = [row];
     await renderScreen();
 
-    // The band hook's own subscription plus the app-aware container's.
-    expect(keyboardListeners('keyboardDidShow').size).toBe(2);
-    expect(keyboardListeners('keyboardDidHide').size).toBe(2);
+    expect(keyboardListeners('keyboardDidShow').size).toBe(0);
+    expect(keyboardListeners('keyboardDidHide').size).toBe(0);
   });
 
   it('narrows the live list to the search text', async () => {

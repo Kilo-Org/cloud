@@ -16,6 +16,8 @@ Then regenerate:
 The Kilo MCP server exposes the Kilo API through two tools, `kilo_search` and
 `kilo_call`.
 
+The changes are recorded in `services/kilo-mcp/CHANGELOG.md`.
+
 ## How to use it
 
 1. **Search first.** `kilo_search` finds catalog endpoints. Never call a path from memory, and never guess one from this skill.
@@ -49,7 +51,7 @@ to send platform feedback and bug reports rather than a support channel.
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**864 procedures** — **370 queries**, **494 mutations** — under **53 prefixes**.
+**861 procedures** — **370 queries**, **491 mutations** — under **52 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|
@@ -59,7 +61,7 @@ each row's `summary` and `tags` are what the search matches.
 | `cloudAgentNext` | 31 | 12 | 19 |
 | `agentProfiles` | 30 | 4 | 26 |
 | `securityAgent` | 26 | 15 | 11 |
-| `kiloPass` | 22 | 11 | 11 |
+| `kiloPass` | 21 | 11 | 10 |
 | `githubPrReview` | 20 | 6 | 14 |
 | `githubApps` | 19 | 9 | 10 |
 | `cliSessionsV2` | 17 | 9 | 8 |
@@ -86,14 +88,13 @@ each row's `summary` and `tags` are what the search matches.
 | `modelPreferences` | 6 | 1 | 5 |
 | `usageAnalytics` | 6 | 6 | 0 |
 | `workspaceFolders` | 6 | 1 | 5 |
-| `activeSessions` | 4 | 3 | 1 |
+| `activeSessions` | 5 | 4 | 1 |
 | `debug` | 4 | 4 | 0 |
 | `discord` | 4 | 1 | 3 |
 | `securityAuditLog` | 4 | 3 | 1 |
 | `slack` | 4 | 1 | 3 |
 | `credits` | 3 | 1 | 2 |
 | `linear` | 3 | 1 | 2 |
-| `quickChat` | 3 | 1 | 2 |
 | `unifiedSessions` | 3 | 3 | 0 |
 | `mcpGatewayAuthorizations` | 2 | 1 | 1 |
 | `models` | 2 | 2 | 0 |

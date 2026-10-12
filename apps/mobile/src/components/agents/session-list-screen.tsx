@@ -1,15 +1,8 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import {
-  AppState,
-  I18nManager,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { AppState, I18nManager, Pressable, useWindowDimensions, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +18,6 @@ import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { SessionListSkeletonRows } from '@/components/agents/session-list-skeleton-rows';
-import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import { estimateSessionListHeaderActionsWidth } from '@/components/agents/session-list-header-actions-width';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
@@ -42,7 +34,6 @@ import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -62,10 +53,6 @@ export function AgentSessionListScreen() {
   // presentation decision needs the window's text scale (see
   // `useAgentsListChrome`).
   const { fontScale } = useWindowDimensions();
-  // Android runs edge-to-edge and never resizes the window for the IME, so the
-  // native KeyboardAvoidingView is inert there; the app-aware container follows
-  // the keyboard events instead (the repo's one platform fork for this).
-  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const context = useLiveSessionContext();
   const { organizationId, isError: isContextError, refetch: refetchContext } = context;
@@ -522,13 +509,12 @@ export function AgentSessionListScreen() {
             onClearSearch={query.handleClearSearch}
           />
         ) : null}
-        {keyboardContainerKind === 'app-aware-padding' ? (
-          <AppAwareKeyboardPaddingView className="flex-1">{region}</AppAwareKeyboardPaddingView>
-        ) : (
-          <KeyboardAvoidingView className="flex-1" behavior="padding">
-            {region}
-          </KeyboardAvoidingView>
-        )}
+        {/* Android runs edge-to-edge and never resizes the window for the IME,
+            so the keyboard is cleared natively: `KeyboardProvider` measures the
+            IME and this view lifts by the overlap it reports. */}
+        <KeyboardAvoidingView className="flex-1" behavior="padding">
+          {region}
+        </KeyboardAvoidingView>
         {/* Empty content owns its creation action; the no-match body owns the band. */}
         {showFab && <SessionListFab organizationId={organizationId} style={fabStyle} />}
         {showFilterModal && (

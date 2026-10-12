@@ -1,7 +1,7 @@
-import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import type { FraudDetectionHeaders } from '@/lib/fraud-detection-headers';
-import type { OpenAiChatGptOwner } from '@/lib/ai-gateway/openai-chatgpt/store';
+import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import type { OpenAiChatGptOwner } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import {
   ReasoningDetailsTransform,
   type ReasoningDetailsTransform as ReasoningDetailsTransformType,

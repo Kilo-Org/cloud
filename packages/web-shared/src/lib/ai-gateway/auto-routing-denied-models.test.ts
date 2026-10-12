@@ -1,9 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
-import { getAutoRoutingSettings } from '@/lib/ai-gateway/auto-routing-admin-client';
-import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
-import { getDataCollectionRequiredModelIds } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import type { EffectiveOrganizationModelPolicy } from '@/lib/organizations/effective-model-access.server';
-import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
+import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
+import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { MINIMAX_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import {
   candidateModelIdsFromSources,
   collectDataCollectionRequiredAutoRoutingModelIds,
@@ -12,15 +12,18 @@ import {
   policyNeedsCandidateEvaluation,
 } from './auto-routing-denied-models';
 
-jest.mock('@/lib/ai-gateway/auto-routing-admin-client', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client', () => ({
   getAutoRoutingSettings: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
-  getDataCollectionRequiredModelIds: jest.fn(),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
+  () => ({
+    getDataCollectionRequiredModelIds: jest.fn(),
+  })
+);
 
 function policy(
   overrides: Partial<EffectiveOrganizationModelPolicy> = {}
@@ -91,7 +94,7 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
         'implementation/code_generation': [
           { model: 'meta/muse-spark-1.3-contributor' },
           { model: 'meta/muse-spark-1.3' },
-          { model: 'stepfun/step-3.7-flash:free' },
+          { model: 'stepfun/step-5-preview-free' },
           { model: 'kilo-auto/balanced' },
         ],
       },
@@ -102,7 +105,7 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
 
     await expect(collectDataCollectionRequiredAutoRoutingModelIds(owner)).resolves.toEqual([
       'meta/muse-spark-1.3-contributor',
-      'stepfun/step-3.7-flash:free',
+      'stepfun/step-5-preview-free',
     ]);
   });
 });

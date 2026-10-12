@@ -1,9 +1,9 @@
 import crypto from 'crypto';
-import { type Provider } from '@/lib/ai-gateway/providers/types';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
-import { getEnvVariable } from '@/lib/dotenvx';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { type Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 /**
  * Generates a service-specific SHA256 hash.

@@ -3,8 +3,8 @@ import {
   createAllowPredicateFromProviderAllowList,
   createAllowPredicateFromRestrictions,
   type ProviderLookup,
-} from '@/lib/model-allow.server';
-import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
+} from '@kilocode/web-shared/lib/model-allow.server';
+import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 
 function lookup(map: Record<string, string[]>): ProviderLookup {
   return async modelId => new Set(map[modelId] ?? []);
@@ -156,27 +156,27 @@ describe('model access predicates', () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       undefined,
       ['deepseek', 'fireworks'],
-      lookup({ 'stepfun/step-3.7-flash': ['fireworks', 'stepfun'] })
+      lookup({ 'stepfun/step-5-preview': ['fireworks', 'stepfun'] })
     );
 
-    await expect(isAllowed('stepfun/step-3.7-flash:free')).resolves.toBe(false);
-    await expect(isAllowed('stepfun/step-3.7-flash')).resolves.toBe(true);
+    await expect(isAllowed('stepfun/step-5-preview-free')).resolves.toBe(false);
+    await expect(isAllowed('stepfun/step-5-preview')).resolves.toBe(true);
   });
 
   test('provider allow list keeps restricted exclusive models when a restricted provider remains enabled', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       undefined,
       ['stepfun', 'fireworks'],
-      lookup({ 'stepfun/step-3.7-flash': ['fireworks'] })
+      lookup({ 'stepfun/step-5-preview': ['fireworks'] })
     );
 
-    await expect(isAllowed('stepfun/step-3.7-flash:free')).resolves.toBe(true);
+    await expect(isAllowed('stepfun/step-5-preview-free')).resolves.toBe(true);
   });
 
   test('provider allow list still evaluates restricted exclusive models missing from the snapshot', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(undefined, ['stepfun'], lookup({}));
 
-    await expect(isAllowed('stepfun/step-3.7-flash:free')).resolves.toBe(true);
+    await expect(isAllowed('stepfun/step-5-preview-free')).resolves.toBe(true);
     await expect(isAllowed('unknown/model')).resolves.toBe(false);
   });
 });

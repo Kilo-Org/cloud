@@ -10,14 +10,14 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   catalogEntryFor,
   catalogForVersion,
   validateMaterializedStepKeys,
   UserDeletionPhase,
 } from '@/lib/user/deletion-queue/deletion-catalog';
-import { USER_DELETION_ANONYMIZE_MIN_REMAINING_MS } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_ANONYMIZE_MIN_REMAINING_MS } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { SUCCESSFUL_TASK_STATUSES } from '@/lib/user/deletion-queue/deletion-types';
 
 export type SelectedDeletionTask = {

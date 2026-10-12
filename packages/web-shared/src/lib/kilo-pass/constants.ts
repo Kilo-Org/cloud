@@ -1,4 +1,4 @@
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 export {
   KILO_PASS_MONTHLY_RAMP_BASE_BONUS_PERCENT,
   KILO_PASS_MONTHLY_RAMP_CAP_BONUS_PERCENT,
@@ -15,8 +15,6 @@ export const KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT = dayjs(
   '2026-05-28T12:06:20.000Z'
 ).utc();
 
-// First-time subscribers receive a 50% bonus for month 2 only if they started
-// strictly before this grandfather cutoff. Month 1 remains 50% for new subscribers.
-export const KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF = dayjs('2026-05-07T00:00:00Z').utc();
-
-export const KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT = 0.5;
+// Eligible monthly subscriptions starting at this boundary receive their welcome promo in month 2.
+export const KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF =
+  dayjs('2026-10-09T00:00:00Z').utc();

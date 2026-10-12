@@ -1,10 +1,10 @@
 import {
   DirectByokModelArraySchema,
   type DirectByokModel,
-} from '@/lib/ai-gateway/providers/direct-byok/types';
-import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { createCachedFetch } from '@/lib/cached-fetch';
-import { readDb } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 

@@ -3,14 +3,13 @@ import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
 import { I18nManager, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 import { useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { offlineHeaderReservation } from '@/lib/offline-banner-state';
-import { useSideInsetStyle } from '@/lib/screen-insets';
+import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 /**
@@ -210,7 +209,7 @@ export function ScreenHeader({
   safeAreaTop = true,
   className,
 }: Readonly<ScreenHeaderProps>) {
-  const insets = useSafeAreaInsets();
+  const insets = useScreenInsets();
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -251,17 +250,9 @@ export function ScreenHeader({
   // vertical padding through `className`.
   const safeAreaStyle = safeAreaTop ? { paddingTop } : undefined;
 
-  // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
-  // whole chrome off the sensor. The one shared hook serves both platforms and
-  // every caller: the brand mark on a page root and the sections, cards and
-  // actions below it then share one leading edge. It goes on an inner wrapper so
-  // it ADDS to the `px-4` gutter: an inline padding on the container would beat
-  // the className (inline style wins in React Native) and swallow the gutter,
-  // pulling the back control's `-ms-4` chevron back inside the sensor area. Zero
-  // insets collapse the wrapper style to `undefined`, so portrait geometry is
-  // byte-identical and a rotation never moves anything vertically. Side padding
-  // applies to every caller — a sheet with `safeAreaTop={false}` still runs
-  // edge-to-edge horizontally and must clear the cutout too.
+  // The shared inset hook keeps the chrome and body clear of side status areas
+  // and rounded corners. The inner wrapper adds this clearance to the gutter
+  // instead of replacing its className padding.
   const sideInsetStyle = useSideInsetStyle();
 
   // When `backIcon` isn't specified, fall back to the historical behaviour

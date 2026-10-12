@@ -7,7 +7,7 @@ import {
   getStripeEndedAtIso,
   resolveSettledInvoicePayment,
 } from './stripe-handlers-utils';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
 
 describe('addOneMonthToIssueMonth', () => {
   it('adds one month to a mid-year month', () => {

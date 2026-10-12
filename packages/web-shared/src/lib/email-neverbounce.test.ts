@@ -1,5 +1,5 @@
 import { captureMessage } from '@sentry/nextjs';
-import { verifyEmail } from '@/lib/email-neverbounce';
+import { verifyEmail } from '@kilocode/web-shared/lib/email-neverbounce';
 
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
@@ -9,7 +9,7 @@ const mockCaptureMessage = captureMessage as jest.MockedFunction<typeof captureM
 
 let mockApiKey: string | undefined = 'test-api-key';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get NEVERBOUNCE_API_KEY() {
     return mockApiKey;
   },

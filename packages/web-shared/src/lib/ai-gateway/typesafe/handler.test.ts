@@ -1,18 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { z } from 'zod';
-import { errorExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { TypeSafeClient, choice, noul, score } from '@typesafe-ai/sdk';
 import type { User } from '@kilocode/db/schema';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { after, NextRequest, NextResponse } from 'next/server';
 import type * as NextServer from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
-} from '@/lib/ai-gateway/gateway-account-rate-limit';
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import {
   creditsBlockedResponse,
   extractFraudAndProjectHeaders,
@@ -20,47 +20,61 @@ import {
   getOrganizationProviderPrivacy,
   modelNotAllowedResponse,
   wrapInSafeNextResponse,
-} from '@/lib/ai-gateway/llm-proxy-helpers';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   getOpenRouterSystemOneModelsFromDatabase,
   resolveOpenRouterModelAlias,
-} from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
-import { logMicrodollarUsageAndReportToBouncer } from '@/lib/ai-gateway/processUsage';
-import { emitGatewayApiMetrics } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { systemOneRequestSchema, TYPESAFE_MODEL } from '@/lib/ai-gateway/typesafe/schemas';
-import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { logMicrodollarUsageAndReportToBouncer } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  systemOneRequestSchema,
+  TYPESAFE_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/typesafe/schemas';
+import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { startBouncerDecide } from '@kilocode/web-shared/lib/bouncer/inference';
+import type * as BouncerInference from '@kilocode/web-shared/lib/bouncer/inference';
+import type { DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
 import { handleSystemOneRequest } from './handler';
 
 jest.mock('next/server', () => ({
   ...jest.requireActual<typeof NextServer>('next/server'),
   after: jest.fn(),
 }));
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   errorExceptInTest: jest.fn(),
   warnExceptInTest: jest.fn(),
+  sentryLogger: jest.fn(() => jest.fn()),
 }));
-jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
-  getProviderSlugsForModel: jest.fn(),
+jest.mock('@kilocode/web-shared/lib/bouncer/inference', () => ({
+  ...jest.requireActual<typeof BouncerInference>('@kilocode/web-shared/lib/bouncer/inference'),
+  startBouncerDecide: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
+  () => ({
+    getProviderSlugsForModel: jest.fn(),
+  })
+);
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterSystemOneModelsFromDatabase: jest.fn(),
   resolveOpenRouterModelAlias: jest.fn(),
 }));
-jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
-jest.mock('@/lib/organizations/organization-usage', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
 }));
-jest.mock('@/lib/organizations/effective-model-access.server', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   resolveOrganizationMemberModelDecision: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/gateway-account-rate-limit', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
   isGatewayAccountRateLimited: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
   creditsBlockedResponse: jest.fn(),
   extractFraudAndProjectHeaders: jest.fn(),
   extractHeaderAndLimitLength: jest.fn(),
@@ -68,18 +82,20 @@ jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => ({
   modelNotAllowedResponse: jest.fn(),
   wrapInSafeNextResponse: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/providers/definitions/openrouter', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter', () => ({
   OPENROUTER: {
     id: 'openrouter',
     apiUrl: 'https://openrouter.ai/api/v1',
     apiKey: 'test-platform-openrouter-key',
   },
 }));
-jest.mock('@/lib/ai-gateway/providerHash', () => ({ generateProviderSpecificHash: jest.fn() }));
-jest.mock('@/lib/ai-gateway/processUsage', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providerHash', () => ({
+  generateProviderSpecificHash: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => ({
   logMicrodollarUsageAndReportToBouncer: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitGatewayApiMetrics: jest.fn(),
 }));
 
@@ -167,11 +183,14 @@ function deferredUsageCallbacks(): Array<() => Promise<unknown>> {
 }
 
 async function runAfter() {
-  // `after()` also carries the report-only bouncer decide promise; the deferred
-  // usage write is the function callback.
+  // The decide is mocked, so the only `after()` callback is the deferred usage write.
   const callbacks = deferredUsageCallbacks();
   expect(callbacks).toHaveLength(1);
   await callbacks[0]();
+}
+
+function mockVerdict(verdict: DecideResponse | null) {
+  jest.mocked(startBouncerDecide).mockResolvedValue(verdict);
 }
 
 describe('handleSystemOneRequest', () => {
@@ -179,6 +198,7 @@ describe('handleSystemOneRequest', () => {
     jest.resetAllMocks();
     globalThis.fetch = mockedFetch;
     setAuth();
+    mockVerdict(null);
     jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 1_000_000 });
     jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
     jest.mocked(gatewayRateLimitKey).mockReturnValue('test-rate-limit-key');
@@ -785,5 +805,44 @@ describe('handleSystemOneRequest', () => {
     );
     expect(deferredUsageCallbacks()).toHaveLength(0);
     expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+  });
+
+  it('starts one decide and rejects an enforced throttle before upstream', async () => {
+    mockVerdict({
+      enforced: true,
+      code: 'rate_limited',
+      retryAfterMs: 500,
+      spendWatch: false,
+      flags: [],
+    });
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('1');
+    expect(response.headers.get('retry-after-ms')).toBe('500');
+    expect(startBouncerDecide).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('passes a spend-watched verdict to usage with the decide request id', async () => {
+    mockVerdict({ enforced: false, spendWatch: true, flags: [] });
+
+    const response = await handleSystemOneRequest(makeRequest());
+    await runAfter();
+
+    expect(response.status).toBe(200);
+    const decideParams = jest.mocked(startBouncerDecide).mock.calls[0]?.[0];
+    if (!decideParams || decideParams instanceof Promise) throw new Error('Expected decide params');
+    expect(decideParams.account).toMatchObject({
+      accountId: `user:${user.id}`,
+      userId: user.id,
+    });
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        bouncer: expect.objectContaining({ spendWatch: true, requestId: decideParams.requestId }),
+      })
+    );
   });
 });

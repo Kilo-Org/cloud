@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 
 const mockedWarnExceptInTest = jest.fn();
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   AUTO_ROUTING_WORKER_URL: '',
   INTERNAL_API_SECRET: '',
 }));
 
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   warnExceptInTest: (...args: unknown[]) => mockedWarnExceptInTest(...args),
 }));
 

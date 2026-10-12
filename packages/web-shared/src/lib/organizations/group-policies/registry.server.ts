@@ -4,7 +4,7 @@ import type {
   OrganizationGroupPolicy,
   OrganizationGroupPolicyOf,
   OrganizationGroupPolicyType,
-} from '@/lib/organizations/group-policies/organization-group-policies';
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { normalizeModelAccessPolicy } from './model-access/model-access.server';
 
 type PolicyServerRegistry = {

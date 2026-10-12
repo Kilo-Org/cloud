@@ -1,8 +1,11 @@
 import 'server-only';
 
-import { db } from '@/lib/drizzle';
-import { fetchWithBackoff } from '@/lib/fetchWithBackoff';
-import { CONTRIBUTOR_CHAMPION_TEAM_EMAILS, GITHUB_ADMIN_STATS_TOKEN } from '@/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { fetchWithBackoff } from '@kilocode/web-shared/lib/fetchWithBackoff';
+import {
+  CONTRIBUTOR_CHAMPION_TEAM_EMAILS,
+  GITHUB_ADMIN_STATS_TOKEN,
+} from '@kilocode/web-shared/lib/config.server';
 import teamLoginsJson from '@/data/contributor-champion-kilo-team.json';
 import {
   contributor_champion_contributors,
@@ -13,8 +16,8 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, gte, isNotNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
-import { grantCreditForCategory } from '@/lib/promotionalCredits';
-import { toMicrodollars } from '@/lib/microdollars';
+import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { captureException } from '@sentry/nextjs';
 

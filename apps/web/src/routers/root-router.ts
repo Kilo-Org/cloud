@@ -1,5 +1,5 @@
 import 'server-only';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { organizationsRouter } from '@/routers/organizations/organization-router';
 import { testRouter } from '@/routers/test-router';
 import { debugRouter } from '@/routers/debug-router';
@@ -53,7 +53,6 @@ import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
 import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
-import { quickChatRouter } from '@/routers/quick-chat-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
@@ -109,7 +108,6 @@ export const rootRouter = createTRPCRouter({
   providerReview: providerReviewRouter,
   moderation: moderationRouter,
   userExports: userExportsRouter,
-  quickChat: quickChatRouter,
   spendAlerts: spendAlertRouter,
 });
 // export type definition of API

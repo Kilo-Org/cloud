@@ -1,0 +1,231 @@
+import {
+  buildGlanceableSnapshot,
+  GLANCEABLE_TERMINAL_MS,
+  isEligibleGlanceableWork,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { buildHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
+
+import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+
+import {
+  GLANCEABLE_FIXTURES,
+  type GlanceableFixture,
+  type GlanceableFixtureName,
+  isGlanceableFixtureName,
+} from './fixture-catalog';
+import { getTerminalBlankEpoch } from './cleanup';
+import {
+  holdGlanceableFixture,
+  isGlanceableFixtureHeld,
+  releaseGlanceableFixtureHold,
+} from './fixture-hold';
+import {
+  clearHomeWidgetData,
+  rememberHomeWidgetData,
+  setHomeWidgetDetails,
+} from './home-widget-data';
+import {
+  clearHomeWidgetRefresh,
+  HomeWidgetRefresh,
+  syncFixtureWidgetLocale,
+} from './home-widget-refresh';
+import { newestSessionTitle } from './newest-session';
+import { getLastGlanceableSnapshot } from './persist';
+import { type GlanceablePublisherContext } from './publisher';
+import { forEachSink, getGlanceableSinks, writeGlanceableFrame } from './sink-registry';
+import { setSurfaceExtras } from './surface-extras';
+import { recordWaitingAsk, selectWaitingAsk } from './waiting-ask';
+
+/**
+ * Dev-only glanceable fixture harness. `kiloapp:///dev/glanceable-fixture/<name>`
+ * pushes a catalog fixture (`fixture-catalog.ts`) into every placed surface and
+ * holds the live publisher; `.../release` drops the hold and the publisher
+ * mount rebuilds its publisher, which republishes the live tray. The only entry
+ * points are `+native-intent.tsx` and the publisher mount, both behind
+ * `__DEV__`.
+ */
+
+const FIXTURE_PATH = /(?:^|\/)dev\/glanceable-fixture\/([\w-]+)\/?(?:[?#].*)?$/;
+const RELEASE = 'release';
+/** Shape-valid hex approval key (`homeWidgetDetailsSchema`); it matches no live permission. */
+const FIXTURE_APPROVAL_KEY = 'a'.repeat(64);
+
+/** The signed-in scope the publisher mount runs under, or null while none. */
+let scope: GlanceablePublisherContext | null = null;
+/** A fixture requested before a scope existed (cold launch, restore in flight). */
+let pendingName: GlanceableFixtureName | null = null;
+let terminalTimer: ReturnType<typeof setTimeout> | null = null;
+let fixtureGeneration = 0;
+
+function log(message: string): void {
+  // eslint-disable-next-line no-console -- dev-only harness feedback in the Metro log
+  console.info(`[glanceable-fixture] ${message}`);
+}
+
+function cancelTerminal(): void {
+  if (terminalTimer !== null) {
+    clearTimeout(terminalTimer);
+    terminalTimer = null;
+  }
+}
+
+async function apply(name: GlanceableFixtureName, ctx: GlanceablePublisherContext): Promise<void> {
+  fixtureGeneration += 1;
+  const generation = fixtureGeneration;
+  const authEpoch = currentAuthEpoch();
+  const blankEpoch = getTerminalBlankEpoch();
+  await HomeWidgetRefresh?.setFixtureMode(true);
+  // Fixture mode blocks `syncHomeWidgetRefresh`, so the app-group locale the
+  // widget chrome mirrors its direction from is written here instead: without
+  // this the extension keeps the direction of the last real configure and draws
+  // Arabic copy inside left-to-right chrome.
+  await syncFixtureWidgetLocale();
+  const superseded = () =>
+    generation !== fixtureGeneration ||
+    !isGlanceableFixtureHeld() ||
+    currentAuthEpoch() !== authEpoch ||
+    getTerminalBlankEpoch() !== blankEpoch ||
+    scope?.userId !== ctx.userId ||
+    scope.organizationId !== ctx.organizationId;
+  if (superseded()) {
+    return;
+  }
+  const fixture: GlanceableFixture = GLANCEABLE_FIXTURES[name];
+  cancelTerminal();
+  clearHomeWidgetData();
+  await clearHomeWidgetRefresh();
+  if (superseded()) {
+    return;
+  }
+  const now = Date.now();
+  // Ids and the cloud connection let the waiting-ask selection name a session,
+  // so the Live Activity and the ongoing card offer Approve like a real ask.
+  // A recorded ask also carries an approval key, which is what makes the Home
+  // widget draw Approve; the key grants nothing and the press still has to
+  // match a live permission.
+  const fixtureRows = fixture.rows?.(now) ?? [];
+  const approvableIndex = fixtureRows.findIndex(row => row.status === 'permission');
+  const rows = fixtureRows.map((row, index) => ({
+    id: `glanceable-fixture-${index}`,
+    connectionId: CLOUD_AGENT_CONNECTION_ID,
+    status: row.status,
+    statusUpdatedAt: new Date(now - row.ago * 60_000).toISOString(),
+    scheduledAt: row.scheduledAt,
+    title: row.title,
+    approvalKey: index === approvableIndex ? FIXTURE_APPROVAL_KEY : undefined,
+  }));
+  // Seeded from the persisted revision, which is never below what any sink
+  // accepted, so the native surfaces take the frame instead of discarding it.
+  const homeSnapshot = buildGlanceableSnapshot({
+    sessions: rows,
+    userId: ctx.userId,
+    organizationId: ctx.organizationId,
+    now: now - (fixture.checkedAgo ?? 0) * 60_000,
+    previousRevision: getLastGlanceableSnapshot()?.revision ?? 0,
+  });
+  const details = buildHomeWidgetDetails(rows);
+  setHomeWidgetDetails(details);
+  const snapshot =
+    fixture.status === 'expired'
+      ? buildGlanceableSnapshot({
+          sessions: [],
+          userId: ctx.userId,
+          organizationId: ctx.organizationId,
+          now,
+          previousRevision: homeSnapshot.revision,
+          status: 'expired',
+        })
+      : { ...homeSnapshot, status: fixture.status ?? homeSnapshot.status };
+  // The Home card retains last-known work across the delayed and expiry frames, so
+  // the record it keeps is the confirmed (happy/empty) snapshot the fixture's rows
+  // imply — not the fixture's display override, which `rememberHomeWidgetData`
+  // rejects as an unconfirmed state. The waiting fixture has no confirmed work at
+  // all, so it retains nothing: an empty record would draw the empty copy instead
+  // of "Checking agents". Every other fixture remembers the same snapshot the
+  // sinks receive, so `home.status` matches what the widget draws.
+  const retained =
+    fixture.status === 'stale' || fixture.status === 'expired' ? homeSnapshot : snapshot;
+  rememberHomeWidgetData({ snapshot: retained, details });
+  const eligible = isEligibleGlanceableWork(snapshot);
+  setSurfaceExtras({
+    newestSessionTitle: newestSessionTitle(rows),
+    actionFeedback: fixture.actionFeedback ?? null,
+  });
+  recordWaitingAsk(eligible ? selectWaitingAsk(rows, ctx, now) : null);
+  writeGlanceableFrame(getGlanceableSinks(), snapshot, ctx);
+  if (!eligible) {
+    // The publisher's happy → empty terminal: a sink that does not own its
+    // native dismissal (the Android ongoing card) is ended after the window.
+    terminalTimer = setTimeout(() => {
+      terminalTimer = null;
+      forEachSink('fixture_terminal_end', sink => {
+        if (!sink.waitForNativeTerminal) {
+          sink.endImmediate();
+        }
+      });
+    }, GLANCEABLE_TERMINAL_MS);
+  }
+  log(`applied ${name} (revision ${snapshot.revision})`);
+}
+
+async function release(): Promise<void> {
+  fixtureGeneration += 1;
+  const generation = fixtureGeneration;
+  pendingName = null;
+  cancelTerminal();
+  clearHomeWidgetData();
+  await clearHomeWidgetRefresh();
+  if (generation !== fixtureGeneration) {
+    return;
+  }
+  await HomeWidgetRefresh?.setFixtureMode(false);
+  if (generation !== fixtureGeneration) {
+    return;
+  }
+  // The rebuilt publisher spreads the current extras, so the fixture's action
+  // feedback must not survive into the live surface.
+  setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
+  recordWaitingAsk(null);
+  releaseGlanceableFixtureHold();
+  log('released');
+}
+
+/**
+ * Handle a fixture link. True when the path is a fixture link (handled, even
+ * when the name is unknown), so the caller returns falsy and nothing navigates.
+ */
+export function handleGlanceableFixturePath(path: string): boolean {
+  const name = FIXTURE_PATH.exec(path)?.[1];
+  if (name === undefined) {
+    return false;
+  }
+  if (name === RELEASE) {
+    void release();
+    return true;
+  }
+  if (!isGlanceableFixtureName(name)) {
+    log(`unknown fixture ${name}`);
+    return true;
+  }
+  // Hold first, so the live publisher stays silent while a cold launch waits
+  // for the scope.
+  holdGlanceableFixture();
+  if (scope === null) {
+    pendingName = name;
+    log(`queued ${name} until a signed-in scope publishes`);
+    return true;
+  }
+  void apply(name, scope);
+  return true;
+}
+
+/** The publisher mount reports its scope; a queued fixture applies on arrival. */
+export function setGlanceableFixtureScope(next: GlanceablePublisherContext | null): void {
+  scope = next;
+  if (next !== null && pendingName !== null) {
+    const name = pendingName;
+    pendingName = null;
+    void apply(name, next);
+  }
+}

@@ -17,8 +17,8 @@ import {
   type SpendAlertRuleKind,
   type SpendAlertRuleView,
 } from './settings';
-import { sentryLogger } from '@/lib/utils.server';
-import type { db as defaultDb } from '@/lib/drizzle';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 
 /**
  * The spend-alert engine. A sweep is one statement that re-derives the hourly

@@ -161,7 +161,7 @@ describe('known setup secret redaction', () => {
         KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key } }),
       })
     );
-    const redact = createSecretRedactor(configs[0], configs[1], configs[2]);
+    const redact = createSecretRedactor(configs[0], [configs[1], configs[2]]);
     expect(redact('wrapper-auth-secret attachment-auth-secret guest-worktree-alias ready')).toBe(
       '[REDACTED] [REDACTED] [REDACTED] ready'
     );
@@ -252,5 +252,53 @@ describe('known setup secret redaction', () => {
     output.onOutput('stdout', 'fake-auth-key\nnext safe line\n');
     output.flush();
     expect(events.join('')).toBe('[setup output truncated]\nnext safe line\n');
+  });
+});
+
+describe('named secret env keys', () => {
+  it('redacts a named non-heuristic value from a later environment', () => {
+    const secret = 'postgres://user:pass@localhost:5432/app';
+    const redact = createSecretRedactor(
+      { NODE_ENV: 'production' },
+      [{ DATABASE_URL: secret }],
+      ['DATABASE_URL']
+    );
+    expect(redact(`connecting to ${secret} (production)`)).toBe(
+      'connecting to [REDACTED] (production)'
+    );
+  });
+
+  it('redacts split, multiline, and JSON-escaped named values', () => {
+    const secret = 'postgres://user:p"a\\ss\nnext-line@db/app';
+    const events: string[] = [];
+    const output = createOutputRedactor(
+      createSecretRedactor({}, [{ CONNECTION_STRING: secret }], ['CONNECTION_STRING']),
+      text => events.push(text)
+    );
+    const line = `CONNECTION_STRING=${secret}\n`;
+    for (let index = 0; index < line.length; index += 5) {
+      output.onOutput('stdout', line.slice(index, index + 5));
+    }
+    output.onOutput('stderr', JSON.stringify({ copied: secret }, null, 2));
+    output.flush();
+    const result = events.join('');
+    expect(result).not.toContain('postgres://user');
+    expect(result).not.toContain('next-line');
+    expect(result).toContain('[REDACTED]');
+  });
+
+  it('ignores inherited object property names in the secret key list', () => {
+    const redact = createSecretRedactor(
+      { NODE_ENV: 'production' },
+      [{}],
+      ['constructor', 'toString', '__proto__']
+    );
+    expect(redact('safe output')).toBe('safe output');
+  });
+
+  it('leaves a non-heuristic value unchanged when its key is not named', () => {
+    const secret = 'postgres://user:pass@localhost:5432/app';
+    const redact = createSecretRedactor({ NODE_ENV: 'production' }, [{ DATABASE_URL: secret }]);
+    expect(redact(`connecting to ${secret}`)).toBe(`connecting to ${secret}`);
   });
 });

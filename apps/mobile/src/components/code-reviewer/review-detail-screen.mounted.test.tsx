@@ -38,7 +38,6 @@ const buttons = vi.hoisted(() => ({
 const viewRenders = vi.hoisted(() => ({
   list: [] as { style?: unknown; className?: string; children?: unknown }[],
 }));
-const modalRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
 const nativePlatform = vi.hoisted(() => ({ OS: 'ios' }));
 const sessionListRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
 const composerRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
@@ -64,6 +63,11 @@ const statusHelpers = vi.hoisted(() => ({
   cancellable: false,
   retriggerable: false,
 }));
+const reviewConfig = vi.hoisted(() => ({
+  query: { isPending: false, data: undefined as unknown },
+  calls: [] as { scope: string; platform: string; enabled: boolean | undefined }[],
+}));
+const routerMock = vi.hoisted(() => ({ push: vi.fn() }));
 const spectatorStream = vi.hoisted(() => ({
   createReviewSpectatorStream: vi.fn(),
 }));
@@ -72,10 +76,6 @@ vi.mock('react-native', () => ({
   View: (props: { style?: unknown; className?: string; children?: ReactNode }) => {
     viewRenders.list.push(props);
     return createElement('View', props, props.children);
-  },
-  Modal: (props: { visible?: boolean; children?: ReactNode }) => {
-    modalRenders.list.push(props);
-    return props.visible ? createElement('Modal', props, props.children) : null;
   },
   Pressable: 'Pressable',
   Platform: nativePlatform,
@@ -96,7 +96,7 @@ vi.mock('react-native-reanimated', () => ({
   FadeOut: { duration: vi.fn() },
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => routerMock,
 }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
@@ -142,10 +142,6 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: ({ children }: { children?: unknown }) => children,
 }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'pr-review',
-  useFeatureFlag: () => true,
-}));
 vi.mock('@/lib/code-reviewer-open-pr-destination', () => ({
   resolveCodeReviewerOpenPrDestination: () => ({ kind: 'browser' }),
 }));
@@ -157,6 +153,13 @@ vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useReviewDetail: () => detail,
   useCancelReview: () => ({ isPending: false, mutate: vi.fn() }),
   useRetriggerReview: () => ({ isPending: false, mutate: vi.fn() }),
+}));
+vi.mock('@/lib/hooks/use-code-reviewer', () => ({
+  isPersonal: (scope: string) => scope === 'personal',
+  useReviewConfig: (scope: string, platform: string, options?: { enabled?: boolean }) => {
+    reviewConfig.calls.push({ scope, platform, enabled: options?.enabled });
+    return reviewConfig.query;
+  },
 }));
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
@@ -219,6 +222,11 @@ function collectText(node: unknown): string[] {
     return collectText((node as { children?: unknown }).children);
   }
   return [];
+}
+
+/** The native transcript sheet host, absent until the sheet is opened. */
+function transcriptSheets(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(node => (node.type as string) === 'BottomSheet');
 }
 
 function makeReview(over: Record<string, unknown> = {}) {
@@ -296,7 +304,9 @@ beforeEach(() => {
   queryErrors.errors = [];
   buttons.rendered = [];
   viewRenders.list = [];
-  modalRenders.list = [];
+  reviewConfig.query = { isPending: false, data: undefined };
+  reviewConfig.calls = [];
+  routerMock.push.mockClear();
   nativePlatform.OS = 'ios';
   sessionListRenders.list = [];
   composerRenders.list = [];
@@ -606,12 +616,13 @@ describe('ReviewDetailScreen transcript sheet', () => {
   });
 
   it('shows a transcript button without mounting the transcript inline', () => {
-    const texts = renderScreen();
+    const renderer = mountScreen();
+    const texts = collectText(renderer.toJSON());
 
     expect(texts).toContain('Session transcript');
     expect(texts).not.toContain('Waiting for the review transcript.');
     expect(texts).not.toContain('Done');
-    expect(modalRenders.list.at(-1)?.visible).toBe(false);
+    expect(transcriptSheets(renderer)).toHaveLength(0);
     expect(sessionListRenders.list).toHaveLength(0);
     expect(spectatorStream.createReviewSpectatorStream).not.toHaveBeenCalled();
   });
@@ -629,18 +640,30 @@ describe('ReviewDetailScreen transcript sheet', () => {
         await Promise.resolve();
       });
 
-      const modal = modalRenders.list.at(-1);
-      expect(modal?.visible).toBe(true);
-      expect(modal?.animationType).toBe('slide');
-      expect(modal?.presentationStyle).toBe(platform === 'ios' ? 'pageSheet' : undefined);
+      const sheet = transcriptSheets(renderer)[0];
+      expect(sheet?.props.index).toBe(0);
+      expect(sheet?.props.snapPoints).toEqual(['100%']);
       expect(collectText(renderer.toJSON())).toContain('Done');
       expect(connection.connect).toHaveBeenCalledTimes(1);
       expect(composerRenders.list).toHaveLength(0);
 
+      // Android expands the sheet over the status bar, so the surface pads the
+      // top inset; iOS presents below it and pads nothing.
+      const surface = renderer.root.findAll(
+        node => node.props.testID === 'session-page-sheet-surface'
+      )[0];
+      expect(surface?.props.style).toEqual({ paddingTop: platform === 'ios' ? 0 : 24 });
+
       act(() => {
-        (modal?.onRequestClose as (() => void) | undefined)?.();
+        (sheet?.props.onClose as (() => void) | undefined)?.();
       });
-      expect(modalRenders.list.at(-1)?.visible).toBe(false);
+      // The surface stays mounted through the dismiss animation: onClose starts
+      // it (index -1) and the native dismiss event ends it.
+      expect(transcriptSheets(renderer)[0]?.props.index).toBe(-1);
+      act(() => {
+        (transcriptSheets(renderer)[0]?.props.onDismiss as (() => void) | undefined)?.();
+      });
+      expect(transcriptSheets(renderer)).toHaveLength(0);
       expect(connection.destroy).toHaveBeenCalledTimes(1);
 
       openTranscriptSheet();
@@ -655,7 +678,11 @@ describe('ReviewDetailScreen transcript sheet', () => {
       act(() => {
         (done?.props.onPress as (() => void) | undefined)?.();
       });
-      expect(modalRenders.list.at(-1)?.visible).toBe(false);
+      expect(transcriptSheets(renderer)[0]?.props.index).toBe(-1);
+      act(() => {
+        (transcriptSheets(renderer)[0]?.props.onDismiss as (() => void) | undefined)?.();
+      });
+      expect(transcriptSheets(renderer)).toHaveLength(0);
       expect(connection.destroy).toHaveBeenCalledTimes(2);
     }
   );
@@ -667,10 +694,13 @@ describe('ReviewDetailScreen transcript sheet', () => {
       resolveConnection = resolve;
     });
     spectatorStream.createReviewSpectatorStream.mockReturnValue(pendingConnection);
-    mountScreen(true);
+    const renderer = mountScreen(true);
 
     act(() => {
-      (modalRenders.list.at(-1)?.onRequestClose as (() => void) | undefined)?.();
+      (transcriptSheets(renderer)[0]?.props.onClose as (() => void) | undefined)?.();
+    });
+    act(() => {
+      (transcriptSheets(renderer)[0]?.props.onDismiss as (() => void) | undefined)?.();
     });
     await act(async () => {
       resolveConnection?.(connection);
@@ -693,7 +723,7 @@ describe('ReviewDetailScreen transcript sheet', () => {
       renderer.update(createElement(ReviewDetailScreen, { scope: 'personal', reviewId: 'rev-2' }));
     });
 
-    expect(modalRenders.list.at(-1)?.visible).toBe(false);
+    expect(transcriptSheets(renderer)).toHaveLength(0);
     expect(connection.destroy).toHaveBeenCalledTimes(1);
     expect(spectatorStream.createReviewSpectatorStream).toHaveBeenCalledTimes(1);
   });
@@ -1139,5 +1169,91 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(liveErrorState).toBeDefined();
     expect(liveErrorState?.placement).toBeUndefined();
     expect(liveErrorState?.onRetry).toBeDefined();
+  });
+});
+
+describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
+  function renderFailedReview(over: Record<string, unknown> = {}) {
+    statusHelpers.retriggerable = true;
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed', manual_config: null, ...over }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    renderScreen();
+    return buttons.rendered.map(button => buttonText(button));
+  }
+
+  it('links to the settings instead of Retry when Code Reviewer is off', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+
+    const labels = renderFailedReview();
+
+    expect(labels).not.toContain('Retry review');
+    expect(labels).toContain('Fix settings');
+    expect(reviewConfig.calls.at(-1)).toEqual({
+      scope: 'personal',
+      platform: 'github',
+      enabled: true,
+    });
+    const fixSettings = buttons.rendered.findLast(button => buttonText(button) === 'Fix settings');
+    act(() => {
+      fixSettings?.onPress?.();
+    });
+    expect(routerMock.push).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github'
+    );
+  });
+
+  it('links to the settings when the configuration needs attention', () => {
+    reviewConfig.query = {
+      isPending: false,
+      data: { isEnabled: false, actionRequired: { reason: 'byok_invalid_key' } },
+    };
+
+    const labels = renderFailedReview();
+
+    expect(labels).not.toContain('Retry review');
+    expect(labels).toContain('Fix settings');
+  });
+
+  it('keeps Retry when Code Reviewer is on', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+
+    const labels = renderFailedReview();
+
+    expect(labels).toContain('Retry review');
+    expect(labels).not.toContain('Fix settings');
+  });
+
+  it('shows neither control while the config loads', () => {
+    reviewConfig.query = { isPending: true, data: undefined };
+
+    const labels = renderFailedReview();
+
+    expect(labels).not.toContain('Retry review');
+    expect(labels).not.toContain('Fix settings');
+  });
+
+  it('keeps Retry for a manual review and does not read the config', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+
+    const labels = renderFailedReview({ manual_config: { agentConfig: {} } });
+
+    expect(labels).toContain('Retry review');
+    expect(reviewConfig.calls.at(-1)?.enabled).toBe(false);
+  });
+
+  it('never queries a personal Bitbucket config and keeps Retry', () => {
+    reviewConfig.query = { isPending: true, data: { isEnabled: false, actionRequired: null } };
+
+    const labels = renderFailedReview({ platform: 'bitbucket' });
+
+    expect(labels).toContain('Retry review');
+    expect(reviewConfig.calls.at(-1)).toEqual({
+      scope: 'personal',
+      platform: 'bitbucket',
+      enabled: false,
+    });
   });
 });

@@ -9,10 +9,8 @@ const GITLAB_MR_URL = 'https://gitlab.com/group/sub/repo/-/merge_requests/7';
 const BITBUCKET_PR_URL = 'https://bitbucket.org/acme/api/pull-requests/42/overview';
 
 describe('selectShareReviewPr', () => {
-  it('returns the parsed destination when flag, new-session and PR text all hold', () => {
-    expect(
-      selectShareReviewPr({ text: PR_URL, prReviewEnabled: true, showNewSession: true })
-    ).toEqual({
+  it('returns the parsed destination when new-session and PR text both hold', () => {
+    expect(selectShareReviewPr({ text: PR_URL, showNewSession: true })).toEqual({
       platform: 'github',
       owner: 'octocat',
       repo: 'hello-world',
@@ -21,9 +19,7 @@ describe('selectShareReviewPr', () => {
   });
 
   it('recognises a GitLab merge request', () => {
-    expect(
-      selectShareReviewPr({ text: GITLAB_MR_URL, prReviewEnabled: true, showNewSession: true })
-    ).toEqual({
+    expect(selectShareReviewPr({ text: GITLAB_MR_URL, showNewSession: true })).toEqual({
       platform: 'gitlab',
       projectPath: 'group/sub/repo',
       mrIid: 7,
@@ -35,7 +31,6 @@ describe('selectShareReviewPr', () => {
     expect(
       selectShareReviewPr({
         text: 'https://gitlab.example.com/team/repo/-/merge_requests/9',
-        prReviewEnabled: true,
         showNewSession: true,
       })
     ).toEqual({
@@ -47,45 +42,37 @@ describe('selectShareReviewPr', () => {
   });
 
   it('recognises a Bitbucket pull request', () => {
-    expect(
-      selectShareReviewPr({ text: BITBUCKET_PR_URL, prReviewEnabled: true, showNewSession: true })
-    ).toEqual({ platform: 'bitbucket', workspace: 'acme', repoSlug: 'api', prId: 42 });
-  });
-
-  it('returns null when the flag is off', () => {
-    expect(
-      selectShareReviewPr({ text: PR_URL, prReviewEnabled: false, showNewSession: true })
-    ).toBeNull();
+    expect(selectShareReviewPr({ text: BITBUCKET_PR_URL, showNewSession: true })).toEqual({
+      platform: 'bitbucket',
+      workspace: 'acme',
+      repoSlug: 'api',
+      prId: 42,
+    });
   });
 
   it('returns null for non-PR text', () => {
     expect(
       selectShareReviewPr({
         text: 'https://example.com',
-        prReviewEnabled: true,
         showNewSession: true,
       })
     ).toBeNull();
     expect(
       selectShareReviewPr({
         text: 'https://example.com/group/repo',
-        prReviewEnabled: true,
         showNewSession: true,
       })
     ).toBeNull();
   });
 
   it('returns null when showNewSession is false even for a PR URL', () => {
-    expect(
-      selectShareReviewPr({ text: PR_URL, prReviewEnabled: true, showNewSession: false })
-    ).toBeNull();
+    expect(selectShareReviewPr({ text: PR_URL, showNewSession: false })).toBeNull();
   });
 
   it('matches a title-plus-URL text', () => {
     expect(
       selectShareReviewPr({
         text: `Fix the thing\n${PR_URL}`,
-        prReviewEnabled: true,
         showNewSession: true,
       })
     ).toEqual({
@@ -100,7 +87,6 @@ describe('selectShareReviewPr', () => {
     expect(
       selectShareReviewPr({
         text: `${PR_URL} https://github.com/octocat/hello-world/pull/7`,
-        prReviewEnabled: true,
         showNewSession: true,
       })
     ).toEqual({
@@ -122,7 +108,6 @@ describe('selectShareReviewPrSubtitle', () => {
   it('numbers a pasted GitLab merge request with the provider separator', () => {
     const ref = selectShareReviewPr({
       text: GITLAB_MR_URL,
-      prReviewEnabled: true,
       showNewSession: true,
     });
     if (ref === null) {

@@ -3,23 +3,23 @@ import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { sentryRootSpan } from '../getRootSpan';
-import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
   JustTheCostsUsageStats,
   MicrodollarUsageStats,
   NotYetCostedUsageStats,
   PromptInfo,
   VercelProviderMetaData,
-} from '@/lib/ai-gateway/processUsage.types';
-import type { GatewayResponsesRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import type { GatewayResponsesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   computeOpenRouterCostFields,
   computeVercelCostMicrodollars,
   drainSseStream,
   extractVercelIsByok,
   extractVercelUpstreamId,
-} from '@/lib/ai-gateway/processUsage.shared';
-import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 
 // OpenRouter adds cost fields to the standard Responses API usage object.
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format

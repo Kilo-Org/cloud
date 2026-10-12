@@ -10,15 +10,15 @@ import {
   commitSignInCode,
   releaseSignInCode,
   consumeSignInCode,
-} from '@/lib/auth/magic-link-tokens';
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { consumeSignInTicket } from '@/lib/auth/passkey';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
   findUserByNormalizedEmail,
   findUserIdByAuthProvider,
 } from '@/lib/user';
-import { generateApiToken } from '@/lib/tokens';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import type { User } from '@kilocode/db/schema';
 
@@ -30,13 +30,13 @@ jest.mock('@/lib/auth/native-id-tokens', () => ({
   verifyNativeGoogleIdToken: jest.fn(),
   exchangeNativeGoogleAuthCode: jest.fn(),
 }));
-jest.mock('@/lib/auth/magic-link-tokens');
+jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens');
 jest.mock('@/lib/auth/passkey', () => ({
   consumeSignInTicket: jest.fn(),
 }));
 jest.mock('@/lib/user');
-jest.mock('@/lib/user/find-user-by-id');
-jest.mock('@/lib/tokens');
+jest.mock('@kilocode/web-shared/lib/user/find-user-by-id');
+jest.mock('@kilocode/web-shared/lib/tokens');
 jest.mock('@/lib/auth/email-signin-eligibility');
 jest.mock('@/lib/auth/native-admission', () => ({
   ...jest.requireActual('@/lib/auth/native-admission'),
@@ -47,7 +47,7 @@ jest.mock('@/lib/auth/native-admission', () => ({
   shouldRefuseAsyncFailure: jest.fn(),
 }));
 jest.mock('@/lib/auth/device-sessions');
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   GOOGLE_CLIENT_ID: 'web-client-id',
 }));
 jest.mock('@sentry/nextjs', () => ({
@@ -58,7 +58,7 @@ jest.mock('@sentry/nextjs', () => ({
 var mockPosthogCapture: jest.Mock;
 // Jest also runs this factory while it generates the automatic `@/lib/user`
 // mock, so reuse one capture mock across calls.
-jest.mock('@/lib/posthog', () => {
+jest.mock('@kilocode/web-shared/lib/posthog', () => {
   mockPosthogCapture ??= jest.fn();
   const capture = mockPosthogCapture;
   return {
@@ -734,13 +734,14 @@ describe('POST /api/auth/native/token', () => {
       expect(mockConsumeSignInCode).not.toHaveBeenCalled();
     });
 
-    it('retry after DIFFERENT-OAUTH release reserves and settles the same code', async () => {
-      // First call: DIFFERENT-OAUTH triggers release. The second call must
-      // re-reserve the same code and settle successfully, proving the release.
+    it.each([
+      { error: 'DIFFERENT-OAUTH' as const, status: 403 },
+      { error: 'SIGNUP-UNAVAILABLE' as const, status: 503 },
+    ])('retry after $error reserves and settles the same code', async ({ error, status }) => {
       mockCreateOrUpdateUser
         .mockResolvedValueOnce({
           success: false,
-          error: 'DIFFERENT-OAUTH',
+          error,
         } as never)
         // Second call falls back to the beforeEach success default.
         .mockResolvedValueOnce({
@@ -752,10 +753,9 @@ describe('POST /api/auth/native/token', () => {
       const email = 'retry-oauth@example.com';
       const code = '654321';
 
-      // First attempt: DIFFERENT-OAUTH → release.
       const first = await POST(createRequest({ provider: 'email', email, code }));
-      expect(first.status).toBe(403);
-      expect(await first.json()).toEqual({ error: 'DIFFERENT-OAUTH' });
+      expect(first.status).toBe(status);
+      expect(await first.json()).toEqual({ error });
       expect(mockReleaseSignInCode).toHaveBeenCalledWith(email, code, undefined);
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockConsumeSignInCode).not.toHaveBeenCalled();
@@ -875,18 +875,21 @@ describe('POST /api/auth/native/token', () => {
     });
   });
 
-  it('returns 403 with the AuthErrorType when createOrUpdateUser fails', async () => {
+  it.each([
+    { error: 'BLOCKED' as const, status: 403 },
+    { error: 'SIGNUP-UNAVAILABLE' as const, status: 503 },
+  ])('returns $status for $error without credentials', async ({ error, status }) => {
     mockVerifyNativeGoogleIdToken.mockResolvedValue({
       sub: 'google-sub-1',
       email: 'googleuser@example.com',
     });
-    mockCreateOrUpdateUser.mockResolvedValue({ success: false, error: 'BLOCKED' } as never);
+    mockCreateOrUpdateUser.mockResolvedValue({ success: false, error });
 
     const response = await POST(createRequest({ provider: 'google', idToken: 'google-id-token' }));
     const data = await response.json();
 
-    expect(response.status).toBe(403);
-    expect(data).toEqual({ error: 'BLOCKED' });
+    expect(response.status).toBe(status);
+    expect(data).toEqual({ error });
     expect(mockGenerateApiToken).not.toHaveBeenCalled();
   });
 

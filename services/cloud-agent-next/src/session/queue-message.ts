@@ -35,7 +35,7 @@ import {
 import type { ControlPlanePromptPayload } from '../shared/control-plane-protocol.js';
 import { isControlSession } from '../session-plane.js';
 import { logger } from '../logger.js';
-import { preflightExistingPromptModel } from './model-preflight.js';
+import { preflightExistingPromptModel, preflightSessionRuntime } from './model-preflight.js';
 import { createMessageId } from './message-id.js';
 import {
   createRuntimeAuthorization,
@@ -259,6 +259,12 @@ export async function preflightAndAdmitPromptMessage<T>(
   procedure: string,
   admit: (input: QueueMessageInput, ctx: QueueMessageContext) => Promise<T>
 ): Promise<T> {
+  await preflightSessionRuntime({
+    env: ctx.env,
+    userId: ctx.userId,
+    cloudAgentSessionId: input.cloudAgentSessionId,
+    procedure,
+  });
   await preflightRuntimeAuthorizationRecovery(input.cloudAgentSessionId, ctx);
   if (isControlSession(input.cloudAgentSessionId)) {
     // Model policy (org allow-list, forbidden/unavailable) still gates a

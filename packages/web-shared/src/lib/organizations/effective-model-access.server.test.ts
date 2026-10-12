@@ -4,8 +4,8 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from './effective-model-access.server';
-import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
-import { VIRTUAL_PROVIDER } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
+import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
+import { VIRTUAL_PROVIDER } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 
 function context(
   overrides: Partial<OrganizationGroupPolicyContext> = {}
@@ -380,7 +380,7 @@ describe('effective organization model access', () => {
     const catalogLookup = async () => new Set(['fireworks', 'stepfun']);
 
     expect(
-      await getEffectiveModelDecision(policy, 'stepfun/step-3.7-flash:free', catalogLookup)
+      await getEffectiveModelDecision(policy, 'stepfun/step-5-preview-free', catalogLookup)
     ).toEqual({ allowed: false, denialSource: 'organization_provider' });
   });
 
@@ -396,7 +396,7 @@ describe('effective organization model access', () => {
     );
     const decision = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-3.7-flash:free',
+      'stepfun/step-5-preview-free',
       async () => new Set(['fireworks'])
     );
 
@@ -418,12 +418,12 @@ describe('effective organization model access', () => {
 
     const exclusive = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-3.7-flash:free',
+      'stepfun/step-5-preview-free',
       catalogLookup
     );
     const catalogModel = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-3.7-flash',
+      'stepfun/step-5-preview',
       catalogLookup
     );
 
@@ -446,7 +446,7 @@ describe('effective organization model access', () => {
 
     const restricted = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-3.7-flash:free',
+      'stepfun/step-5-preview-free',
       emptySnapshot
     );
     const unrestricted = await getEffectiveModelDecision(policy, 'unknown/model', emptySnapshot);

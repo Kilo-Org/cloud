@@ -1,5 +1,5 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isUniqueViolation } from '@/lib/db-errors';
 import { kiloclaw_access_codes } from '@kilocode/db/schema';
 import { eq, and, lt, ne, or } from 'drizzle-orm';

@@ -1,16 +1,16 @@
 import { describe, expect, test, jest } from '@jest/globals';
 import type Stripe from 'stripe';
 
-import { getKnownStripePriceIdsForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
-import { getKnownStripePriceIdsForKiloClaw } from '@/lib/kiloclaw/stripe-price-ids.server';
-import { SEAT_PRODUCT_IDS } from '@/lib/organizations/stripe-seat-line-items';
-import { calculateServiceFeeMinor } from '@/lib/service-fees/calculation';
+import { getKnownStripePriceIdsForKiloPass } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
+import { getKnownStripePriceIdsForKiloClaw } from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
+import { SEAT_PRODUCT_IDS } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
+import { calculateServiceFeeMinor } from '@kilocode/web-shared/lib/service-fees/calculation';
 import {
   SERVICE_FEE_DESCRIPTION,
   SERVICE_FEE_METADATA_TYPE,
   SERVICE_FEE_RATE_BASIS_POINTS,
   SERVICE_FEE_VERSION,
-} from '@/lib/service-fees/constants';
+} from '@kilocode/web-shared/lib/service-fees/constants';
 import {
   buildServiceFeeLineMetadata,
   getEligibleKiloPassSubtotalMinor,
@@ -25,7 +25,7 @@ import {
   listAllInvoiceLineItems,
   sumEligibleKiloPassSubtotalMinor,
   type InvoiceLineItemListClient,
-} from '@/lib/service-fees/stripe-lines';
+} from '@kilocode/web-shared/lib/service-fees/stripe-lines';
 
 const KILO_PASS_PRICE_ID = getKnownStripePriceIdsForKiloPass()[0]!;
 const KILOCLAW_PRICE_ID = getKnownStripePriceIdsForKiloClaw()[0]!;

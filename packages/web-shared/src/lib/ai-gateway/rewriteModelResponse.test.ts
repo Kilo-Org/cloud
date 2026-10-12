@@ -9,23 +9,24 @@ import {
   redactApiRequestLogRequest,
   type RequestLoggingParams,
 } from './rewriteModelResponse';
-import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
-import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
-import { logExceptInTest } from '@/lib/utils.server';
-import { ReasoningDetailsTransform } from '@/lib/ai-gateway/providers/types';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { isDynamicallyOptedIntoRequestLogging } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { UpstreamTimeoutError } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { api_request_log } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import type { FakeR2ClientModule } from '@/tests/helpers/fake-r2.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { eq } from 'drizzle-orm';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 
-jest.mock('@/lib/r2/client', () =>
+jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
   jest
     .requireActual<{
       createFakeR2ClientModule: () => FakeR2ClientModule;
-    }>('@/tests/helpers/fake-r2.helper')
+    }>('@kilocode/web-shared/tests/helpers/fake-r2.helper')
     .createFakeR2ClientModule()
 );
 
@@ -34,12 +35,12 @@ jest.mock('next/server', () => ({
   after: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/request-logging-opt-ins', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins', () => ({
   isDynamicallyOptedIntoRequestLogging: jest.fn(async () => false),
 }));
 
-jest.mock('@/lib/utils.server', () => ({
-  ...(jest.requireActual('@/lib/utils.server') as Record<string, unknown>),
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/utils.server') as Record<string, unknown>),
   logExceptInTest: jest.fn(),
 }));
 
@@ -83,7 +84,11 @@ function hangingSseResponse(body: string): { response: Response; cancel: jest.Mo
   };
 }
 
-function failingResponse(contentType: string, errorName: string, initialBody?: string): Response {
+function failingResponse(
+  contentType: string,
+  failure: string | Error,
+  initialBody?: string
+): Response {
   const encoder = new TextEncoder();
   let pullCount = 0;
   const body = new ReadableStream<Uint8Array>({
@@ -93,8 +98,8 @@ function failingResponse(contentType: string, errorName: string, initialBody?: s
         return;
       }
 
-      const error = new Error(errorName);
-      error.name = errorName;
+      const error = typeof failure === 'string' ? new Error(failure) : failure;
+      if (typeof failure === 'string') error.name = failure;
       controller.error(error);
     },
   });
@@ -239,6 +244,32 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
       'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.'
     );
   });
+
+  test.each(['application/json', 'text/event-stream'])(
+    'reports the gateway duration limit for a %s body that outlives the upstream budget',
+    async contentType => {
+      const result = await rewrite({
+        response: failingResponse(contentType, new UpstreamTimeoutError(600_000, 5_000)),
+        removeCost: true,
+        capture: null,
+        vercelRequestId: 'iad1::iad1::request-id',
+        reasoningEffort: null,
+      });
+      const message =
+        "The response reached the gateway's 600-second duration limit and was stopped before it finished. (request id: iad1::iad1::request-id)";
+
+      if (contentType === 'application/json') {
+        expect(result.status).toBe(503);
+        expect(await result.json()).toEqual({ error: message, error_type: 'timeout', message });
+      } else {
+        const events = dataObjects(await readOutputStream(result)) as {
+          error: { message: string };
+        }[];
+        expect(events).toHaveLength(1);
+        expect(events[0].error.message).toBe(message);
+      }
+    }
+  );
 });
 
 const timeoutEffortRequests = [
@@ -1473,7 +1504,9 @@ describe('rewriteModelResponse', () => {
 });
 
 describe('api_request_log storage', () => {
-  const { fakeR2 } = jest.requireMock<FakeR2ClientModule>('@/lib/r2/client');
+  const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+    '@kilocode/web-shared/lib/r2/create-client'
+  );
   const vercelRequestId = 'api-request-log-r2-storage-test';
   const bucket = 'test-api-request-log';
 

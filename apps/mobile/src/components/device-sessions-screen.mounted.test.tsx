@@ -28,6 +28,12 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
 }));
+// `@/components/device-sessions-screen` confirms through `useConfirmDialog`,
+// whose `DestructiveConfirmDialog` reads the bottom inset; the native module
+// cannot load under this partial `react-native` mock.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 24, left: 0, right: 0, top: 0 }),
+}));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));

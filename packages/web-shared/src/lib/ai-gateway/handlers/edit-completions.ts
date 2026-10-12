@@ -1,14 +1,14 @@
 import { randomUUID } from 'crypto';
-import { INCEPTION_API_KEY } from '@/lib/config.server';
+import { INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
-import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
-import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { sentryRootSpan } from '@/lib/getRootSpan';
-import { getUserFromAuth } from '@/lib/user/server';
+import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   countAndStoreEditUsage,
@@ -21,25 +21,26 @@ import {
   captureProxyError,
   extractHeaderAndLimitLength,
   modelNotAllowedResponse,
-} from '@/lib/ai-gateway/llm-proxy-helpers';
-import { ProxyErrorType } from '@/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { readDb } from '@/lib/drizzle';
-import { debugSaveProxyRequest } from '@/lib/debugUtils';
-import { sentryLogger } from '@/lib/utils.server';
-import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
-import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
-import { findSupportedFimModel } from '@/lib/ai-gateway/supported-fim-models';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { bouncerAccountId, normalizeJa4 } from '@/lib/bouncer/client';
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { findSupportedFimModel } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
+  bouncerRejectionResponse,
   payerSharingIp,
   rawClientIp,
-  scheduleBouncerDecide,
-} from '@/lib/bouncer/inference';
+  startBouncerDecide,
+} from '@kilocode/web-shared/lib/bouncer/inference';
 
 // Inception's edit endpoint mirrors a chat completion shape but is hosted at
 // a separate path. It accepts a single `role: "user"` message; the system prompt
@@ -180,6 +181,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,
     has_middle_out_transform: null,
+    reasoning_setting: null,
     fraudHeaders,
     isStreaming: false,
     organizationId,
@@ -213,7 +215,11 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users.
-  const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+  const { balance, settings, plan, payer } = await getBalanceAndOrgSettings(
+    organizationId,
+    user,
+    readDb
+  );
 
   if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
     return NextResponse.json(
@@ -271,17 +277,23 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     );
   }
 
-  // Report-only verdict: registered with after() and never awaited, so it cannot
-  // hold up the upstream call and survives an early return.
-  scheduleBouncerDecide({
+  // The one decide for this request, awaited before the upstream call within its 500 ms budget.
+  // Only an enforced verdict rejects; every other outcome sends the request.
+  const bouncerVerdictPromise = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
+      userId: user.id,
       tier: bouncerDecideTier(organizationId, plan, balance),
+      payer,
     },
   });
+  const bouncerVerdict = await bouncerVerdictPromise;
+  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  if (bouncerRejection) return bouncerRejection;
+  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   sentryRootSpan()?.setAttribute(
     'edit.time_to_request_start_ms',

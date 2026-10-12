@@ -48,7 +48,7 @@ export const configClassifierModels = sqliteTable('config_classifier_models', {
 
 export const configDeciderModels = sqliteTable('config_decider_models', {
   model: text('model').primaryKey(),
-  // Canonical catalog variant key. Null for legacy rows that hold reasoning_effort.
+  // Retained for rolling deploys; model-level config ignores and clears these columns.
   variant: text('variant'),
   reasoning_effort: text('reasoning_effort'),
 });
@@ -135,6 +135,8 @@ export const modelSummaries = sqliteTable(
     errors: integer('errors').notNull(),
     p95_latency_ms: real('p95_latency_ms'),
     timeouts: integer('timeouts').notNull().default(0),
+    // Classifier summaries only; null for decider summaries and older rows.
+    route_accuracy: real('route_accuracy'),
     // carried=true rows are prior-run summaries copied in at startRun for skipped models.
     carried: integer('carried', { mode: 'boolean' }).notNull().default(false),
   },
@@ -154,10 +156,14 @@ export const caseResults = sqliteTable(
     latency_ms: integer('latency_ms').notNull(),
     cost_usd: real('cost_usd'),
     error: text('error'),
-    // Classifier diagnostics.
+    // Unused since the System One classifier cutover; kept so old-code upserts
+    // during a rolling deploy still succeed.
     fallback_reason: text('fallback_reason'),
-    retried: integer('retried', { mode: 'boolean' }),
+    // Classifier diagnostics: predicted taskType/subtaskType matched the golden
+    // route key. Null for decider rows and older classifier rows.
+    route_hit: integer('route_hit', { mode: 'boolean' }),
     // Decider diagnostics.
+    retried: integer('retried', { mode: 'boolean' }),
     exit_code: integer('exit_code'),
     output_prefix: text('output_prefix'),
     event_count: integer('event_count'),

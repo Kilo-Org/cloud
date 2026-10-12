@@ -5,7 +5,7 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 
 import type { AppleStoreDecodedTransaction } from '@/lib/kilo-pass/apple-store-verifier';
 import type * as AppleStoreVerifier from '@/lib/kilo-pass/apple-store-verifier';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   STORE_PURCHASE_PENDING_MESSAGE,
   StorePurchasePendingError,

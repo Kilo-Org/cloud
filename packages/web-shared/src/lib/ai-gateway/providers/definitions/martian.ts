@@ -1,5 +1,5 @@
-import { getEnvVariable } from '@/lib/dotenvx';
-import type { Provider } from '@/lib/ai-gateway/providers/types';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
 export const MARTIAN = {
   id: 'martian',

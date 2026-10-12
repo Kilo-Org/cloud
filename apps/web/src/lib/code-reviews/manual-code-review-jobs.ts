@@ -9,7 +9,7 @@ import {
   type CodeReviewType,
   type ManualCodeReviewConfig,
 } from '@kilocode/db/schema-types';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { isUniqueViolation } from '@/lib/db-errors';
 import {
   CodeReviewAgentConfigSchema,
@@ -22,7 +22,7 @@ import {
 } from '@kilocode/worker-utils/code-review-council';
 import { assertCouncilCreationAllowed } from './core/council-entitlement';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
+import { isLocalCodeReviewDevelopmentEnabled } from '@kilocode/web-shared/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getAllIntegrationsForOwner } from '@/lib/integrations/db/platform-integrations';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
@@ -33,7 +33,7 @@ import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/
 import type { CodeReviewPlatform, Owner } from './core';
 import { createCodeReview, findActiveProviderPublishingReview } from './db/code-reviews';
 import { tryDispatchPendingReviews } from './dispatch/dispatch-pending-reviews';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 const MANUAL_REVIEW_REQUEST_TIMEOUT_MS = 10_000;
 

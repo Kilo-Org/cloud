@@ -95,7 +95,7 @@ type ChatSidebarProps = {
   worktreeDetails?: Record<string, SidebarWorktreeDetails>;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
   onDeleteWorktree?: (worktreeId: string) => void;
-  deletingWorktreeId?: string;
+  deletingWorktreeIds?: readonly string[];
   isInSheet?: boolean;
   activeSessions?: ActiveSession[];
   foregroundSession?: SidebarForegroundSessionStatus | null;
@@ -198,11 +198,13 @@ const SessionRow = memo(function SessionRow({
             onChange={e => onEditTitleChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={onSaveRename}
-            className="bg-muted min-w-0 flex-1 rounded px-1 py-0.5 text-sm leading-snug outline-none focus:ring-1 focus:ring-ring"
+            className="bg-muted min-w-0 flex-1 rounded px-1 py-0.5 text-sm leading-snug outline-none select-text focus:ring-1 focus:ring-ring"
           />
         ) : (
           <>
-            <span className="line-clamp-1 min-w-0 flex-1 leading-snug">{session.prompt}</span>
+            <span className="line-clamp-1 min-w-0 flex-1 leading-snug" title={session.prompt}>
+              {session.prompt}
+            </span>
             <SessionPrIndicator session={session} />
             <span className="group/session-actions relative flex w-6 shrink-0 justify-end [@media(any-pointer:coarse)]:w-auto [@media(hover:none)]:w-auto">
               {isDeleting ? (
@@ -433,7 +435,7 @@ function WorktreeGroupRow({
                   if (!savingRenameRef.current) finishRename();
                 }
               }}
-              className="bg-muted focus:ring-ring min-w-0 flex-1 rounded px-1 py-0.5 text-sm leading-snug outline-none focus:ring-1"
+              className="bg-muted focus:ring-ring min-w-0 flex-1 rounded px-1 py-0.5 text-sm leading-snug outline-none select-text focus:ring-1"
             />
             {(isSavingRename || isDeleting) && (
               <LoaderCircle
@@ -649,7 +651,7 @@ export function ChatSidebar({
   worktreeDetails = {},
   onRenameWorktree,
   onDeleteWorktree,
-  deletingWorktreeId,
+  deletingWorktreeIds = [],
   isInSheet = false,
   activeSessions = [],
   foregroundSession,
@@ -828,6 +830,12 @@ export function ChatSidebar({
     event.stopPropagation();
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('application/x-kilo-workspace-folder', JSON.stringify(item));
+    const bounds = event.currentTarget.getBoundingClientRect();
+    event.dataTransfer.setDragImage(
+      event.currentTarget,
+      event.clientX - bounds.left,
+      event.clientY - bounds.top
+    );
     setDragItem(item);
     setDropTarget(null);
   };
@@ -929,7 +937,7 @@ export function ChatSidebar({
       creatingWorktreeSourceSessionId={creatingWorktreeSourceSessionId}
       onRenameWorktree={onRenameWorktree}
       onDeleteWorktree={onDeleteWorktree}
-      isDeleting={deletingWorktreeId === group.worktreeId}
+      isDeleting={deletingWorktreeIds.includes(group.worktreeId)}
       activeSessionStatuses={activeSessionStatuses}
       foregroundSession={foregroundSession}
       folderControls={
@@ -1146,7 +1154,7 @@ export function ChatSidebar({
 
       {/* Session list */}
       <div
-        className="flex-1 space-y-px overflow-y-auto p-2"
+        className="flex-1 space-y-px overflow-y-auto p-2 select-none"
         aria-busy={workspaceFolders?.isSaving || undefined}
       >
         {workspaceFolders?.isLoading && (
@@ -1228,7 +1236,10 @@ export function ChatSidebar({
                         activeS.id === currentSessionId && 'bg-accent font-medium'
                       )}
                     >
-                      <span className="line-clamp-1 min-w-0 flex-1 leading-snug">
+                      <span
+                        className="line-clamp-1 min-w-0 flex-1 leading-snug"
+                        title={activeS.title}
+                      >
                         {activeS.title}
                       </span>
                       <span className="flex h-4 w-4 shrink-0 items-center justify-center">

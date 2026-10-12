@@ -1,7 +1,7 @@
 import type { AuditLog } from '@kilocode/db/schema';
 import { organization_audit_logs } from '@kilocode/db/schema';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { db } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
 // Re-export from base file that doesn't depend on schema.ts
 export { AuditLogAction } from './audit-log-actions';

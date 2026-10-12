@@ -4,7 +4,7 @@ import {
   getFallbackModelVariants,
   REASONING_VARIANTS_BINARY,
   REASONING_VARIANTS_NONE_MEDIUM_HIGH,
-} from '@/lib/ai-gateway/providers/variants';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/variants';
 
 describe('getFallbackModelVariants', () => {
   test.each(['google/gemma-4-26b-a4b-it', 'vendor/longcat-preview', 'poolside/laguna-s-2.1:free'])(
@@ -38,7 +38,9 @@ describe('getFallbackModelVariants', () => {
     ['nvidia/nemotron-3-super-120b-a12b:free', ['none', 'medium', 'high']],
     ['openai/gpt-5.6-sol', ['none', 'low', 'medium', 'high', 'xhigh', 'max']],
     ['qwen/qwen3.8', ['minimal', 'low', 'medium', 'high', 'xhigh']],
-    ['stepfun/step-3.7-flash', ['low', 'medium', 'high']],
+    ['stepfun/step-5-preview', ['low', 'medium', 'high']],
+    ['stepfun/step-5-preview-free', ['low', 'medium', 'high']],
+    ['stealth/glyph-cluster', ['low', 'medium', 'high', 'xhigh']],
   ])('orders fallback variants from least to most intensive for %s', (model, expected) => {
     expect(Object.keys(getFallbackModelVariants(model) ?? {})).toEqual(expected);
   });

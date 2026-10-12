@@ -1,5 +1,5 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   auto_top_up_configs,
   bouncer_credit_event_outbox,
@@ -9,12 +9,15 @@ import {
 } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
-import { DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS } from '@/lib/autoTopUpConstants';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  createOrganization,
+  addUserToOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS } from '@kilocode/web-shared/lib/autoTopUpConstants';
 
 // Mock Stripe client to avoid API calls in tests
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     checkout: {
       sessions: {
@@ -235,6 +238,7 @@ describe('organization auto-top-up router', () => {
           orgId: testOrg.id,
           amountCents: 50000,
           accountCreatedAt: new Date(testOrg.created_at).toISOString(),
+          accountUsedMicrodollars: testOrg.microdollars_used,
         })
       );
     });

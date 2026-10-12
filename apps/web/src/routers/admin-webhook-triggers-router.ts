@@ -1,8 +1,8 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull, desc } from 'drizzle-orm';
 import { z } from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_webhook_triggers } from '@kilocode/db/schema';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
 import { getWebhookRequestLogs } from '@/lib/webhook-request-logs';

@@ -1,5 +1,8 @@
-import type { PromoCreditCategoryConfig } from '@/lib/PromoCreditCategoryConfig';
-import { PROMO_CREDIT_EXPIRY_HRS, WELCOME_CREDIT_EXPIRY_HRS } from '@/lib/constants';
+import type { PromoCreditCategoryConfig } from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
+import {
+  PROMO_CREDIT_EXPIRY_HRS,
+  WELCOME_CREDIT_EXPIRY_HRS,
+} from '@kilocode/web-shared/lib/constants';
 
 export const promoCategoriesOld: PromoCreditCategoryConfig[] = [
   {

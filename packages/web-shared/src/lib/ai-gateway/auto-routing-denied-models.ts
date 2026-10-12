@@ -1,14 +1,14 @@
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
-import { getAutoRoutingSettings } from '@/lib/ai-gateway/auto-routing-admin-client';
-import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
-import { hasBestEffortGuessDataCollectionRequirement } from '@/lib/ai-gateway/is-free-model';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
-import { getDataCollectionRequiredModelIds } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
+import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { MINIMAX_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
+import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   getEffectiveModelDecision,
   type EffectiveOrganizationModelPolicy,
-} from '@/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 
 // Keep in sync with services/auto-routing/src/coding-plan-preference.ts.
 // /decide can short-circuit to these without consulting the routing table.

@@ -38,6 +38,10 @@ export type ControlPlaneTimers = {
     heartbeatAckTimeoutMs: number;
     heartbeatNegotiationMs: number;
     cloneMs: number;
+    /** Budget to adopt a repository snapshot before falling back to a clone. */
+    restoreMs: number;
+    /** Backstop over the Sandbox DO's own capture timeout. */
+    captureMs: number;
     kiloRuntimeStartMs: number;
     kiloSessionMs: number;
     sseSilenceMs: number;
@@ -46,6 +50,11 @@ export type ControlPlaneTimers = {
     sseReconnectWindowMs: number;
     kiloRestartLimit: number;
     kiloRestartWindowMs: number;
+    /**
+     * Longest a silent Kilo is left running, instead of a hang restart, while the workload
+     * reclaims at its memory cap. The no-progress clock is paused for that time.
+     */
+    kiloMemoryHoldMs: number;
     noProgressMs: number;
     turnHardCapMs: number;
     reconnectBackoffMinMs: number;
@@ -88,6 +97,8 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     heartbeatAckTimeoutMs: ms(15_000),
     heartbeatNegotiationMs: ms(1_000),
     cloneMs: 6 * MINUTE_MS,
+    restoreMs: 2 * MINUTE_MS,
+    captureMs: 5 * MINUTE_MS + 10_000,
     kiloRuntimeStartMs: 2 * MINUTE_MS,
     kiloSessionMs: 2 * MINUTE_MS,
     sseSilenceMs: 30_000,
@@ -96,8 +107,10 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     sseReconnectWindowMs: 2 * MINUTE_MS,
     kiloRestartLimit: 3,
     kiloRestartWindowMs: ms(10 * MINUTE_MS),
-    noProgressMs: ms(7 * MINUTE_MS),
-    turnHardCapMs: ms(60 * MINUTE_MS),
+    // Scales with the no-progress clock it pauses and the restart window it defers.
+    kiloMemoryHoldMs: ms(10 * MINUTE_MS),
+    noProgressMs: ms(20 * MINUTE_MS),
+    turnHardCapMs: ms(120 * MINUTE_MS),
     reconnectBackoffMinMs: ms(1_000),
     reconnectBackoffMaxMs: ms(30_000),
   };

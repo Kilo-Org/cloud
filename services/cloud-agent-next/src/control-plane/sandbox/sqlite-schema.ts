@@ -32,6 +32,8 @@ export const routes = sqliteTable('routes', {
   // A reference to scope_grants.id, not a credential snapshot.
   grant: text('grant'),
   credential_source: text('credential_source'),
+  /** Keyed hash naming the repository snapshot this route may use; null when none applies. */
+  repo_key: text('repo_key'),
   state: text('state').notNull(),
   attempt_id: text('attempt_id').notNull(),
   attempt_deadline_at: integer('attempt_deadline_at'),

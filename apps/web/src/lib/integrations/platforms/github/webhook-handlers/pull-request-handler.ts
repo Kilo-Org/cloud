@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { addBreadcrumb, captureException } from '@sentry/nextjs';
 import type { PullRequestPayload } from '../webhook-schemas';
 import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   createCodeReview,
   cancelSupersededReviewsForPR,
@@ -35,7 +35,7 @@ import {
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { updateCheckRunId } from '@/lib/code-reviews/db/code-reviews';
 import { resolvePullRequestCheckoutRef } from './pull-request-checkout-ref';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
 
 /**

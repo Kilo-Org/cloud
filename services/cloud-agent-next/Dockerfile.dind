@@ -10,6 +10,10 @@ USER root
 ARG BUILD_DATE=""
 ARG VCS_REF=""
 ARG KILOCODE_CLI_VERSION="7.8.1"
+ARG BUN_VERSION="1.3.14"
+ARG PNPM_VERSION="11.1.2"
+ARG GH_VERSION="2.82.1"
+ARG GLAB_VERSION="1.93.0"
 
 # Cloudflare Containers run without root privileges, so Docker must run in
 # rootless mode. The Sandbox SDK server is copied into this image so the
@@ -38,94 +42,36 @@ RUN apk add --no-cache \
 
 # Install GitHub CLI from the official release. Alpine packages can lag the
 # Debian package used in Dockerfile, so pin the upstream binary archive here.
-RUN GH_VERSION="2.82.1" \
-    && wget -q -O /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+RUN wget -q -O /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
     && tar -xzf /tmp/gh.tar.gz -C /tmp \
     && cp "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh \
     && chmod +x /usr/local/bin/gh \
     && rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64"
 
 # Install GitLab CLI from the official Linux amd64 binary archive.
-RUN GLAB_VERSION="1.93.0" \
-    && wget -q -O /tmp/glab.tar.gz "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.tar.gz" \
-    && tar -xzf /tmp/glab.tar.gz -C /tmp \
-    && cp /tmp/bin/glab /usr/local/bin/glab \
+RUN wget -q -O /tmp/glab.tar.gz "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.tar.gz" \
+    && mkdir -p /tmp/glab-extract \
+    && tar -xzf /tmp/glab.tar.gz -C /tmp/glab-extract \
+    && cp /tmp/glab-extract/bin/glab /usr/local/bin/glab \
     && chmod +x /usr/local/bin/glab \
-    && rm -rf /tmp/glab.tar.gz /tmp/bin
+    && rm -rf /tmp/glab.tar.gz /tmp/glab-extract
 
 COPY scripts/kilo-git-credential /opt/kilo-cloud/kilo-git-credential
 RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
     && ln -sf /opt/kilo-cloud/kilo-git-credential /usr/local/bin/kilo-git-credential
 
-# Tools used by the outer sandbox. Kilo itself is still installed globally for
-# the existing wrapper path; the platform package bundle under /opt/kilo-agent
-# is intended for mounting or copying into inner dev containers.
-RUN npm install -g bun pnpm @devcontainers/cli @kilocode/cli@${KILOCODE_CLI_VERSION}
-
-RUN mkdir -p /opt/kilo-agent/bin \
-    /opt/kilo-agent/cli-linux-x64 \
-    /opt/kilo-agent/cli-linux-x64-musl \
-    && npm pack \
-      "@kilocode/cli-linux-x64@${KILOCODE_CLI_VERSION}" \
-      "@kilocode/cli-linux-x64-musl@${KILOCODE_CLI_VERSION}" \
-      --pack-destination /tmp \
-    && tar -xzf "/tmp/kilocode-cli-linux-x64-${KILOCODE_CLI_VERSION}.tgz" \
-      -C /opt/kilo-agent/cli-linux-x64 --strip-components=1 \
-    && tar -xzf "/tmp/kilocode-cli-linux-x64-musl-${KILOCODE_CLI_VERSION}.tgz" \
-      -C /opt/kilo-agent/cli-linux-x64-musl --strip-components=1 \
-    && rm -f /tmp/kilocode-cli-linux-x64-*.tgz \
-    && rm -f /tmp/kilocode-cli-linux-x64-musl-*.tgz \
-    && rm -f /opt/kilo-agent/cli-linux-x64/bin/*.map \
-    && rm -f /opt/kilo-agent/cli-linux-x64-musl/bin/*.map \
-    && chmod +x /opt/kilo-agent/cli-linux-x64/bin/kilo \
-    && chmod +x /opt/kilo-agent/cli-linux-x64-musl/bin/kilo
-
-RUN cat > /opt/kilo-agent/bin/kilo <<'EOF' \
-    && chmod +x /opt/kilo-agent/bin/kilo
-#!/bin/sh
-set -eu
-
-root="${KILO_AGENT_ROOT:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
-arch="$(uname -m)"
-
-if ldd --version 2>&1 | grep -qi musl; then
-  libc="musl"
-else
-  libc="glibc"
-fi
-
-case "$arch:$libc" in
-  x86_64:glibc) exec "$root/cli-linux-x64/bin/kilo" "$@" ;;
-  x86_64:musl) exec "$root/cli-linux-x64-musl/bin/kilo" "$@" ;;
-  *) echo "Unsupported devcontainer platform: $arch/$libc" >&2; exit 1 ;;
-esac
-EOF
+RUN npm install -g bun@${BUN_VERSION} pnpm@${PNPM_VERSION} @kilocode/cli@${KILOCODE_CLI_VERSION}
 
 # === Build wrapper bundle inside container ===
 # This mirrors Dockerfile but builds on Alpine, matching the DIND base image.
-# /opt/kilo-cloud/ is the canonical location so the wrapper bundle can be
-# bind-mounted read-only into a dev container; /usr/local/bin/ keeps symlinks
-# so existing outer-sandbox callers (`bun /usr/local/bin/kilocode-wrapper.js`)
-# continue to work unchanged.
+# The build entrypoint list lives in src/shared/runtime-distribution.ts.
 COPY wrapper /tmp/wrapper-build/wrapper
 COPY src/shared /tmp/wrapper-build/src/shared
 
-RUN mkdir -p /opt/kilo-cloud \
-    && cd /tmp/wrapper-build/wrapper \
+RUN cd /tmp/wrapper-build/wrapper \
     && bun install --production \
     && ln -sfn /tmp/wrapper-build/wrapper/node_modules /tmp/wrapper-build/node_modules \
-    && bun build src/main.ts --outfile=/opt/kilo-cloud/kilocode-wrapper.js --target=bun --minify \
-    && bun build src/restore-session.ts --outfile=/opt/kilo-cloud/kilo-restore-session.js --target=bun --minify \
-    && bun build src/bitbucket-review-cli.ts --outfile=/opt/kilo-cloud/bb --target=bun --minify \
-    && bun build src/control-plane/main.ts --outfile=/opt/kilo-cloud/kilocode-control-plane-wrapper.js --target=bun --minify \
-    && chmod +x /opt/kilo-cloud/bb \
-    && cp control-plane-supervisor.sh /opt/kilo-cloud/kilocode-control-plane-supervisor.sh \
-    && chmod +x /opt/kilo-cloud/kilocode-control-plane-supervisor.sh \
-    && ln -sf /opt/kilo-cloud/kilocode-wrapper.js /usr/local/bin/kilocode-wrapper.js \
-    && ln -sf /opt/kilo-cloud/kilocode-control-plane-wrapper.js /usr/local/bin/kilocode-control-plane-wrapper.js \
-    && ln -sf /opt/kilo-cloud/kilocode-control-plane-supervisor.sh /usr/local/bin/kilocode-control-plane-supervisor.sh \
-    && ln -sf /opt/kilo-cloud/kilo-restore-session.js /usr/local/bin/kilo-restore-session.js \
-    && ln -sf /opt/kilo-cloud/bb /usr/local/bin/bb \
+    && bun run build.ts --install-dir /opt/kilo-cloud --link-dir /usr/local/bin \
     && rm -rf /tmp/wrapper-build
 
 # Boot script for rootless Docker-in-Docker.

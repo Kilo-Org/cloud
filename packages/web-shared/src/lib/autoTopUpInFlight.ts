@@ -1,7 +1,7 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_top_up_configs } from '@kilocode/db/schema';
 import { and, eq, gt, isNotNull, sql } from 'drizzle-orm';
-import { AUTO_TOP_UP_IN_FLIGHT_WINDOW_SECONDS } from '@/lib/autoTopUpConstants';
+import { AUTO_TOP_UP_IN_FLIGHT_WINDOW_SECONDS } from '@kilocode/web-shared/lib/autoTopUpConstants';
 
 /**
  * Reports whether an auto-top-up is currently in flight for the billing entity.

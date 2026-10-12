@@ -1,11 +1,10 @@
 import { describe, expect, test, jest } from '@jest/globals';
 
 import {
-  buildInheritedInlineServiceFeeTaxInput,
   readServiceFeeTaxBehaviorFromPrice,
   resolveServiceFeeTaxInput,
   type StripePriceTaxReader,
-} from '@/lib/service-fees/tax';
+} from '@kilocode/web-shared/lib/service-fees/tax';
 
 function priceReader(retrieve: StripePriceTaxReader['prices']['retrieve']): StripePriceTaxReader {
   return { prices: { retrieve } };
@@ -34,10 +33,6 @@ describe('service fee tax input', () => {
     await expect(
       resolveServiceFeeTaxInput({ principal: { kind: 'price', priceId: 'price_1' } })
     ).rejects.toThrow('service_fee_tax_behavior_unresolved');
-  });
-
-  test('inline helper represents inherited treatment without Price retrieval', () => {
-    expect(buildInheritedInlineServiceFeeTaxInput()).toEqual({ source: 'inline_inherit' });
   });
 
   test('price helper mirrors exclusive and inclusive tax_behavior', async () => {

@@ -15,7 +15,7 @@ jest.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams
 jest.mock('@/app/api/organizations/hooks', () => ({
   useOrganizationWithMembers: () => ({ data: { name: 'Test org', settings: {} } }),
 }));
-jest.mock('@/lib/ai-gateway/hooks', () => ({
+jest.mock('@/lib/hooks/use-openrouter-models', () => ({
   useModelSelectorList: () => ({ data: { data: [] }, isLoading: false }),
 }));
 jest.mock('@/components/ui/confirm', () => ({ useConfirm: () => jest.fn() }));

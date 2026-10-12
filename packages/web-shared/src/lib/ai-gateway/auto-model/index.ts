@@ -2,8 +2,8 @@ import { z } from 'zod';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@/lib/ai-gateway/providers/anthropic.constants';
-import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import type { OpenRouterReasoningConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   ORGANIZATION_AUTO_MODEL_ID,
   type OpenCodeSettings,
@@ -12,7 +12,7 @@ import {
 import {
   GEMMA_4_26B_A4B_IT_FREE_ID,
   GEMMA_4_26B_A4B_IT_ID,
-} from '@/lib/ai-gateway/providers/google';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 
 export type AutoModelPricing = {
   prompt: string;

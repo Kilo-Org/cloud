@@ -174,6 +174,7 @@ function createHarness(
     },
     hasConnectedStreamClients: () => false,
     getAssistantMessageForUserMessage: () => null,
+    getRecentAssistantMessagesForUserMessage: () => [],
     ensureTerminalMessageEvent: event => {
       if (!events.some(existing => existing.entityId === event.entityId)) events.push(event);
     },

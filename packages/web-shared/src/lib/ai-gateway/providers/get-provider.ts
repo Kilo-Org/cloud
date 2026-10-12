@@ -1,47 +1,50 @@
 import type {
   GatewayRequest,
   OpenRouterProviderConfig,
-} from '@/lib/ai-gateway/providers/openrouter/types';
-import { canRouteToVercel, shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
-import { isGatewayUserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  canRouteToVercel,
+  shouldRouteToVercel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { isGatewayUserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   findKiloExclusiveModel,
   isKiloExclusiveModel,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
-import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   getBYOKforOrganization,
   getBYOKforUser,
   getModelUserByokProviders,
-} from '@/lib/ai-gateway/byok';
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { custom_llm2, type User } from '@kilocode/db/schema';
-import { readDb } from '@/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
-import type { AnonymousUserContext } from '@/lib/anonymous';
-import { isAnonymousContext } from '@/lib/anonymous';
-import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
+import type { AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
+import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
+import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   createUserOpenRouterProvider,
   OPENROUTER,
-} from '@/lib/ai-gateway/providers/definitions/openrouter';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import {
   createUserVercelAiGatewayProvider,
   VERCEL_AI_GATEWAY,
-} from '@/lib/ai-gateway/providers/definitions/vercel';
-import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { checkOpenAiChatGptByok } from '@/lib/ai-gateway/openai-chatgpt/routing';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
-import { buildDirectProvider } from '@/lib/ai-gateway/providers/build-direct-provider';
-import { getGoogleServiceAccountAccessToken } from '@/lib/ai-gateway/custom-llm/google-service-account';
-import { userHasCustomLlmAccess } from '@/lib/ai-gateway/custom-llm/access';
-import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { buildDirectProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
+import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
+import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
+import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
   getLocalFakeLlmProvider,
   getLocalFakeTranscriptionProvider,
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
-} from '@/lib/ai-gateway/local-fake-llm';
+} from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 
 export type GetProviderProviderResult = {
   kind: 'provider';

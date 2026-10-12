@@ -1,9 +1,12 @@
 import { after } from 'next/server';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { z } from 'zod';
-import { O11Y_KILO_GATEWAY_CLIENT_SECRET, O11Y_SERVICE_URL } from '@/lib/config.server';
+import {
+  O11Y_KILO_GATEWAY_CLIENT_SECRET,
+  O11Y_SERVICE_URL,
+} from '@kilocode/web-shared/lib/config.server';
 import type { CompletionUsage } from 'openai/resources/completions';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 export type ApiMetricsTokens = {
   inputTokens?: number;

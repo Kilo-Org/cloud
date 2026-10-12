@@ -16,18 +16,16 @@ const layout = vi.hoisted(() => ({
   platform: 'android' as 'android' | 'ios',
 }));
 /**
- * The occlusion `useKeyboardOcclusion` reports. Mocked at the module boundary so
- * the cases below drive the shared scroll view's own decision (replace the
+ * The keyboard height `useKeyboardState` reports. Mocked at the module boundary
+ * so the cases below drive the shared scroll view's own decision (replace the
  * tab-bar band, report it onward) without reproducing the platform's keyboard
- * event math.
+ * events.
  */
 const keyboard = vi.hoisted(() => ({ occlusion: 0 }));
 
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
-  useKeyboardOcclusion: () => ({
-    keyboardHeight: keyboard.occlusion,
-    keyboardOcclusion: keyboard.occlusion,
-  }),
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: <T,>(selector: (state: { height: number }) => T) =>
+    selector({ height: keyboard.occlusion }),
 }));
 
 vi.mock('react-native', () => ({

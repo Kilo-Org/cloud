@@ -1,5 +1,5 @@
-import { ENKRYPT_PUBLICATION_ENABLED } from '@/lib/config.server';
-import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
+import { ENKRYPT_PUBLICATION_ENABLED } from '@kilocode/web-shared/lib/config.server';
+import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import type { ModelStats } from '@kilocode/db/schema';
 import {
   ENKRYPT_STALE_AFTER_MS,

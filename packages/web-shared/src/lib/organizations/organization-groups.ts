@@ -17,12 +17,12 @@ import {
   type OrganizationGroupPolicies,
   type OrganizationGroupPolicy,
   type OrganizationGroupPolicyType,
-} from '@/lib/organizations/group-policies/organization-group-policies';
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { normalizeRegisteredOrganizationGroupPolicy } from '@/lib/organizations/group-policies/registry.server';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { normalizeRegisteredOrganizationGroupPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/registry.server';
 
 const DEFAULT_POLICIES = [
   { type: 'model_access', data: { mode: 'all' } },

@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import Stripe from 'stripe';
 import { isNotNull } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   evaluateKiloClawPriceRolloutAudit,
   formatKiloClawPriceRolloutAuditReport,

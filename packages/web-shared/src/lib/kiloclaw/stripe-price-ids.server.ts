@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import {
   CURRENT_KILOCLAW_PRICE_VERSION,
   KILOCLAW_PRICE_VERSIONS,

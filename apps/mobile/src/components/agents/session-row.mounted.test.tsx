@@ -119,7 +119,10 @@ vi.mock('./exit-remote-session-from-list', () => ({
   exitRemoteSessionFromList: vi.fn(),
 }));
 vi.mock('./remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn().mockResolvedValue(true),
+  useRemoteSessionExitConfirmation: () => ({
+    confirmExit: vi.fn().mockResolvedValue(true),
+    exitDialog: null,
+  }),
 }));
 
 const session: StoredSession = {

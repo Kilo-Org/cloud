@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   security_remediations,
   security_remediation_attempts,

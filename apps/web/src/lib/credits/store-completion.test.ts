@@ -9,11 +9,11 @@ import {
   kilo_pass_store_events,
   kilocode_users,
 } from '@kilocode/db/schema';
-import type * as Credits from '@/lib/credits';
-import { db } from '@/lib/drizzle';
-import { toMicrodollars } from '@/lib/microdollars';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import type * as Credits from '@kilocode/web-shared/lib/credits';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 import type * as StoreCompletion from './store-completion';
 import type { ValidatedStoreCreditPurchase } from './store-verifier';
@@ -31,8 +31,8 @@ import {
 // id. The real top-up runs against the test database by default; one test makes
 // it report an already-credited transaction that does not exist, to prove the
 // inconsistent-ledger path.
-jest.mock('@/lib/credits', () => {
-  const actual = jest.requireActual<typeof Credits>('@/lib/credits');
+jest.mock('@kilocode/web-shared/lib/credits', () => {
+  const actual = jest.requireActual<typeof Credits>('@kilocode/web-shared/lib/credits');
   return {
     __esModule: true,
     ...actual,
@@ -41,7 +41,7 @@ jest.mock('@/lib/credits', () => {
 });
 
 const mockProcessTopUp = jest.mocked(
-  jest.requireMock<typeof Credits>('@/lib/credits').processTopUp
+  jest.requireMock<typeof Credits>('@kilocode/web-shared/lib/credits').processTopUp
 );
 
 let completeStoreCreditPurchase: typeof StoreCompletion.completeStoreCreditPurchase;
@@ -727,5 +727,98 @@ describe('store purchase bouncer delivery', () => {
     const replayed = await completeStoreCreditPurchase({ user, purchase: storePurchase });
     expect(replayed.alreadyProcessed).toBe(true);
     expect(await outboxRowsFor(user.id)).toHaveLength(1);
+  });
+});
+
+describe('first production credit-pack scheduling', () => {
+  async function auditsFor(userId: string) {
+    return db.query.kilo_pass_audit_log.findMany({
+      where: eq(kilo_pass_audit_log.kilo_user_id, userId),
+    });
+  }
+
+  it('ignores sandbox history and schedules only the first production grant across stores', async () => {
+    const user = await insertTestUser();
+    await completeStoreCreditPurchase({ user, purchase: purchase() });
+    const first = purchase({ environment: 'Production' });
+    await completeStoreCreditPurchase({ user, purchase: first });
+    await completeStoreCreditPurchase({ user, purchase: first });
+    await completeStoreCreditPurchase({
+      user,
+      purchase: playPurchase(`GPA.${crypto.randomUUID()}`, { environment: 'Production' }),
+    });
+
+    const audits = await auditsFor(user.id);
+    expect(audits).toHaveLength(3);
+    expect(audits.filter(row => row.payload_json.firstCreditPackPurchase === true)).toEqual([
+      expect.objectContaining({
+        payload_json: expect.objectContaining({
+          providerTransactionId: first.providerTransactionId,
+        }),
+      }),
+    ]);
+    expect(await balanceOf(user.id)).toBe(toMicrodollars(30));
+  });
+
+  it('does not schedule existing production buyers whose older audit has no marker', async () => {
+    const user = await insertTestUser();
+    await completeStoreCreditPurchase({ user, purchase: purchase({ environment: 'Production' }) });
+    await db
+      .update(kilo_pass_audit_log)
+      .set({ payload_json: sql`${kilo_pass_audit_log.payload_json} - 'firstCreditPackPurchase'` })
+      .where(eq(kilo_pass_audit_log.kilo_user_id, user.id));
+
+    await completeStoreCreditPurchase({
+      user,
+      purchase: playPurchase(`GPA.${crypto.randomUUID()}`, { environment: 'Production' }),
+    });
+    expect(await auditsFor(user.id)).toHaveLength(2);
+    expect((await auditsFor(user.id)).some(row => row.payload_json.firstCreditPackPurchase)).toBe(
+      false
+    );
+  });
+
+  it('marks exactly one of simultaneous Apple and Google production grants', async () => {
+    const user = await insertTestUser();
+    const results = await Promise.all([
+      completeStoreCreditPurchase({ user, purchase: purchase({ environment: 'Production' }) }),
+      completeStoreCreditPurchase({
+        user,
+        purchase: playPurchase(`GPA.${crypto.randomUUID()}`, { environment: 'Production' }),
+      }),
+    ]);
+
+    expect(results.every(result => !result.alreadyProcessed)).toBe(true);
+    const audits = await auditsFor(user.id);
+    expect(audits).toHaveLength(2);
+    expect(audits.filter(row => row.payload_json.firstCreditPackPurchase === true)).toHaveLength(1);
+    expect(await balanceOf(user.id)).toBe(toMicrodollars(20));
+  });
+
+  it('rolls scheduling back with the grant and schedules the next committed production purchase', async () => {
+    const user = await insertTestUser();
+    await expect(
+      db.transaction(async tx => {
+        await completeStoreCreditPurchase({
+          user,
+          purchase: purchase({ environment: 'Production' }),
+          dbOrTx: tx,
+        });
+        throw new Error('abort outer transaction');
+      })
+    ).rejects.toThrow('abort outer transaction');
+    expect(await auditsFor(user.id)).toEqual([]);
+    expect(await balanceOf(user.id)).toBe(0);
+
+    await completeStoreCreditPurchase({
+      user,
+      purchase: playPurchase(`GPA.${crypto.randomUUID()}`, { environment: 'Production' }),
+    });
+    expect(await auditsFor(user.id)).toEqual([
+      expect.objectContaining({
+        payload_json: expect.objectContaining({ firstCreditPackPurchase: true }),
+      }),
+    ]);
+    expect(await balanceOf(user.id)).toBe(toMicrodollars(10));
   });
 });

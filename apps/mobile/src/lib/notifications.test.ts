@@ -20,10 +20,11 @@ import {
   registerGlanceableSink,
   unregisterGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
-import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+import { ACTIVE_USER_ID_KEY, AUTH_TOKEN_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   _setGlanceableSinksLoaderForTests,
   applyGlanceablePushData,
+  runGlanceableBackgroundRefresh,
   setupNotificationBackgroundHandler,
 } from './notifications';
 
@@ -55,6 +56,7 @@ const mocks = vi.hoisted(() => ({
   registerActivityToken: vi.fn(),
   unregisterActivityToken: vi.fn(),
   refreshActiveSessionsFromPush: vi.fn(),
+  activeSessionsList: vi.fn(),
   defineTask: vi.fn(),
   registerTaskAsync: vi.fn(),
   captureEvent: vi.fn(),
@@ -180,6 +182,7 @@ vi.mock('@/lib/trpc', () => ({
       registerActivityToken: { mutate: mocks.registerActivityToken },
       unregisterActivityToken: { mutate: mocks.unregisterActivityToken },
     },
+    activeSessions: { list: { query: mocks.activeSessionsList } },
   },
 }));
 vi.mock('@/lib/query-client', () => ({ queryClient: {} }));
@@ -2111,10 +2114,106 @@ describe('runBackgroundNotificationTask', () => {
     expect(optionsFor('agent-progress')).toMatchObject({ name: 'Agentenfortschritt' });
     expect(optionsFor('needs-input')).toMatchObject({ name: 'Eingabe erforderlich' });
   });
+
+  it('reads a granted notification permission before the sinks see a headless push', async () => {
+    // A headless start never runs the root layout's permission gate. Without
+    // this read, a granted install would keep its Live Activity unstarted.
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    const loaded = await loadNotifications();
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+    const { getNotificationPermissionGranted } = await import('./glanceable/live-activity-switch');
+    expect(getNotificationPermissionGranted()).toBe(false);
+
+    await loaded.runBackgroundNotificationTask({
+      data: {
+        notification: null,
+        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+      },
+      error: null,
+      executionInfo: {
+        eventId: 'e-permission',
+        taskName: 'active-agents-glanceable-background-task',
+      },
+    });
+
+    expect(getNotificationPermissionGranted()).toBe(true);
+  });
+});
+
+describe('runGlanceableBackgroundRefresh', () => {
+  const SUCCESS = 1;
+  const FAILED = 2;
+
+  it('publishes the tray it reads to every sink for the stored scope', async () => {
+    mockSecureStoreKeys();
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+    mocks.activeSessionsList.mockResolvedValue({
+      sessions: [
+        { id: 'ses_ask', status: 'question' },
+        { id: 'ses_run', status: 'busy' },
+      ],
+    });
+
+    const result = await runGlanceableBackgroundRefresh();
+
+    expect(result).toBe(SUCCESS);
+    expect(mocks.activeSessionsList).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org-9', includeCloudAgentSessions: true })
+    );
+    expect(sink.surface.activity).toMatchObject({ needsInput: 1 });
+    expect(sink.surface.context).toEqual({ userId: 'u1', organizationId: 'org-9' });
+    unregisterGlanceableSink(sink);
+  });
+
+  it('reads nothing and writes nothing while signed out', async () => {
+    mocks.getItemAsync.mockImplementation(() => null);
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+
+    const result = await runGlanceableBackgroundRefresh();
+
+    expect(result).toBe(SUCCESS);
+    expect(mocks.activeSessionsList).not.toHaveBeenCalled();
+    expect(sink.publish).not.toHaveBeenCalled();
+    expect(sink.startOrUpdate).not.toHaveBeenCalled();
+    unregisterGlanceableSink(sink);
+  });
+
+  it('keeps the last snapshot and reports a failed run when the tray read fails', async () => {
+    mockSecureStoreKeys();
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+    mocks.activeSessionsList.mockRejectedValue(new Error('offline'));
+
+    const result = await runGlanceableBackgroundRefresh();
+
+    expect(result).toBe(FAILED);
+    expect(sink.publish).not.toHaveBeenCalled();
+    expect(sink.startOrUpdate).not.toHaveBeenCalled();
+    unregisterGlanceableSink(sink);
+  });
+
+  it('reports a failed run when the native surface rejects the write', async () => {
+    mockSecureStoreKeys();
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const sink = makeFakeSink();
+    sink.waitForNativeStart.mockRejectedValue(new Error('native start failed'));
+    registerGlanceableSink(sink);
+    mocks.activeSessionsList.mockResolvedValue({ sessions: [{ id: 'ses_run', status: 'busy' }] });
+
+    expect(await runGlanceableBackgroundRefresh()).toBe(FAILED);
+    unregisterGlanceableSink(sink);
+  });
 });
 
 describe('foreground attention-push suppression', () => {
   async function loadHandler() {
+    // The app posts its own raise only while notifications are allowed.
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'granted' });
     const loaded = await loadNotifications();
     // Imported through the same resetModules cycle as './notifications', so the
     // posted marker this test reads is the one the handler reads.
@@ -2336,6 +2435,8 @@ describe('cold iOS background delivery', () => {
     secureStore.set('glanceable-scope-key', SCOPE_KEY);
     secureStore.set(ACTIVE_USER_ID_KEY, 'u1');
     secureStore.set(ORGANIZATION_STORAGE_KEY, 'org-9');
+    // A signed-in cold process reads its access token from the keychain.
+    secureStore.set(AUTH_TOKEN_KEY, 'access-token');
     mocks.getItemAsync.mockImplementation(secureStoreMock.getItemAsync);
     mocks.setItemAsync.mockImplementation(secureStoreMock.setItemAsync);
     mocks.deleteItemAsync.mockImplementation(async (key: string) => {
@@ -2646,6 +2747,8 @@ describe('cold iOS background delivery', () => {
       // No ask is recorded for this cold push, so the app-built state says so
       // explicitly; the layout gates Approve on this flag.
       canApprove: false,
+      // The header shows the check time, so the app-built state carries it.
+      updatedAt: '2026-01-02T00:00:00.000Z',
     });
     expect(rows.has('scope-token')).toBe(true);
   });

@@ -1,6 +1,7 @@
 /* oxlint-disable max-lines -- cohesive network-error policy: reading the tRPC error, normalizing the URL, and building the fingerprint and event share one set of total helpers */
 /**
- * Warning-level network-error reporting for the mobile app.
+ * Network-error reporting for the mobile app: one warning-level event per
+ * error-status HTTP response, one breadcrumb per transport failure.
  *
  * Pure and total: no SDK import, no network, no React. The caller installs a
  * transport sink (s2 wires the Sentry adapter); until then every report is a
@@ -11,18 +12,19 @@
  * raised by this module's classifier (`abort-classification.ts`), so the fix
  * is there: the production abort shape is matched in `isExpoCanceledError`.
  *
- * Family 3 (KILO-APP-DJ, `java.net.UnknownHostException`) needs no filter and
- * no code change. It is a mid-flight device-network drop, not an app defect:
- * react-query is gated on connectivity — `query-client-lifecycle.tsx` sets
- * `onlineManager` from `isOnline(...)`, mounted in `app-root-providers.tsx`,
- * and `connectivity-online.ts` never treats unknown as online — so the app
- * does not poll while confirmed offline. The reported failure is a request
- * already in flight when the device lost its network.
+ * Family 3 (KILO-APP-B1, KILO-APP-2PD and ~190 siblings: `fetch failed:`
+ * `UnknownHostException`, `The network connection was lost`, SSL handshake,
+ * connect and socket errors, and `RequestDeadlineError`) is a request that
+ * got no HTTP response: the device lost its network or the server was out of
+ * reach. That is not an app defect, and one issue per procedure buried the
+ * real ones, so a transport failure is a breadcrumb (`category: 'network'`),
+ * never an event. The breadcrumb rides on the next real event and still
+ * explains it. An HTTP response with an error status is still an event.
  */
 
 import { z } from 'zod';
 
-import { captureTelemetry } from '@/lib/telemetry/error-sink';
+import { addTelemetryBreadcrumb, captureTelemetry } from '@/lib/telemetry/error-sink';
 import { isAbortError, isRequestDeadlineError } from '@/lib/telemetry/abort-classification';
 import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
 
@@ -32,7 +34,9 @@ export { isAbortError };
 
 type TelemetrySource = 'trpc' | 'fetch';
 
-type NetworkOutcome = 'timeout' | 'http_error' | 'failed';
+type NetworkOutcome = 'http_error' | 'failed';
+
+type TransportOutcome = 'timeout' | 'failed';
 
 export type TrpcErrorContext = {
   code?: string;
@@ -49,7 +53,6 @@ export type NetworkErrorContext = {
   statusText?: string;
   durationMs: number;
   error?: unknown;
-  timedOut?: boolean;
 };
 
 export type NetworkErrorFetchOptions = {
@@ -208,9 +211,6 @@ function statusClassFor(status: number | undefined): '4xx' | '5xx' | undefined {
 }
 
 function networkOutcome(context: NetworkErrorContext): NetworkOutcome {
-  if (context.timedOut === true) {
-    return 'timeout';
-  }
   if (context.status !== undefined && (context.status >= 400 || context.status === 207)) {
     return 'http_error';
   }
@@ -314,7 +314,6 @@ export function reportNetworkError(context: NetworkErrorContext): void {
       ...(context.statusText === undefined ? {} : { statusText: context.statusText }),
       ...(procedure === undefined ? {} : { procedure }),
       ...(trpcCode === undefined ? {} : { trpcCode }),
-      ...(context.timedOut === undefined ? {} : { timedOut: context.timedOut }),
     };
 
     // A non-`Error` context (a parsed tRPC body) rides in the payload context
@@ -341,6 +340,30 @@ export function reportNetworkError(context: NetworkErrorContext): void {
         procedure ?? normalizedPath,
         fingerprintOutcome(context, trpc),
       ],
+    });
+  } catch {
+    // Telemetry must never throw into app code.
+  }
+}
+
+/**
+ * Record a request that got no HTTP response (no network, DNS, TLS, reset, or
+ * the request deadline) as a breadcrumb. Never an event: see Family 3 in the
+ * header. Never throws; never includes the host, headers, bodies, or query
+ * strings.
+ */
+function recordTransportFailure(
+  context: Pick<NetworkErrorContext, 'source' | 'url' | 'method' | 'durationMs' | 'error'>
+): void {
+  try {
+    const method = context.method ?? 'GET';
+    const path = normalizeUrlPath(context.url);
+    const outcome: TransportOutcome = isRequestDeadlineError(context.error) ? 'timeout' : 'failed';
+    addTelemetryBreadcrumb({
+      category: 'network',
+      level: 'warning',
+      message: `${method} ${path} ${outcome}`,
+      data: { source: context.source, method, path, outcome, durationMs: context.durationMs },
     });
   } catch {
     // Telemetry must never throw into app code.
@@ -380,8 +403,9 @@ function safeShouldReport(url: string, shouldReport: (url: string) => boolean): 
 }
 
 /**
- * Wrap a fetch implementation so every failed (or error-status) http(s)
- * request is reported once at warning level. `isResponseError` chooses the
+ * Wrap a fetch implementation so every error-status http(s) response is
+ * reported once at warning level and every transport failure (a rejection
+ * that is not an abort) leaves one breadcrumb. `isResponseError` chooses the
  * statuses that count as errors (default `>= 400`; tRPC adds 207 so a mixed
  * batch is reported). `readResponseError` may parse the body via a clone to
  * enrich the report. The original rejection is re-thrown and the original
@@ -423,13 +447,12 @@ export function createNetworkErrorFetch(
       return response;
     } catch (error) {
       if (safeShouldReport(url, shouldReport) && !isAbortError(error)) {
-        reportNetworkError({
+        recordTransportFailure({
           source,
           url,
           method,
           durationMs: Date.now() - startedAt,
           error,
-          timedOut: isRequestDeadlineError(error),
         });
       }
       throw error;

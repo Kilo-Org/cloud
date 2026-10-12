@@ -16,6 +16,8 @@ Then regenerate:
 The Kilo MCP server exposes the Kilo API through two tools, `kilo_search` and
 `kilo_call`.
 
+The changes are recorded in `services/kilo-mcp/CHANGELOG.md`.
+
 ## How to use it
 
 1. **Search first.** `kilo_search` finds catalog endpoints. Never call a path from memory, and never guess one from this skill.

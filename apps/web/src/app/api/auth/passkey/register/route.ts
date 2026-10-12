@@ -8,7 +8,7 @@ import {
   verifyRegistration,
   PasskeyVerificationError,
 } from '@/lib/auth/passkey';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 /**
  * `{ action: 'options' }` mints registration options and stores the challenge

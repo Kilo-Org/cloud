@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, jest, test } from '@jest/globals';
 import type { saveUsageRelatedDataLocally as saveUsageRelatedDataLocallyType } from './processUsage';
-import type { defineMicrodollarUsage as defineMicrodollarUsageType } from '@/tests/helpers/microdollar-usage.helper';
-import type { insertTestUser as insertTestUserType } from '@/tests/helpers/user.helper';
-import type { findUserById as findUserByIdType } from '@/lib/user/find-user-by-id';
+import type { defineMicrodollarUsage as defineMicrodollarUsageType } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
+import type { insertTestUser as insertTestUserType } from '@kilocode/web-shared/tests/helpers/user.helper';
+import type { findUserById as findUserByIdType } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 /**
  * `processUsage` resolves its PostHog client once at module scope, so the client
@@ -11,7 +11,7 @@ import type { findUserById as findUserByIdType } from '@/lib/user/find-user-by-i
  * `processUsage.test.ts`. The capture spy is created inside the factory because
  * the factory runs before this module's own top-level bindings exist.
  */
-jest.mock('@/lib/posthog', () => {
+jest.mock('@kilocode/web-shared/lib/posthog', () => {
   const capture = jest.fn();
   return {
     __esModule: true,
@@ -29,7 +29,7 @@ jest.mock('@/lib/posthog', () => {
 
 const { __capture: posthogCapture } = jest.requireMock<{
   __capture: jest.Mock<(payload: { event: string }) => void>;
-}>('@/lib/posthog');
+}>('@kilocode/web-shared/lib/posthog');
 
 function capturedEventCount(event: string): number {
   return posthogCapture.mock.calls.filter(([payload]) => payload?.event === event).length;
@@ -42,9 +42,10 @@ let findUserById: typeof findUserByIdType;
 
 beforeAll(async () => {
   ({ saveUsageRelatedDataLocally } = await import('./processUsage'));
-  ({ defineMicrodollarUsage } = await import('@/tests/helpers/microdollar-usage.helper'));
-  ({ insertTestUser } = await import('@/tests/helpers/user.helper'));
-  ({ findUserById } = await import('@/lib/user/find-user-by-id'));
+  ({ defineMicrodollarUsage } =
+    await import('@kilocode/web-shared/tests/helpers/microdollar-usage.helper'));
+  ({ insertTestUser } = await import('@kilocode/web-shared/tests/helpers/user.helper'));
+  ({ findUserById } = await import('@kilocode/web-shared/lib/user/find-user-by-id'));
 });
 
 describe('first-usage analytics for a redelivered usage write', () => {

@@ -2,7 +2,7 @@ import { describe, it, expect, jest } from '@jest/globals';
 
 const mockLimit = jest.fn<() => Promise<Array<{ models: unknown }>>>().mockResolvedValue([]);
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
@@ -11,7 +11,7 @@ jest.mock('@/lib/drizzle', () => ({
     })),
   },
 }));
-import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 
 describe('mapModelIdToVercel', () => {
   describe('catalog aliases', () => {
@@ -32,6 +32,7 @@ describe('mapModelIdToVercel', () => {
       ['mistralai/ministral-3b-2512', 'mistral/ministral-3b'],
       ['mistralai/ministral-8b-2512', 'mistral/ministral-8b'],
       ['mistralai/mistral-large-2512', 'mistral/mistral-large-3'],
+      ['mistralai/mistral-large-4-0', 'mistral/mistral-large-4'],
       ['mistralai/mistral-medium-3-5', 'mistral/mistral-medium-3.5'],
       ['mistralai/mistral-small-2603', 'mistral/mistral-small'],
       ['qwen/qwen3-14b', 'alibaba/qwen-3-14b'],
@@ -149,6 +150,15 @@ describe('mapModelIdToVercel', () => {
       // the generic prefix rewrite instead of substituting internal_id.
       await expect(mapModelIdToVercel('stealth/claude-sonnet-4.6')).resolves.toBe(
         'stealth/claude-sonnet-4.6'
+      );
+      await expect(mapModelIdToVercel('stepfun/step-5-preview-free')).resolves.toBe(
+        'stepfun/step-5-preview-free'
+      );
+    });
+
+    it('maps the Vercel-served Glyph Cluster stealth model to its gateway id', async () => {
+      await expect(mapModelIdToVercel('stealth/glyph-cluster')).resolves.toBe(
+        'stealth/glyph-cluster'
       );
     });
 

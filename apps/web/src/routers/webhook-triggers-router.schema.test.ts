@@ -1,9 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
-import { createCallerFactory } from '@/lib/trpc/init';
+import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import type { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import type { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import type { adminWebhookTriggersRouter as AdminWebhookTriggersRouter } from './admin-webhook-triggers-router';
 import type { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import type {
@@ -32,7 +32,7 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   }),
 }));
 
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateCloudAgentToken: () => 'test-cloud-agent-token',
 }));
 
@@ -52,7 +52,7 @@ const mockSelectWhere = jest.fn<
   >
 >();
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     query: { kilocode_users: { findFirst: mockFindAdmin } },
     select: () => ({
@@ -84,7 +84,7 @@ jest.mock('@/lib/webhook-agent/webhook-agent-client', () => ({
   invokeWorkerScheduledTrigger: mockInvokeWorkerScheduledTrigger,
 }));
 
-jest.mock('@/routers/organizations/utils', () => ({
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: mockEnsureOrganizationAccess,
 }));
 

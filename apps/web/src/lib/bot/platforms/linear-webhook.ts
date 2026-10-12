@@ -4,7 +4,7 @@ import type { LinearAdapter } from '@chat-adapter/linear';
 import { captureException } from '@sentry/nextjs';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { deleteInstallationByOrganizationId } from '@/lib/integrations/linear-service';
-import { LINEAR_WEBHOOK_SECRET } from '@/lib/config.server';
+import { LINEAR_WEBHOOK_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
 /**

@@ -1,14 +1,14 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { deployment_events, deployment_builds, deployments } from '@kilocode/db/schema';
-import { USER_DEPLOYMENTS_API_AUTH_KEY } from '@/lib/config.server';
+import { USER_DEPLOYMENTS_API_AUTH_KEY } from '@kilocode/web-shared/lib/config.server';
 import { and, eq, ne } from 'drizzle-orm';
 import * as z from 'zod';
 import { webhookPayloadSchema, type WebhookPayload } from '@/lib/user-deployments/types';
-import { sendDeploymentFailedEmail } from '@/lib/email';
-import { findUserById } from '@/lib/user/find-user-by-id';
-import { getOrganizationMembers } from '@/lib/organizations/organizations';
+import { sendDeploymentFailedEmail } from '@kilocode/web-shared/lib/email';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { getOrganizationMembers } from '@kilocode/web-shared/lib/organizations/organizations';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const authHeader = req.headers.get('Authorization');

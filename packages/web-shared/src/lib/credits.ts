@@ -2,16 +2,16 @@ import { credit_transactions, transactional_email_log } from '@kilocode/db/schem
 
 import type { User } from '@kilocode/db/schema';
 import { kilocode_users } from '@kilocode/db/schema';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { and, sql, eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import Stripe from 'stripe';
 import { after } from 'next/server';
-import { processFirstTopupBonus } from '@/lib/firstTopupBonus';
-import { grantCreditForCategory } from '@/lib/promotionalCredits';
-import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
-import { sendCreditsTopUpEmail } from '@/lib/email';
-import { client as stripeClient } from '@/lib/stripe-client';
+import { processFirstTopupBonus } from '@kilocode/web-shared/lib/firstTopupBonus';
+import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
+import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
+import { sendCreditsTopUpEmail } from '@kilocode/web-shared/lib/email';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 
 export type StripeConfig = { type: 'stripe'; stripe_payment_id: string };
 

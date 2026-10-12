@@ -19,7 +19,7 @@ const mockConfig = {
   GOOGLE_CLIENT_SECRET: 'web-client-secret',
   APPLE_APP_BUNDLE_ID: 'com.kilocode.kiloapp',
 };
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   GOOGLE_CLIENT_ID: 'web-client-id',
   get GOOGLE_CLIENT_SECRET() {
     return mockConfig.GOOGLE_CLIENT_SECRET;
@@ -41,7 +41,7 @@ import {
   exchangeNativeGoogleAuthCode,
   NativeIdTokenError,
 } from './native-id-tokens';
-import { GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '@/lib/config.server';
+import { GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
 import { captureMessage } from '@sentry/nextjs';
 
 const mockVerifyAppleJwtWithJwks = jest.mocked(verifyAppleJwtWithJwks);

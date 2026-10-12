@@ -16,8 +16,8 @@ import {
   passkey_credentials,
   passkey_sign_in_tickets,
 } from '@kilocode/db/schema';
-import { NEXTAUTH_URL } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
+import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
 import {
   cleanupExpiredPasskeySignInTickets,

@@ -10,7 +10,7 @@ import {
   sanitizeAnalyticsPathname,
   sanitizeAnalyticsUrl,
   sanitizeAnalyticsUrlValue,
-} from '@/lib/sanitize-analytics-url';
+} from '@kilocode/web-shared/lib/sanitize-analytics-url';
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {

@@ -13,12 +13,12 @@
     },
     {
       "files": ["src/session-service.ts", "src/session-service.ts"],
-      "fingerprint": "a3bbedbe1e52f04e",
+      "fingerprint": "d074c54d7bd62a52",
       "owner": "session-service workspace preparation",
-      "reason": "Legacy sandbox preparation and control-plane attachment intentionally project the same workspace execution context while retaining distinct lifecycle flows.",
+      "reason": "Legacy sandbox preparation and control-plane attachment intentionally project the same workspace execution context while retaining distinct lifecycle flows; the review publication target adds one projected field.",
       "kind": "intentional",
       "maxMatches": 1,
-      "maxTokens": 101
+      "maxTokens": 113
     },
     {
       "files": ["src/shared/control-plane-protocol.ts", "src/shared/sandbox-control-protocol.ts"],

@@ -36,6 +36,7 @@ const JsonTextSchema = z.string();
 // hostile or half-built value can never reach the Sentry options.
 const TelemetryDescriptionSchema = z.looseObject({
   fingerprint: z.array(z.string()).min(1),
+  level: z.enum(['warning', 'error']).optional(),
   tags: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
   contexts: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
   extra: z.record(z.string(), z.unknown()).optional(),
@@ -64,26 +65,35 @@ function hasTrpcErrorCode(error: unknown): boolean {
   return TrpcCodeEnvelopeSchema.safeParse(error).success;
 }
 
+function isNetworkLayerError(error: unknown): boolean {
+  if (hasErrorName(error, TRPC_CLIENT_ERROR_NAME)) {
+    return true;
+  }
+  if (hasTrpcErrorCode(error)) {
+    return true;
+  }
+  if (error instanceof CancelledError) {
+    return true;
+  }
+  return hasErrorName(error, REQUEST_DEADLINE_ERROR_NAME);
+}
+
 /**
  * True when the error is already reported by the network layer: a tRPC client
  * error (by name, or any error carrying a tRPC `code` envelope), a react-query
- * `CancelledError`, or a request-deadline timeout. These are captured by the
- * tRPC links or the fetch wrapper, so reporting them again would duplicate
- * issues. A non-tRPC error that merely carries a top-level `code` is not
- * skipped — that would drop unrelated app errors.
+ * `CancelledError`, or a request-deadline timeout. The tRPC links or the fetch
+ * wrapper own these (a timeout is a breadcrumb there, not an event), so
+ * reporting them again would duplicate issues. A non-tRPC error that merely
+ * carries a top-level `code` is not skipped — that would drop unrelated app
+ * errors. An error whose `cause` is one of these is skipped too: a hook that
+ * maps a server error onto user-facing copy keeps the server error as `cause`,
+ * and the network layer owns it.
  */
 export function isAlreadyReportedNetworkError(error: unknown): boolean {
   try {
-    if (hasErrorName(error, TRPC_CLIENT_ERROR_NAME)) {
-      return true;
-    }
-    if (hasTrpcErrorCode(error)) {
-      return true;
-    }
-    if (error instanceof CancelledError) {
-      return true;
-    }
-    return hasErrorName(error, REQUEST_DEADLINE_ERROR_NAME);
+    return (
+      isNetworkLayerError(error) || (error instanceof Error && isNetworkLayerError(error.cause))
+    );
   } catch {
     return false;
   }
@@ -167,12 +177,13 @@ function declaredTelemetryDescription(error: unknown): TelemetryDescription | un
 }
 
 /**
- * Report an error observed by a React Query cache at error level, unless the
- * network layer already reported it. A typed error that declares its own
- * telemetry (see `TELEMETRY_DESCRIPTION_KEY`) is filed under that stable
- * fingerprint and tags; every other error keeps the catch-all `app-error` one.
- * The query key rides in `extra` (not tags, which are indexed and can carry
- * ids). Never throws.
+ * Report an error observed by a React Query cache, unless the network layer
+ * already reported it. The query cache calls this once per fetch, after the
+ * query's last retry failed. A typed error that declares its own telemetry
+ * (see `TELEMETRY_DESCRIPTION_KEY`) is filed under that stable fingerprint,
+ * tags and level; every other error keeps the catch-all `app-error`
+ * fingerprint at error level. The query key rides in `extra` (not tags, which
+ * are indexed and can carry ids). Never throws.
  */
 export function reportAppError(error: unknown, context: AppErrorContext): void {
   try {
@@ -182,7 +193,7 @@ export function reportAppError(error: unknown, context: AppErrorContext): void {
     const declared = declaredTelemetryDescription(error);
     captureTelemetry({
       error,
-      level: 'error',
+      level: declared?.level ?? 'error',
       tags: {
         'error.subsystem': 'app',
         'error.source': context.source,

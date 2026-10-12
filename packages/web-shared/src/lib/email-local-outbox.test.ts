@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { writeEmailToLocalOutbox } from '@/lib/email-local-outbox';
+import { writeEmailToLocalOutbox } from '@kilocode/web-shared/lib/email-local-outbox';
 
 jest.mock('node:child_process', () => ({ execFile: jest.fn() }));
 

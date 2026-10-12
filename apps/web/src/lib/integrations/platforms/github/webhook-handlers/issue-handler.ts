@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { PlatformIntegration } from '@kilocode/db/schema';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { WebhookIssuePayloadSchema } from '@/lib/auto-triage/core/schemas';
 import { IssueLabeledPayloadSchema } from '@/lib/auto-fix/core/schemas';
 import { IssueWebhookProcessor } from '@/lib/auto-triage/application/webhook/issue-webhook-processor';

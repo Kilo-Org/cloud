@@ -7,8 +7,8 @@ import {
   organization_membership_removals,
   organizations,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq, and } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
@@ -17,8 +17,8 @@ import {
   inviteUserToOrganization,
   acceptOrganizationInvite,
   addUserToOrganization,
-} from '@/lib/organizations/organizations';
-import { STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID } from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID } from '@kilocode/web-shared/lib/config.server';
 
 if (STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID?.trim() === '') {
   throw new Error(
@@ -30,7 +30,7 @@ if (STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID?.trim() === '') {
 // organization-seats.ts can verify the existing subscription without hitting
 // the real Stripe API. Return ended_at: null so the guard treats the existing
 // subscription as still active and rejects the duplicate.
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     subscriptions: {
       retrieve: jest.fn().mockResolvedValue({ ended_at: null }),

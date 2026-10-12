@@ -20,7 +20,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { OrganizationPlan, OrganizationRole } from '@/lib/organizations/organization-types';
+import type {
+  OrganizationPlan,
+  OrganizationRole,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { Loader2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -33,7 +36,7 @@ import {
   useOrganizationWithMembers,
 } from '@/app/api/organizations/hooks';
 import { usePostHog } from 'posthog-js/react';
-import { getLowerDomainFromEmail } from '@/lib/email-address';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 
 const emailSchema = z.email();
 

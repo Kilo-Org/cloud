@@ -9,7 +9,18 @@ import {
   isStartableGlanceableWork,
   shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  buildHomeWidgetDetails,
+  EMPTY_HOME_WIDGET_DETAILS,
+  type HomeWidgetDetails,
+} from '@kilocode/app-shared/home-widget';
 
+import { isGlanceableFixtureHeld } from './fixture-hold';
+import {
+  getLastHomeWidgetData,
+  hasSameHomeWidgetDetails,
+  setHomeWidgetDetails,
+} from './home-widget-data';
 import { type NewestSessionRow, newestSessionTitle } from './newest-session';
 import { hasSameGlanceableContent, withStatus } from './snapshot-transforms';
 import {
@@ -121,6 +132,8 @@ export class GlanceablePublisher {
   private readonly skipWaitingAskSessionId?: string;
   private current: GlanceableAgentsSnapshot | null;
   private activityStarted: boolean;
+  /** Home-only details from this publisher's previous tray read. */
+  private homeDetails: HomeWidgetDetails | null = null;
   /**
    * `updatedAt` of the frame the native surface accepted, i.e. the one its stale
    * deadline keys off. A heartbeat whose visible content did not change leaves
@@ -170,18 +183,39 @@ export class GlanceablePublisher {
    */
   handleSessions(
     sessions: readonly (NewestSessionRow & WaitingAskRow)[],
-    ctx: GlanceablePublisherContext
+    ctx: GlanceablePublisherContext,
+    checkedAt: number = this.now()
   ): void {
+    // A dev fixture owns the surfaces and the ask it recorded: stay silent
+    // without clearing that ask.
+    if (isGlanceableFixtureHeld()) {
+      return;
+    }
     if (this.isGated()) {
       // Nothing is asking while the publisher is gated: a terminal blank must
       // not leave an approvable ask behind for the action buttons.
       this.noteWaitingAsk(null);
       return;
     }
-    // The newest session's title never enters the snapshot (privacy contract):
-    // it rides in the surface extras every widget reads on redraw.
     const previousTitle = getSurfaceExtras().newestSessionTitle;
     const nextTitle = newestSessionTitle(sessions);
+    const derivedHomeDetails = buildHomeWidgetDetails(sessions);
+    // The approval key is minted server-side from the session and permission ids
+    // and cannot be recomputed here. Keep the key already held while the ask it
+    // was minted for is still the visible one; a press re-checks the digest, so a
+    // stale key can never approve a different request.
+    const heldHomeDetails = getLastHomeWidgetData()?.details ?? this.homeDetails;
+    const nextHomeDetails =
+      derivedHomeDetails.approvalKey === null &&
+      heldHomeDetails !== null &&
+      heldHomeDetails.approvalKey !== null &&
+      hasSameHomeWidgetDetails(heldHomeDetails, derivedHomeDetails)
+        ? { ...derivedHomeDetails, approvalKey: heldHomeDetails.approvalKey }
+        : derivedHomeDetails;
+    const sameHomeDetails =
+      this.homeDetails !== null && hasSameHomeWidgetDetails(this.homeDetails, nextHomeDetails);
+    this.homeDetails = nextHomeDetails;
+    setHomeWidgetDetails(nextHomeDetails, checkedAt);
     setSurfaceExtras({ ...getSurfaceExtras(), newestSessionTitle: nextTitle });
     getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     const now = this.now();
@@ -235,6 +269,7 @@ export class GlanceablePublisher {
     if (
       this.lastWriteAttemptAt !== null &&
       this.current !== null &&
+      sameHomeDetails &&
       hasSameGlanceableContent(
         { snapshot: this.current, newestSessionTitle: previousTitle },
         { snapshot, newestSessionTitle: nextTitle }
@@ -310,6 +345,9 @@ export class GlanceablePublisher {
 
   /** Cache update failed: keep the last counts only until their original deadline. */
   handleFetchError(ctx: GlanceablePublisherContext): void {
+    if (isGlanceableFixtureHeld()) {
+      return;
+    }
     // A failed refetch supersedes the ask: the surface now shows stale counts,
     // so a still-recorded waiting session must not stay approvable from it.
     this.noteWaitingAsk(null);
@@ -355,6 +393,7 @@ export class GlanceablePublisher {
     if (incoming.status !== 'signed_out' && incoming.status !== 'privacy') {
       getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     }
+    setHomeWidgetDetails(EMPTY_HOME_WIDGET_DETAILS);
     // A late background delivery supersedes a pending coalesced emit and any
     // pending 8 s terminal, so neither can fire after the newer snapshot.
     this.cancelCoalesce();
@@ -375,7 +414,12 @@ export class GlanceablePublisher {
   }
 
   private isGated(): boolean {
-    return this.terminalBlankEpoch() !== this.blankEpochAtStart || this.orgLost();
+    // The fixture hold is dev-only: only the `__DEV__` fixture harness sets it.
+    return (
+      this.terminalBlankEpoch() !== this.blankEpochAtStart ||
+      this.orgLost() ||
+      isGlanceableFixtureHeld()
+    );
   }
 
   /** Hand the current ask to the consumer, when one is wired. */
@@ -468,6 +512,10 @@ export class GlanceablePublisher {
     }
     this.terminalTimer = setTimeout(() => {
       this.terminalTimer = null;
+      // A fixture applied inside the window owns the surfaces now.
+      if (isGlanceableFixtureHeld()) {
+        return;
+      }
       this.activityStarted = false;
       for (const sink of this.sinks) {
         guardSink('terminal_end', () => {

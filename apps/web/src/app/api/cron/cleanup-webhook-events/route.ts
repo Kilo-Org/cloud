@@ -7,8 +7,8 @@ import {
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { webhook_events } from '@kilocode/db/schema';
 import { asc, inArray, lt } from 'drizzle-orm';
-import { CRON_SECRET } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
 const RETENTION_DAYS = 60;
 const BATCH_SIZE = 2_500;

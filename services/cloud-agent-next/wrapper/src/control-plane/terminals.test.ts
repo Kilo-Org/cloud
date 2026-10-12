@@ -57,6 +57,9 @@ function fakeRuntime(client: WrapperKiloClient): KiloRuntime {
     ensure: async () => client,
     installCredentials: async () => undefined,
     applyPendingCredentials: async () => false,
+    sessionState: () => undefined,
+    refreshActivity: async () => undefined,
+    needsCompute: () => false,
     isRetiredClient: () => false,
     phase: () => 'running',
     isSuspected: () => false,
@@ -73,6 +76,7 @@ function fakeRuntimes(runtime: KiloRuntime | undefined): KiloRuntimes {
     },
     get: () => runtime,
     remove: () => undefined,
+    needsCompute: () => false,
     suspected: () => false,
     unavailable: () => false,
     summary: () => ({

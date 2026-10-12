@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
-import { db, sql } from '@/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   organization_invitations,
@@ -9,7 +9,7 @@ import {
   organization_user_limits,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq, and } from 'drizzle-orm';
 import {
   getUserOrganizationsWithSeats,
@@ -23,7 +23,7 @@ import {
   acceptOrganizationInvite,
 } from './organizations';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
+import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@kilocode/web-shared/lib/organizations/constants';
 
 describe('Organizations', () => {
   afterEach(async () => {

@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   cli_sessions_v2,
   cloud_agent_worktrees,
@@ -15,7 +15,7 @@ import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import { TRPCClientError } from '@trpc/client';
 import type * as TrpcServerModule from '@trpc/server';
 import { and, eq, inArray, isNotNull, or } from 'drizzle-orm';
-import type { TRPCContext } from '@/lib/trpc/init';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import type { cliSessionsV2Router } from './cli-sessions-v2-router';
 import type {
   DeleteWorktreeInput,
@@ -52,7 +52,7 @@ const mockCreateCloudAgentNextClient = jest.fn((_token: string) => ({
   getSession: mockGetRuntimeSession,
 }));
 
-jest.mock('@/lib/trpc/init', () => {
+jest.mock('@kilocode/web-shared/lib/trpc/init', () => {
   const { initTRPC } = jest.requireActual<typeof TrpcServerModule>('@trpc/server');
   const trpc = initTRPC.context<TRPCContext>().create();
 
@@ -71,7 +71,7 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: mockCreateCloudAgentNextClient,
 }));
 
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateApiToken: jest.fn(() => 'cloud-agent-token'),
 }));
 
@@ -89,7 +89,7 @@ jest.mock('@/lib/session-ingest-client', () => ({
   unshareSession: jest.fn(),
 }));
 
-jest.mock('@/lib/admin/admin-access-log', () => ({
+jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({
   recordKiloAdminElevation: jest.fn(),
   UNSCOPED_TARGET: 'unscoped',
 }));
@@ -203,7 +203,7 @@ beforeAll(async () => {
       created_by_kilo_user_id: USER_ID,
     },
   ]);
-  const { createCallerFactory } = await import('@/lib/trpc/init');
+  const { createCallerFactory } = await import('@kilocode/web-shared/lib/trpc/init');
   const { cliSessionsV2Router } = await import('./cli-sessions-v2-router');
   createCaller = createCallerFactory(cliSessionsV2Router);
 });
@@ -368,7 +368,14 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
           name: null,
           defaultTitle: ownershipRow.title,
           prSession: null,
-          sessions: [{ sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null }],
+          sessions: [
+            {
+              sessionId: SESSION_ID,
+              sessionStatus: null,
+              sessionStatusUpdatedAt: null,
+              updatedAt: new Date(ownershipRow.updated_at).toISOString(),
+            },
+          ],
         },
       },
     });
@@ -379,6 +386,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
     const sibling = await insertSession({
       status: 'busy',
       status_updated_at: '2026-04-29 01:16:12.945+00',
+      updated_at: '2026-04-29 01:17:12.945+00',
     });
     await insertSession({ kilo_user_id: OTHER_USER_ID, status: 'question' });
     await insertSession({ organization_id: ORGANIZATION_ID, status: 'permission' });
@@ -397,11 +405,17 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
 
     expect(details.worktrees[WORKTREE_ID].sessions).toEqual(
       [
-        { sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null },
+        {
+          sessionId: SESSION_ID,
+          sessionStatus: null,
+          sessionStatusUpdatedAt: null,
+          updatedAt: new Date(ownershipRow.updated_at).toISOString(),
+        },
         {
           sessionId: sibling.session_id,
           sessionStatus: 'busy',
           sessionStatusUpdatedAt: '2026-04-29T01:16:12.945Z',
+          updatedAt: '2026-04-29T01:17:12.945Z',
         },
       ].sort((a, b) => a.sessionId.localeCompare(b.sessionId))
     );
@@ -410,6 +424,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         sessionId: otherWorktreeSession.session_id,
         sessionStatus: 'retry',
         sessionStatusUpdatedAt: null,
+        updatedAt: new Date(otherWorktreeSession.updated_at).toISOString(),
       },
     ]);
     expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
@@ -465,6 +480,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
       sessionId: SESSION_ID,
       sessionStatus: 'question',
       sessionStatusUpdatedAt: '2020-01-01T00:00:00.000Z',
+      updatedAt: '2020-01-01T00:00:00.000Z',
     });
     expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
   });
@@ -742,7 +758,14 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         name: null,
         defaultTitle: ownershipRow.title,
         prSession: null,
-        sessions: [{ sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null }],
+        sessions: [
+          {
+            sessionId: SESSION_ID,
+            sessionStatus: null,
+            sessionStatusUpdatedAt: null,
+            updatedAt: new Date(ownershipRow.updated_at).toISOString(),
+          },
+        ],
       },
     });
     expect(

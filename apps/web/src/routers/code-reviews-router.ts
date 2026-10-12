@@ -1,4 +1,4 @@
-import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
+import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
@@ -13,14 +13,14 @@ import {
 import type { CodeReviewAgentConfig, RepositoryModelOverride } from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import { fetchGitLabRepositoriesForUser } from '@/lib/cloud-agent/gitlab-integration-helpers';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   clearCodeReviewActionRequiredState,
   getCodeReviewActionRequiredState,
@@ -474,8 +474,8 @@ export const personalReviewAgentRouter = createTRPCRouter({
    * and `review_analytics_enabled` on the row even when the patch supplies
    * neither, matching the full-save contract.
    *
-   * Throws `NOT_FOUND` if no stored config exists — a PATCH cannot
-   * bootstrap a row (use `saveReviewConfig` for that).
+   * With no stored config, the patch applies to the defaults that
+   * `getReviewConfig` returns and creates the row (disabled).
    */
   patchReviewConfig: baseProcedure
     .input(PatchReviewConfigInputSchema)
@@ -495,17 +495,10 @@ export const personalReviewAgentRouter = createTRPCRouter({
         }
 
         const previousConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
-        if (!previousConfig) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message:
-              'No existing review agent configuration to patch. Save one with saveReviewConfig first.',
-          });
-        }
-        const previousRepoIds =
-          ((previousConfig.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids as
-            | Array<number | string>
-            | undefined) || [];
+        const prevCfg: Partial<CodeReviewAgentConfig> = previousConfig
+          ? (previousConfig.config as CodeReviewAgentConfig)
+          : {};
+        const previousRepoIds = prevCfg.selected_repository_ids ?? [];
 
         // Delta repository selection: `selectedRepositoryDelta` computes
         // next = (stored ∪ add) \ remove, with remove winning on overlap.
@@ -523,7 +516,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
         // the merge helper. Mirrors the field mapping used in
         // `getReviewConfig` so a round-trip PATCH is a no-op on the read
         // shape.
-        const prevCfg = previousConfig.config as CodeReviewAgentConfig;
         const stored: CodeReviewStoredConfig = {
           reviewStyle: prevCfg.review_style || 'balanced',
           focusAreas: prevCfg.focus_areas || [],

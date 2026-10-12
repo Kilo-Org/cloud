@@ -1,9 +1,9 @@
-import { createCachedFetch } from '@/lib/cached-fetch';
-import { db } from '@/lib/drizzle';
-import { isKiloAutoModel } from '@/lib/ai-gateway/auto-model';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import type { AutoFreeModel } from '@/lib/ai-gateway/models';
-import { getAiSdkProvider } from '@/lib/ai-gateway/providers/model-settings';
+import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import type { AutoFreeModel } from '@kilocode/web-shared/lib/ai-gateway/models';
+import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-types';
 import { eq } from 'drizzle-orm';

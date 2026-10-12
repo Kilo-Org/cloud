@@ -1,29 +1,29 @@
 import { describe, expect, test, jest } from '@jest/globals';
 import type Stripe from 'stripe';
 
-import { getKnownStripePriceIdsForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
-import { getKnownStripePriceIdsForKiloClaw } from '@/lib/kiloclaw/stripe-price-ids.server';
-import { SEAT_PRODUCT_IDS } from '@/lib/organizations/stripe-seat-line-items';
+import { getKnownStripePriceIdsForKiloPass } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
+import { getKnownStripePriceIdsForKiloClaw } from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
+import { SEAT_PRODUCT_IDS } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
 import {
   prepareServiceFeeAssessmentDecision,
   upsertServiceFeeAssessment,
   type ServiceFeeAssessmentRecord,
   type ServiceFeeAssessmentStore,
-} from '@/lib/service-fees/assessments';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
 import {
   SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
   SERVICE_FEE_DESCRIPTION,
   SERVICE_FEE_METADATA_TYPE,
   SERVICE_FEE_RATE_BASIS_POINTS,
   SERVICE_FEE_VERSION,
-} from '@/lib/service-fees/constants';
+} from '@kilocode/web-shared/lib/service-fees/constants';
 import {
   handleKiloPassInvoiceCreated,
   SERVICE_FEE_FAILURE_APPLICATION,
   type KiloPassInvoiceCreatedDependencies,
   type KiloPassInvoiceCreatedStripe,
 } from '@/lib/service-fees/invoice-created';
-import { createInvoiceServiceFeeAssessmentKey } from '@/lib/service-fees/checkout';
+import { createInvoiceServiceFeeAssessmentKey } from '@kilocode/web-shared/lib/service-fees/checkout';
 
 const KILO_PASS_PRICE_ID = getKnownStripePriceIdsForKiloPass()[0]!;
 const KILOCLAW_PRICE_ID = getKnownStripePriceIdsForKiloClaw()[0]!;

@@ -65,7 +65,7 @@ import { MessageSquarePlus } from '@/components/ui/icons';
 import { type Href, useIsFocused, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Platform, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommentModerationProvider } from '@/components/pr-review/discussion/comment-moderation';
@@ -79,6 +79,7 @@ import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import {
   type ConversationComment,
   type DiscussionListItem,
@@ -153,6 +154,7 @@ export function PrReviewDiscussionTab({
     });
 
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   // GitLab calls this a merge request; GitHub and Bitbucket both say pull
   // request, so the three provider-named strings below switch on that term
   // alone rather than forking the tab per provider.
@@ -357,32 +359,26 @@ export function PrReviewDiscussionTab({
   };
 
   const handleDeleteComment = (comment: ReviewComment, kind: PrCommentKind) => {
-    Alert.alert(
-      t('prReview.discussion.deleteCommentTitle'),
-      t('prReview.discussion.deleteCommentMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: () => {
-            // Confirmed offline: fail the confirmed destructive action at once
-            // with the retryable copy instead of starting a write React Query
-            // pauses. Without this the row is optimistically removed while the
-            // write is paused (a false success, lost if the app is killed
-            // before reconnect, and the row reappears later), and the user gets
-            // no failure feedback from a confirmed delete (ux2 spot check).
-            // The row stays, nothing is pending, and the same row action
-            // retries once the banner clears.
-            if (getCommittedConnectivityStatus() === 'offline') {
-              announcingToast.error(t('prReview.discussion.commentDeleteFailed'));
-              return;
-            }
-            deleteComment.mutate({ owner, repo, number, commentId: comment.commentId, kind });
-          },
-        },
-      ]
-    );
+    confirm({
+      title: t('prReview.discussion.deleteCommentTitle'),
+      message: t('prReview.discussion.deleteCommentMessage'),
+      confirmLabel: t('common.delete'),
+      onConfirm: () => {
+        // Confirmed offline: fail the confirmed destructive action at once
+        // with the retryable copy instead of starting a write React Query
+        // pauses. Without this the row is optimistically removed while the
+        // write is paused (a false success, lost if the app is killed
+        // before reconnect, and the row reappears later), and the user gets
+        // no failure feedback from a confirmed delete (ux2 spot check).
+        // The row stays, nothing is pending, and the same row action
+        // retries once the banner clears.
+        if (getCommittedConnectivityStatus() === 'offline') {
+          announcingToast.error(t('prReview.discussion.commentDeleteFailed'));
+          return;
+        }
+        deleteComment.mutate({ owner, repo, number, commentId: comment.commentId, kind });
+      },
+    });
   };
 
   // The bottom CTA bar is static chrome for the two content-bearing views
@@ -392,6 +388,7 @@ export function PrReviewDiscussionTab({
     <View className="flex-1">
       <View className="flex-1">{body}</View>
       <PrCommentCta onPress={openConversationComment} keyboardLift={isFocused} />
+      {dialog}
     </View>
   );
 
@@ -424,46 +421,58 @@ export function PrReviewDiscussionTab({
 
   if (view.kind === 'permission') {
     return (
-      <QueryError
-        variant="permission"
-        message={
-          isMergeRequest
-            ? t('prReview.terms.discussionAccessDenied')
-            : t('prReview.discussion.accessDeniedMessage')
-        }
-      />
+      <>
+        <QueryError
+          variant="permission"
+          message={
+            isMergeRequest
+              ? t('prReview.terms.discussionAccessDenied')
+              : t('prReview.discussion.accessDeniedMessage')
+          }
+        />
+        {dialog}
+      </>
     );
   }
   if (view.kind === 'not-found') {
     return (
-      <QueryError
-        variant="not-found"
-        title={t('prReview.discussion.unavailable')}
-        message={
-          isMergeRequest
-            ? t('prReview.terms.discussionUnavailableMessage')
-            : t('prReview.discussion.unavailableMessage')
-        }
-      />
+      <>
+        <QueryError
+          variant="not-found"
+          title={t('prReview.discussion.unavailable')}
+          message={
+            isMergeRequest
+              ? t('prReview.terms.discussionUnavailableMessage')
+              : t('prReview.discussion.unavailableMessage')
+          }
+        />
+        {dialog}
+      </>
     );
   }
   if (view.kind === 'reconnect') {
     return (
-      <CenteredState className="px-6">
-        <PrReviewReconnectNotice />
-      </CenteredState>
+      <>
+        <CenteredState className="px-6">
+          <PrReviewReconnectNotice />
+        </CenteredState>
+        {dialog}
+      </>
     );
   }
   if (view.kind === 'retryable') {
     return (
-      <QueryError
-        variant="server"
-        title={t('prReview.discussion.couldNotLoad')}
-        onRetry={() => {
-          void query.refetch();
-        }}
-        isRetrying={query.isFetching}
-      />
+      <>
+        <QueryError
+          variant="server"
+          title={t('prReview.discussion.couldNotLoad')}
+          onRetry={() => {
+            void query.refetch();
+          }}
+          isRetrying={query.isFetching}
+        />
+        {dialog}
+      </>
     );
   }
 
@@ -488,6 +497,7 @@ export function PrReviewDiscussionTab({
             <Skeleton className="h-6 w-2/3" />
           </View>
         ))}
+        {dialog}
       </View>
     );
   }

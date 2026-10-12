@@ -2,11 +2,11 @@ import { describe, expect, it, beforeEach } from '@jest/globals';
 
 jest.mock('@vercel/firewall', () => ({ checkRateLimit: jest.fn() }));
 jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
-jest.mock('@/lib/tokens', () => ({ validateAuthorizationHeader: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({ validateAuthorizationHeader: jest.fn() }));
 
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
-import { validateAuthorizationHeader } from '@/lib/tokens';
+import { validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
 import { NextRequest } from 'next/server';
 import { gatewayRateLimitKey, isGatewayAccountRateLimited } from './gateway-account-rate-limit';
 

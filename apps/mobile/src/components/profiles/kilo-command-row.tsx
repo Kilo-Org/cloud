@@ -74,15 +74,12 @@ export function KiloCommandRowView({
           </Text>
           {agent.length > 0 || model.length > 0 ? (
             <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-              {[agent.length > 0 ? `${t('profiles.slashCommands.agent')}: ${agent}` : '', model]
+              {[agent.length > 0 ? `${t('common.agent')}: ${agent}` : '', model]
                 .filter(Boolean)
                 .join('  ')}
             </Text>
           ) : null}
         </View>
-        <Text className="text-xs text-muted-foreground">
-          {enabled ? t('common.enabled') : t('common.disabled')}
-        </Text>
         <Switch value={enabled} accessibilityLabel={name} onValueChange={onToggle} />
       </View>
       <View className="flex-row items-center justify-end gap-1">

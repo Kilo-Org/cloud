@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { APPLE_STORE_BUNDLE_ID } from '@/lib/kilo-pass/apple-store-sdk';
 import {
   decodeAppleStoreTransactionJws,

@@ -5,7 +5,7 @@
 
 import type { Event } from '@sentry/nextjs';
 import { consoleLoggingIntegration, httpIntegration, init } from '@sentry/nextjs';
-import { sanitizeAnalyticsPathname } from '@/lib/sanitize-analytics-url';
+import { sanitizeAnalyticsPathname } from '@kilocode/web-shared/lib/sanitize-analytics-url';
 
 type DrizzleQueryError = Error & {
   query: string;

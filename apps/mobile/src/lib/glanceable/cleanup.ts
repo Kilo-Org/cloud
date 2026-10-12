@@ -4,6 +4,7 @@ import {
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { clearHomeWidgetData } from './home-widget-data';
 import { getLastGlanceableSnapshot } from './persist';
 import { withStatus } from './publisher';
 import { forEachSink, getGlanceableDelivery } from './sink-registry';
@@ -100,6 +101,7 @@ function writeTerminalAndEnd(status: 'signed_out' | 'privacy'): void {
   // Arm the publisher gate before any sink writes, so a cache success that
   // lands during this window can never emit for the torn-down session.
   terminalBlankEpoch += 1;
+  clearHomeWidgetData();
   getGlanceableDelivery().cleanupTokens('scope');
   const snapshot = buildTerminalSnapshot(status);
   // Write the snapshot first, then end: the surface shows the terminal copy

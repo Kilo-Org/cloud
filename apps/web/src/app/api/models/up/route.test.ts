@@ -4,11 +4,11 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
-jest.mock('@/lib/dotenvx', () => ({
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
   getEnvVariable: (name: string) => `test-${name}`,
 }));
 
-jest.mock('@/lib/ai-gateway/preferred-models', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
   getMonitoredModels: async () => [
     'poolside/laguna-s-2.1:free',
     'minimax/minimax-m3',

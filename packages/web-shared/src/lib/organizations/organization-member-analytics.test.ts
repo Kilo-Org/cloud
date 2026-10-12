@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { captureOrganizationMemberJoined as captureOrganizationMemberJoinedType } from './organization-member-analytics';
 
-jest.mock('@/lib/posthog', () => {
+jest.mock('@kilocode/web-shared/lib/posthog', () => {
   const mockCapture = jest.fn();
   return {
     __esModule: true,
@@ -12,7 +12,9 @@ jest.mock('@/lib/posthog', () => {
 
 let captureOrganizationMemberJoined: typeof captureOrganizationMemberJoinedType;
 
-const posthogMock: { mockCapture: jest.Mock } = jest.requireMock('@/lib/posthog');
+const posthogMock: { mockCapture: jest.Mock } = jest.requireMock(
+  '@kilocode/web-shared/lib/posthog'
+);
 const { mockCapture } = posthogMock;
 
 beforeAll(async () => {

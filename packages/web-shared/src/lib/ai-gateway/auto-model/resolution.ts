@@ -1,14 +1,14 @@
-import type { FeatureValue } from '@/lib/feature-detection';
+import type { FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
 import type { User } from '@kilocode/db';
 import type {
   OrganizationPlan,
   OrganizationSettings,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isVirtualAutoModelId, type AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import {
   AUTO_SMALL_TARGET_MODELS,
@@ -21,28 +21,28 @@ import {
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
   ORG_AUTO_MODEL,
-} from '@/lib/ai-gateway/auto-model';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   type AutoFreeModel,
   PRIMARY_DEFAULT_MODEL,
   selectAutoFreeCandidate,
-} from '@/lib/ai-gateway/models';
+} from '@kilocode/web-shared/lib/ai-gateway/models';
 import {
   AUTO_FREE_FALLBACK_MODEL,
   getConfiguredAutoFreeModels,
   isAutoFreeEligibleModelId,
-} from '@/lib/ai-gateway/auto-model/auto-free-config';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import {
   findKiloExclusiveModel,
   isKiloExclusiveFreeModel,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
-import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   getOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
   validateOrganizationAutoTarget,
-} from '@/lib/organizations/organization-auto-model';
-import { getModelVariants } from '@/lib/ai-gateway/providers/model-settings';
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model';
+import { getModelVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 
 type ResolveAutoModelParams = {

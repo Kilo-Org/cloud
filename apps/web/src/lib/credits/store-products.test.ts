@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 import {
   STORE_CREDIT_PRODUCTS,

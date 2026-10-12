@@ -1,10 +1,17 @@
 import 'server-only';
 
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { OPENAI_CLIENT_ID, OPENAI_CLIENT_SECRET, BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
-import { OPENAI_RESOURCE, OPENAI_TOKEN_ENDPOINT } from '@/lib/auth/openai/config';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import {
+  OPENAI_CLIENT_ID,
+  OPENAI_CLIENT_SECRET,
+  BYOK_ENCRYPTION_KEY,
+} from '@kilocode/web-shared/lib/config.server';
+import {
+  OPENAI_RESOURCE,
+  OPENAI_TOKEN_ENDPOINT,
+} from '@kilocode/web-shared/lib/auth/openai/config';
 import {
   decryptOpenAiChatGptConnection,
   markOpenAiChatGptConnectionErrored,

@@ -38,6 +38,22 @@ export function installationGitAuthorFromEnv(
   };
 }
 
+/**
+ * Bot identity for the publication target. Unlike git author attribution, a
+ * missing app-type-specific slug or user id fails closed: the session must not
+ * publish through a fallback identity.
+ */
+export function installationBotIdentityFromEnv(
+  env: GitTokenServiceEnv,
+  githubAppType: 'standard' | 'lite'
+): { slug: string; userId: string } | undefined {
+  const slug = githubAppType === 'lite' ? env.GITHUB_LITE_APP_SLUG : env.GITHUB_APP_SLUG;
+  const userId =
+    githubAppType === 'lite' ? env.GITHUB_LITE_APP_BOT_USER_ID : env.GITHUB_APP_BOT_USER_ID;
+  if (!slug || !userId) return undefined;
+  return { slug, userId };
+}
+
 export type ResolvedGitHubToken = {
   token: string;
   installationId: string;

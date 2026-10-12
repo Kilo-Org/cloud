@@ -3,7 +3,7 @@ import { captureRequestError } from '@sentry/nextjs';
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { registerNodeInstrumentation } =
-      await import('@/lib/observability/node-instrumentation');
+      await import('@kilocode/web-shared/lib/observability/node-instrumentation');
     registerNodeInstrumentation('kilocode-ai-gateway');
   }
 }

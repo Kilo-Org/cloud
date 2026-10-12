@@ -1,8 +1,8 @@
-import type { PaginationMetadata } from '@/types/pagination';
+import type { PaginationMetadata } from '@kilocode/web-shared/types/pagination';
 import { millisecondsInHour } from 'date-fns/constants';
-import { APP_URL } from '@/lib/constants';
-import type { CustomerRequirement } from '@/lib/promoCustomerRequirement';
-import type { OrganizationRequirement } from '@/lib/organizations/organizationRequirement';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import type { CustomerRequirement } from '@kilocode/web-shared/lib/promoCustomerRequirement';
+import type { OrganizationRequirement } from '@kilocode/web-shared/lib/organizations/organizationRequirement';
 
 export type CreditTransactionWithUser = {
   kilo_user_id: string;

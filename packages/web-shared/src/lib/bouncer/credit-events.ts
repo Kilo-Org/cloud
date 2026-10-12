@@ -9,9 +9,9 @@ import {
   normalizeJa4,
   type CreditEvent,
   type CreditFlow,
-} from '@/lib/bouncer/client';
-import { db } from '@/lib/drizzle';
-import { sentryLogger } from '@/lib/utils.server';
+} from '@kilocode/web-shared/lib/bouncer/client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   enqueueBouncerCreditEvent,
   type BouncerCreditEventOutboxDatabase,
@@ -82,10 +82,12 @@ export async function enqueueCreditEvent(
 
 /**
  * The context a `charge.attempted` needs in addition to the flow-specific fields. `accountCreatedAt`
- * is `users.created_at` for a personal charge and `organizations.created_at` for an org charge.
+ * is `users.created_at` for a personal charge and `organizations.created_at` for an org charge;
+ * `accountUsedMicrodollars` is the same payer row's `microdollars_used` at charge time.
  */
 export type ChargeAttemptContext = {
   accountCreatedAt: Date | string;
+  accountUsedMicrodollars: number;
   /** The client IP. Omit it for an off-session charge. */
   ip?: string | null;
   ipCountry?: string | null;
@@ -126,6 +128,7 @@ export async function enqueueChargeAttempted(
     orgId: params.orgId,
     amountCents: params.amountCents,
     accountCreatedAt: params.accountCreatedAt,
+    accountUsedMicrodollars: params.accountUsedMicrodollars,
     ip: params.ip,
     ipCountry: params.ipCountry,
     cardFingerprint: params.cardFingerprint,

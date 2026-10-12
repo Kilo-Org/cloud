@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { handleTRPCRequest } from '@/lib/organizations/organization-settings-route-handler';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { handleTRPCRequest } from '@kilocode/web-shared/lib/organizations/organization-settings-route-handler';
 import { handleOrganizationModelValidationRequest } from './organization-model-validation';
 
-jest.mock('@/lib/organizations/organization-settings-route-handler', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-settings-route-handler', () => ({
   handleTRPCRequest: jest.fn(),
 }));
 

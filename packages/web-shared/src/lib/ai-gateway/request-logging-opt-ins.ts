@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { ai_gateway_request_logging_opt_ins } from '@kilocode/db/schema';
-import { createCachedFetch } from '@/lib/cached-fetch';
-import { db } from '@/lib/drizzle';
+import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
 
 export const RequestLoggingOptInSchema = z.object({

@@ -1,17 +1,19 @@
 import 'server-only';
 
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
   GASTOWN_SERVICE_URL,
-  GASTOWN_CF_ACCESS_CLIENT_ID,
-  GASTOWN_CF_ACCESS_CLIENT_SECRET,
   CLOUDFLARE_ACCOUNT_ID,
   CLOUDFLARE_TOWN_DO_NAMESPACE_ID,
   CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID,
-} from '@/lib/config.server';
-import { generateApiToken } from '@/lib/tokens';
+} from '@kilocode/web-shared/lib/config.server';
+import {
+  GASTOWN_CF_ACCESS_CLIENT_ID,
+  GASTOWN_CF_ACCESS_CLIENT_SECRET,
+} from '@/lib/web-config.server';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import type { User } from '@kilocode/db/schema';
 
 // ── Zod schemas matching Gastown API response shapes ─────────────────────────

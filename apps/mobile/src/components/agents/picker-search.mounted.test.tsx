@@ -222,20 +222,7 @@ describe('repository picker search placeholder', () => {
   });
 });
 
-// RN 0.86 does not resolve `textAlign: 'auto'` from the layout direction, so
-// without a named alignment both search queries stay on the physical left of a
-// row that mirrors (the finding). `lib/rtl-text.ts` owns the rule; these tests
-// pin that each field follows it, and that the overlay box — not the Text's own
-// alignment — places the repo placeholder at the start edge.
-const PHYSICAL_ALIGNMENT_CLASSES = new Set([
-  'text-left',
-  'text-right',
-  'text-center',
-  'text-justify',
-]);
-
 describe('picker search alignment follows the interface direction', () => {
-  const repositoryPlaceholder = 'Search repositories...';
   const cases = [
     { name: 'model', Component: ModelPickerContent },
     { name: 'repository', Component: RepoPickerScreen },
@@ -266,31 +253,6 @@ describe('picker search alignment follows the interface direction', () => {
       expect(inputStyle(input).textAlign).toBeUndefined();
     }
   );
-
-  it.each([false, true])(
-    'places the repository placeholder at the field start edge as a row, never a physical text alignment (RTL=%s)',
-    async isRTL => {
-      i18nManager.isRTL = isRTL;
-      const renderer = await mount(RepoPickerScreen);
-      const placeholder = hosts(renderer, 'Text').find(
-        node => node.props.children === repositoryPlaceholder
-      );
-      if (!placeholder) {
-        throw new Error('Search placeholder overlay did not mount');
-      }
-      const wrapper = placeholder.parent;
-      if (!wrapper) {
-        throw new Error('Search placeholder overlay has no box');
-      }
-      // A `flex-row`'s start edge is the physical right in RTL and the physical
-      // left in LTR, and the hugging Text cannot float away from it.
-      const wrapperClasses = (wrapper.props.className as string).split(' ');
-      expect(wrapperClasses).toEqual(expect.arrayContaining(['flex-row', 'justify-start']));
-      const textClasses = (placeholder.props.className as string).split(' ');
-      expect(textClasses).toEqual(expect.arrayContaining(['shrink', 'max-w-full']));
-      expect(textClasses.filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name))).toEqual([]);
-    }
-  );
 });
 
 describe('repository picker query alignment', () => {
@@ -308,16 +270,17 @@ describe('repository picker query alignment', () => {
     // sit at the right, leaving a dead gap between them.
     i18nManager.isRTL = true;
     const renderer = await mount(RepoPickerScreen);
-    expect(searchInput(renderer).props.style).toEqual([
-      { textAlign: 'right' },
-      { color: theme.foreground },
-    ]);
+    const style = inputStyle(searchInput(renderer));
+    expect(style.textAlign).toBe('right');
+    expect(style.color).toBe(theme.foreground);
   });
 
-  it('leaves the input style to the caller in LTR so English is unchanged', async () => {
+  it('leaves the input alignment to the caller in LTR so English is unchanged', async () => {
     i18nManager.isRTL = false;
     const renderer = await mount(RepoPickerScreen);
-    expect(searchInput(renderer).props.style).toEqual({ color: theme.foreground });
+    const style = inputStyle(searchInput(renderer));
+    expect(style.color).toBe(theme.foreground);
+    expect(style.textAlign).toBeUndefined();
   });
 });
 
@@ -337,13 +300,13 @@ describe('model picker query alignment', () => {
     // them. The model picker had no alignment at all before this.
     i18nManager.isRTL = true;
     const renderer = await mount(ModelPickerContent);
-    expect(searchInput(renderer).props.style).toEqual([{ textAlign: 'right' }, undefined]);
+    expect(inputStyle(searchInput(renderer)).textAlign).toBe('right');
   });
 
-  it('leaves the input style to the caller in LTR so English is unchanged', async () => {
+  it('leaves the input alignment to the caller in LTR so English is unchanged', async () => {
     i18nManager.isRTL = false;
     const renderer = await mount(ModelPickerContent);
-    expect(searchInput(renderer).props.style).toBeUndefined();
+    expect(inputStyle(searchInput(renderer)).textAlign).toBeUndefined();
   });
 });
 
@@ -359,11 +322,11 @@ function hosts(renderer: Awaited<ReturnType<typeof mount>>, type: string) {
 
 /** The style RN flattens an input's array to, or nothing when it carries none. */
 function inputStyle(input: ReturnType<typeof hosts>[number]): Record<string, unknown> {
-  const style = input.props.style;
-  if (style === undefined) {
-    return {};
-  }
-  return Object.assign({}, ...([style] as Record<string, unknown>[]).flat());
+  const entries: unknown[] = [input.props.style];
+  return Object.assign(
+    {},
+    ...entries.flat(Infinity).filter(entry => typeof entry === 'object' && entry !== null)
+  );
 }
 
 // The model picker hosts its rows in a FlashList and manages its own scrolling

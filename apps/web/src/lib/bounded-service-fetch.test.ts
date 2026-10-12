@@ -7,7 +7,7 @@ import {
   ServiceFetchTimeoutError,
   fetchWithinBudget,
 } from './bounded-service-fetch';
-import { CONTROL_PLANE_PROCEDURE_BUDGET_MS } from '@/lib/trpc/control-plane-budget';
+import { CONTROL_PLANE_PROCEDURE_BUDGET_MS } from '@kilocode/web-shared/lib/trpc/control-plane-budget';
 
 const ENDPOINT_WITH_QUERY =
   'https://ingest.example.com/api/sessions/active?session=query-secret&page=1';

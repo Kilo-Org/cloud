@@ -34,12 +34,13 @@ const plugins = [
   {
     name: 'resolve-aliases',
     resolveId(source) {
-      // Resolve @/* path aliases to the tsc output, mirroring the tsconfig
-      // fallback from apps/web/src to packages/web-shared/src.
+      // Resolve the tsconfig path aliases to the tsc output.
       if (source.startsWith('@/')) {
-        const webDts = resolveDts(path.resolve(tscOut, 'apps/web/src', source.slice(2)));
-        if (existsSync(webDts)) return webDts;
-        return resolveDts(path.resolve(tscOut, 'packages/web-shared/src', source.slice(2)));
+        return resolveDts(path.resolve(tscOut, 'apps/web/src', source.slice(2)));
+      }
+      if (source.startsWith('@kilocode/web-shared/')) {
+        const subpath = source.slice('@kilocode/web-shared/'.length);
+        return resolveDts(path.resolve(tscOut, 'packages/web-shared/src', subpath));
       }
       // Resolve @kilocode/db sub-path imports
       if (source === '@kilocode/db' || source.startsWith('@kilocode/db/')) {

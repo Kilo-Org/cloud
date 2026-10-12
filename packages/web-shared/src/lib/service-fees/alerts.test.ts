@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
 import type { captureException as captureSentryException } from '@sentry/nextjs';
 
-import type { sendAdminSlackNotification } from '@/lib/slack/admin-notifications';
+import type { sendAdminSlackNotification } from '@kilocode/web-shared/lib/slack/admin-notifications';
 
 class AdminSlackNotificationError extends Error {
   constructor(
@@ -19,7 +19,7 @@ async function loadAlerts() {
   jest.doMock('@sentry/nextjs', () => ({
     captureException: jest.fn(),
   }));
-  jest.doMock('@/lib/slack/admin-notifications', () => ({
+  jest.doMock('@kilocode/web-shared/lib/slack/admin-notifications', () => ({
     AdminSlackNotificationError,
     sendAdminSlackNotification: jest.fn(async () => undefined),
   }));
@@ -28,7 +28,7 @@ async function loadAlerts() {
 
 afterEach(() => {
   jest.resetModules();
-  jest.dontMock('@/lib/slack/admin-notifications');
+  jest.dontMock('@kilocode/web-shared/lib/slack/admin-notifications');
   jest.dontMock('@sentry/nextjs');
 });
 

@@ -1,5 +1,5 @@
-import type { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
-import { toMicrodollars } from '@/lib/microdollars';
+import type { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 
 /**
  * One-off credit packs sold through the App Store and Google Play.

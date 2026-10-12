@@ -93,7 +93,7 @@ describe('OpenAI OAuth config', () => {
       let clientId: string | undefined;
       jest.isolateModules(() => {
         const configServer = jest.requireActual<{ OPENAI_CLIENT_ID: string }>(
-          '@/lib/config.server'
+          '@kilocode/web-shared/lib/config.server'
         );
         clientId = configServer.OPENAI_CLIENT_ID;
       });

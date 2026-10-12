@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 
 export default async function CustomerSourceSurveyPage({ searchParams }: AppPageProps) {

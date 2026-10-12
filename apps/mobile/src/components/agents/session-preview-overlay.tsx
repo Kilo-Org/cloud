@@ -39,8 +39,8 @@ import {
 import { SESSION_TITLE_MAX_LENGTH } from './session-detail-rename-state';
 import {
   buildSessionActionMenuItems,
-  showDeleteConfirm,
   showRenamePrompt,
+  useSessionDeleteConfirm,
 } from './session-row-actions';
 
 const OPEN_DURATION_MS = 180;
@@ -129,16 +129,35 @@ function SessionPreviewContent({
   const [renameVisible, setRenameVisible] = useState(false);
   const renameVisibleRef = useRef(false);
   const closeCompletedRef = useRef(false);
+  const { confirmDelete, deleteDialog } = useSessionDeleteConfirm();
+  // The delete confirm is a native `Modal`: it stays on screen after the
+  // preview's exit animation, so the release waits for it the same way it
+  // waits for the rename modal. Read during render like `visibleRef` above,
+  // because the animation callback runs outside React.
+  const deleteDialogOpenRef = useRef(false);
+  deleteDialogOpenRef.current = deleteDialog !== null;
 
   const releaseAfterClose = useCallback(() => {
     closeCompletedRef.current = true;
-    if (renameVisibleRef.current) {
-      // The Android rename dialog is still on screen and owns the tree; its
-      // close handler releases the preview instead.
+    if (renameVisibleRef.current || deleteDialogOpenRef.current) {
+      // The Android rename dialog — or the delete confirm — is still on
+      // screen and owns the tree; its close handler releases the preview
+      // instead.
       return;
     }
     releaseSessionPreviewStore();
   }, []);
+
+  // The delete confirm can outlive the preview's exit animation; once it
+  // closes, the deferred release runs.
+  useEffect(() => {
+    if (deleteDialog !== null) {
+      return;
+    }
+    if (closeCompletedRef.current && !renameVisibleRef.current) {
+      releaseSessionPreviewStore();
+    }
+  }, [deleteDialog]);
 
   const closePreview = useCallback(closeSessionPreviewStore, []);
 
@@ -223,32 +242,24 @@ function SessionPreviewContent({
     }
   }, []);
 
-  const onDelete = target.onDelete;
+  const { onOpen, onCopySessionId, onViewPr, onRename, onExit, onDelete } = target;
   // One source for the panel's rows: the same builder the action sheet uses, so
   // order, copy and the destructive row cannot diverge.
   const menu = useMemo(
     () =>
       buildSessionActionMenuItems({
-        onOpen: target.onOpen,
-        onCopySessionId: target.onCopySessionId,
-        onViewPr: target.onViewPr,
-        onRename: target.onRename ? handleRename : undefined,
-        onExit: target.onExit,
+        onOpen,
+        onCopySessionId,
+        onViewPr,
+        onRename: onRename ? handleRename : undefined,
+        onExit,
         onDelete: onDelete
           ? () => {
-              showDeleteConfirm(onDelete);
+              confirmDelete(onDelete);
             }
           : undefined,
       }),
-    [
-      target.onOpen,
-      target.onCopySessionId,
-      target.onViewPr,
-      target.onRename,
-      target.onExit,
-      onDelete,
-      handleRename,
-    ]
+    [onOpen, onCopySessionId, onViewPr, onRename, onExit, onDelete, handleRename, confirmDelete]
   );
 
   // The header strip alone owns the pan, so the transcript keeps its own scroll.
@@ -379,6 +390,7 @@ function SessionPreviewContent({
           }}
         />
       ) : null}
+      {deleteDialog}
     </Portal>
   );
 }

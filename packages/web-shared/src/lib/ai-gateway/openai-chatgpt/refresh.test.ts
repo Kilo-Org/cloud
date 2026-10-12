@@ -1,4 +1,4 @@
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(),
     transaction: jest.fn(),
@@ -6,21 +6,28 @@ jest.mock('@/lib/drizzle', () => ({
   },
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BYOK_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
   OPENAI_CLIENT_ID: 'test-client-id',
   OPENAI_CLIENT_SECRET: 'super-secret-value',
 }));
 
-jest.mock('@/lib/auth/openai/config', () => ({
+jest.mock('@kilocode/web-shared/lib/auth/openai/config', () => ({
   OPENAI_TOKEN_ENDPOINT: 'https://auth.openai.com/api/accounts/oauth/token',
   OPENAI_RESOURCE: 'https://api.openai.com/v1',
 }));
 
-import { db } from '@/lib/drizzle';
-import { encryptApiKey, decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY, OPENAI_CLIENT_ID, OPENAI_CLIENT_SECRET } from '@/lib/config.server';
-import { OPENAI_TOKEN_ENDPOINT, OPENAI_RESOURCE } from '@/lib/auth/openai/config';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { encryptApiKey, decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import {
+  BYOK_ENCRYPTION_KEY,
+  OPENAI_CLIENT_ID,
+  OPENAI_CLIENT_SECRET,
+} from '@kilocode/web-shared/lib/config.server';
+import {
+  OPENAI_TOKEN_ENDPOINT,
+  OPENAI_RESOURCE,
+} from '@kilocode/web-shared/lib/auth/openai/config';
 import {
   OPENAI_CHATGPT_RECONNECT_MESSAGE,
   OPENAI_CHATGPT_REFRESH_MAX_BACKOFF_MS,

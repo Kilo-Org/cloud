@@ -1,41 +1,46 @@
 import { randomUUID } from 'crypto';
 import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { toMicrodollars } from '@/lib/microdollars';
-import { extractPromptInfo } from '@/lib/ai-gateway/extractPromptInfo';
-import { determineFallbackFeature } from '@/lib/ai-gateway/determineFallbackFeature';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
+import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
 import {
   validateFeatureHeader,
   FEATURE_HEADER,
   isUserRateLimitedFeature,
   type FeatureValue,
-} from '@/lib/feature-detection';
+} from '@kilocode/web-shared/lib/feature-detection';
 import type {
   OpenRouterChatCompletionRequest,
   GatewayResponsesRequest,
   GatewayMessagesRequest,
   GatewayRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   getEffectiveProviderPrivacy,
   providerPrivacySchema,
-} from '@/lib/ai-gateway/provider-privacy';
-import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
-import { debugSaveProxyRequest } from '@/lib/debugUtils';
+} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import {
+  getIgnoredProviders,
+  withIgnoredProviders,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
+import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
+import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { sentryRootSpan } from '@/lib/getRootSpan';
+import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import {
   isDisabledKiloExclusiveModel,
   isKiloExclusiveRateLimitedModel,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
-} from '@/lib/ai-gateway/is-free-model';
+} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   accountForMicrodollarUsage,
   captureProxyError,
@@ -43,6 +48,7 @@ import {
   dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
   invalidPathResponse,
+  extractReasoningSetting,
   invalidRequestResponse,
   malformedJsonResponse,
   invalidTokenResponse,
@@ -64,73 +70,74 @@ import {
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
-} from '@/lib/ai-gateway/llm-proxy-helpers';
-import { ProxyErrorType } from '@/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { isDataCollectionExplicitlyDisallowed } from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   rewriteModelResponse,
   logUnrewrittenResponse,
-} from '@/lib/ai-gateway/rewriteModelResponse';
+} from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
   type AnonymousUserContext,
-} from '@/lib/anonymous';
+} from '@kilocode/web-shared/lib/anonymous';
 import {
   checkFreeModelRateLimit,
   checkFreeModelRateLimitByUser,
   logFreeModelRequest,
   checkPromotionLimit,
-} from '@/lib/free-model-rate-limiter';
-import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
+} from '@kilocode/web-shared/lib/free-model-rate-limiter';
+import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@kilocode/web-shared/lib/constants';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
-} from '@/lib/ai-gateway/gateway-account-rate-limit';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
-import { isCloudflareIP } from '@/lib/cloudflare-ip';
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { isCloudflareIP } from '@kilocode/web-shared/lib/cloudflare-ip';
 import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   ORG_AUTO_MODEL,
-} from '@/lib/ai-gateway/auto-model';
-import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
-import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
+import { fetchEfficientAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
-} from '@/lib/ai-gateway/auto-routing-denied-models';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
-} from '@/lib/ai-gateway/processUsage.types';
-import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import {
   getMaxTokens,
   hasMiddleOutTransform,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { logExceptInTest } from '@/lib/utils.server';
-import { readDb } from '@/lib/drizzle';
-import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
-} from '@/lib/organizations/effective-model-access.server';
-import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
-import { bouncerAccountId, normalizeJa4 } from '@/lib/bouncer/client';
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
-  bouncerDecide,
   bouncerDecideTier,
+  bouncerRejectionResponse,
   payerSharingIp,
   rawClientIp,
-} from '@/lib/bouncer/inference';
-import { simHash64 } from '@/lib/bouncer/simhash';
+  startBouncerDecide,
+} from '@kilocode/web-shared/lib/bouncer/inference';
+import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -590,32 +597,28 @@ export async function handleLlmProxyRequest(
   // decide, usage, and the classifier-overhead billing below share one read.
   const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
 
-  // Start the report-only verdict alongside balance and provider work. Register
-  // it with after() now so early returns do not end its lifetime. The event id is
-  // generated server-side so decide and usage share one identity for this request.
+  // Start the one decide alongside balance and provider work; it is awaited just before the
+  // upstream call. The event id is generated server-side so decide and usage share one identity
+  // for this request.
   const bouncerRequestId = randomUUID();
-  after(
-    (isAnonymousContext(user)
-      ? bouncerDecide({
+  const bouncerVerdictPromise = startBouncerDecide(
+    isAnonymousContext(user)
+      ? {
           requestId: bouncerRequestId,
           ip: clientIp,
           ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
-        })
-      : balanceAndSettingsPromise.then(({ balance, plan }) =>
-          bouncerDecide({
-            requestId: bouncerRequestId,
-            ip: clientIp,
-            ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
-            account: {
-              accountId: bouncerAccountId(user.id, organizationId),
-              tier: bouncerDecideTier(organizationId, plan, balance),
-            },
-          })
-        )
-    ).then(
-      () => undefined,
-      () => undefined
-    )
+        }
+      : balanceAndSettingsPromise.then(({ balance, plan, payer }) => ({
+          requestId: bouncerRequestId,
+          ip: clientIp,
+          ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
+          account: {
+            accountId: bouncerAccountId(user.id, organizationId),
+            userId: user.id,
+            tier: bouncerDecideTier(organizationId, plan, balance),
+            payer,
+          },
+        }))
   );
 
   // Bill the classifier overhead as soon as the cost is known and we have an
@@ -666,6 +669,7 @@ export async function handleLlmProxyRequest(
             },
             max_tokens: null,
             has_middle_out_transform: null,
+            reasoning_setting: null,
             isStreaming: false,
             prior_microdollar_usage: priorMicrodollarUsage,
             // No posthog_distinct_id: this internal overhead row must not emit
@@ -755,6 +759,16 @@ export async function handleLlmProxyRequest(
 
   const accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
 
+  async function resolveIsNonTrialEnterprise(): Promise<boolean> {
+    if (!organizationId) return false;
+    const { plan } = await balanceAndSettingsPromise;
+    if (plan !== 'enterprise') return false;
+    return await isNonTrialEnterpriseOrganization(organizationId, readDb);
+  }
+
+  const isNonTrialEnterprise = await resolveIsNonTrialEnterprise();
+  const ignoredProviders = getIgnoredProviders(effectiveModelIdLowerCased, isNonTrialEnterprise);
+
   const providerResult = await getProvider({
     requestedModel: effectiveModelIdLowerCased,
     request: requestBodyParsed,
@@ -762,7 +776,11 @@ export async function handleLlmProxyRequest(
     organizationId,
     botId,
     taskId,
-    getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
+    getRoutingProviderConfig: async () =>
+      withIgnoredProviders(
+        (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
+        ignoredProviders
+      ),
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
@@ -857,6 +875,7 @@ export async function handleLlmProxyRequest(
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
+    reasoning_setting: extractReasoningSetting(requestBodyParsed.body),
     fraudHeaders,
     isStreaming: requestBodyParsed.body.stream === true,
     organizationId,
@@ -927,11 +946,19 @@ export async function handleLlmProxyRequest(
     organizationId: organizationId ?? null,
     sessionId: usageContext.session_id,
     taskId: taskId ?? null,
+    isNonTrialEnterprise,
     search: url.search,
     method: request.method,
     signal: request.signal,
     vercelRequestId,
   };
+
+  // The one decide for this request, bounded by its 500 ms budget. Only an enforced verdict
+  // rejects; every other outcome sends the request.
+  const bouncerVerdict = await bouncerVerdictPromise;
+  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  if (bouncerRejection) return bouncerRejection;
+  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   const attempt = await sendUpstreamAttempt({
     ...upstreamAttemptOptions,

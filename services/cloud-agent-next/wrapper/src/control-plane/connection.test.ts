@@ -84,7 +84,11 @@ describe('acknowledged heartbeat', () => {
     async phase => {
       await withTestSocket(async (connection, socket, disconnected) => {
         if (phase === 'connected')
-          socket.receive({ type: 'welcome', protocolVersion: 2, heartbeatAck: true });
+          socket.receive({
+            type: 'welcome',
+            protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+            heartbeatAck: true,
+          });
         if (phase === 'connecting') {
           connection.recycle();
           socket = TestSocket.instances[1];
@@ -96,7 +100,11 @@ describe('acknowledged heartbeat', () => {
         expect(TestSocket.instances).toHaveLength(count + 1);
         expect(socket.closes).toBe(1);
         socket.onopen?.();
-        socket.receive({ type: 'welcome', protocolVersion: 2, heartbeatAck: true });
+        socket.receive({
+          type: 'welcome',
+          protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+          heartbeatAck: true,
+        });
         socket.receive({ type: 'shutdown', reason: 'stale' });
         socket.onclose?.();
         await Bun.sleep(120);
@@ -129,9 +137,9 @@ describe('acknowledged heartbeat', () => {
         type: 'hello',
         wrapperId: socket.frames[0].type === 'hello' ? socket.frames[0].wrapperId : '',
         allocationId: 'alloc-1',
-        protocolVersion: 2,
+        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       });
-      socket.receive({ type: 'welcome', protocolVersion: 2 });
+      socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       await Bun.sleep(120);
       expect(disconnected).toEqual([]);
       expect(TestSocket.instances).toHaveLength(1);
@@ -142,7 +150,11 @@ describe('acknowledged heartbeat', () => {
     await withTestSocket(async (_connection, socket, disconnected) => {
       await Bun.sleep(100);
       expect(disconnected).toEqual([]);
-      socket.receive({ type: 'welcome', protocolVersion: 2, heartbeatAck: true });
+      socket.receive({
+        type: 'welcome',
+        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+        heartbeatAck: true,
+      });
       await Bun.sleep(45);
       socket.receive({ type: 'heartbeat_ack' });
       await Bun.sleep(45);
@@ -153,7 +165,11 @@ describe('acknowledged heartbeat', () => {
       expect(socket.closes).toBe(1);
       const replacement = TestSocket.instances[1];
       replacement.onopen?.();
-      replacement.receive({ type: 'welcome', protocolVersion: 2, heartbeatAck: true });
+      replacement.receive({
+        type: 'welcome',
+        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+        heartbeatAck: true,
+      });
       socket.receive({ type: 'shutdown', reason: 'stale' });
       socket.receive({ type: 'heartbeat_ack' });
       socket.onclose?.();
@@ -164,7 +180,11 @@ describe('acknowledged heartbeat', () => {
 
   it('shutdown is terminal with a watchdog and pending negotiation', async () => {
     await withTestSocket(async (connection, socket, disconnected) => {
-      socket.receive({ type: 'welcome', protocolVersion: 2, heartbeatAck: true });
+      socket.receive({
+        type: 'welcome',
+        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+        heartbeatAck: true,
+      });
       socket.receive({ type: 'shutdown', reason: 'stopped' });
       socket.receive({ type: 'heartbeat_ack' });
       socket.onclose?.();
@@ -314,6 +334,27 @@ async function connect(
   return connection;
 }
 
+describe('control-plane turn cap and accepted backstop', () => {
+  it('derives the 125-minute accepted backstop from the 120-minute cap', () => {
+    expect(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs).toBe(7_200_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBe(7_500_000);
+
+    const margin =
+      CONTROL_PLANE_TIMERS.session.acceptedBackstopMs - CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs;
+    expect(margin).toBe(300_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBeGreaterThan(
+      CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs
+    );
+
+    const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '100' });
+    expect(scaled.wrapper.turnHardCapMs).toBe(72_000);
+    // The accepted-backstop margin is not scaled, so it does not shrink with the cap.
+    expect(scaled.session.acceptedBackstopMs).toBe(372_000);
+    expect(scaled.session.acceptedBackstopMs).toBe(scaled.wrapper.turnHardCapMs + margin);
+    expect(scaled.session.acceptedBackstopMs).toBeGreaterThan(scaled.wrapper.turnHardCapMs);
+  });
+});
+
 describe('controlPlaneReconnectDelayMs', () => {
   it('grows from the minimum to the maximum and adds bounded jitter', () => {
     const timers = timerOverrides({ reconnectBackoffMinMs: 50, reconnectBackoffMaxMs: 800 });
@@ -391,6 +432,7 @@ describe('createControlPlaneConnection', () => {
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
         heartbeatAck: true,
+        redactsNamedSecrets: true,
       });
       expect(sandbox.authorizations[0]).toBe('Bearer secret-credential');
 

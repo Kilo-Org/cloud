@@ -1,7 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { kilocode_users, type User } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { isResourceTokenIssuanceEnabled, type ResourceTokenFamily } from '@/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  isResourceTokenIssuanceEnabled,
+  type ResourceTokenFamily,
+} from '@kilocode/web-shared/lib/config.server';
 
 export async function prepareCloudAgentWorkflowUser(
   user: User,

@@ -2,7 +2,7 @@ import * as z from 'zod';
 import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
 import { createParser } from 'eventsource-parser';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 export const toolCallArgumentErrorSchema = z.discriminatedUnion('kind', [
   z.object({

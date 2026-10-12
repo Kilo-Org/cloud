@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import {
   Plus,

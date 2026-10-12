@@ -1,20 +1,23 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { addUserToOrganization, getOrganizationById } from '@/lib/organizations/organizations';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import {
+  addUserToOrganization,
+  getOrganizationById,
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { getAllOrganizationModes } from '@/lib/organizations/organization-modes';
-import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { User, Organization } from '@kilocode/db/schema';
 import { organization_audit_logs } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { desc, eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
-jest.mock('@/lib/posthog-feature-flags', () => ({
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isReleaseToggleEnabled: jest.fn(async () => true),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(
     async () =>
       ({
@@ -38,14 +41,17 @@ jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
   ),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
-  getProviderSlugsForModel: jest.fn(async (modelId: string) =>
-    modelId === 'openai/gpt-4o' ? new Set(['openai']) : new Set()
-  ),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
+  () => ({
+    getProviderSlugsForModel: jest.fn(async (modelId: string) =>
+      modelId === 'openai/gpt-4o' ? new Set(['openai']) : new Set()
+    ),
+  })
+);
 
 const mockedIsReleaseToggleEnabled = jest.mocked(
-  jest.requireMock('@/lib/posthog-feature-flags').isReleaseToggleEnabled
+  jest.requireMock('@kilocode/web-shared/lib/posthog-feature-flags').isReleaseToggleEnabled
 );
 
 let owner: User;

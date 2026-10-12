@@ -5,14 +5,14 @@ import type {
   GatewayRequest,
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { emitApiMetricsForResponse, getToolsAvailable, getToolsUsed } from './api-metrics.server';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
   after: jest.fn(),
 }));
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   O11Y_SERVICE_URL: 'https://o11y.test',
   O11Y_KILO_GATEWAY_CLIENT_SECRET: 'test-secret',
 }));

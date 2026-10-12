@@ -1,7 +1,10 @@
-import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { addCacheBreakpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { CustomLlmApiConfig } from '@kilocode/db';
-import { type GatewayChatApiKind, type Provider } from '@/lib/ai-gateway/providers/types';
-import { sanitizeJsonRefToolResults } from '@/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
+import {
+  type GatewayChatApiKind,
+  type Provider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 
 export type ResolvedDirectUpstream = CustomLlmApiConfig & { api_key: string };
 

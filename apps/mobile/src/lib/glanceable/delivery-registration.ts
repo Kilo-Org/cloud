@@ -294,7 +294,7 @@ const delivery: GlanceableDelivery = {
       // Read the sets inside the FIFO so an already-running upsert is included.
       const records = [scopeTokens, activityTokens, sessionActivityTokens];
       const tokens = [
-        ...new Set((includeScope ? records : [activityTokens]).flatMap(set => [...set])),
+        ...new Set((includeScope ? records : [activityTokens]).flatMap(set => Array.from(set))),
       ];
       // Without a session the delete can only answer 401: keep the tokens for an authorized cleanup.
       const authToken = tokens.length > 0 ? await readUnregisterAuthToken() : null;

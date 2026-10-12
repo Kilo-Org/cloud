@@ -3,14 +3,15 @@ import type { Prompt } from './prompt.js';
 import type { ToolCall, ToolDefinition, ToolResult } from './tool.js';
 
 /**
- * How hard the model should think. Both model SDKs spell the levels this way.
+ * How hard the model should think. The model SDKs and the gateway spell the
+ * levels this way; `none` asks a reasoning model not to think at all.
  *
  * This is not `maxTokens`. `maxTokens` is a wall the server enforces and the
  * model cannot see; effort is a dial the model itself follows. A reasoning
  * model spends its thinking out of `maxTokens`, so a low wall and a high effort
  * together produce no answer at all.
  */
-type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+type Effort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 /**
  * What the model was asked. `model` and `effort` are part of the cache key.

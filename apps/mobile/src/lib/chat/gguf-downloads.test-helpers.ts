@@ -110,7 +110,12 @@ export function harness(
       projectors.push(projector);
       const read =
         options.inspection ??
-        (async () => ({ contextWindow: 4096, tools: true, vision: projector !== undefined }));
+        (async () => ({
+          contextWindow: 4096,
+          tools: true,
+          vision: projector !== undefined,
+          thinking: false,
+        }));
       return read();
     },
     release: async fileId => {

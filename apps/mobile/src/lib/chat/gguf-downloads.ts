@@ -124,6 +124,7 @@ export function ggufDownloads({
         contextWindow: read.value.contextWindow,
         tools: read.value.tools,
         vision: projector !== undefined,
+        thinking: read.value.thinking,
       },
     ]);
     publish();

@@ -15,7 +15,8 @@ import {
   type GgufModelRecord,
   type GgufStorage,
 } from './gguf-records';
-import { contextWindowFor, templateSupportsTools } from './gguf-template';
+import { contextWindowFor, templateSupportsThinking, templateSupportsTools } from './gguf-template';
+import { THINKING_SWITCH_VARIANTS } from './effort';
 import { type LocalModelProvider } from './local-models';
 import { type NativeAvailability } from './native-model-client';
 
@@ -87,6 +88,7 @@ const downloads = ggufDownloads({
         contextWindow: contextWindowFor(context.model.metadata),
         tools: templateSupportsTools(context.model.chatTemplates),
         vision: projector !== undefined && (await loadProjector(context, projector, GPU)),
+        thinking: templateSupportsThinking(context.model.metadata),
       };
     } finally {
       await context.release();
@@ -195,7 +197,7 @@ export function ggufModelOptions(models: readonly GgufModelRecord[]): SessionMod
     id: localTargetId('gguf', record.fileId),
     name: record.name,
     displayId: record.fileId,
-    variants: [],
+    variants: record.thinking ? [...THINKING_SWITCH_VARIANTS] : [],
     isPreferred: false,
     showGatewayMetadata: false,
     contextWindow: record.contextWindow,

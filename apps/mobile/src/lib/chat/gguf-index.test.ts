@@ -27,7 +27,9 @@ describe('the saved model list', () => {
   });
 
   it('reads an entry saved before projectors existed as text-only', () => {
-    expect(readModelIndex(JSON.stringify([saved]))).toEqual([{ ...saved, vision: false }]);
+    expect(readModelIndex(JSON.stringify([saved]))).toEqual([
+      { ...saved, vision: false, thinking: false },
+    ]);
     expect(readModelIndex(JSON.stringify([{ ...saved, vision: true }]))[0]?.vision).toBe(true);
   });
 

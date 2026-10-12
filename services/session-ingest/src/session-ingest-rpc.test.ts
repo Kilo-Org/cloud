@@ -1860,6 +1860,32 @@ describe('deleteSessionForCloudAgent clone rollback', () => {
     expect(deleteFn).toHaveBeenCalled();
   });
 
+  it('rolls back a clone stage built with a message cut for the same source', async () => {
+    // The cut is part of the stage identity, so a cut-less inspect reports
+    // mismatch with the same stored source and destination.
+    const inspectCloneStage = vi.fn(() => ({
+      status: 'mismatch',
+      storedSourceSessionId: sourceSessionId,
+      storedDestinationSessionId: destinationSessionId,
+      storedStage: 'complete',
+    }));
+    const resetCloneStage = vi.fn(async () => {});
+    const { db, deleteFn } = makeDeleteDb({
+      session_id: destinationSessionId,
+      kilo_user_id: kiloUserId,
+    });
+    const rpc = makeDeleteRpc({ db, destStub: { inspectCloneStage, resetCloneStage } });
+
+    await rpc.deleteSessionForCloudAgent({
+      sessionId: destinationSessionId,
+      kiloUserId,
+      cloneSourceSessionId: sourceSessionId,
+    });
+
+    expect(resetCloneStage).toHaveBeenCalled();
+    expect(deleteFn).toHaveBeenCalled();
+  });
+
   it('never clears a destination clone that belongs to another source', async () => {
     const inspectCloneStage = vi.fn(() => ({
       status: 'mismatch',

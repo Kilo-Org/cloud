@@ -1579,10 +1579,17 @@ describe('SessionIngestDO clone primitives', () => {
           if (table === ingestItems) items.length = 0;
           if (table === ingestMeta) meta.clear();
         },
-        where: () => ({
+        where: (condition: unknown) => ({
           run: () => {
-            if (table === ingestMeta) {
-              for (const key of meta.keys()) if (key !== 'deleted') meta.delete(key);
+            if (table !== ingestMeta) return;
+            // `ne(key, 'deleted')` wipes all but the tombstone; `eq(key, k)` deletes one key.
+            const key = collectBoundParams(condition).find(
+              (p): p is string => typeof p === 'string'
+            );
+            if (key === 'deleted') {
+              for (const k of meta.keys()) if (k !== 'deleted') meta.delete(k);
+            } else if (key !== undefined) {
+              meta.delete(key);
             }
           },
         }),
@@ -2129,8 +2136,10 @@ describe('SessionIngestDO clone primitives', () => {
     ).toMatchObject({ status: 'mismatch', storedStage: 'complete' });
   });
 
-  it('records no message cut for a full clone stage', () => {
+  it('records no message cut for a full clone stage and clears a stale one', () => {
     const harness = makeCloneHarness();
+    // A leftover cut with no stage identity reads as an empty stage.
+    harness.meta.set('cloneUpToMessageId', 'msg_stale');
     harness.durableObject.stageCloneBatch({
       sourceSessionId: 'src',
       destinationSessionId: 'dst',

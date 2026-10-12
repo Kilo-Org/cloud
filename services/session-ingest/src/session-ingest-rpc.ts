@@ -668,7 +668,15 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         'SessionIngestDO.inspectCloneStage'
       );
 
-      const matches = inspected.status === 'complete' || inspected.status === 'in_progress';
+      // Rollback owns the destination by source and destination only. A stage
+      // built with a message cut reports `mismatch` for a cut-less inspect, yet
+      // it is still this source's clone and must be rolled back.
+      const matches =
+        inspected.status === 'complete' ||
+        inspected.status === 'in_progress' ||
+        (inspected.status === 'mismatch' &&
+          inspected.storedSourceSessionId === cloneSourceSessionId &&
+          inspected.storedDestinationSessionId === parsed.sessionId);
       if (!matches) return;
 
       await this.deleteRootSessionRow(parsed);

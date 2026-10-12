@@ -1,5 +1,4 @@
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex } from '@noble/hashes/utils.js';
+import { requireNativeModule } from 'expo';
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
 import { Directory, File, Paths } from 'expo-file-system';
 import { initLlama } from 'llama.rn';
@@ -33,45 +32,19 @@ function fileIn(name: string): File {
   return new File(directory, name);
 }
 
-/** Small enough that one read never holds much memory, large enough to keep the hash fast. */
-const HASH_CHUNK_BYTES = 4 * 1024 * 1024;
-
-const nextTick = async () => {
-  const { promise, resolve } = Promise.withResolvers<undefined>();
-  setTimeout(resolve, 0);
-  await promise;
-};
-
 /**
  * Neither expo-crypto nor expo-file-system hashes a file incrementally, and a
- * model is too large to read whole, so the file streams through a SHA-256 in
- * chunks. Each chunk yields to the event loop so the screen keeps drawing.
+ * model is too large to read whole, so a local module streams the file through
+ * the platform SHA-256 on a background thread.
  */
-async function fileSha256(file: File): Promise<string> {
-  const hash = sha256.create();
-  const handle = file.open();
-  try {
-    for (;;) {
-      const chunk = handle.readBytes(HASH_CHUNK_BYTES);
-      if (chunk.length === 0) {
-        break;
-      }
-      hash.update(chunk);
-      // eslint-disable-next-line no-await-in-loop -- a deliberate yield between chunks
-      await nextTick();
-    }
-  } finally {
-    handle.close();
-  }
-  return bytesToHex(hash.digest());
-}
+const fileHash = requireNativeModule<{ sha256File(uri: string): Promise<string> }>('KiloFileHash');
 
 const storage: GgufStorage = {
   freeBytes: () => Paths.availableDiskSpace,
   list: () => (directory.exists ? directory.list().map(entry => entry.name) : []),
   size: name => fileIn(name).size,
   sha256: async name => {
-    const hash = await fileSha256(fileIn(name));
+    const hash = await fileHash.sha256File(fileIn(name).uri);
     return hash;
   },
   remove: name => {

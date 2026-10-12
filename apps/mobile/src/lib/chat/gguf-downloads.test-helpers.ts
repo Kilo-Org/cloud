@@ -37,6 +37,8 @@ export function harness(
     readonly failMove?: string;
     /** Hashes by file name; any other file hashes to the fixture's published value. */
     readonly checksums?: Readonly<Record<string, string>>;
+    /** A file the native hash cannot read. */
+    readonly unreadable?: string;
   } = {}
 ) {
   const freeBytes = options.freeBytes ?? 8_000_000_000;
@@ -51,8 +53,12 @@ export function harness(
     freeBytes: () => freeBytes,
     list: () => [...files.keys()],
     size: name => files.get(name) ?? 0,
-    sha256: async name =>
-      options.checksums?.[name] ?? (name.includes('.mmproj.') ? 'b' : 'a').repeat(64),
+    sha256: async name => {
+      if (name === options.unreadable) {
+        throw new Error('read failed');
+      }
+      return options.checksums?.[name] ?? (name.includes('.mmproj.') ? 'b' : 'a').repeat(64);
+    },
     remove: name => {
       files.delete(name);
     },

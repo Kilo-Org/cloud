@@ -142,6 +142,15 @@ describe('pausing, resuming and cancelling', () => {
     expect(h.store.model('small')).toBeUndefined();
   });
 
+  it('refuses a file the hash cannot read, and keeps nothing', async () => {
+    const h = harness({ unreadable: ggufPartialName('small') });
+    h.store.start(CATALOG);
+    await finish(taskAt(h.tasks, 0), 1000);
+    expect(h.store.snapshot().failure).toEqual({ fileId: 'small', problem: 'checksum' });
+    expect(h.inspected).toEqual([]);
+    expect(h.files.size).toBe(0);
+  });
+
   it('checks no hash for a direct link, which publishes none', async () => {
     const h = harness({ checksums: { [ggufPartialName('linked')]: 'f'.repeat(64) } });
     h.store.start({

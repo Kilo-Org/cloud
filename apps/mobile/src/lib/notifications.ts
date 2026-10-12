@@ -31,7 +31,11 @@ import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { dropAndroidSessionRow } from '@/lib/glanceable/session-activity-tokens-android';
-import { applySessionLiveUpdate } from '@/lib/glanceable/session-follow';
+import {
+  applySessionLiveUpdate,
+  isSessionFollowed,
+  restoreFollowedSessionsFromStorage,
+} from '@/lib/glanceable/session-follow';
 import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
 import {
   rememberHomeWidgetSnapshot,
@@ -462,16 +466,22 @@ async function handleBackgroundNotificationTask(
   const pushData = parseHeadlessPushData(data.data);
   if (pushData?.type === 'session_live_update') {
     // One followed session's Android notification
-    // (`.specs/mobile-session-live-activity.md` "Android"). A push for a
-    // session this device no longer follows renders nothing; the app drops
-    // that server row so no later update reaches a stale token.
+    // (`.specs/mobile-session-live-activity.md` "Android"). The in-memory
+    // follow map is empty in this fresh process, so hydrate it first: without
+    // that, a push for a followed session reads as one for a stranger and its
+    // server row would be dropped.
     await restorePersistedGlanceable();
+    await restoreFollowedSessionsFromStorage();
     const applied = applySessionLiveUpdate(
       pushData.event,
       pushData.content,
       pushData.dismissAfterMs
     );
-    if (!applied) {
+    // A session this device no longer follows (a dismissal, or a follow cleared
+    // on another surface) renders nothing and drops its row, so the server stops
+    // addressing this token for it. A followed session keeps its row: a push
+    // that merely changed nothing must never unfollow it.
+    if (!isSessionFollowed(pushData.content.sessionId)) {
       dropUnfollowedSessionRow(pushData.content.sessionId);
     }
     return applied

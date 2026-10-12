@@ -78,6 +78,17 @@ export const applySessionLiveUpdate = (
     ? android().applySessionLiveUpdate(event, content, dismissAfterMs)
     : false;
 
+/**
+ * Android only: hydrate the followed set from storage. A headless push runs in
+ * a fresh process whose in-memory follow map is empty, so without this a push
+ * for a followed session is indistinguishable from one for a stranger.
+ */
+export const restoreFollowedSessionsFromStorage = async (): Promise<void> => {
+  if (Platform.OS === 'android') {
+    await android().restoreFollowedSessionCardsFromStorage();
+  }
+};
+
 /** Android only: revalidate the exact request a card shows and answer it. */
 export const approveFollowedSession = async (
   sessionId: string,

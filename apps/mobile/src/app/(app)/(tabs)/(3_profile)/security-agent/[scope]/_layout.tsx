@@ -30,6 +30,13 @@ export default function SecurityAgentScopeLayout() {
         screenLayout={appUnlockScreenLayout}
         screenOptions={{ headerShown: false }}
       >
+        {/*
+         * An anchored navigation (a notification or system-search link to a
+         * finding) inserts `index` below the target with only its
+         * `initialParams`, not the URL params. Without `scope` here the
+         * dashboard under the finding queries with no `organizationId`.
+         */}
+        <Stack.Screen name="index" initialParams={{ scope }} />
         <Stack.Screen name="dismiss/[id]" options={sheetOptions} />
         <Stack.Screen name="filter" options={sheetOptions} />
       </Stack>

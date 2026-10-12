@@ -14,9 +14,6 @@ import * as Application from 'expo-application';
  * then skip the key they do not understand instead of acting on it.
  */
 
-export const FEATURE_FLAG_PR_REVIEW = 'mobile-pr-review';
-export const FEATURE_FLAG_QUICK_CHAT = 'mobile-quick-chat';
-
 export type FeatureFlagDefinition = Readonly<{
   key: string;
   /** Oldest app version that understands this flag. Lower builds fall back to `defaultValue`. */
@@ -25,16 +22,8 @@ export type FeatureFlagDefinition = Readonly<{
   defaultValue: boolean;
 }>;
 
-/**
- * The registry the version gate reads. Minimums record the first release that
- * shipped each flag's reading code:
- * - `mobile-pr-review` (#4669) first released in 1.0.4.
- * - `mobile-quick-chat` (#5541) first released in 1.0.6.
- */
-export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
-  { key: FEATURE_FLAG_PR_REVIEW, minAppVersion: '1.0.4', defaultValue: true },
-  { key: FEATURE_FLAG_QUICK_CHAT, minAppVersion: '1.0.6', defaultValue: false },
-];
+/** Register future mobile flags with their first supported app version. */
+export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [];
 
 const DEFINITIONS_BY_KEY: ReadonlyMap<string, FeatureFlagDefinition> = new Map(
   FEATURE_FLAG_DEFINITIONS.map(definition => [definition.key, definition])

@@ -4,7 +4,6 @@ import { useCallback } from 'react';
 import { type GestureResponderEvent } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import { parseProviderPrUrl } from '@/lib/pr-review/provider-pr-url';
@@ -41,13 +40,11 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
   const themedSheet = useThemedActionSheetOptions();
   const router = useRouter();
   const { t } = useTranslation();
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
 
   const handlePressLink = useCallback(
     (href: string) => {
-      // When PR Review is off, PR links behave like any other link (default
-      // open-in-browser) instead of showing the Review-PR tap sheet.
-      if (!prReviewEnabled || !parseProviderPrUrl(href)) {
+      // Unsupported PR URLs retain the default open-in-browser behavior.
+      if (!parseProviderPrUrl(href)) {
         return false;
       }
       // Tap on a PR link shows exactly four options: Review PR / Open in
@@ -77,13 +74,13 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
       );
       return true;
     },
-    [prReviewEnabled, router, showActionSheetWithOptions, t, themedSheet]
+    [router, showActionSheetWithOptions, t, themedSheet]
   );
 
   const handleLongPressLink = useCallback(
     (href: string, event?: GestureResponderEvent) => {
       event?.stopPropagation();
-      const isPrLink = prReviewEnabled && parseProviderPrUrl(href) !== null;
+      const isPrLink = parseProviderPrUrl(href) !== null;
       const sheet = buildChatLinkActionSheet({ isPrLink });
       showActionSheetWithOptions(
         {
@@ -112,7 +109,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
         }
       );
     },
-    [prReviewEnabled, router, showActionSheetWithOptions, t, themedSheet]
+    [router, showActionSheetWithOptions, t, themedSheet]
   );
 
   // Code fences in the transcript copy through the shared clipboard helper, so

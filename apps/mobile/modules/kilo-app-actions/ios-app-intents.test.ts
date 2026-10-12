@@ -242,7 +242,11 @@ describe('the Swift action URLs', () => {
 
 describe('the native handshake', () => {
   it('registers the JS dispatcher under the module name the JS side requires', () => {
-    expect(actionsModule).toContain('AsyncFunction("registerAppActionDispatcher")');
+    // A synchronous `Function` runs on the JS thread. An `AsyncFunction` runs on
+    // a background queue, where replacing the dispatcher crashed (KILO-APP-3JG).
+    expect(actionsModule).toContain('Function("registerAppActionDispatcher")');
+    expect(actionsModule).not.toContain('AsyncFunction("registerAppActionDispatcher")');
+    expect(actionsModule).toContain('JavaScriptActor.assumeIsolated');
     expect(actionsModule).toContain('Name("KiloAppActions")');
     expect(actionsModule).toContain('KiloAppActionBridge.shared');
     expect(bridge).toContain('static let shared = KiloAppActionBridge()');
@@ -261,18 +265,18 @@ describe('the native handshake', () => {
     // bridge now parks each waiting run's continuation and resumes it from the
     // registration; one deadline task is the only sleep left.
     expect(bridge, 'the poll interval is gone').not.toContain('registrationPollInterval');
-    expect(bridge, 'no continuation store').toMatch(
-      /waiters: \[\s*UUID: CheckedContinuation<\(dispatcher: JavaScriptValue, runtime: JavaScriptRuntime\), Error>\s*\]/
+    expect(bridge, 'no continuation store').toContain(
+      'waiters: [UUID: CheckedContinuation<DispatcherRegistration, Error>]'
     );
 
     const wait = swiftBlock(bridge, 'func waitUntilRegistered');
     expect(wait).toContain('withCheckedThrowingContinuation');
     expect(wait, 'the wait must not sleep in a loop').not.toContain('Task.sleep');
 
-    // `register(...)` stores the pair and hands it to every parked waiter.
+    // `register(...)` stores the registration and hands it to every parked waiter.
     const register = swiftBlock(bridge, 'func register(');
     expect(register).toMatch(/waiters = \[:\]/);
-    expect(register).toContain('.resume(returning: (dispatcher, runtime))');
+    expect(register).toContain('.resume(returning: next)');
 
     // The one deadline task fails the waiter that outlived registration.
     expect([...bridge.matchAll(/Task\.sleep/g)], 'one sleep, the deadline').toHaveLength(1);
@@ -299,18 +303,20 @@ describe('the native handshake', () => {
     }
   });
 
-  it('drops the registered dispatcher when the runtime goes away, like Android', () => {
-    // The singleton outlives the module, so nothing else can release the
-    // dispatcher and runtime it holds: the module's `OnDestroy` is the teardown,
-    // the mirror of `KiloAppActionsModule.kt`'s `OnDestroy` clear.
-    expect(bridge).toContain('func unregister()');
-    expect(actionsModule).toContain('OnDestroy');
-    expect(actionsModule).toContain('KiloAppActionBridge.shared.unregister()');
-    // A teardown must fail the parked runs now rather than leave them to the
-    // deadline.
-    const teardown = swiftBlock(bridge, 'func unregister()');
-    expect(teardown).toMatch(/waiters = \[:\]/);
-    expect(teardown).toContain('KiloAppActionError.dispatcherUnavailable');
+  it('lets the runtime teardown release the dispatcher on the JS thread', () => {
+    // The singleton outlives the runtime. On a reload (the RTL language switch),
+    // the module's `OnDestroy` runs off the JS thread, maybe after the runtime is
+    // freed, so it must not release a JSI value (KILO-APP-3JG). The runtime's
+    // long-lived objects own the dispatcher, and their teardown sweep releases it
+    // on the JS thread while the runtime is still valid.
+    expect(actionsModule).not.toContain('OnDestroy');
+    expect(bridge).toContain('private final class DispatcherRegistration: LongLivedObject');
+    expect(swiftBlock(bridge, 'func register(')).toContain('runtime.longLivedObjects.add(next)');
+    const release = swiftBlock(bridge, 'func allowRelease()');
+    expect(release).toContain('dispatcher = nil');
+    expect(release).toContain('KiloAppActionBridge.shared.unregister(self)');
+    // A later runtime's registration survives the earlier runtime's sweep.
+    expect(swiftBlock(bridge, 'func unregister(')).toContain('guard registration === released');
   });
 
   it('reads the result fields the JS contract answers with', () => {

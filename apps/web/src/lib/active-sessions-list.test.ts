@@ -68,6 +68,17 @@ beforeEach(() => {
 });
 
 describe('listActiveSessions cloud candidates', () => {
+  it('rejects an unconfigured source instead of confirming empty Home work', async () => {
+    await expect(
+      listActiveSessions({
+        userId: 'user-1',
+        organizationId: null,
+        includeCloudAgentSessions: true,
+        requireCompleteSnapshot: true,
+      })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    expect(selectMock).not.toHaveBeenCalled();
+  });
   it('applies a hard ceiling far above the live-agent target', async () => {
     const result = await listActiveSessions({
       userId: 'user-1',

@@ -397,6 +397,85 @@ describe('startSession unified repository branch', () => {
   });
 });
 
+describe('startSession allocation selection', () => {
+  const config = {
+    workerUrl: 'http://worker.test',
+    user: { id: 'user_1', email: 'user@example.test', api_token_pepper: 'pepper' },
+    nextAuthSecret: 'test-secret',
+    gitUrl: 'https://example.test/repo.git',
+    model: 'kilo/fake-deterministic',
+    fakeLlmUrl: 'http://fake.test',
+  } as const;
+
+  const startEnvelope = {
+    cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+    kiloSessionId: 'kilo_1',
+    messageId: 'message_1',
+    delivery: 'queued',
+  };
+
+  function installFetch(data: unknown): ReturnType<typeof vi.fn> {
+    const fetchMock = vi.fn().mockResolvedValue(okEnvelope(data));
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  function bodyOf(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    if (typeof request?.body !== 'string') throw new Error('Expected a JSON request body');
+    return JSON.parse(request.body) as Record<string, unknown>;
+  }
+
+  it('forwards the driver-wide allocation as a structured request for a prompt-only start', async () => {
+    const fetchMock = installFetch(startEnvelope);
+
+    await startSession({ ...config, sandboxAllocation: 'vercel-small' }, { prompt: 'echo:hi' });
+
+    expect(bodyOf(fetchMock).runtime).toEqual({
+      sandboxAllocation: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'small' },
+    });
+  });
+
+  it('omits the runtime allocation entirely when the driver selects none', async () => {
+    const fetchMock = installFetch(startEnvelope);
+
+    await startSession(config, { prompt: 'echo:hi' });
+
+    expect(bodyOf(fetchMock)).not.toHaveProperty('runtime');
+  });
+
+  it('forwards the driver-wide allocation on the browser prepare path too', async () => {
+    const fetchMock = installFetch({
+      cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+      kiloSessionId: 'kilo_1',
+    });
+
+    await prepareBrowserSession(
+      { ...config, internalApiSecret: 'secret', sandboxAllocation: 'vercel-small' },
+      { prompt: 'worktree:create' }
+    );
+
+    expect(bodyOf(fetchMock).sandboxAllocation).toEqual({
+      provider: { id: 'vercel', account: 'kilo' },
+      instanceType: 'small',
+    });
+  });
+
+  it('rejects an explicit allocation on the legacy API before any request', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      startSession(
+        { ...config, sandboxAllocation: 'vercel-small' },
+        { prompt: 'echo:hi' },
+        'legacy'
+      )
+    ).rejects.toThrow(/unified API/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('trpcCall auth headers', () => {
   it('uses bearerToken verbatim and does not mint', async () => {
     const fetchMock = vi.fn().mockResolvedValue(okEnvelope({}));

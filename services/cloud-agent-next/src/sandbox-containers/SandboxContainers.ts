@@ -16,7 +16,11 @@ import {
 } from '../sandbox-control/container-paths.js';
 import { CONTROL_PLANE_NATIVE_LOGS_ENV } from '../shared/control-diagnostics.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
-import { diagnosticCause, logControlDiagnostic } from '../sandbox-control/diagnostics.js';
+import {
+  diagnosticCause,
+  logControlDiagnostic,
+  type ControlDiagnosticFields,
+} from '../sandbox-control/diagnostics.js';
 import {
   ContainersBilling,
   ContainersBillingScheduler,
@@ -27,8 +31,15 @@ import {
 import {
   createRepoSnapshotIndex,
   repoSnapshotIndexKey,
+  REPO_SNAPSHOT_MAX_START_FAILURES,
   type RepoSnapshotIndex,
 } from './repo-snapshot-index.js';
+import {
+  mainProcessObservationFields,
+  observeCmdline,
+  type MainProcessIdentity,
+  type MainProcessObservation,
+} from './main-process.js';
 import type { Env } from '../types.js';
 
 export type ContainerInstanceSize =
@@ -50,13 +61,15 @@ export type ContainersLaunchInput = {
   containment?: boolean;
   /** Keyed hash of the launch's scope, repository and env; absent means no snapshot. */
   repoKey?: string;
-  /** Start from the image and forget the snapshot stored for `repoKey`. */
-  discardRepository?: true;
+  /** Start from the image and retain the failed snapshot for debugging. */
+  skipRepository?: true;
+  deadlineAt?: number;
 };
 
 export type ContainersLaunchResult = {
   started: boolean;
   startSource: ContainersStartSource;
+  snapshotFailed?: true;
 };
 
 export type ContainersObservation = {
@@ -88,13 +101,13 @@ type ContainersRecord = {
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
   wrapperAttempt?: WrapperAttempt;
+  repositoryStartFailures?: { snapshotId: string; attempts: number };
 };
 
 type ResolvedStart = {
   source: ContainersStartSource;
   options: ContainerStartupOptions;
-  /** Set only for a repository start, so a failed one can forget its entry. */
-  indexKey: string | null;
+  snapshotId: string | null;
 };
 
 type DelayedSchedule<T> = {
@@ -120,37 +133,6 @@ function containedProcessEnv(env: Record<string, string>): Record<string, string
   };
 }
 
-const MAIN_PROCESS_SLEEP_CMDLINE = new TextEncoder().encode('sleep\0infinity');
-const MAIN_PROCESS_SUPERVISOR_CMDLINE = new TextEncoder().encode(
-  `/bin/sh\0${CONTROL_SUPERVISOR_PATH}`
-);
-
-function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
-  if (left.byteLength !== right.byteLength) return false;
-  for (let index = 0; index < left.byteLength; index += 1) {
-    if (left[index] !== right[index]) return false;
-  }
-  return true;
-}
-
-type MainProcessIdentity = 'sleep' | 'supervisor' | 'ambiguous';
-
-/**
- * Classify PID 1 from its `/proc/1/cmdline` bytes. The two known main processes
- * are the image default `sleep infinity` and the native supervisor entrypoint;
- * a trailing NUL is tolerated. Timeout, non-zero, empty, and anything else is
- * ambiguous and must fail the launch rather than guess.
- */
-function classifyMainProcess(cmdline: Uint8Array): MainProcessIdentity {
-  const trimmed =
-    cmdline.byteLength > 0 && cmdline[cmdline.byteLength - 1] === 0
-      ? cmdline.subarray(0, cmdline.byteLength - 1)
-      : cmdline;
-  if (bytesEqual(trimmed, MAIN_PROCESS_SLEEP_CMDLINE)) return 'sleep';
-  if (bytesEqual(trimmed, MAIN_PROCESS_SUPERVISOR_CMDLINE)) return 'supervisor';
-  return 'ambiguous';
-}
-
 const PROBE_TIMEOUT_MS = 5_000;
 const CONTAINER_CALL_TIMEOUT_MS = 5_000;
 /** Pause between readiness probes, so repeated pgrep stays sequential and bounded. */
@@ -162,17 +144,20 @@ const DESTROY_TIMEOUT_MS = 30_000;
 type RepositoryCaptureOutcome = 'stored' | 'index_unavailable' | 'abandoned' | 'failed';
 
 /**
- * One line per capture, with how long the platform snapshot took, so the capture
- * bound can be tuned from real durations. It carries no key, id or credential.
+ * One line per capture, with how long the platform snapshot took and its size
+ * when the platform returned one, so the capture bound can be tuned from real
+ * durations. It carries no key, id or credential.
  */
 function logRepositoryCapture(
   outcome: RepositoryCaptureOutcome,
   durationMs: number,
-  error?: unknown
+  details: { size?: number; error?: unknown } = {}
 ): void {
+  const { size, error } = details;
   const fields = logger.withFields({
     outcome,
     durationMs,
+    ...(size === undefined ? {} : { size }),
     ...(error === undefined ? {} : { error: error instanceof Error ? error.message : 'unknown' }),
   });
   if (outcome === 'stored') fields.info('Repository snapshot captured');
@@ -348,13 +333,16 @@ export class SandboxContainers extends DurableObject<Env> {
     input: ContainersLaunchInput
   ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
+    if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt) {
+      throw new WrapperExecTimeoutError();
+    }
     const containment = input.containment === true;
     // Persist the accepted physical instance before any early return or physical
     // operation, so a resumed launch whose exec fails still records its size.
     const record = await this.installLaunchInstance(stored, input.instance);
     if (containment) await this.installContainmentProxy(container);
     const start = await this.resolveStart(input, true);
-    return this.issueNativeSupervisor(record, ref, start);
+    return this.issueNativeSupervisor(record, ref, start, input);
   }
 
   /**
@@ -365,7 +353,8 @@ export class SandboxContainers extends DurableObject<Env> {
   private async issueNativeSupervisor(
     record: ContainersRecord,
     ref: string,
-    start: ResolvedStart
+    start: ResolvedStart,
+    input: ContainersLaunchInput
   ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
     // Ownership is retained before start: an ambiguous start that takes effect
@@ -378,10 +367,19 @@ export class SandboxContainers extends DurableObject<Env> {
       wrapperAttempt: 'exec_pending',
       startSource: start.source,
     });
-    await this.runStart(start, async () => {
+    if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt) {
+      throw new WrapperExecTimeoutError();
+    }
+    const readinessDeadline =
+      start.source === 'repository' && input.deadlineAt !== undefined
+        ? Date.now() + remainingMs(input.deadlineAt) / 2
+        : input.deadlineAt;
+    const started = await this.runStart(start, async () => {
+      const issuedAt = Date.now();
       await this.startContainerAndActivateBilling(container, record, start.options);
-      await this.awaitSupervisorMainProcess(container);
+      await this.awaitSupervisorMainProcess(container, start.source, issuedAt, readinessDeadline);
     });
+    if (!started) return { started: false, startSource: 'repository', snapshotFailed: true };
     await this.writeRunning(ref, 'clear');
     return { started: true, startSource: start.source };
   }
@@ -389,13 +387,12 @@ export class SandboxContainers extends DurableObject<Env> {
   /**
    * The one start-source rule: a physical start uses the repository snapshot for
    * the launch's `repoKey` and this image when the index has one, and the image
-   * otherwise. `discard` forgets the stored entry first, so a start that follows a
-   * failed repository start cannot use it again.
+   * otherwise. Failed snapshots are retained and retried before image fallback.
    *
    * Emits one `snapshot_lookup` diagnostic per start so `image` vs `repository`
-   * and the reason (no key, no index, miss, discarded, not allowed) are visible.
-   * Like the capture line it carries no repository key; the key is logged by the
-   * Sandbox DO, which owns it.
+   * and the reason (no key, no index, miss, exhausted, skipped, not allowed) are visible.
+   * A hit adds the snapshot's age and size. Like the capture line it carries no
+   * repository key; the key is logged by the Sandbox DO, which owns it.
    */
   private async resolveStart(
     input: ContainersLaunchInput,
@@ -407,7 +404,7 @@ export class SandboxContainers extends DurableObject<Env> {
         input.instance,
         this.nativeLaunchEnv(input.env, input.containment === true)
       ),
-      indexKey: null,
+      snapshotId: null,
     };
     const index = this.repoSnapshotIndex();
     if (index === null) {
@@ -419,9 +416,8 @@ export class SandboxContainers extends DurableObject<Env> {
       return imageStart;
     }
     const indexKey = await repoSnapshotIndexKey(input.repoKey, this.containerImage());
-    if (input.discardRepository === true) {
-      await index.remove(indexKey);
-      this.logSnapshotLookup('image', 'discarded');
+    if (input.skipRepository === true) {
+      this.logSnapshotLookup('image', 'skipped');
       return imageStart;
     }
     if (!allowRepository) {
@@ -433,7 +429,19 @@ export class SandboxContainers extends DurableObject<Env> {
       this.logSnapshotLookup('image', 'index_miss');
       return imageStart;
     }
-    this.logSnapshotLookup('repository', 'index_hit');
+    const failures = (await this.readRecord()).repositoryStartFailures;
+    if (
+      failures?.snapshotId === entry.snapshotId &&
+      failures.attempts >= REPO_SNAPSHOT_MAX_START_FAILURES
+    ) {
+      this.logSnapshotLookup('image', 'retries_exhausted', { attempts: failures.attempts });
+      return imageStart;
+    }
+    // An entry written before `capturedAt` logs no age.
+    this.logSnapshotLookup('repository', 'index_hit', {
+      ageMs: entry.capturedAt === undefined ? undefined : Date.now() - entry.capturedAt,
+      size: entry.size,
+    });
     return {
       source: 'repository',
       options: this.startOptions(
@@ -441,7 +449,7 @@ export class SandboxContainers extends DurableObject<Env> {
         this.nativeLaunchEnv(input.env, input.containment === true),
         entry.snapshotId
       ),
-      indexKey,
+      snapshotId: entry.snapshotId,
     };
   }
 
@@ -449,28 +457,41 @@ export class SandboxContainers extends DurableObject<Env> {
     return this.ctx.id.name ?? this.ctx.id.toString();
   }
 
-  private logSnapshotLookup(source: ContainersStartSource, reason: string): void {
+  private logSnapshotLookup(
+    source: ContainersStartSource,
+    reason: string,
+    fields: ControlDiagnosticFields = {}
+  ): void {
     logControlDiagnostic('snapshot_lookup', {
       sandboxId: this.sandboxNameForLog(),
       source,
       reason,
+      ...fields,
     });
   }
 
-  /**
-   * Run a start and forget the repository snapshot it used when it fails, so a
-   * broken snapshot costs one attempt and the next start is from the image.
-   */
-  private async runStart(start: ResolvedStart, attempt: () => Promise<void>): Promise<void> {
+  /** Count failed snapshot starts durably without changing the shared snapshot index. */
+  private async runStart(start: ResolvedStart, attempt: () => Promise<void>): Promise<boolean> {
     try {
       await attempt();
+      return true;
     } catch (error) {
-      if (start.source === 'repository' && start.indexKey !== null) {
-        await this.repoSnapshotIndex()?.remove(start.indexKey);
-        logControlDiagnostic('snapshot_discard', {
+      if (start.source === 'repository' && start.snapshotId !== null) {
+        const record = await this.readRecord();
+        const previous = record.repositoryStartFailures;
+        const attempts = (previous?.snapshotId === start.snapshotId ? previous.attempts : 0) + 1;
+        await this.writeRecord({
+          ...record,
+          repositoryStartFailures: { snapshotId: start.snapshotId, attempts },
+        });
+        logControlDiagnostic('snapshot_start_failed', {
           sandboxId: this.sandboxNameForLog(),
           reason: 'repository_start_failed',
+          attempts,
+          errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
+          cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
         });
+        return false;
       }
       throw error;
     }
@@ -695,7 +716,7 @@ export class SandboxContainers extends DurableObject<Env> {
     if (containment) await this.installContainmentProxy(container);
     if (!container.running) {
       const start = await this.resolveStart(input, record.startSource === 'repository');
-      return this.issueNativeSupervisor(record, ref, start);
+      return this.issueNativeSupervisor(record, ref, start, input);
     }
     if ((await this.settleRunningMainProcess(record, ref)) === 'supervisor') {
       return { started: true, startSource: recordedStartSource(record) };
@@ -1011,23 +1032,27 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   private async readMainProcessIdentity(container: Container): Promise<MainProcessIdentity> {
-    return this.readMainProcessIdentityWithin(container, Date.now() + PROBE_TIMEOUT_MS);
+    return (await this.observeMainProcess(container, Date.now() + PROBE_TIMEOUT_MS)).identity;
   }
 
-  private async readMainProcessIdentityWithin(
+  private async observeMainProcess(
     container: Container,
     deadlineAt: number
-  ): Promise<MainProcessIdentity> {
+  ): Promise<MainProcessObservation> {
     try {
       const proc = await this.awaitContainerCall(
         container.exec(['cat', '/proc/1/cmdline']),
         deadlineAt
       );
       const output = await this.awaitContainerCall(proc.output(), deadlineAt);
-      if (output.exitCode !== 0) return 'ambiguous';
-      return classifyMainProcess(new Uint8Array(output.stdout));
-    } catch {
-      return 'ambiguous';
+      if (output.exitCode !== 0) {
+        return { kind: 'exit_code', identity: 'ambiguous', exitCode: output.exitCode };
+      }
+      return observeCmdline(new Uint8Array(output.stdout));
+    } catch (error) {
+      if (error instanceof WrapperExecTimeoutError)
+        return { kind: 'deadline', identity: 'ambiguous' };
+      return { kind: 'error', identity: 'ambiguous', error };
     }
   }
 
@@ -1036,18 +1061,64 @@ export class SandboxContainers extends DurableObject<Env> {
    * existing wrapper readiness deadline. This is identity, not a wrapper-child
    * poll: a deadline without a match, or a container that stops first, throws
    * and does not exec.
+   *
+   * Emits one `supervisor_confirm` diagnostic on a match (time to ready since the
+   * start was issued) or at the deadline. The read in flight at the deadline is
+   * usually cut off, so the timeout reports the last read that completed.
    */
-  private async awaitSupervisorMainProcess(container: Container): Promise<void> {
-    const deadlineAt = Date.now() + DEADLINE_MS.wrapperReadiness;
+  private async awaitSupervisorMainProcess(
+    container: Container,
+    source: ContainersStartSource,
+    issuedAt: number,
+    launchDeadlineAt?: number
+  ): Promise<void> {
+    const deadlineAt = Math.min(
+      Date.now() + DEADLINE_MS.wrapperReadiness,
+      launchDeadlineAt ?? Infinity
+    );
+    let checks = 0;
+    let lastCompleted: MainProcessObservation | null = null;
     for (;;) {
       if (container.running !== true) {
         throw new Error('Container stopped before the supervisor main process was confirmed');
       }
-      const identity = await this.readMainProcessIdentityWithin(container, deadlineAt);
-      if (identity === 'supervisor') return;
-      if (Date.now() >= deadlineAt) throw new WrapperExecTimeoutError();
+      const observation = await this.observeMainProcess(container, deadlineAt);
+      checks += 1;
+      if (observation.kind !== 'deadline') lastCompleted = observation;
+      if (observation.identity === 'supervisor') {
+        this.logSupervisorConfirm('ready', source, issuedAt, checks);
+        return;
+      }
+      if (Date.now() >= deadlineAt) {
+        this.logSupervisorConfirm('timeout', source, issuedAt, checks, {
+          finalCutOff: observation.kind === 'deadline',
+          ...mainProcessObservationFields(lastCompleted),
+        });
+        throw new WrapperExecTimeoutError();
+      }
       await this.sleepWithinDeadline(deadlineAt);
     }
+  }
+
+  private logSupervisorConfirm(
+    result: 'ready' | 'timeout',
+    source: ContainersStartSource,
+    issuedAt: number,
+    checks: number,
+    fields: ControlDiagnosticFields = {}
+  ): void {
+    logControlDiagnostic(
+      'supervisor_confirm',
+      {
+        sandboxId: this.sandboxNameForLog(),
+        result,
+        source,
+        elapsedMs: Date.now() - issuedAt,
+        checks,
+        ...fields,
+      },
+      result === 'ready' ? 'info' : 'warn'
+    );
   }
 
   private containerImage(): string {
@@ -1066,6 +1137,9 @@ export class SandboxContainers extends DurableObject<Env> {
       lastSnapshot: record.lastSnapshot ?? null,
       ...(record.instance !== undefined ? { instance: record.instance } : {}),
       ...(record.billingConfigured ? { billingConfigured: true } : {}),
+      ...(record.repositoryStartFailures === undefined
+        ? {}
+        : { repositoryStartFailures: record.repositoryStartFailures }),
     };
   }
 
@@ -1127,19 +1201,24 @@ export class SandboxContainers extends DurableObject<Env> {
         'container snapshot timed out'
       );
       const snapshotMs = Date.now() - startedAt;
+      const size = Number.isFinite(snapshot.size) ? snapshot.size : undefined;
       if (!(await this.isRunningAllocation(allocationRef))) {
-        logRepositoryCapture('abandoned', snapshotMs);
+        logRepositoryCapture('abandoned', snapshotMs, { size });
         return false;
       }
       const key = await repoSnapshotIndexKey(repoKey, this.containerImage());
+      // The capture start bounds the contents' age from above, so an age logged on
+      // use never understates how stale the repository is.
       const stored = await index.store(key, {
         snapshotId: snapshot.id,
+        capturedAt: startedAt,
+        ...(size === undefined ? {} : { size }),
         ...(commit === undefined ? {} : { commit }),
       });
-      logRepositoryCapture(stored ? 'stored' : 'index_unavailable', snapshotMs);
+      logRepositoryCapture(stored ? 'stored' : 'index_unavailable', snapshotMs, { size });
       return stored;
     } catch (error) {
-      logRepositoryCapture('failed', Date.now() - startedAt, error);
+      logRepositoryCapture('failed', Date.now() - startedAt, { error });
       return false;
     }
   }

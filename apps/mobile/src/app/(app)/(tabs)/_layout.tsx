@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { type Href, Tabs, usePathname, useRouter, useSegments } from 'expo-router';
+import { Tabs, usePathname, useRouter, useSegments } from 'expo-router';
 import { Bot, House, MessageCircle, MessageSquare, UserRound } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
@@ -12,7 +12,6 @@ import { TabBarButton } from '@/components/tab-bar-button';
 import { TabBarLabel } from '@/components/tab-bar-label';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
-import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
 import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -103,19 +102,18 @@ function TabLabel({
 }
 
 export default function TabsLayout() {
-  const router = useRouter();
   const pathname = usePathname();
   const segments = useSegments();
+  const router = useRouter();
   const colors = useThemeColors();
   const { bottom, left, right } = useSafeAreaInsets();
   const { width, fontScale } = useWindowDimensions();
   const tabLabelLines = tabLabelLineCount(fontScale);
   const allowLabelWrap = tabLabelLines > 1;
-  const hideTabs = shouldHideTabBar(pathname);
+  const hideTabs = shouldHideTabBar(pathname, segments);
   const showKiloClawTab = useKiloClawTabVisible();
-  const showQuickChatTab = useFeatureFlag(FEATURE_FLAG_QUICK_CHAT, false);
-  const tabFlags = { showKiloClaw: showKiloClawTab, showQuickChat: showQuickChatTab };
-  const tabCount = visibleTabCount(showKiloClawTab, showQuickChatTab);
+  const tabFlags = { showKiloClaw: showKiloClawTab };
+  const tabCount = visibleTabCount(showKiloClawTab);
   // The label box is the tab item minus the bar's side safe areas and the
   // tab item's own padding (subtracted inside `tabLabelFits`). A window whose
   // width was never measured leaves the box unknown — the same missing
@@ -138,7 +136,7 @@ export default function TabsLayout() {
     homeLabel,
     ...(showKiloClawTab ? [kiloclawLabel] : []),
     agentsLabel,
-    ...(showQuickChatTab ? [chatLabel] : []),
+    chatLabel,
     profileLabel,
   ];
   const showTabLabel = shouldShowTabLabel(fontScale, tabItemWidth, tabLabels);
@@ -185,15 +183,6 @@ export default function TabsLayout() {
   // mounted here because this layout owns both the router and the live session
   // list — the destination is decided here and nowhere else.
   usePendingAppAction({ needsInputRows, orgLoaded, isLoading, isError });
-
-  // If the flag flips off while the Chat tab is focused, its `href` becomes
-  // null but the route is still mounted — move to Home instead.
-  const onChatTab = segments.some(segment => segment === '(4_chat)');
-  useEffect(() => {
-    if (!showQuickChatTab && onChatTab) {
-      router.replace('/(app)/(tabs)/(0_home)' as Href);
-    }
-  }, [showQuickChatTab, onChatTab, router]);
 
   // The centered-state band ends at the tab bar's top edge, the region the bar
   // does not cover. The 16pt scroll-content gap (`TAB_SCREEN_BOTTOM_GAP`) is
@@ -286,7 +275,7 @@ export default function TabsLayout() {
             tabPress: event => {
               void Haptics.selectionAsync();
               event.preventDefault();
-              router.navigate('/(app)/(tabs)/(1_kiloclaw)' as Href);
+              router.navigate('/(app)/(tabs)/(1_kiloclaw)');
             },
           }}
         />
@@ -314,7 +303,6 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="(4_chat)"
           options={{
-            href: showQuickChatTab ? undefined : null,
             title: t('common.chat'),
             tabBarAccessibilityLabel: tabAccessibilityLabel(
               t('common.chat'),

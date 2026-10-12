@@ -108,6 +108,25 @@ describe('session activity snapshots', () => {
     ]);
   });
 
+  it('carries the message of a retry status', async () => {
+    const f = fixture();
+    const retry = { type: 'retry', attempt: 3, message: 'Too Many Requests', next: 5_000 };
+    f.client.getSessionStatuses = async (
+      directory?: string
+    ): Promise<Record<string, typeof retry>> => (directory === '/two' ? { child: retry } : {});
+    const snapshot = await readSessionSnapshot({
+      client: f.client,
+      directory: '/one',
+      observedDirectories: [],
+      knownSessions: [],
+      signal: AbortSignal.timeout(1000),
+    });
+    expect(snapshot.find(session => session.id === 'child')).toMatchObject({
+      status: 'retry',
+      retry: { message: 'Too Many Requests' },
+    });
+  });
+
   it('never merges contradictory execution directories for the same session', async () => {
     const f = fixture();
     f.client.getSessionStatuses = async () => ({ child: { type: 'busy' } });

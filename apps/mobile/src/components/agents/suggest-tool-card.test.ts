@@ -35,8 +35,8 @@ vi.mock('./tool-cards/generic-tool-card', () => ({ GenericToolCardBody: 'Generic
 vi.mock('./open-part-detail-context', () => ({ useOpenPartDetail: () => openPartDetail }));
 vi.mock('@/components/ui/selectable-text', () => ({ SelectableText: 'SelectableText' }));
 vi.mock('@/components/ui/icons', () => ({ Sparkles: 'Sparkles' }));
-vi.mock('jotai', () => ({ useAtomValue: () => state.activeSuggestion }));
-vi.mock('@/components/agents/session-provider', () => ({ useSessionManager: () => manager }));
+vi.mock('jotai', () => ({ atom: () => ({}), useAtomValue: () => state.activeSuggestion }));
+vi.mock('./session-manager-context', () => ({ useOptionalSessionManager: () => manager }));
 
 const actions = [
   { label: 'Review', description: 'Review the uncommitted changes', prompt: '/review' },

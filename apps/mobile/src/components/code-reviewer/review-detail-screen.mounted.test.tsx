@@ -63,6 +63,11 @@ const statusHelpers = vi.hoisted(() => ({
   cancellable: false,
   retriggerable: false,
 }));
+const reviewConfig = vi.hoisted(() => ({
+  query: { isPending: false, data: undefined as unknown },
+  calls: [] as { scope: string; platform: string; enabled: boolean | undefined }[],
+}));
+const routerMock = vi.hoisted(() => ({ push: vi.fn() }));
 const spectatorStream = vi.hoisted(() => ({
   createReviewSpectatorStream: vi.fn(),
 }));
@@ -91,7 +96,7 @@ vi.mock('react-native-reanimated', () => ({
   FadeOut: { duration: vi.fn() },
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => routerMock,
 }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
@@ -137,10 +142,6 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: ({ children }: { children?: unknown }) => children,
 }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'pr-review',
-  useFeatureFlag: () => true,
-}));
 vi.mock('@/lib/code-reviewer-open-pr-destination', () => ({
   resolveCodeReviewerOpenPrDestination: () => ({ kind: 'browser' }),
 }));
@@ -152,6 +153,13 @@ vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useReviewDetail: () => detail,
   useCancelReview: () => ({ isPending: false, mutate: vi.fn() }),
   useRetriggerReview: () => ({ isPending: false, mutate: vi.fn() }),
+}));
+vi.mock('@/lib/hooks/use-code-reviewer', () => ({
+  isPersonal: (scope: string) => scope === 'personal',
+  useReviewConfig: (scope: string, platform: string, options?: { enabled?: boolean }) => {
+    reviewConfig.calls.push({ scope, platform, enabled: options?.enabled });
+    return reviewConfig.query;
+  },
 }));
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
@@ -296,6 +304,9 @@ beforeEach(() => {
   queryErrors.errors = [];
   buttons.rendered = [];
   viewRenders.list = [];
+  reviewConfig.query = { isPending: false, data: undefined };
+  reviewConfig.calls = [];
+  routerMock.push.mockClear();
   nativePlatform.OS = 'ios';
   sessionListRenders.list = [];
   composerRenders.list = [];
@@ -1158,5 +1169,91 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(liveErrorState).toBeDefined();
     expect(liveErrorState?.placement).toBeUndefined();
     expect(liveErrorState?.onRetry).toBeDefined();
+  });
+});
+
+describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
+  function renderFailedReview(over: Record<string, unknown> = {}) {
+    statusHelpers.retriggerable = true;
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed', manual_config: null, ...over }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    renderScreen();
+    return buttons.rendered.map(button => buttonText(button));
+  }
+
+  it('links to the settings instead of Retry when Code Reviewer is off', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+
+    const labels = renderFailedReview();
+
+    expect(labels).not.toContain('Retry review');
+    expect(labels).toContain('Fix settings');
+    expect(reviewConfig.calls.at(-1)).toEqual({
+      scope: 'personal',
+      platform: 'github',
+      enabled: true,
+    });
+    const fixSettings = buttons.rendered.findLast(button => buttonText(button) === 'Fix settings');
+    act(() => {
+      fixSettings?.onPress?.();
+    });
+    expect(routerMock.push).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github'
+    );
+  });
+
+  it('links to the settings when the configuration needs attention', () => {
+    reviewConfig.query = {
+      isPending: false,
+      data: { isEnabled: false, actionRequired: { reason: 'byok_invalid_key' } },
+    };
+
+    const labels = renderFailedReview();
+
+    expect(labels).not.toContain('Retry review');
+    expect(labels).toContain('Fix settings');
+  });
+
+  it('keeps Retry when Code Reviewer is on', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+
+    const labels = renderFailedReview();
+
+    expect(labels).toContain('Retry review');
+    expect(labels).not.toContain('Fix settings');
+  });
+
+  it('shows neither control while the config loads', () => {
+    reviewConfig.query = { isPending: true, data: undefined };
+
+    const labels = renderFailedReview();
+
+    expect(labels).not.toContain('Retry review');
+    expect(labels).not.toContain('Fix settings');
+  });
+
+  it('keeps Retry for a manual review and does not read the config', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+
+    const labels = renderFailedReview({ manual_config: { agentConfig: {} } });
+
+    expect(labels).toContain('Retry review');
+    expect(reviewConfig.calls.at(-1)?.enabled).toBe(false);
+  });
+
+  it('never queries a personal Bitbucket config and keeps Retry', () => {
+    reviewConfig.query = { isPending: true, data: { isEnabled: false, actionRequired: null } };
+
+    const labels = renderFailedReview({ platform: 'bitbucket' });
+
+    expect(labels).toContain('Retry review');
+    expect(reviewConfig.calls.at(-1)).toEqual({
+      scope: 'personal',
+      platform: 'bitbucket',
+      enabled: false,
+    });
   });
 });

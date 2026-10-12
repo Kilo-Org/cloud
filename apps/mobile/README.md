@@ -4,6 +4,13 @@ AI agents: see [AGENTS.md](AGENTS.md).
 
 Humans: follow instructions below or talk to [@iscekic](https://github.com/iscekic)
 
+## Feature availability
+
+- Chat and PR Review always appear in signed-in navigation.
+- The `mobile-chat` and `mobile-pr-review` flags no longer control these features.
+- PostHog feature flag infrastructure and the version-aware registry remain available for future flags.
+- KiloClaw tab visibility still depends on instance ownership.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.
@@ -12,7 +19,7 @@ Native permission translations live in `plugins/permission-prompt-copy.json` for
 The camera and photo library prompts explain AI agent attachments and include specific examples.
 Background location descriptions remain disabled because the app does not request background location.
 Apple requires a localized motion description for the location library's linked APIs, even though Kilo does not use or collect motion activity.
-Development builds also localize the local-network prompt; production builds exclude that development-only translation and retain Expo's release stripping.
+Every build localizes the local-network prompt, because Chat can connect to a local model server.
 Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
 
 1. obtain Expo access
@@ -45,6 +52,14 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - Check both displays, all three fold poses, and each orientation after the rebuild.
 - When the app moves to Expo SDK 58, remove the scene support option; its template includes scene support.
 
+#### Widget layout checks
+
+- Home widgets keep a 16pt band on all four sides, including the updating placeholder.
+- Check the medium placeholder on a 164pt-tall card: its header, bars and footer must fit within 132pt or SwiftUI centres the overflow into the padding.
+- Arabic Live Activity direction comes from `homeWidgetLocale` in the shared app group, not the simulator language.
+- The Live Activity direction override is native code in `patches/expo-widgets@57.0.22.patch`. Rebuild the iOS extension after changing the patch; restarting Metro alone leaves the installed extension unchanged.
+- After switching the app language, reopen the development client on Metro before applying a fixture and capturing widgets.
+
 #### Responsive layout checks
 
 - Shared tab and detail scroll views reserve the reported left and right safe areas.
@@ -57,6 +72,77 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - Use `--display=1` for the outer display and `--display=3` for the inner display.
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
+
+## Quick Chat backends
+
+Kilo remains the default backend. Custom backends use the harness SDK's remote
+model plugin, while the SDK owns conversations, tools, and compaction.
+
+- Open **Chat → Manage backends** to configure an API root, protocol, credentials, headers, and models.
+- Use Chat Completions, Responses, or Messages with the endpoint's API root, such as `https://api.openai.com/v1`.
+- Chat Completions uses `max_completion_tokens` by default. Select `max_tokens` when the endpoint requires the legacy field.
+- Enter models manually, or discover models when the endpoint supports discovery.
+- Use **Test model connection** to send a short inference request. The provider can charge for this request.
+- Enable tool calls only when the selected model and endpoint support them.
+
+Profiles and credentials remain on the device and belong to the signed-in
+account. Sign-out and account changes remove them.
+
+- Each conversation retains its backend and upstream model identity, including queued messages.
+- Failed questions retain their requested backend through Retry and restoration. Retry never substitutes the previous conversation's backend.
+- Editing or deleting a backend requires an explicit selection before its conversations can continue.
+- Changing backends shows a warning before sending conversation context to the new backend.
+- Failed or unavailable backends never select Kilo automatically. Compaction uses the conversation's selected backend.
+- Custom requests exclude Kilo authentication, Kilo headers, and browser cookies. Redirects are blocked.
+
+HTTPS is the default. Local HTTP requires approval for the configured endpoint.
+The warning covers unencrypted prompts, responses, credentials, and headers.
+
+- Android release builds require HTTPS, including local servers.
+- Android development builds permit approved loopback and private local HTTP endpoints.
+- iOS permits approved local HTTP endpoints through the local networking exception.
+- Public HTTP endpoints are rejected. HTTPS certificate checks remain enabled.
+
+### On-device models
+
+On iOS 26 or later with Apple Intelligence on, the model picker offers
+**Apple Intelligence (on device)**. The `kilo-apple-model` local module runs
+Apple's Foundation Models system model for inference only; the SDK still owns
+the conversation. Building the module requires Xcode with the iOS 26.4 SDK or
+newer. The minimum iOS version does not change.
+
+On Android devices whose AICore system app supports Gemini Nano, the picker
+offers **Gemini Nano (on device)**. The `kilo-android-model` local module uses
+the ML Kit GenAI Prompt API (`genai-prompt` 1.0.0-beta2, the newest release the
+app's Kotlin 2.1 compiler can read). The library declares minSdk 26; the module
+overrides that in its manifest and returns `unsupported_os` below API 26, so the
+app's minSdk does not change.
+
+- When the system reports the model as downloadable, **Manage backends** shows **Download on-device model**. Only that button starts the system download; the row shows progress and failures, then checks the status again.
+- Gemini Nano runs only while Kilo is in the foreground. Leaving the app stops the reply with fixed copy; **Retry** works after returning.
+
+- **Manage backends** shows its status and why it is unavailable: Apple Intelligence off, device not eligible, model not ready, or iOS older than 26.
+- Apple's model receives the chat's tools through Foundation Models tool calling. When the model calls a tool, the generation waits, JavaScript runs the tool through the harness, and the next request resumes the same generation with the results. A tool whose arguments schema Foundation Models cannot express (a union, a reference, a map with free keys) is left out and logged; an optional argument of that kind is left out of its tool.
+- Gemini Nano is text-only: the ML Kit GenAI Prompt API has no function calling, so it never receives tool definitions.
+- An unavailable or busy model fails the send with fixed copy. It never falls back to Kilo or another backend.
+- Switching between Kilo, a custom backend, and an on-device model shows the context-transfer warning.
+- Usage comes from the model when it reports counts, then its token counter, then an estimate of three characters per token, so compaction still runs on the small window.
+
+### Downloaded GGUF models
+
+**Manage backends → Downloadable models** lists small instruct models the app
+can download and run locally with `llama.rn` (llama.cpp). Each entry states its
+size and license and pins one Hugging Face revision, so the bytes cannot change
+underneath a download. A direct HTTPS link to a `.gguf` file works too. The user
+starts every download; it can be paused, resumed, or cancelled, and a cancelled
+or failed download deletes its partial file. Storage is checked before a
+download and again as soon as the server states a length.
+
+- Model files live in the app's document directory. They hold no account data, so the downloaded list survives sign-out and account changes.
+- A downloaded model appears in the picker once its file has been read by llama.cpp, which is where its context window comes from. Only one model is loaded at a time; switching releases the previous one, and the app releases it in the background.
+- Tools are sent only to a model whose own chat template was verified to render tool definitions and earlier tool calls; every other GGUF model is text-only.
+- An answer streams as it is written, interruption stops llama.cpp, and the token counts and stop reason come from llama.cpp itself. A second question while one is running fails as busy.
+- `llama.rn` ships prebuilt iOS and Android binaries fetched by its `postinstall` (allowed in `pnpm-workspace.yaml`). It needs React Native's New Architecture (this app), minSdk 24 (llama.rn requires 23), and the `llama.rn` Expo plugin in `app.config.ts`; iOS pods must be reinstalled after the dependency changes.
 
 ## Mobile Purchases
 

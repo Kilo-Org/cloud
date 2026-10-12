@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { GGUF_CATALOG } from './gguf-catalog';
-import { hfListUrl, hfRepoInfo, readModelDetail, readModelPage } from './hf-catalog';
+import {
+  hfListUrl,
+  hfRepoInfo,
+  readModelDetail,
+  readModelPage,
+  smallestDownloadBytes,
+} from './hf-catalog';
 
 const REVISION = 'a'.repeat(40);
 const sha = (digit: string) => digit.repeat(64);
@@ -112,6 +118,19 @@ describe('a Hugging Face model detail', () => {
     ]);
   });
 
+  it('offers no draft model beside the named quantizations', () => {
+    const detail = readModelDetail(info(), [
+      file('Big-27B-FastMTP-32K.gguf', 903_453_952, '1'),
+      file('Big-27B-IQ2_M.gguf', 10_319_906_944, '2'),
+    ]);
+    expect(detail.quants.map(quant => quant.label)).toEqual(['IQ2_M']);
+  });
+
+  it('still offers a file without a quantization name when no file has one', () => {
+    const detail = readModelDetail(info(), [file('ggml-model.gguf', 500, '1')]);
+    expect(detail.quants.map(quant => quant.label)).toEqual(['ggml-model']);
+  });
+
   it('keeps the pinned catalog identity for a file the catalog already offers', () => {
     const [pinned] = GGUF_CATALOG;
     if (pinned === undefined) {
@@ -138,5 +157,33 @@ describe('a Hugging Face model detail', () => {
 
   it('rejects a repository without a pinned revision', () => {
     expect(() => hfRepoInfo.parse({ id: 'acme/x', sha: 'main' })).toThrow();
+  });
+});
+
+describe('the size a list entry is rated by', () => {
+  it('is the smallest quantization, not a smaller draft model', () => {
+    expect(
+      smallestDownloadBytes([
+        file('Big-27B-FastMTP-32K.gguf', 903_453_952, '1'),
+        file('Big-27B-Q4_K_P.gguf', 17_923_393_664, '2'),
+        file('Big-27B-IQ2_M.gguf', 10_319_906_944, '3'),
+      ])
+    ).toBe(10_319_906_944);
+  });
+
+  it('adds the projector the smallest quantization downloads with', () => {
+    expect(
+      smallestDownloadBytes([
+        file('Vis-Q4_K_M.gguf', 500, '1'),
+        file('mmproj-Vis-F16.gguf', 300, '2'),
+        file('mmproj-Vis-Q4_K_M.gguf', 100, '3'),
+      ])
+    ).toBe(600);
+  });
+
+  it('is unknown for a repository with only split files', () => {
+    expect(smallestDownloadBytes([file('Big-Q4_K_M-00001-of-00002.gguf', 500, '1')])).toBe(
+      undefined
+    );
   });
 });

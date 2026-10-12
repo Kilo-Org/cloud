@@ -15,11 +15,15 @@ import { Cpu, Download, Eye, SearchX, Star } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { type DeviceBudget, deviceFit, parameterFit } from '@/lib/chat/device-fit';
+import { type DeviceBudget, deviceFit } from '@/lib/chat/device-fit';
 import { type CatalogModel, GGUF_CATALOG } from '@/lib/chat/gguf-catalog';
 import { useGgufModels } from '@/lib/chat/gguf-models';
 import { type HfListedModel, hfModelName } from '@/lib/chat/hf-catalog';
-import { useDeviceBudget, useHfModelSearch } from '@/lib/chat/use-hf-catalog';
+import {
+  useDeviceBudget,
+  useHfModelSearch,
+  useHfSmallestDownload,
+} from '@/lib/chat/use-hf-catalog';
 import { formatFileSize } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -69,10 +73,22 @@ function RecommendedRow({
   );
 }
 
-function ModelRow({ model, budget }: Readonly<{ model: HfListedModel; budget: DeviceBudget }>) {
+function ModelRow({
+  model,
+  budget,
+  fitsOnly,
+}: Readonly<{ model: HfListedModel; budget: DeviceBudget; fitsOnly: boolean }>) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
+  const smallest = useHfSmallestDownload(model.id);
+  const fit =
+    smallest.data === undefined || smallest.data === null
+      ? undefined
+      : deviceFit(smallest.data, budget);
+  if (fitsOnly && (fit === 'tooLarge' || fit === 'noStorage')) {
+    return null;
+  }
   const [owner = '', repo = ''] = model.id.split('/');
   const name = hfModelName(model.id);
   const downloads = compactNumber(model.downloads, i18n.language);
@@ -92,11 +108,7 @@ function ModelRow({ model, budget }: Readonly<{ model: HfListedModel; budget: De
           <Text className="min-w-0 shrink text-sm font-medium" numberOfLines={1}>
             {name}
           </Text>
-          <FitBadge
-            fit={
-              model.parameters === undefined ? undefined : parameterFit(model.parameters, budget)
-            }
-          />
+          <FitBadge fit={fit} />
         </View>
         <Text variant="muted" className="text-xs" numberOfLines={1}>
           {owner}
@@ -239,7 +251,9 @@ export function ModelCatalogScreen() {
       <FlashList
         data={hasPages ? rows : []}
         keyExtractor={model => model.id}
-        renderItem={({ item }) => <ModelRow model={item} budget={budget} />}
+        renderItem={({ item }) => (
+          <ModelRow model={item} budget={budget} fitsOnly={tab === 'fits'} />
+        )}
         ListHeaderComponent={
           <View className="gap-3 pt-2">
             {recommended.length > 0 && (

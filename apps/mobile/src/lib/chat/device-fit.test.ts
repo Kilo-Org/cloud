@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { deviceFit, maxParametersFor, parameterFit } from './device-fit';
+import { deviceFit, maxParametersFor } from './device-fit';
 
 const GIB = 1024 ** 3;
 const roomy = { memoryBytes: 8 * GIB, freeBytes: 64 * GIB };
@@ -20,10 +20,9 @@ describe('device fit', () => {
     expect(deviceFit(0.5 * GIB, { memoryBytes: null, freeBytes: 64 * GIB })).toBeUndefined();
   });
 
-  it('limits the fitting list to models that fit at least tightly', () => {
-    const limit = maxParametersFor(roomy.memoryBytes);
-    expect(parameterFit(limit * 0.99, roomy)).toBe('tight');
-    expect(parameterFit(limit * 1.1, roomy)).toBe('tooLarge');
-    expect(parameterFit(1e9, roomy)).toBe('fits');
+  it('limits the fitting list to models whose Q4_K_M file fits at least tightly', () => {
+    const q4Bytes = maxParametersFor(roomy.memoryBytes) * 0.6;
+    expect(deviceFit(q4Bytes * 0.99, roomy)).toBe('tight');
+    expect(deviceFit(q4Bytes * 1.1, roomy)).toBe('tooLarge');
   });
 });

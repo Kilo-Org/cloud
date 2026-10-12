@@ -170,10 +170,14 @@ function licenseOf(card: HfRepoInfo['cardData']): string | undefined {
   return license === 'other' ? (card?.license_name ?? license) : license;
 }
 
+function quantOf(path: string): string | undefined {
+  const name = path.split('/').pop() ?? path;
+  return QUANT.exec(name.slice(0, -'.gguf'.length))?.[1];
+}
+
 function quantLabel(path: string): string {
   const name = path.split('/').pop() ?? path;
-  const stem = name.slice(0, -'.gguf'.length);
-  return QUANT.exec(stem)?.[1] ?? stem;
+  return quantOf(path) ?? name.slice(0, -'.gguf'.length);
 }
 
 /** Smallest first. */
@@ -199,6 +203,28 @@ function projectorFor(label: string, projectors: readonly HfFile[]): HfFile | un
   );
 }
 
+/**
+ * The model files, smallest first. When the repository names its
+ * quantizations, a file without one is a draft model or an importance matrix,
+ * not a quantization of the model.
+ */
+function quantFiles(files: readonly HfFile[]): readonly HfFile[] {
+  const models = files.filter(file => !PROJECTOR_FILE.test(file.path));
+  const named = models.filter(file => quantOf(file.path) !== undefined);
+  return named.length > 0 ? named : models;
+}
+
+/** The bytes of the smallest quantization and its projector: the best fit the repository offers. */
+export function smallestDownloadBytes(tree: unknown): number | undefined {
+  const files = ggufFiles(tree);
+  const [smallest] = quantFiles(files);
+  if (smallest === undefined) {
+    return undefined;
+  }
+  const projectors = files.filter(file => PROJECTOR_FILE.test(file.path));
+  return smallest.sizeBytes + (projectorFor(quantLabel(smallest.path), projectors)?.sizeBytes ?? 0);
+}
+
 const CURATED = new Map(GGUF_CATALOG.map(model => [model.sha256, model]));
 
 /** The repository name without the conventional GGUF suffix. */
@@ -218,37 +244,35 @@ export function readModelDetail(info: HfRepoInfo, tree: unknown): HfModelDetail 
   const projectors = files.filter(file => PROJECTOR_FILE.test(file.path));
   const license = licenseOf(info.cardData);
   const name = hfModelName(info.id);
-  const quants = files
-    .filter(file => !PROJECTOR_FILE.test(file.path))
-    .map((file): HfQuant => {
-      const label = quantLabel(file.path);
-      const curated = CURATED.get(file.sha256);
-      if (curated !== undefined) {
-        return { label, path: file.path, model: curated };
-      }
-      const projector = projectorFor(label, projectors);
-      return {
-        label,
-        path: file.path,
-        model: {
-          fileId: `hf-${file.sha256.slice(0, 16)}`,
-          name: `${name} (${label})`,
-          url: resolveUrl(info.id, info.sha, file.path),
-          sizeBytes: file.sizeBytes,
-          sha256: file.sha256,
-          license: license ?? '',
-          ...(projector === undefined
-            ? {}
-            : {
-                projector: {
-                  url: resolveUrl(info.id, info.sha, projector.path),
-                  sizeBytes: projector.sizeBytes,
-                  sha256: projector.sha256,
-                },
-              }),
-        },
-      };
-    });
+  const quants = quantFiles(files).map((file): HfQuant => {
+    const label = quantLabel(file.path);
+    const curated = CURATED.get(file.sha256);
+    if (curated !== undefined) {
+      return { label, path: file.path, model: curated };
+    }
+    const projector = projectorFor(label, projectors);
+    return {
+      label,
+      path: file.path,
+      model: {
+        fileId: `hf-${file.sha256.slice(0, 16)}`,
+        name: `${name} (${label})`,
+        url: resolveUrl(info.id, info.sha, file.path),
+        sizeBytes: file.sizeBytes,
+        sha256: file.sha256,
+        license: license ?? '',
+        ...(projector === undefined
+          ? {}
+          : {
+              projector: {
+                url: resolveUrl(info.id, info.sha, projector.path),
+                sizeBytes: projector.sizeBytes,
+                sha256: projector.sha256,
+              },
+            }),
+      },
+    };
+  });
   return {
     id: info.id,
     revision: info.sha,

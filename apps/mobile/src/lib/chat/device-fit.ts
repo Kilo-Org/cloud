@@ -47,12 +47,11 @@ export function deviceFit(downloadBytes: number, budget: DeviceBudget): DeviceFi
   return memory <= budget.memoryBytes * TIGHT_SHARE ? 'tight' : 'tooLarge';
 }
 
-/** The fit of a model known only by its parameter count, at Q4_K_M. */
-export function parameterFit(parameters: number, budget: DeviceBudget): DeviceFit | undefined {
-  return deviceFit(parameters * Q4_BYTES_PER_PARAMETER, budget);
-}
-
-/** The largest parameter count whose Q4_K_M file still fits, tightly, in memory. */
+/**
+ * The largest parameter count whose Q4_K_M file still fits, tightly, in memory.
+ * Only a first filter: Hugging Face can state the count of a draft model the
+ * repository also holds, so the real file sizes decide the fit.
+ */
 export function maxParametersFor(memoryBytes: number): number {
   const download = (memoryBytes * TIGHT_SHARE - RUNTIME_BYTES) / (1 + RUNTIME_OVERHEAD);
   return Math.max(0, download / Q4_BYTES_PER_PARAMETER);

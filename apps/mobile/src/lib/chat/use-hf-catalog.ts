@@ -14,6 +14,7 @@ import {
   hfTreeUrl,
   readModelDetail,
   readModelPage,
+  smallestDownloadBytes,
 } from './hf-catalog';
 
 export class HfRequestError extends Error {
@@ -82,6 +83,23 @@ export function useHfModelDetail(id: string) {
       const tree = await hfGet(hfTreeUrl(info.id, info.sha), signal);
       return readModelDetail(info, tree.body);
     },
+    retry,
+  });
+}
+
+/**
+ * A list entry states only a parameter count, which can describe a draft model
+ * the repository also holds, so the list judges fit by the smallest real file.
+ * Rows mount again as the list scrolls; the sizes stay cached meanwhile.
+ */
+export function useHfSmallestDownload(id: string) {
+  return useQuery({
+    queryKey: ['hf-catalog', 'smallest', id],
+    queryFn: async ({ signal }): Promise<number | null> => {
+      const tree = await hfGet(hfTreeUrl(id, 'main'), signal);
+      return smallestDownloadBytes(tree.body) ?? null;
+    },
+    staleTime: 30 * 60 * 1000,
     retry,
   });
 }

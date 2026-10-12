@@ -37,6 +37,16 @@ function buildObjectKey(kiloUserId: string, messageUuid: string, attachmentId: s
   return `${kiloUserId}/cloud-agent/${messageUuid}/${attachmentId}.bin`;
 }
 
+/** Admit with a random fresh key, as the presign helper does. */
+function admit(
+  params: Omit<Parameters<typeof AdmitPendingUpload>[0], 'freshObjectKey'>
+): Promise<string> {
+  return admitPendingUpload({
+    ...params,
+    freshObjectKey: buildObjectKey(params.kiloUserId, params.messageUuid, crypto.randomUUID()),
+  });
+}
+
 async function insertPendingRow(values: {
   kiloUserId: string;
   messageUuid: string;
@@ -77,7 +87,7 @@ describe('cloud-agent pending-upload ledger', () => {
     const messageUuid = crypto.randomUUID();
 
     for (let i = 0; i < CLOUD_AGENT_ATTACHMENT_MAX_COUNT; i++) {
-      await admitPendingUpload({
+      await admit({
         kiloUserId,
         messageUuid,
         attachmentId: crypto.randomUUID(),
@@ -87,7 +97,7 @@ describe('cloud-agent pending-upload ledger', () => {
     }
 
     await expect(
-      admitPendingUpload({
+      admit({
         kiloUserId,
         messageUuid,
         attachmentId: crypto.randomUUID(),
@@ -116,7 +126,7 @@ describe('cloud-agent pending-upload ledger', () => {
     const messageUuid = crypto.randomUUID();
 
     await expect(
-      admitPendingUpload({
+      admit({
         kiloUserId,
         messageUuid,
         attachmentId: crypto.randomUUID(),
@@ -139,7 +149,9 @@ describe('cloud-agent pending-upload ledger', () => {
     const soon = new Date(Date.now() + 60_000).toISOString();
     await insertPendingRow({ kiloUserId, messageUuid, attachmentId, expiresAt: soon });
 
-    await admitPendingUpload({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 99 });
+    await expect(
+      admit({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 99 })
+    ).resolves.toBe(objectKey);
 
     const rows = await db
       .select()
@@ -159,7 +171,7 @@ describe('cloud-agent pending-upload ledger', () => {
       crypto.randomUUID()
     );
     for (const attachmentId of attachmentIds) {
-      await admitPendingUpload({
+      await admit({
         kiloUserId,
         messageUuid,
         attachmentId,
@@ -169,7 +181,7 @@ describe('cloud-agent pending-upload ledger', () => {
     }
 
     const retriedId = attachmentIds[0] ?? '';
-    await admitPendingUpload({
+    await admit({
       kiloUserId,
       messageUuid,
       attachmentId: retriedId,
@@ -184,26 +196,66 @@ describe('cloud-agent pending-upload ledger', () => {
     expect(rows).toHaveLength(CLOUD_AGENT_ATTACHMENT_MAX_COUNT);
   });
 
-  it('re-admits a key after the client released it before a retry', async () => {
+  it('admits a fresh key after the client released the key before a retry', async () => {
     mockSend.mockResolvedValue({});
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;
     const messageUuid = crypto.randomUUID();
     const attachmentId = crypto.randomUUID();
     const objectKey = buildObjectKey(kiloUserId, messageUuid, attachmentId);
-    await admitPendingUpload({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 42 });
+    await admit({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 42 });
     await releasePendingUploads(kiloUserId, [objectKey]);
 
-    await admitPendingUpload({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 99 });
+    const admittedKey = await admit({
+      kiloUserId,
+      messageUuid,
+      attachmentId,
+      objectKey,
+      byteSize: 99,
+    });
 
+    expect(admittedKey).not.toBe(objectKey);
     const rows = await db
-      .select()
+      .select({
+        object_key: cloud_agent_pending_uploads.object_key,
+        status: cloud_agent_pending_uploads.status,
+        byte_size: cloud_agent_pending_uploads.byte_size,
+      })
       .from(cloud_agent_pending_uploads)
-      .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ status: 'pending', byte_size: 99 });
+      .where(eq(cloud_agent_pending_uploads.message_uuid, messageUuid));
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { object_key: objectKey, status: 'reaped', byte_size: 42 },
+        { object_key: admittedKey, status: 'pending', byte_size: 99 },
+      ])
+    );
+    expect(rows).toHaveLength(2);
   });
 
-  it('refuses to admit a key already linked to a sent message', async () => {
+  it('admits a fresh key when a retry lands while the release still deletes the old object', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachmentId = crypto.randomUUID();
+    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachmentId);
+    await admit({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 42 });
+
+    let retryKey: string | undefined;
+    mockSend.mockImplementation(async () => {
+      retryKey = await admit({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 99 });
+      return {};
+    });
+    await releasePendingUploads(kiloUserId, [objectKey]);
+
+    expect(retryKey).toBeDefined();
+    expect(retryKey).not.toBe(objectKey);
+    expect(mockSend.mock.calls.map(([command]) => command.input.Key)).toEqual([objectKey]);
+    const [retryRow] = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.object_key, retryKey ?? ''));
+    expect(retryRow?.status).toBe('pending');
+  });
+
+  it('never re-admits a key already linked to a sent message', async () => {
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;
     const messageUuid = crypto.randomUUID();
     const attachmentId = crypto.randomUUID();
@@ -217,16 +269,20 @@ describe('cloud-agent pending-upload ledger', () => {
       status: 'linked',
     });
 
-    await expect(
-      admitPendingUpload({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 99 })
-    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    const admittedKey = await admit({
+      kiloUserId,
+      messageUuid,
+      attachmentId,
+      objectKey,
+      byteSize: 99,
+    });
 
-    const rows = await db
+    expect(admittedKey).not.toBe(objectKey);
+    const [linkedRow] = await db
       .select()
       .from(cloud_agent_pending_uploads)
       .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ status: 'linked', byte_size: 42 });
+    expect(linkedRow).toMatchObject({ status: 'linked', byte_size: 42 });
   });
 
   it('links only the supplied object keys and leaves unmatched rows pending', async () => {
@@ -370,7 +426,7 @@ describe('cloud-agent pending-upload ledger', () => {
 
     const results = await Promise.allSettled(
       Array.from({ length: CLOUD_AGENT_ATTACHMENT_MAX_COUNT + 3 }, () =>
-        admitPendingUpload({
+        admit({
           kiloUserId,
           messageUuid,
           attachmentId: crypto.randomUUID(),

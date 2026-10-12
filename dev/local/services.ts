@@ -707,6 +707,7 @@ function buildServiceDefs(): ServiceDef[] {
         command: [
           'env',
           `AI_GATEWAY_PORT=${AI_GATEWAY_BASE_PORT + portOffset}`,
+          'KILO_AI_GATEWAY_MANAGED=1',
           'pnpm',
           'run',
           'dev',

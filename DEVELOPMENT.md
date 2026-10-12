@@ -222,6 +222,8 @@ pnpm dev:start
 ```
 
 This generates the local environment files and launches a tmux dashboard with the Next.js web app, the standalone AI gateway app, and local infrastructure. The web app proxies gateway routes to the local gateway on port 3010 plus the worktree port offset. It does not run database migrations.
+
+`pnpm --filter web dev` also starts the gateway, defaulting to the selected web port plus 10. Set `AI_GATEWAY_PORT` to override that port. Stopping the command stops both apps; if either app exits, the other is stopped too. The managed `dev:start` stack continues to run the gateway as a separate service, without starting a duplicate from the web launcher.
 Port offset selection is automatic by default, keeping secondary worktrees from colliding with the root checkout. This setup order assumes no port conflicts; if startup selects a different offset, run `pnpm test:db` again in another terminal in the same worktree.
 When the Stripe CLI is installed, the command also starts the Stripe webhook forwarder. Run `pnpm dev:status` to get the web app's port.
 

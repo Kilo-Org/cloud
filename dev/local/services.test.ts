@@ -236,6 +236,7 @@ test('passes the same gateway port to the web app and gateway on every worktree 
       const web = getService('nextjs');
       assert.equal(web.command[1], `AI_GATEWAY_PORT=${gateway.port}`);
       assert.equal(gateway.command[1], web.command[1]);
+      assert.ok(web.command.includes('KILO_AI_GATEWAY_MANAGED=1'));
     }
   } finally {
     applyPortOffset(initialOffset);

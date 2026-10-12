@@ -87,4 +87,5 @@ NEXTAUTH_URL="${NEXTAUTH_URL:-$APP_URL_OVERRIDE}"
 export APP_URL_OVERRIDE
 export NEXT_DEV_HOSTNAME
 export NEXTAUTH_URL
-exec next dev -H "$NEXT_DEV_HOSTNAME" -p "$PORT" "$@"
+export AI_GATEWAY_PORT="${AI_GATEWAY_PORT:-$((PORT + 10))}"
+exec node "$REPO_ROOT/scripts/web-dev.mjs" "$@"

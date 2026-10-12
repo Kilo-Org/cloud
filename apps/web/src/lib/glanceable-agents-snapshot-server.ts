@@ -11,7 +11,11 @@ import {
   type HomeWidgetResponse,
   type HomeWidgetSessionRow,
 } from '@kilocode/app-shared/home-widget';
-import { cli_sessions_v2, user_activity_tokens } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  github_branch_pull_requests,
+  user_activity_tokens,
+} from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications';
 import {
@@ -22,6 +26,7 @@ import { and, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 
 import { type ActiveSession, listActiveSessions } from '@/lib/active-sessions-list';
 import { readCloudAgentWidgetApprovalKey } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { sessionPrJoinPredicate } from '@/routers/cli-sessions-v2-router';
 
 type HomeWidgetScope = { userId: string; organizationId: string | null };
 
@@ -186,6 +191,24 @@ function isoOrNull(value: string | null): string | null {
   return Number.isFinite(at) ? new Date(at).toISOString() : null;
 }
 
+/**
+ * The pull request states the session card reports as "Pull request opened".
+ * `unknown` is a link GitHub verified whose state the webhook has not synced
+ * yet: the session just opened it.
+ */
+const LIVE_PR_STATES = new Set(['open', 'draft', 'unknown']);
+
+/**
+ * True when the session's pull request is worth telling the user about: a
+ * link GitHub verified for this session (the session list's own rule for
+ * `associatedPr`), whose pull request is still open or a draft, or not yet
+ * synced. A merged or closed pull request, and a stored link nobody verified,
+ * do not count.
+ */
+export function isSessionCardPrOpened(pr: { verified: boolean; state: string | null }): boolean {
+  return pr.verified && LIVE_PR_STATES.has(pr.state ?? 'unknown');
+}
+
 function liveSummaryOrNull(value: unknown): SessionLiveSummary | null {
   const parsed = sessionLiveSummarySchema.safeParse(value);
   return parsed.success ? parsed.data : null;
@@ -212,9 +235,13 @@ async function readSessionCards(
             lastActivityAt: cli_sessions_v2.last_activity_at,
             costMicrodollars: cli_sessions_v2.total_cost_microdollars,
             createdAt: cli_sessions_v2.created_at,
-            prUrl: cli_sessions_v2.pr_url,
+            prVerifiedAt: cli_sessions_v2.pr_link_verified_at,
+            // Null when no verified link joins a cache row, or the cache has
+            // not synced the pull request yet.
+            prState: github_branch_pull_requests.pr_state,
           })
           .from(cli_sessions_v2)
+          .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
           .where(
             and(
               inArray(cli_sessions_v2.session_id, ids),
@@ -235,7 +262,14 @@ async function readSessionCards(
       const lastActivityAt = isoOrNull(row?.lastActivityAt ?? kept?.lastActivityAt ?? null);
       const costMicrodollars = row?.totalCostMicrodollars ?? kept?.costMicrodollars ?? null;
       const startedAt = isoOrNull(row?.createdAt ?? kept?.createdAt ?? null);
-      const prOpened = row?.associatedPr !== undefined || (kept?.prUrl ?? null) !== null;
+      // A listed row's `associatedPr` is present only for a verified link.
+      const prOpened =
+        row?.associatedPr === undefined
+          ? isSessionCardPrOpened({
+              verified: (kept?.prVerifiedAt ?? null) !== null,
+              state: kept?.prState ?? null,
+            })
+          : isSessionCardPrOpened({ verified: true, state: row.associatedPr.state });
       if (row === undefined) {
         // No open run or live connection holds it any more: the agent finished.
         return {

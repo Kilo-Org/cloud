@@ -17,6 +17,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: { select: jest.fn() }
 import {
   buildGlanceableDeliveryForUser,
   buildHomeWidgetResponseForUser,
+  isSessionCardPrOpened,
 } from './glanceable-agents-snapshot-server';
 
 const mockedListActiveSessions = listActiveSessions as jest.MockedFunction<
@@ -281,20 +282,20 @@ describe('buildGlanceableDeliveryForUser', () => {
     // The awaited form and the `.limit()` form both work, because the parent
     // token read awaits the predicate and the follow gate chains `.limit(1)`.
     jest.mocked(db.select).mockReset();
-    jest.mocked(db.select).mockImplementation(((fields: Fields) => ({
-      from: () => ({
-        where: (predicate: SQL) => {
-          if ('cloudAgentSessionId' in fields) return { limit: async () => cloudRows };
-          if ('prUrl' in fields) {
-            storedFields = fields;
-            return Promise.resolve(storedById(predicate));
-          }
-          followedWhere = predicate;
-          const rows = [...followedRows];
-          return Object.assign(rows, { limit: async (_count: number) => rows });
-        },
-      }),
-    })) as never);
+    jest.mocked(db.select).mockImplementation(((fields: Fields) => {
+      const where = (predicate: SQL) => {
+        if ('cloudAgentSessionId' in fields) return { limit: async () => cloudRows };
+        if ('prState' in fields) {
+          storedFields = fields;
+          return Promise.resolve(storedById(predicate));
+        }
+        followedWhere = predicate;
+        const rows = [...followedRows];
+        return Object.assign(rows, { limit: async (_count: number) => rows });
+      };
+      // The followed session read joins the pull request cache.
+      return { from: () => ({ where, leftJoin: () => ({ where }) }) };
+    }) as never);
   });
 
   const running: ActiveSession = {
@@ -385,7 +386,8 @@ describe('buildGlanceableDeliveryForUser', () => {
         lastActivityAt: '2026-10-12 09:46:00+00',
         costMicrodollars: 12345,
         createdAt: '2026-10-12 09:00:00+00',
-        prUrl: 'https://github.com/acme/repo/pull/7',
+        prVerifiedAt: '2026-10-12 09:40:00+00',
+        prState: 'open',
       },
     ];
 
@@ -421,6 +423,78 @@ describe('buildGlanceableDeliveryForUser', () => {
     ]);
   });
 
+  it('reports only a verified pull request that is still open or not yet synced', () => {
+    expect(isSessionCardPrOpened({ verified: true, state: 'open' })).toBe(true);
+    expect(isSessionCardPrOpened({ verified: true, state: 'draft' })).toBe(true);
+    // Verified, but the webhook has not synced the state yet: just opened.
+    expect(isSessionCardPrOpened({ verified: true, state: null })).toBe(true);
+    expect(isSessionCardPrOpened({ verified: true, state: 'unknown' })).toBe(true);
+    // A merged or closed pull request is not news on the card.
+    expect(isSessionCardPrOpened({ verified: true, state: 'merged' })).toBe(false);
+    expect(isSessionCardPrOpened({ verified: true, state: 'closed' })).toBe(false);
+    // A stored link GitHub never verified is no evidence.
+    expect(isSessionCardPrOpened({ verified: false, state: 'open' })).toBe(false);
+  });
+
+  it('does not report a merged pull request or an unverified link on a finished card', async () => {
+    mockedListActiveSessions.mockResolvedValue({ sessions: [] });
+    followedRows = [{ sessionId: 'ses_merged' }, { sessionId: 'ses_unverified' }];
+    const base = {
+      title: 'Done work',
+      statusUpdatedAt: '2026-10-12 09:45:00+00',
+      updatedAt: '2026-10-12 09:46:00+00',
+      summary: null,
+      lastActivityAt: null,
+      costMicrodollars: null,
+      createdAt: '2026-10-12 09:00:00+00',
+    };
+    storedRows = [
+      {
+        ...base,
+        sessionId: 'ses_merged',
+        prVerifiedAt: '2026-10-12 09:40:00+00',
+        prState: 'merged',
+      },
+      { ...base, sessionId: 'ses_unverified', prVerifiedAt: null, prState: null },
+    ];
+
+    const delivery = await buildGlanceableDeliveryForUser({
+      userId: 'oauth/user-1',
+      organizationId: null,
+    });
+
+    expect(delivery.sessionCards.map(card => card.row?.prOpened)).toEqual([false, false]);
+  });
+
+  it('reads the state of a listed session pull request', async () => {
+    mockedListActiveSessions.mockResolvedValue({
+      sessions: [
+        {
+          ...running,
+          associatedPr: {
+            url: 'https://github.com/acme/repo/pull/7',
+            number: 7,
+            state: 'closed',
+            title: null,
+            headSha: null,
+            lastSyncedAt: '2026-10-12T09:00:00.000Z',
+            reviewDecision: null,
+            reviewDecisionPending: false,
+            platform: 'github',
+          },
+        },
+      ],
+    });
+    followedRows = [{ sessionId: 'ses_running' }];
+
+    const delivery = await buildGlanceableDeliveryForUser({
+      userId: 'oauth/user-1',
+      organizationId: null,
+    });
+
+    expect(delivery.sessionCards[0]?.row?.prOpened).toBe(false);
+  });
+
   it('reads a followed session row in one scope-filtered query', async () => {
     mockedListActiveSessions.mockResolvedValue({ sessions: [running] });
     followedRows = [{ sessionId: 'ses_running' }];
@@ -439,7 +513,8 @@ describe('buildGlanceableDeliveryForUser', () => {
         'lastActivityAt',
         'costMicrodollars',
         'createdAt',
-        'prUrl',
+        'prVerifiedAt',
+        'prState',
       ])
     );
     expect(query.params).toContain('ses_running');

@@ -935,6 +935,72 @@ describe('SessionIngestDO live activity + cost persist', () => {
     };
   }
 
+  function toolPart(id: string, status: 'running' | 'completed', filePath: string) {
+    return {
+      type: 'part' as const,
+      data: {
+        id,
+        messageID: 'm1',
+        type: 'tool',
+        tool: 'edit',
+        state: { status, input: { filePath } },
+      },
+    };
+  }
+
+  it('guards the live summary by the activity time it rides with', async () => {
+    const harness = makeLiveHarness();
+    const ingestedAt = 1_700_000_000_000;
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.15), toolPart('p1', 'running', 'src/auth.ts')],
+      'usr_live',
+      'ses_live',
+      1,
+      ingestedAt
+    );
+    await harness.settle();
+
+    const set = harness.lastPgSet!;
+    expect(set).toHaveProperty('live_summary');
+    // A slower in-flight write of an older batch must not replace a newer
+    // summary, so the write is a CASE on the stored activity, like its siblings.
+    expect(sqlContainsCase(set.live_summary)).toBe(true);
+    const summarySql = sqlFragmentText(set.live_summary);
+    expect(summarySql).toContain(new Date(ingestedAt).toISOString());
+    expect(summarySql).toContain('auth.ts');
+  });
+
+  it('folds only the items the timestamp guard stored into the live summary', async () => {
+    const harness = makeLiveHarness();
+    const newer = 1_700_000_100_000;
+    const older = 1_700_000_000_000;
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.15), toolPart('p1', 'running', 'src/auth.ts')],
+      'usr_live',
+      'ses_live',
+      1,
+      newer
+    );
+    await harness.settle();
+    expect(harness.meta.get('liveSummaryState')).toContain('auth.ts');
+
+    // A replay of an older version of a part the DO already holds newer is
+    // skipped by the guard, so it must not move the step either.
+    await harness.durableObject.ingest(
+      [toolPart('p1', 'running', 'src/stale.ts')],
+      'usr_live',
+      'ses_live',
+      1,
+      older
+    );
+    await harness.settle();
+    const state = harness.meta.get('liveSummaryState') ?? '';
+    expect(state).toContain('auth.ts');
+    expect(state).not.toContain('stale.ts');
+  });
+
   it('persists activity + cost on first assistant message batch', async () => {
     const harness = makeLiveHarness();
     const ingestedAt = 1_700_000_000_000;

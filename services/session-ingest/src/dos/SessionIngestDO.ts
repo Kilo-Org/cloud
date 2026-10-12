@@ -213,9 +213,14 @@ function writeCloneMeta(db: DrizzleSqliteDODatabase, key: CloneMetaKey, value: s
 }
 
 /**
- * Monotonic live-column write for cost and/or last_activity_at.
- * Per-column CASE guards so concurrent waitUntil tasks commute.
+ * Monotonic live-column write for cost, last_activity_at, and the session
+ * card summary. Per-column CASE guards so concurrent waitUntil tasks commute.
  * Used by live ingest persists and the close-path emitSessionMetrics write.
+ *
+ * The summary has no order of its own, so it carries the activity time of
+ * the batch that produced it (`atIso`) and is written only when that time is
+ * not older than the stored activity. A slower in-flight write of an older
+ * batch then leaves the newer summary in place, as the activity guard does.
  */
 export async function persistLiveSessionColumns(
   connectionString: string,
@@ -224,7 +229,7 @@ export async function persistLiveSessionColumns(
   columns: {
     costMicrodollars?: number;
     lastActivityAtIso?: string;
-    liveSummary?: SessionLiveSummary;
+    liveSummary?: { summary: SessionLiveSummary; atIso: string };
   }
 ): Promise<void> {
   const set: {
@@ -254,8 +259,15 @@ export async function persistLiveSessionColumns(
   }
 
   if (columns.liveSummary !== undefined) {
-    // One writer per session, so the newest summary replaces the previous one.
-    set.live_summary = sql`${JSON.stringify(columns.liveSummary)}::jsonb`;
+    // Postgres reads every SET expression against the old row, so this guard
+    // compares with the stored activity, not the value set beside it.
+    const { summary, atIso } = columns.liveSummary;
+    set.live_summary = sql`CASE
+      WHEN ${cli_sessions_v2.last_activity_at} IS NULL
+        OR ${cli_sessions_v2.last_activity_at} <= ${atIso}
+      THEN ${JSON.stringify(summary)}::jsonb
+      ELSE ${cli_sessions_v2.live_summary}
+    END`;
   }
 
   if (Object.keys(set).length === 0) return;
@@ -497,6 +509,12 @@ export class SessionIngestDO extends DurableObject<Env> {
     // re-emit on replay without re-reading item_data from SQLite.
     const pendingAgentNotifications = new Map<string, string>();
 
+    // The items this batch actually stored. The session card summary folds
+    // only these: a stale item is an older version of a row the DO already
+    // holds a newer one of, and folding it would move the summary back (an
+    // old running state of a tool that already finished would revive its step).
+    const storedItems: IngestBatch[number][] = [];
+
     for (const item of payload) {
       const { item_id, item_type } = getItemIdentity(item);
 
@@ -552,6 +570,7 @@ export class SessionIngestDO extends DurableObject<Env> {
           },
         })
         .run();
+      storedItems.push(item);
 
       if (item.type === 'message' || item.type === 'part') {
         wroteActivityItem = true;
@@ -691,7 +710,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     const priorLiveSummary = readLiveSummaryState(this.db);
     const foldedLiveSummary = foldSessionLiveSummary(
       priorLiveSummary,
-      payload as unknown as SessionLiveBatchItem[],
+      storedItems as unknown as SessionLiveBatchItem[],
       statusValue
     );
     const currentLiveSummaryState =
@@ -760,7 +779,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       const columns: {
         costMicrodollars?: number;
         lastActivityAtIso?: string;
-        liveSummary?: SessionLiveSummary;
+        liveSummary?: { summary: SessionLiveSummary; atIso: string };
       } = {};
       if (decision.persistCost && currentCostMicrodollars !== null) {
         columns.costMicrodollars = currentCostMicrodollars;
@@ -772,7 +791,10 @@ export class SessionIngestDO extends DurableObject<Env> {
       // activity (a metadata-only or lifecycle-only batch) must not open a
       // persist of its own, and the next activity carries the newer summary.
       if (decision.persistActivity && liveSummaryDecision) {
-        columns.liveSummary = currentLiveSummary;
+        columns.liveSummary = {
+          summary: currentLiveSummary,
+          atIso: new Date(lastActivityValueMs).toISOString(),
+        };
       }
       const costToPersist = columns.costMicrodollars;
       const activityValueMs = decision.persistActivity ? lastActivityValueMs : undefined;
@@ -791,7 +813,7 @@ export class SessionIngestDO extends DurableObject<Env> {
                   writeIngestMetaValue(
                     this.db,
                     'lastLiveSummaryPersisted',
-                    JSON.stringify(summaryToPersist)
+                    JSON.stringify(summaryToPersist.summary)
                   );
                 }
               }

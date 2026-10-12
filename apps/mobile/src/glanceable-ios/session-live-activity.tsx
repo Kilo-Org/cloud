@@ -567,6 +567,9 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
           {finishedDuration === null
             ? null
             : text(`${COPY.finishedIn ?? 'Finished in'} ${finishedDuration}`, size, scheme.muted)}
+          {plan === null
+            ? null
+            : text(`${count(planDone)}/${count(planTotal)}`, size, scheme.muted)}
           <Spacer minLength={6} />
           {outcomeLine(scheme, size)}
         </HStack>

@@ -195,6 +195,17 @@ describe('session card layout: states', () => {
         })
       ).toEqual({ full: 0, compact: 1, bars: 0 });
     }
+    // A finished card keeps its plan progress, as the compact count once
+    // (spec "Content" rule 6).
+    expect(
+      counts({
+        ...BASE,
+        statusKind: 'idle',
+        statusSince: new Date(NOW).toISOString(),
+        outcome: { kind: 'none' },
+        plan,
+      })
+    ).toEqual({ full: 0, compact: 1, bars: 0 });
     expect(counts({ ...BASE, statusKind: 'needsInput', plan })).toEqual({
       full: 0,
       compact: 1,

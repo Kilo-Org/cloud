@@ -31,6 +31,7 @@ import { requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
 import { resolveChatTarget } from '@/lib/chat/backend-target';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
+import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
 
 import { BetaPill } from './beta-pill';
 import { ChatFailureRow } from './chat-failure-row';
@@ -106,10 +107,20 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
 
   // The model the next message goes to. It starts as the one the conversation
   // is on and changes the moment the person picks another, which is what makes
-  // the switch apply to the next message and not to what was already said.
+  // the switch apply to the next message and not to what was already said. The
+  // effort works the same way: a reopened chat shows the one it was opened with.
   const [picked, setPicked] = useState<string | null>(null);
-  const [variant, setVariant] = useState('');
+  const [pickedVariant, setPickedVariant] = useState<string | null>(null);
   const model = picked ?? state.model;
+  const pickedOption = availableOptions.find(option => option.id === model);
+  const choices: EffortChoices = {
+    variants: pickedOption?.variants ?? [],
+    efforts: models.find(option => option.id === model)?.variantEfforts,
+  };
+  const variant = pickedVariant ?? variantOfEffort(choices, state.effort);
+  // Until the list loads, the chat keeps the effort it was opened with rather
+  // than dropping it for a model the screen cannot see yet.
+  const effort = pickedOption === undefined ? state.effort : effortOfVariant(choices, variant);
   const imagesSupported = useTargetSupportsImages(model);
 
   // The attach control and the send path read image support from the gateway
@@ -121,7 +132,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const selectModel = (modelId: string, variantId: string) => {
     const accept = () => {
       setPicked(modelId);
-      setVariant(variantId);
+      setPickedVariant(variantId);
     };
     if (!requiresBackendDisclosure(model, modelId)) {
       accept();
@@ -186,9 +197,9 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       // The question is on screen the moment it is asked, so the composer
       // empties now rather than when the answer lands.
       options?.onOptimisticSend?.();
-      void send(text, model, options?.images ?? []);
+      void send(text, { model, effort }, options?.images ?? []);
     },
-    [backends, model, send, t]
+    [backends, effort, model, send, t]
   );
 
   const handleStop = useCallback(() => {

@@ -1,3 +1,4 @@
+import { type Effort } from '@kilocode/harness-sdk';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import * as z from 'zod';
@@ -7,6 +8,7 @@ import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { i18n } from '@/i18n';
 import { collator } from '@/lib/intl-cache';
 import { formatShortModelDisplayName } from '@/lib/model-display-name';
+import { catalogVariantEfforts } from '@/lib/chat/effort';
 
 const THINKING_EFFORT_KEYS = {
   none: 'models.thinkingEffort.none',
@@ -16,6 +18,8 @@ const THINKING_EFFORT_KEYS = {
   high: 'models.thinkingEffort.high',
   xhigh: 'models.thinkingEffort.xhigh',
   max: 'models.thinkingEffort.max',
+  off: 'common.off',
+  on: 'securityAgent.settingsOverview.on',
 } satisfies Record<string, string>;
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
@@ -29,6 +33,8 @@ export type ModelOption = {
   id: string;
   name: string;
   variants: string[];
+  /** The effort each variant asks for, as the catalog's variant settings say. */
+  variantEfforts?: Record<string, Effort>;
   isPreferred: boolean;
   isFree?: boolean;
   mayTrainOnYourPrompts?: boolean;
@@ -71,6 +77,7 @@ export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
     hasUserByokAvailable: model.hasUserByokAvailable,
     pricing: model.pricing,
     variants: Object.keys(model.opencode?.variants ?? {}),
+    variantEfforts: catalogVariantEfforts(model.opencode?.variants ?? {}),
     preferredIndex: model.preferredIndex,
     context_length: model.context_length ?? null,
     supportsImages: model.architecture?.input_modalities?.includes('image') === true,
@@ -96,6 +103,7 @@ export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
     id: item.id,
     name: item.name,
     variants: item.variants,
+    variantEfforts: item.variantEfforts,
     isPreferred: item.preferredIndex !== undefined,
     isFree: item.isFree,
     mayTrainOnYourPrompts: item.mayTrainOnYourPrompts,

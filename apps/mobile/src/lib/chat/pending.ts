@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
 
-import { type Question } from './state';
+import { EFFORTS } from './effort';
+import { type ChatTarget, type Question } from './state';
 
 /**
  * The question a chat is waiting on an answer to.
@@ -24,12 +25,14 @@ const LEGACY_SCOPE = 'chat-asked';
 const askedSchema = z.object({
   text: z.string(),
   model: z.string(),
+  // A question remembered before efforts existed asked with the model's default.
+  effort: z.enum(EFFORTS).nullable().default(null),
   // A question remembered before images existed carries none.
   images: z.array(z.object({ media: z.string(), data: z.string() })).default([]),
 });
 
-/** A question with no answer, the target it was asked of, and its images. */
-export type Asked = Question & { readonly model: string };
+/** A question with no answer, the target and effort it was asked of, and its images. */
+export type Asked = Question & ChatTarget;
 
 export async function rememberAsked(sessionId: string, asked: Asked): Promise<void> {
   await setItem(SCOPE, sessionId, JSON.stringify(asked));
@@ -53,7 +56,7 @@ export async function migrateAsked(sessionId: string, model: string): Promise<vo
     return;
   }
   await ((await askedIn(sessionId)) === null
-    ? rememberAsked(sessionId, { text, model, images: [] })
+    ? rememberAsked(sessionId, { text, model, effort: null, images: [] })
     : removeItem(LEGACY_SCOPE, sessionId));
 }
 

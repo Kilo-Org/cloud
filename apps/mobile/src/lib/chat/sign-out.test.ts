@@ -142,11 +142,13 @@ describe('remembered question targets', () => {
     await rememberAsked('gone', {
       text: 'unsent custom question',
       model: 'backend:private:1:model',
+      effort: null,
       images: [],
     });
     await rememberAsked('kept', {
       text: 'another account question',
       model: 'kilo/one',
+      effort: null,
       images: [],
     });
 
@@ -156,6 +158,7 @@ describe('remembered question targets', () => {
     expect(await askedIn('kept')).toEqual({
       text: 'another account question',
       model: 'kilo/one',
+      effort: null,
       images: [],
     });
   });
@@ -164,6 +167,7 @@ describe('remembered question targets', () => {
     await rememberAsked('gone', {
       text: 'unsent custom question',
       model: 'backend:private:1:model',
+      effort: null,
       images: [],
     });
 
@@ -172,6 +176,7 @@ describe('remembered question targets', () => {
     expect(await askedIn('gone')).toEqual({
       text: 'unsent custom question',
       model: 'backend:private:1:model',
+      effort: null,
       images: [],
     });
   });
@@ -225,7 +230,7 @@ describe('custom backend credentials at account boundaries', () => {
       apiKind: 'chat_completions',
       apiKey: 'test-account-key',
       headers: { 'x-private-header': 'test-account-header' },
-      models: [{ id: 'model', name: 'Model', tools: false, images: false }],
+      models: [{ id: 'model', name: 'Model', tools: false, images: false, reasoning: false }],
       allowLocalHttp: false,
     });
     expect(listChatBackends()).toEqual([backend]);

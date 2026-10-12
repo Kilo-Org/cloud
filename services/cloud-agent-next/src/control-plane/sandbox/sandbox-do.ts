@@ -1819,8 +1819,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
   /**
    * The repository snapshot key for a route, or null when none applies. It is hashed
    * from the input spec: the grant rewrites `spec.env` with per-attempt credential
-   * aliases, so the stored spec would give every session its own key. A route with
-   * setup commands has no key, so it neither restores nor captures a snapshot.
+   * aliases, so the stored spec would give every session its own key. The setup
+   * commands are folded into the key, so a snapshot is reused only by a route with
+   * the same setup; a different setup neither restores nor captures under it.
    *
    * Emits one `snapshot_key` diagnostic per route so a missing snapshot can be
    * traced to the gate that rejected it (or to a missing key secret).
@@ -1839,10 +1840,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       userId: source.userId,
       orgId: source.orgId,
     };
-    const eligibility = repoSnapshotEligibility(gate, {
-      ...route,
-      setupCommands: spec.setupCommands,
-    });
+    const eligibility = repoSnapshotEligibility(gate, route);
     if (!eligibility.eligible) {
       this.logSnapshotKey(spec.sessionId, false, eligibility.reason);
       return null;
@@ -1852,7 +1850,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       1_000,
       'Repository snapshot key secret lookup timed out'
     ).catch(() => null);
-    const key = await computeRepoKey({ secret, userId: source.userId, ...route });
+    const key = await computeRepoKey({
+      secret,
+      userId: source.userId,
+      ...route,
+      setupCommands: spec.setupCommands,
+    });
     if (key === null) {
       this.logSnapshotKey(spec.sessionId, false, 'secret_missing');
       return null;

@@ -54,15 +54,6 @@ describe('repoSnapshotEligible', () => {
       })
     ).toBe(false);
   });
-
-  it('excludes a route with setup commands and treats empty or absent the same', () => {
-    const enrolled = gate({ enrolledIds: '*' });
-    expect(repoSnapshotEligible(enrolled, { ...route, setupCommands: ['pnpm install'] })).toBe(
-      false
-    );
-    expect(repoSnapshotEligible(enrolled, { ...route, setupCommands: [] })).toBe(true);
-    expect(repoSnapshotEligible(enrolled, route)).toBe(true);
-  });
 });
 
 describe('repoSnapshotEligibility', () => {
@@ -112,5 +103,37 @@ describe('computeRepoKey', () => {
     expect(base).toMatch(/^[0-9a-f]{64}$/);
     expect(otherUser).not.toBe(base);
     expect(otherRepo).not.toBe(base);
+  });
+
+  it('folds the setup commands into the key and keeps the no-setup key unchanged', async () => {
+    const noSetup = await computeRepoKey({ secret: 'secret', userId: USER, ...route });
+    const empty = await computeRepoKey({
+      secret: 'secret',
+      userId: USER,
+      ...route,
+      setupCommands: [],
+    });
+    const install = await computeRepoKey({
+      secret: 'secret',
+      userId: USER,
+      ...route,
+      setupCommands: ['pnpm install'],
+    });
+    const other = await computeRepoKey({
+      secret: 'secret',
+      userId: USER,
+      ...route,
+      setupCommands: ['pnpm build'],
+    });
+    const installAgain = await computeRepoKey({
+      secret: 'secret',
+      userId: USER,
+      ...route,
+      setupCommands: ['pnpm install'],
+    });
+    expect(empty).toBe(noSetup);
+    expect(install).not.toBe(noSetup);
+    expect(other).not.toBe(install);
+    expect(installAgain).toBe(install);
   });
 });

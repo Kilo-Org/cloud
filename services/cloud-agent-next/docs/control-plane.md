@@ -564,6 +564,10 @@ has no key, so it restores and captures nothing: setup output is never published
     activity until cancellation is confirmed; unconfirmed cancellation uses the existing
     runtime restart owner. A later native abort
     event cannot overwrite the outcome or settle a newly queued message.
+    A `superseded` turn-close is Kilo handing off to a queued follow-up, so the native
+    execution and both of its clocks continue into the next turn. Follow-ups therefore cannot
+    extend a run past 120 minutes from its start; if no turn follows, the next idle snapshot
+    finishes the execution.
     Assistant text/reasoning changes and actual tool output/state changes are progress.
     User input, repeated parts, metadata, busy/retry status and transport heartbeats are not.
     Useful descendant progress advances its ancestors, never unrelated roots. User waits and a

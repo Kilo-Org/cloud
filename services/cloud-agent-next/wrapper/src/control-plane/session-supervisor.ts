@@ -402,10 +402,14 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
     } else if (event.type === 'session.turn.close' && record.execution) {
       const execution = record.execution;
       execution.openRequests = Math.max(0, execution.openRequests - 1);
+      // A `superseded` close is Kilo handing off to a queued follow-up: the next turn
+      // continues this execution, so its no-progress and wall-clock limits keep running.
+      // If no turn follows, the next idle snapshot finishes it.
       if (
         execution.openRequests === 0 &&
         execution.status === 'idle' &&
-        execution.activity !== 'stopping'
+        execution.activity !== 'stopping' &&
+        properties.reason !== 'superseded'
       ) {
         finish(record);
         prune();

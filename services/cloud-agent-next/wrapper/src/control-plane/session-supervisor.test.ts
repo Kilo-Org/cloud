@@ -420,6 +420,45 @@ describe('native session supervision', () => {
     expect(f.failures[0].reason).toBe('execution_limit');
   });
 
+  it('keeps the wall clock cap when Kilo hands off to a queued follow-up', () => {
+    const f = fixture();
+    f.open();
+    const first = f.supervisor.state('root');
+    f.advance(60 * MINUTE);
+    f.text('root', 'before follow-up');
+    // Pinned 7.8.1 sequence when a follow-up was queued during the run.
+    f.event('session.status', { sessionID: 'root', status: { type: 'idle' } });
+    f.event('session.idle', { sessionID: 'root' });
+    f.event('session.turn.close', { sessionID: 'root', reason: 'superseded' });
+    f.event('session.turn.open', { sessionID: 'root' });
+    f.event('session.status', { sessionID: 'root', status: { type: 'busy' } });
+    expect(f.supervisor.state('root')?.execution).toBe(first?.execution);
+    for (let step = 0; step < 5; step++) {
+      f.advance(10 * MINUTE);
+      f.text('root', `after follow-up ${step}`);
+      f.supervisor.tick();
+    }
+    f.advance(10 * MINUTE - 1);
+    f.text('root', 'last');
+    f.supervisor.tick();
+    expect(f.failures).toEqual([]);
+    f.advance(1);
+    f.supervisor.tick();
+    expect(f.failures.map(x => x.reason)).toEqual(['execution_limit']);
+    expect(f.failures[0].identity.execution).toBe(first!.execution);
+  });
+
+  it('finishes a superseded execution at the next idle snapshot when no turn follows', () => {
+    const f = fixture();
+    f.open();
+    f.event('session.status', { sessionID: 'root', status: { type: 'idle' } });
+    f.event('session.turn.close', { sessionID: 'root', reason: 'superseded' });
+    expect(f.supervisor.state('root')).toBeDefined();
+    f.supervisor.reconcile([observation('root', 'idle')], f.supervisor.beginSnapshot());
+    expect(f.supervisor.state('root')).toBeUndefined();
+    expect(f.supervisor.needsCompute()).toBe(false);
+  });
+
   it('one overlapping close does not reset clocks; a genuinely later execution receives new clocks', () => {
     const f = fixture();
     f.open();

@@ -1,3 +1,4 @@
+import { onlineManager } from '@tanstack/react-query';
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,18 +9,14 @@ import {
   type RemoteMcpServer,
 } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
-import { type RemoteMcpDiscovery } from './remote-mcp';
 import { place, server, stateOf, tool } from './remote-mcp.test-helpers';
 import { type StoredRemoteMcpServer } from './remote-mcp-store';
 
 /**
  * The stored remote MCP servers, discovered for the tools they offer.
  *
- * The pure helpers are the join between the list and the discovery, so they are
- * proven directly: an enabled server merges its tools, a disabled one does not,
- * and a failed discovery offers nothing. The store is faked so the module's own
- * subscription — the thing that drops a disabled server's tools — can be driven
- * without a device.
+ * The store is faked so the module's own subscription — the thing that drops a
+ * disabled server's tools — can be driven without a device.
  */
 
 const world = vi.hoisted(() => ({
@@ -30,6 +27,9 @@ const world = vi.hoisted(() => ({
     readonly deps: RemoteMcpClientDeps;
   }[],
   listeners: [] as (() => void)[],
+  /** Whether the stored list has been read, and what reading it later does. */
+  loaded: true,
+  load: undefined as (() => void) | undefined,
 }));
 
 vi.mock('./remote-mcp-store', () => ({
@@ -39,6 +39,12 @@ vi.mock('./remote-mcp-store', () => ({
     return () => {
       world.listeners = world.listeners.filter(current => current !== listener);
     };
+  },
+  getRemoteMcpServersHasLoaded: () => world.loaded,
+  whenRemoteMcpServersLoaded: async () => {
+    await new Promise<void>(resolve => {
+      world.load = resolve;
+    });
   },
 }));
 
@@ -70,10 +76,8 @@ const {
   ensureRemoteMcp,
   forgetRemoteMcp,
   remoteMcpState,
-  remoteServerStates,
   remoteServerToolNames,
   remoteServerTools,
-  remoteServerToolsFor,
 } = await import('./remote-mcp');
 
 /** What the app does when the stored list changes. */
@@ -87,70 +91,11 @@ beforeEach(() => {
   world.servers = [];
   world.epoch = 0;
   world.calls.length = 0;
+  world.loaded = true;
+  world.load = undefined;
   answer = () => Effect.succeed([tool('mcp_alpha_read')]);
+  onlineManager.setOnline(true);
   forgetRemoteMcp();
-});
-
-describe('the pure helpers', () => {
-  it('merges an enabled server’s tools, named for the server', () => {
-    const alpha = server({ id: 'alpha' });
-    const discovered = new Map<string, RemoteMcpDiscovery>([
-      ['alpha', { tools: [tool('mcp_alpha_read'), tool('mcp_alpha_write')] }],
-    ]);
-
-    expect(remoteServerToolsFor([alpha], discovered).map(entry => entry.definition.name)).toEqual([
-      'mcp_alpha_read',
-      'mcp_alpha_write',
-    ]);
-    expect(remoteServerStates([alpha], discovered)).toEqual([
-      stateOf(alpha, { status: 'ready', toolCount: 2, retryable: false }),
-    ]);
-  });
-
-  it('contributes nothing from a disabled server, whatever was cached', () => {
-    const alpha = server({ id: 'alpha', enabled: false });
-    const discovered = new Map<string, RemoteMcpDiscovery>([
-      ['alpha', { tools: [tool('mcp_alpha_read')] }],
-    ]);
-
-    expect(remoteServerToolsFor([alpha], discovered)).toEqual([]);
-    expect(remoteServerStates([alpha], discovered)).toEqual([
-      stateOf(alpha, { status: 'idle', toolCount: 0, retryable: false }),
-    ]);
-  });
-
-  it('keeps two servers’ tools distinct', () => {
-    const alpha = server({ id: 'alpha' });
-    const beta = server({ id: 'beta' });
-    const discovered = new Map<string, RemoteMcpDiscovery>([
-      ['alpha', { tools: [tool('mcp_alpha_read')] }],
-      ['beta', { tools: [tool('mcp_beta_read')] }],
-    ]);
-
-    expect(
-      remoteServerToolsFor([alpha, beta], discovered).map(entry => entry.definition.name)
-    ).toEqual(['mcp_alpha_read', 'mcp_beta_read']);
-  });
-
-  it('leaves a failed discovery failed and offers none of its tools', () => {
-    const alpha = server({ id: 'alpha' });
-    const discovered = new Map<string, RemoteMcpDiscovery>([
-      ['alpha', { tools: [tool('mcp_alpha_read')], failed: true }],
-    ]);
-
-    expect(remoteServerToolsFor([alpha], discovered)).toEqual([]);
-    expect(remoteServerStates([alpha], discovered)).toEqual([
-      stateOf(alpha, { status: 'failed', toolCount: 0, retryable: true }),
-    ]);
-  });
-
-  it('leaves a server that was never asked idle', () => {
-    const alpha = server({ id: 'alpha' });
-
-    expect(remoteServerStates([alpha], new Map())).toEqual([
-      stateOf(alpha, { status: 'idle', toolCount: 0, retryable: false }),
-    ]);
-  });
 });
 
 describe('the discovered state', () => {
@@ -324,7 +269,7 @@ describe('the discovered state', () => {
 
     await ensureRemoteMcp(place);
     expect(remoteMcpState()).toEqual([
-      stateOf(alpha, { status: 'ready', toolCount: 0, retryable: false }),
+      stateOf(alpha, { status: 'ready', toolCount: 0, retryable: true }),
     ]);
 
     // An empty catalog is not an answer: the next ask reconnects, and a server
@@ -336,6 +281,39 @@ describe('the discovered state', () => {
     expect(remoteMcpState()).toEqual([
       stateOf(alpha, { status: 'ready', toolCount: 1, retryable: false }),
     ]);
+    expect(remoteServerToolNames()).toEqual(['mcp_alpha_read']);
+  });
+
+  it('waits for the stored list after a cold start rather than discovering an empty one', async () => {
+    const alpha = server({ id: 'alpha' });
+    world.loaded = false;
+
+    const running = ensureRemoteMcp(place);
+    await Promise.resolve();
+    world.servers = [alpha];
+    world.loaded = true;
+    world.load?.();
+    await running;
+
+    expect(world.calls).toHaveLength(1);
+    expect(remoteServerToolNames()).toEqual(['mcp_alpha_read']);
+  });
+
+  it('connects to nothing on an automatic ask made offline, and offers a Retry', async () => {
+    const alpha = server({ id: 'alpha' });
+    world.servers = [alpha];
+    onlineManager.setOnline(false);
+
+    await ensureRemoteMcp(place);
+
+    expect(world.calls).toHaveLength(0);
+    expect(remoteMcpState()).toEqual([
+      stateOf(alpha, { status: 'failed', toolCount: 0, retryable: true }),
+    ]);
+
+    await ensureRemoteMcp(place, { retry: true });
+
+    expect(world.calls).toHaveLength(1);
     expect(remoteServerToolNames()).toEqual(['mcp_alpha_read']);
   });
 

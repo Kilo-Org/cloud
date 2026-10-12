@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { type Tool } from '@kilocode/harness-sdk';
 
-import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp';
+import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp-state';
 import { type RemoteMcpServerDraft, type StoredRemoteMcpServer } from '@/lib/chat/remote-mcp-store';
 
 import {
@@ -233,10 +233,13 @@ describe('the remote server rows', () => {
     expect(rows[0]?.retry).toBe(false);
   });
 
-  it('says a server answered with no tools', () => {
-    const rows = remoteServerRows([stored()], [discovered({ status: 'ready', toolCount: 0 })]);
+  it('says a server answered with no tools, and offers a Retry', () => {
+    const rows = remoteServerRows(
+      [stored()],
+      [discovered({ status: 'ready', toolCount: 0, retryable: true })]
+    );
 
-    expect(rows[0]).toMatchObject({ statusKey: 'modelChat.mcp.none', toolCount: 0 });
+    expect(rows[0]).toMatchObject({ statusKey: 'modelChat.mcp.none', toolCount: 0, retry: true });
   });
 
   it('keeps the stored order and one row per server', () => {

@@ -21,6 +21,7 @@ import {
   moveMcpEnabled,
   setMcpEnabled as persistMcpEnabled,
 } from './kilo-mcp';
+import { ensureRemoteMcp } from './remote-mcp';
 import { type ChatPlace } from './scope';
 import { askedIn, forgetAsked, migrateAsked, moveAsked, rememberAsked } from './pending';
 import { chatToolNames, chatToolNamesStarting } from './tools';
@@ -167,15 +168,29 @@ export async function prepareChats(place: ChatPlace): Promise<void> {
 }
 
 /**
+ * Discovers the servers a chat opens with: the Kilo server when the chat uses
+ * it, and the person's remote servers. Both run at once on an open's
+ * four-second bound, so a slow or absent server leaves the chat opening on the
+ * tools that answered rather than holding it. A restart keeps no discovered
+ * tool, so without this an open after a restart would name no remote tool.
+ */
+async function discoverServers(place: ChatPlace, kiloEnabled: boolean): Promise<void> {
+  await Promise.all([
+    kiloEnabled && KILO_MCP_URL !== undefined ? ensureKiloMcp(place, 'automatic') : undefined,
+    ensureRemoteMcp(place),
+  ]);
+}
+
+/**
  * Starts a chat: a session of its own, and a row so the list has it.
  *
  * A new chat has the Kilo MCP on unless the caller says otherwise, because the
  * server is available to any signed-in account and there is no setting yet for
- * a chat that does not exist. When it is on, the tools are discovered before
- * the session opens so it can name them — bounded at four seconds, and a
- * failure still opens the chat on the base tools rather than holding the send
- * on the server. The names come from the caller's choice rather than from a
- * stored setting, because a session opens before there is an id to read one.
+ * a chat that does not exist. The servers are discovered before the session
+ * opens so it can name their tools — bounded at four seconds, and a failure
+ * still opens the chat on the base tools rather than holding the send on a
+ * server. The names come from the caller's choice rather than from a stored
+ * setting, because a session opens before there is an id to read one.
  */
 export async function startChat(
   place: ChatPlace,
@@ -184,8 +199,8 @@ export async function startChat(
 ): Promise<string> {
   const runtime = await runtimeFor(place);
   const toolsSupported = targetSupportsTools(model);
-  if (toolsSupported && mcpEnabled && KILO_MCP_URL !== undefined) {
-    await ensureKiloMcp(place, 'automatic');
+  if (toolsSupported) {
+    await discoverServers(place, mcpEnabled);
   }
   const { handle, scope } = await inOwnScope(
     runtime,
@@ -302,15 +317,12 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   if (storedModel !== null) {
     await migrateAsked(sessionId, storedModel);
   }
-  const enabled = await mcpEnabledFor(sessionId);
-  if (enabled && KILO_MCP_URL !== undefined) {
-    /* An open, so the four-second bound: a server that is slow or down leaves
-       the chat opening on the base tools rather than holding it here. */
-    await ensureKiloMcp(place, 'automatic');
-  }
-  /* The stored names are what the session was opened with, and a continued
-     session may not change them. Discovering the server first is what makes
-     them resolve again after a restart. */
+  /* An open, so the four-second bound: a server that is slow or down leaves the
+     chat opening on the base tools rather than holding it here. The stored
+     names are what the session was opened with, and a continued session may
+     not change them. Discovering the servers first is what makes them resolve
+     again after a restart. */
+  await discoverServers(place, await mcpEnabledFor(sessionId));
   const opened = await openOrMissing(runtime, continueSession(sessionId));
   if (!opened.opened) {
     /* The stored names no longer resolve: the server's tool list moved on, or

@@ -1,5 +1,5 @@
 import { type KiloMcpState } from '@/lib/chat/kilo-mcp';
-import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp';
+import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp-state';
 import { type RemoteMcpServerDraft, type StoredRemoteMcpServer } from '@/lib/chat/remote-mcp-store';
 import { normalizeRemoteMcpUrl } from '@/lib/chat/remote-mcp-url';
 
@@ -195,8 +195,8 @@ type RemoteMcpStatusKey =
 /**
  * One remote server, as a row. It always offers enable, edit and delete: the
  * person added it, so the person may change it or take it away. A server whose
- * discovery failed also offers a Retry, because that is the one thing the row
- * can do about it.
+ * discovery failed or answered with no tools also offers a Retry, because that
+ * is the one thing the row can do about it.
  */
 export type RemoteMcpServerRow = {
   readonly id: string;
@@ -205,7 +205,7 @@ export type RemoteMcpServerRow = {
   readonly enabled: boolean;
   readonly statusKey: RemoteMcpStatusKey;
   readonly toolCount: number;
-  /** Whether the row offers a Retry. Only a failed discovery can be asked again. */
+  /** Whether the row offers a Retry: a failed discovery, or one that answered with no tools. */
   readonly retry: boolean;
   readonly canEdit: true;
   readonly canDelete: true;
@@ -241,13 +241,14 @@ function remoteStatusKey(
 /**
  * Whether a row offers a Retry.
  *
- * Every failed discovery is retryable — the server was down, the credential was
- * refused, or the protocol was answered wrong — so the failure itself is the
- * whole condition. A server that is off is asked nothing and a server that
- * answered is already the answer, so neither offers one.
+ * The discovery decides. A failed one — the server was down, the credential was
+ * refused, or the protocol was answered wrong — and one that answered with no
+ * tools can each be asked again. A server that is off is asked nothing, one
+ * that named tools is already the answer, and one not asked yet is about to be:
+ * the sheet asks as it opens.
  */
 function remoteRetry(enabled: boolean, state: RemoteMcpServerState | undefined): boolean {
-  return enabled && state?.status === 'failed';
+  return enabled && state?.retryable === true;
 }
 
 /**

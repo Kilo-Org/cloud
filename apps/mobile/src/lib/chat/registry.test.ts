@@ -51,6 +51,8 @@ let failHistoryFor: string | undefined = undefined;
 /** A cleanup failure after a move installed its session, before onto returned. */
 let failForgetFor: string | undefined = undefined;
 let failAnswerFor: string | undefined = undefined;
+/** The names a stored session was opened with, which must resolve for it to continue. */
+let continuesWith: readonly string[] = [];
 /** Every session whose scope was closed, so a leaked one can be told from one released. */
 const released: string[] = [];
 
@@ -149,6 +151,9 @@ vi.mock('@kilocode/harness-sdk', () => {
       if (missingToolsFor === id) {
         return Effect.fail(new FakeToolMissingError());
       }
+      if (continuesWith.some(name => !remote.tools.some(one => one.definition.name === name))) {
+        return Effect.fail(new FakeToolMissingError());
+      }
       return openInScope(id);
     },
     cloneSession: (
@@ -185,11 +190,27 @@ vi.mock('@/lib/settings/registry', () => ({
 }));
 vi.mock('@/lib/settings/confirm', () => ({ confirmSettingChange: () => undefined }));
 // The person's own remote servers; what is under test is the registry's use of
-// the names, not the discovery.
-const remote = vi.hoisted(() => ({
-  tools: [] as { readonly definition: { readonly name: string } }[],
-}));
+// the names, not the discovery. Nothing is discovered until a chat asks, which
+// is what a fresh start looks like.
+const remote = vi.hoisted(() => {
+  const held = {
+    tools: [] as { readonly definition: { readonly name: string } }[],
+    /** What the servers offer once asked. */
+    offered: [] as { readonly definition: { readonly name: string } }[],
+    ensure: vi.fn(async () => {
+      await Promise.resolve();
+      for (const one of held.offered) {
+        if (!held.tools.includes(one)) {
+          held.tools.push(one);
+        }
+      }
+      return [];
+    }),
+  };
+  return held;
+});
 vi.mock('./remote-mcp', () => ({
+  ensureRemoteMcp: remote.ensure,
   remoteServerTools: () => remote.tools,
   remoteServerToolNames: () => remote.tools.map(tool => tool.definition.name),
 }));
@@ -311,11 +332,14 @@ beforeEach(async () => {
   mcp.tools.length = 0;
   mcp.enabled.clear();
   remote.tools.length = 0;
+  remote.offered.length = 0;
+  continuesWith = [];
   backendState.profiles = [];
   opened = await startChat(place, 'kilo/one');
   await settled();
   /* Cleared after the chat above, so a test counts only its own discoveries. */
   mcp.ensure.mockClear();
+  remote.ensure.mockClear();
 });
 
 describe('what a chat is opened with', () => {
@@ -1188,5 +1212,39 @@ describe('custom backend question targets', () => {
     expect(await askedIn(opened)).toBeNull();
     expect(storedQuestions.has(`chat-asked:${opened}`)).toBe(false);
     expect(snapshotOf(opened)).toMatchObject({ asked: null, askedModel: null });
+  });
+});
+
+describe('remote servers after a restart', () => {
+  /* A registry imported again holds no chat and nothing discovered, which is
+     what the app holds after it restarts. */
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  const ALPHA = { definition: { name: 'mcp_alpha_read' } };
+
+  it('discovers the remote servers when a chat starts, so it offers their tools', async () => {
+    const fresh = await import('./registry');
+    remote.offered.push(ALPHA);
+
+    const started = await fresh.startChat(place, 'kilo/one');
+
+    expect(remote.ensure).toHaveBeenCalledWith(place);
+    expect(openedWith?.tools).toContain('mcp_alpha_read');
+    await fresh.releaseChat(started);
+  });
+
+  it('discovers the remote servers before a stored chat continues on their names', async () => {
+    const fresh = await import('./registry');
+    remote.offered.push(ALPHA);
+    continuesWith = ['mcp_alpha_read'];
+
+    await fresh.enterChat(place, 's9');
+
+    expect(remote.ensure).toHaveBeenCalledWith(place);
+    // The stored names resolved, so the chat continued rather than being moved.
+    expect(clonedWith).toBeUndefined();
+    await fresh.releaseChat('s9');
   });
 });

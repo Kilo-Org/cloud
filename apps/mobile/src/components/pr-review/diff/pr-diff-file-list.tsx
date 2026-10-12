@@ -159,22 +159,17 @@ export function PrReviewFileList({
       buildFileItems({
         files,
         expanded,
-        expandedContext,
-        viewed: viewed.isViewed,
-        headSha,
-        owner,
-        repo,
-        number,
         changedFiles,
         viewMode: effectiveViewMode,
-        // Pagination fields — required by BuildItemsArgs but unused by buildFileItems.
-        isLoading: false,
-        isFetchingNextPage: false,
-        hasNextPage: false,
-        laterPageError: false,
-        fetchToCompletionRunning: false,
-        fetchToCompletionLoaded: 0,
-        totalFiles: null,
+        source: {
+          kind: 'pr',
+          owner,
+          repo,
+          number,
+          headSha,
+          expandedContext,
+          viewed: viewed.isViewed,
+        },
       }),
     [
       files,
@@ -262,6 +257,7 @@ export function PrReviewFileList({
   }, [fetchToCompletion.run]);
 
   const renderItem = useDiffRenderItem({
+    source: 'pr',
     viewed,
     onRetryPage: useCallback(() => {
       void query.fetchNextPage();

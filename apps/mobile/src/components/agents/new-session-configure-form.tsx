@@ -258,10 +258,10 @@ export function NewSessionConfigureForm({
       {!isRemote && !isCloneEntry ? (
         <View className="mt-5">
           <Text className="mb-2 text-sm font-medium text-muted-foreground">
-            {t('agentChat.newSession.changes')}
+            {t('common.changes')}
           </Text>
           <SegmentedControl
-            accessibilityLabel={t('agentChat.newSession.changes')}
+            accessibilityLabel={t('common.changes')}
             options={[
               { value: 'leave', label: t('agentChat.newSession.leaveChanges') },
               { value: 'commit', label: t('agentChat.newSession.commitAndPush') },

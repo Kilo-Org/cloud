@@ -136,7 +136,8 @@
     "working": "Bekerja",
     "yourOwnRepositories": "Repositori milikmu",
     "dismissed": "Diabaikan",
-    "agent": "Agen"
+    "agent": "Agen",
+    "changes": "Perubahan"
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -1673,7 +1674,6 @@
       "retryLoadingEnvironment": "Coba muat ulang lingkungan",
       "defaultEnvironment": "Lingkungan bawaan",
       "environmentSummary": "{{commands}} perintah · {{mcp}} MCP · {{skills}} keterampilan · {{agents}} agen",
-      "changes": "Perubahan",
       "leaveChanges": "Biarkan perubahan",
       "commitAndPush": "Commit dan kirim",
       "startSession": "Mulai sesi",
@@ -2130,6 +2130,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Model ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Lihat perubahan",
+      "asOf": "Per {{time}}",
+      "tooLarge": "Perbedaan kode ini terlalu besar untuk ditampilkan di perangkat seluler.",
+      "empty": "Belum ada perubahan file dalam sesi ini."
     },
     "autoApprove": {
       "title": "Setujui otomatis",
@@ -2634,6 +2640,7 @@
     "fileRows": {
       "collapseFile": "Ciutkan file",
       "diffTooLarge": "Perbedaan kode terlalu besar untuk ditampilkan.",
+      "noPreview": "Pratinjau tidak tersedia untuk file ini",
       "expandFile": "Bentangkan file",
       "markViewed": "Tandai {{path}} sebagai sudah dilihat",
       "openDiffOnGitHub": "Buka perbedaan kode file ini di GitHub",

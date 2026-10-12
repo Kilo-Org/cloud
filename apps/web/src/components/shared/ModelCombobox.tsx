@@ -21,7 +21,7 @@ import {
   type ModelOption,
   type ModelOptionGroup,
 } from './model-combobox-options';
-import { usePreferredModels } from './usePreferredModels';
+import { PREFERRED_MODELS } from '@kilocode/web-shared/lib/ai-gateway/models';
 
 export type { ModelOption };
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -101,11 +101,7 @@ export function ModelCombobox({
     listRef.current?.scrollTo({ top: 0 });
   }, []);
 
-  const preferredModels = usePreferredModels();
-  const modelGroups = useMemo(
-    () => buildModelOptionGroups(models, preferredModels),
-    [models, preferredModels]
-  );
+  const modelGroups = useMemo(() => buildModelOptionGroups(models, PREFERRED_MODELS), [models]);
 
   const selectedModel = [pinnedModel, ...models].find(model => model?.id === value);
   const isCompact = variant === 'compact';

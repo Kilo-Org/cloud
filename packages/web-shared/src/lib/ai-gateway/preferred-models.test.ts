@@ -6,12 +6,10 @@ import {
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import {
-  buildMonitoredModels,
-  buildPreferredModels,
-} from '@kilocode/web-shared/lib/ai-gateway/models';
+import { PREFERRED_MODELS } from '@kilocode/web-shared/lib/ai-gateway/models';
+import { MINIMAX_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import { STEP_5_PREVIEW_FREE_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
-import { getMonitoredModels, getPreferredModels } from './preferred-models';
+import { getMonitoredModels } from './preferred-models';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () => ({
   ...jest.requireActual<typeof AutoFreeConfigModule>(
@@ -20,36 +18,40 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () 
   getConfiguredAutoFreeModels: jest.fn(),
 }));
 
-describe('getPreferredModels', () => {
-  it('places the StepFun free model above kilo-auto/free and configured auto-free models after it, excluding openrouter/free', async () => {
+describe('PREFERRED_MODELS', () => {
+  it('lists the auto models first, then StepFun and Glyph Cluster, without MiniMax', () => {
+    expect(PREFERRED_MODELS.slice(0, 4)).toEqual([
+      KILO_AUTO_EFFICIENT_MODEL.id,
+      KILO_AUTO_FREE_MODEL.id,
+      STEP_5_PREVIEW_FREE_MODEL_ID,
+      'stealth/glyph-cluster',
+    ]);
+    expect(PREFERRED_MODELS).not.toContain(MINIMAX_CURRENT_MODEL_ID);
+  });
+});
+
+describe('getMonitoredModels', () => {
+  it('monitors the concrete preferred models and configured auto-free models, excluding openrouter/free', async () => {
     jest.mocked(getConfiguredAutoFreeModels).mockResolvedValue([
       { model: 'provider/b:free', weight: 1, reasoning: { enabled: true } },
       { model: 'openrouter/free', weight: 1, reasoning: { enabled: true } },
       { model: 'provider/a:free', weight: 5, reasoning: { enabled: true } },
     ]);
 
-    const preferredModels = await getPreferredModels();
-
-    expect(preferredModels.slice(0, 5)).toEqual([
-      KILO_AUTO_EFFICIENT_MODEL.id,
-      STEP_5_PREVIEW_FREE_MODEL_ID,
-      KILO_AUTO_FREE_MODEL.id,
+    expect(await getMonitoredModels()).toEqual([
+      ...PREFERRED_MODELS.filter(model => !isKiloAutoModel(model)),
       'provider/b:free',
       'provider/a:free',
     ]);
-    expect(preferredModels).not.toContain('openrouter/free');
-    expect(preferredModels).toEqual(buildPreferredModels(['provider/b:free', 'provider/a:free']));
-    expect(await getMonitoredModels()).toEqual(
-      buildMonitoredModels(['provider/b:free', 'provider/a:free'])
-    );
-    expect(await getMonitoredModels()).toEqual(
-      preferredModels.filter(model => !isKiloAutoModel(model))
-    );
+    expect(PREFERRED_MODELS).not.toContain('provider/b:free');
+    expect(PREFERRED_MODELS).not.toContain('provider/a:free');
   });
 
-  it('has no free section when no auto-free config is stored', async () => {
+  it('monitors only the concrete preferred models when no auto-free config is stored', async () => {
     jest.mocked(getConfiguredAutoFreeModels).mockResolvedValue(null);
 
-    expect(await getPreferredModels()).toEqual(buildPreferredModels([]));
+    expect(await getMonitoredModels()).toEqual(
+      PREFERRED_MODELS.filter(model => !isKiloAutoModel(model))
+    );
   });
 });

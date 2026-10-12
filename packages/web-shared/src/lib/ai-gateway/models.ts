@@ -9,7 +9,6 @@ import {
 import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
-import { MINIMAX_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';
@@ -43,41 +42,31 @@ export function selectAutoFreeCandidate(
   return null;
 }
 
-const PREFERRED_KILO_EXCLUSIVE_FREE_MODELS = [STEP_5_PREVIEW_FREE_MODEL_ID];
+const GLYPH_CLUSTER_STEALTH_MODEL_ID = 'stealth/glyph-cluster';
 
-const PREFERRED_PAID_MODELS = [
+const PREFERRED_CONCRETE_MODELS: ReadonlyArray<string> = [
+  STEP_5_PREVIEW_FREE_MODEL_ID,
+  GLYPH_CLUSTER_STEALTH_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   GPT_SOL_CURRENT_MODEL_ID,
   DEEPSEEK_V4_1_FLASH_MODEL_ID,
   GLM_FLASH_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
-  MINIMAX_CURRENT_MODEL_ID,
+];
+
+export const PREFERRED_MODELS: ReadonlyArray<string> = [
+  KILO_AUTO_EFFICIENT_MODEL.id,
+  KILO_AUTO_FREE_MODEL.id,
+  ...PREFERRED_CONCRETE_MODELS,
 ];
 
 /**
- * The concrete models in the preferred list; auto models route elsewhere and are not monitored.
- * The free section comes from the admin auto-free configuration, which only the server can
- * read; use `getMonitoredModels` on the server.
+ * The concrete preferred models plus the models kilo-auto/free routes to; auto models route
+ * elsewhere and are not monitored. The auto-free models come from the admin auto-free
+ * configuration, which only the server can read; use `getMonitoredModels` on the server.
  */
-export function buildMonitoredModels(freeModels: ReadonlyArray<string>): string[] {
-  return [
-    ...new Set([...PREFERRED_KILO_EXCLUSIVE_FREE_MODELS, ...freeModels, ...PREFERRED_PAID_MODELS]),
-  ];
-}
-
-/**
- * Builds the preferred model order; use `getPreferredModels` on the server and
- * `usePreferredModels` in client components.
- */
-export function buildPreferredModels(freeModels: ReadonlyArray<string>): string[] {
-  return [
-    ...new Set([
-      KILO_AUTO_EFFICIENT_MODEL.id,
-      ...PREFERRED_KILO_EXCLUSIVE_FREE_MODELS,
-      KILO_AUTO_FREE_MODEL.id,
-      ...buildMonitoredModels(freeModels),
-    ]),
-  ];
+export function buildMonitoredModels(autoFreeModels: ReadonlyArray<string>): string[] {
+  return [...new Set([...PREFERRED_CONCRETE_MODELS, ...autoFreeModels])];
 }
 
 export function isPdfSupportingModel(model: string): boolean {

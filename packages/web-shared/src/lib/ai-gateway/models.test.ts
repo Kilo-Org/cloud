@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { buildPreferredModels, selectAutoFreeCandidate } from './models';
+import { PREFERRED_MODELS, selectAutoFreeCandidate } from './models';
 import {
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviderRestriction,
@@ -176,7 +176,7 @@ describe('isFreeModel', () => {
         expect(kiloExclusiveModels.some(model => model.public_id === modelId)).toBe(false);
         expect(findKiloExclusiveModel(modelId)).toBeNull();
         expect(isUnavailableModel(modelId)).toBe(false);
-        expect(buildPreferredModels([])).not.toContain(modelId);
+        expect(PREFERRED_MODELS).not.toContain(modelId);
       }
     );
 
@@ -193,7 +193,7 @@ describe('isFreeModel', () => {
 
     test('keeps MiniMax free models outside preferred models', () => {
       for (const model of ['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free']) {
-        expect(buildPreferredModels([])).not.toContain(model);
+        expect(PREFERRED_MODELS).not.toContain(model);
       }
     });
 

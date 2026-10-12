@@ -11,10 +11,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   getBYOKforUser: jest.fn(),
 }));
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
-  getPreferredModels: jest.fn(async () => []),
-}));
-
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/model-settings', () => ({
   getAiSdkProvider: jest.fn(),
 }));

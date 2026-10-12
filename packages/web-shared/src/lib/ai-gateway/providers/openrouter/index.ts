@@ -1,5 +1,4 @@
-import { isPdfSupportingModel } from '@kilocode/web-shared/lib/ai-gateway/models';
-import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
+import { isPdfSupportingModel, PREFERRED_MODELS } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
@@ -125,10 +124,9 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
 
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
-  const [endpointsMetadata, dataCollectionRequiredModelIds, preferredModels] = await Promise.all([
+  const [endpointsMetadata, dataCollectionRequiredModelIds] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase(),
     getDataCollectionRequiredModelIds(),
-    getPreferredModels(),
   ]);
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
@@ -170,7 +168,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
       .concat(autoModels)
       .map(applyCustomPricingToModel)
       .map(async (model: OpenRouterModel) => {
-        const preferredIndex = preferredModels.indexOf(model.id);
+        const preferredIndex = PREFERRED_MODELS.indexOf(model.id);
         const addPdf =
           isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
         const description = isFreeNemotronModel(model.id)

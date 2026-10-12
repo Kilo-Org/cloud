@@ -36,7 +36,7 @@ describe('client-safe model imports', () => {
         '@kilocode/web-shared/lib/ai-gateway/providers/stepfun'
       );
 
-      expect(models.buildPreferredModels([])).toContain(models.PRIMARY_DEFAULT_MODEL);
+      expect(models.PREFERRED_MODELS).toContain(models.PRIMARY_DEFAULT_MODEL);
       expect(autoModel.AUTO_SMALL_TARGET_MODELS.free).toBe(google.GEMMA_4_26B_A4B_IT_FREE_ID);
       expect(anthropic.isClaudeModel(anthropic.CLAUDE_OPUS_CURRENT_MODEL_ID)).toBe(true);
       expect(google.isGeminiModel(google.GEMINI_PRO_CURRENT_MODEL_ID)).toBe(true);

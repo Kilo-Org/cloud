@@ -1,7 +1,7 @@
 import { test, expect, describe } from '@jest/globals';
 import {
   buildMonitoredModels,
-  buildPreferredModels,
+  PREFERRED_MODELS,
   PRIMARY_DEFAULT_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/models';
 import {
@@ -25,13 +25,14 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () 
   ]),
 }));
 
-const preferredModels = buildPreferredModels([]);
+const preferredModels = PREFERRED_MODELS;
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
 import { GPT_SOL_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import { MINIMAX_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import { GEMMA_4_26B_A4B_IT_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { QWEN37_PLUS_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
@@ -79,26 +80,27 @@ describe('OpenRouter Models Config', () => {
       expect(preferredModels).not.toContain(model);
     });
 
-    expect(preferredModels.indexOf(STEP_5_PREVIEW_FREE_MODEL_ID)).toBeGreaterThan(
-      preferredModels.indexOf(KILO_AUTO_EFFICIENT_MODEL.id)
-    );
-    expect(preferredModels.indexOf(STEP_5_PREVIEW_FREE_MODEL_ID)).toBeLessThan(
-      preferredModels.indexOf(KILO_AUTO_FREE_MODEL.id)
-    );
+    expect(preferredModels.slice(0, 4)).toEqual([
+      KILO_AUTO_EFFICIENT_MODEL.id,
+      KILO_AUTO_FREE_MODEL.id,
+      STEP_5_PREVIEW_FREE_MODEL_ID,
+      'stealth/glyph-cluster',
+    ]);
+    expect(preferredModels).not.toContain(MINIMAX_CURRENT_MODEL_ID);
+    expect(preferredModels).not.toContain('poolside/laguna-s-2.1:free');
 
     expect(preferredModels.indexOf(DEEPSEEK_V4_1_FLASH_MODEL_ID)).toBeLessThan(
       preferredModels.indexOf(GLM_FLASH_CURRENT_MODEL_ID)
     );
   });
 
-  test('monitors only concrete preferred models', async () => {
+  test('monitors concrete preferred models and configured auto-free models', async () => {
     const monitoredModels = await getMonitoredModels();
-    const configuredPreferredModels = buildPreferredModels(['poolside/laguna-s-2.1:free']);
-    expect(configuredPreferredModels).toContain(KILO_AUTO_EFFICIENT_MODEL.id);
     expect(monitoredModels).toEqual(buildMonitoredModels(['poolside/laguna-s-2.1:free']));
-    expect(monitoredModels).toEqual(
-      configuredPreferredModels.filter(model => !isKiloAutoModel(model))
-    );
+    expect(monitoredModels).toEqual([
+      ...preferredModels.filter(model => !isKiloAutoModel(model)),
+      'poolside/laguna-s-2.1:free',
+    ]);
     expect(monitoredModels).not.toContain('openrouter/free');
     expect(monitoredModels).not.toContain(GEMMA_4_26B_A4B_IT_ID);
     expect(monitoredModels).not.toContain(gemma_4_26b_a4b_it_free_model.public_id);

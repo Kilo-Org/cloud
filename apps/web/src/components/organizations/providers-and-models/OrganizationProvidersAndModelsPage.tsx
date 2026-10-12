@@ -29,7 +29,7 @@ import {
   useProvidersAndModelsAllowListsState,
   type ProviderPolicyFilter,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
-import { usePreferredModels } from '@/components/shared/usePreferredModels';
+import { PREFERRED_MODELS } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import {
   modelRetainsPrompts,
@@ -74,6 +74,10 @@ function normalizeProviderIconUrl(rawUrl: string): string {
   return `https://openrouter.ai/${rawUrl}`;
 }
 
+const preferredIndexByModelId = new Map(
+  PREFERRED_MODELS.map((modelId, index) => [normalizeModelId(modelId), index])
+);
+
 type RecommendedThenSourceIndexSortKey = {
   preferredIndex: number | undefined;
   sourceIndex: number;
@@ -117,16 +121,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     openRouterProviders,
   });
 
-  const preferredModels = usePreferredModels();
-  const preferredIndexByModelId = useMemo(() => {
-    const index = new Map<string, number>();
-    for (let i = 0; i < preferredModels.length; i++) {
-      const modelId = normalizeModelId(preferredModels[i]);
-      index.set(modelId, i);
-    }
-    return index;
-  }, [preferredModels]);
-
   const providerIndex = selectors.modelProvidersIndex;
 
   const modelRows = useMemo((): ModelRow[] => {
@@ -150,7 +144,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     // 2) otherwise preserve OpenRouter-provided order
     rows.sort(compareRecommendedThenSourceIndex);
     return rows;
-  }, [openRouterModels, preferredIndexByModelId, providerIndex]);
+  }, [openRouterModels, providerIndex]);
 
   const initialModelDenyList = organizationData?.settings?.model_deny_list ?? [];
 
@@ -436,7 +430,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     rows.sort(compareRecommendedThenSourceIndex);
 
     return rows;
-  }, [infoProvider, openRouterProviders, preferredIndexByModelId]);
+  }, [infoProvider, openRouterProviders]);
 
   // NOTE: returns must happen after all hooks above, otherwise React will error
   // with "Rendered more hooks than during the previous render" as data loads.

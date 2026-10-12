@@ -9,7 +9,7 @@ import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/
 import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
+import { PREFERRED_MODELS } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { OpenCodeSettings } from '@kilocode/db';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
@@ -72,7 +72,7 @@ function convertModel(
 }
 
 async function getDirectByokModels(byokProviders: UserByokProviderId[]) {
-  let nextPreferredId = (await getPreferredModels()).length;
+  let nextPreferredId = PREFERRED_MODELS.length;
   return (
     await Promise.all(
       DIRECT_BYOK_PROVIDERS.filter(provider => byokProviders.includes(provider.id)).map(

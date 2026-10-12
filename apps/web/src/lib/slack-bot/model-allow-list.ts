@@ -1,5 +1,7 @@
-import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
-import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
+import {
+  PREFERRED_MODELS,
+  PRIMARY_DEFAULT_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   getEffectiveModelDecision,
@@ -48,7 +50,7 @@ export async function getDefaultAllowedModel(
   }
 
   // Try each preferred/recommended model in order
-  for (const model of await getPreferredModels()) {
+  for (const model of PREFERRED_MODELS) {
     if (await isAllowed(model)) {
       return model;
     }

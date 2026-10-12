@@ -16,6 +16,24 @@ export const CONTROL_PLANE_OUTBOX_MAX_BYTES = 8 * 1024 * 1024;
 
 const RECONNECT_JITTER_DIVISOR = 4;
 
+/**
+ * Spec §7 Connection: events are evicted first, then display-only route progress. Route
+ * transitions, outcomes and request results are never evicted; at capacity the newest is rejected.
+ */
+type OutboxKind = 'event' | 'progress' | 'critical';
+
+const OUTBOX_EVICTABLE_BY: Record<OutboxKind, readonly OutboxKind[]> = {
+  event: ['event'],
+  progress: ['event', 'progress'],
+  critical: ['event', 'progress'],
+};
+
+function outboxKindOf(frame: ControlPlaneWrapperFrame): OutboxKind {
+  if (frame.type === 'session.events') return 'event';
+  if (frame.type === 'session.progress') return 'progress';
+  return 'critical';
+}
+
 type WebSocketWithHeadersCtor = new (
   url: string,
   options?: { headers?: Record<string, string> }
@@ -99,7 +117,7 @@ export function createControlPlaneConnection(
   const WebSocketWithHeaders = WebSocket as unknown as WebSocketWithHeadersCtor;
 
   type Phase = ControlPlaneConnectionPhase;
-  type OutboxEntry = { serialized: string; bytes: number; droppable: boolean };
+  type OutboxEntry = { serialized: string; bytes: number; kind: OutboxKind };
 
   let phase: Phase = 'idle';
   let socket: WebSocket | null = null;
@@ -135,41 +153,56 @@ export function createControlPlaneConnection(
     reportSocketLine(phase);
   }
 
-  function isDroppable(frame: ControlPlaneWrapperFrame): boolean {
-    return frame.type === 'session.events';
+  function exceedsCapacity(frames: number, bytes: number): boolean {
+    return frames > maxFrames || bytes > maxBytes;
   }
 
-  function enqueue(serialized: string, droppable: boolean): void {
+  function enqueue(frame: ControlPlaneWrapperFrame, serialized: string): void {
+    const kind = outboxKindOf(frame);
     const bytes = Buffer.byteLength(serialized);
-    if (bytes > maxBytes) {
-      if (droppable) droppedEvents += 1;
-      log('control-plane outbox dropped an oversized frame');
+    const evictable = OUTBOX_EVICTABLE_BY[kind];
+    let keptFrames = 1;
+    let keptBytes = bytes;
+    for (const entry of outbox) {
+      if (evictable.includes(entry.kind)) continue;
+      keptFrames += 1;
+      keptBytes += entry.bytes;
+    }
+    if (exceedsCapacity(keptFrames, keptBytes)) {
+      if (kind === 'event') droppedEvents += 1;
+      log(`control-plane outbox rejected the newest ${frame.type} frame at capacity`);
       return;
     }
-    while (outbox.length >= maxFrames || outboxBytes + bytes > maxBytes) {
-      const droppableIndex = outbox.findIndex(entry => entry.droppable);
-      if (droppableIndex < 0) {
-        if (droppable) droppedEvents += 1;
-        log('control-plane outbox dropped the newest frame under critical-only pressure');
-        return;
+    for (const victim of evictable) {
+      while (exceedsCapacity(outbox.length + 1, outboxBytes + bytes)) {
+        const index = outbox.findIndex(entry => entry.kind === victim);
+        if (index < 0) break;
+        const [removed] = outbox.splice(index, 1);
+        if (!removed) break;
+        outboxBytes -= removed.bytes;
+        if (removed.kind === 'event') droppedEvents += 1;
       }
-      const [removed] = outbox.splice(droppableIndex, 1);
-      if (!removed) break;
-      outboxBytes -= removed.bytes;
-      droppedEvents += 1;
     }
-    outbox.push({ serialized, bytes, droppable });
+    outbox.push({ serialized, bytes, kind });
     outboxBytes += bytes;
   }
 
-  function writeRaw(target: WebSocket, frame: ControlPlaneWrapperFrame): boolean {
+  function write(target: WebSocket, serialized: string): boolean {
+    if (target.readyState !== WebSocket.OPEN) {
+      reconnectSocket(target, 'socket not open');
+      return false;
+    }
     try {
-      target.send(JSON.stringify(frame));
+      target.send(serialized);
       return true;
     } catch {
       reconnectSocket(target, 'send failed');
       return false;
     }
+  }
+
+  function writeRaw(target: WebSocket, frame: ControlPlaneWrapperFrame): boolean {
+    return write(target, JSON.stringify(frame));
   }
 
   function flushOutbox(target: WebSocket): boolean {
@@ -180,13 +213,7 @@ export function createControlPlaneConnection(
     while (outbox.length > 0) {
       const entry = outbox[0];
       if (!entry) break;
-      try {
-        target.send(entry.serialized);
-      } catch {
-        log('control-plane outbox send failed after reconnect');
-        reconnectSocket(target, 'outbox send failed after reconnect');
-        return false;
-      }
+      if (!write(target, entry.serialized)) return false;
       outbox.shift();
       outboxBytes -= entry.bytes;
     }
@@ -284,6 +311,7 @@ export function createControlPlaneConnection(
 
   function reconnectSocket(target: WebSocket, reason: string): void {
     if (socket !== target) return;
+    log(`control-plane socket ended: ${reason}`);
     onSocketEnd(target, reason);
     try {
       target.close(1000, reason);
@@ -311,8 +339,8 @@ export function createControlPlaneConnection(
     if (frame.type === 'welcome') {
       if (phase !== 'awaiting_welcome') return;
       stopHandshake();
-      phase = 'connected';
       if (!flushOutbox(target)) return;
+      phase = 'connected';
       disconnectEpisodeReported = false;
       attempt = 0;
       startHeartbeat(target, frame.heartbeatAck === true);
@@ -356,7 +384,7 @@ export function createControlPlaneConnection(
       )
         return;
       reconnectSocket(target, 'handshake timeout');
-    }, options.timers.sandbox.wrapperHelloMs);
+    }, options.timers.wrapper.handshakeMs);
     handshakeTimer = deadline;
     target.onopen = () => {
       if (socket !== target || phase !== 'connecting') return;
@@ -401,23 +429,8 @@ export function createControlPlaneConnection(
     } catch {
       return;
     }
-    if (phase === 'connected' && socket) {
-      const target = socket;
-      if (target.readyState === WebSocket.OPEN) {
-        try {
-          target.send(serialized);
-          return;
-        } catch {
-          enqueue(serialized, isDroppable(frame));
-          reconnectSocket(target, 'send failed');
-          return;
-        }
-      }
-      enqueue(serialized, isDroppable(frame));
-      reconnectSocket(target, 'socket not open');
-      return;
-    }
-    enqueue(serialized, isDroppable(frame));
+    if (phase === 'connected' && socket && write(socket, serialized)) return;
+    enqueue(frame, serialized);
   }
 
   function recycle(): void {

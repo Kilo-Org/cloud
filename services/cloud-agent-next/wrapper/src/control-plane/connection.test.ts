@@ -265,7 +265,7 @@ describe('control-plane handshake recovery', () => {
         const socket = TestSocket.instances[0];
         socket.readyState = TestSocket.CONNECTING;
         const deadline = timeouts[0];
-        expect(deadline.ms).toBe(CONTROL_PLANE_TIMERS.sandbox.wrapperHelloMs);
+        expect(deadline.ms).toBe(CONTROL_PLANE_TIMERS.wrapper.handshakeMs);
         expect(deadline.ms).toBe(30_000);
         if (phase === 'awaiting_welcome') {
           socket.readyState = TestSocket.OPEN;
@@ -395,7 +395,7 @@ describe('control-plane failed writes', () => {
     frames.reduce((bytes, frame) => bytes + Buffer.byteLength(JSON.stringify(frame)), 0);
 
   it.each([0, 1])('retains the unsent suffix when flush write %s throws', failedIndex => {
-    withControlledConnection(({ connection, timeouts, connected, shutdowns }) => {
+    withControlledConnection(({ connection, timeouts, connected, disconnected, shutdowns }) => {
       const pending = [events[0], events[1], outcome];
       for (const frame of pending) connection.send(frame);
       expect(connection.snapshot().outboxBytes).toBe(bytesOf(pending));
@@ -412,6 +412,7 @@ describe('control-plane failed writes', () => {
       });
       expect(socket.closes).toBe(1);
       expect(connected()).toBe(0);
+      expect(disconnected).toEqual([]);
       expect(shutdowns).toEqual([]);
 
       timeouts[timeouts.length - 1].run();
@@ -428,7 +429,7 @@ describe('control-plane failed writes', () => {
     'retains a failed drop marker but never replays a successfully written marker after %s failure',
     failure => {
       withControlledConnection(
-        ({ connection, timeouts, connected }) => {
+        ({ connection, timeouts, connected, disconnected }) => {
           for (const frame of [...events, outcome]) connection.send(frame);
           const retained = [events[2], outcome];
           const marker = { type: 'events_dropped', dropped: 2 } satisfies ControlPlaneWrapperFrame;
@@ -443,6 +444,7 @@ describe('control-plane failed writes', () => {
           });
           expect(socket.closes).toBe(1);
           expect(connected()).toBe(0);
+          expect(disconnected).toEqual([]);
           timeouts[timeouts.length - 1].run();
           const replacement = TestSocket.instances[1];
           replacement.onopen?.();
@@ -516,6 +518,106 @@ describe('control-plane failed writes', () => {
       );
     }
   );
+
+  const progress: Extract<ControlPlaneWrapperFrame, { type: 'session.progress' }> = {
+    type: 'session.progress',
+    sessionId: 'session-1',
+    step: 'clone',
+  };
+  const ready: ControlPlaneWrapperFrame = { type: 'session.ready', sessionId: 'session-1' };
+
+  it.each([
+    ['outcome', outcome],
+    ['ready', ready],
+  ] as const)(
+    'evicts display-only progress before rejecting a newer %s transition',
+    (_name, critical) => {
+      withControlledConnection(
+        ({ connection, logs }) => {
+          const queued: ControlPlaneWrapperFrame[] = [
+            progress,
+            { ...progress, step: 'setup' },
+            events[0],
+          ];
+          for (const frame of queued) connection.send(frame);
+          const later = { ...outcome, lastMessageId: 'message-2' };
+          connection.send(critical);
+          connection.send(later);
+          expect(logs.filter(line => line.includes('rejected'))).toEqual([
+            'control-plane outbox rejected the newest session.events frame at capacity',
+          ]);
+          const socket = TestSocket.instances[0];
+          socket.onopen?.();
+          socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+          expect(socket.frames.slice(1)).toEqual([
+            { type: 'events_dropped', dropped: 1 },
+            critical,
+            later,
+          ]);
+        },
+        { outboxMaxFrames: 2 }
+      );
+    }
+  );
+
+  it('never lets an event evict progress', () => {
+    withControlledConnection(
+      ({ connection }) => {
+        connection.send(progress);
+        connection.send(events[0]);
+        expect(connection.snapshot().outboxBytes).toBe(bytesOf([progress]));
+        const socket = TestSocket.instances[0];
+        socket.onopen?.();
+        socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+        expect(socket.frames.slice(1)).toEqual([{ type: 'events_dropped', dropped: 1 }, progress]);
+      },
+      { outboxMaxFrames: 1 }
+    );
+  });
+
+  it('does not evict events for a critical frame that cannot fit even after eviction', () => {
+    withControlledConnection(
+      ({ connection, logs }) => {
+        connection.send(outcome);
+        connection.send(events[1]);
+        const before = connection.snapshot().outboxBytes;
+        connection.send({ ...outcome, lastMessageId: `message-${'x'.repeat(100)}` });
+        expect(connection.snapshot().outboxBytes).toBe(before);
+        expect(logs).toContain(
+          'control-plane outbox rejected the newest session.outcome frame at capacity'
+        );
+        const socket = TestSocket.instances[0];
+        socket.onopen?.();
+        socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+        expect(socket.frames.slice(1)).toEqual([outcome, events[1]]);
+      },
+      { outboxMaxBytes: bytesOf([outcome, events[1]]) }
+    );
+  });
+
+  it('treats a welcome on a socket that is no longer open as a failed connect attempt', () => {
+    withControlledConnection(({ connection, timeouts, connected, disconnected }) => {
+      connection.send(outcome);
+      const socket = TestSocket.instances[0];
+      socket.onopen?.();
+      socket.readyState = 2;
+      socket.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      expect(socket.frames).toHaveLength(1);
+      expect(connection.snapshot()).toMatchObject({
+        phase: 'idle',
+        attempt: 1,
+        outboxBytes: bytesOf([outcome]),
+      });
+      expect(connected()).toBe(0);
+      expect(disconnected).toEqual([]);
+      timeouts[timeouts.length - 1].run();
+      const replacement = TestSocket.instances[1];
+      replacement.onopen?.();
+      replacement.receive({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      expect(replacement.frames.slice(1)).toEqual([outcome]);
+      expect(connected()).toBe(1);
+    });
+  });
 });
 
 type HeartbeatFrame = Extract<ControlPlaneWrapperFrame, { type: 'heartbeat' }>;

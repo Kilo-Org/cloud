@@ -457,9 +457,22 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
   reconnect loop. The wrapper passes the signed launch envelope as its bearer unchanged.
 - Reconnect forever with backoff from 1 s to 30 s plus jitter. Never exit because the connection
   failed. SIGUSR1 closes and reopens the connection (existing test hook).
-- While disconnected, keep outbound frames in one bounded buffer (for example 1,000 frames or 8 MB).
-  Keep outcome and route frames; drop the oldest event frames first and send one `events_dropped`
-  frame to the Sandbox DO as internal loss evidence. It has no public marker/Session forwarding contract.
+- Each connect attempt, from socket creation through `welcome` and the outbox flush, is bounded by
+  30 s so a hung upgrade or welcome cannot consume the Sandbox DO's 90 s reconnect window. A socket
+  error, a failed write or a write to a socket that is no longer open ends the socket immediately and
+  schedules the reconnect backoff without waiting for close. Reconnect keeps the same `wrapperId`;
+  transport loss never restarts Kilo.
+- While disconnected, keep outbound frames in one bounded buffer (1,000 frames and 8 MiB of serialized
+  UTF-8). At capacity, evict the oldest event frames first, then the oldest `session.progress` frames
+  (display-only; they never change route state). Route transitions (`session.ready`,
+  `session.failed`), outcomes and request results are never evicted: if only they remain, reject the
+  newest incoming frame and log its type. An event frame never evicts progress, and nothing is
+  evicted for a frame that cannot fit anyway. Every dropped event frame is counted in one
+  `events_dropped` frame sent to the Sandbox DO as internal loss evidence. It has no public
+  marker/Session forwarding contract.
+- After `welcome`, the wrapper writes `events_dropped` and then the buffer in order, removing each
+  frame only after its write succeeds. It reports itself connected (and starts heartbeats) only after
+  the whole flush succeeds; a failed flush is a failed connect attempt and keeps the unsent suffix.
 
 ### Preparation (`session.prepare`, idempotent per session)
 
@@ -751,6 +764,7 @@ them through one development-only override.
 | Wrapper | Native execution without real progress, including silent tools | 20 min excluding user waits | Bounded tree abort; `no_progress` outcome or routed error, or the retried assistant failure when Kilo is retrying the model request |
 | Wrapper | Native execution hard cap | 120 min including user waits | Bounded tree abort; `execution_limit` outcome or routed error |
 | Wrapper | Reconnect backoff | 1 s to 30 s, forever | — |
+| Wrapper | Connect attempt (upgrade, `hello`, `welcome`, outbox flush) | 30 s from socket creation | Detach the socket and use the reconnect backoff; Kilo keeps running |
 | Supervisor | Wrapper restarts | 5 in 10 min | Stop restarting |
 
 ## 9. Failures

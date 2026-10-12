@@ -73,6 +73,10 @@ export type McpSettings = {
   readonly retryingServerIds: readonly string[];
   /** Asks one failed server again, with the longer deadline a Retry gets. */
   readonly retryServer: (id: string) => void;
+  /** The servers whose sign-in is in flight, so only those buttons show it. */
+  readonly signingInServerIds: readonly string[];
+  /** Signs in to one OAuth server in the browser. */
+  readonly signInServer: (id: string) => void;
   /** Adds a server, discovers it, and answers whether the write landed. */
   readonly addServer: (draft: RemoteMcpServerDraft) => Promise<boolean>;
   /** Replaces one server, discovers it, and answers whether the write landed. */
@@ -186,6 +190,8 @@ export function useMcpSettings(place: ChatPlace | null, sessionId: string): McpS
     setServerEnabled: remote.setEnabled,
     retryingServerIds: remote.retryingIds,
     retryServer: remote.retryServer,
+    signingInServerIds: remote.signingInIds,
+    signInServer: remote.signInServer,
     addServer: remote.addServer,
     updateServer: remote.updateServer,
     deleteServer: remote.deleteServer,
@@ -353,6 +359,7 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
           loaded={settings.loaded}
           servers={settings.servers}
           retryingIds={settings.retryingServerIds}
+          signingInIds={settings.signingInServerIds}
           onToggle={(id, next) => {
             settings.setServerEnabled(id, next);
           }}
@@ -360,6 +367,9 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
           onDelete={confirmDelete}
           onRetry={id => {
             settings.retryServer(id);
+          }}
+          onSignIn={id => {
+            settings.signInServer(id);
           }}
           onAdd={openAdd}
         />

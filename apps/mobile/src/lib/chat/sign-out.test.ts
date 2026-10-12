@@ -67,6 +67,10 @@ vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'a0000000-0000-4000-8000-000000000001' }));
+vi.mock('./remote-mcp-oauth-browser', () => ({
+  openRemoteMcpAuthorization: vi.fn(),
+  REMOTE_MCP_REDIRECT_URL: 'kiloapp:///remote-mcp',
+}));
 
 const { chatPlaceOf, forgetChatPlaces } = await import('./scope');
 const { forgetKiloMcp, forgetMcpEnabled } = await import('./kilo-mcp');

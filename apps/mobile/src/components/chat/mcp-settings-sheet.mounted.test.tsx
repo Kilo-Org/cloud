@@ -106,6 +106,7 @@ vi.mock('@/lib/chat/remote-mcp-store', () => ({
   deleteRemoteMcpServer: h.deleteRemoteMcpServer,
 }));
 
+vi.mock('@/lib/chat/remote-mcp-oauth', () => ({ signInRemoteMcpServer: vi.fn() }));
 vi.mock('@/lib/chat/remote-mcp', () => ({
   remoteMcpState: () => h.discovered.value,
   subscribeRemoteMcp: (listener: () => void) => {

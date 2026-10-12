@@ -363,6 +363,12 @@
       }
     },
     {
+      "files": ["src/lib/chat/remote-mcp-pkce.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
       "files": ["src/components/ui/icons.test.ts"],
       "rules": {
         "import/no-nodejs-modules": "off"

@@ -8,6 +8,7 @@ import {
   remoteMcpState,
   subscribeRemoteMcp,
 } from './remote-mcp';
+import { signInRemoteMcpServer } from './remote-mcp-oauth';
 import {
   addRemoteMcpServer,
   deleteRemoteMcpServer,
@@ -44,9 +45,13 @@ export type RemoteMcpServers = {
   readonly discovered: readonly RemoteMcpServerState[];
   /** The servers whose Retry is in flight, so their buttons show it is working. */
   readonly retryingIds: readonly string[];
+  /** The servers whose sign-in is in flight, so their buttons show it is working. */
+  readonly signingInIds: readonly string[];
   readonly setEnabled: (id: string, next: boolean) => void;
   /** Asks one failed server again, with the longer deadline a Retry gets. */
   readonly retryServer: (id: string) => void;
+  /** Signs in to one OAuth server in the browser, then asks it again. */
+  readonly signInServer: (id: string) => void;
   readonly addServer: (draft: RemoteMcpServerDraft) => Promise<boolean>;
   readonly updateServer: (id: string, draft: RemoteMcpServerDraft) => Promise<boolean>;
   readonly deleteServer: (id: string) => Promise<boolean>;
@@ -61,6 +66,7 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
   const discovered = useSyncExternalStore(subscribeRemoteMcp, remoteMcpState);
   const [saving, setSaving] = useState(false);
   const [retryingIds, setRetryingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [signingInIds, setSigningInIds] = useState<ReadonlySet<string>>(() => new Set());
 
   /** The reason a write failed, said out loud because the store kept its value. */
   const failed = useCallback(
@@ -117,6 +123,40 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
       })();
     },
     [failed, place]
+  );
+
+  /**
+   * Signs in in the browser, then asks the server again so the row and an open
+   * chat move onto the tools the sign-in unlocked. A person who closed the
+   * browser is told nothing: the row still offers the Sign in.
+   */
+  const signInServer = useCallback(
+    (id: string) => {
+      const server = listRemoteMcpServers().find(one => one.id === id);
+      if (server === undefined || place === null) {
+        return;
+      }
+      setSigningInIds(current => new Set(current).add(id));
+      void (async () => {
+        try {
+          const outcome = await signInRemoteMcpServer(server);
+          if (outcome === 'failed') {
+            toast.error(t('modelChat.mcpOAuth.signInFailed', { name: server.name }));
+          }
+          await ensureRemoteMcp(place, { retry: true });
+          await refreshChatTools();
+        } catch (error) {
+          failed(error);
+        } finally {
+          setSigningInIds(current => {
+            const next = new Set(current);
+            next.delete(id);
+            return next;
+          });
+        }
+      })();
+    },
+    [failed, place, t]
   );
 
   const addServer = useCallback(
@@ -178,8 +218,10 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
     loaded,
     discovered,
     retryingIds: [...retryingIds],
+    signingInIds: [...signingInIds],
     setEnabled,
     retryServer,
+    signInServer,
     addServer,
     updateServer,
     deleteServer,

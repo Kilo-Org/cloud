@@ -19,8 +19,8 @@ type SessionTasksIndicatorProps = {
  *
  * Compact task-progress pill for the goal row's trailing column, under the PR
  * pill. Same box as `SessionPrBadge`, so the two stack into one column. The
- * pill sits at the bottom of the column, so its extra tap area points down and
- * never overlaps the PR pill above it.
+ * extra tap area grows sideways and only 3px down, so it never overlaps the PR
+ * pill above it or the transcript below the row.
  */
 export function SessionTasksChip({ summary }: Readonly<SessionTasksIndicatorProps>) {
   const openPartDetail = useOpenPartDetail();
@@ -31,7 +31,7 @@ export function SessionTasksChip({ summary }: Readonly<SessionTasksIndicatorProp
   return (
     <Pressable
       onPress={() => openPartDetail?.(summary.partId)}
-      hitSlop={{ bottom: 12, left: 8, right: 8 }}
+      hitSlop={{ bottom: 3, left: 8, right: 8 }}
       accessibilityRole="button"
       accessibilityLabel={t('agentChat.tasks.progressAccessibility', counts)}
       className="active:opacity-70"

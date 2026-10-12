@@ -151,6 +151,11 @@ export const kiloExtras = {
       description: 'Enable native tools for reading, editing, and executing VS Code notebooks',
       type: 'boolean',
     },
+    glob_search_ignored: {
+      description:
+        "Allow the glob tool's includeIgnored option to search paths excluded by ignore files such as .gitignore, and hidden directories (default: false)",
+      type: 'boolean',
+    },
     openTelemetry: {
       description: 'Enable telemetry. Set to false to opt-out.',
       default: true,

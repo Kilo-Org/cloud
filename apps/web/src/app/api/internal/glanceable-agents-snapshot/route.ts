@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { buildHomeWidgetResponseForUser } from '@/lib/glanceable-agents-snapshot-server';
+import { buildGlanceableDeliveryForUser } from '@/lib/glanceable-agents-snapshot-server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 
@@ -56,7 +56,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const data = await buildHomeWidgetResponseForUser({ userId, organizationId });
-  // Separate Home-only envelope field; the snapshot itself stays privacy-minimal.
-  return NextResponse.json({ ...data.snapshot, homeWidgetDetails: data.details }, { status: 200 });
+  const { response, liveActivitySnapshot, sessionCards } = await buildGlanceableDeliveryForUser({
+    userId,
+    organizationId,
+  });
+  // Separate server-only envelope fields; the snapshot itself stays
+  // privacy-minimal. `liveActivitySnapshot` holds the aggregate card counts
+  // without the followed sessions, and `sessionCards` holds the facts of each
+  // followed session card. The worker never copies either into a data-only wake.
+  return NextResponse.json(
+    {
+      ...response.snapshot,
+      homeWidgetDetails: response.details,
+      liveActivitySnapshot,
+      sessionCards,
+    },
+    { status: 200 }
+  );
 }

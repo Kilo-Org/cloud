@@ -8,6 +8,7 @@ import { clearRemoteMcpServers } from './remote-mcp-store';
 import { forgetChatPlaces } from './scope';
 import { clearSettingsToolsEnabled } from './settings-tools-switch';
 import { wipeChats } from './store';
+import { forgetWebSearchEnabled } from './web-search-setting';
 
 /**
  * The account's MCP state, dropped with its chats.
@@ -45,6 +46,7 @@ export async function clearChatsForSignOut(userId: string | null): Promise<void>
   const sessionIds = wipeChats(await encryptedDatabase(), userId);
   await Promise.all([
     forgetMcpEnabled(sessionIds),
+    forgetWebSearchEnabled(sessionIds),
     ...sessionIds.map(async id => {
       await forgetAsked(id);
     }),

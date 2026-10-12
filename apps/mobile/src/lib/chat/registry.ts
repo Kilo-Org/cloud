@@ -24,6 +24,11 @@ import {
 import { type ChatPlace } from './scope';
 import { askedIn, forgetAsked, migrateAsked, moveAsked, rememberAsked } from './pending';
 import { chatToolNames, chatToolNamesStarting } from './tools';
+import {
+  moveWebSearchEnabled,
+  setWebSearchEnabled as persistWebSearchEnabled,
+  webSearchDefault,
+} from './web-search-setting';
 import { waitForChatBackends } from './backend-store';
 import { targetSupportsTools } from './backend-capabilities';
 import { backendFailureKey } from './backend-target';
@@ -78,9 +83,9 @@ type Chat = {
   readonly waiting: Waiting[];
   /**
    * A tool-set change made while an answer was arriving — the Kilo MCP switch,
-   * a Retry, or the settings group switch — applied when it settles. The tool
-   * set is frozen for the life of a session, so it is never changed under an
-   * answer that is still coming.
+   * the web search switch, a Retry, or the settings group switch — applied
+   * when it settles. The tool set is frozen for the life of a session, so it is
+   * never changed under an answer that is still coming.
    */
   pendingTools: boolean | undefined;
   readonly chatScope: string;
@@ -143,14 +148,18 @@ async function inOwnScope<E>(
 /**
  * The system prompt, frozen for the life of every session and identical across
  * them. It is the front of the cached prefix, so it is one constant here and is
- * never built out of anything that varies.
+ * never built out of anything that varies — which is why it speaks of web
+ * search as a tool that may or may not be offered.
  */
 const SYSTEM =
   'You are Kilo, a helpful assistant inside a mobile app. ' +
   'Answer briefly and in plain language, in the language the person writes in. ' +
-  'Your one tool tells you the date and time; the date you were trained on has ' +
-  'passed, so read the clock rather than assuming it. You have no files and no ' +
-  'internet: when something needs one of those, say so rather than guessing. ' +
+  'One tool tells you the date and time; the date you were trained on has ' +
+  'passed, so read the clock rather than assuming it. When a web_search tool is ' +
+  'offered, use it for anything that can have changed since you were trained, ' +
+  'such as news, prices or schedules, and name the sources you used. Without it ' +
+  'you have no internet, and you never have files: when something needs one of ' +
+  'those, say so rather than guessing. ' +
   'Use markdown sparingly, and code blocks for code.';
 
 /**
@@ -192,7 +201,12 @@ export async function startChat(
     openSession({
       system: SYSTEM,
       model,
-      tools: toolsSupported ? chatToolNamesStarting(organizationIdOf(place.org), mcpEnabled) : [],
+      tools: toolsSupported
+        ? chatToolNamesStarting(organizationIdOf(place.org), {
+            kiloEnabled: mcpEnabled,
+            webSearchEnabled: webSearchDefault(model),
+          })
+        : [],
     })
   );
   rememberChat(await open(), { sessionId: handle.id, scope: place.chatScope, at: Date.now() });
@@ -317,7 +331,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
        the server is down while the session was stored with its tools. The chat
        opens either way, on the names the registry holds now. */
     const current = await onto(place, sessionId, {
-      tools: await chatToolNames(organizationIdOf(place.org), sessionId),
+      tools: await chatToolNames(organizationIdOf(place.org), sessionId, storedModel ?? ''),
     });
     const model = modelOfSession(await open(), current) ?? '';
     const asked = await askedIn(current);
@@ -649,11 +663,13 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
   const { handle, scope } = await cloneOnto(runtime, sessionId, {
     move: wanted,
     organizationId: organizationIdOf(place.org),
+    model,
   });
   const database = await open();
   moveChat(database, { from: sessionId, to: handle.id, at: Date.now() });
   await moveAsked(sessionId, handle.id);
   await moveMcpEnabled(sessionId, handle.id);
+  await moveWebSearchEnabled(sessionId, handle.id);
   const turns = await runtime.runPromise(handle.history);
   chats.delete(sessionId);
   chats.set(
@@ -677,10 +693,15 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
   return handle.id;
 }
 
-/** What a copy is made of: what to move onto, and whose settings defaults to name. */
+/**
+ * What a copy is made of: what to move onto, whose settings defaults to name,
+ * and the model it lands on, which decides web search for a chat that never
+ * chose.
+ */
 type Clone = {
   readonly move: Onto;
   readonly organizationId?: string;
+  readonly model: string;
 };
 
 /**
@@ -710,7 +731,7 @@ async function cloneOnto(
        rather than a stored set that moved on. */
     throw new Error('the chat was moved onto a tool the registry does not hold');
   }
-  const tools = await chatToolNames(clone.organizationId, sessionId);
+  const tools = await chatToolNames(clone.organizationId, sessionId, clone.model);
   const again = await openOrMissing(runtime, cloneSession(sessionId, { ...wanted, tools }));
   if (!again.opened) {
     throw new Error('the chat names a tool the registry does not hold');
@@ -753,7 +774,7 @@ async function ontoForUse(sessionId: string, model: string, chat: Chat): Promise
   const marked = chat.pendingTools !== undefined;
   chat.pendingTools = undefined;
   const names = targetSupportsTools(model)
-    ? await chatToolNames(organizationIdOf(chat.org), sessionId)
+    ? await chatToolNames(organizationIdOf(chat.org), sessionId, model)
     : [];
   const stored = toolsOfSession(await open(), sessionId);
   const already =
@@ -776,8 +797,9 @@ async function ontoForUse(sessionId: string, model: string, chat: Chat): Promise
  * those names is left where it is — the switch that moved was not its own.
  */
 async function ontoTools(sessionId: string, place: ChatPlace): Promise<string> {
-  const names = targetSupportsTools(snapshotOf(sessionId).model)
-    ? await chatToolNames(organizationIdOf(place.org), sessionId)
+  const { model } = snapshotOf(sessionId);
+  const names = targetSupportsTools(model)
+    ? await chatToolNames(organizationIdOf(place.org), sessionId, model)
     : [];
   if (await holdsTools(sessionId, names)) {
     return sessionId;
@@ -841,6 +863,28 @@ export async function setMcpEnabled(sessionId: string, enabled: boolean): Promis
   }
   if (chat.answering !== undefined) {
     chat.pendingTools = enabled;
+    return;
+  }
+  await ontoTools(current, chat);
+}
+
+/**
+ * Turns web search on or off for one chat.
+ *
+ * The choice is written first, so it survives whatever happens to the session,
+ * and it is written even when it matches the model's default: from now on the
+ * person's choice, not the model, decides. A chat that is answering is not
+ * moved under the answer; the move is applied when the answer settles.
+ */
+export async function setWebSearchEnabled(sessionId: string, enabled: boolean): Promise<void> {
+  const current = snapshotOf(sessionId).sessionId;
+  await persistWebSearchEnabled(current, enabled);
+  const chat = chats.get(current);
+  if (chat === undefined) {
+    return;
+  }
+  if (chat.answering !== undefined) {
+    chat.pendingTools = true;
     return;
   }
   await ontoTools(current, chat);

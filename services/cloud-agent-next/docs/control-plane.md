@@ -119,12 +119,15 @@ rewrite terminal message outcomes or prepare/wake a stopped sandbox.
 
 Late outcomes and notifications for terminal messages are ignored. The backstop exists only for
 lost notifications; the Sandbox DO and the wrapper settle every normal case earlier. Both values
-are derived from the owners' timers so the backstop never ends work that its owner still runs:
+are derived from the owners' timers so the backstop does not end work within its owner's bound:
 queued = reconnect window (90 s) + one preparation attempt (12 min) + 3 min, which covers the
 longest normal wait (a message sent while the socket is down, then a fresh attempt on a new
-sandbox); accepted = turn hard cap (120 min) + 5 min. After every message change the Session DO sets
-the alarm to the earliest backstop, transport-recovery, report or callback obligation, and clears it
-when none remains (for example after Stop and successful terminal reporting).
+sandbox); accepted = turn hard cap (120 min) + 5 min. The hard cap bounds one native execution, not
+an accepted message, so a batch whose follow-up waits behind a serialized command spans several
+executions and can outlive the accepted backstop (see "Prompts and turn outcome" in section 7).
+After every message change the Session DO sets the alarm to the earliest backstop,
+transport-recovery, report or callback obligation, and clears it when none remains (for example
+after Stop and successful terminal reporting).
 
 ### Queued transport recovery
 

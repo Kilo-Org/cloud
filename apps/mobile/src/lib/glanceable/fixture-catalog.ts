@@ -15,7 +15,7 @@ import { type GlanceableActionFeedback } from './surface-extras';
  */
 
 /** The richer session card facts a fixture applies, as a server push would. */
-export type SessionCardFacts = {
+type SessionCardFacts = {
   step?: {
     verb: 'editing' | 'reading' | 'running' | 'searching' | 'thinking' | 'other';
     target: string | null;

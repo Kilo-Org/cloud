@@ -1,5 +1,7 @@
 import { Platform } from 'react-native';
 
+import { type SessionLiveActivityRow } from '@kilocode/notifications';
+
 import type * as AndroidFollow from '@/glanceable-android/session-follow';
 import type * as IosFollow from '@/glanceable-ios/session-follow';
 
@@ -30,7 +32,8 @@ function iosFollow(): typeof IosFollow {
 
 export type SessionFollowContext = IosFollow.SessionFollowContext;
 export type FollowResult = IosFollow.FollowResult;
-export type SessionCardRow = IosFollow.SessionCardRow;
+/** The one shared row shape both platforms follow: the notifications package's. */
+export type SessionCardRow = SessionLiveActivityRow;
 
 function follow(): typeof IosFollow | typeof AndroidFollow {
   return Platform.OS === 'android' ? android() : iosFollow();
@@ -65,10 +68,6 @@ export const syncFollowedSessionCards = (
   follow().syncFollowedSessionCards(rows, checkedAt);
 };
 
-export const endAllSessionCards = (): void => {
-  follow().endAllSessionCards();
-};
-
 /** Android only: apply one server push to the followed set. */
 export const applySessionLiveUpdate = (
   event: 'update' | 'end',
@@ -78,13 +77,6 @@ export const applySessionLiveUpdate = (
   Platform.OS === 'android'
     ? android().applySessionLiveUpdate(event, content, dismissAfterMs)
     : false;
-
-/** Android only: launch and foreground restore from native storage. */
-export const restoreFollowedSessionCardsFromStorage = async (): Promise<void> => {
-  if (Platform.OS === 'android') {
-    await android().restoreFollowedSessionCardsFromStorage();
-  }
-};
 
 /** Android only: revalidate the exact request a card shows and answer it. */
 export const approveFollowedSession = async (

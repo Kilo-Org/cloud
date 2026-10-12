@@ -80,7 +80,7 @@ function extraText(content: SessionLiveActivityContentState): string | null {
 /** The system-notification card for one content state. */
 export function buildSessionNotificationCard(
   content: SessionLiveActivityContentState,
-  ctx: SessionFollowContext
+  organizationId: string | null
 ): SessionNotificationCard {
   const title = (content.title ?? '').trim();
   const running = content.statusKind === 'running';
@@ -89,7 +89,7 @@ export function buildSessionNotificationCard(
   const canApprove = waiting && content.awaitingPermission && content.approvalKey !== null;
   return {
     sessionId: content.sessionId,
-    organizationId: ctx.organizationId,
+    organizationId,
     title: title.length > 0 ? title : translate('common.agent'),
     text: statusText(content),
     subText: extraText(content),

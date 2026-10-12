@@ -339,9 +339,13 @@ export function sessionCardStaleAfterSeconds(
   content: SessionLiveActivityContentState | SessionLiveActivityProps,
   nowMs: number = Date.now()
 ): number {
-  if (content.statusKind !== 'running') return SESSION_CARD_STALE_AFTER_SECONDS;
+  if (content.statusKind !== 'running') {
+    return SESSION_CARD_STALE_AFTER_SECONDS;
+  }
   const at = content.lastActivityAt == null ? Number.NaN : Date.parse(content.lastActivityAt);
-  if (!Number.isFinite(at)) return SESSION_CARD_STALE_AFTER_SECONDS;
+  if (!Number.isFinite(at)) {
+    return SESSION_CARD_STALE_AFTER_SECONDS;
+  }
   const quietRemaining = Math.max(0, Math.floor((at + SESSION_CARD_QUIET_AFTER_MS - nowMs) / 1000));
   return Math.min(SESSION_CARD_STALE_AFTER_SECONDS, quietRemaining);
 }
@@ -415,7 +419,8 @@ export function followedSessionCounts(): FollowedSessionCounts {
   for (const activity of cards.values()) {
     const props = isLive(activity) ? activity.getProps() : null;
     if (props?.statusKind !== undefined) {
-      counts[props.statusKind] += 1;
+      // A failed turn is finished work, so it counts with the idle sessions.
+      counts[props.statusKind === 'failed' ? 'idle' : props.statusKind] += 1;
       if (props.awaitingPermission === true) {
         counts.needsApproval += 1;
       }

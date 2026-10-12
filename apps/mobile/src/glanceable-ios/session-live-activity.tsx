@@ -134,6 +134,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     fg: string;
     muted: string;
     warn: string;
+    good: string;
     primary: string;
     primaryFg: string;
     secondary: string;
@@ -181,6 +182,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     fg: '#FFFFFF',
     muted: '#8A8680',
     warn: '#F2B05F',
+    // The same green the dark palette uses for the added-lines line.
+    good: '#5FCB8E',
     primary: '#E8F27A',
     primaryFg: '#1A1A10',
     secondary: '#26262B',
@@ -257,8 +260,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     thinking: COPY.thinking ?? 'Thinking it through',
   };
   const stepVerbValue = props.currentStep?.verb ?? null;
-  const stepVerb = stepVerbValue === null ? null : (STEP_COPY[stepVerbValue] ?? null);
-  const stepWords = stepVerb === null || stepVerbValue === 'other' ? null : stepVerb;
+  const stepWords =
+    stepVerbValue === null || stepVerbValue === 'other' ? null : STEP_COPY[stepVerbValue];
   const stepTargetRaw = (props.currentStep?.target ?? '').trim();
   const stepTarget = stepTargetRaw.length > 0 ? stepTargetRaw : null;
   const stepLine = (() => {
@@ -421,7 +424,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
             modifiers={[
               tint(scheme.primary),
               frame({ width: 64, height: 4 }),
-              clipShape(shapes.capsule()),
+              clipShape('capsule'),
             ]}
           />
           <Spacer minLength={0} />

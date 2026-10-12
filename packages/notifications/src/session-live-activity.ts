@@ -58,7 +58,8 @@ export type SessionLiveActivityBuildOptions = {
   updatedAt: string;
   statusSinceFallback: string;
   /** The content the card already shows, so server-only facts survive. */
-  previous?: SessionLiveActivityContentState | undefined;
+  /** The content the card already shows, so server-only facts survive a local rebuild. */
+  previous?: Partial<SessionLiveActivityContentState> | undefined;
 };
 
 function isoOrNull(value: string | null | undefined): string | null {

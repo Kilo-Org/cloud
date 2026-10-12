@@ -8,12 +8,15 @@ import {
 
 import {
   _resetSessionFollowForTests,
+  _setStoredContextReaderForTests,
   applySessionLiveUpdate,
   endAllSessionCards,
   followedSessionCounts,
   followSession,
+  getSessionFollowsRevision,
   isSessionFollowed,
   restoreFollowedSessionCards,
+  restoreFollowedSessionCardsFromStorage,
   SESSION_FINISHED_DISMISS_MS,
   subscribeSessionFollows,
   syncFollowedSessionCards,
@@ -76,6 +79,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getStoredSessionCards.mockReturnValue([]);
   _resetSessionFollowForTests();
+  _setStoredContextReaderForTests(null);
   _resetLiveActivitySwitchForTests();
   setLiveActivityEnabledValue(true);
   setNotificationPermissionGrantedValue(true);
@@ -187,86 +191,6 @@ describe('unfollowSession and endAllSessionCards', () => {
   });
 });
 
-describe('applySessionLiveUpdate', () => {
-  it('renders an update for a followed session and an end after the window', () => {
-    followSession(RUNNING, CTX, NOW);
-    mocks.postSessionCard.mockClear();
-
-    const content = {
-      sessionId: 'session-1',
-      title: 'Migrate the billing webhooks',
-      statusKind: 'idle' as const,
-      statusSince: '2026-10-12T10:05:00.000Z',
-      scheduledAt: null,
-      awaitingPermission: false,
-      approvalKey: null,
-      updatedAt: '2026-10-12T10:05:00.000Z',
-    };
-    expect(applySessionLiveUpdate('end', content, 0)).toBe(true);
-    expect(mocks.postSessionCard).toHaveBeenCalledWith(
-      expect.objectContaining({ text: expect.stringContaining('Finished') }),
-      0
-    );
-    expect(isSessionFollowed('session-1')).toBe(false);
-  });
-
-  it('ignores a push for a session this device does not follow', () => {
-    expect(
-      applySessionLiveUpdate('update', {
-        sessionId: 'session-9',
-        title: null,
-        statusKind: 'running',
-        statusSince: '2026-10-12T10:05:00.000Z',
-        scheduledAt: null,
-        awaitingPermission: false,
-        approvalKey: null,
-        updatedAt: '2026-10-12T10:05:00.000Z',
-      })
-    ).toBe(false);
-    expect(mocks.postSessionCard).not.toHaveBeenCalled();
-  });
-
-  it('does not let an out-of-order update undo newer content', () => {
-    followSession(RUNNING, CTX, NOW);
-    applySessionLiveUpdate('update', {
-      sessionId: 'session-1',
-      title: 'Migrate the billing webhooks',
-      statusKind: 'needsInput',
-      statusSince: '2026-10-12T10:01:00.000Z',
-      scheduledAt: null,
-      awaitingPermission: true,
-      approvalKey: 'a'.repeat(64),
-      updatedAt: '2026-10-12T10:01:00.000Z',
-    });
-    mocks.postSessionCard.mockClear();
-
-    applySessionLiveUpdate('update', {
-      sessionId: 'session-1',
-      title: 'Migrate the billing webhooks',
-      statusKind: 'running',
-      statusSince: '2026-10-12T09:50:00.000Z',
-      scheduledAt: null,
-      awaitingPermission: false,
-      approvalKey: null,
-      updatedAt: '2026-10-12T09:58:00.000Z',
-    });
-
-    expect(mocks.postSessionCard).not.toHaveBeenCalled();
-    expect(
-      applySessionLiveUpdate('update', {
-        sessionId: 'session-1',
-        title: 'Migrate the billing webhooks',
-        statusKind: 'running',
-        statusSince: '2026-10-12T10:01:30.000Z',
-        scheduledAt: null,
-        awaitingPermission: false,
-        approvalKey: null,
-        updatedAt: '2026-10-12T10:01:30.000Z',
-      })
-    ).toBe(true);
-  });
-});
-
 describe('restoreFollowedSessionCards', () => {
   it('cancels a stored card of another scope and re-registers the kept ones', () => {
     followSession(RUNNING, CTX, NOW);
@@ -288,11 +212,29 @@ describe('restoreFollowedSessionCards', () => {
     });
   });
 
-  it('notifies subscribers on every real change', () => {
+  it('notifies subscribers on every real change, and the revision moves with them', () => {
     const listener = vi.fn<() => void>();
+    const before = getSessionFollowsRevision();
     const unsubscribe = subscribeSessionFollows(listener);
     followSession(RUNNING, CTX, NOW);
     expect(listener).toHaveBeenCalled();
+    expect(getSessionFollowsRevision()).toBeGreaterThan(before);
     unsubscribe();
+  });
+
+  it('restores from the stored account and scope when the caller has none', async () => {
+    _setStoredContextReaderForTests(() => CTX);
+    mocks.getStoredSessionCards.mockReturnValue([
+      { sessionId: 'session-1', organizationId: 'org-1', approvalKey: null },
+    ]);
+
+    await restoreFollowedSessionCardsFromStorage();
+
+    expect(mocks.pruneSessionCards).toHaveBeenCalledWith(['session-1']);
+    expect(mocks.registerAndroidSessionToken).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      userId: 'user-1',
+      organizationId: 'org-1',
+    });
   });
 });

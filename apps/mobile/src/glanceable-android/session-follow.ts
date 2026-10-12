@@ -20,10 +20,7 @@ import {
 } from '@/lib/glanceable/session-activity-tokens-android';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
-import {
-  buildSessionNotificationCard,
-  SESSION_FINISHED_DISMISS_MS,
-} from './session-notification-card';
+import { buildSessionNotificationCard } from './session-notification-card';
 import {
   dismissSessionCard,
   getStoredSessionCards,
@@ -39,6 +36,9 @@ import {
  * module owns the notification id, the channel, the actions, and the Live
  * Update promotion.
  */
+
+/** A finished notification stays in the shade this long after it ends. */
+export const SESSION_FINISHED_DISMISS_MS = 15 * 60 * 1000;
 
 export type SessionFollowContext = { userId: string; organizationId: string | null };
 export type SessionLiveUpdateContent = SessionLiveActivityContentState;
@@ -87,7 +87,8 @@ export function followedSessionCounts(): FollowedSessionCounts {
   const counts = { running: 0, needsInput: 0, needsApproval: 0, idle: 0, scheduled: 0 };
   for (const { content } of followed.values()) {
     if (isLiveKind(content.statusKind)) {
-      counts[content.statusKind] += 1;
+      // A failed turn is finished work, so it counts with the idle sessions.
+      counts[content.statusKind === 'failed' ? 'idle' : content.statusKind] += 1;
       if (content.awaitingPermission) {
         counts.needsApproval += 1;
       }
@@ -104,7 +105,7 @@ function render(content: SessionLiveActivityContentState, ctx: SessionFollowCont
     return;
   }
   followed.set(content.sessionId, { content, approvalKey: content.approvalKey, ctx });
-  postSessionCard(buildSessionNotificationCard(content, ctx), 0);
+  postSessionCard(buildSessionNotificationCard(content, ctx.organizationId), 0);
   emit();
 }
 
@@ -112,12 +113,22 @@ function render(content: SessionLiveActivityContentState, ctx: SessionFollowCont
 function repost(sessionId: string): void {
   const stored = followed.get(sessionId);
   if (stored !== undefined) {
-    postSessionCard(buildSessionNotificationCard(stored.content, stored.ctx), 0);
+    postSessionCard(buildSessionNotificationCard(stored.content, stored.ctx.organizationId), 0);
   }
 }
 
 /** The one read this module needs from the keychain module. */
 type SecureStoreModule = { getItemAsync: (key: string) => Promise<string | null> };
+
+/** The stored-context reader a suite injects, so no keychain loads under test. */
+type StoredContextReader = () => SessionFollowContext | null;
+
+let storedContextReader: StoredContextReader | null = null;
+
+/** Test-only: replace the keychain read that supplies the stored scope. */
+export function _setStoredContextReaderForTests(reader: StoredContextReader | null): void {
+  storedContextReader = reader;
+}
 
 /**
  * The stored account and scope, as the iOS adoption reads them. The keychain
@@ -125,6 +136,9 @@ type SecureStoreModule = { getItemAsync: (key: string) => Promise<string | null>
  * register, whose suites never load a native store.
  */
 async function readStoredContext(): Promise<SessionFollowContext | null> {
+  if (storedContextReader !== null) {
+    return storedContextReader();
+  }
   try {
     // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
     const { getItemAsync } = require('@/lib/auth/secure-store') as SecureStoreModule;
@@ -268,7 +282,7 @@ export function syncFollowedSessionCards(
         followed.delete(sessionId);
         emit();
         postSessionCard(
-          buildSessionNotificationCard(content, stored.ctx),
+          buildSessionNotificationCard(content, stored.ctx.organizationId),
           SESSION_FINISHED_DISMISS_MS
         );
       }
@@ -293,7 +307,7 @@ export function applySessionLiveUpdate(
     followed.delete(content.sessionId);
     emit();
     postSessionCard(
-      buildSessionNotificationCard(content, stored.ctx),
+      buildSessionNotificationCard(content, stored.ctx.organizationId),
       dismissAfterMs ?? SESSION_FINISHED_DISMISS_MS
     );
     return true;

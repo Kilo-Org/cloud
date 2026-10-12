@@ -17,15 +17,18 @@ import {
   endAllSessionCards,
   followedSessionCounts,
   followSession,
+  getSessionFollowsRevision,
   isSessionFollowed,
   restoreFollowedSessionCards,
   SESSION_FINISHED_DISMISS_MS,
+  sessionCardStaleAfterSeconds,
   subscribeSessionFollows,
   syncFollowedSessionCards,
   unfollowSession,
 } from './session-follow';
 import {
   renderSessionCardPress,
+  SESSION_CARD_STALE_AFTER_SECONDS,
   type SessionActivity,
   sessionCardPress,
 } from './session-card-press';
@@ -467,5 +470,29 @@ describe('syncFollowedSessionCards against a newer push', () => {
 
     expect(card.update).not.toHaveBeenCalled();
     expect(card.end).not.toHaveBeenCalled();
+  });
+});
+
+describe('follow revision and card freshness', () => {
+  it('moves the revision on every real change', () => {
+    const before = getSessionFollowsRevision();
+    followSession(RUNNING, CTX, NOW);
+    expect(getSessionFollowsRevision()).toBeGreaterThan(before);
+  });
+
+  it('keeps the shared stale window unless a working card just went quiet', () => {
+    expect(sessionCardStaleAfterSeconds({ statusKind: 'idle' }, NOW)).toBe(
+      SESSION_CARD_STALE_AFTER_SECONDS
+    );
+    expect(sessionCardStaleAfterSeconds({ statusKind: 'running' }, NOW)).toBe(
+      SESSION_CARD_STALE_AFTER_SECONDS
+    );
+    // Just active: the card may not claim to be current past its quiet window.
+    const active = { statusKind: 'running' as const, lastActivityAt: new Date(NOW).toISOString() };
+    expect(sessionCardStaleAfterSeconds(active, NOW)).toBeLessThanOrEqual(
+      SESSION_CARD_STALE_AFTER_SECONDS
+    );
+    // Quiet long ago: it is stale now.
+    expect(sessionCardStaleAfterSeconds(active, NOW + 60 * 60_000)).toBe(0);
   });
 });

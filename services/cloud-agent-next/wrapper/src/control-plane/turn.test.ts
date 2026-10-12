@@ -1,4 +1,4 @@
-import { describe, expect, it, spyOn } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import type {
   ControlPlanePromptPayload,
   ControlPlaneRouteSpec,
@@ -522,26 +522,67 @@ describe('turn manager submission', () => {
 
   it('fails a standalone compact when its close is not observed within the bounded wait', async () => {
     const h = createHarness();
-    const timeouts = spyOn(globalThis, 'setTimeout');
-    try {
-      h.registerRoute(routeSpec());
-      h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
-      await settle();
-      // The compact's native execution owns compute; its completion wait adds none.
-      expect(h.manager.hasPendingWork()).toBe(false);
-      expect(outcomeFrames(h.frames)).toEqual([]);
-      const timeout = timeouts.mock.calls.find(([, ms]) => ms === 120_000)?.[0];
-      if (typeof timeout !== 'function') throw new Error('Compact completion timeout not armed');
-      timeout();
-      await settle();
-      expect(outcomeFrames(h.frames)).toMatchObject([
-        { status: 'failed', reason: 'prompt_failed', lastMessageId: 'c1' },
-      ]);
-      expect(h.manager.hasPendingWork()).toBe(false);
-    } finally {
-      h.manager.abort(SESSION_ID);
-      timeouts.mockRestore();
+    h.registerRoute(routeSpec());
+    h.setState(KILO_SESSION, runningState);
+    const summary = Promise.withResolvers<boolean>();
+    h.client(routeSpec()).setSummaryImpl(() => summary.promise);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    // A long summary, then a close wait while the execution is live: its supervisor bounds both.
+    h.advance(10 * 60_000);
+    summary.resolve(true);
+    await settle();
+    for (let index = 0; index < 5; index += 1) {
+      h.advance(60_000);
+      h.manager.tick();
     }
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    // The compact's native execution owns compute; its completion wait adds none.
+    expect(h.manager.hasPendingWork()).toBe(false);
+
+    // The execution ends without a processed close: the delivery deadline starts now.
+    h.setState(KILO_SESSION, undefined);
+    h.manager.refreshActivity(DIRECTORY);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(120_000 - 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(1);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'c1' },
+    ]);
+    expect(h.manager.hasPendingWork()).toBe(false);
+  });
+
+  it('pauses the compact close wait while Kilo is memory-held', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    const key = runtimeKey(spec);
+    h.registerRoute(spec);
+    const client = h.client(spec);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    expect(client.prompts).toEqual([]);
+
+    // The response arrived but the hold stalls the feed, so the close is late.
+    h.manager.onRuntimeMemoryHold({ directory: DIRECTORY, held: true, key });
+    h.advance(10 * 60_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    h.manager.onRuntimeMemoryHold({ directory: DIRECTORY, held: false, key });
+    h.advance(120_000 - 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m1']);
+    expect(outcomeFrames(h.frames)).toEqual([]);
   });
 
   it('retires the old compact completion wait without failing its restart resubmission', async () => {

@@ -559,6 +559,11 @@ has no key, so it restores and captures nothing: setup output is never published
   Ordinary prompts still reach Kilo during model execution through `prompt_async`. Kilo owns its
   native queue and execution; the wrapper must not add a shadow native queue or concurrent HTTP to
   bypass command ordering.
+- A summary's HTTP response can overtake its `session.turn.close` on the feed. Later messages
+  therefore also wait until the summary's completed close is processed, directly or through a
+  reconciled idle, so that close cannot complete newer work. The wait adds no compute activity;
+  the delivery deadline bounds it at 2 minutes from the response, paused and refreshed by a memory
+  hold like any delivery wait. A close that does not arrive in time fails `prompt_failed`.
 - The wrapper tracks each Kilo root session through Kilo's status, idle, turn-close and error events,
   and remembers the last submitted `messageId`.
 - Outcome frame: `sessionId`, `status`, optional `reason`, `lastMessageId`.

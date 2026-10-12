@@ -24,7 +24,6 @@ import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js'
 import type { KiloFeedEvent } from '../control/worktree-feed.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
-import { withTimeoutAndAbort } from '../utils.js';
 import { isUnresponsiveRestart, type KiloRestartInfo } from './kilo-runtime.js';
 import type {
   SessionSupervisor,
@@ -101,7 +100,11 @@ type PendingPrompt = {
   deliveryResumedAt?: number;
   nativeObserved?: boolean;
   acknowledged?: boolean;
-  onNativeClose?: () => void;
+  /**
+   * A summary's native close, which later prompts wait for. Set at dispatch, so a close that
+   * overtakes the response still counts; `respondedAt` starts the wait's delivery deadline.
+   */
+  nativeClose?: { resolve: () => void; respondedAt?: number };
   abort: AbortController;
   message?: Promise<MaterializedPrompt>;
   /** The prompt, compact or command call has been made to Kilo. */
@@ -239,9 +242,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
 
   /**
    * The command/summary a later prompt is queued behind in the serialized submission chain: it was
-   * handed to Kilo, Kilo observed it and still has a live execution for the route, and its HTTP
-   * response has not settled, so the follower cannot dispatch yet. Once that execution ends there
-   * is no native bound left and the follower is no longer exempt.
+   * handed to Kilo, Kilo observed it and still has a live execution for the route, and its
+   * submission (the HTTP response, and for a summary its native close) has not settled, so the
+   * follower cannot dispatch yet. Once that execution ends there is no native bound left and the
+   * follower is no longer exempt.
    */
   function blockedBySerializedCommand(turn: Turn, entry: PendingPrompt): boolean {
     if (liveNativeState(turn) === undefined) return false;
@@ -254,24 +258,39 @@ export function createTurnManager(deps: TurnManagerDeps) {
     return false;
   }
 
-  /** Record the accepted wait for every follower, so its own deadline is not charged for it. */
+  /**
+   * A summary responded and waits for its close while its native execution is still live, so the
+   * native supervisor bounds the wait.
+   */
+  function supervisedCloseWait(turn: Turn, entry: PendingPrompt): boolean {
+    return entry.nativeClose?.respondedAt !== undefined && liveNativeState(turn) !== undefined;
+  }
+
+  /** Record every accepted supervised wait, so the waiting entry's own deadline is not charged for it. */
   function refreshSerializedWaits(turn: Turn): void {
     for (const entry of turn.prompts) {
-      if (entry.nativeObserved) continue;
-      if (blockedBySerializedCommand(turn, entry)) entry.deliveryResumedAt = now();
+      const followerWait = !entry.nativeObserved && blockedBySerializedCommand(turn, entry);
+      if (followerWait || supervisedCloseWait(turn, entry)) entry.deliveryResumedAt = now();
     }
   }
 
   /**
-   * Kilo has not observed this prompt within the 120 s delivery deadline. The deadline does not run
-   * while the runtime is memory-held or while the prompt waits behind a command/summary Kilo already
-   * accepted and still supervises; `tick` refreshes the deadline during either pause, so it is not
-   * charged to the prompt when the wait ends. This predicate has no side effects.
+   * Kilo has not observed this prompt, or a responded summary's native close, within the 120 s
+   * delivery deadline. The deadline does not run while the runtime is memory-held or while a native
+   * execution still supervises the wait (a follower behind a command/summary Kilo accepted, or a
+   * summary's close wait); `tick` refreshes the deadline during either pause, so it is not charged
+   * to the entry when the wait ends. This predicate has no side effects.
    */
   function deliveryExpired(turn: Turn, entry: PendingPrompt): boolean {
-    if (entry.nativeObserved || memoryHeldRuntimes.has(turn.route.runtimeKey)) return false;
-    if (blockedBySerializedCommand(turn, entry)) return false;
-    const from = Math.max(entry.receivedAt, entry.deliveryResumedAt ?? 0);
+    if (memoryHeldRuntimes.has(turn.route.runtimeKey) || supervisedCloseWait(turn, entry))
+      return false;
+    const respondedAt = entry.nativeClose?.respondedAt;
+    if (
+      respondedAt === undefined &&
+      (entry.nativeObserved || blockedBySerializedCommand(turn, entry))
+    )
+      return false;
+    const from = Math.max(respondedAt ?? entry.receivedAt, entry.deliveryResumedAt ?? 0);
     return now() - from >= PROMPT_DELIVERY_TIMEOUT_MS;
   }
 
@@ -409,7 +428,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         continue;
       }
       turn.deferredCompletion = undefined;
-      for (const pending of turn.prompts) pending.onNativeClose?.();
+      for (const pending of turn.prompts) pending.nativeClose?.resolve();
       if (lastReceivedMessageId(turn) === deferred.lastMessageId) void finalize(turn);
     }
   }
@@ -504,31 +523,31 @@ export function createTurnManager(deps: TurnManagerDeps) {
         });
       } else if (pending.payload.turn.command === 'compact') {
         if (model === undefined) throw new Error('Compact requires a model');
-        const nativeClose = Promise.withResolvers<void>();
-        pending.onNativeClose = nativeClose.resolve;
+        const closed = Promise.withResolvers<void>();
+        const nativeClose: NonNullable<PendingPrompt['nativeClose']> = { resolve: closed.resolve };
+        const cancelClose = () => closed.reject(dispatchSignal.reason);
+        pending.nativeClose = nativeClose;
         markDispatched(turn, pending);
-        const summarized = await client.summarizeSession({
-          sessionId: route.kiloSessionId,
-          directory: route.directory,
-          signal: pending.abort.signal,
-          model: { modelID: model },
-        });
-        if (!summarized) throw new Error('Session summarization failed');
-        if (!isCurrent()) return;
-        // The response can overtake the feed. Keep follow-ups undispatched until
-        // the compact's close is processed, so it cannot complete newer work.
         try {
-          await withTimeoutAndAbort(nativeClose.promise, {
-            signal: dispatchSignal,
-            timeoutMs: PROMPT_DELIVERY_TIMEOUT_MS,
-            timeoutMessage: 'Compact completion was not observed',
-            abortMessage: 'Compact completion wait cancelled',
+          const summarized = await client.summarizeSession({
+            sessionId: route.kiloSessionId,
+            directory: route.directory,
+            signal: pending.abort.signal,
+            model: { modelID: model },
           });
-        } catch (error) {
-          if (dispatchSignal.aborted) throw dispatchSignal.reason;
-          throw error;
+          if (!summarized) throw new Error('Session summarization failed');
+          if (!isCurrent()) return;
+          // The response can overtake the feed. Keep follow-ups undispatched until
+          // the compact's close is processed, so it cannot complete newer work. Once
+          // no native execution is live, the delivery deadline `tick` owns bounds the
+          // wait and aborts it.
+          nativeClose.respondedAt = now();
+          dispatchSignal.throwIfAborted();
+          dispatchSignal.addEventListener('abort', cancelClose, { once: true });
+          await closed.promise;
         } finally {
-          if (pending.onNativeClose === nativeClose.resolve) pending.onNativeClose = undefined;
+          dispatchSignal.removeEventListener('abort', cancelClose);
+          if (pending.nativeClose === nativeClose) pending.nativeClose = undefined;
         }
       } else {
         markDispatched(turn, pending);
@@ -1094,7 +1113,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
           return;
         }
         if (event.properties.reason === 'completed') {
-          for (const pending of turn.prompts) pending.onNativeClose?.();
+          for (const pending of turn.prompts) pending.nativeClose?.resolve();
         }
       }
       if (event.type === 'message.updated') {
@@ -1143,7 +1162,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
             pending.dispatched = false;
             pending.nativeObserved = false;
             pending.acknowledged = false;
-            pending.onNativeClose = undefined;
+            pending.nativeClose = undefined;
             pending.receivedAt = now();
           }
           turn.submitting = Promise.resolve();

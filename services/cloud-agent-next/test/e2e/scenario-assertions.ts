@@ -5,7 +5,7 @@
  * use them without importing a Docker, log or database module.
  */
 
-import { messageIdFromEvent, type StreamConnection } from './client.js';
+import { failureReasonFromEvent, messageIdFromEvent, type StreamConnection } from './client.js';
 
 /**
  * One shared lifecycle assertion for a matching message: the stream must show
@@ -35,7 +35,15 @@ export function assertMessageLifecycle(
     .map(event => event.streamEventType)
     .filter(type => type.startsWith('cloud.message.'));
   if (types.includes('cloud.message.failed')) {
-    throw new Error(`${label} has a failed lifecycle for ${messageId}: ${types.join('>')}`);
+    const failed = stream.events.find(
+      event =>
+        messageIdFromEvent(event) === messageId && event.streamEventType === 'cloud.message.failed'
+    );
+    const reason = failureReasonFromEvent(failed ?? null);
+    throw new Error(
+      `${label} has a failed lifecycle for ${messageId}: ${types.join('>')}` +
+        (reason === undefined ? '' : ` reason=${reason}`)
+    );
   }
   const queuedIndex = types.indexOf('cloud.message.queued');
   const sentIndex = types.indexOf('cloud.message.sent');

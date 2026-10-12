@@ -16,6 +16,7 @@
  */
 
 import {
+  failureReasonFromEvent,
   fakeDirective,
   fetchFakeRequests,
   getMessageResult,
@@ -547,7 +548,11 @@ export async function bootToCompletion(
       messageId
     );
     if (!isMessageCompleted(terminal, messageId)) {
-      throw new Error(`${label} boot turn ${messageId} did not complete`);
+      const reason = failureReasonFromEvent(terminal);
+      throw new Error(
+        `${label} boot turn ${messageId} did not complete: terminal=${terminal?.streamEventType ?? 'none'}` +
+          (reason === undefined ? '' : ` reason=${reason}`)
+      );
     }
     const status = await deadline.within(`${label} durable`, signal =>
       awaitDurableTerminal(

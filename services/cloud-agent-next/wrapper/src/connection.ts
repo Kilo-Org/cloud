@@ -10,11 +10,10 @@
  */
 
 import type { WrapperState } from './state.js';
-import {
-  WRAPPER_RECONNECT_GRACE_MS,
-  type IngestEvent,
-  type WrapperCommand,
-  type WrapperTerminalFailureCode,
+import type {
+  IngestEvent,
+  WrapperCommand,
+  WrapperTerminalFailureCode,
 } from '../../src/shared/protocol.js';
 import {
   MAX_INGEST_EVENT_BYTES,
@@ -294,7 +293,7 @@ const RECONNECT_MAX_DELAY_MS = 8_000;
  *  blackout (several hung `INGEST_RECONNECT_CONNECT_TIMEOUT_MS` handshakes),
  *  after which the wrapper reports a disconnect so the Kilo turn is aborted and
  *  the batch drains instead of retrying into a socket nobody will accept. */
-export const RECONNECT_TOTAL_BUDGET_MS = WRAPPER_RECONNECT_GRACE_MS;
+export const RECONNECT_TOTAL_BUDGET_MS = 5 * 60_000;
 /** Maximum time to wait for the SDK SSE `/event` handshake before aborting.
  *  The wrapper talks to kilo on loopback, so handshakes typically complete in
  *  <5ms; a 5s budget covers kilo startup hiccups without blocking `open()` on

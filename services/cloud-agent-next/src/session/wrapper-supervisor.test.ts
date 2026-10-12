@@ -4,7 +4,6 @@ import type { EventQueries } from './queries/index.js';
 import type { SessionId } from '../types/ids.js';
 import type { CallbackJob } from '../callbacks/types.js';
 import { WRAPPER_NO_OUTPUT_TIMEOUT_MS } from './agent-runtime.js';
-import { WRAPPER_RECONNECT_GRACE_MS } from '../shared/protocol.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import {
   createMessageSettlementOutbox,
@@ -729,96 +728,6 @@ describe('WrapperSupervisor pending human input', () => {
 });
 
 describe('WrapperSupervisor', () => {
-  it('preserves accepted work and its fence through reconstruction and a delayed redeploy reconnect', async () => {
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(90_000);
-    const before = createHarness([
-      liveRuntimeState({ pingDeadlineAt: 92_000, noOutputDeadlineAt: 94_000 }),
-      OWNED_WRAPPER_LEASE,
-    ]);
-    await putSessionMessageState(before.storage, acceptedMessage());
-    await before.supervisor.onDisconnected({
-      disconnected: {
-        wrapperRunId: WRAPPER_RUN_ID,
-        wrapperGeneration: 4,
-        wrapperConnectionId: WRAPPER_CONNECTION_ID,
-      },
-      wsCloseCode: 1006,
-      wsCloseReason: 'code updated',
-    });
-
-    clock.mockReturnValue(210_000);
-    const after = createHarness(undefined, { storage: before.storage });
-    await after.supervisor.runMaintenance(Date.now());
-
-    await expect(getSessionMessageState(after.storage, MESSAGE_ID)).resolves.toMatchObject({
-      status: 'accepted',
-      wrapperRunId: WRAPPER_RUN_ID,
-    });
-    await expect(getWrapperLease(after.storage)).resolves.toMatchObject({ state: 'owns_wrapper' });
-    expect(after.stopWrappers).not.toHaveBeenCalled();
-    expect(after.sentPings).toEqual([]);
-    expect(after.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
-    await expect(after.supervisor.nextMaintenanceDeadlines()).resolves.toEqual([
-      90_000 + WRAPPER_RECONNECT_GRACE_MS,
-    ]);
-    await expect(
-      after.supervisor.checkReconnect({
-        wrapperRunId: WRAPPER_RUN_ID,
-        wrapperGeneration: 4,
-        wrapperConnectionId: WRAPPER_CONNECTION_ID,
-      })
-    ).resolves.toEqual({ accepted: true });
-
-    await after.supervisor.recordReconnectAccepted({
-      wrapperGeneration: 4,
-      wrapperConnectionId: WRAPPER_CONNECTION_ID,
-    });
-    await after.supervisor.runMaintenance(Date.now());
-    await expect(after.storage.get('disconnect_grace')).resolves.toBeUndefined();
-    await expect(getWrapperRuntimeState(after.storage)).resolves.toMatchObject({
-      wrapperRunId: WRAPPER_RUN_ID,
-      wrapperGeneration: 4,
-      wrapperConnectionId: WRAPPER_CONNECTION_ID,
-      pingDeadlineAt: undefined,
-    });
-    expect(after.events).toEqual([]);
-    expect(after.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
-  });
-
-  it('does not extend recovery on duplicate disconnects or reconstruction and fails at the original bound', async () => {
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(90_000);
-    const before = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
-    await putSessionMessageState(before.storage, acceptedMessage());
-    const disconnected = {
-      disconnected: {
-        wrapperRunId: WRAPPER_RUN_ID,
-        wrapperGeneration: 4,
-        wrapperConnectionId: WRAPPER_CONNECTION_ID,
-      },
-      wsCloseCode: 1006,
-      wsCloseReason: 'code updated',
-    };
-    await before.supervisor.onDisconnected(disconnected);
-    const grace = await before.storage.get('disconnect_grace');
-    clock.mockReturnValue(90_000 + WRAPPER_RECONNECT_GRACE_MS - 1);
-    const after = createHarness(undefined, { storage: before.storage });
-    await after.supervisor.onDisconnected(disconnected);
-    await after.supervisor.runMaintenance(Date.now());
-    await expect(after.storage.get('disconnect_grace')).resolves.toEqual(grace);
-    await expect(getSessionMessageState(after.storage, MESSAGE_ID)).resolves.toMatchObject({
-      status: 'accepted',
-    });
-
-    clock.mockReturnValue(90_000 + WRAPPER_RECONNECT_GRACE_MS);
-    await after.supervisor.runMaintenance(Date.now());
-    await expect(getSessionMessageState(after.storage, MESSAGE_ID)).resolves.toMatchObject({
-      status: 'failed',
-      failureCode: 'wrapper_disconnected',
-    });
-    await expect(getWrapperLease(after.storage)).resolves.toMatchObject({ state: 'stop_needed' });
-    await expect(after.storage.get('disconnect_grace')).resolves.toBeUndefined();
-  });
-
   it('starts disconnect grace for current accepted work and cancels it after an approved fenced reconnect', async () => {
     const harness = createHarness([liveRuntimeState()]);
     await putSessionMessageState(harness.storage, acceptedMessage());
@@ -876,7 +785,7 @@ describe('WrapperSupervisor', () => {
     expect(grace).toBeDefined();
     if (!grace) throw new Error('Expected finalizing disconnect grace');
 
-    await harness.supervisor.runMaintenance(grace.disconnectedAt + WRAPPER_RECONNECT_GRACE_MS + 1);
+    await harness.supervisor.runMaintenance(grace.disconnectedAt + 10_001);
 
     await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
       state: 'stop_needed',
@@ -955,7 +864,7 @@ describe('WrapperSupervisor', () => {
 
     const grace = await harness.storage.get<{ disconnectedAt: number }>('disconnect_grace');
     if (!grace) throw new Error('Expected disconnect grace to be persisted');
-    await harness.supervisor.runMaintenance(grace.disconnectedAt + WRAPPER_RECONNECT_GRACE_MS + 1);
+    await harness.supervisor.runMaintenance(grace.disconnectedAt + 10_001);
 
     expect(harness.callbackJobs).toHaveLength(1);
     expect(harness.callbackJobs[0].payload).toMatchObject({
@@ -998,7 +907,7 @@ describe('WrapperSupervisor', () => {
       completionSource: 'assistant_message_event',
     });
 
-    await harness.supervisor.runMaintenance(1_001 + WRAPPER_RECONNECT_GRACE_MS);
+    await harness.supervisor.runMaintenance(11_001);
 
     expect(harness.callbackJobs).toHaveLength(1);
     expect(harness.callbackJobs[0].payload).toMatchObject({
@@ -1048,7 +957,7 @@ describe('WrapperSupervisor', () => {
       completionSource: 'assistant_message_event',
     });
 
-    await harness.supervisor.runMaintenance(1_001 + WRAPPER_RECONNECT_GRACE_MS);
+    await harness.supervisor.runMaintenance(11_001);
 
     expect(harness.callbackJobs).toHaveLength(0);
     await expect(harness.settlementOutbox.isWaitingForWrapperTerminalGateResult()).resolves.toBe(
@@ -1076,7 +985,7 @@ describe('WrapperSupervisor', () => {
 
     const grace = await harness.storage.get<{ disconnectedAt: number }>('disconnect_grace');
     if (!grace) throw new Error('Expected disconnect grace to be persisted');
-    await harness.supervisor.runMaintenance(grace.disconnectedAt + WRAPPER_RECONNECT_GRACE_MS + 1);
+    await harness.supervisor.runMaintenance(grace.disconnectedAt + 10_001);
 
     await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
       status: 'failed',
@@ -1534,7 +1443,7 @@ describe('WrapperSupervisor', () => {
           ),
           OWNED_WRAPPER_LEASE,
           ...(failureCode === 'wrapper_disconnected'
-            ? [disconnectGraceForCurrentConnection(deadlineAt - WRAPPER_RECONNECT_GRACE_MS)]
+            ? [disconnectGraceForCurrentConnection(deadlineAt - 10_000)]
             : []),
         ],
         {
@@ -1945,7 +1854,7 @@ describe('WrapperSupervisor', () => {
 
     const grace = await harness.storage.get<{ disconnectedAt: number }>('disconnect_grace');
     if (!grace) throw new Error('Expected disconnect grace to be persisted');
-    await harness.supervisor.runMaintenance(grace.disconnectedAt + WRAPPER_RECONNECT_GRACE_MS + 1);
+    await harness.supervisor.runMaintenance(grace.disconnectedAt + 10_001);
 
     await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
       status: 'completed',
@@ -1958,6 +1867,7 @@ describe('WrapperSupervisor', () => {
   it('defers liveness failure while disconnect grace is active for the current connection', async () => {
     const pingDeadlineAt = 92_000;
     const noOutputDeadlineAt = 332_000;
+    // Grace active from 90_000 through 100_000; ping deadline (92_000) already expired.
     const harness = createHarness([
       liveRuntimeState({ pingDeadlineAt, noOutputDeadlineAt }),
       OWNED_WRAPPER_LEASE,
@@ -2093,7 +2003,8 @@ describe('WrapperSupervisor', () => {
     ]);
     await putSessionMessageState(harness.storage, acceptedMessage());
 
-    await harness.supervisor.runMaintenance(90_001 + WRAPPER_RECONNECT_GRACE_MS);
+    // Grace expired at 100_000; liveness was deferred while it was active.
+    await harness.supervisor.runMaintenance(100_001);
 
     await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
       status: 'failed',
@@ -2106,8 +2017,7 @@ describe('WrapperSupervisor', () => {
     });
   });
 
-  it('schedules grace expiry without repeatedly waking for deferred liveness deadlines', async () => {
-    vi.spyOn(Date, 'now').mockReturnValue(95_000);
+  it('includes the disconnect grace expiry deadline even when the ping deadline is earlier', async () => {
     const harness = createHarness([
       liveRuntimeState({ pingDeadlineAt: 92_000, noOutputDeadlineAt: 332_000 }),
       OWNED_WRAPPER_LEASE,
@@ -2117,9 +2027,10 @@ describe('WrapperSupervisor', () => {
 
     const deadlines = await harness.supervisor.nextMaintenanceDeadlines();
 
-    expect(deadlines).toContain(90_000 + WRAPPER_RECONNECT_GRACE_MS);
-    expect(deadlines).not.toContain(92_000);
-    expect(deadlines).not.toContain(332_000);
+    // Grace expiry (100_000) must remain scheduled alongside the earlier
+    // expired ping deadline (92_000) so reconnect gets its full window.
+    expect(deadlines).toContain(100_000);
+    expect(deadlines).toContain(92_000);
   });
 
   it('releases a finalizing callback on liveness expiry but holds a queued follow-up until physical absence', async () => {
@@ -2199,8 +2110,7 @@ describe('WrapperSupervisor', () => {
     );
   });
 
-  it('aggregates physical, disconnect, and cleanup deadlines while liveness is deferred', async () => {
-    vi.spyOn(Date, 'now').mockReturnValue(10_000);
+  it('aggregates concurrent physical, liveness, disconnect, and cleanup deadlines', async () => {
     const harness = createHarness([
       liveRuntimeState({
         nextPingAt: 20_000,
@@ -2232,11 +2142,9 @@ describe('WrapperSupervisor', () => {
 
     const deadlines = await harness.supervisor.nextMaintenanceDeadlines();
 
-    expect(deadlines).toHaveLength(3);
-    expect(deadlines).toEqual(
-      expect.arrayContaining([60_000, 5_000 + WRAPPER_RECONNECT_GRACE_MS, 40_000])
-    );
-    expect(Math.min(...deadlines)).toBe(40_000);
+    expect(deadlines).toHaveLength(4);
+    expect(deadlines).toEqual(expect.arrayContaining([60_000, 20_000, 15_000, 40_000]));
+    expect(Math.min(...deadlines)).toBe(15_000);
   });
 
   it('persists finalizing only for the current wrapper run', async () => {

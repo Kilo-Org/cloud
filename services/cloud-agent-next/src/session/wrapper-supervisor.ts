@@ -33,7 +33,7 @@ import {
   type SessionMessageStorage,
   type TerminalizeParams,
 } from './session-message-state.js';
-import { WRAPPER_RECONNECT_GRACE_MS, type WrapperTerminalFailureCode } from '../shared/protocol.js';
+import type { WrapperTerminalFailureCode } from '../shared/protocol.js';
 import type { LatestAssistantMessage } from './types.js';
 import type { SandboxId } from '../types.js';
 import {
@@ -75,6 +75,7 @@ import {
   WRAPPER_STOP_MAX_ATTEMPTS,
 } from './wrapper-runtime-state.js';
 
+const DISCONNECT_GRACE_MS = 10_000;
 const WRAPPER_PING_TIMEOUT_MS = 30_000;
 const WRAPPER_STOP_ATTEMPT_TIMEOUT_MS = 45_000;
 const WRAPPER_STOP_RETRY_DELAYS_MS = [5_000, 10_000, 10_000, 10_000] as const;
@@ -546,7 +547,7 @@ export function createWrapperSupervisor(
   async function isActiveDisconnectGraceForCurrentConnection(now: number): Promise<boolean> {
     const graceState = await readDisconnectGrace();
     if (!graceState) return false;
-    if (now - graceState.disconnectedAt >= WRAPPER_RECONNECT_GRACE_MS) return false;
+    if (now - graceState.disconnectedAt >= DISCONNECT_GRACE_MS) return false;
     const state = await getWrapperRuntimeState(storage);
     return (
       state.wrapperRunId === graceState.wrapperRunId &&
@@ -809,14 +810,6 @@ export function createWrapperSupervisor(
 
   async function startDisconnectGrace(input: WrapperDisconnectedInput): Promise<void> {
     const { disconnected, wsCloseCode, wsCloseReason } = input;
-    const existing = await readDisconnectGrace();
-    if (
-      existing?.wrapperRunId === disconnected.wrapperRunId &&
-      existing.wrapperGeneration === disconnected.wrapperGeneration &&
-      existing.wrapperConnectionId === disconnected.wrapperConnectionId
-    ) {
-      return;
-    }
     const now = Date.now();
 
     logger
@@ -825,7 +818,7 @@ export function createWrapperSupervisor(
         wrapperRunId: disconnected.wrapperRunId,
         wsCloseCode,
         wsCloseReason,
-        graceMs: WRAPPER_RECONNECT_GRACE_MS,
+        graceMs: DISCONNECT_GRACE_MS,
       })
       .warn('Wrapper disconnected — starting grace period before marking as failed');
 
@@ -1079,7 +1072,7 @@ export function createWrapperSupervisor(
   async function checkDisconnectGrace(now: number): Promise<void> {
     const graceState = await readDisconnectGrace();
     if (!graceState) return;
-    if (now - graceState.disconnectedAt < WRAPPER_RECONNECT_GRACE_MS) return;
+    if (now - graceState.disconnectedAt < DISCONNECT_GRACE_MS) return;
 
     const { wrapperRunId } = graceState;
     const state = await getWrapperRuntimeState(storage);
@@ -2102,16 +2095,14 @@ export function createWrapperSupervisor(
     if (recoveryDeadline !== undefined) {
       deadlines.push(recoveryDeadline);
     }
-    if (!(await isActiveDisconnectGraceForCurrentConnection(Date.now()))) {
-      const livenessDeadline = await getNextWrapperLivenessDeadline();
-      if (livenessDeadline !== undefined) {
-        deadlines.push(livenessDeadline);
-      }
+    const livenessDeadline = await getNextWrapperLivenessDeadline();
+    if (livenessDeadline !== undefined) {
+      deadlines.push(livenessDeadline);
     }
 
     const graceState = await readDisconnectGrace();
     if (graceState) {
-      deadlines.push(graceState.disconnectedAt + WRAPPER_RECONNECT_GRACE_MS);
+      deadlines.push(graceState.disconnectedAt + DISCONNECT_GRACE_MS);
     }
 
     const wrapperState = await getWrapperRuntimeState(storage);

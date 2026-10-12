@@ -267,18 +267,27 @@ class SessionNotificationCard : Record {
 
   /** Read the shape `toJson` writes; the readable half of the persisted pair. */
   fun fillFromJson(json: JSONObject) {
+    organizationId = optionalString(json, "organizationId")
+    subText = optionalString(json, "subText")
+    compactText = optionalString(json, "compactText")
+    approveLabel = optionalString(json, "approveLabel")
+    approvalKey = optionalString(json, "approvalKey")
     sessionId = json.optString("sessionId")
-    organizationId = json.optString("organizationId").ifEmpty { null }
     title = json.optString("title")
     text = json.optString("text")
-    subText = json.optString("subText").ifEmpty { null }
-    compactText = json.optString("compactText").ifEmpty { null }
     openLabel = json.optString("openLabel")
     openUrl = json.optString("openUrl")
-    approveLabel = json.optString("approveLabel").ifEmpty { null }
-    approvalKey = json.optString("approvalKey").ifEmpty { null }
     whenMs = json.optDouble("whenMs", 0.0)
     showWhen = json.optBoolean("showWhen")
     chronometer = json.optBoolean("chronometer")
+  }
+
+  /**
+   * A truly absent field. `optString` answers the four-letter text "null" for a
+   * JSON null, which the app sends for every optional field it has no value for.
+   */
+  private fun optionalString(json: JSONObject, key: String): String? {
+    if (json.isNull(key)) return null
+    return json.optString(key).ifEmpty { null }
   }
 }

@@ -2,6 +2,9 @@ import type { ActiveSession } from '@/lib/active-sessions-list';
 import { listActiveSessions } from '@/lib/active-sessions-list';
 import { readCloudAgentWidgetApprovalKey } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 jest.mock('@/lib/active-sessions-list', () => ({
   listActiveSessions: jest.fn(),
@@ -253,6 +256,7 @@ describe('buildGlanceableDeliveryForUser', () => {
   let followedRows: { sessionId: string | null }[];
   let storedRows: Fields[];
   let cloudRows: { cloudAgentSessionId: string | null }[];
+  let followedWhere: SQL | undefined;
 
   beforeEach(() => {
     mockedListActiveSessions.mockReset();
@@ -260,14 +264,17 @@ describe('buildGlanceableDeliveryForUser', () => {
     followedRows = [];
     storedRows = [];
     cloudRows = [];
+    followedWhere = undefined;
     // Route each query by its selected fields: the followed token read, the
     // approval identity read, and the read of followed sessions off the list.
     jest.mocked(db.select).mockReset();
     jest.mocked(db.select).mockImplementation(((fields: Fields) => ({
       from: () => ({
-        where: () => {
+        where: (predicate: SQL) => {
           if ('cloudAgentSessionId' in fields) return { limit: async () => cloudRows };
-          return Promise.resolve('updatedAt' in fields ? storedRows : followedRows);
+          if ('updatedAt' in fields) return Promise.resolve(storedRows);
+          followedWhere = predicate;
+          return Promise.resolve(followedRows);
         },
       }),
     })) as never);
@@ -368,6 +375,19 @@ describe('buildGlanceableDeliveryForUser', () => {
       },
       { sessionId: 'ses_deleted', row: null },
     ]);
+  });
+
+  it('ignores session card tokens older than the ActivityKit lifetime', async () => {
+    mockedListActiveSessions.mockResolvedValue({ sessions: [running] });
+
+    await buildGlanceableDeliveryForUser({ userId: 'oauth/user-1', organizationId: null });
+
+    if (followedWhere === undefined) throw new Error('expected the followed token read');
+    const query = new PgDialect().sqlToQuery(followedWhere);
+    expect(query.sql).toContain(
+      '"user_activity_tokens"."created_at" > now() - make_interval(secs =>'
+    );
+    expect(query.params).toContain(SESSION_LIVE_ACTIVITY_MAX_AGE_MS / 1000);
   });
 
   it('reuses the Home snapshot when no session is followed', async () => {

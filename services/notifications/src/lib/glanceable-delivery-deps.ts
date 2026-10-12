@@ -1,8 +1,8 @@
 import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { getWorkerDb } from '@kilocode/db/client';
 import { user_activity_tokens, user_push_tokens } from '@kilocode/db/schema';
-import { pushDataSchema } from '@kilocode/notifications';
-import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { pushDataSchema, SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications';
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { sendLiveActivityApns, type ApnsCredentials } from './apns-live-activity';
@@ -115,6 +115,9 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
       };
     },
     listIosSessionActivityTokens: async (userId, organizationId) => {
+      // ActivityKit ends a card at its maximum lifetime, often with no APNs
+      // rejection to tell the server. Compare on the database clock.
+      const expired = sql<boolean>`${user_activity_tokens.created_at} <= now() - make_interval(secs => ${SESSION_LIVE_ACTIVITY_MAX_AGE_MS / 1000})`;
       const rows = await getDbForCall()
         .select({
           token: user_activity_tokens.token,
@@ -122,6 +125,7 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
           kind: user_activity_tokens.kind,
           id: user_activity_tokens.id,
           updated_at: user_activity_tokens.updated_at,
+          expired,
         })
         .from(user_activity_tokens)
         .where(
@@ -135,10 +139,29 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
             isNotNull(user_activity_tokens.session_id)
           )
         );
-      for (const row of rows) {
+      // An expired row can no longer reach a card: drop it, so its session
+      // counts as unfollowed again. The age check repeats in the delete, so a
+      // row renewed meanwhile stays.
+      await Promise.all(
+        rows
+          .filter(row => row.expired)
+          .map(row =>
+            getDbForCall()
+              .delete(user_activity_tokens)
+              .where(
+                and(
+                  eq(user_activity_tokens.id, row.id),
+                  eq(user_activity_tokens.kind, 'ios_session_activity'),
+                  expired
+                )
+              )
+          )
+      );
+      const live = rows.filter(row => !row.expired);
+      for (const row of live) {
         iosTargets.set(row.token, row);
       }
-      return rows.flatMap(row =>
+      return live.flatMap(row =>
         row.sessionId === null ? [] : [{ token: row.token, sessionId: row.sessionId }]
       );
     },

@@ -8,12 +8,13 @@
  */
 
 import {
+  glanceableStatusKind,
   isEligibleGlanceableWork,
   isStartableGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
+  aggregateLiveActivityRelevance,
   type GlanceableLiveActivityContentState,
-  LIVE_ACTIVITY_RELEVANCE,
   type PushData,
   translatePush,
 } from '@kilocode/notifications';
@@ -40,9 +41,12 @@ export type GlanceableBuild = ActiveAgentsGlanceable & {
 };
 
 /**
- * The aggregate card counts and its keep/start rules. While any session in the
- * scope is followed, the card ends once no unfollowed startable work is left
- * (spec "Aggregate card coexistence" rule 2); otherwise idle work keeps it.
+ * The aggregate card counts and its keep/start rules. While a followed session
+ * card is still live (its session exists and has not finished), the card ends
+ * once no unfollowed startable work is left (spec "Aggregate card coexistence"
+ * rule 2). Otherwise idle work keeps it, as before session cards. A followed
+ * session that is gone or finished ends its own card in this same delivery, so
+ * it must not change the aggregate rule.
  */
 export function aggregateCardWork(build: GlanceableBuild): {
   snapshot: ActiveAgentsGlanceable;
@@ -51,8 +55,10 @@ export function aggregateCardWork(build: GlanceableBuild): {
 } {
   const snapshot = build.liveActivitySnapshot ?? build;
   const startable = isStartableGlanceableWork(snapshot);
-  const eligible =
-    (build.sessionCards?.length ?? 0) > 0 ? startable : isEligibleGlanceableWork(snapshot);
+  const followedLive = (build.sessionCards ?? []).some(
+    ({ row }) => row !== null && glanceableStatusKind(row.status) !== 'idle'
+  );
+  const eligible = followedLive ? startable : isEligibleGlanceableWork(snapshot);
   return { snapshot, eligible, startable };
 }
 
@@ -277,9 +283,10 @@ export async function deliverGlanceableSnapshot(
       deps.beforeIosEnd,
       deps.onIosEndRejected,
       deps.onIosStarted,
-      aggregate.snapshot.needsInput > 0
-        ? LIVE_ACTIVITY_RELEVANCE.aggregateNeedsInput
-        : LIVE_ACTIVITY_RELEVANCE.aggregate
+      aggregateLiveActivityRelevance(
+        aggregate.snapshot.needsInput,
+        aggregate.snapshot.newestResultAt
+      )
     );
   }
 

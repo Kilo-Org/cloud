@@ -6,7 +6,11 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 import { getWorkerDb } from '@kilocode/db/client';
-import type { DispatchPushInput } from '@kilocode/notifications';
+import {
+  aggregateLiveActivityRelevance,
+  type DispatchPushInput,
+  sessionLiveActivityRelevance,
+} from '@kilocode/notifications';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import { NotificationChannelDO, NotificationsService } from '../index';
 import { sendPushNotifications, type ExpoPushMessage } from './expo-push';
@@ -110,6 +114,8 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           Partial<Scope> & {
             kind: ActivityKind;
             sessionId?: string;
+            /** Older than the ActivityKit lifetime, as the database clock reports it. */
+            expired?: boolean;
             updated_at?: string;
             superseded_at?: string | null;
           }
@@ -131,6 +137,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         id: string;
         kind: ActivityKind;
         sessionId?: string;
+        expired?: boolean;
         updated_at: string;
         superseded_at?: string | null;
       }
@@ -225,6 +232,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
               row.kind,
               row.id,
               row.updated_at,
+              row.expired ?? false,
             ]),
         };
       }
@@ -784,7 +792,9 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
 
     await createService().refreshGlanceableSessions(personalRefresh);
     const aggregate = apns.find(({ token }) => token === 'aggregate-token');
-    expect(aggregate?.aps['relevance-score']).toBe(40);
+    expect(aggregate?.aps['relevance-score']).toBe(
+      aggregateLiveActivityRelevance(0, snapshot.newestResultAt)
+    );
     expect(JSON.parse(aggregate?.aps['content-state'].props ?? '{}')).toMatchObject({
       running: 1,
       needsInput: 0,
@@ -794,7 +804,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       priority: '10',
       aps: {
         event: 'update',
-        'relevance-score': 100,
+        'relevance-score': sessionLiveActivityRelevance('needsInput', '2026-08-27T09:59:00.000Z'),
         'content-state': { name: 'SessionLiveActivity' },
       },
     });
@@ -829,7 +839,10 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     expect(cardPushes()).toHaveLength(2);
     expect(cardPushes()[1]).toMatchObject({
       priority: '5',
-      aps: { event: 'update', 'relevance-score': 60 },
+      aps: {
+        event: 'update',
+        'relevance-score': sessionLiveActivityRelevance('running', '2026-08-27T10:00:19.000Z'),
+      },
     });
     expect(JSON.parse(cardPushes()[1].aps['content-state'].props)).toMatchObject({
       statusKind: 'running',
@@ -846,7 +859,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       priority: '10',
       aps: {
         event: 'end',
-        'relevance-score': 20,
+        'relevance-score': sessionLiveActivityRelevance('idle', '2026-08-27T10:00:29.000Z'),
         'dismissal-date': Date.parse('2026-08-27T10:15:30.000Z') / 1000,
       },
     });
@@ -857,6 +870,38 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     // The accepted end retires the token, so the session counts as unfollowed.
     expect(activityRows.has('card-token')).toBe(false);
     expect(activityRows.has('aggregate-token')).toBe(true);
+  });
+
+  it('drops a session card token older than the ActivityKit lifetime without a push', async () => {
+    const pem = await generateTestPrivateKeyPem();
+    const row = {
+      title: 'Old work',
+      status: 'busy',
+      statusUpdatedAt: '2026-08-27T09:00:00.000Z',
+      scheduledAt: null,
+      approvalKey: null,
+    };
+    const { createService, apns, activityRows } = setupService({
+      privateKey: async () => pem,
+      iosTokens: [
+        { token: 'old-card', kind: 'ios_session_activity', sessionId: 'ses_old', expired: true },
+        { token: 'new-card', kind: 'ios_session_activity', sessionId: 'ses_new' },
+      ],
+      response: () =>
+        Response.json({
+          ...freshSnapshot(),
+          sessionCards: [
+            { sessionId: 'ses_old', row },
+            { sessionId: 'ses_new', row },
+          ],
+        }),
+    });
+
+    await createService().refreshGlanceableSessions(personalRefresh);
+
+    expect(apns.map(({ token }) => token)).toEqual(['new-card']);
+    expect(activityRows.has('old-card')).toBe(false);
+    expect(activityRows.has('new-card')).toBe(true);
   });
 
   it('ends every session card in a scope the user lost', async () => {
@@ -2338,7 +2383,9 @@ describe('deliverGlanceableSnapshot', () => {
       const [tokens, contentState] = sendIosLiveActivity.mock.calls[0];
       expect(tokens).toEqual([{ token: 'activity-token', event: 'update' }]);
       expect(JSON.parse(contentState.props)).toMatchObject({ running: 1, needsInput: 0 });
-      expect(sendIosLiveActivity.mock.calls[0][8]).toBe(40);
+      expect(sendIosLiveActivity.mock.calls[0][8]).toBe(
+        aggregateLiveActivityRelevance(0, snapshot.newestResultAt)
+      );
       // The Home widget wake still counts every session.
       expect(calls.expoSends[0][0].data).toMatchObject({ running: 2, needsInput: 1 });
       const wake = JSON.stringify(calls.expoSends);
@@ -2356,7 +2403,9 @@ describe('deliverGlanceableSnapshot', () => {
         sendIosLiveActivity,
       });
       await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
-      expect(sendIosLiveActivity.mock.calls[0][8]).toBe(80);
+      expect(sendIosLiveActivity.mock.calls[0][8]).toBe(
+        aggregateLiveActivityRelevance(1, snapshot.newestResultAt)
+      );
     });
 
     it('ends the aggregate card when only idle work is left unfollowed', async () => {
@@ -2380,6 +2429,34 @@ describe('deliverGlanceableSnapshot', () => {
 
       expect(calls.iosSends[0][0]).toEqual([{ token: 'activity-token', event: 'end' }]);
     });
+
+    it.each([
+      ['finished', { ...followedCard, row: { ...followedCard.row, status: 'idle' } }],
+      ['gone', { sessionId: 'ses_followed', row: null }],
+    ])(
+      'keeps idle unfollowed work on the aggregate card when the followed session is %s',
+      async (_, card) => {
+        const { deps, calls } = fakeDeps({
+          buildSnapshot: vi.fn(async () => ({
+            ...snapshot,
+            liveActivitySnapshot: {
+              ...snapshot,
+              running: 0,
+              needsInput: 0,
+              needsApproval: 0,
+              idle: 1,
+              needsInputSince: null,
+            },
+            sessionCards: [card],
+          })),
+          listIosActivityTokens: vi.fn(async () => [activityRow]),
+        });
+
+        await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
+
+        expect(calls.iosSends[0][0]).toEqual([{ token: 'activity-token', event: 'update' }]);
+      }
+    );
 
     it('pushes the followed session card through the session card IO', async () => {
       const sendIosSessionLiveActivity = vi.fn(async () => true);

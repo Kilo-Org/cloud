@@ -137,7 +137,9 @@ its turn, or when the user loses access to the session.
 ### Aggregate card coexistence
 
 1. The aggregate card MUST count only the sessions in its scope that are
-   not followed.
+   not followed. The server's update excludes the sessions followed on any
+   of the user's iOS devices, while the app's local update excludes only
+   the sessions this device follows.
 2. When the unfollowed count of startable work reaches zero, the
    aggregate card MUST end as it does today for an empty scope.
 3. When a session is unfollowed, or its session card ends, the aggregate

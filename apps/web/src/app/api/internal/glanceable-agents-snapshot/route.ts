@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NextResponse, type NextRequest } from 'next/server';
+import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -51,8 +52,17 @@ export async function POST(req: NextRequest) {
         { user: { id: userId, is_admin: false } } as unknown as TRPCContext,
         organizationId
       );
-    } catch {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    } catch (error) {
+      // The worker reads 403 as a lost scope and ends every session card in
+      // it, so only a real access denial may answer 403. A database failure is
+      // a 500: the worker keeps the cards and retries.
+      if (
+        error instanceof TRPCError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN')
+      ) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+      }
+      return NextResponse.json({ error: 'Organization access check failed' }, { status: 500 });
     }
   }
 

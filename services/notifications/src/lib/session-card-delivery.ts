@@ -112,7 +112,9 @@ export function planSessionCardSend(params: {
   });
 
   if (source.row === null) {
-    const content: SessionLiveActivityContentState = previous ?? {
+    // The session is gone or the user lost access: end with no content (spec
+    // "Ending" rule 2), never with the title the card showed before.
+    const content: SessionLiveActivityContentState = {
       sessionId,
       title: null,
       statusKind: 'idle',
@@ -129,7 +131,7 @@ export function planSessionCardSend(params: {
         event: 'end',
         contentState: envelope(content),
         priority: 10,
-        relevanceScore: sessionLiveActivityRelevance('idle'),
+        relevanceScore: sessionLiveActivityRelevance('idle', content.statusSince),
         dismissalDateSeconds: nowSeconds,
       },
     };
@@ -154,7 +156,7 @@ export function planSessionCardSend(params: {
         event: 'end',
         contentState: envelope(content),
         priority: 10,
-        relevanceScore: sessionLiveActivityRelevance('idle'),
+        relevanceScore: sessionLiveActivityRelevance('idle', content.statusSince),
         dismissalDateSeconds: nowSeconds + SESSION_CARD_FINISHED_DISMISS_MS / 1000,
       },
     };
@@ -167,7 +169,7 @@ export function planSessionCardSend(params: {
       event: 'update',
       contentState: envelope(content),
       priority: statusKind === 'needsInput' && previous?.statusKind !== 'needsInput' ? 10 : 5,
-      relevanceScore: sessionLiveActivityRelevance(statusKind),
+      relevanceScore: sessionLiveActivityRelevance(statusKind, content.statusSince),
     },
   };
 }

@@ -1,4 +1,7 @@
-import type { SessionLiveActivityContentState } from '@kilocode/notifications';
+import {
+  type SessionLiveActivityContentState,
+  sessionLiveActivityRelevance,
+} from '@kilocode/notifications';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -51,7 +54,7 @@ describe('planSessionCardSend', () => {
     expect(plan(source({ status: 'question' }))?.send).toMatchObject({
       event: 'update',
       priority: 10,
-      relevanceScore: 100,
+      relevanceScore: sessionLiveActivityRelevance('needsInput', '2026-10-12T09:00:00.000Z'),
     });
     expect(
       plan(source({ status: 'question' }), shown(source({ status: 'busy' })))?.send.priority
@@ -68,7 +71,7 @@ describe('planSessionCardSend', () => {
   it('uses priority 5 for running and scheduled updates', () => {
     expect(plan(source({ status: 'busy' }))?.send).toMatchObject({
       priority: 5,
-      relevanceScore: 60,
+      relevanceScore: sessionLiveActivityRelevance('running', '2026-10-12T09:00:00.000Z'),
     });
     const scheduled = plan(
       source({ status: 'scheduled', scheduledAt: '2026-10-12T12:00:00.000Z' }),
@@ -105,7 +108,7 @@ describe('planSessionCardSend', () => {
     expect(finished?.send).toMatchObject({
       event: 'end',
       priority: 10,
-      relevanceScore: 20,
+      relevanceScore: sessionLiveActivityRelevance('idle', '2026-10-12T09:58:00.000Z'),
       dismissalDateSeconds: nowSeconds + 15 * 60,
     });
     expect(JSON.parse(finished?.send.contentState.props ?? '{}')).toMatchObject({
@@ -123,7 +126,19 @@ describe('planSessionCardSend', () => {
       priority: 10,
       dismissalDateSeconds: nowSeconds,
     });
-    expect(gone?.content).toEqual(previous);
+    // Neutral content: never the title the card showed before.
+    expect(gone?.content).toEqual({
+      sessionId: 'ses_1',
+      title: null,
+      statusKind: 'idle',
+      statusSince: updatedAt,
+      scheduledAt: null,
+      awaitingPermission: false,
+      approvalKey: null,
+      updatedAt,
+    });
+    expect(gone?.send.contentState.props).not.toContain('Fix login');
+    expect(previous.title).toBe('Fix login');
   });
 });
 

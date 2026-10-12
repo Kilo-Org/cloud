@@ -13,7 +13,8 @@ import {
 } from '@kilocode/app-shared/home-widget';
 import { cli_sessions_v2, user_activity_tokens } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications';
+import { and, eq, gt, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 
 import { type ActiveSession, listActiveSessions } from '@/lib/active-sessions-list';
 import { readCloudAgentWidgetApprovalKey } from '@/lib/cloud-agent-next/cloud-agent-client';
@@ -259,7 +260,13 @@ export async function buildGlanceableDeliveryForUser(
             : eq(user_activity_tokens.organization_id, scope.organizationId),
           eq(user_activity_tokens.kind, 'ios_session_activity'),
           isNull(user_activity_tokens.superseded_at),
-          isNotNull(user_activity_tokens.session_id)
+          isNotNull(user_activity_tokens.session_id),
+          // ActivityKit ends a card at its maximum lifetime; an older row
+          // follows nothing. The notifications service deletes such rows.
+          gt(
+            user_activity_tokens.created_at,
+            sql`now() - make_interval(secs => ${SESSION_LIVE_ACTIVITY_MAX_AGE_MS / 1000})`
+          )
         )
       ),
   ]);

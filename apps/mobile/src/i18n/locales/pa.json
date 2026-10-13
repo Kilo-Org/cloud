@@ -3251,7 +3251,6 @@
       "fieldName": "ਦਿਖਾਇਆ ਨਾਮ",
       "fieldUrl": "ਸਰਵਰ URL",
       "fieldUrlInvalid": "ਇੱਕ ਵੈਧ ਸਰਵਰ URL ਦਾਖਲ ਕਰੋ।",
-      "fieldToken": "Bearer ਟੋਕਨ (ਵਿਕਲਪਿਕ)",
       "enableServer": "ਇਹ ਸਰਵਰ ਚਾਲੂ ਕਰੋ: {{name}}",
       "editServer": "ਸਰਵਰ ਸੰਪਾਦਿਤ ਕਰੋ",
       "deleteServer": "ਸਰਵਰ ਮਿਟਾਓ",
@@ -3271,6 +3270,18 @@
       "serverToolCount": "{{count}} ਟੂਲ",
       "serverUnreachable": "ਇਸ ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ",
       "serverOff": "ਇਹ ਸਰਵਰ ਬੰਦ ਹੈ"
+    },
+    "mcpOAuth": {
+      "authMethod": "ਪ੍ਰਮਾਣੀਕਰਨ",
+      "authNone": "ਕੋਈ ਸਾਈਨ ਇਨ ਨਹੀਂ",
+      "authBearer": "Bearer ਟੋਕਨ",
+      "authOAuth": "OAuth ਸਾਈਨ ਇਨ",
+      "fieldToken": "ਟੋਕਨ",
+      "oauthHint": "ਸੇਵ ਕਰਨ ਤੋਂ ਬਾਅਦ, ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਨਾਲ ਸਾਈਨ ਇਨ ਕਰਨ ਲਈ ਸਰਵਰ 'ਤੇ $t(modelChat.mcpOAuth.signIn) 'ਤੇ ਟੈਪ ਕਰੋ।",
+      "serverNeedsSignIn": "ਇਸ ਸਰਵਰ ਨੂੰ ਵਰਤਣ ਲਈ ਸਾਈਨ ਇਨ ਕਰੋ",
+      "signIn": "ਸਾਈਨ ਇਨ ਕਰੋ",
+      "signInA11y": "ਇਸ ਸਰਵਰ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ: {{name}}",
+      "signInFailed": "{{name}} ਵਿੱਚ ਸਾਈਨ ਇਨ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "backends": {
       "title": "ਚੈਟ ਬੈਕਐਂਡ",
@@ -3425,6 +3436,9 @@
       "downloading": "ਡਾਊਨਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
       "downloadProgress": "ਡਾਊਨਲੋਡ ਹੋ ਰਿਹਾ ਹੈ… {{percent}}%",
       "downloadFailed": "ਡਾਊਨਲੋਡ ਪੂਰਾ ਨਹੀਂ ਹੋਇਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਅਤੇ ਖਾਲੀ ਸਟੋਰੇਜ ਜਾਂਚੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+    },
+    "reasoningEffort": {
+      "modelFlag": "ਇਹ ਮਾਡਲ ਸੋਚਣ ਦੇ ਪੱਧਰ ਦਾ ਸਮਰਥਨ ਕਰਦਾ ਹੈ"
     }
   },
   "settingsTools": {

@@ -3251,7 +3251,6 @@
       "fieldName": "Vertoonnaam",
       "fieldUrl": "Bediener-URL",
       "fieldUrlInvalid": "Voer 'n geldige bediener-URL in.",
-      "fieldToken": "Draertoken (opsioneel)",
       "enableServer": "Aktiveer hierdie bediener: {{name}}",
       "editServer": "Wysig bediener",
       "deleteServer": "Skrap bediener",
@@ -3271,6 +3270,18 @@
       "serverToolCount": "{{count}} gereedskap",
       "serverUnreachable": "Kon nie hierdie bediener bereik nie",
       "serverOff": "Hierdie bediener is af"
+    },
+    "mcpOAuth": {
+      "authMethod": "Verifikasie",
+      "authNone": "Geen aanmelding",
+      "authBearer": "Draertoken",
+      "authOAuth": "OAuth-aanmelding",
+      "fieldToken": "Token",
+      "oauthHint": "Nadat jy gestoor het, tik $t(modelChat.mcpOAuth.signIn) op die bediener om met jou blaaier aan te meld.",
+      "serverNeedsSignIn": "Meld aan om hierdie bediener te gebruik",
+      "signIn": "Meld aan",
+      "signInA11y": "Meld aan by hierdie bediener: {{name}}",
+      "signInFailed": "Kon nie by {{name}} aanmeld nie. Probeer weer."
     },
     "backends": {
       "title": "Kletsagtergrondstelsels",
@@ -3425,6 +3436,9 @@
       "downloading": "Laai tans af…",
       "downloadProgress": "Laai tans af… {{percent}}%",
       "downloadFailed": "Die aflaai is nie voltooi nie. Kontroleer jou verbinding en vrye berging, en probeer dan weer."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Hierdie model ondersteun denkinspanning"
     }
   },
   "settingsTools": {

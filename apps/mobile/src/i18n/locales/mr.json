@@ -3251,7 +3251,6 @@
       "fieldName": "दर्शवलेले नाव",
       "fieldUrl": "सर्व्हर URL",
       "fieldUrlInvalid": "वैध सर्व्हर URL प्रविष्ट करा.",
-      "fieldToken": "Bearer टोकन (ऐच्छिक)",
       "enableServer": "हा सर्व्हर सक्षम करा: {{name}}",
       "editServer": "सर्व्हर संपादित करा",
       "deleteServer": "सर्व्हर हटवा",
@@ -3271,6 +3270,18 @@
       "serverToolCount": "{{count}} साधने",
       "serverUnreachable": "या सर्व्हरपर्यंत पोहोचता आले नाही",
       "serverOff": "हा सर्व्हर बंद आहे"
+    },
+    "mcpOAuth": {
+      "authMethod": "प्रमाणीकरण",
+      "authNone": "साइन इन नाही",
+      "authBearer": "Bearer टोकन",
+      "authOAuth": "OAuth साइन इन",
+      "fieldToken": "टोकन",
+      "oauthHint": "सेव्ह केल्यानंतर, तुमच्या ब्राउझरद्वारे साइन इन करण्यासाठी सर्व्हरवरील $t(modelChat.mcpOAuth.signIn) वर टॅप करा.",
+      "serverNeedsSignIn": "हा सर्व्हर वापरण्यासाठी साइन इन करा",
+      "signIn": "साइन इन करा",
+      "signInA11y": "या सर्व्हरवर साइन इन करा: {{name}}",
+      "signInFailed": "{{name}} वर साइन इन करता आले नाही. पुन्हा प्रयत्न करा."
     },
     "backends": {
       "title": "चॅट बॅकएंड",
@@ -3425,6 +3436,9 @@
       "downloading": "डाउनलोड होत आहे…",
       "downloadProgress": "डाउनलोड होत आहे… {{percent}}%",
       "downloadFailed": "डाउनलोड पूर्ण झाले नाही. तुमचे कनेक्शन आणि मोकळी स्टोरेज जागा तपासा, मग पुन्हा प्रयत्न करा."
+    },
+    "reasoningEffort": {
+      "modelFlag": "हे मॉडेल विचारांची पातळी समर्थित करते"
     }
   },
   "settingsTools": {

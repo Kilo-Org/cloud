@@ -3333,7 +3333,6 @@
       "fieldName": "Zobrazovaný názov",
       "fieldUrl": "URL servera",
       "fieldUrlInvalid": "Zadajte platnú URL servera.",
-      "fieldToken": "Token Bearer (voliteľné)",
       "enableServer": "Povoliť tento server: {{name}}",
       "editServer": "Upraviť server",
       "deleteServer": "Odstrániť server",
@@ -3353,6 +3352,18 @@
       "serverToolCount": "{{count}} nástrojov",
       "serverUnreachable": "Nepodarilo sa pripojiť k tomuto serveru",
       "serverOff": "Tento server je vypnutý"
+    },
+    "mcpOAuth": {
+      "authMethod": "Overenie",
+      "authNone": "Bez prihlásenia",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Prihlásenie cez OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Po uložení ťuknite pri serveri na $t(modelChat.mcpOAuth.signIn) a prihláste sa v prehliadači.",
+      "serverNeedsSignIn": "Ak chcete používať tento server, prihláste sa",
+      "signIn": "Prihlásiť sa",
+      "signInA11y": "Prihlásiť sa k tomuto serveru: {{name}}",
+      "signInFailed": "Nepodarilo sa prihlásiť k {{name}}. Skúste to znova."
     },
     "backends": {
       "title": "Servery chatu",
@@ -3507,6 +3518,9 @@
       "downloading": "Sťahuje sa…",
       "downloadProgress": "Sťahuje sa… {{percent}} %",
       "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tento model podporuje intenzitu uvažovania"
     }
   },
   "settingsTools": {

@@ -3251,7 +3251,6 @@
       "fieldName": "表示名",
       "fieldUrl": "サーバーURL",
       "fieldUrlInvalid": "有効なサーバーURLを入力してください。",
-      "fieldToken": "Bearerトークン（任意）",
       "enableServer": "このサーバーを有効にする：{{name}}",
       "editServer": "サーバーを編集",
       "deleteServer": "サーバーを削除",
@@ -3271,6 +3270,18 @@
       "serverToolCount": "{{count}} 個のツール",
       "serverUnreachable": "このサーバーに接続できませんでした",
       "serverOff": "このサーバーはオフです"
+    },
+    "mcpOAuth": {
+      "authMethod": "認証",
+      "authNone": "サインインなし",
+      "authBearer": "Bearerトークン",
+      "authOAuth": "OAuthサインイン",
+      "fieldToken": "トークン",
+      "oauthHint": "保存後、サーバーの$t(modelChat.mcpOAuth.signIn)をタップして、ブラウザでサインインしてください。",
+      "serverNeedsSignIn": "このサーバーを使うにはサインインしてください",
+      "signIn": "サインイン",
+      "signInA11y": "このサーバーにサインイン：{{name}}",
+      "signInFailed": "{{name}}にサインインできませんでした。もう一度お試しください。"
     },
     "backends": {
       "title": "チャットバックエンド",
@@ -3425,6 +3436,9 @@
       "downloading": "ダウンロード中…",
       "downloadProgress": "ダウンロード中… {{percent}}%",
       "downloadFailed": "ダウンロードが完了しませんでした。接続と空き容量を確認してから、もう一度お試しください。"
+    },
+    "reasoningEffort": {
+      "modelFlag": "このモデルは思考量の指定に対応しています"
     }
   },
   "settingsTools": {

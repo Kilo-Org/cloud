@@ -3251,7 +3251,6 @@
       "fieldName": "Weergavenaam",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Voer een geldige server-URL in.",
-      "fieldToken": "Bearer-token (optioneel)",
       "enableServer": "Deze server inschakelen: {{name}}",
       "editServer": "Server bewerken",
       "deleteServer": "Server verwijderen",
@@ -3271,6 +3270,18 @@
       "serverToolCount": "{{count}} tools",
       "serverUnreachable": "Kon deze server niet bereiken",
       "serverOff": "Deze server staat uit"
+    },
+    "mcpOAuth": {
+      "authMethod": "Authenticatie",
+      "authNone": "Geen aanmelding",
+      "authBearer": "Bearer-token",
+      "authOAuth": "OAuth-aanmelding",
+      "fieldToken": "Token",
+      "oauthHint": "Tik na het opslaan op $t(modelChat.mcpOAuth.signIn) bij de server om je aan te melden via je browser.",
+      "serverNeedsSignIn": "Meld je aan om deze server te gebruiken",
+      "signIn": "Aanmelden",
+      "signInA11y": "Aanmelden bij deze server: {{name}}",
+      "signInFailed": "Kon niet aanmelden bij {{name}}. Probeer het opnieuw."
     },
     "backends": {
       "title": "Chatservers",
@@ -3425,6 +3436,9 @@
       "downloading": "Downloaden…",
       "downloadProgress": "Downloaden… {{percent}}%",
       "downloadFailed": "Het downloaden is niet voltooid. Controleer je verbinding en vrije opslagruimte en probeer het opnieuw."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Dit model ondersteunt denkinspanning"
     }
   },
   "settingsTools": {

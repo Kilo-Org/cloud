@@ -3251,7 +3251,6 @@
       "fieldName": "Nama paparan",
       "fieldUrl": "URL pelayan",
       "fieldUrlInvalid": "Masukkan URL pelayan yang sah.",
-      "fieldToken": "Token Bearer (pilihan)",
       "enableServer": "Dayakan pelayan ini: {{name}}",
       "editServer": "Edit pelayan",
       "deleteServer": "Padam pelayan",
@@ -3271,6 +3270,18 @@
       "serverToolCount": "{{count}} alat",
       "serverUnreachable": "Tidak dapat menghubungi pelayan ini",
       "serverOff": "Pelayan ini dimatikan"
+    },
+    "mcpOAuth": {
+      "authMethod": "Pengesahan",
+      "authNone": "Tiada log masuk",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Log masuk OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Selepas anda menyimpan, ketik $t(modelChat.mcpOAuth.signIn) pada pelayan untuk log masuk dengan pelayar anda.",
+      "serverNeedsSignIn": "Log masuk untuk menggunakan pelayan ini",
+      "signIn": "Log masuk",
+      "signInA11y": "Log masuk ke pelayan ini: {{name}}",
+      "signInFailed": "Tidak dapat log masuk ke {{name}}. Cuba lagi."
     },
     "backends": {
       "title": "Sistem pelayan sembang",
@@ -3425,6 +3436,9 @@
       "downloading": "Memuat turun…",
       "downloadProgress": "Memuat turun… {{percent}}%",
       "downloadFailed": "Muat turun tidak selesai. Semak sambungan dan ruang storan kosong anda, kemudian cuba lagi."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Model ini menyokong tahap pemikiran"
     }
   },
   "settingsTools": {

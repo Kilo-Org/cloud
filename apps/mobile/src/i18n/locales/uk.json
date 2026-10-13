@@ -3333,7 +3333,6 @@
       "fieldName": "Відображувана назва",
       "fieldUrl": "URL сервера",
       "fieldUrlInvalid": "Введіть дійсну URL-адресу сервера.",
-      "fieldToken": "Токен Bearer (необов’язково)",
       "enableServer": "Увімкнути цей сервер: {{name}}",
       "editServer": "Редагувати сервер",
       "deleteServer": "Видалити сервер",
@@ -3353,6 +3352,18 @@
       "serverToolCount": "{{count}} інструментів",
       "serverUnreachable": "Не вдалося зв’язатися з цим сервером",
       "serverOff": "Цей сервер вимкнено"
+    },
+    "mcpOAuth": {
+      "authMethod": "Автентифікація",
+      "authNone": "Без входу",
+      "authBearer": "Токен Bearer",
+      "authOAuth": "Вхід через OAuth",
+      "fieldToken": "Токен",
+      "oauthHint": "Після збереження торкніться «$t(modelChat.mcpOAuth.signIn)» на сервері, щоб увійти через браузер.",
+      "serverNeedsSignIn": "Увійдіть, щоб використовувати цей сервер",
+      "signIn": "Увійти",
+      "signInA11y": "Увійти на цей сервер: {{name}}",
+      "signInFailed": "Не вдалося увійти на {{name}}. Спробуйте ще раз."
     },
     "backends": {
       "title": "Сервери чату",
@@ -3507,6 +3518,9 @@
       "downloading": "Завантаження…",
       "downloadProgress": "Завантаження… {{percent}}%",
       "downloadFailed": "Завантаження не завершилося. Перевірте з'єднання та вільне місце, потім спробуйте ще раз."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ця модель підтримує рівень міркування"
     }
   },
   "settingsTools": {

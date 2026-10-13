@@ -6,13 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
-import { computeMonthlyCadenceBonusPercent } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import { cn } from '@/lib/utils';
 
 import { KiloPassBonusRampDialog } from './KiloPassBonusRampDialog';
 import {
   formatPercent,
   getBaseCreditsLabel,
+  getMonthlyBonusPreview,
   getTierName,
   getYearlyMonthlyBonusLabel,
 } from './utils';
@@ -38,15 +38,8 @@ export function KiloPassTierCard(props: {
     onSelect,
   } = props;
   const config = KILO_PASS_TIER_CONFIG[tier];
-  const firstMonthPercent = computeMonthlyCadenceBonusPercent({
+  const { firstMonthPercent, secondMonthPercent } = getMonthlyBonusPreview({
     tier,
-    streakMonths: 1,
-    isFirstTimeSubscriberEver: showFirstMonthPromo,
-    subscriptionStartedAtIso,
-  });
-  const secondMonthPercent = computeMonthlyCadenceBonusPercent({
-    tier,
-    streakMonths: 2,
     isFirstTimeSubscriberEver: showFirstMonthPromo,
     subscriptionStartedAtIso,
   });

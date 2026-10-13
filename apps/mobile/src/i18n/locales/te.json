@@ -3251,7 +3251,6 @@
       "fieldName": "ప్రదర్శించే పేరు",
       "fieldUrl": "సర్వర్ URL",
       "fieldUrlInvalid": "చెల్లుబాటు అయ్యే సర్వర్ URL నమోదు చేయండి.",
-      "fieldToken": "Bearer టోకెన్ (ఐచ్ఛికం)",
       "enableServer": "ఈ సర్వర్‌ను ప్రారంభించండి: {{name}}",
       "editServer": "సర్వర్‌ను సవరించండి",
       "deleteServer": "సర్వర్‌ను తొలగించండి",
@@ -3271,6 +3270,18 @@
       "serverToolCount": "{{count}} సాధనాలు",
       "serverUnreachable": "ఈ సర్వర్‌ను చేరుకోలేకపోయింది",
       "serverOff": "ఈ సర్వర్ ఆఫ్‌లో ఉంది"
+    },
+    "mcpOAuth": {
+      "authMethod": "ప్రామాణీకరణ",
+      "authNone": "సైన్ ఇన్ లేదు",
+      "authBearer": "Bearer టోకెన్",
+      "authOAuth": "OAuth సైన్ ఇన్",
+      "fieldToken": "టోకెన్",
+      "oauthHint": "సేవ్ చేసిన తర్వాత, మీ బ్రౌజర్‌తో సైన్ ఇన్ చేయడానికి సర్వర్‌పై $t(modelChat.mcpOAuth.signIn) నొక్కండి.",
+      "serverNeedsSignIn": "ఈ సర్వర్‌ను ఉపయోగించడానికి సైన్ ఇన్ చేయండి",
+      "signIn": "సైన్ ఇన్ చేయండి",
+      "signInA11y": "ఈ సర్వర్‌కు సైన్ ఇన్ చేయండి: {{name}}",
+      "signInFailed": "{{name}}కు సైన్ ఇన్ చేయలేకపోయింది. మళ్లీ ప్రయత్నించండి."
     },
     "backends": {
       "title": "చాట్ బ్యాకెండ్‌లు",
@@ -3425,6 +3436,9 @@
       "downloading": "డౌన్‌లోడ్ అవుతోంది…",
       "downloadProgress": "డౌన్‌లోడ్ అవుతోంది… {{percent}}%",
       "downloadFailed": "డౌన్‌లోడ్ పూర్తి కాలేదు. మీ కనెక్షన్‌ను, ఖాళీ స్టోరేజ్‌ను తనిఖీ చేసి, మళ్లీ ప్రయత్నించండి."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ఈ మోడల్ ఆలోచనా స్థాయికి మద్దతు ఇస్తుంది"
     }
   },
   "settingsTools": {

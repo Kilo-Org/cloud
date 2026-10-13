@@ -1,4 +1,4 @@
-import { type Turn } from '@kilocode/harness-sdk';
+import { type Effort, type Turn } from '@kilocode/harness-sdk';
 
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
 
@@ -18,10 +18,15 @@ export type Question = {
   readonly images: readonly LocalImage[];
 };
 
+/** Where a question goes: the model, and the effort it is asked with. Null is the model's default. */
+export type ChatTarget = { readonly model: string; readonly effort: Effort | null };
+
 /** What a chat screen draws. */
 export type ChatState = {
   readonly sessionId: string;
   readonly model: string;
+  /** The effort the session asks with. Null asks with the model's own default. */
+  readonly effort: Effort | null;
   /** Every turn the store holds, oldest first. */
   readonly turns: readonly Turn[];
   /** The answer arriving right now, empty when none is. */
@@ -37,6 +42,8 @@ export type ChatState = {
   readonly askedImages: readonly LocalImage[];
   /** The target that question was asked of, even if moving onto it failed. */
   readonly askedModel: string | null;
+  /** The effort that question was asked with. */
+  readonly askedEffort: Effort | null;
   /**
    * Questions typed while an answer was arriving, in the order they will be
    * asked. The composer stays open while the model works, so a person can ask
@@ -119,11 +126,12 @@ export const NOTHING = {
   asked: null,
   askedImages: [] as readonly LocalImage[],
   askedModel: null,
+  askedEffort: null,
   waiting: [] as readonly Question[],
   failed: null,
   failureKey: null,
   record: NO_RECORD,
-} satisfies Omit<ChatState, 'sessionId' | 'model' | 'status'>;
+} satisfies Omit<ChatState, 'sessionId' | 'model' | 'effort' | 'status'>;
 
 function publish(sessionId: string): void {
   for (const watcher of watchers.get(sessionId) ?? []) {
@@ -171,7 +179,13 @@ export function snapshotOf(sessionId: string): ChatState {
   if (held !== undefined) {
     return held;
   }
-  const fresh: ChatState = { sessionId: target, model: '', status: 'opening', ...NOTHING };
+  const fresh: ChatState = {
+    sessionId: target,
+    model: '',
+    effort: null,
+    status: 'opening',
+    ...NOTHING,
+  };
   states.set(target, fresh);
   return fresh;
 }

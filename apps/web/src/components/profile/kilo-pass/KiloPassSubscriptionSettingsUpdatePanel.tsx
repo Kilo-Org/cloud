@@ -25,6 +25,7 @@ type UpdatePanelProps = {
   targetCadence: KiloPassCadence;
   isMutating: boolean;
   updateSummary: UpdateSummary;
+  cancellationWithdrawalNotice: string | null;
   hasScheduledChange: boolean;
   effectiveAtLabel: string | null;
   onSelectTier: (tier: KiloPassTier) => void;
@@ -41,6 +42,7 @@ export function UpdatePanel(props: UpdatePanelProps) {
     targetCadence,
     isMutating,
     updateSummary,
+    cancellationWithdrawalNotice,
     hasScheduledChange,
     effectiveAtLabel,
     onSelectTier,
@@ -104,6 +106,12 @@ export function UpdatePanel(props: UpdatePanelProps) {
         </div>
         <p className="text-muted-foreground text-sm">{updateSummary.body}</p>
       </div>
+
+      {cancellationWithdrawalNotice ? (
+        <p role="note" className="text-sm text-amber-400">
+          {cancellationWithdrawalNotice}
+        </p>
+      ) : null}
 
       {hasScheduledChange && effectiveAtLabel ? (
         <div className="text-muted-foreground text-xs">Scheduled for {effectiveAtLabel}</div>

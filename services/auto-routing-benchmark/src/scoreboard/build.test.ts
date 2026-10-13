@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { buildScoreboard } from './build';
 import { compareScoreboards } from './compare';
 import {
+  ReplayMetricsSchema,
   ScoreboardRoutingTableSchema,
   ScoreboardSchema,
   type ProdMetrics,
+  type ReplayMetrics,
   type ScoreboardRoutingTable,
 } from './schema';
 
@@ -62,13 +64,17 @@ function prod(routeMix: Record<string, number>): ProdMetrics {
   };
 }
 
-function build(inputTable: ScoreboardRoutingTable, metrics: ProdMetrics | null = null) {
+function build(
+  inputTable: ScoreboardRoutingTable,
+  metrics: ProdMetrics | null = null,
+  replay: ReplayMetrics | null = null
+) {
   return buildScoreboard({
     label: 'fixture',
     table: inputTable,
     classifierRouteAccuracy: 0.75,
     prod: metrics,
-    replay: null,
+    replay,
     now,
   });
 }
@@ -165,6 +171,38 @@ describe('compareScoreboards', () => {
     expect(compareScoreboards(base, base, { relativeOnly: true })).toMatch(
       /latency: flat\ncost: flat\nquality: flat$/
     );
+  });
+
+  it('preserves replay costs and compares them as lower-is-better cost metrics', () => {
+    const scenario = { n: 1, p50: 10, p90: 10, p99: 10, errors: 0 };
+    const replay = ReplayMetricsSchema.parse({
+      kind: 'replay',
+      target: 'http://localhost:8810',
+      startedAt: now.toISOString(),
+      sessions: 1,
+      scenarios: {
+        cold: { ...scenario, costUsd: 0.02 },
+        warm_new_turn: scenario,
+        exact_repeat: scenario,
+      },
+    });
+    const base = build(table, null, replay);
+    expect(ScoreboardSchema.parse(base).latency.routerOverheadMs.replay).toEqual(replay.scenarios);
+    const head = structuredClone(base);
+    head.latency.routerOverheadMs.replay = {
+      ...replay.scenarios,
+      cold: { ...replay.scenarios.cold, costUsd: 0.01 },
+    };
+    const markdown = compareScoreboards(base, head, { relativeOnly: false });
+    expect(markdown).toContain('| replay.cold.costUsd | 0.02 | 0.01 | -50.00% | better |');
+    expect(markdown).not.toContain('replay.warm_new_turn.costUsd');
+    expect(markdown).toMatch(/latency: flat\ncost: better\nquality: flat$/);
+    expect(() =>
+      ReplayMetricsSchema.parse({
+        ...replay,
+        scenarios: { ...replay.scenarios, cold: { ...scenario, costUsd: -1 } },
+      })
+    ).toThrow();
   });
 
   it('handles missing and zero baselines without NaN or false improvements', () => {

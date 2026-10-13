@@ -34,9 +34,18 @@ export const ProdMetricsSchema = z.object({
 export type ProdMetrics = z.infer<typeof ProdMetricsSchema>;
 
 const replayScenariosSchema = z.object({
-  cold: DistSchema.extend({ errors: z.number().int().nonnegative() }),
-  warm_new_turn: DistSchema.extend({ errors: z.number().int().nonnegative() }),
-  exact_repeat: DistSchema.extend({ errors: z.number().int().nonnegative() }),
+  cold: DistSchema.extend({
+    errors: z.number().int().nonnegative(),
+    costUsd: z.number().nonnegative().optional(),
+  }),
+  warm_new_turn: DistSchema.extend({
+    errors: z.number().int().nonnegative(),
+    costUsd: z.number().nonnegative().optional(),
+  }),
+  exact_repeat: DistSchema.extend({
+    errors: z.number().int().nonnegative(),
+    costUsd: z.number().nonnegative().optional(),
+  }),
 });
 export const ReplayMetricsSchema = z.object({
   kind: z.literal('replay'),

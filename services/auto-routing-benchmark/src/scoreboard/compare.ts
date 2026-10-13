@@ -51,6 +51,7 @@ export function compareScoreboards(
       before?.errors ?? null,
       after?.errors ?? null
     );
+    add(`replay.${scenario}.costUsd`, 'cost', before?.costUsd ?? null, after?.costUsd ?? null);
   }
   const phases = new Set([
     ...Object.keys(base.latency.workerPhasesMs ?? {}),

@@ -31,7 +31,7 @@ type ChatBody = {
 };
 
 type Scenario = keyof ReplayMetrics['scenarios'];
-type Samples = { durations: number[]; errors: number };
+type Samples = { durations: number[]; errors: number; costUsd: number };
 
 function positiveInteger(value: string, flag: string): number {
   const number = Number(value);
@@ -148,9 +148,9 @@ async function main(): Promise<void> {
   const target = url.toString().replace(/\/+$/, '');
   const startedAt = new Date().toISOString();
   const samples: Record<Scenario, Samples> = {
-    cold: { durations: [], errors: 0 },
-    warm_new_turn: { durations: [], errors: 0 },
-    exact_repeat: { durations: [], errors: 0 },
+    cold: { durations: [], errors: 0, costUsd: 0 },
+    warm_new_turn: { durations: [], errors: 0, costUsd: 0 },
+    exact_repeat: { durations: [], errors: 0, costUsd: 0 },
   };
 
   async function measure(scenario: Scenario, payload: string): Promise<void> {
@@ -165,7 +165,23 @@ async function main(): Promise<void> {
         redirect: 'error',
       });
       failed = !response.ok;
-      await response.arrayBuffer();
+      if (response.ok) {
+        const result: unknown = await response.json();
+        if (
+          typeof result === 'object' &&
+          result !== null &&
+          'cost' in result &&
+          typeof result.cost === 'number' &&
+          Number.isFinite(result.cost) &&
+          result.cost >= 0
+        ) {
+          samples[scenario].costUsd += result.cost;
+        } else {
+          failed = true;
+        }
+      } else {
+        await response.arrayBuffer();
+      }
     } catch {
       failed = true;
     }
@@ -205,6 +221,7 @@ async function main(): Promise<void> {
   const scenarioMetrics = (scenario: Scenario) => ({
     ...distribution(samples[scenario].durations),
     errors: samples[scenario].errors,
+    costUsd: samples[scenario].costUsd,
   });
   const result: ReplayMetrics = {
     kind: 'replay',

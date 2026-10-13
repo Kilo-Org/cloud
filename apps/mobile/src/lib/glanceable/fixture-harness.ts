@@ -11,16 +11,11 @@ import {
 import { Platform } from 'react-native';
 
 import {
-  discoverSessionCards,
+  applyFixtureSessionContent,
   endAllSessionCards,
   followSession,
-} from '@/glanceable-ios/session-follow';
-import {
-  SESSION_CARD_STALE_AFTER_SECONDS,
-  sessionCardRelevance,
-  settleCardWork,
-} from '@/glanceable-ios/session-card-press';
-import { syncFollowedSessionCards } from '@/lib/glanceable/session-follow';
+  syncFixtureSessionCards,
+} from '@/lib/glanceable/session-follow';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 
@@ -87,7 +82,8 @@ function cancelTerminal(): void {
 }
 
 /**
- * iOS: follow the fixture's row through the Follow path, so the aggregate card
+ * Follow the fixture's row through the Follow path on either platform (the
+ * shim picks the Live Activity or the Android notification), so the aggregate card
  * counts it out and the card is drawn from production content. A permission
  * fixture then applies the content a server push would carry (the same
  * builder, with the approval key the server mints); a finished fixture
@@ -100,6 +96,7 @@ function applySessionCardFixture(input: {
   now: number;
 }): void {
   const { fixture, rows, ctx, now } = input;
+  // The fixture's follow replaces any real one: one session card surface at a time.
   endAllSessionCards();
   const follow = fixture.follow;
   const row = follow === undefined ? undefined : rows[follow.index];
@@ -114,11 +111,10 @@ function applySessionCardFixture(input: {
   };
   log(`session card ${followSession(follow.finish === true ? working : row, ctx, now)}`);
   if (follow.finish === true) {
-    syncFollowedSessionCards([{ ...row, statusUpdatedAt: at }], now);
+    syncFixtureSessionCards([{ ...row, statusUpdatedAt: at }], now);
   }
-  const card = discoverSessionCards().find(activity => activity.getProps()?.sessionId === row.id);
   const facts = follow.card;
-  if ((follow.approvalKey === true || facts !== undefined) && card !== undefined) {
+  if (follow.approvalKey === true || facts !== undefined) {
     // The richer facts a server push carries, applied through the production
     // builder, so no fixture ever hands the card hand-made props. A quiet
     // fixture moves the last activity past the quiet window, which is what the
@@ -153,9 +149,7 @@ function applySessionCardFixture(input: {
         statusSinceFallback: row.statusUpdatedAt ?? at,
       }
     );
-    void settleCardWork(
-      card.update(content, SESSION_CARD_STALE_AFTER_SECONDS, sessionCardRelevance(content))
-    );
+    applyFixtureSessionContent(content);
   }
 }
 

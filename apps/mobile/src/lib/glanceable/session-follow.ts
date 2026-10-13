@@ -1,9 +1,16 @@
 import { Platform } from 'react-native';
 
-import { type SessionLiveActivityRow } from '@kilocode/notifications';
+import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  type SessionLiveActivityContentState,
+  sessionLiveActivityRelevance,
+  type SessionLiveActivityRow,
+} from '@kilocode/notifications';
 
 import type * as AndroidFollow from '@/glanceable-android/session-follow';
 import type * as IosFollow from '@/glanceable-ios/session-follow';
+
+import { isGlanceableFixtureHeld } from './fixture-hold';
 
 /**
  * The per-session follow lifecycle, per platform
@@ -20,7 +27,20 @@ import type * as IosFollow from '@/glanceable-ios/session-follow';
  * the widget or notification graphs that only need one platform.
  */
 
+/**
+ * A suite's Android follow module: the lazy `require` below is not reachable by
+ * `vi.mock`, so a test hands in the real module it imported with its own mocks.
+ */
+let androidFollowForTests: typeof AndroidFollow | null = null;
+
+export function _setAndroidFollowForTests(module: typeof AndroidFollow | null): void {
+  androidFollowForTests = module;
+}
+
 function android(): typeof AndroidFollow {
+  if (androidFollowForTests !== null) {
+    return androidFollowForTests;
+  }
   // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
   return require('@/glanceable-android/session-follow') as typeof AndroidFollow;
 }
@@ -61,12 +81,69 @@ export const dismissFinishedSessionCard = (sessionId: string): void => {
   follow().dismissFinishedSessionCard(sessionId);
 };
 
+/**
+ * The tray rows update the followed cards. While a dev fixture is held, the
+ * fixture owns every surface, so the live tray must not overwrite its card (the
+ * flag is always false in a release build).
+ */
 export const syncFollowedSessionCards = (
+  rows: readonly SessionCardRow[],
+  checkedAt?: number
+): void => {
+  if (isGlanceableFixtureHeld()) {
+    return;
+  }
+  follow().syncFollowedSessionCards(rows, checkedAt);
+};
+
+/** End every session card: the fixture harness clears the surface before it draws one. */
+export const endAllSessionCards = (): void => {
+  follow().endAllSessionCards();
+};
+
+/**
+ * Dev fixtures: the fixture harness drives the session card through the same
+ * paths a real follow takes. `syncFixtureSessionCards` is the tray update the
+ * held fixture's own rows make (the live tray stays gated), and
+ * `applyFixtureSessionContent` lays the content a server push would carry onto
+ * the followed card: the Android push path, or an ActivityKit update with the
+ * shared stale window and relevance on iOS.
+ */
+export const syncFixtureSessionCards = (
   rows: readonly SessionCardRow[],
   checkedAt?: number
 ): void => {
   follow().syncFollowedSessionCards(rows, checkedAt);
 };
+
+export const applyFixtureSessionContent = (content: SessionLiveActivityContentState): boolean => {
+  if (Platform.OS === 'android') {
+    return android().applySessionLiveUpdate('update', content);
+  }
+  const card = iosFollow()
+    .discoverSessionCards()
+    .find(activity => activity.getProps()?.sessionId === content.sessionId);
+  if (card === undefined) {
+    return false;
+  }
+  void settleFixtureCardWork(
+    card.update(
+      content,
+      GLANCEABLE_STALE_MS / 1000,
+      sessionLiveActivityRelevance(content.statusKind, content.statusSince)
+    )
+  );
+  return true;
+};
+
+/** Run one fixture card write whose failure has nothing left to correct. */
+async function settleFixtureCardWork(work: Promise<void>): Promise<void> {
+  try {
+    await work;
+  } catch {
+    // A card iOS already removed; the fixture shows the rest.
+  }
+}
 
 /** Android only: apply one server push to the followed set. */
 export const applySessionLiveUpdate = (

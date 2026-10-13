@@ -2154,6 +2154,11 @@
       "collapse": "Whakaitihia te whāinga",
       "expand": "Whakawhānuitia te whāinga"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Ngā mahi, {{completed}} o {{total}} kua oti",
+      "rowAccessibility": "Ngā mahi, {{completed}} o {{total}} kua oti. Mahi o nāianei: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Ngā mea i whakamahia tata nei",
       "couldNotLoadGithubRepositories": "Kāore i taea te uta i ngā putunga waehere GitHub.",
@@ -2208,6 +2213,10 @@
       "importingSession": "Kei te kawemai i te wātū",
       "cliCannotContinue": "Kāore e taea e tēnei CLI te haere tonu i tētahi wātū. Kōwhiria a Cloud Agent, tētahi atu CLI rānei.",
       "importFailed": "Kāore i taea te kawemai i tēnei wātū.",
+      "cliCannotFork": "Whakahōungia te Kilo CLI kia taea ai te peka mai i tētahi karere.",
+      "forkCutNotSynced": "Kāore anō tēnei karere kia tiakina. Ngana anō ā tōna wā poto.",
+      "forkFilesFromBaseBranch": "Ka tīmata ngā kōnae i te peka taketake.",
+      "forkFilesUnchangedOnComputer": "Kāore e panonihia ngā kōnae i tēnei rorohiko.",
       "pickProfile": "Tīpakohia he kōtaha",
       "noProfile": "Kāore he kōtaha",
       "manageProfiles": "Whakahaere pūkete",
@@ -2323,6 +2332,7 @@
       "copyMessage": "Tāruatia te karere",
       "copyText": "Tāruatia te kuputuhi",
       "selectText": "Kōwhiria te kuputuhi",
+      "forkFromHere": "Peka mai i konei",
       "reportAiResponse": "Pūrongotia te whakautu AI",
       "reportAiResponseConfirm": "Pūrongotia tēnei whakautu kia arotakengia?",
       "report": "Pūrongotia",
@@ -3196,6 +3206,7 @@
     "tutorialLabel": "Akoranga"
   },
   "modelChat": {
+    "offlineFailure": "Me whai hononga ipurangi tēnei tauira. Tūhono, ka ngana anō, kia huri rānei ki tētahi tauira i tēnei pūrere.",
     "empty": {
       "title": "Tīmata he kōrero",
       "description": "Tukuna he karere hei kōrero ki tētahi tauira."
@@ -3207,6 +3218,11 @@
       "deleteTitle": "Muku i tēnei kōrero?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Rapu i te ipurangi",
+      "description": "Tukuna tēnei kōrerorero kia rapu i ngā mōhiohio hou mā tō pūkete Kilo. Ka whakamahia e ngā rapunga tō wāhanga rapu ā-marama.",
+      "allowanceExhausted": "Kua pau ō rapunga ipurangi utukore mō tēnei marama. Tāpirihia he nama kia rapu anō."
+    },
     "mcp": {
       "title": "Ngā taputapu Kilo",
       "use": "Whakamahia ngā taputapu Kilo",
@@ -3332,8 +3348,48 @@
         "notGguf": "Me tohu te hononga ki tētahi kōnae .gguf.",
         "space": "Kāore e ranea te wāhi rokiroki mō tēnei tauira. Whakawāteahia he wāhi, ka ngana anō.",
         "network": "Kāore i oti te tikiake. Tirohia tō hononga, ka ngana anō.",
-        "invalidFile": "Ehara te kōnae kua tikiake i tētahi tauira ka taea e tēnei taupānga te whakahaere, nō reira kua tangohia."
+        "invalidFile": "Ehara te kōnae kua tikiake i tētahi tauira ka taea e tēnei taupānga te whakahaere, nō reira kua tangohia.",
+        "checksum": "Kāore te kōnae kua tikiake e ōrite ki tōna tātai arowhai kua whakaputaina, nō reira kua tangohia. Whakamātauria anō te tikiake."
       }
+    },
+    "catalog": {
+      "browse": "Tirotiro tauira",
+      "title": "Rārangi tauira",
+      "search": "Rapu tauira Hugging Face",
+      "tabs": "Tātari tauira",
+      "fitsTab": "E uru ana ki tēnei pūrere",
+      "fromHuggingFace": "Nō Hugging Face",
+      "loading": "E uta ana i ngā tauira",
+      "noResults": "Kāore he tauira i kitea",
+      "noFits": "Kāore he tauira e uru ana ki tēnei pūrere",
+      "noFitsDescription": "Kei te ripa $t(common.all) ngā tauira nui ake.",
+      "fit": {
+        "fits": "E uru ana",
+        "tight": "He kuiti",
+        "tooLarge": "He nui rawa",
+        "noStorage": "Kāore e rawaka te rokiroki"
+      },
+      "parameters": "Tawhā: {{value}}",
+      "downloads": "Tikiake: {{value}}",
+      "likes": "Pai: {{value}}",
+      "context": "Matapihi horopaki: {{value}}",
+      "license": "Raihana: {{license}}",
+      "licenseUnknown": "Kāore i whakahuatia te raihana",
+      "tools": "Karanga utauta",
+      "vision": "Tāuru atahanga",
+      "hintsHelp": "He tohu nō Hugging Face. Ka arotakehia te tauira e te taupānga i muri i te tikiake.",
+      "gated": "Me whai pūkete Hugging Face tēnei tauira, nō reira kāore e taea e te taupānga te tikiake.",
+      "quantizations": "Ngā inenga",
+      "quantizationsHelp": "He iti ake te mahara me te rokiroki e whakamahia ana e ngā kōnae iti ake. Ko te tikanga, he pai ake ngā whakautu a ngā kōnae nui ake.",
+      "quantDetail": "Tikiake {{size}} · tata ki te {{memory}} o te mahara",
+      "downloadQuant": "Tikiake {{quant}}",
+      "loadingModel": "E uta ana i ngā taipitopito tauira",
+      "couldNotLoadModel": "Kāore i taea te uta i tēnei tauira",
+      "noFiles": "Kāore he kōnae e taea ana e tēnei taupānga te whakahaere",
+      "noFilesDescription": "Ka whakahaere tēnei taupānga i ngā tauira he kōnae GGUF kotahi.",
+      "tooLargeTitle": "Tērā pea kāore tēnei tauira e rere",
+      "tooLargeMessage": "Tērā pea ka nui ake te mahara e hiahiatia ana e {{name}} i tā tēnei pūrere. Ka kati pea te taupānga i te wā e whakautu ana te tauira. Me tikiake tonu?",
+      "downloadAnyway": "Tikiake tonu"
     },
     "localModels": {
       "title": "Ngā tauira i te pūrere",

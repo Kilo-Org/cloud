@@ -2154,6 +2154,11 @@
       "collapse": "Cél összecsukása",
       "expand": "Cél kibontása"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Feladatok, {{total}}ból {{completed}} kész",
+      "rowAccessibility": "Feladatok, {{total}}ból {{completed}} kész. Jelenlegi feladat: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Legutóbb használt",
       "couldNotLoadGithubRepositories": "Nem sikerült betölteni a GitHub-tárolókat.",
@@ -2208,6 +2213,10 @@
       "importingSession": "Munkamenet importálása…",
       "cliCannotContinue": "Ez a CLI nem támogatja a munkamenetek folytatását. Válaszd a Cloud Agentet vagy egy másik CLI-t.",
       "importFailed": "Nem sikerült importálni ezt a munkamenetet.",
+      "cliCannotFork": "Frissítsd a Kilo CLI-t, hogy egy üzenettől elágaztathass.",
+      "forkCutNotSynced": "Ez az üzenet még nincs mentve. Próbáld újra egy kis idő múlva.",
+      "forkFilesFromBaseBranch": "A fájlok az alapági állapotból indulnak.",
+      "forkFilesUnchangedOnComputer": "A számítógépen lévő fájlok nem változnak.",
       "pickProfile": "Válassz egy profilt",
       "noProfile": "Nincs profil",
       "manageProfiles": "Profilok kezelése",
@@ -2327,6 +2336,7 @@
       "copyMessage": "Üzenet másolása",
       "copyText": "Szöveg másolása",
       "selectText": "Szöveg kijelölése",
+      "forkFromHere": "Elágaztatás innen",
       "reportAiResponse": "AI-válasz jelentése",
       "reportAiResponseConfirm": "Jelented ezt a választ, hogy ellenőrizzük?",
       "report": "Jelentés",
@@ -3196,6 +3206,7 @@
     "tutorialLabel": "Oktatóprogram"
   },
   "modelChat": {
+    "offlineFailure": "Ehhez a modellhez internetkapcsolat szükséges. Csatlakozzon, és próbálja újra, vagy váltson egy ezen az eszközön lévő modellre.",
     "empty": {
       "title": "Kezdjen csevegést",
       "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."
@@ -3207,6 +3218,11 @@
       "deleteTitle": "Törli ezt a csevegést?"
     },
     "beta": "Béta",
+    "webSearch": {
+      "title": "Keresés a weben",
+      "description": "Engedd, hogy ez a csevegés aktuális információkat keressen a Kilo-fiókodon keresztül. A keresések a havi keresési keretedet használják.",
+      "allowanceExhausted": "Elfogytak az e havi ingyenes webes kereséseid. Adj hozzá kreditet, hogy újra kereshess."
+    },
     "mcp": {
       "title": "Kilo-eszközök",
       "use": "Kilo-eszközök használata",
@@ -3332,8 +3348,48 @@
         "notGguf": "A hivatkozásnak .gguf fájlra kell mutatnia.",
         "space": "Nincs elég szabad tárhely ehhez a modellhez. Szabadítson fel tárhelyet, és próbálja újra.",
         "network": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot, és próbálja újra.",
-        "invalidFile": "A letöltött fájl nem olyan modell, amelyet ez az alkalmazás futtatni tud, ezért eltávolítottuk."
+        "invalidFile": "A letöltött fájl nem olyan modell, amelyet ez az alkalmazás futtatni tud, ezért eltávolítottuk.",
+        "checksum": "A letöltött fájl nem egyezik a közzétett ellenőrzőösszegével, ezért eltávolítottuk. Próbálja meg újra a letöltést."
       }
+    },
+    "catalog": {
+      "browse": "Modellek böngészése",
+      "title": "Modellkatalógus",
+      "search": "Keresés a Hugging Face modellek között",
+      "tabs": "Modellszűrő",
+      "fitsTab": "Elfér ezen az eszközön",
+      "fromHuggingFace": "A Hugging Face-ről",
+      "loading": "Modellek betöltése",
+      "noResults": "Nem található modell",
+      "noFits": "Egyik modell sem fér el ezen az eszközön",
+      "noFitsDescription": "A nagyobb modellek a(z) $t(common.all) lapon találhatók.",
+      "fit": {
+        "fits": "Elfér",
+        "tight": "Épphogy elfér",
+        "tooLarge": "Túl nagy",
+        "noStorage": "Nincs elég tárhely"
+      },
+      "parameters": "Paraméterek: {{value}}",
+      "downloads": "Letöltések: {{value}}",
+      "likes": "Kedvelések: {{value}}",
+      "context": "Kontextusablak: {{value}}",
+      "license": "Licenc: {{license}}",
+      "licenseUnknown": "A licenc nincs megadva",
+      "tools": "Eszközhívás",
+      "vision": "Képbemenet",
+      "hintsHelp": "Tippek a Hugging Face-ről. Az alkalmazás a letöltés után ellenőrzi a modellt.",
+      "gated": "Ehhez a modellhez Hugging Face-fiók szükséges, ezért az alkalmazás nem tudja letölteni.",
+      "quantizations": "Kvantálások",
+      "quantizationsHelp": "A kisebb fájlok kevesebb memóriát és tárhelyet használnak. A nagyobb fájlok általában jobb válaszokat adnak.",
+      "quantDetail": "{{size}} letöltés · kb. {{memory}} memória",
+      "downloadQuant": "{{quant}} letöltése",
+      "loadingModel": "Modell részleteinek betöltése",
+      "couldNotLoadModel": "Nem sikerült betölteni ezt a modellt",
+      "noFiles": "Nincs az alkalmazás által futtatható fájl",
+      "noFilesDescription": "Az alkalmazás egyetlen GGUF-fájlból álló modelleket futtat.",
+      "tooLargeTitle": "Előfordulhat, hogy ez a modell nem fut",
+      "tooLargeMessage": "A(z) {{name}} valószínűleg több memóriát igényel, mint amennyi ezen az eszközön van. Az alkalmazás bezáródhat, miközben a modell válaszol. Letölti mégis?",
+      "downloadAnyway": "Letöltés mégis"
     },
     "localModels": {
       "title": "Eszközön futó modellek",

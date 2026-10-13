@@ -1,6 +1,6 @@
 import { type ReactNode, useContext, useEffect, useRef } from 'react';
 import { createStore, Provider as JotaiProvider } from 'jotai';
-import { type SessionManager } from '@kilocode/cloud-agent-sdk';
+import { type KiloSessionId, type SessionManager } from '@kilocode/cloud-agent-sdk';
 import { useLocalSearchParams } from 'expo-router';
 import { createMobileAgentSessionManager } from '@/components/agents/mobile-session-manager';
 import {
@@ -25,12 +25,15 @@ type AgentSessionProviderProps = {
    * only keeps this manager alive while the same credentials still own it.
    */
   restoredUserId?: string;
+  /** Set when the route opens a session just cloned onto a remote CLI. */
+  clonedSessionId?: KiloSessionId;
 };
 
 export function AgentSessionProvider({
   children,
   organizationId,
   restoredUserId,
+  clonedSessionId,
 }: Readonly<AgentSessionProviderProps>) {
   const userWebConnection = useUserWebConnection();
   const storeRef = useRef(createStore());
@@ -47,6 +50,7 @@ export function AgentSessionProvider({
     userWebConnection,
     organizationId,
     userId: scopeUserId,
+    clonedSessionId,
   });
 
   // The provider only mounts on the agent-chat route, so the route's session id

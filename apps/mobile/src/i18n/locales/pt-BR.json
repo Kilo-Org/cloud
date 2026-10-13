@@ -1623,6 +1623,11 @@
       "collapse": "Recolher meta",
       "expand": "Expandir meta"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tarefas, {{completed}} de {{total}} concluídas",
+      "rowAccessibility": "Tarefas, {{completed}} de {{total}} concluídas. Tarefa atual: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Usados recentemente",
       "couldNotLoadGithubRepositories": "Não foi possível carregar os repositórios do GitHub.",
@@ -1677,6 +1682,10 @@
       "importingSession": "Importando sessão",
       "cliCannotContinue": "Esta CLI não permite continuar uma sessão. Escolha o Cloud Agent ou outra CLI.",
       "importFailed": "Não foi possível importar esta sessão.",
+      "cliCannotFork": "Atualize a Kilo CLI para criar um fork a partir de uma mensagem.",
+      "forkCutNotSynced": "Esta mensagem ainda não foi salva. Tente novamente em instantes.",
+      "forkFilesFromBaseBranch": "Os arquivos começam a partir do branch base.",
+      "forkFilesUnchangedOnComputer": "Os arquivos neste computador não são alterados.",
       "pickProfile": "Escolha um perfil",
       "noProfile": "Sem perfil",
       "manageProfiles": "Gerenciar perfis",
@@ -1796,6 +1805,7 @@
       "copyMessage": "Copiar mensagem",
       "copyText": "Copiar texto",
       "selectText": "Selecionar texto",
+      "forkFromHere": "Criar fork a partir daqui",
       "reportAiResponse": "Denunciar resposta da IA",
       "reportAiResponseConfirm": "Denunciar esta resposta para análise?",
       "report": "Denunciar",
@@ -3237,6 +3247,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Este modelo precisa de conexão com a internet. Conecte-se e tente novamente ou mude para um modelo neste dispositivo.",
     "empty": {
       "title": "Iniciar um chat",
       "description": "Envie uma mensagem para conversar com um modelo."
@@ -3248,6 +3259,11 @@
       "deleteTitle": "Excluir esta conversa?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Pesquisar na web",
+      "description": "Permita que este chat busque informações atuais pela sua conta Kilo. As pesquisas usam sua cota mensal de pesquisas.",
+      "allowanceExhausted": "Suas pesquisas na web gratuitas deste mês acabaram. Adicione créditos para pesquisar de novo."
+    },
     "mcp": {
       "title": "Ferramentas do Kilo",
       "use": "Usar as ferramentas do Kilo",
@@ -3373,8 +3389,48 @@
         "notGguf": "O link deve apontar para um arquivo .gguf.",
         "space": "Não há espaço livre suficiente para este modelo. Libere espaço e tente novamente.",
         "network": "O download não foi concluído. Verifique sua conexão e tente novamente.",
-        "invalidFile": "O arquivo baixado não é um modelo que este app pode executar, então ele foi removido."
+        "invalidFile": "O arquivo baixado não é um modelo que este app pode executar, então ele foi removido.",
+        "checksum": "O arquivo baixado não corresponde à soma de verificação publicada, então ele foi removido. Tente baixar novamente."
       }
+    },
+    "catalog": {
+      "browse": "Explorar modelos",
+      "title": "Catálogo de modelos",
+      "search": "Pesquisar modelos do Hugging Face",
+      "tabs": "Filtro de modelos",
+      "fitsTab": "Cabem neste dispositivo",
+      "fromHuggingFace": "Do Hugging Face",
+      "loading": "Carregando modelos",
+      "noResults": "Nenhum modelo encontrado",
+      "noFits": "Nenhum modelo cabe neste dispositivo",
+      "noFitsDescription": "Modelos maiores estão na aba $t(common.all).",
+      "fit": {
+        "fits": "Cabe",
+        "tight": "Cabe por pouco",
+        "tooLarge": "Grande demais",
+        "noStorage": "Armazenamento insuficiente"
+      },
+      "parameters": "Parâmetros: {{value}}",
+      "downloads": "Downloads: {{value}}",
+      "likes": "Curtidas: {{value}}",
+      "context": "Janela de contexto: {{value}}",
+      "license": "Licença: {{license}}",
+      "licenseUnknown": "A licença não foi informada",
+      "tools": "Chamada de ferramentas",
+      "vision": "Entrada de imagem",
+      "hintsHelp": "Indicações do Hugging Face. O app verifica o modelo depois que ele é baixado.",
+      "gated": "Este modelo exige uma conta do Hugging Face, então o app não pode baixá-lo.",
+      "quantizations": "Quantizações",
+      "quantizationsHelp": "Arquivos menores usam menos memória e armazenamento. Arquivos maiores geralmente dão respostas melhores.",
+      "quantDetail": "Download de {{size}} · cerca de {{memory}} de memória",
+      "downloadQuant": "Baixar {{quant}}",
+      "loadingModel": "Carregando detalhes do modelo",
+      "couldNotLoadModel": "Não foi possível carregar este modelo",
+      "noFiles": "Nenhum arquivo que este app possa executar",
+      "noFilesDescription": "Este app executa modelos que são um único arquivo GGUF.",
+      "tooLargeTitle": "Este modelo pode não funcionar",
+      "tooLargeMessage": "{{name}} provavelmente precisa de mais memória do que este dispositivo tem. O app pode fechar enquanto o modelo responde. Baixar mesmo assim?",
+      "downloadAnyway": "Baixar mesmo assim"
     },
     "localModels": {
       "title": "Modelos no dispositivo",

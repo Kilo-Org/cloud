@@ -163,6 +163,9 @@ export const createSessionForCloudAgentSchema = z.object({
   // Compatibility: old callers omit this field and create empty destination
   // storage. Remove that path only when all deployed callers require cloning.
   cloneFromKiloSessionId: sessionIdSchema.optional(),
+  // Inclusive cut for a clone: keep messages with ID <= this ID (and their
+  // parts) and drop the session diff. Only meaningful with cloneFromKiloSessionId.
+  cloneUpToMessageId: messageIdSchema.optional(),
 });
 export type CreateSessionForCloudAgentParams = z.input<typeof createSessionForCloudAgentSchema>;
 
@@ -178,7 +181,8 @@ export type SessionCloneRejectionCode =
   | 'missing_source_body'
   | 'source_digest_changed'
   | 'destination_conflict'
-  | 'clone_setup_failed';
+  | 'clone_setup_failed'
+  | 'clone_cut_not_found';
 
 /**
  * Clone acknowledgement carried by the `ready` result. `sessionId` is the

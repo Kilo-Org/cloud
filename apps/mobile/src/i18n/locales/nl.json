@@ -1642,6 +1642,11 @@
       "collapse": "Doel inklappen",
       "expand": "Doel uitklappen"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Taken, {{completed}} van {{total}} voltooid",
+      "rowAccessibility": "Taken, {{completed}} van {{total}} voltooid. Huidige taak: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Recent gebruikt",
       "couldNotLoadGithubRepositories": "De GitHub-repositories konden niet worden geladen.",
@@ -1696,6 +1701,10 @@
       "importingSession": "Sessie importeren…",
       "cliCannotContinue": "Deze CLI kan geen sessie voortzetten. Kies Cloud Agent of een andere CLI.",
       "importFailed": "Deze sessie kon niet worden geïmporteerd.",
+      "cliCannotFork": "Werk de Kilo CLI bij om vanaf een bericht te forken.",
+      "forkCutNotSynced": "Dit bericht is nog niet opgeslagen. Probeer het zo opnieuw.",
+      "forkFilesFromBaseBranch": "Bestanden beginnen vanaf de basisbranch.",
+      "forkFilesUnchangedOnComputer": "Bestanden op deze computer worden niet gewijzigd.",
       "pickProfile": "Kies een profiel",
       "noProfile": "Geen profiel",
       "manageProfiles": "Beheer profielen",
@@ -1811,6 +1820,7 @@
       "copyMessage": "Bericht kopiëren",
       "copyText": "Tekst kopiëren",
       "selectText": "Tekst selecteren",
+      "forkFromHere": "Vanaf hier forken",
       "reportAiResponse": "AI-antwoord melden",
       "reportAiResponseConfirm": "Wil je dit antwoord ter beoordeling melden?",
       "report": "Melden",
@@ -3196,6 +3206,7 @@
     "tutorialLabel": "Zelfstudie"
   },
   "modelChat": {
+    "offlineFailure": "Dit model heeft een internetverbinding nodig. Maak verbinding en probeer het opnieuw, of schakel over naar een model op dit apparaat.",
     "empty": {
       "title": "Start een chat",
       "description": "Stuur een bericht om met een model te praten."
@@ -3207,6 +3218,11 @@
       "deleteTitle": "Deze chat verwijderen?"
     },
     "beta": "Bèta",
+    "webSearch": {
+      "title": "Zoeken op het web",
+      "description": "Laat deze chat actuele informatie opzoeken via je Kilo-account. Zoekopdrachten gebruiken je maandelijkse zoektegoed.",
+      "allowanceExhausted": "Je gratis webzoekopdrachten voor deze maand zijn op. Voeg tegoed toe om weer te zoeken."
+    },
     "mcp": {
       "title": "Kilo-tools",
       "use": "Kilo-tools gebruiken",
@@ -3332,8 +3348,48 @@
         "notGguf": "De link moet naar een .gguf-bestand verwijzen.",
         "space": "Er is niet genoeg vrije opslagruimte voor dit model. Maak ruimte vrij en probeer het opnieuw.",
         "network": "De download is niet voltooid. Controleer je verbinding en probeer het opnieuw.",
-        "invalidFile": "Het gedownloade bestand is geen model dat deze app kan uitvoeren, dus het is verwijderd."
+        "invalidFile": "Het gedownloade bestand is geen model dat deze app kan uitvoeren, dus het is verwijderd.",
+        "checksum": "Het gedownloade bestand komt niet overeen met de gepubliceerde controlesom, dus het is verwijderd. Probeer het opnieuw te downloaden."
       }
+    },
+    "catalog": {
+      "browse": "Modellen bekijken",
+      "title": "Modelcatalogus",
+      "search": "Hugging Face-modellen zoeken",
+      "tabs": "Modelfilter",
+      "fitsTab": "Past op dit apparaat",
+      "fromHuggingFace": "Van Hugging Face",
+      "loading": "Modellen laden",
+      "noResults": "Geen modellen gevonden",
+      "noFits": "Geen modellen passen op dit apparaat",
+      "noFitsDescription": "Grotere modellen staan op het tabblad $t(common.all).",
+      "fit": {
+        "fits": "Past",
+        "tight": "Past krap",
+        "tooLarge": "Te groot",
+        "noStorage": "Onvoldoende opslag"
+      },
+      "parameters": "Parameters: {{value}}",
+      "downloads": "Downloads: {{value}}",
+      "likes": "Likes: {{value}}",
+      "context": "Contextvenster: {{value}}",
+      "license": "Licentie: {{license}}",
+      "licenseUnknown": "De licentie is niet vermeld",
+      "tools": "Toolaanroepen",
+      "vision": "Afbeeldingsinvoer",
+      "hintsHelp": "Hints van Hugging Face. De app controleert het model na het downloaden.",
+      "gated": "Voor dit model is een Hugging Face-account nodig, dus de app kan het niet downloaden.",
+      "quantizations": "Kwantisaties",
+      "quantizationsHelp": "Kleinere bestanden gebruiken minder geheugen en opslag. Grotere bestanden geven meestal betere antwoorden.",
+      "quantDetail": "Download van {{size}} · ongeveer {{memory}} geheugen",
+      "downloadQuant": "{{quant}} downloaden",
+      "loadingModel": "Modeldetails laden",
+      "couldNotLoadModel": "Kan dit model niet laden",
+      "noFiles": "Geen bestanden die deze app kan uitvoeren",
+      "noFilesDescription": "Deze app voert modellen uit die uit één GGUF-bestand bestaan.",
+      "tooLargeTitle": "Dit model werkt mogelijk niet",
+      "tooLargeMessage": "{{name}} heeft waarschijnlijk meer geheugen nodig dan dit apparaat heeft. De app kan sluiten terwijl het model antwoordt. Toch downloaden?",
+      "downloadAnyway": "Toch downloaden"
     },
     "localModels": {
       "title": "Modellen op het apparaat",

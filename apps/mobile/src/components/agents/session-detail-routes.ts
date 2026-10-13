@@ -64,8 +64,15 @@ export function replaceWithAgentSession(
  * replaces an existing query string. The optional `?organizationId=`
  * already produced by `getAgentSessionPath` is preserved and `spawned=1`
  * is joined with `&` in that case.
+ *
+ * `cloned` adds `cloned=1` for a spawn that cloned a session: the route then
+ * re-reads an empty first page until the CLI's sync of the clone lands.
  */
-export function getSpawnedAgentSessionPath(kiloSessionId: string, organizationId?: string): Href {
+export function getSpawnedAgentSessionPath(
+  kiloSessionId: string,
+  organizationId?: string,
+  options: { cloned?: boolean } = {}
+): Href {
   // `getAgentSessionPath` returns an `Href` (= `string | HrefObject`)
   // but in this codebase every construction site uses the string
   // branch. Narrow with `as string` so the `.includes('?')` check
@@ -73,5 +80,6 @@ export function getSpawnedAgentSessionPath(kiloSessionId: string, organizationId
   // HrefObject (which the rest of the app does not use).
   const base = getAgentSessionPath(kiloSessionId, organizationId) as string;
   const separator = base.includes('?') ? '&' : '?';
-  return `${base}${separator}spawned=1` as Href;
+  const cloned = options.cloned ? '&cloned=1' : '';
+  return `${base}${separator}spawned=1${cloned}` as Href;
 }

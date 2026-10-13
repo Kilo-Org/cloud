@@ -2154,6 +2154,11 @@
       "collapse": "Fella markmið saman",
       "expand": "Fella markmið út"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Verkefni, {{completed}} af {{total}} lokið",
+      "rowAccessibility": "Verkefni, {{completed}} af {{total}} lokið. Núverandi verkefni: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nýlega notað",
       "couldNotLoadGithubRepositories": "Ekki tókst að hlaða kóðasöfnum frá GitHub.",
@@ -2208,6 +2213,10 @@
       "importingSession": "Flytur lotuna inn",
       "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
       "importFailed": "Ekki tókst að flytja inn þessa lotu.",
+      "cliCannotFork": "Uppfærðu Kilo CLI til að kvísla frá skilaboðum.",
+      "forkCutNotSynced": "Þessi skilaboð hafa ekki verið vistuð enn. Reyndu aftur eftir smástund.",
+      "forkFilesFromBaseBranch": "Skrár byrja frá grunngreininni.",
+      "forkFilesUnchangedOnComputer": "Skrám á þessari tölvu er ekki breytt.",
       "pickProfile": "Veldu prófíl",
       "noProfile": "Enginn prófíll",
       "manageProfiles": "Stjórna prófílum",
@@ -2323,6 +2332,7 @@
       "copyMessage": "Afrita skilaboð",
       "copyText": "Afrita texta",
       "selectText": "Velja texta",
+      "forkFromHere": "Kvísla héðan",
       "reportAiResponse": "Tilkynna AI-svar",
       "reportAiResponseConfirm": "Viltu tilkynna þetta svar til yfirferðar?",
       "report": "Tilkynna",
@@ -3196,6 +3206,7 @@
     "tutorialLabel": "Leiðbeiningar"
   },
   "modelChat": {
+    "offlineFailure": "Þetta líkan þarf nettengingu. Tengstu og reyndu aftur, eða skiptu yfir í líkan á þessu tæki.",
     "empty": {
       "title": "Byrjaðu spjall",
       "description": "Sendu skilaboð til að tala við líkan."
@@ -3207,6 +3218,11 @@
       "deleteTitle": "Eyða þessu spjalli?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Leita á vefnum",
+      "description": "Leyfðu þessu spjalli að fletta upp nýjum upplýsingum í gegnum Kilo-reikninginn þinn. Leitir nota mánaðarlegan leitarkvóta þinn.",
+      "allowanceExhausted": "Ókeypis vefleitirnar þínar fyrir þennan mánuð eru búnar. Bættu við inneign til að leita aftur."
+    },
     "mcp": {
       "title": "Kilo-verkfæri",
       "use": "Nota Kilo-verkfæri",
@@ -3332,8 +3348,48 @@
         "notGguf": "Tengillinn verður að vísa á .gguf-skrá.",
         "space": "Það er ekki nóg laust geymslupláss fyrir þetta líkan. Losaðu pláss og reyndu aftur.",
         "network": "Niðurhalið kláraðist ekki. Athugaðu tenginguna þína og reyndu aftur.",
-        "invalidFile": "Niðurhalaða skráin er ekki líkan sem þetta forrit getur keyrt, svo henni var eytt."
+        "invalidFile": "Niðurhalaða skráin er ekki líkan sem þetta forrit getur keyrt, svo henni var eytt.",
+        "checksum": "Niðurhalaða skráin passar ekki við uppgefna gátsummu sína, svo henni var eytt. Reyndu að hlaða henni niður aftur."
       }
+    },
+    "catalog": {
+      "browse": "Skoða líkön",
+      "title": "Líkanaskrá",
+      "search": "Leita að líkönum á Hugging Face",
+      "tabs": "Síun líkana",
+      "fitsTab": "Passar í þetta tæki",
+      "fromHuggingFace": "Frá Hugging Face",
+      "loading": "Hleður líkönum",
+      "noResults": "Engin líkön fundust",
+      "noFits": "Engin líkön passa í þetta tæki",
+      "noFitsDescription": "Stærri líkön eru á flipanum $t(common.all).",
+      "fit": {
+        "fits": "Passar",
+        "tight": "Passar naumlega",
+        "tooLarge": "Of stórt",
+        "noStorage": "Ekki nóg geymslupláss"
+      },
+      "parameters": "Færibreytur: {{value}}",
+      "downloads": "Niðurhöl: {{value}}",
+      "likes": "Líkar: {{value}}",
+      "context": "Samhengisgluggi: {{value}}",
+      "license": "Leyfi: {{license}}",
+      "licenseUnknown": "Leyfi er ekki tilgreint",
+      "tools": "Verkfærakall",
+      "vision": "Myndinntak",
+      "hintsHelp": "Vísbendingar frá Hugging Face. Forritið athugar líkanið eftir niðurhal.",
+      "gated": "Þetta líkan krefst Hugging Face-aðgangs og því getur forritið ekki sótt það.",
+      "quantizations": "Magngreiningar",
+      "quantizationsHelp": "Minni skrár nota minna minni og geymslupláss. Stærri skrár gefa yfirleitt betri svör.",
+      "quantDetail": "{{size}} niðurhal · um {{memory}} af minni",
+      "downloadQuant": "Sækja {{quant}}",
+      "loadingModel": "Hleður upplýsingum um líkan",
+      "couldNotLoadModel": "Ekki tókst að hlaða þessu líkani",
+      "noFiles": "Engar skrár sem þetta forrit getur keyrt",
+      "noFilesDescription": "Þetta forrit keyrir líkön sem eru ein GGUF-skrá.",
+      "tooLargeTitle": "Þetta líkan keyrir hugsanlega ekki",
+      "tooLargeMessage": "{{name}} þarf líklega meira minni en þetta tæki hefur. Forritið gæti lokast meðan líkanið svarar. Sækja samt?",
+      "downloadAnyway": "Sækja samt"
     },
     "localModels": {
       "title": "Líkön í tækinu",

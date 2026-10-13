@@ -2154,6 +2154,11 @@
       "collapse": "Sembunyikan matlamat",
       "expand": "Paparkan matlamat"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tugasan, {{completed}} daripada {{total}} selesai",
+      "rowAccessibility": "Tugasan, {{completed}} daripada {{total}} selesai. Tugasan semasa: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Digunakan baru-baru ini",
       "couldNotLoadGithubRepositories": "Tidak dapat memuatkan repositori GitHub.",
@@ -2208,6 +2213,10 @@
       "importingSession": "Mengimport sesi",
       "cliCannotContinue": "CLI ini tidak dapat meneruskan sesi. Pilih Cloud Agent atau CLI lain.",
       "importFailed": "Tidak dapat mengimport sesi ini.",
+      "cliCannotFork": "Kemas kini Kilo CLI untuk fork daripada mesej.",
+      "forkCutNotSynced": "Mesej ini belum disimpan. Cuba lagi sebentar lagi.",
+      "forkFilesFromBaseBranch": "Fail bermula daripada cabang asas.",
+      "forkFilesUnchangedOnComputer": "Fail pada komputer ini tidak diubah.",
       "pickProfile": "Pilih profil",
       "noProfile": "Tiada profil",
       "manageProfiles": "Urus profil",
@@ -2323,6 +2332,7 @@
       "copyMessage": "Salin mesej",
       "copyText": "Salin teks",
       "selectText": "Pilih teks",
+      "forkFromHere": "Fork dari sini",
       "reportAiResponse": "Laporkan respons AI",
       "reportAiResponseConfirm": "Laporkan respons ini untuk semakan?",
       "report": "Lapor",
@@ -3196,6 +3206,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Model ini memerlukan sambungan internet. Sambung dan cuba lagi, atau tukar kepada model pada peranti ini.",
     "empty": {
       "title": "Mulakan sembang",
       "description": "Hantar mesej untuk bercakap dengan model."
@@ -3207,6 +3218,11 @@
       "deleteTitle": "Padam sembang ini?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Cari di web",
+      "description": "Benarkan sembang ini mencari maklumat terkini melalui akaun Kilo anda. Carian menggunakan peruntukan carian bulanan anda.",
+      "allowanceExhausted": "Carian web percuma anda untuk bulan ini telah habis. Tambah kredit untuk mencari lagi."
+    },
     "mcp": {
       "title": "Alat Kilo",
       "use": "Gunakan alat Kilo",
@@ -3332,8 +3348,48 @@
         "notGguf": "Pautan mesti menunjuk ke fail .gguf.",
         "space": "Ruang storan kosong tidak mencukupi untuk model ini. Kosongkan ruang dan cuba lagi.",
         "network": "Muat turun tidak selesai. Semak sambungan anda dan cuba lagi.",
-        "invalidFile": "Fail yang dimuat turun bukan model yang boleh dijalankan oleh aplikasi ini, jadi ia telah dibuang."
+        "invalidFile": "Fail yang dimuat turun bukan model yang boleh dijalankan oleh aplikasi ini, jadi ia telah dibuang.",
+        "checksum": "Fail yang dimuat turun tidak sepadan dengan checksum yang diterbitkan, jadi ia telah dibuang. Cuba muat turun sekali lagi."
       }
+    },
+    "catalog": {
+      "browse": "Layari model",
+      "title": "Katalog model",
+      "search": "Cari model Hugging Face",
+      "tabs": "Penapis model",
+      "fitsTab": "Sesuai untuk peranti ini",
+      "fromHuggingFace": "Daripada Hugging Face",
+      "loading": "Memuatkan model",
+      "noResults": "Tiada model ditemui",
+      "noFits": "Tiada model yang sesuai untuk peranti ini",
+      "noFitsDescription": "Model yang lebih besar terdapat dalam tab $t(common.all).",
+      "fit": {
+        "fits": "Sesuai",
+        "tight": "Hampir tidak muat",
+        "tooLarge": "Terlalu besar",
+        "noStorage": "Storan tidak mencukupi"
+      },
+      "parameters": "Parameter: {{value}}",
+      "downloads": "Muat turun: {{value}}",
+      "likes": "Suka: {{value}}",
+      "context": "Tetingkap konteks: {{value}}",
+      "license": "Lesen: {{license}}",
+      "licenseUnknown": "Lesen tidak dinyatakan",
+      "tools": "Panggilan alat",
+      "vision": "Input imej",
+      "hintsHelp": "Petunjuk daripada Hugging Face. Apl menyemak model selepas ia dimuat turun.",
+      "gated": "Model ini memerlukan akaun Hugging Face, jadi apl tidak dapat memuat turunnya.",
+      "quantizations": "Pengkuantuman",
+      "quantizationsHelp": "Fail yang lebih kecil menggunakan kurang memori dan storan. Fail yang lebih besar biasanya memberikan jawapan yang lebih baik.",
+      "quantDetail": "Muat turun {{size}} · kira-kira {{memory}} memori",
+      "downloadQuant": "Muat turun {{quant}}",
+      "loadingModel": "Memuatkan butiran model",
+      "couldNotLoadModel": "Tidak dapat memuatkan model ini",
+      "noFiles": "Tiada fail yang boleh dijalankan oleh apl ini",
+      "noFilesDescription": "Apl ini menjalankan model yang terdiri daripada satu fail GGUF.",
+      "tooLargeTitle": "Model ini mungkin tidak dapat dijalankan",
+      "tooLargeMessage": "{{name}} mungkin memerlukan lebih banyak memori daripada yang ada pada peranti ini. Apl mungkin tertutup semasa model menjawab. Muat turun juga?",
+      "downloadAnyway": "Muat turun juga"
     },
     "localModels": {
       "title": "Model pada peranti",

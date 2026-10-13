@@ -1420,6 +1420,107 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    it.each(['byok', 'managed', 'unknown', undefined] as const)(
+      'handles invalid-request callback ownership %s without disabling reviews',
+      async providerOwnership => {
+        const retryFlow = mockCreatedInfraRetryFlow();
+        mockGetCodeReviewById.mockResolvedValue(makeReview({ session_id: retryFlow.sessionId }));
+        const byok = providerOwnership === 'byok';
+        const errorMessage = byok
+          ? 'Your provider rejected the request. Check your provider account and settings.'
+          : 'Assistant request was invalid';
+        const terminalReason = byok
+          ? 'assistant_invalid_request_byok'
+          : 'assistant_invalid_request';
+
+        const response = await POST(
+          makeRequest({
+            status: 'failed',
+            cloudAgentSessionId: retryFlow.sessionId,
+            errorMessage,
+            failure: {
+              code: 'assistant_error',
+              assistantReason: 'invalid_request',
+              providerOwnership,
+              message: errorMessage,
+            },
+          }),
+          makeParams(REVIEW_ID)
+        );
+
+        expect(response.status).toBe(200);
+        expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+          expect.objectContaining({ status: 'failed', terminalReason })
+        );
+        expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+        if (byok) {
+          expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+          expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+          expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+            REVIEW_ID,
+            'failed',
+            expect.objectContaining({ terminalReason })
+          );
+          expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+            'inst-1',
+            'owner',
+            'repo',
+            12345,
+            expect.objectContaining({
+              conclusion: 'failure',
+              output: expect.objectContaining({
+                title: 'Kilo Code Review request rejected by your provider',
+                summary: errorMessage,
+              }),
+            }),
+            'standard'
+          );
+          expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
+            'inst-1',
+            'owner',
+            'repo',
+            99,
+            expect.stringContaining('Your provider rejected the request.'),
+            'standard'
+          );
+        } else {
+          await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
+          expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+            codeReviewId: REVIEW_ID,
+            retryOfAttemptId: retryFlow.failedAttemptId,
+          });
+          expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+            sessionId: retryFlow.sessionId,
+            reason: errorMessage,
+            failedAttemptId: retryFlow.failedAttemptId,
+            retryAttemptId: retryFlow.retryAttemptId,
+          });
+          expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+        }
+      }
+    );
+
+    it('accepts explicit assistant_invalid_request_byok without a fresh retry or action-required disable', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          terminalReason: 'assistant_invalid_request_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'assistant_invalid_request_byok' })
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+    });
+
     // cloud-agent-next projects the raw provider body down to 'Assistant request
     // was not authorized' before the callback, so the message-based BYOK
     // detection can never fire. Ownership on the structured failure is the only

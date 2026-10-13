@@ -45,6 +45,9 @@ export type AndroidBuildDeps = {
   // its path, or undefined on a miss. When set, a cache miss tries this
   // before compiling locally.
   fetchRemote?: (args: { nativeHash: string; destDir: string }) => Promise<string | undefined>;
+  // When true, a failed remote fetch fails the build instead of compiling
+  // locally (KILO_REMOTE_NATIVE=required).
+  requireRemote?: boolean;
 };
 
 // Repo-root inputs that shape the native build but live outside
@@ -156,7 +159,8 @@ export async function runAndroidBuild(serial: string, deps: AndroidBuildDeps): P
 // Reuses publish() unchanged — only the build step is swapped for a fetch
 // into staging — so the package-id check, checksum, manifest, and atomic
 // publish all still apply. Any failure returns undefined and the caller
-// compiles locally.
+// compiles locally, unless deps.requireRemote is set: then the failure
+// propagates.
 async function tryRemotePublish(
   serial: string,
   key: string,
@@ -178,9 +182,14 @@ async function tryRemotePublish(
       },
     });
   } catch (error) {
-    process.stderr.write(
-      `remote native build unavailable (${error instanceof Error ? error.message : error}); building locally\n`
-    );
+    const reason = error instanceof Error ? error.message : String(error);
+    if (deps.requireRemote) {
+      throw new Error(
+        `remote native build unavailable (${reason}); KILO_REMOTE_NATIVE=required forbids a local build`,
+        { cause: error }
+      );
+    }
+    process.stderr.write(`remote native build unavailable (${reason}); building locally\n`);
     return undefined;
   }
 }

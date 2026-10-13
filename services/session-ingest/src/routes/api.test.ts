@@ -245,6 +245,9 @@ describe('api routes', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(getSessionIngestDO).mockImplementation(env => r2StagingStub(env) as never);
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      clearSession: vi.fn(async () => undefined),
+    } as never);
     vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: null,
@@ -1272,6 +1275,77 @@ describe('api routes', () => {
     expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 
+  it('GET /session/:sessionId/export passes an upToMessageId cut to the DO export', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const payload = JSON.stringify({ info: {}, messages: [], sessionDiff: [] });
+    const ingestStub = {
+      hasMessageItem: vi.fn(async () => true),
+      getAllStream: vi.fn(async () => new Response(payload).body!),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        'http://local/session/ses_12345678901234567890123456/export?upToMessageId=msg_02',
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe(payload);
+    expect(ingestStub.hasMessageItem).toHaveBeenCalledWith('msg_02');
+    expect(ingestStub.getAllStream).toHaveBeenCalledWith('msg_02');
+  });
+
+  it('GET /session/:sessionId/export returns 404 clone_cut_not_found for an absent cut message', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const ingestStub = {
+      hasMessageItem: vi.fn(async () => false),
+      getAllStream: vi.fn(),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(
+      ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        'http://local/session/ses_12345678901234567890123456/export?upToMessageId=msg_99',
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: 'clone_cut_not_found' });
+    expect(ingestStub.getAllStream).not.toHaveBeenCalled();
+  });
+
+  it('GET /session/:sessionId/export returns 400 for an invalid upToMessageId', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        'http://local/session/ses_12345678901234567890123456/export?upToMessageId=not-a-message',
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: 'Invalid upToMessageId' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
   it('GET /session/:sessionId/messages returns 400 for invalid sessionId', async () => {
     const app = makeApiApp();
     const res = await app.fetch(
@@ -2074,6 +2148,8 @@ describe('api routes', () => {
     vi.mocked(getSessionIngestDO).mockReturnValue(
       ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
     );
+    const connectionStub = { clearSession: vi.fn(async () => undefined) };
+    vi.mocked(getUserConnectionDO).mockReturnValue(connectionStub as never);
 
     const app = makeApiApp();
     const env = makeTestEnv();
@@ -2126,6 +2202,8 @@ describe('api routes', () => {
       sessionId: parentSessionId,
     });
     expect(ingestStub.clear).toHaveBeenCalledTimes(2);
+    expect(getUserConnectionDO).toHaveBeenCalledWith(env, { kiloUserId: 'usr_test' });
+    expect(connectionStub.clearSession.mock.calls).toEqual([[childSessionId], [parentSessionId]]);
     expect(notifyUserSessionEvent).toHaveBeenNthCalledWith(1, env, 'usr_test', {
       type: 'session.deleted',
       data: {

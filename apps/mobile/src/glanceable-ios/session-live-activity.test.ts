@@ -330,6 +330,13 @@ describe('session card layout: states', () => {
     // The app's own cost rules: two decimals from half a cent, four below it,
     // and nothing below the four-decimal zero.
     expect(finished(1_234_500)).toContain('$1.23');
+    // A four-figure amount is grouped in threes, as the app's formatter does.
+    expect(finished(1_234_500_000, { group: ',' })).toContain('$1,234.50');
+    expect(
+      finished(1_234_500_000, { costTemplate: '# $', costDecimal: ',', group: '.' })
+    ).toContain('1.234,50 $');
+    // A language without a separator leaves the amount whole.
+    expect(finished(1_234_500_000, { group: '' })).toContain('$1234.50');
     expect(finished(3100)).toContain('$0.0031');
     expect(finished(40).some(value => value.startsWith('$'))).toBe(false);
     // A German template and an Arabic digit table, as the copy bakes them.

@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
 
+import { formatCurrency } from '@/lib/format';
+
 import { glanceableLayoutCopy, withGlanceableCopy } from './layout-copy';
 
 const PLACEHOLDER = '__KILO_GLANCEABLE_COPY__';
@@ -60,7 +62,12 @@ describe('withGlanceableCopy', () => {
   });
 
   it('bakes the session cost template and decimal separator from the app cost format', async () => {
-    expect(glanceableLayoutCopy()).toMatchObject({ costTemplate: '$#', costDecimal: '.' });
+    const english = glanceableLayoutCopy();
+    expect(english).toMatchObject({ costTemplate: '$#', costDecimal: '.', group: ',' });
+    // The baked parts rebuild the app's own label for a four-figure cost.
+    expect(
+      english.costTemplate.split('#').join(`1${english.group}234${english.costDecimal}50`)
+    ).toBe(formatCurrency(1234.5, 'en', 2));
     const previous = i18n.language;
     try {
       await i18n.changeLanguage('de');

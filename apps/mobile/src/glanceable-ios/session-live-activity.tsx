@@ -497,7 +497,16 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       COPY.costDecimal === undefined || COPY.costDecimal === '' ? '.' : COPY.costDecimal;
     const template =
       COPY.costTemplate === undefined || COPY.costTemplate === '' ? '$#' : COPY.costTemplate;
-    const amount = `${count(whole ?? '0')}${decimal}${count(fraction ?? '')}`;
+    // Group the whole dollars in threes with the app language's separator,
+    // as the app's cost formatter does ("1,234.50", "1.234,50").
+    const group = COPY.group ?? '';
+    let grouped = whole ?? '0';
+    if (group !== '') {
+      for (let at = grouped.length - 3; at > 0; at -= 3) {
+        grouped = `${grouped.slice(0, at)}${group}${grouped.slice(at)}`;
+      }
+    }
+    const amount = `${count(grouped)}${decimal}${count(fraction ?? '')}`;
     return template.split('#').join(amount);
   })();
   const costLine = (scheme: Scheme, size: number) =>

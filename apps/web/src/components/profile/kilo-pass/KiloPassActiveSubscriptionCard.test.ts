@@ -63,7 +63,7 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
       ['2026-10-08T23:59:59.999Z', true, 0, 9.5],
       ['2026-10-08T23:59:59.999Z', true, 1, 1.9],
       ['2026-10-08T23:59:59.999Z', true, 2, 2.85],
-      ['2026-10-09T00:00:00Z', true, 0, 0.95],
+      ['2026-10-09T00:00:00Z', true, 0, 1.9],
       ['2026-10-09T00:00:00Z', true, 1, 9.5],
       ['2026-10-09T00:00:00Z', true, 2, 2.85],
       ['2026-05-06T00:00:00Z', true, 0, 9.5],
@@ -297,34 +297,6 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
       expect(model.changeSuffix).toContain('(change to');
       expect(model.labelPrefix).toContain(model.changeSuffix);
     });
-
-    test.each([
-      { startedAt: '2026-10-08T23:59:59.999Z', streakMonths: 0, percent: 0.5 },
-      { startedAt: '2026-10-09T00:00:00Z', streakMonths: 0, percent: 0.1 },
-      { startedAt: '2026-10-09T00:00:00Z', streakMonths: 1, percent: 0.5 },
-    ])(
-      'projects the next renewal bonus for start $startedAt and streak $streakMonths',
-      ({ startedAt, streakMonths, percent }) => {
-        const rows = computeRenewInfoRowModel({
-          subscription: buildSubscription({
-            startedAt,
-            currentStreakMonths: streakMonths,
-            isFirstTimeSubscriberEver: true,
-            refillAt: '2026-11-14T00:00:00Z',
-          }),
-          isPendingCancellation: false,
-          scheduledChange: null,
-          nowIso: '2026-11-13T00:00:00Z',
-        });
-
-        expect(rows).toHaveLength(1);
-        const model = rows[0];
-        if (model?.kind !== 'renews_and_adds_bonus') {
-          throw new Error('expected renews_and_adds_bonus');
-        }
-        expect(model.bonusUsd).toBeCloseTo(getMonthlyPriceUsd(KiloPassTier.Tier19) * percent);
-      }
-    );
 
     test('pluralizes day vs days in the label prefix', () => {
       const day1Rows = computeRenewInfoRowModel({

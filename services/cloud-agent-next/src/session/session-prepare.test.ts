@@ -27,8 +27,6 @@ import {
   resolveSharedSandboxAssignment,
   SHARED_SANDBOX_FAILOVER_SUFFIX,
 } from '../shared-sandbox-route.js';
-import { getSandboxNamespace } from '../sandbox-id.js';
-import { SANDBOX_USAGE_SKUS } from '../container-usage-context.js';
 import type { OperationLedgerRow } from '@kilocode/db/schema';
 
 import type { Env } from '../types.js';
@@ -1407,17 +1405,12 @@ describe('explicit sandbox session creation', () => {
     expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBeUndefined();
   });
 
-  it('admits a saved review allocation through the resolver and persists its hardware identity', async () => {
+  it('ignores saved settings for a code review and keeps its trusted crv sandbox', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({
       contextAllocation: 'cloudflare-single',
     });
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
-    const smallContainmentNamespace = {
-      idFromName: vi.fn((name: string) => ({ toString: () => name })),
-      get: vi.fn(),
-    };
-    Object.assign(ctx.env, { SandboxSmallContainment: smallContainmentNamespace });
     const request = makeRequest({
       repository: { type: 'github', repo: 'acme/repo' },
       options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
@@ -1429,18 +1422,10 @@ describe('explicit sandbox session creation', () => {
     });
 
     expect(result).toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
-    expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledTimes(1);
+    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
     const metadata = createdMetadata(doStub);
-    expect(metadata?.workspace?.sandboxAllocation).toBe('cloudflare-single');
-    expect(metadata?.workspace?.sandboxProvider).toBe('cloudflare');
-    const sandboxId = metadata?.workspace?.sandboxId ?? '';
-    expect(sandboxId).toMatch(/^ses-/);
-    // The saved `ses-` review session bills the contained small namespace/SKU,
-    // not the trusted code-review namespace.
-    expect(getSandboxNamespace(ctx.env, sandboxId, { managedScmContainment: true })).toBe(
-      smallContainmentNamespace
-    );
-    expect(SANDBOX_USAGE_SKUS.SandboxSmallContainment).toBe('cloud-agent-small-2026-07');
+    expect(metadata?.workspace?.sandboxAllocation).toBeUndefined();
+    expect(metadata?.workspace?.sandboxId).toMatch(/^crv-/);
   });
 });
 

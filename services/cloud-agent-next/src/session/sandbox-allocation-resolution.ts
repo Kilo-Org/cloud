@@ -106,8 +106,10 @@ export async function withSavedSandboxAllocation(
   ) {
     return input;
   }
-  const target = repositoryAllocationTarget(input.repository);
   const capability = allocationCapabilityFor(input, args.billingOrigin);
+  // Code review keeps its trusted `crv-` sandbox, so saved settings never apply.
+  if (capability === 'review') return { ...input, savedSandboxAllocation: null };
+  const target = repositoryAllocationTarget(input.repository);
   const saved = await resolveSavedSandboxAllocation({
     db: args.db,
     env: args.env,

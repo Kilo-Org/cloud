@@ -198,7 +198,7 @@ describe('withSavedSandboxAllocation', () => {
     expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
   });
 
-  it('skips a saved Vercel choice for a code review origin', async () => {
+  it('ignores saved settings for a code review origin', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({
       repositoryAllocation: 'vercel-small',
       contextAllocation: 'cloudflare-containers-standard-4',
@@ -209,6 +209,8 @@ describe('withSavedSandboxAllocation', () => {
       billingOrigin: 'code-review',
     });
 
-    expect(resolved.savedSandboxAllocation).toBe('cloudflare-containers-standard-4');
+    expect(resolved.savedSandboxAllocation).toBeNull();
+    expect(requestedSandboxAllocation(resolved)).toBeUndefined();
+    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
   });
 });

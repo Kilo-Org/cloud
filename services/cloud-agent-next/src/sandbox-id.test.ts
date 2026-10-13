@@ -608,31 +608,6 @@ describe('generateSandboxId', () => {
         sandboxId: 'crv-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
       });
     });
-
-    it('keeps a saved review allocation identity and shared routing instead of crv', async () => {
-      const sessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
-      const isolated = await generateSandboxRoutingTarget(
-        undefined,
-        'org-review',
-        'user-id',
-        sessionId,
-        undefined,
-        { createdOnPlatform: 'code-review', sandboxAllocation: 'cloudflare-single' }
-      );
-      if (isolated.kind !== 'isolated') throw new Error('expected isolated routing');
-      expect(isolated.sandboxId).toMatch(/^ses-/);
-      expect(isolated.sandboxId).not.toMatch(/^crv-/);
-
-      const shared = await generateSandboxRoutingTarget(
-        undefined,
-        'org-review',
-        'user-id',
-        sessionId,
-        undefined,
-        { createdOnPlatform: 'code-review', sandboxAllocation: 'cloudflare-shared' }
-      );
-      expect(shared.kind).toBe('shared');
-    });
   });
 });
 

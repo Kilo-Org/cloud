@@ -474,6 +474,9 @@ export async function generateSandboxRoutingTarget(
   const routingOptions = options ?? {};
   const allocation = routingOptions.sandboxAllocation;
   if (allocation !== undefined) {
+    if (routingOptions.createdOnPlatform === 'code-review') {
+      throw new Error('Sandbox allocations cannot be combined with specialized sandbox routing');
+    }
     if (
       sandboxAllocationRequiresControlPlane(allocation) &&
       sessionPlaneFromId(sessionId) !== 'control'
@@ -484,9 +487,7 @@ export async function generateSandboxRoutingTarget(
     // `cloudflare-shared` has no isolated prefix: it falls through to the shared route.
     if (prefix) return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, prefix) };
   }
-  // The trusted Code Reviewer namespace is the fallback only when no allocation
-  // was selected; a selected allocation keeps its normal identity instead.
-  if (routingOptions.createdOnPlatform === 'code-review' && allocation === undefined) {
+  if (routingOptions.createdOnPlatform === 'code-review') {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'crv') };
   }
   if (allocation !== 'cloudflare-shared') {

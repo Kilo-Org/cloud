@@ -49,6 +49,7 @@ vi.mock('@/lib/glanceable/session-activity-tokens-android', () => ({
 vi.mock('@/lib/glanceable/approve-ask', () => ({ runGlanceableApprove: vi.fn() }));
 vi.mock('@/glanceable-android/count-format', () => ({
   formatGlanceableClock: (at: string) => at.slice(11, 16),
+  formatGlanceableCount: String,
 }));
 
 // The Home widget's native refresh store and the persisted snapshot.
@@ -129,6 +130,21 @@ describe('session card fixtures on Android', () => {
     expect(androidFollow.isSessionFollowed('real-session')).toBe(false);
     expect(mocks.pruneSessionCards).toHaveBeenCalledWith([]);
     expect(androidFollow.isSessionFollowed('glanceable-fixture-0')).toBe(true);
+  });
+
+  it('draw the failed fixture with its stop reason, as the end push carries it', async () => {
+    await applyFixture('session-card-failed');
+
+    const [card, dismissAfterMs] = mocks.postSessionCard.mock.calls.at(-1) ?? [];
+    expect(card).toMatchObject({
+      sessionId: 'glanceable-fixture-0',
+      text: expect.stringContaining('Stopped: provider error'),
+      subText: '2 of 5',
+      chronometer: false,
+    });
+    expect(dismissAfterMs).toBe(androidFollow.SESSION_FINISHED_DISMISS_MS);
+    // The failed card ends the follow, as a real failed run does.
+    expect(androidFollow.isSessionFollowed('glanceable-fixture-0')).toBe(false);
   });
 
   it('keep the fixture card while held: the live tray does not overwrite it', async () => {

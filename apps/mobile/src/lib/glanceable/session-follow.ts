@@ -103,17 +103,28 @@ export const endAllSessionCards = (): void => {
 
 /**
  * Dev fixtures: the fixture harness drives the session card through the same
- * paths a real follow takes. `syncFixtureSessionCards` is the tray update the
- * held fixture's own rows make (the live tray stays gated), and
- * `applyFixtureSessionContent` lays the content a server push would carry onto
- * the followed card: the Android push path, or an ActivityKit update with the
- * shared stale window and relevance on iOS.
+ * paths a real follow takes. `applyFixtureSessionContent` lays the content a
+ * server push would carry onto the followed card: the Android push path, or an
+ * ActivityKit update with the shared stale window and relevance on iOS.
+ * `finishFixtureSessionCard` ends a fixture's follow the way a finished or
+ * failed run does; the live tray stays gated while the fixture is held.
  */
-export const syncFixtureSessionCards = (
-  rows: readonly SessionCardRow[],
-  checkedAt?: number
+export const finishFixtureSessionCard = (
+  row: SessionCardRow,
+  content: SessionLiveActivityContentState | null,
+  checkedAt: number
 ): void => {
-  follow().syncFollowedSessionCards(rows, checkedAt);
+  if (Platform.OS === 'android' && content !== null) {
+    // Android ends the follow as the card finishes, so content applied after
+    // the end is dropped: the fixture's content is the end itself, as the
+    // server's end push carries it.
+    android().applySessionLiveUpdate('end', content);
+    return;
+  }
+  follow().syncFollowedSessionCards([row], checkedAt);
+  if (content !== null) {
+    applyFixtureSessionContent(content);
+  }
 };
 
 export const applyFixtureSessionContent = (content: SessionLiveActivityContentState): boolean => {

@@ -6,6 +6,7 @@ import {
 import { buildHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
 import {
   buildSessionLiveActivityContentState,
+  type SessionLiveActivityContentState,
   type SessionLiveActivityRow,
 } from '@kilocode/notifications';
 import { Platform } from 'react-native';
@@ -13,8 +14,8 @@ import { Platform } from 'react-native';
 import {
   applyFixtureSessionContent,
   endAllSessionCards,
+  finishFixtureSessionCard,
   followSession,
-  syncFixtureSessionCards,
 } from '@/lib/glanceable/session-follow';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -110,45 +111,47 @@ function applySessionCardFixture(input: {
     statusUpdatedAt: new Date(now - 20 * 60_000).toISOString(),
   };
   log(`session card ${followSession(follow.finish === true ? working : row, ctx, now)}`);
-  if (follow.finish === true) {
-    syncFixtureSessionCards([{ ...row, statusUpdatedAt: at }], now);
-  }
   const facts = follow.card;
-  if (follow.approvalKey === true || facts !== undefined) {
-    // The richer facts a server push carries, applied through the production
-    // builder, so no fixture ever hands the card hand-made props. A quiet
-    // fixture moves the last activity past the quiet window, which is what the
-    // card reaches its warning from.
-    const content = buildSessionLiveActivityContentState(
-      {
-        ...row,
-        statusUpdatedAt:
-          facts?.activityAgo === undefined
-            ? row.statusUpdatedAt
-            : new Date(now - facts.activityAgo * 60_000).toISOString(),
-        currentStep: facts?.step ?? null,
-        plan: facts?.plan ?? null,
-        changes: facts?.changes ?? null,
-        permissionCommand: facts?.permissionCommand ?? null,
-        lastActivityAt:
-          facts?.activityAgo === undefined
-            ? null
-            : new Date(now - facts.activityAgo * 60_000).toISOString(),
-        costMicrodollars: facts?.costMicrodollars ?? null,
-        outcome: facts?.outcome ?? null,
-        failure: facts?.failure ?? null,
-        prOpened: facts?.outcome === 'pr_opened',
-        startedAt:
-          facts?.startedAgo === undefined
-            ? null
-            : new Date(now - facts.startedAgo * 60_000).toISOString(),
-      },
-      {
-        approvalKey: follow.approvalKey === true ? FIXTURE_APPROVAL_KEY : null,
-        updatedAt: at,
-        statusSinceFallback: row.statusUpdatedAt ?? at,
-      }
-    );
+  // The richer facts a server push carries, applied through the production
+  // builder, so no fixture ever hands the card hand-made props. A quiet fixture
+  // moves the last activity past the quiet window, which is what the card
+  // reaches its warning from.
+  const content: SessionLiveActivityContentState | null =
+    follow.approvalKey !== true && facts === undefined
+      ? null
+      : buildSessionLiveActivityContentState(
+          {
+            ...row,
+            statusUpdatedAt:
+              facts?.activityAgo === undefined
+                ? row.statusUpdatedAt
+                : new Date(now - facts.activityAgo * 60_000).toISOString(),
+            currentStep: facts?.step ?? null,
+            plan: facts?.plan ?? null,
+            changes: facts?.changes ?? null,
+            permissionCommand: facts?.permissionCommand ?? null,
+            lastActivityAt:
+              facts?.activityAgo === undefined
+                ? null
+                : new Date(now - facts.activityAgo * 60_000).toISOString(),
+            costMicrodollars: facts?.costMicrodollars ?? null,
+            outcome: facts?.outcome ?? null,
+            failure: facts?.failure ?? null,
+            prOpened: facts?.outcome === 'pr_opened',
+            startedAt:
+              facts?.startedAgo === undefined
+                ? null
+                : new Date(now - facts.startedAgo * 60_000).toISOString(),
+          },
+          {
+            approvalKey: follow.approvalKey === true ? FIXTURE_APPROVAL_KEY : null,
+            updatedAt: at,
+            statusSinceFallback: row.statusUpdatedAt ?? at,
+          }
+        );
+  if (follow.finish === true) {
+    finishFixtureSessionCard({ ...row, statusUpdatedAt: at }, content, now);
+  } else if (content !== null) {
     applyFixtureSessionContent(content);
   }
 }

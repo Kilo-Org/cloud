@@ -294,6 +294,22 @@ describe('CloudChatPage route-aware transcript phase', () => {
     expect(mockChatInput?.placeholder).toBe('Loading session…');
   });
 
+  it('shows cached rows before metadata without allowing submission or resuming an anchor', () => {
+    mockAtParam = 'msg_1';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.isRefreshingCachedTranscript = true;
+    mockAtomValues.isLoading = false;
+    mockAtomValues.canSend = false;
+
+    render();
+
+    expect(skeleton()).toBeNull();
+    expect(dom.container.querySelector('[data-conversation]')).not.toBeNull();
+    expect(dom.container.querySelector('[aria-label="Refreshing session…"]')).not.toBeNull();
+    expect(mockChatInput?.disabled).toBe(true);
+    expect(mockPlanResumeAttempt).not.toHaveBeenCalled();
+  });
+
   it('shows the existing error alert and drops prior rows once the started open fails', () => {
     render();
     expect(skeleton()).not.toBeNull();

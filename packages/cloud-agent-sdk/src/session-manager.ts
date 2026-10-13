@@ -351,10 +351,9 @@ type SessionManagerConfig = {
    * while the switch generation and session identity still match.
    * A missing hook, a `null` result, or an empty page is a no-op: the
    * loading skeleton stays up until the transport replays the transcript.
-   * Web/extension pass nothing, so their behavior is unchanged; the mobile
-   * adapter is the canonical provider.
    */
   readCachedSnapshotPage?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshotPage | null>;
+  writeCachedSnapshotPage?: (page: SessionSnapshotPage) => void;
   /**
    * Optional classifier for a `fetchSession` failure that means "the request
    * never answered" — a client-side deadline abort — as opposed to the server
@@ -485,6 +484,13 @@ type SessionManagerAtoms = {
   permission: W<PermissionState | null>;
   suggestion: W<SuggestionState | null>;
   pendingMessages: W<ReadonlyMap<string, MessageDeliveryState>>;
+  /**
+   * Optimistic user-message ids whose transport send has not settled, for the
+   * active session. Drives the request-pending "Sending" cue. It is empty on a
+   * fresh load and never outlives the request, so a restored or queued synthetic
+   * row cannot be shown as still sending.
+   */
+  sendingMessageIds: W<ReadonlySet<string>>;
   failedPrompt: W<string | null>;
   billingFailure: W<CustomerBillingFailure | null>;
   fetchedSessionData: W<FetchedSessionData | null>;
@@ -928,7 +934,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * or a preserved transcript across a metadata-retry) that the live transport
    * has not caught up with yet: the rows are readable, but the session's current
    * transcript is still being fetched. Drives the inline refresh indicator.
-   * Callers without a cached-page reader (web, extension) never set it, so their
+   * Callers without a cached-page reader never set it, so their
    * behavior is unchanged. It clears when the live transcript lands — the page
    * callback when one is configured, otherwise the replayed `session.created`
    * — and on an error, a transcript clear, or a session reset.
@@ -972,6 +978,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const suggestionAtom = atom<SuggestionState | null>(null);
   const activeSuggestionAtom = atom<StandaloneSuggestion | null>(null);
   const pendingMessagesAtom = atom<ReadonlyMap<string, MessageDeliveryState>>(new Map());
+  // Client-side request-pending marker for optimistic rows whose transport send
+  // has not settled. Distinct from `pendingMessagesAtom`, which is server
+  // delivery state: this set is empty on a fresh load and never outlives the
+  // request, so it cannot present a restored or queued row as still sending.
+  const sendingMessageIdsAtom = atom<ReadonlySet<string>>(new Set<string>());
   const failedPromptAtom = atom<string | null>(null);
   const billingFailureAtom = atom<CustomerBillingFailure | null>(null);
   const fetchedSessionDataAtom = atom<FetchedSessionData | null>(null);
@@ -1348,6 +1359,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   let lastPromptMode: string | null = null;
 
+  function markSending(messageId: string, sending: boolean): void {
+    const current = store.get(sendingMessageIdsAtom);
+    if (current.has(messageId) === sending) return;
+    const next = new Set(current);
+    if (sending) next.add(messageId);
+    else next.delete(messageId);
+    store.set(sendingMessageIdsAtom, next);
+  }
+
   function setIndicator(ind: SessionStatusIndicator | null): void {
     if (indicatorTimer !== null) {
       clearTimeout(indicatorTimer);
@@ -1406,6 +1426,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(suggestionAtom, null);
     store.set(activeSuggestionAtom, null);
     store.set(pendingMessagesAtom, new Map());
+    store.set(sendingMessageIdsAtom, new Set<string>());
     store.set(failedPromptAtom, null);
     store.set(billingFailureAtom, null);
     store.set(fetchedSessionDataAtom, null);
@@ -2224,6 +2245,25 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
+    if (
+      config.writeCachedSnapshotPage &&
+      currentSession !== null &&
+      activeSessionId !== null &&
+      store.get(fetchedSessionDataAtom)?.kiloSessionId === activeSessionId &&
+      !store.get(isLoadingAtom) &&
+      !store.get(isRefreshingCachedTranscriptAtom)
+    ) {
+      try {
+        config.writeCachedSnapshotPage({
+          info: { id: activeSessionId },
+          messages: store.get(messagesListAtom),
+          nextCursor: olderMessagesCursor,
+          omittedItemCount: store.get(olderMessagesOmittedItemCountAtom),
+        });
+      } catch {
+        // A cache failure must not prevent navigation.
+      }
+    }
     // A retry of a failed metadata refresh must keep the transcript mounted.
     // A real session switch (or a caller without caching) still starts clean.
     const preserveTranscript = Boolean(
@@ -2304,6 +2344,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(sessionStorageAtom, jotaiStorage);
     const initialPageGeneration = loadOlderGeneration;
     let acceptCachedPage = true;
+    let cachedSnapshotPage: SessionSnapshotPage | null = preserveTranscript
+      ? {
+          info: { id: kiloSessionId },
+          messages: store.get(messagesListAtom),
+          nextCursor: null,
+          omittedItemCount: 0,
+        }
+      : null;
     // False while this open's cached-transcript read is still in flight. A
     // retryable metadata failure must not decide the screen until the read
     // settles, or a warm offline open would flash the terminal error over
@@ -2320,6 +2368,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           if (!acceptCachedPage || expectedGeneration !== switchGeneration) return;
           if (cachedPage && cachedPage.messages.length > 0) {
             if (applyPage({ ...cachedPage, kind: 'success' }, initialPageGeneration, true)) {
+              cachedSnapshotPage = cachedPage;
               store.set(isLoadingAtom, false);
               // Rows are on screen but they are the cached page: the live
               // transcript is still being fetched, so the open is refreshing,
@@ -2439,6 +2488,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // and omitted-item count.
     const recordInitialPage = (page: SessionSnapshotPage): void => {
       if (applyPage({ ...page, kind: 'success' }, initialPageGeneration, true)) {
+        if (cachedSnapshotPage) {
+          const storage = store.get(sessionStorageAtom);
+          const liveMessages = new Map(page.messages.map(message => [message.info.id, message]));
+          for (const cached of cachedSnapshotPage.messages) {
+            const live = liveMessages.get(cached.info.id);
+            if (!live) {
+              storage?.deleteMessage(cached.info.id);
+              continue;
+            }
+            const livePartIds = new Set(live.parts.map(part => part.id));
+            for (const part of cached.parts) {
+              if (!livePartIds.has(part.id)) storage?.deletePart(cached.info.id, part.id);
+            }
+          }
+          cachedSnapshotPage = null;
+        }
         // The live bounded page landed: what is on screen is no longer the
         // cached page, so the refresh indicator is done. Guarded by the
         // applied flag so a superseded page cannot clear a newer open's state.
@@ -2896,6 +2961,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (sessionType === 'remote') {
         remoteOptimisticIds.add(messageId);
       }
+      markSending(messageId, true);
       // Signal the composer exactly once, after the row is in the transcript.
       input.onOptimisticSend?.();
     }
@@ -2983,6 +3049,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       }
       return false;
+    } finally {
+      // The request is settled either way: the Sending cue is request-pending
+      // state, so it must not outlive the call. Server delivery state (queued /
+      // failed) takes over from here.
+      markSending(messageId, false);
     }
   }
 
@@ -3338,6 +3409,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       suggestion: suggestionAtom,
       activeSuggestion: activeSuggestionAtom,
       pendingMessages: pendingMessagesAtom,
+      sendingMessageIds: sendingMessageIdsAtom,
       failedPrompt: failedPromptAtom,
       billingFailure: billingFailureAtom,
       fetchedSessionData: fetchedSessionDataAtom,

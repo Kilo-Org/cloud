@@ -894,3 +894,141 @@ describe('CloudAgentWorkspaceTabs', () => {
     expect(chatTab).not.toContain('data-state="inactive"');
   });
 });
+
+describe('pending new-chat tab', () => {
+  const baseProps = {
+    activeTabId: CHAT_TAB_ID,
+    currentSessionId: 'ses_first',
+    onSelectChat: () => undefined,
+    onCloseChat: () => undefined,
+    onCreateChat: () => undefined,
+    onRenameChat: async () => undefined,
+    terminals: [],
+    files: [],
+    onCloseFile: () => undefined,
+    terminalStatuses: {},
+    canCreateTerminal: false,
+    onSelectTab: () => undefined,
+    onCreateTerminal: () => undefined,
+    onCloseTerminal: () => undefined,
+  };
+
+  function tabButtons(container: HTMLElement): HTMLButtonElement[] {
+    return Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  }
+  function tabByText(container: HTMLElement, text: string): HTMLButtonElement | undefined {
+    return tabButtons(container).find(button => button.textContent?.includes(text));
+  }
+
+  it('keeps the source tab selectable next to the pending tab in append mode', () => {
+    const dom = installTabsTestDom();
+    let root: Root | undefined;
+    const onValueChange = jest.fn();
+    const onDismissPendingChat = jest.fn();
+
+    try {
+      root = createRoot(dom.container);
+      act(() => {
+        root?.render(
+          createElement(
+            Tabs,
+            { value: 'pending-new-chat:op-1', onValueChange },
+            createElement(CloudAgentWorkspaceTabs, {
+              ...baseProps,
+              chatSessions: [makeSession('ses_first', 'First worktree chat')],
+              pendingChat: {
+                tabId: 'pending-new-chat:op-1',
+                worktreeId: 'worktree_shared',
+                sourceKiloSessionId: 'ses_first',
+                placement: 'append',
+                owned: true,
+                resolvedKiloSessionId: null,
+                originLocationKey: 'origin',
+              },
+              onDismissPendingChat,
+            })
+          )
+        );
+      });
+
+      const pendingTab = tabByText(dom.container, 'New chat');
+      expect(pendingTab).toBeDefined();
+      expect(pendingTab?.getAttribute('aria-selected')).toBe('true');
+      expect(pendingTab?.getAttribute('aria-busy')).toBe('true');
+
+      const sourceTab = tabByText(dom.container, 'First worktree chat');
+      expect(sourceTab).toBeDefined();
+      expect(sourceTab?.getAttribute('aria-selected')).toBe('false');
+      expect(sourceTab?.hasAttribute('disabled')).toBe(false);
+
+      // The source tab keeps its own selectable value; selecting it makes Radix
+      // mark it active while the pending tab (a distinct value) stays inactive.
+      act(() => {
+        root?.render(
+          createElement(
+            Tabs,
+            { value: 'chat:ses_first', onValueChange },
+            createElement(CloudAgentWorkspaceTabs, {
+              ...baseProps,
+              chatSessions: [makeSession('ses_first', 'First worktree chat')],
+              pendingChat: {
+                tabId: 'pending-new-chat:op-1',
+                worktreeId: 'worktree_shared',
+                sourceKiloSessionId: 'ses_first',
+                placement: 'append',
+                owned: true,
+                resolvedKiloSessionId: null,
+                originLocationKey: 'origin',
+              },
+              onDismissPendingChat,
+            })
+          )
+        );
+      });
+      expect(tabByText(dom.container, 'First worktree chat')?.getAttribute('aria-selected')).toBe(
+        'true'
+      );
+      expect(tabByText(dom.container, 'New chat')?.getAttribute('aria-selected')).toBe('false');
+      expect(tabByText(dom.container, 'New chat')?.getAttribute('aria-busy')).toBe('true');
+
+      const dismiss = dom.container.querySelector<HTMLButtonElement>(
+        '[aria-label="Dismiss new chat"]'
+      );
+      expect(dismiss).not.toBeNull();
+      act(() => {
+        dismiss?.dispatchEvent(new window.Event('click', { bubbles: true }));
+      });
+      expect(onDismissPendingChat).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => root?.unmount());
+      dom.cleanup();
+    }
+  });
+
+  it('replaces the source chat tab with the pending tab in replace mode', () => {
+    const html = renderWorkspaceTabs({
+      chatSessions: [
+        makeSession('ses_first', 'First worktree chat'),
+        makeSession('ses_second', 'Second worktree chat'),
+      ],
+      currentSessionId: 'ses_second',
+      pendingChat: {
+        tabId: 'pending-new-chat:op-2',
+        worktreeId: 'worktree_shared',
+        sourceKiloSessionId: 'ses_first',
+        placement: 'replace',
+        owned: true,
+        resolvedKiloSessionId: null,
+        originLocationKey: 'origin',
+      },
+    });
+
+    const busyTab = (html.match(/<button\b[^>]*aria-busy="true"[^>]*>[\s\S]*?<\/button>/g) ??
+      [])[0];
+    expect(busyTab).toBeDefined();
+    expect(busyTab).toContain('New chat');
+    expect(html).toContain('Second worktree chat');
+    expect(html).not.toContain('First worktree chat');
+    expect(html).not.toContain('Close First worktree chat');
+  });
+});

@@ -661,6 +661,56 @@ describe('createSessionManager', () => {
   });
 
   describe('switchSession', () => {
+    it('saves the latest live transcript before clearing the outgoing session', async () => {
+      const cached = new Map<string, SessionSnapshotPage>();
+      const config = createMockConfig({
+        writeCachedSnapshotPage: page => cached.set(page.info.id, page),
+        readCachedSnapshotPage: async id => cached.get(id) ?? null,
+        fetchSession: async id => ({ ...defaultFetchedSession, kiloSessionId: id }),
+      });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const storage = latestStorage;
+      if (!storage) throw new Error('Expected session storage');
+      const message = createStoredMessage('latest-message', 'ses-1', 'user');
+      storage.upsertMessage(message.info);
+      storage.upsertPart(
+        message.info.id,
+        stubTextPart({
+          id: 'latest-part',
+          messageID: message.info.id,
+          sessionID: 'ses-1',
+          text: 'latest live text',
+        })
+      );
+
+      await mgr.switchSession(kiloId('ses-2'));
+      expect(cached.get('ses-1')?.messages[0]?.parts[0]).toMatchObject({
+        text: 'latest live text',
+      });
+      expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(0);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(config.store.get(mgr.atoms.messagesList)[0]?.parts[0]).toMatchObject({
+        text: 'latest live text',
+      });
+      mgr.destroy();
+    });
+
+    it('continues switching when the outgoing transcript cache fails', async () => {
+      const config = createMockConfig({
+        writeCachedSnapshotPage: () => {
+          throw new Error('Cache unavailable');
+        },
+        fetchSession: async id => ({ ...defaultFetchedSession, kiloSessionId: id }),
+      });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.switchSession(kiloId('ses-2'));
+      expect(config.store.get(mgr.atoms.fetchedSessionData)?.kiloSessionId).toBe('ses-2');
+      mgr.destroy();
+    });
+
     it('sets isLoading=true synchronously and clears it after completion', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -767,6 +817,64 @@ describe('createSessionManager', () => {
         expect(atomValue<boolean>(config.store, mgr.atoms.isRefreshingCachedTranscript)).toBe(
           false
         );
+      });
+
+      it('removes cached-only messages and parts without deleting live arrivals', async () => {
+        const live = deferred<SessionSnapshotPageOutcome | null>();
+        const cached = {
+          ...cachedPage('ses-1', ['msg-retained', 'msg-removed']),
+          messages: [
+            makePageMessage('msg-retained', 'ses-1', 'removed cached part'),
+            makePageMessage('msg-removed', 'ses-1', 'removed cached message'),
+          ],
+        };
+        const config = createMockConfig({
+          readCachedSnapshotPage: async () => cached,
+          fetchSnapshotPage: createPageFetchMock(() => live.promise),
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        const storage = latestStorage;
+        if (!storage) throw new Error('Expected session storage');
+        storage.upsertMessage(createStoredMessage('msg-live-event', 'ses-1', 'user').info);
+        const fresh = makePageMessage('msg-retained', 'ses-1', 'fresh live part');
+        fresh.parts[0].id = 'fresh-part-id';
+
+        live.resolve(makePage({ kiloSessionId: 'ses-1', messages: [fresh] }));
+        await new Promise<void>(resolve => setImmediate(resolve));
+
+        expect(config.store.get(mgr.atoms.messagesList).map(message => message.info.id)).toEqual(
+          expect.arrayContaining(['msg-retained', 'msg-live-event'])
+        );
+        expect(storage.getMessageInfo('msg-removed')).toBeUndefined();
+        expect(storage.getParts('msg-retained').map(part => part.id)).toEqual(['fresh-part-id']);
+        expect(config.store.get(mgr.atoms.isRefreshingCachedTranscript)).toBe(false);
+        mgr.destroy();
+      });
+
+      it('reconciles cached rows preserved by a metadata retry', async () => {
+        const config = createMockConfig({
+          fetchSession: jest
+            .fn()
+            .mockRejectedValueOnce(new Error('offline'))
+            .mockResolvedValue(defaultFetchedSession),
+          readCachedSnapshotPage: async () => cachedPage('ses-1', ['msg-removed']),
+          fetchSnapshotPage: createPageFetchMock(async () =>
+            makePage({ kiloSessionId: 'ses-1', messages: [] })
+          ),
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(1);
+
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise<void>(resolve => setImmediate(resolve));
+
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(0);
+        expect(config.store.get(mgr.atoms.isRefreshingCachedTranscript)).toBe(false);
+        mgr.destroy();
       });
 
       it('clears the cached transcript refresh when a legacy transport replays its snapshot', async () => {
@@ -2554,6 +2662,53 @@ describe('createSessionManager', () => {
         },
         images: undefined,
       });
+    });
+
+    it('marks the optimistic row as sending only while the request is pending', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const sendingIds = () =>
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.sendingMessageIds);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(sendingIds().size).toBe(0);
+
+      let resolveSend!: () => void;
+      mockSession.send.mockImplementation(
+        () =>
+          new Promise<void>(resolve => {
+            resolveSend = resolve;
+          })
+      );
+      const accepted = mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
+
+      const [messageId] = mockSession.storage!.getMessageIds();
+      expect(messageId).toBeDefined();
+      expect([...sendingIds()]).toEqual([messageId]);
+
+      resolveSend();
+      await accepted;
+
+      expect(sendingIds().size).toBe(0);
+    });
+
+    it('clears the sending mark when the request fails', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockRejectedValue(new Error('network down'));
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
+
+      expect(accepted).toBe(false);
+      expect(atomValue<ReadonlySet<string>>(config.store, mgr.atoms.sendingMessageIds).size).toBe(
+        0
+      );
     });
 
     it('queued event does not duplicate or overwrite the optimistic row', async () => {

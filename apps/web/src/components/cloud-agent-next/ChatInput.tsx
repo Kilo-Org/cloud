@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { Button as UIButton } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover';
 import { Command, CommandList, CommandItem, CommandEmpty } from '@/components/ui/command';
-import { Send, Square, Paperclip, Upload } from 'lucide-react';
+import { Send, Square, Paperclip, Upload, LoaderCircle } from 'lucide-react';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 import { cn } from '@/lib/utils';
 import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
@@ -22,6 +22,7 @@ import { MobileToolbarPopover } from './MobileToolbarPopover';
 import { AttachmentPreviewStrip } from './AttachmentPreviewStrip';
 import {
   useCloudAgentAttachmentUpload,
+  type CloudAgentAttachmentFile,
   type UseCloudAgentAttachmentUploadOptions,
 } from '@/hooks/useCloudAgentAttachmentUpload';
 import {
@@ -33,10 +34,34 @@ import type { AgentMode } from './types';
 import {
   acceptedSubmissionAttachmentIdsToRemove,
   getChatInputPresentationCommands,
-  hasSubmissionAttachmentPayload,
   isWorktreeNewChatCommand,
   shouldRejectAttachedSlashCommand,
 } from './chat-input-attachments';
+import {
+  revokeComposerSnapshotPreviews,
+  saveComposerSnapshot,
+  takeComposerSnapshot,
+  type ComposerSnapshot,
+} from './composer-snapshots';
+
+const DEFAULT_CONVERSATION_KEY = 'default';
+
+/**
+ * A restored attachment whose upload was interrupted by a conversation switch
+ * cannot be resumed without a new object key, so surface it as an error the
+ * user can remove or re-add instead of a silently stuck "uploading" row.
+ */
+function normalizeRestoredAttachments(
+  attachments: readonly CloudAgentAttachmentFile[]
+): CloudAgentAttachmentFile[] {
+  return attachments.map(attachment =>
+    attachment.status === 'processing' ||
+    attachment.status === 'pending' ||
+    attachment.status === 'uploading'
+      ? { ...attachment, status: 'error', error: 'Upload interrupted' }
+      : attachment
+  );
+}
 
 type ChatInputProps = {
   onSend: (message: string, attachments?: CloudAgentAttachments) => Promise<boolean>;
@@ -98,6 +123,12 @@ type ChatInputProps = {
   variantPickerDisabled?: boolean;
   /** Explanatory tooltip shown alongside the locked variant picker. */
   variantPickerTooltip?: string;
+  /**
+   * Identity of the conversation this composer edits. A send that settles after
+   * the user switched away must not restore its draft or focus into the newly
+   * selected chat, so completion is scoped to this key.
+   */
+  conversationKey?: string;
 };
 
 export function ChatInput({
@@ -131,11 +162,20 @@ export function ChatInput({
   modelPickerTooltip,
   variantPickerDisabled,
   variantPickerTooltip,
+  conversationKey,
 }: ChatInputProps) {
   const [value, setValue] = useState('');
-  const [isAttachmentSubmissionPending, setIsAttachmentSubmissionPending] = useState(false);
+  const [pendingSubmissionKeys, setPendingSubmissionKeys] = useState<ReadonlySet<string>>(
+    new Set()
+  );
   const valueRef = useRef('');
-  const attachmentSubmissionPendingRef = useRef(false);
+  const attachmentSubmissionPendingRef = useRef<ReadonlySet<string>>(new Set());
+  const conversationKeyRef = useRef(conversationKey);
+  conversationKeyRef.current = conversationKey;
+  const isAttachmentSubmissionPending = pendingSubmissionKeys.has(
+    conversationKey ?? DEFAULT_CONVERSATION_KEY
+  );
+  const isNewChatDraft = isWorktreeNewChatCommand(value.trim(), onNewChat !== undefined);
   const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = inputRef ?? internalTextareaRef;
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -146,21 +186,64 @@ export function ChatInput({
     setValue(nextValue);
   }, []);
 
-  /** Ref for the synchronous re-entry guard, state for the disabled UI. */
-  const setAttachmentSubmissionPending = useCallback((pending: boolean) => {
-    attachmentSubmissionPendingRef.current = pending;
-    setIsAttachmentSubmissionPending(pending);
+  const setAttachmentSubmissionPending = useCallback((pending: boolean, key: string) => {
+    const next = new Set(attachmentSubmissionPendingRef.current);
+    if (pending) next.add(key);
+    else next.delete(key);
+    attachmentSubmissionPendingRef.current = next;
+    setPendingSubmissionKeys(next);
   }, []);
+  const hasPendingSubmission = useCallback(
+    () =>
+      attachmentSubmissionPendingRef.current.has(
+        conversationKeyRef.current ?? DEFAULT_CONVERSATION_KEY
+      ),
+    []
+  );
 
   const attachmentUpload = useCloudAgentAttachmentUpload(attachmentUploadOptions);
   const isAttachmentLimitReached =
     attachmentUpload.attachments.length >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT;
 
+  const composerSnapshotsRef = useRef(new Map<string, ComposerSnapshot>());
+  const composerConversationRef = useRef(conversationKey ?? DEFAULT_CONVERSATION_KEY);
+  const liveAttachmentsRef = useRef(attachmentUpload.attachments);
+  liveAttachmentsRef.current = attachmentUpload.attachments;
+  const { replaceAttachments } = attachmentUpload;
+
+  const storeComposerSnapshot = useCallback((key: string, snapshot: ComposerSnapshot) => {
+    const shownKey = conversationKeyRef.current ?? DEFAULT_CONVERSATION_KEY;
+    const evicted = saveComposerSnapshot(
+      composerSnapshotsRef.current,
+      key,
+      snapshot,
+      candidate => candidate === shownKey || attachmentSubmissionPendingRef.current.has(candidate)
+    );
+    revokeComposerSnapshotPreviews(evicted);
+  }, []);
+
   useEffect(() => {
-    if (!attachmentsEnabled) {
-      attachmentUpload.clearAttachments();
-    }
-  }, [attachmentUpload.clearAttachments, attachmentsEnabled]);
+    const snapshots = composerSnapshotsRef.current;
+    return () => revokeComposerSnapshotPreviews(snapshots.values());
+  }, []);
+
+  // Each conversation keeps its own draft and attachments. Switching away saves
+  // them and switching back restores them, so a failed send in one chat is
+  // recoverable after visiting another — and a transient `attachmentsEnabled`
+  // false never releases a submitted upload's pending-ledger key.
+  useEffect(() => {
+    const previous = composerConversationRef.current;
+    const next = conversationKey ?? DEFAULT_CONVERSATION_KEY;
+    if (previous === next) return;
+    composerConversationRef.current = next;
+    storeComposerSnapshot(previous, {
+      text: valueRef.current,
+      attachments: liveAttachmentsRef.current,
+    });
+    const snapshot = takeComposerSnapshot(composerSnapshotsRef.current, next);
+    setInputValue(snapshot?.text ?? '');
+    replaceAttachments(normalizeRestoredAttachments(snapshot?.attachments ?? []));
+  }, [conversationKey, replaceAttachments, setInputValue, storeComposerSnapshot]);
 
   // Restore text into the textarea when initialValue changes (e.g. after a failed send).
   // Treats undefined as "no opinion" (skip), but empty string actively clears the field.
@@ -195,12 +278,22 @@ export function ChatInput({
   const sendMessage = useCallback(
     async (message: string) => {
       const trimmed = message.trim();
-      if (!trimmed || disabled) return false;
-      if (trimmed.length > CLOUD_AGENT_PROMPT_MAX_LENGTH) return false;
-      if (attachmentSubmissionPendingRef.current) return false;
-      if (attachmentsEnabled && attachmentUpload.hasUploadingAttachments) return false;
+      if (!trimmed) return false;
 
+      const conversationAtSend = conversationKeyRef.current ?? DEFAULT_CONVERSATION_KEY;
       const createsWorktreeChat = isWorktreeNewChatCommand(trimmed, onNewChat !== undefined);
+
+      // `/new` is navigation, not an ordinary send: a temporary send
+      // unavailability (busy session, unsaved draft) must not block starting a
+      // chat. Its own creation guard dedupes doubles, and the shared checks for
+      // read-only/unresolved transports still apply because `onNewChat` is only
+      // provided for an eligible worktree session.
+      if (!createsWorktreeChat) {
+        if (disabled) return false;
+        if (trimmed.length > CLOUD_AGENT_PROMPT_MAX_LENGTH) return false;
+        if (attachmentSubmissionPendingRef.current.has(conversationAtSend)) return false;
+        if (attachmentsEnabled && attachmentUpload.hasUploadingAttachments) return false;
+      }
 
       // Re-match against the trimmed value at submit time, and reject a slash
       // command carrying files BEFORE finalizing the attachment ledger: a
@@ -230,16 +323,19 @@ export function ChatInput({
       }
 
       let attachmentsData: CloudAgentAttachments | undefined;
-      if (attachmentsEnabled) {
-        // Take the in-flight guard BEFORE the link RPC: while finalize awaits,
-        // the send button stays enabled and Enter still reaches sendMessage,
-        // so an unguarded await lets a second submit start its own
-        // finalize + send.
-        setAttachmentSubmissionPending(true);
+      const hasAttachments = attachmentsEnabled && attachmentUpload.attachments.length > 0;
+      // Take the in-flight guard for the whole submission — the link RPC and,
+      // for a plain prompt, the send itself. While either is in flight the send
+      // button stays disabled and Enter is refused, so a second submit cannot
+      // start its own finalize + send. A plain prompt has nothing to finalize:
+      // skipping the await lets onSend insert its optimistic row in the same
+      // tick as the keypress.
+      if (!createsWorktreeChat) setAttachmentSubmissionPending(true, conversationAtSend);
+      if (hasAttachments) {
         try {
           attachmentsData = await attachmentUpload.finalizeAttachments();
         } catch (error) {
-          setAttachmentSubmissionPending(false);
+          setAttachmentSubmissionPending(false, conversationAtSend);
           toast.error('Failed to attach files. Please try again.', {
             description: String(error instanceof Error ? error.message : ''),
           });
@@ -247,11 +343,7 @@ export function ChatInput({
         }
       }
       const submittedAttachments = attachmentsEnabled ? attachmentUpload.attachments : [];
-      const submitsAttachments = hasSubmissionAttachmentPayload(attachmentsData);
 
-      if (!submitsAttachments) {
-        setAttachmentSubmissionPending(false);
-      }
       setInputValue('');
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -265,20 +357,36 @@ export function ChatInput({
         } else {
           accepted = await onSend(trimmed, attachmentsData);
         }
-
-        if (!accepted) return false;
-
-        acceptedSubmissionAttachmentIdsToRemove(submittedAttachments, accepted).forEach(
-          attachmentUpload.removeAttachment
-        );
-        return true;
+        return accepted;
       } finally {
-        if (submitsAttachments) {
-          setAttachmentSubmissionPending(false);
-        }
-        if (!accepted && valueRef.current === '') {
-          setInputValue(trimmed);
-          textareaRef.current?.focus();
+        if (!createsWorktreeChat) setAttachmentSubmissionPending(false, conversationAtSend);
+        const currentKey = conversationKeyRef.current ?? DEFAULT_CONVERSATION_KEY;
+        if (accepted) {
+          const removeIds = acceptedSubmissionAttachmentIdsToRemove(submittedAttachments, accepted);
+          if (removeIds.length > 0) {
+            if (currentKey === conversationAtSend) {
+              removeIds.forEach(attachmentUpload.removeAttachment);
+            } else {
+              const existing = composerSnapshotsRef.current.get(conversationAtSend);
+              storeComposerSnapshot(conversationAtSend, {
+                text: existing?.text ?? '',
+                attachments: (existing?.attachments ?? []).filter(
+                  attachment => !removeIds.includes(attachment.id)
+                ),
+              });
+            }
+          }
+        } else {
+          // The failed submission's inputs belong to its own conversation: keep
+          // them there so returning recovers the original text and files.
+          storeComposerSnapshot(conversationAtSend, {
+            text: trimmed,
+            attachments: submittedAttachments,
+          });
+          if (currentKey === conversationAtSend && valueRef.current === '') {
+            setInputValue(trimmed);
+            textareaRef.current?.focus();
+          }
         }
       }
     },
@@ -292,6 +400,7 @@ export function ChatInput({
       setAttachmentSubmissionPending,
       setInputValue,
       slashCommands,
+      storeComposerSnapshot,
     ]
   );
 
@@ -374,7 +483,7 @@ export function ChatInput({
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
-      if (!attachmentsEnabled || attachmentSubmissionPendingRef.current) return;
+      if (!attachmentsEnabled || hasPendingSubmission()) return;
 
       const files = Array.from(e.clipboardData.items)
         .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
@@ -384,13 +493,13 @@ export function ChatInput({
         attachmentUpload.addFiles(files);
       }
     },
-    [attachmentUpload, attachmentsEnabled]
+    [attachmentUpload, attachmentsEnabled, hasPendingSubmission]
   );
 
   const dragHandlers = attachmentsEnabled
     ? {
         onDragEnter: (event: React.DragEvent) => {
-          if (attachmentSubmissionPendingRef.current) {
+          if (hasPendingSubmission()) {
             event.preventDefault();
             event.stopPropagation();
             return;
@@ -398,7 +507,7 @@ export function ChatInput({
           attachmentUpload.dragHandlers.onDragEnter(event);
         },
         onDragOver: (event: React.DragEvent) => {
-          if (attachmentSubmissionPendingRef.current) {
+          if (hasPendingSubmission()) {
             event.preventDefault();
             event.stopPropagation();
             return;
@@ -407,7 +516,7 @@ export function ChatInput({
         },
         onDragLeave: attachmentUpload.dragHandlers.onDragLeave,
         onDrop: (event: React.DragEvent) => {
-          if (attachmentSubmissionPendingRef.current) {
+          if (hasPendingSubmission()) {
             event.preventDefault();
             event.stopPropagation();
             return;
@@ -464,7 +573,7 @@ export function ChatInput({
             multiple
             className="hidden"
             onChange={e => {
-              if (e.target.files && !attachmentSubmissionPendingRef.current) {
+              if (e.target.files && !hasPendingSubmission()) {
                 attachmentUpload.addFiles(e.target.files);
               }
               e.target.value = '';
@@ -654,7 +763,7 @@ export function ChatInput({
               variant="ghost"
               size="icon"
               onClick={() => {
-                if (!attachmentSubmissionPendingRef.current) {
+                if (!hasPendingSubmission()) {
                   fileInputRef.current?.click();
                 }
               }}
@@ -685,16 +794,26 @@ export function ChatInput({
             size="icon"
             onClick={handleSend}
             disabled={
-              disabled ||
-              isAttachmentSubmissionPending ||
+              (!isNewChatDraft && (disabled || isAttachmentSubmissionPending)) ||
               !value.trim() ||
               value.length > CLOUD_AGENT_PROMPT_MAX_LENGTH ||
               (attachmentsEnabled && attachmentUpload.hasUploadingAttachments)
             }
             className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
-            aria-label="Send message"
+            aria-label={
+              isNewChatDraft
+                ? 'New chat'
+                : isAttachmentSubmissionPending
+                  ? 'Sending message'
+                  : 'Send message'
+            }
+            aria-busy={(!isNewChatDraft && isAttachmentSubmissionPending) || undefined}
           >
-            <Send className="h-4 w-4" />
+            {isAttachmentSubmissionPending && !isNewChatDraft ? (
+              <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </UIButton>
         </div>
       </div>

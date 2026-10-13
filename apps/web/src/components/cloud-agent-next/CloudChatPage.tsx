@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  startTransition,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -43,6 +44,13 @@ import {
   isRenderableSessionCost,
 } from './session-cost-breakdown';
 import { ConversationMessages } from './ConversationMessages';
+import { PendingChatView } from './PendingChatView';
+import {
+  PENDING_FIRST_CHAT_STATUS_LABEL,
+  usePendingFirstChat,
+  resolvePendingFirstChatView,
+} from './pending-first-chat';
+import { shouldShowPendingWorktreeView } from './worktree-chat-pending';
 import { CurrentTaskList } from './CurrentTaskList';
 import { getCurrentTodos } from './current-todos';
 import { planResumeAttempt, resumeAnchorForTranscript, sendTakesOverResume } from './resume-anchor';
@@ -214,6 +222,10 @@ export default function CloudChatPage({
     closeSession,
     renameSession,
     deletingSessionIds,
+    pendingWorktreeChat,
+    releasePendingWorktreeOwnership,
+    dismissPendingWorktreeChat,
+    resolvePendingWorktreeChat,
   } = useWorktreeChatTabs();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -264,6 +276,7 @@ export default function CloudChatPage({
   // -- Manager atoms --------------------------------------------------------
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const isLoading = useAtomValue(manager.atoms.isLoading);
+  const isRefreshingCachedTranscript = useAtomValue(manager.atoms.isRefreshingCachedTranscript);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const canSend = useAtomValue(manager.atoms.canSend);
@@ -283,6 +296,7 @@ export default function CloudChatPage({
   const staticMessages = useAtomValue(manager.atoms.staticMessages);
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
+  const sendingMessageIds = useAtomValue(manager.atoms.sendingMessageIds);
   const liveTotalCostUsd = useAtomValue(manager.atoms.totalCost);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
@@ -306,11 +320,52 @@ export default function CloudChatPage({
     requestedSessionId: sessionIdFromParams,
     lastStartedSessionId,
     ownerSessionId: fetchedSessionData?.kiloSessionId ?? null,
+    cachedSessionId: isRefreshingCachedTranscript
+      ? ((staticMessages[0] ?? dynamicMessages[0])?.info.sessionID ?? null)
+      : null,
     isLoading,
     hasMessages: transcriptMessageCount > 0,
     terminalOpenFailure,
   });
-  const transcriptReady = transcriptReadyForEffects(transcriptPhase);
+  const transcriptReady =
+    transcriptReadyForEffects(transcriptPhase) && !isRefreshingCachedTranscript;
+
+  const { pendingFirstChat, setPendingFirstChat } = usePendingFirstChat();
+  const pendingWorktreeResolvedKiloSessionId = pendingWorktreeChat?.resolvedKiloSessionId ?? null;
+  const pendingFirstChatDecision = pendingFirstChat
+    ? resolvePendingFirstChatView({
+        pending: pendingFirstChat,
+        requestedSessionId: sessionIdFromParams,
+        visibleMessageIds: [...staticMessages, ...dynamicMessages].map(message => message.info.id),
+        transcriptPhase,
+        hasMessages: transcriptMessageCount > 0,
+        fetchedSession: fetchedSessionData,
+      })
+    : 'idle';
+
+  useEffect(() => {
+    if (pendingFirstChatDecision === 'clear') setPendingFirstChat(null);
+  }, [pendingFirstChatDecision, setPendingFirstChat]);
+
+  useEffect(() => {
+    if (!pendingWorktreeResolvedKiloSessionId) return;
+    if (sessionIdFromParams !== pendingWorktreeResolvedKiloSessionId) return;
+    if (transcriptPhase === 'failed' || transcriptPhase === 'live') {
+      resolvePendingWorktreeChat();
+    }
+  }, [
+    pendingWorktreeResolvedKiloSessionId,
+    sessionIdFromParams,
+    transcriptPhase,
+    resolvePendingWorktreeChat,
+  ]);
+
+  const showPendingWorktreeView = shouldShowPendingWorktreeView(
+    pendingWorktreeChat,
+    selectedWorktreeId ?? null
+  );
+  const showPendingFirstChatView = pendingFirstChatDecision === 'show';
+
   const getCurrentSessionCostBreakdown = useCallback(
     () =>
       getSessionCostBreakdown(
@@ -791,6 +846,7 @@ export default function CloudChatPage({
   const canCreateWorktreeChat = worktreeChatSourceSessionId !== null;
   const handleCreateWorktreeChat = useCallback(async () => {
     if (!worktreeChatSourceSessionId) return false;
+    setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
     return createWorktreeChat(worktreeChatSourceSessionId);
   }, [createWorktreeChat, worktreeChatSourceSessionId]);
   const handleReplaceWorktreeChat = useCallback(async () => {
@@ -902,9 +958,12 @@ export default function CloudChatPage({
   const fetchRouteReady = useCallback(
     async (kiloSessionId: string): Promise<boolean | undefined> => {
       try {
-        const data = await queryClient.fetchQuery(
-          trpc.cliSessionsV2.getWithRuntimeState.queryOptions({ session_id: kiloSessionId })
-        );
+        const data = await queryClient.fetchQuery({
+          ...trpc.cliSessionsV2.getWithRuntimeState.queryOptions({ session_id: kiloSessionId }),
+          staleTime: 0,
+          retry: false,
+          networkMode: 'always',
+        });
         return data.runtimeState?.routeReady;
       } catch {
         return undefined;
@@ -998,19 +1057,27 @@ export default function CloudChatPage({
 
   const handleSelectWorkspaceTab = useCallback(
     (tabId: WorkspaceTabId) => {
+      if (tabId !== CHAT_TAB_ID) releasePendingWorktreeOwnership();
       setWorkspaceTabs(state => selectWorkspaceTab(state, tabId));
     },
-    [setWorkspaceTabs]
+    [releasePendingWorktreeOwnership, setWorkspaceTabs]
   );
 
   const handleWorkspaceValueChange = (value: string) => {
-    const chat = openWorktreeChats.find(chat => value === `chat:${chat.sessionId}`);
-    if (chat) {
-      setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
-      if (chat.sessionId !== sessionIdFromParams) openSession(chat.sessionId);
-    } else {
-      setWorkspaceTabs(state => selectWorkspaceTab(state, value));
-    }
+    if (value === pendingWorktreeChat?.tabId) return;
+    releasePendingWorktreeOwnership();
+    startTransition(() => {
+      const chat = openWorktreeChats.find(chat => value === `chat:${chat.sessionId}`);
+      if (chat) {
+        setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
+        if (chat.sessionId !== sessionIdFromParams) openSession(chat.sessionId);
+      } else {
+        // Selecting a terminal or file tab leaves the chat: a background
+        // creation must not regain the foreground when it completes.
+        releasePendingWorktreeOwnership();
+        setWorkspaceTabs(state => selectWorkspaceTab(state, value));
+      }
+    });
   };
 
   const handleReviewAccepted = useCallback(
@@ -1692,12 +1759,26 @@ export default function CloudChatPage({
             </SetPageTitle>
             {showChatInterface ? (
               <Tabs
-                value={activeWorkspaceTabId === CHAT_TAB_ID ? chatTabValue : activeWorkspaceTabId}
+                value={
+                  showPendingWorktreeView && pendingWorktreeChat
+                    ? pendingWorktreeChat.tabId
+                    : activeWorkspaceTabId === CHAT_TAB_ID
+                      ? chatTabValue
+                      : activeWorkspaceTabId
+                }
                 onValueChange={handleWorkspaceValueChange}
                 className="flex min-h-0 flex-1 flex-col"
               >
-                {(transcriptPhase === 'opening' || showLoadingIndicator) && (
-                  <div className="bg-primary h-0.5 w-full animate-pulse" />
+                {(transcriptPhase === 'opening' ||
+                  isRefreshingCachedTranscript ||
+                  showLoadingIndicator) && (
+                  <div
+                    role="status"
+                    aria-label={
+                      isRefreshingCachedTranscript ? 'Refreshing session…' : 'Loading session…'
+                    }
+                    className="bg-primary h-0.5 w-full animate-pulse motion-reduce:animate-none"
+                  />
                 )}
 
                 <div className="flex shrink-0 flex-wrap items-center gap-x-2 border-b px-3 py-2 sm:flex-nowrap">
@@ -1735,6 +1816,8 @@ export default function CloudChatPage({
                         onCloseTerminal={handleCloseTerminalTab}
                         onActivateTab={closeChangesView}
                         selectionSuppressed={changesViewOpen}
+                        pendingChat={pendingWorktreeChat}
+                        onDismissPendingChat={dismissPendingWorktreeChat}
                       />
                     )}
                   </div>
@@ -1763,6 +1846,27 @@ export default function CloudChatPage({
                       }
                     >
                       <div className="relative min-h-0 flex-1">
+                        {showPendingWorktreeView && (
+                          <div className="bg-background absolute inset-0 z-10">
+                            <PendingChatView
+                              statusLabel={
+                                pendingWorktreeChat?.resolvedKiloSessionId
+                                  ? 'Opening chat…'
+                                  : 'Creating chat…'
+                              }
+                              onDismiss={dismissPendingWorktreeChat}
+                            />
+                          </div>
+                        )}
+                        {showPendingFirstChatView && pendingFirstChat && (
+                          <div className="bg-background absolute inset-0 z-10">
+                            <PendingChatView
+                              prompt={pendingFirstChat.prompt}
+                              attachmentNames={pendingFirstChat.attachmentNames}
+                              statusLabel={PENDING_FIRST_CHAT_STATUS_LABEL}
+                            />
+                          </div>
+                        )}
                         {!sessionIdFromParams &&
                           selectedWorktreeId &&
                           workspaceTabs.activeTabId === CHAT_TAB_ID && (
@@ -1796,6 +1900,7 @@ export default function CloudChatPage({
                           <div
                             ref={scrollContainerRef}
                             hidden={!chatTabActive}
+                            inert={showPendingWorktreeView || showPendingFirstChatView || undefined}
                             className={`absolute inset-0 overflow-x-hidden overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2 transition-opacity duration-150 ${showLoadingIndicator && transcriptPhase === 'live' ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
                             onScroll={handleScroll}
                           >
@@ -1829,6 +1934,7 @@ export default function CloudChatPage({
                                     staticMessages={staticMessages}
                                     dynamicMessages={dynamicMessages}
                                     pendingMessages={pendingMessages}
+                                    sendingMessageIds={sendingMessageIds}
                                     preparationByMessageId={preparationByMessageId}
                                     commitsAfterMessage={commitsAfterMessage}
                                     getChildMessages={getChildMessages}
@@ -1866,7 +1972,17 @@ export default function CloudChatPage({
                         </>
                       </div>
 
-                      <div hidden={!chatTabActive} className={chatTabActive ? '' : 'hidden'}>
+                      <div
+                        hidden={
+                          !chatTabActive || showPendingWorktreeView || showPendingFirstChatView
+                        }
+                        inert={showPendingWorktreeView || showPendingFirstChatView || undefined}
+                        className={
+                          chatTabActive && !showPendingWorktreeView && !showPendingFirstChatView
+                            ? ''
+                            : 'hidden'
+                        }
+                      >
                         {isReadOnly ? (
                           !isLoading &&
                           sessionIdFromParams &&
@@ -1929,6 +2045,7 @@ export default function CloudChatPage({
                                 }
                                 onStop={handleStopExecution}
                                 canInterrupt={canInterrupt}
+                                conversationKey={sessionIdFromParams ?? 'new'}
                                 disabled={
                                   !canSend ||
                                   isLoading ||

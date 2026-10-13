@@ -4,6 +4,7 @@ import * as z from 'zod';
 
 const CLASSIFICATION_HOT_CACHE_LIMIT = 5000;
 const ENTRY_TTL_MS = 30 * 60 * 1000;
+const PENDING_COST_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 // Cloudflare caps storage.delete() at 128 keys per call.
 const DELETE_BATCH_SIZE = 128;
 
@@ -14,16 +15,19 @@ type StoredValue = ClassifierOutput | StickyDecision | number;
 type StoredEntry = {
   value: StoredValue;
   storedAt: number;
+  stickyGeneration?: number;
 };
 
 type StoredConversationState = {
   classification: StoredEntry | null;
   sticky: StoredValue | null;
   pendingCostUsd: StoredValue | null;
+  generation: number;
 };
 
 const STICKY_DECISION_KEY = 'sticky';
 const PENDING_COST_KEY = 'pending-cost';
+const GENERATION_KEY = 'generation';
 const PendingCostSchema = z.number().finite().nonnegative();
 
 const classificationHotCache = new Map<string, { value: ClassifierOutput; storedAt: number }>();
@@ -50,22 +54,36 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
       classificationKey,
       STICKY_DECISION_KEY,
       PENDING_COST_KEY,
+      GENERATION_KEY,
     ]);
     const now = Date.now();
+    const previousGeneration = PendingCostSchema.safeParse(entries.get(GENERATION_KEY)?.value);
+    const generation = (previousGeneration.success ? previousGeneration.data : 0) + 1;
+    entries.delete(GENERATION_KEY);
     const keysToDelete: string[] = [];
     for (const [key, entry] of entries) {
-      if (now - entry.storedAt > ENTRY_TTL_MS) {
+      if (
+        now - entry.storedAt >
+        (key === PENDING_COST_KEY ? PENDING_COST_RETENTION_MS : ENTRY_TTL_MS)
+      ) {
         entries.delete(key);
         keysToDelete.push(key);
       }
     }
     const pendingCost = entries.get(PENDING_COST_KEY);
     if (consumePendingCost && pendingCost) keysToDelete.push(PENDING_COST_KEY);
-    if (keysToDelete.length > 0) await this.ctx.storage.delete(keysToDelete);
+    await Promise.all([
+      this.ctx.storage.put(GENERATION_KEY, {
+        value: generation,
+        storedAt: now,
+      } satisfies StoredEntry),
+      ...(keysToDelete.length > 0 ? [this.ctx.storage.delete(keysToDelete)] : []),
+    ]);
     return {
       classification: entries.get(classificationKey) ?? null,
       sticky: entries.get(STICKY_DECISION_KEY)?.value ?? null,
       pendingCostUsd: pendingCost?.value ?? null,
+      generation,
     };
   }
 
@@ -73,9 +91,22 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
     const entry = await this.ctx.storage.get<StoredEntry>(PENDING_COST_KEY);
     const now = Date.now();
     const pending = PendingCostSchema.safeParse(
-      entry && now - entry.storedAt <= ENTRY_TTL_MS ? entry.value : 0
+      entry && now - entry.storedAt <= PENDING_COST_RETENTION_MS ? entry.value : 0
     );
     await this.putEntry(PENDING_COST_KEY, (pending.success ? pending.data : 0) + usd);
+  }
+
+  async putStickyDecision(value: StickyDecision, generation: number): Promise<void> {
+    const current = await this.ctx.storage.get<StoredEntry>(STICKY_DECISION_KEY);
+    if (generation < (current?.stickyGeneration ?? 0)) return;
+    await this.ctx.storage.put(STICKY_DECISION_KEY, {
+      value,
+      storedAt: Date.now(),
+      stickyGeneration: generation,
+    } satisfies StoredEntry);
+    if ((await this.ctx.storage.getAlarm()) === null) {
+      await this.ctx.storage.setAlarm(Date.now() + ENTRY_TTL_MS);
+    }
   }
 
   async putEntry(key: string, value: StoredValue): Promise<void> {
@@ -94,7 +125,11 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
     const expiredKeys: string[] = [];
     let liveEntries = 0;
     for (const [key, entry] of entries) {
-      if (now - entry.storedAt > ENTRY_TTL_MS) {
+      if (key === GENERATION_KEY) continue;
+      if (
+        now - entry.storedAt >
+        (key === PENDING_COST_KEY ? PENDING_COST_RETENTION_MS : ENTRY_TTL_MS)
+      ) {
         expiredKeys.push(key);
       } else {
         liveEntries++;
@@ -137,6 +172,7 @@ export type ConversationState = {
   classification: ClassifierOutput | null;
   sticky: StickyDecision | null;
   pendingCostUsd: number;
+  generation: number;
 };
 
 export async function readConversationState(
@@ -171,9 +207,10 @@ export async function readConversationState(
       classification,
       sticky: sticky.success ? sticky.data : null,
       pendingCostUsd: pendingCost.success ? pendingCost.data : 0,
+      generation: state.generation,
     };
   } catch {
-    return { classification: null, sticky: null, pendingCostUsd: 0 };
+    return { classification: null, sticky: null, pendingCostUsd: 0, generation: 0 };
   }
 }
 
@@ -194,14 +231,14 @@ export async function putStickyDecision(
   conversationKey: string,
   model: string,
   variant: string | null,
-  routeKey: string
+  routeKey: string,
+  generation: number
 ): Promise<void> {
   try {
-    await cacheStub(env, conversationKey).putEntry(STICKY_DECISION_KEY, {
-      model,
-      variant,
-      routeKey,
-    } satisfies StickyDecision);
+    await cacheStub(env, conversationKey).putStickyDecision(
+      { model, variant, routeKey } satisfies StickyDecision,
+      generation
+    );
   } catch {
     // Sticky writes are best effort and must not fail the decision.
   }

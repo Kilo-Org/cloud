@@ -73,10 +73,14 @@ export function usageSince(now: ModelUsage, counted: ModelUsage): ModelUsage {
   };
 }
 
-export function countUsage(usage: ChatUsage, model: string, part: ModelUsage): ChatUsage {
-  return { ...usage, [model]: sumUsage(usage[model] ?? zeroUsage, part) };
+export function countUsage(usage: ChatUsage, model: string, part: ModelUsage) {
+  return { ...usage, [model]: sumUsage(usage[model] ?? zeroUsage, part) } satisfies ChatUsage;
 }
 
 export function totalUsage(usage: ChatUsage): ModelUsage {
-  return Object.values(usage).reduce(sumUsage, zeroUsage);
+  let total = zeroUsage;
+  for (const used of Object.values(usage)) {
+    total = sumUsage(total, used);
+  }
+  return total;
 }

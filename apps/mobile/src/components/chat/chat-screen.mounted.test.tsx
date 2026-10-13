@@ -258,20 +258,26 @@ describe('the chat transcript while it opens', () => {
   });
 });
 
-describe('the chat details', () => {
-  type Metric = ReactElement<{ onPress: () => void; info: unknown }>;
-  const metricOf = (tree: ReactTestRenderer): Metric => {
-    const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
-    const right = header.props.headerRight as ReactElement<{ children: readonly Metric[] }>;
-    const [metric] = right.props.children;
-    if (metric === undefined) {
-      throw new Error('the header has no metric');
-    }
-    return metric;
-  };
-  const details = (tree: ReactTestRenderer) =>
-    tree.root.find(node => (node.type as string) === 'ChatDetailsSheet').props;
+type Metric = ReactElement<{ onPress: () => void; info: unknown }>;
 
+function metricOf(tree: ReactTestRenderer): Metric {
+  const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
+  const right = header.props.headerRight as ReactElement<{ children: readonly Metric[] }>;
+  const [metric] = right.props.children;
+  if (metric === undefined) {
+    throw new Error('the header has no metric');
+  }
+  return metric;
+}
+
+function details(tree: ReactTestRenderer) {
+  return tree.root.find(node => (node.type as string) === 'ChatDetailsSheet').props as {
+    readonly visible: boolean;
+    readonly onClose: () => void;
+  };
+}
+
+describe('the chat details', () => {
   it('opens from the header metric onto the chat the screen shows', async () => {
     state.status = 'idle';
     const tree = await mount();

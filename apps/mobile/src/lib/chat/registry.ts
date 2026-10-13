@@ -507,9 +507,9 @@ function partsOf({ text, images }: Question): string | readonly PartDraft[] {
 async function countCall(
   sessionId: string,
   chat: Chat,
-  total: ModelUsage,
-  last: ModelUsage
+  call: { readonly total: ModelUsage; readonly last: ModelUsage }
 ): Promise<void> {
+  const { total, last } = call;
   const spent = usageSince(total, chat.counted);
   chat.counted = total;
   const { model, record } = snapshotOf(sessionId);
@@ -529,10 +529,12 @@ function reading(sessionId: string, question: Question, runtime: ChatRuntime): E
   let said = '';
   return Stream.runForEach(chat.handle.ask(partsOf(question)), (event: ModelEvent) => {
     if (event.kind === 'done') {
-      return Effect.flatMap(chat.handle.usage, total =>
-        Effect.promise(async () => {
-          await countCall(sessionId, chat, total, event.usage);
-        })
+      return chat.handle.usage.pipe(
+        Effect.flatMap(total =>
+          Effect.promise(async () => {
+            await countCall(sessionId, chat, { total, last: event.usage });
+          })
+        )
       );
     }
     return Effect.sync(() => {

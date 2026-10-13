@@ -108,8 +108,10 @@ it('adds up the cost the provider reported, and reports none when it never did',
     );
   /* Absent is not zero: a free model and a provider that sends no cost both
      leave it out, and a caller must not read either as a session that was free. */
-  expect((await twice({ cost: 0.25 })).value.cost).toBe(0.5);
-  expect((await twice({})).value).not.toHaveProperty('cost');
+  const reported = await twice({ cost: 0.25 });
+  const silent = await twice({});
+  expect(reported.value.cost).toBe(0.5);
+  expect(silent.value).not.toHaveProperty('cost');
 });
 
 it('asks with the same effort on every question of a session', async () => {

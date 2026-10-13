@@ -99,21 +99,24 @@ its turn, or when the user loses access to the session.
    "Reading", "Run", "Web search", "Thinking it through") and its short
    target, capped in length. The card MUST NOT repeat the step on a
    second line.
-6. The card MUST show plan progress when the session keeps a plan: a bar,
-   the count ("3 of 7"), and the current step's name, capped in length.
+6. The card MUST show plan progress when the session keeps a plan. The
+   compact Lock Screen card shows the count ("3 of 7"); the expanded view
+   also shows the bar and the current step's name, capped in length.
 7. A `running` card whose session has no activity for
    `SESSION_CARD_QUIET_AFTER_MS` (5 minutes) MUST replace the step line
    with a quiet warning that names the quiet time. The card MUST NOT show
    "Last known" at the same time.
 8. The card MUST show the diff size when the session has changed files:
-   the file count, the added lines, and the removed lines.
+   the file count, the added lines, and the removed lines. On the compact
+   Lock Screen card it appears on the same line as the plan count.
 9. A card that waits on a permission MUST show the command the request
    runs, trimmed to one short line, beside the Approve control. A card
    that waits on a question MUST NOT show Approve.
 10. An `idle` card MUST show the duration of the run and its outcome when
     one is known: that a pull request opened, or the diff size.
-11. The cost so far MUST appear only in the expanded iOS island view and
-    on a finished card. It MUST NOT appear on a working Lock Screen card.
+11. The cost so far MUST appear only in the expanded view and on a
+    finished or failed card. It MUST NOT appear on a working Lock Screen
+    card.
 12. The timer MUST count on the device. The server MUST NOT push an update
     only to advance a clock.
 13. The session card MUST NOT show the organization name, the repository,
@@ -123,6 +126,30 @@ its turn, or when the user loses access to the session.
 14. The card MUST follow the existing glanceable design rules: equal
     padding, the real logo, RTL mirroring, digits in the app language, and
     no repeated information.
+
+### Content budget
+
+1. The compact Lock Screen card MUST fit the surface's own height. It
+   shows at most three single-line rows: the header (logo, title, and a
+   last-known time when the content is out of date), the status row (the
+   state label, the state time, and the controls), and one merged detail
+   row. Every row is one line, and no row wraps.
+2. The merged detail row carries, in order of importance, the state's own
+   line (the current step, the quiet warning, "Wants to run" with the
+   command, or the stop reason) and then the compact facts: the plan
+   count, the diff size, and the file count. The cost joins them only on a
+   finished or failed card.
+3. When a state's own line needs the whole row, it keeps the row and the
+   compact facts move to the expanded view. A `failed` card is that case:
+   the stop reason takes the row alone, because a truncated reason names
+   nothing.
+4. The expanded view MUST show the full set: the rows above, the plan bar
+   and the current step's name, and the cost.
+5. The status label and every number MUST NOT truncate in either view.
+   Only a label truncates, and only at its end.
+6. A card whose content is wider than the surface MUST drop the least
+   important fact rather than truncate the state line, the status label,
+   or a number.
 
 ### Presentation order
 
@@ -358,7 +385,26 @@ observable behavior is the same.
   aggregate card excludes followed sessions.
 - The server's aggregate exclusion counts both platforms' session rows.
 
-### 2026-10-12 -- Richer content and the failed state
+### 2026-10-13 -- The Lock Screen content budget
+
+- Split the content rules by surface: the compact Lock Screen card shows the
+  plan count and the diff size on one merged row, while the plan bar, the plan
+  step's name, and the cost stay in the expanded view.
+- Added a Content budget section: three single-line rows on the Lock Screen, the
+  state's own line first, the compact facts after it, and the expanded view
+  carries the full set.
+- A `failed` card gives its row to the stop reason alone, because a truncated
+  reason names nothing.
+
+### 2026-10-13 -- Device findings
+
+- A self-updating date `Text` MUST NOT carry `fixedSize({ horizontal: true })`.
+  It reports an infinite ideal width, which degenerates every frame in the card
+  and leaves an empty platter (PR #7434).
+- The card's cost is formatted with the app language's digits, decimal
+  separator, currency layout, and thousands grouping.
+
+### 2026-10-13 -- Richer content and the failed state
 
 - The card now shows the current step, plan progress, the permission command,
   the diff size, the time since the last activity, the cost (expanded view and

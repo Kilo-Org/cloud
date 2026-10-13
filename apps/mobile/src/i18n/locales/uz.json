@@ -3222,6 +3222,19 @@
       "openHint": "Chatni ochadi. Nomini o‘zgartirish yoki o‘chirish uchun bosib turing."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Suhbat tafsilotlari",
+      "backend": "Server",
+      "effortDefault": "Model standarti",
+      "noCost": "Xarajatsiz",
+      "costUnknown": "Noma'lum",
+      "costEstimatedNote": "Narxni bildirmagan javoblar ro'yxatdagi narxlar bo'yicha taxminan hisoblangan.",
+      "costUnknownNote": "Bu model uchun narx ma'lum emas.",
+      "costPartialNote": "Bu jamiga narxi ma'lum bo'lmagan modellar kirmaydi.",
+      "localNote": "Qurilmadagi modellar shu qurilmada ishlaydi. Ularda xarajat ham, so'rov keshi ham yo'q, token soni esa taxminiy bo'lishi mumkin.",
+      "countedSinceNote": "Bu suhbat foydalanish qayd etila boshlanishidan oldin boshlangan. Jami qiymatlar faqat undan keyingi javoblarni ko'rsatadi.",
+      "remoteServersOn": "Yoqilgan masofaviy MCP serverlari"
+    },
     "webSearch": {
       "title": "Internetdan qidirish",
       "description": "Bu chatga Kilo hisobingiz orqali dolzarb ma’lumot qidirishga ruxsat bering. Qidiruvlar oylik qidiruv limitingizdan foydalanadi.",

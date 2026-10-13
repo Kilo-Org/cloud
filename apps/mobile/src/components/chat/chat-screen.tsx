@@ -8,12 +8,12 @@ import { useTranslation } from 'react-i18next';
 
 import { ChatComposer, type ChatComposerSendOptions } from '@/components/agents/chat-composer';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { EmptyState } from '@/components/empty-state';
-import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { MessageCircle, Wrench } from '@/components/ui/icons';
 import { StatusDot } from '@/components/ui/status-dot';
@@ -23,7 +23,6 @@ import { useSessionModelOptions } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useChat, useChatList, useChatPlace } from '@/lib/chat/use-chat';
-import { CHAT_TITLE_MAX_LENGTH } from '@/lib/chat/store';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
@@ -35,7 +34,9 @@ import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
 
-import { BetaPill } from './beta-pill';
+import { ChatTitle } from './chat-title';
+import { ChatDetailsSheet } from './chat-details-sheet';
+import { useChatDetails } from './chat-details-state';
 import { ChatFailureRow } from './chat-failure-row';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
@@ -83,7 +84,6 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   // A chat is listed once its session is written. Until then it has no row to name.
   const summary = chats.find(chat => chat.sessionId === state.sessionId);
   const title = summary === undefined || summary.title === '' ? t('common.chat') : summary.title;
-  const [renaming, setRenaming] = useState(false);
   const keyboardVisible = useKeyboardState(keyboard => keyboard.isVisible);
   // The sheet's whole model — the Kilo control, the settings-tools group switch
   // and the remote servers — is read here. The header draws its dot from the
@@ -167,6 +167,14 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const messages = asMessages(state);
   const actions = useChatMessageActions(state, messages, retry);
   const { actionsFor } = actions;
+  const details = useChatDetails({
+    model: state.model === '' ? model : state.model,
+    record: state.record,
+    modelOptions: availableOptions,
+    backends,
+    mcp,
+    hasMessages: messages.length > 0,
+  });
 
   const renderItem: ListRenderItem<StoredMessage> = useCallback(
     ({ item }) => <MessageBubble message={item} {...actionsFor(item)} />,
@@ -302,23 +310,18 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       <ScreenHeader
         title={title}
         titleContent={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('modelChat.rename.accessibility', { title })}
-            disabled={summary === undefined}
-            onPress={() => {
-              setRenaming(true);
+          <ChatTitle
+            title={title}
+            initialValue={summary?.title ?? ''}
+            canRename={summary !== undefined}
+            onRename={async name => {
+              await rename(state.sessionId, name);
             }}
-            className="shrink flex-row items-center gap-2 active:opacity-70"
-          >
-            <Text className="shrink text-lg font-semibold text-foreground" numberOfLines={1}>
-              {title}
-            </Text>
-            <BetaPill />
-          </Pressable>
+          />
         }
         headerRight={
-          <View className="flex-row">
+          <View className="flex-row items-center">
+            <SessionContextMetrics {...details.metrics} />
             <BackendSettingsControl />
             <Pressable
               onPress={() => {
@@ -346,21 +349,8 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         settings={mcp}
         webSearch={webSearch}
       />
-      {renaming ? (
-        <RenameModal
-          title={t('modelChat.rename.title')}
-          placeholder={t('chat.conversation.renamePlaceholder')}
-          initialValue={summary?.title ?? ''}
-          maxLength={CHAT_TITLE_MAX_LENGTH}
-          onSave={async name => {
-            await rename(state.sessionId, name);
-          }}
-          onClose={() => {
-            setRenaming(false);
-          }}
-        />
-      ) : null}
       <MessageDetailsSheet {...actions.details} modelOptions={modelOptions.options} />
+      <ChatDetailsSheet {...details.sheet} />
     </View>
   );
 }

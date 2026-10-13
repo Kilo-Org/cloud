@@ -3222,6 +3222,19 @@
       "openHint": "Membuka sembang. Tekan lama untuk menamakan semula atau memadam."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Butiran sembang",
+      "backend": "Sistem pelayan",
+      "effortDefault": "Lalai model",
+      "noCost": "Tiada kos",
+      "costUnknown": "Tidak diketahui",
+      "costEstimatedNote": "Jawapan yang tidak melaporkan harga dianggarkan daripada harga senarai.",
+      "costUnknownNote": "Tiada harga yang diketahui untuk model ini.",
+      "costPartialNote": "Jumlah ini tidak termasuk model yang tiada harga diketahui.",
+      "localNote": "Model pada peranti berjalan pada peranti ini. Model ini tiada kos dan tiada cache gesaan, dan kiraan tokennya mungkin anggaran.",
+      "countedSinceNote": "Sembang ini bermula sebelum penggunaan direkodkan. Jumlah hanya menunjukkan jawapan selepas itu.",
+      "remoteServersOn": "Pelayan MCP jauh yang dihidupkan"
+    },
     "webSearch": {
       "title": "Cari di web",
       "description": "Benarkan sembang ini mencari maklumat terkini melalui akaun Kilo anda. Carian menggunakan peruntukan carian bulanan anda.",

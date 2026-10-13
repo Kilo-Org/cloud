@@ -3222,6 +3222,19 @@
       "openHint": "Opens the chat. Long press to rename or delete."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Chat details",
+      "backend": "Backend",
+      "effortDefault": "Model default",
+      "noCost": "No cost",
+      "costUnknown": "Not known",
+      "costEstimatedNote": "Answers that did not report a price are estimated from list prices.",
+      "costUnknownNote": "No price is known for this model.",
+      "costPartialNote": "This total does not include models that have no known price.",
+      "localNote": "On-device models run on this device. They have no cost and no prompt cache, and their token counts can be estimates.",
+      "countedSinceNote": "This chat started before usage was recorded. The totals show only the answers after that.",
+      "remoteServersOn": "Remote MCP servers on"
+    },
     "backends": {
       "title": "Chat backends",
       "manage": "Manage backends",

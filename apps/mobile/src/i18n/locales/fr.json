@@ -3263,6 +3263,19 @@
       "openHint": "Ouvre la discussion. Appui long pour renommer ou supprimer."
     },
     "beta": "Bêta",
+    "details": {
+      "title": "Détails de la discussion",
+      "backend": "Service",
+      "effortDefault": "Valeur par défaut du modèle",
+      "noCost": "Aucun coût",
+      "costUnknown": "Inconnu",
+      "costEstimatedNote": "Le coût des réponses qui n'ont pas indiqué de prix est estimé d'après les prix catalogue.",
+      "costUnknownNote": "Aucun prix n'est connu pour ce modèle.",
+      "costPartialNote": "Ce total n'inclut pas les modèles dont le prix est inconnu.",
+      "localNote": "Les modèles sur l'appareil s'exécutent sur cet appareil. Ils n'ont ni coût ni cache de prompts, et leur nombre de jetons peut être une estimation.",
+      "countedSinceNote": "Cette discussion a commencé avant l'enregistrement de l'utilisation. Les totaux n'indiquent que les réponses suivantes.",
+      "remoteServersOn": "Serveurs MCP distants activés"
+    },
     "webSearch": {
       "title": "Rechercher sur le web",
       "description": "Autorisez ce chat à rechercher des informations récentes via votre compte Kilo. Les recherches utilisent votre quota mensuel de recherches.",

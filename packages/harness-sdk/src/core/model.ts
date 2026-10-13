@@ -37,12 +37,18 @@ interface ModelRequest {
 /**
  * Token counts for one reply. `cacheReadTokens / (cacheReadTokens + inputTokens)`
  * is the cache hit ratio, which must stay above 95 percent.
+ *
+ * `cost` is what the provider says the reply cost, in US dollars. It is absent
+ * when the provider said nothing, which is not the same as free: the Kilo
+ * gateway sends it for a paid model and leaves it out for a free one, and most
+ * other providers never send it. Nothing here estimates it from a price list.
  */
 interface ModelUsage {
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly cacheReadTokens: number;
   readonly cacheWriteTokens: number;
+  readonly cost?: number;
 }
 
 /**

@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- every chat screen behavior shares this one mocked harness */
 /* eslint-disable typescript-eslint/no-deprecated -- the DOM-free `test-renderer` mounts React/RN trees under vitest (see src/test/render-with-providers.tsx) */
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -30,6 +30,13 @@ const state = vi.hoisted(() => ({
   model: 'm1',
   effort: null as 'low' | 'medium' | 'high' | null,
   images: false,
+  record: {
+    createdAt: 1,
+    updatedAt: 2,
+    usage: {},
+    prompted: 0,
+    effort: null,
+  },
 }));
 
 type AlertAction = { onPress?: () => void };
@@ -93,6 +100,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
       waiting: [],
       failed: state.failed,
       failureKey: state.failureKey,
+      record: state.record,
     },
     send: state.send,
     stop: vi.fn(),
@@ -164,6 +172,10 @@ vi.mock('@/components/chat/beta-pill', () => ({ BetaPill: 'BetaPill' }));
 vi.mock('@/components/chat/mcp-settings-sheet', () => ({
   McpSettingsSheet: 'McpSettingsSheet',
   useMcpSettings: () => mcpModel,
+}));
+vi.mock('@/components/chat/chat-details-sheet', () => ({ ChatDetailsSheet: 'ChatDetailsSheet' }));
+vi.mock('@/components/agents/session-context-metrics', () => ({
+  SessionContextMetrics: 'SessionContextMetrics',
 }));
 vi.mock('@/components/chat/web-search-row', () => ({
   useWebSearchSetting: () => ({ enabled: true, setEnabled: () => undefined }),
@@ -268,6 +280,49 @@ describe('the chat transcript while it opens', () => {
     expect(count(tree, 'SessionMessageList')).toBe(1);
     expect(count(tree, 'EmptyState')).toBe(0);
     expect(count(tree, 'SessionSkeletonMessages')).toBe(0);
+  });
+});
+
+type Metric = ReactElement<{ onPress: () => void; info: unknown }>;
+
+function metricOf(tree: ReactTestRenderer): Metric {
+  const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
+  const right = header.props.headerRight as ReactElement<{ children: readonly Metric[] }>;
+  const [metric] = right.props.children;
+  if (metric === undefined) {
+    throw new Error('the header has no metric');
+  }
+  return metric;
+}
+
+function details(tree: ReactTestRenderer) {
+  return tree.root.find(node => (node.type as string) === 'ChatDetailsSheet').props as {
+    readonly visible: boolean;
+    readonly onClose: () => void;
+  };
+}
+
+describe('the chat details', () => {
+  it('opens from the header metric onto the chat the screen shows', async () => {
+    state.status = 'idle';
+    const tree = await mount();
+
+    expect(details(tree)).toMatchObject({ visible: false, model: 'm1', record: state.record });
+    act(() => {
+      metricOf(tree).props.onPress();
+    });
+    expect(details(tree).visible).toBe(true);
+    act(() => {
+      details(tree).onClose();
+    });
+    expect(details(tree).visible).toBe(false);
+  });
+
+  it('shows no window reading before the first answer', async () => {
+    state.status = 'idle';
+    const tree = await mount();
+
+    expect(metricOf(tree).props.info).toBeUndefined();
   });
 });
 

@@ -3222,6 +3222,19 @@
       "openHint": "Avab vestluse. Ümbernimetamiseks või kustutamiseks hoia all."
     },
     "beta": "Beeta",
+    "details": {
+      "title": "Vestluse üksikasjad",
+      "backend": "Taustsüsteem",
+      "effortDefault": "Mudeli vaikeväärtus",
+      "noCost": "Kulu puudub",
+      "costUnknown": "Teadmata",
+      "costEstimatedNote": "Nende vastuste kulu, mille kohta hinda ei teatatud, on hinnatud hinnakirja alusel.",
+      "costUnknownNote": "Selle mudeli hind pole teada.",
+      "costPartialNote": "See kogusumma ei hõlma mudeleid, mille hind pole teada.",
+      "localNote": "Seadmesisesed mudelid töötavad selles seadmes. Neil pole kulu ega viibavahemälu ning nende tokenite arv võib olla hinnanguline.",
+      "countedSinceNote": "See vestlus algas enne, kui kasutust hakati salvestama. Kogusummad näitavad ainult sellele järgnenud vastuseid.",
+      "remoteServersOn": "Sisselülitatud kaug-MCP-serverid"
+    },
     "webSearch": {
       "title": "Otsi veebist",
       "description": "Luba sellel vestlusel otsida ajakohast teavet sinu Kilo konto kaudu. Otsingud kasutavad sinu igakuist otsingumahtu.",

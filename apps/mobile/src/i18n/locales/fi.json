@@ -3222,6 +3222,19 @@
       "openHint": "Avaa keskustelun. Nimeä uudelleen tai poista painamalla pitkään."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Keskustelun tiedot",
+      "backend": "Taustapalvelu",
+      "effortDefault": "Mallin oletus",
+      "noCost": "Ei kustannuksia",
+      "costUnknown": "Ei tiedossa",
+      "costEstimatedNote": "Niiden vastausten kustannukset, jotka eivät ilmoittaneet hintaa, on arvioitu listahintojen perusteella.",
+      "costUnknownNote": "Tämän mallin hintaa ei tiedetä.",
+      "costPartialNote": "Tähän summaan eivät sisälly mallit, joiden hintaa ei tiedetä.",
+      "localNote": "Laitteessa toimivat mallit ajetaan tässä laitteessa. Niillä ei ole kustannuksia eikä kehotevälimuistia, ja niiden tokenimäärät voivat olla arvioita.",
+      "countedSinceNote": "Tämä keskustelu alkoi ennen käytön tallentamista. Summat näyttävät vain sen jälkeiset vastaukset.",
+      "remoteServersOn": "Käytössä olevat etä-MCP-palvelimet"
+    },
     "webSearch": {
       "title": "Hae verkosta",
       "description": "Anna tämän keskustelun hakea ajantasaista tietoa Kilo-tilisi kautta. Haut kuluttavat kuukausittaista hakukiintiötäsi.",

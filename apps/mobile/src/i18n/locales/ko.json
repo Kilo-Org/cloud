@@ -3222,6 +3222,19 @@
       "openHint": "채팅을 엽니다. 길게 눌러 이름을 변경하거나 삭제합니다."
     },
     "beta": "베타",
+    "details": {
+      "title": "채팅 세부 정보",
+      "backend": "백엔드",
+      "effortDefault": "모델 기본값",
+      "noCost": "비용 없음",
+      "costUnknown": "알 수 없음",
+      "costEstimatedNote": "가격을 보고하지 않은 답변은 정가를 기준으로 추정했습니다.",
+      "costUnknownNote": "이 모델의 가격을 알 수 없습니다.",
+      "costPartialNote": "이 합계에는 가격을 알 수 없는 모델이 포함되지 않습니다.",
+      "localNote": "기기 내 모델은 이 기기에서 실행됩니다. 비용과 프롬프트 캐시가 없으며, 토큰 수는 추정치일 수 있습니다.",
+      "countedSinceNote": "이 채팅은 사용량 기록이 시작되기 전에 시작되었습니다. 합계에는 그 이후의 답변만 표시됩니다.",
+      "remoteServersOn": "켜진 원격 MCP 서버"
+    },
     "webSearch": {
       "title": "웹 검색",
       "description": "이 채팅이 Kilo 계정을 통해 최신 정보를 찾아보도록 허용합니다. 검색에는 월간 검색 한도가 사용됩니다.",

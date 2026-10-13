@@ -3222,6 +3222,19 @@
       "openHint": "開啟對話。長按可重新命名或刪除。"
     },
     "beta": "測試版",
+    "details": {
+      "title": "聊天詳細資料",
+      "backend": "後端",
+      "effortDefault": "模型預設",
+      "noCost": "無費用",
+      "costUnknown": "未知",
+      "costEstimatedNote": "未回報價格的回答依牌價估算。",
+      "costUnknownNote": "此模型沒有已知價格。",
+      "costPartialNote": "此總計不包含沒有已知價格的模型。",
+      "localNote": "裝置端模型在此裝置上執行。它們沒有費用，也沒有提示快取，其詞元數可能是估算值。",
+      "countedSinceNote": "此聊天在開始記錄用量之前就已開始。總計僅包含之後的回答。",
+      "remoteServersOn": "已開啟的遠端 MCP 伺服器"
+    },
     "webSearch": {
       "title": "搜尋網路",
       "description": "允許此聊天透過你的 Kilo 帳戶查詢最新資訊。搜尋會使用你每月的搜尋額度。",

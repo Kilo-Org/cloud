@@ -3222,6 +3222,19 @@
       "openHint": "Öffnet den Chat. Zum Umbenennen oder Löschen lange drücken."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Chat-Details",
+      "backend": "Backend",
+      "effortDefault": "Modellstandard",
+      "noCost": "Keine Kosten",
+      "costUnknown": "Unbekannt",
+      "costEstimatedNote": "Die Kosten für Antworten ohne gemeldeten Preis wurden anhand der Listenpreise geschätzt.",
+      "costUnknownNote": "Für dieses Modell ist kein Preis bekannt.",
+      "costPartialNote": "Diese Summe enthält keine Modelle ohne bekannten Preis.",
+      "localNote": "Modelle auf dem Gerät laufen auf diesem Gerät. Sie verursachen keine Kosten, haben keinen Prompt-Cache, und ihre Token-Zahlen können Schätzungen sein.",
+      "countedSinceNote": "Dieser Chat hat begonnen, bevor die Nutzung erfasst wurde. Die Summen zeigen nur die Antworten danach.",
+      "remoteServersOn": "Aktive Remote-MCP-Server"
+    },
     "webSearch": {
       "title": "Im Web suchen",
       "description": "Lass diesen Chat aktuelle Informationen über dein Kilo-Konto nachschlagen. Suchen verbrauchen dein monatliches Suchkontingent.",

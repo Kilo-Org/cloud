@@ -15,6 +15,7 @@
 import { type Effort } from '@kilocode/harness-sdk';
 import { z } from 'zod';
 
+import { type ChatUsage, parseChatUsage } from './chat-usage';
 import { effortOf } from './effort';
 
 /** The tool names the SDK's store writes for a session: a JSON array of names. */
@@ -136,15 +137,69 @@ export function toolsOfSession(db: ChatDatabase, sessionId: string): readonly st
   }
 }
 
-/** Records a chat, so the list has it. */
+/**
+ * What the details sheet reads of a chat besides its turns.
+ *
+ * `prompted` and `effort` are the SDK's: what the last call put in front of the
+ * model, and the effort the session was opened with. The rest is the app's.
+ */
+export type ChatRecord = {
+  /** Null for a chat started before this was kept; its usage misses the earlier answers. */
+  readonly createdAt: number | null;
+  readonly updatedAt: number | null;
+  readonly usage: ChatUsage;
+  readonly prompted: number;
+  readonly effort: string | null;
+};
+
+export const NO_RECORD: ChatRecord = {
+  createdAt: null,
+  updatedAt: null,
+  usage: {},
+  prompted: 0,
+  effort: null,
+};
+
+type RecordRow = {
+  readonly created_at: number | null;
+  readonly updated_at: number;
+  readonly usage: string | null;
+  readonly prompted: number | null;
+  readonly effort: string | null;
+};
+
+export function recordOfChat(db: ChatDatabase, sessionId: string): ChatRecord {
+  const [row] = db.getAllSync<RecordRow>(
+    'select chats.created_at, chats.updated_at, chats.usage, sessions.prompted, sessions.effort ' +
+      'from chats left join sessions on sessions.id = chats.session_id where chats.session_id = ?',
+    [sessionId]
+  );
+  if (row === undefined) {
+    return NO_RECORD;
+  }
+  return {
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    usage: parseChatUsage(row.usage),
+    prompted: row.prompted ?? 0,
+    effort: row.effort,
+  };
+}
+
+/** Writes what the chat has used so far, which a reopened chat reads back. */
+export function recordUsage(db: ChatDatabase, sessionId: string, usage: ChatUsage): void {
+  db.runSync('update chats set usage = ? where session_id = ?', [JSON.stringify(usage), sessionId]);
+}
+
+/** Records a chat, so the list has it. A new chat's usage is counted from its first answer. */
 export function rememberChat(
   db: ChatDatabase,
   chat: { readonly sessionId: string; readonly scope: string; readonly at: number }
 ): void {
   db.runSync(
-    'insert into chats (session_id, scope, updated_at) values (?, ?, ?) ' +
+    'insert into chats (session_id, scope, updated_at, created_at, usage) values (?, ?, ?, ?, ?) ' +
       'on conflict (session_id) do update set updated_at = excluded.updated_at',
-    [chat.sessionId, chat.scope, chat.at]
+    [chat.sessionId, chat.scope, chat.at, chat.at, '{}']
   );
 }
 

@@ -29,6 +29,14 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** US dollars per token, as decimal strings, the way the catalog sends them. */
+export type ModelPricing = {
+  prompt?: string;
+  completion?: string;
+  input_cache_read?: string;
+  input_cache_write?: string;
+};
+
 export type ModelOption = {
   id: string;
   name: string;
@@ -40,7 +48,7 @@ export type ModelOption = {
   mayTrainOnYourPrompts?: boolean;
   hasUserByokAvailable?: boolean;
   context_length?: number | null;
-  pricing?: { prompt?: string; completion?: string };
+  pricing?: ModelPricing;
   /** The catalog lists image input for this model. */
   supportsImages?: boolean;
 };
@@ -54,7 +62,7 @@ type ModelResponse = {
     hasUserByokAvailable?: boolean;
     context_length?: number | null;
     preferredIndex?: number;
-    pricing?: { prompt?: string; completion?: string };
+    pricing?: ModelPricing;
     architecture?: { input_modalities?: string[] };
     opencode?: {
       variants?: Record<string, unknown>;
@@ -136,7 +144,12 @@ export const OpenRouterModelsResponseSchema = z.object({
       context_length: z.number().nullable().optional(),
       preferredIndex: z.number().optional(),
       pricing: z
-        .object({ prompt: z.string().optional(), completion: z.string().optional() })
+        .object({
+          prompt: z.string().optional(),
+          completion: z.string().optional(),
+          input_cache_read: z.string().optional(),
+          input_cache_write: z.string().optional(),
+        })
         .optional(),
       opencode: z.object({ variants: z.record(z.string(), z.unknown()).optional() }).optional(),
       architecture: z.object({ input_modalities: z.array(z.string()).optional() }).optional(),

@@ -3263,6 +3263,19 @@
       "openHint": "Otvara razgovor. Dugo pritisnite za preimenovanje ili brisanje."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Pojedinosti razgovora",
+      "backend": "Pozadinski sustav",
+      "effortDefault": "Zadano za model",
+      "noCost": "Bez troška",
+      "costUnknown": "Nepoznato",
+      "costEstimatedNote": "Trošak odgovora koji nisu prijavili cijenu procijenjen je prema cjeniku.",
+      "costUnknownNote": "Za ovaj model nije poznata cijena.",
+      "costPartialNote": "Ovaj zbroj ne uključuje modele bez poznate cijene.",
+      "localNote": "Modeli na uređaju rade na ovom uređaju. Nemaju trošak ni predmemoriju upita, a broj njihovih tokena može biti procjena.",
+      "countedSinceNote": "Ovaj je razgovor započeo prije nego što se počela bilježiti upotreba. Zbrojevi prikazuju samo odgovore nakon toga.",
+      "remoteServersOn": "Uključeni udaljeni MCP poslužitelji"
+    },
     "webSearch": {
       "title": "Pretraži web",
       "description": "Dopustite ovom chatu da traži aktualne informacije putem vašeg Kilo računa. Pretraživanja troše vaš mjesečni limit pretraživanja.",

@@ -3222,6 +3222,19 @@
       "openHint": "Ka whakatuwhera i te kōrero. Pēhia roa hei whakaingoa anō, hei muku rānei."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Ngā taipitopito kōrerorero",
+      "backend": "Pūnaha tuarā",
+      "effortDefault": "Te taunoa o te tauira",
+      "noCost": "Kāore he utu",
+      "costUnknown": "Kāore i te mōhiotia",
+      "costEstimatedNote": "Ko ngā whakautu kāore i whakaatu he utu, i whakatauhia mai i ngā utu rārangi.",
+      "costUnknownNote": "Kāore e mōhiotia ana he utu mō tēnei tauira.",
+      "costPartialNote": "Kāore tēnei tapeke e whakauru i ngā tauira kāore e mōhiotia ana tō rātou utu.",
+      "localNote": "Ka rere ngā tauira i te pūrere i runga i tēnei pūrere. Kāore he utu, kāore he keteroki tohutohu, ā, he whakatau tata pea ō rātou tatau tōkena.",
+      "countedSinceNote": "I tīmata tēnei kōrerorero i mua i te tīmatanga o te tuhi i te whakamahinga. Ko ngā tapeke e whakaatu ana i ngā whakautu i muri mai anake.",
+      "remoteServersOn": "Ngā tūmau MCP mamao kua whakakāngia"
+    },
     "webSearch": {
       "title": "Rapu i te ipurangi",
       "description": "Tukuna tēnei kōrerorero kia rapu i ngā mōhiohio hou mā tō pūkete Kilo. Ka whakamahia e ngā rapunga tō wāhanga rapu ā-marama.",

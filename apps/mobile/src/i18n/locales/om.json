@@ -3222,6 +3222,19 @@
       "openHint": "Marii ni bana. Maqaa jijjiiruuf ykn haquuf cuqaasii dheeraa godhi."
     },
     "beta": "Beetaa",
+    "details": {
+      "title": "Bal'ina chaat",
+      "backend": "Sirna duubaa",
+      "effortDefault": "Durtii moodeelichaa",
+      "noCost": "Baasii hin qabu",
+      "costUnknown": "Hin beekamu",
+      "costEstimatedNote": "Deebiiwwan gatii hin gabaasin gatii tarree irraa tilmaamamaniiru.",
+      "costUnknownNote": "Moodeela kanaaf gatiin beekamu hin jiru.",
+      "costPartialNote": "Waliigalli kun moodeelota gatiin isaanii hin beekamne hin dabalatu.",
+      "localNote": "Moodeelonni meeshaa irratti meeshaa kana irratti hojjetu. Baasii fi kuusaa yeroo ajajaa hin qaban, lakkoofsi tookanoota isaanii immoo tilmaama ta'uu danda'a.",
+      "countedSinceNote": "Chaatiin kun osoo itti fayyadamni hin galmeeffamin jalqabe. Waliigalli deebiiwwan sana booda jiran qofa agarsiisa.",
+      "remoteServersOn": "Sarvaroota MCP fagoo banaman"
+    },
     "webSearch": {
       "title": "Weebii irratti barbaadi",
       "description": "Haasaan kun herrega Kilo keessaniin odeeffannoo haaraa akka barbaadu hayyami. Barbaacha ji'aan siif kenname barbaachi ni fayyadama.",

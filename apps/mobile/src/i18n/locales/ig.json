@@ -3222,6 +3222,19 @@
       "openHint": "Na-emeghe nkata ahụ. Pịgide iji gbanwee aha ma ọ bụ hichapụ."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Nkọwa nkata",
+      "backend": "Sava",
+      "effortDefault": "Ndabara ụdị nlereanya",
+      "noCost": "Enweghị ọnụ ahịa",
+      "costUnknown": "Amaghị",
+      "costEstimatedNote": "A na-eme atụmatụ ọnụ ahịa azịza ndị na-akọghị ọnụ ahịa site na ọnụ ahịa ndepụta.",
+      "costUnknownNote": "Amaghị ọnụ ahịa ụdị nlereanya a.",
+      "costPartialNote": "Ngụkọta a agụnyeghị ụdị nlereanya ndị a na-amaghị ọnụ ahịa ha.",
+      "localNote": "Ụdị nlereanya na ngwaọrụ na-arụ ọrụ na ngwaọrụ a. Ha enweghị ọnụ ahịa, ha enweghị nchekwa nwa oge maka ihe ị dere, ọnụ ọgụgụ iberibe ederede ha nwekwara ike ịbụ atụmatụ.",
+      "countedSinceNote": "Nkata a malitere tupu e debe ojiji. Ngụkọta na-egosi naanị azịza ndị bịara mgbe nke ahụ gasịrị.",
+      "remoteServersOn": "Sava MCP dị anya gbanyere"
+    },
     "webSearch": {
       "title": "Chọọ na weebụ",
       "description": "Kwe ka mkparịta ụka a chọọ ozi ọhụrụ site na akaụntụ Kilo gị. Nchọta na-eji oke nchọta gị kwa ọnwa.",

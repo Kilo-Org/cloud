@@ -3222,6 +3222,19 @@
       "openHint": "Åpner chatten. Trykk og hold for å gi nytt navn eller slette."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Chatdetaljer",
+      "backend": "Baksystem",
+      "effortDefault": "Modellens standard",
+      "noCost": "Ingen kostnad",
+      "costUnknown": "Ukjent",
+      "costEstimatedNote": "Svar som ikke oppga en pris, er beregnet ut fra listepriser.",
+      "costUnknownNote": "Ingen pris er kjent for denne modellen.",
+      "costPartialNote": "Denne summen inkluderer ikke modeller uten kjent pris.",
+      "localNote": "Modeller på enheten kjører på denne enheten. De har ingen kostnad og ingen ledetekstbuffer, og tokenantallet kan være anslag.",
+      "countedSinceNote": "Denne chatten startet før bruk ble registrert. Summene viser bare svarene etter det.",
+      "remoteServersOn": "Eksterne MCP-servere på"
+    },
     "webSearch": {
       "title": "Søk på nettet",
       "description": "La denne chatten slå opp oppdatert informasjon via Kilo-kontoen din. Søk bruker den månedlige søkekvoten din.",

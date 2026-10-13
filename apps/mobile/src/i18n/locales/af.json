@@ -3222,6 +3222,19 @@
       "openHint": "Maak die klets oop. Hou lank in om te hernoem of te skrap."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Kletsbesonderhede",
+      "backend": "Agtergrondstelsel",
+      "effortDefault": "Modelverstek",
+      "noCost": "Geen koste",
+      "costUnknown": "Onbekend",
+      "costEstimatedNote": "Antwoorde wat nie 'n prys aangegee het nie, word volgens lyspryse geskat.",
+      "costUnknownNote": "Geen prys is vir hierdie model bekend nie.",
+      "costPartialNote": "Hierdie totaal sluit nie modelle in waarvoor geen prys bekend is nie.",
+      "localNote": "Modelle op die toestel loop op hierdie toestel. Hulle het geen koste en geen promptkas nie, en hul tekentellings kan skattings wees.",
+      "countedSinceNote": "Hierdie klets het begin voordat gebruik aangeteken is. Die totale wys slegs die antwoorde daarna.",
+      "remoteServersOn": "Afgeleë MCP-bedieners aan"
+    },
     "webSearch": {
       "title": "Deursoek die web",
       "description": "Laat hierdie klets huidige inligting deur jou Kilo-rekening opsoek. Soektogte gebruik jou maandelikse soektoelaag.",

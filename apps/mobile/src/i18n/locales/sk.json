@@ -3304,6 +3304,19 @@
       "openHint": "Otvorí chat. Dlhým stlačením ho premenujete alebo odstránite."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Podrobnosti chatu",
+      "backend": "Server",
+      "effortDefault": "Predvolené pre model",
+      "noCost": "Bez nákladov",
+      "costUnknown": "Neznáme",
+      "costEstimatedNote": "Náklady na odpovede, ktoré neuviedli cenu, sú odhadnuté podľa cenníkových cien.",
+      "costUnknownNote": "Cena tohto modelu nie je známa.",
+      "costPartialNote": "Tento súčet nezahŕňa modely, ktorých cena nie je známa.",
+      "localNote": "Modely v zariadení bežia v tomto zariadení. Nemajú žiadne náklady ani vyrovnávaciu pamäť promptov a ich počty tokenov môžu byť odhadované.",
+      "countedSinceNote": "Tento chat sa začal pred zaznamenávaním využitia. Súčty zahŕňajú iba odpovede po tomto čase.",
+      "remoteServersOn": "Zapnuté vzdialené servery MCP"
+    },
     "webSearch": {
       "title": "Hľadať na webe",
       "description": "Povoľte tomuto četu vyhľadávať aktuálne informácie cez váš účet Kilo. Vyhľadávania čerpajú váš mesačný limit vyhľadávania.",

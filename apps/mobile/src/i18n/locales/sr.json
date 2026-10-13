@@ -3263,6 +3263,19 @@
       "openHint": "Otvara ćaskanje. Dugo pritisnite za preimenovanje ili brisanje."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detalji ćaskanja",
+      "backend": "Pozadinski servis",
+      "effortDefault": "Podrazumevano za model",
+      "noCost": "Bez troška",
+      "costUnknown": "Nepoznato",
+      "costEstimatedNote": "Trošak odgovora koji nisu prijavili cenu procenjen je prema cenovniku.",
+      "costUnknownNote": "Cena ovog modela nije poznata.",
+      "costPartialNote": "Ovaj zbir ne uključuje modele čija cena nije poznata.",
+      "localNote": "Modeli na uređaju rade na ovom uređaju. Nemaju trošak ni keš upita, a broj tokena za njih može biti procena.",
+      "countedSinceNote": "Ovo ćaskanje je počelo pre nego što se beležila potrošnja. Zbirovi prikazuju samo odgovore nakon toga.",
+      "remoteServersOn": "Uključeni udaljeni MCP serveri"
+    },
     "webSearch": {
       "title": "Pretraži veb",
       "description": "Dozvoli ovom ćaskanju da traži aktuelne informacije preko tvog Kilo naloga. Pretrage troše tvoj mesečni limit pretraga.",

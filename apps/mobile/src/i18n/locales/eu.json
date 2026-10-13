@@ -3222,6 +3222,19 @@
       "openHint": "Txata irekitzen du. Berrizendatzeko edo ezabatzeko, sakatu luze."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Txataren xehetasunak",
+      "backend": "Atzeko zerbitzua",
+      "effortDefault": "Modeloaren lehenetsia",
+      "noCost": "Kosturik gabe",
+      "costUnknown": "Ezezaguna",
+      "costEstimatedNote": "Preziorik adierazi ez duten erantzunen kostua zerrendako prezioetan oinarrituta estimatu da.",
+      "costUnknownNote": "Ez da ezagutzen modelo honen preziorik.",
+      "costPartialNote": "Guztizko honek ez ditu barne hartzen prezio ezagunik ez duten modeloak.",
+      "localNote": "Gailuko modeloak gailu honetan exekutatzen dira. Ez dute kosturik ez gonbiten cachérik, eta haien token-kopuruak estimazioak izan daitezke.",
+      "countedSinceNote": "Txat hau erabilera erregistratzen hasi aurretik hasi zen. Guztizkoek ondorengo erantzunak soilik erakusten dituzte.",
+      "remoteServersOn": "Aktibatutako urruneko MCP zerbitzariak"
+    },
     "webSearch": {
       "title": "Bilatu sarean",
       "description": "Utzi txat honi informazio eguneratua bilatzen zure Kilo kontuaren bidez. Bilaketek zure hileko bilaketa-kuota erabiltzen dute.",

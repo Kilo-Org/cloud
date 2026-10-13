@@ -3222,6 +3222,19 @@
       "openHint": "Manokatra ny resaka. Tsindrio ela mba hanovana ny anarana na hamafana."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Antsipirian'ny resaka",
+      "backend": "Rafitra mpizara",
+      "effortDefault": "Mahazatra amin'ny modely",
+      "noCost": "Maimaim-poana",
+      "costUnknown": "Tsy fantatra",
+      "costEstimatedNote": "Ny valiny tsy nanome vidiny dia nobanabanaina araka ny lisitry ny vidiny.",
+      "costUnknownNote": "Tsy fantatra ny vidin'ity modely ity.",
+      "costPartialNote": "Tsy tafiditra amin'ity fitambarany ity ireo modely tsy fantatra vidiny.",
+      "localNote": "Ny modely ao amin'ny fitaovana dia mandeha amin'ity fitaovana ity. Tsy misy sarany izy ireo ary tsy misy fitehirizana vonjimaika ho an'ny baiko, ary mety ho tombantombana ny isan'ny sombin-tsoratra.",
+      "countedSinceNote": "Nanomboka talohan'ny nandraisana an-tsoratra ny fampiasana ity resaka ity. Ny valiny taorian'izay ihany no hita amin'ny fitambarany.",
+      "remoteServersOn": "Server MCP lavitra mandeha"
+    },
     "webSearch": {
       "title": "Mikaroka amin'ny tranonkala",
       "description": "Avelao ity resaka ity hikaroka vaovao farany amin'ny alalan'ny kaontinao Kilo. Mampiasa ny fetran'ny fikarohanao isam-bolana ny fikarohana.",

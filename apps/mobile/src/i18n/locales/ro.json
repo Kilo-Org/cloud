@@ -3263,6 +3263,19 @@
       "openHint": "Deschide chatul. Apasă lung pentru a redenumi sau a șterge."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detaliile chatului",
+      "backend": "Backend",
+      "effortDefault": "Implicit pentru model",
+      "noCost": "Fără cost",
+      "costUnknown": "Necunoscut",
+      "costEstimatedNote": "Răspunsurile care nu au raportat un preț sunt estimate după prețurile de listă.",
+      "costUnknownNote": "Nu se cunoaște niciun preț pentru acest model.",
+      "costPartialNote": "Acest total nu include modelele fără preț cunoscut.",
+      "localNote": "Modelele pe dispozitiv rulează pe acest dispozitiv. Nu au cost și nici cache de prompturi, iar numărul lor de tokenuri poate fi estimat.",
+      "countedSinceNote": "Acest chat a început înainte ca utilizarea să fie înregistrată. Totalurile arată doar răspunsurile de după.",
+      "remoteServersOn": "Servere MCP la distanță active"
+    },
     "webSearch": {
       "title": "Caută pe web",
       "description": "Permite acestui chat să caute informații actuale prin contul tău Kilo. Căutările folosesc cota ta lunară de căutări.",

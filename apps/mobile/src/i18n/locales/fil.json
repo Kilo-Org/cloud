@@ -3222,6 +3222,19 @@
       "openHint": "Binubuksan ang chat. Pindutin nang matagal para palitan ang pangalan o burahin."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Mga detalye ng chat",
+      "backend": "Sistema",
+      "effortDefault": "Default ng modelo",
+      "noCost": "Walang gastos",
+      "costUnknown": "Hindi alam",
+      "costEstimatedNote": "Tinantiya mula sa mga nakalistang presyo ang gastos ng mga sagot na hindi nag-ulat ng presyo.",
+      "costUnknownNote": "Walang alam na presyo para sa modelong ito.",
+      "costPartialNote": "Hindi kasama sa kabuuang ito ang mga modelong walang alam na presyo.",
+      "localNote": "Tumatakbo sa device na ito ang mga modelong nasa device. Wala silang gastos at walang prompt cache, at maaaring tantiya lang ang bilang ng kanilang mga token.",
+      "countedSinceNote": "Nagsimula ang chat na ito bago pa naitala ang paggamit. Ang mga sagot lang pagkatapos noon ang ipinapakita ng mga kabuuan.",
+      "remoteServersOn": "Mga naka-on na remote MCP server"
+    },
     "webSearch": {
       "title": "Maghanap sa web",
       "description": "Hayaan ang chat na ito na maghanap ng kasalukuyang impormasyon gamit ang iyong Kilo account. Ginagamit ng mga paghahanap ang iyong buwanang allowance sa paghahanap.",

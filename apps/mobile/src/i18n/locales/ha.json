@@ -3222,6 +3222,19 @@
       "openHint": "Yana buɗe tattaunawar. Danna sosai don sauya suna ko sharewa."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Bayanan tattaunawa",
+      "backend": "Uwar garke",
+      "effortDefault": "Na asali na samfuri",
+      "noCost": "Babu kuɗi",
+      "costUnknown": "Ba a sani ba",
+      "costEstimatedNote": "An ƙiyasta kuɗin amsoshin da ba su bayar da farashi ba daga farashin jeri.",
+      "costUnknownNote": "Ba a san farashin wannan samfuri ba.",
+      "costPartialNote": "Wannan jimla ba ta haɗa da samfuran da ba a san farashinsu ba.",
+      "localNote": "Samfuran da ke kan na'ura suna aiki a kan wannan na'ura. Ba su da kuɗi kuma ba su da ma'ajiyar wucin gadi ta umarni, kuma ƙidayar guntayen rubutunsu na iya zama ƙiyasi.",
+      "countedSinceNote": "Wannan tattaunawa ta fara kafin a fara rubuta amfani. Jimlolin suna nuna amsoshin da suka zo bayan haka kawai.",
+      "remoteServersOn": "Sabar MCP na nesa da ke kunne"
+    },
     "webSearch": {
       "title": "Bincika yanar gizo",
       "description": "Bari wannan hira ta nemo bayanai na yanzu ta asusunka na Kilo. Bincike yana amfani da adadin bincikenka na wata-wata.",

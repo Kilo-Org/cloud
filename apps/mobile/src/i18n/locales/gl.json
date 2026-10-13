@@ -3222,6 +3222,19 @@
       "openHint": "Abre o chat. Mantén premido para renomear ou eliminar."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detalles do chat",
+      "backend": "Servizo",
+      "effortDefault": "Predeterminado do modelo",
+      "noCost": "Sen custo",
+      "costUnknown": "Descoñecido",
+      "costEstimatedNote": "O custo das respostas que non informaron dun prezo estímase a partir dos prezos de tarifa.",
+      "costUnknownNote": "Non se coñece ningún prezo para este modelo.",
+      "costPartialNote": "Este total non inclúe os modelos sen prezo coñecido.",
+      "localNote": "Os modelos no dispositivo execútanse neste dispositivo. Non teñen custo nin caché de instrucións, e o seu reconto de unidades de texto pode ser estimado.",
+      "countedSinceNote": "Este chat comezou antes de que se rexistrase o uso. Os totais só mostran as respostas posteriores.",
+      "remoteServersOn": "Servidores MCP remotos activados"
+    },
     "webSearch": {
       "title": "Buscar na web",
       "description": "Permite que este chat busque información actual a través da túa conta de Kilo. As buscas usan a túa cota mensual de buscas.",

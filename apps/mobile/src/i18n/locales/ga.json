@@ -3345,6 +3345,19 @@
       "openHint": "Osclaíonn sé an comhrá. Brúigh go fada chun athainmniú nó scriosadh."
     },
     "beta": "Béite",
+    "details": {
+      "title": "Sonraí an chomhrá",
+      "backend": "Cúlchóras",
+      "effortDefault": "Réamhshocrú an tsamhla",
+      "noCost": "Gan chostas",
+      "costUnknown": "Níl sé ar eolas",
+      "costEstimatedNote": "Meastar costas na bhfreagraí nár thuairiscigh praghas ó phraghsanna liosta.",
+      "costUnknownNote": "Níl aon phraghas ar eolas don tsamhail seo.",
+      "costPartialNote": "Ní áirítear san iomlán seo samhlacha nach bhfuil praghas ar eolas dóibh.",
+      "localNote": "Ritheann samhlacha ar an ngléas ar an ngléas seo. Níl aon chostas orthu ná aon taisce leideanna, agus d'fhéadfadh gur meastacháin iad a gcomhaireamh comharthaí.",
+      "countedSinceNote": "Thosaigh an comhrá seo sular taifeadadh úsáid. Ní thaispeánann na hiomláin ach na freagraí ina dhiaidh sin.",
+      "remoteServersOn": "Freastalaithe MCP cianda ar siúl"
+    },
     "webSearch": {
       "title": "Cuardaigh an gréasán",
       "description": "Lig don chomhrá seo faisnéis reatha a lorg trí do chuntas Kilo. Úsáideann cuardaigh do liúntas cuardaigh míosúil.",

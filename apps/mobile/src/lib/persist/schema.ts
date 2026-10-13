@@ -35,6 +35,14 @@ export const chats = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
     /** The name the person gave the chat. Null means the first thing they said names it. */
     title: text('title'),
+    /**
+     * When the chat was started. A model switch keeps it, because it moves this
+     * row rather than adding one. Null for a chat started before it was kept,
+     * which is also a chat whose usage was not counted from its first answer.
+     */
+    createdAt: integer('created_at'),
+    /** What the chat has used, per model, as JSON. See `src/lib/chat/chat-usage.ts`. */
+    usage: text('usage'),
   },
   table => [index('chats_scope_updated_at').on(table.scope, table.updatedAt)]
 );

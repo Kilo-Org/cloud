@@ -3222,6 +3222,19 @@
       "openHint": "Opnar spjallið. Haltu inni til að endurnefna eða eyða."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Upplýsingar um spjall",
+      "backend": "Bakendi",
+      "effortDefault": "Sjálfgefið fyrir líkan",
+      "noCost": "Enginn kostnaður",
+      "costUnknown": "Óþekkt",
+      "costEstimatedNote": "Kostnaður svara sem gáfu ekki upp verð er áætlaður út frá listaverði.",
+      "costUnknownNote": "Ekkert verð er þekkt fyrir þetta líkan.",
+      "costPartialNote": "Þessi heildartala nær ekki til líkana sem hafa ekkert þekkt verð.",
+      "localNote": "Líkön í tækinu keyra á þessu tæki. Þau kosta ekkert og hafa ekkert skyndiminni fyrir skilaboð, og tókafjöldi þeirra getur verið áætlaður.",
+      "countedSinceNote": "Þetta spjall hófst áður en notkun var skráð. Heildartölurnar sýna aðeins svörin eftir það.",
+      "remoteServersOn": "Kveikt á fjartengdum MCP-þjónum"
+    },
     "webSearch": {
       "title": "Leita á vefnum",
       "description": "Leyfðu þessu spjalli að fletta upp nýjum upplýsingum í gegnum Kilo-reikninginn þinn. Leitir nota mánaðarlegan leitarkvóta þinn.",

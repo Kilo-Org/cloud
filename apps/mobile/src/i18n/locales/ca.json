@@ -3263,6 +3263,19 @@
       "openHint": "Obre el xat. Mantén premut per reanomenar-lo o suprimir-lo."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detalls del xat",
+      "backend": "Servidor",
+      "effortDefault": "Valor per defecte del model",
+      "noCost": "Sense cost",
+      "costUnknown": "Desconegut",
+      "costEstimatedNote": "El cost de les respostes que no han indicat cap preu s'ha estimat a partir dels preus de tarifa.",
+      "costUnknownNote": "No es coneix cap preu per a aquest model.",
+      "costPartialNote": "Aquest total no inclou els models que no tenen cap preu conegut.",
+      "localNote": "Els models al dispositiu s'executen en aquest dispositiu. No tenen cost ni memòria cau de peticions, i els seus recomptes de tòkens poden ser estimacions.",
+      "countedSinceNote": "Aquest xat va començar abans que es registrés l'ús. Els totals només mostren les respostes posteriors.",
+      "remoteServersOn": "Servidors MCP remots activats"
+    },
     "webSearch": {
       "title": "Cerca al web",
       "description": "Permet que aquest xat busqui informació actual a través del teu compte de Kilo. Les cerques fan servir la teva quota mensual de cerques.",

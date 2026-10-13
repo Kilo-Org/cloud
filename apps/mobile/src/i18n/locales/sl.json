@@ -3304,6 +3304,19 @@
       "openHint": "Odpre klepet. Pridržite za preimenovanje ali brisanje."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Podrobnosti klepeta",
+      "backend": "Zaledje",
+      "effortDefault": "Privzeto za model",
+      "noCost": "Brez stroškov",
+      "costUnknown": "Ni znano",
+      "costEstimatedNote": "Strošek odgovorov, ki niso sporočili cene, je ocenjen po ceniku.",
+      "costUnknownNote": "Cena tega modela ni znana.",
+      "costPartialNote": "Ta skupni znesek ne vključuje modelov, katerih cena ni znana.",
+      "localNote": "Modeli v napravi se izvajajo v tej napravi. Nimajo stroškov in predpomnilnika pozivov, njihovo število žetonov pa je lahko ocenjeno.",
+      "countedSinceNote": "Ta klepet se je začel, preden se je začela beležiti poraba. Skupni zneski vključujejo samo odgovore po tem.",
+      "remoteServersOn": "Vklopljeni oddaljeni strežniki MCP"
+    },
     "webSearch": {
       "title": "Išči po spletu",
       "description": "Dovolite temu klepetu, da poišče aktualne informacije prek vašega računa Kilo. Iskanja porabljajo vašo mesečno kvoto iskanj.",

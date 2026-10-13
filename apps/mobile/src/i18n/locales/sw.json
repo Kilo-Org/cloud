@@ -3222,6 +3222,19 @@
       "openHint": "Hufungua gumzo. Bonyeza kwa muda mrefu ili kubadilisha jina au kufuta."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Maelezo ya gumzo",
+      "backend": "Huduma",
+      "effortDefault": "Chaguo-msingi la modeli",
+      "noCost": "Hakuna gharama",
+      "costUnknown": "Haijulikani",
+      "costEstimatedNote": "Majibu ambayo hayakuripoti bei yamekadiriwa kwa bei za orodha.",
+      "costUnknownNote": "Hakuna bei inayojulikana kwa modeli hii.",
+      "costPartialNote": "Jumla hii haijumuishi modeli ambazo hazina bei inayojulikana.",
+      "localNote": "Modeli za kwenye kifaa huendeshwa kwenye kifaa hiki. Hazina gharama wala hifadhi ya muda ya maagizo, na idadi ya tokeni zake inaweza kuwa makadirio.",
+      "countedSinceNote": "Gumzo hili lilianza kabla matumizi hayajaanza kurekodiwa. Jumla zinaonyesha majibu ya baada ya hapo tu.",
+      "remoteServersOn": "Seva za MCP za mbali zilizowashwa"
+    },
     "webSearch": {
       "title": "Tafuta kwenye wavuti",
       "description": "Ruhusu gumzo hili litafute taarifa za sasa kupitia akaunti yako ya Kilo. Utafutaji hutumia kiwango chako cha utafutaji cha kila mwezi.",

@@ -3222,6 +3222,19 @@
       "openHint": "Mở cuộc trò chuyện. Nhấn giữ để đổi tên hoặc xóa."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Chi tiết cuộc trò chuyện",
+      "backend": "Máy chủ",
+      "effortDefault": "Mặc định của mô hình",
+      "noCost": "Không tốn phí",
+      "costUnknown": "Không rõ",
+      "costEstimatedNote": "Các câu trả lời không báo giá được ước tính theo giá niêm yết.",
+      "costUnknownNote": "Chưa rõ giá của mô hình này.",
+      "costPartialNote": "Tổng này không bao gồm các mô hình chưa rõ giá.",
+      "localNote": "Mô hình trên thiết bị chạy ngay trên thiết bị này. Chúng không tốn phí, không có bộ nhớ đệm lời nhắc và số token có thể là ước tính.",
+      "countedSinceNote": "Cuộc trò chuyện này bắt đầu trước khi mức sử dụng được ghi lại. Tổng chỉ tính các câu trả lời sau thời điểm đó.",
+      "remoteServersOn": "Máy chủ MCP từ xa đang bật"
+    },
     "webSearch": {
       "title": "Tìm kiếm trên web",
       "description": "Cho phép cuộc trò chuyện này tra cứu thông tin mới nhất qua tài khoản Kilo của bạn. Mỗi lần tìm kiếm dùng hạn mức tìm kiếm hằng tháng của bạn.",

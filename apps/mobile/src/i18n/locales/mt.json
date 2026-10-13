@@ -3345,6 +3345,19 @@
       "openHint": "Jiftaħ iċ-chat. Agħfas fit-tul biex tibdel l-isem jew tħassar."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Dettalji taċ-chat",
+      "backend": "Servizz",
+      "effortDefault": "Standard tal-mudell",
+      "noCost": "Bla spiża",
+      "costUnknown": "Mhux magħruf",
+      "costEstimatedNote": "It-tweġibiet li ma rrappurtawx prezz huma stmati mill-prezzijiet tal-lista.",
+      "costUnknownNote": "L-ebda prezz mhu magħruf għal dan il-mudell.",
+      "costPartialNote": "Dan it-total ma jinkludix mudelli li m'għandhom l-ebda prezz magħruf.",
+      "localNote": "Il-mudelli fuq l-apparat jaħdmu fuq dan l-apparat. M'għandhom l-ebda spiża u l-ebda cache tal-prompts, u l-għadd tal-unitajiet tat-test tagħhom jista' jkun stima.",
+      "countedSinceNote": "Din iċ-chat bdiet qabel ma beda jiġi rreġistrat l-użu. It-totali juru biss it-tweġibiet ta' wara.",
+      "remoteServersOn": "Servers MCP remoti mixgħula"
+    },
     "webSearch": {
       "title": "Fittex fuq il-web",
       "description": "Ħalli din iċ-chat tfittex informazzjoni kurrenti permezz tal-kont Kilo tiegħek. It-tfittxijiet jużaw il-kwota ta' tfittxija ta' kull xahar tiegħek.",

@@ -3263,6 +3263,19 @@
       "openHint": "Apre la chat. Tieni premuto per rinominare o eliminare."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Dettagli della chat",
+      "backend": "Servizio",
+      "effortDefault": "Predefinito del modello",
+      "noCost": "Nessun costo",
+      "costUnknown": "Non noto",
+      "costEstimatedNote": "Il costo delle risposte che non hanno indicato un prezzo è stimato in base ai prezzi di listino.",
+      "costUnknownNote": "Nessun prezzo noto per questo modello.",
+      "costPartialNote": "Questo totale non include i modelli senza un prezzo noto.",
+      "localNote": "I modelli sul dispositivo vengono eseguiti su questo dispositivo. Non hanno costi né cache dei prompt e il loro conteggio dei token può essere una stima.",
+      "countedSinceNote": "Questa chat è iniziata prima che l'utilizzo venisse registrato. I totali mostrano solo le risposte successive.",
+      "remoteServersOn": "Server MCP remoti attivi"
+    },
     "webSearch": {
       "title": "Cerca sul web",
       "description": "Consenti a questa chat di cercare informazioni aggiornate tramite il tuo account Kilo. Le ricerche usano la tua quota mensile di ricerche.",

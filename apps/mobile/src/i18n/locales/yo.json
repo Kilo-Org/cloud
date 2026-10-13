@@ -3222,6 +3222,19 @@
       "openHint": "Ṣí ìjíròrò náà. Tẹ̀ mọ́lẹ̀ láti yí orúkọ padà tàbí láti pa á rẹ́."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Àlàyé ìjíròrò",
+      "backend": "Ètò ẹ̀yìn",
+      "effortDefault": "Ètò àìyípadà awoṣe",
+      "noCost": "Kò sí iye owó",
+      "costUnknown": "A kò mọ̀",
+      "costEstimatedNote": "Àwọn ìdáhùn tí kò sọ iye owó ni a ṣírò láti inú iye owó àkọsílẹ̀.",
+      "costUnknownNote": "A kò mọ iye owó awoṣe yìí.",
+      "costPartialNote": "Àpapọ̀ yìí kò ní àwọn awoṣe tí a kò mọ iye owó wọn nínú.",
+      "localNote": "Àwọn awoṣe lórí ẹ̀rọ ń ṣiṣẹ́ lórí ẹ̀rọ yìí. Wọn kò ní iye owó, wọn kò sì ní ìpamọ́ ìgbà díẹ̀ fún ìbéèrè, iye tókẹ̀n wọn sì lè jẹ́ àfojúbù.",
+      "countedSinceNote": "Ìjíròrò yìí bẹ̀rẹ̀ kí a tó máa ṣàkọsílẹ̀ ìlò. Àpapọ̀ ń fi àwọn ìdáhùn lẹ́yìn ìgbà náà nìkan hàn.",
+      "remoteServersOn": "Àwọn sáfà MCP jíjìn tí ó wà ní títàn"
+    },
     "webSearch": {
       "title": "Wá lórí wẹ́ẹ̀bù",
       "description": "Jẹ́ kí ìjíròrò yìí wá ìsọfúnni tuntun nípasẹ̀ àkọọ́lẹ̀ Kilo rẹ. Àwọn ìwákiri ń lo ìpín ìwákiri oṣooṣù rẹ.",

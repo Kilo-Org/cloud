@@ -3222,6 +3222,19 @@
       "openHint": "Megnyitja a csevegést. Hosszan nyomja meg az átnevezéshez vagy a törléshez."
     },
     "beta": "Béta",
+    "details": {
+      "title": "Csevegés részletei",
+      "backend": "Háttérrendszer",
+      "effortDefault": "A modell alapértelmezése",
+      "noCost": "Nincs költség",
+      "costUnknown": "Nem ismert",
+      "costEstimatedNote": "Az árat nem jelentő válaszok költsége listaárak alapján becsült.",
+      "costUnknownNote": "Ehhez a modellhez nem ismert ár.",
+      "costPartialNote": "Ez az összeg nem tartalmazza az ismert ár nélküli modelleket.",
+      "localNote": "Az eszközön futó modellek ezen az eszközön futnak. Nincs költségük és utasítás-gyorsítótáruk, a tokenszámuk pedig becsült lehet.",
+      "countedSinceNote": "Ez a csevegés még a használat rögzítése előtt kezdődött. Az összesítések csak az azt követő válaszokat mutatják.",
+      "remoteServersOn": "Bekapcsolt távoli MCP-szerverek"
+    },
     "webSearch": {
       "title": "Keresés a weben",
       "description": "Engedd, hogy ez a csevegés aktuális információkat keressen a Kilo-fiókodon keresztül. A keresések a havi keresési keretedet használják.",

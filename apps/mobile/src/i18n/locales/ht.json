@@ -3222,6 +3222,19 @@
       "openHint": "Louvri chat la. Peze lontan pou chanje non an oswa pou efase."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detay chat la",
+      "backend": "Sèvis",
+      "effortDefault": "Pa defo modèl la",
+      "noCost": "Pa koute anyen",
+      "costUnknown": "Pa konnen",
+      "costEstimatedNote": "Pri repons ki pa t bay yon pri estime dapre pri katalòg yo.",
+      "costUnknownNote": "Pa gen okenn pri ki konnen pou modèl sa a.",
+      "costPartialNote": "Total sa a pa gen ladan l modèl ki pa gen yon pri ki konnen.",
+      "localNote": "Modèl sou aparèy la mache sou aparèy sa a. Yo pa koute anyen, yo pa gen kach pou enstriksyon, epi kantite jeton yo ka se yon estimasyon.",
+      "countedSinceNote": "Chat sa a te kòmanse anvan yo te kòmanse anrejistre itilizasyon. Total yo montre sèlman repons ki vini apre sa.",
+      "remoteServersOn": "Sèvè MCP aleka ki aktive"
+    },
     "webSearch": {
       "title": "Chèche sou entènèt",
       "description": "Kite chat sa a chèche enfòmasyon ki ajou atravè kont Kilo ou. Rechèch yo itilize alokasyon rechèch chak mwa ou.",

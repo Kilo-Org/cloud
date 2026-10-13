@@ -3222,6 +3222,19 @@
       "openHint": "Membuka obrolan. Tekan lama untuk mengganti nama atau menghapus."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detail obrolan",
+      "backend": "Layanan",
+      "effortDefault": "Bawaan model",
+      "noCost": "Tanpa biaya",
+      "costUnknown": "Tidak diketahui",
+      "costEstimatedNote": "Biaya jawaban yang tidak melaporkan harga diperkirakan dari harga daftar.",
+      "costUnknownNote": "Harga untuk model ini tidak diketahui.",
+      "costPartialNote": "Total ini tidak mencakup model yang harganya tidak diketahui.",
+      "localNote": "Model di perangkat berjalan di perangkat ini. Model ini tidak memiliki biaya maupun cache instruksi, dan jumlah tokennya bisa berupa perkiraan.",
+      "countedSinceNote": "Obrolan ini dimulai sebelum penggunaan dicatat. Total hanya menampilkan jawaban setelah itu.",
+      "remoteServersOn": "Server MCP jarak jauh aktif"
+    },
     "webSearch": {
       "title": "Cari di web",
       "description": "Izinkan chat ini mencari informasi terkini melalui akun Kilo Anda. Pencarian menggunakan jatah pencarian bulanan Anda.",

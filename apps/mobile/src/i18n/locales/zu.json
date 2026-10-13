@@ -3222,6 +3222,19 @@
       "openHint": "Ivula ingxoxo. Cindezela isikhathi eside ukuze uqambe kabusha noma usule."
     },
     "beta": "Beta",
+    "details": {
+      "title": "Imininingwane yengxoxo",
+      "backend": "Uhlelo olungemuva",
+      "effortDefault": "Okuzenzakalelayo kwemodeli",
+      "noCost": "Azikho izindleko",
+      "costUnknown": "Akwaziwa",
+      "costEstimatedNote": "Izimpendulo ezingabikanga intengo zilinganiselwe ngokwamanani ohlu.",
+      "costUnknownNote": "Ayikho intengo eyaziwayo yale modeli.",
+      "costPartialNote": "Le ngqikithi ayifaki amamodeli angenayo intengo eyaziwayo.",
+      "localNote": "Amamodeli asedivayisini asebenza kule divayisi. Awanazo izindleko futhi awanayo inqolobane yesikhashana yemiyalo, futhi izibalo zawo zamathokheni zingaba ngezilinganiselwe.",
+      "countedSinceNote": "Le ngxoxo yaqala ngaphambi kokuthi ukusetshenziswa kuqoshwe. Izingqikithi zibonisa kuphela izimpendulo zangemuva kwalokho.",
+      "remoteServersOn": "Amaseva e-MCP akude avuliwe"
+    },
     "webSearch": {
       "title": "Sesha kuwebhu",
       "description": "Vumela le ngxoxo ibheke ulwazi lwamanje ngokusebenzisa i-akhawunti yakho ye-Kilo. Ukusesha kusebenzisa isabelo sakho sokusesha senyanga.",

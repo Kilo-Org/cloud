@@ -34,7 +34,12 @@ const {
     sandboxId: 'ses-0123456789abcdef',
     provider: 'cloudflare',
   }),
-  selectSandboxProviderMock: vi.fn(() => 'cloudflare'),
+  selectSandboxProviderMock: vi.fn(
+    (input?: { sandboxAllocation?: string }): 'cloudflare' | 'cloudflare-containers' | 'vercel' =>
+      input?.sandboxAllocation === 'cloudflare-containers-standard-3'
+        ? 'cloudflare-containers'
+        : 'cloudflare'
+  ),
   createCliSessionMock: vi.fn().mockResolvedValue({ created: true }),
   deleteCliSessionMock: vi.fn().mockResolvedValue({ deleted: true }),
   createSessionReportMock: vi.fn().mockResolvedValue(undefined),
@@ -326,7 +331,7 @@ describe('sandbox selection Worker API', () => {
     const result = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId });
     expect(result.enabled).toBe(true);
     expect(result.options.map(option => option.allocation)).toEqual([
-      getSandboxAllocationRequest('cloudflare-single'),
+      getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-shared'),
     ]);
   });
@@ -417,7 +422,9 @@ describe('sandbox selection Worker API', () => {
       ctx.env.PER_SESSION_SANDBOX_ORG_IDS = '*';
       const caller = appRouter.createCaller(ctx);
       const normal = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId });
-      expect(normal.defaultDestination).toEqual(getSandboxAllocationRequest('cloudflare-single'));
+      expect(normal.defaultDestination).toEqual(
+        getSandboxAllocationRequest('cloudflare-containers-standard-3')
+      );
       for (const devcontainer of [false, true]) {
         expect(
           await caller.getSandboxSelectionOptions({ kilocodeOrganizationId, devcontainer })
@@ -514,7 +521,10 @@ describe('sandbox selection Worker API', () => {
       await caller.start({ ...startInput, runtime: { sandboxAllocation } });
       await caller.prepareSession({ ...prepareInput, sandboxAllocation });
       const metadata = expect.objectContaining({
-        workspace: expect.objectContaining({ sandboxAllocation: 'cloudflare-single' }),
+        workspace: expect.objectContaining({
+          sandboxAllocation: 'cloudflare-containers-standard-3',
+          sandboxProvider: 'cloudflare-containers',
+        }),
       });
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
         expect.objectContaining({ metadata })

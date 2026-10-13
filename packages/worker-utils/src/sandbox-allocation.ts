@@ -33,6 +33,13 @@ export const SELECTABLE_SANDBOX_ALLOCATIONS = [
 /** Allocation auto-routed containers sessions run when the owner picks nothing. */
 export const CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION = 'cloudflare-containers-standard-4' as const;
 
+/**
+ * Native containers size for new sessions that would have used Cloudflare
+ * sandbox small: 2 vCPU / 8 GiB. Existing sessions keep their stored runtime.
+ */
+export const CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION =
+  'cloudflare-containers-standard-3' as const satisfies SandboxAllocation;
+
 export type SelectableSandboxAllocation = (typeof SELECTABLE_SANDBOX_ALLOCATIONS)[number];
 
 const cloudflareAllocationRequestSchema = z

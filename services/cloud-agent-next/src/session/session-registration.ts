@@ -20,6 +20,7 @@ import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
 import {
+  CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   isSelectableSandboxAllocation,
   sandboxAllocationRequiresControlPlane,
   sandboxAllocationSchema,
@@ -56,6 +57,7 @@ import {
   getControlPlaneCredentialContainment,
   DEVCONTAINER_RETIRED_MESSAGE,
   CurrentSessionMetadataSchema,
+  hasCredentialContainment,
   type CredentialContainment,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
@@ -89,7 +91,10 @@ import {
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
 import {
+  cloudflareSandboxSmallNativeReplacement,
   generateSandboxRoutingTarget,
+  recordedSandboxAllocationMatchesRequest,
+  resolveNewSessionSandboxAllocation,
   selectSandboxProvider,
   type SandboxSelection,
 } from '../sandbox-id.js';
@@ -623,6 +628,24 @@ async function assertSandboxAllocationMembership(
   await assertOrganizationMembership(getPgDb(ctx.env), ctx.userId, orgId);
 }
 
+function sandboxSmallReplacementForSession(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  sessionId: string,
+  options?: { billingOrigin?: string }
+): SandboxAllocation | undefined {
+  return cloudflareSandboxSmallNativeReplacement({
+    env: ctx.env,
+    orgId: input.options?.kilocodeOrganizationId,
+    userId: ctx.userId,
+    sessionId,
+    requestedAllocation: input.runtime?.sandboxAllocation,
+    contained: hasCredentialContainment(computeCredentialContainment(sessionId, input, ctx.env)),
+    createdOnPlatform: input.options?.createdOnPlatform,
+    billingOrigin: options?.billingOrigin,
+  });
+}
+
 async function allocateNewSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
@@ -630,14 +653,26 @@ async function allocateNewSession(
   ledger?: SessionCreationLedgerHooks
 ): Promise<NewSessionAllocation> {
   await assertSandboxAllocationMembership(input, ctx);
-  const sandboxAllocation = input.runtime?.sandboxAllocation;
+  const requestedAllocation = input.runtime?.sandboxAllocation;
   const orgId = input.options?.kilocodeOrganizationId;
-  if (sandboxAllocation !== undefined) {
-    assertSandboxAllocationAvailable(ctx.env, { userId: ctx.userId, orgId }, sandboxAllocation);
+  if (requestedAllocation !== undefined) {
+    assertSandboxAllocationAvailable(ctx.env, { userId: ctx.userId, orgId }, requestedAllocation);
   }
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
   const cloudAgentSessionId = generateSessionId(sessionPlaneForCreate(input, ctx, options));
+  const sandboxAllocation = resolveNewSessionSandboxAllocation({
+    env: ctx.env,
+    orgId,
+    userId: ctx.userId,
+    sessionId: cloudAgentSessionId,
+    requestedAllocation,
+    contained: hasCredentialContainment(
+      computeCredentialContainment(cloudAgentSessionId, input, ctx.env)
+    ),
+    createdOnPlatform: input.options?.createdOnPlatform,
+    billingOrigin: options?.billingOrigin,
+  });
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =
     input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
@@ -706,7 +741,7 @@ async function allocateNewSession(
       ctx.botId,
       {
         createdOnPlatform: options?.billingOrigin === 'code-review' ? 'code-review' : undefined,
-        sandboxAllocation,
+        sandboxAllocation: requestedAllocation,
       }
     );
     if (target.kind === 'shared') {
@@ -722,14 +757,18 @@ async function allocateNewSession(
       };
     } else {
       sandboxId = target.sandboxId;
-      sandboxProvider = selectSandboxProvider({
-        env: ctx.env,
-        orgId,
-        userId: ctx.userId,
-        sandboxId,
-        sessionId: cloudAgentSessionId,
-        sandboxAllocation,
-      });
+      sandboxProvider =
+        sandboxAllocation === CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION &&
+        requestedAllocation !== CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION
+          ? 'cloudflare-containers'
+          : selectSandboxProvider({
+              env: ctx.env,
+              orgId,
+              userId: ctx.userId,
+              sandboxId,
+              sessionId: cloudAgentSessionId,
+              sandboxAllocation: requestedAllocation,
+            });
     }
   } catch (error) {
     await recordPostSetupFailure(() =>
@@ -905,7 +944,8 @@ async function allocateNewSession(
 function rebuildRecordedSessionAllocation(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
-  row: OperationLedgerRow
+  row: OperationLedgerRow,
+  options?: { billingOrigin?: string }
 ): NewSessionAllocation {
   const canonical = row.canonical_result ?? {};
   const cloudAgentSessionId = canonical.cloudAgentSessionId;
@@ -928,7 +968,14 @@ function rebuildRecordedSessionAllocation(
     ? input.runtime?.sandboxAllocation
     : undefined;
   const recorded = sandboxAllocationSchema.optional().safeParse(canonical.sandboxAllocation);
-  if (!recorded.success || recorded.data !== requested) {
+  const replacement =
+    typeof cloudAgentSessionId === 'string'
+      ? sandboxSmallReplacementForSession(input, ctx, cloudAgentSessionId, options)
+      : undefined;
+  if (
+    !recorded.success ||
+    !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement)
+  ) {
     throw creationInProgressError();
   }
   if (recorded.data !== undefined) {
@@ -1112,9 +1159,11 @@ function buildSessionRegistrationCommand(
       ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
       ...(allocation.sandboxKind ? { sandboxKind: allocation.sandboxKind } : {}),
       credentialContainment: allocation.credentialContainment,
-      ...(input.runtime?.sandboxAllocation
-        ? { sandboxAllocation: input.runtime.sandboxAllocation }
-        : {}),
+      ...(allocation.sandboxAllocation
+        ? { sandboxAllocation: allocation.sandboxAllocation }
+        : input.runtime?.sandboxAllocation
+          ? { sandboxAllocation: input.runtime.sandboxAllocation }
+          : {}),
     },
   };
 }
@@ -1659,15 +1708,26 @@ export async function sessionCreateIntentFingerprint(
  */
 async function assertCreateIntentUnchanged(
   input: SessionRegistrationInput,
-  row: OperationLedgerRow
+  row: OperationLedgerRow,
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
 ): Promise<void> {
   if (row.canonical_result === null) return;
   const stored = row.canonical_result?.[SESSION_CREATE_INTENT_FINGERPRINT_KEY];
   const selectable = isSelectableSandboxAllocation(input.runtime?.sandboxAllocation)
     ? input.runtime?.sandboxAllocation
     : undefined;
+  const recorded = sandboxAllocationSchema
+    .optional()
+    .safeParse(row.canonical_result?.sandboxAllocation);
+  const sessionId = row.canonical_result?.cloudAgentSessionId;
+  const replacement =
+    typeof sessionId === 'string'
+      ? sandboxSmallReplacementForSession(input, ctx, sessionId, options)
+      : undefined;
   if (
-    row.canonical_result?.sandboxAllocation !== selectable ||
+    !recorded.success ||
+    !recordedSandboxAllocationMatchesRequest(recorded.data, selectable, replacement) ||
     (selectable !== undefined && (typeof stored !== 'string' || stored.length === 0))
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
@@ -1730,7 +1790,9 @@ export async function createSessionWithLedger(
             worktreeEnabledForCreate(input, ctx, existing),
             finalizationVersionForCreate(existing)
           ),
-          existing
+          existing,
+          ctx,
+          options
         );
       }
     }
@@ -1760,7 +1822,7 @@ export async function createSessionWithLedger(
     case 'admitted':
       return executeLedgerCreate(effectiveInput, ctx, options, db, admission.row, 'new');
     case 'duplicate_settled':
-      return replaySettledCreate(admission.row, effectiveInput);
+      return replaySettledCreate(admission.row, effectiveInput, ctx, options);
     case 'duplicate_in_flight':
     case 'duplicate_reconcile_in_progress':
       throw creationInProgressError();
@@ -1772,7 +1834,9 @@ export async function createSessionWithLedger(
 
 async function replaySettledCreate(
   row: OperationLedgerRow,
-  input: SessionRegistrationInput
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
 ): Promise<LedgerSessionCreateResult> {
   // Only a `completed` settle may replay a successful create. Failed, no_op,
   // interrupted, and superseded terminal rows must surface the typed
@@ -1783,7 +1847,7 @@ async function replaySettledCreate(
   }
   // A changed same-key create intent must never replay the prior session; the
   // typed non-retryable failure lets the client clear the key and start fresh.
-  await assertCreateIntentUnchanged(input, row);
+  await assertCreateIntentUnchanged(input, row, ctx, options);
   const ids = canonicalSessionIds(row);
   if (!ids) {
     // A completed settle without canonical IDs has no session to replay. Treat
@@ -1974,7 +2038,7 @@ async function resumeCloneCreate(
     throw creationInProgressError();
   }
 
-  const allocation = rebuildRecordedSessionAllocation(input, ctx, row);
+  const allocation = rebuildRecordedSessionAllocation(input, ctx, row, options);
   const hooks = await buildLedgerHooks(input, ctx, options, db, row, 'takeover');
   const sessionService = new SessionService();
   const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
@@ -2192,7 +2256,7 @@ async function reconcileLedgerCreate(
 ): Promise<LedgerSessionCreateResult> {
   // A changed same-key create intent is rejected before ANY reconcile step: no
   // fresh create, no ownership-row lookup, and no DO metadata read.
-  await assertCreateIntentUnchanged(input, row);
+  await assertCreateIntentUnchanged(input, row, ctx, options);
 
   const ids = canonicalSessionIds(row);
 
@@ -2202,7 +2266,7 @@ async function reconcileLedgerCreate(
   }
 
   const worktreeAllocation = worktreeEnabledForCreate(input, ctx, row)
-    ? rebuildRecordedSessionAllocation(input, ctx, row)
+    ? rebuildRecordedSessionAllocation(input, ctx, row, options)
     : undefined;
 
   // (b) Ownership row lookup by kiloSessionId.

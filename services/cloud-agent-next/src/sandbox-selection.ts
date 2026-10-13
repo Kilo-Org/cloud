@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import {
+  CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   SELECTABLE_SANDBOX_ALLOCATIONS,
   getKiloSandboxAllocation,
   getSandboxAllocationProvider,
@@ -10,7 +11,11 @@ import {
 import { parseVercelSandboxRuntimeConfig } from './agent-sandbox/vercel/vercel-runtime-config.js';
 import { isCloudflareContainersEnrolled } from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
 import { isCloudAgentContainerBillingEnabled } from './container-billing-rollout.js';
-import { getDefaultSandboxDestination, isOrgInList } from './sandbox-id.js';
+import {
+  credentialContainmentEnabled,
+  getDefaultSandboxDestination,
+  isOrgInList,
+} from './sandbox-id.js';
 import type { Env } from './types.js';
 
 type SelectionOwner = { userId: string; orgId?: string };
@@ -53,12 +58,22 @@ export function getSandboxSelectionCapabilities(
     return { enabled: false, options: [] };
   }
 
+  const available = SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+    allocation => sandboxAllocationUnavailableReason(env, owner, allocation) === undefined
+  );
+  const options = credentialContainmentEnabled(env)
+    ? available.flatMap(allocation => {
+        if (allocation !== 'cloudflare-single') return [allocation];
+        return available.includes(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION)
+          ? []
+          : [CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION];
+      })
+    : available;
+
   return {
     enabled: true,
     defaultDestination: getDefaultSandboxDestination(env, owner),
-    options: SELECTABLE_SANDBOX_ALLOCATIONS.filter(
-      allocation => sandboxAllocationUnavailableReason(env, owner, allocation) === undefined
-    ).map(allocation => ({ allocation: getSandboxAllocationRequest(allocation) })),
+    options: options.map(allocation => ({ allocation: getSandboxAllocationRequest(allocation) })),
   };
 }
 
@@ -69,6 +84,7 @@ export function isSandboxAllocationAvailable(
   return (
     capabilities.enabled &&
     (allocation === 'isolated-standard' ||
+      allocation === 'cloudflare-single' ||
       capabilities.options.some(
         option => getKiloSandboxAllocation(option.allocation) === allocation
       ))

@@ -30,12 +30,12 @@ describe('sandbox selection policy', () => {
     {
       name: 'isolated Cloudflare without an allowlist',
       overrides: {},
-      expected: getSandboxAllocationRequest('cloudflare-single'),
+      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
       name: 'isolated Cloudflare with an empty allowlist',
       overrides: { PER_SESSION_SANDBOX_ORG_IDS: '' },
-      expected: getSandboxAllocationRequest('cloudflare-single'),
+      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
       name: 'Vercel with provider-default resources',
@@ -52,7 +52,7 @@ describe('sandbox selection policy', () => {
     {
       name: 'isolated Cloudflare outside the former allowlist',
       overrides: { PER_SESSION_SANDBOX_ORG_IDS: 'other-org' },
-      expected: getSandboxAllocationRequest('cloudflare-single'),
+      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
       name: 'missing Vercel configuration',
@@ -60,6 +60,11 @@ describe('sandbox selection policy', () => {
         VERCEL_SANDBOX_ORG_IDS: owner.orgId,
         VERCEL_TOKEN: undefined,
       },
+      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+    },
+    {
+      name: 'keeps Cloudflare sandbox small when containment is disabled',
+      overrides: { CREDENTIAL_CONTAINMENT_ENABLED: 'false' },
       expected: getSandboxAllocationRequest('cloudflare-single'),
     },
     {
@@ -69,7 +74,7 @@ describe('sandbox selection policy', () => {
         CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
         CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: owner.orgId,
       },
-      expected: getSandboxAllocationRequest('cloudflare-single'),
+      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
       name: 'Cloudflare containers when the isolated owner is enrolled',
@@ -138,21 +143,21 @@ describe('sandbox selection policy', () => {
   it('keeps the trigger-only allocation out of the manual picker', () => {
     const capabilities = getSandboxSelectionCapabilities(configured as Env, owner);
     expect(capabilities.options.map(option => option.allocation)).toEqual([
-      getSandboxAllocationRequest('cloudflare-single'),
+      getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-shared'),
       getSandboxAllocationRequest('vercel-small'),
       getSandboxAllocationRequest('vercel-large'),
     ]);
   });
 
-  it('reports the full catalog and omits Cloudflare containers when the owner is unenrolled', () => {
+  it('reports the native small allocation and gates larger containers on enrollment', () => {
     const missingContainers = { ...configured } as Env;
     expect(
       getSandboxSelectionCapabilities(missingContainers, owner).options.map(
         option => option.allocation
       )
     ).toEqual([
-      getSandboxAllocationRequest('cloudflare-single'),
+      getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-shared'),
       getSandboxAllocationRequest('vercel-small'),
       getSandboxAllocationRequest('vercel-large'),
@@ -167,7 +172,6 @@ describe('sandbox selection policy', () => {
         option => option.allocation
       )
     ).toEqual([
-      getSandboxAllocationRequest('cloudflare-single'),
       getSandboxAllocationRequest('cloudflare-shared'),
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-containers-standard-4'),
@@ -208,7 +212,7 @@ describe('sandbox selection policy', () => {
     } as Env;
     const capabilities = getSandboxSelectionCapabilities(env, owner);
     expect(capabilities.enabled).toBe(true);
-    expect(capabilities.options).toHaveLength(6);
+    expect(capabilities.options).toHaveLength(5);
     expect(capabilities.options.every(option => !('available' in option))).toBe(true);
     expect(JSON.stringify(capabilities)).not.toContain('test-token');
     for (const preset of sandboxAllocationSchema.options) {
@@ -223,7 +227,7 @@ describe('sandbox selection policy', () => {
       const capabilities = getSandboxSelectionCapabilities(env, owner);
       expect(capabilities.enabled).toBe(true);
       expect(capabilities.options.map(option => option.allocation)).toEqual([
-        getSandboxAllocationRequest('cloudflare-single'),
+        getSandboxAllocationRequest('cloudflare-containers-standard-3'),
         getSandboxAllocationRequest('cloudflare-shared'),
       ]);
       for (const preset of ['vercel-small', 'vercel-large'] as const) {
@@ -243,7 +247,7 @@ describe('sandbox selection policy', () => {
     } as Env;
     const capabilities = getSandboxSelectionCapabilities(env, owner);
     expect(capabilities.options.map(option => option.allocation)).toEqual([
-      getSandboxAllocationRequest('cloudflare-single'),
+      getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-shared'),
     ]);
     for (const preset of ['vercel-small', 'vercel-large'] as const) {
@@ -272,11 +276,20 @@ describe('sandbox selection policy', () => {
     }
 
     const unenrolled = { ...configured, CLOUDFLARE_CONTAINERS_ORG_IDS: 'other-org' } as Env;
-    expect(
-      getSandboxSelectionCapabilities(unenrolled, owner).options.map(option => option.allocation)
-    ).not.toContainEqual(getSandboxAllocationRequest('cloudflare-containers-standard-3'));
+    const unenrolledOptions = getSandboxSelectionCapabilities(unenrolled, owner).options.map(
+      option => option.allocation
+    );
+    expect(unenrolledOptions).toContainEqual(
+      getSandboxAllocationRequest('cloudflare-containers-standard-3')
+    );
+    expect(unenrolledOptions).not.toContainEqual(
+      getSandboxAllocationRequest('cloudflare-containers-standard-4')
+    );
     expect(() =>
       assertSandboxAllocationAvailable(unenrolled, owner, 'cloudflare-containers-standard-3')
+    ).not.toThrow();
+    expect(() =>
+      assertSandboxAllocationAvailable(unenrolled, owner, 'cloudflare-containers-standard-4')
     ).toThrow('not enabled for this account');
   });
 

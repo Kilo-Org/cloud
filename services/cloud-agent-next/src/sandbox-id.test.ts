@@ -626,6 +626,40 @@ describe('selectSandboxForNewSession', () => {
   const controlSessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
   const legacySessionId = 'agent_12345678-1234-1234-1234-123456789abc';
 
+  it.each([
+    { createdOnPlatform: undefined, clientProvenance: undefined },
+    { createdOnPlatform: 'cloud-agent-web', clientProvenance: undefined },
+    { createdOnPlatform: 'cloud-agent-web', clientProvenance: 'mobile' },
+    ...[
+      'slack',
+      'github',
+      'linear',
+      'discord',
+      'security-agent',
+      'security-remediation',
+      'webhook',
+      'scheduled',
+      'code-review',
+    ].map(createdOnPlatform => ({ createdOnPlatform, clientProvenance: 'browser' as const })),
+    {
+      createdOnPlatform: 'cloud-agent-web',
+      clientProvenance: 'browser',
+      billingOrigin: 'code-review',
+    },
+  ] as const)('keeps non-web or non-browser small sessions on Cloudflare: %j', async origin => {
+    for (const sandboxAllocation of [undefined, 'cloudflare-single'] as const) {
+      const selection = await selectSandboxForNewSession({
+        env: {},
+        userId: 'user-id',
+        sessionId: controlSessionId,
+        sandboxAllocation,
+        ...origin,
+      });
+      expect(selection.provider).toBe('cloudflare');
+      expect(selection.sandboxId).toMatch(/^ses-/);
+    }
+  });
+
   it.each(['cloudflare-single', 'cloudflare-shared', 'vercel-small', 'vercel-large'] as const)(
     'routes explicit %s independently of conflicting allocation and provider rollouts',
     async sandboxAllocation => {
@@ -640,6 +674,8 @@ describe('selectSandboxForNewSession', () => {
           userId: 'user-id',
           sessionId: controlSessionId,
           sandboxAllocation,
+          createdOnPlatform: 'cloud-agent-web',
+          clientProvenance: 'browser',
         });
         expect(selection.provider).toBe(
           sandboxAllocation === 'cloudflare-single'
@@ -869,12 +905,14 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('moves isolated control-plane sessions to native containers when the containers gate is unset', async () => {
+  it('moves browser web sessions to native containers when the containers gate is unset', async () => {
     const selection = await selectSandboxForNewSession({
       env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id' },
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: controlSessionId,
+      createdOnPlatform: 'cloud-agent-web',
+      clientProvenance: 'browser',
     });
 
     expect(selection.provider).toBe('cloudflare-containers');
@@ -892,18 +930,22 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('selects containers for enrolled and unenrolled isolated control-plane organizations', async () => {
+  it('selects containers for enrolled and unenrolled browser web organizations', async () => {
     const enrolled = await selectSandboxForNewSession({
       env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', CLOUDFLARE_CONTAINERS_ORG_IDS: 'org-id' },
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: controlSessionId,
+      createdOnPlatform: 'cloud-agent-web',
+      clientProvenance: 'browser',
     });
     const outside = await selectSandboxForNewSession({
       env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', CLOUDFLARE_CONTAINERS_ORG_IDS: 'other-org' },
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: controlSessionId,
+      createdOnPlatform: 'cloud-agent-web',
+      clientProvenance: 'browser',
     });
 
     expect(enrolled.provider).toBe('cloudflare-containers');
@@ -983,6 +1025,8 @@ describe('selectSandboxForNewSession', () => {
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: controlSessionId,
+      createdOnPlatform: 'cloud-agent-web',
+      clientProvenance: 'browser',
     });
 
     expect(selection.provider).toBe('cloudflare-containers');

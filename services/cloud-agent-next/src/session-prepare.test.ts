@@ -505,7 +505,7 @@ describe('sandbox selection Worker API', () => {
   });
 
   it.each(['legacy', 'structured'] as const)(
-    'keeps canonical workspace metadata for authorized %s starts and prepares',
+    'keeps public %s starts on small and upgrades browser prepares to native containers',
     async format => {
       const doStub = createMockDOStub();
       const ctx = createInternalApiContext({ doStub });
@@ -519,7 +519,12 @@ describe('sandbox selection Worker API', () => {
           : getSandboxAllocationRequest('cloudflare-single');
       const caller = appRouter.createCaller(ctx);
       await caller.start({ ...startInput, runtime: { sandboxAllocation } });
-      await caller.prepareSession({ ...prepareInput, sandboxAllocation });
+      await caller.prepareSession({
+        ...prepareInput,
+        sandboxAllocation,
+        createdOnPlatform: 'cloud-agent-web',
+        clientProvenance: 'browser',
+      });
       const metadata = expect.objectContaining({
         workspace: expect.objectContaining({
           sandboxAllocation: 'cloudflare-containers-standard-3',
@@ -527,7 +532,14 @@ describe('sandbox selection Worker API', () => {
         }),
       });
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
-        expect.objectContaining({ metadata })
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            workspace: expect.objectContaining({
+              sandboxAllocation: 'cloudflare-single',
+              sandboxProvider: 'cloudflare',
+            }),
+          }),
+        })
       );
       expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
         expect.objectContaining({ metadata })

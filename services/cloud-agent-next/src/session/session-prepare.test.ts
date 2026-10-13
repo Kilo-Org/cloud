@@ -482,8 +482,7 @@ describe('explicit sandbox session creation', () => {
         ctx,
         format === 'structured' ? requestFromStructuredAllocation(preset) : requestForPreset(preset)
       );
-      const persistedAllocation =
-        preset === 'cloudflare-single' ? 'cloudflare-containers-standard-3' : preset;
+      const persistedAllocation = preset;
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,
@@ -516,6 +515,38 @@ describe('explicit sandbox session creation', () => {
       }
     }
   );
+
+  it.each([
+    { createdOnPlatform: 'cloud-agent-web', clientProvenance: 'browser', native: true },
+    { createdOnPlatform: 'cloud-agent-web', clientProvenance: 'mobile', native: false },
+    { createdOnPlatform: 'cloud-agent-web', clientProvenance: undefined, native: false },
+    { createdOnPlatform: 'scheduled', clientProvenance: 'browser', native: false },
+    { createdOnPlatform: 'slack', clientProvenance: 'browser', native: false },
+  ] as const)('replaces small allocations only for browser web creates: %j', async origin => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    const request = requestForPreset('cloudflare-single');
+    request.options = {
+      ...request.options,
+      createdOnPlatform: origin.createdOnPlatform,
+      clientProvenance: origin.clientProvenance,
+    };
+
+    await runCreate(ctx, request);
+
+    const sandboxAllocation = origin.native
+      ? 'cloudflare-containers-standard-3'
+      : 'cloudflare-single';
+    expect(createdMetadata(doStub)?.workspace).toMatchObject({
+      sandboxAllocation,
+      sandboxProvider: origin.native ? 'cloudflare-containers' : 'cloudflare',
+    });
+    expect(recordOperationProgressMock).toHaveBeenCalledWith(
+      expect.anything(),
+      ROW_ID,
+      expect.objectContaining({ sandboxAllocation })
+    );
+  });
 
   it.each([
     { preset: 'cloudflare-single', sandboxId: /^ses-/ },
@@ -585,10 +616,7 @@ describe('explicit sandbox session creation', () => {
         operationKey: OPERATION_KEY,
       });
       expect(generateSessionIdMock).toHaveBeenCalledOnce();
-      const persistedAllocation =
-        sandboxAllocation === 'cloudflare-single'
-          ? 'cloudflare-containers-standard-3'
-          : sandboxAllocation;
+      const persistedAllocation = sandboxAllocation;
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,

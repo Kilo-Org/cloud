@@ -248,6 +248,8 @@ describe('GET /admin/config', () => {
         min_accuracy: 0.9,
         switch_cost_factor: 3,
         best_accuracy_switch_threshold: 0.05,
+        production_token_profile: null,
+        switch_horizon_turns: null,
         max_concurrency: 4,
         benchmark_user_id: null,
         benchmark_org_id: null,

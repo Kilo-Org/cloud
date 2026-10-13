@@ -99,6 +99,8 @@ const configRow = {
   min_accuracy: 0.7,
   switch_cost_factor: 3,
   best_accuracy_switch_threshold: 0.05,
+  production_token_profile: null,
+  switch_horizon_turns: null,
   max_concurrency: 4,
   benchmark_user_id: 'user-1',
   benchmark_org_id: null,

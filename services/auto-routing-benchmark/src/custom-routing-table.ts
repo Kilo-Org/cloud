@@ -37,9 +37,14 @@ export async function assembleCustomRoutingTable(
   config: Pick<
     BenchmarkConfig,
     'deciderRepetitions' | 'minAccuracy' | 'switchCostFactor' | 'bestAccuracySwitchThreshold'
-  > & Partial<Pick<BenchmarkConfig, 'productionTokenProfile' | 'switchHorizonTurns'>>,
+  > &
+    Partial<Pick<BenchmarkConfig, 'productionTokenProfile' | 'switchHorizonTurns'>>,
   entries: readonly PoolEntry[],
-  options: { now?: Date; catalogEnv?: { KILO_WEB_API_BASE_URL: string }; fetchImpl?: typeof fetch } = {}
+  options: {
+    now?: Date;
+    catalogEnv?: { KILO_WEB_API_BASE_URL: string };
+    fetchImpl?: typeof fetch;
+  } = {}
 ): Promise<CustomRoutingTableResponse> {
   assertUniqueEntries(entries);
   const current = currentProfileContextFromConfig(config);
@@ -65,7 +70,9 @@ export async function assembleCustomRoutingTable(
   const summaries = await getSummariesForRuns(db, runIds);
   const generatedAt = (options.now ?? new Date()).toISOString();
   const prices = options.catalogEnv
-    ? catalogCandidatePrices(await fetchBenchmarkModelCatalog(options.catalogEnv, options.fetchImpl))
+    ? catalogCandidatePrices(
+        await fetchBenchmarkModelCatalog(options.catalogEnv, options.fetchImpl)
+      )
     : undefined;
 
   const table: CustomRoutingTable | null = buildCustomRoutingTable({

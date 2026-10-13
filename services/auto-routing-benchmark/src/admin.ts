@@ -325,7 +325,11 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         );
       }
       try {
-        return c.json(await assembleCustomRoutingTable(c.env.BENCH_DB, config, body.entries, { catalogEnv: c.env }));
+        return c.json(
+          await assembleCustomRoutingTable(c.env.BENCH_DB, config, body.entries, {
+            catalogEnv: c.env,
+          })
+        );
       } catch (error) {
         if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {
           return c.json({ error: error.message }, 400);

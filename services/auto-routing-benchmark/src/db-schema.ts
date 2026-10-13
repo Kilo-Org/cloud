@@ -26,7 +26,9 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   min_accuracy: real('min_accuracy').notNull(),
   switch_cost_factor: real('switch_cost_factor').notNull(),
   best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
-  production_token_profile: text('production_token_profile', { mode: 'json' }).$type<ProductionTokenProfile>(),
+  production_token_profile: text('production_token_profile', {
+    mode: 'json',
+  }).$type<ProductionTokenProfile>(),
   switch_horizon_turns: integer('switch_horizon_turns'),
   max_concurrency: integer('max_concurrency').notNull(),
   // Live container budget for user-queue runs, independent of max_concurrency
@@ -191,7 +193,9 @@ export const routingTables = sqliteTable('routing_tables', {
   min_accuracy: real('min_accuracy').notNull(),
   switch_cost_factor: real('switch_cost_factor').notNull(),
   best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
-  production_token_profile: text('production_token_profile', { mode: 'json' }).$type<ProductionTokenProfile>(),
+  production_token_profile: text('production_token_profile', {
+    mode: 'json',
+  }).$type<ProductionTokenProfile>(),
   switch_horizon_turns: integer('switch_horizon_turns'),
   source: text('source').notNull(),
 });

@@ -9,15 +9,24 @@ import {
 
 describe('catalog candidate pricing', () => {
   it('keeps USD-per-token catalog prices and treats missing or invalid prices as unpriced', () => {
-    const prices = catalogCandidatePrices(BenchmarkModelCatalogSchema.parse({
-      data: [
-        { id: 'synthetic/priced', pricing: { prompt: '0.002', completion: '0.003', input_cache_read: '0.0001' } },
-        { id: 'synthetic/uncached', pricing: { prompt: '0.002', completion: '0.003' } },
-        { id: 'synthetic/missing' },
-        { id: 'synthetic/invalid', pricing: { prompt: 'invalid', completion: '0.003' } },
-      ],
-    }));
-    expect(prices.get('synthetic/priced')).toEqual({ promptUsdPerToken: 0.002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: 0.0001 });
+    const prices = catalogCandidatePrices(
+      BenchmarkModelCatalogSchema.parse({
+        data: [
+          {
+            id: 'synthetic/priced',
+            pricing: { prompt: '0.002', completion: '0.003', input_cache_read: '0.0001' },
+          },
+          { id: 'synthetic/uncached', pricing: { prompt: '0.002', completion: '0.003' } },
+          { id: 'synthetic/missing' },
+          { id: 'synthetic/invalid', pricing: { prompt: 'invalid', completion: '0.003' } },
+        ],
+      })
+    );
+    expect(prices.get('synthetic/priced')).toEqual({
+      promptUsdPerToken: 0.002,
+      completionUsdPerToken: 0.003,
+      cacheReadUsdPerToken: 0.0001,
+    });
     expect(prices.get('synthetic/uncached')?.cacheReadUsdPerToken).toBeNull();
     expect(prices.get('synthetic/missing')).toBeNull();
     expect(prices.get('synthetic/invalid')).toBeNull();

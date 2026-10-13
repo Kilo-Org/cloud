@@ -1333,8 +1333,12 @@ export function rowsToRoutingTable(
       accuracy: row.accuracy,
       avgCostUsd: row.avg_cost_usd,
       meetsThreshold: row.meets_threshold,
-      ...(row.pricing != null || row.estimated_request_cost_usd != null ? { pricing: row.pricing ?? null } : {}),
-      ...(row.estimated_request_cost_usd != null ? { estimatedRequestCostUsd: row.estimated_request_cost_usd } : {}),
+      ...(row.pricing != null || row.estimated_request_cost_usd != null
+        ? { pricing: row.pricing ?? null }
+        : {}),
+      ...(row.estimated_request_cost_usd != null
+        ? { estimatedRequestCostUsd: row.estimated_request_cost_usd }
+        : {}),
       ...(effort !== null
         ? { reasoningEffort: effort }
         : { variant: variantFromStorage(row.variant) }),
@@ -1346,9 +1350,15 @@ export function rowsToRoutingTable(
     minAccuracy: tableRow.min_accuracy,
     switchCostFactor: tableRow.switch_cost_factor,
     bestAccuracySwitchThreshold: tableRow.best_accuracy_switch_threshold,
-    ...(tableRow.production_token_profile != null || sorted.some(row => row.estimated_request_cost_usd != null)
-      ? { productionTokenProfile: tableRow.production_token_profile ?? null, switchHorizonTurns: tableRow.switch_horizon_turns ?? null }
-      : tableRow.switch_horizon_turns != null ? { switchHorizonTurns: tableRow.switch_horizon_turns } : {}),
+    ...(tableRow.production_token_profile != null ||
+    sorted.some(row => row.estimated_request_cost_usd != null)
+      ? {
+          productionTokenProfile: tableRow.production_token_profile ?? null,
+          switchHorizonTurns: tableRow.switch_horizon_turns ?? null,
+        }
+      : tableRow.switch_horizon_turns != null
+        ? { switchHorizonTurns: tableRow.switch_horizon_turns }
+        : {}),
     source: tableRow.source as RoutingTable['source'],
     routes: routeMap,
   };

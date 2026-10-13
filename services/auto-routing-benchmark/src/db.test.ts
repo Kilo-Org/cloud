@@ -217,11 +217,17 @@ describe('rowsToRoutingTable', () => {
       productionTokenProfile: { uncachedInputTokens: 20, cachedInputTokens: 80 },
       switchHorizonTurns: 4,
       routes: {
-        'implementation/code_generation': [{
-          ...candidate('synthetic/model'),
-          pricing: { promptUsdPerToken: 0.002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: 0.0001 },
-          estimatedRequestCostUsd: 0.049,
-        }],
+        'implementation/code_generation': [
+          {
+            ...candidate('synthetic/model'),
+            pricing: {
+              promptUsdPerToken: 0.002,
+              completionUsdPerToken: 0.003,
+              cacheReadUsdPerToken: 0.0001,
+            },
+            estimatedRequestCostUsd: 0.049,
+          },
+        ],
       },
     };
     const rows = routingTableToRows(table, '2026-06-01T11:00:00.000Z');

@@ -21,6 +21,8 @@ const configResponse = {
     minAccuracy: 0.8,
     switchCostFactor: 3,
     bestAccuracySwitchThreshold: 0.05,
+    productionTokenProfile: null,
+    switchHorizonTurns: null,
     maxConcurrency: 4,
     userMaxConcurrency: 100,
     benchmarkUserId: null,

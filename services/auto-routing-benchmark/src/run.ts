@@ -68,7 +68,12 @@ import {
   warmUpCliContainer,
 } from './cli-runner';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
-import { catalogCandidatePrices, fetchBenchmarkModelCatalog, fetchPlatformRegistryEntries, platformRegistryEntries } from './platform-models';
+import {
+  catalogCandidatePrices,
+  fetchBenchmarkModelCatalog,
+  fetchPlatformRegistryEntries,
+  platformRegistryEntries,
+} from './platform-models';
 import { pickClassifierWinner } from './winner';
 
 /** One exact Pool entry identity used throughout a decider/classifier run. */

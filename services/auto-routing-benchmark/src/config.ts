@@ -1,4 +1,8 @@
-import type { BenchmarkConfig, BenchmarkPlatformModel, ProductionTokenProfile } from '@kilocode/auto-routing-contracts';
+import type {
+  BenchmarkConfig,
+  BenchmarkPlatformModel,
+  ProductionTokenProfile,
+} from '@kilocode/auto-routing-contracts';
 import {
   getConfigRows,
   replaceConfig,

@@ -426,7 +426,11 @@ describe('computeDecision', () => {
           'best_accuracy',
           { contextTokens: 0 }
         );
-        expect(decision).toMatchObject({ model: incumbent.model, sticky: true, switchReason: null });
+        expect(decision).toMatchObject({
+          model: incumbent.model,
+          sticky: true,
+          switchReason: null,
+        });
       });
 
       it('forces threshold switches even when cache loss exceeds the expected saving', () => {

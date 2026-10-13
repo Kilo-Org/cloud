@@ -160,6 +160,8 @@ beforeEach(() => {
     benchmarkOrgId: null,
     switchCostFactor: 3,
     bestAccuracySwitchThreshold: 0.05,
+    productionTokenProfile: null,
+    switchHorizonTurns: null,
     classifierRepetitions: 1,
     deciderRepetitions: 1,
     classifierMaxP95LatencyMs: 1000,
@@ -566,6 +568,8 @@ describe('processJob — canonical registry publication', () => {
       variant: 'max',
       accuracy: 0.9,
       avgCostUsd: 0.001,
+      pricing: null,
+      estimatedRequestCostUsd: 0.001,
       meetsThreshold: true,
     });
   });

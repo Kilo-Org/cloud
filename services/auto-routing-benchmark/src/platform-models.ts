@@ -13,7 +13,8 @@ const CatalogTokenPriceSchema = z
   .trim()
   .min(1)
   .transform(value => Number(value))
-  .pipe(z.number().nonnegative().nullable())
+  .pipe(z.number().nonnegative())
+  .nullable()
   .catch(null);
 
 export const BenchmarkModelCatalogSchema = z.object({

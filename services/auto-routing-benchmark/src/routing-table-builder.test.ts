@@ -53,15 +53,29 @@ describe('production-cost table version', () => {
     const contributors = [{ runId: 'synthetic-run', model: 'synthetic/model', variant: null }];
     const knobs = { minAccuracy: 0.9, switchCostFactor: 3, bestAccuracySwitchThreshold: 0.05 };
     const base = computeRegistryRoutingTableVersion(contributors, knobs);
-    expect(computeRegistryRoutingTableVersion(contributors, { ...knobs, productionTokenProfile: null })).toBe(base);
-    expect(computeRegistryRoutingTableVersion(contributors, {
-      ...knobs, productionTokenProfile: { uncachedInputTokens: 20, cachedInputTokens: 80 },
-    })).not.toBe(base);
-    expect(computeRegistryRoutingTableVersion(contributors, { ...knobs, switchHorizonTurns: 4 })).not.toBe(base);
-    expect(computeRegistryRoutingTableVersion(contributors, {
-      ...knobs,
-      prices: new Map([['synthetic/model', { promptUsdPerToken: 0.002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: null }]]),
-    })).not.toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, { ...knobs, productionTokenProfile: null })
+    ).toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        productionTokenProfile: { uncachedInputTokens: 20, cachedInputTokens: 80 },
+      })
+    ).not.toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, { ...knobs, switchHorizonTurns: 4 })
+    ).not.toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        prices: new Map([
+          [
+            'synthetic/model',
+            { promptUsdPerToken: 0.002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: null },
+          ],
+        ]),
+      })
+    ).not.toBe(base);
   });
 });
 
@@ -79,8 +93,14 @@ describe('buildRoutingTable', () => {
         summary('model/value', routeKey, 1, 0.02),
       ]),
       prices: new Map([
-        ['model/cheap', { promptUsdPerToken: 0.002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: 0.001 }],
-        ['model/value', { promptUsdPerToken: 0.0002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: 0.0001 }],
+        [
+          'model/cheap',
+          { promptUsdPerToken: 0.002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: 0.001 },
+        ],
+        [
+          'model/value',
+          { promptUsdPerToken: 0.0002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: 0.0001 },
+        ],
       ]),
     };
     const route = 'implementation/code_generation';

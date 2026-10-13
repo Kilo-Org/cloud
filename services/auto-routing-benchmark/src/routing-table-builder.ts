@@ -140,12 +140,24 @@ export function computeRegistryRoutingTableVersion(
       parts,
       knobs: [knobs.minAccuracy, knobs.switchCostFactor, knobs.bestAccuracySwitchThreshold],
       profile: knobs.productionTokenProfile
-        ? [knobs.productionTokenProfile.uncachedInputTokens, knobs.productionTokenProfile.cachedInputTokens]
+        ? [
+            knobs.productionTokenProfile.uncachedInputTokens,
+            knobs.productionTokenProfile.cachedInputTokens,
+          ]
         : null,
       horizon: knobs.switchHorizonTurns ?? null,
       prices: [...new Set(contributors.map(c => c.model))].sort().map(model => {
         const pricing = knobs.prices?.get(model);
-        return [model, pricing ? [pricing.promptUsdPerToken, pricing.completionUsdPerToken, pricing.cacheReadUsdPerToken] : null];
+        return [
+          model,
+          pricing
+            ? [
+                pricing.promptUsdPerToken,
+                pricing.completionUsdPerToken,
+                pricing.cacheReadUsdPerToken,
+              ]
+            : null,
+        ];
       }),
       // A ranking change reorders tables built from unchanged measurements.
       policy: RANKING_POLICY_VERSION,
@@ -241,7 +253,14 @@ export function buildCustomRoutingTable(params: {
       model: r.entry.model,
       variant: r.entry.variant,
     })),
-    { minAccuracy, switchCostFactor, bestAccuracySwitchThreshold, productionTokenProfile: params.productionTokenProfile, switchHorizonTurns: params.switchHorizonTurns, prices: params.prices }
+    {
+      minAccuracy,
+      switchCostFactor,
+      bestAccuracySwitchThreshold,
+      productionTokenProfile: params.productionTokenProfile,
+      switchHorizonTurns: params.switchHorizonTurns,
+      prices: params.prices,
+    }
   );
 
   const table: CustomRoutingTable = {

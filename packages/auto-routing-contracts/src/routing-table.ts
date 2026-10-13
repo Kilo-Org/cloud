@@ -205,7 +205,11 @@ export function rankCandidates(
       return {
         candidate: { ...c, estimatedRequestCostUsd, meetsThreshold: c.accuracy >= minAccuracy },
         competes: c.accuracy > 0 && c.accuracy >= floor,
-        value: rankValue({ avgCostUsd: estimatedRequestCostUsd, accuracy: c.accuracy, p50LatencyMs }),
+        value: rankValue({
+          avgCostUsd: estimatedRequestCostUsd,
+          accuracy: c.accuracy,
+          p50LatencyMs,
+        }),
       };
     })
     .toSorted((a, b) => {

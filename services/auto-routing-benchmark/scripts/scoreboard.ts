@@ -80,10 +80,7 @@ const pricingCatalogSchema = z
       ])
     )
   );
-const pricingSchema = z.union([
-  pricingCatalogSchema,
-  z.record(z.string(), CandidatePricingSchema),
-]);
+const pricingSchema = z.union([pricingCatalogSchema, z.record(z.string(), CandidatePricingSchema)]);
 
 async function loadPricing(path: string) {
   if (path !== 'live') return readJson(path, pricingSchema);
@@ -213,7 +210,9 @@ async function main() {
       values['rerank-profile']
         ? readJson(values['rerank-profile'], ProductionTokenProfileSchema)
         : null,
-      values['cost-profile'] ? readJson(values['cost-profile'], ProductionTokenProfileSchema) : null,
+      values['cost-profile']
+        ? readJson(values['cost-profile'], ProductionTokenProfileSchema)
+        : null,
     ]);
     if (pricing) {
       for (const candidates of Object.values(source.table.routes)) {

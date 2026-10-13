@@ -22,6 +22,15 @@ import { deleteActivityTokens, readUnregisterAuthToken } from './unregister-sess
  * publish, so a transient network failure cannot leave a followed session
  * invisible to the server. A scope teardown deletes every recorded token before
  * the device session is revoked, as it does for the aggregate card.
+ *
+ * The last call wins. Every register and release records the session's desired
+ * state synchronously, when it is made (a follow in `pending`, and a new
+ * `generations` number for both), and every server mutation runs in the FIFO
+ * and acts on the desired state as it is when the mutation runs, not as it was
+ * when it was queued: an upsert runs only while its follow is still the pending
+ * one, and a delete only while its release is still the latest call. So an
+ * upsert and a delete for one session commute: whichever call was made later
+ * decides the row, however their awaits interleave.
  */
 
 export type AndroidSessionScope = {
@@ -44,6 +53,15 @@ const pending = new Map<string, PendingRegistration>();
 
 /** Sessions with a registration attempt running now, so a retry cannot double it. */
 const inFlight = new Set<string>();
+
+/** Bumped by every register and release of a session: the latest call's number. */
+const generations = new Map<string, number>();
+
+function nextGeneration(sessionId: string): number {
+  const generation = (generations.get(sessionId) ?? 0) + 1;
+  generations.set(sessionId, generation);
+  return generation;
+}
 
 let registeredScope: { userId: string; organizationId: string | null } | null = null;
 
@@ -165,6 +183,7 @@ async function runRegistration(sessionId: string): Promise<void> {
  * stays pending until the server accepts it.
  */
 export async function registerAndroidSessionToken(scope: AndroidSessionScope): Promise<void> {
+  nextGeneration(scope.sessionId);
   pending.set(scope.sessionId, { ...scope, authEpoch: currentAuthEpoch() });
   await runRegistration(scope.sessionId);
 }
@@ -187,9 +206,21 @@ export function isAndroidSessionTokenPending(sessionId: string): boolean {
   return pending.has(sessionId);
 }
 
-/** Delete one session's row for this device; a failed delete is retried by the scope teardown. */
-async function deleteSessionRow(sessionId: string, token: string): Promise<void> {
+/**
+ * Delete one session's row for this device, unless a later call superseded the
+ * release that asked for it: a re-follow made meanwhile holds the row, and its
+ * upsert may already have run ahead of this delete in the FIFO. A failed delete
+ * is retried by the scope teardown.
+ */
+async function deleteSessionRow(
+  sessionId: string,
+  token: string,
+  generation: number
+): Promise<void> {
   await enqueueTokenMutation(async () => {
+    if (generations.get(sessionId) !== generation) {
+      return;
+    }
     const authToken = await readUnregisterAuthToken();
     if (authToken === null) {
       return;
@@ -205,12 +236,13 @@ async function deleteSessionRow(sessionId: string, token: string): Promise<void>
  * the device token is read again, so a dismissed follow cannot leave its row.
  */
 export async function releaseAndroidSessionToken(sessionId: string): Promise<void> {
+  const generation = nextGeneration(sessionId);
   pending.delete(sessionId);
   const known = tokensBySession.get(sessionId);
   tokensBySession.delete(sessionId);
   const token = known ?? (await getDevicePushToken());
   if (token !== null && token.length > 0) {
-    await deleteSessionRow(sessionId, token);
+    await deleteSessionRow(sessionId, token, generation);
   }
 }
 
@@ -228,5 +260,6 @@ export function _resetAndroidSessionTokensForTests(): void {
   tokensBySession.clear();
   pending.clear();
   inFlight.clear();
+  generations.clear();
   androidSessionActivityTokens.clear();
 }

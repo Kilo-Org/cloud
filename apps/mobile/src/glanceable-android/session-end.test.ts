@@ -129,6 +129,24 @@ describe('every end path releases the session row', () => {
     expect(released()).toEqual(['session-1']);
   });
 
+  it('but opening a session this device does not follow deletes no row', () => {
+    // Another device's or another surface's follow: its row is not this device's.
+    dismissFinishedSessionCard('session-9');
+
+    expect(mocks.dismissSessionCard).toHaveBeenCalledWith('session-9');
+    expect(mocks.releaseAndroidSessionToken).not.toHaveBeenCalled();
+  });
+
+  it('nor does opening a finished session whose end already released its row', () => {
+    applySessionLiveUpdate('end', FINISHED, 900_000);
+    mocks.releaseAndroidSessionToken.mockClear();
+
+    dismissFinishedSessionCard('session-1');
+
+    expect(mocks.dismissSessionCard).toHaveBeenCalledWith('session-1');
+    expect(mocks.releaseAndroidSessionToken).not.toHaveBeenCalled();
+  });
+
   it('an Unfollow and a dismissal', async () => {
     unfollowSession('session-1');
     expect(released()).toEqual(['session-1']);

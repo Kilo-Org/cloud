@@ -147,13 +147,11 @@ describe('a release while the registration is in flight', () => {
     answer(undefined);
     await Promise.all([first, release, second]);
 
-    // Upsert, delete, then the re-follow's own upsert: the row exists at the end.
+    // The re-follow is the later call, so the release's delete is superseded
+    // and the re-follow upserts its own row: the row exists at the end, and
+    // nothing was deleted after the last upsert.
     expect(mocks.register).toHaveBeenCalledTimes(2);
-    expect(mocks.unregister).toHaveBeenCalledTimes(1);
-    const upsertOrder = mocks.register.mock.invocationCallOrder;
-    const deleteOrder = mocks.unregister.mock.invocationCallOrder[0] ?? 0;
-    expect(upsertOrder[0]).toBeLessThan(deleteOrder);
-    expect(upsertOrder[1]).toBeGreaterThan(deleteOrder);
+    expect(mocks.unregister).not.toHaveBeenCalled();
     expect(isAndroidSessionTokenPending('session-1')).toBe(false);
   });
 
@@ -170,6 +168,81 @@ describe('a release while the registration is in flight', () => {
 
     // A later follow must upsert: the row was deleted after the first upsert.
     await registerAndroidSessionToken(FOLLOW);
+    expect(mocks.register).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('a release and a re-follow commute: the later call wins', () => {
+  /** A device-token reader whose first read waits for `open()`; later reads answer at once. */
+  function slowFirstTokenRead(): { open: () => void } {
+    const { promise, resolve } = Promise.withResolvers<undefined>();
+    let first = true;
+    _setDevicePushTokenReaderForTests(async () => {
+      if (first) {
+        first = false;
+        await promise;
+      }
+      return mocks.deviceToken;
+    });
+    return {
+      open: () => {
+        resolve(undefined);
+      },
+    };
+  }
+
+  it('a re-follow whose upsert runs before the release delete keeps the row', async () => {
+    // A fresh process knows no token, so the release must read the device
+    // token first; the re-follow's upsert overtakes it in the FIFO.
+    const read = slowFirstTokenRead();
+    const release = releaseAndroidSessionToken('session-1');
+    await registerAndroidSessionToken(FOLLOW);
+    expect(mocks.register).toHaveBeenCalledTimes(1);
+
+    read.open();
+    await release;
+
+    // The superseded delete must not remove the row the re-follow holds.
+    expect(mocks.unregister).not.toHaveBeenCalled();
+    expect(isAndroidSessionTokenPending('session-1')).toBe(false);
+    // The row is still claimed: another retry sends nothing.
+    await retryAndroidSessionTokens();
+    expect(mocks.register).toHaveBeenCalledTimes(1);
+  });
+
+  it('a release made after the re-follow still deletes the row', async () => {
+    const read = slowFirstTokenRead();
+    const firstRelease = releaseAndroidSessionToken('session-1');
+    await registerAndroidSessionToken(FOLLOW);
+    // The user unfollows again: this release is now the latest call.
+    await releaseAndroidSessionToken('session-1');
+    read.open();
+    await firstRelease;
+
+    expect(mocks.register).toHaveBeenCalledTimes(1);
+    // Only the latest release deletes; the superseded first one does nothing.
+    expect(mocks.unregister).toHaveBeenCalledExactlyOnceWith({
+      token: 'ExponentPushToken[device]',
+      sessionId: 'session-1',
+    });
+    const upsertAt = mocks.register.mock.invocationCallOrder[0] ?? 0;
+    const deleteAt = mocks.unregister.mock.invocationCallOrder[0] ?? 0;
+    expect(deleteAt).toBeGreaterThan(upsertAt);
+
+    // Nothing claims the deleted row: a later follow upserts it again.
+    await registerAndroidSessionToken(FOLLOW);
+    expect(mocks.register).toHaveBeenCalledTimes(2);
+  });
+
+  it('a release queued ahead of a re-follow does not delete the row the re-follow then holds', async () => {
+    // The release reads its token at once (the row is claimed), so its delete
+    // is queued first; the re-follow still wins because it was called later.
+    await registerAndroidSessionToken(FOLLOW);
+    const release = releaseAndroidSessionToken('session-1');
+    const refollow = registerAndroidSessionToken(FOLLOW);
+    await Promise.all([release, refollow]);
+
+    expect(mocks.unregister).not.toHaveBeenCalled();
     expect(mocks.register).toHaveBeenCalledTimes(2);
   });
 });

@@ -258,7 +258,15 @@ export async function unfollowDismissedSession(sessionId: string): Promise<void>
   await endFollow(sessionId);
 }
 
-/** Opening a session dismisses its finished notification at once (spec "Ending" 1). */
+/**
+ * Opening a session dismisses its finished notification at once (spec "Ending" 1).
+ *
+ * Only a session this device still follows has a row to release. Any other
+ * session either never had a row from this device, or released it when its
+ * card ended (every end goes through `endFollow`), so opening it cancels the
+ * native card and deletes nothing: a row another surface or device owns must
+ * not be touched by a screen visit.
+ */
 export function dismissFinishedSessionCard(sessionId: string): void {
   const stored = followed.get(sessionId);
   // A rebuilt follow with no content yet still follows live work.
@@ -266,7 +274,9 @@ export function dismissFinishedSessionCard(sessionId: string): void {
     return;
   }
   dismissSessionCard(sessionId);
-  void endFollow(sessionId);
+  if (stored !== undefined) {
+    void endFollow(sessionId);
+  }
 }
 
 /**

@@ -1265,6 +1265,105 @@ function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingP
   };
 }
 
+describe('fallback-only custom pricing', () => {
+  const fallbackUsageCost = {
+    type: 'custom',
+    modelId: 'provider/fallback-model',
+    customPricing: {
+      fallbackOnly: true,
+      pricing: [
+        {
+          start_context_length: 0,
+          pricing: {
+            prompt_per_million: 1,
+            completion_per_million: 4,
+            input_cache_read_per_million: null,
+            input_cache_write_per_million: null,
+          },
+        },
+      ],
+    },
+  } as const;
+
+  test('keeps a positive upstream cost', async () => {
+    const usage = {
+      cost: 0.5,
+      cost_details: { upstream_inference_cost: 0.4 },
+      is_byok: false,
+      prompt_tokens: 1_000,
+      completion_tokens: 100,
+      total_tokens: 1_100,
+    };
+    const result = await rewriteModelResponse_ChatCompletions({
+      response: jsonResponse({ usage }),
+      usageCost: fallbackUsageCost,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+      responseTransforms: null,
+    });
+
+    expect((await result.json()).usage).toEqual(usage);
+  });
+
+  test.each([
+    ['no upstream cost', {}],
+    ['a zero upstream cost', { cost: 0, is_byok: false }],
+  ])('reports the custom-priced cost for %s', async (_name, upstreamCost) => {
+    const result = await rewriteModelResponse_ChatCompletions({
+      response: jsonResponse({
+        usage: {
+          ...upstreamCost,
+          prompt_tokens: 1_000,
+          completion_tokens: 100,
+          total_tokens: 1_100,
+        },
+      }),
+      usageCost: fallbackUsageCost,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+      responseTransforms: null,
+    });
+
+    expect((await result.json()).usage).toEqual({
+      prompt_tokens: 1_000,
+      completion_tokens: 100,
+      total_tokens: 1_100,
+      cost: Math.round(1_000 * 1 + 100 * 4) / 1_000_000,
+    });
+  });
+
+  test('keeps the upstream message_start cost and reports the custom cost in message_delta', async () => {
+    const result = await rewriteModelResponse_Messages({
+      response: sseResponse(
+        'event: message_start\n' +
+          'data: {"type":"message_start","message":{"id":"msg_1","usage":{"input_tokens":1000,"output_tokens":1,"cost":0.1,"is_byok":false}}}\n\n' +
+          'event: message_delta\n' +
+          'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":1000,"output_tokens":100}}\n\n' +
+          'event: message_stop\n' +
+          'data: {"type":"message_stop"}\n\n'
+      ),
+      usageCost: fallbackUsageCost,
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    const [start, delta] = dataObjects(await readOutputStream(result)) as [
+      { message: { usage: Record<string, unknown> } },
+      { usage: Record<string, unknown> },
+    ];
+    expect(start.message.usage).toEqual({
+      input_tokens: 1_000,
+      output_tokens: 1,
+      cost: 0.1,
+      is_byok: false,
+    });
+    expect(delta.usage.cost).toBe(Math.round(1_000 * 1 + 100 * 4) / 1_000_000);
+  });
+});
+
 describe('redactApiRequestLogRequest', () => {
   test('replaces gateway BYOK credentials without mutating the upstream request', () => {
     const request = {

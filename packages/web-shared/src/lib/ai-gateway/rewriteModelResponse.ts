@@ -446,12 +446,25 @@ type UpstreamUsageCost = {
   is_byok?: boolean | null;
 };
 
+/** Mirrors `computeOpenRouterCostFields`, which billing compares against zero. */
+function upstreamReportsCost(usage: UpstreamUsageCost): boolean {
+  const upstreamCost = usage.is_byok ? usage.cost_details?.upstream_inference_cost : usage.cost;
+  return (upstreamCost ?? 0) > 0;
+}
+
 function rewriteUsageCost(
   usage: UpstreamUsageCost,
   usageCost: UsageCostRewrite,
   tokenCounts: UsageTokenCounts
 ) {
   if (usageCost.type === 'upstream') return;
+  if (
+    usageCost.type === 'custom' &&
+    usageCost.customPricing.fallbackOnly &&
+    upstreamReportsCost(usage)
+  ) {
+    return;
+  }
   delete usage.cost;
   delete usage.cost_details;
   delete usage.is_byok;
@@ -658,6 +671,15 @@ type MessagesApiError = {
   error: unknown;
 };
 
+/**
+ * Billing uses the final message_delta usage; the start event only has partial counts,
+ * so it must not report a custom-priced cost.
+ */
+function messageStartUsageCost(usageCost: UsageCostRewrite): UsageCostRewrite {
+  if (usageCost.type !== 'custom') return usageCost;
+  return usageCost.customPricing.fallbackOnly ? { type: 'upstream' } : { type: 'remove' };
+}
+
 function rewriteMessagesUsage(usage: MessagesApiUsage, usageCost: UsageCostRewrite) {
   rewriteUsageCost(usage, usageCost, messagesUsageTokenCounts(usage));
 }
@@ -753,11 +775,7 @@ export async function rewriteModelResponse_Messages({
               });
             }
             if (e.message.usage) {
-              // Billing uses the final message_delta usage; the start event only has partial counts.
-              rewriteMessagesUsage(
-                e.message.usage,
-                usageCost.type === 'custom' ? { type: 'remove' } : usageCost
-              );
+              rewriteMessagesUsage(e.message.usage, messageStartUsageCost(usageCost));
             }
           }
 
@@ -991,8 +1009,8 @@ export async function rewriteModelResponse_Responses({
 
 /**
  * Clients should see the cost Kilo bills, which `processTokenData` derives from the
- * requested model: non-fallback custom pricing replaces the upstream cost, and BYOK
- * requests are not billed.
+ * requested model: custom pricing replaces the upstream cost (fallback-only pricing only
+ * when the upstream reports none), and BYOK requests are not billed.
  */
 function getUsageCostRewrite(
   model: string,
@@ -1000,7 +1018,14 @@ function getUsageCostRewrite(
   userByok: boolean
 ): UsageCostRewrite {
   const customPricing = getCustomPricing(model);
-  if (customPricing !== undefined && !customPricing.fallbackOnly) {
+  if (customPricing?.fallbackOnly) {
+    // Vercel reports its cost in provider_metadata or the generation lookup rather than
+    // in `usage`, so the response alone cannot tell whether the fallback applies.
+    return userByok || providerId === 'vercel'
+      ? { type: 'upstream' }
+      : { type: 'custom', modelId: model, customPricing };
+  }
+  if (customPricing !== undefined) {
     return userByok ? { type: 'remove' } : { type: 'custom', modelId: model, customPricing };
   }
   if ((providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model)) {

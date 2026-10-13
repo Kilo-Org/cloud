@@ -11,6 +11,7 @@ import {
 } from '@/lib/user/deletion-queue/deletion-crypto';
 import {
   applyResponseCookies,
+  isSubstackReauthRequired,
   reauthenticateSubstackSession,
   type SubstackReauthFailure,
 } from '@/lib/user/deletion-queue/substack-session';
@@ -297,55 +298,74 @@ async function runSubstackCredentialTest(credential: ParsedSubstackCredential): 
   cookieChanged: boolean;
 }> {
   const publication = getSubstackPublicationUrl();
-  const profile = await testSubstackProfile(publication, credential.cookie);
-  if (profile.result.status !== 'healthy' || !credential.totpSecret) {
-    return {
-      result: profile.result,
-      cookie: profile.cookie,
-      cookieChanged: profile.cookie !== credential.cookie,
-    };
-  }
-
-  const reauth = await reauthenticateSubstackSession({
-    publication,
-    cookie: profile.cookie,
-    totpSecret: credential.totpSecret,
-    timeoutMs: SUBSTACK_PROFILE_TIMEOUT_MS,
-  });
-  if (!reauth.ok) {
-    return {
-      result: reauthFailureResult(reauth.failure),
-      cookie: reauth.cookie,
-      cookieChanged: reauth.cookie !== credential.cookie,
-    };
-  }
+  const profile = await testSubstackProfile(publication, credential);
   return {
-    result: { ...profile.result, totpVerified: true },
-    cookie: reauth.cookie,
-    cookieChanged: reauth.cookie !== credential.cookie,
+    result: profile.result,
+    cookie: profile.cookie,
+    cookieChanged: profile.cookie !== credential.cookie,
   };
 }
 
 async function testSubstackProfile(
   publication: string,
-  cookie: string
+  credential: ParsedSubstackCredential
 ): Promise<{ result: SubstackCredentialTestResult; cookie: string }> {
-  const profileUrl = `${publication}/api/v1/user/profile/self`;
-  const first = await fetchSubstackProfile(profileUrl, cookie);
-  let workingCookie = cookie;
+  let profileUrl = `${publication}/api/v1/user/profile/self`;
+  const first = await fetchSubstackProfile(profileUrl, credential.cookie);
+  let workingCookie = credential.cookie;
   if (first.kind !== 'response') {
     return { result: await classifySubstackProfileResponse(first), cookie: workingCookie };
   }
   workingCookie = applyResponseCookies(workingCookie, first.response);
-  if (first.response.status === 404 && publication !== SUBSTACK_COM_ORIGIN) {
+  let profile = first;
+  let isFallback = false;
+  let reauthRequired = await isSubstackReauthRequired(first.response);
+  if (!reauthRequired && first.response.status === 404 && publication !== SUBSTACK_COM_ORIGIN) {
     // The substack.com fallback verifies the session only; its Set-Cookie values must not leak into the publication session.
-    const fallback = await fetchSubstackProfile(
-      `${SUBSTACK_COM_ORIGIN}/api/v1/user/profile/self`,
-      workingCookie
-    );
-    return { result: await classifySubstackProfileResponse(fallback), cookie: workingCookie };
+    profileUrl = `${SUBSTACK_COM_ORIGIN}/api/v1/user/profile/self`;
+    const fallback = await fetchSubstackProfile(profileUrl, workingCookie);
+    if (fallback.kind !== 'response') {
+      return { result: await classifySubstackProfileResponse(fallback), cookie: workingCookie };
+    }
+    profile = fallback;
+    isFallback = true;
+    reauthRequired = await isSubstackReauthRequired(fallback.response);
   }
-  return { result: await classifySubstackProfileResponse(first), cookie: workingCookie };
+  if (!reauthRequired) {
+    return { result: await classifySubstackProfileResponse(profile), cookie: workingCookie };
+  }
+  if (!credential.totpSecret) {
+    return {
+      result: { status: 'error', errorCode: 'substack_reauth_required' },
+      cookie: workingCookie,
+    };
+  }
+  const reauth = await reauthenticateSubstackSession({
+    publication,
+    cookie: workingCookie,
+    totpSecret: credential.totpSecret,
+    timeoutMs: SUBSTACK_PROFILE_TIMEOUT_MS,
+  });
+  workingCookie = reauth.cookie;
+  if (!reauth.ok) {
+    return { result: reauthFailureResult(reauth.failure), cookie: workingCookie };
+  }
+  const retry = await fetchSubstackProfile(profileUrl, workingCookie);
+  if (retry.kind === 'response') {
+    if (!isFallback) workingCookie = applyResponseCookies(workingCookie, retry.response);
+    if (await isSubstackReauthRequired(retry.response)) {
+      return {
+        result: { status: 'error', errorCode: 'substack_reauth_required' },
+        cookie: workingCookie,
+      };
+    }
+  }
+  const result = await classifySubstackProfileResponse(retry);
+  return {
+    result:
+      result.status === 'healthy' ? { ...result, totpVerified: reauth.method === 'totp' } : result,
+    cookie: workingCookie,
+  };
 }
 
 type ProfileFetchResult =

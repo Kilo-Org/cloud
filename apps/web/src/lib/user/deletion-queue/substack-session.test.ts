@@ -1,5 +1,6 @@
 import {
   applyResponseCookies,
+  isSubstackReauthRequired,
   parseCookieHeader,
   reauthenticateSubstackSession,
   serializeCookieJar,
@@ -50,6 +51,33 @@ describe('cookie jar', () => {
   });
 });
 
+describe('isSubstackReauthRequired', () => {
+  it.each([400, 401, 403, 404])(
+    'recognizes an explicit HTTP %s challenge without consuming the body',
+    async status => {
+      const payload = { type: 'reauthentication_required' };
+      const response = Response.json(payload, { status });
+      await expect(isSubstackReauthRequired(response)).resolves.toBe(true);
+      await expect(response.json()).resolves.toEqual(payload);
+    }
+  );
+
+  it.each([
+    [200, { type: 'reauthentication_required' }],
+    [401, { error: 'unauthorized' }],
+    [403, { error: 'reauthentication_required' }],
+    [403, { body: { type: 'reauthentication_required' } }],
+  ])('does not reauthenticate unrelated responses (%s, %j)', async (status, payload) => {
+    await expect(isSubstackReauthRequired(Response.json(payload, { status }))).resolves.toBe(false);
+  });
+
+  it('does not treat malformed JSON as a challenge', async () => {
+    await expect(
+      isSubstackReauthRequired(new Response('Forbidden', { status: 403 }))
+    ).resolves.toBe(false);
+  });
+});
+
 describe('reauthenticateSubstackSession', () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -80,6 +108,64 @@ describe('reauthenticateSubstackSession', () => {
     const completeHeaders = calls[1].init.headers as Record<string, string>;
     expect(completeHeaders.Cookie).toContain('session=rotated');
     expect(JSON.parse(String(calls[1].init.body))).toEqual({ code: '287082' });
+  });
+
+  it.each([{}, { method: null }, { method: '' }])(
+    'accepts an already authenticated session (%j) without submitting a TOTP code',
+    async payload => {
+      const fetchSpy = jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(
+          Response.json(payload, { headers: { 'set-cookie': 'session=rotated' } })
+        );
+
+      await expect(
+        reauthenticateSubstackSession({
+          publication: PUBLICATION,
+          cookie: 'connect.sid=old',
+          totpSecret: RFC_SECRET,
+        })
+      ).resolves.toEqual({
+        ok: true,
+        cookie: 'connect.sid=old; session=rotated',
+        cookieChanged: true,
+        method: null,
+      });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each([{ error: 'Rejected' }, { success: false }, { errors: ['Rejected'] }])(
+    'rejects a start error payload (%j) without completing',
+    async payload => {
+      const fetchSpy = jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(Response.json(payload));
+
+      await expect(
+        reauthenticateSubstackSession({
+          publication: PUBLICATION,
+          cookie: 'connect.sid=old',
+          totpSecret: RFC_SECRET,
+        })
+      ).resolves.toMatchObject({ ok: false, failure: { kind: 'error_payload' } });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('rejects malformed start JSON without completing', async () => {
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('<html>login</html>', { status: 200 }));
+
+    await expect(
+      reauthenticateSubstackSession({
+        publication: PUBLICATION,
+        cookie: 'connect.sid=old',
+        totpSecret: RFC_SECRET,
+      })
+    ).resolves.toMatchObject({ ok: false, failure: { kind: 'incomplete' } });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it('does not make a request when the guard is already closed', async () => {

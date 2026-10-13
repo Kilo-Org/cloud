@@ -156,6 +156,11 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     action:
       'Store a new Substack credential with a valid base32 TOTP secret, or leave TOTP blank for cookie-only, then Retry.',
   },
+  substack_reauth_required: {
+    title: 'Substack requires reauthentication',
+    action:
+      'Configure the service account TOTP secret, or sign in manually and store a fresh cookie, then Retry. If reauthentication still fails, confirm the service account settings.',
+  },
   substack_reauth_method_unsupported: {
     title: 'Substack did not offer TOTP reauthentication',
     action:

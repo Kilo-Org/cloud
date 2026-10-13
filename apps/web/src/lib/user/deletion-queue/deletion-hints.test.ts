@@ -64,6 +64,7 @@ describe('deletionAttentionHint', () => {
     expect(deletionAttentionHint('substack_forbidden')?.action).toMatch(/permission/);
     expect(deletionAttentionHint('substack_forbidden')?.title).not.toMatch(/expired/i);
     expect(deletionAttentionHint('substack_totp_invalid')?.action).toMatch(/base32/);
+    expect(deletionAttentionHint('substack_reauth_required')?.action).toMatch(/TOTP secret/);
     expect(deletionAttentionHint('substack_reauth_method_unsupported')?.title).toMatch(/TOTP/);
     expect(deletionAttentionHint('substack_reauth_rejected')?.action).toMatch(/TOTP secret/);
     expect(deletionAttentionHint('substack_reauth_incomplete')?.action).toMatch(/Retry/);

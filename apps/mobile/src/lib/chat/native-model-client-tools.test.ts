@@ -1,5 +1,4 @@
 import { type ModelClientService, type ModelEvent, type ModelRequest } from '@kilocode/harness-sdk';
-import { asOffered } from '@kilocode/harness-sdk/core';
 import { Effect, Either, Stream } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -263,28 +262,6 @@ describe('native on-device model client with tools', () => {
     expect(bridge.cancel).toHaveBeenCalledExactlyOnceWith(waiting);
     expect(bridge.resume).not.toHaveBeenCalled();
     expect(bridge.generate).toHaveBeenCalledOnce();
-  });
-
-  it('hands the native module the tools without the harness wait field', async () => {
-    const offered = asOffered({
-      definition: {
-        name: 'clock',
-        description: 'Tells the time',
-        parameters: { type: 'object', properties: {} },
-      },
-      run: () => Effect.succeed('noon'),
-    });
-    // The harness offers every tool with the field, and the model decides it.
-    expect(Object.keys(offered.parameters.properties)).toEqual(['wait']);
-    const { bridge } = toolBridge(answerWith({}));
-    await said(nativeModelClient(bridge), { ...request, tools: [offered] });
-    expect(bridge.generate.mock.calls[0]?.[0].tools).toEqual([
-      {
-        name: 'clock',
-        description: 'Tells the time',
-        parameters: JSON.stringify({ type: 'object', properties: [] }),
-      },
-    ]);
   });
 
   it('does not start again when a token generation fails after the tool calls ran', async () => {

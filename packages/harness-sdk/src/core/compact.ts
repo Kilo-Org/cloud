@@ -1,5 +1,5 @@
 import { Effect, Option, Ref, Stream } from 'effect';
-import type { ModelError } from './model.js';
+import type { ModelError, ModelUsage } from './model.js';
 import { appendTurn, sinceSummary } from './session.js';
 import { onStore, type StoreError } from './storage.js';
 import { add } from './usage.js';
@@ -40,11 +40,8 @@ const instruction =
 const heading = 'Summary of the conversation so far:';
 
 /** The completed exchange occupies both its input and its generated answer. */
-const promptedOf = (usage: {
-  readonly inputTokens: number;
-  readonly cacheReadTokens: number;
-  readonly outputTokens: number;
-}): number => usage.inputTokens + usage.cacheReadTokens + usage.outputTokens;
+const promptedOf = (usage: ModelUsage): number =>
+  usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens + usage.outputTokens;
 
 /**
  * The share of the window a session may fill before it compacts. It leaves room

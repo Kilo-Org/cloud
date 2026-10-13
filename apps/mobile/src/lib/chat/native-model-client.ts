@@ -1,6 +1,6 @@
 import {
   type ModelClientService,
-  ModelError,
+  type ModelError,
   type ModelEvent,
   type ModelRequest,
   type ModelUsage,
@@ -9,7 +9,7 @@ import {
 import { Chunk, Effect, Stream } from 'effect';
 import { z } from 'zod';
 
-import { LocalModelError, type LocalModelProblem } from './local-model-error';
+import { nativeModelFailure } from './native-model-error';
 import {
   nativeRequest,
   type NativeRequest,
@@ -71,23 +71,6 @@ type ToolLoop = { waiting?: { readonly id: string; readonly calls: readonly stri
 /** One native module and the tool round it may hold open. */
 type Provider = { readonly bridge: NativeModelBridge; readonly loop: ToolLoop };
 
-/** Reasons that mean the model cannot run here now, as opposed to a failed answer. */
-const UNAVAILABLE_REASONS = new Set([
-  'unsupported_os',
-  'device_not_eligible',
-  'apple_intelligence_disabled',
-  'model_not_ready',
-  'model_unavailable',
-  // Android AICore: the model still needs, or is in, its system download.
-  'model_download_required',
-  'model_downloading',
-  // Android AICore: the system service must be updated first.
-  'aicore_incompatible',
-  'system_update_required',
-  // Android AICore: the per-app battery quota for inference is spent.
-  'battery_quota_exceeded',
-]);
-
 /** A native promise rejection carries its stable reason as an Expo error code. */
 const codedRejection = z.object({ code: z.string() });
 
@@ -101,25 +84,6 @@ let sequence = 0;
 function nextRequestId(): string {
   sequence += 1;
   return `quick-chat-${sequence}`;
-}
-
-function problemOf(reason: string | undefined): LocalModelProblem {
-  if (reason === 'busy') {
-    return 'busy';
-  }
-  // Android runs the model only while the app is in front; Retry works after returning.
-  if (reason === 'background_use_blocked') {
-    return 'background';
-  }
-  return reason !== undefined && UNAVAILABLE_REASONS.has(reason) ? 'unavailable' : 'failed';
-}
-
-/** Fixed copy only: the native reason picks the key and is not shown or logged. */
-function failure(problem: LocalModelProblem, started: boolean): ModelError {
-  return new ModelError({
-    reason: started ? 'stream' : 'unsupported',
-    cause: new LocalModelError(problem),
-  });
 }
 
 /**
@@ -187,7 +151,7 @@ function answer(
     let retries = resumption === undefined ? 1 : 0;
     const fail = (reason: string | undefined) => {
       state = 'over';
-      void emit.fail(failure(problemOf(reason), output !== ''));
+      void emit.fail(nativeModelFailure(reason, output !== ''));
     };
     const failOrRetry = (reason: string | undefined) => {
       if (
@@ -366,11 +330,11 @@ export function nativeModelClient(bridge: NativeModelBridge): ModelClientService
             const availability = await bridge.availability();
             return availability;
           },
-          catch: () => failure('unavailable', false),
+          catch: () => nativeModelFailure('model_unavailable', false),
         }).pipe(
           Effect.filterOrFail(
             availability => availability.status === 'available',
-            () => failure('unavailable', false)
+            () => nativeModelFailure('model_unavailable', false)
           ),
           Effect.map(availability => answer(provider, availability, request))
         )

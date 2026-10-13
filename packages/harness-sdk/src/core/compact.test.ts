@@ -115,10 +115,13 @@ it('counts what the cache read towards the window', async () => {
   expect(calls).toHaveLength(3);
 });
 
-it('compacts before the next question when the answer fills the remaining window', async () => {
+it('counts the completed answer and newly cached input before the next question', async () => {
   const { calls } = await runWith({
     replies: [
-      { deltas: ['a long answer'], usage: { inputTokens: 100, outputTokens: 750 } },
+      {
+        deltas: ['a long answer'],
+        usage: { inputTokens: 100, cacheWriteTokens: 400, outputTokens: 350 },
+      },
       { deltas: ['the summary'] },
       { deltas: ['the next answer'] },
     ],

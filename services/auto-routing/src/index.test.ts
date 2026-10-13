@@ -201,7 +201,6 @@ function conversationState(
       classification === null ? null : { value: classification, storedAt: Date.now() },
     sticky,
     pendingCostUsd,
-    generation: 1,
   };
 }
 
@@ -216,7 +215,6 @@ async function drainBackgroundTasks() {
 function mockStoredConversation() {
   const store = new Map<string, unknown>();
   let pendingCostUsd = 0;
-  let generation = 0;
   let stickyGeneration = 0;
   cacheReadConversationState.mockImplementation(
     async (key: string | null, consumePendingCost: boolean) => {
@@ -225,7 +223,6 @@ function mockStoredConversation() {
         store.get('sticky') ?? null,
         pendingCostUsd
       );
-      state.generation = ++generation;
       if (consumePendingCost) pendingCostUsd = 0;
       return state;
     }
@@ -2205,42 +2202,58 @@ describe('auto routing worker', () => {
     await drainBackgroundTasks();
   });
 
-  it('does not let an older background turn overwrite a newer sticky write', async () => {
-    const store = mockStoredConversation();
-    store.set('sticky', {
-      model: 'google/gemini-2.5-flash-lite',
-      variant: null,
-      routeKey: 'implementation/feature_development',
-    });
-    const older = Promise.withResolvers<ClassifierRunResult>();
-    classifyNormalizedInput.mockReturnValueOnce(older.promise);
-    await decideRequest(
-      mirrorPayload({
-        input: { ...normalizedInput, userPromptPrefix: 'Turn A' },
-      })
-    );
-    const olderTasks = backgroundTasks.splice(0);
-    classifyNormalizedInput.mockResolvedValueOnce({
-      ...mockClassifierResult,
-      classification: {
-        ...mockClassification,
-        taskType: 'planning_design',
-        subtaskType: 'system_design',
-      },
-    });
-    await decideRequest(
-      mirrorPayload({
-        input: { ...normalizedInput, userPromptPrefix: 'Turn B' },
-      })
-    );
-    await drainBackgroundTasks();
-    const newerSticky = store.get('sticky');
-    expect(newerSticky).toMatchObject({ routeKey: 'planning_design/system_design' });
-    older.resolve(mockClassifierResult as ClassifierRunResult);
-    await Promise.all(olderTasks);
-    expect(store.get('sticky')).toEqual(newerSticky);
-    expect(cacheAddPendingClassifierCost).toHaveBeenCalledTimes(2);
-  });
+  it.each([false, true])(
+    'orders background sticky writes by request start time (equal timestamps: %s)',
+    async equalTimestamps => {
+      const olderStartedAt = Date.now();
+      const now = vi.spyOn(Date, 'now').mockReturnValue(olderStartedAt);
+      const store = mockStoredConversation();
+      store.set('sticky', {
+        model: 'google/gemini-2.5-flash-lite',
+        variant: null,
+        routeKey: 'implementation/feature_development',
+      });
+      const older = Promise.withResolvers<ClassifierRunResult>();
+      classifyNormalizedInput.mockReturnValueOnce(older.promise);
+      await decideRequest(
+        mirrorPayload({
+          input: { ...normalizedInput, userPromptPrefix: 'Turn A' },
+        })
+      );
+      const olderTasks = backgroundTasks.splice(0);
+      classifyNormalizedInput.mockResolvedValueOnce({
+        ...mockClassifierResult,
+        classification: {
+          ...mockClassification,
+          taskType: 'planning_design',
+          subtaskType: 'system_design',
+        },
+      });
+      now.mockReturnValue(olderStartedAt + (equalTimestamps ? 0 : 1));
+      await decideRequest(
+        mirrorPayload({
+          input: { ...normalizedInput, userPromptPrefix: 'Turn B' },
+        })
+      );
+      await drainBackgroundTasks();
+      const newerSticky = store.get('sticky');
+      expect(newerSticky).toMatchObject({ routeKey: 'planning_design/system_design' });
+      older.resolve(mockClassifierResult as ClassifierRunResult);
+      await Promise.all(olderTasks);
+      if (equalTimestamps) {
+        expect(store.get('sticky')).toMatchObject({
+          routeKey: 'implementation/feature_development',
+        });
+      } else {
+        expect(store.get('sticky')).toEqual(newerSticky);
+      }
+      expect(cachePutStickyDecision.mock.calls.map(([, generation]) => generation)).toEqual([
+        olderStartedAt + (equalTimestamps ? 0 : 1),
+        olderStartedAt,
+      ]);
+      expect(cacheAddPendingClassifierCost).toHaveBeenCalledTimes(2);
+    }
+  );
 
   it('keeps the session on the incumbent model when the taxonomy route changes', async () => {
     const store = new Map<string, unknown>();

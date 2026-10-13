@@ -39,14 +39,14 @@ function createFakeStorage() {
       }
       return entries.get(key);
     }),
-    put: async (key: string, value: unknown) => {
+    put: vi.fn(async (key: string, value: unknown) => {
       entries.set(key, value);
-    },
-    delete: async (keys: string | string[]) => {
+    }),
+    delete: vi.fn(async (keys: string | string[]) => {
       for (const key of Array.isArray(keys) ? keys : [keys]) {
         entries.delete(key);
       }
-    },
+    }),
     list: async () => new Map(entries),
   };
 }
@@ -113,19 +113,17 @@ describe('AutoRoutingDecisionCacheDO', () => {
     await cacheDO.putEntry('sticky', { model: 'mid/chat', variant: null, routeKey: null });
     await cacheDO.addPendingClassifierCost(0.03);
     storage.get.mockClear();
+    storage.put.mockClear();
+    storage.delete.mockClear();
 
     const state = await cacheDO.readConversationState('model:hash', false);
 
     expect(state.classification?.value).toEqual(classification);
     expect(state.sticky).toEqual({ model: 'mid/chat', variant: null, routeKey: null });
     expect(state.pendingCostUsd).toBe(0.03);
-    expect(state.generation).toBe(1);
-    expect(storage.get).toHaveBeenCalledExactlyOnceWith([
-      'model:hash',
-      'sticky',
-      'pending-cost',
-      'generation',
-    ]);
+    expect(storage.get).toHaveBeenCalledExactlyOnceWith(['model:hash', 'sticky', 'pending-cost']);
+    expect(storage.put).not.toHaveBeenCalled();
+    expect(storage.delete).not.toHaveBeenCalled();
   });
 
   it('expires cached decisions while retaining pending cost beyond the cache TTL', async () => {
@@ -140,14 +138,13 @@ describe('AutoRoutingDecisionCacheDO', () => {
       classification: null,
       sticky: null,
       pendingCostUsd: 0.03,
-      generation: 1,
     });
-    expect([...storage.entries.keys()]).toEqual(['pending-cost', 'generation']);
+    expect([...storage.entries.keys()]).toEqual(['model:hash', 'sticky', 'pending-cost']);
     vi.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
     expect((await cacheDO.readConversationState('model:hash', true)).pendingCostUsd).toBeNull();
   });
 
-  it('expires each entry independently without dropping fresh sticky state or cost', async () => {
+  it('ignores expired entries on read without writing or dropping fresh sticky state or cost', async () => {
     const { cacheDO, storage } = createCacheDO();
     await cacheDO.putEntry('model:hash', classification);
     vi.advanceTimersByTime(29 * 60 * 1000);
@@ -159,9 +156,8 @@ describe('AutoRoutingDecisionCacheDO', () => {
       classification: null,
       sticky: { model: 'mid/chat', variant: null, routeKey: null },
       pendingCostUsd: 0.03,
-      generation: 1,
     });
-    expect([...storage.entries.keys()]).toEqual(['sticky', 'pending-cost', 'generation']);
+    expect([...storage.entries.keys()]).toEqual(['model:hash', 'sticky', 'pending-cost']);
   });
 
   it('schedules a sweep alarm only when none is pending', async () => {
@@ -205,17 +201,32 @@ describe('AutoRoutingDecisionCacheDO', () => {
 describe('conversation state', () => {
   it('rejects older sticky writes without dropping their classification or pending cost', async () => {
     const { env, readState } = createCacheEnv();
-    const older = await readState();
-    const newer = await readState();
-    expect(newer.generation).toBe(older.generation + 1);
-    await putStickyDecision(env, 'conversation-1', 'new/chat', null, 'new/route', newer.generation);
-    await putStickyDecision(env, 'conversation-1', 'old/chat', null, 'old/route', older.generation);
+    const older = Date.now();
+    vi.advanceTimersByTime(1);
+    const newer = Date.now();
+    await putStickyDecision(env, 'conversation-1', 'new/chat', null, 'new/route', newer);
+    await putStickyDecision(env, 'conversation-1', 'old/chat', null, 'old/route', older);
     await putCachedClassification(env, 'conversation-1', 'hash', 'model', classification);
     await addPendingClassifierCost(env, 'conversation-1', 0.03);
     const state = await readState(true);
     expect(state.sticky?.model).toBe('new/chat');
     expect(state.classification).toEqual(classification);
     expect(state.pendingCostUsd).toBe(0.03);
+  });
+
+  it('accepts the last sticky write when request start times are equal', async () => {
+    const { env, readState } = createCacheEnv();
+    const generation = Date.now();
+    await putStickyDecision(env, 'conversation-1', 'first/chat', null, 'first/route', generation);
+    await putStickyDecision(env, 'conversation-1', 'last/chat', null, 'last/route', generation);
+    expect((await readState()).sticky?.model).toBe('last/chat');
+  });
+
+  it('does not write when reading a conversation without pending cost', async () => {
+    const { cacheDO, storage } = createCacheDO();
+    await cacheDO.readConversationState('model:hash', true);
+    expect(storage.put).not.toHaveBeenCalled();
+    expect(storage.delete).not.toHaveBeenCalled();
   });
 
   it('keeps unpaid cost across the cache TTL when adding another increment', async () => {
@@ -291,7 +302,6 @@ describe('conversation state', () => {
         routeKey: 'implementation/code_generation',
       },
       pendingCostUsd: 0,
-      generation: 1,
     });
 
     await putStickyDecision(
@@ -322,7 +332,7 @@ describe('conversation state', () => {
       consumePendingCost: false,
     });
 
-    expect(state).toEqual({ classification, sticky: null, pendingCostUsd: 0, generation: 1 });
+    expect(state).toEqual({ classification, sticky: null, pendingCostUsd: 0 });
     expect(second.readRpc).toHaveBeenCalledTimes(1);
   });
 
@@ -372,7 +382,6 @@ describe('conversation state', () => {
       classification: null,
       sticky: { model: 'mid/chat', variant: null, routeKey: 'implementation/code_generation' },
       pendingCostUsd: 0,
-      generation: 1,
     });
     expect(storage.entries.has('pending-cost')).toBe(false);
   });
@@ -387,7 +396,6 @@ describe('conversation state', () => {
       classification,
       sticky: null,
       pendingCostUsd: 0.03,
-      generation: 1,
     });
   });
 
@@ -411,7 +419,6 @@ describe('conversation state', () => {
       classification: null,
       sticky: null,
       pendingCostUsd: 0,
-      generation: 0,
     });
   });
 });

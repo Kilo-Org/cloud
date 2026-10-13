@@ -1,8 +1,14 @@
 import { spawn } from 'node:child_process';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
+import { parseConfigFileTextToJson } from 'typescript';
+import {
+  DECISION_LOG_SAMPLE_RATE_CONFIG_KEY,
+  DEFAULT_DECISION_LOG_SAMPLE_RATE,
+} from '../../auto-routing/src/classifier-config';
 import { ProdMetricsSchema, type Dist, type ProdMetrics } from '../src/scoreboard/schema';
+import { estimateClassifiedMetrics } from '../src/scoreboard/production';
 
 const requestPrefix =
   "['cloudflare-logpush'] | where ScriptName == 'auto-routing' and ['Event.Request.URL'] endswith '/decide'";
@@ -39,6 +45,7 @@ const tabularSchema = z.object({
 });
 const countSchema = z.object({ n: z.number().int().nonnegative() });
 const groupedSchema = countSchema.extend({
+  sampled: z.boolean(),
   route: z.string(),
   cacheHit: z.boolean().nullable(),
   cost: nullableNumber,
@@ -65,6 +72,58 @@ function count(rows: Record<string, unknown>[]): number {
   if (rows.length === 0) return 0;
   if (rows.length !== 1) throw new CollectionError('unexpected aggregate row count');
   return countSchema.parse(rows[0]).n;
+}
+
+async function decisionLogSampleRate(): Promise<number> {
+  try {
+    const configUrl = new URL('../../auto-routing/wrangler.jsonc', import.meta.url);
+    const parsed = parseConfigFileTextToJson('wrangler.jsonc', await readFile(configUrl, 'utf8'));
+    if (parsed.error) throw new CollectionError('invalid auto-routing Wrangler config');
+    const config = z
+      .object({
+        kv_namespaces: z.array(z.object({ binding: z.string(), id: z.string() })),
+      })
+      .parse(parsed.config);
+    const namespace = config.kv_namespaces.find(item => item.binding === 'AUTO_ROUTING_CONFIG');
+    if (!namespace) throw new CollectionError('missing AUTO_ROUTING_CONFIG namespace');
+    const raw = await new Promise<string>((resolve, reject) => {
+      const child = spawn(
+        'wrangler',
+        [
+          'kv',
+          'key',
+          'get',
+          '--remote',
+          '--namespace-id',
+          namespace.id,
+          DECISION_LOG_SAMPLE_RATE_CONFIG_KEY,
+        ],
+        { stdio: ['ignore', 'pipe', 'pipe'], timeout: 65_000 }
+      );
+      let stdout = '';
+      child.stdout.setEncoding('utf8');
+      child.stdout.on('data', (chunk: string) => {
+        stdout += chunk;
+      });
+      child.stderr.resume();
+      child.on('error', () => reject(new CollectionError('could not start wrangler')));
+      child.on('close', code => {
+        if (code === 0) resolve(stdout.trim());
+        else reject(new CollectionError('could not read decision log sample rate from KV'));
+      });
+    });
+    const rate = Number(raw);
+    if (!raw || !Number.isFinite(rate) || rate < 0 || rate > 1) {
+      throw new CollectionError('missing or invalid decision log sample rate in KV');
+    }
+    return rate;
+  } catch (error) {
+    const reason = error instanceof CollectionError ? error.message : 'config read failed';
+    console.error(
+      `Warning: ${reason}; using worker default decision log sample rate ${DEFAULT_DECISION_LOG_SAMPLE_RATE}.`
+    );
+    return DEFAULT_DECISION_LOG_SAMPLE_RATE;
+  }
 }
 
 function axiomQuery(window: Window): AxiomQuery {
@@ -104,10 +163,10 @@ function axiomQuery(window: Window): AxiomQuery {
   };
 }
 
-async function workerMetrics(query: AxiomQuery): Promise<Partial<ProdMetrics>> {
+async function workerMetrics(query: AxiomQuery, sampleRate: number): Promise<Partial<ProdMetrics>> {
   const [groups, requests, switched, workerDuration, timings] = await Promise.all([
     query(
-      `${sampledPrefix} | extend route=strcat(tostring(j.taskType), '/', tostring(j.subtaskType)), cacheHit=tobool(j.cacheHit), cost=todouble(j.classifierCostCredits) | summarize n=count() by route, cacheHit, cost`
+      `${decisionPrefix} | where j.status == 'classified' | extend sampled=tobool(j.sampled), route=strcat(tostring(j.taskType), '/', tostring(j.subtaskType)), cacheHit=tobool(j.cacheHit), cost=todouble(j.classifierCostCredits) | summarize n=count() by sampled, route, cacheHit, cost`
     ),
     query(`${requestPrefix} | summarize n=count()`),
     query(`${decisionPrefix} | where j.switched == true | summarize n=count()`),
@@ -123,38 +182,19 @@ async function workerMetrics(query: AxiomQuery): Promise<Partial<ProdMetrics>> {
       })
     ),
   ]);
-  let sampledCount = 0;
-  let cacheCount = 0;
-  let cacheHits = 0;
-  let costCount = 0;
-  let costTotal = 0;
-  const routeCounts: Record<string, number> = {};
-  for (const row of groups) {
-    const group = groupedSchema.parse(row);
-    sampledCount += group.n;
-    routeCounts[group.route] = (routeCounts[group.route] ?? 0) + group.n;
-    if (group.cacheHit !== null) {
-      cacheCount += group.n;
-      if (group.cacheHit) cacheHits += group.n;
-    }
-    if (group.cost !== null) {
-      costCount += group.n;
-      costTotal += group.cost * group.n;
-    }
-  }
   const requestCount = count(requests);
+  const classifiedMetrics = estimateClassifiedMetrics(
+    groups.map(row => groupedSchema.parse(row)),
+    sampleRate
+  );
   const availablePhases = timings.filter(
     (entry): entry is readonly [(typeof phases)[number], Dist] => entry[1] !== null
   );
   return {
     workerDecideMs: distribution(workerDuration),
     workerPhasesMs: availablePhases.length ? Object.fromEntries(availablePhases) : null,
-    cacheHitRate: cacheCount ? cacheHits / cacheCount : null,
-    classifierPerRequestUsd: costCount ? costTotal / costCount : null,
+    ...classifiedMetrics,
     switchRate: requestCount ? count(switched) / requestCount : null,
-    routeMix: Object.fromEntries(
-      Object.entries(routeCounts).map(([route, n]) => [route, n / sampledCount])
-    ),
   };
 }
 
@@ -217,7 +257,7 @@ SELECT
 FROM microdollar_usage_metadata meta
 JOIN auto_model am ON am.auto_model_id = meta.auto_model_id
 JOIN microdollar_usage usage ON usage.id = meta.id
-WHERE am.auto_model = 'kilo-auto/efficient'
+WHERE am.auto_model IN ('kilo-auto/efficient', 'kilo-auto/balanced')
   AND meta.created_at >= '${window.start}'::timestamptz
   AND meta.created_at < '${window.end}'::timestamptz
   AND usage.created_at >= '${window.start}'::timestamptz
@@ -266,16 +306,34 @@ async function main(): Promise<void> {
   const options = (() => {
     try {
       return parseArgs({
-        options: { since: { type: 'string', default: '24' }, out: { type: 'string' } },
+        options: {
+          since: { type: 'string', default: '24' },
+          out: { type: 'string' },
+          'sample-rate': { type: 'string' },
+        },
       });
     } catch {
-      throw new CollectionError('usage: scoreboard:prod --since <hours> --out <file>');
+      throw new CollectionError(
+        'usage: scoreboard:prod --since <hours> --out <file> [--sample-rate <0..1>]'
+      );
     }
   })();
   const hours = Number(options.values.since);
   const out = options.values.out;
   if (!Number.isFinite(hours) || hours <= 0 || typeof out !== 'string' || !out) {
     throw new CollectionError('usage: scoreboard:prod --since <positive hours> --out <file>');
+  }
+  const sampleRateOverride = options.values['sample-rate'];
+  const sampleRate = sampleRateOverride === undefined ? undefined : Number(sampleRateOverride);
+  if (
+    sampleRateOverride !== undefined &&
+    (!sampleRateOverride.trim() ||
+      sampleRate === undefined ||
+      !Number.isFinite(sampleRate) ||
+      sampleRate < 0 ||
+      sampleRate > 1)
+  ) {
+    throw new CollectionError('--sample-rate must be a number between 0 and 1');
   }
   const end = new Date();
   const start = new Date(end.getTime() - hours * 3_600_000);
@@ -306,7 +364,8 @@ async function main(): Promise<void> {
   try {
     const query = axiomQuery(window);
     jobs.push(
-      workerMetrics(query)
+      Promise.resolve(sampleRate ?? decisionLogSampleRate())
+        .then(rate => workerMetrics(query, rate))
         .then(result => {
           Object.assign(metrics, result);
         })

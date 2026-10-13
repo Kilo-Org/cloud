@@ -94,7 +94,7 @@ export async function fetchEfficientAutoDecision(
 
   const startedAt = performance.now();
   let status: number | null = null;
-  let outcome: 'ok' | 'timeout' | 'error' | 'http_error' = 'error';
+  let outcome: 'ok' | 'timeout' | 'error' | 'http_error' | 'invalid_response' = 'error';
   let signal: AbortSignal | undefined;
   try {
     signal = AbortSignal.timeout(options.timeoutMs ?? EFFICIENT_DECISION_TIMEOUT_MS);
@@ -115,6 +115,7 @@ export async function fetchEfficientAutoDecision(
     }
     const parsed = AutoRoutingDecisionResponseSchema.safeParse(await response.json());
     if (!parsed.success) {
+      outcome = 'invalid_response';
       onError('Efficient auto decision response invalid', { error: 'invalid_response' });
       return null;
     }

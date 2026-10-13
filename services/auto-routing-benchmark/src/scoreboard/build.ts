@@ -53,7 +53,9 @@ export function buildScoreboard({
     : table.routes;
   const routeKeys = Object.keys(table.routes);
   const routeMix =
-    prod?.routeMix ?? Object.fromEntries(routeKeys.map(key => [key, 1 / routeKeys.length]));
+    prod && Object.keys(prod.routeMix).length > 0
+      ? prod.routeMix
+      : Object.fromEntries(routeKeys.map(key => [key, 1 / routeKeys.length]));
   const weighted = (
     metric: 'accuracy' | 'avgCostUsd' | 'p50LatencyMs' | 'estimatedRequestCostUsd'
   ): number | null => {

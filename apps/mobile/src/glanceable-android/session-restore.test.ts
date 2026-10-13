@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   postSessionCard: vi.fn(),
   dismissSessionCard: vi.fn(),
   pruneSessionCards: vi.fn(),
+  restoreSessionCard: vi.fn(),
   getStoredSessionCards: vi.fn<
     () => { sessionId: string; organizationId: string | null; approvalKey: string | null }[]
   >(() => []),
@@ -40,6 +41,7 @@ vi.mock('./session-notification', () => ({
   postSessionCard: mocks.postSessionCard,
   dismissSessionCard: mocks.dismissSessionCard,
   pruneSessionCards: mocks.pruneSessionCards,
+  restoreSessionCard: mocks.restoreSessionCard,
   getStoredSessionCards: mocks.getStoredSessionCards,
 }));
 
@@ -55,6 +57,12 @@ vi.mock('@/lib/glanceable/approve-ask', () => ({ runGlanceableApprove: vi.fn() }
 vi.mock('./count-format', () => ({
   formatGlanceableClock: (at: string) => at.slice(11, 16),
   formatGlanceableCount: String,
+}));
+
+vi.mock('./ensure-notification-channels', () => ({
+  ensureAndroidNotificationChannels: vi.fn(async () => {
+    await Promise.resolve();
+  }),
 }));
 
 const NOW = Date.parse('2026-10-12T10:00:00.000Z');
@@ -76,7 +84,7 @@ beforeEach(() => {
 });
 
 describe('a fresh process', () => {
-  it('follows the stored cards again, so a push for one still renders', () => {
+  it('follows the stored cards again, so a push for one still renders', async () => {
     mocks.getStoredSessionCards.mockReturnValue([
       { sessionId: 'session-1', organizationId: null, approvalKey: null },
     ]);
@@ -86,7 +94,7 @@ describe('a fresh process', () => {
     expect(isSessionFollowed('session-1')).toBe(true);
     expect(mocks.dismissSessionCard).not.toHaveBeenCalled();
     expect(
-      applySessionLiveUpdate('update', {
+      await applySessionLiveUpdate('update', {
         sessionId: 'session-1',
         title: 'Migrate the billing webhooks',
         statusKind: 'running',
@@ -98,6 +106,20 @@ describe('a fresh process', () => {
       })
     ).toBe(true);
     expect(mocks.postSessionCard).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-posts the kept native card after a force-stop without waiting for the tray', () => {
+    mocks.getStoredSessionCards.mockReturnValue([
+      { sessionId: 'session-1', organizationId: null, approvalKey: null },
+      { sessionId: 'other-scope', organizationId: 'org-1', approvalKey: null },
+    ]);
+
+    restoreFollowedSessionCards(PERSONAL, NOW);
+
+    expect(mocks.restoreSessionCard).toHaveBeenCalledExactlyOnceWith('session-1');
+    expect(isSessionFollowed('session-1')).toBe(true);
+    expect(mocks.dismissSessionCard).toHaveBeenCalledWith('other-scope');
+    expect(mocks.postSessionCard).not.toHaveBeenCalled();
   });
 
   it('lets the tray fill a rebuilt follow and keeps it on a session open', () => {

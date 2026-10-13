@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   postSession: vi.fn(),
   dismissSession: vi.fn(),
   pruneSessions: vi.fn(),
+  restoreSession: vi.fn(),
   getSessionCards: vi.fn<() => string>(() => '[]'),
   native: null as Record<string, unknown> | null,
 }));
@@ -16,11 +17,17 @@ mocks.native = {
   postSession: mocks.postSession,
   dismissSession: mocks.dismissSession,
   pruneSessions: mocks.pruneSessions,
+  restoreSession: mocks.restoreSession,
   getSessionCards: mocks.getSessionCards,
 };
 
-const { dismissSessionCard, getStoredSessionCards, postSessionCard, pruneSessionCards } =
-  await import('./session-notification');
+const {
+  dismissSessionCard,
+  getStoredSessionCards,
+  postSessionCard,
+  pruneSessionCards,
+  restoreSessionCard,
+} = await import('./session-notification');
 
 /** The card the bridge hands over, read off the bridge itself. */
 type SessionNotificationCard = Parameters<typeof postSessionCard>[0];
@@ -52,6 +59,7 @@ beforeEach(() => {
     postSession: mocks.postSession,
     dismissSession: mocks.dismissSession,
     pruneSessions: mocks.pruneSessions,
+    restoreSession: mocks.restoreSession,
     getSessionCards: mocks.getSessionCards,
   };
   mocks.getSessionCards.mockReturnValue('[]');
@@ -77,6 +85,12 @@ describe('session notification bridge', () => {
 
     expect(mocks.dismissSession).toHaveBeenCalledWith('session-1');
     expect(mocks.pruneSessions).toHaveBeenCalledWith('["session-1","session-2"]');
+  });
+
+  it('asks native storage to re-post a followed session without rebuilding its content', () => {
+    restoreSessionCard('session-1');
+
+    expect(mocks.restoreSession).toHaveBeenCalledExactlyOnceWith('session-1');
   });
 
   it('reads the stored cards and drops a record that no longer parses', () => {

@@ -173,8 +173,6 @@ export function buildSessionNotificationCard(
     openUrl: launcherSessionUrl(content.sessionId),
     approveLabel: canApprove ? translate('common.approve') : null,
     approvalKey: content.approvalKey,
-    // A Working card counts up on the system timer. Every other card draws no
-    // system time, and its state time only orders the cards in the shade.
     ...(timed
       ? quietFields(content, now)
       : {

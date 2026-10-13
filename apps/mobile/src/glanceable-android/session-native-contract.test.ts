@@ -27,6 +27,7 @@ const RECEIVER = kotlin('ActiveAgentsActionReceiver.kt');
 const WORKER = kotlin('ActiveAgentsApproveWorker.kt');
 const BRIDGE = readFileSync(join(__dirname, 'session-notification.ts'), 'utf8');
 const APPROVE_TASK = readFileSync(join(__dirname, 'approve-task.ts'), 'utf8');
+const REGISTER = readFileSync(join(__dirname, 'register.ts'), 'utf8');
 
 /** The text of one Kotlin function body, from its signature to its closing brace. */
 function body(source: string, signature: string): string {
@@ -121,6 +122,37 @@ describe('SessionNotifications', () => {
     expect(NOTIFICATIONS).toContain('private const val FINISHED_UNTIL = "finishedUntil"');
     expect(BRIDGE).toContain('finishedUntil: z.number().optional()');
   });
+
+  it('gives each session its own explicit notification group', () => {
+    expect(body(NOTIFICATIONS, 'private fun builder(')).toMatch(
+      /\.setGroup\("followed-session:\$\{card\.sessionId\}"\)/
+    );
+    expect(NOTIFICATIONS).not.toContain('setGroupSummary(true)');
+  });
+
+  it('restores the persisted live card through the same native posting path', () => {
+    const restore = body(NOTIFICATIONS, 'fun restore(');
+    expect(restore).toContain('getString(KEY_PREFIX + sessionId, null) ?: return');
+    expect(restore).toContain('json.has(FINISHED_UNTIL)');
+    expect(restore).toContain('fillFromJson(json)');
+    expect(restore).toContain('post(context, SessionNotificationCard()');
+    expect(MODULE).toContain('AsyncFunction("restoreSession")');
+    expect(MODULE).toContain('SessionNotifications.restore(context, sessionId)');
+  });
+
+  it('starts restoration even when registration loads after the app became active', () => {
+    expect(REGISTER).toMatch(
+      /if \(AppState\.currentState === 'active'\) \{\s+void sessionFollow\(\)\.restoreFollowedSessionCardsFromStorage\(\)/
+    );
+  });
+
+  it('keeps the notification silent independently of channel importance', () => {
+    const build = body(NOTIFICATIONS, 'private fun builder(');
+    expect(build).toContain('.setSound(null)');
+    expect(build).toContain('.setVibrate(null)');
+    expect(build).toContain('.setOnlyAlertOnce(true)');
+    expect(NOTIFICATIONS).toContain('CHANNEL_ID = "followed-sessions-lock-screen"');
+  });
 });
 
 describe('the quiet moment of a Working card', () => {
@@ -186,8 +218,9 @@ describe('the quiet moment of a Working card', () => {
 
   it('hides the relative system time on every card that does not count up', () => {
     const build = body(NOTIFICATIONS, 'private fun builder(');
-    expect(build).toMatch(/\} else \{[^}]*\}\s+builder\.setShowWhen\(false\)/);
-    expect(NOTIFICATIONS).not.toContain('showWhen');
+    expect(build).toContain('builder.setWhen(0).setShowWhen(false)');
+    expect(build.match(/setWhen\(card\.whenMs\.toLong\(\)\)/g)).toHaveLength(1);
+    expect(NOTIFICATIONS).not.toContain('@Field var showWhen');
   });
 });
 

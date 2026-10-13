@@ -295,6 +295,11 @@ observable behavior is the same.
    own notification group, on a dedicated silent channel. The notification MUST
    NOT make a sound or vibrate, and it MUST use the platform's
    alert-once behavior, so an update never re-alerts.
+   The dedicated channel MUST use default importance so the card appears on the
+   Lock Screen with the system's default settings. The channel MUST disable
+   sound and vibration explicitly; user changes to notification settings remain
+   authoritative. An install with the old low-importance channel MUST migrate
+   to a new channel id because Android keeps channel importance after creation.
 2. The system MUST key the notification by the session id, through a stable
    notification id derived from it, so an update replaces that session's
    notification and never another session's.
@@ -307,7 +312,8 @@ observable behavior is the same.
    in that state. A `running` card MUST show the elapsed time as the platform's
    own counting-up timer, so it stays right while no process runs; every other
    card MUST show the absolute time the rules above define in its text, and
-   MUST hide the platform's header time, which draws a relative age.
+   MUST clear the platform's timestamp and hide its header time in both the
+   collapsed and expanded views, which otherwise draw a relative age.
 5. The system MAY draw extra detail the platform can show, as the Content
    rules define it: the current step, plan progress, the permission command,
    the diff size, and the cost so far. The cost MUST appear only in the
@@ -320,6 +326,9 @@ observable behavior is the same.
    at the end of the quiet window with no push and no running app process.
 7. The system MUST create the channel before the first post and MUST carry a
    translated channel name, as the other Android channels do.
+8. A launch after a force-stop MUST re-post the stored cards of the current
+   signed-in scope without waiting for the tray. Finished cards MUST NOT become
+   followed cards again, and cards of another scope MUST NOT be re-posted.
 
 ### Android: actions
 
@@ -424,3 +433,12 @@ observable behavior is the same.
 - Android cards other than Working show the absolute time in the text and hide
   the relative header time.
 - The Android cost moved out of the collapsed header into the expanded text.
+
+### 2026-10-13 -- Android restart and Lock Screen delivery
+
+- Clear non-timed system timestamps, including the expanded notification header.
+- Assign each session an explicit notification group.
+- Move followed cards to a default-importance channel with sound and vibration
+  disabled so they appear on the Lock Screen with the default system settings.
+- Await a pushed end's own row release instead of superseding it with another.
+- Re-post the current scope's stored followed cards after a force-stop.

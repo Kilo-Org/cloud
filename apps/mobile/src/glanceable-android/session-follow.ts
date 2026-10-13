@@ -21,12 +21,14 @@ import {
 } from '@/lib/glanceable/session-activity-tokens-android';
 
 import { buildSessionNotificationCard } from './session-notification-card';
+import { ensureAndroidNotificationChannels } from './ensure-notification-channels';
 import { readStoredContext } from './session-stored-context';
 import {
   dismissSessionCard,
   getStoredSessionCards,
   postSessionCard,
   pruneSessionCards,
+  restoreSessionCard,
 } from './session-notification';
 
 /**
@@ -157,6 +159,7 @@ export function restoreFollowedSessionCards(
       dismissSessionCard(card.sessionId);
     } else if (card.finishedUntil === undefined) {
       kept.set(card.sessionId, card.approvalKey);
+      restoreSessionCard(card.sessionId);
     } else if (card.finishedUntil > now) {
       finished.push(card.sessionId);
     } else {
@@ -201,6 +204,7 @@ export function restoreFollowedSessionCards(
  * "not followed".
  */
 export async function restoreFollowedSessionCardsFromStorage(): Promise<boolean> {
+  await ensureAndroidNotificationChannels();
   const ctx = await readStoredContext();
   if (ctx === 'unavailable') {
     return false;
@@ -330,11 +334,11 @@ export function syncFollowedSessionCards(
  * the caller drops that server row. A headless caller restores the set from
  * native storage first (`restoreFollowedSessionCardsFromStorage`).
  */
-export function applySessionLiveUpdate(
+export async function applySessionLiveUpdate(
   event: 'update' | 'end',
   content: SessionLiveActivityContentState,
   dismissAfterMs?: number
-): boolean {
+): Promise<boolean> {
   const stored = followed.get(content.sessionId);
   if (stored === undefined) {
     return false;
@@ -349,7 +353,7 @@ export function applySessionLiveUpdate(
     }
     // The server retires its row on an accepted end; the release also covers an
     // end the app reached first, so no path leaves the row behind.
-    void endFollow(content.sessionId);
+    await endFollow(content.sessionId);
     return true;
   }
   render(content, stored.ctx);

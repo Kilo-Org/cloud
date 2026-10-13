@@ -109,6 +109,12 @@ class ActiveAgentsLiveUpdateModule : Module() {
       }
     }.runOnQueue(moduleQueue)
 
+    AsyncFunction("restoreSession") { sessionId: String ->
+      durable {
+        SessionNotifications.restore(context, sessionId)
+      }
+    }.runOnQueue(moduleQueue)
+
     AsyncFunction("dismissSession") { sessionId: String ->
       durable {
         SessionNotifications.cancel(context, sessionId)

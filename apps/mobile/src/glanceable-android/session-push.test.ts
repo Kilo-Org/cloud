@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   postSessionCard: vi.fn(),
   dismissSessionCard: vi.fn(),
   pruneSessionCards: vi.fn(),
+  restoreSessionCard: vi.fn(),
   getStoredSessionCards: vi.fn<() => unknown[]>(() => []),
   registerAndroidSessionToken: vi.fn(),
   releaseAndroidSessionToken: vi.fn(async () => {
@@ -36,6 +37,7 @@ vi.mock('./session-notification', () => ({
   postSessionCard: mocks.postSessionCard,
   dismissSessionCard: mocks.dismissSessionCard,
   pruneSessionCards: mocks.pruneSessionCards,
+  restoreSessionCard: mocks.restoreSessionCard,
   getStoredSessionCards: mocks.getStoredSessionCards,
 }));
 
@@ -101,7 +103,7 @@ describe('approveFollowedSession', () => {
   it('drops Approve from the card once the request is answered', async () => {
     mocks.runGlanceableApprove.mockResolvedValue({ kind: 'approved' });
     followSession({ ...RUNNING, status: 'permission' }, CTX, NOW);
-    applySessionLiveUpdate('update', {
+    await applySessionLiveUpdate('update', {
       sessionId: 'session-1',
       title: 'Migrate the billing webhooks',
       statusKind: 'needsInput',
@@ -137,7 +139,7 @@ describe('approveFollowedSession', () => {
 });
 
 describe('applySessionLiveUpdate', () => {
-  it('renders an update for a followed session and an end after the window', () => {
+  it('renders an update for a followed session and an end after the window', async () => {
     followSession(RUNNING, CTX, NOW);
     mocks.postSessionCard.mockClear();
 
@@ -151,7 +153,7 @@ describe('applySessionLiveUpdate', () => {
       approvalKey: null,
       updatedAt: '2026-10-12T10:05:00.000Z',
     };
-    expect(applySessionLiveUpdate('end', content, 900_000)).toBe(true);
+    expect(await applySessionLiveUpdate('end', content, 900_000)).toBe(true);
     expect(mocks.postSessionCard).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining('Finished') }),
       900_000
@@ -159,12 +161,40 @@ describe('applySessionLiveUpdate', () => {
     expect(isSessionFollowed('session-1')).toBe(false);
   });
 
-  it('cancels at once an end with no window: the session is gone or out of scope', () => {
+  it('waits for its own row release before completing a pushed end', async () => {
+    followSession(RUNNING, CTX, NOW);
+    const release = Promise.withResolvers<undefined>();
+    mocks.releaseAndroidSessionToken.mockReturnValueOnce(release.promise);
+    let completed = false;
+    const ending = (async () => {
+      const result = await applySessionLiveUpdate('end', {
+        sessionId: 'session-1',
+        title: RUNNING.title,
+        statusKind: 'idle',
+        statusSince: new Date(NOW).toISOString(),
+        scheduledAt: null,
+        awaitingPermission: false,
+        approvalKey: null,
+        updatedAt: new Date(NOW).toISOString(),
+      });
+      completed = true;
+      return result;
+    })();
+
+    await Promise.resolve();
+    expect(isSessionFollowed('session-1')).toBe(false);
+    expect(mocks.releaseAndroidSessionToken).toHaveBeenCalledExactlyOnceWith('session-1');
+    expect(completed).toBe(false);
+    release.resolve(undefined);
+    expect(await ending).toBe(true);
+  });
+
+  it('cancels at once an end with no window: the session is gone or out of scope', async () => {
     followSession(RUNNING, CTX, NOW);
     mocks.postSessionCard.mockClear();
 
     expect(
-      applySessionLiveUpdate(
+      await applySessionLiveUpdate(
         'end',
         {
           sessionId: 'session-1',
@@ -186,9 +216,9 @@ describe('applySessionLiveUpdate', () => {
     expect(isSessionFollowed('session-1')).toBe(false);
   });
 
-  it('shows the wake time of a scheduled card, not the time it was drawn', () => {
+  it('shows the wake time of a scheduled card, not the time it was drawn', async () => {
     followSession(RUNNING, CTX, NOW);
-    applySessionLiveUpdate('update', {
+    await applySessionLiveUpdate('update', {
       sessionId: 'session-1',
       title: 'Nightly dependency audit',
       statusKind: 'scheduled',
@@ -205,11 +235,11 @@ describe('applySessionLiveUpdate', () => {
     });
   });
 
-  it('shows the time a finished card ended, not the time it was drawn', () => {
+  it('shows the time a finished card ended, not the time it was drawn', async () => {
     followSession(RUNNING, CTX, NOW);
     mocks.postSessionCard.mockClear();
 
-    applySessionLiveUpdate(
+    await applySessionLiveUpdate(
       'end',
       {
         sessionId: 'session-1',
@@ -230,9 +260,9 @@ describe('applySessionLiveUpdate', () => {
     });
   });
 
-  it('ignores a push for a session this device does not follow', () => {
+  it('ignores a push for a session this device does not follow', async () => {
     expect(
-      applySessionLiveUpdate('update', {
+      await applySessionLiveUpdate('update', {
         sessionId: 'session-9',
         title: null,
         statusKind: 'running',
@@ -246,9 +276,9 @@ describe('applySessionLiveUpdate', () => {
     expect(mocks.postSessionCard).not.toHaveBeenCalled();
   });
 
-  it('does not let an out-of-order update undo newer content', () => {
+  it('does not let an out-of-order update undo newer content', async () => {
     followSession(RUNNING, CTX, NOW);
-    applySessionLiveUpdate('update', {
+    await applySessionLiveUpdate('update', {
       sessionId: 'session-1',
       title: 'Migrate the billing webhooks',
       statusKind: 'needsInput',
@@ -260,7 +290,7 @@ describe('applySessionLiveUpdate', () => {
     });
     mocks.postSessionCard.mockClear();
 
-    applySessionLiveUpdate('update', {
+    await applySessionLiveUpdate('update', {
       sessionId: 'session-1',
       title: 'Migrate the billing webhooks',
       statusKind: 'running',
@@ -273,7 +303,7 @@ describe('applySessionLiveUpdate', () => {
 
     expect(mocks.postSessionCard).not.toHaveBeenCalled();
     expect(
-      applySessionLiveUpdate('update', {
+      await applySessionLiveUpdate('update', {
         sessionId: 'session-1',
         title: 'Migrate the billing webhooks',
         statusKind: 'running',

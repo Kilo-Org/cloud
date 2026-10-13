@@ -60,7 +60,7 @@ registerGlanceableSink(androidSink);
  */
 type SessionFollowLazy = {
   endAllSessionCards: () => void;
-  restoreFollowedSessionCardsFromStorage: () => Promise<void>;
+  restoreFollowedSessionCardsFromStorage: () => Promise<boolean>;
 };
 
 function sessionFollow(): SessionFollowLazy {
@@ -86,6 +86,10 @@ AppState.addEventListener('change', state => {
     void sessionFollow().restoreFollowedSessionCardsFromStorage();
   }
 });
+
+if (AppState.currentState === 'active') {
+  void sessionFollow().restoreFollowedSessionCardsFromStorage();
+}
 
 // Turning the in-app switch off must clear the Live Update already in the
 // shade, not just stop the next start. `startOrUpdate` holds the guard for

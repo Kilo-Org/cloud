@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   postSessionCard: vi.fn(),
   dismissSessionCard: vi.fn(),
   pruneSessionCards: vi.fn(),
+  restoreSessionCard: vi.fn(),
   getStoredSessionCards: vi.fn<
     () => {
       sessionId: string;
@@ -49,7 +50,14 @@ vi.mock('./session-notification', () => ({
   postSessionCard: mocks.postSessionCard,
   dismissSessionCard: mocks.dismissSessionCard,
   pruneSessionCards: mocks.pruneSessionCards,
+  restoreSessionCard: mocks.restoreSessionCard,
   getStoredSessionCards: mocks.getStoredSessionCards,
+}));
+
+vi.mock('./ensure-notification-channels', () => ({
+  ensureAndroidNotificationChannels: vi.fn(async () => {
+    await Promise.resolve();
+  }),
 }));
 
 vi.mock('@/lib/glanceable/session-activity-tokens-android', () => ({
@@ -102,14 +110,14 @@ beforeEach(() => {
 });
 
 describe('every end path releases the session row', () => {
-  it('a server end with the finished window', () => {
-    applySessionLiveUpdate('end', FINISHED, 900_000);
+  it('a server end with the finished window', async () => {
+    await applySessionLiveUpdate('end', FINISHED, 900_000);
     expect(isSessionFollowed('session-1')).toBe(false);
     expect(released()).toEqual(['session-1']);
   });
 
-  it('a server end at once (the session is gone or out of scope)', () => {
-    applySessionLiveUpdate('end', { ...FINISHED, title: null }, 0);
+  it('a server end at once (the session is gone or out of scope)', async () => {
+    await applySessionLiveUpdate('end', { ...FINISHED, title: null }, 0);
     expect(released()).toEqual(['session-1']);
   });
 
@@ -119,9 +127,9 @@ describe('every end path releases the session row', () => {
     expect(released()).toEqual(['session-1']);
   });
 
-  it('opening a finished session', () => {
+  it('opening a finished session', async () => {
     // A rebuilt or finished follow: the content says the session finished.
-    applySessionLiveUpdate('update', { ...FINISHED, statusKind: 'failed' });
+    await applySessionLiveUpdate('update', { ...FINISHED, statusKind: 'failed' });
     mocks.releaseAndroidSessionToken.mockClear();
 
     dismissFinishedSessionCard('session-1');
@@ -138,8 +146,8 @@ describe('every end path releases the session row', () => {
     expect(mocks.releaseAndroidSessionToken).not.toHaveBeenCalled();
   });
 
-  it('nor does opening a finished session whose end already released its row', () => {
-    applySessionLiveUpdate('end', FINISHED, 900_000);
+  it('nor does opening a finished session whose end already released its row', async () => {
+    await applySessionLiveUpdate('end', FINISHED, 900_000);
     mocks.releaseAndroidSessionToken.mockClear();
 
     dismissFinishedSessionCard('session-1');

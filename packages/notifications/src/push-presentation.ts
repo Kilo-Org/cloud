@@ -14,10 +14,15 @@ export const ANDROID_NOTIFICATION_CHANNELS = [
   { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
   { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
   { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
-  // The silent ongoing notification of each followed session. Low importance:
-  // it never makes a sound, and it stays above `IMPORTANCE_MIN`, which a Live
-  // Update may not use.
-  { id: 'followed-sessions', name: 'Followed sessions', importance: 'low', bypassDnd: false },
+  // Importance is immutable after channel creation. A new ID replaces the
+  // silent LOW channel so followed cards appear on the Lock Screen by default.
+  // The mobile channel writer disables its sound and vibration explicitly.
+  {
+    id: 'followed-sessions-lock-screen',
+    name: 'Followed sessions',
+    importance: 'default',
+    bypassDnd: false,
+  },
 ] as const;
 
 export type AndroidNotificationChannelId = (typeof ANDROID_NOTIFICATION_CHANNELS)[number]['id'];
@@ -274,7 +279,7 @@ export function androidChannelIdForPushData(data: PushData): AndroidNotification
     case 'security_lifecycle':
       return 'security';
     case 'session_live_update':
-      return 'followed-sessions';
+      return 'followed-sessions-lock-screen';
     default: {
       // Exhaustiveness: the agent variants returned above.
       const _exhaustive: never = data;

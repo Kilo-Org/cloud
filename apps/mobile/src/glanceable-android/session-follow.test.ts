@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   postSessionCard: vi.fn(),
   dismissSessionCard: vi.fn<(sessionId: string) => void>(),
   pruneSessionCards: vi.fn(),
+  restoreSessionCard: vi.fn(),
   getStoredSessionCards: vi.fn<
     () => { sessionId: string; organizationId: string | null; approvalKey: string | null }[]
   >(() => []),
@@ -53,7 +54,14 @@ vi.mock('./session-notification', () => ({
   postSessionCard: mocks.postSessionCard,
   dismissSessionCard: mocks.dismissSessionCard,
   pruneSessionCards: mocks.pruneSessionCards,
+  restoreSessionCard: mocks.restoreSessionCard,
   getStoredSessionCards: mocks.getStoredSessionCards,
+}));
+
+vi.mock('./ensure-notification-channels', () => ({
+  ensureAndroidNotificationChannels: vi.fn(async () => {
+    await Promise.resolve();
+  }),
 }));
 
 vi.mock('@/lib/glanceable/session-activity-tokens-android', () => ({
@@ -114,11 +122,11 @@ describe('followSession', () => {
     expect(isSessionFollowed('session-1')).toBe(true);
   });
 
-  it('shows Approve only for a permission wait that carries a key', () => {
+  it('shows Approve only for a permission wait that carries a key', async () => {
     followSession({ ...RUNNING, status: 'permission' }, CTX, NOW);
     expect(lastCard()).toMatchObject({ approveLabel: null });
 
-    applySessionLiveUpdate('update', {
+    await applySessionLiveUpdate('update', {
       sessionId: 'session-1',
       title: 'Migrate the billing webhooks',
       statusKind: 'needsInput',

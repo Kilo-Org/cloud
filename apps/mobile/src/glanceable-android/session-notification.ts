@@ -36,9 +36,9 @@ export type SessionNotificationCard = {
   approveLabel: string | null;
   approvalKey: string | null;
   /**
-   * The state time, in epoch milliseconds; 0 when none is known. Only a
-   * Working card draws it, as its counting-up timer; on every other card it
-   * orders the shade, and the text names the absolute time instead.
+   * The state time, in epoch milliseconds; absent when none is known. Only
+   * a Working card uses it for the system timer. Other cards name the
+   * absolute time in their text and clear the system timestamp.
    */
   whenMs: number;
   /**
@@ -93,6 +93,7 @@ const storedSessionCardsSchema = z.array(z.unknown());
 type SessionNotificationNativeModule = {
   postSession(cardJson: string, dismissAfterMs: number): void;
   dismissSession(sessionId: string): void;
+  restoreSession(sessionId: string): void;
   pruneSessions(keepJson: string): void;
   getSessionCards(): string;
 };
@@ -103,6 +104,10 @@ const nativeModule =
 /** Post or update one followed session's ongoing notification. */
 export function postSessionCard(card: SessionNotificationCard, dismissAfterMs = 0): void {
   nativeModule?.postSession(JSON.stringify(card), dismissAfterMs);
+}
+
+export function restoreSessionCard(sessionId: string): void {
+  nativeModule?.restoreSession(sessionId);
 }
 
 /** Cancel one session's notification and forget its stored card. */

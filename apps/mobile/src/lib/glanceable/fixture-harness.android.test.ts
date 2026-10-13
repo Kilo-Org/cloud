@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   postSessionCard: vi.fn(),
   dismissSessionCard: vi.fn(),
   pruneSessionCards: vi.fn(),
+  restoreSessionCard: vi.fn(),
   registerAndroidSessionToken: vi.fn(async () => {
     await Promise.resolve();
   }),
@@ -36,6 +37,7 @@ vi.mock('@/glanceable-android/session-notification', () => ({
   postSessionCard: mocks.postSessionCard,
   dismissSessionCard: mocks.dismissSessionCard,
   pruneSessionCards: mocks.pruneSessionCards,
+  restoreSessionCard: mocks.restoreSessionCard,
   getStoredSessionCards: () => [],
 }));
 vi.mock('@/lib/glanceable/session-activity-tokens-android', () => ({

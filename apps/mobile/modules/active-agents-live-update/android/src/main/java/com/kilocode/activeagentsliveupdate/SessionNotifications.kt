@@ -42,7 +42,7 @@ import org.json.JSONObject
 internal object SessionNotifications {
   private const val STORE = "active_agents_session_notifications"
   private const val KEY_PREFIX = "session:"
-  private const val CHANNEL_ID = "followed-sessions"
+  private const val CHANNEL_ID = "followed-sessions-lock-screen"
 
   /** The notification id of one session: stable, and never the aggregate card's. */
   private fun notificationId(sessionId: String): Int =
@@ -164,6 +164,15 @@ internal object SessionNotifications {
     post(context, card, 0)
   }
 
+  fun restore(context: Context, sessionId: String) {
+    val stored = state(context).getString(KEY_PREFIX + sessionId, null) ?: return
+    val json = JSONObject(stored)
+    if (json.has(FINISHED_UNTIL)) {
+      return
+    }
+    post(context, SessionNotificationCard().apply { fillFromJson(json) }, 0)
+  }
+
   private fun quietIntent(context: Context, sessionId: String, quietAtMs: Long): PendingIntent =
     PendingIntent.getBroadcast(
       context,
@@ -202,19 +211,17 @@ internal object SessionNotifications {
       .setOngoing(true)
       .setOnlyAlertOnce(true)
       .setSound(null)
+      .setVibrate(null)
+      .setGroup("followed-session:${card.sessionId}")
       .setCategory(Notification.CATEGORY_STATUS)
       .setDeleteIntent(deleteIntent(context, card.sessionId))
 
-    // The Working card counts up on the system clock. Every other card hides
-    // the system time, which draws a relative age; its text names the absolute
-    // time, and its state time only orders the shade.
+    // Expanded system headers can ignore showWhen, so non-timed cards must
+    // carry no timestamp at all. Their text already names the absolute time.
     if (card.chronometer) {
       builder.setUsesChronometer(true).setWhen(card.whenMs.toLong())
     } else {
-      if (card.whenMs > 0) {
-        builder.setWhen(card.whenMs.toLong())
-      }
-      builder.setShowWhen(false)
+      builder.setWhen(0).setShowWhen(false)
     }
 
     // Approve first, then Open. Approve is omitted, not disabled, when the card

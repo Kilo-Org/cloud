@@ -472,7 +472,7 @@ async function handleBackgroundNotificationTask(
     // server row would be dropped.
     await restorePersistedGlanceable();
     const followsKnown = await restoreFollowedSessionsFromStorage();
-    const applied = applySessionLiveUpdate(
+    const applied = await applySessionLiveUpdate(
       pushData.event,
       pushData.content,
       pushData.dismissAfterMs
@@ -483,7 +483,7 @@ async function handleBackgroundNotificationTask(
     // that merely changed nothing must never unfollow it.
     // An unreadable keychain leaves the set empty without meaning "unfollowed",
     // so the row stays until a read can tell.
-    if (followsKnown && !isSessionFollowed(pushData.content.sessionId)) {
+    if (!applied && followsKnown && !isSessionFollowed(pushData.content.sessionId)) {
       // Awaited: the headless task ends with this promise.
       await releaseAndroidSessionToken(pushData.content.sessionId);
     }
@@ -662,7 +662,12 @@ let androidChannelsPromise: Promise<void> | null = null;
 // The channels the two named kinds replaced. Android keeps an app-created
 // channel until the app deletes it, so a stale one would still appear in the
 // system settings list after the upgrade.
-const LEGACY_ANDROID_NOTIFICATION_CHANNELS = ['agent', 'chat', 'active-agents'] as const;
+const LEGACY_ANDROID_NOTIFICATION_CHANNELS = [
+  'agent',
+  'chat',
+  'active-agents',
+  'followed-sessions',
+] as const;
 
 // Android plays a channel-based post's sound from the channel (the builder's
 // `setSound(null)` is a no-op for a channel post on API 26+), and the framework
@@ -672,7 +677,7 @@ const LEGACY_ANDROID_NOTIFICATION_CHANNELS = ['agent', 'chat', 'active-agents'] 
 // enabled, so silence also has to disable it explicitly.
 const SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS = new Set<AndroidNotificationChannelId>([
   'agent-progress',
-  'followed-sessions',
+  'followed-sessions-lock-screen',
 ]);
 
 /** What one Android channel write asks the framework for. */
@@ -797,7 +802,7 @@ const CHANNEL_NAME_KEYS = {
   kiloclaw: 'notifications.channel.kiloclaw',
   balance: 'notifications.channel.balance',
   security: 'notifications.channel.security',
-  'followed-sessions': 'notifications.channel.followedSessions',
+  'followed-sessions-lock-screen': 'notifications.channel.followedSessions',
 } as const satisfies Record<AndroidNotificationChannelId, string>;
 
 /**

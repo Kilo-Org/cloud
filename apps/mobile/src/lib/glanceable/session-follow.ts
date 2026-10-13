@@ -118,7 +118,7 @@ export const finishFixtureSessionCard = (
     // Android ends the follow as the card finishes, so content applied after
     // the end is dropped: the fixture's content is the end itself, as the
     // server's end push carries it.
-    android().applySessionLiveUpdate('end', content);
+    void android().applySessionLiveUpdate('end', content);
     return;
   }
   // iOS ends the card inside the tray sync, so content applied after the end
@@ -145,9 +145,12 @@ export const finishFixtureSessionCard = (
   );
 };
 
-export const applyFixtureSessionContent = (content: SessionLiveActivityContentState): boolean => {
+export const applyFixtureSessionContent = async (
+  content: SessionLiveActivityContentState
+): Promise<boolean> => {
   if (Platform.OS === 'android') {
-    return android().applySessionLiveUpdate('update', content);
+    const applied = await android().applySessionLiveUpdate('update', content);
+    return applied;
   }
   const card = iosFollow()
     .discoverSessionCards()
@@ -175,14 +178,17 @@ async function settleFixtureCardWork(work: Promise<void>): Promise<void> {
 }
 
 /** Android only: apply one server push to the followed set. */
-export const applySessionLiveUpdate = (
+export const applySessionLiveUpdate = async (
   event: 'update' | 'end',
   content: AndroidFollow.SessionLiveUpdateContent,
   dismissAfterMs?: number
-): boolean =>
-  Platform.OS === 'android'
-    ? android().applySessionLiveUpdate(event, content, dismissAfterMs)
-    : false;
+): Promise<boolean> => {
+  if (Platform.OS !== 'android') {
+    return false;
+  }
+  const applied = await android().applySessionLiveUpdate(event, content, dismissAfterMs);
+  return applied;
+};
 
 /**
  * Android only: hydrate the followed set from storage. A headless push runs in

@@ -82,7 +82,7 @@ const channelCases = [
         updatedAt: '2026-01-01T00:00:01.000Z',
       },
     },
-    'followed-sessions',
+    'followed-sessions-lock-screen',
   ],
 ] as const;
 
@@ -111,7 +111,12 @@ describe('ANDROID_NOTIFICATION_CHANNELS', () => {
       { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
       { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
       { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
-      { id: 'followed-sessions', name: 'Followed sessions', importance: 'low', bypassDnd: false },
+      {
+        id: 'followed-sessions-lock-screen',
+        name: 'Followed sessions',
+        importance: 'default',
+        bypassDnd: false,
+      },
     ]);
   });
 

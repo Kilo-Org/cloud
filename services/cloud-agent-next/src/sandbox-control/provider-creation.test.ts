@@ -7,12 +7,20 @@ import {
 } from '../container-usage-context.js';
 import type { SandboxContainers } from '../sandbox-containers/SandboxContainers.js';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
-import { VercelSandboxRestError } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import {
+  VercelSandboxRestError,
+  type VercelSandboxCreateEnvelope,
+} from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { createCloudflareProviderAdapter } from './cloudflare-provider.js';
 import { createCloudflareContainersProviderAdapter } from './cloudflare-containers-provider.js';
 import { createControlPlaneCredential } from './managed-credential.js';
 import { buildControlNetworkPolicy, type SessionCredentialGrant } from './session-credentials.js';
-import { createVercelProviderAdapter } from './vercel-provider.js';
+import {
+  createVercelProviderAdapter,
+  decodeVercelProviderRef,
+  encodeVercelProviderRef,
+  type VercelControlRestClient,
+} from './vercel-provider.js';
 import {
   ProviderCreationError,
   type ProviderAdapter,
@@ -302,6 +310,149 @@ describe('Vercel creation causes', () => {
       readContainedGrants: async () => [],
     });
     await expect(provider.create(intent)).rejects.toMatchObject({ kind: 'request_failed' });
+  });
+});
+
+describe('Vercel runtime metadata', () => {
+  it.each(
+    ['create', 'recover'].flatMap(operation =>
+      [
+        { region: 'iad1', sourceSnapshotId: 'observed-snapshot', validMetadata: true },
+        { region: 'iad1', sourceSnapshotId: undefined, validMetadata: true },
+        { region: '', sourceSnapshotId: 'observed-snapshot', validMetadata: false },
+        { region: 'x'.repeat(129), sourceSnapshotId: undefined, validMetadata: false },
+        { region: 'iad1', sourceSnapshotId: 'x'.repeat(129), validMetadata: false },
+      ].map(metadata => ({ operation, ...metadata }))
+    )
+  )(
+    'keeps runtime identity usable on $operation with validMetadata=$validMetadata, region=$region, snapshot=$sourceSnapshotId',
+    async ({ operation, sourceSnapshotId, region, validMetadata }) => {
+      const envelope: VercelSandboxCreateEnvelope = {
+        sandbox: {} as never,
+        session: {
+          id: 'physical-session',
+          sourceSandboxName: SANDBOX_ID,
+          projectId: config.projectId,
+          ...(sourceSnapshotId === undefined ? {} : { sourceSnapshotId }),
+          runtime: config.runtime,
+          status: 'running',
+          memory: 4096,
+          vcpus: 2,
+          region,
+          timeout: config.initialTimeoutMs,
+          requestedAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          cwd: '/',
+        },
+        runtime: { sandboxName: SANDBOX_ID, sessionId: 'physical-session' },
+        routes: [],
+      };
+      const restClient = {
+        createSandbox: vi
+          .fn<VercelControlRestClient['createSandbox']>()
+          .mockResolvedValue(envelope),
+        inspectByName: vi
+          .fn<VercelControlRestClient['inspectByName']>()
+          .mockResolvedValue(envelope),
+        getSession: vi.fn<VercelControlRestClient['getSession']>().mockResolvedValue({
+          session: { ...envelope.session, region: 'sfo1', sourceSnapshotId: 'later-snapshot' },
+          routes: [],
+        }),
+        stopSession: vi.fn<VercelControlRestClient['stopSession']>().mockResolvedValue({
+          ...envelope.session,
+          status: 'stopped',
+        }),
+        executeCommand: vi.fn<VercelControlRestClient['executeCommand']>(),
+        extendSessionTimeout: vi.fn<VercelControlRestClient['extendSessionTimeout']>(),
+        readFile: vi.fn<VercelControlRestClient['readFile']>(),
+        updateNetworkPolicy: vi.fn<VercelControlRestClient['updateNetworkPolicy']>(),
+      };
+      const billingLifetimeSink = vi.fn();
+      const provider = createVercelProviderAdapter({
+        sandboxName: SANDBOX_ID,
+        config,
+        restClient,
+        billingLifetimeSink,
+        readContainedGrants: async () => [],
+      });
+      const result =
+        operation === 'create'
+          ? await provider.create(intent)
+          : await provider.observe(null, intent);
+      if (!('providerRef' in result) || result.providerRef === undefined) {
+        throw new Error('Provider did not resolve the physical session');
+      }
+      const { providerRef } = result;
+      const expectedSnapshot = validMetadata
+        ? (sourceSnapshotId ?? config.snapshotId)
+        : config.snapshotId;
+      expect(decodeVercelProviderRef(providerRef)).toEqual({
+        ...envelope.runtime,
+        ...(validMetadata
+          ? {
+              metadata: {
+                region,
+                instanceType: 'small',
+                ...(sourceSnapshotId === undefined ? {} : { sourceSnapshotId }),
+              },
+            }
+          : {}),
+      });
+      expect(provider.describeRuntime?.(providerRef)).toEqual({
+        provider: 'vercel',
+        sandboxId: SANDBOX_ID,
+        instanceId: 'physical-session',
+        ...(validMetadata ? { region, instanceType: 'small' } : {}),
+        snapshotId: expectedSnapshot,
+        runtimeBuildId: config.runtimeBuildId,
+        startSource: 'snapshot',
+      });
+      expect(restClient.createSandbox).toHaveBeenCalledTimes(operation === 'create' ? 1 : 0);
+      expect(restClient.inspectByName).toHaveBeenCalledTimes(operation === 'recover' ? 1 : 0);
+      expect(restClient.getSession).not.toHaveBeenCalled();
+      if (operation === 'create') {
+        expect(restClient.createSandbox).toHaveBeenCalledWith(
+          expect.objectContaining({ snapshotId: config.snapshotId })
+        );
+      } else {
+        expect(restClient.inspectByName).toHaveBeenCalledWith(
+          expect.objectContaining({ snapshotId: config.snapshotId })
+        );
+      }
+      expect(await provider.launch(providerRef, {})).toEqual({ startSource: 'image' });
+      expect(restClient.executeCommand).toHaveBeenCalledOnce();
+      expect(await provider.observe(providerRef, intent)).toEqual({ status: 'active' });
+      expect(await provider.stop(providerRef, intent)).toBe('terminal');
+      expect(restClient.stopSession).toHaveBeenCalledOnce();
+      expect(billingLifetimeSink.mock.calls.map(([evidence]) => evidence.providerRef)).toEqual([
+        providerRef,
+        providerRef,
+        providerRef,
+      ]);
+      expect(provider.describeRuntime?.(providerRef)?.region).toBe(
+        validMetadata ? region : undefined
+      );
+      expect(provider.describeRuntime?.(providerRef)?.snapshotId).toBe(expectedSnapshot);
+    }
+  );
+
+  it('reads old refs without metadata using the configured snapshot and no region', () => {
+    const provider = createVercelProviderAdapter({
+      sandboxName: SANDBOX_ID,
+      config,
+      readContainedGrants: async () => [],
+    });
+    const oldRef = { sandboxName: SANDBOX_ID, sessionId: 'physical-session' };
+    expect(decodeVercelProviderRef(encodeVercelProviderRef(oldRef))).toEqual(oldRef);
+    expect(provider.describeRuntime?.(encodeVercelProviderRef(oldRef))).toEqual({
+      provider: 'vercel',
+      sandboxId: SANDBOX_ID,
+      instanceId: 'physical-session',
+      snapshotId: config.snapshotId,
+      runtimeBuildId: config.runtimeBuildId,
+      startSource: 'snapshot',
+    });
   });
 });
 

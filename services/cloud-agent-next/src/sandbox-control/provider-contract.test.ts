@@ -389,6 +389,32 @@ const harnessFactories = [cloudflareHarness, containersHarness, vercelHarness];
 describe.each(harnessFactories.map(factory => [factory().name, factory] as const))(
   'provider adapter contract: %s',
   (_name, factory) => {
+    it('projects owned runtime identity without querying the backend', async () => {
+      const harness = factory();
+      const ref = await harness.create();
+      harness.failObserve();
+      harness.failCreate();
+      const container = harness.adapter.describeRuntime?.(ref);
+      expect(container).toEqual({
+        provider: harness.name,
+        sandboxId: SANDBOX,
+        instanceId: harness.name === 'vercel' ? 'session-1' : intent.intentId,
+        ...(harness.name === 'vercel'
+          ? {
+              region: 'fra1',
+              instanceType: 'small',
+              snapshotId: 'snapshot',
+              runtimeBuildId: 'build',
+              startSource: 'snapshot',
+            }
+          : harness.name === 'cloudflare'
+            ? { startSource: 'image' }
+            : { instanceType: 'standard-3' }),
+      });
+      expect(harness.adapter.describeRuntime?.(harness.foreignRef())).toBeUndefined();
+      expect(harness.adapter.describeRuntime?.('invalid')).toBeUndefined();
+    });
+
     it('creates a ref, then launch maps the ref, caller env and supervisor', async () => {
       const harness = factory();
       const ref = await harness.create();

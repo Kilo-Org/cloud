@@ -150,14 +150,14 @@ describe('sandbox selection policy', () => {
     ]);
   });
 
-  it('reports the full catalog and omits Cloudflare containers when the owner is unenrolled', () => {
+  it('reports the native small allocation and gates larger containers on enrollment', () => {
     const missingContainers = { ...configured } as Env;
     expect(
       getSandboxSelectionCapabilities(missingContainers, owner).options.map(
         option => option.allocation
       )
     ).toEqual([
-      getSandboxAllocationRequest('cloudflare-single'),
+      getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-shared'),
       getSandboxAllocationRequest('vercel-small'),
       getSandboxAllocationRequest('vercel-large'),
@@ -172,7 +172,6 @@ describe('sandbox selection policy', () => {
         option => option.allocation
       )
     ).toEqual([
-      getSandboxAllocationRequest('cloudflare-single'),
       getSandboxAllocationRequest('cloudflare-shared'),
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-containers-standard-4'),

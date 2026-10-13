@@ -505,7 +505,7 @@ describe('sandbox selection Worker API', () => {
   });
 
   it.each(['legacy', 'structured'] as const)(
-    'keeps public %s starts on small and upgrades browser prepares to native containers',
+    'keeps public %s starts on small and upgrades web prepares to native containers',
     async format => {
       const doStub = createMockDOStub();
       const ctx = createInternalApiContext({ doStub });
@@ -523,7 +523,6 @@ describe('sandbox selection Worker API', () => {
         ...prepareInput,
         sandboxAllocation,
         createdOnPlatform: 'cloud-agent-web',
-        clientProvenance: 'browser',
       });
       const metadata = expect.objectContaining({
         workspace: expect.objectContaining({

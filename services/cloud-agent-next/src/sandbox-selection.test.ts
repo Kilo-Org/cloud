@@ -102,7 +102,6 @@ describe('sandbox selection policy', () => {
       env,
       ...owner,
       createdOnPlatform: 'cloud-agent-web',
-      clientProvenance: 'browser',
       sessionId: `${plane === 'control' ? 'workspace' : 'agent'}_12345678-1234-1234-1234-123456789012`,
     });
     expect(actual.provider).toBe(expected.provider.id);

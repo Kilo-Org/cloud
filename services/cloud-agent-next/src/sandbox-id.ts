@@ -260,7 +260,6 @@ type SelectSandboxForNewSessionInput = {
   botId?: string;
   sandboxAllocation?: SandboxAllocation;
   createdOnPlatform?: string;
-  clientProvenance?: 'browser' | 'mobile';
   billingOrigin?: string;
 };
 
@@ -346,7 +345,7 @@ export function credentialContainmentEnabled(env: {
 }
 
 /**
- * New browser web sessions that would start on Cloudflare sandbox small use
+ * New web sessions that would start on Cloudflare sandbox small use
  * the native containers runtime at 2 vCPU / 8 GiB instead. Legacy sessions stay
  * on sandbox small: the native runtime exists only on the control plane.
  * Existing sessions are unaffected because they keep their stored provider.
@@ -359,14 +358,12 @@ export function cloudflareSandboxSmallNativeReplacement(input: {
   requestedAllocation?: SandboxAllocation;
   contained: boolean;
   createdOnPlatform?: string;
-  clientProvenance?: 'browser' | 'mobile';
   billingOrigin?: string;
 }): SandboxAllocation | undefined {
   if (sessionPlaneFromId(input.sessionId) !== 'control' || !input.contained) return undefined;
   if (
     input.billingOrigin === CODE_REVIEW_PLATFORM ||
-    input.createdOnPlatform !== 'cloud-agent-web' ||
-    input.clientProvenance !== 'browser'
+    input.createdOnPlatform !== 'cloud-agent-web'
   ) {
     return undefined;
   }
@@ -392,7 +389,6 @@ export function resolveNewSessionSandboxAllocation(input: {
   requestedAllocation?: SandboxAllocation;
   contained: boolean;
   createdOnPlatform?: string;
-  clientProvenance?: 'browser' | 'mobile';
   billingOrigin?: string;
 }): SandboxAllocation | undefined {
   return cloudflareSandboxSmallNativeReplacement(input) ?? input.requestedAllocation;
@@ -440,7 +436,6 @@ export async function selectSandboxForNewSession(
     sessionId: input.sessionId,
     requestedAllocation: input.sandboxAllocation,
     createdOnPlatform: input.createdOnPlatform,
-    clientProvenance: input.clientProvenance,
     billingOrigin: input.billingOrigin,
     contained:
       sessionPlaneFromId(input.sessionId) === 'control' && credentialContainmentEnabled(input.env),

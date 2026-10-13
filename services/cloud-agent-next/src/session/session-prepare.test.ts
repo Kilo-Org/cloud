@@ -518,35 +518,38 @@ describe('explicit sandbox session creation', () => {
 
   it.each([
     { createdOnPlatform: 'cloud-agent-web', clientProvenance: 'browser', native: true },
-    { createdOnPlatform: 'cloud-agent-web', clientProvenance: 'mobile', native: false },
-    { createdOnPlatform: 'cloud-agent-web', clientProvenance: undefined, native: false },
+    { createdOnPlatform: 'cloud-agent-web', clientProvenance: 'mobile', native: true },
+    { createdOnPlatform: 'cloud-agent-web', clientProvenance: undefined, native: true },
     { createdOnPlatform: 'scheduled', clientProvenance: 'browser', native: false },
     { createdOnPlatform: 'slack', clientProvenance: 'browser', native: false },
-  ] as const)('replaces small allocations only for browser web creates: %j', async origin => {
-    const doStub = makeDoStub();
-    const ctx = selectedContext(doStub);
-    const request = requestForPreset('cloudflare-single');
-    request.options = {
-      ...request.options,
-      createdOnPlatform: origin.createdOnPlatform,
-      clientProvenance: origin.clientProvenance,
-    };
+  ] as const)(
+    'replaces small allocations only for web creates regardless of provenance: %j',
+    async origin => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      const request = requestForPreset('cloudflare-single');
+      request.options = {
+        ...request.options,
+        createdOnPlatform: origin.createdOnPlatform,
+        clientProvenance: origin.clientProvenance,
+      };
 
-    await runCreate(ctx, request);
+      await runCreate(ctx, request);
 
-    const sandboxAllocation = origin.native
-      ? 'cloudflare-containers-standard-3'
-      : 'cloudflare-single';
-    expect(createdMetadata(doStub)?.workspace).toMatchObject({
-      sandboxAllocation,
-      sandboxProvider: origin.native ? 'cloudflare-containers' : 'cloudflare',
-    });
-    expect(recordOperationProgressMock).toHaveBeenCalledWith(
-      expect.anything(),
-      ROW_ID,
-      expect.objectContaining({ sandboxAllocation })
-    );
-  });
+      const sandboxAllocation = origin.native
+        ? 'cloudflare-containers-standard-3'
+        : 'cloudflare-single';
+      expect(createdMetadata(doStub)?.workspace).toMatchObject({
+        sandboxAllocation,
+        sandboxProvider: origin.native ? 'cloudflare-containers' : 'cloudflare',
+      });
+      expect(recordOperationProgressMock).toHaveBeenCalledWith(
+        expect.anything(),
+        ROW_ID,
+        expect.objectContaining({ sandboxAllocation })
+      );
+    }
+  );
 
   it.each([
     { preset: 'cloudflare-single', sandboxId: /^ses-/ },

@@ -627,9 +627,7 @@ describe('selectSandboxForNewSession', () => {
   const legacySessionId = 'agent_12345678-1234-1234-1234-123456789abc';
 
   it.each([
-    { createdOnPlatform: undefined, clientProvenance: undefined },
-    { createdOnPlatform: 'cloud-agent-web', clientProvenance: undefined },
-    { createdOnPlatform: 'cloud-agent-web', clientProvenance: 'mobile' },
+    { createdOnPlatform: undefined },
     ...[
       'slack',
       'github',
@@ -640,13 +638,12 @@ describe('selectSandboxForNewSession', () => {
       'webhook',
       'scheduled',
       'code-review',
-    ].map(createdOnPlatform => ({ createdOnPlatform, clientProvenance: 'browser' as const })),
+    ].map(createdOnPlatform => ({ createdOnPlatform })),
     {
       createdOnPlatform: 'cloud-agent-web',
-      clientProvenance: 'browser',
       billingOrigin: 'code-review',
     },
-  ] as const)('keeps non-web or non-browser small sessions on Cloudflare: %j', async origin => {
+  ] as const)('keeps non-web or Code Reviewer small sessions on Cloudflare: %j', async origin => {
     for (const sandboxAllocation of [undefined, 'cloudflare-single'] as const) {
       const selection = await selectSandboxForNewSession({
         env: {},
@@ -675,7 +672,6 @@ describe('selectSandboxForNewSession', () => {
           sessionId: controlSessionId,
           sandboxAllocation,
           createdOnPlatform: 'cloud-agent-web',
-          clientProvenance: 'browser',
         });
         expect(selection.provider).toBe(
           sandboxAllocation === 'cloudflare-single'
@@ -905,14 +901,13 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('moves browser web sessions to native containers when the containers gate is unset', async () => {
+  it('moves web sessions to native containers when the containers gate is unset', async () => {
     const selection = await selectSandboxForNewSession({
       env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id' },
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: controlSessionId,
       createdOnPlatform: 'cloud-agent-web',
-      clientProvenance: 'browser',
     });
 
     expect(selection.provider).toBe('cloudflare-containers');
@@ -930,14 +925,13 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('selects containers for enrolled and unenrolled browser web organizations', async () => {
+  it('selects containers for enrolled and unenrolled web organizations', async () => {
     const enrolled = await selectSandboxForNewSession({
       env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', CLOUDFLARE_CONTAINERS_ORG_IDS: 'org-id' },
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: controlSessionId,
       createdOnPlatform: 'cloud-agent-web',
-      clientProvenance: 'browser',
     });
     const outside = await selectSandboxForNewSession({
       env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', CLOUDFLARE_CONTAINERS_ORG_IDS: 'other-org' },
@@ -945,7 +939,6 @@ describe('selectSandboxForNewSession', () => {
       userId: 'user-id',
       sessionId: controlSessionId,
       createdOnPlatform: 'cloud-agent-web',
-      clientProvenance: 'browser',
     });
 
     expect(enrolled.provider).toBe('cloudflare-containers');
@@ -1026,7 +1019,6 @@ describe('selectSandboxForNewSession', () => {
       userId: 'user-id',
       sessionId: controlSessionId,
       createdOnPlatform: 'cloud-agent-web',
-      clientProvenance: 'browser',
     });
 
     expect(selection.provider).toBe('cloudflare-containers');

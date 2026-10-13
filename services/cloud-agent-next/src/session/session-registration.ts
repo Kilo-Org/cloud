@@ -643,7 +643,6 @@ function sandboxSmallReplacementForSession(
     contained: hasCredentialContainment(computeCredentialContainment(sessionId, input, ctx.env)),
     createdOnPlatform: input.options?.createdOnPlatform,
     billingOrigin: options?.billingOrigin,
-    clientProvenance: input.options?.clientProvenance,
   });
 }
 
@@ -673,7 +672,6 @@ async function allocateNewSession(
     ),
     createdOnPlatform: input.options?.createdOnPlatform,
     billingOrigin: options?.billingOrigin,
-    clientProvenance: input.options?.clientProvenance,
   });
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =

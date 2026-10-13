@@ -127,6 +127,15 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
 
   deploy-workers:
+    needs:
+      [
+        check-changes,
+        check-staging-db-startup,
+        run-migrations,
+        deploy-app,
+        deploy-global-app,
+        deploy-ai-gateway,
+      ]
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/deploy-workers.yml

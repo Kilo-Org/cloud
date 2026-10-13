@@ -58,6 +58,7 @@ describe('DECIDER_CASES', () => {
       const check = c.check;
       if (check.kind === 'json_equal') {
         expect(JSON.parse(JSON.stringify(check.value)), c.id).toEqual(check.value);
+        expect(typeof check.value === 'object' && check.value !== null, `${c.id}: json_equal needs an object or array`).toBe(true);
       }
     }
   });

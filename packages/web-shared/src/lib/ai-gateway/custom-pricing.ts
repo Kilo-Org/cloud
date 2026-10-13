@@ -8,6 +8,7 @@ import {
 import {
   formatPricePerToken,
   getCustomPricing,
+  type ConfiguredCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 
 function applyPricing(pricing: OpenRouterModel['pricing'], customPricing: Pricing) {
@@ -28,16 +29,20 @@ function applyPricing(pricing: OpenRouterModel['pricing'], customPricing: Pricin
 
 export function applyCustomPricingToPricing(
   modelId: string,
-  pricing: OpenRouterModel['pricing']
+  pricing: OpenRouterModel['pricing'],
+  configuredCustomPricing: ConfiguredCustomPricing
 ): OpenRouterModel['pricing'] {
-  const customPricing = getCustomPricing(modelId);
+  const customPricing = getCustomPricing(modelId, configuredCustomPricing);
   return customPricing && !customPricing.fallbackOnly
     ? applyPricing(pricing, customPricing.pricing[0].pricing)
     : pricing;
 }
 
-export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterModel {
-  const customPricing = getCustomPricing(model.id);
+export function applyCustomPricingToModel(
+  model: OpenRouterModel,
+  configuredCustomPricing: ConfiguredCustomPricing
+): OpenRouterModel {
+  const customPricing = getCustomPricing(model.id, configuredCustomPricing);
   if (!customPricing) return model;
 
   const discountSuffix =
@@ -54,9 +59,10 @@ export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterMod
 
 export function calculateCustomCost_mUsd(
   modelId: string,
-  usage: JustTheCostsUsageStats
+  usage: JustTheCostsUsageStats,
+  configuredCustomPricing: ConfiguredCustomPricing
 ): number | undefined {
-  const customPricing = getCustomPricing(modelId);
+  const customPricing = getCustomPricing(modelId, configuredCustomPricing);
   if (!customPricing || (customPricing.fallbackOnly && usage.cost_mUsd > 0)) return undefined;
 
   const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;

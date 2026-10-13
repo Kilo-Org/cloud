@@ -57,6 +57,7 @@ const freeUsageContext = {
   is_free: true,
   user_byok: false,
   api_kind: 'chat_completions',
+  configuredCustomPricing: {},
 } satisfies RewriteResponseParams['usageContext'];
 
 beforeEach(() => {
@@ -2037,6 +2038,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
               is_free: isFree,
               user_byok: userByok,
               api_kind: shape.kind,
+              configuredCustomPricing: {},
             },
             usage,
             provider === 'vercel' ? { provider_metadata: providerMetadata, providerMetadata } : {}
@@ -2065,6 +2067,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
           is_free: false,
           user_byok: false,
           api_kind: shape.kind,
+          configuredCustomPricing: {},
         },
         {
           ...shape.tokens,
@@ -2094,6 +2097,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
             is_free: false,
             user_byok: false,
             api_kind: shape.kind,
+            configuredCustomPricing: {},
           },
           {
             ...shape.tokens,
@@ -2129,6 +2133,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
             is_free: false,
             user_byok: userByok,
             api_kind: shape.kind,
+            configuredCustomPricing: {},
           },
           {
             ...shape.tokens,
@@ -2198,6 +2203,7 @@ test.each(['openrouter', 'vercel'] as const)(
         is_free: false,
         user_byok: false,
         api_kind: 'messages',
+        configuredCustomPricing: {},
       },
       capture: null,
       vercelRequestId: null,
@@ -2237,6 +2243,7 @@ test.each(['provider_metadata', 'providerMetadata'])(
         is_free: false,
         user_byok: false,
         api_kind: 'messages',
+        configuredCustomPricing: {},
       },
       capture: null,
       vercelRequestId: null,
@@ -2311,6 +2318,7 @@ describe.each(usageShapes.filter(shape => shape.kind !== 'chat_completions'))(
             is_free: false,
             user_byok: false,
             api_kind: shape.kind,
+            configuredCustomPricing: {},
           },
           capture: null,
           vercelRequestId: null,

@@ -12,6 +12,7 @@ import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo
 import {
   formatPricePerToken,
   getCustomPricing,
+  type ConfiguredCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { EndpointPricing } from './providers/openrouter/display-pricing';
@@ -21,6 +22,7 @@ import {
   mapResolvedModelIdToVercel,
 } from './providers/vercel/mapModelIdToVercel';
 import { applyCustomPricingToPricing } from './custom-pricing';
+import { getConfiguredCustomPricing } from './configured-custom-pricing';
 
 type RateTier = {
   start_context_length: number;
@@ -71,6 +73,7 @@ function pickerRequestPrice(
   models: Record<string, StoredModel>,
   catalog: OpenRouterModel[],
   preferredProviderOrderConfig: PreferredProviderOrderConfig,
+  configuredCustomPricing: ConfiguredCustomPricing,
   inputTokenCeiling: number
 ): TextPricingRates {
   const extra = pickerExtraModel(modelId);
@@ -78,11 +81,12 @@ function pickerRequestPrice(
   if (!model) throw new Error('Model pricing is unavailable');
   const pickerPricing = applyCustomPricingToPricing(
     model.id,
-    extra ? model.pricing : pickerModelPricing(model, models, preferredProviderOrderConfig)
+    extra ? model.pricing : pickerModelPricing(model, models, preferredProviderOrderConfig),
+    configuredCustomPricing
   );
   let rates = textPricingRates(pickerPricing);
   const exclusivePricing = findKiloExclusiveModel(modelId)?.pricing;
-  const customPricing = getCustomPricing(modelId);
+  const customPricing = getCustomPricing(modelId, configuredCustomPricing);
   const exclusiveTier = exclusivePricing
     ? tierAtInputLength(exclusivePricing.tiers, inputTokenCeiling)
     : undefined;
@@ -288,11 +292,13 @@ export async function enforceRequestCostLimit(
   const parsed = boundedRequestSchema.safeParse(body);
   if (!parsed.success) return refused(boundedRefusal(parsed.error));
   try {
-    const [models, rawCatalog, preferredProviderOrderConfig] = await Promise.all([
-      getOpenRouterModelsMetadataFromDatabase(),
-      getRawOpenRouterModels(),
-      getPreferredProviderOrderConfig(),
-    ]);
+    const [models, rawCatalog, preferredProviderOrderConfig, configuredCustomPricing] =
+      await Promise.all([
+        getOpenRouterModelsMetadataFromDatabase(),
+        getRawOpenRouterModels(),
+        getPreferredProviderOrderConfig(),
+        getConfiguredCustomPricing(),
+      ]);
     const requestedMetadata = StoredModelSchema.safeParse(models[model]);
     const aliasTarget =
       model.startsWith('~') && requestedMetadata.success
@@ -324,6 +330,7 @@ export async function enforceRequestCostLimit(
       models,
       rawCatalog.data,
       preferredProviderOrderConfig,
+      configuredCustomPricing,
       inputTokenCeiling
     );
     const targetPrice = aliasTarget
@@ -332,6 +339,7 @@ export async function enforceRequestCostLimit(
           models,
           rawCatalog.data,
           preferredProviderOrderConfig,
+          configuredCustomPricing,
           inputTokenCeiling
         )
       : undefined;

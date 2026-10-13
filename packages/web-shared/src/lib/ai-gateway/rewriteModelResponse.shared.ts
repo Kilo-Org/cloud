@@ -11,6 +11,7 @@ import type {
   VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
+import type { ConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
@@ -39,7 +40,7 @@ export type RewriteResponseParams = {
 export type ResponseUsageContext = Pick<
   MicrodollarUsageContext,
   'requested_model' | 'provider' | 'is_free' | 'user_byok' | 'api_kind'
->;
+> & { configuredCustomPricing: ConfiguredCustomPricing };
 
 export type ResponseUsage = {
   cost?: number;
@@ -324,7 +325,7 @@ export function rewriteUsage(
     cacheWriteTokens,
     is_byok: usage.is_byok ?? null,
   };
-  applyUsagePricing(costs, context);
+  applyUsagePricing(costs, context, context.configuredCustomPricing);
   usage.cost = costs.cost_mUsd / 1_000_000;
   usage.is_byok = context.user_byok || context.provider === 'openai-chatgpt';
   if (

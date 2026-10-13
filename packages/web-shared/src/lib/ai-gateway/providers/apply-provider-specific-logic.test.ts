@@ -100,7 +100,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
       request.body.service_tier = 'priority';
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel);
+      removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel, {});
 
       expect(request.body.service_tier).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
@@ -124,7 +124,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
       request.body.service_tier = tier;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeUnsupportedRequestServiceTier(model, request, null);
+      removeUnsupportedRequestServiceTier(model, request, null, {});
 
       expect(request.body.service_tier).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
@@ -143,7 +143,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
       request.body.service_tier = tier as unknown as typeof request.body.service_tier;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeUnsupportedRequestServiceTier(model, request, null);
+      removeUnsupportedRequestServiceTier(model, request, null, {});
 
       expect(request.body.service_tier).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
@@ -167,9 +167,34 @@ describe('removeUnsupportedRequestServiceTier', () => {
     const request = makeRequest(model);
     request.body.service_tier = 'priority';
 
-    removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel);
+    removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel, {});
 
     expect(request.body.service_tier).toBe('priority');
+  });
+
+  it('applies to models with admin-configured non-fallback custom pricing', () => {
+    const request = makeRequest('vendor/standard-model');
+    request.body.service_tier = 'priority';
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    removeUnsupportedRequestServiceTier('vendor/standard-model', request, null, {
+      'vendor/standard-model': {
+        pricing: [
+          {
+            start_context_length: 0,
+            pricing: {
+              prompt_per_million: 1,
+              completion_per_million: 2,
+              input_cache_read_per_million: null,
+              input_cache_write_per_million: null,
+            },
+          },
+        ],
+      },
+    });
+
+    expect(request.body.service_tier).toBeUndefined();
+    warn.mockRestore();
   });
 });
 

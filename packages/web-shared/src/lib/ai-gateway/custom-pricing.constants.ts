@@ -48,7 +48,19 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
   },
 };
 
-export function getCustomPricing(modelId: string): CustomPricing | undefined {
+/** Admin-configured pricing from `ai_gateway_config.custom_pricing`, keyed by model ID. */
+export type ConfiguredCustomPricing = Readonly<Record<string, CustomPricing>>;
+
+/**
+ * Admin-configured pricing takes precedence; the built-in pricing above is the fallback.
+ * Server code gets the configured pricing from `getConfiguredCustomPricing`; client code
+ * from the `models.customPricing` query.
+ */
+export function getCustomPricing(
+  modelId: string,
+  configuredCustomPricing: ConfiguredCustomPricing
+): CustomPricing | undefined {
+  if (Object.hasOwn(configuredCustomPricing, modelId)) return configuredCustomPricing[modelId];
   if (!Object.hasOwn(customPricingByModelId, modelId)) return undefined;
   return customPricingByModelId[modelId];
 }

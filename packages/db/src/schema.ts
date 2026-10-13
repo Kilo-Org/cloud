@@ -126,6 +126,7 @@ import type {
   GatewayModelListConfig,
   VercelModelIdOverridesConfig,
   PreferredProviderOrderConfig,
+  CustomPricingConfig,
   KiloClawAdminAuditAction,
   AdminActionAuditAction,
   AdminActionAuditTargetType,
@@ -5634,6 +5635,7 @@ export const ai_gateway_config = pgTable(
     unavailable_models: jsonb().$type<GatewayModelListConfig>(),
     vercel_model_id_overrides: jsonb().$type<VercelModelIdOverridesConfig>(),
     preferred_provider_order: jsonb().$type<PreferredProviderOrderConfig>(),
+    custom_pricing: jsonb().$type<CustomPricingConfig>(),
   },
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );

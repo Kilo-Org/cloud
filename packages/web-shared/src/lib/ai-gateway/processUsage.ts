@@ -18,6 +18,7 @@ import {
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
+import { getConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import type { OpenAI } from 'openai';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import type {
@@ -1485,7 +1486,7 @@ export async function processTokenData(
     usageStats.model = usageContext.requested_model;
   }
 
-  applyUsagePricing(usageStats, usageContext);
+  applyUsagePricing(usageStats, usageContext, await getConfiguredCustomPricing());
 
   return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
 }

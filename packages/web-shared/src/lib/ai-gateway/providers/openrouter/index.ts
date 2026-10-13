@@ -45,6 +45,7 @@ import {
   NVIDIA_TRIAL_TOS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { getConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import {
   getCustomLlmsById,
   isPublicCustomLlm,
@@ -174,6 +175,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     unavailableModelIds,
     preferredProviderOrderConfig,
     customLlmsById,
+    configuredCustomPricing,
   ] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase(),
     getDataCollectionRequiredModelIds(),
@@ -181,6 +183,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     getUnavailableModelIds(),
     getPreferredProviderOrderConfig(),
     getCustomLlmsById(),
+    getConfiguredCustomPricing(),
   ]);
   const publicCustomLlms = [...customLlmsById.values()].flatMap(customLlm =>
     isPublicCustomLlm(customLlm.definition) &&
@@ -229,7 +232,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         .map(model => convertFromKiloExclusiveModel(model))
     )
     .concat(autoModels)
-    .map(applyCustomPricingToModel)
+    .map(model => applyCustomPricingToModel(model, configuredCustomPricing))
     // Public custom LLMs are complete as defined; id-based pricing, PDF, and
     // protocol guesses below would describe a model routing does not serve.
     .concat(publicCustomLlmModels);

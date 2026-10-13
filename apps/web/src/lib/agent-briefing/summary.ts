@@ -23,6 +23,7 @@ import {
   pickerModelPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { applyCustomPricingToPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { getConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
 import {
@@ -221,10 +222,12 @@ export function briefingPrompt(row: BriefingReportRow, language: string): string
  */
 async function briefingPriceRates(model: string): Promise<TextPricingRates> {
   const extra = pickerExtraModel(model);
-  const [endpointsMetadata, preferredProviderOrderConfig] = await Promise.all([
-    getOpenRouterModelsMetadataFromDatabase().catch((): StoredModelMap => ({})),
-    getPreferredProviderOrderConfig(),
-  ]);
+  const [endpointsMetadata, preferredProviderOrderConfig, configuredCustomPricing] =
+    await Promise.all([
+      getOpenRouterModelsMetadataFromDatabase().catch((): StoredModelMap => ({})),
+      getPreferredProviderOrderConfig(),
+      getConfiguredCustomPricing(),
+    ]);
   const unavailable = await getUnavailableModelIds();
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   if (
@@ -254,7 +257,8 @@ async function briefingPriceRates(model: string): Promise<TextPricingRates> {
           item.id,
           item === extra || item === targetExtra
             ? item.pricing
-            : pickerModelPricing(item, endpointsMetadata, preferredProviderOrderConfig)
+            : pickerModelPricing(item, endpointsMetadata, preferredProviderOrderConfig),
+          configuredCustomPricing
         )
       )
     );

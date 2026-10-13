@@ -7,6 +7,8 @@ import { enforceRequestCostLimit as enforceRequestCostLimitDecision } from './re
 import { addCacheBreakpoints } from './providers/openrouter/request-helpers';
 import type { GatewayRequest } from './providers/openrouter/types';
 import { getVercelModelIdOverrides } from './providers/vercel/mapModelIdToVercel';
+import { getConfiguredCustomPricing } from './configured-custom-pricing';
+import type { CustomPricing } from './custom-pricing.constants';
 
 jest.mock('./providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
@@ -17,6 +19,9 @@ jest.mock('./providers/openrouter', () => ({
 }));
 jest.mock('./providers/preferred-provider-order-config', () => ({
   getPreferredProviderOrderConfig: jest.fn(),
+}));
+jest.mock('./configured-custom-pricing', () => ({
+  getConfiguredCustomPricing: jest.fn(async () => ({})),
 }));
 jest.mock('./providers/vercel/mapModelIdToVercel', () => ({
   ...jest.requireActual('./providers/vercel/mapModelIdToVercel'),
@@ -79,7 +84,22 @@ beforeEach(() => {
   });
   jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({ rules: [] });
   jest.mocked(getVercelModelIdOverrides).mockResolvedValue(new Map());
+  jest.mocked(getConfiguredCustomPricing).mockResolvedValue({});
 });
+const configuredPricing: CustomPricing = {
+  pricing: [
+    {
+      start_context_length: 0,
+      pricing: {
+        prompt_per_million: 10,
+        completion_per_million: 20,
+        input_cache_read_per_million: null,
+        input_cache_write_per_million: null,
+      },
+    },
+  ],
+  fallbackOnly: false,
+};
 function mockModels(models: StoredModel[]) {
   const modelMap = Object.fromEntries(models.map(entry => [entry.id, entry]));
   jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(modelMap);
@@ -243,6 +263,14 @@ describe('request cost admission', () => {
       { id: 'openrouter', userFunded: false }
     );
     expect(decision.refusal).toBe('Request exceeds its spend safeguard before generation');
+  });
+  it('bounds admin-configured custom pricing above the route prices', async () => {
+    jest.mocked(getConfiguredCustomPricing).mockResolvedValue({ [model.id]: configuredPricing });
+    const decision = await enforceRequestCostLimitDecision('2000000', model.id, body, 2_000_000, {
+      id: 'openrouter',
+      userFunded: false,
+    });
+    expect(decision.providerConfig?.max_price).toMatchObject({ prompt: 20, completion: 20 });
   });
   it('rejects before upstream spend for an insufficient ceiling or balance', async () => {
     await expect(enforceRequestCostLimit('1', model.id, body, 2_000_000)).resolves.toMatch(

@@ -1,4 +1,5 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
+import { getConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import { detectToolCallArgumentErrors } from '@kilocode/web-shared/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
@@ -211,6 +212,7 @@ export async function rewriteModelResponse({
     api_kind: kind,
     is_free: isFree,
     user_byok: userByok,
+    configuredCustomPricing: await getConfiguredCustomPricing(),
   };
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);

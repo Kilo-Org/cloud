@@ -1,5 +1,6 @@
 import { captureMessage } from '@sentry/nextjs';
 import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import type { ConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import type {
@@ -45,7 +46,8 @@ export function calculateKiloExclusiveCost_mUsd(
 
 export function applyUsagePricing(
   usage: JustTheCostsUsageStats,
-  context: Pick<MicrodollarUsageContext, 'requested_model' | 'is_free' | 'user_byok' | 'provider'>
+  context: Pick<MicrodollarUsageContext, 'requested_model' | 'is_free' | 'user_byok' | 'provider'>,
+  configuredCustomPricing: ConfiguredCustomPricing
 ): void {
   const kiloExclusiveModel = findKiloExclusiveModel(context.requested_model);
   if (kiloExclusiveModel?.pricing) {
@@ -56,7 +58,11 @@ export function applyUsagePricing(
     }
   }
 
-  const customCost_mUsd = calculateCustomCost_mUsd(context.requested_model, usage);
+  const customCost_mUsd = calculateCustomCost_mUsd(
+    context.requested_model,
+    usage,
+    configuredCustomPricing
+  );
 
   usage.market_cost ??= usage.cost_mUsd;
   usage.cost_mUsd = customCost_mUsd ?? usage.cost_mUsd;

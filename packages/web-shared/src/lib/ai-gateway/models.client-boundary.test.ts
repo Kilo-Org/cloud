@@ -51,7 +51,9 @@ describe('client-safe model imports', () => {
       const modelUtils = jest.requireActual<typeof ModelUtilsModule>(
         '@kilocode/web-shared/lib/ai-gateway/model-utils'
       );
-      expect(customPricing.getCustomPricing(google.GEMINI_FLASH_CURRENT_MODEL_ID)).toBeDefined();
+      expect(
+        customPricing.getCustomPricing(google.GEMINI_FLASH_CURRENT_MODEL_ID, {})
+      ).toBeDefined();
       expect(modelUtils.normalizeModelId(google.GEMMA_4_26B_A4B_IT_FREE_ID)).toBe(
         google.GEMMA_4_26B_A4B_IT_ID
       );

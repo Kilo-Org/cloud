@@ -2136,6 +2136,13 @@
       "when": 1793024513267,
       "tag": "0304_fine_moonstone",
       "breakpoints": true
+    },
+    {
+      "idx": 305,
+      "version": "7",
+      "when": 1793026700570,
+      "tag": "0305_custom_pricing",
+      "breakpoints": true
     }
   ]
 }

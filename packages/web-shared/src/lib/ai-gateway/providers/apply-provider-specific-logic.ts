@@ -54,7 +54,11 @@ import {
 import { isQwenExplicitCacheModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
 import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
-import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import {
+  getCustomPricing,
+  type ConfiguredCustomPricing,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { getConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
@@ -243,9 +247,10 @@ function serviceTierForLog(serviceTier: unknown) {
 export function removeUnsupportedRequestServiceTier(
   requestedModel: string,
   requestToMutate: GatewayRequest,
-  kiloExclusiveModel: KiloExclusiveModel | null
+  kiloExclusiveModel: KiloExclusiveModel | null,
+  configuredCustomPricing: ConfiguredCustomPricing
 ) {
-  const customPricing = getCustomPricing(requestedModel);
+  const customPricing = getCustomPricing(requestedModel, configuredCustomPricing);
   const reason =
     customPricing && !customPricing.fallbackOnly
       ? 'non-fallback custom pricing'
@@ -356,7 +361,12 @@ export async function applyProviderSpecificLogic(
   enableReasoningSummaries(requestToMutate);
 
   const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
-  removeUnsupportedRequestServiceTier(requestedModel, requestToMutate, kiloExclusiveModel);
+  removeUnsupportedRequestServiceTier(
+    requestedModel,
+    requestToMutate,
+    kiloExclusiveModel,
+    await getConfiguredCustomPricing()
+  );
   if (kiloExclusiveModel) {
     applyKiloExclusiveModelSettings(requestToMutate, kiloExclusiveModel);
   }

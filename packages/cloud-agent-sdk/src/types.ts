@@ -240,6 +240,8 @@ export type PreparationStepSnapshot = {
   label: string;
   status: PreparationStepStatus;
   startedAt: number;
+  startedRevision?: number | undefined;
+  parentStepId?: string | undefined;
   completedAt?: number | undefined;
   revision: number;
   latestDetail?: string | undefined;

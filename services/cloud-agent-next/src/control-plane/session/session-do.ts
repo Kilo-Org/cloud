@@ -209,7 +209,7 @@ const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
 
 const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'Creating sandbox',
-  sandbox_start: 'Starting sandbox from snapshot',
+  sandbox_start: 'Starting sandbox',
   snapshot_fallback: 'Retrying without a snapshot',
   clone: 'Cloning repository',
   restore: 'Updating repository',
@@ -2148,17 +2148,34 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const attemptId = this.route.attemptId;
     const attempt = readPreparationAttempt(this.eventQueries, attemptId);
     if (attempt?.status !== 'running') return;
+    let steps = readPreparationSteps(this.eventQueries, attemptId);
+    let phase = steps.findLast(step => step.kind === 'phase' && step.key === 'setup_commands');
+    const latestPhase = steps.findLast(step => step.kind === 'phase');
+    if (
+      phase === undefined ||
+      (phase.id !== latestPhase?.id &&
+        (event.type === CONTROL_PLANE_SETUP_EVENTS.started ||
+          event.type === CONTROL_PLANE_SETUP_EVENTS.output))
+    ) {
+      this.preparationRecorder(attemptId, attempt.triggerMessageId).onProgress(
+        'setup_commands',
+        'Running setup commands'
+      );
+      steps = readPreparationSteps(this.eventQueries, attemptId);
+      phase = steps.findLast(step => step.kind === 'phase' && step.key === 'setup_commands');
+    }
+    if (phase === undefined) return;
     const command = event.properties.command;
-    const stepId = `setup_command:${command - 1}`;
-    const existingStep = readPreparationSteps(this.eventQueries, attemptId).find(
-      step => step.id === stepId
-    );
+    const commandId = `setup_command:${command - 1}`;
+    const stepId = phase.id === 'phase:setup_commands' ? commandId : `${phase.id}:${commandId}`;
+    const existingStep = steps.find(step => step.id === stepId);
     if (existingStep !== undefined && existingStep.status !== 'running') return;
     const base = {
       version: 2 as const,
       attemptId,
       triggerMessageId: attempt.triggerMessageId,
-      revision: attempt.revision + 1,
+      revision:
+        (readPreparationAttempt(this.eventQueries, attemptId)?.revision ?? attempt.revision) + 1,
       timestamp: Date.now(),
       step: 'setup_commands' as const,
     };
@@ -2181,6 +2198,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           kind: 'setup_command',
           label,
           commandIndex: command - 1,
+          parentStepId: phase.id,
           ...(event.type === CONTROL_PLANE_SETUP_EVENTS.started
             ? { commandCount: event.properties.commandCount }
             : {}),

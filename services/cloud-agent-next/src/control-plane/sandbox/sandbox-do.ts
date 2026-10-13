@@ -3023,6 +3023,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
             step: 'snapshot_fallback',
             detail: 'Snapshot startup failed. Retrying without a snapshot.',
           });
+          await notifyPreparingRoutes(this.routeContext(afterCleanup), {
+            step: 'sandbox_start',
+            detail: 'Starting sandbox without a snapshot',
+          });
           launched = await withTimeout(
             this.provider.launch(createdRef, imageLaunchEnv, {
               ...launch.options,

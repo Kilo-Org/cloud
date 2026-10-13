@@ -5,9 +5,8 @@ import { toast } from 'sonner-native';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { SheetHeader } from '@/components/sheet-header';
-import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { SlidersHorizontal, Wrench } from '@/components/ui/icons';
+import { SlidersHorizontal } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { Text } from '@/components/ui/text';
 import { kiloMcpState, mcpEnabledFor, watchKiloMcp } from '@/lib/chat/kilo-mcp';
@@ -25,8 +24,8 @@ import {
 } from '@/lib/chat/settings-tools-switch';
 import { useRemoteMcpServers } from '@/lib/chat/use-remote-mcp-servers';
 
+import { KiloMcpSection } from './kilo-mcp-section';
 import {
-  kiloServerRow,
   mcpSettingsView,
   type McpSettingsView,
   type RemoteMcpServerRow,
@@ -218,8 +217,7 @@ export function McpSettingsSheet({
   // mounts of the same add sheet, so the second open would otherwise keep the
   // previous name and URL and a type-in would concatenate them.
   const formGeneration = useRef(0);
-  const { view, settingsTools, discoverServers } = settings;
-  const kilo = kiloServerRow(view);
+  const { settingsTools, discoverServers } = settings;
 
   // A restart keeps no discovered tool, so the sheet asks the servers as it
   // opens rather than showing a server with no tools and nothing running.
@@ -323,51 +321,12 @@ export function McpSettingsSheet({
           </View>
         </View>
 
-        {/* 2. The Kilo row: enable, disable and a Retry, and nothing else. The
-            Kilo server is the build's own, so it is never edited or deleted. */}
-        <View className="gap-2">
-          <PreferenceRow
-            icon={Wrench}
-            title={t('modelChat.mcp.use')}
-            subtitle={t('modelChat.mcp.useDescription')}
-            value={kilo.enabled}
-            disabled={!kilo.toggleable}
-            busy={kilo.busy}
-            onValueChange={next => {
-              settings.setEnabled(next);
-            }}
-          />
-          <View className="min-h-6 justify-center px-1">
-            <Text className="text-sm font-medium text-foreground">
-              {t(kilo.statusKey, { count: kilo.toolCount })}
-            </Text>
-          </View>
-          {kilo.descriptionKey === null ? null : (
-            <Text variant="muted" className="px-1 text-xs">
-              {t(kilo.descriptionKey)}
-            </Text>
-          )}
-          <Text variant="muted" className="px-1 text-xs">
-            {t('modelChat.mcp.kiloBuiltIn')}
-          </Text>
-          {kilo.retry ? (
-            <Button
-              /* Replacing the native control when the spinner stops is what
-                 gives the name back: Android writes busy into the content
-                 description and does not restore a label on the same view
-                 (BaseViewManager, RN 0.86). */
-              key={settings.retrying ? 'retrying' : 'idle'}
-              variant="secondary"
-              onPress={() => {
-                settings.retry();
-              }}
-              loading={settings.retrying}
-              accessibilityLabel={t('common.retry')}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
-          ) : null}
-        </View>
+        <KiloMcpSection
+          view={settings.view}
+          retrying={settings.retrying}
+          onToggle={settings.setEnabled}
+          onRetry={settings.retry}
+        />
 
         {/* 3. The remote servers the person added. */}
         <McpServersSection

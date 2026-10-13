@@ -3238,7 +3238,6 @@
       "fieldName": "顯示名稱",
       "fieldUrl": "伺服器 URL",
       "fieldUrlInvalid": "請輸入有效的伺服器 URL。",
-      "fieldToken": "Bearer 權杖（選填）",
       "enableServer": "啟用此伺服器：{{name}}",
       "editServer": "編輯伺服器",
       "deleteServer": "刪除伺服器",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} 個工具",
       "serverUnreachable": "無法連線至此伺服器",
       "serverOff": "此伺服器已關閉"
+    },
+    "mcpOAuth": {
+      "authMethod": "驗證",
+      "authNone": "不需登入",
+      "authBearer": "Bearer 權杖",
+      "authOAuth": "OAuth 登入",
+      "fieldToken": "權杖",
+      "oauthHint": "儲存後，請點選伺服器上的「$t(modelChat.mcpOAuth.signIn)」，透過瀏覽器登入。",
+      "serverNeedsSignIn": "請登入以使用此伺服器",
+      "signIn": "登入",
+      "signInA11y": "登入此伺服器：{{name}}",
+      "signInFailed": "無法登入 {{name}}，請再試一次。"
     },
     "backends": {
       "title": "聊天後端",

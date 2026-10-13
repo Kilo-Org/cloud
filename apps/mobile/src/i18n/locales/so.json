@@ -3238,7 +3238,6 @@
       "fieldName": "Magaca la muujiyo",
       "fieldUrl": "URL-ka serverka",
       "fieldUrlInvalid": "Geli URL server sax ah.",
-      "fieldToken": "Token Bearer (ikhtiyaari)",
       "enableServer": "Daar serverkan: {{name}}",
       "editServer": "Wax ka beddel serverka",
       "deleteServer": "Tirtir serverka",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} qalab",
       "serverUnreachable": "Lama gaari karin serverkan",
       "serverOff": "Serverkan waa dammaan"
+    },
+    "mcpOAuth": {
+      "authMethod": "Xaqiijinta",
+      "authNone": "Gelitaan la'aan",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Gelitaanka OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Kadib markaad keydiso, ku dhufo $t(modelChat.mcpOAuth.signIn) serverka si aad ugu gasho biraawsarkaaga.",
+      "serverNeedsSignIn": "Gal si aad u isticmaasho serverkan",
+      "signIn": "Gal",
+      "signInA11y": "Gal serverkan: {{name}}",
+      "signInFailed": "Laguma guulaysan in la galo {{name}}. Mar kale isku day."
     },
     "backends": {
       "title": "Adeegyada gadaale ee wada sheekaysiga",

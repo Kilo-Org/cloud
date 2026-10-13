@@ -3238,7 +3238,6 @@
       "fieldName": "प्रदर्शित नाम",
       "fieldUrl": "सर्वर URL",
       "fieldUrlInvalid": "मान्य सर्वर URL दर्ज करें।",
-      "fieldToken": "Bearer टोकन (वैकल्पिक)",
       "enableServer": "इस सर्वर को सक्षम करें: {{name}}",
       "editServer": "सर्वर संपादित करें",
       "deleteServer": "सर्वर हटाएँ",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} टूल",
       "serverUnreachable": "इस सर्वर तक नहीं पहुँच सका",
       "serverOff": "यह सर्वर बंद है"
+    },
+    "mcpOAuth": {
+      "authMethod": "प्रमाणीकरण",
+      "authNone": "कोई साइन इन नहीं",
+      "authBearer": "Bearer टोकन",
+      "authOAuth": "OAuth साइन इन",
+      "fieldToken": "टोकन",
+      "oauthHint": "सहेजने के बाद, अपने ब्राउज़र से साइन इन करने के लिए सर्वर पर $t(modelChat.mcpOAuth.signIn) पर टैप करें।",
+      "serverNeedsSignIn": "इस सर्वर का उपयोग करने के लिए साइन इन करें",
+      "signIn": "साइन इन करें",
+      "signInA11y": "इस सर्वर में साइन इन करें: {{name}}",
+      "signInFailed": "{{name}} में साइन इन नहीं हो सका। फिर से कोशिश करें।"
     },
     "backends": {
       "title": "चैट बैकएंड",

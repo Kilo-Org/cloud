@@ -3320,7 +3320,6 @@
       "fieldName": "Wyświetlana nazwa",
       "fieldUrl": "Adres URL serwera",
       "fieldUrlInvalid": "Wprowadź prawidłowy adres URL serwera.",
-      "fieldToken": "Token Bearer (opcjonalnie)",
       "enableServer": "Włącz ten serwer: {{name}}",
       "editServer": "Edytuj serwer",
       "deleteServer": "Usuń serwer",
@@ -3340,6 +3339,18 @@
       "serverToolCount": "{{count}} narzędzi",
       "serverUnreachable": "Nie udało się połączyć z tym serwerem",
       "serverOff": "Ten serwer jest wyłączony"
+    },
+    "mcpOAuth": {
+      "authMethod": "Uwierzytelnianie",
+      "authNone": "Bez logowania",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Logowanie OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Po zapisaniu dotknij $t(modelChat.mcpOAuth.signIn) przy serwerze, aby zalogować się w przeglądarce.",
+      "serverNeedsSignIn": "Zaloguj się, aby używać tego serwera",
+      "signIn": "Zaloguj się",
+      "signInA11y": "Zaloguj się do tego serwera: {{name}}",
+      "signInFailed": "Nie udało się zalogować do {{name}}. Spróbuj ponownie."
     },
     "backends": {
       "title": "Backendy czatu",

@@ -74,7 +74,8 @@ export type McpSettings = {
   readonly retryingServerIds: readonly string[];
   /** Asks one server with no tools on hand again, with the longer deadline a Retry gets. */
   readonly retryServer: (id: string) => void;
-  /** Asks every enabled server with no tools on hand, as the sheet opens. */
+  readonly signingInServerIds: readonly string[];
+  readonly signInServer: (id: string) => void;
   readonly discoverServers: () => void;
   /** Adds a server, discovers it, and answers whether the write landed. */
   readonly addServer: (draft: RemoteMcpServerDraft) => Promise<boolean>;
@@ -189,6 +190,8 @@ export function useMcpSettings(place: ChatPlace | null, sessionId: string): McpS
     setServerEnabled: remote.setEnabled,
     retryingServerIds: remote.retryingIds,
     retryServer: remote.retryServer,
+    signingInServerIds: remote.signingInIds,
+    signInServer: remote.signInServer,
     discoverServers: remote.discover,
     addServer: remote.addServer,
     updateServer: remote.updateServer,
@@ -337,6 +340,7 @@ export function McpSettingsSheet({
           loaded={settings.loaded}
           servers={settings.servers}
           retryingIds={settings.retryingServerIds}
+          signingInIds={settings.signingInServerIds}
           onToggle={(id, next) => {
             settings.setServerEnabled(id, next);
           }}
@@ -344,6 +348,9 @@ export function McpSettingsSheet({
           onDelete={confirmDelete}
           onRetry={id => {
             settings.retryServer(id);
+          }}
+          onSignIn={id => {
+            settings.signInServer(id);
           }}
           onAdd={openAdd}
         />

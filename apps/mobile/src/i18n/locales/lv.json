@@ -3279,7 +3279,6 @@
       "fieldName": "Parādāmais nosaukums",
       "fieldUrl": "Servera URL",
       "fieldUrlInvalid": "Ievadi derīgu servera URL.",
-      "fieldToken": "Bearera pilnvara (neobligāti)",
       "enableServer": "Iespējot šo serveri: {{name}}",
       "editServer": "Rediģēt serveri",
       "deleteServer": "Dzēst serveri",
@@ -3299,6 +3298,18 @@
       "serverToolCount": "{{count}} rīki",
       "serverUnreachable": "Neizdevās sasniegt šo serveri",
       "serverOff": "Šis serveris ir izslēgts"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikācija",
+      "authNone": "Bez pieteikšanās",
+      "authBearer": "Bearera pilnvara",
+      "authOAuth": "OAuth pieteikšanās",
+      "fieldToken": "Pilnvara",
+      "oauthHint": "Pēc saglabāšanas pieskaries pie $t(modelChat.mcpOAuth.signIn) pie servera, lai pieteiktos ar pārlūku.",
+      "serverNeedsSignIn": "Piesakies, lai izmantotu šo serveri",
+      "signIn": "Pieteikties",
+      "signInA11y": "Pieteikties šajā serverī: {{name}}",
+      "signInFailed": "Neizdevās pieteikties serverī {{name}}. Mēģini vēlreiz."
     },
     "backends": {
       "title": "Tērzēšanas aizmugursistēmas",

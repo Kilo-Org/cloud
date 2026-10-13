@@ -1,6 +1,7 @@
 import { getShareExtensionKey } from 'expo-share-intent';
 
 import { handleAppActionPath } from '@/lib/app-actions/action-url-handler';
+import { takeRemoteMcpRedirect } from '@/lib/chat/remote-mcp-oauth-browser';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
@@ -19,6 +20,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   }
   if (shareKey && path.includes(`dataUrl=${shareKey}`)) {
     // Cold start: boot the app normally. Warm: stay exactly where the user is.
+    return initial ? '/' : null;
+  }
+  // The Android remote MCP sign-in ends on `kiloapp:///remote-mcp?code=…`, which
+  // is the waiting sign-in's answer and not a screen.
+  if (takeRemoteMcpRedirect(path)) {
     return initial ? '/' : null;
   }
   // Dev-only glanceable fixture links (`kiloapp:///dev/glanceable-fixture/<name>`).

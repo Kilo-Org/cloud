@@ -3238,7 +3238,6 @@
       "fieldName": "Харагдах нэр",
       "fieldUrl": "Серверийн URL",
       "fieldUrlInvalid": "Хүчинтэй серверийн URL оруулна уу.",
-      "fieldToken": "Bearer токен (заавал биш)",
       "enableServer": "Энэ серверийг идэвхжүүлэх: {{name}}",
       "editServer": "Сервер засах",
       "deleteServer": "Сервер устгах",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} хэрэгсэл",
       "serverUnreachable": "Энэ серверт хүрч чадсангүй",
       "serverOff": "Энэ сервер унтарсан"
+    },
+    "mcpOAuth": {
+      "authMethod": "Баталгаажуулалт",
+      "authNone": "Нэвтрэхгүй",
+      "authBearer": "Bearer токен",
+      "authOAuth": "OAuth нэвтрэлт",
+      "fieldToken": "Токен",
+      "oauthHint": "Хадгалсны дараа хөтчөөрөө нэвтрэхийн тулд сервер дээрх $t(modelChat.mcpOAuth.signIn) дээр дарна уу.",
+      "serverNeedsSignIn": "Энэ серверийг ашиглахын тулд нэвтэрнэ үү",
+      "signIn": "Нэвтрэх",
+      "signInA11y": "Энэ серверт нэвтрэх: {{name}}",
+      "signInFailed": "{{name}}-д нэвтэрч чадсангүй. Дахин оролдоно уу."
     },
     "backends": {
       "title": "Чатын үйлчилгээний серверүүд",

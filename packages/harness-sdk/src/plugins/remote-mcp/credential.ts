@@ -1,3 +1,4 @@
+import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import { Effect } from 'effect';
 import type { Deadline } from './http.js';
 import { RemoteMcpError, type RemoteMcpServer } from './server.js';
@@ -62,5 +63,33 @@ const credentialFor = (
   );
 };
 
-export type { RemoteMcpToken };
-export { credentialFor };
+/** What the transport is handed for OAuth: the provider, or nothing at all. */
+interface RemoteMcpOAuthOption {
+  readonly authProvider?: OAuthClientProvider;
+}
+
+/**
+ * The provider an `oauth` server is opened with. One without a provider is a
+ * caller's mistake, reported as one rather than sent as an anonymous request.
+ */
+const authProviderFor = (
+  server: RemoteMcpServer,
+  provider: OAuthClientProvider | undefined
+): Effect.Effect<RemoteMcpOAuthOption, RemoteMcpError> => {
+  if (server.auth.type !== 'oauth') {
+    return Effect.succeed({});
+  }
+  if (provider === undefined) {
+    return Effect.fail(
+      new RemoteMcpError({
+        serverId: server.id,
+        kind: 'unauthorized',
+        cause: 'this server signs in with OAuth and no provider for it was given',
+      })
+    );
+  }
+  return Effect.succeed({ authProvider: provider });
+};
+
+export type { RemoteMcpOAuthOption, RemoteMcpToken };
+export { authProviderFor, credentialFor, ended };

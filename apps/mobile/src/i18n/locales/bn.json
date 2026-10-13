@@ -3238,7 +3238,6 @@
       "fieldName": "প্রদর্শিত নাম",
       "fieldUrl": "সার্ভার URL",
       "fieldUrlInvalid": "একটি বৈধ সার্ভার URL লিখুন।",
-      "fieldToken": "Bearer টোকেন (ঐচ্ছিক)",
       "enableServer": "এই সার্ভার সক্রিয় করুন: {{name}}",
       "editServer": "সার্ভার সম্পাদনা করুন",
       "deleteServer": "সার্ভার মুছুন",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} টুল",
       "serverUnreachable": "এই সার্ভারে পৌঁছানো যায়নি",
       "serverOff": "এই সার্ভার বন্ধ আছে"
+    },
+    "mcpOAuth": {
+      "authMethod": "প্রমাণীকরণ",
+      "authNone": "সাইন-ইন নেই",
+      "authBearer": "Bearer টোকেন",
+      "authOAuth": "OAuth সাইন-ইন",
+      "fieldToken": "টোকেন",
+      "oauthHint": "সংরক্ষণ করার পর, আপনার ব্রাউজার দিয়ে সাইন-ইন করতে সার্ভারে $t(modelChat.mcpOAuth.signIn) ট্যাপ করুন।",
+      "serverNeedsSignIn": "এই সার্ভার ব্যবহার করতে সাইন-ইন করুন",
+      "signIn": "সাইন-ইন করুন",
+      "signInA11y": "এই সার্ভারে সাইন-ইন করুন: {{name}}",
+      "signInFailed": "{{name}}-এ সাইন-ইন করা যায়নি। আবার চেষ্টা করুন।"
     },
     "backends": {
       "title": "চ্যাট ব্যাকএন্ড",

@@ -3238,7 +3238,6 @@
       "fieldName": "ပြသမည့်အမည်",
       "fieldUrl": "ဆာဗာ URL",
       "fieldUrlInvalid": "မှန်ကန်သော ဆာဗာ URL ထည့်ပါ။",
-      "fieldToken": "Bearer တိုကင် (ရွေးချယ်နိုင်)",
       "enableServer": "ဤဆာဗာကို ဖွင့်ပါ: {{name}}",
       "editServer": "ဆာဗာ တည်းဖြတ်ပါ",
       "deleteServer": "ဆာဗာ ဖျက်ပါ",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "ကိရိယာ {{count}} ခု",
       "serverUnreachable": "ဤဆာဗာသို့ မရောက်နိုင်ခဲ့ပါ",
       "serverOff": "ဤဆာဗာ ပိတ်ထားသည်"
+    },
+    "mcpOAuth": {
+      "authMethod": "အထောက်အထားစိစစ်ခြင်း",
+      "authNone": "ဝင်ရောက်ရန် မလိုပါ",
+      "authBearer": "Bearer တိုကင်",
+      "authOAuth": "OAuth ဖြင့် ဝင်ရောက်ခြင်း",
+      "fieldToken": "တိုကင်",
+      "oauthHint": "သိမ်းဆည်းပြီးနောက် ဘရောက်ဇာဖြင့် ဝင်ရောက်ရန် ဆာဗာပေါ်ရှိ $t(modelChat.mcpOAuth.signIn) ကို နှိပ်ပါ။",
+      "serverNeedsSignIn": "ဤဆာဗာကို အသုံးပြုရန် ဝင်ရောက်ပါ",
+      "signIn": "ဝင်ရောက်ရန်",
+      "signInA11y": "ဤဆာဗာသို့ ဝင်ရောက်ပါ: {{name}}",
+      "signInFailed": "{{name}} သို့ ဝင်ရောက်၍ မရခဲ့ပါ။ ထပ်စမ်းပါ။"
     },
     "backends": {
       "title": "စကားပြော နောက်ခံစနစ်များ",

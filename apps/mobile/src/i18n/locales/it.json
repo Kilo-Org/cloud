@@ -3279,7 +3279,6 @@
       "fieldName": "Nome visualizzato",
       "fieldUrl": "URL del server",
       "fieldUrlInvalid": "Inserisci un URL del server valido.",
-      "fieldToken": "Token Bearer (facoltativo)",
       "enableServer": "Attiva questo server: {{name}}",
       "editServer": "Modifica server",
       "deleteServer": "Elimina server",
@@ -3299,6 +3298,18 @@
       "serverToolCount": "{{count}} strumenti",
       "serverUnreachable": "Impossibile raggiungere questo server",
       "serverOff": "Questo server è disattivato"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autenticazione",
+      "authNone": "Nessun accesso",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Accesso OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Dopo il salvataggio, tocca $t(modelChat.mcpOAuth.signIn) sul server per accedere con il browser.",
+      "serverNeedsSignIn": "Accedi per usare questo server",
+      "signIn": "Accedi",
+      "signInA11y": "Accedi a questo server: {{name}}",
+      "signInFailed": "Impossibile accedere a {{name}}. Riprova."
     },
     "backends": {
       "title": "Servizi di chat",

@@ -3238,7 +3238,6 @@
       "fieldName": "Megjelenített név",
       "fieldUrl": "Szerver URL-címe",
       "fieldUrlInvalid": "Adj meg érvényes szerver URL-címet.",
-      "fieldToken": "Bearer token (nem kötelező)",
       "enableServer": "Szerver engedélyezése: {{name}}",
       "editServer": "Szerver szerkesztése",
       "deleteServer": "Szerver törlése",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} eszköz",
       "serverUnreachable": "Nem sikerült elérni ezt a szervert",
       "serverOff": "Ez a szerver ki van kapcsolva"
+    },
+    "mcpOAuth": {
+      "authMethod": "Hitelesítés",
+      "authNone": "Nincs bejelentkezés",
+      "authBearer": "Bearer token",
+      "authOAuth": "OAuth-bejelentkezés",
+      "fieldToken": "Token",
+      "oauthHint": "Mentés után koppints a(z) $t(modelChat.mcpOAuth.signIn) gombra a szervernél, hogy a böngésződben bejelentkezz.",
+      "serverNeedsSignIn": "Jelentkezz be a szerver használatához",
+      "signIn": "Bejelentkezés",
+      "signInA11y": "Bejelentkezés ebbe a szerverbe: {{name}}",
+      "signInFailed": "Nem sikerült bejelentkezni ide: {{name}}. Próbáld újra."
     },
     "backends": {
       "title": "Csevegési háttérrendszerek",

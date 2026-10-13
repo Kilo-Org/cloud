@@ -3238,7 +3238,6 @@
       "fieldName": "පෙන්වන නම",
       "fieldUrl": "සේවාදායක URL",
       "fieldUrlInvalid": "වලංගු සේවාදායක URL එකක් ඇතුළත් කරන්න.",
-      "fieldToken": "Bearer ටෝකනය (විකල්ප)",
       "enableServer": "මෙම සේවාදායකය සක්‍රීය කරන්න: {{name}}",
       "editServer": "සේවාදායකය සංස්කරණය කරන්න",
       "deleteServer": "සේවාදායකය මකන්න",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "මෙවලම් {{count}}",
       "serverUnreachable": "මෙම සේවාදායකය වෙත ළඟා විය නොහැකි විය",
       "serverOff": "මෙම සේවාදායකය ක්‍රියා විරහිතයි"
+    },
+    "mcpOAuth": {
+      "authMethod": "සත්‍යාපනය",
+      "authNone": "පිවිසීමක් නැත",
+      "authBearer": "Bearer ටෝකනය",
+      "authOAuth": "OAuth පිවිසුම",
+      "fieldToken": "ටෝකනය",
+      "oauthHint": "සුරැකීමෙන් පසු, ඔබගේ බ්‍රවුසරය සමඟ පිවිසීමට සේවාදායකයේ $t(modelChat.mcpOAuth.signIn) තට්ටු කරන්න.",
+      "serverNeedsSignIn": "මෙම සේවාදායකය භාවිත කිරීමට පිවිසෙන්න",
+      "signIn": "පිවිසෙන්න",
+      "signInA11y": "මෙම සේවාදායකයට පිවිසෙන්න: {{name}}",
+      "signInFailed": "{{name}} වෙත පිවිසිය නොහැකි විය. නැවත උත්සාහ කරන්න."
     },
     "backends": {
       "title": "කතාබස් පසුපස සේවා",

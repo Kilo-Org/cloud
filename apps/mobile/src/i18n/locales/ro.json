@@ -3279,7 +3279,6 @@
       "fieldName": "Nume afișat",
       "fieldUrl": "URL server",
       "fieldUrlInvalid": "Introdu un URL de server valid.",
-      "fieldToken": "Token Bearer (opțional)",
       "enableServer": "Activează acest server: {{name}}",
       "editServer": "Editează serverul",
       "deleteServer": "Șterge serverul",
@@ -3299,6 +3298,18 @@
       "serverToolCount": "{{count}} instrumente",
       "serverUnreachable": "Nu s-a putut contacta acest server",
       "serverOff": "Acest server este oprit"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentificare",
+      "authNone": "Fără autentificare",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Autentificare OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "După ce salvezi, atinge $t(modelChat.mcpOAuth.signIn) pe server pentru a te autentifica în browser.",
+      "serverNeedsSignIn": "Autentifică-te pentru a folosi acest server",
+      "signIn": "Autentifică-te",
+      "signInA11y": "Autentifică-te la acest server: {{name}}",
+      "signInFailed": "Nu s-a putut realiza autentificarea la {{name}}. Încearcă din nou."
     },
     "backends": {
       "title": "Backenduri de chat",

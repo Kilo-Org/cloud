@@ -3238,7 +3238,6 @@
       "fieldName": "Nama tampilan",
       "fieldUrl": "URL server",
       "fieldUrlInvalid": "Masukkan URL server yang valid.",
-      "fieldToken": "Token Bearer (opsional)",
       "enableServer": "Aktifkan server ini: {{name}}",
       "editServer": "Edit server",
       "deleteServer": "Hapus server",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} alat",
       "serverUnreachable": "Tidak dapat menjangkau server ini",
       "serverOff": "Server ini nonaktif"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentikasi",
+      "authNone": "Tanpa masuk",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Masuk dengan OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Setelah menyimpan, ketuk $t(modelChat.mcpOAuth.signIn) pada server untuk masuk dengan browser Anda.",
+      "serverNeedsSignIn": "Masuk untuk memakai server ini",
+      "signIn": "Masuk",
+      "signInA11y": "Masuk ke server ini: {{name}}",
+      "signInFailed": "Tidak dapat masuk ke {{name}}. Coba lagi."
     },
     "backends": {
       "title": "Layanan obrolan",

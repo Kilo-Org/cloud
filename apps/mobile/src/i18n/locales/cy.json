@@ -3402,7 +3402,6 @@
       "fieldName": "Enw dangos",
       "fieldUrl": "URL gweinydd",
       "fieldUrlInvalid": "Rhowch URL gweinydd dilys.",
-      "fieldToken": "Tocyn Bearer (dewisol)",
       "enableServer": "Galluogi'r gweinydd hwn: {{name}}",
       "editServer": "Golygu gweinydd",
       "deleteServer": "Dileu gweinydd",
@@ -3422,6 +3421,18 @@
       "serverToolCount": "{{count}} offeryn",
       "serverUnreachable": "Ni ellid cyrraedd y gweinydd hwn",
       "serverOff": "Mae'r gweinydd hwn i ffwrdd"
+    },
+    "mcpOAuth": {
+      "authMethod": "Dilysu",
+      "authNone": "Dim mewngofnodi",
+      "authBearer": "Tocyn Bearer",
+      "authOAuth": "Mewngofnodi OAuth",
+      "fieldToken": "Tocyn",
+      "oauthHint": "Ar ôl i chi gadw, tapiwch $t(modelChat.mcpOAuth.signIn) ar y gweinydd i fewngofnodi gyda'ch porwr.",
+      "serverNeedsSignIn": "Mewngofnodwch i ddefnyddio'r gweinydd hwn",
+      "signIn": "Mewngofnodi",
+      "signInA11y": "Mewngofnodi i'r gweinydd hwn: {{name}}",
+      "signInFailed": "Ni ellid mewngofnodi i {{name}}. Rhowch gynnig arall arni."
     },
     "backends": {
       "title": "Ôl-bennau sgwrs",

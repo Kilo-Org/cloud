@@ -107,31 +107,35 @@ internal object SessionNotifications {
    * after the window is what removes it.
    */
   fun post(context: Context, card: SessionNotificationCard, dismissAfterMs: Long) {
+    // One clock read for the whole post: the card drawn now and the quiet
+    // alarm must agree on whether the quiet window has passed.
+    val nowMs = System.currentTimeMillis()
     val timeoutMs = dismissAfterMs.coerceAtLeast(0)
     val stored = card.toJson()
     if (timeoutMs > 0) {
-      stored.put(FINISHED_UNTIL, System.currentTimeMillis() + timeoutMs)
+      stored.put(FINISHED_UNTIL, nowMs + timeoutMs)
     }
     state(context).edit().putString(KEY_PREFIX + card.sessionId, stored.toString()).commit()
-    val builder = builder(context, card.shownAt(System.currentTimeMillis()))
+    val builder = builder(context, card.shownAt(nowMs))
     if (timeoutMs > 0 && Build.VERSION.SDK_INT >= 26) {
       builder.setTimeoutAfter(timeoutMs)
     }
     manager(context).notify(TAG, notificationId(card.sessionId), builder.build())
-    scheduleQuiet(context, card)
+    scheduleQuiet(context, card, nowMs)
   }
 
   /**
    * Arm the quiet moment of a Working card, or disarm it for every other card.
    * The alarm posts the stored card again at that moment, so the quiet warning
-   * appears with no push and no running process.
+   * appears with no push and no running process. `nowMs` is the clock read the
+   * post drew the card with.
    */
-  private fun scheduleQuiet(context: Context, card: SessionNotificationCard) {
+  private fun scheduleQuiet(context: Context, card: SessionNotificationCard, nowMs: Long) {
     val quietAt = card.quietAtMs.toLong()
     val operation = quietIntent(context, card.sessionId, quietAt)
     val alarmManager = alarms(context)
     alarmManager.cancel(operation)
-    if (quietAt <= System.currentTimeMillis() || card.quietText == null) {
+    if (quietAt <= nowMs || card.quietText == null) {
       return
     }
     if (Build.VERSION.SDK_INT >= 31) {

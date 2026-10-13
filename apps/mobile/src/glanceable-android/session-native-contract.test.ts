@@ -73,6 +73,7 @@ describe('SessionNotificationCard', () => {
       'organizationId',
       'subText',
       'expandedText',
+      'quietText',
       'compactText',
       'approveLabel',
       'approvalKey',
@@ -113,7 +114,7 @@ describe('SessionNotifications', () => {
     // survive a sign-out.
     const post = body(NOTIFICATIONS, 'fun post(');
     expect(post).toMatch(
-      /if \(timeoutMs > 0\) \{\s+stored\.put\(FINISHED_UNTIL, System\.currentTimeMillis\(\) \+ timeoutMs\)/
+      /if \(timeoutMs > 0\) \{\s+stored\.put\(FINISHED_UNTIL, nowMs \+ timeoutMs\)/
     );
     expect(post).toContain('putString(KEY_PREFIX + card.sessionId, stored.toString())');
     expect(post).not.toContain('editor.remove(');
@@ -125,12 +126,24 @@ describe('SessionNotifications', () => {
 describe('the quiet moment of a Working card', () => {
   it('posts the card as it shows now, then arms or disarms its quiet alarm', () => {
     const post = body(NOTIFICATIONS, 'fun post(');
-    expect(post).toContain('builder(context, card.shownAt(System.currentTimeMillis()))');
-    expect(post.indexOf('scheduleQuiet(context, card)')).toBeGreaterThan(post.indexOf('.notify('));
+    expect(post).toContain('builder(context, card.shownAt(nowMs))');
+    expect(post.indexOf('scheduleQuiet(context, card, nowMs)')).toBeGreaterThan(
+      post.indexOf('.notify(')
+    );
     const schedule = body(NOTIFICATIONS, 'private fun scheduleQuiet(');
     expect(schedule.indexOf('alarmManager.cancel(operation)')).toBeLessThan(
       schedule.indexOf('setAndAllowWhileIdle')
     );
+  });
+
+  it('reads the clock once per post, so the drawn card and the quiet alarm agree', () => {
+    const post = body(NOTIFICATIONS, 'fun post(');
+    expect(post.match(/System\.currentTimeMillis\(\)/g)).toHaveLength(1);
+    expect(post).toContain('val nowMs = System.currentTimeMillis()');
+    const schedule = body(NOTIFICATIONS, 'private fun scheduleQuiet(');
+    expect(schedule).toContain('nowMs: Long');
+    expect(schedule).not.toContain('System.currentTimeMillis()');
+    expect(schedule).toContain('if (quietAt <= nowMs');
   });
 
   it('swaps to the quiet text and the last-activity timer once the window passed', () => {

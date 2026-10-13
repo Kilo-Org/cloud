@@ -90,12 +90,12 @@ function cancelTerminal(): void {
  * builder, with the approval key the server mints); a finished fixture
  * follows the row while it works and then reports it idle.
  */
-function applySessionCardFixture(input: {
+async function applySessionCardFixture(input: {
   fixture: GlanceableFixture;
   rows: readonly SessionLiveActivityRow[];
   ctx: GlanceablePublisherContext;
   now: number;
-}): void {
+}): Promise<void> {
   const { fixture, rows, ctx, now } = input;
   // The fixture's follow replaces any real one: one session card surface at a time.
   endAllSessionCards();
@@ -152,7 +152,10 @@ function applySessionCardFixture(input: {
   if (follow.finish === true) {
     finishFixtureSessionCard({ ...row, statusUpdatedAt: at }, content, now);
   } else if (content !== null) {
-    applyFixtureSessionContent(content);
+    // Await the platform path: the Android branch goes through the real push
+    // apply, and the iOS branch settles a card update. Awaiting means the
+    // harness's own "applied" line only prints once the card is laid down.
+    await applyFixtureSessionContent(content);
   }
 }
 
@@ -241,7 +244,7 @@ async function apply(name: GlanceableFixtureName, ctx: GlanceablePublisherContex
   recordWaitingAsk(eligible ? selectWaitingAsk(rows, ctx, now) : null);
   // Before the frame: the aggregate card counts a followed row out.
   if (Platform.OS === 'ios' || Platform.OS === 'android') {
-    applySessionCardFixture({ fixture, rows, ctx, now });
+    await applySessionCardFixture({ fixture, rows, ctx, now });
   }
   writeGlanceableFrame(getGlanceableSinks(), snapshot, ctx);
   if (!eligible) {

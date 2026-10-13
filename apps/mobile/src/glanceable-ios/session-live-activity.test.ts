@@ -471,9 +471,9 @@ describe('session card layout: surfaces', () => {
     // The card keeps its equal 16 pt inset.
     const root = element(banner);
     expect(root).not.toBeNull();
-    const padding = (root?.props.modifiers as { $type: string; args?: unknown }[] | undefined)?.find(
-      modifier => modifier.$type === 'padding'
-    );
+    const padding = (
+      root?.props.modifiers as { $type: string; args?: unknown }[] | undefined
+    )?.find(modifier => modifier.$type === 'padding');
     expect(padding?.args).toEqual({ all: 16 });
     // No control reserves a minimum width: each pill takes its label's width.
     const frames = collect(banner).flatMap(item =>

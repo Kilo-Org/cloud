@@ -39,6 +39,7 @@ import {
   NVIDIA_TRIAL_TOS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { loadConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
@@ -131,6 +132,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
       getDataCollectionRequiredModelIds(),
       getPreferredModels(),
       getUnavailableModelIds(),
+      loadConfiguredCustomPricing(),
     ]);
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();

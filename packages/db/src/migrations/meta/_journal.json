@@ -1947,6 +1947,13 @@
       "when": 1791906786083,
       "tag": "0277_curved_joystick",
       "breakpoints": true
+    },
+    {
+      "idx": 278,
+      "version": "7",
+      "when": 1791916734778,
+      "tag": "0278_handy_talkback",
+      "breakpoints": true
     }
   ]
 }

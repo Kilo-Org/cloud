@@ -136,6 +136,7 @@ import type {
   CustomLlmDefinition,
   AutoFreeConfig,
   GatewayModelListConfig,
+  CustomPricingConfig,
   KiloClawAdminAuditAction,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
@@ -5782,6 +5783,7 @@ export const ai_gateway_config = pgTable(
     auto_free: jsonb().$type<AutoFreeConfig>(),
     preferred_models: jsonb().$type<GatewayModelListConfig>(),
     unavailable_models: jsonb().$type<GatewayModelListConfig>(),
+    custom_pricing: jsonb().$type<CustomPricingConfig>(),
   },
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );

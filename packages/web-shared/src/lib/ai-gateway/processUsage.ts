@@ -12,6 +12,7 @@ import {
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
+import { loadConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import type { OpenAI } from 'openai';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import type {
@@ -1382,6 +1383,7 @@ export async function processTokenData(
     }
   }
 
+  await loadConfiguredCustomPricing();
   const customCost_mUsd = calculateCustomCost_mUsd(usageContext.requested_model, usageStats);
 
   // Preserve the real cost before zeroing for free/BYOK

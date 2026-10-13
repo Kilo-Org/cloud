@@ -470,7 +470,8 @@ describe('session card layout: surfaces', () => {
     });
     // The card keeps its equal 16 pt inset.
     const root = element(banner);
-    const padding = (root?.props.modifiers as { $type: string; args?: unknown }[]).find(
+    expect(root).not.toBeNull();
+    const padding = (root?.props.modifiers as { $type: string; args?: unknown }[] | undefined)?.find(
       modifier => modifier.$type === 'padding'
     );
     expect(padding?.args).toEqual({ all: 16 });

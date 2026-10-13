@@ -324,8 +324,12 @@ export function McpSettingsSheet({
         <KiloMcpSection
           view={settings.view}
           retrying={settings.retrying}
-          onToggle={settings.setEnabled}
-          onRetry={settings.retry}
+          onToggle={next => {
+            settings.setEnabled(next);
+          }}
+          onRetry={() => {
+            settings.retry();
+          }}
         />
 
         {/* 3. The remote servers the person added. */}

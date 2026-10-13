@@ -48,7 +48,7 @@ export function parseChatUsage(stored: string | null): ChatUsage {
 const costOf = (held: number | undefined, part: number | undefined) =>
   held === undefined && part === undefined ? {} : { cost: (held ?? 0) + (part ?? 0) };
 
-export function sumUsage(held: ModelUsage, part: ModelUsage): ModelUsage {
+function sumUsage(held: ModelUsage, part: ModelUsage): ModelUsage {
   return {
     inputTokens: held.inputTokens + part.inputTokens,
     outputTokens: held.outputTokens + part.outputTokens,

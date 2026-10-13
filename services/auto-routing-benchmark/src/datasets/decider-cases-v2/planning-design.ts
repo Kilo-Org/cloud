@@ -517,7 +517,7 @@ export const PLANNING_DESIGN_V2_CASES: readonly DeciderCase[] = [
     subtaskType: 'system_design',
     systemPrompt: SYS_SYS,
     userPrompt:
-      'Compute fixed response latency for this proposed hedging plan. Network ingress takes 8 ms, then routing takes 12 ms. Routing starts a region-A request lasting 44 ms. Ten ms after A starts, it starts a region-B request lasting 28 ms. The first successful region response wins; both succeed, and the loser need not complete before responding. Response assembly then takes 5 ms. Durations are deterministic, not percentiles. Answer only total elapsed milliseconds from ingress start.',
+      'Compute fixed response latency for this proposed hedging plan. Network ingress takes 8 ms. Only after ingress finishes does routing begin; routing takes 12 ms. Only after routing finishes does a region-A request start; it lasts 44 ms. Exactly 10 ms after A starts, a region-B request starts; it lasts 28 ms. The first successful region response wins; both succeed, and the loser need not complete before responding. Only after the winning response arrives does response assembly start; assembly takes 5 ms. Apart from the two overlapping region requests, the stages do not overlap. Durations are deterministic, not percentiles. Return only the integer total elapsed milliseconds from ingress start through assembly completion, without units or explanation.',
     check: { kind: 'exact', value: '63' },
   },
   {

@@ -121,11 +121,7 @@ describe('AutoRoutingDecisionCacheDO', () => {
     expect(state.classification?.value).toEqual(classification);
     expect(state.sticky).toEqual({ model: 'mid/chat', variant: null, routeKey: null });
     expect(state.pendingCostUsd).toBe(0.03);
-    expect(storage.get).toHaveBeenCalledExactlyOnceWith([
-      'model:hash',
-      'sticky',
-      'pending-cost',
-    ]);
+    expect(storage.get).toHaveBeenCalledExactlyOnceWith(['model:hash', 'sticky', 'pending-cost']);
     expect(storage.put).not.toHaveBeenCalled();
     expect(storage.delete).not.toHaveBeenCalled();
   });

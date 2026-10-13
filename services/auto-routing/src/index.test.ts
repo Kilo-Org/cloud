@@ -2241,7 +2241,9 @@ describe('auto routing worker', () => {
       older.resolve(mockClassifierResult as ClassifierRunResult);
       await Promise.all(olderTasks);
       if (equalTimestamps) {
-        expect(store.get('sticky')).toMatchObject({ routeKey: 'implementation/feature_development' });
+        expect(store.get('sticky')).toMatchObject({
+          routeKey: 'implementation/feature_development',
+        });
       } else {
         expect(store.get('sticky')).toEqual(newerSticky);
       }

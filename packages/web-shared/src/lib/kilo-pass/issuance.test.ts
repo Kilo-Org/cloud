@@ -30,6 +30,7 @@ import {
 } from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
 import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
+import { processLocalExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 
 import {
   applyPendingKiloPassReferralBonusForIssuance,
@@ -138,8 +139,8 @@ async function createPendingKiloPassReferralReward(params: {
   return { rewardId: reward.id, conversionId: conversion.id };
 }
 
-test('base issuance is idempotent: calling twice only creates one credit_transaction', async () => {
-  const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+test.each([0, 5_000_000])('idempotent base grant repays debt %s', async debt => {
+  const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: debt });
   const { subscriptionId } = await createTestSubscription({
     kiloUserId: user.id,
     tier: KiloPassTier.Tier49,
@@ -195,6 +196,15 @@ test('base issuance is idempotent: calling twice only creates one credit_transac
       )
     );
   expect(transactions).toHaveLength(1);
+  const baseCredit = await db.query.credit_transactions.findFirst({
+    where: eq(credit_transactions.id, transactions[0].id),
+  });
+  expect(baseCredit!.expiration_baseline_microdollars_used).toBe(debt);
+  expect(baseCredit!.debt_repaid_microdollars).toBe(debt);
+  expect(new Date(baseCredit!.expiry_date!).getTime()).toBeCloseTo(
+    dayjs(baseCredit!.created_at).utc().add(1, 'year').valueOf(),
+    -4
+  );
 
   const issuanceItems = await db
     .select({ id: kilo_pass_issuance_items.id })
@@ -221,6 +231,14 @@ test('base issuance is idempotent: calling twice only creates one credit_transac
     KiloPassAuditLogResult.SkippedIdempotent,
     KiloPassAuditLogResult.Success,
   ]);
+  const current = await db.query.kilocode_users.findFirst({
+    where: (users, { eq }) => eq(users.id, user.id),
+  });
+  await processLocalExpirations(current!, new Date('2099-01-01T00:00:00Z'));
+  const expired = await db.query.kilocode_users.findFirst({
+    where: (users, { eq }) => eq(users.id, user.id),
+  });
+  expect(expired!.total_microdollars_acquired - expired!.microdollars_used).toBe(0);
 });
 
 test('createOrGetIssuanceHeader throws if the same stripeInvoiceId is reused for a different subscription/month', async () => {

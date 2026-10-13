@@ -1,5 +1,8 @@
 import type { CreditTransactionForBlocks } from '@kilocode/web-shared/lib/creditExpiration';
-import { computeExpiration } from '@kilocode/web-shared/lib/creditExpiration';
+import {
+  applyCreditRefundAdjustments,
+  computeExpiration,
+} from '@kilocode/web-shared/lib/creditExpiration';
 import { toNonNullish } from '@/lib/utils';
 
 type EntityForCreditBlocks = {
@@ -33,8 +36,9 @@ export function getCreditBlocks(
   }
 
   // Filter to unprocessed transactions with expiry dates
-  const all_expiring_transactions = transactions.filter(
-    t => t.expiry_date != null && !processedById.has(t.id)
+  const all_expiring_transactions = applyCreditRefundAdjustments(
+    transactions.filter(t => t.expiry_date != null && !processedById.has(t.id)),
+    transactions
   );
 
   const max_expiration_date = all_expiring_transactions.reduce(

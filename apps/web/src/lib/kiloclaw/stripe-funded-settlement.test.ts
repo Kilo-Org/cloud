@@ -11,6 +11,7 @@ import {
 } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { applyStripeFundedKiloClawPeriod } from '@/lib/kiloclaw/credit-billing';
+import { processLocalExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const makeStripeSubscriptionNonRenewing =
@@ -577,8 +578,12 @@ describe('Stripe-funded KiloClaw settlement', () => {
       .from(credit_transactions)
       .where(eq(credit_transactions.kilo_user_id, user.id));
     expect(transactions.map(row => row.amountMicrodollars).sort((a, b) => a - b)).toEqual([
-      -12_340_000, 12_340_000,
+      -12_340_000, 0, 12_340_000,
     ]);
+    const settledUser = await readUser(user.id);
+    expect(settledUser.next_credit_expiration_at).toBeNull();
+    await processLocalExpirations(settledUser, new Date('2099-01-01T00:00:00.000Z'));
+    expect((await readUser(user.id)).total_microdollars_acquired).toBe(0);
   });
 
   it('keeps distinct payments for the same period balance-neutral', async () => {
@@ -640,7 +645,7 @@ describe('Stripe-funded KiloClaw settlement', () => {
       .from(credit_transactions)
       .where(eq(credit_transactions.kilo_user_id, user.id));
     expect(transactions.map(row => row.amountMicrodollars).sort((a, b) => a - b)).toEqual([
-      -55_000_000, -55_000_000, 55_000_000, 55_000_000,
+      -55_000_000, -55_000_000, 0, 0, 55_000_000, 55_000_000,
     ]);
     expect(
       new Set(

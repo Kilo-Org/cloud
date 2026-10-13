@@ -148,6 +148,17 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 10. Stripe yearly subscriptions MUST receive an initial monthly base grant from invoice handling and later monthly base
     grants from the yearly monthly-base cron. The cron processes Stripe rows only.
 11. Base credits for a subscription and issue month MUST be issued at most once through the normal issuance path.
+    Newly issued paid base credits MUST expire one UTC calendar year after issuance, including organization base
+    grants and supplements. February 29 MUST clamp to February 28 in the following year. Existing credit rows and
+    their expiration dates MUST remain unchanged; replaying an issuance MUST NOT renew its expiration.
+    New base grants MUST record any negative-balance repayment from the locked account state as already consumed,
+    separately from the usage baseline. Repayment MUST NOT expire or reuse consumption claimed by an earlier grant.
+    Refund adjustments MUST retain a link to their grant. Expiration MUST remove only unused, unrefunded value,
+    while preserving consumption already attributed before a refund so another grant cannot claim it again.
+    Refunds after expiration MUST NOT deduct expired value again. Reversals MUST preserve the original deadline;
+    after expiration they MAY restore clawed-back consumed value but MUST NOT reinstate expired unused value.
+    Refund and reversal ledger usage snapshots MUST come from the account lock protecting the adjustment,
+    not from an earlier grant or refund lookup.
 12. A successful qualifying base grant MUST overwrite the user-global threshold with the lesser of cumulative user
     usage plus the configured monthly base amount and total acquired credits after the grant. This keeps the effective
     threshold reachable when the pre-grant balance is negative. The threshold belongs to the user, not to one

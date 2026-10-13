@@ -12,6 +12,7 @@ import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCred
 import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
 import { sendCreditsTopUpEmail } from '@kilocode/web-shared/lib/email';
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
+import { paidCreditExpiration } from '@kilocode/web-shared/lib/paid-credit-expiration';
 
 export type StripeConfig = { type: 'stripe'; stripe_payment_id: string };
 
@@ -83,8 +84,8 @@ export async function processTopUp(
     creditDescriptionOverride ??
     (isAutoTopUp ? `Auto top-up via ${config.type}` : `Top-up via ${config.type}`);
   const creditAmountInMicrodollars = amountInCents * 10_000;
+  const expiryDate = creditAmountInMicrodollars > 0 ? paidCreditExpiration().toISOString() : null;
 
-  // Create a credit transaction in our database
   const new_credit_transaction_id = creditTransactionIdOverride ?? crypto.randomUUID();
   const creditTransactionOptions = {
     id: new_credit_transaction_id,
@@ -92,14 +93,34 @@ export async function processTopUp(
     is_free: false,
     amount_microdollars: creditAmountInMicrodollars,
     description: creditDescription,
-    original_baseline_microdollars_used: user.microdollars_used,
     stripe_payment_id: config.stripe_payment_id,
   } satisfies typeof credit_transactions.$inferInsert;
 
   const insertCreditTransactionAndUpdateBalance = async (tx: DrizzleTransaction) => {
+    const [currentUser] = await tx
+      .select({
+        microdollarsUsed: kilocode_users.microdollars_used,
+        acquired: kilocode_users.total_microdollars_acquired,
+      })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id))
+      .for('no key update');
+    if (!currentUser) throw new Error(`User not found for top-up: ${user.id}`);
+
     const attemptToInsert = await tx
       .insert(credit_transactions)
-      .values(creditTransactionOptions)
+      .values({
+        ...creditTransactionOptions,
+        debt_repaid_microdollars: expiryDate
+          ? Math.min(
+              creditAmountInMicrodollars,
+              Math.max(0, currentUser.microdollarsUsed - currentUser.acquired)
+            )
+          : null,
+        original_baseline_microdollars_used: currentUser.microdollarsUsed,
+        expiration_baseline_microdollars_used: expiryDate ? currentUser.microdollarsUsed : null,
+        expiry_date: expiryDate,
+      })
       .onConflictDoNothing();
     const didInsertCreditTransaction = (attemptToInsert.rowCount ?? 0) > 0;
 
@@ -109,6 +130,9 @@ export async function processTopUp(
       .update(kilocode_users)
       .set({
         total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${Math.round(creditAmountInMicrodollars)}`,
+        ...(expiryDate && {
+          next_credit_expiration_at: sql`LEAST(${kilocode_users.next_credit_expiration_at}, ${expiryDate}::timestamptz)`,
+        }),
       })
       .where(eq(kilocode_users.id, user.id));
 

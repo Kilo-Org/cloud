@@ -806,6 +806,8 @@ rows renew.
    positive credit entry and a matching negative credit deduction
    in a single atomic operation. The user's visible credit balance
    MUST NOT change as a result.
+   The paired deposit MUST be closed to expiration in that same transaction;
+   its later expiry MUST NOT deduct the settled invoice amount again.
 4. The deduction amount MUST equal the settled invoice amount. The
    system MUST NOT substitute locally defined plan cost constants.
    Payment-provider-side adjustments (first-month discounts,

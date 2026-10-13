@@ -25,6 +25,8 @@ import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
+import { creditRefundAdjustment } from '@kilocode/web-shared/lib/credit-refund';
+import { paidCreditExpiration } from '@kilocode/web-shared/lib/paid-credit-expiration';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -204,22 +206,50 @@ async function insertCreditTransactionAdjustment(
     amountMicrodollars: number;
     description: string;
     creditCategory: string;
-    originalBaselineMicrodollarsUsed: number;
+    originalTransactionId?: string;
     isFree?: boolean;
   }
 ): Promise<{ wasInserted: boolean; creditTransactionId: string | null }> {
   const creditTransactionId = crypto.randomUUID();
+  const [currentUser] = await tx
+    .select({
+      microdollarsUsed: kilocode_users.microdollars_used,
+      acquired: kilocode_users.total_microdollars_acquired,
+    })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, params.kiloUserId))
+    .for('no key update');
+  if (!currentUser) throw new Error('Store credit owner not found');
+  const adjustment = params.originalTransactionId
+    ? await creditRefundAdjustment(tx, params.originalTransactionId, params.amountMicrodollars)
+    : {
+        amountMicrodollars: params.amountMicrodollars,
+        microdollarsUsed: currentUser.microdollarsUsed,
+      };
+  const amountMicrodollars = adjustment.amountMicrodollars;
+  const expiryDate =
+    amountMicrodollars > 0 && !params.isFree ? paidCreditExpiration().toISOString() : null;
   const insertResult = await tx
     .insert(credit_transactions)
     .values({
       id: creditTransactionId,
       kilo_user_id: params.kiloUserId,
-      amount_microdollars: params.amountMicrodollars,
+      amount_microdollars: amountMicrodollars,
       is_free: params.isFree ?? false,
       description: params.description,
       credit_category: params.creditCategory,
+      refund_for_transaction_id: params.originalTransactionId,
+      created_at: new Date().toISOString(),
+      expiry_date: expiryDate,
+      debt_repaid_microdollars: expiryDate
+        ? Math.min(
+            amountMicrodollars,
+            Math.max(0, currentUser.microdollarsUsed - currentUser.acquired)
+          )
+        : null,
+      expiration_baseline_microdollars_used: expiryDate ? adjustment.microdollarsUsed : null,
       check_category_uniqueness: true,
-      original_baseline_microdollars_used: params.originalBaselineMicrodollarsUsed,
+      original_baseline_microdollars_used: adjustment.microdollarsUsed,
     })
     .onConflictDoNothing();
 
@@ -240,7 +270,10 @@ async function insertCreditTransactionAdjustment(
   await tx
     .update(kilocode_users)
     .set({
-      total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${params.amountMicrodollars}`,
+      total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${amountMicrodollars}`,
+      ...(expiryDate && {
+        next_credit_expiration_at: sql`LEAST(${kilocode_users.next_credit_expiration_at}, ${expiryDate}::timestamptz)`,
+      }),
     })
     .where(eq(kilocode_users.id, params.kiloUserId));
 
@@ -338,12 +371,12 @@ async function resetIssuanceItemsForStoreUpgrade(
     purchase: ValidatedStoreKiloPassPurchase;
     upgradedBaseCreditTransactionId: string;
     upgradedBaseAmountUsd: number;
-    originalBaselineMicrodollarsUsed: number;
   }
 ): Promise<void> {
   const bonusItems = await tx
     .select({
       itemId: kilo_pass_issuance_items.id,
+      creditTransactionId: credit_transactions.id,
       kind: kilo_pass_issuance_items.kind,
       amountMicrodollars: credit_transactions.amount_microdollars,
     })
@@ -371,9 +404,9 @@ async function resetIssuanceItemsForStoreUpgrade(
     const reversal = await insertCreditTransactionAdjustment(tx, {
       kiloUserId: params.user.id,
       amountMicrodollars: -item.amountMicrodollars,
+      originalTransactionId: item.creditTransactionId,
       description: getUpgradeBonusReversalDescription(item.kind),
       creditCategory: `kilo-pass-upgrade-bonus-reversal:${params.purchase.paymentProvider}:${params.purchase.providerTransactionId}:${item.kind}:${item.itemId}`,
-      originalBaselineMicrodollarsUsed: params.originalBaselineMicrodollarsUsed,
       isFree: true,
     });
     if (reversal.creditTransactionId) {
@@ -457,12 +490,19 @@ async function applyStoreUpgradeCreditAdjustments(
   });
 
   if (refundMicrodollars > 0) {
+    const baseItem = await tx.query.kilo_pass_issuance_items.findFirst({
+      where: and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, params.issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
+      ),
+    });
+    if (!baseItem) throw new Error('App Store upgrade base credit not found');
     const refundResult = await insertCreditTransactionAdjustment(tx, {
       kiloUserId: params.user.id,
       amountMicrodollars: -refundMicrodollars,
+      originalTransactionId: baseItem.credit_transaction_id,
       description: `Kilo Pass upgrade refund clawback (${params.oldTier})`,
       creditCategory: `kilo-pass-upgrade-refund:${params.purchase.paymentProvider}:${params.purchase.providerTransactionId}`,
-      originalBaselineMicrodollarsUsed: freshUser.microdollarsUsed,
     });
     await appendKiloPassAuditLog(tx, {
       action: KiloPassAuditLogAction.BaseCreditsIssued,
@@ -489,7 +529,6 @@ async function applyStoreUpgradeCreditAdjustments(
     amountMicrodollars: newTierMicrodollars,
     description: `Kilo Pass upgrade base credits (${params.purchase.tier}, ${params.purchase.cadence})`,
     creditCategory: `kilo-pass-upgrade-base:${params.purchase.paymentProvider}:${params.purchase.providerTransactionId}`,
-    originalBaselineMicrodollarsUsed: freshUser.microdollarsUsed,
   });
 
   await appendKiloPassAuditLog(tx, {
@@ -521,7 +560,6 @@ async function applyStoreUpgradeCreditAdjustments(
     purchase: params.purchase,
     upgradedBaseCreditTransactionId: issueResult.creditTransactionId,
     upgradedBaseAmountUsd: newTierAmountUsd,
-    originalBaselineMicrodollarsUsed: freshUser.microdollarsUsed,
   });
 
   if (issueResult.wasInserted) {

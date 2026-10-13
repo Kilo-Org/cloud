@@ -1,4 +1,5 @@
 import 'server-only';
+import { closeCreditExpirationsForBalanceReset } from '@kilocode/web-shared/lib/credit-refund';
 
 import { captureException } from '@sentry/nextjs';
 import { addDays } from 'date-fns';
@@ -613,6 +614,7 @@ async function resetUserCreditBalanceForAcceptedDispute(params: {
       return 0;
     }
 
+    await closeCreditExpirationsForBalanceReset(tx, userId, user.microdollars_used);
     await tx.insert(credit_transactions).values({
       kilo_user_id: userId,
       organization_id: null,

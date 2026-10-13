@@ -16,7 +16,10 @@ import {
 import { eq, and, isNull, gt, asc } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
-import { computeExpiration } from '@kilocode/web-shared/lib/creditExpiration';
+import {
+  applyCreditRefundAdjustments,
+  computeExpiration,
+} from '@kilocode/web-shared/lib/creditExpiration';
 
 export type MigrationResult = Result<UserBalanceUpdates, string>;
 
@@ -134,6 +137,8 @@ async function fetchUserBalanceData(userId: string) {
       description: credit_transactions.description,
       is_free: credit_transactions.is_free,
       original_transaction_id: credit_transactions.original_transaction_id,
+      refund_for_transaction_id: credit_transactions.refund_for_transaction_id,
+      debt_repaid_microdollars: credit_transactions.debt_repaid_microdollars,
     })
     .from(credit_transactions)
     .where(
@@ -171,12 +176,18 @@ export function computeUserBalanceUpdates(
 
   // Use computeExpiration to determine correct expiration baselines.
   // Start with original baselines, then merge in shifts from computeExpiration.
-  const expiringTransactions = creditTransactions
-    .filter(t => t.expiry_date != null)
-    .map(t => ({
+  const expiringTransactions = applyCreditRefundAdjustments(
+    creditTransactions
+      .filter(t => t.expiry_date != null)
+      .map(t => ({
+        ...t,
+        expiration_baseline_microdollars_used: computedOriginalBaselines.get(t.id) ?? 0,
+      })),
+    creditTransactions.map(t => ({
       ...t,
-      expiration_baseline_microdollars_used: computedOriginalBaselines.get(t.id) ?? 0,
-    }));
+      original_baseline_microdollars_used: computedOriginalBaselines.get(t.id) ?? 0,
+    }))
+  );
 
   // Use the latest expiration event time (max created_at of records with original_transaction_id)
   // This ensures we only replay expirations that have already been processed

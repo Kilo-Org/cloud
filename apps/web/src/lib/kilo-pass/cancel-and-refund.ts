@@ -1,4 +1,5 @@
 import 'server-only';
+import { closeCreditExpirationsForBalanceReset } from '@kilocode/web-shared/lib/credit-refund';
 
 import type Stripe from 'stripe';
 import { and, eq, isNull, sql } from 'drizzle-orm';
@@ -222,6 +223,7 @@ export async function cancelAndRefundKiloPassForUser({
 
     let balanceReset: number | null = null;
     if (currentBalanceMicrodollars > 0 && freshUser) {
+      await closeCreditExpirationsForBalanceReset(tx, userId, freshUser.microdollars_used);
       await tx.insert(credit_transactions).values({
         kilo_user_id: userId,
         organization_id: null,

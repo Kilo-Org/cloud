@@ -1,4 +1,5 @@
 import 'server-only';
+import { paidCreditExpiration } from '@kilocode/web-shared/lib/paid-credit-expiration';
 
 import {
   credit_transactions,
@@ -507,7 +508,10 @@ async function grant(
 ) {
   if (input.microdollars === 0) return null;
   const [organization] = await tx
-    .select({ microdollarsUsed: organizations.microdollars_used })
+    .select({
+      microdollarsUsed: organizations.microdollars_used,
+      acquired: organizations.total_microdollars_acquired,
+    })
     .from(organizations)
     .where(eq(organizations.id, input.organizationId))
     .for('update');
@@ -524,6 +528,12 @@ async function grant(
       credit_category: input.identity,
       check_category_uniqueness: true,
       expiry_date: expiresAt ?? null,
+      debt_repaid_microdollars: expiresAt
+        ? Math.min(
+            Math.max(0, input.microdollars),
+            Math.max(0, organization.microdollarsUsed - organization.acquired)
+          )
+        : null,
       expiration_baseline_microdollars_used: expiresAt ? organization.microdollarsUsed : null,
       original_baseline_microdollars_used: organization.microdollarsUsed,
     })
@@ -706,6 +716,7 @@ async function issue(
       microdollars: base,
       identity: grantKey,
       description: 'Kilo Pass organization base issuance',
+      expiresAt: paidCreditExpiration(),
     });
     const bonusId =
       row.term.bonus_mode === KiloPassOrgBonusMode.Upfront
@@ -1216,6 +1227,7 @@ export async function createParentSupplement(input: {
       microdollars: baseAmount,
       identity: `kpo:supplement:base:${input.providerInvoiceLineId}`,
       description: 'Kilo Pass organization supplement',
+      expiresAt: paidCreditExpiration(),
     });
     const bonusId =
       agreement.term.bonus_mode === KiloPassOrgBonusMode.Upfront

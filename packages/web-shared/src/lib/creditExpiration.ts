@@ -19,10 +19,13 @@ export type ExpiringTransaction = Pick<
   | 'expiry_date'
   | 'description'
   | 'is_free'
->;
+> & { refunded_consumption_microdollars?: number; debt_repaid_microdollars?: number | null };
 
 export type CreditTransactionForBlocks = ExpiringTransaction &
-  Pick<CreditTransaction, 'credit_category' | 'original_transaction_id' | 'created_at'>;
+  Pick<CreditTransaction, 'credit_category' | 'original_transaction_id' | 'created_at'> &
+  Partial<
+    Pick<CreditTransaction, 'refund_for_transaction_id' | 'original_baseline_microdollars_used'>
+  >;
 
 export type EntityForExpiration = { id: string; microdollars_used: number };
 export type UserForExpiration = EntityForExpiration;
@@ -79,10 +82,20 @@ export function computeExpiration(
     if (!isExpired) continue;
 
     const baseline = newBaselines.get(t.id) ?? t.expiration_baseline_microdollars_used ?? 0;
-    const transactionEnd = baseline + t.amount_microdollars;
+    const refundedConsumption = Math.max(
+      0,
+      (t.refunded_consumption_microdollars ?? 0) -
+        (baseline - (t.expiration_baseline_microdollars_used ?? 0))
+    );
+    const transactionEnd =
+      baseline +
+      Math.max(t.amount_microdollars - (t.debt_repaid_microdollars ?? 0), refundedConsumption);
     const usageEnd = Math.min(transactionEnd, entity.microdollars_used);
     const usage = Math.max(0, usageEnd - baseline);
-    const expiredAmount = t.amount_microdollars - usage;
+    const expiredAmount = Math.max(
+      0,
+      t.amount_microdollars - (t.debt_repaid_microdollars ?? 0) - usage
+    );
     newTransactions.push({
       kilo_user_id,
       amount_microdollars: expiredAmount === 0 ? 0 : -expiredAmount,
@@ -97,6 +110,19 @@ export function computeExpiration(
       const otherT = sortedByExpiry[laterIndex];
       const otherBaseline =
         newBaselines.get(otherT.id) ?? otherT.expiration_baseline_microdollars_used ?? 0;
+      const otherRefundedConsumption = Math.max(
+        0,
+        (otherT.refunded_consumption_microdollars ?? 0) -
+          (otherBaseline - (otherT.expiration_baseline_microdollars_used ?? 0))
+      );
+      // A consumed refund reserve is historical debt, not movable remaining credit.
+      if (
+        otherRefundedConsumption > 0 &&
+        otherRefundedConsumption >=
+          otherT.amount_microdollars - (otherT.debt_repaid_microdollars ?? 0) &&
+        otherBaseline + otherRefundedConsumption <= baseline
+      )
+        continue;
       const consumedOverlap = Math.min(usage, usageEnd - otherBaseline);
       if (consumedOverlap <= 0) continue;
       newBaselines.set(otherT.id, otherBaseline + consumedOverlap);
@@ -105,16 +131,59 @@ export function computeExpiration(
   return { newTransactions, newBaselines };
 }
 
-export async function fetchExpiringTransactions(userId: string, fromDb: typeof db = db) {
+export function applyCreditRefundAdjustments<T extends ExpiringTransaction>(
+  transactions: T[],
+  adjustments: (Pick<CreditTransaction, 'amount_microdollars' | 'created_at'> &
+    Partial<
+      Pick<CreditTransaction, 'refund_for_transaction_id' | 'original_baseline_microdollars_used'>
+    >)[]
+): (T & { refunded_consumption_microdollars: number })[] {
+  return transactions.map(transaction => {
+    let amount = transaction.amount_microdollars;
+    let consumed = 0;
+    const refunds = adjustments
+      .filter(
+        row =>
+          row.refund_for_transaction_id === transaction.id &&
+          (!transaction.expiry_date || new Date(row.created_at) < new Date(transaction.expiry_date))
+      )
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    for (const refund of refunds) {
+      if (refund.amount_microdollars < 0) {
+        // Refunding already-consumed value creates debt, not usage another grant can claim.
+        consumed = Math.max(
+          consumed,
+          Math.min(
+            Math.max(0, amount - (transaction.debt_repaid_microdollars ?? 0)),
+            Math.max(
+              0,
+              (refund.original_baseline_microdollars_used ?? 0) -
+                (transaction.expiration_baseline_microdollars_used ?? 0)
+            )
+          )
+        );
+      }
+      amount += refund.amount_microdollars;
+    }
+    return {
+      ...transaction,
+      amount_microdollars: Math.max(0, amount),
+      refunded_consumption_microdollars: consumed,
+    };
+  });
+}
+
+export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx = db) {
   const expiredCredits = alias(creditTransactionsTable, 'expired_credits');
 
   // Fetch ALL transactions with expiry dates (including future ones) for baseline adjustment
   // Use LEFT JOIN to exclude transactions that have already been processed (have a credits_expired entry)
   // Match on original_transaction_id (preferred) OR orb_credit_block_id (legacy)
-  return await fromDb
+  const transactions = await fromDb
     .select({
       id: creditTransactionsTable.id,
       amount_microdollars: creditTransactionsTable.amount_microdollars,
+      debt_repaid_microdollars: creditTransactionsTable.debt_repaid_microdollars,
       expiration_baseline_microdollars_used:
         creditTransactionsTable.expiration_baseline_microdollars_used,
       expiry_date: creditTransactionsTable.expiry_date,
@@ -142,6 +211,20 @@ export async function fetchExpiringTransactions(userId: string, fromDb: typeof d
         isNull(creditTransactionsTable.organization_id)
       )
     );
+  if (!transactions.length) return transactions;
+  const adjustments = await fromDb
+    .select()
+    .from(creditTransactionsTable)
+    .where(
+      and(
+        eq(creditTransactionsTable.kilo_user_id, userId),
+        inArray(
+          creditTransactionsTable.refund_for_transaction_id,
+          transactions.map(t => t.id)
+        )
+      )
+    );
+  return applyCreditRefundAdjustments(transactions, adjustments);
 }
 
 /**
@@ -153,12 +236,13 @@ export async function fetchExpiringTransactions(userId: string, fromDb: typeof d
  */
 export async function processLocalExpirations(
   user: UserForLocalExpiration,
-  now: Date
+  now: Date,
+  transaction?: DrizzleTransaction
 ): Promise<null | {
   total_microdollars_acquired: number;
 }> {
   const next_credit_expiration_at = user.next_credit_expiration_at;
-  const all_expiring_transactions = await fetchExpiringTransactions(user.id);
+  const all_expiring_transactions = await fetchExpiringTransactions(user.id, transaction ?? db);
 
   const expirationResult = computeExpiration(all_expiring_transactions, user, now, user.id);
 
@@ -180,7 +264,7 @@ export async function processLocalExpirations(
   );
   const new_total_microdollars_acquired = user.total_microdollars_acquired + total_expired;
 
-  const somethingExpired = await db.transaction(async tx => {
+  const persist = async (tx: DrizzleTransaction) => {
     // Update user with optimistic concurrency check
     const updateResult = await tx
       .update(kilocode_users)
@@ -219,7 +303,8 @@ export async function processLocalExpirations(
         .where(eq(creditTransactionsTable.id, transactionId));
     }
     return true;
-  });
+  };
+  const somethingExpired = transaction ? await persist(transaction) : await db.transaction(persist);
 
   if (!somethingExpired) return null;
 
@@ -263,6 +348,7 @@ export async function fetchExpiringTransactionsForOrganization(
     .select({
       id: creditTransactionsTable.id,
       amount_microdollars: creditTransactionsTable.amount_microdollars,
+      debt_repaid_microdollars: creditTransactionsTable.debt_repaid_microdollars,
       expiration_baseline_microdollars_used:
         creditTransactionsTable.expiration_baseline_microdollars_used,
       expiry_date: creditTransactionsTable.expiry_date,
@@ -369,6 +455,7 @@ async function fetchExpiringTransactionsForOrganizations(
     .select({
       id: creditTransactionsTable.id,
       amount_microdollars: creditTransactionsTable.amount_microdollars,
+      debt_repaid_microdollars: creditTransactionsTable.debt_repaid_microdollars,
       expiration_baseline_microdollars_used:
         creditTransactionsTable.expiration_baseline_microdollars_used,
       expiry_date: creditTransactionsTable.expiry_date,

@@ -238,6 +238,98 @@ describe('ChatInput finalize failure', () => {
     jest.clearAllMocks();
   });
 
+  it('autosizes a hidden composer on reveal and width changes without reacting to height changes', () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const previousResizeObserver = globalThis.ResizeObserver;
+    const textareaPrototype = Object.getPrototypeOf(
+      dom.container.ownerDocument.createElement('textarea')
+    );
+    const previousClientWidth = Object.getOwnPropertyDescriptor(textareaPrototype, 'clientWidth');
+    const previousScrollHeight = Object.getOwnPropertyDescriptor(textareaPrototype, 'scrollHeight');
+    let width = 0;
+    let scrollHeight = 0;
+    const readScrollHeight = jest.fn(() => scrollHeight);
+    const observe = jest.fn();
+    const disconnect = jest.fn();
+    let notifyResize = () => {};
+    class MockResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        notifyResize = () => callback([], this);
+      }
+      observe = observe;
+      disconnect = disconnect;
+      unobserve = jest.fn();
+    }
+    Object.defineProperties(textareaPrototype, {
+      clientWidth: { configurable: true, get: () => width },
+      scrollHeight: { configurable: true, get: readScrollHeight },
+    });
+    Object.assign(globalThis, { ResizeObserver: MockResizeObserver });
+
+    try {
+      act(() => {
+        root.render(
+          createElement(ChatInput, {
+            onSend: jest.fn(async () => true),
+            attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+          })
+        );
+      });
+      const textarea = dom.container.querySelector('textarea');
+      if (!textarea) throw new Error('textarea missing');
+      expect(textarea.style.height).not.toBe('0px');
+      expect(readScrollHeight).not.toHaveBeenCalled();
+      expect(observe).toHaveBeenCalledWith(textarea);
+
+      width = 640;
+      scrollHeight = 40;
+      act(() => notifyResize());
+      expect(textarea.style.height).toBe('40px');
+      act(() => setTextareaValue(dom.container, 'Visible draft'));
+      expect(textarea.value).toBe('Visible draft');
+
+      readScrollHeight.mockClear();
+      scrollHeight = 80;
+      act(() => notifyResize());
+      expect(readScrollHeight).not.toHaveBeenCalled();
+
+      width = 320;
+      act(() => notifyResize());
+      expect(textarea.style.height).toBe('80px');
+      scrollHeight = 240;
+      act(() => setTextareaValue(dom.container, 'Longer draft'));
+      expect(textarea.style.height).toBe('200px');
+
+      width = 0;
+      scrollHeight = 0;
+      act(() => notifyResize());
+      act(() => setTextareaValue(dom.container, 'Hidden draft'));
+      expect(textarea.style.height).toBe('200px');
+      width = 640;
+      scrollHeight = 40;
+      act(() => notifyResize());
+      expect(textarea.style.height).toBe('40px');
+      expect(textarea.value).toBe('Hidden draft');
+    } finally {
+      act(() => root.unmount());
+      if (previousClientWidth) {
+        Object.defineProperty(textareaPrototype, 'clientWidth', previousClientWidth);
+      } else {
+        delete textareaPrototype.clientWidth;
+      }
+      if (previousScrollHeight) {
+        Object.defineProperty(textareaPrototype, 'scrollHeight', previousScrollHeight);
+      } else {
+        delete textareaPrototype.scrollHeight;
+      }
+      Object.assign(globalThis, { ResizeObserver: previousResizeObserver });
+      dom.cleanup();
+    }
+    expect(disconnect).toHaveBeenCalled();
+  });
+
   it('gates Stop on interrupt capability independently of send availability', () => {
     mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
     const onStop = jest.fn();

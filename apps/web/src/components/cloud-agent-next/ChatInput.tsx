@@ -271,9 +271,24 @@ export function ChatInput({
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    textarea.style.height = 'auto';
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
-  }, [value]);
+    const resize = () => {
+      if (textarea.clientWidth === 0) return;
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    };
+    resize();
+
+    if (typeof ResizeObserver === 'undefined') return;
+    let previousWidth = textarea.clientWidth;
+    const observer = new ResizeObserver(() => {
+      const width = textarea.clientWidth;
+      if (width === previousWidth) return;
+      previousWidth = width;
+      resize();
+    });
+    observer.observe(textarea);
+    return () => observer.disconnect();
+  }, [value, textareaRef]);
 
   const sendMessage = useCallback(
     async (message: string) => {
@@ -430,8 +445,6 @@ export function ChatInput({
         const inserted = `/${command.trigger} `;
         setInputValue(inserted);
         if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
           const end = inserted.length;
           textareaRef.current.setSelectionRange(end, end);
         }
@@ -600,7 +613,7 @@ export function ChatInput({
               placeholder={placeholder}
               disabled={textareaDisabled}
               maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
-              className="max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent px-3 pt-3 pb-1 text-base focus:ring-0 focus:outline-none md:text-sm"
+              className="min-h-10 max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent px-3 pt-3 pb-1 text-base focus:ring-0 focus:outline-none md:text-sm"
               rows={1}
               role="combobox"
               aria-expanded={showAutocomplete}

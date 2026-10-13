@@ -38,7 +38,12 @@ export async function assembleCustomRoutingTable(
     BenchmarkConfig,
     'deciderRepetitions' | 'minAccuracy' | 'switchCostFactor' | 'bestAccuracySwitchThreshold'
   > &
-    Partial<Pick<BenchmarkConfig, 'productionTokenProfile' | 'switchHorizonTurns'>>,
+    Partial<
+      Pick<
+        BenchmarkConfig,
+        'productionTokenProfile' | 'switchHorizonTurns' | 'lowConfidenceThreshold'
+      >
+    >,
   entries: readonly PoolEntry[],
   options: {
     now?: Date;
@@ -82,6 +87,7 @@ export async function assembleCustomRoutingTable(
     bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
     productionTokenProfile: config.productionTokenProfile ?? null,
     switchHorizonTurns: config.switchHorizonTurns ?? null,
+    lowConfidenceThreshold: config.lowConfidenceThreshold ?? null,
     prices,
     readyEntries,
     summaries,

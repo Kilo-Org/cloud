@@ -331,6 +331,7 @@ export function formStateToConfig(
     bestAccuracySwitchThreshold: state.bestAccuracySwitchThreshold,
     productionTokenProfile: base?.productionTokenProfile ?? null,
     switchHorizonTurns: base?.switchHorizonTurns ?? null,
+    lowConfidenceThreshold: base?.lowConfidenceThreshold ?? null,
     maxConcurrency: state.maxConcurrency,
     userMaxConcurrency: state.userMaxConcurrency,
     benchmarkUserId: benchmarkUserId.length > 0 ? benchmarkUserId : null,

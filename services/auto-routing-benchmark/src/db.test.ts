@@ -216,10 +216,12 @@ describe('rowsToRoutingTable', () => {
       ...sampleTable,
       productionTokenProfile: { uncachedInputTokens: 20, cachedInputTokens: 80 },
       switchHorizonTurns: 4,
+      lowConfidenceThreshold: 0.8,
       routes: {
         'implementation/code_generation': [
           {
             ...candidate('synthetic/model'),
+            cases: 30,
             pricing: {
               promptUsdPerToken: 0.002,
               completionUsdPerToken: 0.003,
@@ -288,6 +290,7 @@ describe('rowsToRoutingTable', () => {
       best_accuracy_switch_threshold: 0.05,
       production_token_profile: null,
       switch_horizon_turns: null,
+      low_confidence_threshold: null,
       source: 'benchmark',
     };
     const candidateRows = [
@@ -297,6 +300,7 @@ describe('rowsToRoutingTable', () => {
         rank: 0,
         model: 'model-a',
         accuracy: 0.9,
+        cases: null,
         avg_cost_usd: 0.001,
         meets_threshold: true,
         reasoning_effort: 'high',
@@ -321,6 +325,7 @@ describe('rowsToRoutingTable', () => {
       best_accuracy_switch_threshold: 0.05,
       production_token_profile: null,
       switch_horizon_turns: null,
+      low_confidence_threshold: null,
       source: 'benchmark',
     };
     const candidateRows = [
@@ -330,6 +335,7 @@ describe('rowsToRoutingTable', () => {
         rank: 0,
         model: 'model-a',
         accuracy: 0.9,
+        cases: null,
         avg_cost_usd: 0.001,
         meets_threshold: true,
         reasoning_effort: null,

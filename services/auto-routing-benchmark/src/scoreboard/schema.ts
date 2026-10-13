@@ -129,6 +129,7 @@ export const LiveScoreboardTableRowSchema = z.object({
     .positive()
     .nullish()
     .transform(value => value ?? null),
+  low_confidence_threshold: nullableRate.optional().transform(value => value ?? null),
   source: z.string(),
 });
 
@@ -149,5 +150,11 @@ export const LiveScoreboardCandidateRowSchema = z.object({
     .nullish()
     .transform(value => value ?? null),
   estimated_request_cost_usd: nullableMetric.optional().transform(value => value ?? null),
+  cases: z
+    .number()
+    .int()
+    .nonnegative()
+    .nullish()
+    .transform(value => value ?? null),
   p50LatencyMs: nullableMetric,
 });

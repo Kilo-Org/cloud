@@ -125,6 +125,193 @@ describe('computeDecision', () => {
       switchReason: null,
     });
   });
+  describe('low-confidence fallback', () => {
+    const configuredTable: RoutingTable = { ...table, lowConfidenceThreshold: 0.8 };
+
+    it('picks the most accurate eligible candidate below the threshold', () => {
+      const decision = computeDecision(
+        classification,
+        configuredTable,
+        null,
+        new Set(),
+        'cost_per_accuracy',
+        { confidence: 0.79 }
+      );
+      expect(decision).toMatchObject({ model: 'pricey/chat', source: 'benchmark', sticky: false });
+    });
+
+    it.each([0.8, 0.81])('keeps the value pick at confidence %s', confidence => {
+      const decision = computeDecision(
+        classification,
+        configuredTable,
+        null,
+        new Set(),
+        'cost_per_accuracy',
+        { confidence }
+      );
+      expect(decision?.model).toBe('cheap/chat');
+    });
+
+    it.each([null, undefined])('keeps the value pick with threshold %s', lowConfidenceThreshold => {
+      const decision = computeDecision(
+        classification,
+        { ...table, lowConfidenceThreshold },
+        null,
+        new Set(),
+        'cost_per_accuracy',
+        { confidence: 0.1 }
+      );
+      expect(decision?.model).toBe('cheap/chat');
+    });
+
+    it('does not use synthetic confidence when no classifier confidence is supplied', () => {
+      const decision = computeDecision({ ...classification, confidence: 0 }, configuredTable, null);
+      expect(decision?.model).toBe('cheap/chat');
+    });
+
+    it('excludes denied candidates before the accuracy pick', () => {
+      const decision = computeDecision(
+        classification,
+        configuredTable,
+        null,
+        new Set(['pricey/chat']),
+        'cost_per_accuracy',
+        { confidence: 0.1 }
+      );
+      expect(decision?.model).toBe('cheap/chat');
+    });
+
+    it('excludes candidates that lack the required input modality', () => {
+      const decision = computeDecision(
+        classification,
+        configuredTable,
+        null,
+        new Set(),
+        'cost_per_accuracy',
+        {
+          confidence: 0.1,
+          constraints: { requiredInputModalities: ['image'] },
+          capabilityMap: makeCaps({
+            'cheap/chat': { inputModalities: ['image'] },
+            'mid/chat': { inputModalities: ['image'] },
+            'pricey/chat': { inputModalities: ['text'] },
+          }),
+        }
+      );
+      expect(decision?.model).toBe('cheap/chat');
+    });
+
+    it('excludes candidates whose known context cannot fit the prompt', () => {
+      const decision = computeDecision(
+        classification,
+        configuredTable,
+        null,
+        new Set(),
+        'cost_per_accuracy',
+        {
+          confidence: 0.1,
+          constraints: { promptTokensEstimate: 100 },
+          capabilityMap: makeCaps({
+            'cheap/chat': { contextLength: 200 },
+            'mid/chat': { contextLength: 200 },
+            'pricey/chat': { contextLength: 50 },
+          }),
+        }
+      );
+      expect(decision?.model).toBe('cheap/chat');
+    });
+
+    it('excludes inactive candidates in a custom pool', () => {
+      const decision = computeDecision(
+        classification,
+        configuredTable,
+        null,
+        new Set(),
+        'cost_per_accuracy',
+        {
+          confidence: 0.1,
+          failClosedOnInactive: true,
+          capabilityMap: makeCaps({
+            'cheap/chat': {},
+            'mid/chat': {},
+            'pricey/chat': { isActive: false },
+          }),
+        }
+      );
+      expect(decision?.model).toBe('cheap/chat');
+    });
+
+    it('uses the existing lower-cost tie-break for equally accurate candidates', () => {
+      const tiedTable: RoutingTable = {
+        ...configuredTable,
+        routes: {
+          'implementation/code_generation': [
+            { model: 'value/chat', accuracy: 0.8, avgCostUsd: 0.001, meetsThreshold: true },
+            { model: 'expensive/chat', accuracy: 0.9, avgCostUsd: 0.03, meetsThreshold: true },
+            { model: 'accurate/chat', accuracy: 0.9, avgCostUsd: 0.02, meetsThreshold: true },
+          ],
+        },
+      };
+      const decision = computeDecision(
+        classification,
+        tiedTable,
+        null,
+        new Set(),
+        'cost_per_accuracy',
+        { confidence: 0.1 }
+      );
+      expect(decision?.model).toBe('accurate/chat');
+    });
+
+    it('still applies cost-mode stickiness after the fresh accuracy pick', () => {
+      const decision = computeDecision(
+        classification,
+        configuredTable,
+        inc('cheap/chat'),
+        new Set(),
+        'cost_per_accuracy',
+        { confidence: 0.1 }
+      );
+      expect(decision).toMatchObject({ model: 'cheap/chat', sticky: true, switchReason: null });
+    });
+
+    it('returns no decision when filters exclude every candidate', () => {
+      const decision = computeDecision(
+        classification,
+        configuredTable,
+        null,
+        new Set(),
+        'cost_per_accuracy',
+        {
+          confidence: 0.1,
+          constraints: { requiredInputModalities: ['image'] },
+          capabilityMap: makeCaps({
+            'cheap/chat': { inputModalities: ['text'] },
+            'mid/chat': { inputModalities: ['text'] },
+            'pricey/chat': { inputModalities: ['text'] },
+            'weak/chat': { inputModalities: ['text'] },
+          }),
+        }
+      );
+      expect(decision).toBeNull();
+    });
+
+    it('does not retain an incumbent excluded by fallback filters', () => {
+      const decision = computeDecision(
+        classification,
+        configuredTable,
+        inc('pricey/chat'),
+        new Set(['pricey/chat', 'cheap/chat']),
+        'cost_per_accuracy',
+        { confidence: 0.1 }
+      );
+      expect(decision).toMatchObject({
+        model: 'mid/chat',
+        sticky: false,
+        switchReason: 'threshold',
+      });
+    });
+  });
   it('does not keep a lower-accuracy incumbent in best accuracy mode', () => {
     const decision = computeDecision(
       classification,

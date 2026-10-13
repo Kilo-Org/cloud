@@ -74,6 +74,7 @@ const validConfig = {
   bestAccuracySwitchThreshold: 0.05,
   productionTokenProfile: null,
   switchHorizonTurns: null,
+  lowConfidenceThreshold: null,
   maxConcurrency: 4,
   userMaxConcurrency: 100,
   benchmarkUserId: null,

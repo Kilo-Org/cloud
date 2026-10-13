@@ -275,13 +275,13 @@ function isTransientFailure(response: Response | ClassifierRunError): boolean {
   );
 }
 
-export async function classifyWithSystemOne(
+export async function requestSystemOne(
   client: SystemOneClient,
-  input: NormalizedClassifierInput,
-  classifierModel: string
-): Promise<ClassifierRunResult> {
-  const body = JSON.stringify(buildClassifierRequest(input, classifierModel));
-  let response = await postSystemOne(client, body, classifierModel);
+  request: unknown,
+  model: string
+): Promise<Response> {
+  const body = JSON.stringify(request);
+  let response = await postSystemOne(client, body, model);
   // One quick retry absorbs a rate-limit or provider blip; the gateway waits on
   // this decision, so the retry stays single and short. Failed HTTP calls are
   // not billed, so no cost is carried over.
@@ -290,7 +290,7 @@ export async function classifyWithSystemOne(
     const { promise, resolve } = Promise.withResolvers<void>();
     setTimeout(resolve, TRANSIENT_RETRY_DELAY_MS);
     await promise;
-    response = await postSystemOne(client, body, classifierModel);
+    response = await postSystemOne(client, body, model);
   }
   if (response instanceof ClassifierRunError) throw response;
 
@@ -299,10 +299,23 @@ export async function classifyWithSystemOne(
     await response.body?.cancel();
     throw new ClassifierRunError(`System One returned HTTP ${response.status}`, {
       cost: null,
-      classifierModel,
+      classifierModel: model,
       failureStage: `http_${response.status}`,
     });
   }
+  return response;
+}
+
+export async function classifyWithSystemOne(
+  client: SystemOneClient,
+  input: NormalizedClassifierInput,
+  classifierModel: string
+): Promise<ClassifierRunResult> {
+  const response = await requestSystemOne(
+    client,
+    buildClassifierRequest(input, classifierModel),
+    classifierModel
+  );
 
   const responseBody: unknown = await response.json().catch(() => null);
   const parsed = SystemOneClassifierResponseSchema.safeParse(responseBody);

@@ -31,6 +31,7 @@ export function buildRoutingTable(params: {
   bestAccuracySwitchThreshold: number;
   productionTokenProfile?: ProductionTokenProfile | null;
   switchHorizonTurns?: number | null;
+  lowConfidenceThreshold?: number | null;
   prices?: ReadonlyMap<string, CandidatePricing | null>;
   deciderModels: BenchmarkDeciderModel[];
   summaries: BenchmarkModelSummary[];
@@ -68,6 +69,7 @@ export function buildRoutingTable(params: {
           return {
             model: s.model,
             accuracy: s.accuracy,
+            cases: s.cases,
             avgCostUsd: s.avgCostUsd ?? 0,
             p50LatencyMs: s.p50LatencyMs,
             variant,
@@ -90,6 +92,7 @@ export function buildRoutingTable(params: {
     bestAccuracySwitchThreshold,
     productionTokenProfile: params.productionTokenProfile ?? null,
     switchHorizonTurns: params.switchHorizonTurns ?? null,
+    lowConfidenceThreshold: params.lowConfidenceThreshold ?? null,
     source: 'benchmark',
     routes,
   };
@@ -129,6 +132,7 @@ export function computeRegistryRoutingTableVersion(
     bestAccuracySwitchThreshold: number;
     productionTokenProfile?: ProductionTokenProfile | null;
     switchHorizonTurns?: number | null;
+    lowConfidenceThreshold?: number | null;
     prices?: ReadonlyMap<string, CandidatePricing | null>;
   }
 ): string {
@@ -146,6 +150,7 @@ export function computeRegistryRoutingTableVersion(
           ]
         : null,
       horizon: knobs.switchHorizonTurns ?? null,
+      lowConfidenceThreshold: knobs.lowConfidenceThreshold ?? null,
       prices: [...new Set(contributors.map(c => c.model))].sort().map(model => {
         const pricing = knobs.prices?.get(model);
         return [
@@ -198,6 +203,7 @@ export function buildCustomRoutingTable(params: {
   bestAccuracySwitchThreshold: number;
   productionTokenProfile?: ProductionTokenProfile | null;
   switchHorizonTurns?: number | null;
+  lowConfidenceThreshold?: number | null;
   prices?: ReadonlyMap<string, CandidatePricing | null>;
   /** Ready current profiles with provenance run ids. */
   readyEntries: readonly {
@@ -231,6 +237,7 @@ export function buildCustomRoutingTable(params: {
         .map(s => ({
           model: s.model,
           accuracy: s.accuracy,
+          cases: s.cases,
           avgCostUsd: s.avgCostUsd ?? 0,
           p50LatencyMs: s.p50LatencyMs,
           pricing: params.prices?.get(s.model) ?? null,
@@ -259,6 +266,7 @@ export function buildCustomRoutingTable(params: {
       bestAccuracySwitchThreshold,
       productionTokenProfile: params.productionTokenProfile,
       switchHorizonTurns: params.switchHorizonTurns,
+      lowConfidenceThreshold: params.lowConfidenceThreshold,
       prices: params.prices,
     }
   );
@@ -271,6 +279,7 @@ export function buildCustomRoutingTable(params: {
     bestAccuracySwitchThreshold,
     productionTokenProfile: params.productionTokenProfile ?? null,
     switchHorizonTurns: params.switchHorizonTurns ?? null,
+    lowConfidenceThreshold: params.lowConfidenceThreshold ?? null,
     source: 'benchmark',
     routes,
   };

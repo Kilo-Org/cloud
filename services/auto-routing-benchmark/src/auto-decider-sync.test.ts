@@ -58,6 +58,7 @@ const config = {
   best_accuracy_switch_threshold: 0.05,
   production_token_profile: null,
   switch_horizon_turns: null,
+  low_confidence_threshold: null,
   max_concurrency: 100,
   benchmark_user_id: 'user-123',
   benchmark_org_id: null,

@@ -30,6 +30,7 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
     mode: 'json',
   }).$type<ProductionTokenProfile>(),
   switch_horizon_turns: integer('switch_horizon_turns'),
+  low_confidence_threshold: real('low_confidence_threshold'),
   max_concurrency: integer('max_concurrency').notNull(),
   // Live container budget for user-queue runs, independent of max_concurrency
   // (the platform-queue budget). The two must sum to at most the platform
@@ -197,6 +198,7 @@ export const routingTables = sqliteTable('routing_tables', {
     mode: 'json',
   }).$type<ProductionTokenProfile>(),
   switch_horizon_turns: integer('switch_horizon_turns'),
+  low_confidence_threshold: real('low_confidence_threshold'),
   source: text('source').notNull(),
 });
 
@@ -208,6 +210,7 @@ export const routingTableCandidates = sqliteTable(
     rank: integer('rank').notNull(),
     model: text('model').notNull(),
     accuracy: real('accuracy').notNull(),
+    cases: integer('cases'),
     // Non-null unlike model_summaries: RankedCandidate.avgCostUsd is a plain
     // nonnegative number (buildRoutingTable excludes summaries without a
     // cost signal, so every published candidate has one).

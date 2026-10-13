@@ -244,6 +244,17 @@ function sameExactPair(
   return a.model === b.model && a.variant === b.variant;
 }
 
+export function isLowConfidence(
+  table: RoutingTable | null,
+  confidence: number | undefined
+): boolean {
+  return (
+    typeof table?.lowConfidenceThreshold === 'number' &&
+    confidence !== undefined &&
+    confidence < table.lowConfidenceThreshold
+  );
+}
+
 export function computeDecision(
   classification: ClassifierOutput,
   table: RoutingTable | null,
@@ -251,6 +262,7 @@ export function computeDecision(
   deniedModelIds: ReadonlySet<string> = new Set(),
   mode: AutoRoutingMode = DEFAULT_AUTO_ROUTING_MODE,
   options: {
+    confidence?: number;
     constraints?: RoutingConstraints | undefined;
     contextTokens?: number | undefined;
     capabilityMap?: ModelCapabilitiesMap | undefined;
@@ -284,7 +296,10 @@ export function computeDecision(
     return null;
   }
 
-  const freshPick = pickFreshCandidate(candidates, mode);
+  const freshPick = pickFreshCandidate(
+    candidates,
+    isLowConfidence(table, options.confidence) ? 'best_accuracy' : mode
+  );
   const freshPair = { model: freshPick.model, variant: candidateVariant(freshPick) };
 
   const incumbentCandidate = findIncumbentCandidate(candidates, incumbent);

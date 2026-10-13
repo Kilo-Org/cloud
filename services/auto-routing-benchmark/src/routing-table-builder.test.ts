@@ -66,6 +66,12 @@ describe('production-cost table version', () => {
       computeRegistryRoutingTableVersion(contributors, { ...knobs, switchHorizonTurns: 4 })
     ).not.toBe(base);
     expect(
+      computeRegistryRoutingTableVersion(contributors, { ...knobs, lowConfidenceThreshold: 0.8 })
+    ).not.toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, { ...knobs, lowConfidenceThreshold: null })
+    ).toBe(base);
+    expect(
       computeRegistryRoutingTableVersion(contributors, {
         ...knobs,
         prices: new Map([
@@ -106,12 +112,41 @@ describe('buildRoutingTable', () => {
     const route = 'implementation/code_generation';
     expect(buildRoutingTable(params).routes[route]?.[0]?.model).toBe('model/cheap');
     const productionTokenProfile = { uncachedInputTokens: 20, cachedInputTokens: 80 };
-    const table = buildRoutingTable({ ...params, productionTokenProfile, switchHorizonTurns: 4 });
+    const table = buildRoutingTable({
+      ...params,
+      productionTokenProfile,
+      switchHorizonTurns: 4,
+      lowConfidenceThreshold: 0.8,
+    });
     expect(table.routes[route]?.[0]?.model).toBe('model/value');
     expect(table.routes[route]?.[0]?.estimatedRequestCostUsd).toBeCloseTo(0.032);
     expect(table.routes[route]?.[0]?.pricing).toEqual(params.prices.get('model/value'));
     expect(table.productionTokenProfile).toEqual(productionTokenProfile);
     expect(table.switchHorizonTurns).toBe(4);
+    expect(table.lowConfidenceThreshold).toBe(0.8);
+    expect(table.routes[route]?.[0]?.cases).toBe(10);
+  });
+
+  it('ranks equally accurate candidates by their measured sample size', () => {
+    const routeKey = 'implementation/code_generation';
+    const table = buildRoutingTable({
+      version: 'synthetic-wilson',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.95,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      deciderModels: DECIDER_MODELS,
+      summaries: summariesForEveryRoute({
+        [routeKey]: [
+          { ...summary('model/cheap', routeKey, 1), cases: 10 },
+          { ...summary('model/value', routeKey, 1), cases: 100 },
+        ],
+      }),
+    });
+    expect(table.routes[routeKey]?.map(c => [c.model, c.cases])).toEqual([
+      ['model/value', 100],
+      ['model/cheap', 10],
+    ]);
   });
 
   it('ranks candidates by lowest cost per accuracy for each taxonomy route', () => {

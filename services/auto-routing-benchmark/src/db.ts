@@ -154,6 +154,7 @@ export async function replaceConfig(
     best_accuracy_switch_threshold: number;
     production_token_profile?: ProductionTokenProfile | null;
     switch_horizon_turns?: number | null;
+    low_confidence_threshold?: number | null;
     max_concurrency: number;
     user_max_concurrency: number;
     benchmark_user_id: string | null;
@@ -1286,6 +1287,7 @@ export function routingTableToRows(
     best_accuracy_switch_threshold: table.bestAccuracySwitchThreshold,
     production_token_profile: table.productionTokenProfile ?? null,
     switch_horizon_turns: table.switchHorizonTurns ?? null,
+    low_confidence_threshold: table.lowConfidenceThreshold ?? null,
     source: table.source,
   };
 
@@ -1302,6 +1304,7 @@ export function routingTableToRows(
         rank,
         model: c.model,
         accuracy: c.accuracy,
+        cases: c.cases ?? null,
         avg_cost_usd: c.avgCostUsd,
         meets_threshold: c.meetsThreshold,
         reasoning_effort: effortKey,
@@ -1331,6 +1334,7 @@ export function rowsToRoutingTable(
     routeMap[row.route_key].push({
       model: row.model,
       accuracy: row.accuracy,
+      ...(row.cases != null ? { cases: row.cases } : {}),
       avgCostUsd: row.avg_cost_usd,
       meetsThreshold: row.meets_threshold,
       ...(row.pricing != null || row.estimated_request_cost_usd != null
@@ -1359,6 +1363,9 @@ export function rowsToRoutingTable(
       : tableRow.switch_horizon_turns != null
         ? { switchHorizonTurns: tableRow.switch_horizon_turns }
         : {}),
+    ...(tableRow.low_confidence_threshold != null
+      ? { lowConfidenceThreshold: tableRow.low_confidence_threshold }
+      : {}),
     source: tableRow.source as RoutingTable['source'],
     routes: routeMap,
   };
@@ -1387,6 +1394,7 @@ export async function saveRoutingTable(
           best_accuracy_switch_threshold: tableRow.best_accuracy_switch_threshold,
           production_token_profile: tableRow.production_token_profile,
           switch_horizon_turns: tableRow.switch_horizon_turns,
+          low_confidence_threshold: tableRow.low_confidence_threshold,
           source: tableRow.source,
         },
       }),

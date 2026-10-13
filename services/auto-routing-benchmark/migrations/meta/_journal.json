@@ -92,6 +92,13 @@
       "when": 1791913598739,
       "tag": "0012_fancy_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1791917551948,
+      "tag": "0013_harsh_pyro",
+      "breakpoints": true
     }
   ]
 }

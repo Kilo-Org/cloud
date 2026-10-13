@@ -13,6 +13,7 @@
     "db:generate": "drizzle-kit generate",
     "scoreboard": "tsx scripts/scoreboard.ts",
     "scoreboard:prod": "tsx scripts/scoreboard-prod.ts",
+    "judge:calibrate": "tsx scripts/judge-calibration.ts",
     "test": "vitest run"
   },
   "dependencies": {

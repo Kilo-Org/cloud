@@ -54,7 +54,8 @@ import {
   type CaseResultRow,
   type PriorModelResult,
 } from './db';
-import { gradeClassifierOutput, runDeciderCheck } from './grading';
+import { gradeClassifierOutput, gradeDeciderOutput, type DeciderJudge } from './grading';
+import { createDeciderJudge } from './decider-judge';
 import { createSystemOneClient } from './openrouter';
 import {
   buildRoutingTable,
@@ -414,6 +415,7 @@ export async function publishPlatformRoutingTable(
         bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
         productionTokenProfile: config.productionTokenProfile,
         switchHorizonTurns: config.switchHorizonTurns,
+        lowConfidenceThreshold: config.lowConfidenceThreshold,
         prices,
       }
     )}-variants`,
@@ -423,6 +425,7 @@ export async function publishPlatformRoutingTable(
     bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
     productionTokenProfile: config.productionTokenProfile,
     switchHorizonTurns: config.switchHorizonTurns,
+    lowConfidenceThreshold: config.lowConfidenceThreshold,
     prices,
     deciderModels,
     summaries: filterSummariesByProvenance(readyEntries, summaries),
@@ -453,7 +456,7 @@ export async function publishPlatformRoutingTable(
 // image's pinned CLI, or any other execution input NOT captured by the dataset
 // hash changes in a way that invalidates prior measurements. Forces every
 // carried summary to be re-benchmarked on the next run.
-const BENCHMARK_ENGINE_VERSION = 1;
+const BENCHMARK_ENGINE_VERSION = 2;
 
 function fnv1aHex(input: string): string {
   let hash = 0x811c9dc5;
@@ -1233,8 +1236,18 @@ async function processDeciderJob(
     caseIds: cases.map(c => c.id),
   });
   const casesToRun = cases.filter(c => !existingCaseIds.has(c.id));
+  let graderCostUsd = 0;
 
   if (casesToRun.length > 0) {
+    let judge: DeciderJudge | null = null;
+    let judgeSetupError: string | null = null;
+    if (casesToRun.some(c => c.check.kind === 'judged')) {
+      try {
+        judge = createDeciderJudge(await createSystemOneClient(env));
+      } catch {
+        judgeSetupError = 'Decider judge client initialization failed';
+      }
+    }
     // Fetch a short-lived user token ONCE per queue message. Non-OK throws so the
     // queue retries the message. The token is never logged.
     const kiloToken = await fetchBenchmarkUserToken(
@@ -1294,20 +1307,30 @@ async function processDeciderJob(
               : (retry.costUsd ?? 0) + (result.costUsd ?? 0);
           result = retry;
         }
-        const succeeded =
-          result.exitCode === 0 &&
-          result.text.length > 0 &&
-          runDeciderCheck(benchCase.check, result.text);
+        const grade =
+          result.exitCode === 0 && result.text.length > 0
+            ? await gradeDeciderOutput(benchCase.check, {
+                userPrompt: benchCase.userPrompt,
+                output: result.text,
+                judge,
+              })
+            : { score: 0, costUsd: 0, graderError: null };
+        graderCostUsd += grade.costUsd;
         await upsertCaseResult(env.BENCH_DB, {
           run_id: message.runId,
           model: message.model,
           variant: storedVariant,
           case_id: benchCase.id,
           route_key: taxonomyRouteKey(benchCase),
-          score: succeeded ? 1 : 0,
+          score: grade.score,
           latency_ms: result.latencyMs,
           cost_usd: result.costUsd,
-          error: result.exitCode !== 0 ? result.stderrTail.slice(0, 500) : null,
+          error:
+            result.exitCode !== 0
+              ? result.stderrTail.slice(0, 500)
+              : grade.graderError
+                ? (judgeSetupError ?? grade.graderError).slice(0, 500)
+                : null,
           fallback_reason: null,
           route_hit: null,
           retried,
@@ -1334,6 +1357,17 @@ async function processDeciderJob(
       }
     });
   }
+  console.log(
+    JSON.stringify({
+      event: 'benchmark_decider_grader_cost',
+      runId: message.runId,
+      model: message.model,
+      variant: entryVariant,
+      rep,
+      chunk,
+      graderCostUsd,
+    })
+  );
 
   const hasNextChunk = await enqueueNextDeciderChunkIfNeeded(
     env,

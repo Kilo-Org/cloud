@@ -54,10 +54,20 @@ Expand a route to inspect every ranked model/effort pair.
 
 - `rankCandidates` (`@kilocode/auto-routing-contracts`) orders every route's candidates.
 - A candidate competes when its accuracy is at most 0.05 below `minAccuracy`, the benchmark noise band.
-- Competing candidates are ordered by `avgCostUsd × p50LatencyMs^1.5 / accuracy^15`, lowest first.
+- Competing candidates are ordered by `estimatedRequestCostUsd × p50LatencyMs^1.5 / wilson^15`, lowest first.
+- `estimatedRequestCostUsd` adds the configured `productionTokenProfile` prompt cost at catalog prices to `avgCostUsd`. Without a profile or pricing, it equals `avgCostUsd`.
+- `wilson` is the Wilson lower bound (z = 1) of accuracy over the candidate's measured `cases`. A well-measured candidate beats a thinly measured one at equal accuracy. Without `cases`, raw accuracy is used.
 - The other candidates follow by accuracy, then cost.
+- When `lowConfidenceThreshold` is set and the classifier's route confidence is below it, the worker picks the most accurate eligible candidate of the route instead of the first-ranked one.
 - `meetsThreshold` stays strict (`accuracy >= minAccuracy`) for sticky routing.
 - The ranking policy version is part of every registry table version, so a policy change republishes.
+
+## Grading
+
+- Decider cases use mechanical checks (`exact`, `contains_all`, `regex`, `json_equal`) wherever an answer can be checked.
+- `judged` checks, at most 30% of a route, are graded by a System One model (`typesafe/jev-1.13`). The case score is its probability that the answer meets the rubric.
+- Calibrate the grader with `pnpm judge:calibrate --in labels.jsonl` or `--from-mechanical cases.json`. The command reports accuracy, the Brier score and a reliability table.
+- Grader cost is logged per job. It is not added to the model's `cost_usd`.
 
 
 ## Scoreboard

@@ -32,6 +32,7 @@ import {
 import type { StickyDecision } from './decision-cache';
 import {
   computeDecision,
+  isLowConfidence,
   modelSatisfiesConstraints,
   type DecisionIncumbent,
 } from './decision-engine';
@@ -271,7 +272,8 @@ function recordDecision(
   autoRoutingMode: string,
   decision: AutoRoutingDecision | null = null,
   incumbent: StickyDecision | null = null,
-  classification: 'sync' | 'cache' | 'background' = outcome.kind === 'cache_hit' ? 'cache' : 'sync'
+  classification: 'sync' | 'cache' | 'background' = outcome.kind === 'cache_hit' ? 'cache' : 'sync',
+  lowConfidence = false
 ): void {
   const summary = summarizeOutcome(outcome);
   summary.details.timings = { ...ctx.timings, totalMs: durationMs };
@@ -341,6 +343,7 @@ function recordDecision(
       decidedSubtaskType: decision?.subtaskType ?? null,
       decisionSource: decision?.source ?? null,
       classification,
+      ...(lowConfidence && decision ? { lowConfidence: true } : {}),
       sticky: decision?.sticky ?? null,
       incumbentModel,
       switched,
@@ -594,7 +597,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
             incumbent,
             deniedModelIds,
             routingMode,
-            decisionOptions
+            { ...decisionOptions, confidence: classifier.classification.confidence }
           );
           await Promise.all([
             putCachedClassification(
@@ -624,7 +627,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
             routingMode,
             decision,
             sticky,
-            'background'
+            'background',
+            isLowConfidence(routingTable, classifier.classification.confidence)
           );
         } catch (error) {
           const cost = getClassifierFailureMetadata(error).cost ?? 0;
@@ -644,14 +648,10 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   }
   if (outcome.kind === 'cache_hit') {
     const cached = outcome.classification;
-    const decision = computeDecision(
-      cached,
-      routingTable,
-      incumbent,
-      deniedModelIds,
-      routingMode,
-      decisionOptions
-    );
+    const decision = computeDecision(cached, routingTable, incumbent, deniedModelIds, routingMode, {
+      ...decisionOptions,
+      confidence: cached.confidence,
+    });
     if (decision) {
       c.executionCtx.waitUntil(
         putStickyDecision(
@@ -671,7 +671,9 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       outcome,
       routingMode,
       decision,
-      sticky
+      sticky,
+      'cache',
+      isLowConfidence(routingTable, cached.confidence)
     );
     return c.json(decisionResponse(pendingCostUsd, cached, payload.input, decision));
   }
@@ -694,7 +696,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       incumbent,
       deniedModelIds,
       routingMode,
-      decisionOptions
+      { ...decisionOptions, confidence: classifier.classification.confidence }
     );
     if (decision) {
       c.executionCtx.waitUntil(
@@ -715,7 +717,9 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       { kind: 'model', classifier },
       routingMode,
       decision,
-      sticky
+      sticky,
+      'sync',
+      isLowConfidence(routingTable, classifier.classification.confidence)
     );
     return c.json(
       decisionResponse(

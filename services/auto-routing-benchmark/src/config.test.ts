@@ -28,6 +28,17 @@ const autoRows = [
 ];
 
 describe('platform model configuration', () => {
+  it('preserves a configured confidence threshold and defaults old rows to disabled', () => {
+    const models = [{ model: 'manual/model', variant: null, reasoning_effort: null }];
+    expect(
+      mapConfigRows(configRow, ['classifier/model'], models)?.lowConfidenceThreshold
+    ).toBeNull();
+    expect(
+      mapConfigRows({ ...configRow, low_confidence_threshold: 0.8 }, ['classifier/model'], models)
+        ?.lowConfidenceThreshold
+    ).toBe(0.8);
+  });
+
   it('discards stale saved variants and legacy selected efforts in every config list', () => {
     const result = mapConfigRows(
       configRow,

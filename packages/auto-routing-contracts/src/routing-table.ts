@@ -89,6 +89,7 @@ export const RankedCandidateSchema = z
     model: z.string().trim().min(1),
     // Benchmark accuracy in [0, 1] for this taxonomy route.
     accuracy: z.number().min(0).max(1),
+    cases: z.number().int().nonnegative().nullable().optional(),
     // Average observed OpenRouter cost per benchmark case, in USD credits.
     avgCostUsd: z.number().nonnegative(),
     meetsThreshold: z.boolean(),
@@ -125,6 +126,7 @@ const routingTableFields = {
   bestAccuracySwitchThreshold: z.number().min(0).max(1).default(0.05),
   productionTokenProfile: ProductionTokenProfileSchema.nullable().optional(),
   switchHorizonTurns: z.number().int().positive().nullable().optional(),
+  lowConfidenceThreshold: z.number().min(0).max(1).nullable().optional(),
   source: z.enum(['benchmark']),
 } as const;
 
@@ -165,18 +167,14 @@ export type CustomRoutingTable = z.infer<typeof CustomRoutingTableSchema>;
 
 export const ROUTING_TABLE_KV_KEY = 'routing_table_v1';
 
-// Accuracy comes from about 10 golden cases per route, so a candidate up to
-// this far below `minAccuracy` is inside benchmark noise. Such a candidate
-// competes on value with the candidates that meet the threshold.
+// Candidates within this raw-accuracy margin of minAccuracy compete on value.
 const ACCURACY_NOISE_BAND = 0.05;
-// Value = avgCostUsd * p50LatencyMs^LATENCY_WEIGHT / accuracy^ACCURACY_WEIGHT;
-// lower is better. The accuracy weight makes a 0.9 candidate rank first only
-// when its cost-latency product is about 4.9x better than a 1.0 candidate's.
+// Value uses the Wilson lower bound when the measured case count is known.
 const LATENCY_WEIGHT = 1.5;
 const ACCURACY_WEIGHT = 15;
 // Part of every registry table version: a policy change must republish tables
 // built from unchanged measurements.
-export const RANKING_POLICY_VERSION = 'value-latency-prodcost-v2';
+export const RANKING_POLICY_VERSION = 'value-latency-prodcost-wilson-v3';
 
 type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
   meetsThreshold?: boolean;
@@ -184,9 +182,24 @@ type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
   p50LatencyMs: number | null;
 };
 
-function rankValue(c: { avgCostUsd: number; accuracy: number; p50LatencyMs: number | null }) {
-  if (c.p50LatencyMs === null) return Number.POSITIVE_INFINITY;
-  return (c.avgCostUsd * c.p50LatencyMs ** LATENCY_WEIGHT) / c.accuracy ** ACCURACY_WEIGHT;
+export function wilsonLowerBound(accuracy: number, n: number, z = 1.0): number {
+  if (n <= 0) return 0;
+  const zSquared = z * z;
+  const denominator = 1 + zSquared / n;
+  const center = accuracy + zSquared / (2 * n);
+  const margin = z * Math.sqrt((accuracy * (1 - accuracy) + zSquared / (4 * n)) / n);
+  return Math.max(0, (center - margin) / denominator);
+}
+
+function rankValue(c: {
+  avgCostUsd: number;
+  accuracy: number;
+  cases?: number | null;
+  p50LatencyMs: number | null;
+}) {
+  const accuracy = c.cases == null ? c.accuracy : wilsonLowerBound(c.accuracy, c.cases);
+  if (c.p50LatencyMs === null || accuracy <= 0) return Number.POSITIVE_INFINITY;
+  return (c.avgCostUsd * c.p50LatencyMs ** LATENCY_WEIGHT) / accuracy ** ACCURACY_WEIGHT;
 }
 
 // Candidates within ACCURACY_NOISE_BAND of the threshold come first, best
@@ -208,6 +221,7 @@ export function rankCandidates(
         value: rankValue({
           avgCostUsd: estimatedRequestCostUsd,
           accuracy: c.accuracy,
+          cases: c.cases,
           p50LatencyMs,
         }),
       };

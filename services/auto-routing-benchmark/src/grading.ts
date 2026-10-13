@@ -38,11 +38,54 @@ export type DeciderCheck =
   | { kind: 'exact'; value: string }
   | { kind: 'contains_all'; values: readonly string[] }
   | { kind: 'regex'; pattern: string; flags?: string }
-  | { kind: 'json_equal'; value: unknown };
+  | { kind: 'json_equal'; value: unknown }
+  | { kind: 'judged'; rubric: string; reference?: string };
 
-// Mechanical pass/fail grading keeps the decider benchmark deterministic:
-// no LLM judges. Normalization tolerates formatting noise (whitespace,
-// case, markdown fences) without weakening the assertion.
+export type MechanicalDeciderCheck = Exclude<DeciderCheck, { kind: 'judged' }>;
+
+export type DeciderJudge = (input: {
+  userPrompt: string;
+  output: string;
+  rubric: string;
+  reference?: string;
+}) => Promise<{ probability: number; costUsd: number }>;
+
+export async function gradeDeciderOutput(
+  check: DeciderCheck,
+  ctx: { userPrompt: string; output: string; judge: DeciderJudge | null }
+): Promise<{ score: number; costUsd: number; graderError: string | null }> {
+  if (check.kind !== 'judged') {
+    return { score: runDeciderCheck(check, ctx.output) ? 1 : 0, costUsd: 0, graderError: null };
+  }
+  if (!ctx.judge) {
+    return { score: 0, costUsd: 0, graderError: 'Decider judge is unavailable' };
+  }
+  try {
+    const result = await ctx.judge({
+      userPrompt: ctx.userPrompt,
+      output: ctx.output,
+      rubric: check.rubric,
+      ...(check.reference !== undefined ? { reference: check.reference } : {}),
+    });
+    if (
+      !Number.isFinite(result.probability) ||
+      result.probability < 0 ||
+      result.probability > 1 ||
+      !Number.isFinite(result.costUsd) ||
+      result.costUsd < 0
+    ) {
+      throw new Error('Decider judge returned an invalid probability or cost');
+    }
+    return { score: result.probability, costUsd: result.costUsd, graderError: null };
+  } catch (error) {
+    return {
+      score: 0,
+      costUsd: 0,
+      graderError: error instanceof Error ? error.message : 'Decider judge failed',
+    };
+  }
+}
+
 export function normalizeAnswer(text: string): string {
   return text
     .replace(/```[a-z]*\n?/gi, '')
@@ -91,7 +134,7 @@ function extractJson(text: string): unknown {
   throw new Error('unbalanced JSON');
 }
 
-export function runDeciderCheck(check: DeciderCheck, output: string): boolean {
+export function runDeciderCheck(check: MechanicalDeciderCheck, output: string): boolean {
   switch (check.kind) {
     case 'exact': {
       // Agent harnesses sometimes prepend prose despite instructions; accept

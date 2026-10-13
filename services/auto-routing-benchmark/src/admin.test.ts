@@ -18,6 +18,7 @@ const TEST_CONFIG: BenchmarkConfig = {
   bestAccuracySwitchThreshold: 0.05,
   productionTokenProfile: null,
   switchHorizonTurns: null,
+  lowConfidenceThreshold: null,
   maxConcurrency: 100,
   userMaxConcurrency: 100,
   benchmarkUserId: null,
@@ -40,6 +41,7 @@ const TEST_CONFIG_ROWS = {
     best_accuracy_switch_threshold: TEST_CONFIG.bestAccuracySwitchThreshold,
     production_token_profile: null,
     switch_horizon_turns: null,
+    low_confidence_threshold: null,
     max_concurrency: TEST_CONFIG.maxConcurrency,
     user_max_concurrency: TEST_CONFIG.userMaxConcurrency,
     benchmark_user_id: TEST_CONFIG.benchmarkUserId,
@@ -250,6 +252,7 @@ describe('GET /admin/config', () => {
         best_accuracy_switch_threshold: 0.05,
         production_token_profile: null,
         switch_horizon_turns: null,
+        low_confidence_threshold: null,
         max_concurrency: 4,
         benchmark_user_id: null,
         benchmark_org_id: null,
@@ -321,6 +324,7 @@ describe('PUT /admin/config', () => {
     const validConfig = {
       ...TEST_CONFIG,
       minAccuracy: 0.85,
+      lowConfidenceThreshold: 0.8,
       deciderModels: [{ id: 'manual/model' }, { id: 'auto/model' }],
       manualDeciderModels: [{ id: 'manual/model' }],
       autoDeciderModels: [{ id: 'auto/model', avgAttemptCostUsd: 20 }],
@@ -335,9 +339,15 @@ describe('PUT /admin/config', () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      config: { minAccuracy: number; updatedBy: string | null; updatedAt: string | null };
+      config: {
+        minAccuracy: number;
+        lowConfidenceThreshold: number | null;
+        updatedBy: string | null;
+        updatedAt: string | null;
+      };
     };
     expect(body.config.minAccuracy).toBe(0.85);
+    expect(body.config.lowConfidenceThreshold).toBe(0.8);
     expect(body.config.updatedBy).toBe('igor@kilocode.ai');
     expect(typeof body.config.updatedAt).toBe('string');
 
@@ -345,6 +355,7 @@ describe('PUT /admin/config', () => {
     const [, configArg, , deciderModelRows, excludedAutoDeciderModels] =
       vi.mocked(replaceConfig).mock.calls[0];
     expect(configArg.min_accuracy).toBe(0.85);
+    expect(configArg.low_confidence_threshold).toBe(0.8);
     expect(configArg.auto_decider_min_cost_usd).toBe(15);
     expect(configArg.auto_decider_max_cost_usd).toBe(25);
     expect(typeof configArg.updated_at).toBe('string');

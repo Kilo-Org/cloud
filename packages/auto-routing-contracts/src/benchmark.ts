@@ -135,6 +135,7 @@ export const BenchmarkConfigSchema = z
     switchCostFactor: z.number().min(1).max(100),
     productionTokenProfile: ProductionTokenProfileSchema.nullable().default(null),
     switchHorizonTurns: z.number().int().positive().nullable().default(null),
+    lowConfidenceThreshold: z.number().min(0).max(1).nullable().default(null),
     // Absolute accuracy delta required before best-accuracy mode switches away
     // from a session incumbent that still meets the route threshold.
     bestAccuracySwitchThreshold: z.number().min(0).max(1).default(0.05),

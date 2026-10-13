@@ -29,6 +29,7 @@ export function mapConfigRows(
     best_accuracy_switch_threshold: number;
     production_token_profile?: ProductionTokenProfile | null;
     switch_horizon_turns?: number | null;
+    low_confidence_threshold?: number | null;
     max_concurrency: number;
     user_max_concurrency: number;
     benchmark_user_id: string | null;
@@ -74,6 +75,7 @@ export function mapConfigRows(
     bestAccuracySwitchThreshold: configRow.best_accuracy_switch_threshold,
     productionTokenProfile: configRow.production_token_profile ?? null,
     switchHorizonTurns: configRow.switch_horizon_turns ?? null,
+    lowConfidenceThreshold: configRow.low_confidence_threshold ?? null,
     maxConcurrency: configRow.max_concurrency,
     userMaxConcurrency: configRow.user_max_concurrency,
     benchmarkUserId: configRow.benchmark_user_id,
@@ -119,6 +121,7 @@ export async function saveBenchmarkConfig(
       best_accuracy_switch_threshold: config.bestAccuracySwitchThreshold,
       production_token_profile: config.productionTokenProfile,
       switch_horizon_turns: config.switchHorizonTurns,
+      low_confidence_threshold: config.lowConfidenceThreshold,
       max_concurrency: config.maxConcurrency,
       user_max_concurrency: config.userMaxConcurrency,
       benchmark_user_id: config.benchmarkUserId,

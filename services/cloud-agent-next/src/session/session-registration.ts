@@ -20,7 +20,6 @@ import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
 import {
-  CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   isSelectableSandboxAllocation,
   sandboxAllocationRequiresControlPlane,
   sandboxAllocationSchema,
@@ -101,6 +100,7 @@ import {
 import {
   sandboxKindMatchesKey,
   sandboxKindSchema,
+  selectControlPlaneSandbox,
   type SandboxKind,
 } from '../sandbox-placement.js';
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
@@ -651,6 +651,58 @@ function sandboxSmallReplacementForSession(
   });
 }
 
+/**
+ * Legacy-plane sandbox identity: the prefixed key carries the routing decision,
+ * and a shared key resolves through the operator failover override.
+ */
+async function selectLegacySandbox(
+  ctx: SessionRegistrationContext,
+  cloudAgentSessionId: string,
+  input: { orgId?: string; sandboxAllocation?: SandboxAllocation; codeReview: boolean }
+): Promise<{
+  sandboxId: SandboxId;
+  sandboxRoute?: SharedSandboxRouteMetadata;
+  sandboxProvider: SandboxSelection['provider'];
+}> {
+  const target = await generateSandboxRoutingTarget(
+    ctx.env.PER_SESSION_SANDBOX_ORG_IDS,
+    input.orgId,
+    ctx.userId,
+    cloudAgentSessionId,
+    ctx.botId,
+    {
+      createdOnPlatform: input.codeReview ? 'code-review' : undefined,
+      sandboxAllocation: input.sandboxAllocation,
+    }
+  );
+  if (target.kind === 'shared') {
+    const assignment = await resolveSharedSandboxAssignment(
+      ctx.env.SHARED_SANDBOX_OVERRIDES,
+      target.routeKey
+    );
+    return {
+      sandboxId: assignment.sandboxId,
+      sandboxRoute: {
+        kind: 'shared',
+        routeKey: target.routeKey,
+        ...(assignment.suffix ? { suffix: assignment.suffix } : {}),
+      },
+      sandboxProvider: 'cloudflare',
+    };
+  }
+  return {
+    sandboxId: target.sandboxId,
+    sandboxProvider: selectSandboxProvider({
+      env: ctx.env,
+      orgId: input.orgId,
+      userId: ctx.userId,
+      sandboxId: target.sandboxId,
+      sessionId: cloudAgentSessionId,
+      sandboxAllocation: input.sandboxAllocation,
+    }),
+  };
+}
+
 async function allocateNewSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
@@ -748,44 +800,28 @@ async function allocateNewSession(
   const credentialContainment = computeCredentialContainment(cloudAgentSessionId, input, ctx.env);
   let sandboxId: SandboxId;
   let sandboxRoute: SharedSandboxRouteMetadata | undefined;
+  let sandboxKind: SandboxKind | undefined;
   let sandboxProvider: SandboxSelection['provider'] = 'cloudflare';
   try {
-    const target = await generateSandboxRoutingTarget(
-      ctx.env.PER_SESSION_SANDBOX_ORG_IDS,
-      orgId,
-      ctx.userId,
-      cloudAgentSessionId,
-      ctx.botId,
-      {
-        createdOnPlatform: options?.billingOrigin === 'code-review' ? 'code-review' : undefined,
-        sandboxAllocation: requestedAllocation,
-      }
-    );
-    if (target.kind === 'shared') {
-      const assignment = await resolveSharedSandboxAssignment(
-        ctx.env.SHARED_SANDBOX_OVERRIDES,
-        target.routeKey
-      );
-      sandboxId = assignment.sandboxId;
-      sandboxRoute = {
-        kind: 'shared',
-        routeKey: target.routeKey,
-        ...(assignment.suffix ? { suffix: assignment.suffix } : {}),
-      };
+    if (sessionPlaneFromId(cloudAgentSessionId) === 'control') {
+      const decision = await selectControlPlaneSandbox({
+        env: ctx.env,
+        sessionId: cloudAgentSessionId,
+        userId: ctx.userId,
+        orgId,
+        botId: ctx.botId,
+        codeReview: options?.billingOrigin === 'code-review',
+        sandboxAllocation,
+      });
+      sandboxId = decision.sandboxId;
+      sandboxKind = decision.sandboxKind;
+      sandboxProvider = decision.provider;
     } else {
-      sandboxId = target.sandboxId;
-      sandboxProvider =
-        sandboxAllocation === CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION &&
-        requestedAllocation !== CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION
-          ? 'cloudflare-containers'
-          : selectSandboxProvider({
-              env: ctx.env,
-              orgId,
-              userId: ctx.userId,
-              sandboxId,
-              sessionId: cloudAgentSessionId,
-              sandboxAllocation: requestedAllocation,
-            });
+      ({ sandboxId, sandboxRoute, sandboxProvider } = await selectLegacySandbox(
+        ctx,
+        cloudAgentSessionId,
+        { orgId, sandboxAllocation, codeReview: options?.billingOrigin === 'code-review' }
+      ));
     }
   } catch (error) {
     await recordPostSetupFailure(() =>
@@ -816,6 +852,7 @@ async function allocateNewSession(
         sandboxId,
         sandboxProvider,
         ...(sandboxRoute ? { sandboxRoute } : {}),
+        ...(sandboxKind ? { sandboxKind } : {}),
       });
     } catch (error) {
       rethrowAllocationFailure(ledger, 'sandbox', error);
@@ -920,6 +957,7 @@ async function allocateNewSession(
     kiloSessionId,
     sandboxId,
     sandboxRoute,
+    ...(sandboxKind ? { sandboxKind } : {}),
     sandboxProvider,
     ...(worktreeId ? { worktreeId } : {}),
     ...(sandboxAllocation ? { sandboxAllocation } : {}),

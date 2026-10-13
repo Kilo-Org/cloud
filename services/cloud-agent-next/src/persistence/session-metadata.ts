@@ -272,7 +272,8 @@ function sandboxIdentityMatchesAllocation(
   if (workspace.sandboxKind !== undefined) {
     return shared
       ? workspace.sandboxKind === 'shared'
-      : allocation !== 'isolated-standard' && workspace.sandboxKind === 'isolated';
+      : workspace.sandboxKind ===
+          (allocation === 'isolated-standard' ? 'isolated-standard' : 'isolated');
   }
   return shared
     ? isGeneratedSharedSandboxId(sandboxId) && workspace.sandboxRoute !== undefined

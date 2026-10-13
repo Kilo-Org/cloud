@@ -2852,6 +2852,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             subject: pin.billing.subject,
             instanceId: pin.billing.sandboxId,
             checkpoint: 'control-plane-create',
+            billingOrigin: pin.billing.metadata?.origin,
           });
         }
         const createDeadline =

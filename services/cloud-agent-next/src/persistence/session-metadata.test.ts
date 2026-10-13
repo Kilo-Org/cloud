@@ -483,6 +483,7 @@ describe('session metadata boundary', () => {
 
     it.each([
       ['isolated Cloudflare', 'cloudflare', 'isolated'],
+      ['isolated Standard Cloudflare', 'cloudflare', 'isolated-standard'],
       ['code-review Cloudflare', 'cloudflare', 'code-review'],
       ['shared Cloudflare', 'cloudflare', 'shared'],
       ['isolated Vercel', 'vercel', 'isolated'],
@@ -528,6 +529,9 @@ describe('session metadata boundary', () => {
 
     it.each([
       ['cloudflare-single', 'isolated', true],
+      ['isolated-standard', 'isolated-standard', true],
+      ['isolated-standard', 'isolated', false],
+      ['cloudflare-single', 'isolated-standard', false],
       ['cloudflare-single', 'shared', false],
       ['cloudflare-single', 'code-review', false],
       ['cloudflare-shared', 'shared', true],

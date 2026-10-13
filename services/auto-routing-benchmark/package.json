@@ -11,6 +11,8 @@
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/auto-routing-benchmark/src",
     "db:generate": "drizzle-kit generate",
+    "scoreboard": "tsx scripts/scoreboard.ts",
+    "scoreboard:prod": "tsx scripts/scoreboard-prod.ts",
     "test": "vitest run"
   },
   "dependencies": {

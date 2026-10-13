@@ -197,6 +197,7 @@ const SETUP_EVENT_TYPES: ReadonlySet<string> = new Set([
 const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'sandbox_provision',
   sandbox_start: 'sandbox_boot',
+  snapshot_fallback: 'snapshot_fallback',
   clone: 'cloning',
   restore: 'workspace_restore',
   checkout: 'branch',
@@ -209,6 +210,7 @@ const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
 const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'Creating sandbox',
   sandbox_start: 'Starting sandbox from snapshot',
+  snapshot_fallback: 'Retrying without a snapshot',
   clone: 'Cloning repository',
   restore: 'Updating repository',
   checkout: 'Checking out branch',

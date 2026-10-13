@@ -29,6 +29,7 @@ import {
   verifySandboxLaunchCredential,
 } from '../../sandbox-control/credential.js';
 import { rejectSandboxWrapperUpgrade } from '../../sandbox-control/socket-admission.js';
+import { DEADLINE_MS } from '../../sandbox-control/deadlines.js';
 import { createCloudflareContainersProviderAdapter } from '../../sandbox-control/cloudflare-containers-provider.js';
 import {
   createCloudflareProviderAdapter,
@@ -1619,7 +1620,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async applyEvent(event: AllocationEvent): Promise<void> {
     const previous = await this.readAllocation();
-    const { state, effects, stopReason } = reduceAllocation(previous, event, this.sandboxTimers());
+    const timers = { ...this.sandboxTimers() };
+    if (
+      this.currentProvider() === 'cloudflare-containers' &&
+      (event.type === 'ensure' || event.type === 'tick')
+    ) {
+      const launch = repositoryLaunchOptions(
+        await listRoutes(this.db),
+        await readRepositoryLaunch(this.ctx.storage)
+      );
+      if (launch.options.repoKey !== undefined && !launch.skipped) {
+        timers.providerCreateMs = DEADLINE_MS.repositoryStartup;
+      }
+    }
+    const { state, effects, stopReason } = reduceAllocation(previous, event, timers);
     await this.writeAllocation(state, previous);
     if (
       previous.kind !== state.kind ||
@@ -2954,6 +2968,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
           skip: launch.skipped,
           repoKey: launch.options.repoKey?.slice(0, 16),
         });
+        if (launch.skipped) {
+          await notifyPreparingRoutes(this.routeContext(current), {
+            step: 'snapshot_fallback',
+            detail: 'Previous snapshot startup failed. Retrying without a snapshot.',
+          });
+        }
         // Persist a placeholder before the launch so a `hello` accepted while it
         // runs confirms this allocation, and that confirmation outlives the
         // allocation stopping before the launch resolves.
@@ -2998,6 +3018,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
             sandboxId: this.sandboxId,
             allocationId,
             reason: 'repository_start_failed',
+          });
+          await notifyPreparingRoutes(this.routeContext(afterCleanup), {
+            step: 'snapshot_fallback',
+            detail: 'Snapshot startup failed. Retrying without a snapshot.',
           });
           launched = await withTimeout(
             this.provider.launch(createdRef, imageLaunchEnv, {

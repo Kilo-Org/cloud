@@ -889,7 +889,7 @@ console.log(JSON.stringify(result));`,
     taskType: 'investigation',
     subtaskType: 'codebase_understanding',
     systemPrompt: CODE_SYS,
-    userPrompt: `Study this self-contained JavaScript subsystem. What does its final console.log print? Return only the JSON, preserving the shown key order.
+    userPrompt: `Study this self-contained JavaScript subsystem. What does its final console.log print? Return only the JSON, preserving the shown key order. The isolated field contains arrays of uppercase hexadecimal Unicode code points, padded to at least four digits, so replacement characters must appear explicitly as FFFD.
 
 const chunks = [
   Uint8Array.from([0x41, 0xe2]),
@@ -905,7 +905,10 @@ for (const chunk of chunks) {
 streamed.push(decoder.decode());
 const joined = streamed.join('');
 const isolated = chunks.map(chunk => {
-  return new TextDecoder('utf-8').decode(chunk);
+  const text = new TextDecoder('utf-8').decode(chunk);
+  return Array.from(text, point =>
+    point.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')
+  );
 });
 let rejected = false;
 try {
@@ -927,10 +930,10 @@ console.log(JSON.stringify(result));`,
         ],
         "joined": "A€B😀",
         "isolated": [
-          "A�",
-          "�",
-          "�B�",
-          "��"
+          ["0041", "FFFD"],
+          ["FFFD"],
+          ["FFFD", "0042", "FFFD"],
+          ["FFFD", "FFFD"]
         ],
         "rejected": true
       },

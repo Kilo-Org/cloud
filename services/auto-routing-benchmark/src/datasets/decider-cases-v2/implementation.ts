@@ -16,7 +16,7 @@ export const IMPLEMENTATION_V2_CASES: readonly DeciderCase[] = [
     userPrompt: `Implement an in-memory ledger with idempotent event IDs and reversals. Start with balance zero. Ignore an event entirely if its id has already been seen. Otherwise mark its id seen, even if a reversal does nothing. A normal event adds n and records that amount under its id. A reversal subtracts the recorded amount of its target, then deletes that target's recorded amount; it does nothing if that target is not currently recorded. Process this input in order:
 [{"id":"a","n":12},{"id":"b","n":-5},{"id":"early","reverse":"late"},{"id":"a","n":99},{"id":"c","n":7},{"id":"r1","reverse":"b"},{"id":"b","n":20},{"id":"r2","reverse":"b"},{"id":"late","n":9},{"id":"early","reverse":"late"},{"id":"r3","reverse":"r1"},{"id":"r4","reverse":"a"},{"id":"a","n":100},{"id":"d","n":-4},{"id":"r5","reverse":"late"},{"id":"e","n":0},{"id":"r6","reverse":"d"}]
 Run the feature on this fixture. Return only the final balance as a JSON number.`,
-    check: { kind: 'json_equal', value: 7 },
+    check: { kind: 'exact', value: '7' },
   },
   {
     id: 'impl-feat-v2-half-open-coalescing',

@@ -528,7 +528,7 @@ Preserve object keys in exactly the order printed by this program; JSON whitespa
     taskType: 'refactoring',
     subtaskType: "migration",
     systemPrompt: CODE_SYS,
-    userPrompt: `Migrate adapt's input API from [key, value] tuples to { key, value } records and update the supplied input construction. Preserve scalar last-write wins, accumulation for [] keys, the reset when a scalar overwrites an array, null-prototype safety, and output key order. Perform the migration, then report only the JSON output of the migrated whole program; do not output code.
+    userPrompt: `Migrate adapt's input API from [key, value] tuples to { key, value } records and update the supplied input construction. Preserve scalar last-write wins, accumulation for [] keys, the reset when a scalar overwrites an array, null-prototype safety (including the enumerable own '__proto__' data property), and output key order. Perform the migration, then report only the JSON output of the migrated whole program; do not output code.
 
 \`\`\`javascript
 function adapt(pairs) {
@@ -555,7 +555,7 @@ console.log(JSON.stringify(adapt(pairs)));
 Preserve object keys in exactly the order printed by this program; JSON whitespace is immaterial.`,
     check: {
       kind: "json_equal",
-      value: {"page": "2", "tag": ["green"], "empty": "", "__proto__": "safe"},
+      value: {"page": "2", "tag": ["green"], "empty": "", ["__proto__"]: "safe"},
     },
   },
   {
@@ -1673,7 +1673,7 @@ Preserve object keys in exactly the order printed by this program; JSON whitespa
     taskType: 'refactoring',
     subtaskType: "architecture_improvement",
     systemPrompt: CODE_SYS,
-    userPrompt: `Refactor event replay into a pure replay(events, initialState) boundary returning the final state and historical snapshots, leaving event construction and reporting at the outer boundary. Preserve reducer immutability, snapshot identity separation, existing insertion order, and remove/re-add behavior. Perform the architecture refactor, then report only the JSON output of the refactored whole program, including its existing history and identity signature; do not output code.
+    userPrompt: `Refactor event replay into a pure replay(events, initialState) boundary returning the final state and historical snapshots, leaving event construction and reporting at the outer boundary. Preserve reducer immutability, snapshot identity separation, existing insertion order, and remove/re-add behavior. Perform the architecture refactor, then report only the JSON output of the refactored whole program, including its existing history and identity signature. Your entire response must be exactly one JSON array: no prose, headings, bracketed notes, code, or Markdown fences before or after it.
 
 \`\`\`javascript
 function reduce(state, event) {

@@ -136,7 +136,10 @@
     "working": "Çalışıyor",
     "yourOwnRepositories": "Kendi depoların",
     "dismissed": "Yok sayıldı",
-    "agent": "Ajan"
+    "agent": "Ajan",
+    "durationMinuteShort": "dk",
+    "durationHourShort": "sa",
+    "changes": "Değişiklikler"
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -320,7 +323,8 @@
       "kiloclaw": "KiloClaw etkinliği",
       "balance": "Bakiye uyarıları",
       "security": "Güvenlik bulguları",
-      "spend": "Harcama uyarıları"
+      "spend": "Harcama uyarıları",
+      "followedSessions": "Takip edilen oturumlar"
     },
     "category": {
       "chatMessagesSubtitle": "konuşmalarındaki yanıtlar",
@@ -1575,6 +1579,8 @@
       "title": "Oturum",
       "copyErrorDetails": "Hata ayrıntılarını kopyala",
       "backToSessions": "Oturumlara geri dön",
+      "follow": "Kilit ekranında takip et",
+      "unfollow": "Kilit ekranında takibi bırak",
       "couldNotLoad": "Oturum yüklenemedi.",
       "failedToLoadDetails": "Oturum ayrıntıları yüklenemedi.",
       "failedToStopExecution": "Çalışan işlem durdurulamadı.",
@@ -1678,7 +1684,6 @@
       "retryLoadingEnvironment": "Ortamı yüklemeyi tekrar dene",
       "defaultEnvironment": "Varsayılan ortam",
       "environmentSummary": "{{commands}} komut · {{mcp}} MCP · {{skills}} beceri · {{agents}} ajan",
-      "changes": "Değişiklikler",
       "leaveChanges": "Değişiklikleri koru",
       "commitAndPush": "İşle ve gönder",
       "startSession": "Oturumu başlat",
@@ -1749,8 +1754,8 @@
       "toolList": "listele",
       "toolPatch": "yama uygula",
       "toolTask": "görev",
-      "readTodos": "Görevleri oku",
-      "updateTodos": "Görevleri güncelle",
+      "readTodos": "Planı oku",
+      "updateTodos": "Planı güncelle",
       "linesBadge": "{{displayCount}} satır",
       "filesBadge": "{{displayCount}} dosya",
       "matchesBadge": "{{displayCount}} eşleşme",
@@ -2140,6 +2145,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Değişiklikleri görüntüle",
+      "asOf": "{{time}} itibarıyla",
+      "tooLarge": "Bu fark, mobilde gösterilemeyecek kadar büyük.",
+      "empty": "Bu oturumda henüz dosya değişikliği yok."
     },
     "autoApprove": {
       "title": "Otomatik onayla",
@@ -2644,6 +2655,7 @@
     "fileRows": {
       "collapseFile": "Dosyayı daralt",
       "diffTooLarge": "Fark, görüntülenemeyecek kadar büyük.",
+      "noPreview": "Bu dosya için önizleme yok",
       "expandFile": "Dosyayı genişlet",
       "markViewed": "{{path}} dosyasını görüntülenmiş olarak işaretle",
       "openDiffOnGitHub": "Bu dosyanın farkını GitHub'da aç",
@@ -3163,6 +3175,8 @@
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
     "openSession": "Aç",
+    "finished": "Tamamlandı",
+    "followFailed": "Bu ajan kilit ekranında gösterilemedi.",
     "approveFailed": "Onaylanamadı. Tekrar denemek için $t(common.approve) öğesine dokun.",
     "checked": "Kontrol edildi",
     "lastKnown": "Son bilinen",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "Sizi bekliyor",
     "nextScheduled": "Sıradaki zamanlananlar",
     "answerNeeded": "Yanıt bekliyor",
-    "waitingToRetry": "Yeniden deneme bekleniyor"
+    "waitingToRetry": "Yeniden deneme bekleniyor",
+    "step": {
+      "editing": "Düzenleniyor",
+      "reading": "Okunuyor",
+      "running": "Çalıştır",
+      "searching": "Web araması",
+      "thinking": "İyice düşünüyor"
+    },
+    "planOf": "/",
+    "filesChanged": "dosya değişti",
+    "finishedIn": "Tamamlanma süresi",
+    "noActivityFor": "Etkinlik yok",
+    "prOpened": "Pull request açıldı",
+    "permissionWants": "Çalıştırmak istiyor",
+    "failure": {
+      "provider": "Durduruldu: sağlayıcı hatası",
+      "tool": "Durduruldu: araç hatası",
+      "cancelled": "Durduruldu: iptal edildi",
+      "other": "DURDURULDU"
+    }
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "Sohbet geçmişi yüklenemedi.",
       "new": "Yeni sohbet",
-      "openHint": "Sohbeti açar. Silmek için uzun basın.",
       "deleteTitle": "Bu sohbet silinsin mi?"
     },
+    "rename": {
+      "title": "Sohbeti yeniden adlandır",
+      "accessibility": "Sohbeti yeniden adlandır: {{title}}",
+      "openHint": "Sohbeti açar. Yeniden adlandırmak veya silmek için uzun basın."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Sohbet ayrıntıları",
+      "backend": "Arka uç",
+      "effortDefault": "Model varsayılanı",
+      "noCost": "Maliyet yok",
+      "costUnknown": "Bilinmiyor",
+      "costEstimatedNote": "Fiyat bildirmeyen yanıtlar liste fiyatlarına göre tahmin edilmiştir.",
+      "costUnknownNote": "Bu model için bilinen bir fiyat yok.",
+      "costPartialNote": "Bu toplam, fiyatı bilinmeyen modelleri içermez.",
+      "localNote": "Cihazdaki modeller bu cihazda çalışır. Maliyetleri ve istem önbellekleri yoktur; belirteç sayıları tahmini olabilir.",
+      "countedSinceNote": "Bu sohbet, kullanım kaydedilmeye başlanmadan önce başladı. Toplamlar yalnızca bundan sonraki yanıtları gösterir.",
+      "remoteServersOn": "Açık uzak MCP sunucuları"
+    },
     "webSearch": {
       "title": "Web'de ara",
       "description": "Bu sohbetin Kilo hesabın üzerinden güncel bilgi aramasına izin ver. Aramalar aylık arama hakkını kullanır.",
@@ -3238,7 +3288,6 @@
       "fieldName": "Görünen ad",
       "fieldUrl": "Sunucu URL'si",
       "fieldUrlInvalid": "Geçerli bir sunucu URL'si girin.",
-      "fieldToken": "Bearer belirteci (isteğe bağlı)",
       "enableServer": "Bu sunucuyu etkinleştir: {{name}}",
       "editServer": "Sunucuyu düzenle",
       "deleteServer": "Sunucuyu sil",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "{{count}} araç",
       "serverUnreachable": "Bu sunucuya ulaşılamadı",
       "serverOff": "Bu sunucu kapalı"
+    },
+    "mcpOAuth": {
+      "authMethod": "Kimlik doğrulama",
+      "authNone": "Oturum açma yok",
+      "authBearer": "Bearer belirteci",
+      "authOAuth": "OAuth ile oturum açma",
+      "fieldToken": "Belirteç",
+      "oauthHint": "Kaydettikten sonra tarayıcınla oturum açmak için sunucuda $t(modelChat.mcpOAuth.signIn) seçeneğine dokun.",
+      "serverNeedsSignIn": "Bu sunucuyu kullanmak için oturum aç",
+      "signIn": "Oturum aç",
+      "signInA11y": "Bu sunucuda oturum aç: {{name}}",
+      "signInFailed": "{{name}} sunucusunda oturum açılamadı. Tekrar dene."
     },
     "backends": {
       "title": "Sohbet arka uçları",
@@ -3412,6 +3473,9 @@
       "downloading": "İndiriliyor…",
       "downloadProgress": "İndiriliyor… %{{percent}}",
       "downloadFailed": "İndirme tamamlanamadı. Bağlantınızı ve boş depolama alanınızı kontrol edip yeniden deneyin."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Bu model düşünme düzeyini destekler"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play eşleşen kredi paketi döndürmedi.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account üzerindeki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum aç.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındaki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum açın."
+  },
+  "todos": {
+    "saveAsTodo": "Görev olarak kaydet",
+    "segment": {
+      "label": "Ajanlar görünümü",
+      "sessions": "Oturumlar",
+      "todos": "Görevler"
+    },
+    "lists": {
+      "newList": "Yeni liste",
+      "empty": "Henüz liste yok",
+      "couldNotLoad": "Listeler yüklenemedi",
+      "noRepository": "Depo yok",
+      "rowA11y": "{{name}} — {{openCount}}",
+      "openCount_one": "{{count}} açık",
+      "openCount_other": "{{count}} açık",
+      "archived_one": "Arşivlenenler ({{count}})",
+      "archived_other": "Arşivlenenler ({{count}})",
+      "archive": "Arşivle",
+      "unarchive": "Arşivden çıkar",
+      "deleteTitle": "{{name}} silinsin mi?",
+      "deleteMessage": "Görevleri de silinir. Oturumları kalır."
+    },
+    "listSettings": {
+      "title": "Liste ayarları",
+      "name": "Ad",
+      "namePlaceholder": "Hatalar, fikirler, sürüm…",
+      "emoji": "Emoji",
+      "mode": "Mod",
+      "defaultsHint": "Bu listeden başlatılan oturumlar bu varsayılanları kullanır."
+    },
+    "list": {
+      "addPlaceholder": "Bir görev ekle",
+      "add": "Görev ekle",
+      "empty": "Henüz görev yok",
+      "setDefaults": "Depo, mod ve model ayarla",
+      "completed_one": "Tamamlandı ({{count}})",
+      "completed_other": "Tamamlandı ({{count}})"
+    },
+    "item": {
+      "markDone": "Tamamlandı olarak işaretle",
+      "markOpen": "Tamamlanmadı olarak işaretle",
+      "markDonePrompt": "Tamamlandı olarak işaretlensin mi?",
+      "deleted": "Görev silindi",
+      "undo": "Geri al",
+      "runCount_one": "{{count}} çalıştırma",
+      "runCount_other": "{{count}} çalıştırma",
+      "startNow": "İncelemeden başlat",
+      "startNowHint": "İncelemeden başlatmak için basılı tut",
+      "titleLabel": "Görev başlığı",
+      "notes": "Notlar",
+      "notesPlaceholder": "Markdown ile not ekle",
+      "sessions": "Bağlı oturumlar",
+      "noSessions": "Henüz oturum yok",
+      "linkSession": "Oturum bağla",
+      "unlinkSession": "{{title}} bağlantısını kaldır",
+      "linkFailed": "Oturum göreve bağlanamadı"
+    },
+    "linkSession": {
+      "title": "Bir oturum bağla",
+      "empty": "Son oturum yok",
+      "emptyInRepository": "{{repository}} deposunda son oturum yok"
+    },
+    "upNext": "Sıradaki",
+    "sessionTodo": "Görev: {{title}}",
+    "linkToTodo": "Göreve bağla",
+    "candidates": {
+      "empty": "Açık görev yok"
+    },
+    "saveSheet": {
+      "title": "Listeye kaydet",
+      "saved": "{{list}} listesine kaydedildi"
+    }
   }
 }

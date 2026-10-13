@@ -4,7 +4,19 @@ import {
   isEligibleGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { buildHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
+import {
+  buildSessionLiveActivityContentState,
+  type SessionLiveActivityContentState,
+  type SessionLiveActivityRow,
+} from '@kilocode/notifications';
+import { Platform } from 'react-native';
 
+import {
+  applyFixtureSessionContent,
+  endAllSessionCards,
+  finishFixtureSessionCard,
+  followSession,
+} from '@/lib/glanceable/session-follow';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 
@@ -67,6 +79,83 @@ function cancelTerminal(): void {
   if (terminalTimer !== null) {
     clearTimeout(terminalTimer);
     terminalTimer = null;
+  }
+}
+
+/**
+ * Follow the fixture's row through the Follow path on either platform (the
+ * shim picks the Live Activity or the Android notification), so the aggregate card
+ * counts it out and the card is drawn from production content. A permission
+ * fixture then applies the content a server push would carry (the same
+ * builder, with the approval key the server mints); a finished fixture
+ * follows the row while it works and then reports it idle.
+ */
+async function applySessionCardFixture(input: {
+  fixture: GlanceableFixture;
+  rows: readonly SessionLiveActivityRow[];
+  ctx: GlanceablePublisherContext;
+  now: number;
+}): Promise<void> {
+  const { fixture, rows, ctx, now } = input;
+  // The fixture's follow replaces any real one: one session card surface at a time.
+  endAllSessionCards();
+  const follow = fixture.follow;
+  const row = follow === undefined ? undefined : rows[follow.index];
+  if (follow === undefined || row === undefined) {
+    return;
+  }
+  const at = new Date(now).toISOString();
+  const working = {
+    ...row,
+    status: 'busy',
+    statusUpdatedAt: new Date(now - 20 * 60_000).toISOString(),
+  };
+  log(`session card ${followSession(follow.finish === true ? working : row, ctx, now)}`);
+  const facts = follow.card;
+  // The richer facts a server push carries, applied through the production
+  // builder, so no fixture ever hands the card hand-made props. A quiet fixture
+  // moves the last activity past the quiet window, which is what the card
+  // reaches its warning from.
+  const content: SessionLiveActivityContentState | null =
+    follow.approvalKey !== true && facts === undefined
+      ? null
+      : buildSessionLiveActivityContentState(
+          {
+            ...row,
+            statusUpdatedAt:
+              facts?.activityAgo === undefined
+                ? row.statusUpdatedAt
+                : new Date(now - facts.activityAgo * 60_000).toISOString(),
+            currentStep: facts?.step ?? null,
+            plan: facts?.plan ?? null,
+            changes: facts?.changes ?? null,
+            permissionCommand: facts?.permissionCommand ?? null,
+            lastActivityAt:
+              facts?.activityAgo === undefined
+                ? null
+                : new Date(now - facts.activityAgo * 60_000).toISOString(),
+            costMicrodollars: facts?.costMicrodollars ?? null,
+            outcome: facts?.outcome ?? null,
+            failure: facts?.failure ?? null,
+            prOpened: facts?.outcome === 'pr_opened',
+            startedAt:
+              facts?.startedAgo === undefined
+                ? null
+                : new Date(now - facts.startedAgo * 60_000).toISOString(),
+          },
+          {
+            approvalKey: follow.approvalKey === true ? FIXTURE_APPROVAL_KEY : null,
+            updatedAt: at,
+            statusSinceFallback: row.statusUpdatedAt ?? at,
+          }
+        );
+  if (follow.finish === true) {
+    finishFixtureSessionCard({ ...row, statusUpdatedAt: at }, content, now);
+  } else if (content !== null) {
+    // Await the platform path: the Android branch goes through the real push
+    // apply, and the iOS branch settles a card update. Awaiting means the
+    // harness's own "applied" line only prints once the card is laid down.
+    await applyFixtureSessionContent(content);
   }
 }
 
@@ -153,6 +242,10 @@ async function apply(name: GlanceableFixtureName, ctx: GlanceablePublisherContex
     actionFeedback: fixture.actionFeedback ?? null,
   });
   recordWaitingAsk(eligible ? selectWaitingAsk(rows, ctx, now) : null);
+  // Before the frame: the aggregate card counts a followed row out.
+  if (Platform.OS === 'ios' || Platform.OS === 'android') {
+    await applySessionCardFixture({ fixture, rows, ctx, now });
+  }
   writeGlanceableFrame(getGlanceableSinks(), snapshot, ctx);
   if (!eligible) {
     // The publisher's happy → empty terminal: a sink that does not own its
@@ -187,6 +280,9 @@ async function release(): Promise<void> {
   // feedback must not survive into the live surface.
   setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
   recordWaitingAsk(null);
+  if (Platform.OS === 'ios' || Platform.OS === 'android') {
+    endAllSessionCards();
+  }
   releaseGlanceableFixtureHold();
   log('released');
 }

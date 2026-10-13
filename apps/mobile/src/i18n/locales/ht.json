@@ -136,7 +136,10 @@
     "working": "Ap travay",
     "yourOwnRepositories": "Pwòp depo ou yo",
     "dismissed": "Rejte",
-    "agent": "Ajan"
+    "agent": "Ajan",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Chanjman"
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -325,6 +328,7 @@
       "collapseFile": "Kache kontni fichye a",
       "expandFile": "Montre kontni fichye a",
       "diffTooLarge": "Diferans kòd yo twò gwo pou afiche.",
+      "noPreview": "Pa gen apèsi disponib pou fichye sa a",
       "openOnGitHub": "Louvri sou GitHub",
       "openDiffOnGitHub": "Louvri diferans kòd fichye sa a sou GitHub",
       "githubDiff": "Diferans kòd sou GitHub"
@@ -831,7 +835,8 @@
       "kiloclaw": "Aktivite KiloClaw",
       "balance": "Alèt balans",
       "security": "Pwoblèm sekirite detekte",
-      "spend": "Alèt depans"
+      "spend": "Alèt depans",
+      "followedSessions": "Sesyon swiv"
     },
     "category": {
       "chatMessagesSubtitle": "repons nan konvèsasyon ou yo",
@@ -2086,6 +2091,8 @@
       "title": "Sesyon",
       "copyErrorDetails": "Kopye detay erè a",
       "backToSessions": "Tounen nan sesyon yo",
+      "follow": "Swiv sou ekran fèmen an",
+      "unfollow": "Sispann swiv sou ekran fèmen an",
       "couldNotLoad": "Nou pa t ka chaje sesyon an.",
       "failedToLoadDetails": "Nou pa t ka chaje detay sesyon an.",
       "failedToStopExecution": "Nou pa t ka sispann egzekisyon an.",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "Eseye chaje anviwònman an ankò",
       "defaultEnvironment": "Anviwònman pa defo",
       "environmentSummary": "{{commands}} kòmandman · {{mcp}} MCP · {{skills}} konpetans · {{agents}} ajan",
-      "changes": "Chanjman",
       "leaveChanges": "Kite chanjman yo",
       "commitAndPush": "Anrejistre epi voye",
       "startSession": "Kòmanse sesyon an",
@@ -2260,8 +2266,8 @@
       "toolList": "fè lis",
       "toolPatch": "korije",
       "toolTask": "travay",
-      "readTodos": "Li lis travay la",
-      "updateTodos": "Mete lis travay la ajou",
+      "readTodos": "Li plan an",
+      "updateTodos": "Mete plan an ajou",
       "linesBadge": "{{displayCount}} liy",
       "filesBadge": "{{displayCount}} fichye",
       "matchesBadge": "{{displayCount}} rezilta",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modèl ({{displayCount}})",
       "modelsCount_other": "Modèl ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Wè chanjman yo",
+      "asOf": "Depi {{time}}",
+      "tooLarge": "Diferans kòd sa a twò gwo pou afiche sou mobil.",
+      "empty": "Poko gen chanjman nan fichye yo nan sesyon sa a."
     },
     "autoApprove": {
       "title": "Apwobasyon otomatik",
@@ -3163,6 +3175,8 @@
     "channelName": "Ajan aktif",
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an.",
     "openSession": "Louvri",
+    "finished": "Fini",
+    "followFailed": "Nou pa t ka montre ajan sa a sou ekran fèmen an.",
     "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò.",
     "checked": "Verifye",
     "lastKnown": "Dènye eta koni",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "Ap tann ou",
     "nextScheduled": "Pwochen ki pwograme",
     "answerNeeded": "Bezwen repons",
-    "waitingToRetry": "Ap tann pou reeseye"
+    "waitingToRetry": "Ap tann pou reeseye",
+    "step": {
+      "editing": "Modifikasyon",
+      "reading": "Lekti",
+      "running": "Ekzekisyon",
+      "searching": "Rechèch wèb",
+      "thinking": "Ap reflechi"
+    },
+    "planOf": "sou",
+    "filesChanged": "fichye chanje",
+    "finishedIn": "Fini nan",
+    "noActivityFor": "Pa gen aktivite pou",
+    "prOpened": "Demann rale ouvè",
+    "permissionWants": "Vle ekzekite",
+    "failure": {
+      "provider": "Sispann: erè founisè",
+      "tool": "Sispann: erè zouti",
+      "cancelled": "Sispann: anile",
+      "other": "SISPANN"
+    }
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "Pa t ka chaje istwa chat la.",
       "new": "Nouvo chat",
-      "openHint": "Louvri chat la. Peze lontan pou efase.",
       "deleteTitle": "Efase chat sa a?"
     },
+    "rename": {
+      "title": "Chanje non chat la",
+      "accessibility": "Chanje non chat la: {{title}}",
+      "openHint": "Louvri chat la. Peze lontan pou chanje non an oswa pou efase."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Detay chat la",
+      "backend": "Sèvis",
+      "effortDefault": "Pa defo modèl la",
+      "noCost": "Pa koute anyen",
+      "costUnknown": "Pa konnen",
+      "costEstimatedNote": "Pri repons ki pa t bay yon pri estime dapre pri katalòg yo.",
+      "costUnknownNote": "Pa gen okenn pri ki konnen pou modèl sa a.",
+      "costPartialNote": "Total sa a pa gen ladan l modèl ki pa gen yon pri ki konnen.",
+      "localNote": "Modèl sou aparèy la mache sou aparèy sa a. Yo pa koute anyen, yo pa gen kach pou enstriksyon, epi kantite jeton yo ka se yon estimasyon.",
+      "countedSinceNote": "Chat sa a te kòmanse anvan yo te kòmanse anrejistre itilizasyon. Total yo montre sèlman repons ki vini apre sa.",
+      "remoteServersOn": "Sèvè MCP aleka ki aktive"
+    },
     "webSearch": {
       "title": "Chèche sou entènèt",
       "description": "Kite chat sa a chèche enfòmasyon ki ajou atravè kont Kilo ou. Rechèch yo itilize alokasyon rechèch chak mwa ou.",
@@ -3238,7 +3288,6 @@
       "fieldName": "Non ki parèt",
       "fieldUrl": "URL sèvè a",
       "fieldUrlInvalid": "Antre yon URL sèvè ki valab.",
-      "fieldToken": "Token Bearer (opsyonèl)",
       "enableServer": "Aktive sèvè sa a: {{name}}",
       "editServer": "Modifye sèvè a",
       "deleteServer": "Efase sèvè a",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "{{count}} zouti",
       "serverUnreachable": "Nou pa t kapab rive jwenn sèvè sa a",
       "serverOff": "Sèvè sa a etenn"
+    },
+    "mcpOAuth": {
+      "authMethod": "Otantifikasyon",
+      "authNone": "San koneksyon",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Koneksyon OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Apre w fin anrejistre, tape $t(modelChat.mcpOAuth.signIn) sou sèvè a pou w konekte ak navigatè w la.",
+      "serverNeedsSignIn": "Konekte pou w sèvi ak sèvè sa a",
+      "signIn": "Konekte",
+      "signInA11y": "Konekte nan sèvè sa a: {{name}}",
+      "signInFailed": "Nou pa t kapab konekte nan {{name}}. Eseye ankò."
     },
     "backends": {
       "title": "Sèvis chat yo",
@@ -3412,6 +3473,9 @@
       "downloading": "Ap telechaje…",
       "downloadProgress": "Ap telechaje… {{percent}}%",
       "downloadFailed": "Telechajman an pa t fini. Verifye koneksyon w ak espas ki lib sou aparèy la, epi eseye ankò."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Modèl sa a sipòte efò refleksyon"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play pa t retounen okenn pake kredi ki matche.",
     "purchaseOwnedByAnotherAccount": "Kredi ki sou Apple Account sa a fè pati yon lòt kont Kilo. Konekte nan kont Kilo sa a pou itilize yo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredi ki sou kont Google Play sa a fè pati yon lòt kont Kilo. Siyen nan kont Kilo sa a pou itilize yo."
+  },
+  "todos": {
+    "saveAsTodo": "Anrejistre kòm travay",
+    "segment": {
+      "label": "Vi ajan yo",
+      "sessions": "Sesyon",
+      "todos": "Travay"
+    },
+    "lists": {
+      "newList": "Nouvo lis",
+      "empty": "Poko gen lis",
+      "couldNotLoad": "Nou pa t ka chaje lis yo",
+      "noRepository": "Pa gen depo",
+      "rowA11y": "{{name}} — {{openCount}}",
+      "openCount_one": "{{count}} ouvè",
+      "openCount_other": "{{count}} ouvè",
+      "archived_one": "Achive ({{count}})",
+      "archived_other": "Achive ({{count}})",
+      "archive": "Achive",
+      "unarchive": "Retire nan achiv",
+      "deleteTitle": "Efase {{name}}?",
+      "deleteMessage": "Travay li yo efase tou. Sesyon yo rete."
+    },
+    "listSettings": {
+      "title": "Paramèt lis la",
+      "name": "Non",
+      "namePlaceholder": "Bug, Lide, Vèsyon…",
+      "emoji": "Emoji",
+      "mode": "Mòd",
+      "defaultsHint": "Sesyon ki kòmanse nan lis sa a itilize paramèt sa yo."
+    },
+    "list": {
+      "addPlaceholder": "Ajoute yon travay",
+      "add": "Ajoute travay",
+      "empty": "Poko gen travay",
+      "setDefaults": "Mete depo, mòd ak modèl",
+      "completed_one": "Fini ({{count}})",
+      "completed_other": "Fini ({{count}})"
+    },
+    "item": {
+      "markDone": "Make kòm fini",
+      "markOpen": "Make kòm pa fini",
+      "markDonePrompt": "Make kòm fini?",
+      "deleted": "Travay la efase",
+      "undo": "Defèt",
+      "runCount_one": "{{count}} egzekisyon",
+      "runCount_other": "{{count}} egzekisyon",
+      "startNow": "Kòmanse san revizyon",
+      "startNowHint": "Peze lontan pou kòmanse san revizyon",
+      "titleLabel": "Tit travay la",
+      "notes": "Nòt",
+      "notesPlaceholder": "Ajoute nòt nan Markdown",
+      "sessions": "Sesyon ki lye yo",
+      "noSessions": "Poko gen sesyon",
+      "linkSession": "Lye sesyon",
+      "unlinkSession": "Retire lyen {{title}}",
+      "linkFailed": "Nou pa t ka lye sesyon an ak travay la"
+    },
+    "linkSession": {
+      "title": "Lye yon sesyon",
+      "empty": "Pa gen sesyon resan",
+      "emptyInRepository": "Pa gen sesyon resan nan {{repository}}"
+    },
+    "upNext": "Pwochen",
+    "sessionTodo": "Travay: {{title}}",
+    "linkToTodo": "Lye ak travay",
+    "candidates": {
+      "empty": "Pa gen travay ouvè"
+    },
+    "saveSheet": {
+      "title": "Anrejistre nan lis",
+      "saved": "Anrejistre nan {{list}}"
+    }
   }
 }

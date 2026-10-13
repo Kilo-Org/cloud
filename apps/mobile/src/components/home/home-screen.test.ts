@@ -48,6 +48,9 @@ vi.mock('@/components/home/new-task-from-picture-button', () => ({
 vi.mock('@/components/home/product-choices', () => ({
   ProductChoices: () => null,
 }));
+vi.mock('@/components/todos/up-next-section', () => ({
+  UpNextSection: () => null,
+}));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: () => null,
 }));

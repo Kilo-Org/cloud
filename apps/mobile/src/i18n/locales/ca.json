@@ -136,7 +136,10 @@
     "working": "En curs",
     "yourOwnRepositories": "Els teus repositoris",
     "dismissed": "Descartat",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Canvis"
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -325,6 +328,7 @@
       "collapseFile": "Plega el fitxer",
       "expandFile": "Desplega el fitxer",
       "diffTooLarge": "Hi ha massa diferències per mostrar-les totes.",
+      "noPreview": "No hi ha cap previsualització disponible per a aquest fitxer",
       "openOnGitHub": "Obre a GitHub",
       "openDiffOnGitHub": "Obre les diferències d'aquest fitxer a GitHub",
       "githubDiff": "Diferències a GitHub"
@@ -847,7 +851,8 @@
       "kiloclaw": "Activitat de KiloClaw",
       "balance": "Alertes de saldo",
       "security": "Problemes de seguretat",
-      "spend": "Alertes de despesa"
+      "spend": "Alertes de despesa",
+      "followedSessions": "Sessions seguides"
     },
     "category": {
       "chatMessagesSubtitle": "respostes a les teves converses",
@@ -2114,6 +2119,8 @@
       "title": "Sessió",
       "copyErrorDetails": "Copia els detalls de l'error",
       "backToSessions": "Torna a les sessions",
+      "follow": "Segueix a la pantalla de bloqueig",
+      "unfollow": "Deixa de seguir a la pantalla de bloqueig",
       "couldNotLoad": "No s'ha pogut carregar la sessió.",
       "failedToLoadDetails": "No s'han pogut carregar els detalls de la sessió.",
       "failedToStopExecution": "No s'ha pogut aturar l'execució.",
@@ -2217,7 +2224,6 @@
       "retryLoadingEnvironment": "Torna a provar de carregar l'entorn",
       "defaultEnvironment": "Entorn predeterminat",
       "environmentSummary": "{{commands}} ordres · {{mcp}} MCP · {{skills}} habilitats · {{agents}} agents",
-      "changes": "Canvis",
       "leaveChanges": "Deixa els canvis",
       "commitAndPush": "Consigna i envia",
       "startSession": "Inicia la sessió",
@@ -2289,8 +2295,8 @@
       "toolList": "llista",
       "toolPatch": "aplica un pedaç",
       "toolTask": "tasca",
-      "readTodos": "Llegeix les tasques pendents",
-      "updateTodos": "Actualitza les tasques pendents",
+      "readTodos": "Llegeix el pla",
+      "updateTodos": "Actualitza el pla",
       "linesBadge": "{{displayCount}} línies",
       "filesBadge": "{{displayCount}} fitxers",
       "matchesBadge": "{{displayCount}} coincidències",
@@ -2689,6 +2695,12 @@
       "modelsCount_one": "Model utilitzat ({{displayCount}})",
       "modelsCount_other": "Models utilitzats ({{displayCount}})",
       "modelsCount_many": "Models utilitzats ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Mostra els canvis",
+      "asOf": "A les {{time}}",
+      "tooLarge": "Aquestes diferències són massa grans per mostrar-les al mòbil.",
+      "empty": "Encara no hi ha canvis de fitxers en aquesta sessió."
     },
     "autoApprove": {
       "title": "Aprovació automàtica",
@@ -3204,6 +3216,8 @@
     "channelName": "Agents actius",
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig.",
     "openSession": "Obre",
+    "finished": "Acabat",
+    "followFailed": "No s'ha pogut mostrar aquest agent a la pantalla de bloqueig.",
     "approveFailed": "No s'ha pogut aprovar. Toca $t(common.approve) per tornar-ho a provar.",
     "checked": "Comprovat",
     "lastKnown": "Últim estat conegut",
@@ -3212,7 +3226,26 @@
     "waitingForYou": "Esperant-te",
     "nextScheduled": "Properes programades",
     "answerNeeded": "Pendent de resposta",
-    "waitingToRetry": "Pendent de reintent"
+    "waitingToRetry": "Pendent de reintent",
+    "step": {
+      "editing": "Edició",
+      "reading": "Lectura",
+      "running": "Execució",
+      "searching": "Cerca web",
+      "thinking": "Pensant-ho bé"
+    },
+    "planOf": "de",
+    "filesChanged": "fitxers modificats",
+    "finishedIn": "Acabat en",
+    "noActivityFor": "Sense activitat durant",
+    "prOpened": "Sol·licitud d'extracció oberta",
+    "permissionWants": "Vol executar",
+    "failure": {
+      "provider": "Aturat: error del proveïdor",
+      "tool": "Aturat: error de l'eina",
+      "cancelled": "Aturat: cancel·lat",
+      "other": "ATURAT"
+    }
   },
   "transcriptionModel": {
     "title": "Model de transcripció",
@@ -3248,10 +3281,27 @@
     "list": {
       "loadFailed": "No s'ha pogut carregar l'historial del xat.",
       "new": "Xat nou",
-      "openHint": "Obre el xat. Mantén premut per suprimir.",
       "deleteTitle": "Vols suprimir aquest xat?"
     },
+    "rename": {
+      "title": "Reanomena el xat",
+      "accessibility": "Reanomena el xat: {{title}}",
+      "openHint": "Obre el xat. Mantén premut per reanomenar-lo o suprimir-lo."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Detalls del xat",
+      "backend": "Servidor",
+      "effortDefault": "Valor per defecte del model",
+      "noCost": "Sense cost",
+      "costUnknown": "Desconegut",
+      "costEstimatedNote": "El cost de les respostes que no han indicat cap preu s'ha estimat a partir dels preus de tarifa.",
+      "costUnknownNote": "No es coneix cap preu per a aquest model.",
+      "costPartialNote": "Aquest total no inclou els models que no tenen cap preu conegut.",
+      "localNote": "Els models al dispositiu s'executen en aquest dispositiu. No tenen cost ni memòria cau de peticions, i els seus recomptes de tòkens poden ser estimacions.",
+      "countedSinceNote": "Aquest xat va començar abans que es registrés l'ús. Els totals només mostren les respostes posteriors.",
+      "remoteServersOn": "Servidors MCP remots activats"
+    },
     "webSearch": {
       "title": "Cerca al web",
       "description": "Permet que aquest xat busqui informació actual a través del teu compte de Kilo. Les cerques fan servir la teva quota mensual de cerques.",
@@ -3279,7 +3329,6 @@
       "fieldName": "Nom que es mostra",
       "fieldUrl": "URL del servidor",
       "fieldUrlInvalid": "Introdueix una URL de servidor vàlida.",
-      "fieldToken": "Testimoni Bearer (opcional)",
       "enableServer": "Activa aquest servidor: {{name}}",
       "editServer": "Edita el servidor",
       "deleteServer": "Elimina el servidor",
@@ -3299,6 +3348,18 @@
       "serverToolCount": "{{count}} eines",
       "serverUnreachable": "No s'ha pogut contactar amb aquest servidor",
       "serverOff": "Aquest servidor està desactivat"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autenticació",
+      "authNone": "Sense inici de sessió",
+      "authBearer": "Testimoni Bearer",
+      "authOAuth": "Inici de sessió OAuth",
+      "fieldToken": "Testimoni",
+      "oauthHint": "Després de desar, toca $t(modelChat.mcpOAuth.signIn) al servidor per iniciar la sessió amb el navegador.",
+      "serverNeedsSignIn": "Inicia la sessió per utilitzar aquest servidor",
+      "signIn": "Inicia la sessió",
+      "signInA11y": "Inicia la sessió en aquest servidor: {{name}}",
+      "signInFailed": "No s'ha pogut iniciar la sessió a {{name}}. Torna-ho a provar."
     },
     "backends": {
       "title": "Servidors de xat",
@@ -3453,6 +3514,9 @@
       "downloading": "S'està baixant…",
       "downloadProgress": "S'està baixant… {{percent}}%",
       "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Aquest model admet l'esforç de raonament"
     }
   },
   "settingsTools": {
@@ -3675,5 +3739,82 @@
     "noMatchingProductsPlay": "Google Play no ha retornat cap paquet de crèdits coincident.",
     "purchaseOwnedByAnotherAccount": "Els crèdits d'aquest Apple Account pertanyen a un altre compte de Kilo. Inicia la sessió en aquell compte de Kilo per utilitzar-los.",
     "purchaseOwnedByAnotherAccountPlay": "Els crèdits d'aquest compte de Google Play pertanyen a un compte de Kilo diferent. Inicia la sessió en aquest compte de Kilo per utilitzar-los."
+  },
+  "todos": {
+    "saveAsTodo": "Desa com a tasca",
+    "segment": {
+      "label": "Vista d'agents",
+      "sessions": "Sessions",
+      "todos": "Tasques"
+    },
+    "lists": {
+      "newList": "Nova llista",
+      "empty": "Encara no hi ha llistes",
+      "couldNotLoad": "No s'han pogut carregar les llistes",
+      "noRepository": "Sense repositori",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} obertes",
+      "openCount_many": "{{count}} obertes",
+      "openCount_other": "{{count}} obertes",
+      "archived_one": "Arxivades ({{count}})",
+      "archived_many": "Arxivades ({{count}})",
+      "archived_other": "Arxivades ({{count}})",
+      "archive": "Arxiva",
+      "unarchive": "Desarxiva",
+      "deleteTitle": "Vols eliminar {{name}}?",
+      "deleteMessage": "També s'eliminen les seves tasques. Les sessions es mantenen."
+    },
+    "listSettings": {
+      "title": "Configuració de la llista",
+      "name": "Nom",
+      "namePlaceholder": "Errors, idees, versions…",
+      "emoji": "Emoji",
+      "mode": "Mode",
+      "defaultsHint": "Les sessions iniciades des d'aquesta llista utilitzen aquests valors per defecte."
+    },
+    "list": {
+      "addPlaceholder": "Afegeix una tasca",
+      "add": "Afegeix la tasca",
+      "empty": "Encara no hi ha tasques",
+      "setDefaults": "Defineix el repositori, el mode i el model",
+      "completed_one": "Completades ({{count}})",
+      "completed_many": "Completades ({{count}})",
+      "completed_other": "Completades ({{count}})"
+    },
+    "item": {
+      "markDone": "Marca com a feta",
+      "markOpen": "Marca com a no feta",
+      "markDonePrompt": "Vols marcar-la com a feta?",
+      "deleted": "Tasca eliminada",
+      "undo": "Desfés",
+      "runCount_one": "{{count}} execució",
+      "runCount_many": "{{count}} execucions",
+      "runCount_other": "{{count}} execucions",
+      "startNow": "Inicia sense revisió",
+      "startNowHint": "Mantén premut per iniciar sense revisió",
+      "titleLabel": "Títol de la tasca",
+      "notes": "Notes",
+      "notesPlaceholder": "Afegeix notes en Markdown",
+      "sessions": "Sessions vinculades",
+      "noSessions": "Encara no hi ha sessions",
+      "linkSession": "Vincula una sessió",
+      "unlinkSession": "Desvincula {{title}}",
+      "linkFailed": "No s'ha pogut vincular la sessió a la tasca"
+    },
+    "linkSession": {
+      "title": "Vincular una sessió",
+      "empty": "No hi ha sessions recents",
+      "emptyInRepository": "No hi ha sessions recents a {{repository}}"
+    },
+    "upNext": "A continuació",
+    "sessionTodo": "Tasca: {{title}}",
+    "linkToTodo": "Vincula a una tasca",
+    "candidates": {
+      "empty": "No hi ha tasques obertes"
+    },
+    "saveSheet": {
+      "title": "Desa a la llista",
+      "saved": "Desada a {{list}}"
+    }
   }
 }

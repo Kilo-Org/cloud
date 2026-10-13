@@ -136,7 +136,10 @@
     "working": "处理中",
     "yourOwnRepositories": "你自己的仓库",
     "dismissed": "已忽略",
-    "agent": "代理人"
+    "agent": "代理人",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "更改"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -320,7 +323,8 @@
       "kiloclaw": "KiloClaw 活动",
       "balance": "余额提醒",
       "security": "安全问题",
-      "spend": "支出提醒"
+      "spend": "支出提醒",
+      "followedSessions": "已关注的会话"
     },
     "category": {
       "chatMessagesSubtitle": "对话中的回复",
@@ -1575,6 +1579,8 @@
       "title": "会话",
       "copyErrorDetails": "复制错误详情",
       "backToSessions": "返回会话列表",
+      "follow": "在锁定屏幕上关注",
+      "unfollow": "停止在锁定屏幕上关注",
       "couldNotLoad": "无法加载会话。",
       "failedToLoadDetails": "无法加载会话详情。",
       "failedToStopExecution": "停止执行失败。",
@@ -1678,7 +1684,6 @@
       "retryLoadingEnvironment": "重新加载环境",
       "defaultEnvironment": "默认环境",
       "environmentSummary": "{{commands}} 条命令 · {{mcp}} 个 MCP · {{skills}} 项技能 · {{agents}} 个智能体",
-      "changes": "更改",
       "leaveChanges": "保留更改",
       "commitAndPush": "提交并推送",
       "startSession": "开始会话",
@@ -1749,8 +1754,8 @@
       "toolList": "列出目录",
       "toolPatch": "应用补丁",
       "toolTask": "任务",
-      "readTodos": "读取待办事项",
-      "updateTodos": "更新待办事项",
+      "readTodos": "读取计划",
+      "updateTodos": "更新计划",
       "linesBadge": "{{displayCount}} 行",
       "filesBadge": "{{displayCount}} 个文件",
       "matchesBadge": "{{displayCount}} 项匹配",
@@ -2140,6 +2145,12 @@
       "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}",
       "modelsCount_one": "模型（{{displayCount}}）",
       "modelsCount_other": "模型（{{displayCount}}）"
+    },
+    "sessionChanges": {
+      "viewChanges": "查看更改",
+      "asOf": "截至 {{time}}",
+      "tooLarge": "差异过大，无法在移动端显示。",
+      "empty": "此会话中尚无文件更改。"
     },
     "autoApprove": {
       "title": "自动批准",
@@ -2644,6 +2655,7 @@
     "fileRows": {
       "collapseFile": "折叠文件",
       "diffTooLarge": "差异过大，无法显示。",
+      "noPreview": "此文件无法预览",
       "expandFile": "展开文件",
       "markViewed": "将 {{path}} 标记为已查看",
       "openDiffOnGitHub": "在 GitHub 上打开此文件的差异",
@@ -3163,6 +3175,8 @@
     "channelName": "运行中的智能体",
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。",
     "openSession": "打开",
+    "finished": "已结束",
+    "followFailed": "无法在锁定屏幕上显示此智能体。",
     "approveFailed": "无法批准。点按$t(common.approve)重试。",
     "checked": "上次确认",
     "lastKnown": "上次已知状态",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "等待你处理",
     "nextScheduled": "后续计划",
     "answerNeeded": "等待回答",
-    "waitingToRetry": "等待重试"
+    "waitingToRetry": "等待重试",
+    "step": {
+      "editing": "编辑中",
+      "reading": "读取中",
+      "running": "运行",
+      "searching": "网页搜索",
+      "thinking": "正在思考"
+    },
+    "planOf": "/",
+    "filesChanged": "个文件已更改",
+    "finishedIn": "耗时",
+    "noActivityFor": "无活动",
+    "prOpened": "拉取请求已打开",
+    "permissionWants": "想要运行",
+    "failure": {
+      "provider": "已停止：提供商错误",
+      "tool": "已停止：工具错误",
+      "cancelled": "已停止：已取消",
+      "other": "已停止"
+    }
   },
   "transcriptionModel": {
     "title": "转写模型",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "无法加载聊天历史。",
       "new": "新对话",
-      "openHint": "打开对话。长按可删除。",
       "deleteTitle": "删除这个对话？"
     },
+    "rename": {
+      "title": "重命名聊天",
+      "accessibility": "重命名聊天：{{title}}",
+      "openHint": "打开对话。长按可重命名或删除。"
+    },
     "beta": "测试版",
+    "details": {
+      "title": "聊天详情",
+      "backend": "后端",
+      "effortDefault": "模型默认",
+      "noCost": "无费用",
+      "costUnknown": "未知",
+      "costEstimatedNote": "未报告价格的回答按标价估算。",
+      "costUnknownNote": "此模型没有已知价格。",
+      "costPartialNote": "此总计不包括没有已知价格的模型。",
+      "localNote": "本机模型在此设备上运行。它们没有费用，也没有提示缓存，其词元数可能是估算值。",
+      "countedSinceNote": "此聊天开始于记录用量之前。总计仅包含之后的回答。",
+      "remoteServersOn": "已开启的远程 MCP 服务器"
+    },
     "webSearch": {
       "title": "搜索网络",
       "description": "允许此聊天通过你的 Kilo 账户查找最新信息。搜索会占用你每月的搜索额度。",
@@ -3238,7 +3288,6 @@
       "fieldName": "显示名称",
       "fieldUrl": "服务器 URL",
       "fieldUrlInvalid": "请输入有效的服务器 URL。",
-      "fieldToken": "Bearer 令牌（可选）",
       "enableServer": "启用此服务器：{{name}}",
       "editServer": "编辑服务器",
       "deleteServer": "删除服务器",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "{{count}} 个工具",
       "serverUnreachable": "无法连接此服务器",
       "serverOff": "此服务器已关闭"
+    },
+    "mcpOAuth": {
+      "authMethod": "身份验证",
+      "authNone": "无需登录",
+      "authBearer": "Bearer 令牌",
+      "authOAuth": "OAuth 登录",
+      "fieldToken": "令牌",
+      "oauthHint": "保存后，在服务器上点按“$t(modelChat.mcpOAuth.signIn)”，即可通过浏览器登录。",
+      "serverNeedsSignIn": "登录后即可使用此服务器",
+      "signIn": "登录",
+      "signInA11y": "登录此服务器：{{name}}",
+      "signInFailed": "无法登录 {{name}}，请重试。"
     },
     "backends": {
       "title": "聊天后端",
@@ -3412,6 +3473,9 @@
       "downloading": "正在下载…",
       "downloadProgress": "正在下载… {{percent}}%",
       "downloadFailed": "下载未完成。请检查网络连接和可用存储空间，然后重试。"
+    },
+    "reasoningEffort": {
+      "modelFlag": "此模型支持思考强度"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play 未返回匹配的额度包。",
     "purchaseOwnedByAnotherAccount": "此 Apple Account 上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 账户上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。"
+  },
+  "todos": {
+    "saveAsTodo": "保存为待办事项",
+    "segment": {
+      "label": "智能体视图",
+      "sessions": "会话",
+      "todos": "待办事项"
+    },
+    "lists": {
+      "newList": "新建列表",
+      "empty": "暂无列表",
+      "couldNotLoad": "无法加载列表",
+      "noRepository": "无仓库",
+      "rowA11y": "{{name}}，{{openCount}}",
+      "openCount_one": "{{count}} 个未完成",
+      "openCount_other": "{{count}} 个未完成",
+      "archived_one": "已归档 ({{count}})",
+      "archived_other": "已归档 ({{count}})",
+      "archive": "归档",
+      "unarchive": "取消归档",
+      "deleteTitle": "删除 {{name}}？",
+      "deleteMessage": "其中的待办事项也会被删除，关联的会话会保留。"
+    },
+    "listSettings": {
+      "title": "列表设置",
+      "name": "名称",
+      "namePlaceholder": "缺陷、想法、发布…",
+      "emoji": "表情符号",
+      "mode": "模式",
+      "defaultsHint": "从此列表启动的会话将使用这些默认设置。"
+    },
+    "list": {
+      "addPlaceholder": "添加待办事项",
+      "add": "添加待办",
+      "empty": "暂无待办事项",
+      "setDefaults": "设置仓库、模式和模型",
+      "completed_one": "已完成 ({{count}})",
+      "completed_other": "已完成 ({{count}})"
+    },
+    "item": {
+      "markDone": "标记为已完成",
+      "markOpen": "标记为未完成",
+      "markDonePrompt": "标记为已完成？",
+      "deleted": "待办事项已删除",
+      "undo": "撤销删除",
+      "runCount_one": "{{count}} 次运行",
+      "runCount_other": "{{count}} 次运行",
+      "startNow": "无需审查直接开始",
+      "startNowHint": "长按可无需审查直接开始",
+      "titleLabel": "待办事项标题",
+      "notes": "备注",
+      "notesPlaceholder": "用 Markdown 添加备注",
+      "sessions": "已关联的会话",
+      "noSessions": "暂无会话",
+      "linkSession": "关联会话",
+      "unlinkSession": "取消关联 {{title}}",
+      "linkFailed": "无法将会话关联到该待办事项"
+    },
+    "linkSession": {
+      "title": "关联会话",
+      "empty": "暂无近期会话",
+      "emptyInRepository": "{{repository}} 中暂无近期会话"
+    },
+    "upNext": "接下来",
+    "sessionTodo": "待办事项：{{title}}",
+    "linkToTodo": "关联到待办事项",
+    "candidates": {
+      "empty": "暂无未完成的待办事项"
+    },
+    "saveSheet": {
+      "title": "保存到列表",
+      "saved": "已保存到 {{list}}"
+    }
   }
 }

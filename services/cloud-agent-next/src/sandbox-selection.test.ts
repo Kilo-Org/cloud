@@ -94,7 +94,7 @@ describe('sandbox selection policy', () => {
         VERCEL_SANDBOX_ORG_IDS: '',
         CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
       },
-      expected: getSandboxAllocationRequest('cloudflare-containers-standard-4'),
+      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
     {
       name: 'Cloudflare containers without an isolation allowlist',
@@ -102,7 +102,7 @@ describe('sandbox selection policy', () => {
         VERCEL_SANDBOX_ORG_IDS: '',
         CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
       },
-      expected: getSandboxAllocationRequest('cloudflare-containers-standard-4'),
+      expected: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
     },
   ])('previews $name consistently with actual routing', async ({ overrides, expected }) => {
     const env = { ...configured, ...overrides } as Env;
@@ -137,6 +137,29 @@ describe('sandbox selection policy', () => {
       )
     ).toBe(false);
   });
+
+  it.each([{ userId: owner.userId }, owner])(
+    'defaults enrolled owners to native medium without selection permission: %j',
+    async owner => {
+      const env = {
+        ...configured,
+        SANDBOX_SELECTION_IDS: '',
+        CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
+      } as Env;
+
+      expect(getSandboxSelectionCapabilities(env, owner)).toEqual({
+        enabled: false,
+        options: [],
+        defaultDestination: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+      });
+      const actual = await selectSandboxForNewSession({
+        env,
+        ...owner,
+        sessionId: 'workspace_12345678-1234-1234-1234-123456789012',
+      });
+      expect(actual.provider).toBe('cloudflare-containers');
+    }
+  );
 
   it.each([
     { SANDBOX_SELECTION_IDS: undefined },
@@ -342,7 +365,7 @@ describe('sandbox selection policy', () => {
     expect(options).toContainEqual(getSandboxAllocationRequest('cloudflare-containers-standard-3'));
     expect(options).toContainEqual(getSandboxAllocationRequest('cloudflare-containers-standard-4'));
     expect(capabilities.defaultDestination).toEqual(
-      getSandboxAllocationRequest('cloudflare-containers-standard-4')
+      getSandboxAllocationRequest('cloudflare-containers-standard-3')
     );
     expect(options).toContainEqual(capabilities.defaultDestination);
     expect(isSandboxAllocationAvailable(capabilities, 'cloudflare-containers-standard-4')).toBe(

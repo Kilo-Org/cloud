@@ -133,7 +133,12 @@ describe('downloading a vision model', () => {
 
   it('refuses a projector llama.cpp does not read images with, and keeps nothing', async () => {
     const h = harness({
-      inspection: async () => ({ contextWindow: 4096, tools: false, vision: false }),
+      inspection: async () => ({
+        contextWindow: 4096,
+        tools: false,
+        vision: false,
+        thinking: false,
+      }),
     });
     h.store.start(VISION_CATALOG);
     await finish(taskAt(h.tasks, 0), 1000);
@@ -173,6 +178,7 @@ describe('downloading a vision model', () => {
       contextWindow: 4096,
       tools: false,
       vision: true,
+      thinking: false,
     };
     h.index.text = JSON.stringify([saved]);
     h.files.set(ggufModelName('eyes'), 1000);

@@ -17,6 +17,8 @@ export type BackendModel = {
   tools: boolean;
   /** Image parts are sent only when this is true. */
   images: boolean;
+  /** The effort picker is offered, and the effort sent, only when this is true. */
+  reasoning: boolean;
 };
 export type StoredChatBackend = {
   id: string;
@@ -73,6 +75,8 @@ const backendModelSchema = z
     tools: z.boolean(),
     // A profile stored before the flag existed reads as text-only.
     images: z.boolean().default(false),
+    // A profile stored before the flag existed sends no effort.
+    reasoning: z.boolean().default(false),
   })
   .strip();
 

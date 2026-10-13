@@ -136,7 +136,10 @@
     "working": "په کار بوخت",
     "yourOwnRepositories": "ستاسو خپل زېرمتونونه",
     "dismissed": "له پامه غورځول شوی",
-    "agent": "اجنټ"
+    "agent": "اجنټ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "بدلونونه"
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -325,6 +328,7 @@
       "collapseFile": "د فایل منځپانګه پټه کړئ",
       "expandFile": "د فایل منځپانګه ښکاره کړئ",
       "diffTooLarge": "توپیر دومره لوی دی چې نه شي ښودل کېدای.",
+      "noPreview": "د دې فایل لپاره مخکتنه نشته",
       "openOnGitHub": "په GitHub کې پرانیزئ",
       "openDiffOnGitHub": "د دې فایل توپیر په GitHub کې پرانیزئ",
       "githubDiff": "د GitHub توپیر"
@@ -831,7 +835,8 @@
       "kiloclaw": "د KiloClaw فعالیت",
       "balance": "د بیلانس خبرتیاوې",
       "security": "امنیتي موندنې",
-      "spend": "د لګښت خبرتیاوې"
+      "spend": "د لګښت خبرتیاوې",
+      "followedSessions": "تعقیب شوې ناستې"
     },
     "category": {
       "chatMessagesSubtitle": "ستاسو په خبرو اترو کې ځوابونه",
@@ -2086,6 +2091,8 @@
       "title": "ناسته",
       "copyErrorDetails": "د تېروتنې جزیات کاپي کړئ",
       "backToSessions": "بېرته ناستو ته ورشئ",
+      "follow": "د قلف پر سکرین تعقیب کړئ",
+      "unfollow": "د قلف پر سکرین تعقیب بند کړئ",
       "couldNotLoad": "ناسته بار نه شوه.",
       "failedToLoadDetails": "د ناستې جزیات بار نه شول.",
       "failedToStopExecution": "اجرا ونه درول شوه.",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "د چاپېریال بارولو بیا هڅه کړئ",
       "defaultEnvironment": "تلواله چاپېریال",
       "environmentSummary": "{{commands}} کمانډونه · {{mcp}} MCP · {{skills}} مهارتونه · {{agents}} ایجنټونه",
-      "changes": "بدلونونه",
       "leaveChanges": "بدلونونه پرېږدئ",
       "commitAndPush": "کمیټ او پش کړئ",
       "startSession": "ناسته پیل کړئ",
@@ -2260,8 +2266,8 @@
       "toolList": "لېست کول",
       "toolPatch": "سمون پلي کول",
       "toolTask": "دنده",
-      "readTodos": "د دندو لېست ولولئ",
-      "updateTodos": "د دندو لېست تازه کړئ",
+      "readTodos": "پلان ولولئ",
+      "updateTodos": "پلان تازه کړئ",
       "linesBadge": "{{displayCount}} کرښې",
       "filesBadge": "{{displayCount}} فایلونه",
       "matchesBadge": "{{displayCount}} پایلې",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
       "modelsCount_one": "ماډل ({{displayCount}})",
       "modelsCount_other": "ماډلونه ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "بدلونونه وګورئ",
+      "asOf": "تر {{time}} پورې",
+      "tooLarge": "دا توپیر دومره لوی دی چې په موبایل کې نه شي ښودل کېدای.",
+      "empty": "په دې ناسته کې تر اوسه په فایلونو کې هېڅ بدلون نه دی راغلی."
     },
     "autoApprove": {
       "title": "اتوماتیک تصویب",
@@ -3163,6 +3175,8 @@
     "channelName": "فعال اجنټان",
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ.",
     "openSession": "پرانیستل",
+    "finished": "پای ته ورسېد",
+    "followFailed": "دا اجنټ د قلف پر سکرین ونه ښودل شو.",
     "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ.",
     "checked": "تایید شوی",
     "lastKnown": "وروستی معلوم حالت",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "ستاسو په تمه",
     "nextScheduled": "راتلونکی مهال ویش",
     "answerNeeded": "ځواب ته اړتیا لري",
-    "waitingToRetry": "د بیا هڅې په تمه"
+    "waitingToRetry": "د بیا هڅې په تمه",
+    "step": {
+      "editing": "سمون",
+      "reading": "لوستل",
+      "running": "چلول",
+      "searching": "وېب پلټنه",
+      "thinking": "فکر کول"
+    },
+    "planOf": "له",
+    "filesChanged": "فایلونه بدل شول",
+    "finishedIn": "بشپړ شو",
+    "noActivityFor": "هیڅ فعالیت نشته",
+    "prOpened": "د پل غوښتنه پرانیستل شوه",
+    "permissionWants": "چلول غواړي",
+    "failure": {
+      "provider": "ودرېد: د برابرونکي تېروتنه",
+      "tool": "ودرېد: د وسیلې تېروتنه",
+      "cancelled": "ودرېد: لغوه شو",
+      "other": "درېدلی"
+    }
   },
   "transcriptionModel": {
     "title": "د غږ د متن ته بدلولو ماډل",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "د چټ تاریخ بار کیدلای نه شو.",
       "new": "نوې خبرې اترې",
-      "openHint": "خبرې اترې پرانیزي. د حذف لپاره اوږده کېکاږئ.",
       "deleteTitle": "دا خبرې اترې حذف کړئ؟"
     },
+    "rename": {
+      "title": "د خبرو اترو نوم بدل کړئ",
+      "accessibility": "د خبرو اترو نوم بدل کړئ: {{title}}",
+      "openHint": "خبرې اترې پرانیزي. د نوم بدلولو یا حذف لپاره اوږده کېکاږئ."
+    },
     "beta": "بیټا",
+    "details": {
+      "title": "د چټ جزئیات",
+      "backend": "شالید خدمت",
+      "effortDefault": "د ماډل اصلي ترتیب",
+      "noCost": "هیڅ لګښت نشته",
+      "costUnknown": "نامعلوم",
+      "costEstimatedNote": "د هغو ځوابونو لګښت چې بیه یې نه وه ښودلې، د لیست له بیو اټکل شوی دی.",
+      "costUnknownNote": "د دې ماډل لپاره کومه بیه نه ده معلومه.",
+      "costPartialNote": "په دې ټولګه کې هغه ماډلونه نه دي شامل چې بیه یې نه ده معلومه.",
+      "localNote": "په وسیله کې ماډلونه په همدې وسیله چلېږي. هېڅ لګښت او د پرامپټ زېرمه نه لري، او د ټوکنونو شمېر یې ښايي اټکل وي.",
+      "countedSinceNote": "دا چټ مخکې له دې پیل شو چې کارونه ثبت شي. ټولګې یوازې له هغې وروسته ځوابونه ښيي.",
+      "remoteServersOn": "فعال لرې MCP سرورونه"
+    },
     "webSearch": {
       "title": "په وېب کې لټون",
       "description": "دې چټ ته اجازه ورکړئ چې ستاسو د Kilo حساب له لارې تازه معلومات ولټوي. لټونونه ستاسو د میاشتني لټون برخه کاروي.",
@@ -3238,7 +3288,6 @@
       "fieldName": "ښکارېدونکی نوم",
       "fieldUrl": "د سرور URL",
       "fieldUrlInvalid": "د سرور سم URL ولیکئ.",
-      "fieldToken": "Bearer ټوکن (اختیاري)",
       "enableServer": "دا سرور فعال کړئ: {{name}}",
       "editServer": "سرور سم کړئ",
       "deleteServer": "سرور ړنګ کړئ",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "{{count}} وسیلې",
       "serverUnreachable": "دې سرور ته رسېدل ممکن نه شول",
       "serverOff": "دا سرور بند دی"
+    },
+    "mcpOAuth": {
+      "authMethod": "تصدیق",
+      "authNone": "بې ننوتلو",
+      "authBearer": "Bearer ټوکن",
+      "authOAuth": "د OAuth له لارې ننوتل",
+      "fieldToken": "ټوکن",
+      "oauthHint": "له خوندي کولو وروسته، په سرور باندې $t(modelChat.mcpOAuth.signIn) ټک کړئ ترڅو د خپل براوزر له لارې ننوځئ.",
+      "serverNeedsSignIn": "د دې سرور کارولو لپاره ننوځئ",
+      "signIn": "ننوتل",
+      "signInA11y": "دې سرور ته ننوځئ: {{name}}",
+      "signInFailed": "{{name}} ته ننوتل ممکن نه شول. بیا هڅه وکړئ."
     },
     "backends": {
       "title": "د چټ شالید خدمتونه",
@@ -3412,6 +3473,9 @@
       "downloading": "ښکته کېږي…",
       "downloadProgress": "ښکته کېږي… {{percent}}%",
       "downloadFailed": "ښکته کول بشپړ نه شول. خپل اتصال او خالي ځای وګورئ، بیا هڅه وکړئ."
+    },
+    "reasoningEffort": {
+      "modelFlag": "دا ماډل د فکر کچه ملاتړ کوي"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play د سمون خور کریډیټ بنډلونه بیرته را نه کړل.",
     "purchaseOwnedByAnotherAccount": "په دې Apple Account کې کریډیټونه د Kilo په بل حساب پورې اړه لري. د کارولو لپاره یې د Kilo هماغه حساب ته ننوځئ.",
     "purchaseOwnedByAnotherAccountPlay": "دا Google Play حساب باندې کریډیټونه د بل Kilo حساب پورې اړه لري. د کارولو لپاره هغه Kilo حساب ته ننوځئ."
+  },
+  "todos": {
+    "saveAsTodo": "د دندې په توګه خوندي کړئ",
+    "segment": {
+      "label": "د اجنټانو کتنه",
+      "sessions": "ناستې",
+      "todos": "دندې"
+    },
+    "lists": {
+      "newList": "نوی لېست",
+      "empty": "تر اوسه هېڅ لېست نشته",
+      "couldNotLoad": "لېستونه بار نه شول",
+      "noRepository": "زېرمتون نشته",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} پرانیستي",
+      "openCount_other": "{{count}} پرانیستي",
+      "archived_one": "آرشیف شوي ({{count}})",
+      "archived_other": "آرشیف شوي ({{count}})",
+      "archive": "آرشیف کړئ",
+      "unarchive": "له آرشیف راوباسئ",
+      "deleteTitle": "{{name}} ړنګ شي؟",
+      "deleteMessage": "د هغې دندې هم ړنګېږي. ناستې یې پاتې کېږي."
+    },
+    "listSettings": {
+      "title": "د لېست تنظیمات",
+      "name": "نوم",
+      "namePlaceholder": "بګونه، نظرونه، خپرونه…",
+      "emoji": "ایموجي",
+      "mode": "حالت",
+      "defaultsHint": "له دې لېست پیل شوې ناستې همدا اصلي تنظیمات کاروي."
+    },
+    "list": {
+      "addPlaceholder": "دنده اضافه کړئ",
+      "add": "دنده اضافه کړئ",
+      "empty": "تر اوسه هېڅ دنده نشته",
+      "setDefaults": "زېرمتون، حالت او ماډل وټاکئ",
+      "completed_one": "بشپړې شوې ({{count}})",
+      "completed_other": "بشپړې شوې ({{count}})"
+    },
+    "item": {
+      "markDone": "بشپړه په نښه کړئ",
+      "markOpen": "نابشپړه په نښه کړئ",
+      "markDonePrompt": "بشپړه په نښه کړئ؟",
+      "deleted": "دنده ړنګه شوه",
+      "undo": "بېرته راوګرځوئ",
+      "runCount_one": "{{count}} اجرا",
+      "runCount_other": "{{count}} اجرا",
+      "startNow": "بې له بیاکتنې پیل کړئ",
+      "startNowHint": "د بیاکتنې پرته د پیل لپاره اوږده کېکاږئ",
+      "titleLabel": "د دندې سرلیک",
+      "notes": "یادښتونه",
+      "notesPlaceholder": "په Markdown یادښتونه اضافه کړئ",
+      "sessions": "تړل شوې ناستې",
+      "noSessions": "تر اوسه هېڅ ناسته نشته",
+      "linkSession": "ناسته ونښلوئ",
+      "unlinkSession": "{{title}} جلا کړئ",
+      "linkFailed": "ناسته له دندې سره ونښلول نه شوه"
+    },
+    "linkSession": {
+      "title": "یوه ناسته ونښلوئ",
+      "empty": "وروستې ناستې نشته",
+      "emptyInRepository": "په {{repository}} کې وروستې ناستې نشته"
+    },
+    "upNext": "بل",
+    "sessionTodo": "دنده: {{title}}",
+    "linkToTodo": "له دندې سره ونښلوئ",
+    "candidates": {
+      "empty": "هېڅ پرانیستې دنده نشته"
+    },
+    "saveSheet": {
+      "title": "په لېست کې خوندي کړئ",
+      "saved": "په {{list}} کې خوندي شو"
+    }
   }
 }

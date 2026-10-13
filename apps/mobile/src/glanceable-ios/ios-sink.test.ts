@@ -25,6 +25,10 @@ import {
   _setSecureStoreForTests,
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
+import {
+  rememberSnapshotRows,
+  setFollowedSessionsSource,
+} from '@/lib/glanceable/followed-sessions';
 import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
@@ -988,6 +992,58 @@ describe('iosSink widget publish', () => {
       expect(props.countLines).toHaveLength(counts);
       expect(props.primaryKind === undefined).toBe(!hasPrimary);
     }
+  });
+});
+
+describe('iosSink followed sessions', () => {
+  afterEach(() => {
+    setFollowedSessionsSource(null);
+  });
+
+  it('draws the wait and wake times of the sessions it still counts, not the followed ones', () => {
+    const rows = [
+      {
+        id: 'followed',
+        status: 'permission',
+        statusUpdatedAt: new Date(NOW - 60 * 60_000).toISOString(),
+      },
+      {
+        id: 'other',
+        status: 'question',
+        statusUpdatedAt: new Date(NOW - 5 * 60_000).toISOString(),
+      },
+      {
+        id: 'followed-wake',
+        status: 'scheduled',
+        scheduledAt: new Date(NOW + 30 * 60_000).toISOString(),
+      },
+      {
+        id: 'other-wake',
+        status: 'scheduled',
+        scheduledAt: new Date(NOW + 90 * 60_000).toISOString(),
+      },
+    ];
+    setFollowedSessionsSource({
+      ids: () => ['followed', 'followed-wake'],
+      counts: () => ({ running: 0, needsInput: 1, needsApproval: 1, idle: 0, scheduled: 1 }),
+    });
+    const snapshot = buildGlanceableSnapshot({
+      sessions: rows,
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    rememberSnapshotRows(snapshot.scopeKey, rows);
+
+    iosSink.startOrUpdate(snapshot, CTX);
+
+    expect(mockState.started[0]?.props).toMatchObject({
+      needsInput: 1,
+      needsApproval: 0,
+      scheduled: 1,
+      needsInputSince: rows[1]?.statusUpdatedAt,
+      scheduledAt: rows[3]?.scheduledAt,
+    });
   });
 });
 

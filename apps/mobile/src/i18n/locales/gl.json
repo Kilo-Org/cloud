@@ -136,7 +136,10 @@
     "working": "Traballando",
     "yourOwnRepositories": "Os teus propios repositorios",
     "dismissed": "Descartado",
-    "agent": "Axente"
+    "agent": "Axente",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Cambios"
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -325,6 +328,7 @@
       "collapseFile": "Contraer ficheiro",
       "expandFile": "Expandir ficheiro",
       "diffTooLarge": "Hai demasiadas diferenzas para amosalas.",
+      "noPreview": "Non hai vista previa dispoñible para este ficheiro",
       "openOnGitHub": "Abrir en GitHub",
       "openDiffOnGitHub": "Abrir as diferenzas deste ficheiro en GitHub",
       "githubDiff": "Diferenzas en GitHub"
@@ -831,7 +835,8 @@
       "kiloclaw": "Actividade de KiloClaw",
       "balance": "Alertas de saldo",
       "security": "Problemas de seguridade",
-      "spend": "Alertas de gasto"
+      "spend": "Alertas de gasto",
+      "followedSessions": "Sesións seguidas"
     },
     "category": {
       "chatMessagesSubtitle": "respostas nas túas conversas",
@@ -2086,6 +2091,8 @@
       "title": "Sesión",
       "copyErrorDetails": "Copiar detalles do erro",
       "backToSessions": "Volver ás sesións",
+      "follow": "Seguir na pantalla de bloqueo",
+      "unfollow": "Deixar de seguir na pantalla de bloqueo",
       "couldNotLoad": "Non se puido cargar a sesión.",
       "failedToLoadDetails": "Non se puideron cargar os detalles da sesión.",
       "failedToStopExecution": "Non se puido deter a execución.",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "Volver tentar cargar o contorno",
       "defaultEnvironment": "Contorno predeterminado",
       "environmentSummary": "{{commands}} comandos · {{mcp}} MCP · {{skills}} habilidades · {{agents}} axentes",
-      "changes": "Cambios",
       "leaveChanges": "Manter cambios",
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sesión",
@@ -2260,8 +2266,8 @@
       "toolList": "listar",
       "toolPatch": "aplicar parche",
       "toolTask": "tarefa",
-      "readTodos": "Ler tarefas",
-      "updateTodos": "Actualizar tarefas",
+      "readTodos": "Ler o plan",
+      "updateTodos": "Actualizar o plan",
       "linesBadge": "{{displayCount}} liñas",
       "filesBadge": "{{displayCount}} ficheiros",
       "matchesBadge": "{{displayCount}} coincidencias",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modelo ({{displayCount}})",
       "modelsCount_other": "Modelos ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Ver cambios",
+      "asOf": "Ás {{time}}",
+      "tooLarge": "Hai demasiadas diferenzas para amosalas no móbil.",
+      "empty": "Aínda non hai cambios en ficheiros nesta sesión."
     },
     "autoApprove": {
       "title": "Aprobación automática",
@@ -3163,6 +3175,8 @@
     "channelName": "Axentes activos",
     "activityKitDisabledBody": "Activa as actividades en directo nos axustes para ver os axentes activos na pantalla de bloqueo.",
     "openSession": "Abrir",
+    "finished": "Rematado",
+    "followFailed": "Non se puido mostrar este axente na pantalla de bloqueo.",
     "approveFailed": "Non se puido aprobar. Toca $t(common.approve) para tentalo de novo.",
     "checked": "Comprobado",
     "lastKnown": "Último estado coñecido",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "Agardando por ti",
     "nextScheduled": "Próximas tarefas programadas",
     "answerNeeded": "Agardando resposta",
-    "waitingToRetry": "Agardando para reintentar"
+    "waitingToRetry": "Agardando para reintentar",
+    "step": {
+      "editing": "Edición",
+      "reading": "Lectura",
+      "running": "Execución",
+      "searching": "Busca web",
+      "thinking": "Pensando"
+    },
+    "planOf": "de",
+    "filesChanged": "ficheiros modificados",
+    "finishedIn": "Rematado en",
+    "noActivityFor": "Sen actividade durante",
+    "prOpened": "Solicitude de extracción aberta",
+    "permissionWants": "Quere executar",
+    "failure": {
+      "provider": "Detido: erro do provedor",
+      "tool": "Detido: erro da ferramenta",
+      "cancelled": "Detido: cancelado",
+      "other": "PARADO"
+    }
   },
   "transcriptionModel": {
     "title": "Modelo de transcrición",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "Non se puido cargar o historial do chat.",
       "new": "Chat novo",
-      "openHint": "Abre o chat. Mantén premido para eliminar.",
       "deleteTitle": "Eliminar este chat?"
     },
+    "rename": {
+      "title": "Renomear o chat",
+      "accessibility": "Renomear o chat: {{title}}",
+      "openHint": "Abre o chat. Mantén premido para renomear ou eliminar."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Detalles do chat",
+      "backend": "Servizo",
+      "effortDefault": "Predeterminado do modelo",
+      "noCost": "Sen custo",
+      "costUnknown": "Descoñecido",
+      "costEstimatedNote": "O custo das respostas que non informaron dun prezo estímase a partir dos prezos de tarifa.",
+      "costUnknownNote": "Non se coñece ningún prezo para este modelo.",
+      "costPartialNote": "Este total non inclúe os modelos sen prezo coñecido.",
+      "localNote": "Os modelos no dispositivo execútanse neste dispositivo. Non teñen custo nin caché de instrucións, e o seu reconto de unidades de texto pode ser estimado.",
+      "countedSinceNote": "Este chat comezou antes de que se rexistrase o uso. Os totais só mostran as respostas posteriores.",
+      "remoteServersOn": "Servidores MCP remotos activados"
+    },
     "webSearch": {
       "title": "Buscar na web",
       "description": "Permite que este chat busque información actual a través da túa conta de Kilo. As buscas usan a túa cota mensual de buscas.",
@@ -3238,7 +3288,6 @@
       "fieldName": "Nome mostrado",
       "fieldUrl": "URL do servidor",
       "fieldUrlInvalid": "Introduce un URL de servidor válido.",
-      "fieldToken": "Token Bearer (opcional)",
       "enableServer": "Activar este servidor: {{name}}",
       "editServer": "Editar o servidor",
       "deleteServer": "Eliminar o servidor",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "{{count}} ferramentas",
       "serverUnreachable": "Non se puido contactar con este servidor",
       "serverOff": "Este servidor está desactivado"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autenticación",
+      "authNone": "Sen inicio de sesión",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Inicio de sesión OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Despois de gardar, toca $t(modelChat.mcpOAuth.signIn) no servidor para iniciar sesión co navegador.",
+      "serverNeedsSignIn": "Inicia sesión para usar este servidor",
+      "signIn": "Iniciar sesión",
+      "signInA11y": "Iniciar sesión neste servidor: {{name}}",
+      "signInFailed": "Non se puido iniciar sesión en {{name}}. Téntao de novo."
     },
     "backends": {
       "title": "Servizos de chat",
@@ -3412,6 +3473,9 @@
       "downloading": "Descargando…",
       "downloadProgress": "Descargando… {{percent}}%",
       "downloadFailed": "A descarga non rematou. Comproba a conexión e o espazo libre e téntao de novo."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Este modelo admite esforzo de razoamento"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play non devolveu ningún paquete de créditos coincidente.",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta de Google Play pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos."
+  },
+  "todos": {
+    "saveAsTodo": "Gardar como tarefa",
+    "segment": {
+      "label": "Vista de axentes",
+      "sessions": "Sesións",
+      "todos": "Tarefas"
+    },
+    "lists": {
+      "newList": "Nova lista",
+      "empty": "Aínda non hai listas",
+      "couldNotLoad": "Non se puideron cargar as listas",
+      "noRepository": "Sen repositorio",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} abertas",
+      "openCount_other": "{{count}} abertas",
+      "archived_one": "Arquivadas ({{count}})",
+      "archived_other": "Arquivadas ({{count}})",
+      "archive": "Arquivar",
+      "unarchive": "Desarquivar",
+      "deleteTitle": "Eliminar {{name}}?",
+      "deleteMessage": "As súas tarefas tamén se eliminan. As sesións mantéñense."
+    },
+    "listSettings": {
+      "title": "Axustes da lista",
+      "name": "Nome",
+      "namePlaceholder": "Erros, Ideas, Lanzamento…",
+      "emoji": "Emoji",
+      "mode": "Modo",
+      "defaultsHint": "As sesións iniciadas desde esta lista usan estes valores predeterminados."
+    },
+    "list": {
+      "addPlaceholder": "Engadir unha tarefa",
+      "add": "Engadir tarefa",
+      "empty": "Aínda non hai tarefas",
+      "setDefaults": "Define repositorio, modo e modelo",
+      "completed_one": "Rematadas ({{count}})",
+      "completed_other": "Rematadas ({{count}})"
+    },
+    "item": {
+      "markDone": "Marcar como feita",
+      "markOpen": "Marcar como non feita",
+      "markDonePrompt": "Marcar como feita?",
+      "deleted": "Tarefa eliminada",
+      "undo": "Desfacer",
+      "runCount_one": "{{count}} execución",
+      "runCount_other": "{{count}} execucións",
+      "startNow": "Iniciar sen revisión",
+      "startNowHint": "Mantén premido para iniciar sen revisión",
+      "titleLabel": "Título da tarefa",
+      "notes": "Notas",
+      "notesPlaceholder": "Engadir notas en Markdown",
+      "sessions": "Sesións vinculadas",
+      "noSessions": "Aínda non hai sesións",
+      "linkSession": "Vincular sesión",
+      "unlinkSession": "Desvincular {{title}}",
+      "linkFailed": "Non se puido vincular a sesión á tarefa"
+    },
+    "linkSession": {
+      "title": "Vincular unha sesión",
+      "empty": "Non hai sesións recentes",
+      "emptyInRepository": "Non hai sesións recentes en {{repository}}"
+    },
+    "upNext": "A continuación",
+    "sessionTodo": "Tarefa: {{title}}",
+    "linkToTodo": "Vincular á tarefa",
+    "candidates": {
+      "empty": "Non hai tarefas abertas"
+    },
+    "saveSheet": {
+      "title": "Gardar na lista",
+      "saved": "Gardada en {{list}}"
+    }
   }
 }

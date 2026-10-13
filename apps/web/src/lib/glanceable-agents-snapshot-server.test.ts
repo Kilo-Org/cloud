@@ -2,6 +2,9 @@ import type { ActiveSession } from '@/lib/active-sessions-list';
 import { listActiveSessions } from '@/lib/active-sessions-list';
 import { readCloudAgentWidgetApprovalKey } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 jest.mock('@/lib/active-sessions-list', () => ({
   listActiveSessions: jest.fn(),
@@ -11,7 +14,11 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: { select: jest.fn() } }));
 
-import { buildHomeWidgetResponseForUser } from './glanceable-agents-snapshot-server';
+import {
+  buildGlanceableDeliveryForUser,
+  buildHomeWidgetResponseForUser,
+  isSessionCardPrOpened,
+} from './glanceable-agents-snapshot-server';
 
 const mockedListActiveSessions = listActiveSessions as jest.MockedFunction<
   typeof listActiveSessions
@@ -160,7 +167,7 @@ describe('buildHomeWidgetResponseForUser', () => {
     it('binds only the oldest approvable cloud permission and ranks it first', async () => {
       mockedListActiveSessions.mockResolvedValue({ sessions: permissionRows });
       limit.mockResolvedValue([{ cloudAgentSessionId: CLOUD_SESSION }]);
-      mockedReadApprovalKey.mockResolvedValue(KEY);
+      mockedReadApprovalKey.mockResolvedValue({ approvalKey: KEY, command: 'npm test' });
 
       const response = await buildHomeWidgetResponseForUser({
         userId: 'oauth/user-1',
@@ -242,5 +249,300 @@ describe('buildHomeWidgetResponseForUser', () => {
       expect(mockedReadApprovalKey).not.toHaveBeenCalled();
       expect(response.home.canApprove).toBe(false);
     });
+  });
+});
+
+describe('buildGlanceableDeliveryForUser', () => {
+  type Fields = Record<string, unknown>;
+  let followedRows: { sessionId: string | null }[];
+  let storedRows: Fields[];
+  let cloudRows: { cloudAgentSessionId: string | null }[];
+  let followedWhere: SQL | undefined;
+  let storedWhere: SQL | undefined;
+  let storedFields: Fields | undefined;
+
+  const storedById = (predicate: SQL): Fields[] => {
+    storedWhere = predicate;
+    const query = new PgDialect().sqlToQuery(predicate);
+    const wanted = new Set(
+      (query.params as unknown[]).filter((value): value is string => typeof value === 'string')
+    );
+    return storedRows.filter(row => wanted.has(row.sessionId as string));
+  };
+
+  beforeEach(() => {
+    mockedListActiveSessions.mockReset();
+    mockedReadApprovalKey.mockReset();
+    followedRows = [];
+    storedRows = [];
+    cloudRows = [];
+    followedWhere = undefined;
+    // Route each query by its selected fields: the followed token read, the
+    // approval identity read, and the read of followed sessions off the list.
+    // The awaited form and the `.limit()` form both work, because the parent
+    // token read awaits the predicate and the follow gate chains `.limit(1)`.
+    jest.mocked(db.select).mockReset();
+    jest.mocked(db.select).mockImplementation(((fields: Fields) => {
+      const where = (predicate: SQL) => {
+        if ('cloudAgentSessionId' in fields) return { limit: async () => cloudRows };
+        if ('prState' in fields) {
+          storedFields = fields;
+          return Promise.resolve(storedById(predicate));
+        }
+        followedWhere = predicate;
+        const rows = [...followedRows];
+        return Object.assign(rows, { limit: async (_count: number) => rows });
+      };
+      // The followed session read joins the pull request cache.
+      return { from: () => ({ where, leftJoin: () => ({ where }) }) };
+    }) as never);
+  });
+
+  const running: ActiveSession = {
+    id: 'ses_running',
+    status: 'busy',
+    title: 'Running work',
+    connectionId: 'cloud-agent',
+    statusUpdatedAt: '2026-10-12T09:00:00.000Z',
+  };
+  const waiting: ActiveSession = {
+    id: 'ses_waiting',
+    status: 'permission',
+    title: 'Followed approval',
+    connectionId: 'cloud-agent',
+    statusUpdatedAt: '2026-10-12T09:30:00.000Z',
+  };
+
+  it('counts only the sessions no session card follows on the aggregate card', async () => {
+    mockedListActiveSessions.mockResolvedValue({ sessions: [running, waiting] });
+    followedRows = [{ sessionId: 'ses_waiting' }];
+    cloudRows = [{ cloudAgentSessionId: CLOUD_SESSION }];
+    mockedReadApprovalKey.mockResolvedValue({ approvalKey: KEY, command: 'npm test' });
+
+    const delivery = await buildGlanceableDeliveryForUser({
+      userId: 'oauth/user-1',
+      organizationId: null,
+    });
+
+    // Home keeps every session; the aggregate card leaves the followed one out.
+    expect(delivery.response.snapshot).toMatchObject({ running: 1, needsInput: 1 });
+    expect(delivery.liveActivitySnapshot).toMatchObject({
+      status: 'happy',
+      running: 1,
+      needsInput: 0,
+      needsApproval: 0,
+    });
+    expect(JSON.stringify(delivery.liveActivitySnapshot)).not.toContain('ses_waiting');
+    expect(delivery.sessionCards).toEqual([
+      {
+        sessionId: 'ses_waiting',
+        row: {
+          title: 'Followed approval',
+          status: 'permission',
+          statusUpdatedAt: '2026-10-12T09:30:00.000Z',
+          scheduledAt: null,
+          approvalKey: KEY,
+          summary: null,
+          permissionCommand: 'npm test',
+          lastActivityAt: null,
+          costMicrodollars: null,
+          startedAt: null,
+          prOpened: false,
+        },
+      },
+    ]);
+  });
+
+  it('leaves the aggregate card empty when every session is followed', async () => {
+    mockedListActiveSessions.mockResolvedValue({ sessions: [running] });
+    followedRows = [{ sessionId: 'ses_running' }];
+
+    const delivery = await buildGlanceableDeliveryForUser({
+      userId: 'oauth/user-1',
+      organizationId: null,
+    });
+
+    expect(delivery.response.snapshot.running).toBe(1);
+    expect(delivery.liveActivitySnapshot).toMatchObject({ status: 'empty', running: 0 });
+    expect(delivery.sessionCards[0]?.row).toMatchObject({ status: 'busy', approvalKey: null });
+  });
+
+  it('finishes a followed session that left the list and ends a missing one', async () => {
+    mockedListActiveSessions.mockResolvedValue({ sessions: [running] });
+    followedRows = [{ sessionId: 'ses_finished' }, { sessionId: 'ses_deleted' }];
+    storedRows = [
+      {
+        sessionId: 'ses_finished',
+        title: 'Done work',
+        // Production-shaped PostgreSQL timestamp text.
+        statusUpdatedAt: '2026-10-12 09:45:12.945+00',
+        updatedAt: '2026-10-12 09:46:00+00',
+        summary: {
+          step: null,
+          plan: { done: 1, total: 2, current: 'tests' },
+          changes: { files: 2, added: 10, removed: 3 },
+          failure: { kind: 'provider' },
+        },
+        lastActivityAt: '2026-10-12 09:46:00+00',
+        costMicrodollars: 12345,
+        createdAt: '2026-10-12 09:00:00+00',
+        prVerifiedAt: '2026-10-12 09:40:00+00',
+        prState: 'open',
+      },
+    ];
+
+    const delivery = await buildGlanceableDeliveryForUser({
+      userId: 'oauth/user-1',
+      organizationId: null,
+    });
+
+    expect(delivery.liveActivitySnapshot.running).toBe(1);
+    expect(delivery.sessionCards).toEqual([
+      {
+        sessionId: 'ses_finished',
+        row: {
+          title: 'Done work',
+          status: 'idle',
+          statusUpdatedAt: '2026-10-12T09:45:12.945Z',
+          scheduledAt: null,
+          approvalKey: null,
+          summary: {
+            step: null,
+            plan: { done: 1, total: 2, current: 'tests' },
+            changes: { files: 2, added: 10, removed: 3 },
+            failure: { kind: 'provider' },
+          },
+          permissionCommand: null,
+          lastActivityAt: '2026-10-12T09:46:00.000Z',
+          costMicrodollars: 12345,
+          startedAt: '2026-10-12T09:00:00.000Z',
+          prOpened: true,
+        },
+      },
+      { sessionId: 'ses_deleted', row: null },
+    ]);
+  });
+
+  it('reports only a verified pull request that is still open or not yet synced', () => {
+    expect(isSessionCardPrOpened({ verified: true, state: 'open' })).toBe(true);
+    expect(isSessionCardPrOpened({ verified: true, state: 'draft' })).toBe(true);
+    // Verified, but the webhook has not synced the state yet: just opened.
+    expect(isSessionCardPrOpened({ verified: true, state: null })).toBe(true);
+    expect(isSessionCardPrOpened({ verified: true, state: 'unknown' })).toBe(true);
+    // A merged or closed pull request is not news on the card.
+    expect(isSessionCardPrOpened({ verified: true, state: 'merged' })).toBe(false);
+    expect(isSessionCardPrOpened({ verified: true, state: 'closed' })).toBe(false);
+    // A stored link GitHub never verified is no evidence.
+    expect(isSessionCardPrOpened({ verified: false, state: 'open' })).toBe(false);
+  });
+
+  it('does not report a merged pull request or an unverified link on a finished card', async () => {
+    mockedListActiveSessions.mockResolvedValue({ sessions: [] });
+    followedRows = [{ sessionId: 'ses_merged' }, { sessionId: 'ses_unverified' }];
+    const base = {
+      title: 'Done work',
+      statusUpdatedAt: '2026-10-12 09:45:00+00',
+      updatedAt: '2026-10-12 09:46:00+00',
+      summary: null,
+      lastActivityAt: null,
+      costMicrodollars: null,
+      createdAt: '2026-10-12 09:00:00+00',
+    };
+    storedRows = [
+      {
+        ...base,
+        sessionId: 'ses_merged',
+        prVerifiedAt: '2026-10-12 09:40:00+00',
+        prState: 'merged',
+      },
+      { ...base, sessionId: 'ses_unverified', prVerifiedAt: null, prState: null },
+    ];
+
+    const delivery = await buildGlanceableDeliveryForUser({
+      userId: 'oauth/user-1',
+      organizationId: null,
+    });
+
+    expect(delivery.sessionCards.map(card => card.row?.prOpened)).toEqual([false, false]);
+  });
+
+  it('reads the state of a listed session pull request', async () => {
+    mockedListActiveSessions.mockResolvedValue({
+      sessions: [
+        {
+          ...running,
+          associatedPr: {
+            url: 'https://github.com/acme/repo/pull/7',
+            number: 7,
+            state: 'closed',
+            title: null,
+            headSha: null,
+            lastSyncedAt: '2026-10-12T09:00:00.000Z',
+            reviewDecision: null,
+            reviewDecisionPending: false,
+            platform: 'github',
+          },
+        },
+      ],
+    });
+    followedRows = [{ sessionId: 'ses_running' }];
+
+    const delivery = await buildGlanceableDeliveryForUser({
+      userId: 'oauth/user-1',
+      organizationId: null,
+    });
+
+    expect(delivery.sessionCards[0]?.row?.prOpened).toBe(false);
+  });
+
+  it('reads a followed session row in one scope-filtered query', async () => {
+    mockedListActiveSessions.mockResolvedValue({ sessions: [running] });
+    followedRows = [{ sessionId: 'ses_running' }];
+
+    await buildGlanceableDeliveryForUser({ userId: 'oauth/user-1', organizationId: null });
+
+    if (storedWhere === undefined) throw new Error('expected the followed session read');
+    const query = new PgDialect().sqlToQuery(storedWhere);
+    expect(Object.keys(storedFields ?? {})).toEqual(
+      expect.arrayContaining([
+        'sessionId',
+        'title',
+        'statusUpdatedAt',
+        'updatedAt',
+        'summary',
+        'lastActivityAt',
+        'costMicrodollars',
+        'createdAt',
+        'prVerifiedAt',
+        'prState',
+      ])
+    );
+    expect(query.params).toContain('ses_running');
+    expect(query.params).toContain('oauth/user-1');
+  });
+
+  it('ignores session card tokens older than the ActivityKit lifetime', async () => {
+    mockedListActiveSessions.mockResolvedValue({ sessions: [running] });
+
+    await buildGlanceableDeliveryForUser({ userId: 'oauth/user-1', organizationId: null });
+
+    if (followedWhere === undefined) throw new Error('expected the followed token read');
+    const query = new PgDialect().sqlToQuery(followedWhere);
+    expect(query.sql).toContain(
+      '"user_activity_tokens"."created_at" > now() - make_interval(secs =>'
+    );
+    expect(query.params).toContain(SESSION_LIVE_ACTIVITY_MAX_AGE_MS / 1000);
+  });
+
+  it('reuses the Home snapshot when no session is followed', async () => {
+    mockedListActiveSessions.mockResolvedValue({ sessions: [running] });
+
+    const delivery = await buildGlanceableDeliveryForUser({
+      userId: 'oauth/user-1',
+      organizationId: null,
+    });
+
+    expect(delivery.liveActivitySnapshot).toBe(delivery.response.snapshot);
+    expect(delivery.sessionCards).toEqual([]);
   });
 });

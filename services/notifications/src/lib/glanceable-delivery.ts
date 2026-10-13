@@ -8,10 +8,12 @@
  */
 
 import {
+  glanceableStatusKind,
   isEligibleGlanceableWork,
   isStartableGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
+  aggregateLiveActivityRelevance,
   type GlanceableLiveActivityContentState,
   type PushData,
   translatePush,
@@ -19,8 +21,46 @@ import {
 
 import type { LiveActivityAlert, LiveActivityEvent } from './apns-live-activity';
 import type { ExpoPushMessage } from './expo-push';
+import {
+  deliverSessionCards,
+  type SessionCardDeliveryDeps,
+  type SessionCardSource,
+} from './session-card-delivery';
 
 export type ActiveAgentsGlanceable = Extract<PushData, { type: 'active_agents_glanceable' }>;
+
+/**
+ * One snapshot build. The server-only fields never reach a data-only wake:
+ * `liveActivitySnapshot` holds the aggregate card counts without the followed
+ * sessions, and `sessionCards` holds the facts of each followed session.
+ * Both are absent from a web build that predates session cards.
+ */
+export type GlanceableBuild = ActiveAgentsGlanceable & {
+  liveActivitySnapshot?: ActiveAgentsGlanceable;
+  sessionCards?: SessionCardSource[];
+};
+
+/**
+ * The aggregate card counts and its keep/start rules. While a followed session
+ * card is still live (its session exists and has not finished), the card ends
+ * once no unfollowed startable work is left (spec "Aggregate card coexistence"
+ * rule 2). Otherwise idle work keeps it, as before session cards. A followed
+ * session that is gone or finished ends its own card in this same delivery, so
+ * it must not change the aggregate rule.
+ */
+export function aggregateCardWork(build: GlanceableBuild): {
+  snapshot: ActiveAgentsGlanceable;
+  eligible: boolean;
+  startable: boolean;
+} {
+  const snapshot = build.liveActivitySnapshot ?? build;
+  const startable = isStartableGlanceableWork(snapshot);
+  const followedLive = (build.sessionCards ?? []).some(
+    ({ row }) => row !== null && glanceableStatusKind(row.status) !== 'idle'
+  );
+  const eligible = followedLive ? startable : isEligibleGlanceableWork(snapshot);
+  return { snapshot, eligible, startable };
+}
 
 /** Matches the first argument to `createLiveActivity` in the widget extension. */
 const ACTIVE_AGENTS_LIVE_ACTIVITY_NAME = 'ActiveAgentsLiveActivity';
@@ -142,16 +182,36 @@ export function buildGlanceableExpoMessages(
 
 type IosActivityRegistration = IosActivityToken & { id: string; updated_at: string };
 
-export type GlanceableDeliveryDeps = {
+/** The session card IO. Optional so callers that only drive the aggregate surfaces need none. */
+type SessionCardDeps = Pick<
+  SessionCardDeliveryDeps,
+  | 'listIosSessionActivityTokens'
+  | 'sendIosSessionLiveActivity'
+  | 'listAndroidSessionTokens'
+  | 'sendAndroidSessionLiveUpdate'
+  | 'sessionCardMemory'
+>;
+
+/** True when the deps can reach at least one platform's session cards. */
+export function hasSessionCardIo(deps: SessionCardDeps): boolean {
+  return (
+    (deps.listIosSessionActivityTokens !== undefined &&
+      deps.sendIosSessionLiveActivity !== undefined) ||
+    (deps.listAndroidSessionTokens !== undefined && deps.sendAndroidSessionLiveUpdate !== undefined)
+  );
+}
+
+export type GlanceableDeliveryDeps = SessionCardDeps & {
   /**
    * Build the fresh snapshot via the web internal route. `null` means the
    * snapshot could not be built (route failure, missing config, invalid
-   * payload) and the caller must skip delivery.
+   * payload) and the caller must skip delivery. `'access_denied'` means the
+   * user lost the scope: the caller ends its session cards and skips the rest.
    */
   buildSnapshot: (
     userId: string,
     organizationId: string | null
-  ) => Promise<ActiveAgentsGlanceable | null>;
+  ) => Promise<GlanceableBuild | 'access_denied' | null>;
   listIosActivityTokens: (
     userId: string,
     organizationId: string | null
@@ -164,7 +224,8 @@ export type GlanceableDeliveryDeps = {
     isCurrent?: () => Promise<boolean>,
     beforeEnd?: (token: string) => Promise<boolean>,
     onEndRejected?: (token: string) => Promise<void>,
-    onStarted?: (token: string) => Promise<void>
+    onStarted?: (token: string) => Promise<void>,
+    relevanceScore?: number
   ) => Promise<void>;
   /** Independent WidgetKit targets, never part of ActivityKit singleton/end grouping. */
   sendIosWidgetHints?: (
@@ -195,11 +256,16 @@ export async function deliverGlanceableSnapshot(
   params: { userId: string; organizationId: string | null },
   deps: GlanceableDeliveryDeps
 ): Promise<void> {
-  const snapshot = await deps.buildSnapshot(params.userId, params.organizationId);
-  if (snapshot === null) {
+  const build = await deps.buildSnapshot(params.userId, params.organizationId);
+  if (build === null || build === 'access_denied') {
     return;
   }
-  const contentState = toGlanceableContentState(snapshot);
+  // Keep the server-only fields out of every data-only wake below.
+  const { liveActivitySnapshot: _liveActivity, sessionCards = [], ...snapshot } = build;
+  const aggregate = aggregateCardWork(build);
+  const contentState = toGlanceableContentState(aggregate.snapshot);
+  const timestampSeconds =
+    deps.apnsTimestampSeconds ?? Math.floor(Date.parse(snapshot.updatedAt) / 1000);
 
   // Read the iOS Expo rows first: they carry the only per-user locale on this
   // path, and APNs requires a localized alert on a push-to-start. The
@@ -209,8 +275,7 @@ export async function deliverGlanceableSnapshot(
 
   const iosTokens = await deps.listIosActivityTokens(params.userId, params.organizationId);
   if (deps.isCurrent && !(await deps.isCurrent())) return;
-  const eligible = isEligibleGlanceableWork(snapshot);
-  const iosSends = apnsSendsForTokens(iosTokens, eligible, isStartableGlanceableWork(snapshot));
+  const iosSends = apnsSendsForTokens(iosTokens, aggregate.eligible, aggregate.startable);
   if (iosSends.length > 0) {
     await deps.sendIosLiveActivity(
       iosSends,
@@ -224,11 +289,36 @@ export async function deliverGlanceableSnapshot(
           'Active agents have an update'
         ),
       },
-      deps.apnsTimestampSeconds ?? Math.floor(Date.parse(snapshot.updatedAt) / 1000),
+      timestampSeconds,
       deps.isCurrent,
       deps.beforeIosEnd,
       deps.onIosEndRejected,
-      deps.onIosStarted
+      deps.onIosStarted,
+      aggregateLiveActivityRelevance(
+        aggregate.snapshot.needsInput,
+        aggregate.snapshot.newestResultAt
+      )
+    );
+  }
+
+  if (hasSessionCardIo(deps)) {
+    await deliverSessionCards(
+      {
+        userId: params.userId,
+        organizationId: params.organizationId,
+        sources: sessionCards,
+        updatedAt: snapshot.updatedAt,
+        timestampSeconds,
+        nowSeconds: Math.floor(Date.now() / 1000),
+      },
+      {
+        listIosSessionActivityTokens: deps.listIosSessionActivityTokens,
+        sendIosSessionLiveActivity: deps.sendIosSessionLiveActivity,
+        listAndroidSessionTokens: deps.listAndroidSessionTokens,
+        sendAndroidSessionLiveUpdate: deps.sendAndroidSessionLiveUpdate,
+        sessionCardMemory: deps.sessionCardMemory,
+        isCurrent: deps.isCurrent,
+      }
     );
   }
 

@@ -136,7 +136,10 @@
     "working": "Í vinnslu",
     "yourOwnRepositories": "Þín eigin kóðasöfn",
     "dismissed": "Vísað frá",
-    "agent": "Umboðsmaður"
+    "agent": "Umboðsmaður",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Breytingar"
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -325,6 +328,7 @@
       "collapseFile": "Fella saman skrá",
       "expandFile": "Fella út skrá",
       "diffTooLarge": "Breytingarnar eru of umfangsmiklar til að birta.",
+      "noPreview": "Engin forskoðun í boði fyrir þessa skrá",
       "openOnGitHub": "Opna á GitHub",
       "openDiffOnGitHub": "Opna breytingasamanburð skrárinnar á GitHub",
       "githubDiff": "Breytingasamanburður á GitHub"
@@ -831,7 +835,8 @@
       "kiloclaw": "Virkni í KiloClaw",
       "balance": "Inneignarviðvaranir",
       "security": "Öryggisniðurstöður",
-      "spend": "Útgjaldaviðvaranir"
+      "spend": "Útgjaldaviðvaranir",
+      "followedSessions": "Fylgdar lotur"
     },
     "category": {
       "chatMessagesSubtitle": "svör í samtölunum þínum",
@@ -2086,6 +2091,8 @@
       "title": "Lota",
       "copyErrorDetails": "Afrita villuupplýsingar",
       "backToSessions": "Til baka í lotur",
+      "follow": "Fylgjast með á lásskjánum",
+      "unfollow": "Hætta að fylgjast með á lásskjánum",
       "couldNotLoad": "Ekki tókst að hlaða lotunni.",
       "failedToLoadDetails": "Ekki tókst að hlaða upplýsingum um lotuna.",
       "failedToStopExecution": "Ekki tókst að stöðva keyrsluna.",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "Reyna að hlaða umhverfinu aftur",
       "defaultEnvironment": "Sjálfgefið umhverfi",
       "environmentSummary": "{{commands}} skipanir · {{mcp}} MCP · {{skills}} færniatriði · {{agents}} fulltrúar",
-      "changes": "Breytingar",
       "leaveChanges": "Halda breytingum",
       "commitAndPush": "Skrá og senda",
       "startSession": "Byrja lotu",
@@ -2260,8 +2266,8 @@
       "toolList": "birta lista",
       "toolPatch": "lagfæra",
       "toolTask": "verkefni",
-      "readTodos": "Lesa verkefnalista",
-      "updateTodos": "Uppfæra verkefnalista",
+      "readTodos": "Lesa áætlun",
+      "updateTodos": "Uppfæra áætlun",
       "linesBadge": "{{displayCount}} línur",
       "filesBadge": "{{displayCount}} skrár",
       "matchesBadge": "{{displayCount}} samsvaranir",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Líkan ({{displayCount}})",
       "modelsCount_other": "Líkön ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Skoða breytingar",
+      "asOf": "Staða kl. {{time}}",
+      "tooLarge": "Breytingarnar eru of umfangsmiklar til að birta í farsíma.",
+      "empty": "Engar breytingar á skrám í þessari lotu enn."
     },
     "autoApprove": {
       "title": "Sjálfvirk samþykkt",
@@ -3163,6 +3175,8 @@
     "channelName": "Virkir fulltrúar",
     "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum.",
     "openSession": "Opna",
+    "finished": "Búið",
+    "followFailed": "Ekki tókst að sýna þennan fulltrúa á lásskjánum.",
     "approveFailed": "Ekki tókst að samþykkja. Ýttu á $t(common.approve) til að reyna aftur.",
     "checked": "Staðfest",
     "lastKnown": "Síðast þekkta staða",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "Bíður eftir þér",
     "nextScheduled": "Næst á dagskrá",
     "answerNeeded": "Bíður eftir svari",
-    "waitingToRetry": "Bíður eftir endurtilraun"
+    "waitingToRetry": "Bíður eftir endurtilraun",
+    "step": {
+      "editing": "Breyting",
+      "reading": "Lestur",
+      "running": "Keyrsla",
+      "searching": "Vefleit",
+      "thinking": "Ígrundun"
+    },
+    "planOf": "af",
+    "filesChanged": "skrár breyttar",
+    "finishedIn": "Lokið á",
+    "noActivityFor": "Engin virkni í",
+    "prOpened": "Pull request opnað",
+    "permissionWants": "Vill keyra",
+    "failure": {
+      "provider": "Stöðvað: villa veitanda",
+      "tool": "Stöðvað: verkfæravilla",
+      "cancelled": "Stöðvað: hætt við",
+      "other": "STÖÐVAÐ"
+    }
   },
   "transcriptionModel": {
     "title": "Umritunarlíkan",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "Ekki tókst að hlaða samtalsferilinn.",
       "new": "Nýtt spjall",
-      "openHint": "Opnar spjallið. Haltu inni til að eyða.",
       "deleteTitle": "Eyða þessu spjalli?"
     },
+    "rename": {
+      "title": "Endurnefna spjall",
+      "accessibility": "Endurnefna spjall: {{title}}",
+      "openHint": "Opnar spjallið. Haltu inni til að endurnefna eða eyða."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Upplýsingar um spjall",
+      "backend": "Bakendi",
+      "effortDefault": "Sjálfgefið fyrir líkan",
+      "noCost": "Enginn kostnaður",
+      "costUnknown": "Óþekkt",
+      "costEstimatedNote": "Kostnaður svara sem gáfu ekki upp verð er áætlaður út frá listaverði.",
+      "costUnknownNote": "Ekkert verð er þekkt fyrir þetta líkan.",
+      "costPartialNote": "Þessi heildartala nær ekki til líkana sem hafa ekkert þekkt verð.",
+      "localNote": "Líkön í tækinu keyra á þessu tæki. Þau kosta ekkert og hafa ekkert skyndiminni fyrir skilaboð, og tókafjöldi þeirra getur verið áætlaður.",
+      "countedSinceNote": "Þetta spjall hófst áður en notkun var skráð. Heildartölurnar sýna aðeins svörin eftir það.",
+      "remoteServersOn": "Kveikt á fjartengdum MCP-þjónum"
+    },
     "webSearch": {
       "title": "Leita á vefnum",
       "description": "Leyfðu þessu spjalli að fletta upp nýjum upplýsingum í gegnum Kilo-reikninginn þinn. Leitir nota mánaðarlegan leitarkvóta þinn.",
@@ -3238,7 +3288,6 @@
       "fieldName": "Sýnt heiti",
       "fieldUrl": "Slóð þjóns",
       "fieldUrlInvalid": "Sláðu inn gilda slóð þjóns.",
-      "fieldToken": "Bearer-tákn (valfrjálst)",
       "enableServer": "Virkja þennan þjón: {{name}}",
       "editServer": "Breyta þjóni",
       "deleteServer": "Eyða þjóni",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "{{count}} verkfæri",
       "serverUnreachable": "Náði ekki sambandi við þennan þjón",
       "serverOff": "Þessi þjónn er óvirkur"
+    },
+    "mcpOAuth": {
+      "authMethod": "Auðkenning",
+      "authNone": "Engin innskráning",
+      "authBearer": "Bearer-tákn",
+      "authOAuth": "OAuth-innskráning",
+      "fieldToken": "Tákn",
+      "oauthHint": "Eftir að þú vistar skaltu ýta á $t(modelChat.mcpOAuth.signIn) á þjóninum til að skrá þig inn í vafranum.",
+      "serverNeedsSignIn": "Skráðu þig inn til að nota þennan þjón",
+      "signIn": "Skrá inn",
+      "signInA11y": "Skrá inn á þennan þjón: {{name}}",
+      "signInFailed": "Ekki tókst að skrá inn á {{name}}. Reyndu aftur."
     },
     "backends": {
       "title": "Bakendar spjalls",
@@ -3412,6 +3473,9 @@
       "downloading": "Sæki…",
       "downloadProgress": "Sæki… {{percent}}%",
       "downloadFailed": "Niðurhalinu lauk ekki. Athugaðu nettenginguna og laust geymslupláss og reyndu svo aftur."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Þetta líkan styður dýpt rökhugsunar"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play skilaði engum samsvarandi inneignarpökkum.",
     "purchaseOwnedByAnotherAccount": "Inneignin á þessum Apple Account-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana.",
     "purchaseOwnedByAnotherAccountPlay": "Inneignin á þessum Google Play-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana."
+  },
+  "todos": {
+    "saveAsTodo": "Vista sem verkefni",
+    "segment": {
+      "label": "Sýn erindreka",
+      "sessions": "Lotur",
+      "todos": "Verkefni"
+    },
+    "lists": {
+      "newList": "Nýr listi",
+      "empty": "Engir listar enn",
+      "couldNotLoad": "Ekki tókst að sækja lista",
+      "noRepository": "Ekkert kóðasafn",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} opið",
+      "openCount_other": "{{count}} opið",
+      "archived_one": "Geymt ({{count}})",
+      "archived_other": "Geymt ({{count}})",
+      "archive": "Geyma",
+      "unarchive": "Taka úr geymslu",
+      "deleteTitle": "Eyða {{name}}?",
+      "deleteMessage": "Verkefnum þess er líka eytt. Loturnar þeirra haldast."
+    },
+    "listSettings": {
+      "title": "Stillingar lista",
+      "name": "Heiti",
+      "namePlaceholder": "Villur, Hugmyndir, Útgáfa…",
+      "emoji": "Emoji",
+      "mode": "Hamur",
+      "defaultsHint": "Lotur sem hefjast úr þessum lista nota þessi sjálfgefnu gildi."
+    },
+    "list": {
+      "addPlaceholder": "Bæta við verkefni",
+      "add": "Bæta við",
+      "empty": "Engin verkefni enn",
+      "setDefaults": "Stilltu kóðasafn, ham og líkan",
+      "completed_one": "Lokið ({{count}})",
+      "completed_other": "Lokið ({{count}})"
+    },
+    "item": {
+      "markDone": "Merkja sem lokið",
+      "markOpen": "Merkja sem ólokið",
+      "markDonePrompt": "Merkja sem lokið?",
+      "deleted": "Verkefni eytt",
+      "undo": "Afturkalla",
+      "runCount_one": "{{count}} keyrsla",
+      "runCount_other": "{{count}} keyrslur",
+      "startNow": "Byrja án rýni",
+      "startNowHint": "Haltu inni til að byrja án rýni",
+      "titleLabel": "Heiti verkefnis",
+      "notes": "Minnispunktar",
+      "notesPlaceholder": "Bæta við minnispunktum í Markdown",
+      "sessions": "Tengdar lotur",
+      "noSessions": "Engar lotur enn",
+      "linkSession": "Tengja lotu",
+      "unlinkSession": "Aftengja {{title}}",
+      "linkFailed": "Ekki tókst að tengja lotuna við verkefnið"
+    },
+    "linkSession": {
+      "title": "Tengja lotu við verkefni",
+      "empty": "Engar nýlegar lotur",
+      "emptyInRepository": "Engar nýlegar lotur í {{repository}}"
+    },
+    "upNext": "Næst í röðinni",
+    "sessionTodo": "Verkefni: {{title}}",
+    "linkToTodo": "Tengja við verkefni",
+    "candidates": {
+      "empty": "Engin opin verkefni"
+    },
+    "saveSheet": {
+      "title": "Vista á lista",
+      "saved": "Vistað á {{list}}"
+    }
   }
 }

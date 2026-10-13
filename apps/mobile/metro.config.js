@@ -48,10 +48,17 @@ config.resolver.blockList = [
 // bytes while leaving the never-rendered code paths harmlessly referencing
 // `undefined`. iOS uses native SF Symbols and never reaches this chain.
 const MATERIAL_SYMBOLS_PKG = '@expo-google-fonts/material-symbols';
+// The MCP SDK's OAuth client imports `pkce-challenge`, which reads Web Crypto
+// (`crypto.subtle`, `crypto.getRandomValues`) that Hermes does not have. Resolve
+// it to the same API built on expo-crypto instead of installing a global.
+const PKCE_SHIM = path.resolve(__dirname, 'src/lib/chat/remote-mcp-pkce.ts');
 const upstreamResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === MATERIAL_SYMBOLS_PKG || moduleName.startsWith(`${MATERIAL_SYMBOLS_PKG}/`)) {
     return { type: 'empty' };
+  }
+  if (moduleName === 'pkce-challenge') {
+    return { type: 'sourceFile', filePath: PKCE_SHIM };
   }
   const resolve = upstreamResolveRequest || context.resolveRequest;
   return resolve(context, moduleName, platform);

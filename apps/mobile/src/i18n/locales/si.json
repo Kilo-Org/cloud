@@ -136,7 +136,10 @@
     "working": "ක්‍රියාත්මකයි",
     "yourOwnRepositories": "ඔබේම කේත ගබඩා",
     "dismissed": "ඉවතලා ඇත",
-    "agent": "නියෝජිතයා"
+    "agent": "නියෝජිතයා",
+    "durationMinuteShort": "මිනි",
+    "durationHourShort": "පැය",
+    "changes": "වෙනස්කම්"
   },
   "language": {
     "restarting": "භාෂාව යෙදීමට නැවත ආරම්භ කරමින්",
@@ -325,6 +328,7 @@
       "collapseFile": "ගොනුව හකුළන්න",
       "expandFile": "ගොනුව පුළුල් කරන්න",
       "diffTooLarge": "වෙනස්කම් ප්‍රමාණය පෙන්වීමට නොහැකි තරම් විශාලයි.",
+      "noPreview": "මෙම ගොනුව සඳහා පෙරදසුනක් නොමැත",
       "openOnGitHub": "GitHub හි විවෘත කරන්න",
       "openDiffOnGitHub": "මෙම ගොනුවේ වෙනස්කම් GitHub හි විවෘත කරන්න",
       "githubDiff": "GitHub හි වෙනස්කම්"
@@ -831,7 +835,8 @@
       "kiloclaw": "KiloClaw ක්‍රියාකාරකම්",
       "balance": "ශේෂය පිළිබඳ ඇඟවීම්",
       "security": "හඳුනාගත් ආරක්ෂක ගැටලු",
-      "spend": "වියදම් දැනුම්දීම්"
+      "spend": "වියදම් දැනුම්දීම්",
+      "followedSessions": "අනුගමනය කරන සැසි"
     },
     "category": {
       "chatMessagesSubtitle": "ඔබේ සංවාදවල පිළිතුරු",
@@ -2086,6 +2091,8 @@
       "title": "සැසිය",
       "copyErrorDetails": "දෝෂ විස්තර පිටපත් කරන්න",
       "backToSessions": "සැසි වෙත ආපසු යන්න",
+      "follow": "අගුළු තිරයේ අනුගමනය කරන්න",
+      "unfollow": "අගුළු තිරයේ අනුගමනය කිරීම නවත්වන්න",
       "couldNotLoad": "සැසිය පූරණය කළ නොහැකි විය.",
       "failedToLoadDetails": "සැසියේ විස්තර පූරණය කළ නොහැකි විය.",
       "failedToStopExecution": "ක්‍රියාත්මක කිරීම නතර කළ නොහැකි විය.",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "පරිසරය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
       "defaultEnvironment": "පෙරනිමි පරිසරය",
       "environmentSummary": "විධාන {{commands}} · MCP {{mcp}} · කුසලතා {{skills}} · නියෝජිතයන් {{agents}}",
-      "changes": "වෙනස්කම්",
       "leaveChanges": "වෙනස්කම් තබන්න",
       "commitAndPush": "කමිට් කර පුෂ් කරන්න",
       "startSession": "සැසිය ආරම්භ කරන්න",
@@ -2260,8 +2266,8 @@
       "toolList": "ලැයිස්තුගත කරන්න",
       "toolPatch": "සංශෝධනය යොදන්න",
       "toolTask": "කාර්යය",
-      "readTodos": "කළ යුතු දේ කියවන්න",
-      "updateTodos": "කළ යුතු දේ යාවත්කාලීන කරන්න",
+      "readTodos": "සැලැස්ම කියවන්න",
+      "updateTodos": "සැලැස්ම යාවත්කාලීන කරන්න",
       "linesBadge": "පේළි {{displayCount}}",
       "filesBadge": "ගොනු {{displayCount}}",
       "matchesBadge": "ගැළපීම් {{displayCount}}",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "මාදිලිය ({{displayCount}})",
       "modelsCount_other": "මාදිලි ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "වෙනස්කම් බලන්න",
+      "asOf": "{{time}} වන විට",
+      "tooLarge": "මෙම වෙනස්කම් ජංගම උපාංගයේ පෙන්වීමට නොහැකි තරම් විශාලයි.",
+      "empty": "මෙම සැසියේ තවම ගොනු වෙනස්කම් නොමැත."
     },
     "autoApprove": {
       "title": "ස්වයංක්‍රීය අනුමැතිය",
@@ -3163,6 +3175,8 @@
     "channelName": "සක්‍රීය නියෝජිතයන්",
     "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න.",
     "openSession": "විවෘත කරන්න",
+    "finished": "නිම විය",
+    "followFailed": "මෙම නියෝජිතයා අගුළු තිරයේ පෙන්වීමට නොහැකි විය.",
     "approveFailed": "අනුමත කිරීමට නොහැකි විය. නැවත උත්සාහ කිරීමට $t(common.approve) තට්ටු කරන්න.",
     "checked": "තහවුරු කළේ",
     "lastKnown": "අවසන් වරට දන්නා තත්ත්වය",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "ඔබේ ප්‍රතිචාරය එනතුරු",
     "nextScheduled": "ඊළඟ නියමිත කාර්යයන්",
     "answerNeeded": "පිළිතුරක් අවශ්‍යයි",
-    "waitingToRetry": "නැවත උත්සාහ කිරීමට රැඳී සිටී"
+    "waitingToRetry": "නැවත උත්සාහ කිරීමට රැඳී සිටී",
+    "step": {
+      "editing": "සංස්කරණය",
+      "reading": "කියවීම",
+      "running": "ක්‍රියාත්මක කිරීම",
+      "searching": "වෙබ් සෙවීම",
+      "thinking": "සිතා බැලීම"
+    },
+    "planOf": "න්",
+    "filesChanged": "ගොනු වෙනස් විය",
+    "finishedIn": "අවසන් විය",
+    "noActivityFor": "ක්‍රියාකාරකම් නැත",
+    "prOpened": "Pull request විවෘත කරන ලදී",
+    "permissionWants": "ක්‍රියාත්මක කිරීමට අවශ්‍යයි",
+    "failure": {
+      "provider": "නතර විය: සපයන්නාගේ දෝෂය",
+      "tool": "නතර විය: මෙවලම් දෝෂය",
+      "cancelled": "නතර විය: අවලංගු කරන ලදී",
+      "other": "නතර කර ඇත"
+    }
   },
   "transcriptionModel": {
     "title": "හඬ පෙළට හරවන ආකෘතිය",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "සංවාද ඉතිහාසය පූරණය කළ නොහැකි විය.",
       "new": "නව කතාබහ",
-      "openHint": "කතාබහ විවෘත කරයි. මකා දැමීමට දිගු ලෙස ඔබන්න.",
       "deleteTitle": "මෙම කතාබහ මකන්නද?"
     },
+    "rename": {
+      "title": "කතාබහේ නම වෙනස් කරන්න",
+      "accessibility": "{{title}} කතාබහේ නම වෙනස් කරන්න",
+      "openHint": "කතාබහ විවෘත කරයි. නම වෙනස් කිරීමට හෝ මකා දැමීමට දිගු ලෙස ඔබන්න."
+    },
     "beta": "බීටා",
+    "details": {
+      "title": "කතාබස් විස්තර",
+      "backend": "පසුපස සේවාව",
+      "effortDefault": "ආකෘතියේ පෙරනිමිය",
+      "noCost": "පිරිවැයක් නැත",
+      "costUnknown": "නොදනී",
+      "costEstimatedNote": "මිලක් වාර්තා නොකළ පිළිතුරු ලැයිස්තු මිල අනුව ඇස්තමේන්තු කර ඇත.",
+      "costUnknownNote": "මෙම ආකෘතිය සඳහා මිලක් නොදනී.",
+      "costPartialNote": "දන්නා මිලක් නැති ආකෘති මෙම මුළු එකතුවට ඇතුළත් නොවේ.",
+      "localNote": "උපාංගයේ ආකෘති මෙම උපාංගයේ ධාවනය වේ. ඒවාට පිරිවැයක් හෝ විමසුම් හැඹිලියක් නැති අතර, ඒවායේ ටෝකන ගණන් ඇස්තමේන්තු විය හැක.",
+      "countedSinceNote": "භාවිතය වාර්තා කිරීමට පෙර මෙම කතාබස ආරම්භ විය. මුළු එකතුවේ පෙන්වන්නේ ඉන් පසු ලැබුණු පිළිතුරු පමණි.",
+      "remoteServersOn": "සක්‍රීය දුරස්ථ MCP සේවාදායක"
+    },
     "webSearch": {
       "title": "වෙබයේ සොයන්න",
       "description": "ඔබගේ Kilo ගිණුම හරහා වත්මන් තොරතුරු සෙවීමට මෙම කතාබහට ඉඩ දෙන්න. සෙවීම් ඔබගේ මාසික සෙවීම් සීමාව භාවිත කරයි.",
@@ -3238,7 +3288,6 @@
       "fieldName": "පෙන්වන නම",
       "fieldUrl": "සේවාදායක URL",
       "fieldUrlInvalid": "වලංගු සේවාදායක URL එකක් ඇතුළත් කරන්න.",
-      "fieldToken": "Bearer ටෝකනය (විකල්ප)",
       "enableServer": "මෙම සේවාදායකය සක්‍රීය කරන්න: {{name}}",
       "editServer": "සේවාදායකය සංස්කරණය කරන්න",
       "deleteServer": "සේවාදායකය මකන්න",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "මෙවලම් {{count}}",
       "serverUnreachable": "මෙම සේවාදායකය වෙත ළඟා විය නොහැකි විය",
       "serverOff": "මෙම සේවාදායකය ක්‍රියා විරහිතයි"
+    },
+    "mcpOAuth": {
+      "authMethod": "සත්‍යාපනය",
+      "authNone": "පිවිසීමක් නැත",
+      "authBearer": "Bearer ටෝකනය",
+      "authOAuth": "OAuth පිවිසුම",
+      "fieldToken": "ටෝකනය",
+      "oauthHint": "සුරැකීමෙන් පසු, ඔබගේ බ්‍රවුසරය සමඟ පිවිසීමට සේවාදායකයේ $t(modelChat.mcpOAuth.signIn) තට්ටු කරන්න.",
+      "serverNeedsSignIn": "මෙම සේවාදායකය භාවිත කිරීමට පිවිසෙන්න",
+      "signIn": "පිවිසෙන්න",
+      "signInA11y": "මෙම සේවාදායකයට පිවිසෙන්න: {{name}}",
+      "signInFailed": "{{name}} වෙත පිවිසිය නොහැකි විය. නැවත උත්සාහ කරන්න."
     },
     "backends": {
       "title": "කතාබස් පසුපස සේවා",
@@ -3412,6 +3473,9 @@
       "downloading": "බාගත වෙමින්…",
       "downloadProgress": "බාගත වෙමින්… {{percent}}%",
       "downloadFailed": "බාගැනීම සම්පූර්ණ නොවීය. ඔබගේ සම්බන්ධතාවය සහ නිදහස් ආචයනය පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+    },
+    "reasoningEffort": {
+      "modelFlag": "මෙම ආකෘතිය සිතීමේ මට්ටමට සහාය දක්වයි"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play ගැළපෙන ක්‍රෙඩිට් පැකේජ ආපසු ලබා දුන්නේ නැත.",
     "purchaseOwnedByAnotherAccount": "මෙම Apple Account හි ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පිවිසෙන්න.",
     "purchaseOwnedByAnotherAccountPlay": "මෙම Google Play ගිණුමේ ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පුරනය වන්න."
+  },
+  "todos": {
+    "saveAsTodo": "කටයුත්තක් ලෙස සුරකින්න",
+    "segment": {
+      "label": "නියෝජිත දසුන",
+      "sessions": "සැසි",
+      "todos": "කටයුතු"
+    },
+    "lists": {
+      "newList": "නව ලැයිස්තුවක්",
+      "empty": "තවම ලැයිස්තු නැත",
+      "couldNotLoad": "ලැයිස්තු පූරණය කිරීමට නොහැකි විය.",
+      "noRepository": "කේත ගබඩාවක් නැත",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} විවෘත",
+      "openCount_other": "{{count}} විවෘත",
+      "archived_one": "සංරක්ෂිතයි ({{count}})",
+      "archived_other": "සංරක්ෂිතයි ({{count}})",
+      "archive": "සංරක්ෂණය කරන්න",
+      "unarchive": "සංරක්ෂණයෙන් ඉවත් කරන්න",
+      "deleteTitle": "{{name}} මකන්නද?",
+      "deleteMessage": "එහි කටයුතු ද මකා දැමේ. ඒවායේ සැසි රැඳී තිබේ."
+    },
+    "listSettings": {
+      "title": "ලැයිස්තු සැකසුම්",
+      "name": "නම",
+      "namePlaceholder": "දෝෂ, අදහස්, නිකුතුව…",
+      "emoji": "ඉමෝජි",
+      "mode": "ප්‍රකාරය",
+      "defaultsHint": "මෙම ලැයිස්තුවෙන් ආරම්භ කරන සැසි මෙම පෙරනිමි අගයන් භාවිත කරයි."
+    },
+    "list": {
+      "addPlaceholder": "කටයුත්තක් ලියන්න",
+      "add": "කටයුත්තක් එක් කරන්න",
+      "empty": "තවම කටයුතු නැත",
+      "setDefaults": "කේත ගබඩාව, ප්‍රකාරය සහ ආකෘතිය සකසන්න",
+      "completed_one": "සම්පූර්ණයි ({{count}})",
+      "completed_other": "සම්පූර්ණයි ({{count}})"
+    },
+    "item": {
+      "markDone": "සම්පූර්ණ ලෙස සලකුණු කරන්න",
+      "markOpen": "සම්පූර්ණ නොවූ ලෙස සලකුණු කරන්න",
+      "markDonePrompt": "සම්පූර්ණ ලෙස සලකුණු කරන්නද?",
+      "deleted": "කටයුත්ත මකා දමන ලදී",
+      "undo": "අහෝසි කරන්න",
+      "runCount_one": "{{count}} ධාවන",
+      "runCount_other": "{{count}} ධාවන",
+      "startNow": "සමාලෝචනයකින් තොරව අරඹන්න",
+      "startNowHint": "සමාලෝචනයකින් තොරව අරඹන්නට දිගට එබන්න",
+      "titleLabel": "කටයුත්තේ මාතෘකාව",
+      "notes": "සටහන්",
+      "notesPlaceholder": "Markdown හි සටහන් එක් කරන්න",
+      "sessions": "සම්බන්ධිත සැසි",
+      "noSessions": "තවම සැසි නැත",
+      "linkSession": "සැසියක් සම්බන්ධ කරන්න",
+      "unlinkSession": "{{title}} වෙන් කරන්න",
+      "linkFailed": "සැසිය කටයුත්තට සම්බන්ධ කිරීමට නොහැකි විය."
+    },
+    "linkSession": {
+      "title": "සැසියක් සම්බන්ධ කිරීම",
+      "empty": "මෑත සැසි නැත",
+      "emptyInRepository": "{{repository}} හි මෑත සැසි නැත"
+    },
+    "upNext": "ඊළඟට",
+    "sessionTodo": "කටයුත්ත: {{title}}",
+    "linkToTodo": "කටයුත්තකට සම්බන්ධ කරන්න",
+    "candidates": {
+      "empty": "විවෘත කටයුතු නැත"
+    },
+    "saveSheet": {
+      "title": "ලැයිස්තුවකට සුරකින්න",
+      "saved": "{{list}} වෙත සුරකින ලදී"
+    }
   }
 }

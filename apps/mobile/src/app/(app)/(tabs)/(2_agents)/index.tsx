@@ -1,10 +1,12 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect } from 'expo-router';
 import { Alert, AppState, Platform } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { AgentSessionListScreen } from '@/components/agents/session-list-screen';
+import { type AgentsView, AgentsViewSegment } from '@/components/todos/agents-view-segment';
+import { TodoListsScreen } from '@/components/todos/todo-lists-screen';
 import { runPendingWidgetActions } from '@/glanceable-ios/widget-actions';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -123,6 +125,7 @@ async function retryGitHubInstall(organizationId?: string): Promise<void> {
 }
 
 export default function AgentSessionList() {
+  const [view, setView] = useState<AgentsView>('sessions');
   const consumeReturnOutcome = useCallback(() => {
     const result = getGitHubInstallReturnOutcome();
     const alert = buildGitHubInstallOutcomeAlert(result, () => {
@@ -161,5 +164,10 @@ export default function AgentSessionList() {
     }, [])
   );
 
-  return <AgentSessionListScreen />;
+  const segmentControl = <AgentsViewSegment value={view} onChange={setView} />;
+  return view === 'sessions' ? (
+    <AgentSessionListScreen segmentControl={segmentControl} />
+  ) : (
+    <TodoListsScreen segmentControl={segmentControl} />
+  );
 }

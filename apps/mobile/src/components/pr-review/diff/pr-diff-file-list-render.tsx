@@ -1,11 +1,12 @@
-// `renderItem` for the PR diff FlashList. Extracted out of
-// `pr-diff-file-list.tsx` so that file stays under the max-lines
-// limit. Receives the full set of state needed to switch on item kind
-// and dispatch to the right row component.
+// `renderItem` for the diff FlashList (PR review and session changes).
+// Extracted out of `pr-diff-file-list.tsx` so that file stays under the
+// max-lines limit. Receives the full set of state needed to switch on item
+// kind and dispatch to the right row component.
 
 import { useCallback, useEffect, useRef } from 'react';
 
 import { DiffLine } from '@/components/pr-review/diff/diff-line';
+import { type FileViewedToggle } from '@/components/pr-review/diff/pr-diff-file-rows';
 import {
   ExpandSeparatorRow,
   FileHeaderRow,
@@ -23,23 +24,34 @@ import { type ExpandSeparatorItem, type ListItem } from '@/lib/pr-review/diff/pr
 import { type ParsedHunk } from '@/lib/pr-review/diff/parse-patch';
 import { sideForDiffLineType } from '@/lib/pr-review/diff-selection';
 
-type UseDiffRenderItemArgs = {
-  viewed: {
-    isViewed: (path: string) => boolean;
-    toggle: (path: string) => Promise<void>;
-  };
-  /** Retries the failed next page (pagination row). */
-  onRetryPage: () => void;
-  /** Drives the query to completion ("Load all"). */
-  onFetchAll: () => void;
-  handleLoadContext: (item: ExpandSeparatorItem, windowSize: number) => void;
-  setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-  /** Producer-side tap handler. Receives the parsed data needed to run
-   *  the diff-selection reducer. S7a wires this from `PrDiffFileList`. */
-  onLineTap: (args: LineTapArgs) => void;
-  /** `null` when no selection; otherwise the current selection range. */
-  selection: SelectionView;
-};
+/**
+ * A PR review list renders viewed toggles, expand separators, pagination rows,
+ * and selectable lines. A session diff is read only: its builder emits none of
+ * those (see `DiffFileSource`), so it passes no handlers for them.
+ */
+type UseDiffRenderItemArgs =
+  | {
+      source: 'pr';
+      viewed: {
+        isViewed: (path: string) => boolean;
+        toggle: (path: string) => Promise<void>;
+      };
+      /** Retries the failed next page (pagination row). */
+      onRetryPage: () => void;
+      /** Drives the query to completion ("Load all"). */
+      onFetchAll: () => void;
+      handleLoadContext: (item: ExpandSeparatorItem, windowSize: number) => void;
+      setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+      /** Producer-side tap handler. Receives the parsed data needed to run
+       *  the diff-selection reducer. S7a wires this from `PrDiffFileList`. */
+      onLineTap: (args: LineTapArgs) => void;
+      /** `null` when no selection; otherwise the current selection range. */
+      selection: SelectionView;
+    }
+  | {
+      source: 'session';
+      setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+    };
 
 /** Lightweight view of the current selection — what the rows need to
  *  decide whether to paint the focus ring. The full `DiffSelection`
@@ -103,15 +115,16 @@ function DiffLineRow({
   );
 }
 
-export function useDiffRenderItem({
-  viewed,
-  onRetryPage,
-  onFetchAll,
-  handleLoadContext,
-  setExpanded,
-  onLineTap,
-  selection,
-}: UseDiffRenderItemArgs) {
+export function useDiffRenderItem(args: UseDiffRenderItemArgs) {
+  const { setExpanded } = args;
+  const review = args.source === 'pr' ? args : null;
+  const viewed = review?.viewed;
+  const onRetryPage = review?.onRetryPage;
+  const onFetchAll = review?.onFetchAll;
+  const handleLoadContext = review?.handleLoadContext;
+  const onLineTap = review?.onLineTap;
+  const linesSelectable = onLineTap !== undefined;
+  const selection = review?.selection ?? null;
   // Identity-stable per-line tap callbacks so `DiffLine`'s memo comparator —
   // which compares `onTap` by reference — can hit. A fresh closure per line per
   // render defeated it, so tapping one line re-rendered every mounted diff row
@@ -160,7 +173,7 @@ export function useDiffRenderItem({
           if (lineNumber === undefined || !hunk) {
             return;
           }
-          onLineTapRef.current({
+          onLineTapRef.current?.({
             filePath: current.filePath,
             hunkKey: `${current.filePath}:${current.hunkIndex}`,
             side,
@@ -176,6 +189,20 @@ export function useDiffRenderItem({
     [registerLineItem]
   );
 
+  const viewedToggleFor = useCallback(
+    (path: string, isViewed: boolean | null): FileViewedToggle =>
+      viewed && isViewed !== null
+        ? {
+            viewed: isViewed,
+            handleToggle: () => {
+              void viewed.toggle(path);
+              setExpanded(prev => collapseOnMarkViewed(prev, path, isViewed));
+            },
+          }
+        : null,
+    [viewed, setExpanded]
+  );
+
   return useCallback(
     ({ item }: { item: ListItem }) => {
       switch (item.kind) {
@@ -188,13 +215,9 @@ export function useDiffRenderItem({
               file={item.file}
               expanded={item.expanded}
               hasDiff={item.hasDiff}
-              viewed={item.viewed}
+              viewedToggle={viewedToggleFor(item.file.path, item.viewed)}
               onToggleExpand={() => {
                 setExpanded(prev => ({ ...prev, [item.file.path]: !prev[item.file.path] }));
-              }}
-              onToggleViewed={() => {
-                void viewed.toggle(item.file.path);
-                setExpanded(prev => collapseOnMarkViewed(prev, item.file.path, item.viewed));
               }}
             />
           );
@@ -203,12 +226,8 @@ export function useDiffRenderItem({
           return (
             <PatchMissingRow
               file={item.file}
-              viewed={item.viewed}
+              viewedToggle={viewedToggleFor(item.file.path, item.viewed)}
               githubUrl={item.githubUrl}
-              onToggleViewed={() => {
-                void viewed.toggle(item.file.path);
-                setExpanded(prev => collapseOnMarkViewed(prev, item.file.path, item.viewed));
-              }}
             />
           );
         }
@@ -227,7 +246,7 @@ export function useDiffRenderItem({
           const side = sideForDiffLineType(parsedLine.type);
           const lineNumber = side === 'LEFT' ? parsedLine.oldLine : parsedLine.newLine;
           const hunk = item.parsed.hunks[item.hunkIndex];
-          const isSelectable = item.selectable !== false;
+          const isSelectable = linesSelectable && item.selectable !== false;
           return (
             <DiffLineRow
               item={item}
@@ -248,17 +267,17 @@ export function useDiffRenderItem({
           );
         }
         case 'expand-separator': {
-          return (
+          return handleLoadContext ? (
             <ExpandSeparatorRow
               item={item}
               onLoad={windowSize => {
                 handleLoadContext(item, windowSize);
               }}
             />
-          );
+          ) : null;
         }
         case 'pagination-row': {
-          return (
+          return onRetryPage && onFetchAll ? (
             <PaginationRow
               state={item.state}
               loadedFiles={item.loadedFiles}
@@ -266,7 +285,7 @@ export function useDiffRenderItem({
               onRetry={onRetryPage}
               onFetchAll={onFetchAll}
             />
-          );
+          ) : null;
         }
         default: {
           return null;
@@ -274,11 +293,12 @@ export function useDiffRenderItem({
       }
     },
     [
-      viewed,
       onRetryPage,
       onFetchAll,
       handleLoadContext,
       setExpanded,
+      viewedToggleFor,
+      linesSelectable,
       lineTapFor,
       registerLineItem,
       releaseLine,

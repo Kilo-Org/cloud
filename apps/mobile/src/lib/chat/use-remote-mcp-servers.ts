@@ -2,12 +2,8 @@ import { useCallback, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
-import {
-  ensureRemoteMcp,
-  type RemoteMcpServerState,
-  remoteMcpState,
-  subscribeRemoteMcp,
-} from './remote-mcp';
+import { ensureRemoteMcp, remoteMcpState, subscribeRemoteMcp } from './remote-mcp';
+import { type RemoteMcpServerState } from './remote-mcp-state';
 import {
   addRemoteMcpServer,
   deleteRemoteMcpServer,
@@ -45,8 +41,10 @@ export type RemoteMcpServers = {
   /** The servers whose Retry is in flight, so their buttons show it is working. */
   readonly retryingIds: readonly string[];
   readonly setEnabled: (id: string, next: boolean) => void;
-  /** Asks one failed server again, with the longer deadline a Retry gets. */
+  /** Asks one server with no tools on hand again, with the longer deadline a Retry gets. */
   readonly retryServer: (id: string) => void;
+  /** Asks every enabled server that has no tools on hand, on the automatic deadline. */
+  readonly discover: () => void;
   readonly addServer: (draft: RemoteMcpServerDraft) => Promise<boolean>;
   readonly updateServer: (id: string, draft: RemoteMcpServerDraft) => Promise<boolean>;
   readonly deleteServer: (id: string) => Promise<boolean>;
@@ -119,6 +117,28 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
     [failed, place]
   );
 
+  /**
+   * Asks the servers with no tools on hand, as the sheet opens.
+   *
+   * After a restart nothing has been discovered, so a sheet that only drew the
+   * snapshot would show a server with no tools and nothing running. It asks on
+   * the automatic deadline, and the registry is told so an open chat moves onto
+   * whatever the ask found.
+   */
+  const discover = useCallback(() => {
+    if (place === null) {
+      return;
+    }
+    void (async () => {
+      try {
+        await ensureRemoteMcp(place);
+        await refreshChatTools();
+      } catch (error) {
+        failed(error);
+      }
+    })();
+  }, [failed, place]);
+
   const addServer = useCallback(
     async (draft: RemoteMcpServerDraft): Promise<boolean> => {
       setSaving(true);
@@ -180,6 +200,7 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
     retryingIds: [...retryingIds],
     setEnabled,
     retryServer,
+    discover,
     addServer,
     updateServer,
     deleteServer,

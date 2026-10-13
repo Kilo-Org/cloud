@@ -18,10 +18,9 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { Text } from '@/components/ui/text';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useSessionModelOptions } from '@/lib/hooks/use-session-model-options';
-import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { chatPlaceOf, useChat } from '@/lib/chat/use-chat';
+import { useChat, useChatPlace } from '@/lib/chat/use-chat';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
@@ -38,6 +37,7 @@ import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
 import { ModelToolsHint } from './model-tools-hint';
 import { useChatMessageActions } from './use-chat-message-actions';
+import { useWebSearchSetting } from './web-search-row';
 
 /**
  * One conversation.
@@ -74,8 +74,7 @@ type ChatScreenProps = {
 export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const { t } = useTranslation();
   const { organizationId } = useOrganization();
-  const { userId } = useCurrentUserId();
-  const place = chatPlaceOf(userId, organizationId);
+  const place = useChatPlace();
   const { state, send, stop, retry } = useChat(place, opened);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   // The sheet's whole model — the Kilo control, the settings-tools group switch
@@ -110,6 +109,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const [picked, setPicked] = useState<string | null>(null);
   const [variant, setVariant] = useState('');
   const model = picked ?? state.model;
+  const webSearch = useWebSearchSetting(state.sessionId, model);
   const imagesSupported = useTargetSupportsImages(model);
 
   // The attach control and the send path read image support from the gateway
@@ -328,6 +328,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           setMcpOpen(false);
         }}
         settings={mcp}
+        webSearch={webSearch}
       />
       <MessageDetailsSheet {...actions.details} modelOptions={modelOptions.options} />
     </View>

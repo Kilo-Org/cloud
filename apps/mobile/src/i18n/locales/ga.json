@@ -2236,6 +2236,11 @@
       "collapse": "Fill an sprioc",
       "expand": "Leathnaigh an sprioc"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Spriocanna, {{completed}} as {{total}} déanta",
+      "rowAccessibility": "Spriocanna, {{completed}} as {{total}} déanta. Sprioc reatha: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "A úsáideadh le déanaí",
       "couldNotLoadGithubRepositories": "Níorbh fhéidir stórtha GitHub a lódáil.",
@@ -2291,6 +2296,10 @@
       "importingSession": "Ag iompórtáil an tseisiúin",
       "cliCannotContinue": "Ní féidir leis an CLI seo leanúint ar aghaidh le seisiún. Roghnaigh Cloud Agent nó CLI eile.",
       "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil.",
+      "cliCannotFork": "Nuashonraigh an Kilo CLI chun craobhú as teachtaireacht.",
+      "forkCutNotSynced": "Níl an teachtaireacht seo sábháilte fós. Bain triail eile as i gceann nóiméid.",
+      "forkFilesFromBaseBranch": "Tosaíonn na comhaid ón mbunchraobh.",
+      "forkFilesUnchangedOnComputer": "Ní athraítear na comhaid ar an ríomhaire seo.",
       "pickProfile": "Roghnaigh próifíl",
       "noProfile": "Gan próifíl",
       "manageProfiles": "Bainistigh próifílí",
@@ -2422,6 +2431,7 @@
       "copyMessage": "Cóipeáil teachtaireacht",
       "copyText": "Cóipeáil téacs",
       "selectText": "Roghnaigh téacs",
+      "forkFromHere": "Craobhaigh as seo",
       "reportAiResponse": "Tuairiscigh freagra AI",
       "reportAiResponseConfirm": "An dtuairisceofar an freagra seo le haghaidh athbhreithnithe?",
       "report": "Tuairiscigh",
@@ -3312,6 +3322,7 @@
     "tutorialLabel": "Treoir"
   },
   "modelChat": {
+    "offlineFailure": "Teastaíonn nasc idirlín ón tsamhail seo. Ceangail agus bain triail eile as, nó athraigh go samhail ar an ngléas seo.",
     "empty": {
       "title": "Tosaigh comhrá",
       "description": "Seol teachtaireacht chun labhairt le samhail."
@@ -3323,6 +3334,11 @@
       "deleteTitle": "An comhrá seo a scriosadh?"
     },
     "beta": "Béite",
+    "webSearch": {
+      "title": "Cuardaigh an gréasán",
+      "description": "Lig don chomhrá seo faisnéis reatha a lorg trí do chuntas Kilo. Úsáideann cuardaigh do liúntas cuardaigh míosúil.",
+      "allowanceExhausted": "Tá do chuardaigh ghréasáin saor in aisce don mhí seo ídithe. Cuir creidmheasanna leis chun cuardach arís."
+    },
     "mcp": {
       "title": "Uirlisí Kilo",
       "use": "Úsáid uirlisí Kilo",
@@ -3448,8 +3464,48 @@
         "notGguf": "Caithfidh an nasc díriú ar chomhad .gguf.",
         "space": "Níl go leor stórála saor don tsamhail seo. Saor roinnt spáis agus triail arís.",
         "network": "Níor críochnaíodh an íoslódáil. Seiceáil do cheangal agus triail arís.",
-        "invalidFile": "Ní samhail é an comhad íoslódáilte ar féidir leis an aip seo a rith, mar sin baineadh é."
+        "invalidFile": "Ní samhail é an comhad íoslódáilte ar féidir leis an aip seo a rith, mar sin baineadh é.",
+        "checksum": "Ní mheaitseálann an comhad íoslódáilte a shuim seiceála foilsithe, mar sin baineadh é. Bain triail as an íoslódáil arís."
       }
+    },
+    "catalog": {
+      "browse": "Brabhsáil samhlacha",
+      "title": "Catalóg samhlacha",
+      "search": "Cuardaigh samhlacha Hugging Face",
+      "tabs": "Scagaire samhlacha",
+      "fitsTab": "Oireann don ghléas seo",
+      "fromHuggingFace": "Ó Hugging Face",
+      "loading": "Samhlacha á lódáil",
+      "noResults": "Níor aimsíodh aon samhail",
+      "noFits": "Ní oireann aon samhail don ghléas seo",
+      "noFitsDescription": "Tá samhlacha níos mó ar an gcluaisín $t(common.all).",
+      "fit": {
+        "fits": "Oireann",
+        "tight": "Ar éigean a oireann",
+        "tooLarge": "Rómhór",
+        "noStorage": "Níl dóthain stórais ann"
+      },
+      "parameters": "Paraiméadair: {{value}}",
+      "downloads": "Íoslódálacha: {{value}}",
+      "likes": "Moltaí: {{value}}",
+      "context": "Fuinneog chomhthéacs: {{value}}",
+      "license": "Ceadúnas: {{license}}",
+      "licenseUnknown": "Níl an ceadúnas luaite",
+      "tools": "Glaonna ar uirlisí",
+      "vision": "Ionchur íomhánna",
+      "hintsHelp": "Leideanna ó Hugging Face. Seiceálann an aip an tsamhail tar éis í a íoslódáil.",
+      "gated": "Teastaíonn cuntas Hugging Face don tsamhail seo, mar sin ní féidir leis an aip í a íoslódáil.",
+      "quantizations": "Cainníochtuithe",
+      "quantizationsHelp": "Úsáideann comhaid níos lú níos lú cuimhne agus stórais. De ghnáth tugann comhaid níos mó freagraí níos fearr.",
+      "quantDetail": "Íoslódáil {{size}} · thart ar {{memory}} cuimhne",
+      "downloadQuant": "Íoslódáil {{quant}}",
+      "loadingModel": "Sonraí na samhla á lódáil",
+      "couldNotLoadModel": "Níorbh fhéidir an tsamhail seo a lódáil",
+      "noFiles": "Níl aon chomhaid ann is féidir leis an aip seo a rith",
+      "noFilesDescription": "Ritheann an aip seo samhlacha atá ina gcomhad GGUF amháin.",
+      "tooLargeTitle": "Seans nach rithfidh an tsamhail seo",
+      "tooLargeMessage": "Is dócha go dteastaíonn níos mó cuimhne ó {{name}} ná mar atá ag an ngléas seo. D'fhéadfadh an aip dúnadh agus an tsamhail ag freagairt. An bhfuil fonn ort í a íoslódáil mar sin féin?",
+      "downloadAnyway": "Íoslódáil mar sin féin"
     },
     "localModels": {
       "title": "Samhlacha ar an ngléas",

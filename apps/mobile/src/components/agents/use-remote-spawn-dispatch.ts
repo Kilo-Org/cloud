@@ -15,7 +15,10 @@ import {
   type RemoteInstanceSpawnStatus,
   useRemoteInstanceSpawn,
 } from '@/lib/hooks/use-remote-instance-spawn';
-import { resolveCloneImportFailure } from '@/lib/hooks/remote-instance-spawn-classifier';
+import {
+  resolveCloneCapabilityRefusal,
+  resolveCloneImportFailure,
+} from '@/lib/hooks/remote-instance-spawn-classifier';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { resolveLiveInstance } from '@/lib/resolve-live-instance';
 import {
@@ -24,8 +27,8 @@ import {
   resolveRemoteSubmitOutcome,
 } from '@/lib/remote-submit-outcome';
 import { resolveRemoteSpawnAdmission } from '@/lib/remote-spawn-admission';
-import { putSharePayload, type SharePayload } from '@/lib/share-payload';
-import { appendShareParams } from '@/lib/share-navigation';
+import { type SharePayload } from '@/lib/share-payload';
+import { withComposerHandoff } from '@/lib/share-navigation';
 
 /**
  * Refetch signature matching the slice of
@@ -83,6 +86,18 @@ type UseRemoteSpawnDispatchArgs = {
    * `onCloneImportFailure` instead of the generic spawn toast.
    */
   cloneFromKiloSessionId?: string | null;
+  /**
+   * Inclusive fork cut ("Fork from here"). Sent beside the clone source only
+   * when the instance advertises `sessionCloneAtMessage`; otherwise the spawn
+   * is refused with the inline "update the CLI" reason (fail closed: an old
+   * CLI would ignore the cut and clone the whole session).
+   */
+  cloneUpToMessageId?: string | null;
+  /**
+   * Composer text for the new session (a forked user message). Delivered as a
+   * one-shot composer prefill that the user sends themselves.
+   */
+  forkPrefillText?: string | null;
   /**
    * Invoked with an inline failure i18n key when a clone/import spawn fails
    * non-retryably (delivered CLI clone error, or the instance lacks
@@ -177,6 +192,8 @@ export function useRemoteSpawnDispatch({
   directory,
   getSubmitPayload,
   cloneFromKiloSessionId,
+  cloneUpToMessageId,
+  forkPrefillText,
   onCloneImportFailure,
   onSpawnAdmitted,
   onSpawnFailed,
@@ -228,6 +245,8 @@ export function useRemoteSpawnDispatch({
     organizationId,
     directory,
     cloneFromKiloSessionId,
+    cloneUpToMessageId,
+    forkPrefillText,
   });
   const onSpawnAdmittedRef = useRef(onSpawnAdmitted);
   const onSpawnFailedRef = useRef(onSpawnFailed);
@@ -236,7 +255,15 @@ export function useRemoteSpawnDispatch({
   const onSpawnSucceededRef = useRef(onSpawnSucceeded);
   useEffect(() => {
     getSubmitPayloadRef.current = getSubmitPayload;
-    spawnFieldsRef.current = { mode, selection, organizationId, directory, cloneFromKiloSessionId };
+    spawnFieldsRef.current = {
+      mode,
+      selection,
+      organizationId,
+      directory,
+      cloneFromKiloSessionId,
+      cloneUpToMessageId,
+      forkPrefillText,
+    };
     onSpawnAdmittedRef.current = onSpawnAdmitted;
     onSpawnFailedRef.current = onSpawnFailed;
     onSpawnReadyRef.current = onSpawnReady;
@@ -249,6 +276,8 @@ export function useRemoteSpawnDispatch({
     organizationId,
     directory,
     cloneFromKiloSessionId,
+    cloneUpToMessageId,
+    forkPrefillText,
     onSpawnAdmitted,
     onSpawnFailed,
     onSpawnReady,
@@ -271,13 +300,13 @@ export function useRemoteSpawnDispatch({
       toast.error(admission.toast);
       return;
     }
-    // Clone entry: only an instance the picker reported as explicitly
-    // incapable (`sessionClone: false`) is refused before we send the source
-    // id; an unknown capability is optimistic. Fail before spawn (and before
-    // admitting the attempt) so the route shows the inline "cannot continue"
-    // note instead of firing a spawn the CLI rejects.
-    if (fields.cloneFromKiloSessionId && runOnInstance.capabilities?.sessionClone === false) {
-      onCloneImportFailureRef.current?.('agentChat.newSession.cliCannotContinue');
+    // Clone entry: a full clone is refused only by an explicit
+    // `sessionClone: false`; a fork cut needs `sessionCloneAtMessage: true`.
+    // Fail before spawn (and before admitting the attempt) so the route shows
+    // the inline reason instead of firing a spawn the CLI rejects or mis-cuts.
+    const cloneRefusal = resolveCloneCapabilityRefusal(fields, runOnInstance);
+    if (cloneRefusal !== null) {
+      onCloneImportFailureRef.current?.(cloneRefusal);
       return;
     }
     // Admission passed and voice settlement already happened at the caller:
@@ -290,6 +319,7 @@ export function useRemoteSpawnDispatch({
       organizationId: fields.organizationId,
       directory: fields.directory,
       cloneFromKiloSessionId: fields.cloneFromKiloSessionId,
+      cloneUpToMessageId: fields.cloneUpToMessageId,
     });
     void (async () => {
       setIsResolvingInstance(true);
@@ -327,8 +357,9 @@ export function useRemoteSpawnDispatch({
           onSpawnFailedRef.current?.();
           return;
         }
-        if (fields.cloneFromKiloSessionId && live.capabilities?.sessionClone === false) {
-          onCloneImportFailureRef.current?.('agentChat.newSession.cliCannotContinue');
+        const liveCloneRefusal = resolveCloneCapabilityRefusal(fields, live);
+        if (liveCloneRefusal !== null) {
+          onCloneImportFailureRef.current?.(liveCloneRefusal);
           onSpawnFailedRef.current?.();
           return;
         }
@@ -347,6 +378,8 @@ export function useRemoteSpawnDispatch({
             selection: fields.selection,
             organizationId: fields.organizationId,
             directory: fields.directory,
+            // A different fork cut is a different intent, never a replay.
+            cloneUpToMessageId: fields.cloneUpToMessageId ?? undefined,
           })
         );
         const outcome = await remoteSpawn.spawn(selectedConnectionId, createInput, {
@@ -355,19 +388,17 @@ export function useRemoteSpawnDispatch({
         if (outcome.status === 'ready') {
           // The spawn settled; the next submit is a fresh intent.
           rotateKey();
-          const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId);
+          const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId, {
+            cloned: Boolean(fields.cloneFromKiloSessionId),
+          });
           // Arm the clone entry's busy leave-lock bypass right before the
           // success replace so the navigation is not intercepted as an abandon.
           onSpawnReadyRef.current?.();
           onSpawnSucceededRef.current?.(outcome.sessionID);
-          if (submitPayload === null) {
-            router.replace(spawnedPath);
-            return;
-          }
-          const shareId = putSharePayload(submitPayload);
           router.replace(
-            appendShareParams(spawnedPath as string, shareId, {
-              autoSend: true,
+            withComposerHandoff(spawnedPath as string, {
+              submitPayload,
+              forkPrefillText: fields.forkPrefillText,
               mode: fields.mode,
             }) as Href
           );

@@ -289,6 +289,10 @@ vi.mock('@/lib/session-handoff', () => ({
   },
 }));
 vi.mock('@/components/agents/session-pr-badge', () => ({ SessionPrBadge: 'SessionPrBadge' }));
+vi.mock('@/components/agents/session-tasks-indicator', () => ({
+  SessionTasksChip: 'SessionTasksChip',
+  SessionTasksRow: 'SessionTasksRow',
+}));
 vi.mock('@/components/agents/session-status-indicator', () => ({
   SessionStatusIndicator: 'SessionStatusIndicator',
 }));
@@ -315,6 +319,7 @@ vi.mock('@/components/agents/chat-markdown-text', () => ({
 vi.mock('@/components/agents/tool-cards', () => ({
   TaskToolCard: 'TaskToolCard',
   ReadToolCard: 'ReadToolCard',
+  TodoToolCard: 'TodoToolCard',
 }));
 vi.mock('@/components/agents/suggest-tool-card', () => ({ SuggestToolCard: 'SuggestToolCard' }));
 vi.mock('@/components/agents/session-message-list', () => ({
@@ -3403,9 +3408,8 @@ describe('SessionDetailContent goal visibility', () => {
     // The context sheet owns its own PR pill, so scope this assertion to the goal row.
     const section = goalSectionOf(view);
     expect(section.props.goal).toEqual(pausedGoal);
-    expect(section.props.trailing).toMatchObject({ props: { pr: ASSOCIATED_PR } });
     expect(section.props.onPress).toBeTypeOf('function');
-    expect(section.findAllByType('SessionPrBadge')).toHaveLength(1);
+    expect(section.findByType('SessionPrBadge' as ElementType).props.pr).toEqual(ASSOCIATED_PR);
   });
 
   it('displays the merged PR badge in the active goal row', async () => {
@@ -3415,8 +3419,48 @@ describe('SessionDetailContent goal visibility', () => {
 
     const section = goalSectionOf(view);
     expect(section.props.goal).toEqual(activeGoal);
-    expect(section.props.trailing).toMatchObject({ props: { pr: mergedPr } });
-    expect(section.findAllByType('SessionPrBadge')).toHaveLength(1);
+    expect(section.findByType('SessionPrBadge' as ElementType).props.pr).toEqual(mergedPr);
+  });
+
+  it('shows open tasks under the PR pill with a goal, and as a row without one', async () => {
+    const todoMessage: StoredMessage = {
+      info: { ...assistantMessage('msg-todo').info, sessionID: ROOT_ID },
+      parts: [
+        {
+          id: 'part-todo',
+          sessionID: ROOT_ID,
+          messageID: 'msg-todo',
+          type: 'tool',
+          callID: 'call-todo',
+          tool: 'todowrite',
+          state: {
+            status: 'completed',
+            input: { todos: [{ content: 'Write tests', status: 'in_progress' }] },
+            output: '',
+            title: 'todowrite',
+            metadata: {},
+            time: { start: 0, end: 1 },
+          },
+        },
+      ],
+    };
+    const summary = { partId: 'part-todo', completed: 0, total: 1 };
+
+    goalMountOptions = { goal: activeGoal, resolvedType: 'remote' };
+    associatedPrMountOption = mergedPr;
+    const withGoal = await mountDetails([todoMessage], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const section = goalSectionOf(withGoal);
+    expect(section.findByType('SessionTasksChip' as ElementType).props.summary).toMatchObject(
+      summary
+    );
+    expect(withGoal.renderer.root.findAllByType('SessionTasksRow' as ElementType)).toHaveLength(0);
+    withGoal.renderer.unmount();
+
+    goalMountOptions = { resolvedType: 'remote' };
+    const withoutGoal = await mountDetails([todoMessage], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(
+      withoutGoal.renderer.root.findByType('SessionTasksRow' as ElementType).props.summary
+    ).toMatchObject(summary);
   });
 
   it.each(['open', 'merged'] as const)(

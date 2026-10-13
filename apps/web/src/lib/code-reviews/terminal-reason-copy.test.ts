@@ -46,6 +46,20 @@ describe('getCodeReviewTerminalReasonCopy', () => {
     });
   });
 
+  it('describes BYOK request rejection without claiming an invalid key or disabling reviews', () => {
+    const copy = getCodeReviewTerminalReasonCopy('assistant_invalid_request_byok');
+    expect(copy).toMatchObject({
+      label: 'Provider rejected request',
+      message: 'Your provider rejected the request. Check your provider account and settings.',
+      checkTitle: 'Kilo Code Review request rejected by your provider',
+      checkSummary: 'Your provider rejected the request. Check your provider account and settings.',
+    });
+    expect(copy?.summaryBody.replace(/\s+/g, ' ')).toContain('Kilo does not retry automatically');
+    expect(copy?.summaryBody).toContain('inline comments');
+    expect(copy?.summaryBody).not.toMatch(/disabled|invalid key/i);
+    expect(getCodeReviewTerminalReasonCopy('assistant_invalid_request')).toBeNull();
+  });
+
   it('tells the customer how to recover from each model-limit failure', () => {
     const remedies: Record<string, string> = {
       assistant_output_limit: 'thinking effort',

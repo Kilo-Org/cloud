@@ -40,6 +40,19 @@ vi.mock('./remote-mcp', () => ({
   remoteServerToolNames: () => remote.tools.map(tool => tool.definition.name),
 }));
 
+// The chat's own web search choice; absent means on, as for a Kilo model.
+const webSearch = vi.hoisted(() => ({ enabled: new Map<string, boolean>() }));
+vi.mock('./web-search', () => ({
+  WEB_SEARCH_TOOL_NAME: 'web_search',
+  webSearchTool: () => ({ definition: { name: 'web_search' }, run: () => undefined }),
+}));
+vi.mock('./web-search-setting', () => ({
+  webSearchEnabledFor: async (sessionId: string) => {
+    await Promise.resolve();
+    return webSearch.enabled.get(sessionId) ?? true;
+  },
+}));
+
 const namesOf = (tools: readonly { readonly definition: { readonly name: string } }[]) =>
   tools.map(tool => tool.definition.name);
 
@@ -51,19 +64,21 @@ beforeEach(() => {
   mcp.tools.length = 0;
   mcp.enabled.clear();
   remote.tools.length = 0;
+  webSearch.enabled.clear();
 });
 
 /**
  * What a chat offers the model.
  *
- * One tool of its own, the clock, and the app-settings tools behind one group
- * switch. The switch is the whole of the gate: off means the names are not in
- * the list at all, so the model is never offered a tool that would refuse it.
+ * Two tools of its own, the clock and web search, and the app-settings tools
+ * behind one group switch. The switch is the whole of the gate: off means the
+ * names are not in the list at all, so the model is never offered a tool that
+ * would refuse it.
  */
 
 describe('the tools a chat offers', () => {
-  it('is the clock and the settings tools while the group switch is on', () => {
-    expect(namesOf(chatTools())).toEqual(['time', 'settings_list', 'settings_set']);
+  it('is the clock, web search and the settings tools while the group switch is on', () => {
+    expect(namesOf(chatTools())).toEqual(['time', 'web_search', 'settings_list', 'settings_set']);
   });
 
   it('leaves the settings tools out when the group switch is off', () => {
@@ -71,7 +86,7 @@ describe('the tools a chat offers', () => {
 
     const names = namesOf(chatTools());
 
-    expect(names).toEqual(['time']);
+    expect(names).toEqual(['time', 'web_search']);
     expect(names.filter(name => name.startsWith('settings_'))).toEqual([]);
   });
 
@@ -89,6 +104,7 @@ describe('the tools the registry holds', () => {
 
     expect(namesOf(chatToolsWithMcp())).toEqual([
       'time',
+      'web_search',
       'settings_list',
       'settings_set',
       'mcp_kilo_read-file',
@@ -100,7 +116,7 @@ describe('the tools the registry holds', () => {
     settings.enabled = false;
     mcp.tools.push(KILO);
 
-    expect(namesOf(chatToolsWithMcp())).toEqual(['time', 'mcp_kilo_read-file']);
+    expect(namesOf(chatToolsWithMcp())).toEqual(['time', 'web_search', 'mcp_kilo_read-file']);
   });
 });
 
@@ -109,8 +125,9 @@ describe('the names a chat is opened with', () => {
     mcp.tools.push(KILO);
     remote.tools.push(REMOTE);
 
-    expect(await chatToolNames(undefined, 's1')).toEqual([
+    expect(await chatToolNames(undefined, 's1', 'kilo/one')).toEqual([
       'time',
+      'web_search',
       'settings_list',
       'settings_set',
       'mcp_kilo_read-file',
@@ -118,37 +135,47 @@ describe('the names a chat is opened with', () => {
     ]);
   });
 
+  it('names no web search for a chat that turned it off', async () => {
+    webSearch.enabled.set('s1', false);
+
+    expect(await chatToolNames(undefined, 's1', 'kilo/one')).toEqual([
+      'time',
+      'settings_list',
+      'settings_set',
+    ]);
+  });
+
   it('names no Kilo tool for a chat that turned the server off', async () => {
     mcp.tools.push(KILO);
     mcp.enabled.set('s1', false);
 
-    expect(await chatToolNames(undefined, 's1')).toEqual(['time', 'settings_list', 'settings_set']);
+    expect(await chatToolNames(undefined, 's1', 'kilo/one')).toEqual([
+      'time',
+      'web_search',
+      'settings_list',
+      'settings_set',
+    ]);
   });
 
   it('names no settings tool once the group switch is off', async () => {
     settings.enabled = false;
     mcp.tools.push(KILO);
 
-    const names = await chatToolNames(undefined, 's1');
+    const names = await chatToolNames(undefined, 's1', 'kilo/one');
 
-    expect(names).toEqual(['time', 'mcp_kilo_read-file']);
+    expect(names).toEqual(['time', 'web_search', 'mcp_kilo_read-file']);
     expect(names).not.toContain('settings_list');
     expect(names).not.toContain('settings_set');
   });
 
-  it('takes the Kilo setting from the caller for a chat that does not exist yet', () => {
+  it('takes the Kilo and web search settings from the caller for a chat that does not exist yet', () => {
     mcp.tools.push(KILO);
 
-    expect(chatToolNamesStarting(undefined, false)).toEqual([
-      'time',
-      'settings_list',
-      'settings_set',
-    ]);
-    expect(chatToolNamesStarting(undefined, true)).toEqual([
-      'time',
-      'settings_list',
-      'settings_set',
-      'mcp_kilo_read-file',
-    ]);
+    expect(
+      chatToolNamesStarting(undefined, { kiloEnabled: false, webSearchEnabled: false })
+    ).toEqual(['time', 'settings_list', 'settings_set']);
+    expect(chatToolNamesStarting(undefined, { kiloEnabled: true, webSearchEnabled: true })).toEqual(
+      ['time', 'web_search', 'settings_list', 'settings_set', 'mcp_kilo_read-file']
+    );
   });
 });

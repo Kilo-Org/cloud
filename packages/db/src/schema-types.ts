@@ -2444,6 +2444,7 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'assistant_timeout',
   'assistant_unauthorized',
   'assistant_invalid_request',
+  'assistant_invalid_request_byok',
   'assistant_context_limit',
   'assistant_output_limit',
   'assistant_content_filter',
@@ -2500,6 +2501,7 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   // unqualified 'assistant_rate_limited' also stays non-benign, since unknown
   // ownership could be either.
   'assistant_rate_limited_byok',
+  'assistant_invalid_request_byok',
   // Set only by the stale review reaper, which measures cleanup rather than the
   // fault that stranded the review, so alerting on it would count janitorial work
   // as incidents. Every stranded pending review measured on 2026-08-04 traced to

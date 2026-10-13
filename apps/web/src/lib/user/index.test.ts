@@ -76,6 +76,7 @@ import {
   agent_environment_profiles,
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
+  cloud_agent_sandbox_allocation_settings,
   deleted_user_email_tombstones,
   impact_attribution_touches,
   impact_advocate_participants,
@@ -1894,6 +1895,49 @@ describe('User', () => {
       expect(rows).toHaveLength(1);
       expect(rows[0].kilo_user_id).toBeNull();
       expect(rows[0].created_by).toBe(connector.id);
+    });
+
+    it('removes personal sandbox allocation settings while keeping the organization rows', async () => {
+      const user = await insertTestUser({
+        google_user_email: `sandbox-settings-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `Sandbox settings cleanup ${randomUUID()}`,
+        user.id,
+        0
+      );
+      await db.insert(cloud_agent_sandbox_allocation_settings).values([
+        { owned_by_user_id: user.id, allocation: 'cloudflare-single' },
+        {
+          owned_by_user_id: user.id,
+          repository_full_name: 'acme/web',
+          repository_platform: 'github',
+          allocation: 'vercel-small',
+        },
+        {
+          owned_by_organization_id: organization.id,
+          repository_full_name: 'acme/web',
+          repository_platform: 'github',
+          allocation: 'vercel-small',
+        },
+      ]);
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_sandbox_allocation_settings)
+          .where(eq(cloud_agent_sandbox_allocation_settings.owned_by_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_sandbox_allocation_settings)
+          .where(
+            eq(cloud_agent_sandbox_allocation_settings.owned_by_organization_id, organization.id)
+          )
+      ).toHaveLength(1);
     });
   });
 

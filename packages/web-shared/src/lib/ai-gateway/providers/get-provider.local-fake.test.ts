@@ -351,6 +351,24 @@ describe('getProvider ChatGPT connection routing order', () => {
     env.restore();
   });
 
+  test('retains Anthropic BYOK ownership when routing through Vercel', async () => {
+    jest.mocked(getModelUserByokProviders).mockResolvedValue(['anthropic']);
+    const credentials = [
+      { decryptedAPIKey: 'synthetic-provider-key', providerId: 'anthropic' },
+    ] as const;
+    jest.mocked(getBYOKforUser).mockResolvedValue([...credentials]);
+
+    const result = await getProvider(providerInput('anthropic/synthetic-model'));
+
+    expect(result).toEqual({
+      kind: 'provider',
+      provider: VERCEL_AI_GATEWAY,
+      userByok: credentials,
+      bypassAccessCheck: false,
+    });
+    expect(jest.mocked(getBYOKforUser).mock.calls[0]?.slice(1)).toEqual([user.id, ['anthropic']]);
+  });
+
   test('an ineligible chat_completions request resolves exactly as before', async () => {
     const env = replaceEnv({ OPENAI_CHATGPT_API_KEY: 'partner-project-key' });
     jest
@@ -396,57 +414,61 @@ describe('getProvider direct BYOK routing', () => {
     jest.mocked(getBYOKforUser).mockReset();
   });
 
-  test('removes the OpenRouter provider config before the provider transform runs', async () => {
-    const directByokTransform = jest.fn((context: TransformRequestContext) => {
-      expect(context.request.body.provider).toBeUndefined();
-    });
-    jest.mocked(getDirectByokModel).mockResolvedValue({
-      provider: {
-        id: 'nvidia-byok',
-        base_url: 'https://direct-byok.example/v1',
-        base_url_overrides: {},
-        supported_chat_apis: ['chat_completions', 'responses', 'messages'],
-        default_ai_sdk_provider: 'openai-compatible',
-        transformRequest: directByokTransform,
-        models: async () => [],
-      },
-      model: {
-        id: 'upstream-model',
-        name: 'Upstream Model',
-        context_length: 1000,
-        max_completion_tokens: 1000,
-      },
-    });
-    jest
-      .mocked(getBYOKforUser)
-      .mockResolvedValue([{ decryptedAPIKey: 'user-direct-key', providerId: 'nvidia-byok' }]);
+  test.each(['nvidia-byok', 'opencode-go'] as const)(
+    'retains %s BYOK ownership and removes routing config before the provider transform',
+    async providerId => {
+      const directByokTransform = jest.fn((context: TransformRequestContext) => {
+        expect(context.request.body.provider).toBeUndefined();
+      });
+      jest.mocked(getDirectByokModel).mockResolvedValue({
+        provider: {
+          id: providerId,
+          base_url: 'https://direct-byok.example/v1',
+          base_url_overrides: {},
+          supported_chat_apis: ['chat_completions', 'responses', 'messages'],
+          default_ai_sdk_provider: 'openai-compatible',
+          transformRequest: directByokTransform,
+          models: async () => [],
+        },
+        model: {
+          id: 'upstream-model',
+          name: 'Upstream Model',
+          context_length: 1000,
+          max_completion_tokens: 1000,
+        },
+      });
+      jest
+        .mocked(getBYOKforUser)
+        .mockResolvedValue([{ decryptedAPIKey: 'user-direct-key', providerId }]);
 
-    const result = await getProvider(providerInput('nvidia-byok/upstream-model'));
-    if (result.kind !== 'provider') throw new Error('expected provider result');
+      const result = await getProvider(providerInput(`${providerId}/upstream-model`));
+      if (result.kind !== 'provider') throw new Error('expected provider result');
 
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: {
-        model: 'nvidia-byok/upstream-model',
-        messages: [],
-        provider: { only: ['openai'], data_collection: 'deny' },
-      },
-    };
-    await result.provider.transformRequest({
-      provider: result.provider,
-      model: 'nvidia-byok/upstream-model',
-      request,
-      originalHeaders: getFraudDetectionHeaders(new Headers()),
-      extraHeaders: {},
-      userByok: result.userByok,
-      kilo_user_id: user.id,
-      organization_id: null,
-      session_id: null,
-    });
+      const request: GatewayRequest = {
+        kind: 'chat_completions',
+        body: {
+          model: `${providerId}/upstream-model`,
+          messages: [],
+          provider: { only: ['openai'], data_collection: 'deny' },
+        },
+      };
+      await result.provider.transformRequest({
+        provider: result.provider,
+        model: `${providerId}/upstream-model`,
+        request,
+        originalHeaders: getFraudDetectionHeaders(new Headers()),
+        extraHeaders: {},
+        userByok: result.userByok,
+        kilo_user_id: user.id,
+        organization_id: null,
+        session_id: null,
+      });
 
-    expect(result.provider.id).toBe('direct-byok');
-    expect(directByokTransform).toHaveBeenCalledTimes(1);
-    expect(request.body).not.toHaveProperty('provider');
-    expect(request.body.model).toBe('upstream-model');
-  });
+      expect(result.provider.id).toBe('direct-byok');
+      expect(result.userByok).toEqual([{ decryptedAPIKey: 'user-direct-key', providerId }]);
+      expect(directByokTransform).toHaveBeenCalledTimes(1);
+      expect(request.body).not.toHaveProperty('provider');
+      expect(request.body.model).toBe('upstream-model');
+    }
+  );
 });

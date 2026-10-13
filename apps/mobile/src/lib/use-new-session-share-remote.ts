@@ -42,6 +42,10 @@ type UseNewSessionShareRemoteArgs = {
    * `useRemoteSpawnDispatch` so the CLI import carries it on the wire.
    */
   cloneFromKiloSessionId?: string | null;
+  /** Inclusive fork cut; forwarded to `useRemoteSpawnDispatch`. */
+  cloneUpToMessageId?: string | null;
+  /** A forked user message's text for the new composer; forwarded to `useRemoteSpawnDispatch`. */
+  forkPrefillText?: string | null;
   /**
    * Invoked with an inline failure i18n key when a clone/import spawn fails
    * non-retryably. Forwarded to `useRemoteSpawnDispatch`.
@@ -78,6 +82,8 @@ export function useNewSessionShareRemote({
   onSpawnAdmitted,
   onSpawnFailed,
   cloneFromKiloSessionId,
+  cloneUpToMessageId,
+  forkPrefillText,
   onCloneImportFailure,
   onSpawnReady,
   onSpawnSucceeded,
@@ -115,6 +121,8 @@ export function useNewSessionShareRemote({
     onSpawnAdmitted,
     onSpawnFailed,
     cloneFromKiloSessionId,
+    cloneUpToMessageId,
+    forkPrefillText,
     onCloneImportFailure,
     onSpawnReady,
     onSpawnSucceeded,

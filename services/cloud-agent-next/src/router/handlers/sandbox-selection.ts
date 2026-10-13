@@ -1,7 +1,12 @@
 import { z } from 'zod';
-import { sandboxSelectionCapabilitiesSchema } from '@kilocode/worker-utils/sandbox-allocation';
+import {
+  getSandboxAllocationRequest,
+  sandboxSelectionCapabilitiesSchema,
+  type SandboxSelectionCapabilities,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { getPgDb } from '../../db/pg.js';
 import { getSandboxSelectionCapabilities } from '../../sandbox-selection.js';
+import { resolveSavedSandboxAllocation } from '../../session/sandbox-allocation-resolution.js';
 import { protectedProcedure } from '../auth.js';
 import { assertOrganizationMembership } from './organization-membership.js';
 
@@ -11,6 +16,8 @@ export const getSandboxSelectionOptions = protectedProcedure
       .object({
         kilocodeOrganizationId: z.string().uuid().optional(),
         devcontainer: z.boolean().optional(),
+        repositoryType: z.enum(['github', 'gitlab', 'bitbucket', 'git']).optional(),
+        repositoryFullName: z.string().min(1).max(500).optional(),
       })
       .strict()
   )
@@ -23,8 +30,26 @@ export const getSandboxSelectionOptions = protectedProcedure
         input.kilocodeOrganizationId
       );
     }
-    return getSandboxSelectionCapabilities(ctx.env, {
-      userId: ctx.userId,
-      orgId: input.kilocodeOrganizationId,
+    const owner = { userId: ctx.userId, orgId: input.kilocodeOrganizationId };
+    const capabilities = getSandboxSelectionCapabilities(
+      ctx.env,
+      owner,
+      input.repositoryType ? { repositoryType: input.repositoryType } : undefined
+    );
+    if (!capabilities.enabled || !input.repositoryType) return capabilities;
+
+    const { repositoryType, repositoryFullName } = input;
+    const saved = await resolveSavedSandboxAllocation({
+      db: getPgDb(ctx.env),
+      env: ctx.env,
+      owner,
+      repositoryType,
+      ...(repositoryFullName && (repositoryType === 'github' || repositoryType === 'gitlab')
+        ? { target: { platform: repositoryType, fullName: repositoryFullName } }
+        : {}),
     });
+    const effectiveDestination: SandboxSelectionCapabilities['effectiveDestination'] = saved
+      ? getSandboxAllocationRequest(saved)
+      : capabilities.defaultDestination;
+    return { ...capabilities, effectiveDestination };
   });

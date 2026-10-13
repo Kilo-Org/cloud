@@ -1,4 +1,4 @@
-/* eslint-disable require-await, @typescript-eslint/require-await -- the fake mutate/outbox factories settle without await */
+/* eslint-disable require-await, @typescript-eslint/require-await, max-lines -- the fake mutate/outbox factories settle without await; the full and fork Continue suites share one hook harness */
 import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -70,6 +70,9 @@ vi.mock('@/lib/operation-key', () => ({
 vi.mock('@/lib/persist/use-mutation-outbox', () => ({
   useMutationOutbox: () => outboxMock,
 }));
+
+const putSharePayloadMock = vi.hoisted(() => vi.fn((_payload: unknown) => 'share-fork-1'));
+vi.mock('@/lib/share-payload', () => ({ putSharePayload: putSharePayloadMock }));
 
 // Mirror of the real retryability predicate (covered by its own suite); this
 // test only needs to distinguish one retryable and one terminal shape so the
@@ -202,6 +205,60 @@ describe('useContinueCloudCreate', () => {
     });
     expect(input).not.toHaveProperty('prompt');
     expect(input).not.toHaveProperty('initialMessageId');
+  });
+
+  it('sends the fork cut and keys the retry on it, leaving a full Continue fingerprint unchanged', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(SOURCE_SESSION, DEST, 'code');
+    });
+    await act(async () => {
+      await run(
+        SOURCE_SESSION,
+        { ...DEST, cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn' },
+        'code'
+      );
+    });
+
+    const fullInput = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    const forkInput = prepareSessionMutate.mock.calls[1]?.[0] as Record<string, unknown>;
+    expect(fullInput).not.toHaveProperty('cloneUpToMessageId');
+    expect(forkInput).toMatchObject({
+      cloneFromKiloSessionId: 'ses_source',
+      cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+    });
+    const [fullFingerprint, forkFingerprint] = operationKeyMock.getKey.mock.calls.map(
+      ([fingerprint]) => fingerprint
+    );
+    expect(fullFingerprint).not.toContain('cloneUpToMessageId');
+    expect(forkFingerprint).toContain('"cloneUpToMessageId":"msg_018f1e2d3c4bAbCdEfGhIjKlMn"');
+  });
+
+  it('prefills a forked user message in the new composer without auto-send', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(
+        SOURCE_SESSION,
+        {
+          ...DEST,
+          cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          forkPrefillText: 'Second question',
+        },
+        'code'
+      );
+    });
+
+    expect(putSharePayloadMock).toHaveBeenCalledWith({
+      text: 'Second question',
+      files: [],
+      failedFiles: [],
+    });
+    const href = routerReplace.mock.calls[0]?.[0] as string;
+    expect(href).toContain('agent-chat/ses_12345678901234567890123456');
+    expect(href).toContain('shareId=share-fork-1');
+    expect(href).not.toContain('autoSend=');
   });
 
   it('writes gitlabProject (never githubRepo) for a GitLab repository', async () => {

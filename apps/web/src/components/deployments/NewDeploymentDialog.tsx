@@ -82,8 +82,7 @@ export function NewDeploymentDialog({
 
   // Check deployment eligibility through the deployment context
   const { data: deploymentEligibility } = deploymentQueries.checkDeploymentEligibility();
-  const canCreateDeployment = deploymentEligibility?.canCreateDeployment ?? true;
-  const creditsPageUrl = organizationId ? `/organizations/${organizationId}` : '/credits';
+  const canCreateDeployment = deploymentEligibility?.canCreateDeployment ?? false;
   const trpc = useTRPC();
   const orgId = organizationId ?? undefined;
   const ghInput = orgId ? { organizationId: orgId } : undefined;
@@ -370,13 +369,9 @@ export function NewDeploymentDialog({
           {!canCreateDeployment && (
             <Alert variant="warning" className="mt-3">
               <AlertTriangle className="size-4" />
-              <AlertDescription className="flex items-center justify-between gap-2">
-                <span>You need to add credits to your account to create deployments.</span>
-                <Link href={creditsPageUrl}>
-                  <Button variant="secondary" size="sm" className="shrink-0">
-                    Add Credits
-                  </Button>
-                </Link>
+              <AlertDescription>
+                Deploy has reached end of life. New deployments and redeployments are no longer
+                available.
               </AlertDescription>
             </Alert>
           )}

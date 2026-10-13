@@ -2,9 +2,17 @@ import {
   estimateRequestCostUsd,
   poolEntryKey,
   rankCandidates,
+  type CandidatePricing,
   type ProductionTokenProfile,
 } from '@kilocode/auto-routing-contracts';
-import type { ProdMetrics, ReplayMetrics, Scoreboard, ScoreboardRoutingTable } from './schema';
+import type {
+  OfflineSweep,
+  OfflineSweepSummary,
+  ProdMetrics,
+  ReplayMetrics,
+  Scoreboard,
+  ScoreboardRoutingTable,
+} from './schema';
 
 type BuildScoreboardInput = {
   label: string;
@@ -15,6 +23,9 @@ type BuildScoreboardInput = {
   now: Date;
   rerankProfile?: ProductionTokenProfile | null;
   costProfile?: ProductionTokenProfile | null;
+  sweep?: OfflineSweep | null;
+  rebuildFromSweep?: boolean;
+  pricing?: Record<string, CandidatePricing | null> | null;
 };
 
 export function buildScoreboard({
@@ -26,31 +37,80 @@ export function buildScoreboard({
   now,
   rerankProfile = null,
   costProfile,
+  sweep = null,
+  rebuildFromSweep = false,
+  pricing = null,
 }: BuildScoreboardInput): Scoreboard {
   const profile = costProfile ?? rerankProfile ?? table.productionTokenProfile ?? null;
-  const routes = rerankProfile
+  if (rebuildFromSweep && !sweep) throw new Error('Rebuilding requires an offline sweep');
+  const candidateKey = (candidate: {
+    model: string;
+    variant?: string | null;
+    reasoningEffort?: string | null;
+  }) =>
+    poolEntryKey({
+      model: candidate.model,
+      variant: candidate.variant ?? candidate.reasoningEffort ?? null,
+    });
+  const storedPricing = new Map(
+    Object.values(table.routes).flatMap(candidates =>
+      candidates.map(candidate => [candidate.model, candidate.pricing ?? null] as const)
+    )
+  );
+  const trainingRoutes: Record<string, OfflineSweepSummary[]> = {};
+  if (rebuildFromSweep && sweep) {
+    for (const summary of sweep.summaries) {
+      if (summary.split !== 'train') continue;
+      (trainingRoutes[summary.routeKey] ??= []).push(summary);
+    }
+  }
+  const routes = rebuildFromSweep
     ? Object.fromEntries(
-        Object.entries(table.routes).map(([route, candidates]) => {
-          const key = (candidate: (typeof candidates)[number]) =>
-            poolEntryKey({
-              model: candidate.model,
-              variant: candidate.variant ?? candidate.reasoningEffort ?? null,
-            });
-          const latencies = Object.fromEntries(
-            candidates.map(candidate => [key(candidate), candidate.p50LatencyMs])
+        Object.entries(trainingRoutes).map(([route, summaries]) => {
+          const latencies = new Map(
+            summaries.map(summary => [candidateKey(summary), summary.p50LatencyMs])
           );
-          const ranked = rankCandidates(
-            candidates.map(candidate => ({
+          const candidates = summaries.map(
+            ({ model, variant, accuracy, cases, avgCostUsd, p50LatencyMs }) => ({
+              model,
+              variant,
+              accuracy,
+              cases,
+              avgCostUsd,
+              p50LatencyMs,
+              pricing: pricing ? pricing[model] ?? null : storedPricing.get(model) ?? null,
+            })
+          );
+          return [
+            route,
+            rankCandidates(candidates, table.minAccuracy, { profile }).map(candidate => ({
               ...candidate,
-              p50LatencyMs: candidate.p50LatencyMs ?? null,
+              p50LatencyMs: latencies.get(candidateKey(candidate)) ?? null,
             })),
-            table.minAccuracy,
-            { profile: rerankProfile }
-          ).map(candidate => ({ ...candidate, p50LatencyMs: latencies[key(candidate)] }));
-          return [route, ranked];
+          ];
         })
       )
-    : table.routes;
+    : rerankProfile
+      ? Object.fromEntries(
+          Object.entries(table.routes).map(([route, candidates]) => {
+            const latencies = Object.fromEntries(
+              candidates.map(candidate => [candidateKey(candidate), candidate.p50LatencyMs])
+            );
+            const ranked = rankCandidates(
+              candidates.map(candidate => ({
+                ...candidate,
+                p50LatencyMs: candidate.p50LatencyMs ?? null,
+              })),
+              table.minAccuracy,
+              { profile: rerankProfile }
+            ).map(candidate => ({
+              ...candidate,
+              p50LatencyMs: latencies[candidateKey(candidate)],
+            }));
+            return [route, ranked];
+          })
+        )
+      : table.routes;
   const routeKeys = Object.keys(table.routes);
   const routeMix =
     prod && Object.keys(prod.routeMix).length > 0
@@ -71,6 +131,37 @@ export function buildScoreboard({
           : candidate[metric];
       if (value == null) continue;
       total += share * value;
+      weight += share;
+    }
+    return weight > 0 ? total / weight : null;
+  };
+
+  const heldOutByRoute = new Map<string, Map<string, OfflineSweepSummary>>();
+  for (const summary of sweep?.summaries ?? []) {
+    if (summary.split !== 'heldOut') continue;
+    let summaries = heldOutByRoute.get(summary.routeKey);
+    if (!summaries) {
+      summaries = new Map();
+      heldOutByRoute.set(summary.routeKey, summaries);
+    }
+    summaries.set(candidateKey(summary), summary);
+  }
+  const heldOutPicks = Object.entries(routeMix).flatMap(([route, share]) => {
+    const pick = (rebuildFromSweep ? routes : table.routes)[route]?.[0];
+    const summary = pick && heldOutByRoute.get(route)?.get(candidateKey(pick));
+    return summary && pick && share > 0 ? [{ pick, summary, share }] : [];
+  });
+  const heldOutWeighted = (
+    metric: 'accuracy' | 'avgCostUsd' | 'p50LatencyMs'
+  ): number | null => {
+    let total = 0;
+    let weight = 0;
+    for (const { pick, summary, share } of heldOutPicks) {
+      const value =
+        metric === 'avgCostUsd'
+          ? estimateRequestCostUsd({ avgCostUsd: summary.avgCostUsd, pricing: pick.pricing }, profile)
+          : summary[metric];
+      total += value * share;
       weight += share;
     }
     return weight > 0 ? total / weight : null;
@@ -104,7 +195,14 @@ export function buildScoreboard({
     quality: {
       benchmarkAccuracyWeighted: weighted('accuracy'),
       classifierRouteAccuracy,
-      heldOut: null,
+      heldOut: sweep
+        ? {
+            accuracyWeighted: heldOutWeighted('accuracy'),
+            estimatedRequestUsdWeighted: heldOutWeighted('avgCostUsd'),
+            p50LatencyMsWeighted: heldOutWeighted('p50LatencyMs'),
+            routes: heldOutPicks.length,
+          }
+        : null,
     },
     routeMix,
   };

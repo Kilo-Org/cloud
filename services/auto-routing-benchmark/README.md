@@ -91,7 +91,8 @@ pricing, and request-cost estimates; stored JSON fields are decoded and validate
 Production and replay inputs are optional. Without production input, benchmark
 weights are uniform over table routes; otherwise they use the observed route mix.
 Missing routes and null benchmark metrics are excluded and the remaining weights normalized.
-Quality is benchmark accuracy and classifier route accuracy, not a held-out score.
+Quality includes benchmark accuracy and classifier route accuracy; supplying `--sweep`
+also evaluates the exact first model/variant picks on held-out cases.
 `benchmarkP50Weighted` is the weighted benchmark model latency, not production TTFT.
 Use `--relative-only` for PR bodies so raw production measurements stay local.
 Unavailable comparisons are `n/a`; rows unavailable on both sides are omitted.
@@ -114,6 +115,23 @@ Without it, the published order is preserved. `--cost-profile` only affects the
 estimated request cost; it takes precedence over the rerank profile, which otherwise
 also supplies the cost estimate. If neither flag is supplied, the estimate uses the
 table's `productionTokenProfile`, or just the benchmark cost when that is absent.
+
+For held-out measurement without deploying, set `OPENROUTER_API_KEY` and save pairs
+as `[{"model":"provider/model","variant":null}]`. The sweep excludes `agentic_execution`,
+grades rubric cases with the decider judge, and hashes case ids into stable train/held-out
+splits. `--rebuild-from-sweep` ranks train data only with Wilson counts, pricing, and the
+cost profile; both builds evaluate exact first picks on held-out accuracy, estimated
+request cost, and wall-clock latency. Missing picks are excluded; `quality.heldOut.routes`
+reports coverage. `--max-usd` includes model and grader spend (in-flight requests can
+overshoot). Atomic checkpoints every 200 cases retain each pair's raw `results`;
+`--resume sweep.json` skips completed pair/case/repetitions and retains accumulated spend.
+
+```bash
+pnpm --filter auto-routing-benchmark sweep:offline --pairs pairs.json --catalog live --max-usd 20 --out sweep.json
+pnpm --filter auto-routing-benchmark scoreboard build --label baseline --table live --pricing live --cost-profile p.json --sweep sweep.json --out baseline.json
+pnpm --filter auto-routing-benchmark scoreboard build --label candidate --table live --pricing live --cost-profile p.json --sweep sweep.json --rebuild-from-sweep --out candidate.json
+pnpm --filter auto-routing-benchmark scoreboard compare baseline.json candidate.json --relative-only
+```
 
 `--pricing live` hydrates candidates by model id from
 `https://app.kilo.ai/api/openrouter/models`. Prompt, completion, and optional

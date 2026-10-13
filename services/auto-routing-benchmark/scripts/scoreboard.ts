@@ -17,6 +17,7 @@ import { compareScoreboards } from '../src/scoreboard/compare';
 import {
   LiveScoreboardCandidateRowSchema,
   LiveScoreboardTableRowSchema,
+  OfflineSweepSchema,
   ProdMetricsSchema,
   ReplayMetricsSchema,
   ScoreboardRoutingTableSchema,
@@ -145,16 +146,18 @@ async function main() {
         pricing: { type: 'string' },
         'rerank-profile': { type: 'string' },
         'cost-profile': { type: 'string' },
+        sweep: { type: 'string' },
+        'rebuild-from-sweep': { type: 'boolean', default: false },
       },
       allowPositionals: true,
     });
     if (!values.label || !values.out || positionals.length > 0) {
       throw new Error(
-        'Usage: scoreboard build --label <label> [--table live|file.json] [--pricing live|file.json] [--cost-profile file.json] [--rerank-profile file.json] [--prod file.json] [--replay file.json] --out file.json'
+        'Usage: scoreboard build --label <label> [--table live|file.json] [--pricing live|file.json] [--cost-profile file.json] [--rerank-profile file.json] [--sweep file.json] [--rebuild-from-sweep] [--prod file.json] [--replay file.json] --out file.json'
       );
     }
     const tablePath = values.table ?? 'live';
-    const [source, prod, replay, pricing, rerankProfile, costProfile] = await Promise.all([
+    const [source, prod, replay, pricing, rerankProfile, costProfile, sweep] = await Promise.all([
       tablePath === 'live'
         ? loadLiveTable()
         : readJson(tablePath, ScoreboardRoutingTableSchema).then(table => ({
@@ -170,6 +173,7 @@ async function main() {
       values['cost-profile']
         ? readJson(values['cost-profile'], ProductionTokenProfileSchema)
         : null,
+      values.sweep ? readJson(values.sweep, OfflineSweepSchema) : null,
     ]);
     if (pricing) {
       for (const candidates of Object.values(source.table.routes)) {
@@ -186,6 +190,9 @@ async function main() {
         replay,
         rerankProfile,
         costProfile,
+        sweep,
+        rebuildFromSweep: values['rebuild-from-sweep'],
+        pricing,
         now: new Date(),
       })
     );

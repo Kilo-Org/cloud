@@ -14,6 +14,7 @@
     "scoreboard": "tsx scripts/scoreboard.ts",
     "scoreboard:prod": "tsx scripts/scoreboard-prod.ts",
     "judge:calibrate": "tsx scripts/judge-calibration.ts",
+    "sweep:offline": "tsx scripts/offline-sweep.ts",
     "test": "vitest run"
   },
   "dependencies": {

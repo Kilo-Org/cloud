@@ -95,9 +95,28 @@ export function compareScoreboards(
   ] as const) {
     add(`cost.${name}`, 'cost', base.cost[name], head.cost[name], name === 'prodCacheReadShare');
   }
-  for (const name of ['benchmarkAccuracyWeighted', 'classifierRouteAccuracy', 'heldOut'] as const) {
+  for (const name of ['benchmarkAccuracyWeighted', 'classifierRouteAccuracy'] as const) {
     add(`quality.${name}`, 'quality', base.quality[name], head.quality[name], true);
   }
+  add(
+    'quality.heldOut.accuracyWeighted',
+    'quality',
+    base.quality.heldOut?.accuracyWeighted ?? null,
+    head.quality.heldOut?.accuracyWeighted ?? null,
+    true
+  );
+  add(
+    'quality.heldOut.estimatedRequestUsdWeighted',
+    'cost',
+    base.quality.heldOut?.estimatedRequestUsdWeighted ?? null,
+    head.quality.heldOut?.estimatedRequestUsdWeighted ?? null
+  );
+  add(
+    'quality.heldOut.p50LatencyMsWeighted',
+    'latency',
+    base.quality.heldOut?.p50LatencyMsWeighted ?? null,
+    head.quality.heldOut?.p50LatencyMsWeighted ?? null
+  );
 
   const directions: Record<Axis, Set<Direction>> = {
     latency: new Set(),

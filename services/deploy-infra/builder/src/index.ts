@@ -1,5 +1,5 @@
 import { Hono, type Context } from 'hono';
-import type { Env, HonoEnv, DeployRequest, DeployResponse, StatusResponse } from './types';
+import type { Env, HonoEnv, StatusResponse } from './types';
 import {
   backendAuthMiddleware,
   createErrorHandler,
@@ -35,10 +35,6 @@ export const EventsManager = Sentry.instrumentDurableObjectWithSentry(
   EventsManagerBase
 );
 
-function createDurableObjectBuilderID() {
-  return crypto.randomUUID();
-}
-
 // Create Hono app with Env type
 const app = new Hono<HonoEnv>();
 
@@ -53,118 +49,15 @@ app.use(
   backendAuthMiddleware<HonoEnv>(c => c.env.BACKEND_AUTH_TOKEN)
 );
 
-app.post('/deploy', async (c: Context<HonoEnv>) => {
-  let body: DeployRequest;
-
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: 'Invalid JSON body' }, 400);
-  }
-
-  if (body.cancelBuildIds && body.cancelBuildIds.length > 0) {
-    await Promise.allSettled(
-      body.cancelBuildIds.map(async buildId => {
-        try {
-          const id = c.env.DeploymentOrchestrator.idFromName(buildId);
-          const stub = c.env.DeploymentOrchestrator.get(id);
-          await stub.cancel('due to newer deployment');
-        } catch (error) {
-          Sentry.captureException(error, {
-            level: 'warning',
-          });
-        }
-      })
-    );
-  }
-
-  if (!body.slug || !body.provider || !body.repoSource) {
-    return c.json({ error: 'Missing required fields: slug, provider, repoSource' }, 400);
-  }
-
-  try {
-    validateWorkerName(body.slug);
-  } catch (_error) {
-    return c.json({ error: 'Invalid worker slug' }, 400);
-  }
-
-  const buildId = createDurableObjectBuilderID();
-
-  const id = c.env.DeploymentOrchestrator.idFromName(buildId);
-  const stub = c.env.DeploymentOrchestrator.get(id);
-
-  const result = await stub.start({
-    buildId,
-    slug: body.slug,
-    source: {
-      type: 'git',
-      provider: body.provider,
-      repoSource: body.repoSource,
-      accessToken: body.accessToken,
-      branch: body.branch,
+app.on('POST', ['/deploy', '/deploy-archive'], c =>
+  c.json(
+    {
+      error:
+        'Deploy has reached end of life. New deployments and redeployments are no longer available.',
     },
-    envVars: body.envVars,
-  });
-
-  const response: DeployResponse = {
-    buildId,
-    slug: body.slug,
-    status: result.status,
-  };
-
-  return c.json(response, 202);
-});
-
-app.post('/deploy-archive', async (c: Context<HonoEnv>) => {
-  const slug = c.req.header('X-Slug');
-
-  if (!slug) {
-    return c.json({ error: 'Missing X-Slug header' }, 400);
-  }
-
-  try {
-    validateWorkerName(slug);
-  } catch (_error) {
-    return c.json({ error: 'Invalid worker slug' }, 400);
-  }
-
-  const envVarsHeader = c.req.header('X-Env-Vars');
-  let envVars: DeployRequest['envVars'] | undefined;
-  if (envVarsHeader) {
-    try {
-      envVars = JSON.parse(envVarsHeader) as DeployRequest['envVars'];
-    } catch {
-      return c.json({ error: 'Invalid X-Env-Vars header: must be valid JSON' }, 400);
-    }
-  }
-
-  // Read archive from body
-  const archiveBuffer = await c.req.arrayBuffer();
-
-  if (archiveBuffer.byteLength === 0) {
-    return c.json({ error: 'Empty archive body' }, 400);
-  }
-
-  const buildId = createDurableObjectBuilderID();
-
-  const id = c.env.DeploymentOrchestrator.idFromName(buildId);
-  const stub = c.env.DeploymentOrchestrator.get(id);
-
-  const result = await stub.startFromArchive({
-    buildId,
-    slug,
-    archiveBuffer: new Uint8Array(archiveBuffer),
-    envVars,
-  });
-
-  const response: DeployResponse = {
-    buildId,
-    slug,
-    status: result.status,
-  };
-
-  return c.json(response, 202);
-});
+    410
+  )
+);
 
 // Route: GET /deploy/:buildId/status
 app.get('/deploy/:buildId/status', async (c: Context<HonoEnv>) => {

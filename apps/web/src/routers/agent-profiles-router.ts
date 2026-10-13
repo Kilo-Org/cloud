@@ -1,5 +1,9 @@
 import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  ORGANIZATION_MANAGE_ROLES,
+  canManageOrganization,
+} from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import * as profileService from '@kilocode/cloud-agent-profile';
@@ -286,12 +290,12 @@ export const agentProfilesRouter = createTRPCRouter({
     .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
-      }
       const owner = getOwner(input.organizationId, ctx.user.id);
+      const canManage = input.organizationId
+        ? canManageOrganization(await ensureOrganizationAccess(ctx, input.organizationId))
+        : true;
       try {
-        await profileService.deleteProfile(db, input.profileId, owner);
+        await profileService.deleteProfile(db, input.profileId, owner, canManage);
         return { success: true };
       } catch (error) {
         // Check for FK violation (profile referenced by webhook triggers)
@@ -417,7 +421,7 @@ export const agentProfilesRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await repoBindingService.bindProfileToRepo(
@@ -442,7 +446,7 @@ export const agentProfilesRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await repoBindingService.unbindRepo(db, owner, input.repoFullName, input.platform);

@@ -30,13 +30,16 @@ export const CONTROL_PLANE_GIT_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as 
 export type ControlPlaneGitPlatform = (typeof CONTROL_PLANE_GIT_PLATFORMS)[number];
 
 /**
- * Route preparation steps. `sandbox_create` and `sandbox_start` come from the
- * Sandbox DO's allocation (provider create, then waiting for the wrapper's
- * `hello`); the rest come from the wrapper's `session.progress`.
+ * Route preparation steps. `sandbox_create`, `sandbox_start` and
+ * `snapshot_fallback` come from the Sandbox DO's allocation (provider create,
+ * then waiting for the wrapper's `hello`, and starting from the image when a
+ * repository snapshot start failed); the rest come from the wrapper's
+ * `session.progress`.
  */
 export const CONTROL_PLANE_PREPARATION_STEPS = [
   'sandbox_create',
   'sandbox_start',
+  'snapshot_fallback',
   'clone',
   'restore',
   'checkout',

@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -142,6 +143,7 @@ function BackendSettingsContent({ onClose }: Readonly<{ onClose: () => void }>) 
   const { confirm, dialog } = useConfirmDialog();
   const { t } = useTranslation();
   const backends = useChatBackends();
+  const router = useRouter();
   const loaded = useSyncExternalStore(
     subscribeChatBackends,
     getChatBackendsHasLoaded,
@@ -208,7 +210,12 @@ function BackendSettingsContent({ onClose }: Readonly<{ onClose: () => void }>) 
         <Text>{t('modelChat.backends.defaultKilo')}</Text>
         <Text className="text-sm text-muted-foreground">{t('modelChat.backends.kiloHelp')}</Text>
         <LocalModelSection />
-        <GgufModelSection />
+        <GgufModelSection
+          onBrowse={() => {
+            onClose();
+            router.push('/model-catalog');
+          }}
+        />
         {!loaded ? (
           <Text>{t('common.loading')}</Text>
         ) : (

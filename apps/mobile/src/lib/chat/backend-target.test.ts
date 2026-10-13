@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { onlineManager } from '@tanstack/react-query';
+import { describe, expect, it, onTestFinished } from 'vitest';
 
 import { i18n } from '@/i18n';
 
 import { type StoredChatBackend } from './backend-store';
 import {
+  backendFailureKey,
   backendTargetId,
   decodeBackendTarget,
   localTargetId,
@@ -25,6 +27,21 @@ const first: StoredChatBackend = {
   allowLocalHttp: false,
 };
 const modelId = 'vendor/model:latest';
+
+describe('backendFailureKey', () => {
+  it('says a remote model needs a connection while the device is offline', () => {
+    onlineManager.setOnline(false);
+    onTestFinished(() => {
+      onlineManager.setOnline(true);
+    });
+
+    expect(backendFailureKey(new Error('Network request failed'))).toBe('modelChat.offlineFailure');
+  });
+
+  it('keeps the generic copy for a failure while online', () => {
+    expect(backendFailureKey(new Error('upstream 500'))).toBe('common.somethingWentWrong');
+  });
+});
 
 describe('persisted chat backend targets', () => {
   it('distinguishes the same upstream model on two configured backends', () => {

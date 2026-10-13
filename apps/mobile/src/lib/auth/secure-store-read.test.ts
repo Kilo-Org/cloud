@@ -217,6 +217,43 @@ describe('readStoredValueWithRetry', () => {
     expect(JSON.stringify(events[0])).not.toContain('auth-token');
   });
 
+  // The gate is imported like the helper, after the suite's registry resets, so
+  // both share one module instance.
+  it('fails at once and unreported while the device is locked, without calling the keychain', async () => {
+    const { ProtectedDataUnavailableError, setProtectedDataAvailable } =
+      await import('@/lib/protected-data');
+    const readStoredValueWithRetry = await loadHelper();
+    setProtectedDataAvailable(false);
+    try {
+      await expect(readStoredValueWithRetry('auth-token')).rejects.toBeInstanceOf(
+        ProtectedDataUnavailableError
+      );
+      expect(getItemAsync).not.toHaveBeenCalled();
+      expect(events).toEqual([]);
+    } finally {
+      setProtectedDataAvailable(true);
+    }
+  });
+
+  it('stops retrying when the device locks during the reads and reports nothing', async () => {
+    const { setProtectedDataAvailable } = await import('@/lib/protected-data');
+    getItemAsync.mockImplementation(async () => {
+      setProtectedDataAvailable(false);
+      await Promise.resolve();
+      throw new Error('User interaction is not allowed.');
+    });
+    const readStoredValueWithRetry = await loadHelper();
+    try {
+      await expect(readStoredValueWithRetry('auth-token')).rejects.toThrow(
+        'User interaction is not allowed.'
+      );
+      expect(getItemAsync).toHaveBeenCalledTimes(1);
+      expect(events).toEqual([]);
+    } finally {
+      setProtectedDataAvailable(true);
+    }
+  });
+
   it('reports nothing when a retry recovers the read', async () => {
     getItemAsync
       .mockRejectedValueOnce(new Error('keychain unavailable'))

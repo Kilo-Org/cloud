@@ -2152,6 +2152,11 @@
       "collapse": "Tolestu helburua",
       "expand": "Zabaldu helburua"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Zereginak, {{total}} zereginetatik {{completed}} eginda",
+      "rowAccessibility": "Zereginak, {{total}} zereginetatik {{completed}} eginda. Uneko zeregina: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Duela gutxi erabiliak",
       "couldNotLoadGithubRepositories": "Ezin izan dira GitHub-eko biltegiak kargatu.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Saioa inportatzen",
       "cliCannotContinue": "CLI honek ezin dio saio bati jarraitu. Aukeratu Cloud Agent edo beste CLI bat.",
       "importFailed": "Ezin izan da saio hau inportatu.",
+      "cliCannotFork": "Eguneratu Kilo CLI mezu batetik adarkatzeko.",
+      "forkCutNotSynced": "Mezu hau ez da gorde oraindik. Saiatu berriro une batean.",
+      "forkFilesFromBaseBranch": "Fitxategiak oinarrizko adarretik abiatzen dira.",
+      "forkFilesUnchangedOnComputer": "Ordenagailu honetako fitxategiak ez dira aldatzen.",
       "pickProfile": "Aukeratu profil bat",
       "noProfile": "Ez dago profilik",
       "manageProfiles": "Kudeatu profilak",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Kopiatu mezua",
       "copyText": "Kopiatu testua",
       "selectText": "Hautatu testua",
+      "forkFromHere": "Adarkatu hemendik",
       "reportAiResponse": "Salatu AIaren erantzuna",
       "reportAiResponseConfirm": "Salatu erantzun hau berrikus dezaten?",
       "report": "Salatu",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Tutorial-a"
   },
   "modelChat": {
+    "offlineFailure": "Modelo honek interneteko konexioa behar du. Konektatu eta saiatu berriro, edo aldatu gailu honetako modelo batera.",
     "empty": {
       "title": "Hasi txat bat",
       "description": "Bidali mezu bat modelo batekin hitz egiteko."
@@ -3200,6 +3211,11 @@
       "deleteTitle": "Txat hau ezabatu?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Bilatu sarean",
+      "description": "Utzi txat honi informazio eguneratua bilatzen zure Kilo kontuaren bidez. Bilaketek zure hileko bilaketa-kuota erabiltzen dute.",
+      "allowanceExhausted": "Hilabete honetako doako web-bilaketak agortu dituzu. Gehitu kredituak berriro bilatzeko."
+    },
     "mcp": {
       "title": "Kiloren tresnak",
       "use": "Erabili Kiloren tresnak",
@@ -3325,8 +3341,48 @@
         "notGguf": "Estekak .gguf fitxategi batera eraman behar du.",
         "space": "Ez dago nahikoa biltegiratze libre modelo honetarako. Askatu lekua eta saiatu berriro.",
         "network": "Deskarga ez da amaitu. Egiaztatu zure konexioa eta saiatu berriro.",
-        "invalidFile": "Deskargatutako fitxategia ez da aplikazio honek exekutatu dezakeen modeloa, beraz, kendu egin da."
+        "invalidFile": "Deskargatutako fitxategia ez da aplikazio honek exekutatu dezakeen modeloa, beraz, kendu egin da.",
+        "checksum": "Deskargatutako fitxategia ez dator bat argitaratutako kontrol-baturarekin, beraz, kendu egin da. Saiatu berriro deskargatzen."
       }
+    },
+    "catalog": {
+      "browse": "Arakatu modeloak",
+      "title": "Modeloen katalogoa",
+      "search": "Bilatu Hugging Face-ko modeloak",
+      "tabs": "Modeloen iragazkia",
+      "fitsTab": "Gailu honetan sartzen dira",
+      "fromHuggingFace": "Hugging Face-tik",
+      "loading": "Modeloak kargatzen",
+      "noResults": "Ez da modelorik aurkitu",
+      "noFits": "Ez dago gailu honetan sartzen den modelorik",
+      "noFitsDescription": "Modelo handiagoak $t(common.all) fitxan daude.",
+      "fit": {
+        "fits": "Sartzen da",
+        "tight": "Estu sartzen da",
+        "tooLarge": "Handiegia",
+        "noStorage": "Ez dago behar adina biltegiratze"
+      },
+      "parameters": "Parametroak: {{value}}",
+      "downloads": "Deskargak: {{value}}",
+      "likes": "Atsegiteak: {{value}}",
+      "context": "Testuinguru-leihoa: {{value}}",
+      "license": "Lizentzia: {{license}}",
+      "licenseUnknown": "Lizentzia ez dago adierazita",
+      "tools": "Tresna-deiak",
+      "vision": "Irudi-sarrera",
+      "hintsHelp": "Hugging Face-ren argibideak. Aplikazioak modeloa egiaztatzen du deskargatu ondoren.",
+      "gated": "Modelo honek Hugging Face kontu bat behar du; beraz, aplikazioak ezin du deskargatu.",
+      "quantizations": "Kuantizazioak",
+      "quantizationsHelp": "Fitxategi txikiagoek memoria eta biltegiratze gutxiago erabiltzen dute. Fitxategi handiagoek erantzun hobeak ematen dituzte normalean.",
+      "quantDetail": "{{size}} deskargatzeko · {{memory}} memoria inguru",
+      "downloadQuant": "Deskargatu {{quant}}",
+      "loadingModel": "Modeloaren xehetasunak kargatzen",
+      "couldNotLoadModel": "Ezin izan da modelo hau kargatu",
+      "noFiles": "Ez dago aplikazio honek exekuta dezakeen fitxategirik",
+      "noFilesDescription": "Aplikazio honek GGUF fitxategi bakarreko modeloak exekutatzen ditu.",
+      "tooLargeTitle": "Baliteke modelo hau ez ibiltzea",
+      "tooLargeMessage": "Litekeena da {{name}} modeloak gailu honek duena baino memoria gehiago behar izatea. Aplikazioa itxi egin daiteke modeloak erantzuten duen bitartean. Deskargatu hala ere?",
+      "downloadAnyway": "Deskargatu hala ere"
     },
     "localModels": {
       "title": "Gailuko modeloak",

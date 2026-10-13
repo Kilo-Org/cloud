@@ -67,6 +67,9 @@ vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'a0000000-0000-4000-8000-000000000001' }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => 'online',
+}));
 
 const { chatPlaceOf, forgetChatPlaces } = await import('./scope');
 const { forgetKiloMcp, forgetMcpEnabled } = await import('./kilo-mcp');

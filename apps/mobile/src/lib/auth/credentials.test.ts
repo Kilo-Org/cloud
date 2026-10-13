@@ -116,6 +116,9 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
   clearViewedFiles: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@/lib/telemetry/controller', () => ({ clearTelemetryDecision: vi.fn() }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('@/lib/telemetry/posthog-storage', () => ({
   purgePostHogPersistence: vi.fn().mockResolvedValue(undefined),
 }));
@@ -192,6 +195,7 @@ import * as SecureStore from 'expo-secure-store';
 import { performRefresh, persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { clearActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 import {
   AUTH_TOKEN_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
@@ -406,6 +410,43 @@ describe('refresh rotation', () => {
       expect(store.get(AUTH_TOKEN_KEY)).toBe('stored-token');
       expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
     } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('retries later, never unreadable, when the device is locked', async () => {
+    store.set(AUTH_TOKEN_KEY, 'stored-token');
+    store.set(REFRESH_TOKEN_KEY, 'r1');
+    setProtectedDataAvailable(false);
+    const fetchMock = vi.fn().mockRejectedValue(new Error('fetch must not be called'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      await expect(performRefresh()).resolves.toEqual({ ok: false, refused: false });
+      expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('retries later, never unreadable, when the device locks during the refresh-token read', async () => {
+    store.set(AUTH_TOKEN_KEY, 'stored-token');
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async () => {
+      await Promise.resolve();
+      // A locked keychain can answer null for a WHEN_UNLOCKED item.
+      setProtectedDataAvailable(false);
+      return null;
+    });
+    const fetchMock = vi.fn().mockRejectedValue(new Error('fetch must not be called'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      await expect(performRefresh()).resolves.toEqual({ ok: false, refused: false });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      setProtectedDataAvailable(true);
       vi.unstubAllGlobals();
     }
   });

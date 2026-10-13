@@ -21,6 +21,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 ### Configuration & Constant URLs
 
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `packages/web-shared/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
+- `AI_GATEWAY_URL` - Optional origin of the `apps/ai-gateway` app that `apps/web` rewrites its AI gateway routes to; read at build time in `apps/web/ai-gateway-rewrites.mjs`. When unset, Vercel's `production` target uses `https://ai-gateway.kilo.ai`, its `staging` target uses `https://staging-ai-gateway.kilo.ai`, and other environments serve the routes from `apps/web` itself. `pnpm dev:start` sets it to the local ai-gateway app. [SERVER]
 - `KILOCLAW_INSTANCE_URL_TEMPLATE` - URL template for KiloClaw instances; used in `packages/web-shared/src/lib/config.server.ts`. [SERVER]
 - `NEXTAUTH_URL` - Base URL for NextAuth.js; used across many auth-related files. [SERVER]
 - `NEXTAUTH_SECRET` - Secret key for NextAuth.js session encryption and five-minute, audience-bound user assertions verified by internal Workers such as user data export. `[SECRET]`
@@ -60,7 +61,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 ### Vercel & Build Info
 
 - `VERCEL_ENV` - Vercel environment (`development`, `preview`, `production`); used in `apps/web/next.config.mjs`, `packages/web-shared/src/lib/constants.ts`, and `apps/web/.env.test`. [SERVER]
-- `VERCEL_TARGET_ENV` - Vercel system or custom deployment environment (`development`, `preview`, `production`, `staging`, etc.); used in `apps/web/src/app/layout.tsx` to identify staging UI. [SERVER]
+- `VERCEL_TARGET_ENV` - Vercel system or custom deployment environment (`development`, `preview`, `production`, `staging`, etc.); used in `apps/web/src/app/layout.tsx` to identify staging UI and in `apps/web/ai-gateway-rewrites.mjs` to pick the AI gateway origin. [SERVER]
 - `VERCEL_URL` - Auto-injected by Vercel; current deployment URL. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
 - `VERCEL_GIT_COMMIT_SHA` - Auto-injected by Vercel; Git commit SHA of the current deployment. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
 - `NEXT_PUBLIC_VERCEL_URL` - Client-exposed Vercel deployment URL from build info. [PUBLIC]
@@ -209,7 +210,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 
 ### Ablation / Experimentation
 
-- `GLOBAL_KILO_BACKEND` - Override to select the global backend region/endpoint; used in `next.config.mjs`. [SERVER]
+- `GLOBAL_KILO_BACKEND` - Marks the `kilocode-global-app` deployment, which serves `/api/exa` and `/api/marketplace` itself instead of rewriting them to `global-api.kilo.ai`; used in `next.config.mjs`. [SERVER]
 - `ANALYZE` - Next.js bundle analyzer switch; enables `@next/bundle-analyzer` in `next.config.mjs`. [SERVER]
 
 ### Database
@@ -454,6 +455,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `CODE_REVIEW_CONTROL_PLANE_IDS` - Comma-separated user or org IDs whose Code Reviewer (`createdOnPlatform: 'code-review'`) sessions run on the call-home control plane (`workspace_` sessions) instead of the legacy plane. Empty admits nobody. `*` includes personal accounts. `wrangler.jsonc` sets `*` in production and dev; set the value in the Cloudflare dashboard to narrow it without a deploy. Independent of the origin-based routing that now sends interactive web, chat-bot, Security Agent, webhook-ingest and scheduled sessions to the control plane; only the worker-trusted code-review billing origin is honored, so a public `start` cannot select it. [SERVER]
 - `SANDBOX_SELECTION_IDS` - Comma-separated user or org IDs allowed to pick a Cloud Agent sandbox destination on the new-session page. Empty admits nobody. `*` includes personal accounts. Production `wrangler.jsonc` sets the allowlist, so a deploy overwrites the Cloudflare dashboard value. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
 - `VERCEL_SANDBOX_ORG_IDS` - Comma-separated org IDs routed to Vercel sandboxes. Empty is off. `*` includes personal accounts. [SERVER]
+- `CLOUDFLARE_CONTAINERS_ORG_IDS` - Comma-separated org IDs enrolled for the DO-managed Cloudflare Containers runtime, which is also the default sandbox destination for isolated control-plane sessions. Empty is off. `*` includes every organization and personal account. Production `wrangler.jsonc` sets `*` so a deploy overwrites the Cloudflare dashboard value; wrangler `dev` also sets `*`. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
 
 ### Gastown

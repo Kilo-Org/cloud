@@ -45,7 +45,7 @@ export type GgufDownload = {
   readonly total: number;
 };
 
-export type GgufDownloadProblem = 'space' | 'network' | 'invalidFile';
+export type GgufDownloadProblem = 'space' | 'network' | 'invalidFile' | 'checksum';
 
 export type GgufDownloadsSnapshot = {
   readonly models: readonly GgufModelRecord[];
@@ -69,6 +69,8 @@ export type GgufStorage = {
   readonly freeBytes: () => number;
   readonly list: () => readonly string[];
   readonly size: (name: string) => number;
+  /** The file's SHA-256 as lowercase hex. */
+  readonly sha256: (name: string) => Promise<string>;
   readonly remove: (name: string) => void;
   readonly move: (from: string, to: string) => void;
   readonly path: (name: string) => string;

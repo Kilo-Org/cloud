@@ -3,6 +3,7 @@ import { type CompletionParams, type LlamaContext } from 'llama.rn';
 import { z } from 'zod';
 
 import { type GgufModelFile } from './gguf-records';
+import { offeredTools } from './offered-tools';
 
 /** The part of a llama.rn context that describes its model. */
 type ModelInfo = Pick<LlamaContext, 'model'>['model'];
@@ -175,7 +176,7 @@ export function paramsOf(request: ModelRequest, file: GgufModelFile): Completion
     ...(tools
       ? {
           tool_choice: 'auto',
-          tools: request.tools.map(tool => ({
+          tools: offeredTools(request.tools).map(tool => ({
             type: 'function',
             function: {
               name: tool.name,

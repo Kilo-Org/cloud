@@ -46,6 +46,37 @@ export function localModelOptions(
   );
 }
 
+/**
+ * The model a new chat starts on: the one the latest chat is on, then Kilo's
+ * preferred model, then any Kilo model, then an on-device model, then anything
+ * offered. Kilo models are offered only once the catalog has loaded, so while
+ * it loads the answer waits for it rather than starting on whatever is there.
+ * A catalog that cannot load — offline, or the API down — is not waited for:
+ * an on-device model answers with no connection.
+ */
+export function defaultChatModel(input: {
+  readonly options: readonly SessionModelOption[];
+  readonly latestChatModel: string | undefined;
+  readonly catalogLoading: boolean;
+}): string | undefined {
+  const { options, latestChatModel, catalogLoading } = input;
+  if (options.some(option => option.id === latestChatModel)) {
+    return latestChatModel;
+  }
+  if (catalogLoading) {
+    return undefined;
+  }
+  const kilo = options.filter(
+    option => decodeLocalTarget(option.id) === null && decodeBackendTarget(option.id) === null
+  );
+  return (
+    kilo.find(option => option.isPreferred)?.id ??
+    kilo[0]?.id ??
+    options.find(option => decodeLocalTarget(option.id) !== null)?.id ??
+    options[0]?.id
+  );
+}
+
 /** Kilo, one backend revision, or one on-device provider model. */
 function backendIdentity(targetId: string): string {
   const local = decodeLocalTarget(targetId);

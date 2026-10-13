@@ -1641,6 +1641,11 @@
       "collapse": "Thu gọn mục tiêu",
       "expand": "Mở rộng mục tiêu"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Nhiệm vụ, đã xong {{completed}} trên {{total}}",
+      "rowAccessibility": "Nhiệm vụ, đã xong {{completed}} trên {{total}}. Nhiệm vụ hiện tại: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Đã dùng gần đây",
       "couldNotLoadGithubRepositories": "Không thể tải danh sách kho mã GitHub.",
@@ -1696,6 +1701,10 @@
       "importingSession": "Đang nhập phiên",
       "cliCannotContinue": "CLI này không hỗ trợ tiếp tục phiên. Hãy chọn Cloud Agent hoặc CLI khác.",
       "importFailed": "Không thể nhập phiên này.",
+      "cliCannotFork": "Hãy cập nhật Kilo CLI để tách nhánh từ một tin nhắn.",
+      "forkCutNotSynced": "Tin nhắn này chưa được lưu. Hãy thử lại sau giây lát.",
+      "forkFilesFromBaseBranch": "Các tệp bắt đầu từ nhánh gốc.",
+      "forkFilesUnchangedOnComputer": "Các tệp trên máy tính này không bị thay đổi.",
       "pickProfile": "Chọn một hồ sơ",
       "noProfile": "Không có hồ sơ",
       "manageProfiles": "Quản lý hồ sơ",
@@ -1811,6 +1820,7 @@
       "copyMessage": "Sao chép tin nhắn",
       "copyText": "Sao chép văn bản",
       "selectText": "Chọn văn bản",
+      "forkFromHere": "Tách nhánh từ đây",
       "reportAiResponse": "Báo cáo phản hồi AI",
       "reportAiResponseConfirm": "Bạn có muốn báo cáo phản hồi này để chúng tôi kiểm tra không?",
       "report": "Báo cáo",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Hướng dẫn"
   },
   "modelChat": {
+    "offlineFailure": "Mô hình này cần kết nối internet. Hãy kết nối và thử lại, hoặc chuyển sang một mô hình trên thiết bị này.",
     "empty": {
       "title": "Bắt đầu trò chuyện",
       "description": "Gửi tin nhắn để trò chuyện với mô hình."
@@ -3200,6 +3211,11 @@
       "deleteTitle": "Xóa cuộc trò chuyện này?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Tìm kiếm trên web",
+      "description": "Cho phép cuộc trò chuyện này tra cứu thông tin mới nhất qua tài khoản Kilo của bạn. Mỗi lần tìm kiếm dùng hạn mức tìm kiếm hằng tháng của bạn.",
+      "allowanceExhausted": "Bạn đã dùng hết lượt tìm kiếm web miễn phí của tháng này. Hãy thêm tín dụng để tìm kiếm tiếp."
+    },
     "mcp": {
       "title": "Công cụ Kilo",
       "use": "Dùng công cụ Kilo",
@@ -3325,8 +3341,48 @@
         "notGguf": "Liên kết phải trỏ đến tệp .gguf.",
         "space": "Không đủ dung lượng trống cho mô hình này. Hãy giải phóng dung lượng và thử lại.",
         "network": "Tải xuống chưa hoàn tất. Kiểm tra kết nối của bạn và thử lại.",
-        "invalidFile": "Tệp đã tải xuống không phải là mô hình mà ứng dụng này có thể chạy, nên tệp đã bị xóa."
+        "invalidFile": "Tệp đã tải xuống không phải là mô hình mà ứng dụng này có thể chạy, nên tệp đã bị xóa.",
+        "checksum": "Tệp đã tải xuống không khớp với mã kiểm tra đã công bố, nên tệp đã bị xóa. Hãy thử tải xuống lại."
       }
+    },
+    "catalog": {
+      "browse": "Duyệt mô hình",
+      "title": "Danh mục mô hình",
+      "search": "Tìm mô hình trên Hugging Face",
+      "tabs": "Bộ lọc mô hình",
+      "fitsTab": "Phù hợp với thiết bị này",
+      "fromHuggingFace": "Từ Hugging Face",
+      "loading": "Đang tải danh sách mô hình",
+      "noResults": "Không tìm thấy mô hình nào",
+      "noFits": "Không có mô hình nào phù hợp với thiết bị này",
+      "noFitsDescription": "Các mô hình lớn hơn nằm ở thẻ $t(common.all).",
+      "fit": {
+        "fits": "Phù hợp",
+        "tight": "Vừa sát",
+        "tooLarge": "Quá lớn",
+        "noStorage": "Không đủ dung lượng"
+      },
+      "parameters": "Tham số: {{value}}",
+      "downloads": "Lượt tải xuống: {{value}}",
+      "likes": "Lượt thích: {{value}}",
+      "context": "Cửa sổ ngữ cảnh: {{value}}",
+      "license": "Giấy phép: {{license}}",
+      "licenseUnknown": "Chưa nêu rõ giấy phép",
+      "tools": "Gọi công cụ",
+      "vision": "Đầu vào hình ảnh",
+      "hintsHelp": "Gợi ý từ Hugging Face. Ứng dụng sẽ kiểm tra mô hình sau khi tải xuống.",
+      "gated": "Mô hình này yêu cầu tài khoản Hugging Face nên ứng dụng không thể tải xuống.",
+      "quantizations": "Lượng tử hóa",
+      "quantizationsHelp": "Tệp nhỏ hơn dùng ít bộ nhớ và dung lượng hơn. Tệp lớn hơn thường cho câu trả lời tốt hơn.",
+      "quantDetail": "Tải xuống {{size}} · khoảng {{memory}} bộ nhớ",
+      "downloadQuant": "Tải {{quant}} xuống",
+      "loadingModel": "Đang tải chi tiết mô hình",
+      "couldNotLoadModel": "Không thể tải mô hình này",
+      "noFiles": "Không có tệp nào ứng dụng này chạy được",
+      "noFilesDescription": "Ứng dụng này chạy các mô hình gồm một tệp GGUF duy nhất.",
+      "tooLargeTitle": "Mô hình này có thể không chạy được",
+      "tooLargeMessage": "{{name}} có thể cần nhiều bộ nhớ hơn mức thiết bị này có. Ứng dụng có thể bị đóng khi mô hình đang trả lời. Vẫn tải xuống?",
+      "downloadAnyway": "Vẫn tải xuống"
     },
     "localModels": {
       "title": "Mô hình trên thiết bị",

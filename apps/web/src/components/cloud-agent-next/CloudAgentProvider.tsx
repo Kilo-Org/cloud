@@ -1,8 +1,9 @@
 'use client';
 
-import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Provider as JotaiProvider, createStore } from 'jotai';
-import { useRawTRPCClient } from '@/lib/trpc/utils';
+import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import {
   createSessionManager,
   createBrowserLifecycleHooks,
@@ -25,6 +26,7 @@ import type { CloudAgentApi } from '@kilocode/cloud-agent-sdk/transport';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { createWorktreeReviewSend, type WorktreeReviewSendApi } from './worktree-review-send';
 import { MarkdownParseCacheProvider } from './markdown-parse-cache';
+import { createWebSessionTranscriptCache } from './session-transcript-cache';
 
 const ManagerContext = createContext<SessionManager | null>(null);
 const UserWebConnectionContext = createContext<UserWebConnection | null>(null);
@@ -64,6 +66,9 @@ function normalizeTransportPayload(payload: TransportSendPayload): SendMessagePa
 export function CloudAgentProvider({ children, organizationId }: CloudAgentProviderProps) {
   const storeRef = useRef(createStore());
   const trpcClient = useRawTRPCClient();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const transcriptCacheScope = useId();
   const posthog = usePostHog();
   const posthogRef = useRef(posthog);
   posthogRef.current = posthog;
@@ -135,10 +140,21 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
     });
   }
   if (managerRef.current === null) {
+    const transcriptCache = createWebSessionTranscriptCache(queryClient, transcriptCacheScope);
     managerRef.current = createSessionManager({
       store: storeRef.current,
 
       resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
+        const fetchedSession = queryClient.getQueryData(
+          trpc.cliSessionsV2.getWithRuntimeState.queryKey({ session_id: kiloSessionId })
+        );
+        if (fetchedSession?.cloud_agent_session_id) {
+          return {
+            type: 'cloud-agent',
+            kiloSessionId,
+            cloudAgentSessionId: fetchedSession.cloud_agent_session_id as CloudAgentSessionId,
+          };
+        }
         // 1. Check if the session is in the active sessions list (remote CLI)
         try {
           const active = await trpcClient.activeSessions.list.query();
@@ -201,6 +217,8 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       },
 
       fetchSnapshotPage: (id, options) => fetchWebSessionSnapshotPage(trpcClient, id, options),
+      readCachedSnapshotPage: transcriptCache.read,
+      writeCachedSnapshotPage: transcriptCache.write,
 
       userWebConnection: sharedConnection,
 
@@ -327,8 +345,14 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       },
 
       fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {
-        const sessionResult = await trpcClient.cliSessionsV2.getWithRuntimeState.query({
-          session_id: kiloSessionId,
+        const sessionResult = await queryClient.fetchQuery({
+          ...trpc.cliSessionsV2.getWithRuntimeState.queryOptions(
+            { session_id: kiloSessionId },
+            { trpc: { context: { skipBatch: true } } }
+          ),
+          staleTime: 0,
+          retry: false,
+          networkMode: 'always',
         });
         const rs = sessionResult.runtimeState;
 

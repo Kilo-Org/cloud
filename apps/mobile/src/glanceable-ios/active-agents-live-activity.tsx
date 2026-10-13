@@ -51,7 +51,7 @@ type ContentState = Partial<GlanceableLiveActivityContentState> & {
 
 /**
  * The approved Live Activity design (round 7). The Lock Screen card is 364pt
- * wide: the header at 16pt (mark, Kilo, and the checked time trailing), the
+ * wide: the header at 16pt (the mark, and the checked time trailing), the
  * status row centred at 74pt (count 36, dot, label 16, Approve pill 96x32), and
  * an optional muted line at 118pt — the card is 140pt tall with it and 108pt
  * without. The expanded Dynamic Island repeats it on black at count 32 and
@@ -263,11 +263,10 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     }
   };
 
-  // Header: the mark, Kilo, and the checked time at the trailing edge.
+  // Header: the mark and the checked time at the trailing edge.
   const header = (scheme: Scheme) => (
     <HStack alignment="center" spacing={6} modifiers={[frame({ height: 18 })]}>
       {mark(18)}
-      {text('Kilo', 13, scheme.fg, 'semibold')}
       <Spacer minLength={8} />
       {checkedAt === null ? null : (
         <HStack spacing={3}>

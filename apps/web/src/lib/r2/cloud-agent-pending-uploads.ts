@@ -1,7 +1,7 @@
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { TRPCError } from '@trpc/server';
 import { randomUUID } from 'crypto';
-import { and, count, eq, inArray, ne, sql, type SQL } from 'drizzle-orm';
+import { and, count, eq, inArray, like, not, sql, type SQL } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { r2Client, r2CloudAgentAttachmentsBucketName } from '@kilocode/web-shared/lib/r2/client';
 import {
@@ -31,9 +31,10 @@ export type AdmitPendingUploadParams = {
  * advisory lock, count pending rows, reject at the file-count bound, reject
  * oversized uploads, then admit a pending row with a 24-hour lease.
  *
- * A client Retry presigns the same ids, so objectKey can already have a row.
- * A 'pending' row is refreshed in place and does not count against the bound.
- * A row in any other state keeps its key, and the upload gets freshObjectKey:
+ * A client Retry presigns the same ids. If the attachment already has a
+ * 'pending' row, that row is refreshed in place, keeps its key (which can be
+ * an earlier fresh key), and does not count against the bound. Otherwise a
+ * row for objectKey in any other state keeps its key, and the upload gets freshObjectKey:
  * a release or reaper claim sets 'reaped' before its DeleteObject runs, so a
  * PUT to the old key could land before that delete, and a 'linked' key holds
  * a sent attachment. The row is later flipped to 'linked' by
@@ -56,6 +57,14 @@ export async function admitPendingUpload({
       sql`select pg_advisory_xact_lock(hashtext(${`cloud-agent-pending-upload:${kiloUserId}:${messageUuid}`}))`
     );
 
+    // A retry of this attachment: same id and same key suffix. A different
+    // suffix is a different file type, so its row must not be reused.
+    const suffix = objectKey.slice(objectKey.lastIndexOf('.'));
+    const sameAttachment = and(
+      eq(cloud_agent_pending_uploads.attachment_id, attachmentId),
+      like(cloud_agent_pending_uploads.object_key, `%${suffix}`)
+    );
+
     const pendingRows = await tx
       .select({ pendingCount: count() })
       .from(cloud_agent_pending_uploads)
@@ -64,7 +73,7 @@ export async function admitPendingUpload({
           eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
           eq(cloud_agent_pending_uploads.message_uuid, messageUuid),
           eq(cloud_agent_pending_uploads.status, 'pending'),
-          ne(cloud_agent_pending_uploads.object_key, objectKey)
+          not(sameAttachment ?? sql`false`)
         )
       );
     const pendingCount = pendingRows[0]?.pendingCount ?? 0;
@@ -92,13 +101,15 @@ export async function admitPendingUpload({
       .set({ byte_size: byteSize, expires_at: expiresAt })
       .where(
         and(
-          eq(cloud_agent_pending_uploads.object_key, objectKey),
           eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+          eq(cloud_agent_pending_uploads.message_uuid, messageUuid),
+          sameAttachment,
           eq(cloud_agent_pending_uploads.status, 'pending')
         )
       )
-      .returning({ id: cloud_agent_pending_uploads.id });
-    if (refreshed.length > 0) return objectKey;
+      .returning({ object_key: cloud_agent_pending_uploads.object_key });
+    const refreshedKey = refreshed[0]?.object_key;
+    if (refreshedKey !== undefined) return refreshedKey;
 
     const row = {
       kilo_user_id: kiloUserId,

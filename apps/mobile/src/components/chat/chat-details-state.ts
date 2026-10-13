@@ -1,11 +1,16 @@
 import { calculateContextUsagePercentage } from '@kilocode/cloud-agent-sdk/context-usage';
 import { type ModelUsage } from '@kilocode/harness-sdk';
+import { useState } from 'react';
 
 import { chatTargetKind, decodeBackendTarget, decodeLocalTarget } from '@/lib/chat/backend-target';
+import { type StoredChatBackend } from '@/lib/chat/backend-store';
 import { type ChatUsage } from '@/lib/chat/chat-usage';
+import { type ChatRecord } from '@/lib/chat/store';
 import { type ModelPricing } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type SessionContextInfo } from '@/lib/session-context-info';
+
+import { type McpSettings } from './mcp-settings-sheet';
 
 /**
  * What one model cost a chat.
@@ -159,5 +164,45 @@ export function chatContextInfo(
     modelID: model,
     contextWindow,
     percentage: calculateContextUsagePercentage(prompted, contextWindow),
+  };
+}
+
+export function useChatDetails({
+  model,
+  record,
+  modelOptions,
+  backends,
+  mcp,
+  hasMessages,
+}: {
+  model: string;
+  record: ChatRecord;
+  modelOptions: readonly SessionModelOption[];
+  backends: readonly StoredChatBackend[];
+  mcp: McpSettings;
+  hasMessages: boolean;
+}) {
+  const [visible, setVisible] = useState(false);
+  const cost = chatCost(chatModelUsages(record.usage, modelOptions).map(one => one.cost));
+  return {
+    metrics: {
+      info: chatContextInfo(model, record.prompted, modelOptions),
+      totalCostMicrodollars: cost.kind === 'known' ? Math.round(cost.usd * 1_000_000) : null,
+      hasMessages,
+      onPress: () => {
+        setVisible(true);
+      },
+    },
+    sheet: {
+      visible,
+      onClose: () => {
+        setVisible(false);
+      },
+      model,
+      record,
+      modelOptions,
+      backends,
+      mcp,
+    },
   };
 }

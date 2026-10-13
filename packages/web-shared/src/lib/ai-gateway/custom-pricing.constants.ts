@@ -1,4 +1,7 @@
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import {
+  GEMINI_4_ARGON_MODEL_ID,
+  GEMINI_FLASH_CURRENT_MODEL_ID,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { MISTRAL_LARGE_4_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral.constants';
 import type { PricingTiers } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 
@@ -25,6 +28,21 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
           completion_per_million: 3.75,
           input_cache_read_per_million: 0.075,
           input_cache_write_per_million: 0.0416666666667,
+        },
+      },
+    ],
+  },
+  // OpenRouter lists a 50% Google discount on every Gemini 4 Argon endpoint.
+  [GEMINI_4_ARGON_MODEL_ID]: {
+    discountPercentage: 50,
+    pricing: [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 2,
+          completion_per_million: 10,
+          input_cache_read_per_million: 0.1,
+          input_cache_write_per_million: 0.1875,
         },
       },
     ],

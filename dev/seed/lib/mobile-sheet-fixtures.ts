@@ -35,6 +35,7 @@ export const ROOT_ASSISTANT_MESSAGE_ID = 'msgRootAssistant001';
 export const ROOT_READ_PART_ID = 'prtRootRead00000001';
 export const ROOT_TASK_PART_ID = 'prtRootTask00000001';
 export const ROOT_FILE_PART_ID = 'prtRootFile00000001';
+export const ROOT_SUGGEST_PART_ID = 'prtRootSuggest00001';
 
 export const CHILD_USER_MESSAGE_ID = 'msgChildUser0000001';
 export const CHILD_ASSISTANT_MESSAGE_ID = 'msgChildAssistant01';
@@ -52,6 +53,8 @@ const ROOT_READ_START = 1_700_000_021_000;
 const ROOT_READ_END = 1_700_000_022_000;
 const ROOT_TASK_START = 1_700_000_022_500;
 const ROOT_TASK_END = 1_700_000_024_000;
+const ROOT_SUGGEST_START = 1_700_000_024_200;
+const ROOT_SUGGEST_END = 1_700_000_024_800;
 
 const CHILD_USER_CREATED = 1_700_000_040_000;
 const CHILD_ASSISTANT_CREATED = 1_700_000_050_000;
@@ -117,7 +120,7 @@ export function fixtureSessionIds(childPerformance = false): string[] {
 /** Part IDs that must appear in the materialized history for a fixture session. */
 export function expectedPartIdsFor(sessionId: string): string[] {
   if (sessionId === ROOT_SESSION_ID) {
-    return [ROOT_READ_PART_ID, ROOT_TASK_PART_ID, ROOT_FILE_PART_ID];
+    return [ROOT_READ_PART_ID, ROOT_TASK_PART_ID, ROOT_FILE_PART_ID, ROOT_SUGGEST_PART_ID];
   }
   if (sessionId === CHILD_SESSION_ID) {
     return [CHILD_BASH_PART_ID];
@@ -323,6 +326,24 @@ export function buildRootIngestItems(): SessionIngestItem[] {
       mime: ROOT_FILE_MIME,
       filename: ROOT_FILE_NAME,
       url: ROOT_FILE_URL,
+    }),
+    // A finished suggestion: the session preview renders this row without a
+    // live session manager.
+    buildToolPartItem({
+      partId: ROOT_SUGGEST_PART_ID,
+      sessionId: ROOT_SESSION_ID,
+      messageId: ROOT_ASSISTANT_MESSAGE_ID,
+      callId: 'callRootSuggest001',
+      tool: 'suggest',
+      input: {
+        suggest: 'Review the fixture changes.',
+        actions: [{ label: 'Review', description: 'Review the changes', prompt: '/review' }],
+      },
+      output: 'User dismissed the suggestion.',
+      title: 'Suggestion dismissed',
+      metadata: { dismissed: true, truncated: false },
+      start: ROOT_SUGGEST_START,
+      end: ROOT_SUGGEST_END,
     }),
     {
       type: 'session_diff',

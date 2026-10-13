@@ -271,7 +271,6 @@ export const AgentsSessionView = ({
     void manager.loadOlderMessages();
   }, [manager]);
 
-  // ---- Context usage + session cost (header indicator) ----
   const auth = useStoredAuth();
   const { modelOptions } = useGatewayModels({
     auth: auth ?? { token: '', userEmail: undefined },
@@ -287,7 +286,6 @@ export const AgentsSessionView = ({
   );
   const showContextMetrics = shouldShowContextMetrics(isLoading, contextUsage);
 
-  // ---- In-session model picker ----
   const picker = useMemo(
     () =>
       selectSessionModelPicker({

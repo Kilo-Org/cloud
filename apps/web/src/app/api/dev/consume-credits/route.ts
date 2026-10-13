@@ -94,6 +94,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       session_id: null,
       mode: null,
       auto_model: null,
+      reasoning_setting: null,
       ttfb_ms: null,
     };
 

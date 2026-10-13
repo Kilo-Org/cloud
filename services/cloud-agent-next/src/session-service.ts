@@ -1,3 +1,8 @@
+import {
+  buildAgentEntryFromRuntimeAgent,
+  buildKiloCommandsConfiguration,
+} from './shared/runtime-profile-config.js';
+export { buildAgentEntryFromRuntimeAgent } from './shared/runtime-profile-config.js';
 import { dirname, relative } from 'node:path';
 import {
   parseManagedBitbucketCloneUrl,
@@ -16,6 +21,7 @@ import {
   normalizeKilocodeModel,
 } from './persistence/model-utils.js';
 import {
+  installationBotIdentityFromEnv,
   installationGitAuthorFromEnv,
   isTemporaryManagedBitbucketTokenFailure,
   issueCloudAgentGitHubSessionCapability,
@@ -26,6 +32,12 @@ import {
   resolveManagedBitbucketToken,
   resolveManagedGitLabToken,
 } from './services/git-token-service-client.js';
+import {
+  GITHUB_REVIEW_API_BASE_ENV,
+  GITHUB_REVIEW_MCP_SERVER_NAME,
+  GITHUB_REVIEW_TARGET_ENV,
+  serializeGitHubReviewTarget,
+} from './shared/github-review-target.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from './runtime-credential-proxy.js';
 import { ExecutionError } from './execution/errors.js';
@@ -49,16 +61,13 @@ import type {
   CreateSessionForCloudAgentResult,
 } from '@kilocode/session-ingest-contracts';
 import { timedExec } from './sandbox-timeout-logging.js';
-import type {
-  PersistenceEnv,
-  CloudAgentSessionState,
-  RuntimeSkill,
-  RuntimeAgent,
-} from './persistence/types.js';
+import type { PersistenceEnv, CloudAgentSessionState, RuntimeSkill } from './persistence/types.js';
 import {
   getEffectiveCredentialContainment,
   parseSessionMetadata,
   requiresContainmentSandbox,
+  hasRetiredDevcontainerRuntime,
+  DEVCONTAINER_RETIRED_MESSAGE,
 } from './persistence/session-metadata.js';
 import { withDORetry } from './utils/do-retry.js';
 import { resolveLegacySessionStub, resolveSessionStub } from './sandbox-session/session-stub.js';
@@ -68,21 +77,7 @@ import { codeReviewIdFromCallbackTarget } from './router/schemas.js';
 import { materializeMcpServers } from './mcp-config.js';
 import type { SessionProfileBundle } from './session-profile.js';
 import { readProfileBundle } from './session-profile.js';
-import {
-  bringUpDevContainer,
-  buildRestoreCommand,
-  detectDevContainer,
-  KILO_AGENT_SESSION_LABEL,
-  KILO_CLI_VERSION,
-  type DevContainerHandle,
-} from './kilo/devcontainer.js';
-import { randomPort } from './kilo/ports.js';
-import {
-  buildKiloSessionXdgEnv,
-  dockerSocketEnv,
-  resolveDockerSocketPath,
-} from './kilo/sandbox-runtime.js';
-import { shellQuote, validShellEnvEntries } from './kilo/utils.js';
+import { shellQuote } from './kilo/utils.js';
 import { buildSignedPromptAttachments } from './execution/attachment-prompt-parts.js';
 import {
   type WrapperBootstrapRepoSource,
@@ -566,6 +561,32 @@ export function buildCommandGuardBashPermissions(
   return bashPermissions;
 }
 
+export function getCommandGuardPermissions(
+  policy: CommandGuardPolicy,
+  workspacePath: string,
+  bitbucketReviewId?: string
+): Record<string, string | Record<string, string>> {
+  const bitbucketReviewPolicy = policy.policyName === 'bitbucket-code-review-read-only';
+  return {
+    edit:
+      policy.policyName === 'security-remediation-pr'
+        ? 'allow'
+        : bitbucketReviewPolicy && bitbucketReviewId
+          ? {
+              '*': 'deny',
+              [relative(workspacePath, bitbucketReviewInputPath(bitbucketReviewId))]: 'allow',
+            }
+          : 'deny',
+    bash: buildCommandGuardBashPermissions(policy),
+    ...(bitbucketReviewPolicy ? { task: 'deny', lsp: 'deny' } : {}),
+    webfetch: 'deny',
+    websearch: 'deny',
+    codesearch: 'deny',
+    todowrite: 'allow',
+    todoread: 'allow',
+  };
+}
+
 function matchesKiloPermissionPattern(input: string, pattern: string): boolean {
   let escaped = pattern
     .replaceAll('\\', '/')
@@ -682,125 +703,57 @@ function parseRestoreScriptOutput(stdout: string | undefined): {
  * @param setupCommands - Array of setup commands to execute
  * @param failFast - Whether to stop on first failure (default: false)
  */
-type RunSetupCommandsOptions = {
-  devcontainer?: DevContainerHandle;
-  dockerEnv?: Record<string, string>;
-  runtimeEnv?: Record<string, string | undefined>;
-};
-
-function buildSetupEnvFileContent(env: Record<string, string | undefined>): string {
-  return `${validShellEnvEntries(env)
-    .map(([key, value]) => `export ${key}=${shellQuote(value)}`)
-    .join('\n')}\n`;
-}
-
-function buildDevContainerSetupCommand(
-  devcontainer: DevContainerHandle,
-  command: string,
-  envFilePath: string | undefined
-): string {
-  const workspaceCommand = `cd ${shellQuote(devcontainer.innerWorkspaceFolder)} && ${command}`;
-  const innerCommand = envFilePath
-    ? `. ${shellQuote(envFilePath)} && ${workspaceCommand}`
-    : workspaceCommand;
-  return [
-    'devcontainer exec',
-    `--workspace-folder ${shellQuote(devcontainer.workspacePath)}`,
-    `--config ${shellQuote(devcontainer.overrideConfigPath)}`,
-    `--id-label ${shellQuote(`${KILO_AGENT_SESSION_LABEL}=${devcontainer.agentSessionId}`)}`,
-    '--',
-    'sh -c',
-    shellQuote(innerCommand),
-  ].join(' ');
-}
-
 export async function runSetupCommands(
   session: ExecutionSession,
   context: SessionContext,
   setupCommands: string[],
-  failFast: boolean = false,
-  options: RunSetupCommandsOptions = {}
+  failFast: boolean = false
 ): Promise<void> {
   if (!setupCommands || setupCommands.length === 0) {
     return;
   }
 
-  const dockerEnv = options.devcontainer
-    ? (options.dockerEnv ?? dockerSocketEnv(await resolveDockerSocketPath(session)))
-    : undefined;
-  const setupEnvFilePath =
-    options.devcontainer && options.runtimeEnv
-      ? `${context.sessionHome}/tmp/kilo-setup-env-${options.devcontainer.agentSessionId}-${Date.now()}.sh`
-      : undefined;
-
-  if (setupEnvFilePath && options.runtimeEnv) {
-    await session.writeFile(setupEnvFilePath, buildSetupEnvFileContent(options.runtimeEnv));
-  }
-
   logger.setTags({ setupCommandsCount: setupCommands.length });
   logger.info('Running setup commands');
 
-  try {
-    for (const command of setupCommands) {
-      try {
-        const setupCommand = options.devcontainer
-          ? buildDevContainerSetupCommand(options.devcontainer, command, setupEnvFilePath)
-          : command;
-        const result = await timedExec(session, setupCommand, 'session.runSetupCommand', {
-          timeoutMs: SETUP_COMMAND_TIMEOUT_SECONDS * 1000,
-          cwd: context.workspacePath,
-          env: dockerEnv,
-        });
+  for (const command of setupCommands) {
+    try {
+      const result = await timedExec(session, command, 'session.runSetupCommand', {
+        timeoutMs: SETUP_COMMAND_TIMEOUT_SECONDS * 1000,
+        cwd: context.workspacePath,
+      });
 
-        if (result.exitCode !== 0) {
-          logger
-            .withFields({
-              command,
-              exitCode: result.exitCode,
-              stdout: result.stdout,
-              stderr: result.stderr,
-            })
-            .warn('Setup command failed');
-
-          if (failFast) {
-            throw new SetupCommandFailedError(command, result.exitCode, result.stderr);
-          }
-        }
-      } catch (error) {
+      if (result.exitCode !== 0) {
         logger
           .withFields({
             command,
-            error: error instanceof Error ? error.message : String(error),
+            exitCode: result.exitCode,
+            stdout: result.stdout,
+            stderr: result.stderr,
           })
-          .error('Error executing setup command');
+          .warn('Setup command failed');
 
         if (failFast) {
-          if (error instanceof SetupCommandFailedError) {
-            throw error;
-          }
-          throw new SetupCommandFailedError(
-            command,
-            -1,
-            error instanceof Error ? error.message : String(error)
-          );
+          throw new SetupCommandFailedError(command, result.exitCode, result.stderr);
         }
       }
-    }
-  } finally {
-    if (setupEnvFilePath) {
-      try {
-        await timedExec(
-          session,
-          `rm -f ${shellQuote(setupEnvFilePath)}`,
-          'session.runSetupCommand.cleanup'
+    } catch (error) {
+      logger
+        .withFields({
+          command,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .error('Error executing setup command');
+
+      if (failFast) {
+        if (error instanceof SetupCommandFailedError) {
+          throw error;
+        }
+        throw new SetupCommandFailedError(
+          command,
+          -1,
+          error instanceof Error ? error.message : String(error)
         );
-      } catch (error) {
-        logger
-          .withFields({
-            setupEnvFilePath,
-            error: error instanceof Error ? error.message : String(error),
-          })
-          .warn('Failed to clean up setup command env file');
       }
     }
   }
@@ -827,43 +780,6 @@ export async function writeAuthFile(
   logger.info('Wrote kilo auth file for session ingest');
 }
 
-function getRestoreTokenFilePath(sessionHome: string): string {
-  return `${sessionHome}/.local/share/kilo/session-restore-token`;
-}
-
-async function writeRestoreTokenFile(
-  sandbox: SandboxInstance,
-  session: ExecutionSession,
-  sessionHome: string,
-  kilocodeToken: string
-): Promise<string> {
-  const tokenPath = getRestoreTokenFilePath(sessionHome);
-  const tokenDir = dirname(tokenPath);
-
-  await timedExec(session, `mkdir -p ${shellQuote(tokenDir)}`, 'session.restoreTokenFile.mkdir');
-  await sandbox.writeFile(tokenPath, kilocodeToken);
-  await timedExec(session, `chmod 600 ${shellQuote(tokenPath)}`, 'session.restoreTokenFile.chmod');
-
-  return tokenPath;
-}
-
-async function cleanupRestoreTokenFile(
-  session: ExecutionSession,
-  tokenPath: string,
-  sessionId: string
-): Promise<void> {
-  try {
-    await timedExec(session, `rm -f ${shellQuote(tokenPath)}`, 'session.restoreTokenFile.cleanup');
-  } catch (error) {
-    logger
-      .withFields({
-        sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      })
-      .warn('Failed to clean up restore token file');
-  }
-}
-
 // Write global rules file so the CLI injects cloud-agent-specific instructions.
 // The CLI's RulesMigrator discovers ~/.kilocode/rules/*.md and appends them
 // to the system prompt automatically.
@@ -886,26 +802,6 @@ function shortHash(input: string): string {
     hash = ((hash << 5) + hash + input.charCodeAt(i)) | 0;
   }
   return (hash >>> 0).toString(16);
-}
-
-export function buildAgentEntryFromRuntimeAgent(agent: RuntimeAgent): Record<string, unknown> {
-  const { config } = agent;
-  const entry: Record<string, unknown> = {
-    mode: config.mode ?? 'primary',
-  };
-  if (config.prompt !== undefined) entry.prompt = config.prompt;
-  if (config.description !== undefined) entry.description = config.description;
-  if (config.model != null) entry.model = normalizeKilocodeModel(config.model);
-  if (config.variant !== undefined) entry.variant = config.variant;
-  if (config.temperature !== undefined) entry.temperature = config.temperature;
-  if (config.top_p !== undefined) entry.top_p = config.top_p;
-  if (config.steps !== undefined) entry.steps = config.steps;
-  if (config.hidden !== undefined) entry.hidden = config.hidden;
-  if (config.disable !== undefined) entry.disable = config.disable;
-  if (config.color !== undefined) entry.color = config.color;
-  if (config.permission !== undefined) entry.permission = config.permission;
-  if (config.options !== undefined) entry.options = config.options;
-  return entry;
 }
 
 function isSafeSkillFilePath(relativePath: string): boolean {
@@ -1098,6 +994,7 @@ export class SessionService {
         this._metadata.identity.botId,
         {
           createdOnPlatform: this._metadata.identity.createdOnPlatform,
+          legacyFallback: true,
         }
       ));
 
@@ -1121,6 +1018,8 @@ export class SessionService {
     sessionHome?: string;
     githubRepo?: string;
     githubToken?: string;
+    githubPullRequestNumber?: number;
+    githubAppType?: 'standard' | 'lite';
     gitUrl?: string;
     gitToken?: string;
     gitlabTokenManaged?: boolean;
@@ -1155,6 +1054,8 @@ export class SessionService {
       botId: options.botId,
       githubRepo: options.githubRepo,
       githubToken: options.githubToken,
+      githubPullRequestNumber: options.githubPullRequestNumber,
+      githubAppType: options.githubAppType,
       gitUrl: options.gitUrl,
       gitToken: options.gitToken,
       gitlabTokenManaged: options.gitlabTokenManaged,
@@ -1190,6 +1091,8 @@ export class SessionService {
       originalOrgId: opts.originalOrgId,
       githubToken: context.githubToken,
       githubRepo: context.githubRepo,
+      githubPullRequestNumber: context.githubPullRequestNumber,
+      githubAppType: context.githubAppType,
       createdOnPlatform: opts.createdOnPlatform,
       callbackTarget: opts.callbackTarget,
       appendSystemPrompt: opts.appendSystemPrompt,
@@ -1202,10 +1105,13 @@ export class SessionService {
       bitbucketWorkspaceUuid: context.bitbucketWorkspaceUuid,
       bitbucketRepositoryUuid: context.bitbucketRepositoryUuid,
       profile: effectiveProfile,
-    });
+    }).env;
   }
 
-  private getSaferEnvVars(opts: GetSaferEnvVarsOptions): Record<string, string> {
+  private getSaferEnvVars(opts: GetSaferEnvVarsOptions): {
+    env: Record<string, string>;
+    secretEnvKeys: string[];
+  } {
     const {
       sessionHome,
       sessionId,
@@ -1219,6 +1125,8 @@ export class SessionService {
       originalOrgId,
       githubToken,
       githubRepo,
+      githubPullRequestNumber,
+      githubAppType,
       createdOnPlatform,
       callbackTarget,
       appendSystemPrompt,
@@ -1243,10 +1151,26 @@ export class SessionService {
     const runtimeAgents = profile?.runtimeAgents;
     const kiloCommands = profile?.kiloCommands;
 
+    // A profile may not forge the publication tool or its trusted target, so
+    // both are stripped for every session; the real server is attached by the
+    // wrapper only when the sandbox env carries a worker-set target.
+    const sanitizedMcpServers = mcpServers
+      ? Object.fromEntries(
+          Object.entries(mcpServers).filter(([name]) => name !== GITHUB_REVIEW_MCP_SERVER_NAME)
+        )
+      : undefined;
+    const isGithubCodeReview =
+      createdOnPlatform === 'code-review' &&
+      platform === 'github' &&
+      githubRepo !== undefined &&
+      githubPullRequestNumber !== undefined;
+
     const kilocodeOrganizationId = env.KILOCODE_ORG_ID_OVERRIDE ?? originalOrgId;
 
     // Bitbucket Code Reviewer sessions use only trusted worker-owned environment values.
     let baseEnvVars = isBitbucketCodeReview ? {} : { ...userEnvVars };
+    let decryptedSecretKeys: string[] = [];
+    let decryptedSecretValues: Record<string, string> = {};
 
     if (!isBitbucketCodeReview && encryptedSecrets && Object.keys(encryptedSecrets).length > 0) {
       const privateKey = env.AGENT_ENV_VARS_PRIVATE_KEY;
@@ -1255,7 +1179,12 @@ export class SessionService {
           'Encrypted secrets provided but AGENT_ENV_VARS_PRIVATE_KEY is not configured on the worker'
         );
       }
-      baseEnvVars = mergeEnvVarsWithSecrets(baseEnvVars, encryptedSecrets, privateKey);
+      const mergedSecrets = mergeEnvVarsWithSecrets(baseEnvVars, encryptedSecrets, privateKey);
+      baseEnvVars = mergedSecrets;
+      decryptedSecretKeys = Object.keys(encryptedSecrets);
+      decryptedSecretValues = Object.fromEntries(
+        decryptedSecretKeys.map(key => [key, mergedSecrets[key]])
+      );
       logger
         .withTags({ secretCount: Object.keys(encryptedSecrets).length })
         .info('Decrypted and merged encrypted secrets');
@@ -1293,6 +1222,8 @@ export class SessionService {
         delete envVars[key];
       }
     }
+    delete envVars[GITHUB_REVIEW_TARGET_ENV];
+    delete envVars[GITHUB_REVIEW_API_BASE_ENV];
 
     const providerOptions: Record<string, string> = {
       apiKey: kiloCapability,
@@ -1334,7 +1265,7 @@ export class SessionService {
     const permission: Record<string, unknown> = {
       external_directory: 'allow',
       ...(!isInteractive && { question: 'deny' }),
-      read: 'allow',
+      read: { '*': 'allow', '*.env': 'allow', '*.env.*': 'allow' },
       edit: 'allow',
       glob: 'allow',
       grep: 'allow',
@@ -1357,36 +1288,14 @@ export class SessionService {
     };
 
     if (commandGuardPolicy) {
-      const bashPermissions = buildCommandGuardBashPermissions(commandGuardPolicy);
-
-      // Parity with old autoApproval config:
-      //   read: allow  (was read.enabled: true)
-      //   edit: deny   (was write.enabled: false)
-      //   webfetch/websearch/codesearch: deny  (was browser.enabled: false)
-      //   MCP: allowed by default (was mcp.enabled: true)
-      //   question: handled above (line 564) for non-interactive sessions
-      const bitbucketReviewPolicy =
-        commandGuardPolicy.policyName === 'bitbucket-code-review-read-only';
-      Object.assign(permission, {
-        read: 'allow',
-        edit:
-          commandGuardPolicy.policyName === 'security-remediation-pr'
-            ? 'allow'
-            : bitbucketReviewPolicy && bitbucketInputPath
-              ? {
-                  '*': 'deny',
-                  [relative(workspacePath, bitbucketInputPath)]: 'allow',
-                }
-              : 'deny',
-        bash: bashPermissions,
-        task: bitbucketReviewPolicy ? 'deny' : permission.task,
-        lsp: bitbucketReviewPolicy ? 'deny' : permission.lsp,
-        webfetch: 'deny',
-        websearch: 'deny',
-        codesearch: 'deny',
-        todowrite: 'allow',
-        todoread: 'allow',
-      });
+      Object.assign(
+        permission,
+        getCommandGuardPermissions(
+          commandGuardPolicy,
+          workspacePath,
+          bitbucketReviewId ?? undefined
+        )
+      );
 
       logger
         .withFields({
@@ -1414,8 +1323,11 @@ export class SessionService {
       // alive for the session, which the sandbox does not budget for.
       indexing: { enabled: false },
     };
-    if (!bitbucketInputPath && mcpServers && Object.keys(mcpServers).length > 0) {
-      const materialized = materializeMcpServers(mcpServers, env.AGENT_ENV_VARS_PRIVATE_KEY);
+    if (!bitbucketInputPath && sanitizedMcpServers && Object.keys(sanitizedMcpServers).length > 0) {
+      const materialized = materializeMcpServers(
+        sanitizedMcpServers,
+        env.AGENT_ENV_VARS_PRIVATE_KEY
+      );
       configContent.mcp = materialized;
       logger.info('MCP config merged into KILO_CONFIG_CONTENT', {
         mcpServerNames: Object.keys(materialized),
@@ -1447,18 +1359,7 @@ export class SessionService {
       configContent.agent = agentConfig;
     }
     if (!bitbucketInputPath && kiloCommands && kiloCommands.length > 0) {
-      configContent.command = Object.fromEntries(
-        kiloCommands.map(cmd => [
-          cmd.name,
-          {
-            template: cmd.template,
-            ...(cmd.description && { description: cmd.description }),
-            ...(cmd.agent && { agent: cmd.agent }),
-            ...(cmd.model && { model: normalizeKilocodeModel(cmd.model) }),
-            subtask: cmd.subtask ?? false,
-          },
-        ])
-      );
+      configContent.command = buildKiloCommandsConfiguration(kiloCommands);
       logger.info('Kilo commands merged into KILO_CONFIG_CONTENT', {
         kiloCommandNames: kiloCommands.map(c => c.name),
         kiloCommandCount: kiloCommands.length,
@@ -1468,7 +1369,26 @@ export class SessionService {
     envVars.OPENCODE_CONFIG_CONTENT = configJson;
     envVars.KILO_CONFIG_CONTENT = configJson;
     envVars.KILO_DISABLE_CODEBASE_INDEXING = 'vscode-no-workspace';
-    if (!baseEnvVars.GH_TOKEN) {
+    if (
+      isGithubCodeReview &&
+      githubToken &&
+      githubRepo &&
+      githubPullRequestNumber !== undefined &&
+      githubAppType !== undefined
+    ) {
+      // A bound code review always uses the worker-resolved token and target,
+      // even when the profile set GH_TOKEN.
+      envVars.GH_TOKEN = githubToken;
+      const botIdentity = installationBotIdentityFromEnv(env, githubAppType);
+      if (botIdentity) {
+        envVars[GITHUB_REVIEW_TARGET_ENV] = serializeGitHubReviewTarget({
+          repo: githubRepo,
+          pullRequestNumber: githubPullRequestNumber,
+          appType: githubAppType,
+          botUserId: botIdentity.userId,
+        });
+      }
+    } else if (!baseEnvVars.GH_TOKEN) {
       if (githubToken && githubRepo) {
         envVars.GH_TOKEN = githubToken;
       } else if (platform === 'github' && gitToken) {
@@ -1559,7 +1479,12 @@ export class SessionService {
       envVars.KILO_SESSION_INGEST_URL = env.KILO_SESSION_INGEST_URL;
     }
 
-    return envVars;
+    return {
+      env: envVars,
+      // A later grant step may have overwritten a decrypted secret; only what is
+      // still that secret's value is safe to advertise for redaction.
+      secretEnvKeys: decryptedSecretKeys.filter(key => envVars[key] === decryptedSecretValues[key]),
+    };
   }
 
   /**
@@ -1881,10 +1806,6 @@ export class SessionService {
     providerBaseUrl?: string;
     sessionIngestBaseUrl?: string;
   }> {
-    if (params.sandboxId.startsWith('dind-')) {
-      return { capability: params.userToken };
-    }
-
     if (!params.kilocodeContainment) {
       logger
         .withFields({ sandboxId: params.sandboxId })
@@ -1966,6 +1887,9 @@ export class SessionService {
     const { scope, turn, agent, finalization, workspace, wrapper } = plan;
     const { sessionId, userId, orgId } = scope;
     const { sandboxId, metadata } = workspace;
+    if (hasRetiredDevcontainerRuntime(metadata) || sandboxId.startsWith('dind-')) {
+      throw ExecutionError.invalidRequest(DEVCONTAINER_RETIRED_MESSAGE);
+    }
     if (!metadata.auth.kilocodeToken) {
       throw ExecutionError.invalidRequest('Missing kilocodeToken in session metadata');
     }
@@ -2025,8 +1949,6 @@ export class SessionService {
       kiloSessionIngestBaseUrl = kiloCredential.sessionIngestBaseUrl;
     }
 
-    const devcontainerRequested =
-      metadata.workspace?.devcontainerRequested === true || metadata.devcontainer !== undefined;
     const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata, sandboxId as SandboxId);
     const workspacePath =
       metadata.workspace?.worktreeId && metadata.workspace.workspacePath
@@ -2049,6 +1971,8 @@ export class SessionService {
       sessionHome,
       githubRepo: github?.repo,
       githubToken: resolvedTokens.githubToken,
+      githubPullRequestNumber: github?.pullRequestNumber,
+      githubAppType: resolvedTokens.githubAppType,
       gitUrl:
         resolvedTokens.gitlabCapabilityGitUrl ??
         resolvedTokens.bitbucketCapabilityGitUrl ??
@@ -2067,35 +1991,39 @@ export class SessionService {
       platform,
     });
 
-    const materializedEnv = this.getSaferEnvVars({
-      sessionHome,
-      sessionId,
-      workspacePath,
-      env,
-      kiloCapability,
-      kiloBackendBaseUrl,
-      kiloProviderBaseUrl,
-      kiloSessionIngestBaseUrl,
-      kilocodeModel: agent.model,
-      originalOrgId: orgId,
-      githubToken: resolvedTokens.githubToken,
-      githubRepo: github?.repo,
-      createdOnPlatform: metadata.identity.createdOnPlatform,
-      callbackTarget: metadata.callback?.target,
-      appendSystemPrompt: metadata.agent?.appendSystemPrompt,
-      gitUrl:
-        resolvedTokens.gitlabCapabilityGitUrl ??
-        resolvedTokens.bitbucketCapabilityGitUrl ??
-        git?.url,
-      gitToken: resolvedTokens.gitToken,
-      gitlabInstanceUrl: resolvedTokens.gitlabInstanceUrl,
-      glabIsOAuth2: resolvedTokens.glabIsOAuth2,
-      platform,
-      bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
-      bitbucketWorkspaceUuid: git?.type === 'bitbucket' ? git.workspaceUuid : undefined,
-      bitbucketRepositoryUuid: git?.type === 'bitbucket' ? git.repositoryUuid : undefined,
-      profile,
-    });
+    const { env: materializedEnv, secretEnvKeys: materializedSecretEnvKeys } = this.getSaferEnvVars(
+      {
+        sessionHome,
+        sessionId,
+        workspacePath,
+        env,
+        kiloCapability,
+        kiloBackendBaseUrl,
+        kiloProviderBaseUrl,
+        kiloSessionIngestBaseUrl,
+        kilocodeModel: agent.model,
+        originalOrgId: orgId,
+        githubToken: resolvedTokens.githubToken,
+        githubRepo: github?.repo,
+        githubPullRequestNumber: github?.pullRequestNumber,
+        githubAppType: resolvedTokens.githubAppType,
+        createdOnPlatform: metadata.identity.createdOnPlatform,
+        callbackTarget: metadata.callback?.target,
+        appendSystemPrompt: metadata.agent?.appendSystemPrompt,
+        gitUrl:
+          resolvedTokens.gitlabCapabilityGitUrl ??
+          resolvedTokens.bitbucketCapabilityGitUrl ??
+          git?.url,
+        gitToken: resolvedTokens.gitToken,
+        gitlabInstanceUrl: resolvedTokens.gitlabInstanceUrl,
+        glabIsOAuth2: resolvedTokens.glabIsOAuth2,
+        platform,
+        bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
+        bitbucketWorkspaceUuid: git?.type === 'bitbucket' ? git.workspaceUuid : undefined,
+        bitbucketRepositoryUuid: git?.type === 'bitbucket' ? git.repositoryUuid : undefined,
+        profile,
+      }
+    );
 
     const ready = {
       workspacePath,
@@ -2108,7 +2036,6 @@ export class SessionService {
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
       bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
-      ...(metadata.devcontainer ? { devcontainer: metadata.devcontainer } : {}),
     } satisfies WrapperWorkspaceReady;
 
     const repo = this.buildWrapperRepoSource(metadata, resolvedTokens);
@@ -2157,16 +2084,9 @@ export class SessionService {
       },
       ...(repo ? { repo } : {}),
       ...(runtimeCredentialProxy ? { runtimeCredentialProxy } : {}),
-      ...(devcontainerRequested
-        ? {
-            devcontainer: {
-              requested: true,
-              ...(metadata.devcontainer ? { resolved: metadata.devcontainer } : {}),
-            },
-          }
-        : {}),
       materialized: {
         env: materializedEnv,
+        ...(materializedSecretEnvKeys.length ? { secretEnvKeys: materializedSecretEnvKeys } : {}),
         ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),
         ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
       },
@@ -2278,6 +2198,9 @@ export class SessionService {
   @WithLogTags('SessionService.prepareWorkspace')
   async prepareWorkspace(options: PrepareWorkspaceOptions): Promise<PreparedWorkspace> {
     const { sandbox, sandboxId, userId, sessionId, env, metadata, onProgress } = options;
+    if (hasRetiredDevcontainerRuntime(metadata) || sandboxId.startsWith('dind-')) {
+      throw ExecutionError.invalidRequest(DEVCONTAINER_RETIRED_MESSAGE);
+    }
     const orgId = options.orgId;
 
     if (!metadata.auth.kilocodeToken) {
@@ -2324,6 +2247,8 @@ export class SessionService {
       sessionHome,
       githubRepo: github?.repo,
       githubToken: resolvedTokens.githubToken,
+      githubPullRequestNumber: github?.pullRequestNumber,
+      githubAppType: resolvedTokens.githubAppType,
       gitUrl:
         resolvedTokens.gitlabCapabilityGitUrl ??
         resolvedTokens.bitbucketCapabilityGitUrl ??
@@ -2353,7 +2278,6 @@ export class SessionService {
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
       bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
-      devcontainer: metadata.devcontainer,
     } satisfies PreparedWorkspace['ready'];
     const runtimeEnv = this.buildRuntimeEnv({
       context,
@@ -2392,56 +2316,12 @@ export class SessionService {
       await this.sanitizeGitRemote(session, context.workspacePath, metadata, resolvedTokens);
       await this.refreshGitAuthor(session, context, metadata, resolvedTokens);
 
-      const detectedDevcontainer =
-        metadata.workspace?.devcontainerRequested && !metadata.devcontainer
-          ? await detectDevContainer(session, workspacePath)
-          : null;
-      if (
-        metadata.workspace?.devcontainerRequested &&
-        !metadata.devcontainer &&
-        !detectedDevcontainer
-      ) {
-        throw ExecutionError.invalidRequest(
-          'Devcontainer runtime was requested, but the repository has no devcontainer config'
-        );
-      }
-      const devcontainerPlan =
-        metadata.devcontainer ??
-        (detectedDevcontainer
-          ? {
-              workspacePath,
-              wrapperPort: randomPort(),
-              configPath: detectedDevcontainer.configPath,
-            }
-          : undefined);
-      if (!devcontainerPlan) {
-        return { context, session, runtimeEnv, ready };
-      }
-
-      const devcontainer = await bringUpDevContainer(session, {
-        workspacePath: devcontainerPlan.workspacePath,
-        sessionHome,
-        agentSessionId: sessionId,
-        wrapperPort: devcontainerPlan.wrapperPort,
-        kiloCliVersion: KILO_CLI_VERSION,
-        configPath: devcontainerPlan.configPath,
-        onProgress: message => onProgress?.('devcontainer_setup', message),
-      });
-      ready.devcontainer = {
-        workspacePath: devcontainerPlan.workspacePath,
-        innerWorkspaceFolder: devcontainer.innerWorkspaceFolder,
-        wrapperPort: devcontainerPlan.wrapperPort,
-        configPath: devcontainerPlan.configPath,
-      };
-      return { context, session, runtimeEnv, devcontainer, ready };
+      return { context, session, runtimeEnv, ready };
     }
 
     onProgress?.('disk_check', 'Checking disk space…');
     await checkDiskAndCleanBeforeSetup(sandbox, orgId, userId, sessionId, {
-      inspectContainers:
-        sandboxId.startsWith('dind-') ||
-        metadata.workspace?.devcontainerRequested === true ||
-        metadata.devcontainer !== undefined,
+      inspectContainers: false,
     });
 
     onProgress?.('workspace_setup', 'Setting up workspace…');
@@ -2459,8 +2339,6 @@ export class SessionService {
       kiloSessionIngestBaseUrl
     );
 
-    let devcontainer: DevContainerHandle | undefined;
-    let dockerEnv: Record<string, string> | undefined;
     try {
       onProgress?.('cloning', 'Cloning repository…');
       await this.cloneRepository(session, workspacePath, metadata, resolvedTokens);
@@ -2472,46 +2350,6 @@ export class SessionService {
       await writeAuthFile(sandbox, sessionHome, kiloCapability);
       await writeGlobalRules(sandbox, sessionHome, env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS);
 
-      const detectedDevcontainer = metadata.workspace?.devcontainerRequested
-        ? await detectDevContainer(session, workspacePath)
-        : null;
-      if (
-        metadata.workspace?.devcontainerRequested &&
-        !metadata.devcontainer &&
-        !detectedDevcontainer
-      ) {
-        throw ExecutionError.invalidRequest(
-          'Devcontainer runtime was requested, but the repository has no devcontainer config'
-        );
-      }
-      const devcontainerPlan =
-        metadata.devcontainer ??
-        (detectedDevcontainer
-          ? {
-              workspacePath,
-              wrapperPort: randomPort(),
-              configPath: detectedDevcontainer.configPath,
-            }
-          : undefined);
-      if (devcontainerPlan) {
-        dockerEnv = dockerSocketEnv(await resolveDockerSocketPath(session));
-        devcontainer = await bringUpDevContainer(session, {
-          workspacePath: devcontainerPlan.workspacePath,
-          sessionHome,
-          agentSessionId: sessionId,
-          wrapperPort: devcontainerPlan.wrapperPort,
-          kiloCliVersion: KILO_CLI_VERSION,
-          configPath: devcontainerPlan.configPath,
-          onProgress: message => onProgress?.('devcontainer_setup', message),
-        });
-        ready.devcontainer = {
-          workspacePath: devcontainerPlan.workspacePath,
-          innerWorkspaceFolder: devcontainer.innerWorkspaceFolder,
-          wrapperPort: devcontainerPlan.wrapperPort,
-          configPath: devcontainerPlan.configPath,
-        };
-      }
-
       const preferSnapshot =
         metadata.clone !== undefined || metadata.lifecycle.preparedAt !== undefined;
       onProgress?.('kilo_session', preferSnapshot ? 'Restoring session…' : 'Importing session…');
@@ -2521,41 +2359,18 @@ export class SessionService {
         metadata.auth.kiloSessionId,
         workspacePath,
         preferSnapshot,
-        metadata.clone !== undefined,
-        {
-          devcontainer,
-          dockerEnv,
-          env,
-          kiloCapability,
-          kiloSessionIngestBaseUrl,
-          runtimeEnv,
-          sessionHome,
-        }
+        metadata.clone !== undefined
       );
 
       const setupCommands = readProfileBundle(metadata).setupCommands;
       if (setupCommands && setupCommands.length > 0) {
         onProgress?.('setup_commands', 'Running setup commands…');
-        await runSetupCommands(session, context, setupCommands, false, {
-          devcontainer,
-          dockerEnv,
-          runtimeEnv,
-        });
+        await runSetupCommands(session, context, setupCommands, false);
       }
 
       onProgress?.('kilo_server', 'Starting Kilo…');
-      return { context, session, runtimeEnv, devcontainer, ready };
+      return { context, session, runtimeEnv, ready };
     } catch (error) {
-      if (devcontainer) {
-        await devcontainer.teardown().catch(teardownError => {
-          logger
-            .withFields({
-              sessionId,
-              error: teardownError instanceof Error ? teardownError.message : String(teardownError),
-            })
-            .warn('Failed to tear down devcontainer after workspace preparation failure');
-        });
-      }
       logger
         .withFields({ sessionId, error: error instanceof Error ? error.message : String(error) })
         .warn('Workspace preparation step failed; removing workspace for clean retry');
@@ -2740,16 +2555,13 @@ export class SessionService {
     kiloSessionId: string,
     workspacePath: string,
     preferSnapshot: boolean,
-    requireSnapshot: boolean,
-    options: RestoreRuntimeOptions
+    requireSnapshot: boolean
   ): Promise<void> {
     if (preferSnapshot) {
       const restored = await this.tryRestoreKiloSessionFromSnapshot(
-        sandbox,
         session,
         kiloSessionId,
-        workspacePath,
-        options
+        workspacePath
       );
       if (restored) return;
       if (requireSnapshot) {
@@ -2762,81 +2574,39 @@ export class SessionService {
     // without a clone bootstrapped an empty session instead of attempting
     // snapshot restore. Remove this fallback only after old prepared sessions
     // age out.
-    await this.bootstrapKiloSession(sandbox, session, kiloSessionId, workspacePath, options);
-  }
-
-  private getDevContainerRestoreEnv(
-    options: RestoreRuntimeOptions,
-    restoreTokenFilePath: string | undefined
-  ): Record<string, string | undefined> {
-    const backendUrl =
-      options.kiloBackendBaseUrl ??
-      (options.env.KILOCODE_BACKEND_BASE_URL
-        ? backendUrlForSandbox(options.env.KILOCODE_BACKEND_BASE_URL)
-        : undefined);
-    return {
-      KILOCODE_TOKEN_FILE: restoreTokenFilePath,
-      KILO_SESSION_INGEST_URL:
-        options.kiloSessionIngestBaseUrl ?? options.env.KILO_SESSION_INGEST_URL,
-      ...buildKiloSessionXdgEnv(options.sessionHome),
-      ...(backendUrl ? { KILOCODE_BACKEND_BASE_URL: backendUrl, KILO_API_URL: backendUrl } : {}),
-    };
+    await this.bootstrapKiloSession(sandbox, session, kiloSessionId, workspacePath);
   }
 
   private async executeRestoreCommand(
-    sandbox: SandboxInstance,
     session: ExecutionSession,
     kiloSessionId: string,
     workspacePath: string,
-    options: RestoreRuntimeOptions,
     operation: string,
     importFilePath?: string
   ) {
-    const restoreTokenFilePath = options.devcontainer
-      ? getRestoreTokenFilePath(options.sessionHome)
-      : undefined;
-    try {
-      if (restoreTokenFilePath) {
-        await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kiloCapability);
-      }
-      const restoreCommand = buildRestoreCommand({
-        kiloSessionId,
-        importFilePath,
-        runtimeWorkspacePath: options.devcontainer?.innerWorkspaceFolder ?? workspacePath,
-        runtimeEnv: options.devcontainer
-          ? this.getDevContainerRestoreEnv(options, restoreTokenFilePath)
-          : undefined,
-        devContainer: options.devcontainer,
-      });
-      return await timedExec(session, restoreCommand, operation, {
-        timeoutMs: GIT_COMMAND_TIMEOUT_MS,
-        cwd: dirname(workspacePath),
-        env: options.devcontainer ? options.dockerEnv : undefined,
-      });
-    } finally {
-      if (restoreTokenFilePath) {
-        await cleanupRestoreTokenFile(
-          session,
-          restoreTokenFilePath,
-          options.devcontainer?.agentSessionId ?? ''
-        );
-      }
-    }
+    const restoreCommand = [
+      'bun /usr/local/bin/kilo-restore-session.js',
+      importFilePath ? `--file ${shellQuote(importFilePath)}` : undefined,
+      shellQuote(kiloSessionId),
+      shellQuote(workspacePath),
+    ]
+      .filter(Boolean)
+      .join(' ');
+    return await timedExec(session, restoreCommand, operation, {
+      timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+      cwd: dirname(workspacePath),
+    });
   }
 
   private async tryRestoreKiloSessionFromSnapshot(
-    sandbox: SandboxInstance,
     session: ExecutionSession,
     kiloSessionId: string,
-    workspacePath: string,
-    options: RestoreRuntimeOptions
+    workspacePath: string
   ): Promise<boolean> {
     const restoreResult = await this.executeRestoreCommand(
-      sandbox,
       session,
       kiloSessionId,
       workspacePath,
-      options,
       'session.prepareWorkspace.restore'
     );
 
@@ -2868,8 +2638,7 @@ export class SessionService {
     sandbox: SandboxInstance,
     session: ExecutionSession,
     kiloSessionId: string,
-    workspacePath: string,
-    options: RestoreRuntimeOptions
+    workspacePath: string
   ): Promise<void> {
     const now = Date.now();
     const minimalSessionJson = JSON.stringify({
@@ -2884,16 +2653,12 @@ export class SessionService {
       },
       messages: [],
     });
-    const importFilePath = options.devcontainer
-      ? `${options.sessionHome}/tmp/kilo-empty-session-${kiloSessionId}.json`
-      : `/tmp/kilo-empty-session-${kiloSessionId}.json`;
+    const importFilePath = `/tmp/kilo-empty-session-${kiloSessionId}.json`;
     await sandbox.writeFile(importFilePath, minimalSessionJson);
     const restoreResult = await this.executeRestoreCommand(
-      sandbox,
       session,
       kiloSessionId,
       workspacePath,
-      options,
       'session.prepareWorkspace.bootstrap',
       importFilePath
     );
@@ -2924,7 +2689,7 @@ export class SessionService {
     createdOnPlatform: string,
     title?: string,
     gitUrl?: string,
-    cloneFromKiloSessionId?: string,
+    clone?: { cloneFromKiloSessionId: string; cloneUpToMessageId?: string },
     cloudAgentWorktreeId?: CloudAgentWorktreeId,
     cloudAgentWorktreeLocation?: CloudAgentWorktreeLocation
   ): Promise<CreateSessionForCloudAgentResult | undefined> {
@@ -2938,7 +2703,8 @@ export class SessionService {
         title,
         gitUrl,
         profileId,
-        cloneFromKiloSessionId,
+        cloneFromKiloSessionId: clone?.cloneFromKiloSessionId,
+        ...(clone?.cloneUpToMessageId ? { cloneUpToMessageId: clone.cloneUpToMessageId } : {}),
         ...(cloudAgentWorktreeId ? { cloudAgentWorktreeId } : {}),
         ...(cloudAgentWorktreeLocation ? { cloudAgentWorktreeLocation } : {}),
       });
@@ -2989,7 +2755,6 @@ export type PreparedSession = {
   context: SessionContext;
   session: Awaited<ReturnType<SessionService['getOrCreateSession']>>;
   runtimeEnv: Record<string, string>;
-  devcontainer?: DevContainerHandle;
 };
 
 export type GetOrCreateSessionOptions = {
@@ -3010,17 +2775,6 @@ export type GetOrCreateSessionOptions = {
 
 export type BuildRuntimeEnvOptions = Omit<GetOrCreateSessionOptions, 'sandbox'>;
 
-type RestoreRuntimeOptions = {
-  devcontainer?: DevContainerHandle;
-  dockerEnv?: Record<string, string>;
-  env: PersistenceEnv;
-  kiloCapability: string;
-  kiloBackendBaseUrl?: string;
-  kiloSessionIngestBaseUrl?: string;
-  runtimeEnv: Record<string, string>;
-  sessionHome: string;
-};
-
 type GetSaferEnvVarsOptions = {
   sessionHome: string;
   sessionId: string;
@@ -3034,6 +2788,8 @@ type GetSaferEnvVarsOptions = {
   originalOrgId?: string;
   githubToken?: string;
   githubRepo?: string;
+  githubPullRequestNumber?: number;
+  githubAppType?: 'standard' | 'lite';
   createdOnPlatform?: string;
   callbackTarget?: NonNullable<CloudAgentSessionState['callback']>['target'];
   appendSystemPrompt?: string;
@@ -3059,7 +2815,6 @@ export type WorkspaceReadyMetadata = {
   gitToken?: string;
   gitlabTokenManaged?: boolean;
   bitbucketTokenManaged?: boolean;
-  devcontainer?: CloudAgentSessionState['devcontainer'];
 };
 
 export type PreparedWorkspace = PreparedSession & {

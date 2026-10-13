@@ -71,7 +71,11 @@ async function processSSOInternal(
     trackingContext
   );
   if (!res.success) {
-    if (res.error === 'SIGNUP-RATE-LIMITED' || res.error === 'EMAIL-ALREADY-USED') {
+    if (
+      res.error === 'SIGNUP-RATE-LIMITED' ||
+      res.error === 'SIGNUP-UNAVAILABLE' ||
+      res.error === 'EMAIL-ALREADY-USED'
+    ) {
       return `${SSO_SIGNIN_PATH}?error=${res.error}`;
     }
     throw new Error(res.error);

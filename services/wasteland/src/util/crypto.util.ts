@@ -76,8 +76,6 @@ export async function deriveEncryptionKey(secret: string): Promise<CryptoKey> {
   );
 }
 
-// --- base64 helpers using platform-agnostic approach ---
-
 function uint8ToBase64(bytes: Uint8Array): string {
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {

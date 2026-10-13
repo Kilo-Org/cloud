@@ -93,6 +93,7 @@ describe('kilo config.json schema merge', () => {
     expect(props.web_search).toEqual(expect.objectContaining({ type: 'boolean', default: false }));
     expect(props.privacy_mode).toBeDefined();
     expect(props.retention).toBeDefined();
+    expect(props.memory_model).toBeDefined();
   });
 
   test('retention exposes enabled boolean and maxAgeDays number', () => {
@@ -143,11 +144,13 @@ describe('kilo config.json schema merge', () => {
     expect(cm.properties.prompt).toEqual(expect.objectContaining({ type: 'string' }));
   });
 
-  test('allows null on model and small_model', () => {
+  test('allows null on model, small_model and memory_model', () => {
     const model = props.model as { anyOf: Array<{ type?: string }> };
     expect(model.anyOf.some(m => m.type === 'null')).toBe(true);
     const small = props.small_model as { anyOf: Array<{ type?: string }> };
     expect(small.anyOf.some(m => m.type === 'null')).toBe(true);
+    const memory = props.memory_model as { anyOf: Array<{ type?: string }> };
+    expect(memory.anyOf.some(m => m.type === 'null')).toBe(true);
   });
 
   test('adds kilo primary agents', () => {
@@ -185,6 +188,9 @@ describe('kilo config.json schema merge', () => {
     expect(exp.properties.agent_requirements).toEqual(expect.objectContaining({ type: 'boolean' }));
     expect(exp.properties.native_notebook_tools).toEqual(
       expect.objectContaining({ type: 'boolean' })
+    );
+    expect(exp.properties.glob_include_ignored).toEqual(
+      expect.objectContaining({ type: 'array', items: { type: 'string' } })
     );
     expect(exp.properties.openTelemetry).toBeDefined();
     expect(exp.properties.batch_tool).toBeDefined(); // upstream key preserved

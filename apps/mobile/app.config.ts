@@ -127,7 +127,7 @@ const config: ExpoConfig = {
   // Keep in lockstep with AGENT_CHANNEL_SPLIT_APP_VERSION in
   // @kilocode/notifications: this is the first build that creates the split
   // agent channels, so older tokens stay on the legacy `agent` channel.
-  version: '1.0.13',
+  version: '1.0.14',
   // Rotation is supported on iOS and Android: `default` resolves to portrait +
   // both landscapes in UISupportedInterfaceOrientations on iOS and all
   // orientations in the Android manifest, satisfying WCAG 1.3.4 (Orientation)
@@ -206,6 +206,10 @@ const config: ExpoConfig = {
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      // Custom LAN backends require an app-level approval before each endpoint
+      // can use HTTP. ATS stays enabled for public HTTPS endpoints.
+      NSAppTransportSecurity: { NSAllowsLocalNetworking: true },
+      NSLocalNetworkUsageDescription: permissionLocales.en.ios.NSLocalNetworkUsageDescription,
       // iOS reads this list, not the JS catalog. Without it the system treats
       // the app as English-only, so OS-drawn text we cannot translate — the
       // native Sign in with Apple button above all — stays English on a
@@ -279,7 +283,9 @@ const config: ExpoConfig = {
         android: {
           enableMinifyInReleaseBuilds: true,
           // Keep expo-task-manager's reflectively-loaded headless app loader.
-          extraProguardRules: ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES,
+          // R8 runs on release builds and llama.rn's JSI bindings are reached
+          // only through JNI, so every com.rnllama class has to be kept too.
+          extraProguardRules: `${ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES}\n-keep class com.rnllama.** { *; }`,
           // Old release AABs shipped without resource shrinking. Keep this on so
           // the unused zz_unused_shrink_sentinel raw resource is stripped and
           // the inspector contract can catch a shrink regression before it lands.
@@ -288,6 +294,8 @@ const config: ExpoConfig = {
         },
         ios: {
           ccacheEnabled: true,
+          // SDK 27 requires the scene lifecycle, including scene-based window and link handling.
+          enableSceneSupport: true,
           // iOS consumes React Native Core prebuilt by default, so the pnpm patch
           // over RCTComponentViewFactory.mm would never compile into the app.
           // The Expo Podfile maps this to ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
@@ -310,6 +318,18 @@ const config: ExpoConfig = {
         },
       },
     ],
+    // llama.cpp for on-device GGUF inference. The two options are the defaults
+    // turned off: the podspec already compiles itself as C++20, and the app
+    // offloads nothing to Android GPUs, so neither global Podfile flags nor
+    // Qualcomm native libraries belong in the manifest. iOS memory entitlements
+    // stay on: a GGUF context needs the raised ceiling.
+    [
+      'llama.rn',
+      {
+        forceCxx20: false,
+        enableOpenCLAndHexagon: false,
+      },
+    ],
     [
       'expo-speech-recognition',
       {
@@ -320,6 +340,15 @@ const config: ExpoConfig = {
     ],
     'expo-router',
     'expo-image',
+    // Inline video file parts in the session transcript (file-part-renderer).
+    'expo-video',
+    [
+      'expo-image-picker',
+      {
+        cameraPermission: PERMISSION_PROMPT_COPY.en.NSCameraUsageDescription,
+        photosPermission: PERMISSION_PROMPT_COPY.en.NSPhotoLibraryUsageDescription,
+      },
+    ],
     'expo-font',
     // The app owns its Android backup rules (plugins/withAndroidManifestFix.js
     // writes the union of the SecureStore and AppsFlyer exclusions). Disable the
@@ -350,7 +379,13 @@ const config: ExpoConfig = {
         enableBackgroundRemoteNotifications: true,
       },
     ],
+    // Registers the BGTaskScheduler identifier and the `processing` background
+    // mode for the periodic glanceable refresh, the fallback for a dropped push
+    // (src/lib/glanceable-refresh-task.ts).
+    'expo-background-task',
     'expo-web-browser',
+    // Must stay before '@sentry/react-native/expo': it edits the RNSentrySDK.start() line that plugin writes.
+    './plugins/withReactMountLogBreadcrumbs',
     [
       '@sentry/react-native/expo',
       {
@@ -359,6 +394,10 @@ const config: ExpoConfig = {
         organization: 'anaconda-nq',
         useNativeInit: true,
         options: SENTRY_NATIVE_OPTIONS,
+        // Android release builds upload NDK debug symbols and the R8 mapping, so
+        // native tombstones (libhermes, libreactnative, Expo modules) and Java
+        // frames symbolicate. The default sentry.gradle.kts uploads only JS source maps.
+        experimental_android: { enableAndroidGradlePlugin: true },
       },
     ],
     // One native splash configuration and shared AnimatedSplashOverlay lifecycle
@@ -377,6 +416,11 @@ const config: ExpoConfig = {
       {
         locationWhenInUsePermission:
           'Allow $(PRODUCT_NAME) to use your location to set up local weather.',
+        // The app requests only foreground location for weather setup.
+        locationAlwaysAndWhenInUsePermission: false,
+        locationAlwaysPermission: false,
+        // Apple requires this key for the library's linked motion APIs, even though Kilo never calls them.
+        motionUsagePermission: PERMISSION_PROMPT_COPY.en.NSMotionUsageDescription,
         isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
         isAndroidForegroundServiceEnabled: false,
@@ -457,6 +501,8 @@ const config: ExpoConfig = {
     // Aggregate "Active Agents" glanceable surfaces: one Live Activity plus Home
     // Screen and Lock Screen widgets, rendered by src/glanceable-ios. The widget
     // target reuses the existing app group; no second group is created.
+    // Native Home refresh runs after expo-widgets' source generation (mods run in reverse).
+    './plugins/withHomeWidgetRefresh',
     [
       'expo-widgets',
       {

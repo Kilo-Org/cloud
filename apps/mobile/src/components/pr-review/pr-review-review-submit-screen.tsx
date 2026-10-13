@@ -8,6 +8,7 @@ import { CenteredState } from '@/components/centered-state';
 
 import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import { PrReviewSubmit } from '@/components/pr-review/pr-review-submit';
+import { selectGitHubReviewEvents } from '@/components/pr-review/pr-review-submit-view';
 import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseParam } from '@/lib/route-params';
@@ -123,9 +124,12 @@ export function PrReviewReviewSubmitScreen() {
         eyebrow={eyebrow}
         prRef={providerRef && providerRef.platform !== 'github' ? providerRef : undefined}
         reviewEvents={
-          providerRef && providerRef.platform !== 'github' && capabilitiesData
-            ? capabilitiesData.reviewEvents
-            : undefined
+          providerRef && providerRef.platform !== 'github'
+            ? capabilitiesData?.reviewEvents
+            : selectGitHubReviewEvents({
+                authorLogin: pr.data.author?.login,
+                viewerLogin: pr.data.repo.viewerLogin,
+              })
         }
         onDismiss={dismiss}
       />

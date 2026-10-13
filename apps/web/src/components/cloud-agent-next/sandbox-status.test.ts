@@ -81,6 +81,40 @@ describe('sandbox status eligibility', () => {
 });
 
 describe('sandbox status observation', () => {
+  it('keeps a subscribed live snapshot fresh without requiring periodic updates', () => {
+    expect(
+      sandboxStatusPresentation({ ...observation, live: true, now: now + 30_000 })
+    ).toMatchObject({
+      status: 'active',
+    });
+    expect(
+      sandboxStatusPresentation({ ...observation, live: false, now: now + 30_000 })
+    ).toMatchObject({
+      status: 'unknown',
+    });
+    expect(
+      sandboxStatusPresentation({ ...observation, live: true, observation: 'checking' })
+    ).toMatchObject({
+      status: 'unknown',
+    });
+  });
+
+  it('continues advancing sleep timing on a live stream and waits for authoritative sleep', () => {
+    expect(
+      sandboxStatusPresentation({ ...observation, live: true, now: now + 121_000 })
+    ).toMatchObject({
+      status: 'sleeping-soon',
+      sleepMinutesRemaining: 1,
+    });
+    const expiredEstimate = sandboxStatusPresentation({
+      ...observation,
+      live: true,
+      now: now + 180_000,
+    });
+    expect(expiredEstimate.status).toBe('active');
+    expect(expiredEstimate.estimatedSleepAt).toBeNull();
+    expect(expiredEstimate.nextChangeAt).toBeNull();
+  });
   it('retains request time when a delayed response arrives after activity or resuming', async () => {
     const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
     const pending = Promise.withResolvers<SandboxStatusSnapshot>();

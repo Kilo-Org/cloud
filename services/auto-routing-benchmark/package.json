@@ -17,7 +17,6 @@
     "@cloudflare/containers": "0.1.1",
     "@kilocode/auto-routing-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
-    "@openrouter/sdk": "^0.12.79",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:"

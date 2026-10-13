@@ -57,11 +57,16 @@ const EXPECTED_ROUTES_COLUMNS: ColumnSignature[] = [
   { name: 'credential_source', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'grant', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'reason', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
+  { name: 'repo_key', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'session_id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
   { name: 'spec', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
   { name: 'state', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
   { name: 'updated_at', type: 'integer', notnull: 1, dflt_value: null, pk: 0 },
 ];
+
+const CONSOLIDATED_MIGRATION_AT = 1790455891314;
+const SCOPE_GRANTS_MIGRATION_AT = 1790793579352;
+const REPO_KEY_MIGRATION_AT = 1790860790832;
 
 const OLD_FOUR_MIGRATIONS = {
   journal: {
@@ -159,7 +164,7 @@ afterEach(async () => {
 });
 
 describe('sandbox control V2 consolidated migrations', () => {
-  it('applies the consolidated migration to a fresh database', async () => {
+  it('applies the consolidated migration and the repo key migration to a fresh database', async () => {
     const stub = newSandboxStub();
     await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
@@ -174,14 +179,18 @@ describe('sandbox control V2 consolidated migrations', () => {
         { name: 'grant', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
         { name: 'id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
       ]);
-      expect(appliedMigrations(db)).toHaveLength(2);
+      expect(appliedMigrations(db)).toEqual([
+        { hash: '', created_at: CONSOLIDATED_MIGRATION_AT },
+        { hash: '', created_at: SCOPE_GRANTS_MIGRATION_AT },
+        { hash: '', created_at: REPO_KEY_MIGRATION_AT },
+      ]);
       const applied = appliedMigrations(db);
       await migrate(db, migrations);
       expect(appliedMigrations(db)).toEqual(applied);
     });
   });
 
-  it('skips the consolidated migration on a database already migrated by the old four, preserving data', async () => {
+  it('skips the consolidated migration but adds the repo key on a database already migrated by the old four, preserving data', async () => {
     const stub = newSandboxStub();
     await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
@@ -200,23 +209,26 @@ describe('sandbox control V2 consolidated migrations', () => {
         stop_pending: false,
         unconfirmed_provider_ref: '{"fixture":"old-provider-ref"}',
       });
-      await db.insert(routesTable).values({
-        session_id: 'workspace_old',
-        spec: '{"kind":"old"}',
-        state: 'routed',
-        attempt_id: 'attempt_old',
-        updated_at: 111,
-        grant: '{"fixture":"old-grant"}',
-        credential_source: '{"fixture":"old-credential-source"}',
-      });
+      // Raw SQL: the table schema already has `repo_key`, which the old database lacks.
+      db.run(
+        sql`INSERT INTO routes (session_id, spec, state, attempt_id, updated_at, grant, credential_source)
+            VALUES ('workspace_old', '{"kind":"old"}', 'routed', 'attempt_old', 111,
+                    '{"fixture":"old-grant"}', '{"fixture":"old-credential-source"}')`
+      );
 
       await expect(migrate(db, migrations)).resolves.toBeUndefined();
 
       expect(appliedMigrations(db).slice(0, oldApplied.length)).toEqual(oldApplied);
-      expect(appliedMigrations(db)).toHaveLength(oldApplied.length + 1);
+      expect(appliedMigrations(db).slice(oldApplied.length)).toEqual([
+        { hash: '', created_at: SCOPE_GRANTS_MIGRATION_AT },
+        { hash: '', created_at: REPO_KEY_MIGRATION_AT },
+      ]);
       expect(db.select().from(scopeGrants).all()).toEqual([]);
       expect(columnSignatures(db, 'allocation')).toEqual(oldAllocationColumns);
-      expect(columnSignatures(db, 'routes')).toEqual(oldRoutesColumns);
+      expect(columnSignatures(db, 'routes')).toEqual(EXPECTED_ROUTES_COLUMNS);
+      expect(columnSignatures(db, 'routes').filter(column => column.name !== 'repo_key')).toEqual(
+        oldRoutesColumns
+      );
       expect(db.select().from(allocationTable).get()).toMatchObject({
         id: 'current',
         state: 'stopped',
@@ -228,6 +240,7 @@ describe('sandbox control V2 consolidated migrations', () => {
         updated_at: 111,
         grant: '{"fixture":"old-grant"}',
         credential_source: '{"fixture":"old-credential-source"}',
+        repo_key: null,
       });
     });
   });

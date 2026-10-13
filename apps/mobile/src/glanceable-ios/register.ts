@@ -7,17 +7,27 @@ import { AppState, Platform } from 'react-native';
 import { addUserInteractionListener } from 'expo-widgets';
 
 import { i18n } from '@/i18n';
-import { getGlanceableDelivery, registerGlanceableSink } from '@/lib/glanceable/sink-registry';
+import { subscribeGlanceableTerminalEnd } from '@/lib/glanceable/cleanup';
+import {
+  getGlanceableDelivery,
+  guardSink,
+  registerGlanceableSink,
+} from '@/lib/glanceable/sink-registry';
+import { replayGlanceableLiveActivity } from '@/lib/glanceable/activity-kit-prompt';
 import {
   getLiveActivityEnabled,
+  getNotificationPermissionGranted,
   subscribeLiveActivityEnabled,
+  subscribeNotificationPermissionGranted,
 } from '@/lib/glanceable/live-activity-switch';
 
-import { adoptPushStartedActivity } from './adopt-activity';
+import { adoptPushStartedActivity, restoreStoredSessionCards } from './adopt-activity';
 import { refreshActiveAgentsLiveActivityCopy } from './active-agents-live-activity';
 import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
 import { handleGlanceableInteraction } from './interaction';
-import { iosSink, sweepStrayActivities } from './ios-sink';
+import { iosSink, republishAggregateCard, sweepStrayActivities } from './ios-sink';
+import { endAllSessionCards, subscribeSessionFollows } from './session-follow';
+import { refreshSessionLiveActivityCopy } from './session-live-activity';
 import { registerWidgetActionHandling } from './widget-actions';
 import { ensureWidgetLogo } from './widget-logo';
 
@@ -72,10 +82,15 @@ if (Platform.OS === 'ios') {
   // `approve` and `open` targets, so a press is answered by exactly one of them.
   registerWidgetActionHandling();
 
-  // Copy the Kilo mark into the shared app group so the widget extension can read
-  // it. Fire and forget: it lands long before the first snapshot arrives, and a
-  // failure only costs the logo.
+  // Copy the Kilo mark and its monochrome glyph into the shared app group so
+  // the widget extension can read them. Fire and forget: it lands long before
+  // the first snapshot arrives, and a failure only costs the logo.
   void ensureWidgetLogo();
+
+  // The widget gallery shows the approved Needs input layouts with sample
+  // agents; this writes that preview in the language i18n holds now, and the
+  // language listener below re-writes it once the stored language applies.
+  refreshActiveAgentsWidgetCopy();
 
   // Claim a card raised by a push-to-start before anything else runs. iOS grants
   // this process background run time for exactly that, and the server cannot
@@ -90,15 +105,34 @@ if (Platform.OS === 'ios') {
   AppState.addEventListener('change', state => {
     if (state === 'active') {
       sweepStrayActivities();
+      // Followed cards can end or change by push while the app is away, and a
+      // token registration that failed retries here.
+      void restoreStoredSessionCards();
     }
   });
 
+  // The aggregate card counts only the sessions this device does not follow,
+  // so a follow or an unfollow re-renders it from the last snapshot — and an
+  // unfollow raises it again when the reduced card becomes startable, because
+  // no tray update follows a follow change that changes nothing else.
+  subscribeSessionFollows(() => {
+    guardSink('follow_publish', () => {
+      republishAggregateCard();
+    });
+  });
+
+  // Sign-out, an account change, an organization switch, and a lost
+  // organization end every followed session card at once. The terminal blank
+  // retires the whole token scope first, session card tokens included.
+  subscribeGlanceableTerminalEnd(endAllSessionCards);
+
   // The layouts bake their copy in at import, when i18n still holds English: the
   // stored language is applied a few ticks later. Re-bake on every language
-  // change so both the Live Activity and the widget gallery placeholder follow
+  // change so both Live Activities and the widget gallery placeholder follow
   // the user's language.
   i18n.on('languageChanged', () => {
     refreshActiveAgentsLiveActivityCopy();
+    refreshSessionLiveActivityCopy();
     refreshActiveAgentsWidgetCopy();
   });
 
@@ -113,9 +147,19 @@ if (Platform.OS === 'ios') {
       // `endImmediate` retires only the activity tokens. The push-to-start
       // subscription outlives them, so a remote start would still reach a
       // switched-off surface. `canRegisterActivityTokenKind` keeps it retired
-      // until the switch returns.
+      // until the switch returns. The scope cleanup also reads every session
+      // card's token, so it runs before those cards end.
       getGlanceableDelivery().cleanupTokens('scope');
+      endAllSessionCards();
     }
     liveActivityAllowed = next;
+  });
+
+  // The sink starts no card before the user grants notification permission
+  // (see `startCard`). Work that was live at the grant starts its card now.
+  subscribeNotificationPermissionGranted(() => {
+    if (getNotificationPermissionGranted()) {
+      void replayGlanceableLiveActivity();
+    }
   });
 }

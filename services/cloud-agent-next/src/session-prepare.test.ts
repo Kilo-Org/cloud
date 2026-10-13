@@ -25,6 +25,7 @@ const {
   mergeProfileConfigurationMock,
   organizationMembershipLimitMock,
   assertKiloModelAvailableMock,
+  getSandboxAllocationCandidatesMock,
 } = vi.hoisted(() => ({
   generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
   generateSandboxRoutingTargetMock: vi
@@ -34,7 +35,12 @@ const {
     sandboxId: 'ses-0123456789abcdef',
     provider: 'cloudflare',
   }),
-  selectSandboxProviderMock: vi.fn(() => 'cloudflare'),
+  selectSandboxProviderMock: vi.fn(
+    (input?: { sandboxAllocation?: string }): 'cloudflare' | 'cloudflare-containers' | 'vercel' =>
+      input?.sandboxAllocation === 'cloudflare-containers-standard-3'
+        ? 'cloudflare-containers'
+        : 'cloudflare'
+  ),
   createCliSessionMock: vi.fn().mockResolvedValue({ created: true }),
   deleteCliSessionMock: vi.fn().mockResolvedValue({ deleted: true }),
   createSessionReportMock: vi.fn().mockResolvedValue(undefined),
@@ -47,6 +53,7 @@ const {
   mergeProfileConfigurationMock: vi.fn(),
   organizationMembershipLimitMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
+  getSandboxAllocationCandidatesMock: vi.fn(),
 }));
 
 vi.mock('@kilocode/cloud-agent-profile', async importActual => {
@@ -54,6 +61,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
   return {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
+    getSandboxAllocationCandidates: getSandboxAllocationCandidatesMock,
   };
 });
 
@@ -62,7 +70,9 @@ vi.mock('./db/pg.js', () => ({
     mockedDb: true,
     select: vi.fn(() => ({
       from: vi.fn(() => ({
-        where: vi.fn(() => ({ limit: organizationMembershipLimitMock })),
+        where: vi.fn(() =>
+          Object.assign(Promise.resolve([]), { limit: organizationMembershipLimitMock })
+        ),
       })),
     })),
   })),
@@ -284,6 +294,7 @@ describe('sandbox selection Worker API', () => {
     organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership' }]);
     mergeProfileConfigurationMock.mockResolvedValue({});
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
+    getSandboxAllocationCandidatesMock.mockResolvedValue({});
   });
 
   it('requires authentication for capability discovery', async () => {
@@ -321,13 +332,16 @@ describe('sandbox selection Worker API', () => {
     const caller = appRouter.createCaller(ctx);
     await expect(
       caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId })
-    ).resolves.toEqual({ enabled: false, options: [] });
+    ).resolves.toMatchObject({ enabled: false, options: [] });
     ctx.env.SANDBOX_SELECTION_IDS = orgId;
-    ctx.env.CONTROL_PLANE_IDS = orgId;
     const result = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId });
     expect(result.enabled).toBe(true);
-    expect(result.options.map(option => option.allocation)).toEqual([
-      getSandboxAllocationRequest('cloudflare-single'),
+    expect(
+      result.options
+        .filter(option => option.unavailableReason === undefined)
+        .map(option => option.allocation)
+    ).toEqual([
+      getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-shared'),
     ]);
   });
@@ -347,6 +361,69 @@ describe('sandbox selection Worker API', () => {
       expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
     }
   );
+
+  it('reports the default destination even when selection is disabled', async () => {
+    const caller = appRouter.createCaller(createInternalApiContext({}));
+    const result = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId });
+    expect(result).toMatchObject({
+      enabled: false,
+      options: [],
+      defaultDestination: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+    });
+    expect(result.effectiveDestination).toBeUndefined();
+  });
+
+  describe('effective destination', () => {
+    const enrolledCaller = (owner: 'org' | 'personal' = 'org') => {
+      const ctx = createInternalApiContext({});
+      ctx.env.SANDBOX_SELECTION_IDS = owner === 'org' ? orgId : 'test-user-123';
+      return appRouter.createCaller(ctx);
+    };
+    const input = {
+      kilocodeOrganizationId: orgId,
+      repositoryType: 'github' as const,
+      repositoryFullName: 'Acme/Repo',
+    };
+
+    it('falls back to the default destination when nothing is saved', async () => {
+      const result = await enrolledCaller().getSandboxSelectionOptions(input);
+      expect(result.effectiveDestination).toEqual(result.defaultDestination);
+    });
+
+    it('prefers the repository override over the owner default', async () => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue({
+        repositoryAllocation: 'cloudflare-shared',
+        contextAllocation: 'cloudflare-single',
+      });
+      const result = await enrolledCaller().getSandboxSelectionOptions(input);
+      expect(result.effectiveDestination).toEqual(getSandboxAllocationRequest('cloudflare-shared'));
+      expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledWith(
+        expect.anything(),
+        { type: 'organization', id: orgId },
+        { platform: 'github', fullName: 'Acme/Repo' }
+      );
+    });
+
+    it('skips a saved allocation that is unavailable', async () => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue({
+        repositoryAllocation: 'vercel-small',
+        contextAllocation: 'cloudflare-shared',
+      });
+      const result = await enrolledCaller().getSandboxSelectionOptions({
+        ...input,
+        repositoryType: 'gitlab',
+      });
+      expect(result.effectiveDestination).toEqual(getSandboxAllocationRequest('cloudflare-shared'));
+    });
+
+    it('is not computed without a repository type', async () => {
+      const result = await enrolledCaller().getSandboxSelectionOptions({
+        kilocodeOrganizationId: orgId,
+      });
+      expect(result.effectiveDestination).toBeUndefined();
+      expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    });
+  });
 
   it('exposes personal capabilities without membership when the user is enrolled', async () => {
     const ctx = createInternalApiContext({});
@@ -410,26 +487,28 @@ describe('sandbox selection Worker API', () => {
     }
   );
 
-  it('returns default destination metadata without allocating, including devcontainer context', async () => {
-    const ctx = createInternalApiContext({});
-    ctx.env.SANDBOX_SELECTION_IDS = orgId;
-    ctx.env.PER_SESSION_SANDBOX_ORG_IDS = orgId;
-    const caller = appRouter.createCaller(ctx);
-    const normal = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId });
-    expect(normal.defaultDestination).toEqual(getSandboxAllocationRequest('cloudflare-single'));
-    const devcontainer = await caller.getSandboxSelectionOptions({
-      kilocodeOrganizationId: orgId,
-      devcontainer: true,
-    });
-    expect(devcontainer.defaultDestination).toEqual({
-      provider: { id: 'cloudflare', account: 'kilo' },
-      instanceType: 'devcontainer',
-    });
-    expect(generateSessionIdMock).not.toHaveBeenCalled();
-    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
-    expect(createSessionReportMock).not.toHaveBeenCalled();
-    expect(createCliSessionMock).not.toHaveBeenCalled();
-  });
+  it.each([orgId, undefined])(
+    'ignores retired selection context for owner %s without allocating',
+    async kilocodeOrganizationId => {
+      const ctx = createInternalApiContext({});
+      ctx.env.SANDBOX_SELECTION_IDS = '*';
+      ctx.env.PER_SESSION_SANDBOX_ORG_IDS = '*';
+      const caller = appRouter.createCaller(ctx);
+      const normal = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId });
+      expect(normal.defaultDestination).toEqual(
+        getSandboxAllocationRequest('cloudflare-containers-standard-3')
+      );
+      for (const devcontainer of [false, true]) {
+        expect(
+          await caller.getSandboxSelectionOptions({ kilocodeOrganizationId, devcontainer })
+        ).toEqual(normal);
+      }
+      expect(generateSessionIdMock).not.toHaveBeenCalled();
+      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+      expect(createSessionReportMock).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+    }
+  );
 
   it.each(['small', 'large'] as const)(
     'rejects BYOC %s before allocation side effects',
@@ -460,7 +539,7 @@ describe('sandbox selection Worker API', () => {
     }
   );
 
-  it.each(['webhook', 'scheduled'])(
+  it.each(['auto-triage', 'autofix'])(
     'authorizes Dedicated Standard for an enrolled organization %s trigger',
     async createdOnPlatform => {
       const doStub = createMockDOStub();
@@ -506,7 +585,6 @@ describe('sandbox selection Worker API', () => {
       ctx.env.SANDBOX_SESSION = ctx.env
         .CLOUD_AGENT_SESSION as unknown as typeof ctx.env.SANDBOX_SESSION;
       ctx.env.SANDBOX_SELECTION_IDS = orgId;
-      ctx.env.CONTROL_PLANE_IDS = orgId;
       generateSessionIdMock.mockReturnValue('workspace_12345678-1234-1234-1234-123456789abc');
       const sandboxAllocation =
         format === 'legacy'
@@ -516,7 +594,10 @@ describe('sandbox selection Worker API', () => {
       await caller.start({ ...startInput, runtime: { sandboxAllocation } });
       await caller.prepareSession({ ...prepareInput, sandboxAllocation });
       const metadata = expect.objectContaining({
-        workspace: expect.objectContaining({ sandboxAllocation: 'cloudflare-single' }),
+        workspace: expect.objectContaining({
+          sandboxAllocation: 'cloudflare-containers-standard-3',
+          sandboxProvider: 'cloudflare-containers',
+        }),
       });
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
         expect.objectContaining({ metadata })
@@ -1165,51 +1246,24 @@ describe('prepareSession endpoint', () => {
     );
   });
 
-  it('creates auto-initiated devcontainer sessions with grouped DIND sandbox intent', async () => {
-    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
-      kind: 'isolated',
-      sandboxId: 'dind-abcdef',
-    });
+  it('rejects retired devcontainer sessions before allocation or registration', async () => {
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
-    await caller.prepareSession({
-      prompt: 'Prepare the devcontainer runtime',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      autoInitiate: true,
-      devcontainer: true,
-    });
-
-    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledWith(
-      undefined,
-      undefined,
-      'test-user-123',
-      'agent_12345678-1234-1234-1234-123456789abc',
-      undefined,
-      {
+    await expect(
+      caller.prepareSession({
+        prompt: 'Prepare the devcontainer runtime',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
         devcontainer: true,
-        createdOnPlatform: undefined,
-      }
-    );
-    expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
-      expect.objectContaining({
-        workspace: {
-          sandboxId: 'dind-abcdef',
-          sandboxProvider: 'cloudflare',
-          shallow: false,
-          credentialContainment: {
-            github: false,
-            gitlab: false,
-            bitbucket: false,
-            kilocode: false,
-          },
-          devcontainerRequested: true,
-        },
       })
-    );
+    ).rejects.toThrow('Devcontainer support has been retired');
+
+    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     expect(doStub.registerSession).not.toHaveBeenCalled();
   });
 
@@ -1246,6 +1300,44 @@ describe('prepareSession endpoint', () => {
       })
     );
   });
+
+  it.each([
+    ['ses-abcdef', undefined, undefined],
+    [`ses-${'a'.repeat(48)}`, 'cloudflare-single', undefined],
+    ['crv-abcdef', undefined, 'code-review'],
+  ] as const)(
+    'persists the generated %s identity unchanged with containment disabled',
+    async (sandboxId, sandboxAllocation, createdOnPlatform) => {
+      generateSandboxRoutingTargetMock.mockResolvedValueOnce({ kind: 'isolated', sandboxId });
+      const doStub = createMockDOStub();
+      const ctx = createInternalApiContext({ doStub, credentialContainmentEnabled: 'false' });
+      ctx.env.SANDBOX_SELECTION_IDS = '*';
+      await appRouter.createCaller(ctx).prepareSession({
+        prompt: 'Create a non-contained session',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        sandboxAllocation,
+        createdOnPlatform,
+      });
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspace: expect.objectContaining({
+            sandboxId,
+            sandboxProvider: 'cloudflare',
+            ...(sandboxAllocation ? { sandboxAllocation } : {}),
+            credentialContainment: {
+              github: false,
+              gitlab: false,
+              bitbucket: false,
+              kilocode: false,
+            },
+          }),
+        })
+      );
+    }
+  );
 
   it('disables all containment when the global flag is false', async () => {
     const doStub = createMockDOStub();
@@ -1330,7 +1422,7 @@ describe('prepareSession endpoint', () => {
         autoInitiate: false,
         devcontainer: true,
       })
-    ).rejects.toThrow('devcontainer sessions must use autoInitiate');
+    ).rejects.toThrow('Devcontainer support has been retired');
 
     expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();

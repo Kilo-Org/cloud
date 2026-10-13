@@ -1,0 +1,5 @@
+# Synthetic-credential fixtures. security.test.ts builds a credential URL from
+# the literal "user:private-key@provider.example"; a later commit replaced it
+# with a constructed value, but the commit that added it stays in branch history.
+# Exclude the fixture path so the historical commit does not fail the scan.
+packages/harness-sdk/src/plugins/remote-model/security\.test\.ts

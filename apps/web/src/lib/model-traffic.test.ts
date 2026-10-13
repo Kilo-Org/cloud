@@ -1,0 +1,104 @@
+import { describe, expect, it } from '@jest/globals';
+import * as z from 'zod';
+import { getModelTraffic } from '@/lib/model-traffic';
+import type { RunAnalyticsEngineQuery } from '@/lib/cloudflare/analytics-engine';
+
+const NOW = new Date('2026-10-02T12:03:20Z');
+const LAST_BUCKET = '2026-10-02 11:50:00';
+const FIRST_BUCKET = '2026-10-01 12:00:00';
+
+function fakeQuery(responses: {
+  totals: unknown[];
+  topModels: unknown[];
+  modelBuckets: unknown[];
+}): { runQuery: RunAnalyticsEngineQuery; queries: string[] } {
+  const queries: string[] = [];
+  const rowsFor = (sql: string): unknown[] => {
+    if (sql.includes('GROUP BY bucket, model')) return responses.modelBuckets;
+    if (sql.includes('GROUP BY model')) return responses.topModels;
+    return responses.totals;
+  };
+  const runQuery: RunAnalyticsEngineQuery = async (sql, rowSchema) => {
+    queries.push(sql);
+    return z.array(rowSchema).parse(rowsFor(sql));
+  };
+  return { runQuery, queries };
+}
+
+describe('getModelTraffic', () => {
+  it.each([
+    {
+      range: 'day',
+      bucketMinutes: 10,
+      bucketCount: 144,
+      first: '2026-10-01T12:00:00.000Z',
+      last: '2026-10-02T11:50:00.000Z',
+      end: '2026-10-02T12:00:00Z',
+    },
+    {
+      range: 'week',
+      bucketMinutes: 60,
+      bucketCount: 168,
+      first: '2026-09-25T12:00:00.000Z',
+      last: '2026-10-02T11:00:00.000Z',
+      end: '2026-10-02T12:00:00Z',
+    },
+  ] as const)(
+    'returns $bucketCount completed $bucketMinutes-minute buckets for the $range range',
+    async ({ range, bucketMinutes, bucketCount, first, last, end }) => {
+      const { runQuery, queries } = fakeQuery({ totals: [], topModels: [], modelBuckets: [] });
+
+      const traffic = await getModelTraffic({ now: NOW, range, excludeByok: false }, runQuery);
+
+      expect(traffic.range).toBe(range);
+      expect(traffic.bucketMinutes).toBe(bucketMinutes);
+      expect(traffic.bucketStarts).toHaveLength(bucketCount);
+      expect(traffic.bucketStarts[0]).toBe(first);
+      expect(traffic.bucketStarts.at(-1)).toBe(last);
+      expect(traffic.models).toEqual([]);
+      expect(queries).toHaveLength(2);
+      expect(queries[0]).toContain(`INTERVAL '${bucketMinutes}' MINUTE`);
+      expect(queries[0]).toContain(`timestamp >= toDateTime(${Date.parse(first) / 1000})`);
+      expect(queries[0]).toContain(`timestamp < toDateTime(${Date.parse(end) / 1000})`);
+      expect(queries[0]).not.toContain('blob6');
+    }
+  );
+
+  it('places top-model series into buckets and derives the remainder as other models', async () => {
+    const { runQuery, queries } = fakeQuery({
+      totals: [
+        { bucket: FIRST_BUCKET, requests: '100', errors: '10' },
+        { bucket: LAST_BUCKET, requests: 50, errors: 0 },
+      ],
+      topModels: [
+        { model: 'anthropic/claude-opus-5.5', requests: '120' },
+        { model: "vendor/o'model", requests: '20' },
+      ],
+      modelBuckets: [
+        { bucket: FIRST_BUCKET, model: 'anthropic/claude-opus-5.5', requests: '70', errors: '7' },
+        { bucket: LAST_BUCKET, model: 'anthropic/claude-opus-5.5', requests: '50', errors: '0' },
+        { bucket: FIRST_BUCKET, model: "vendor/o'model", requests: '20', errors: '1' },
+        { bucket: '2026-10-02 12:00:00', model: "vendor/o'model", requests: '5', errors: '5' },
+      ],
+    });
+
+    const traffic = await getModelTraffic({ now: NOW, range: 'day', excludeByok: true }, runQuery);
+
+    const [opus, other] = traffic.models;
+    expect(opus.model).toBe('anthropic/claude-opus-5.5');
+    expect(opus.totalRequests).toBe(120);
+    expect(opus.requests[0]).toBe(70);
+    expect(opus.errors[0]).toBe(7);
+    expect(opus.requests.at(-1)).toBe(50);
+    expect(other.requests.reduce((sum, value) => sum + value, 0)).toBe(20);
+
+    expect(traffic.allModels.requests[0]).toBe(100);
+    expect(traffic.otherModels.requests[0]).toBe(10);
+    expect(traffic.otherModels.errors[0]).toBe(2);
+    expect(traffic.otherModels.requests.at(-1)).toBe(0);
+
+    expect(queries).toHaveLength(3);
+    for (const sql of queries) expect(sql).toContain("blob6 = '0'");
+    expect(queries[2]).toContain("blob2 IN ('anthropic/claude-opus-5.5', 'vendor/o''model')");
+  });
+});

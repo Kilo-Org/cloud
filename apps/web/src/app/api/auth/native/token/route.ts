@@ -367,7 +367,10 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       );
       if (!result.success) {
         phase = 'release';
-        return NextResponse.json({ error: result.error }, { status: 403 });
+        return NextResponse.json(
+          { error: result.error },
+          { status: result.error === 'SIGNUP-UNAVAILABLE' ? 503 : 403 }
+        );
       }
 
       if (result.user.blocked_reason) {
@@ -547,7 +550,10 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     true
   );
   if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: 403 });
+    return NextResponse.json(
+      { error: result.error },
+      { status: result.error === 'SIGNUP-UNAVAILABLE' ? 503 : 403 }
+    );
   }
 
   if (result.user.blocked_reason) {

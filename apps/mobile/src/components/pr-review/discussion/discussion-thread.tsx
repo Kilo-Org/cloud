@@ -8,10 +8,10 @@
 //     is pressable (collapse). The resolve toggle is its own nested
 //     pressable in both states.
 //   - The thread header shows the anchor label ("src/a.ts L10 (RIGHT)"
-//     or "File comment on src/a.ts" or "Outdated on ...") and the
-//     "Outdated" / "Resolved" badges when applicable. The "Resolved"
-//     badge is the sole Resolved text indicator; the resolve control
-//     is an icon-only circular button (a11y: "Resolve thread" /
+//     or "File comment on src/a.ts" or "Outdated on ..."). The anchor
+//     owns file-level and outdated metadata; the "Resolved" badge is
+//     the sole Resolved text indicator. The resolve control is an
+//     icon-only circular button (a11y: "Resolve thread" /
 //     "Unresolve thread").
 //   - Expanded LINE-anchored threads render a capped quoted diff
 //     snippet (from thread.diffHunk) above the comments list. File-
@@ -29,7 +29,7 @@
 //     thread just routes the events and lets the cache flow.
 
 import * as Haptics from 'expo-haptics';
-import { CheckCheck, ChevronDown, ChevronUp, type LucideIcon } from '@/components/ui/icons';
+import { CheckCheck, ChevronDown, ChevronUp } from '@/components/ui/icons';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -47,7 +47,6 @@ import {
   type ReviewReactionContent,
   type ReviewThread,
   selectThreadAnchorLabel,
-  selectThreadBadges,
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { selectThreadDiffSnippet } from '@/lib/pr-review/discussion/thread-diff-snippet';
 import {
@@ -115,7 +114,6 @@ export function DiscussionThread({
   const { t } = useTranslation();
 
   const anchorLabel = selectThreadAnchorLabel(thread);
-  const badges = selectThreadBadges(thread);
   // Parse only when expanded; memoize so DiffLine's memo comparator sees a
   // stable `lines` identity across parent re-renders (e.g. reaction toggles).
   const { diffHunk, subjectType, path } = thread;
@@ -152,9 +150,7 @@ export function DiscussionThread({
   );
   const headerCommonProps = {
     anchorLabel,
-    resolved: badges.resolved,
-    outdated: badges.outdated,
-    fileLevel: badges.fileLevel,
+    resolved: thread.isResolved,
     commentCount: thread.comments.length,
     firstTimestamp: firstComment?.createdAt ?? null,
     expanded,
@@ -250,8 +246,6 @@ export function DiscussionThread({
 type ThreadHeaderProps = {
   readonly anchorLabel: string;
   readonly resolved: boolean;
-  readonly outdated: boolean;
-  readonly fileLevel: boolean;
   readonly commentCount: number;
   readonly firstTimestamp: string | null;
   readonly expanded: boolean;
@@ -265,8 +259,6 @@ type ThreadHeaderProps = {
 function ThreadHeader({
   anchorLabel,
   resolved,
-  outdated,
-  fileLevel,
   commentCount,
   firstTimestamp,
   expanded,
@@ -313,12 +305,13 @@ function ThreadHeader({
       </View>
       <View className="flex-row flex-wrap items-center gap-1.5">
         {resolved ? (
-          <Badge tone="good" icon={CheckCheck} label={t('prReview.discussion.resolved')} />
+          <View className="flex-row items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-good">
+            <CheckCheck size={10} color={colors.good} />
+            <Text className="text-[10px] font-medium uppercase tracking-wide">
+              {t('prReview.discussion.resolved')}
+            </Text>
+          </View>
         ) : null}
-        {outdated ? <Badge tone="muted" label={t('prReview.discussion.outdated')} /> : null}
-        {/* i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'), which
-            languages inflect by number; this key is the standalone noun label. */}
-        {fileLevel && !resolved ? <Badge tone="muted" label={t('common.file')} /> : null}
         <Text variant="muted" className="text-xs">
           {t('prReview.discussion.comment', {
             count: commentCount,
@@ -327,38 +320,6 @@ function ThreadHeader({
           {relative ? t('prReview.discussion.startedRelative', { relative }) : ''}
         </Text>
       </View>
-    </View>
-  );
-}
-
-type BadgeProps = {
-  readonly tone: 'good' | 'muted' | 'warn' | 'destructive';
-  readonly icon?: LucideIcon;
-  readonly label: string;
-};
-
-const BADGE_TONE_CLASS = {
-  good: 'bg-secondary text-good',
-  warn: 'bg-secondary text-warn',
-  destructive: 'bg-secondary text-destructive',
-  muted: 'bg-secondary text-muted-foreground',
-} satisfies Record<BadgeProps['tone'], string>;
-
-function Badge({ tone, icon: Icon, label }: Readonly<BadgeProps>) {
-  const colors = useThemeColors();
-  const toneClass = BADGE_TONE_CLASS[tone];
-  // Native Lucide icons don't resolve NativeWind text classes, so set the
-  // icon color explicitly per tone from the theme tokens.
-  const iconColor = {
-    good: colors.good,
-    warn: colors.warn,
-    destructive: colors.destructive,
-    muted: colors.mutedForeground,
-  } satisfies Record<BadgeProps['tone'], string>;
-  return (
-    <View className={cn('flex-row items-center gap-1 rounded-full px-2 py-0.5', toneClass)}>
-      {Icon ? <Icon size={10} color={iconColor[tone]} /> : null}
-      <Text className="text-[10px] font-medium uppercase tracking-wide">{label}</Text>
     </View>
   );
 }

@@ -6,7 +6,7 @@
  * those dimensions that every breakdown chart has multiple slices.
  */
 import { FEATURE_VALUES } from '@kilocode/web-shared/lib/feature-detection';
-import { GatewayApiKindSchema } from '@kilocode/db';
+import { GatewayApiKindSchema } from '@kilocode/usage-contracts';
 
 export type ModelSpec = {
   id: string;

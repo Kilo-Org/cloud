@@ -10,13 +10,17 @@ import {
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 
-import { PROVIDER_CAPABILITIES } from '../agent-sandbox/capabilities.js';
 import {
   classifySandboxId,
   isGeneratedSharedSandboxId,
   isValidSandboxId,
   type SandboxIdClass,
 } from '../sandbox-id.js';
+import {
+  sandboxKindMatchesKey,
+  sandboxKindSchema,
+  type SandboxKind,
+} from '../sandbox-placement.js';
 import { sessionPlaneFromId } from '../session-plane.js';
 import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
@@ -139,6 +143,7 @@ const MetadataRepositorySchema = z.preprocess(
           githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
           githubInstallationId: z.string().optional(),
           githubAppType: z.enum(['standard', 'lite']).optional(),
+          pullRequestNumber: z.number().int().positive().optional(),
           ...RepositoryCommonSchema,
         })
         .strip(),
@@ -258,10 +263,37 @@ const SANDBOX_ALLOCATION_ID_CLASS: Record<
   'vercel-large': 'isolated-small',
 };
 
+function sandboxIdentityMatchesAllocation(
+  sandboxId: string,
+  workspace: { sandboxRoute?: unknown; sandboxKind?: SandboxKind },
+  allocation: SandboxAllocation
+): boolean {
+  const shared = allocation === 'cloudflare-shared';
+  if (workspace.sandboxKind !== undefined) {
+    return shared
+      ? workspace.sandboxKind === 'shared'
+      : allocation !== 'isolated-standard' && workspace.sandboxKind === 'isolated';
+  }
+  return shared
+    ? isGeneratedSharedSandboxId(sandboxId) && workspace.sandboxRoute !== undefined
+    : classifySandboxId(sandboxId) === SANDBOX_ALLOCATION_ID_CLASS[allocation];
+}
+
+/** Vercel and Cloudflare Containers serve only a single-session sandbox. */
+function isIsolatedProviderWorkspace(workspace: {
+  sandboxId?: string;
+  sandboxKind?: SandboxKind;
+}): boolean {
+  return workspace.sandboxKind !== undefined
+    ? workspace.sandboxKind === 'isolated'
+    : workspace.sandboxId?.startsWith('ses-') === true;
+}
+
 const MetadataWorkspaceSchema = z
   .object({
     sandboxId: SandboxIdSchema.optional(),
     sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
+    sandboxKind: sandboxKindSchema.optional(),
     sandboxProvider: SandboxProviderSchema.optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
     providerRuntime: ProviderRuntimeSchema.optional(),
@@ -276,16 +308,24 @@ const MetadataWorkspaceSchema = z
   })
   .strip()
   .superRefine((workspace, context) => {
+    if (
+      workspace.sandboxId === undefined
+        ? workspace.sandboxKind !== undefined
+        : !sandboxKindMatchesKey(workspace.sandboxId, workspace.sandboxKind)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['sandboxKind'],
+        message: 'Sandbox kind does not match the sandbox key',
+      });
+    }
     const allocation = workspace.sandboxAllocation;
     if (allocation !== undefined) {
-      const shared = allocation === 'cloudflare-shared';
       if (
         // Metadata written before an explicit provider defaults to Cloudflare.
         (workspace.sandboxProvider ?? 'cloudflare') !== getSandboxAllocationProvider(allocation) ||
         !workspace.sandboxId ||
-        (shared
-          ? !isGeneratedSharedSandboxId(workspace.sandboxId) || !workspace.sandboxRoute
-          : classifySandboxId(workspace.sandboxId) !== SANDBOX_ALLOCATION_ID_CLASS[allocation]) ||
+        !sandboxIdentityMatchesAllocation(workspace.sandboxId, workspace, allocation) ||
         workspace.devcontainerRequested === true
       ) {
         context.addIssue({
@@ -325,19 +365,18 @@ const MetadataWorkspaceSchema = z
     }
   })
   .refine(
-    workspace =>
-      workspace.sandboxProvider !== 'vercel' || workspace.sandboxId?.startsWith('ses-') === true,
-    'Vercel sandbox metadata requires an isolated ses-* sandbox'
+    workspace => workspace.sandboxProvider !== 'vercel' || isIsolatedProviderWorkspace(workspace),
+    'Vercel sandbox metadata requires an isolated sandbox'
   )
   .refine(
     workspace =>
       workspace.sandboxProvider !== 'cloudflare-containers' ||
-      workspace.sandboxId?.startsWith('ses-') === true,
-    'Cloudflare containers sandbox metadata requires an isolated ses-* sandbox'
+      isIsolatedProviderWorkspace(workspace),
+    'Cloudflare containers sandbox metadata requires an isolated sandbox'
   )
   .refine(
     workspace =>
-      PROVIDER_CAPABILITIES[workspace.sandboxProvider ?? 'cloudflare'].devcontainer ||
+      (workspace.sandboxProvider ?? 'cloudflare') === 'cloudflare' ||
       workspace.devcontainerRequested !== true,
     'Sandbox provider does not support devcontainers'
   )
@@ -370,6 +409,8 @@ const MetadataLifecycleSchema = z
 const MetadataCloneSchema = z
   .object({
     cloneFromKiloSessionId: kiloSessionIdSchema,
+    // Inclusive cut ("Fork from here"); absent for a full-session clone.
+    cloneUpToMessageId: MessageIdSchema.optional(),
     reportingCreatedAt: z.string().datetime({ offset: true }).optional(),
   })
   .strip();
@@ -393,30 +434,25 @@ export const CurrentSessionMetadataSchema = z
   .strip()
   .refine(
     metadata =>
-      PROVIDER_CAPABILITIES[metadata.workspace?.sandboxProvider ?? 'cloudflare'].devcontainer ||
+      (metadata.workspace?.sandboxProvider ?? 'cloudflare') === 'cloudflare' ||
       !metadata.devcontainer,
     'Sandbox provider metadata cannot contain a devcontainer runtime'
   )
   .refine(
-    metadata =>
-      metadata.workspace?.sandboxAllocation === undefined ||
-      (!metadata.devcontainer &&
-        metadata.identity.billingOrigin !== 'code-review' &&
-        metadata.identity.createdOnPlatform !== 'code-review'),
-    'Sandbox allocations cannot be combined with specialized routing'
-  )
-  .refine(
-    metadata =>
-      // `isolated-standard` remains legacy-plane only; Vercel is control-plane only.
-      metadata.workspace?.sandboxAllocation !== 'isolated-standard' ||
-      sessionPlaneFromId(metadata.identity.sessionId) === 'legacy',
-    'Isolated Standard allocation is not supported for control-plane sessions'
+    metadata => metadata.workspace?.sandboxAllocation === undefined || !metadata.devcontainer,
+    'Sandbox allocations cannot be combined with a devcontainer runtime'
   )
   .refine(
     metadata =>
       !sandboxAllocationRequiresControlPlane(metadata.workspace?.sandboxAllocation) ||
       sessionPlaneFromId(metadata.identity.sessionId) === 'control',
     'Sandbox allocations for this provider require a control-plane session'
+  )
+  .refine(
+    metadata =>
+      metadata.workspace?.sandboxKind === undefined ||
+      sessionPlaneFromId(metadata.identity.sessionId) === 'control',
+    'Sandbox kind requires a control-plane session'
   )
   .refine(
     metadata =>
@@ -457,9 +493,28 @@ export function getEffectiveCredentialContainment(
   return { github: legacyContainment, gitlab: false, kilocode: legacyContainment };
 }
 
+export function hasCredentialContainment(containment: CredentialContainment): boolean {
+  return (
+    containment.github ||
+    containment.gitlab ||
+    containment.bitbucket === true ||
+    containment.kilocode
+  );
+}
+
+export const DEVCONTAINER_RETIRED_MESSAGE =
+  'Devcontainer support has been retired. This session cannot be started or resumed. Create a new session using the default sandbox.';
+
+export function hasRetiredDevcontainerRuntime(metadata: SessionMetadata): boolean {
+  return (
+    metadata.workspace?.sandboxId?.startsWith('dind-') === true ||
+    metadata.workspace?.devcontainerRequested === true ||
+    metadata.devcontainer !== undefined
+  );
+}
+
 export function requiresContainmentSandbox(metadata: SessionMetadata): boolean {
-  const containment = getEffectiveCredentialContainment(metadata);
-  return containment.github || containment.gitlab || containment.bitbucket || containment.kilocode;
+  return hasCredentialContainment(getEffectiveCredentialContainment(metadata));
 }
 
 export function getSandboxProvider(metadata: SessionMetadata): AgentSandboxProvider {

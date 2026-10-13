@@ -7,8 +7,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function CommitDetails({ commit }: { commit: SessionCommit }) {
-  const [subject, ...bodyLines] = commit.commitMessage.split('\n');
-  const body = bodyLines.join('\n').replace(/^\n+/, '');
+  const [subject, ...bodyLines] = commit.commitMessage.replace(/\r\n/g, '\n').split('\n');
+  const body = bodyLines
+    .join('\n')
+    .replace(/^\n+/, '')
+    .split(/\n{2,}/)
+    .map(paragraph => paragraph.split('\n').filter(Boolean).join(' '))
+    .filter(Boolean)
+    .join('\n\n');
   const notPushed = commit.pushStatus === 'failed' || commit.pushStatus === 'not_attempted';
 
   return (

@@ -1239,6 +1239,7 @@ export async function createOrganizationKiloPassCheckout(input: {
       orgId: input.organizationId,
       amountCents: invoice.amount_due,
       accountCreatedAt: input.attempt.accountCreatedAt,
+      accountUsedMicrodollars: input.attempt.accountUsedMicrodollars,
       ip: input.attempt.ip,
       ipCountry: input.attempt.ipCountry,
       ja4: input.attempt.ja4,

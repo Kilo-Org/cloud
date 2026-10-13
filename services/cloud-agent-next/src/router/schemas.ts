@@ -497,6 +497,13 @@ const PrepareSessionSharedFields = {
     .optional(),
   bitbucketIntegrationId: z.string().uuid().optional(),
   bitbucketPullRequestId: z.number().int().positive().safe().optional(),
+  githubPullRequestNumber: z
+    .number()
+    .int()
+    .positive()
+    .safe()
+    .optional()
+    .describe('GitHub pull request number the code review must publish its summary to'),
   bitbucketExpectedHeadSha: z
     .string()
     .regex(/^[0-9a-f]{40}$/)
@@ -584,11 +591,10 @@ const PrepareSessionSharedFields = {
     ),
   devcontainer: z
     .boolean()
+    .refine(value => !value, { message: 'Devcontainer support has been retired' })
     .optional()
     .default(false)
-    .describe(
-      'When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes'
-    ),
+    .describe('Deprecated; devcontainer requests are no longer supported'),
   sandboxAllocation: ManagedSandboxAllocationInput.optional().describe(
     'Select a provider account and instance type instead of default routing'
   ),
@@ -604,6 +610,7 @@ const PrepareSessionNonCloneVariant = z.object({
    * the fallback only after old clients and prepared sessions expire.
    */
   cloneFromKiloSessionId: z.undefined().optional(),
+  cloneUpToMessageId: z.undefined().optional(),
   /**
    * When `true`, `prepareSession` also enqueues the initial user message
    * (mirroring the unified `start` endpoint) so callers that navigate
@@ -644,6 +651,9 @@ const PrepareSessionCloneVariant = z.object({
   initialPayload: z.undefined().optional(),
   cloneFromKiloSessionId: kiloSessionIdSchema.describe(
     'Source Kilo session ID to clone into this Cloud Agent session'
+  ),
+  cloneUpToMessageId: MessageIdSchema.optional().describe(
+    'Inclusive cut: copy source messages up to and including this message ID; omit to copy the whole session'
   ),
   autoInitiate: z.literal(true),
   operationKey: z
@@ -1171,6 +1181,15 @@ export const GetSessionOutput = z.object({
   // Lifecycle timestamps (critical for idempotency)
   preparedAt: z.number().optional().describe('Timestamp when session was prepared'),
   initiatedAt: z.number().optional().describe('Timestamp when session was initiated'),
+
+  // Route readiness for terminal ownership: control-plane sessions report
+  // whether their route view is `ready`; legacy sessions report whether they
+  // have been prepared. Consumers must not infer readiness from `preparedAt` or
+  // `initiatedAt`, which persist across route loss.
+  routeReady: z
+    .boolean()
+    .optional()
+    .describe('Whether the session currently has a ready route that can own a terminal'),
 
   // Callback configuration is intentionally NOT exposed here. The stored
   // `callbackTarget` may carry service-to-service auth headers (e.g. an

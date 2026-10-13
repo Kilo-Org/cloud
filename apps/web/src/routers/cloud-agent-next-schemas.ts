@@ -58,12 +58,6 @@ export const cloudAgentGetImageUploadUrlSchema = z.object({
   contentLength: z.number().int().positive().max(CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES),
 });
 
-const cloudAgentAttachmentFilenameSchema = z
-  .string()
-  .regex(
-    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$/
-  );
-
 const DENIED_EXTENSION_SET = new Set<string>(CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS);
 
 /**
@@ -102,9 +96,17 @@ export const cloudAgentRelaxedAttachmentFilenameSchema = z.string().superRefine(
   }
 });
 
+/**
+ * Send-time attachment reference (`prepareSession`, `sendMessage`). Accepts
+ * every basename the upload presign can issue, so a file uploaded with a
+ * relaxed extension is not rejected when the message is sent.
+ */
 export const cloudAgentAttachmentsSchema = z.object({
   path: z.uuid(),
-  files: z.array(cloudAgentAttachmentFilenameSchema).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
+  files: z
+    .array(cloudAgentRelaxedAttachmentFilenameSchema)
+    .min(1)
+    .max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
 });
 
 /**
@@ -432,7 +434,10 @@ const PrepareSessionSharedFields = {
   autoCommit: z.boolean().optional(),
   attachments: cloudAgentAttachmentsSchema.optional(),
   images: cloudAgentImagesSchema,
-  devcontainer: z.boolean().optional(),
+  devcontainer: z
+    .boolean()
+    .refine(value => !value, { message: 'Devcontainer support has been retired' })
+    .optional(),
 };
 
 const PrepareSessionNonCloneVariant = z.object({
@@ -447,6 +452,7 @@ const PrepareSessionNonCloneVariant = z.object({
    * Old callers omit the field and create an empty destination session.
    */
   cloneFromKiloSessionId: z.undefined().optional(),
+  cloneUpToMessageId: z.undefined().optional(),
   ...PrepareSessionSharedFields,
 });
 
@@ -455,6 +461,11 @@ const PrepareSessionCloneVariant = z.object({
   initialMessageId: z.undefined().optional(),
   initialPayload: z.undefined().optional(),
   cloneFromKiloSessionId: kiloSessionIdSchema,
+  /**
+   * Inclusive cut ("Fork from here"): copy only the source messages up to and
+   * including this message. Omitted copies the whole session.
+   */
+  cloneUpToMessageId: messageIdNextSchema.optional(),
   autoInitiate: z.literal(true),
   operationKey: z.string().uuid(),
   ...PrepareSessionSharedFields,
@@ -770,6 +781,9 @@ export const baseGetSessionNextOutputSchema = z.object({
   // Lifecycle timestamps
   preparedAt: z.number().optional(),
   initiatedAt: z.number().optional(),
+
+  // Route readiness for terminal ownership. Mirrors cloud-agent-next/router/schemas.ts.
+  routeReady: z.boolean().optional(),
 
   // Callback configuration is intentionally NOT exposed: the stored target
   // may carry service-to-service auth headers (e.g. X-Internal-Secret used

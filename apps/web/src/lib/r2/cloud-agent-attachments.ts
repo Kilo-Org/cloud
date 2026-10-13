@@ -1,5 +1,7 @@
 import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { TRPCError } from '@trpc/server';
+import { randomUUID } from 'crypto';
 import {
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
   CLOUD_AGENT_ATTACHMENT_MIME_TO_EXTENSION,
@@ -117,21 +119,26 @@ export async function generateCloudAgentAttachmentUploadUrl({
     ? (() => {
         const normalized = normalizeAttachmentExtension(extension);
         if ((CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS as readonly string[]).includes(normalized)) {
-          throw new Error(`Attachment extension "${normalized}" is not allowed`);
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Attachment extension "${normalized}" is not allowed`,
+          });
         }
         return normalized;
       })()
     : CLOUD_AGENT_ATTACHMENT_MIME_TO_EXTENSION[contentType as CloudAgentAttachmentAllowedType];
-  const key = `${userId}/cloud-agent/${messageUuid}/${attachmentId}.${suffix}`;
+  const keyPrefix = `${userId}/cloud-agent/${messageUuid}`;
 
   // Admit into the pending-upload ledger before signing. Compatibility: old
   // clients presigned with no ledger; remove this admit call only when every
-  // uploader has moved onto send-time finalization.
-  await admitPendingUpload({
+  // uploader has moved onto send-time finalization. Clients send back the
+  // returned key, so a retry can get a fresh key without a client change.
+  const key = await admitPendingUpload({
     kiloUserId: userId,
     messageUuid,
     attachmentId,
-    objectKey: key,
+    objectKey: `${keyPrefix}/${attachmentId}.${suffix}`,
+    freshObjectKey: `${keyPrefix}/${randomUUID()}.${suffix}`,
     byteSize: contentLength,
   });
 

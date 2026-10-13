@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import { isHomeFixtureConnectionLost, subscribeHomeFixture } from '@/lib/home-fixture';
 
 /**
  * Reactive binding to the shared user-web-connection transport
@@ -39,5 +40,10 @@ export function useUserWebConnectionHealth(): UserWebConnectionHealth {
     listener => connection.onReconnectExhaustionChange(listener),
     () => connection.isReconnectExhausted()
   );
+  // Dev-only `home-fixture/connection-lost` link (`home-fixture.ts`).
+  const fixtureLost = useSyncExternalStore(subscribeHomeFixture, isHomeFixtureConnectionLost);
+  if (fixtureLost) {
+    return { isConnected: false, reconnectExhausted: true };
+  }
   return { isConnected, reconnectExhausted };
 }

@@ -106,8 +106,6 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     setAutoDismissConfidenceThreshold(config.data.autoDismissConfidenceThreshold);
   }, [config.data]);
 
-  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
-
   // Ref indirection keeps the tracking effect independent of the mutation
   // object's identity (a new object every render) — fires once per mount,
   // mirroring finding-detail-screen.tsx's tracked-once pattern.
@@ -139,6 +137,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   const dirty =
     hydratedRef.current &&
     getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {
     const result = await save.mutateAsync(patch);
@@ -176,7 +175,11 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     );
   };
 
-  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
+    dirty,
+    valid,
+    onSave: handleSave,
+  });
 
   if (config.isError && !config.data) {
     return (
@@ -191,8 +194,9 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   if (config.isLoading || !config.data) {
     return <AutomationSettingsSkeleton />;
   }
-  if (!config.data.isEnabled) {
-    return null;
+  if (!config.data.isEnabled && !dirty) {
+    // Keep a dirty draft and its controls usable if the redirect is cancelled.
+    return <>{dialog}</>;
   }
 
   return (
@@ -310,6 +314,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           </Text>
         )}
       </TabScreenScrollView>
+      {dialog}
     </View>
   );
 }

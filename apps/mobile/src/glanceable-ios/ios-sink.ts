@@ -1,13 +1,27 @@
 /* eslint-disable max-lines -- one ActivityKit sink: adopt, start, update, and end */
 import {
+  countGlanceableApprovals,
+  countGlanceableSessions,
   GLANCEABLE_STALE_MS,
   GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
   isStartableGlanceableWork,
+  newestGlanceableResult,
+  oldestNeedsInputSince,
+  soonestScheduledAt,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { aggregateLiveActivityRelevance } from '@kilocode/notifications';
 
 import { i18n } from '@/i18n';
+import {
+  type FollowableSessionRow,
+  type FollowedSessionCounts,
+  getFollowedSessionCounts,
+  getFollowedSessionIds,
+  getSnapshotRows,
+} from '@/lib/glanceable/followed-sessions';
+import { getHomeWidgetDataForSnapshot } from '@/lib/glanceable/home-widget-data';
 import {
   getLastGlanceableSnapshot,
   isGlanceableRestoreSettled,
@@ -20,7 +34,10 @@ import {
   type GlanceableSink,
   type GlanceableSinkContext,
 } from '@/lib/glanceable/sink-registry';
-import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
+import {
+  getLiveActivityEnabled,
+  getNotificationPermissionGranted,
+} from '@/lib/glanceable/live-activity-switch';
 import { getWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 
 import { ActiveAgentsLiveActivity, OPEN_AGENTS_URL } from './active-agents-live-activity';
@@ -44,6 +61,94 @@ import {
 
 /** ActivityKit takes the stale window in seconds. */
 const STALE_AFTER_SECONDS = GLANCEABLE_STALE_MS / 1000;
+
+/**
+ * The aggregate card's place among this app's cards (spec "Presentation
+ * order"): above a running session card while something needs input, below it
+ * otherwise, then the newer state change first. The server pushes the same
+ * scores.
+ */
+function aggregateRelevance(snapshot: GlanceableAgentsSnapshot): number {
+  return aggregateLiveActivityRelevance(snapshot.needsInput, snapshot.newestResultAt);
+}
+
+/**
+ * The snapshot the aggregate card counts: the scope's work without the
+ * sessions this device follows (spec "Aggregate card coexistence"). Every
+ * followed session has its own card, so the aggregate card ends when no other
+ * startable work is left, as the server's card does. Only the Live Activity
+ * reads this; the Home widget keeps every session.
+ *
+ * The counts and times come from the tray rows the publisher built the
+ * snapshot from, without the followed rows, so the card never shows a
+ * followed session's wait or wake time. The rows describe the snapshot only
+ * when their counts match it; otherwise (a pushed or a stale snapshot) the
+ * followed counts are subtracted and a time stays only while its count does.
+ */
+function withoutFollowedSessions(snapshot: GlanceableAgentsSnapshot): GlanceableAgentsSnapshot {
+  const followed = getFollowedSessionCounts();
+  if (followed.running + followed.needsInput + followed.idle + followed.scheduled === 0) {
+    return snapshot;
+  }
+  const remaining = remainingRows(snapshot);
+  const card =
+    remaining === null ? subtractFollowed(snapshot, followed) : fromRows(snapshot, remaining);
+  // While a session is followed, idle work alone does not keep the card.
+  return isStartableGlanceableWork(card) ? card : { ...card, idle: 0 };
+}
+
+/** The snapshot's own rows without the followed sessions, or null when unknown. */
+function remainingRows(snapshot: GlanceableAgentsSnapshot): FollowableSessionRow[] | null {
+  const rows = getSnapshotRows(snapshot.scopeKey);
+  if (rows === null) {
+    return null;
+  }
+  const counts = countGlanceableSessions(rows);
+  const describes =
+    counts.running === snapshot.running &&
+    counts.needsInput === snapshot.needsInput &&
+    counts.idle === snapshot.idle &&
+    counts.scheduled === snapshot.scheduled;
+  if (!describes) {
+    return null;
+  }
+  const followedIds = getFollowedSessionIds();
+  return rows.filter(row => row.id === undefined || !followedIds.has(row.id));
+}
+
+function fromRows(
+  snapshot: GlanceableAgentsSnapshot,
+  rows: readonly FollowableSessionRow[]
+): GlanceableAgentsSnapshot {
+  const newest = newestGlanceableResult(rows);
+  return {
+    ...snapshot,
+    ...countGlanceableSessions(rows),
+    needsApproval: countGlanceableApprovals(rows),
+    needsInputSince: oldestNeedsInputSince(rows),
+    scheduledAt: soonestScheduledAt(rows),
+    newestResultKind: newest?.kind ?? null,
+    newestResultAt: newest?.at ?? null,
+  };
+}
+
+function subtractFollowed(
+  snapshot: GlanceableAgentsSnapshot,
+  followed: FollowedSessionCounts
+): GlanceableAgentsSnapshot {
+  const needsInput = Math.max(0, snapshot.needsInput - followed.needsInput);
+  const scheduled = Math.max(0, snapshot.scheduled - followed.scheduled);
+  return {
+    ...snapshot,
+    running: Math.max(0, snapshot.running - followed.running),
+    needsInput,
+    needsApproval: Math.max(0, (snapshot.needsApproval ?? 0) - followed.needsApproval),
+    idle: Math.max(0, snapshot.idle - followed.idle),
+    scheduled,
+    needsInputSince: needsInput === 0 ? null : snapshot.needsInputSince,
+    scheduledAt: scheduled === 0 ? null : snapshot.scheduledAt,
+  };
+}
 
 let activityKitDeniedState = false;
 let activity: Activity | null = null;
@@ -101,17 +206,30 @@ function pruneActionNotice(snapshot: GlanceableAgentsSnapshot): void {
 }
 
 /**
+ * Whether an Approve pressed on the card is in flight. The card swaps Approve
+ * for a muted Approving… pill until the press resolves; the interaction clears
+ * it on every outcome, so it can never stick.
+ */
+let approving = false;
+
+/** Mark (or clear) the in-flight Approve the next Live Activity update draws. */
+export function setGlanceableActionApproving(value: boolean): void {
+  approving = value;
+}
+
+/**
  * The content-state one update carries: the counts, the Approve gate, and the
  * pending notice when there is one. Every Live Activity update goes through
  * this, so the notice cannot be dropped by one path and kept by another.
  */
 function liveActivityContentState(snapshot: GlanceableAgentsSnapshot): GlanceableLiveActivityProps {
   pruneActionNotice(snapshot);
-  return buildGlanceableLiveActivityContentState(
+  const contentState = buildGlanceableLiveActivityContentState(
     snapshot,
     isApprovableAskRecorded(),
     actionNotice ?? undefined
   );
+  return approving ? { ...contentState, approving: true } : contentState;
 }
 
 /**
@@ -152,7 +270,11 @@ function startCard(
       lastProps = contentState;
       revision = snapshot.revision;
       getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
-      inFlightUpdate = activity.update(contentState, STALE_AFTER_SECONDS);
+      inFlightUpdate = activity.update(
+        contentState,
+        STALE_AFTER_SECONDS,
+        aggregateRelevance(snapshot)
+      );
       return;
     }
     const remaining = ActiveAgentsLiveActivity.getInstances(true).filter(
@@ -161,10 +283,16 @@ function startCard(
     if (remaining.length > 0) {
       return;
     }
+    // The first start raises iOS's "Allow Live Activities?" prompt. Wait for the
+    // user's notification opt-in; the grant replays eligible work (see register).
+    if (!getNotificationPermissionGranted()) {
+      return;
+    }
     const started = ActiveAgentsLiveActivity.start(
       contentState,
       OPEN_AGENTS_URL,
-      STALE_AFTER_SECONDS
+      STALE_AFTER_SECONDS,
+      aggregateRelevance(snapshot)
     );
     activity = started;
     inFlightUpdate = null;
@@ -453,6 +581,31 @@ export function _resetIosSinkForTests(): void {
   pendingStartAt = 0;
   actionNotice = null;
   noticeAskKey = null;
+  approving = false;
+  lastSinkContext = null;
+}
+
+/**
+ * The context of the last tray update, kept for the follow-change republish.
+ * A follow change carries no tray update of its own, so the republish uses the
+ * one the last publish ran under to register the card's token.
+ */
+let lastSinkContext: GlanceableSinkContext | null = null;
+
+/**
+ * Re-render the aggregate card after a follow or an unfollow, from the last
+ * snapshot the publisher wrote.
+ *
+ * An unfollow makes the reduced card startable again on the spot: the card
+ * ended while the last session was followed, and no tray update follows an
+ * unfollow that changes nothing else, so the card has to come back here.
+ */
+export function republishAggregateCard(): void {
+  const snapshot = getLastGlanceableSnapshot();
+  if (snapshot === null) {
+    return;
+  }
+  iosSink.publish(snapshot, lastSinkContext ?? undefined);
 }
 
 export const iosSink: GlanceableSink = {
@@ -464,19 +617,32 @@ export const iosSink: GlanceableSink = {
     await pendingStart;
   },
 
-  publish(snapshot) {
-    const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate));
+  /**
+   * Re-render the aggregate card from a snapshot the publisher already wrote.
+   *
+   * `ctx` is the context of the last tray update. It is present only when the
+   * caller may raise a card: the follow subscription passes it, because a
+   * follow change can make work startable again on the spot — the card ended
+   * while the last session was followed, and no tray update follows an
+   * unfollow that changes nothing else. A background press omits it, because a
+   * press must never raise a new card.
+   */
+  publish(snapshot, ctx) {
+    const homeData = getHomeWidgetDataForSnapshot(snapshot);
+    const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate, homeData));
     ActiveAgentsWidget.updateSnapshot(props);
     // updateSnapshot leaves a single frame behind, so the shared builder adds
     // the delayed and expiry frames every timeline writer owes WidgetKit (see
     // `widgetTimelineFrames`). Null means a terminal blank, whose copy needs no
     // further frame.
-    const frames = widgetTimelineFrames(snapshot, props, translate);
+    const frames = widgetTimelineFrames(snapshot, props, translate, homeData);
     if (frames !== null) {
       ActiveAgentsWidget.updateTimeline(frames);
     }
-    const contentState = liveActivityContentState(snapshot);
-    if (!isEligibleGlanceableWork(snapshot)) {
+    // The Live Activity counts only the sessions this device does not follow.
+    const card = withoutFollowedSessions(snapshot);
+    const contentState = liveActivityContentState(card);
+    if (!isEligibleGlanceableWork(card)) {
       // ActivityKit owns removal after this call, even if JavaScript stops.
       // The after-date retains Lock Screen content, not the Dynamic Island.
       const immediate = snapshot.status === 'signed_out' || snapshot.status === 'privacy';
@@ -486,14 +652,25 @@ export const iosSink: GlanceableSink = {
       void endNow(immediate ? null : GLANCEABLE_TERMINAL_MS, contentState, true);
       return;
     }
-    // Never start here. Recheck cached native work and preserve update/end ordering.
+    // Recheck cached native work and preserve update/end ordering.
     if (refreshActivity() && activity !== null) {
       lastProps = contentState;
-      inFlightUpdate = activity.update(lastProps, STALE_AFTER_SECONDS);
+      inFlightUpdate = activity.update(lastProps, STALE_AFTER_SECONDS, aggregateRelevance(card));
+      return;
+    }
+    // No live card. A follow change can make the reduced card startable again
+    // with no tray update behind it, so raise the card here when the caller
+    // carries a context; `startOrUpdate` owns the replacement of a card that is
+    // still waiting out its dismissal.
+    if (ctx !== undefined && isStartableGlanceableWork(card)) {
+      iosSink.startOrUpdate(snapshot, ctx);
     }
   },
 
-  startOrUpdate(snapshot, ctx) {
+  startOrUpdate(rawSnapshot, ctx) {
+    lastSinkContext = ctx;
+    // The Live Activity counts only the sessions this device does not follow.
+    const snapshot = withoutFollowedSessions(rawSnapshot);
     // The in-app switch is checked first: it is the one the user set here, and
     // honoring it costs no native call. ActivityKit's own switch still decides
     // the rest, and `start` remains the authority on it.
@@ -568,7 +745,11 @@ export const iosSink: GlanceableSink = {
     }
     const contentState = liveActivityContentState(snapshot);
     lastProps = contentState;
-    inFlightUpdate = activity.update(contentState, STALE_AFTER_SECONDS);
+    inFlightUpdate = activity.update(
+      contentState,
+      STALE_AFTER_SECONDS,
+      aggregateRelevance(snapshot)
+    );
     revision = snapshot.revision;
   },
 

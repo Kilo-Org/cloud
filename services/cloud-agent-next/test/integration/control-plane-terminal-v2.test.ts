@@ -5,9 +5,10 @@ import type { SandboxSessionV2 } from '../../src/control-plane/session/session-d
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-plane.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
-import type {
-  ControlPlanePromptPayload,
-  ControlPlaneWrapperFrame,
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+  type ControlPlaneWrapperFrame,
 } from '../../src/shared/control-plane-protocol.js';
 import type {
   ProviderAdapter,
@@ -79,15 +80,13 @@ function promptPayload(id: string): ControlPlanePromptPayload {
 function createFakeProvider(): FakeProvider {
   const provider: FakeProvider = { adapter: null as unknown as ProviderAdapter, launchEnvs: [] };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
@@ -143,7 +142,7 @@ async function connectAndHello(
   const { credential, allocationId } = launchIdentity(provider);
   const wrapper = await FakeWrapper.connect({ sandboxId, credential });
   const reply = await wrapper.hello({ wrapperId, allocationId });
-  expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   return wrapper;
 }
 

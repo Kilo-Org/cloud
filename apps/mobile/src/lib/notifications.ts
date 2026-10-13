@@ -1,8 +1,9 @@
 /* eslint-disable max-lines -- notification wiring: foreground/background handlers, channels, and push-token plumbing are kept together. */
+import * as BackgroundTask from 'expo-background-task';
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { z } from 'zod';
 
 import * as Sentry from '@sentry/react-native';
@@ -23,24 +24,37 @@ import {
   type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 
 import { captureEvent } from '@/lib/analytics/posthog';
 import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
+import { releaseAndroidSessionToken } from '@/lib/glanceable/session-activity-tokens-android';
+import {
+  applySessionLiveUpdate,
+  isSessionFollowed,
+  restoreFollowedSessionsFromStorage,
+} from '@/lib/glanceable/session-follow';
 import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
+import {
+  rememberHomeWidgetSnapshot,
+  setHomeWidgetDetails,
+} from '@/lib/glanceable/home-widget-data';
 import {
   getLastGlanceableSnapshot,
   getLocalScopeKey,
   persistGlanceableSink,
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
+import { setNotificationPermissionGrantedValue } from '@/lib/glanceable/live-activity-switch';
 import { getActiveUserId, getSelectedOrganizationId } from '@/lib/glanceable/scope';
 import {
   getGlanceableSinks,
   type GlanceableSink,
   registerGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
+import { publishTrayOnce } from '@/lib/glanceable/tray-refresh';
 import { readWaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { getDndAccessGranted } from '@/glanceable-android/live-update';
@@ -218,7 +232,7 @@ export async function applyGlanceablePushData(
 
   // Fence and rebase against the latest publication after storage reads.
   // A publication during the reads also wins a timestamp tie.
-  const { type: _type, ...fields } = data;
+  const { type: _type, homeWidgetDetails, ...fields } = data;
   const current = getLastGlanceableSnapshot();
   if (
     current !== null &&
@@ -233,6 +247,8 @@ export async function applyGlanceablePushData(
     revision: current === null ? fields.revision : current.revision + 1,
     accountEpoch: authEpoch,
   };
+  setHomeWidgetDetails(homeWidgetDetails ?? EMPTY_HOME_WIDGET_DETAILS);
+  rememberHomeWidgetSnapshot(snapshot);
 
   const ctx = { userId, organizationId };
   const eligible = isEligibleGlanceableWork(snapshot);
@@ -288,6 +304,12 @@ export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
     handleNotification: async notification => {
       const data = parseNotificationData(notification.request.content.data);
+
+      if (data?.type === 'session_live_update') {
+        // The session carrier is data-only: the app draws the ongoing
+        // notification itself, so this message never becomes a banner.
+        return suppressed;
+      }
 
       if (data?.type === 'active_agents_glanceable') {
         // The aggregate glanceable push is a data carrier for the ongoing
@@ -442,6 +464,33 @@ async function handleBackgroundNotificationTask(
   }
 
   const pushData = parseHeadlessPushData(data.data);
+  if (pushData?.type === 'session_live_update') {
+    // One followed session's Android notification
+    // (`.specs/mobile-session-live-activity.md` "Android"). The in-memory
+    // follow map is empty in this fresh process, so hydrate it first: without
+    // that, a push for a followed session reads as one for a stranger and its
+    // server row would be dropped.
+    await restorePersistedGlanceable();
+    const followsKnown = await restoreFollowedSessionsFromStorage();
+    const applied = await applySessionLiveUpdate(
+      pushData.event,
+      pushData.content,
+      pushData.dismissAfterMs
+    );
+    // A session this device no longer follows (a dismissal, or a follow cleared
+    // on another surface) renders nothing and drops its row, so the server stops
+    // addressing this token for it. A followed session keeps its row: a push
+    // that merely changed nothing must never unfollow it.
+    // An unreadable keychain leaves the set empty without meaning "unfollowed",
+    // so the row stays until a read can tell.
+    if (!applied && followsKnown && !isSessionFollowed(pushData.content.sessionId)) {
+      // Awaited: the headless task ends with this promise.
+      await releaseAndroidSessionToken(pushData.content.sessionId);
+    }
+    return applied
+      ? Notifications.BackgroundNotificationTaskResult.NewData
+      : Notifications.BackgroundNotificationTaskResult.NoData;
+  }
   if (pushData?.type !== 'active_agents_glanceable') {
     return Notifications.BackgroundNotificationTaskResult.NoData;
   }
@@ -463,16 +512,11 @@ async function handleBackgroundNotificationTask(
 }
 
 /**
- * Executor entry for the background notification task, exported for
- * `notification-background-task.ts`, whose task executor lazy-loads this module
- * when a task fires (a headless start evaluates only the app entry, so this
- * graph must not load at entry). Applies the stored language, loads the
- * glanceable sinks — a fresh headless process has none registered — creates the
- * Android channels, then dispatches.
+ * The setup every headless glanceable run needs before it touches a sink:
+ * the stored language, the glanceable sinks — a fresh headless process has none
+ * registered — the Android channels, and the notification permission read.
  */
-export async function runBackgroundNotificationTask(
-  body: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>
-): Promise<Notifications.BackgroundNotificationTaskResult> {
+async function prepareHeadlessGlanceableRun(): Promise<void> {
   // A killed process starts on the bundled English catalog, and nothing else on
   // this path applies the stored language. Apply it before the channels are
   // written, or the names below revert the user's notification settings to
@@ -485,7 +529,54 @@ export async function runBackgroundNotificationTask(
   // to a channel the app never created, and FirebaseMessaging logs the miss on
   // every message. Idempotent and never rejecting.
   await ensureAndroidNotificationChannels();
+  // A headless start never runs `setupNotificationPermissionGate`, so the Live
+  // Activity gate would read "not granted" on an install that granted it. Read
+  // the permission before the sinks see the push.
+  try {
+    await getNotificationPermissionStatus();
+  } catch {
+    // An unknown answer stays "not granted": the next foreground reads again.
+  }
+}
+
+/**
+ * Executor entry for the background notification task, exported for
+ * `notification-background-task.ts`, whose task executor lazy-loads this module
+ * when a task fires (a headless start evaluates only the app entry, so this
+ * graph must not load at entry).
+ */
+export async function runBackgroundNotificationTask(
+  body: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>
+): Promise<Notifications.BackgroundNotificationTaskResult> {
+  await prepareHeadlessGlanceableRun();
   return handleBackgroundNotificationTask(body);
+}
+
+/**
+ * Executor entry for the periodic glanceable refresh, exported for
+ * `glanceable-refresh-task.ts`, which lazy-loads this module like the
+ * notification task does. It is the fallback for a data-only push the OS
+ * dropped or throttled: it reads the tray once and republishes the surfaces.
+ * Signed out, it does nothing. A failed read or native write reports `Failed`
+ * and leaves the last published snapshot in place.
+ */
+export async function runGlanceableBackgroundRefresh(): Promise<BackgroundTask.BackgroundTaskResult> {
+  await prepareHeadlessGlanceableRun();
+  // The same durable state the push path restores: the persisted snapshot
+  // seeds the revision, and the sinks read the recorded ask synchronously.
+  await restorePersistedGlanceable();
+  await readWaitingAsk();
+  const userId = await getActiveUserId();
+  if (userId === null) {
+    return BackgroundTask.BackgroundTaskResult.Success;
+  }
+  const organizationId = await getSelectedOrganizationId();
+  try {
+    await publishTrayOnce({ userId, organizationId });
+  } catch {
+    return BackgroundTask.BackgroundTaskResult.Failed;
+  }
+  return BackgroundTask.BackgroundTaskResult.Success;
 }
 
 async function registerBackgroundNotificationTask(): Promise<void> {
@@ -571,7 +662,12 @@ let androidChannelsPromise: Promise<void> | null = null;
 // The channels the two named kinds replaced. Android keeps an app-created
 // channel until the app deletes it, so a stale one would still appear in the
 // system settings list after the upgrade.
-const LEGACY_ANDROID_NOTIFICATION_CHANNELS = ['agent', 'chat', 'active-agents'] as const;
+const LEGACY_ANDROID_NOTIFICATION_CHANNELS = [
+  'agent',
+  'chat',
+  'active-agents',
+  'followed-sessions',
+] as const;
 
 // Android plays a channel-based post's sound from the channel (the builder's
 // `setSound(null)` is a no-op for a channel post on API 26+), and the framework
@@ -581,6 +677,7 @@ const LEGACY_ANDROID_NOTIFICATION_CHANNELS = ['agent', 'chat', 'active-agents'] 
 // enabled, so silence also has to disable it explicitly.
 const SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS = new Set<AndroidNotificationChannelId>([
   'agent-progress',
+  'followed-sessions-lock-screen',
 ]);
 
 /** What one Android channel write asks the framework for. */
@@ -625,10 +722,11 @@ function androidChannelConfiguration(
 ): Notifications.NotificationChannelInput {
   return {
     name,
-    importance:
-      channel.importance === 'high'
-        ? Notifications.AndroidImportance.HIGH
-        : Notifications.AndroidImportance.DEFAULT,
+    importance: {
+      high: Notifications.AndroidImportance.HIGH,
+      default: Notifications.AndroidImportance.DEFAULT,
+      low: Notifications.AndroidImportance.LOW,
+    }[channel.importance],
     bypassDnd,
     // An absent sound is the system default; an explicit null is silence, and a
     // silent channel must not vibrate either (the default is enabled).
@@ -704,6 +802,7 @@ const CHANNEL_NAME_KEYS = {
   kiloclaw: 'notifications.channel.kiloclaw',
   balance: 'notifications.channel.balance',
   security: 'notifications.channel.security',
+  'followed-sessions-lock-screen': 'notifications.channel.followedSessions',
 } as const satisfies Record<AndroidNotificationChannelId, string>;
 
 /**
@@ -819,6 +918,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
     // does not. Any non-granted result maps to denied.
     emitNotificationPermissionResponded(finalStatus === Notifications.PermissionStatus.GRANTED);
   }
+  setNotificationPermissionGrantedValue(finalStatus === Notifications.PermissionStatus.GRANTED);
 
   if (finalStatus !== Notifications.PermissionStatus.GRANTED) {
     return null;
@@ -888,7 +988,30 @@ export async function getNotificationPermissionStatus(): Promise<
   'granted' | 'denied' | 'undetermined'
 > {
   const { status } = await Notifications.getPermissionsAsync();
+  setNotificationPermissionGrantedValue(status === Notifications.PermissionStatus.GRANTED);
   return status;
+}
+
+/**
+ * Keep the glanceable permission gate current: read it at launch and on every
+ * foreground, since the user can change it in Settings while the app is away.
+ * The Live Activity and push-to-start wait for a grant (see
+ * `live-activity-switch`).
+ */
+export function setupNotificationPermissionGate(): void {
+  const refresh = async () => {
+    try {
+      await getNotificationPermissionStatus();
+    } catch {
+      // Keep the last answer; the next foreground reads again.
+    }
+  };
+  void refresh();
+  AppState.addEventListener('change', state => {
+    if (state === 'active') {
+      void refresh();
+    }
+  });
 }
 
 export function getPlatform(): 'ios' | 'android' {

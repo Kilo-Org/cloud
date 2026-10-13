@@ -307,6 +307,11 @@ export function ChildSessionDrawer({
                 <span>
                   {selectedEntry?.agent ? `Agent: ${selectedEntry.agent}` : 'Sub-agent session'}
                 </span>
+                {selectedEntry?.model && (
+                  <span className="truncate" title={selectedEntry.model}>
+                    Model: {selectedEntry.model}
+                  </span>
+                )}
                 {selectedSessionId && (
                   <span className="truncate font-mono text-xs">{selectedSessionId}</span>
                 )}
@@ -318,7 +323,7 @@ export function ChildSessionDrawer({
         <div className="relative min-h-0 flex-1">
           <div
             ref={scrollContainerRef}
-            className="h-full overflow-y-auto px-4 py-4 sm:px-6"
+            className="h-full overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-6"
             onScroll={handleScroll}
           >
             <div ref={messagesContentRef}>

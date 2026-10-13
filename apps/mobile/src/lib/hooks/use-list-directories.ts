@@ -4,6 +4,7 @@ import { withDeadline } from '@kilocode/event-service';
 import { listDirectoriesOnConnection } from '@kilocode/cloud-agent-sdk/list-directories';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import { cliCommandUnavailableError } from '@/lib/hooks/cli-command-unavailable-error';
 
 /** One child directory returned by `list_directories`. */
 export type DirectoryEntry = { name: string; path: string };
@@ -31,11 +32,12 @@ export type UseListDirectoriesResult = {
 };
 
 /**
- * Marks the SDK outcomes that retrying can never fix (`unsupported`/`invalid`).
- * React Query owns the error state, so the marker is what keeps those outcomes
- * terminal instead of the picker's retryable branch.
+ * Query data for the SDK outcomes that retrying can never fix
+ * (`unsupported`/`invalid`). They resolve instead of throwing, as in
+ * `useInstanceModelCatalog`: an old CLI is an expected answer, not a failure,
+ * so it stays out of the error state and out of the app's error reports.
  */
-class DirectoryListingUnsupported extends Error {}
+const LISTING_UNSUPPORTED = 'unsupported';
 
 /**
  * Budget for one directory listing before the picker offers Retry. The SDK's
@@ -101,11 +103,12 @@ const LISTING_RETRY_RESEND_DELAY_MS = 1200;
  * `staleTime: Infinity` is what the replaced cache did: a listed path is never
  * stale, so returning to it serves its data synchronously and never refetches.
  * `retry: false` keeps the picker's Retry CTA the only retry, matching the old
- * generation-guard flow. A `transport` failure is thrown as a plain `Error`, so
- * the app-wide `QueryCache.onError` telemetry reports it like any other failed
- * query; it carries no tRPC code, so no auth or permission handling changes.
- * A listing that has not answered within {@link LISTING_DEADLINE_MS} throws
- * that same plain `Error` instead of holding the skeleton past the picker's
+ * generation-guard flow. A `transport` failure is thrown as
+ * `cliCommandUnavailableError` with the SDK's failure as its `cause`, so the
+ * app-wide `QueryCache.onError` reports each failed attempt once, at warning
+ * level; it carries no tRPC code, so no auth or permission handling changes.
+ * A listing that has not answered within {@link LISTING_DEADLINE_MS} fails
+ * into the same retryable state instead of holding the skeleton past the picker's
  * budget. A plain open puts the listing on the wire once; the picker's Retry
  * gets the longer {@link LISTING_RETRY_DEADLINE_MS} budget and repeats the send,
  * so one tap can bridge a relay restart (see {@link LISTING_RETRY_MAX_SENDS}).
@@ -118,7 +121,7 @@ export function useListDirectories(connectionId: string | null): UseListDirector
   // budget. Read and cleared by the queryFn; see LISTING_RETRY_DEADLINE_MS.
   const retryBudgetRef = useRef(false);
 
-  const query = useQuery<DirectoryEntry[]>({
+  const query = useQuery<DirectoryEntry[] | typeof LISTING_UNSUPPORTED>({
     queryKey: ['list-directories', connectionId, path],
     queryFn: async ({ signal }) => {
       // `enabled` guarantees both are set; the guard narrows the types and
@@ -133,6 +136,9 @@ export function useListDirectories(connectionId: string | null): UseListDirector
       // only the Retry repeats the send while the transport recovers.
       const maxSends = isRetry ? LISTING_RETRY_MAX_SENDS : 1;
       let nudged = false;
+      // The last send's transport failure: the cause of a deadline that runs
+      // out while the Retry waits to send again.
+      let lastCause: unknown = undefined;
       for (let send = 1; ; send += 1) {
         // React Query aborts this signal when the picker unmounts and clears
         // the connection's listings. The paced Retry must not keep sending for
@@ -144,7 +150,11 @@ export function useListDirectories(connectionId: string | null): UseListDirector
         }
         const remaining = deadlineAt - Date.now();
         if (remaining <= 0) {
-          throw new Error('directory listing unavailable');
+          throw cliCommandUnavailableError(
+            'list_directories',
+            'directory listing unavailable',
+            lastCause
+          );
         }
         if (!nudged && !connection.isConnected()) {
           // The reconnect loop may have parked on a long backoff or exhausted
@@ -175,15 +185,20 @@ export function useListDirectories(connectionId: string | null): UseListDirector
         if (result.ok) {
           return result.directories;
         }
-        // Permanent for this connection; the marker keeps the phase terminal.
+        // Permanent for this connection: resolve so the phase stays terminal.
         if (result.reason !== 'transport') {
-          throw new DirectoryListingUnsupported('directory listing unsupported');
+          return LISTING_UNSUPPORTED;
         }
         if (send >= maxSends || deadlineAt - Date.now() <= LISTING_RETRY_RESEND_DELAY_MS) {
           // Retryable: React Query owns the error state, and `retry: false`
           // leaves the retry to the picker's Retry CTA.
-          throw new Error('directory listing unavailable');
+          throw cliCommandUnavailableError(
+            'list_directories',
+            'directory listing unavailable',
+            result.cause
+          );
         }
+        lastCause = result.cause;
         // eslint-disable-next-line no-await-in-loop -- the next send must wait out the reconnect the previous send failed on
         await new Promise<void>(resolve => {
           setTimeout(resolve, LISTING_RETRY_RESEND_DELAY_MS);
@@ -256,13 +271,13 @@ export function useListDirectories(connectionId: string | null): UseListDirector
       return { phase: 'skeleton', path };
     }
     if (query.isError) {
-      return {
-        phase: query.error instanceof DirectoryListingUnsupported ? 'unsupported' : 'retryable',
-        path,
-      };
+      return { phase: 'retryable', path };
+    }
+    if (query.data === LISTING_UNSUPPORTED) {
+      return { phase: 'unsupported', path };
     }
     return { phase: 'ready', path, directories: query.data };
-  }, [path, query.data, query.error, query.isError, query.isPending]);
+  }, [path, query.data, query.isError, query.isPending]);
 
   return { state, list };
 }

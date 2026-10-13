@@ -661,6 +661,56 @@ describe('createSessionManager', () => {
   });
 
   describe('switchSession', () => {
+    it('saves the latest live transcript before clearing the outgoing session', async () => {
+      const cached = new Map<string, SessionSnapshotPage>();
+      const config = createMockConfig({
+        writeCachedSnapshotPage: page => cached.set(page.info.id, page),
+        readCachedSnapshotPage: async id => cached.get(id) ?? null,
+        fetchSession: async id => ({ ...defaultFetchedSession, kiloSessionId: id }),
+      });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const storage = latestStorage;
+      if (!storage) throw new Error('Expected session storage');
+      const message = createStoredMessage('latest-message', 'ses-1', 'user');
+      storage.upsertMessage(message.info);
+      storage.upsertPart(
+        message.info.id,
+        stubTextPart({
+          id: 'latest-part',
+          messageID: message.info.id,
+          sessionID: 'ses-1',
+          text: 'latest live text',
+        })
+      );
+
+      await mgr.switchSession(kiloId('ses-2'));
+      expect(cached.get('ses-1')?.messages[0]?.parts[0]).toMatchObject({
+        text: 'latest live text',
+      });
+      expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(0);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(config.store.get(mgr.atoms.messagesList)[0]?.parts[0]).toMatchObject({
+        text: 'latest live text',
+      });
+      mgr.destroy();
+    });
+
+    it('continues switching when the outgoing transcript cache fails', async () => {
+      const config = createMockConfig({
+        writeCachedSnapshotPage: () => {
+          throw new Error('Cache unavailable');
+        },
+        fetchSession: async id => ({ ...defaultFetchedSession, kiloSessionId: id }),
+      });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.switchSession(kiloId('ses-2'));
+      expect(config.store.get(mgr.atoms.fetchedSessionData)?.kiloSessionId).toBe('ses-2');
+      mgr.destroy();
+    });
+
     it('sets isLoading=true synchronously and clears it after completion', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -767,6 +817,81 @@ describe('createSessionManager', () => {
         expect(atomValue<boolean>(config.store, mgr.atoms.isRefreshingCachedTranscript)).toBe(
           false
         );
+      });
+
+      it('retains cached messages and parts omitted from the live page alongside live arrivals', async () => {
+        const live = deferred<SessionSnapshotPageOutcome | null>();
+        const cached = {
+          ...cachedPage('ses-1', ['msg-retained', 'msg-omitted']),
+          messages: [
+            makePageMessage('msg-retained', 'ses-1', 'omitted cached part'),
+            makePageMessage('msg-omitted', 'ses-1', 'omitted cached message'),
+          ],
+        };
+        const config = createMockConfig({
+          readCachedSnapshotPage: async () => cached,
+          fetchSnapshotPage: createPageFetchMock(() => live.promise),
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        const storage = latestStorage;
+        if (!storage) throw new Error('Expected session storage');
+        storage.upsertMessage(createStoredMessage('msg-live-event', 'ses-1', 'user').info);
+        const fresh = makePageMessage('msg-retained', 'ses-1', 'fresh live part');
+        fresh.parts[0].id = 'fresh-part-id';
+
+        live.resolve(makePage({ kiloSessionId: 'ses-1', messages: [fresh] }));
+        await new Promise<void>(resolve => setImmediate(resolve));
+
+        expect(config.store.get(mgr.atoms.messagesList).map(message => message.info.id)).toEqual(
+          expect.arrayContaining(['msg-retained', 'msg-omitted', 'msg-live-event'])
+        );
+        expect(storage.getParts('msg-omitted')).toEqual(cached.messages[1].parts);
+        expect(storage.getParts('msg-retained')).toEqual(
+          expect.arrayContaining([...cached.messages[0].parts, ...fresh.parts])
+        );
+        expect(config.store.get(mgr.atoms.isRefreshingCachedTranscript)).toBe(false);
+        mgr.destroy();
+      });
+
+      it('retains cached rows and reader scroll intent through a metadata retry and an empty live page', async () => {
+        const metadata = deferred<FetchedSessionData>();
+        const config = createMockConfig({
+          fetchSession: jest
+            .fn()
+            .mockRejectedValueOnce(new Error('offline'))
+            .mockReturnValueOnce(metadata.promise)
+            .mockResolvedValue(defaultFetchedSession),
+          readCachedSnapshotPage: async id => cachedPage(id, ['msg-retained']),
+          fetchSnapshotPage: createPageFetchMock(async () =>
+            makePage({ kiloSessionId: 'ses-1', messages: [] })
+          ),
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(1);
+        const rows = config.store.get(mgr.atoms.messagesList);
+        const readerIntent = { shouldAutoScroll: false };
+        config.store.set(mgr.atoms.chatUI, readerIntent);
+
+        const retry = mgr.switchSession(kiloId('ses-1'));
+        expect(config.store.get(mgr.atoms.messagesList)).toBe(rows);
+        expect(config.store.get(mgr.atoms.chatUI)).toBe(readerIntent);
+        metadata.resolve(defaultFetchedSession);
+        await retry;
+        await new Promise<void>(resolve => setImmediate(resolve));
+
+        expect(config.store.get(mgr.atoms.messagesList).map(message => message.info.id)).toEqual([
+          'msg-retained',
+        ]);
+        expect(config.store.get(mgr.atoms.chatUI)).toBe(readerIntent);
+        expect(config.store.get(mgr.atoms.isRefreshingCachedTranscript)).toBe(false);
+
+        await mgr.switchSession(kiloId('ses-2'));
+        expect(config.store.get(mgr.atoms.chatUI)).toEqual({ shouldAutoScroll: true });
+        mgr.destroy();
       });
 
       it('clears the cached transcript refresh when a legacy transport replays its snapshot', async () => {
@@ -2556,6 +2681,74 @@ describe('createSessionManager', () => {
       });
     });
 
+    it('marks the optimistic row as sending only while the request is pending', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const sendingIds = () =>
+        atomValue<ReadonlySet<string>>(config.store, mgr.atoms.sendingMessageIds);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(sendingIds().size).toBe(0);
+
+      let resolveSend!: () => void;
+      mockSession.send.mockImplementation(
+        () =>
+          new Promise<void>(resolve => {
+            resolveSend = resolve;
+          })
+      );
+      const accepted = mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
+
+      const [messageId] = mockSession.storage!.getMessageIds();
+      expect(messageId).toBeDefined();
+      expect([...sendingIds()]).toEqual([messageId]);
+
+      resolveSend();
+      await accepted;
+
+      expect(sendingIds().size).toBe(0);
+    });
+
+    it('clears the sending mark when the request fails', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockRejectedValue(new Error('network down'));
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
+
+      expect(accepted).toBe(false);
+      expect(atomValue<ReadonlySet<string>>(config.store, mgr.atoms.sendingMessageIds).size).toBe(
+        0
+      );
+    });
+
+    it('clears the sending mark and optimistic row when the composer callback throws', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        onOptimisticSend: () => {
+          throw new Error('composer callback failed');
+        },
+      });
+
+      expect(accepted).toBe(false);
+      expect(atomValue<ReadonlySet<string>>(config.store, mgr.atoms.sendingMessageIds).size).toBe(
+        0
+      );
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Hello');
+      expect(mockSession.send).not.toHaveBeenCalled();
+    });
+
     it('queued event does not duplicate or overwrite the optimistic row', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -3168,6 +3361,68 @@ describe('createSessionManager', () => {
           code: 'insufficient-credits',
         })
       );
+    });
+
+    it('refreshes retry details without a type transition and clears the warning on idle', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      for (const [attempt, message] of [
+        [1, 'Overloaded'],
+        [1, 'Rate limited'],
+        [2, 'Rate limited'],
+      ] as const) {
+        mockSession.state.getActivity.mockReturnValue({ type: 'retrying', attempt, message });
+        notifyStateChange?.();
+        expect(config.store.get(mgr.atoms.statusIndicator)).toEqual(
+          expect.objectContaining({ type: 'warning', message: `Retrying… ${message}` })
+        );
+      }
+      const indicator = config.store.get(mgr.atoms.statusIndicator);
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.statusIndicator)).toBe(indicator);
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.statusIndicator)).toBeNull();
+      mgr.destroy();
+    });
+
+    it('keeps an error indicator raised during a retry when activity returns to idle', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.state.getActivity.mockReturnValue({
+        type: 'retrying',
+        attempt: 1,
+        message: 'Overloaded',
+      });
+      notifyStateChange?.();
+      mockSession.state.getStatus.mockReturnValue({ type: 'error', message: 'Provider failed' });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.statusIndicator)).toEqual(
+        expect.objectContaining({ type: 'error', message: 'Provider failed' })
+      );
+
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.statusIndicator)).toEqual(
+        expect.objectContaining({ type: 'error', message: 'Provider failed' })
+      );
+      mgr.destroy();
     });
 
     it('clears disconnected error and indicator after the transport reconnects', async () => {
@@ -5061,6 +5316,36 @@ describe('createSessionManager', () => {
       expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
       expect(atomValue<boolean>(config.store, mgr.atoms.canInterrupt)).toBe(true);
       expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+    });
+
+    it('keeps Stop disabled after an acknowledged interrupt until the turn leaves retrying', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.state.getActivity.mockReturnValue({
+        type: 'retrying',
+        attempt: 1,
+        message: 'Overloaded',
+      });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.canInterrupt)).toBe(true);
+
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+      expect(config.store.get(mgr.atoms.canInterrupt)).toBe(false);
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.canInterrupt)).toBe(false);
+
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.canInterrupt)).toBe(true);
+      mgr.destroy();
     });
 
     it('re-enables canSend after interrupt even when session.canSend is briefly false', async () => {

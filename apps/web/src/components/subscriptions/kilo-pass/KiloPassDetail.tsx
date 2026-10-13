@@ -33,9 +33,7 @@ import { useKiloPassChurnkeyCancelFlow } from '@/components/profile/kilo-pass/us
 import type { KiloPassSubscription } from '@/components/profile/kilo-pass/kiloPassSubscription';
 import { KiloPassSubscriptionSettingsModal } from '@/components/profile/kilo-pass/KiloPassSubscriptionSettingsModal';
 import { KiloPassBonusRampDialog } from '@/components/profile/kilo-pass/KiloPassBonusRampDialog';
-import { computeMonthlyCadenceBonusPercent } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
-import { KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import {
   computeUsageProgressModel,
   computeRenewInfoRowModel,
@@ -101,25 +99,6 @@ export function KiloPassDetail() {
   });
 
   const scheduledChange = scheduledChangeQuery.data?.scheduledChange ?? null;
-
-  const showFirstMonthPromoInDialog =
-    subscription?.cadence === 'monthly' &&
-    computeMonthlyCadenceBonusPercent({
-      tier: subscription.tier,
-      streakMonths: Math.max(1, subscription.currentStreakMonths),
-      isFirstTimeSubscriberEver: subscription.isFirstTimeSubscriberEver,
-      subscriptionStartedAtIso: subscription.startedAt,
-    }) === KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
-
-  const showSecondMonthPromoInDialog =
-    subscription?.cadence === 'monthly' &&
-    subscription.currentStreakMonths <= 2 &&
-    computeMonthlyCadenceBonusPercent({
-      tier: subscription.tier,
-      streakMonths: 2,
-      isFirstTimeSubscriberEver: subscription.isFirstTimeSubscriberEver,
-      subscriptionStartedAtIso: subscription.startedAt,
-    }) === KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
 
   async function refreshData() {
     await Promise.all([
@@ -256,10 +235,11 @@ export function KiloPassDetail() {
                 Bonus streak
                 <KiloPassBonusRampDialog
                   tier={subscription.tier}
-                  showFirstMonthPromo={showFirstMonthPromoInDialog}
-                  showSecondMonthPromo={showSecondMonthPromoInDialog}
+                  showFirstMonthPromo={
+                    subscription.cadence === 'monthly' && subscription.isFirstTimeSubscriberEver
+                  }
                   streakMonths={subscription.currentStreakMonths}
-                  subscriptionStartedAtIso={subscription.startedAt ?? undefined}
+                  subscriptionStartedAtIso={subscription.startedAt}
                 />
               </CardTitle>
             </CardHeader>

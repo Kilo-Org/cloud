@@ -255,11 +255,11 @@ describe('getToolDisplay mapping', () => {
   it('maps todo read and todo write', () => {
     expect(getDisplay(makeToolPart('todoread', completed()))).toEqual({
       title: 'todoread',
-      subtitle: 'Read todos',
+      subtitle: 'Read plan',
     });
     expect(getDisplay(makeToolPart('todowrite', completed()))).toEqual({
       title: 'todowrite',
-      subtitle: 'Update todos',
+      subtitle: 'Update plan',
     });
   });
 

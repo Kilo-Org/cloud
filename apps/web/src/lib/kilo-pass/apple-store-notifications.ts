@@ -8,6 +8,7 @@ import {
   type ConsumptionRequest,
 } from '@apple/app-store-server-library';
 import { and, eq, inArray, like, notInArray, or, sql } from 'drizzle-orm';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
 
@@ -90,7 +91,7 @@ type SendConsumptionInformation = (
   request: ConsumptionRequest
 ) => Promise<void>;
 type EndStoreSubscription = (
-  dbOrTx: DbOrTx,
+  tx: DrizzleTransaction,
   transaction: AppleStoreDecodedTransaction
 ) => Promise<void>;
 type StoreEventClaimStatus = 'claimed' | 'already_processed' | 'in_flight';
@@ -194,22 +195,27 @@ export async function decodeAppleStoreNotificationJws(
 }
 
 export async function markStoreSubscriptionEnded(
-  dbOrTx: DbOrTx,
+  tx: DrizzleTransaction,
   transaction: AppleStoreDecodedTransaction
 ): Promise<void> {
-  await dbOrTx
+  const endedAt = new Date().toISOString();
+  const endedRows = await tx
     .update(kilo_pass_subscriptions)
     .set({
       status: 'canceled',
       cancel_at_period_end: false,
-      ended_at: new Date().toISOString(),
+      ended_at: endedAt,
     })
     .where(
       and(
         eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.AppStore),
         eq(kilo_pass_subscriptions.provider_subscription_id, transaction.originalTransactionId)
       )
-    );
+    )
+    .returning({ id: kilo_pass_subscriptions.id });
+  for (const row of endedRows) {
+    await closePauseEvent(tx, { kiloPassSubscriptionId: row.id, resumedAt: endedAt });
+  }
 }
 
 async function markStoreSubscriptionCancelingAtPeriodEnd(
@@ -1275,7 +1281,7 @@ export async function processAppStoreKiloPassNotification(params: {
   }
 
   if (transaction && EXPIRED_TYPES.has(notification.notificationType)) {
-    await markStoreSubscriptionEnded(db, transaction);
+    await db.transaction(tx => markStoreSubscriptionEnded(tx, transaction));
     await appendKiloPassAuditLog(db, {
       action: KiloPassAuditLogAction.StoreSubscriptionExpired,
       result: KiloPassAuditLogResult.Success,

@@ -60,6 +60,8 @@ const GENERIC_FAILURE_MESSAGES = {
   missing_assistant_reply: 'No assistant reply was produced',
   payment_required: 'Assistant request failed: insufficient credits',
   admission_billing_unavailable: 'Sandbox billing is unavailable',
+  container_limit_reached:
+    'Concurrent container limit reached (20 for personal accounts, 50 for organizations). Stop an existing container before starting another.',
   user_interrupt: 'The message was interrupted by the user',
   container_shutdown: 'The agent container shut down',
   system_interrupt: 'The message was interrupted',

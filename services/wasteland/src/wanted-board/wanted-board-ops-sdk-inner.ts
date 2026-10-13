@@ -165,8 +165,6 @@ async function readLatestCompletion(
   }
 }
 
-// ── Inner ops ────────────────────────────────────────────────────────────
-
 export async function browseViaSdk(
   ctx: SdkContext,
   optionsOrFetch?: BrowseWantedBoardOptions | typeof fetch,

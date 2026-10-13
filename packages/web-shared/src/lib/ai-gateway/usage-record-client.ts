@@ -4,15 +4,15 @@ import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type { UsageRecordInsertResult } from './processUsage.types';
-import { UsageRecordResponseSchema, type UsageRecordRequest } from './usage-record-contract';
+import { UsageRecordResponseSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 
 /**
  * Client for handing the AI-gateway usage write to a Frankfurt-local endpoint.
  *
  * `APP_URL` resolves to the Frankfurt-only `kilocode-app` deployment in
- * production. Its `next.config.mjs` rewrites divert only the six listed gateway
- * paths to `global-api.kilo.ai`, so `/api/internal/*` executes locally there,
- * next to the PostgreSQL primary.
+ * production. Its `next.config.mjs` rewrites divert only the listed gateway,
+ * Exa, and marketplace paths to other deployments, so `/api/internal/*`
+ * executes locally there, next to the PostgreSQL primary.
  */
 
 const USAGE_RECORD_PATH = '/api/internal/usage/record';

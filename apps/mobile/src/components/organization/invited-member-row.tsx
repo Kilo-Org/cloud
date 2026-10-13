@@ -1,7 +1,8 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, Share, View } from 'react-native';
+import { Pressable, Share, View } from 'react-native';
 
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
@@ -42,6 +43,7 @@ export function InvitedMemberRow({
   last,
 }: Readonly<InvitedMemberRowProps>) {
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const { showActionSheetWithOptions } = useActionSheet();
   const themedSheet = useThemedActionSheetOptions();
   const mutations = useOrganizationMutations(organizationId);
@@ -50,20 +52,14 @@ export function InvitedMemberRow({
   const statusLabel = emailStatusLabel(invite.emailStatus);
 
   function confirmRevoke() {
-    Alert.alert(
-      t('organization.members.revokeInvitation'),
-      t('organization.members.revokeInvitationMessage', { email: invite.email }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('organization.members.revokeConfirm'),
-          style: 'destructive',
-          onPress: () => {
-            mutations.deleteInvite.mutate({ inviteId: invite.inviteId });
-          },
-        },
-      ]
-    );
+    confirm({
+      title: t('organization.members.revokeInvitation'),
+      message: t('organization.members.revokeInvitationMessage', { email: invite.email }),
+      confirmLabel: t('organization.members.revokeConfirm'),
+      onConfirm: () => {
+        mutations.deleteInvite.mutate({ inviteId: invite.inviteId });
+      },
+    });
   }
 
   function openActions() {
@@ -131,7 +127,12 @@ export function InvitedMemberRow({
   );
 
   if (!canManage) {
-    return <View className="px-3">{inner}</View>;
+    return (
+      <View className="px-3">
+        {inner}
+        {dialog}
+      </View>
+    );
   }
 
   return (
@@ -142,6 +143,7 @@ export function InvitedMemberRow({
       className="px-3 active:opacity-70"
     >
       {inner}
+      {dialog}
     </Pressable>
   );
 }

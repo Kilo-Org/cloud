@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Platform, Pressable, type TextInput, View } from 'react-native';
+import { Platform, type TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { DialogCard } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -27,7 +28,7 @@ type RenameModalProps<TSaveResult> = {
   multiline?: boolean;
 };
 
-// Mount this component only while the modal should be open (e.g. `{visible && <RenameModal ... />}`)
+// Mount this component only while the dialog should be open (e.g. `{visible && <RenameModal ... />}`)
 // so each open gets fresh state: current initialValue, a reset canSave, and a re-armed Android autofocus.
 export function RenameModal<TSaveResult>({
   title,
@@ -47,7 +48,7 @@ export function RenameModal<TSaveResult>({
   const [saveInFlight, setSaveInFlight] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  // autoFocus doesn't reliably raise the keyboard inside Modal on Android
+  // autoFocus doesn't reliably raise the keyboard inside a presented surface on Android
   useEffect(() => {
     if (Platform.OS !== 'android') {
       return undefined;
@@ -93,68 +94,52 @@ export function RenameModal<TSaveResult>({
   };
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={handleClose}>
-      <Pressable
-        accessible={false}
-        className="flex-1 justify-start px-6 pt-[25%]"
-        onPress={handleClose}
-      >
-        <View className="absolute inset-0 bg-black opacity-50" />
-        <Pressable
-          accessible={false}
-          className="rounded-xl bg-card p-5 gap-4"
-          accessibilityViewIsModal
-          onPress={e => {
-            e.stopPropagation();
+    <DialogCard onClose={handleClose} placement="top">
+      <Text className="text-base font-semibold">{title}</Text>
+      <Input
+        ref={inputRef}
+        accessible
+        accessibilityLabel={placeholder}
+        // Single-line: leading-[normal] (not leading-5) so no lineHeight reaches
+        // the style: a lineHeight above the font's natural one makes iOS draw the
+        // placeholder lower than the typed text and clip its bottom.
+        // Multi-line: an explicit leading-5 plus bounded min/max heights, so the
+        // value soft-wraps into the field and scrolls vertically past the cap.
+        className={cn(
+          'rounded-md border border-input bg-background pl-3 pr-3 text-sm text-foreground',
+          multiline ? 'py-2.5 max-h-40 min-h-24 leading-5' : 'leading-[normal]',
+          pending && 'opacity-50'
+        )}
+        placeholder={placeholder}
+        placeholderTextColor={colors.mutedForeground}
+        defaultValue={initialValue}
+        multiline={multiline}
+        textAlignVertical={multiline ? 'top' : undefined}
+        onChangeText={val => {
+          nameRef.current = val;
+          const trimmed = val.trim();
+          setCanSave(trimmed.length > 0 && trimmed !== initialValue);
+        }}
+        autoFocus={Platform.OS !== 'android'}
+        maxLength={maxLength}
+        editable={!pending}
+        accessibilityState={{ disabled: pending }}
+      />
+      {errorText ? <Text className="text-sm text-destructive">{errorText}</Text> : null}
+      <View className="flex-row justify-end gap-3">
+        <Button variant="outline" onPress={handleClose} disabled={pending}>
+          <Text>{t('common.cancel')}</Text>
+        </Button>
+        <Button
+          onPress={() => {
+            void handleSave();
           }}
+          disabled={!canSave || saveInFlight}
+          loading={pending}
         >
-          <Text className="text-base font-semibold">{title}</Text>
-          <Input
-            ref={inputRef}
-            accessible
-            accessibilityLabel={placeholder}
-            // Single-line: leading-[normal] (not leading-5) so no lineHeight reaches
-            // the style: a lineHeight above the font's natural one makes iOS draw the
-            // placeholder lower than the typed text and clip its bottom.
-            // Multi-line: an explicit leading-5 plus bounded min/max heights, so the
-            // value soft-wraps into the field and scrolls vertically past the cap.
-            className={cn(
-              'rounded-md border border-input bg-background px-3 text-sm text-foreground',
-              multiline ? 'py-2.5 max-h-40 min-h-24 leading-5' : 'leading-[normal]',
-              pending && 'opacity-50'
-            )}
-            placeholder={placeholder}
-            placeholderTextColor={colors.mutedForeground}
-            defaultValue={initialValue}
-            multiline={multiline}
-            textAlignVertical={multiline ? 'top' : undefined}
-            onChangeText={val => {
-              nameRef.current = val;
-              const trimmed = val.trim();
-              setCanSave(trimmed.length > 0 && trimmed !== initialValue);
-            }}
-            autoFocus={Platform.OS !== 'android'}
-            maxLength={maxLength}
-            editable={!pending}
-            accessibilityState={{ disabled: pending }}
-          />
-          {errorText ? <Text className="text-sm text-destructive">{errorText}</Text> : null}
-          <View className="flex-row justify-end gap-3">
-            <Button variant="outline" onPress={handleClose} disabled={pending}>
-              <Text>{t('common.cancel')}</Text>
-            </Button>
-            <Button
-              onPress={() => {
-                void handleSave();
-              }}
-              disabled={!canSave || saveInFlight}
-              loading={pending}
-            >
-              <Text className="text-primary-foreground">{t('common.save')}</Text>
-            </Button>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+          <Text className="text-primary-foreground">{t('common.save')}</Text>
+        </Button>
+      </View>
+    </DialogCard>
   );
 }

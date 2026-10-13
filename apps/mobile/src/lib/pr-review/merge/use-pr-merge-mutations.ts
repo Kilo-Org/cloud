@@ -67,7 +67,7 @@ type GithubDisableAutoMergeInput = RouterInputs['githubPrReview']['disableAutoMe
  * GitLab folds it into `squash`, Bitbucket Cloud has only the merge
  * commit, and the fingerprint mirrors the server's `method` field.
  */
-export type ProviderMergeVars = {
+type ProviderMergeVars = {
   expectedHeadSha: string;
   squash?: boolean;
   deleteBranch?: boolean;

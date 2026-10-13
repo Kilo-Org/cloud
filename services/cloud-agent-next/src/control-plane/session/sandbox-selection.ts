@@ -3,6 +3,7 @@ import { agentSandboxProviderSchema } from '../../types.js';
 import { sandboxProviderConfigurationSchema } from '../../sandbox-control/provider.js';
 import { sandboxBillingInputEnvelopeSchema } from '../../container-usage-context.js';
 import { credentialContainmentSchema } from '../../sandbox-control/credential-containment.js';
+import { sandboxKindSchema } from '../../sandbox-placement.js';
 import {
   controlPlaneCredentialSourceSchema,
   controlPlaneRouteSpecSchema,
@@ -21,6 +22,8 @@ export const controlPlaneSandboxSelectionSchema = z
     configuration: sandboxProviderConfigurationSchema.optional(),
     billing: sandboxBillingInputEnvelopeSchema.optional(),
     containment: credentialContainmentSchema.optional(),
+    /** The stored kind of a placed (`sbx-`) key; absent for a legacy prefixed key. */
+    sandboxKind: sandboxKindSchema.optional(),
   })
   .strict();
 

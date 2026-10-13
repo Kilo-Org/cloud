@@ -11,10 +11,11 @@
  *   signs; their signatures verify but they are not Apple's.
  */
 import { describe, test, expect } from '@jest/globals';
-import { createHash } from 'node:crypto';
+import { createHash, createSign, generateKeyPairSync } from 'node:crypto';
 import {
   appAttestClientDataHash,
   verifyAppleAttestation,
+  verifyAppleAssertion,
   extractAppleAttestNonce,
   parseAppleAttestNonceExtension,
 } from './native-admission-apple';
@@ -267,6 +268,80 @@ describe('verifyAppleAttestation certificate chain', () => {
       bundleId
     );
     expect(result).toEqual({ ok: false, error: 'CERT_CHAIN_INVALID' });
+  });
+});
+
+// ── Assertion verification ─────────────────────────────────────────────────
+
+describe('verifyAppleAssertion', () => {
+  const keyId = createHash('sha256').update('device-key').digest('base64');
+  const challenge = 'c2VydmVyLWNoYWxsZW5nZQ';
+  const clientDataHash = appAttestClientDataHash(challenge);
+  const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+  const publicKeySpkiBase64 = publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
+
+  /** rpIdHash(32) + flags(1) + signCount(4), the assertion authenticator data. */
+  function assertionAuthData(signCount: number): Buffer {
+    const counter = Buffer.alloc(4);
+    counter.writeUInt32BE(signCount);
+    return Buffer.concat([Buffer.alloc(32, 0x11), Buffer.from([0x00]), counter]);
+  }
+
+  function assertionWith(authenticatorData: Buffer, signedMessage: Buffer): string {
+    const signature = createSign('sha256').update(signedMessage).sign(privateKey);
+    return cborMap([
+      [cborText('signature'), cborBytes(signature)],
+      [cborText('authenticatorData'), cborBytes(authenticatorData)],
+    ]).toString('base64');
+  }
+
+  test('accepts a signature over nonce, as the Secure Enclave produces it', async () => {
+    // DCAppAttestService signs nonce = SHA256(authenticatorData || clientDataHash)
+    // with ECDSA-SHA256, so the signed digest is SHA256(nonce).
+    const authenticatorData = assertionAuthData(7);
+    const nonce = createHash('sha256')
+      .update(Buffer.concat([authenticatorData, clientDataHash]))
+      .digest();
+
+    const result = await verifyAppleAssertion(
+      keyId,
+      clientDataHash,
+      assertionWith(authenticatorData, nonce),
+      publicKeySpkiBase64
+    );
+
+    expect(result).toEqual({ ok: true, signCount: 7 });
+  });
+
+  test('rejects a signature over the unhashed authenticatorData || clientDataHash', async () => {
+    // Regression: the verifier hashed the concatenation only once, so every real
+    // assertion failed with INVALID_ASSERTION and returning iOS sign-ins got 403.
+    const authenticatorData = assertionAuthData(7);
+
+    const result = await verifyAppleAssertion(
+      keyId,
+      clientDataHash,
+      assertionWith(authenticatorData, Buffer.concat([authenticatorData, clientDataHash])),
+      publicKeySpkiBase64
+    );
+
+    expect(result).toEqual({ ok: false, error: 'INVALID_ASSERTION' });
+  });
+
+  test('rejects an assertion bound to a different challenge', async () => {
+    const authenticatorData = assertionAuthData(7);
+    const otherNonce = createHash('sha256')
+      .update(Buffer.concat([authenticatorData, appAttestClientDataHash('other-challenge')]))
+      .digest();
+
+    const result = await verifyAppleAssertion(
+      keyId,
+      clientDataHash,
+      assertionWith(authenticatorData, otherNonce),
+      publicKeySpkiBase64
+    );
+
+    expect(result).toEqual({ ok: false, error: 'INVALID_ASSERTION' });
   });
 });
 

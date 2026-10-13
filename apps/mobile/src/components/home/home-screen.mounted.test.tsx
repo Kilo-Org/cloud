@@ -31,7 +31,6 @@ const state = vi.hoisted(() => ({
   },
   internet: 'online' as BannerState,
   connection: { isConnected: true, reconnectExhausted: false },
-  prReviewEnabled: true,
   /** Landscape side safe areas (notch/sensor); portrait is all zeros. */
   insets: { top: 0, bottom: 0, left: 0, right: 0 },
   /** The platform value the safe-area layout must be identical under. */
@@ -98,6 +97,7 @@ vi.mock('expo-router', () => ({
   }),
 }));
 vi.mock('@/components/home/new-task-button', () => ({ NewTaskButton: 'NewTaskButton' }));
+vi.mock('@/components/todos/up-next-section', () => ({ UpNextSection: 'UpNextSection' }));
 vi.mock('@/components/home/new-task-from-picture-button', () => ({
   NewTaskFromPictureButton: 'NewTaskFromPictureButton',
 }));
@@ -131,11 +131,6 @@ vi.mock('@/components/ui/icons', () => ({
   WifiOff: 'WifiOff',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'mobile-pr-review',
-  useFeatureFlag: (flag: string, fallback: boolean) =>
-    flag === 'mobile-pr-review' ? state.prReviewEnabled : fallback,
-}));
 vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
 vi.mock('@/components/agents/use-agent-session-navigator', () => ({
   useAgentSessionNavigator: () => vi.fn(),
@@ -154,10 +149,6 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#777777' }),
-}));
-vi.mock('@/lib/home-live-shape', () => ({
-  readLiveShapeHint: () => 'rows',
-  persistLiveShapeHint: vi.fn(),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => state.internet,
@@ -275,7 +266,6 @@ beforeEach(() => {
   Object.assign(state.insets, { top: 0, bottom: 0, left: 0, right: 0 });
   state.platformOS = 'ios';
   state.internet = 'online';
-  state.prReviewEnabled = true;
   state.destination = '';
   state.announcements = [];
   state.refetch.mockReset().mockResolvedValue(true);
@@ -739,7 +729,7 @@ describe('Home admission', () => {
   });
 
   it.each(['unresolved', 'failed', 'missing'] as const)(
-    'keeps PR Review behind its own flag and route while membership is %s',
+    'keeps PR Review available on its own route while membership is %s',
     async mode => {
       state.organization.organizationId = 'org-1';
       state.boundary.isResolving = mode === 'unresolved';
@@ -751,11 +741,6 @@ describe('Home admission', () => {
       expect(text()).not.toContain('Security Agent');
       press('PR Review');
       expect(state.destination).toBe('/(app)/pr-review');
-
-      state.prReviewEnabled = false;
-      await renderHome();
-      expect(text()).not.toContain('PR Review');
-      expect(nodes('SectionHeader').some(node => node.props.label === 'Explore')).toBe(false);
     }
   );
   it.each(['pending', 'failed'] as const)(
@@ -852,7 +837,7 @@ describe('Home admission', () => {
   });
 
   it.each(['unavailable', 'error'] as const)(
-    'centers %s feedback only without remaining product choices',
+    'keeps %s feedback inline alongside PR Review',
     async mode => {
       state.organization.organizationId = 'org-1';
       state.boundary.orgs = [];
@@ -861,68 +846,52 @@ describe('Home admission', () => {
       expect(nodes('CenteredState')).toHaveLength(0);
       expect(nodes('ScrollView')).toHaveLength(1);
       expect(text()).toContain('PR Review');
-
-      state.prReviewEnabled = false;
-      await renderHome();
-      expect(nodes('CenteredState')).toHaveLength(1);
-      expect(nodes('CenteredState')[0]?.props.refreshControl).toBeDefined();
-      expect(nodes('ScrollView')).toHaveLength(0);
-      expect(nodes('NewTaskButton')).toHaveLength(0);
-      expect(text()).not.toContain('PR Review');
-      expect(text()).toContain(
-        mode === 'error' ? "Couldn't load your organizations" : 'Organization unavailable'
-      );
     }
   );
 
   it('keeps session failures inline when the new task choice remains', async () => {
     state.live.terminalError = failure;
-    state.prReviewEnabled = false;
     await renderHome();
     expect(nodes('CenteredState')).toHaveLength(0);
     expect(nodes('ScrollView')).toHaveLength(1);
     expect(nodes('NewTaskButton')).toHaveLength(1);
   });
 
-  it.each([false, true])(
-    'refreshes organization errors through the context with product choices=%s',
-    async prReviewEnabled => {
-      state.organization.organizationId = 'org-1';
-      state.boundary.isError = true;
-      state.prReviewEnabled = prReviewEnabled;
-      const pending = Promise.withResolvers<undefined>();
-      state.boundaryRefetch.mockReturnValue(pending.promise);
-      await renderHome();
-      const refresh = () =>
-        nodes(prReviewEnabled ? 'ScrollView' : 'CenteredState')[0]?.props.refreshControl as {
-          props: { refreshing: boolean; onRefresh: () => void };
-        };
-      act(() => {
-        refresh().props.onRefresh();
-      });
-      expect(state.boundaryRefetch).toHaveBeenCalledOnce();
-      expect(state.refetch).not.toHaveBeenCalled();
-      expect(refresh().props.refreshing).toBe(true);
-      await act(async () => {
-        pending.resolve(undefined);
-        await pending.promise;
-      });
-      expect(refresh().props.refreshing).toBe(false);
-
-      state.organization.organizationId = null;
-      state.live.activeSessions = [row];
-      await renderHome();
-      const readyRefresh = nodes('ScrollView')[0]?.props.refreshControl as {
-        props: { onRefresh: () => void };
+  it('refreshes organization errors through the context', async () => {
+    state.organization.organizationId = 'org-1';
+    state.boundary.isError = true;
+    const pending = Promise.withResolvers<undefined>();
+    state.boundaryRefetch.mockReturnValue(pending.promise);
+    await renderHome();
+    const refresh = () =>
+      nodes('ScrollView')[0]?.props.refreshControl as {
+        props: { refreshing: boolean; onRefresh: () => void };
       };
-      await act(async () => {
-        readyRefresh.props.onRefresh();
-        await Promise.resolve();
-      });
-      expect(state.refetch).toHaveBeenCalledOnce();
-      expect(state.boundaryRefetch).toHaveBeenCalledOnce();
-    }
-  );
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    expect(state.boundaryRefetch).toHaveBeenCalledOnce();
+    expect(state.refetch).not.toHaveBeenCalled();
+    expect(refresh().props.refreshing).toBe(true);
+    await act(async () => {
+      pending.resolve(undefined);
+      await pending.promise;
+    });
+    expect(refresh().props.refreshing).toBe(false);
+
+    state.organization.organizationId = null;
+    state.live.activeSessions = [row];
+    await renderHome();
+    const readyRefresh = nodes('ScrollView')[0]?.props.refreshControl as {
+      props: { onRefresh: () => void };
+    };
+    await act(async () => {
+      readyRefresh.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(state.refetch).toHaveBeenCalledOnce();
+    expect(state.boundaryRefetch).toHaveBeenCalledOnce();
+  });
 
   it('recovers membership through boundary Retry and revokes admission on an unresolved organization change', async () => {
     state.organization.organizationId = 'org-1';
@@ -954,105 +923,5 @@ describe('Home admission', () => {
     expect(hasLoadedCard()).toBe(false);
     expect(nodes('NewTaskButton')).toHaveLength(0);
     expect(text()).not.toContain('Nothing running right now');
-  });
-});
-
-describe('Home leading edge', () => {
-  /** The outer header chrome: the first `bg-background` container above the logo. */
-  function headerContainerClass() {
-    let node = nodes('Image')[0]?.parent ?? null;
-    while (node) {
-      if (
-        typeof node.props.className === 'string' &&
-        node.props.className.includes('bg-background')
-      ) {
-        return node.props.className;
-      }
-      node = node.parent;
-    }
-    throw new Error('Missing the header container above the logo');
-  }
-
-  /** Host views that carry the landscape side safe area as inline padding. */
-  function sideInsetViews(side: number) {
-    return nodes('View').filter(node => {
-      const { paddingLeft, paddingRight } = (node.props.style ?? {}) as {
-        paddingLeft?: number;
-        paddingRight?: number;
-      };
-      return paddingLeft === side && paddingRight === side;
-    });
-  }
-
-  it('clears the landscape side safe area on the page body, exactly as the header chrome does', async () => {
-    // The reporter's device reports a large left cutout in landscape (47pt is
-    // the fleet's worst case, see `tab-bar-layout.test.ts`).
-    state.insets.left = 47;
-    state.insets.right = 47;
-    await renderHome();
-
-    // The header chrome and the page body must clear the SAME sensor by the
-    // same amount, or the brand mark sits inside the leading edge of the
-    // sections, cards and actions below it.
-    const inset = sideInsetViews(47);
-    expect(inset).toHaveLength(2);
-    const scroll = nodes('ScrollView')[0];
-    expect(scroll).toBeDefined();
-    expect(inset.some(view => view.findAll(node => node === scroll).length > 0)).toBe(true);
-  });
-
-  it('renders the same landscape inset on iOS and Android, one implementation for both', async () => {
-    state.insets.left = 47;
-    state.insets.right = 47;
-    state.platformOS = 'ios';
-    await renderHome();
-    const ios = sideInsetViews(47);
-
-    state.platformOS = 'android';
-    await renderHome();
-    const android = sideInsetViews(47);
-
-    // One implementation for both platforms: the platform value never changes
-    // the header chrome's or the page body's leading edge.
-    expect(ios).toHaveLength(2);
-    expect(android.map(view => view.props.style)).toEqual(ios.map(view => view.props.style));
-  });
-
-  it('clears the landscape side safe area around the centered feedback body too', async () => {
-    state.insets.left = 47;
-    state.insets.right = 47;
-    state.organization.organizationId = 'org-1';
-    state.boundary.orgs = [];
-    state.boundary.isError = true;
-    await renderHome();
-    state.prReviewEnabled = false;
-    await renderHome();
-
-    const centered = nodes('CenteredState')[0];
-    expect(centered).toBeDefined();
-    expect(
-      sideInsetViews(47).some(view => view.findAll(node => node === centered).length > 0)
-    ).toBe(true);
-  });
-
-  it('leaves portrait geometry untouched when the side insets are zero', async () => {
-    await renderHome();
-    const positivePadding = nodes('View').filter(node => {
-      const style = node.props.style as { paddingLeft?: number; paddingRight?: number } | undefined;
-      return (style?.paddingLeft ?? 0) > 0 || (style?.paddingRight ?? 0) > 0;
-    });
-    expect(positivePadding).toHaveLength(0);
-  });
-
-  it('keeps the brand mark on the page gutter that the sections and cards use', async () => {
-    await renderHome();
-    const bodyGutter = nodes('View').find(
-      node =>
-        typeof node.props.className === 'string' && node.props.className.split(' ').includes('mx-4')
-    );
-    expect(bodyGutter).toBeDefined();
-    // The logo is the header's only visible child, so the header's px-4 is the
-    // brand mark's leading edge; the body's leading edge is the mx-4 above.
-    expect(headerContainerClass()).toContain('px-4');
   });
 });

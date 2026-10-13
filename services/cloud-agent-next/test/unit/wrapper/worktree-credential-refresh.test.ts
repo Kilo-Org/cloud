@@ -84,6 +84,22 @@ const originalEnv = { GH_TOKEN: 'github-original', CUSTOM_VALUE: 'profile-value'
 const registries: WorktreeKiloRuntimes[] = [];
 
 describe('cloud runtime feature configuration', () => {
+  it('explicitly approves dotenv reads without enabling disabled tools', () => {
+    const env = buildWorktreeKiloEnvironment(identity.directory, '/runtime-home', auth, {}, {});
+
+    for (const key of ['KILO_CONFIG_CONTENT', 'OPENCODE_CONFIG_CONTENT']) {
+      const config: unknown = JSON.parse(env[key]);
+      expect(config).toMatchObject({
+        permission: {
+          read: { '*': 'allow', '*.env': 'allow', '*.env.*': 'allow' },
+          suggest: 'deny',
+          schedule_wakeup: 'deny',
+          cron_create: 'deny',
+        },
+      });
+    }
+  });
+
   it('disables background subagents, indexing and snapshots despite profile or inherited overrides', () => {
     const overrides = {
       KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'true',

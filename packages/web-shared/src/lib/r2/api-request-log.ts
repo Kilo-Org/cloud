@@ -2,7 +2,7 @@ import { GetObjectCommand, NoSuchKey, PutObjectCommand, type S3Client } from '@a
 import { randomUUID } from 'node:crypto';
 import type { ApiRequestLog } from '@kilocode/db/schema';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import { createR2Client } from '@kilocode/web-shared/lib/r2/client';
+import { createR2Client } from '@kilocode/web-shared/lib/r2/create-client';
 
 export type ApiRequestLogBlobUpload = {
   columns: Pick<ApiRequestLog, 'request_r2_key' | 'response_r2_key'>;

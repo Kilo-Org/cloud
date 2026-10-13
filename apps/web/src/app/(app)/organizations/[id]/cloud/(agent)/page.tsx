@@ -1,6 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
-import { isFeatureFlagEnabledOrDevelopment } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { NewSessionPanel } from '@/components/cloud-agent-next/NewSessionPanel';
 
 export default async function OrganizationCloudPage({
@@ -13,10 +12,6 @@ export default async function OrganizationCloudPage({
   const user = await getUserFromAuthOrRedirect(
     `/users/sign_in?callbackPath=${encodeURIComponent(`/organizations/${organizationId}/cloud`)}`
   );
-  const isDevcontainerAvailable = await isFeatureFlagEnabledOrDevelopment(
-    'cloud-agent-devcontainer',
-    organizationId
-  );
 
   return (
     <OrganizationByPageLayout
@@ -27,7 +22,6 @@ export default async function OrganizationCloudPage({
           organizationId={organization.id}
           organizationName={organization.name}
           organizationRole={role}
-          isDevcontainerAvailable={isDevcontainerAvailable}
         />
       )}
     />

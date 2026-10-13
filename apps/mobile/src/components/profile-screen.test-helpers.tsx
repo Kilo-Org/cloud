@@ -88,16 +88,12 @@ vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
 }));
 
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'mobile-pr-review',
-  useFeatureFlag: () => true,
-}));
-
 vi.mock('@/components/use-delete-account', () => ({
   useDeleteAccount: () => ({
     phase: 'idle',
     isPending: false,
     devCode: null,
+    canSubmitCode: false,
     beginDelete: vi.fn(),
     submitCode: vi.fn(),
     setCode: vi.fn(),
@@ -137,6 +133,14 @@ vi.mock('@/lib/external-link', () => ({
 
 vi.mock('@/lib/feedback', () => ({
   showFeedbackPrompt: vi.fn(),
+}));
+
+vi.mock('@/components/use-feedback-prompt', () => ({
+  useFeedbackPrompt: () => ({ requestPrompt: vi.fn(), promptDialog: null }),
+}));
+
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
 }));
 
 vi.mock('@/components/ui/icons', () => ({

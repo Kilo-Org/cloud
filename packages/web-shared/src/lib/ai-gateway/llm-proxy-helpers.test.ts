@@ -32,6 +32,7 @@ import {
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
+  extractReasoningSetting,
   getOrganizationProviderPrivacy,
   lastUserPromptText,
   makeErrorReadable,
@@ -41,6 +42,125 @@ import {
   requestedLogprobs,
   requestedSamples,
 } from './llm-proxy-helpers';
+
+describe('extractReasoningSetting', () => {
+  it.each<{ name: string; body: unknown; expected: string | null }>([
+    { name: 'absent fields', body: {}, expected: null },
+    { name: 'null body', body: null, expected: null },
+    { name: 'undefined body', body: undefined, expected: null },
+    { name: 'primitive body', body: 'high', expected: null },
+    { name: 'array body', body: [], expected: null },
+    {
+      name: 'enabled thinking',
+      body: { thinking: { type: 'enabled' } },
+      expected: 'thinking:enabled',
+    },
+    {
+      name: 'adaptive thinking',
+      body: { thinking: { type: 'adaptive' } },
+      expected: 'thinking:adaptive',
+    },
+    {
+      name: 'disabled thinking',
+      body: { thinking: { type: 'disabled' } },
+      expected: 'thinking:disabled',
+    },
+    ...[
+      [0, 'le1k'],
+      [1_000, 'le1k'],
+      [1_001, 'le4k'],
+      [4_000, 'le4k'],
+      [4_001, 'le16k'],
+      [16_000, 'le16k'],
+      [16_001, 'le64k'],
+      [32_000, 'le64k'],
+      [64_000, 'le64k'],
+      [64_001, 'gt64k'],
+    ].flatMap(([budget, bucket]) => [
+      {
+        name: `thinking budget ${budget}`,
+        body: { thinking: { type: 'enabled', budget_tokens: budget } },
+        expected: `thinking:enabled:${bucket}`,
+      },
+      {
+        name: `reasoning budget ${budget}`,
+        body: { reasoning: { max_tokens: budget } },
+        expected: `reasoning:budget:${bucket}`,
+      },
+    ]),
+    ...['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].flatMap(effort => [
+      {
+        name: `chat effort ${effort}`,
+        body: { reasoning_effort: effort },
+        expected: `effort:${effort}`,
+      },
+      {
+        name: `messages effort ${effort}`,
+        body: { output_config: { effort } },
+        expected: `effort:${effort}`,
+      },
+      {
+        name: `responses effort ${effort}`,
+        body: { reasoning: { effort } },
+        expected: `effort:${effort}`,
+      },
+    ]),
+    ...['HIGH', '', 'unbounded-client-label'.repeat(100)].flatMap(effort => [
+      { name: 'unknown chat effort', body: { reasoning_effort: effort }, expected: 'effort:other' },
+      {
+        name: 'unknown messages effort',
+        body: { output_config: { effort } },
+        expected: 'effort:other',
+      },
+      {
+        name: 'unknown reasoning effort',
+        body: { reasoning: { effort } },
+        expected: 'effort:other',
+      },
+    ]),
+    {
+      name: 'reasoning disabled',
+      body: { reasoning: { enabled: false } },
+      expected: 'reasoning:disabled',
+    },
+    { name: 'reasoning exclude ignored', body: { reasoning: { exclude: true } }, expected: null },
+    { name: 'reasoning enabled ignored', body: { reasoning: { enabled: true } }, expected: null },
+    {
+      name: 'fixed label order',
+      body: {
+        reasoning: { effort: 'high', enabled: false, max_tokens: 4_000, exclude: true },
+        thinking: { type: 'adaptive', budget_tokens: 32_000 },
+      },
+      expected: 'thinking:adaptive:le64k+effort:high+reasoning:disabled+reasoning:budget:le4k',
+    },
+    {
+      name: 'effort alias precedence',
+      body: {
+        output_config: { effort: 'low' },
+        reasoning_effort: 'medium',
+        reasoning: { effort: 'high' },
+      },
+      expected: 'effort:low',
+    },
+    ...[
+      { thinking: { type: 'client-supplied', budget_tokens: 32_000 } },
+      { thinking: 'enabled', reasoning: 'high', output_config: 'high' },
+      { thinking: [], reasoning: [], output_config: [] },
+      { thinking: null, reasoning: null, output_config: null },
+      { thinking: { type: 123 }, reasoning: { enabled: 'false', max_tokens: '1000' } },
+      { reasoning_effort: 123, output_config: { effort: {} }, reasoning: { effort: false } },
+      { reasoning: { max_tokens: NaN } },
+      { reasoning: { max_tokens: Infinity } },
+    ].map(body => ({ name: 'malformed input', body, expected: null })),
+    {
+      name: 'malformed budget does not discard known thinking type',
+      body: { thinking: { type: 'enabled', budget_tokens: '32000' } },
+      expected: 'thinking:enabled',
+    },
+  ])('$name', ({ body, expected }) => {
+    expect(extractReasoningSetting(body)).toBe(expected);
+  });
+});
 
 describe('getOrganizationProviderPrivacy', () => {
   it.each(['allow', 'deny'] as const)('returns data_collection=%s', dataCollection => {
@@ -269,6 +389,7 @@ describe('countAndStoreFimUsage', () => {
       session_id: null,
       mode: null,
       auto_model: null,
+      reasoning_setting: null,
       ttfb_ms: null,
       ...overrides,
     } as MicrodollarUsageContext;
@@ -365,6 +486,7 @@ describe('countAndStoreEditUsage', () => {
       session_id: null,
       mode: null,
       auto_model: null,
+      reasoning_setting: null,
       ttfb_ms: null,
       ...overrides,
     } as MicrodollarUsageContext;
@@ -660,16 +782,207 @@ describe('makeErrorReadable', () => {
   it('does not label other user BYOK 404 responses as Vertex errors', async () => {
     const response = Response.json({ error: { message: 'Model not found' } }, { status: 404 });
 
-    await expect(
-      makeErrorReadable({
-        providerId: 'vercel',
-        requestedModel: 'anthropic/claude-sonnet-5',
-        request,
-        response,
-        userByokProviderIds: ['anthropic'],
-      })
-    ).resolves.toBeUndefined();
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-5',
+      request,
+      response,
+      userByokProviderIds: ['anthropic'],
+    });
+
+    expect(result?.status).toBe(404);
+    await expect(result?.json()).resolves.toEqual({
+      error: '[BYOK] Model not found',
+      error_type: 'byok_error',
+      message: '[BYOK] Model not found',
+    });
   });
+
+  it.each([
+    {
+      providerId: 'direct-byok',
+      userByokProviderIds: ['opencode-go'],
+      body: {
+        error: { type: 'server_error', message: 'A synthetic region setting blocks this model.' },
+      },
+      expectedMessage: 'A synthetic region setting blocks this model.',
+    },
+    {
+      providerId: 'vercel',
+      userByokProviderIds: ['anthropic'],
+      body: {
+        error: {
+          message: 'Synthetic provider account configuration needs attention.',
+          metadata: { routing: { credentialType: 'byok' } },
+        },
+        isRetryable: false,
+      },
+      expectedMessage: 'Synthetic provider account configuration needs attention.',
+    },
+    {
+      providerId: 'vercel',
+      userByokProviderIds: [],
+      body: { message: 'Synthetic request option is unsupported.' },
+      expectedMessage: 'Synthetic request option is unsupported.',
+    },
+  ] as const)(
+    'marks a $providerId BYOK 400 without forwarding upstream metadata',
+    async fixture => {
+      const result = await makeErrorReadable({
+        providerId: fixture.providerId,
+        requestedModel: 'synthetic-model',
+        request,
+        response: Response.json(fixture.body, { status: 400 }),
+        userByokProviderIds: [...fixture.userByokProviderIds],
+      });
+
+      expect(result?.status).toBe(400);
+      await expect(result?.json()).resolves.toEqual({
+        error: `[BYOK] ${fixture.expectedMessage}`,
+        error_type: 'byok_error',
+        message: `[BYOK] ${fixture.expectedMessage}`,
+      });
+    }
+  );
+
+  it.each([400, 404, 405, 408, 409, 422, 499])(
+    'preserves the upstream status for a generic BYOK %i',
+    async status => {
+      const result = await makeErrorReadable({
+        providerId: 'vercel',
+        requestedModel: 'synthetic-model',
+        request,
+        response: Response.json({}, { status }),
+        userByokProviderIds: [],
+      });
+
+      expect(result?.status).toBe(status);
+      await expect(result?.json()).resolves.toEqual({
+        error:
+          '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+        error_type: 'byok_error',
+        message:
+          '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+      });
+    }
+  );
+
+  it('keeps context overflow ahead of generic BYOK rejection', async () => {
+    const body = {
+      error: { message: 'The maximum context length is 1024 tokens. Requested 2048 tokens.' },
+    };
+    const result = await makeErrorReadable({
+      providerId: 'direct-byok',
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(body, { status: 400 }),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    expect(result?.status).toBe(400);
+    await expect(result?.json()).resolves.toEqual({
+      ...body,
+      error_type: 'context_length_exceeded',
+    });
+  });
+
+  it.each([
+    [401, []],
+    [402, ['anthropic']],
+    [403, ['anthropic']],
+    [403, ['opencode-go']],
+    [429, []],
+    [404, ['vertex']],
+  ] as const)(
+    'keeps the specific BYOK %i mapping ahead of an upstream overflow body for %j',
+    async (status, providerIds) => {
+      const options = {
+        providerId: 'vercel',
+        requestedModel: 'synthetic-model',
+        request,
+        userByokProviderIds: [...providerIds],
+      } satisfies Omit<Parameters<typeof makeErrorReadable>[0], 'response'>;
+      const baseline = await makeErrorReadable({
+        ...options,
+        response: Response.json({}, { status }),
+      });
+      const result = await makeErrorReadable({
+        ...options,
+        response: Response.json(
+          {
+            error: { message: 'The maximum context length is 1024 tokens. Requested 2048 tokens.' },
+          },
+          { status }
+        ),
+      });
+
+      expect(result?.status).toBe(status);
+      const body = await result?.json();
+      expect(body).toMatchObject({ error_type: 'byok_error' });
+      expect(body).toEqual(await baseline?.json());
+    }
+  );
+
+  it.each([400, 500, 502, 503])(
+    'leaves non-BYOK errors and BYOK outages unchanged for status %i',
+    async status => {
+      for (const userByokProviderIds of status === 400 ? [null] : [null, ['anthropic'] as const]) {
+        await expect(
+          makeErrorReadable({
+            providerId: 'vercel',
+            requestedModel: 'synthetic-model',
+            request,
+            response: Response.json(
+              { error: { message: 'Synthetic provider failure.' } },
+              { status }
+            ),
+            userByokProviderIds: userByokProviderIds === null ? null : [...userByokProviderIds],
+          })
+        ).resolves.toBeUndefined();
+      }
+    }
+  );
+
+  it('removes control characters and bounds generic BYOK provider text', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(
+        { error: { message: `  Synthetic\u0000\n\u007f\u0085${'x'.repeat(400)}  ` } },
+        { status: 400 }
+      ),
+      userByokProviderIds: ['anthropic'],
+    });
+
+    const expected = `[BYOK] ${`Synthetic    ${'x'.repeat(400)}`.slice(0, 300)}`;
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it.each(['not json', '{}', '{"error":{"message":42}}', '{"message":"\\u0000\\n"}'])(
+    'falls back to fixed BYOK text for an unusable provider body: %s',
+    async body => {
+      const result = await makeErrorReadable({
+        providerId: 'vercel',
+        requestedModel: 'synthetic-model',
+        request,
+        response: new Response(body, { status: 400 }),
+        userByokProviderIds: ['anthropic'],
+      });
+
+      await expect(result?.json()).resolves.toEqual({
+        error:
+          '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+        error_type: 'byok_error',
+        message:
+          '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+      });
+    }
+  );
 
   it.each([
     [401, []],
@@ -738,35 +1051,38 @@ describe('makeErrorReadable', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('returns an actionable error when no allowed provider serves the model', async () => {
-    const response = Response.json(
-      {
-        message: 'No allowed providers are available for the selected model.',
-        code: 404,
-        metadata: {
-          available_providers: ['alibaba'],
-          requested_providers: ['anthropic', 'openai'],
+  it.each([null, ['anthropic']] as const)(
+    'keeps provider routing errors ahead of generic BYOK rejection with provider set %j',
+    async providerIds => {
+      const response = Response.json(
+        {
+          message: 'No allowed providers are available for the selected model.',
+          code: 404,
+          metadata: {
+            available_providers: ['alibaba'],
+            requested_providers: ['anthropic', 'openai'],
+          },
         },
-      },
-      { status: 404 }
-    );
+        { status: 404 }
+      );
 
-    const result = await makeErrorReadable({
-      providerId: 'openrouter',
-      requestedModel: 'qwen/qwen3.7-plus',
-      request,
-      response,
-      userByokProviderIds: null,
-    });
+      const result = await makeErrorReadable({
+        providerId: 'openrouter',
+        requestedModel: 'qwen/qwen3.7-plus',
+        request,
+        response,
+        userByokProviderIds: providerIds === null ? null : [...providerIds],
+      });
 
-    expect(result?.status).toBe(404);
-    await expect(result?.json()).resolves.toEqual({
-      error: 'No eligible provider can serve the selected model.',
-      error_type: 'provider_not_allowed',
-      message:
-        'No eligible provider can serve the selected model. Select another model or update the provider routing settings.',
-    });
-  });
+      expect(result?.status).toBe(404);
+      await expect(result?.json()).resolves.toEqual({
+        error: 'No eligible provider can serve the selected model.',
+        error_type: 'provider_not_allowed',
+        message:
+          'No eligible provider can serve the selected model. Select another model or update the provider routing settings.',
+      });
+    }
+  );
 
   it('recognizes the wrapped OpenRouter error response', async () => {
     const response = Response.json(

@@ -24,6 +24,18 @@ console.info('SDK provenance resolution', {
 
 export default defineConfig({
   plugins: [
+    {
+      name: 'fix-pg-cjs-dependencies',
+      enforce: 'pre',
+      resolveId(source: string, importer?: string) {
+        if (importer === undefined) return undefined;
+        if (source === 'pg-protocol') {
+          return createRequire(importer).resolve('pg-protocol/dist/index.js');
+        }
+        if (source === 'pg-pool') return createRequire(importer).resolve(source);
+        return undefined;
+      },
+    },
     cloudflareTest({
       main: './test/sdk-provenance/worker.ts',
       miniflare: {

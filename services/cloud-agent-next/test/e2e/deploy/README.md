@@ -74,14 +74,14 @@ The commands below run from `services/cloud-agent-next` (or use the full path fr
 4. Render and deploy the e2e Worker:
 
    ```sh
-   E2E_USER_ID=<id> FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh dry-run
-   E2E_USER_ID=<id> FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy
+   FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh dry-run
+   FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy
    # add E2E_INTERNAL_API_SECRET=<secret> on the first deploy, or to rotate it
    ```
 
-   The deployed test Worker enrolls `E2E_USER_ID` for control-plane and
-   worktree-session creation, and it writes to production Postgres and R2; pass
-   `*` only as a deliberate opt-in to enrol every authenticated Kilo user.
+   The deployed test Worker writes to production Postgres and R2. Every
+   authenticated Kilo user can start control-plane sessions and create worktrees
+   on it.
 
    `deploy` uploads `E2E_INTERNAL_API_SECRET` as the Worker's
    `INTERNAL_API_SECRET` secret when a source supplies it. `wrangler deploy` never
@@ -161,7 +161,6 @@ script never falls back to another token and never prints the token value.
 
 | Name | Required | Meaning |
 |---|---|---|
-| `E2E_USER_ID` | yes | Required. The Kilo user id enrolled in `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS`. The deployed test Worker writes to production Postgres and R2, so pass `*` only as a deliberate opt-in to enrol every authenticated Kilo user. |
 | `E2E_AUTH_FILE` | no | Optional mode-600 JSON file for a deployed run: `{ token, userId?, email?, fakeLlmAdminToken?, e2eInternalApiSecret? }`. Supplies the user token when `E2E_USER_TOKEN` is unset or empty, and the identity (`userId` derived from the token when omitted; `email` optional). `deploy-fake-llm.sh` reads its `fakeLlmAdminToken` field when `FAKE_LLM_ADMIN_TOKEN` is unset or empty; `deploy-e2e-worker.sh` and the deployed driver read its `e2eInternalApiSecret` field when `E2E_INTERNAL_API_SECRET` is unset or empty. |
 | `E2E_USER_TOKEN` | no | An ordinary personal Kilo API token for the driver, presented verbatim. Takes precedence over the auth file's `token` field and needs no separate `userId`/`email`. Not read by `deploy-fake-llm.sh`. |
 | `E2E_INTERNAL_API_SECRET` | required for the deployed driver; optional for deploy | Value uploaded as the `cloud-agent-e2e-test` Worker's `INTERNAL_API_SECRET` secret when a source supplies it, and always presented by the driver as both the surface key and the internal tRPC key. Needed for the first deploy or a rotation; a redeploy without it keeps the deployed value. When unset or empty, both `deploy-e2e-worker.sh` and the deployed driver resolve it from the `E2E_AUTH_FILE`'s `e2eInternalApiSecret` field. The shared `requireE2eInternalSecret` rules require at least 16 characters, no whitespace, and not the development default; the dotenv alphabet `[A-Za-z0-9._~-]` is a local-renderer concern only, so a base64 value is accepted here. Must differ from production's `INTERNAL_API_SECRET` (an operator requirement the scripts cannot prove). |
@@ -203,29 +202,30 @@ semantics.
 | `main` and container `image` paths rebased (`../src/index.ts`, `../Dockerfile*`) | The rendered config lives one directory deeper, in `.wrangler/`. |
 | Report-queue producer and consumer removed | The e2e Worker must not produce or consume the production report queue. |
 | Callback-queue producer and consumer renamed to `cloud-agent-next-callback-queue-e2e-test` | The e2e Worker can never consume production callback messages. |
-| Only the `SandboxSmall` container class kept, `max_instances = 20`, `ssh.enabled = true` | The stack only runs normal `ses-` sessions; `20` is a cap rather than a reservation and leaves parallelism headroom for later parallel runs. Enables SSH inspection. |
+| Only the `Sandbox` container class kept, `max_instances = 20`, `ssh.enabled = true` | The stack only runs normal non-contained `ses-` sessions, which route to `Sandbox`; `20` is a cap rather than a reservation and leaves parallelism headroom for later parallel runs. Enables SSH inspection. |
 | The other container classes removed from `containers`, `durable_objects.bindings` and `migrations` | A container class is all three entries; keeping a binding or migration without its class fails the deploy. Removing them removes unused capacity and deploy cost. |
 | Billing flags off (`CLOUD_AGENT_CONTAINER_BILLING_*`) | Matches the dev profile. |
 | `CREDENTIAL_CONTAINMENT_ENABLED=false` | Non-contained dispatch; see plan sections 5 and 11.6. |
 | `NEXTAUTH_SECRET` Secrets Store binding added | Verifies the ticket and API token, and seals runtime authorization. |
 | `SHARED_SANDBOX_OVERRIDES` KV binding pinned to the e2e namespace id | An id-less binding makes wrangler auto-provision the namespace and fail with `code: 10014` because the title already exists. |
+| `REPO_SNAPSHOTS` KV binding removed | The e2e Worker has no `SandboxContainers` class, so no repository snapshots; an id-less binding would provision a namespace for nothing. |
 
 ### Container classes and removed bindings
 
-The e2e Worker provisions exactly one container class, `SandboxSmall`, with
+The e2e Worker provisions exactly one container class, `Sandbox`, with
 `max_instances: 20`. The value is an upper cap, not a reservation, and gives
-parallelism headroom for later parallel runs. `SandboxSmall` keeps the rendered
+parallelism headroom for later parallel runs. `Sandbox` keeps the rendered
 `image` and `instance_type`; only `max_instances` and `ssh.enabled` change.
 
-All other container classes (`Sandbox`, `SandboxDIND`, `SandboxCodeReview`,
+All other container classes (`SandboxSmall`, `SandboxDIND`, `SandboxCodeReview`,
 `SandboxContainment`, `SandboxSmallContainment`, `SandboxCodeReviewContainment`,
 `SandboxContainers`)
 are removed from `containers`, `durable_objects.bindings` and `migrations`, so
 those bindings do not exist on `cloud-agent-e2e-test`. The migration list keeps
 each surviving SQLite Durable Object class on its original production tag
-(`CloudAgentSession` `v2`, `SandboxSmall` `v3`, `UserKiloFacade` `v5`,
+(`Sandbox` `v1`, `CloudAgentSession` `v2`, `UserKiloFacade` `v5`,
 `StreamTicketNonceDO` `v8`, `SandboxControl` `v9`, `SandboxSession` `v10`);
-entries whose classes are all removed (`v1`, `v4`, `v6`, `v7`, `v11`) are dropped, and
+entries whose classes are all removed (`v3`, `v4`, `v6`, `v7`, `v11`) are dropped, and
 no surviving tag is renumbered or reordered. The e2e Worker's Durable Object
 migration history is **append-only**: once a Worker has been deployed, existing
 tags are part of its creation history and cannot be renumbered. To change the
@@ -244,19 +244,19 @@ and the public-surface `worktree-chat`, `worktree-multi-chat`,
 `PER_SESSION_SANDBOX_ORG_IDS='*'` they get a `ses-{hash}` sandbox ID
 (`src/sandbox-id.ts`), and with `CREDENTIAL_CONTAINMENT_ENABLED='false'` their
 metadata has no credential containment, so `getSandboxNamespace` reads
-`env.SandboxSmall` — a kept binding. Those scenarios cannot reach a removed
-binding. The worktree/worktree-creation flags this needs are already rendered
-into the deployed e2e Worker config:
-`WORKTREE_CREATION_ENABLED_IDS`/`CONTROL_PLANE_IDS` default to `*`
-(`E2E_USER_ID`), so the four new scenarios need no additional render change.
+`env.Sandbox` — a kept binding, because every non-contained sandbox routes
+there. Those scenarios cannot reach a removed binding. Control-plane sessions
+now always create worktrees, so the four new scenarios need no additional render
+change.
+
+Code-review `crv-{hash}`, isolated-standard `istd-{hash}` and shared
+`org-`/`usr-`/`bot-`/`ubt-` (or legacy `__`) sandboxes are also non-contained
+here, so they read the kept `env.Sandbox` binding like `ses-{hash}`.
 
 Paths outside this stack now read a missing binding and fail. They are
 documented limitations, not supported behaviour:
 
-- Devcontainer / `dind-{hash}` sessions read `env.SandboxDIND`.
-- Code-review `crv-{hash}` sessions read `env.SandboxCodeReview`.
-- Isolated-standard `istd-{hash}` allocations, and shared `org-`/`usr-`/`bot-`/
-  `ubt-` (or legacy `__`) route keys, fall back to `env.Sandbox`.
+- Retired `dind-{hash}` sessions retain `env.SandboxDIND` for stop/delete access only; start and resume are rejected.
 - Containment requests (`managedScmContainment: true`) for non-devcontainer
   sandboxes read `env.SandboxSmallContainment`, `env.SandboxContainment` or
   `env.SandboxCodeReviewContainment`; `dind-{hash}` still selects
@@ -268,7 +268,7 @@ documented limitations, not supported behaviour:
 `idFromName` raises instead of silently using another class. The
 `CloudAgentSession` checks `!env.Sandbox && !env.SandboxSmall` and
 `env.Sandbox || env.SandboxSmall` only test presence; both stay satisfied by the
-kept `SandboxSmall` binding.
+kept `Sandbox` binding.
 
 ## Token requirement
 
@@ -298,14 +298,12 @@ touched again.
 
 ## Deploy-safety notes
 
-- `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS` are feature flags,
-  not authentication.
 - The fake's model routes are public but require a valid Kilo JWT; its `/test/*`
   routes require the admin token. A leaked admin token exposes only the test
   side channel (gate release, counters, scenario status), not billing or
   session data.
 - The stack is public test endpoints with capped, not guaranteed, capacity.
-  The e2e Worker provisions only the `SandboxSmall` container class with
+  The e2e Worker provisions only the `Sandbox` container class with
   `max_instances: 20`; that is a cap, not a reservation, and it gives
   parallelism headroom for later parallel runs. Capacity is not guaranteed.
 - There is no per-user admission guarantee and no concurrent-run isolation.

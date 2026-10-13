@@ -1,5 +1,5 @@
-import { S3Client } from '@aws-sdk/client-s3';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { createR2Client } from '@kilocode/web-shared/lib/r2/create-client';
 
 // R2 configuration from environment variables
 const R2_ACCOUNT_ID = getEnvVariable('R2_ACCOUNT_ID');
@@ -24,19 +24,6 @@ if (!R2_SECRET_ACCESS_KEY) {
 
 if (!R2_CLI_SESSIONS_BUCKET_NAME) {
   throw new Error('R2_CLI_SESSIONS_BUCKET_NAME environment variable is required');
-}
-
-/**
- * Creates an S3 client for Cloudflare R2 in the `R2_ACCOUNT_ID` account.
- *
- * R2 is Cloudflare's S3-compatible object storage service.
- */
-export function createR2Client(credentials: { accessKeyId: string; secretAccessKey: string }) {
-  return new S3Client({
-    region: 'auto',
-    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials,
-  });
 }
 
 /** Singleton R2 client using the shared `R2_ACCESS_KEY_ID` credentials. */

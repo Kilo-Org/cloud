@@ -22,7 +22,6 @@ import { type SecurityAnalysis } from '@/lib/security-agent';
 const texts = vi.hoisted(() => ({ items: [] as string[] }));
 const mocks = vi.hoisted(() => ({
   routerPush: vi.fn(),
-  prReviewEnabled: true,
   openExternalUrl: vi.fn(),
   start: vi.fn(),
   retry: vi.fn(),
@@ -35,12 +34,15 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
 }));
+// The panel's confirm is `useConfirmDialog`'s `DestructiveConfirmDialog`,
+// which reads the bottom inset; the native module cannot load under this
+// partial `react-native` mock. `@rn-primitives/dialog` itself is stubbed for
+// the whole project by vitest.setup.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 24, left: 0, right: 0, top: 0 }),
+}));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: mocks.routerPush }),
-}));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'mobile-pr-review',
-  useFeatureFlag: () => mocks.prReviewEnabled,
 }));
 vi.mock('@/lib/external-link', () => ({
   openExternalUrl: mocks.openExternalUrl,
@@ -270,25 +272,20 @@ describe('FindingRemediationPanel pull request navigation', () => {
     texts.items = [];
     mocks.routerPush.mockReset();
     mocks.openExternalUrl.mockReset();
-    mocks.prReviewEnabled = true;
   });
 
   it.each([
-    ['https://github.com/kilo/kilo/pull/123', true, '/(app)/pr-review/kilo/kilo/123'],
-    ['https://github.com/kilo/kilo/pull/123', false, null],
+    ['https://github.com/kilo/kilo/pull/123', '/(app)/pr-review/kilo/kilo/123'],
     [
       'https://gitlab.com/kilo/kilo/-/merge_requests/123',
-      true,
       '/(app)/pr-review/gitlab/kilo/kilo/123?instance=https%3A%2F%2Fgitlab.com',
     ],
     [
       'https://bitbucket.org/kilo/kilo/pull-requests/123',
-      true,
       '/(app)/pr-review/bitbucket/kilo/kilo/123',
     ],
-    ['https://github.example.com/kilo/kilo/pull/123', true, null],
-  ] as const)('opens %s with PR review=%s', (prUrl, enabled, expectedHref) => {
-    mocks.prReviewEnabled = enabled;
+    ['https://github.example.com/kilo/kilo/pull/123', null],
+  ] as const)('opens %s at its supported destination', (prUrl, expectedHref) => {
     pressButtons(
       renderPanel(analysisFixture({ remediationSummary: { status: 'pr_opened', prUrl } }))
     );

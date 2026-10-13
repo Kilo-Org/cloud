@@ -55,13 +55,16 @@ export const BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL =
   getEnvVariable('BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL') || '';
 export const LINKEDIN_CLIENT_ID = getEnvVariable('LINKEDIN_CLIENT_ID');
 export const LINKEDIN_CLIENT_SECRET = getEnvVariable('LINKEDIN_CLIENT_SECRET');
-export const TURNSTILE_SECRET_KEY = getEnvVariable('TURNSTILE_SECRET_KEY');
 export const NEXTAUTH_SECRET = getEnvVariable('NEXTAUTH_SECRET');
 export const OPENROUTER_API_KEY = getEnvVariable('OPENROUTER_API_KEY');
 export const MISTRAL_API_KEY = getEnvVariable('MISTRAL_API_KEY');
 export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
+export const USAGE_INGEST_URL = getEnvVariable('USAGE_INGEST_URL');
+export const USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('USAGE_INGEST_PUBLISH_SECRET');
+export const USAGE_SHADOW_PUBLISH_ENABLED =
+  getEnvVariable('USAGE_SHADOW_PUBLISH_ENABLED') === 'true';
 // Shared secret with the MCP catalog CI job
 // (.github/workflows/kilo-mcp-catalog.yml). It authenticates only the mint in
 // app/api/internal/mcp-catalog/token; it is never accepted as a Kilo credential.
@@ -100,7 +103,6 @@ export function isResourceTokenIssuanceEnabled(family: ResourceTokenFamily): boo
 export const USER_DATA_EXPORT_WORKER_URL =
   getEnvVariable('USER_DATA_EXPORT_WORKER_URL') ||
   (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8818' : '');
-export const CALLBACK_TOKEN_SECRET = getEnvVariable('CALLBACK_TOKEN_SECRET');
 export const CODE_REVIEW_WORKER_AUTH_TOKEN = getEnvVariable('CODE_REVIEW_WORKER_AUTH_TOKEN');
 export const IMPACT_ACCOUNT_SID = getEnvVariable('IMPACT_ACCOUNT_SID') || '';
 export const IMPACT_AUTH_TOKEN = getEnvVariable('IMPACT_AUTH_TOKEN') || '';
@@ -141,8 +143,6 @@ export function isLocalCodeReviewDevelopmentEnabled(): boolean {
 }
 
 if (!NEXTAUTH_SECRET) throw new Error('NEXTAUTH_SECRET is required JWT signing');
-if (!TURNSTILE_SECRET_KEY) throw new Error('TURNSTILE_SECRET_KEY is required');
-if (!CALLBACK_TOKEN_SECRET) throw new Error('CALLBACK_TOKEN_SECRET is required');
 
 export const STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID = getEnvVariable(
   'STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID'
@@ -304,7 +304,7 @@ export const SLACK_DEPLOY_THREAT_WEBHOOK_URL = getEnvVariable('SLACK_DEPLOY_THRE
 // AI Attribution Service
 export const AI_ATTRIBUTION_ADMIN_SECRET = getEnvVariable('AI_ATTRIBUTION_ADMIN_SECRET');
 
-// Bouncer: report-only fraud, distillation, and rate verdicts (Kilo-Org/bouncer).
+// Bouncer: configurable signup and inference admission, plus payment and usage evidence.
 export const BOUNCER_URL =
   getEnvVariable('BOUNCER_URL') ||
   (process.env.NODE_ENV === 'production' ? 'https://bouncer.kiloapps.io' : null);
@@ -323,19 +323,6 @@ export const GASTOWN_SERVICE_URL =
 export const GASTOWN_BILLING_ANNOUNCEMENT_ENABLED =
   process.env.NODE_ENV === 'development' ||
   getEnvVariable('GASTOWN_BILLING_ANNOUNCEMENT_ENABLED') === 'true';
-export const GASTOWN_CF_ACCESS_CLIENT_ID = getEnvVariable('GASTOWN_SERVICE_CF_ACCESS_CLIENT_ID');
-export const GASTOWN_CF_ACCESS_CLIENT_SECRET = getEnvVariable(
-  'GASTOWN_SERVICE_CF_ACCESS_CLIENT_SECRET'
-);
-
-if (process.env.NODE_ENV === 'production') {
-  if (!GASTOWN_CF_ACCESS_CLIENT_ID) {
-    throw new Error('GASTOWN_CF_ACCESS_CLIENT_ID is required in production');
-  }
-  if (!GASTOWN_CF_ACCESS_CLIENT_SECRET) {
-    throw new Error('GASTOWN_CF_ACCESS_CLIENT_SECRET is required in production');
-  }
-}
 
 // Cloudflare dashboard link construction (admin town inspector)
 export const CLOUDFLARE_ACCOUNT_ID = getEnvVariable('CLOUDFLARE_ACCOUNT_ID');
@@ -496,31 +483,4 @@ export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY
 // the user's email so the widget can verify the end user's identity.
 export const PYLON_IDENTITY_SECRET = getEnvVariable('PYLON_IDENTITY_SECRET') || '';
 
-/**
- * User-deletion HMAC key. Required because the sign-in/sign-up identity
- * fence HMACs the email on every account creation and provider link, so a
- * missing value would fail authentication rather than only deletion. Fail at
- * boot instead.
- */
-export const USER_DELETION_AUDIT_HMAC_KEY = requireEnv(
-  'USER_DELETION_AUDIT_HMAC_KEY',
-  getEnvVariable('USER_DELETION_AUDIT_HMAC_KEY')
-);
-/**
- * AES-256 key for user-deletion checkpoints and provider credentials.
- * Must be a base64-encoded 32-byte key.
- */
-export const USER_DELETION_ENCRYPTION_KEY = requireEnv(
-  'USER_DELETION_ENCRYPTION_KEY',
-  getEnvVariable('USER_DELETION_ENCRYPTION_KEY')
-);
 export const SUPPORT_API_SECRET = getEnvVariable('SUPPORT_API_SECRET') || '';
-
-// Pipe-delimited list of TLDs to block from new signups, each with a leading dot (e.g. ".shop|.top|.co.uk")
-const blacklistTldsEnv = getEnvVariable('BLACKLIST_TLDS');
-export const BLACKLIST_TLDS = blacklistTldsEnv
-  ? blacklistTldsEnv
-      .split('|')
-      .map((tld: string) => tld.trim().toLowerCase())
-      .filter(Boolean)
-  : [];

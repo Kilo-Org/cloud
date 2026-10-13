@@ -11,6 +11,7 @@ import type {
 } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { isExecutionError } from '../execution/errors.js';
+import { isContainerConcurrencyLimitError } from '../container-concurrency.js';
 import { logger } from '../logger.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
@@ -260,6 +261,8 @@ function classifyDeliveryFailure(code: PendingFlushFailureCode | undefined): {
   failureCode: SessionMessageFailureCode;
 } {
   switch (code) {
+    case 'CONTAINER_LIMIT_REACHED':
+      return { failureStage: 'pre_dispatch', failureCode: 'container_limit_reached' };
     case 'SANDBOX_CONNECT_FAILED':
       return { failureStage: 'pre_dispatch', failureCode: 'sandbox_connect_failed' };
     case 'WORKSPACE_SETUP_FAILED':
@@ -559,8 +562,10 @@ export async function flushNextPendingSessionMessage(params: {
         remainingCount: totalCount,
       };
     }
-    const code =
-      error instanceof MessageDeliveryRequestValidationError
+    const quotaDenied = isContainerConcurrencyLimitError(error);
+    const code = quotaDenied
+      ? 'CONTAINER_LIMIT_REACHED'
+      : error instanceof MessageDeliveryRequestValidationError
         ? error.code
         : isSandboxWorkspaceProbeTimeoutError(error)
           ? 'INTERNAL'
@@ -575,7 +580,7 @@ export async function flushNextPendingSessionMessage(params: {
         code: code ?? 'UNKNOWN',
         subtype: isExecutionError(error) ? error.workspaceFailureSubtype : undefined,
         safeFailureMessage: isExecutionError(error) ? error.safeFailureMessage : undefined,
-        retryable: isExecutionError(error) ? error.retryable : undefined,
+        retryable: quotaDenied ? false : isExecutionError(error) ? error.retryable : undefined,
         scheduleTerminalizationRepair: params.scheduleTerminalizationRepair,
       }
     );

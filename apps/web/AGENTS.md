@@ -8,7 +8,7 @@ For `apps/web`, that skill replaces the root `DESIGN.md`. Its `src/tokens.cloud.
 
 ## Web Environment Variables
 
-When a shared web environment variable needs to be added or rotated across tracked dotenv files and Vercel deployments, tell the user to run `pnpm web:env set <VARIABLE>`. Agents must not run this command because it prompts for secret values and writes to external systems. This rule also applies to work under `scripts/web-env/`. See [DEVELOPMENT.md](../../DEVELOPMENT.md) for the user-run workflow.
+When a shared web environment variable needs to be added or rotated across tracked dotenv files and Vercel deployments, tell the user to run `pnpm web:env set <VARIABLE>`. To fill a new Vercel project from an existing one, tell the user to run `pnpm web:env copy`. Agents must not run either command, even with `--dry-run`, because they read or prompt for secret values and write to external systems. This rule also applies to work under `scripts/web-env/`. See [DEVELOPMENT.md](../../DEVELOPMENT.md) for the user-run workflow.
 
 ## Client Server State
 
@@ -21,3 +21,13 @@ When `subscriptionSchedules.create()` uses `from_subscription`, do not set `meta
 ## Database-Backed APIs
 
 For database-backed API work, consult `packages/db/AGENTS.md` for shared PostgreSQL data-contract requirements.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

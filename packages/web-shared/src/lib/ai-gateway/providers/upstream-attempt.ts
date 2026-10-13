@@ -6,7 +6,13 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import {
+  isChatGptUserNotEligible,
+  OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
+import { OPENAI_ON_BEHALF_OF_TOKEN_HEADER } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import {
   clearOpenAiChatGptUsageLimit,
+  markOpenAiChatGptNotEligible,
   recordOpenAiChatGptUsageLimit,
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
@@ -28,6 +34,7 @@ type SendUpstreamAttemptInput = {
   organizationId: string | null;
   sessionId: string | null;
   taskId: string | null;
+  isNonTrialEnterprise: boolean;
   search: string;
   method: string;
   signal?: AbortSignal;
@@ -54,6 +61,7 @@ export async function sendUpstreamAttempt({
   organizationId,
   sessionId,
   taskId,
+  isNonTrialEnterprise,
   search,
   method,
   signal,
@@ -70,7 +78,8 @@ export async function sendUpstreamAttempt({
     userId,
     organizationId,
     sessionId,
-    taskId
+    taskId,
+    isNonTrialEnterprise
   );
 
   if (providerContext.provider.id === 'openrouter') {
@@ -94,7 +103,13 @@ export async function sendUpstreamAttempt({
   if (result.type === 'error') return result;
 
   if (providerContext.provider.id === OPENAI_CHATGPT_PROVIDER_ID) {
-    await syncChatGptUsageLimit(result.response, providerContext.provider.chatGptOwner);
+    const owner = providerContext.provider.chatGptOwner;
+    await syncChatGptUsageLimit(result.response, owner);
+    await recordChatGptNotEligible(
+      result.response,
+      owner,
+      extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER]
+    );
   }
 
   return {
@@ -151,6 +166,28 @@ async function syncChatGptUsageLimit(
     const limit = readChatGptUsageLimit(response.status, await response.clone().json());
     if (!limit) return;
     await recordOpenAiChatGptUsageLimit(owner, limit);
+  } catch {
+    // Best-effort: the caller still receives the upstream response.
+  }
+}
+
+/**
+ * Disables the connection when OpenAI refuses the connected account. OpenAI
+ * says the same account fails every later request and every reconnect, so the
+ * card must explain the restriction instead of letting the person retry. The
+ * refused response still reaches the caller unchanged. Best-effort, like the
+ * usage-limit record above.
+ */
+async function recordChatGptNotEligible(
+  response: Response,
+  owner: OpenAiChatGptOwner | undefined,
+  accessToken: string | undefined
+): Promise<void> {
+  if (!owner || !accessToken || response.status !== 403) return;
+
+  try {
+    if (!isChatGptUserNotEligible(response.status, await response.clone().json())) return;
+    await markOpenAiChatGptNotEligible(owner, accessToken, OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE);
   } catch {
     // Best-effort: the caller still receives the upstream response.
   }

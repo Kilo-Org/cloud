@@ -22,10 +22,6 @@ vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ b
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: (key: string) => key } }));
-vi.mock('@/lib/analytics/posthog', () => ({
-  FEATURE_FLAG_PR_REVIEW: 'pr-review',
-  useFeatureFlag: () => true,
-}));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: mocks.openExternalUrl }));
 vi.mock('@/lib/hooks/use-themed-action-sheet', () => ({
   useThemedActionSheetOptions: () => ({

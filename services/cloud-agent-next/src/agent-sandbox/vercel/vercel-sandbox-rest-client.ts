@@ -5,7 +5,8 @@ import {
 import { z } from 'zod';
 
 const VERCEL_SANDBOX_API_BASE_URL = 'https://api.vercel.com';
-const VERCEL_SANDBOX_NAME = /^ses-[A-Za-z0-9_-]+$/;
+/** Names this service creates: legacy isolated `ses-` keys and placed control-plane `sbx-` keys. */
+const VERCEL_SANDBOX_NAME = /^(ses|sbx)-[A-Za-z0-9_-]+$/;
 const MAX_JSON_RESPONSE_BYTES = 1024 * 1024;
 const MAX_NDJSON_RESPONSE_BYTES = 1024 * 1024;
 const MAX_NDJSON_LINE_BYTES = 256 * 1024;

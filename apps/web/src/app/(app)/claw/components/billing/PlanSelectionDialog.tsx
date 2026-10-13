@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { cn } from '@/lib/utils';
 import { useTRPC } from '@/lib/trpc/utils';
+import { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { formatPercent, getMonthlyBonusPreview } from '@/components/profile/kilo-pass/utils';
 import {
   createKiloClawSignupDisplay,
   formatMicrodollars,
@@ -39,6 +41,12 @@ const TIER_DATA: Record<
 };
 
 const TIERS: Tier[] = ['19', '49', '199'];
+
+const KILO_PASS_TIERS: Record<Tier, KiloPassTier> = {
+  '19': KiloPassTier.Tier19,
+  '49': KiloPassTier.Tier49,
+  '199': KiloPassTier.Tier199,
+};
 
 function isCommitAvailable(tier: Tier | null, cadence: Cadence): boolean {
   if (!tier) return false;
@@ -92,11 +100,15 @@ function TierCard({
   cadence,
   isSelected,
   onSelect,
+  showFirstMonthPromo,
+  subscriptionStartedAtIso,
 }: {
   tier: Tier;
   cadence: Cadence;
   isSelected: boolean;
   onSelect: () => void;
+  showFirstMonthPromo: boolean;
+  subscriptionStartedAtIso: string;
 }) {
   const data = TIER_DATA[tier];
   const isYearly = cadence === 'yearly';
@@ -105,6 +117,11 @@ function TierCard({
   const creditsLabel = isYearly
     ? `$${data.yearlyPrice}/year paid credits`
     : `$${data.monthlyPrice}/month paid credits`;
+  const { firstMonthPercent, secondMonthPercent } = getMonthlyBonusPreview({
+    tier: KILO_PASS_TIERS[tier],
+    isFirstTimeSubscriberEver: showFirstMonthPromo,
+    subscriptionStartedAtIso,
+  });
 
   return (
     <button
@@ -130,11 +147,15 @@ function TierCard({
         <div className="text-muted-foreground text-xs leading-relaxed">
           <span className="text-amber-300">{creditsLabel}</span>
         </div>
-        <div className="text-muted-foreground text-xs leading-relaxed">
-          Up to <span className="text-emerald-300">40%</span> free bonus credits
-        </div>
+        {!isYearly && (
+          <div className="text-muted-foreground text-xs leading-relaxed">
+            Up to <span className="text-emerald-300">40%</span> free bonus credits
+          </div>
+        )}
         <div className="text-xs leading-relaxed text-emerald-300">
-          First month: +50% free bonus credits
+          {isYearly
+            ? '+50% free bonus credits every month'
+            : `Month 1: +${formatPercent(firstMonthPercent)}; month 2: +${formatPercent(secondMonthPercent)} free bonus credits`}
         </div>
       </div>
 
@@ -289,8 +310,21 @@ function HostingOnlyPlanCard({
   );
 }
 
-function CreditsHowItWorks() {
+function CreditsHowItWorks({
+  cadence,
+  showFirstMonthPromo,
+  subscriptionStartedAtIso,
+}: {
+  cadence: Cadence;
+  showFirstMonthPromo: boolean;
+  subscriptionStartedAtIso: string;
+}) {
   const [open, setOpen] = useState(false);
+  const { welcomeDescription } = getMonthlyBonusPreview({
+    tier: KiloPassTier.Tier19,
+    isFirstTimeSubscriberEver: showFirstMonthPromo,
+    subscriptionStartedAtIso,
+  });
   return (
     <div className="border-border/50 mb-3.5 overflow-hidden rounded-lg border">
       <button
@@ -307,7 +341,7 @@ function CreditsHowItWorks() {
         <div className="space-y-1 px-3.5 pb-3">
           <div className="text-muted-foreground flex items-start gap-2 py-0.5 text-xs">
             <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
-            <span>Your payment converts 1:1 into paid credits that never expire</span>
+            <span>Your payment converts 1:1 into paid credits</span>
           </div>
           <div className="text-muted-foreground flex items-start gap-2 py-0.5 text-xs">
             <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
@@ -319,8 +353,16 @@ function CreditsHowItWorks() {
           <div className="text-muted-foreground flex items-start gap-2 py-0.5 text-xs">
             <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
             <span>
-              First-time subscribers receive <span className="text-emerald-300">50%</span> free
-              bonus credits for the first month.
+              {cadence === 'yearly' ? (
+                <>Yearly subscribers receive 50% free bonus credits every month.</>
+              ) : !showFirstMonthPromo ? (
+                <>
+                  Monthly subscribers start with 5% free bonus credits, increasing by 5 percentage
+                  points each consecutive month up to 40%.
+                </>
+              ) : (
+                welcomeDescription
+              )}
             </span>
           </div>
         </div>
@@ -509,6 +551,9 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
   const { data: billing, isPending: billingSummaryPending } = useQuery(
     trpc.kiloclaw.getPersonalBillingSummary.queryOptions()
   );
+  const { data: kiloPassState } = useQuery(trpc.kiloPass.getState.queryOptions());
+  const showFirstMonthPromo = kiloPassState?.isEligibleForFirstMonthPromo === true;
+  const subscriptionStartedAtIso = new Date().toISOString();
   const checkout = useMutation(trpc.kiloclaw.createSubscriptionCheckout.mutationOptions());
   const kiloPassUpsell = useMutation(
     trpc.kiloclaw.createKiloPassUpsellCheckout.mutationOptions({
@@ -729,13 +774,19 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
                       key={tier}
                       tier={tier}
                       cadence={cadence}
+                      showFirstMonthPromo={showFirstMonthPromo}
+                      subscriptionStartedAtIso={subscriptionStartedAtIso}
                       isSelected={selectedTier === tier}
                       onSelect={() => handleTierSelect(tier)}
                     />
                   ))}
                 </div>
 
-                <CreditsHowItWorks />
+                <CreditsHowItWorks
+                  cadence={cadence}
+                  showFirstMonthPromo={showFirstMonthPromo}
+                  subscriptionStartedAtIso={subscriptionStartedAtIso}
+                />
 
                 {/* Warning */}
                 <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">

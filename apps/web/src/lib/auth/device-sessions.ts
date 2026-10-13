@@ -2,12 +2,35 @@ import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
-import { eq, and, isNull, gt } from 'drizzle-orm';
+import { eq, and, isNull, gt, sql, getTableColumns } from 'drizzle-orm';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { createHash, randomBytes } from 'node:crypto';
 import { persistAttestedKeyTx, type VerifyAdmissionOk } from './native-admission';
 
 const REFRESH_TOKEN_BYTES = 32;
+
+/**
+ * How long a consumed refresh token can rotate again while the pair it was
+ * exchanged for was never used. A mobile client loses a rotation response
+ * when the OS suspends the app mid-request, the connection drops, or the
+ * keychain write fails. The client then retries with the token it still holds.
+ * Without this window, that retry is reuse and revokes the session.
+ */
+const LOST_ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
+
+function isWithinLostRotationGrace(consumedAt: string): boolean {
+  return Date.now() - new Date(consumedAt).getTime() < LOST_ROTATION_GRACE_MS;
+}
+
+async function revokeForReuse(deviceSessionId: string, revokedAt: string): Promise<void> {
+  await db
+    .update(device_sessions)
+    .set({ revoked_at: revokedAt, revoked_reason: 'refresh_reuse_detected' })
+    .where(eq(device_sessions.id, deviceSessionId));
+  console.warn('[native-refresh] refresh token reuse detected; session revoked', {
+    deviceSessionId,
+  });
+}
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -79,13 +102,30 @@ export async function issueSessionCredentials(
  *
  * Precondition checks (session validity, user blocked_reason) happen BEFORE
  * the atomic consume, so a blocked refusal does not consume the token.
- * Reuse-detection: if the refresh token was already consumed (consumed_at is set),
- * the session is revoked because replay implies theft.
  * An unknown or expired token is refused without revocation.
+ *
+ * Reuse detection: a consumed token is a replay, and the session is revoked,
+ * when the session chain has advanced past it (a later token was consumed) or
+ * it was consumed more than `LOST_ROTATION_GRACE_MS` ago. Otherwise the pair
+ * it was exchanged for was never used: the client lost the response. The
+ * token then rotates again and the unused pair is retired. A retired token is
+ * stamped with the original consume time, so a later use of it is a replay
+ * and revokes the session. The session keeps one live refresh token.
+ *
+ * Stale requests: a request that read the token before the consume that won
+ * is refused without revocation and retires nothing. After a client timeout,
+ * the aborted request can reach the session lock after the retry. It must not
+ * retire the pair that the retry delivered.
+ *
+ * Each consume is stamped with the database time of the request's first read
+ * (`firstReadAt`), not with the time it got the lock. A request writes only if
+ * its first read came after the consume it replaces, so the consume times of
+ * a session are ordered, and a stale request is identified in either lock
+ * order.
  *
  * The session validity check is repeated INSIDE the transaction under a row
  * lock, so a session revoked concurrently with the rotation cannot receive a
- * replacement pair.
+ * replacement pair. The same lock serializes every rotation of the session.
  *
  * The consume and the replacement issuance run in one transaction. If issuing
  * the replacement fails, the transaction rolls back so the old token stays
@@ -101,8 +141,12 @@ export async function rotateRefreshToken(
   const now = new Date().toISOString();
 
   // Step 1: Look up the token row to check validity and reuse BEFORE consuming.
+  // `firstReadAt` is the database time of this request's first read.
   const [row] = await db
-    .select()
+    .select({
+      ...getTableColumns(device_refresh_tokens),
+      firstReadAt: sql<string>`clock_timestamp()::text`,
+    })
     .from(device_refresh_tokens)
     .where(eq(device_refresh_tokens.token_hash, tokenHash))
     .limit(1);
@@ -111,21 +155,17 @@ export async function rotateRefreshToken(
   if (!row) {
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
+  const { firstReadAt } = row;
 
   // Expired token: refuse without revocation.
   if (new Date(row.expires_at) <= new Date()) {
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
 
-  // Reused (consumed_at is set): refuse AND revoke the session.
-  if (row.consumed_at) {
-    await db
-      .update(device_sessions)
-      .set({
-        revoked_at: now,
-        revoked_reason: 'refresh_reuse_detected',
-      })
-      .where(eq(device_sessions.id, row.device_session_id));
+  // Consumed outside the lost-rotation grace: refuse AND revoke the session.
+  // A consume inside the grace is decided under the session lock below.
+  if (row.consumed_at && !isWithinLostRotationGrace(row.consumed_at)) {
+    await revokeForReuse(row.device_session_id, now);
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
 
@@ -159,7 +199,7 @@ export async function rotateRefreshToken(
     return { ok: false, error: 'USER_BLOCKED' };
   }
 
-  // Steps 4-8: Consume the old token and issue the replacement pair in one
+  // Steps 4-7: Consume the old token and issue the replacement pair in one
   // transaction. If issuing the replacement fails, the transaction rolls back
   // and the old token remains usable, so the client can retry with it.
   const outcome = await db.transaction(async tx => {
@@ -196,33 +236,90 @@ export async function rotateRefreshToken(
       return { kind: 'session_revoked' } as const;
     }
 
-    // Step 5: Atomic consume — only after the in-transaction revocation check.
-    const [consumed] = await tx
-      .update(device_refresh_tokens)
-      .set({ consumed_at: now })
-      .where(
-        and(
-          eq(device_refresh_tokens.token_hash, tokenHash),
-          isNull(device_refresh_tokens.consumed_at),
-          gt(device_refresh_tokens.expires_at, now)
-        )
-      )
-      .returning();
+    // Step 5: Re-read the token under the session lock. Every rotation of
+    // this session holds the same lock, so this read sees the result of any
+    // rotation that ran concurrently with the checks above.
+    const [current] = await tx
+      .select({
+        expires_at: device_refresh_tokens.expires_at,
+        consumed_at: device_refresh_tokens.consumed_at,
+        consumedAfterFirstRead: sql<boolean>`${device_refresh_tokens.consumed_at} >= ${firstReadAt}::timestamptz`,
+      })
+      .from(device_refresh_tokens)
+      .where(eq(device_refresh_tokens.token_hash, tokenHash))
+      .limit(1);
 
-    // Step 6: If consume failed, a concurrent request consumed the token.
-    // We already confirmed the token was not reused at Step 1, so this is
-    // a race, not theft. Refuse without revocation.
-    if (!consumed) {
-      return { kind: 'consume_lost' } as const;
+    if (!current || new Date(current.expires_at) <= new Date()) {
+      return { kind: 'invalid_token' } as const;
     }
 
-    // Step 7: Update last_seen_at on the session.
+    if (current.consumed_at) {
+      // The consume that won happened after this request read the token:
+      // this request is stale. Refuse it and change nothing.
+      if (current.consumedAfterFirstRead) {
+        return { kind: 'stale_request' } as const;
+      }
+
+      const consumedAt = current.consumed_at;
+      const [laterConsume] = await tx
+        .select({ token_hash: device_refresh_tokens.token_hash })
+        .from(device_refresh_tokens)
+        .where(
+          and(
+            eq(device_refresh_tokens.device_session_id, lockedSession.id),
+            gt(device_refresh_tokens.consumed_at, consumedAt)
+          )
+        )
+        .limit(1);
+
+      if (laterConsume || !isWithinLostRotationGrace(consumedAt)) {
+        return { kind: 'reuse_detected' } as const;
+      }
+
+      // Lost rotation: retire the unused replacement with this token's
+      // consume time, then stamp this token again.
+      await tx
+        .update(device_refresh_tokens)
+        .set({ consumed_at: consumedAt })
+        .where(
+          and(
+            eq(device_refresh_tokens.device_session_id, lockedSession.id),
+            isNull(device_refresh_tokens.consumed_at)
+          )
+        );
+      await tx
+        .update(device_refresh_tokens)
+        .set({ consumed_at: firstReadAt })
+        .where(eq(device_refresh_tokens.token_hash, tokenHash));
+      console.info('[native-refresh] lost rotation recovered', {
+        deviceSessionId: lockedSession.id,
+      });
+    } else {
+      // Atomic consume — only after the in-transaction revocation check.
+      const [consumed] = await tx
+        .update(device_refresh_tokens)
+        .set({ consumed_at: firstReadAt })
+        .where(
+          and(
+            eq(device_refresh_tokens.token_hash, tokenHash),
+            isNull(device_refresh_tokens.consumed_at),
+            gt(device_refresh_tokens.expires_at, now)
+          )
+        )
+        .returning({ token_hash: device_refresh_tokens.token_hash });
+
+      if (!consumed) {
+        return { kind: 'invalid_token' } as const;
+      }
+    }
+
+    // Step 6: Update last_seen_at on the session.
     await tx
       .update(device_sessions)
       .set({ last_seen_at: now })
-      .where(eq(device_sessions.id, consumed.device_session_id));
+      .where(eq(device_sessions.id, lockedSession.id));
 
-    // Step 8: Issue the replacement pair in the same transaction.
+    // Step 7: Issue the replacement pair in the same transaction.
     const accessToken = generateApiToken(
       fullUser,
       { deviceSessionId: lockedSession.id },
@@ -246,6 +343,18 @@ export async function rotateRefreshToken(
 
   if (outcome.kind === 'session_revoked') {
     return { ok: false, error: 'SESSION_REVOKED' };
+  }
+
+  if (outcome.kind === 'reuse_detected') {
+    await revokeForReuse(session.id, now);
+    return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
+  }
+
+  if (outcome.kind === 'stale_request') {
+    console.info('[native-refresh] stale rotation request refused', {
+      deviceSessionId: session.id,
+    });
+    return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
 
   if (outcome.kind !== 'ok') {

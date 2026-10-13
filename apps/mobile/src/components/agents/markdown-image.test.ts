@@ -36,7 +36,7 @@ vi.mock('@/components/ui/icons', () => ({
   Download: 'Download',
   RotateCcw: 'RotateCcw',
 }));
-vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
+vi.mock('@/components/ui/image-viewer', () => ({ ImageViewer: 'ImageViewer' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -459,13 +459,13 @@ describe('MarkdownImage inert-until-load', () => {
       await Promise.resolve();
       (imageButton.props.onPress as () => void)();
     });
-    expect(ofType(renderer.root, 'ImageViewerModal')).toHaveLength(1);
+    expect(ofType(renderer.root, 'ImageViewer')).toHaveLength(1);
 
     await act(async () => {
       await Promise.resolve();
       renderer.update(createElement(MarkdownImage, { uri: 'https://example.com/b.png', alt: '' }));
     });
-    expect(ofType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(ofType(renderer.root, 'ImageViewer')).toHaveLength(0);
 
     await unmount(renderer);
   });
@@ -590,7 +590,7 @@ describe('MarkdownImage inert-until-load', () => {
       await Promise.resolve();
       (imageButton.props.onPress as () => void)();
     });
-    expect(ofType(renderer.root, 'ImageViewerModal')).toHaveLength(1);
+    expect(ofType(renderer.root, 'ImageViewer')).toHaveLength(1);
 
     await unmount(renderer);
   });
@@ -615,7 +615,7 @@ describe('MarkdownImage inert-until-load', () => {
       (imageLink.props.onPress as () => void)();
     });
     expect(onPress).toHaveBeenCalledTimes(1);
-    expect(ofType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(ofType(renderer.root, 'ImageViewer')).toHaveLength(0);
 
     await unmount(renderer);
   });

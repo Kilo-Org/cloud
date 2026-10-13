@@ -1,6 +1,12 @@
+import {
+  RuntimeSkillsSchema,
+  RuntimeAgentsSchema,
+  RuntimeKiloCommandsSchema,
+} from '../shared/runtime-profile.js';
+export * from '../shared/runtime-profile.js';
 import * as z from 'zod';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
-import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
+import { Limits } from '../schema.js';
 import { isValidSandboxId } from '../sandbox-id.js';
 import type { SandboxId } from '../types.js';
 
@@ -219,151 +225,6 @@ export const MCPServerConfigSchema = z.discriminatedUnion('type', [
   MCPLocalServerConfigSchema,
   MCPRemoteServerConfigSchema,
 ]);
-
-const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
-
-/** Validate a map of companion files bundled with a skill. */
-const RuntimeSkillFilesSchema = z
-  .record(
-    z.string().min(1).max(Limits.MAX_RUNTIME_SKILL_COMPANION_PATH_LENGTH),
-    z.string().max(Limits.MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE)
-  )
-  .refine(
-    files => Object.keys(files).length <= Limits.MAX_RUNTIME_SKILL_COMPANION_FILES,
-    `A skill may have at most ${Limits.MAX_RUNTIME_SKILL_COMPANION_FILES} companion files`
-  )
-  .superRefine((files, ctx) => {
-    let total = 0;
-    for (const [path, content] of Object.entries(files)) {
-      if (!SKILL_FILE_PATH_PATTERN.test(path)) {
-        ctx.addIssue({ code: 'custom', message: `Skill file path rejected: ${path}` });
-        return;
-      }
-      if (path.startsWith('/') || path.includes('..') || path.includes('//')) {
-        ctx.addIssue({ code: 'custom', message: `Skill file path rejected: ${path}` });
-        return;
-      }
-      if (path === 'SKILL.md' || path.toLowerCase() === 'skill.md') {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'SKILL.md must be passed as rawMarkdown, not inside files',
-        });
-        return;
-      }
-      total += content.length;
-    }
-    if (total > Limits.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `Skill companion files total ${total} bytes, exceeds ${Limits.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL}`,
-      });
-    }
-  });
-
-/**
- * Runtime skill schema. Each entry is materialized to
- * `${SESSION_HOME}/.kilocode/skills/<name>/` at preparation time — `rawMarkdown`
- * is written to `SKILL.md`, and each `files[path]` is written under the same
- * directory.
- */
-export const RuntimeSkillSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .max(Limits.MAX_RUNTIME_SKILL_NAME_LENGTH)
-    .regex(/^[a-z0-9][a-z0-9-]*$/, 'Skill name must be a slug'),
-  rawMarkdown: z.string().min(1).max(Limits.MAX_RUNTIME_SKILL_MARKDOWN),
-  files: RuntimeSkillFilesSchema.optional(),
-});
-
-export const RuntimeSkillsSchema = z
-  .array(RuntimeSkillSchema)
-  .max(Limits.MAX_RUNTIME_SKILLS, `Maximum ${Limits.MAX_RUNTIME_SKILLS} runtime skills allowed`);
-
-export type RuntimeSkillInput = z.infer<typeof RuntimeSkillSchema>;
-
-// --- Runtime agents ---
-
-const PermissionActionSchema = z.enum(['allow', 'ask', 'deny']);
-// Flat permissive shape — the runtime tolerates any shape the CLI accepts
-// (bare action string, per-tool map with per-pattern maps, null sentinels).
-// Schema-level typing kept loose so the zod inference used by MetadataSchema
-// stays tractable; tighter validation lives at the web-app boundary.
-const PermissionConfigSchema = z.union([PermissionActionSchema, z.record(z.string(), z.unknown())]);
-
-/**
- * Runtime agent schema. Each entry is materialized into
- * `KILO_CONFIG_CONTENT.agent.<slug>` at session preparation time. Mirrors the
- * CLI's AgentConfig shape so we pass through verbatim.
- *
- * Reserved built-in slugs (`code`, `plan`, `architect`, `custom`, …) are
- * rejected here so an inline or persisted runtime agent cannot override a
- * built-in agent's prompt or permissions inside the sandbox. The web-side
- * profile service applies the same rule when persisting agents.
- */
-export const RuntimeAgentSchema = z.object({
-  slug: z
-    .string()
-    .min(1)
-    .max(Limits.MAX_RUNTIME_AGENT_SLUG_LENGTH)
-    .regex(/^[a-z][a-z0-9-]*$/, 'Agent slug must start with a letter')
-    .refine(slug => !BUILTIN_AGENT_MODES.has(slug), {
-      message: 'Slug conflicts with a built-in agent; choose a different slug',
-    }),
-  name: z.string().min(1).max(Limits.MAX_RUNTIME_AGENT_NAME_LENGTH),
-  config: z
-    .object({
-      prompt: z.string().max(Limits.MAX_RUNTIME_AGENT_PROMPT).optional(),
-      description: z.string().max(Limits.MAX_RUNTIME_AGENT_DESCRIPTION).optional(),
-      mode: z.enum(['subagent', 'primary', 'all']).optional(),
-      model: z.string().max(Limits.MAX_RUNTIME_AGENT_MODEL_LENGTH).nullable().optional(),
-      variant: z.string().max(50).optional(),
-      temperature: z.number().optional(),
-      top_p: z.number().optional(),
-      steps: z.number().int().positive().optional(),
-      hidden: z.boolean().optional(),
-      disable: z.boolean().optional(),
-      color: z.string().max(50).optional(),
-      permission: PermissionConfigSchema.optional(),
-      options: z.record(z.string(), z.unknown()).optional(),
-    })
-    // Variant keys are model-specific, so a `variant` without a `model`
-    // has no anchor — mirror the web-side AgentConfigSchema invariant.
-    .refine(c => !c.variant || (typeof c.model === 'string' && c.model.length > 0), {
-      message: 'variant requires a model — variants are model-specific',
-      path: ['variant'],
-    }),
-});
-
-export const RuntimeAgentsSchema = z
-  .array(RuntimeAgentSchema)
-  .max(Limits.MAX_RUNTIME_AGENTS, `Maximum ${Limits.MAX_RUNTIME_AGENTS} runtime agents allowed`);
-
-export type RuntimeAgentInput = z.infer<typeof RuntimeAgentSchema>;
-
-// --- Runtime kilo commands ---
-
-export const RuntimeKiloCommandSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .max(Limits.MAX_RUNTIME_KILO_COMMAND_NAME_LENGTH)
-    .regex(/^[a-z][a-z0-9-]*$/, 'Command name must start with a letter and be a slug'),
-  template: z.string().min(1).max(Limits.MAX_RUNTIME_KILO_COMMAND_TEMPLATE),
-  description: z.string().max(Limits.MAX_RUNTIME_KILO_COMMAND_DESCRIPTION).nullable().optional(),
-  agent: z.string().max(Limits.MAX_RUNTIME_AGENT_SLUG_LENGTH).nullable().optional(),
-  model: z.string().max(Limits.MAX_RUNTIME_AGENT_MODEL_LENGTH).nullable().optional(),
-  subtask: z.boolean().optional(),
-});
-
-export const RuntimeKiloCommandsSchema = z
-  .array(RuntimeKiloCommandSchema)
-  .max(
-    Limits.MAX_RUNTIME_KILO_COMMANDS,
-    `Maximum ${Limits.MAX_RUNTIME_KILO_COMMANDS} runtime kilo commands allowed`
-  );
-
-export type RuntimeKiloCommandInput = z.infer<typeof RuntimeKiloCommandSchema>;
 
 /** Discriminated payload for the initial execution on a newly-prepared session. */
 export const InitialExecutionPayloadSchema = z.discriminatedUnion('type', [

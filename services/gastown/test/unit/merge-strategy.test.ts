@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TownConfigSchema, TownConfigUpdateSchema, MergeStrategy } from '../../src/types';
+import { TownConfigSchema, TownConfigUpdateSchema } from '../../src/types';
 import { resolveMergeStrategy } from '../../src/dos/town/config';
 import { parseGitUrl, buildPRBody, type QualityGateResult } from '../../src/util/platform-pr.util';
 
@@ -48,20 +48,6 @@ describe('merge strategy', () => {
     });
   });
 
-  describe('MergeStrategy enum', () => {
-    it('parses "direct"', () => {
-      expect(MergeStrategy.parse('direct')).toBe('direct');
-    });
-
-    it('parses "pr"', () => {
-      expect(MergeStrategy.parse('pr')).toBe('pr');
-    });
-
-    it('rejects invalid values', () => {
-      expect(() => MergeStrategy.parse('squash')).toThrow();
-    });
-  });
-
   describe('resolveMergeStrategy', () => {
     const townConfig = (strategy: 'direct' | 'pr') =>
       TownConfigSchema.parse({ merge_strategy: strategy });
@@ -74,11 +60,6 @@ describe('merge strategy', () => {
     it('returns rig override when set', () => {
       expect(resolveMergeStrategy(townConfig('direct'), 'pr')).toBe('pr');
       expect(resolveMergeStrategy(townConfig('pr'), 'direct')).toBe('direct');
-    });
-
-    it('rig override takes precedence over town default', () => {
-      const config = townConfig('direct');
-      expect(resolveMergeStrategy(config, 'pr')).toBe('pr');
     });
   });
 });

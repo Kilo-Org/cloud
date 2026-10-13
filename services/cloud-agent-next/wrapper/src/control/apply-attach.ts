@@ -439,10 +439,13 @@ async function executeSessionAttach(
         git(args, { ...options, cwd, env, inheritEnv: false, signal }));
     const runSetup = deps.runSetup ?? defaultRunSetup;
     const progress = createProgress(attach.preparation, deps.emitPreparing);
-    const redact = createSecretRedactor(process.env, attach.env ?? {}, {
-      ...env,
-      ...(attach.git?.token ? { GIT_TOKEN: attach.git.token } : {}),
-    });
+    const redact = createSecretRedactor(process.env, [
+      attach.env ?? {},
+      {
+        ...env,
+        ...(attach.git?.token ? { GIT_TOKEN: attach.git.token } : {}),
+      },
+    ]);
 
     const workspaceFailure = await serializeWorkspacePreparation(directory, signal, async () => {
       try {

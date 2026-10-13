@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from './db';
 import { syncAutoDeciderModels } from './auto-decider-sync';
 
@@ -69,21 +69,47 @@ const config = {
   updated_by: null,
 };
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe('syncAutoDeciderModels', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tokenGet.mockResolvedValue('secret');
-    fetchImpl.mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          candidates: [
-            { id: 'auto/existing', avgAttemptCostUsd: 18 },
-            { id: 'auto/new', avgAttemptCostUsd: 21.75 },
+    vi.stubGlobal('fetch', fetchImpl);
+    fetchImpl.mockImplementation(async input => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.includes('/api/openrouter/models')) {
+        return Response.json({
+          data: [
+            { id: 'manual/model' },
+            {
+              id: 'auto/existing',
+              opencode: {
+                variants: {
+                  low: { reasoning: { effort: 'low' } },
+                  high: { reasoning: { effort: 'high' } },
+                },
+              },
+            },
+            {
+              id: 'auto/new',
+              opencode: {
+                variants: {
+                  instant: { reasoning: { enabled: false } },
+                  thinking: { reasoning: { enabled: true } },
+                },
+              },
+            },
           ],
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } }
-      )
-    );
+        });
+      }
+      return Response.json({
+        candidates: [
+          { id: 'auto/existing', avgAttemptCostUsd: 18 },
+          { id: 'auto/new', avgAttemptCostUsd: 21.75 },
+        ],
+      });
+    });
     vi.mocked(getConfigRows).mockResolvedValue({
       config,
       classifierModels: ['classifier/model'],
@@ -98,7 +124,10 @@ describe('syncAutoDeciderModels', () => {
       ],
       excludedAutoDeciderModels: [],
     });
-    vi.mocked(replaceAutoDeciderModels).mockResolvedValue(undefined);
+    vi.mocked(replaceAutoDeciderModels).mockImplementation(async (_db, autoDeciderModels) => {
+      const rows = await getConfigRows(env.BENCH_DB);
+      vi.mocked(getConfigRows).mockResolvedValue({ ...rows, autoDeciderModels });
+    });
     vi.mocked(markStaleRunsFailed).mockResolvedValue(undefined);
     vi.mocked(listStaleRunningDeciderRuns).mockResolvedValue([]);
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([]);
@@ -114,7 +143,7 @@ describe('syncAutoDeciderModels', () => {
     queueSendBatch.mockResolvedValue(undefined);
   });
 
-  it('persists auto candidates, preserves existing reasoning effort, and starts a decider run for new effective models', async () => {
+  it('refreshes model-level auto selections and reconciles every supported effort before draining', async () => {
     const result = await syncAutoDeciderModels(env, { fetchImpl });
 
     expect(fetchImpl).toHaveBeenCalledWith(
@@ -124,12 +153,18 @@ describe('syncAutoDeciderModels', () => {
       })
     );
     expect(replaceAutoDeciderModels).toHaveBeenCalledWith(env.BENCH_DB, [
-      expect.objectContaining({ model: 'auto/existing', reasoning_effort: 'high' }),
+      expect.objectContaining({ model: 'auto/existing', reasoning_effort: null }),
       expect.objectContaining({ model: 'auto/new', reasoning_effort: null }),
     ]);
     // Newly configured models enter the registry queue; nothing is measured
     // straight from the config list.
-    expect(syncPlatformRegistryRows).toHaveBeenCalledOnce();
+    expect(syncPlatformRegistryRows).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), [
+      { model: 'manual/model', variant: null },
+      { model: 'auto/existing', variant: 'low' },
+      { model: 'auto/existing', variant: 'high' },
+      { model: 'auto/new', variant: 'instant' },
+      { model: 'auto/new', variant: 'thinking' },
+    ]);
     expect(result).toMatchObject({
       addedModels: ['auto/new'],
       removedModels: [],
@@ -168,7 +203,7 @@ describe('syncAutoDeciderModels', () => {
 
   it('drains stranded pending profiles when the slot is free and no model change', async () => {
     // No effective model change after sync.
-    fetchImpl.mockResolvedValue(
+    fetchImpl.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
           candidates: [{ id: 'auto/existing', avgAttemptCostUsd: 18 }],
@@ -213,7 +248,7 @@ describe('syncAutoDeciderModels', () => {
 
     // Configured models become registry rows; nothing is measured directly from
     // the config list any more.
-    expect(syncPlatformRegistryRows).toHaveBeenCalledOnce();
+    expect(syncPlatformRegistryRows).toHaveBeenCalled();
     const [, , desired] = vi.mocked(syncPlatformRegistryRows).mock.calls[0];
     expect(desired.length).toBe(result.platformEntries);
     expect(desired.length).toBeGreaterThan(0);

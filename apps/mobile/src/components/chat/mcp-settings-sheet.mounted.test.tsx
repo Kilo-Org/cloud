@@ -1,0 +1,676 @@
+/* eslint-disable max-lines -- the model, the render checks and the CRUD checks share one mock harness */
+/* eslint-disable typescript-eslint/no-deprecated -- the DOM-free `test-renderer` mounts React/RN trees under vitest (see src/test/renderer.ts) */
+import { createElement } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { McpSettingsSheet, useMcpSettings } from '@/components/chat/mcp-settings-sheet';
+import { useWebSearchSetting } from '@/components/chat/web-search-row';
+import { i18n } from '@/i18n';
+import { type KiloMcpState } from '@/lib/chat/kilo-mcp';
+import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp-state';
+import {
+  type RemoteMcpServerDraft,
+  type RemoteMcpServerPatch,
+  type StoredRemoteMcpServer,
+} from '@/lib/chat/remote-mcp-store';
+import { chatPlaceOf } from '@/lib/chat/scope';
+import { act, TestRenderer } from '@/test/renderer';
+
+/**
+ * The chat-tools sheet and the model behind it.
+ *
+ * Three things have to hold: the group switch moves the store and tells the
+ * registry so an open chat's tool list moves with it; the Kilo row is the
+ * per-chat switch alone, with no edit or delete; and a remote server is added,
+ * edited and deleted through the one store, with a delete that never happens
+ * without the confirmation. The Kilo switch's own failure handling is here too.
+ */
+
+const h = vi.hoisted(() => {
+  const group = { value: true, listeners: new Set<() => void>() };
+  const servers = { value: [] as StoredRemoteMcpServer[], listeners: new Set<() => void>() };
+  const hasLoaded = { value: true };
+  const discovered = { value: [] as RemoteMcpServerState[], listeners: new Set<() => void>() };
+  const kilo: { value: KiloMcpState } = { value: { status: 'ready', tools: [] } };
+  const stores = { group, servers, discovered };
+  const emit = (which: 'group' | 'servers' | 'discovered') => {
+    for (const listener of stores[which].listeners) {
+      listener();
+    }
+  };
+  const confirmRequest: {
+    value: null | { title: string; message: string; confirmLabel: string; onConfirm: () => void };
+  } = { value: null };
+  return {
+    group,
+    servers,
+    hasLoaded,
+    discovered,
+    kilo,
+    confirmRequest,
+    confirm: vi.fn((request: typeof confirmRequest.value) => {
+      confirmRequest.value = request;
+    }),
+    toastError: vi.fn(),
+    setSettingsToolsEnabled: vi.fn((next: boolean) => {
+      group.value = next;
+      emit('group');
+    }),
+    setRemoteMcpServerEnabled: vi.fn((id: string, next: boolean) => {
+      servers.value = servers.value.map(one => (one.id === id ? { ...one, enabled: next } : one));
+      emit('servers');
+    }),
+    addRemoteMcpServer: vi.fn((draft: RemoteMcpServerDraft) => {
+      servers.value = [...servers.value, { id: 'added', ...draft }];
+      emit('servers');
+    }),
+    updateRemoteMcpServer: vi.fn((id: string, patch: RemoteMcpServerPatch) => {
+      servers.value = servers.value.map(one => (one.id === id ? { ...one, ...patch } : one));
+      emit('servers');
+    }),
+    deleteRemoteMcpServer: vi.fn((id: string) => {
+      servers.value = servers.value.filter(one => one.id !== id);
+      emit('servers');
+    }),
+    ensureRemoteMcp: vi.fn(),
+    refreshChatTools: vi.fn(),
+    setMcpEnabled: vi.fn(),
+    retryKiloMcp: vi.fn(),
+    mcpEnabledFor: vi.fn(),
+    setWebSearchEnabled: vi.fn(),
+    webSearchEnabledFor: vi.fn(),
+    watchKiloMcp: vi.fn(() => () => undefined),
+  };
+});
+
+vi.mock('@/lib/chat/settings-tools-switch', () => ({
+  isSettingsToolsEnabled: () => h.group.value,
+  subscribeSettingsToolsEnabled: (listener: () => void) => {
+    h.group.listeners.add(listener);
+    return () => {
+      h.group.listeners.delete(listener);
+    };
+  },
+  setSettingsToolsEnabled: h.setSettingsToolsEnabled,
+}));
+
+vi.mock('@/lib/chat/remote-mcp-store', () => ({
+  listRemoteMcpServers: () => h.servers.value,
+  getRemoteMcpServersHasLoaded: () => h.hasLoaded.value,
+  subscribeRemoteMcpServers: (listener: () => void) => {
+    h.servers.listeners.add(listener);
+    return () => {
+      h.servers.listeners.delete(listener);
+    };
+  },
+  setRemoteMcpServerEnabled: h.setRemoteMcpServerEnabled,
+  addRemoteMcpServer: h.addRemoteMcpServer,
+  updateRemoteMcpServer: h.updateRemoteMcpServer,
+  deleteRemoteMcpServer: h.deleteRemoteMcpServer,
+}));
+
+vi.mock('@/lib/chat/remote-mcp-oauth', () => ({ signInRemoteMcpServer: vi.fn() }));
+vi.mock('@/lib/chat/remote-mcp', () => ({
+  remoteMcpState: () => h.discovered.value,
+  subscribeRemoteMcp: (listener: () => void) => {
+    h.discovered.listeners.add(listener);
+    return () => {
+      h.discovered.listeners.delete(listener);
+    };
+  },
+  ensureRemoteMcp: h.ensureRemoteMcp,
+}));
+
+vi.mock('@/lib/chat/kilo-mcp', () => ({
+  kiloMcpState: () => h.kilo.value,
+  mcpEnabledFor: h.mcpEnabledFor,
+  watchKiloMcp: h.watchKiloMcp,
+}));
+
+vi.mock('@/lib/chat/registry', () => ({
+  refreshChatTools: h.refreshChatTools,
+  retryKiloMcp: h.retryKiloMcp,
+  setMcpEnabled: h.setMcpEnabled,
+  setWebSearchEnabled: h.setWebSearchEnabled,
+}));
+
+vi.mock('@/lib/chat/web-search-setting', () => ({
+  webSearchDefault: (model: string) => !model.startsWith('local:'),
+  webSearchEnabledFor: h.webSearchEnabledFor,
+}));
+
+vi.mock('react-native', () => ({
+  ScrollView: 'ScrollView',
+  Switch: 'Switch',
+  View: 'View',
+}));
+
+/* The sheet confirms through the app's dialog. The real one renders a native
+   sheet, which this DOM-free renderer cannot mount, so the test reads the
+   request instead and answers it. */
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
+}));
+
+vi.mock('sonner-native', () => ({ toast: { error: h.toastError } }));
+vi.mock('@/components/agents/session-page-sheet', () => ({
+  SessionPageSheet: 'SessionPageSheet',
+}));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/icons', () => ({
+  Globe: 'Globe',
+  Server: 'Server',
+  SlidersHorizontal: 'SlidersHorizontal',
+  Wrench: 'Wrench',
+}));
+vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/chat/remote-mcp-server-form', () => ({
+  RemoteMcpServerForm: 'RemoteMcpServerForm',
+}));
+
+type Settings = ReturnType<typeof useMcpSettings>;
+
+const held: { settings: Settings | undefined } = { settings: undefined };
+const place = chatPlaceOf('u1', null);
+
+function noop(): void {
+  // The sheet's close is not what these checks are about.
+}
+
+function Harness({ sessionId, model = 'kilo/one' }: { sessionId: string; model?: string }) {
+  const settings = useMcpSettings(place, sessionId);
+  const webSearch = useWebSearchSetting(sessionId, model);
+  held.settings = settings;
+  return createElement(McpSettingsSheet, { visible: true, onClose: noop, settings, webSearch });
+}
+
+function server(id: string, overrides: Partial<StoredRemoteMcpServer> = {}): StoredRemoteMcpServer {
+  return {
+    id,
+    name: `Server ${id}`,
+    url: `https://${id}.example/mcp`,
+    auth: { type: 'none' },
+    enabled: true,
+    ...overrides,
+  };
+}
+
+function serverState(
+  id: string,
+  overrides: Partial<RemoteMcpServerState> = {}
+): RemoteMcpServerState {
+  return {
+    id,
+    name: `Server ${id}`,
+    url: `https://${id}.example/mcp`,
+    enabled: true,
+    status: 'idle',
+    toolCount: 0,
+    retryable: false,
+    ...overrides,
+  };
+}
+
+let renderer: ReturnType<typeof TestRenderer.create> | undefined = undefined;
+
+async function mount(model?: string): Promise<void> {
+  renderer = TestRenderer.create(createElement(Harness, { sessionId: 's1', model }));
+  // The stored setting is read in an effect; let that read land before a tap.
+  await flush();
+}
+
+/** Flushes the taps and the promise chains the handlers do not await. */
+async function flush(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+function nodes(type: string): TestRenderer.ReactTestInstance[] {
+  return renderer?.root.findAll(node => (node.type as string) === type) ?? [];
+}
+
+function texts(): string[] {
+  return nodes('Text').flatMap(node =>
+    typeof node.props.children === 'string' ? [node.props.children] : []
+  );
+}
+
+function preferenceRow(title: string): TestRenderer.ReactTestInstance | undefined {
+  return nodes('PreferenceRow').find(node => node.props.title === title);
+}
+
+function switchFor(label: string): TestRenderer.ReactTestInstance | undefined {
+  return nodes('Switch').find(node => node.props.accessibilityLabel === label);
+}
+
+function buttonFor(label: string): TestRenderer.ReactTestInstance | undefined {
+  return nodes('Button').find(
+    button =>
+      button.findAll(node => (node.type as string) === 'Text' && node.props.children === label)
+        .length > 0
+  );
+}
+
+/** The node, or a failure that says which one the sheet did not draw. */
+function required<T>(value: T | undefined, what: string): T {
+  if (value === undefined) {
+    throw new Error(`${what} was not rendered`);
+  }
+  return value;
+}
+
+async function tapSwitch(label: string, next: boolean): Promise<void> {
+  await act(async () => {
+    (required(switchFor(label), label).props.onValueChange as (value: boolean) => void)(next);
+    await Promise.resolve();
+  });
+}
+
+/** The Kilo and group switches are drawn by the (mocked) PreferenceRow. */
+async function tapRow(title: string, next: boolean): Promise<void> {
+  await act(async () => {
+    (required(preferenceRow(title), title).props.onValueChange as (value: boolean) => void)(next);
+    await Promise.resolve();
+  });
+}
+
+beforeEach(() => {
+  h.group.value = true;
+  h.servers.value = [];
+  h.hasLoaded.value = true;
+  h.discovered.value = [];
+  h.kilo.value = { status: 'ready', tools: [] };
+  h.mcpEnabledFor.mockResolvedValue(true);
+  h.setMcpEnabled.mockResolvedValue(undefined);
+  h.webSearchEnabledFor.mockResolvedValue(true);
+  h.setWebSearchEnabled.mockResolvedValue(undefined);
+  h.retryKiloMcp.mockResolvedValue(undefined);
+  h.refreshChatTools.mockResolvedValue(undefined);
+  h.ensureRemoteMcp.mockResolvedValue([]);
+});
+
+afterEach(() => {
+  renderer?.unmount();
+  renderer = undefined;
+  held.settings = undefined;
+  vi.clearAllMocks();
+});
+
+describe('the web search switch', () => {
+  it('shows the chat choice and keeps a new position once the chat moved', async () => {
+    h.webSearchEnabledFor.mockResolvedValue(false);
+    await mount('local:gguf:qwen.gguf');
+
+    expect(preferenceRow('Search the web')?.props.value).toBe(false);
+
+    await tapRow('Search the web', true);
+    await flush();
+
+    expect(h.setWebSearchEnabled).toHaveBeenCalledWith('s1', true);
+    expect(preferenceRow('Search the web')?.props.value).toBe(true);
+  });
+
+  it('goes back and says why when the chat cannot be moved', async () => {
+    h.setWebSearchEnabled.mockRejectedValue(new Error('the chat could not be moved'));
+    await mount();
+
+    await tapRow('Search the web', false);
+    await flush();
+
+    expect(preferenceRow('Search the web')?.props.value).toBe(true);
+    expect(h.toastError).toHaveBeenCalledWith('the chat could not be moved');
+  });
+});
+
+describe('the Kilo MCP switch', () => {
+  it('keeps the new position when the write and the move land', async () => {
+    await mount();
+
+    await tapRow('Use Kilo tools', false);
+
+    expect(held.settings?.view.enabled).toBe(false);
+    expect(h.setMcpEnabled).toHaveBeenCalledWith('s1', false);
+    expect(h.toastError).not.toHaveBeenCalled();
+  });
+
+  it('goes back and says why when the chat cannot be moved', async () => {
+    h.setMcpEnabled.mockRejectedValue(new Error('the chat could not be moved'));
+    await mount();
+
+    await tapRow('Use Kilo tools', false);
+
+    expect(held.settings?.view.enabled).toBe(true);
+    expect(h.toastError).toHaveBeenCalledWith('the chat could not be moved');
+  });
+
+  it('says something went wrong when the failure carries no reason', async () => {
+    h.setMcpEnabled.mockRejectedValue('no reason');
+    await mount();
+
+    await tapRow('Use Kilo tools', false);
+
+    expect(held.settings?.view.enabled).toBe(true);
+    expect(h.toastError).toHaveBeenCalledWith(i18n.t('common.somethingWentWrong'));
+  });
+
+  it('drops a setting that answers late for the session that left', async () => {
+    const left = Promise.withResolvers<boolean>();
+    const arrived = Promise.withResolvers<boolean>();
+    h.mcpEnabledFor.mockReturnValueOnce(left.promise).mockReturnValueOnce(arrived.promise);
+
+    renderer = TestRenderer.create(createElement(Harness, { sessionId: 's1' }));
+    // The first session's read is in flight and must not be flushed yet.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      renderer?.update(createElement(Harness, { sessionId: 's2' }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      arrived.resolve(true);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      left.resolve(false);
+      await Promise.resolve();
+    });
+
+    expect(h.mcpEnabledFor).toHaveBeenCalledWith('s1');
+    expect(h.mcpEnabledFor).toHaveBeenCalledWith('s2');
+    expect(held.settings?.view.enabled).toBe(true);
+  });
+
+  it('says why when the Retry itself fails', async () => {
+    h.retryKiloMcp.mockRejectedValue(new Error('the chat could not be moved'));
+    await mount();
+
+    await act(async () => {
+      held.settings?.retry();
+      await Promise.resolve();
+    });
+
+    expect(h.toastError).toHaveBeenCalledWith('the chat could not be moved');
+    expect(held.settings?.retrying).toBe(false);
+  });
+
+  it('says something went wrong when the Retry failure carries no reason', async () => {
+    h.retryKiloMcp.mockRejectedValue('no reason');
+    await mount();
+
+    await act(async () => {
+      held.settings?.retry();
+      await Promise.resolve();
+    });
+
+    expect(h.toastError).toHaveBeenCalledWith(i18n.t('common.somethingWentWrong'));
+  });
+
+  it('names the Kilo Retry, so the platform can drop its busy state when the ask ends', async () => {
+    /* Android writes a busy button's state into the view's content description
+       and only rewrites it when the button has a name to put back, so a Retry
+       with none is read as "busy" for the rest of the screen's life
+       (BaseViewManager.updateViewContentDescription, RN 0.86). */
+    h.kilo.value = { status: 'failed', kind: 'unreachable', retryable: true };
+    await mount();
+
+    expect(required(buttonFor('Retry'), 'Retry').props.accessibilityLabel).toBe(
+      i18n.t('common.retry')
+    );
+  });
+
+  it('replaces the Kilo Retry when the ask ends so Android cannot keep a busy name', async () => {
+    h.kilo.value = { status: 'failed', kind: 'unreachable', retryable: true };
+    const pending = Promise.withResolvers<undefined>();
+    h.retryKiloMcp.mockReturnValue(pending.promise);
+    await mount();
+    const idle = required(buttonFor('Retry'), 'Retry');
+
+    await act(async () => {
+      held.settings?.retry();
+      await Promise.resolve();
+    });
+    const busy = required(buttonFor('Retry'), 'Retry');
+    expect(busy.props.loading).toBe(true);
+    expect(busy).not.toBe(idle);
+
+    await act(async () => {
+      pending.resolve(undefined);
+      await Promise.resolve();
+    });
+    await flush();
+    const ready = required(buttonFor('Retry'), 'Retry');
+    expect(ready.props.loading).toBe(false);
+    expect(ready).not.toBe(busy);
+    expect(ready.props.accessibilityLabel).toBe(i18n.t('common.retry'));
+  });
+});
+
+describe('the chat-tools sheet', () => {
+  it('moves the group switch and tells the registry the tool list changed', async () => {
+    await mount();
+    expect(preferenceRow('Let Kilo change app settings')?.props.value).toBe(true);
+
+    await tapRow('Let Kilo change app settings', false);
+
+    expect(h.setSettingsToolsEnabled).toHaveBeenCalledWith(false);
+    expect(h.refreshChatTools).toHaveBeenCalled();
+    // The row reads the store, so it moved with the write.
+    expect(preferenceRow('Let Kilo change app settings')?.props.value).toBe(false);
+  });
+
+  it('draws the Kilo row with no edit or delete control', async () => {
+    await mount();
+
+    expect(preferenceRow('Use Kilo tools')).toBeDefined();
+    expect(texts()).toContain(
+      'Built in. Turn it on or off for this chat; it cannot be edited or deleted.'
+    );
+    expect(buttonFor('Edit server')).toBeUndefined();
+    expect(buttonFor('Delete server')).toBeUndefined();
+  });
+
+  it('shows the empty state and the way to add one when no server was added', async () => {
+    await mount();
+
+    const empty = nodes('EmptyState')[0];
+    expect(empty?.props.title).toBe('No remote servers yet');
+    expect(empty?.props.description).toBe('Add one to offer its tools in your chats.');
+    expect(buttonFor('Add MCP server')).toBeDefined();
+  });
+
+  it('draws a skeleton instead of the empty state while the list is still being read', async () => {
+    h.hasLoaded.value = false;
+    await mount();
+
+    expect(nodes('Skeleton').length).toBeGreaterThan(0);
+    expect(nodes('EmptyState')).toHaveLength(0);
+    // The way to add one belongs to the section, so the wait never hides it.
+    expect(buttonFor('Add MCP server')).toBeDefined();
+  });
+
+  it('retries a failed server through the discovery when its Retry is pressed', async () => {
+    h.servers.value = [server('alpha')];
+    h.discovered.value = [serverState('alpha', { status: 'failed', retryable: true })];
+    const pending = Promise.withResolvers<readonly RemoteMcpServerState[]>();
+    h.ensureRemoteMcp.mockReturnValue(pending.promise);
+    await mount();
+
+    const retry = required(buttonFor('Retry'), 'Retry');
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(h.ensureRemoteMcp).toHaveBeenCalledWith(place, { retry: true });
+    // The busy flag is that row's, so the person can see the ask they made.
+    expect(required(buttonFor('Retry'), 'Retry').props.loading).toBe(true);
+
+    await act(async () => {
+      pending.resolve([]);
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(required(buttonFor('Retry'), 'Retry').props.loading).toBe(false);
+    // The chat's tool list has to move onto what the Retry just found.
+    expect(h.refreshChatTools).toHaveBeenCalled();
+  });
+
+  it('asks the servers as it opens, so a restart never leaves a server unasked', async () => {
+    h.servers.value = [server('alpha')];
+    await mount();
+    await flush();
+
+    // The open is not a person's Retry, so it gets the automatic deadline.
+    expect(h.ensureRemoteMcp).toHaveBeenCalledWith(place);
+    expect(h.refreshChatTools).toHaveBeenCalled();
+  });
+
+  it('offers a Retry on a server that answered with no tools', async () => {
+    h.servers.value = [server('alpha')];
+    h.discovered.value = [serverState('alpha', { status: 'ready', retryable: true })];
+    await mount();
+
+    // The Kilo row also reads "No tools available", so the remote row is read by its own fields.
+    expect(held.settings?.servers[0]).toMatchObject({
+      statusKey: 'modelChat.mcp.none',
+      retry: true,
+    });
+    const label = i18n.t('modelChat.mcp.retryServerA11y', { name: 'Server alpha' });
+    expect(required(buttonFor('Retry'), 'Retry').props.accessibilityLabel).toBe(label);
+  });
+
+  it('turns a server off for the chats and tells the registry', async () => {
+    h.servers.value = [server('alpha')];
+    await mount();
+    // The row's switch names its server, so two rows read apart.
+    const label = i18n.t('modelChat.mcp.enableServer', { name: 'Server alpha' });
+    expect(switchFor(label)?.props.value).toBe(true);
+
+    await tapSwitch(label, false);
+
+    expect(h.setRemoteMcpServerEnabled).toHaveBeenCalledWith('alpha', false);
+    expect(h.refreshChatTools).toHaveBeenCalled();
+    expect(switchFor(label)?.props.value).toBe(false);
+  });
+
+  it('adds a server through the store and discovers it when the form is saved', async () => {
+    await mount();
+
+    await act(async () => {
+      (required(buttonFor('Add MCP server'), 'Add MCP server').props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    const form = required(nodes('RemoteMcpServerForm')[0], 'RemoteMcpServerForm');
+    expect(form.props.server).toBeUndefined();
+
+    const draft: RemoteMcpServerDraft = {
+      name: 'Remote',
+      url: 'https://remote.example/mcp',
+      auth: { type: 'none' },
+      enabled: true,
+    };
+    await act(async () => {
+      (form.props.onSave as (next: RemoteMcpServerDraft) => void)(draft);
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(h.addRemoteMcpServer).toHaveBeenCalledWith(draft);
+    expect(h.ensureRemoteMcp).toHaveBeenCalledWith(place, { retry: true });
+    expect(h.refreshChatTools).toHaveBeenCalled();
+  });
+
+  it('mounts a new add form after a save so the next add does not keep the last name', async () => {
+    await mount();
+
+    await act(async () => {
+      (required(buttonFor('Add MCP server'), 'Add MCP server').props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    const first = required(nodes('RemoteMcpServerForm')[0], 'RemoteMcpServerForm');
+    const draft: RemoteMcpServerDraft = {
+      name: 'Remote',
+      url: 'https://remote.example/mcp',
+      auth: { type: 'none' },
+      enabled: true,
+    };
+    await act(async () => {
+      (first.props.onSave as (next: RemoteMcpServerDraft) => void)(draft);
+      await Promise.resolve();
+    });
+    await flush();
+    expect(nodes('RemoteMcpServerForm')).toHaveLength(0);
+
+    await act(async () => {
+      (required(buttonFor('Add MCP server'), 'Add MCP server').props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    const second = required(nodes('RemoteMcpServerForm')[0], 'RemoteMcpServerForm');
+    expect(second).not.toBe(first);
+    expect(second.props.server).toBeUndefined();
+  });
+
+  it('edits the server the row names through the store', async () => {
+    h.servers.value = [server('alpha')];
+    await mount();
+
+    await act(async () => {
+      (required(buttonFor('Edit server'), 'Edit server').props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    const form = required(nodes('RemoteMcpServerForm')[0], 'RemoteMcpServerForm');
+    expect(form.props.server).toMatchObject({ id: 'alpha', name: 'Server alpha' });
+
+    const draft: RemoteMcpServerDraft = {
+      name: 'Renamed',
+      url: 'https://alpha.example/mcp',
+      auth: { type: 'none' },
+      enabled: true,
+    };
+    await act(async () => {
+      (form.props.onSave as (next: RemoteMcpServerDraft) => void)(draft);
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(h.updateRemoteMcpServer).toHaveBeenCalledWith('alpha', draft);
+    expect(h.ensureRemoteMcp).toHaveBeenCalledWith(place, { retry: true });
+  });
+
+  it('asks before deleting a server and deletes only on the destructive choice', async () => {
+    h.servers.value = [server('alpha')];
+    await mount();
+
+    await act(async () => {
+      (required(buttonFor('Delete server'), 'Delete server').props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    const request = h.confirmRequest.value;
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    expect(request?.title).toBe('Delete this server?');
+    expect(request?.message).toBe('Its tools leave every chat.');
+    expect(request?.confirmLabel).toBe(i18n.t('common.delete'));
+    expect(h.deleteRemoteMcpServer).not.toHaveBeenCalled();
+
+    await act(async () => {
+      request?.onConfirm();
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(h.deleteRemoteMcpServer).toHaveBeenCalledWith('alpha');
+  });
+});

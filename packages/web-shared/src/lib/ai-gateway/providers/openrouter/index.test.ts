@@ -18,7 +18,6 @@ import {
   kiloExclusiveModels,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
-import { isFableModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
@@ -185,13 +184,6 @@ describe('shouldSuppressOpenRouterModel', () => {
   it('suppresses hidden Kilo-exclusive models from OpenRouter', () => {
     expect(gemma_4_26b_a4b_it_free_model.status).toBe('hidden');
     expect(shouldSuppressOpenRouterModel(gemma_4_26b_a4b_it_free_model)).toBe(true);
-  });
-});
-
-describe('isFableModel', () => {
-  it('only matches Claude Fable model IDs', () => {
-    expect(isFableModel('anthropic/claude-fable-5')).toBe(true);
-    expect(isFableModel('vendor/fable-model')).toBe(false);
   });
 });
 

@@ -73,12 +73,12 @@ function workspaceImporterKey(version, baseDir) {
   return undefined;
 }
 
-function toPurl(name, version) {
+export function toPurl(name, version) {
   const encoded = name.startsWith('@') ? `%40${name.slice(1)}` : name;
   return `pkg:npm/${encoded}@${version}`;
 }
 
-function integrityHashes(entry) {
+export function integrityHashes(entry) {
   const integrity =
     isRecord(entry) && isRecord(entry.resolution) ? entry.resolution.integrity : undefined;
   if (typeof integrity !== 'string' || !integrity.startsWith(SHA512_PREFIX)) return undefined;
@@ -86,7 +86,7 @@ function integrityHashes(entry) {
   return [{ alg: 'SHA-512', content }];
 }
 
-function compareComponents(a, b) {
+export function compareComponents(a, b) {
   if (a.name !== b.name) return a.name < b.name ? -1 : 1;
   if (a.version !== b.version) return a.version < b.version ? -1 : 1;
   return 0;

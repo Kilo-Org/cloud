@@ -40,7 +40,17 @@ vi.mock('./ios-sink', () => ({
   iosSink: mocks.iosSink,
   sweepStrayActivities: mocks.sweepStrayActivities,
 }));
-vi.mock('./adopt-activity', () => ({ adoptPushStartedActivity: vi.fn() }));
+vi.mock('./adopt-activity', () => ({
+  adoptPushStartedActivity: vi.fn(),
+  restoreStoredSessionCards: vi.fn(),
+}));
+vi.mock('./session-follow', () => ({
+  endAllSessionCards: vi.fn(),
+  subscribeSessionFollows: vi.fn(),
+}));
+vi.mock('./session-live-activity', () => ({ refreshSessionLiveActivityCopy: vi.fn() }));
+vi.mock('@/lib/glanceable/cleanup', () => ({ subscribeGlanceableTerminalEnd: vi.fn() }));
+vi.mock('@/lib/glanceable/persist', () => ({ getLastGlanceableSnapshot: () => null }));
 vi.mock('./active-agents-live-activity', () => ({
   refreshActiveAgentsLiveActivityCopy: vi.fn(),
 }));
@@ -54,7 +64,12 @@ vi.mock('./widget-logo', () => ({ ensureWidgetLogo: vi.fn() }));
 vi.mock('@/i18n', () => ({ i18n: { on: vi.fn(), t: (key: string) => key } }));
 vi.mock('@/lib/glanceable/live-activity-switch', () => ({
   getLiveActivityEnabled: () => true,
+  getNotificationPermissionGranted: () => true,
   subscribeLiveActivityEnabled: vi.fn(),
+  subscribeNotificationPermissionGranted: vi.fn(),
+}));
+vi.mock('@/lib/glanceable/activity-kit-prompt', () => ({
+  replayGlanceableLiveActivity: vi.fn(),
 }));
 
 describe('glanceable-ios register', () => {

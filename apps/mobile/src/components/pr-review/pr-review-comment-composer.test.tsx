@@ -2,8 +2,8 @@
 // Clear-rule coverage for the comment composer's durable draft. The composer
 // clears its draft on three committed outcomes — comment post, add-to-review,
 // and a confirmed discard — and keeps it on a dismissed-without-confirmation
-// discard. `Alert.alert` is captured so the test can press the Discard /
-// Keep editing buttons the discard gate renders.
+// discard. The confirm request is captured so the test can drive the
+// discard gate's confirm.
 //
 // The composer is mounted by calling it as a plain function (no renderer), so
 // the React hook primitives are stubbed, mirroring pr-merge-sheet.test.tsx.
@@ -28,16 +28,30 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 
-type AlertButton = { text?: string; style?: string; onPress?: () => void };
-type AlertCall = { title: string; message: string; buttons: AlertButton[] };
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+};
 
-const { alertCalls, createCommentMocks } = vi.hoisted(() => ({
-  alertCalls: [] as AlertCall[],
+const { confirmRequests, createCommentMocks } = vi.hoisted(() => ({
+  confirmRequests: [] as ConfirmRequest[],
   createCommentMocks: {
     mutateAsync: vi.fn<() => Promise<unknown>>(),
     isPending: false,
     error: null as Error | null,
   },
+}));
+
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: ConfirmRequest) => {
+      confirmRequests.push(request);
+    },
+    dialog: null,
+  }),
 }));
 
 vi.mock('react', async () => {
@@ -60,11 +74,6 @@ vi.mock('react', async () => {
 });
 
 vi.mock('react-native', () => ({
-  Alert: {
-    alert: (title: string, message: string, buttons: AlertButton[]) => {
-      alertCalls.push({ title, message, buttons });
-    },
-  },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   ScrollView: 'ScrollView',
   View: 'View',
@@ -236,7 +245,7 @@ async function flushMicrotasks(): Promise<void> {
 
 describe('PrReviewCommentComposer draft clear rules', () => {
   beforeEach(() => {
-    alertCalls.length = 0;
+    confirmRequests.length = 0;
     createCommentMocks.mutateAsync.mockReset();
     createCommentMocks.isPending = false;
     createCommentMocks.error = null;
@@ -278,25 +287,23 @@ describe('PrReviewCommentComposer draft clear rules', () => {
     typeBody(element, 'hello');
     footerProp(element, 'onCancel')?.();
 
-    const call = alertCalls.at(-1);
-    if (!call) {
-      throw new Error('No discard Alert was shown');
-    }
-    call.buttons.find(b => b.style === 'destructive')?.onPress?.();
+    expect(confirmRequests.at(-1)).toMatchObject({
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+    });
+    confirmRequests.at(-1)?.onConfirm();
 
     expect(clearDraft).toHaveBeenCalledWith('u1', 'pr-comment:key');
   });
 
-  it('does not clear the draft on a dismissed-without-confirmation discard', () => {
+  it('does not clear the draft when the discard gate is dismissed without confirming', () => {
     const element = mountComposer();
     typeBody(element, 'hello');
     footerProp(element, 'onCancel')?.();
 
-    const call = alertCalls.at(-1);
-    if (!call) {
-      throw new Error('No discard Alert was shown');
-    }
-    call.buttons.find(b => b.text === 'Keep editing')?.onPress?.();
+    // The gate presented the keep-editing / discard choice; taking the safe
+    // choice (never confirming) leaves the durable draft intact.
+    expect(confirmRequests.at(-1)?.cancelLabel).toBe('Keep editing');
 
     expect(clearDraft).not.toHaveBeenCalled();
   });

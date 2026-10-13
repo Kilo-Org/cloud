@@ -7,8 +7,11 @@ import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  messageIdSchema,
   persistedKiloSdkMessageHistorySchema,
+  sessionDiffReadSchema,
   sessionIdSchema,
+  type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
 import type { Env } from '../env';
@@ -16,6 +19,7 @@ import { zodJsonValidator, withDORetry } from '@kilocode/worker-utils';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
+import { createConnectionTicket } from '../dos/connection-ticket';
 import { getSessionExport } from '../services/session-export';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { handleDirectIngestRequest } from '../ingest/direct-ingest';
@@ -90,6 +94,11 @@ async function clearSessionLocalState(
     () => getSessionIngestDO(env, { kiloUserId, sessionId }),
     stub => stub.clear(),
     'SessionIngestDO.clear'
+  );
+  await withDORetry(
+    () => getUserConnectionDO(env, { kiloUserId }),
+    stub => stub.clearSession(sessionId),
+    'UserConnectionDO.clearSession'
   );
 }
 
@@ -475,16 +484,66 @@ api.get('/session/:sessionId/export', async c => {
     return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
   }
 
-  const kiloUserId = c.get('user_id');
-  const stream = await getSessionExport(c.env, parsed.data, kiloUserId);
+  // Optional inclusive cut: export only the transcript up to this message.
+  const rawUpToMessageId = c.req.query('upToMessageId');
+  let upToMessageId: string | undefined;
+  if (rawUpToMessageId !== undefined) {
+    const parsedCut = messageIdSchema.safeParse(rawUpToMessageId);
+    if (!parsedCut.success) {
+      return c.json(
+        { success: false, error: 'Invalid upToMessageId', issues: parsedCut.error.issues },
+        400
+      );
+    }
+    upToMessageId = parsedCut.data;
+  }
 
-  if (stream === null) {
+  const kiloUserId = c.get('user_id');
+  const result = await getSessionExport(c.env, parsed.data, kiloUserId, upToMessageId);
+
+  if (result.status !== 'ok') {
+    return c.json({ success: false, error: result.status }, 404);
+  }
+
+  return c.body(result.stream, 200, {
+    'content-type': 'application/json; charset=utf-8',
+  });
+});
+
+/**
+ * The stored cumulative session diff (`session_diff` item) for one Kilo
+ * session the user can read. Reads only that row, never the transcript.
+ */
+api.get('/session/:sessionId/diff', async c => {
+  const parsed = sessionIdSchema.safeParse(c.req.param('sessionId'));
+  if (!parsed.success) {
+    return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
+  }
+
+  const kiloUserId = c.get('user_id');
+  const session = await resolveAccessibleKiloSession(c.env, {
+    kiloUserId,
+    kiloSessionId: parsed.data,
+  });
+  if (!session) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  return c.body(stream, 200, {
-    'content-type': 'application/json; charset=utf-8',
+  const rawDiff = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+    () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+    stub => stub.readSessionDiff(),
+    'SessionIngestDO.readSessionDiff'
+  );
+  const read = sessionDiffReadSchema.safeParse(rawDiff);
+  const diff: SessionDiffRead = read.success ? read.data : { kind: 'invalid_data' };
+  console.log({
+    event: 'session_diff_read',
+    sessionId: parsed.data,
+    outcome: diff.kind,
+    fileCount: diff.kind === 'value' ? diff.files.length : 0,
   });
+
+  return c.json({ success: true, kiloSessionId: parsed.data, diff }, 200);
 });
 
 /**
@@ -971,18 +1030,18 @@ api.get('/user/web', async c => {
 });
 
 // Web UI mints a one-use ticket before opening /api/user/web. The ticket is
-// opaque (UUID); the DO stores { userId, expiresAt } keyed by the ticket and
-// the websocket upgrade consumes it exactly once.
+// opaque; its object stores { userId, expiresAt, secret } and the websocket
+// upgrade consumes it exactly once.
 api.post('/user/web-ticket', async c => {
   const kiloUserId = c.get('user_id');
-  const ticket = crypto.randomUUID();
+  const { ticket, secret, getStub } = createConnectionTicket(c.env.CONNECTION_TICKET_DO);
   const doExpiresAt = Date.now() + 60_000;
 
-  const stub = c.env.CONNECTION_TICKET_DO.get(c.env.CONNECTION_TICKET_DO.idFromName(ticket));
-  await stub.mint({
-    userId: kiloUserId,
-    expiresAt: doExpiresAt,
-  });
+  await withDORetry(
+    getStub,
+    stub => stub.mint({ userId: kiloUserId, expiresAt: doExpiresAt, secret }),
+    'ConnectionTicketDO.mint'
+  );
 
   return c.json({ ticket, expiresAt: Math.floor(doExpiresAt / 1000) }, 200);
 });

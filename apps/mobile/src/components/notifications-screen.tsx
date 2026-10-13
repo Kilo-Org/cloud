@@ -12,7 +12,6 @@ import {
   Bell,
   BellOff,
   Bot,
-  CircleCheck,
   KeyRound,
   ListTodo,
   MessageSquare,
@@ -714,7 +713,7 @@ export function NotificationsScreen() {
             {masterLeading === 'on' && <Bell size={18} color={colors.secondaryForeground} />}
             {masterLeading === 'off' && <BellOff size={18} color={colors.secondaryForeground} />}
             <View className="flex-1">
-              <Text className="text-sm font-medium">{t('notifications.enabled')}</Text>
+              <Text className="text-sm font-medium">{t('common.notifications')}</Text>
               {masterLeading === 'neutral' && <Skeleton className="mt-0.5 h-4 w-52" />}
               {masterLeading === 'on' && (
                 <Text variant="muted" className="mt-0.5 text-xs">
@@ -749,7 +748,7 @@ export function NotificationsScreen() {
                 <Switch
                   value={notificationsEnabled}
                   disabled={isMasterBusy}
-                  accessibilityLabel={t('notifications.enabled')}
+                  accessibilityLabel={t('common.notifications')}
                   accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
                   onValueChange={value => {
                     if (value) {
@@ -771,15 +770,9 @@ export function NotificationsScreen() {
               so a non-retryable CTA is structurally absent. */}
           {!permissionLoading && !permissionError && gateSettled && showEnableCta && (
             <View className="rounded-lg border border-border bg-card p-4">
-              <View className="flex-row items-start gap-3">
-                <CircleCheck size={18} color={colors.foreground} />
-                <View className="flex-1 gap-1">
-                  <Text className="text-sm font-medium">{t('notifications.enable')}</Text>
-                  <Text variant="muted" className="text-xs">
-                    {t('notifications.enableDescription')}
-                  </Text>
-                </View>
-              </View>
+              <Text variant="muted" className="text-xs">
+                {t('notifications.enableDescription')}
+              </Text>
               <Pressable
                 onPress={() => void handleEnableNotifications()}
                 disabled={isMasterBusy}

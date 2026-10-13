@@ -1,8 +1,25 @@
 import { AppState, Linking } from 'react-native';
-import { type WidgetTaskHandlerProps } from 'react-native-android-widget';
+import {
+  getWidgetInfo,
+  requestWidgetUpdateById,
+  type WidgetTaskHandlerProps,
+} from 'react-native-android-widget';
+import { z } from 'zod';
 
 import { i18n } from '@/i18n';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
+import { getTerminalBlankEpoch, subscribeGlanceableTerminalEnd } from '@/lib/glanceable/cleanup';
+import {
+  getHomeWidgetDataForSnapshot,
+  getLastHomeWidgetData,
+  restoreHomeWidgetData,
+} from '@/lib/glanceable/home-widget-data';
+import {
+  applyHomeWidgetResponse,
+  HomeWidgetRefresh,
+  restoreNativeHomeWidgetData,
+} from '@/lib/glanceable/home-widget-refresh';
 import {
   getLiveActivityEnabled,
   subscribeLiveActivityEnabled,
@@ -10,17 +27,21 @@ import {
 import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
-import {
-  failureFeedback,
-  runningFeedback,
-  runWidgetAction,
-  type WidgetAction,
-} from '@/lib/glanceable/widget-actions';
-import { LAUNCHER_NEW_AGENT_URL } from '@/lib/launcher-surfaces';
+import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
 
-import { renderActiveAgentsWidget } from './active-agents-widget';
-import { androidSink, getCurrentWidgetProps, handleAppStateActive } from './android-sink';
-import { formatGlanceableAgo, formatGlanceableCount, isWidgetRtl } from './count-format';
+import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
+import {
+  androidSink,
+  getCurrentWidgetProps,
+  handleAppStateActive,
+  refreshPostedCardAction,
+} from './android-sink';
+import {
+  formatGlanceableAgo,
+  formatGlanceableClock,
+  formatGlanceableCount,
+  isWidgetRtl,
+} from './count-format';
 import { getStoredWidgetSnapshot, setWidgetSnapshot } from './live-update';
 import {
   type AndroidWidgetProps,
@@ -33,13 +54,42 @@ import {
 // render. No React dependency here: the publisher is plain state.
 registerGlanceableSink(androidSink);
 
-// The permission alert needs a foreground Activity; RN Android's AlertModule
-// no-ops in headless JS. Show it when the app returns to the foreground instead.
+/**
+ * The two session-follow entries this file calls. The module loads on demand:
+ * a widget redraw must not carry the notification graph.
+ */
+type SessionFollowLazy = {
+  endAllSessionCards: () => void;
+  restoreFollowedSessionCardsFromStorage: () => Promise<boolean>;
+};
+
+function sessionFollow(): SessionFollowLazy {
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
+  return require('./session-follow') as SessionFollowLazy;
+}
+
+// A sign-out, an account change, or a privacy lock blanks every surface; the
+// followed session notifications are not snapshot sinks, so they end here.
+subscribeGlanceableTerminalEnd(() => {
+  sessionFollow().endAllSessionCards();
+});
+
+// A Live Update the permission blocked starts once the user grants it, which
+// can happen in Settings while the app is away.
 AppState.addEventListener('change', state => {
   if (state === 'active') {
     void handleAppStateActive();
+    // Rebuild the followed session notifications from native truth: a push may
+    // have updated them while no process ran, and a dismissal the receiver
+    // missed leaves a stored card for a session the app no longer follows.
+    // Loaded here for the same reason as the terminal end above.
+    void sessionFollow().restoreFollowedSessionCardsFromStorage();
   }
 });
+
+if (AppState.currentState === 'active') {
+  void sessionFollow().restoreFollowedSessionCardsFromStorage();
+}
 
 // Turning the in-app switch off must clear the Live Update already in the
 // shade, not just stop the next start. `startOrUpdate` holds the guard for
@@ -49,6 +99,9 @@ subscribeLiveActivityEnabled(() => {
   const next = getLiveActivityEnabled();
   if (liveUpdateAllowed && !next) {
     androidSink.endImmediate();
+    // The switch off ends every followed session too, and deletes their rows
+    // (spec "Android: updates and ending" rule 4).
+    sessionFollow().endAllSessionCards();
   }
   liveUpdateAllowed = next;
 });
@@ -71,61 +124,51 @@ export async function applyWidgetLanguage(): Promise<void> {
   await applyStoredLanguage();
 }
 
-/** The custom click actions the widget's own rows emit (never OPEN_APP/OPEN_URI). */
-function isWidgetAction(value: string | undefined): value is WidgetAction {
-  return value === 'approve' || value === 'new-agent';
-}
+/**
+ * The one custom click action the widget emits; New agent and the body are
+ * `OPEN_URI` deep links the host handles without JS.
+ */
+const APPROVE_CLICK_ACTION = 'approve';
 
-/** Where an unfinished action lands: the same agents list the body tap opens. */
+/** Where an Approve with nothing to answer lands: the agents list the body tap opens. */
 const OPEN_AGENTS_URI = 'kiloapp:///cloud/sessions';
-/**
- * Where a create with nothing to start from lands: the new-session screen.
- *
- * `LAUNCHER_NEW_AGENT_URL` is the canonical `kiloapp:///cloud/sessions/new` the
- * launcher shortcuts already use; `resolveIncomingUrl` maps it to
- * `/(app)/agent-chat/new`. The old widget-local `kiloapp://agent-chat/new`
- * matched no universal-link row, so the deep link resolved to null and the tap
- * dead-ended. One source of truth keeps the widget and the shortcuts agreeing.
- */
-const OPEN_NEW_AGENT_URI = LAUNCHER_NEW_AGENT_URL;
 
 /**
- * Run one in-place action and redraw the widget the user is looking at. The
- * action's request goes out with its progress line already drawn, and the
- * redraw after it re-reads native storage: a successful action republishes the
- * tray through the sink, which writes the new snapshot there (see
- * `runWidgetAction`). A custom clickAction itself never opens the app — it
- * launches a headless task — but an action that cannot complete in place hands
- * the user to the app instead of dead-ending on the widget.
+ * Run the in-place Approve and redraw the widget the user is looking at. The
+ * request goes out with its progress line already drawn, and the redraw after
+ * it re-reads native storage: a successful approve republishes the tray through
+ * the sink, which writes the new snapshot there (see `runWidgetApprove`). A
+ * custom clickAction itself never opens the app — it launches a headless task —
+ * but an approve that cannot complete in place hands the user to the app
+ * instead of dead-ending on the widget.
  */
-async function handleWidgetAction(
-  action: WidgetAction,
-  task: Pick<WidgetTaskHandlerProps, 'renderWidget' | 'widgetInfo'>,
+async function handleWidgetApprove(
+  task: Pick<WidgetTaskHandlerProps, 'renderWidget' | 'widgetInfo' | 'clickActionData'>,
   currentProps: () => AndroidWidgetProps
 ): Promise<void> {
   const { renderWidget, widgetInfo } = task;
   const draw = () => {
     renderWidget(renderActiveAgentsWidget(currentProps(), widgetInfo, isWidgetRtl()));
   };
-  setSurfaceExtras({ ...getSurfaceExtras(), actionFeedback: runningFeedback(action) });
+  setSurfaceExtras({ ...getSurfaceExtras(), actionFeedback: 'approving' });
   draw();
-  const result = await runWidgetAction(action);
+  const approvalKey = task.clickActionData?.approvalKey;
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- untyped native click payload
+  const result = await runWidgetApprove(typeof approvalKey === 'string' ? approvalKey : null);
   setSurfaceExtras({
     ...getSurfaceExtras(),
-    // The failure line is the action's own retry copy, and the row that was
-    // tapped stays offered; the body tap still opens Kilo.
-    actionFeedback: result.kind === 'failed' ? failureFeedback(action) : null,
+    // The failure line is Approve's own retry copy, and Approve stays offered;
+    // the body tap still opens Kilo.
+    actionFeedback: result.kind === 'failed' ? 'couldNotApprove' : null,
   });
   draw();
+  refreshPostedCardAction();
   // Nothing to act on, or the agent asked a free-form question the widget must
-  // never invent an answer to: the action hands the user to the app. The
-  // create action lands on the new-session screen when it had no draft or
-  // repository to start from; a failed call stays on the widget, whose retry
-  // row and body tap remain offered.
-  if (result.kind === 'none' || result.kind === 'no-permission') {
-    const uri = action === 'approve' ? OPEN_AGENTS_URI : OPEN_NEW_AGENT_URI;
+  // never invent an answer to: open the agents list. A failed call stays on the
+  // widget, whose retry row and body tap remain offered.
+  if (result.kind === 'none' || result.kind === 'no-permission' || result.kind === 'stale') {
     try {
-      await Linking.openURL(uri);
+      await Linking.openURL(OPEN_AGENTS_URI);
     } catch {
       // A host that cannot start the Activity leaves the settled widget on
       // screen; the task itself must not fail on the open.
@@ -142,19 +185,44 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
   const { widgetInfo, renderWidget, widgetAction, clickAction } = task;
 
   await applyStoredLanguage();
+  await restoreNativeHomeWidgetData();
+  if (
+    widgetAction === 'WIDGET_ADDED' ||
+    widgetAction === 'WIDGET_DELETED' ||
+    widgetAction === 'WIDGET_RESIZED'
+  ) {
+    await HomeWidgetRefresh?.widgetsChanged();
+  }
+  if (widgetAction === 'WIDGET_DELETED') {
+    return;
+  }
 
   // Re-read native storage even in a live process. An old alarm can already have
   // queued this task when newer work or a privacy blank replaces its deadline.
+  const beforeRestore = getStoredWidgetSnapshot();
+  if (beforeRestore !== null) {
+    await restoreHomeWidgetData(beforeRestore.scopeKey);
+  }
   const stored = getStoredWidgetSnapshot();
   let snapshot = stored;
   let props =
     stored === null
       ? getCurrentWidgetProps()
-      : buildCurrentWidgetProps(stored, translate, formatGlanceableCount, formatGlanceableAgo);
+      : buildCurrentWidgetProps(
+          stored,
+          translate,
+          formatGlanceableCount,
+          formatGlanceableAgo,
+          formatGlanceableClock,
+          getHomeWidgetDataForSnapshot(stored)
+        );
   if (props === null) {
     // Migrate the existing mirror when this installation has no native snapshot yet.
     await restorePersistedGlanceable();
     const restored = getLastGlanceableSnapshot();
+    if (restored !== null) {
+      await restoreHomeWidgetData(restored.scopeKey);
+    }
     if (restored !== null && getCurrentWidgetProps() === null) {
       setWidgetSnapshot(restored);
     }
@@ -168,7 +236,9 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
               restored,
               translate,
               formatGlanceableCount,
-              formatGlanceableAgo
+              formatGlanceableAgo,
+              formatGlanceableClock,
+              getHomeWidgetDataForSnapshot(restored)
             );
     } else {
       // A live publish during restoration owns the widget.
@@ -185,15 +255,131 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
   const currentProps = (): AndroidWidgetProps => {
     const latest = getStoredWidgetSnapshot();
     if (latest !== null) {
-      return buildCurrentWidgetProps(latest, translate, formatGlanceableCount, formatGlanceableAgo);
+      return buildCurrentWidgetProps(
+        latest,
+        translate,
+        formatGlanceableCount,
+        formatGlanceableAgo,
+        formatGlanceableClock,
+        getHomeWidgetDataForSnapshot(latest)
+      );
+    }
+    // A live sink snapshot is rebuilt per draw so progress and failure feedback show.
+    const live = getCurrentWidgetProps();
+    if (live !== null) {
+      return live;
     }
     return snapshot === null
       ? props
-      : buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount, formatGlanceableAgo);
+      : buildCurrentWidgetProps(
+          snapshot,
+          translate,
+          formatGlanceableCount,
+          formatGlanceableAgo,
+          formatGlanceableClock,
+          getHomeWidgetDataForSnapshot(snapshot)
+        );
   };
-  if (widgetAction === 'WIDGET_CLICK' && isWidgetAction(clickAction)) {
-    await handleWidgetAction(clickAction, task, currentProps);
+  if (widgetAction === 'WIDGET_CLICK' && clickAction === APPROVE_CLICK_ACTION) {
+    await handleWidgetApprove(task, currentProps);
     return;
   }
   renderWidget(renderActiveAgentsWidget(currentProps(), widgetInfo, isWidgetRtl()));
+}
+
+/** The WorkManager payload; `response` stays raw for `applyHomeWidgetResponse` to decode. */
+const homeWidgetRefreshPayloadSchema = z.looseObject({
+  scopeKey: z.string(),
+  accountEpoch: z.number(),
+  generation: z.string(),
+});
+
+/** WorkManager delivers authorized Home-only data without starting an ongoing notification. */
+export async function handleHomeWidgetRefresh(rawPayload: unknown): Promise<void> {
+  const parsed = homeWidgetRefreshPayloadSchema.safeParse(rawPayload);
+  if (!parsed.success || HomeWidgetRefresh === null) {
+    return;
+  }
+  const payload = parsed.data;
+  const context = {
+    scopeKey: payload.scopeKey,
+    accountEpoch: payload.accountEpoch,
+    generation: payload.generation,
+  };
+  const terminal = payload.terminal === 'privacy';
+  if (!terminal && !('response' in payload)) {
+    return;
+  }
+  const response = terminal ? { terminal: 'privacy' } : payload.response;
+  if (!(await applyHomeWidgetResponse(response, context))) {
+    return;
+  }
+  const authEpoch = currentAuthEpoch();
+  const blankEpoch = getTerminalBlankEpoch();
+  await applyStoredLanguage();
+  const data = getLastHomeWidgetData();
+  if (!terminal && data === null) {
+    return;
+  }
+  const widgets = await getWidgetInfo(WIDGET_NAME);
+  if (widgets.length === 0) {
+    await HomeWidgetRefresh.widgetsChanged();
+    return;
+  }
+  for (const widget of widgets) {
+    if (
+      currentAuthEpoch() !== authEpoch ||
+      getTerminalBlankEpoch() !== blankEpoch ||
+      // eslint-disable-next-line no-await-in-loop -- each widget re-checks the native generation before its own redraw
+      !(await HomeWidgetRefresh.isCurrent(
+        context.scopeKey,
+        context.accountEpoch,
+        context.generation
+      ))
+    ) {
+      return;
+    }
+    let superseded = false;
+    try {
+      // eslint-disable-next-line no-await-in-loop -- widgets redraw one at a time so a superseded refresh stops the rest
+      await requestWidgetUpdateById({
+        widgetName: WIDGET_NAME,
+        widgetId: widget.widgetId,
+        renderWidget: async info => {
+          if (
+            !(await HomeWidgetRefresh?.isCurrent(
+              context.scopeKey,
+              context.accountEpoch,
+              context.generation
+            )) ||
+            currentAuthEpoch() !== authEpoch ||
+            getTerminalBlankEpoch() !== blankEpoch
+          ) {
+            superseded = true;
+            throw new Error('Home widget refresh superseded');
+          }
+          const props =
+            terminal || data === null
+              ? buildGenericWidgetProps(key =>
+                  translate(key === 'glanceable.signedOut' ? 'glanceable.privacy' : key)
+                )
+              : buildCurrentWidgetProps(
+                  data.snapshot,
+                  translate,
+                  formatGlanceableCount,
+                  formatGlanceableAgo,
+                  formatGlanceableClock,
+                  getHomeWidgetDataForSnapshot(data.snapshot)
+                );
+          return renderActiveAgentsWidget(props, info, isWidgetRtl());
+        },
+      });
+    } catch (error) {
+      // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition -- the renderWidget closure sets `superseded` before this catch can run
+      if (!superseded) {
+        throw error;
+      }
+      return;
+    }
+  }
 }

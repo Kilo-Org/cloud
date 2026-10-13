@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ContainerConcurrencyLimitError } from './container-concurrency.js';
 
 const { mockError, mockInfo, mockWithFields } = vi.hoisted(() => {
   const error = vi.fn();
@@ -30,6 +31,24 @@ import {
 } from './workspace-errors.js';
 
 describe('sandbox recovery', () => {
+  it('does not destroy a sandbox for RPC-wrapped quota denial, even inside an SDK 500 envelope', async () => {
+    const denial = new Error(
+      `remote RPC: ${new ContainerConcurrencyLimitError('organization', 50).message}`
+    );
+    Object.assign(denial, { name: 'SandboxError', code: 'INTERNAL_ERROR', httpStatus: 500 });
+    const deleteSandbox = vi.fn();
+    expect(isSandboxInternalServerError(denial)).toBe(false);
+    expect(getPreparationInfrastructureFailure(denial)).toBeUndefined();
+    await expect(
+      withPreparationInfrastructureRecovery(
+        { deleteSandbox, sandboxId: 'sandbox-test', phase: 'quota-test' },
+        async () => {
+          throw denial;
+        }
+      )
+    ).rejects.toBe(denial);
+    expect(deleteSandbox).not.toHaveBeenCalled();
+  });
   it('classifies sandbox SDK internal server errors', () => {
     const error = new Error('control plane failed');
     Object.assign(error, {

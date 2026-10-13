@@ -27,7 +27,11 @@ import {
   getIntegrationsByOrganization,
 } from '@/lib/integrations/db/platform-integrations';
 import * as githubAppsService from '@/lib/integrations/github-apps-service';
-import { fetchGitLabBranches } from '@/lib/integrations/platforms/gitlab/adapter';
+import { isGitHubRateLimitError } from '@/lib/integrations/platforms/github/adapter';
+import {
+  fetchGitLabBranches,
+  GitLabBranchesFetchError,
+} from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   authorizeProject,
   GitLabReviewError,
@@ -75,6 +79,16 @@ const missingConnectionMessage = (label: string) =>
   `No ${label} connection found for this account. Connect ${label} first.`;
 const inactiveConnectionMessage = (label: string) =>
   `The ${label} connection is no longer active. Reconnect ${label} to continue.`;
+
+/**
+ * The GitHub refusal copy for a repository the connection cannot reach. The
+ * provider status is the only detail carried over; no token, host, or
+ * response body is ever embedded.
+ */
+const githubRepositoryForbiddenMessage =
+  'GitHub refused access to this repository. Check the GitHub App installation and repository permissions.';
+const githubRepositoryNotFoundMessage =
+  'This repository was not found in your GitHub App installation. Install the GitHub App on the account that owns it.';
 
 /** The active integration row of one owner and platform, or a clear refusal. */
 async function requireActiveIntegration(owner: Owner, platform: string, label: string) {
@@ -127,10 +141,15 @@ function cachesRepository(integration: GitHubIntegrationRow, repositoryFullName:
   );
 }
 
+/** The HTTP status of a provider refusal, when the thrown error carries one. */
+function refusalStatus(error: unknown): unknown {
+  return (error as { status?: unknown } | null)?.status;
+}
+
 /** A refusal meaning "this installation cannot see that repository" — try the next one. */
 function isRepositoryUnreachable(error: unknown): boolean {
   if (error instanceof TRPCError) return error.code === 'NOT_FOUND' || error.code === 'FORBIDDEN';
-  const status = (error as { status?: unknown } | null)?.status;
+  const status = refusalStatus(error);
   return status === 404 || status === 403;
 }
 
@@ -198,12 +217,41 @@ async function listGitHubBranches(
     return listOrganizationGitHubBranches(owner, owner.id, repositoryFullName);
   }
   const integration = await requireActiveIntegration(owner, PLATFORM.GITHUB, 'GitHub');
-  const { branches } = await githubAppsService.listBranches(
-    owner,
-    integration.id,
-    repositoryFullName
-  );
-  return toListing(branches);
+  try {
+    const { branches } = await githubAppsService.listBranches(
+      owner,
+      integration.id,
+      repositoryFullName
+    );
+    return toListing(branches);
+  } catch (error) {
+    // A blocked or missing repository is GitHub's own refusal, not a server
+    // fault: surface it as 403/404 so the caller stops retrying a 500. 403 is
+    // overloaded — a rate-limited request is transient and stays retryable.
+    const status = refusalStatus(error);
+    if (status === 403) {
+      if (isGitHubRateLimitError(error)) {
+        throw new TRPCError({
+          code: 'BAD_GATEWAY',
+          message: 'GitHub is limiting requests. Try again in a moment.',
+          cause: error,
+        });
+      }
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: githubRepositoryForbiddenMessage,
+        cause: error,
+      });
+    }
+    if (status === 404) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: githubRepositoryNotFoundMessage,
+        cause: error,
+      });
+    }
+    throw error;
+  }
 }
 
 /** A refusal meaning "this GitLab review call cannot proceed" — router worded. */
@@ -219,6 +267,36 @@ function gitlabErrorToTrpcError(error: GitLabReviewError): TRPCError {
       // stale_head cannot come from a read; retryable surfaces as a
       // retryable gateway failure, never as an empty branch list.
       return new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
+  }
+}
+
+/**
+ * Map a GitLab branches HTTP refusal onto the router error states. Only the
+ * status is carried over; the adapter's message stays out of the copy.
+ */
+function gitlabBranchesErrorToTrpcError(error: GitLabBranchesFetchError): TRPCError {
+  switch (error.status) {
+    case 401:
+    case 403:
+      return new TRPCError({
+        code: 'FORBIDDEN',
+        message:
+          'Your GitLab connection does not allow listing branches of this project. Reconnect GitLab if the connection has expired.',
+        cause: error,
+      });
+    case 404:
+      return new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'This GitLab project was not found, or your GitLab connection cannot access it.',
+        cause: error,
+      });
+    default:
+      // 5xx and anything else is a provider-side failure to retry, never a 500.
+      return new TRPCError({
+        code: 'BAD_GATEWAY',
+        message: "GitLab could not list this project's branches. Try again.",
+        cause: error,
+      });
   }
 }
 
@@ -247,6 +325,7 @@ async function listGitLabBranches(
     return toListing(branches.map(branch => ({ name: branch.name, isDefault: branch.default })));
   } catch (error) {
     if (error instanceof GitLabReviewError) throw gitlabErrorToTrpcError(error);
+    if (error instanceof GitLabBranchesFetchError) throw gitlabBranchesErrorToTrpcError(error);
     throw error;
   }
 }

@@ -1,12 +1,6 @@
-/* eslint-disable max-lines -- The Kilo Pass screen composes the presentation gate, loading, error, unavailable, and native-IAP surfaces; each is a small rendered surface that mirrors the shared header/scroll pattern. */
-import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Platform, View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 
 import { CenteredState } from '@/components/centered-state';
 import { DetailScreenScrollView } from '@/components/detail-screen';
@@ -14,65 +8,9 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { i18n } from '@/i18n';
-import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatUsd } from '@/lib/format';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getStoreLegalLinks, kiloPassLegalDisclosure } from '@/lib/kilo-pass/legal-links';
-import { ensureProfileAfterKiloPassPurchase } from '@/lib/kilo-pass/navigation';
-import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
-import { useInlinePurchaseErrorOwnership } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import { useTRPC } from '@/lib/trpc';
-import { cn } from '@/lib/utils';
 import { KILO_PASS_TITLE, type PurchasePresentationKind } from '@kilocode/app-shared/commerce';
-import { KiloPassNativeIapOwner, useKiloPassNativeIap } from './kilo-pass-native-iap-owner';
-import { RestorePurchasesButton } from './restore-purchases-button';
-
-type SubscriptionScreenFeedback = { type: 'success' | 'info' | 'error'; text: string };
-
-/**
- * A failed preflight is either retryable (transient network/5xx) or
- * non-retryable (the server refused the purchase). The retryable variant keeps
- * the product so the "Try again" CTA can re-run preflight without starting IAP.
- */
-type PreflightFailure =
-  | { kind: 'retryable'; message: string; product: AppStoreKiloPassProduct }
-  | { kind: 'nonRetryable'; message: string };
-
-function getPreflightFailureMessage(reason: string | null, isAndroid: boolean): string {
-  if (reason === 'already_subscribed') {
-    return i18n.t('kiloPass.alreadySubscribed');
-  }
-  if (reason === 'owned_by_another_account') {
-    return i18n.t(isAndroid ? 'kiloPass.otherAccountCopyPlay' : 'kiloPass.otherAccountCopy');
-  }
-  return i18n.t('kiloPass.purchaseUnavailable');
-}
-
-function formatTier(product: AppStoreKiloPassProduct): string {
-  return i18n.t('kiloPass.tierCredits', {
-    amount: formatUsd(product.webMonthlyPriceUsd, i18n.language, {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }),
-  });
-}
-
-function formatStorePrice(product: AppStoreKiloPassProduct): string {
-  return i18n.t('kiloPass.perMonth', { price: product.displayPrice });
-}
-
-/**
- * The owner's warning for a failed ownership lookup. The products-unavailable
- * card states the same store failure, so only this message is hidden inline
- * while the card is shown; a failed restore or a purchase error still renders.
- */
-function getStoreConnectionErrorMessage(isAndroid: boolean): string {
-  return i18n.t(
-    isAndroid ? 'kiloPass.couldNotConnectToPlay' : 'kiloPass.couldNotConnectToAppStore'
-  );
-}
 
 function KiloPassLoadingScreen() {
   const { t } = useTranslation();
@@ -121,10 +59,7 @@ function KiloPassPresentationErrorScreen({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-/**
- * Rendered when the server presentation is not `native_iap`. Shows truthful
- * copy and, for `web_management`, a Manage action that opens the web URL.
- */
+/** Shows the server presentation and opens web management when available. */
 function KiloPassUnavailableScreen({
   presentation,
 }: {
@@ -168,433 +103,29 @@ function KiloPassUnavailableScreen({
   );
 }
 
-function KiloPassNativeIapContent() {
-  const isAndroid = Platform.OS === 'android';
-  const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const trpc = useTRPC();
-  const { t } = useTranslation();
-  const {
-    clearError,
-    errorMessage,
-    storeConnectionError,
-    isPending,
-    products,
-    productsError,
-    productsIsLoading,
-    productsIsRefetching,
-    productsRefetch,
-    purchase,
-    ownedByAnotherAccount,
-    ownedAppleProductId,
-    ownedOriginalTransactionId,
-    ownedGoogleProductId,
-    ownedGooglePurchaseToken,
-    ownershipChecked,
-    ownershipCheckFailed,
-    retryOwnershipCheck,
-  } = useKiloPassNativeIap();
-  // Registered here, not on the owner: the owner mounts for every presentation
-  // variant, but only this content renders `errorMessage` inline and only this
-  // content can start a purchase or a restore. The owner's recovery path, the
-  // only one that can run without this content, passes `notifyErrors: false`,
-  // so it never reaches the toast this suppresses.
-  useInlinePurchaseErrorOwnership();
-  const queryClient = useQueryClient();
-  const preflightPurchase = useMutation(trpc.kiloPass.preflightPurchase.mutationOptions());
-  const invalidateAfterManagement = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter()),
-      queryClient.invalidateQueries(trpc.user.getContextBalance.pathFilter()),
-      queryClient.invalidateQueries(trpc.kiloPass.getPurchasePresentation.pathFilter()),
-    ]);
-  };
-  const [restoreFeedback, setRestoreFeedback] = useState<SubscriptionScreenFeedback | null>(null);
-  const [preflightFailure, setPreflightFailure] = useState<PreflightFailure | null>(null);
-  // A store failure leaves the catalog empty and may also surface `errorMessage`.
-  // The products-unavailable card is the single surface for that failure, so only
-  // the store connection message stays hidden while the card is shown; every
-  // other failure (a failed restore, a purchase error) still renders inline. The
-  // owner reports the message's identity, never the translated copy: the app
-  // language can change while the message is on screen and an equality check
-  // would then fail and duplicate the card's failure inline.
-  const productsUnavailable = !productsIsLoading && products.length === 0;
-  const storeErrorMessageHidden = productsUnavailable && storeConnectionError;
-  // The ownership retry below renders from `ownershipCheckFailed` alone, so its
-  // explanation must come from the same flag: when the screen has already cleared
-  // the message (its unmount clears it), a retry must not stand there with no
-  // error beside it.
-  const inlineErrorMessage =
-    errorMessage ??
-    (ownershipCheckFailed && !productsUnavailable
-      ? getStoreConnectionErrorMessage(isAndroid)
-      : null);
-  let feedback: SubscriptionScreenFeedback | null = restoreFeedback;
-  if (ownedByAnotherAccount) {
-    feedback = {
-      type: 'error',
-      text: t(isAndroid ? 'kiloPass.otherAccountCopyPlay' : 'kiloPass.otherAccountCopy'),
-    };
-  } else if (inlineErrorMessage && !storeErrorMessageHidden) {
-    feedback = { type: 'error', text: inlineErrorMessage };
-  } else if (preflightFailure) {
-    feedback = { type: 'error', text: preflightFailure.message };
-  }
-  const preflightBlocked = preflightFailure?.kind === 'nonRetryable';
-  const isRetryDisabled = isPending || productsIsRefetching;
-  const tilesDisabled =
-    isPending ||
-    preflightBlocked ||
-    preflightPurchase.isPending ||
-    ownedByAnotherAccount ||
-    !ownershipChecked;
-  const [privacyPolicyLink, termsOfUseLink] = getStoreLegalLinks(WEB_BASE_URL);
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-  useEffect(
-    () => () => {
-      clearError();
-    },
-    [clearError]
-  );
-
-  const runPreflight = async (product: AppStoreKiloPassProduct) => {
-    setPreflightFailure(null);
-    // eslint-disable-next-line init-declarations -- assigned in the try block below
-    let preflight: Awaited<ReturnType<typeof preflightPurchase.mutateAsync>>;
-    try {
-      preflight = await preflightPurchase.mutateAsync({
-        platform: isAndroid ? 'android' : 'ios',
-        storefront: isAndroid ? 'play' : 'app_store',
-        product: 'kilo_pass',
-        supportsNativePlayKiloPass: true,
-        appleProductId: product.appleProductId,
-        ...(isAndroid
-          ? {
-              googleProductId: product.googleProductId,
-              googlePurchaseToken: ownedGooglePurchaseToken,
-            }
-          : {
-              appleOriginalTransactionId: ownedOriginalTransactionId,
-            }),
-      });
-    } catch {
-      setPreflightFailure({
-        kind: 'retryable',
-        message: t('kiloPass.verifyPurchaseFailed'),
-        product,
-      });
-      return;
-    }
-
-    if (!preflight.allowed) {
-      setPreflightFailure({
-        kind: 'nonRetryable',
-        message: getPreflightFailureMessage(preflight.reason, isAndroid),
-      });
-      return;
-    }
-
-    if (!mountedRef.current) {
-      return;
-    }
-
-    await purchase(product, {
-      ...(isAndroid &&
-      ownedGoogleProductId &&
-      ownedGooglePurchaseToken &&
-      ownedGoogleProductId !== product.googleProductId
-        ? {
-            googleReplacement: {
-              productId: ownedGoogleProductId,
-              purchaseToken: ownedGooglePurchaseToken,
-            },
-          }
-        : {}),
-      onCompleted: () => {
-        ensureProfileAfterKiloPassPurchase(router);
-      },
-    });
-  };
-
-  const managePlaySubscription = async () => {
-    if (!ownedGoogleProductId) {
-      return;
-    }
-    const { openPlaySubscriptionManagement } = await import('./kilo-pass-play-manage');
-    await openPlaySubscriptionManagement({
-      skuAndroid: ownedGoogleProductId,
-      invalidateAfter: invalidateAfterManagement,
-    });
-  };
-
-  const handleProductPress = (product: AppStoreKiloPassProduct) => {
-    void Haptics.selectionAsync();
-
-    // Apple manages tier changes. Android opens management for the current tier.
-    const ownedProductId = isAndroid ? ownedGoogleProductId : ownedAppleProductId;
-    const productId = isAndroid ? product.googleProductId : product.appleProductId;
-    if (
-      ownedProductId &&
-      (isAndroid ? ownedProductId === productId : ownedProductId !== productId)
-    ) {
-      void (async () => {
-        if (isAndroid) {
-          await managePlaySubscription();
-          return;
-        }
-        const { openAppStoreManagement } = await import('./kilo-pass-ios-manage');
-        await openAppStoreManagement({ invalidateAfter: invalidateAfterManagement });
-      })();
-      return;
-    }
-
-    void runPreflight(product);
-  };
-
-  return (
-    <View className="flex-1 bg-background" testID="kilo-pass-native-iap">
-      <ScreenHeader title={t('kiloPass.title')} modal />
-      <View className="flex-1 px-5">
-        <DetailScreenScrollView
-          className="-mx-1 flex-1"
-          contentContainerClassName="gap-3 px-1"
-          showsVerticalScrollIndicator={false}
-        >
-          <Text className="px-1 text-sm leading-5 text-muted-foreground">
-            {t('kiloPass.subscriptionHeaderDescription')}
-          </Text>
-
-          {feedback && (
-            <Text
-              className={cn('px-1 text-sm', {
-                'text-destructive': feedback.type === 'error',
-                'text-good': feedback.type === 'success',
-                'text-muted-foreground': feedback.type === 'info',
-              })}
-            >
-              {feedback.text}
-            </Text>
-          )}
-
-          {ownershipCheckFailed && !productsUnavailable && (
-            <Button
-              accessibilityLabel={t('kiloPass.retryLoading')}
-              className="self-start"
-              onPress={retryOwnershipCheck}
-              variant="outline"
-            >
-              <Text>{t('common.tryAgain')}</Text>
-            </Button>
-          )}
-
-          {preflightFailure?.kind === 'retryable' && (
-            <Button
-              accessibilityLabel={t('kiloPass.tryVerifyingPurchaseAgain')}
-              className="self-start"
-              onPress={() => {
-                void runPreflight(preflightFailure.product);
-              }}
-              variant="outline"
-            >
-              <Text>{t('common.tryAgain')}</Text>
-            </Button>
-          )}
-
-          {productsIsLoading &&
-            [0, 1, 2].map(index => (
-              <Skeleton key={index} className="h-[112px] w-full rounded-xl" />
-            ))}
-
-          {productsUnavailable && (
-            <View className="gap-3 rounded-xl border border-border bg-card p-5">
-              <Text className="font-semibold text-foreground">
-                {t(isAndroid ? 'kiloPass.productsUnavailablePlay' : 'kiloPass.productsUnavailable')}
-              </Text>
-              <Text className="text-sm text-muted-foreground">
-                {productsError ??
-                  t(
-                    isAndroid
-                      ? 'kiloPass.productsCouldNotLoadPlay'
-                      : 'kiloPass.productsCouldNotLoad'
-                  )}
-              </Text>
-              <Button
-                accessibilityLabel={t('kiloPass.tryLoadingProductsAgain')}
-                accessibilityState={{
-                  busy: productsIsRefetching,
-                  disabled: isRetryDisabled,
-                }}
-                className="self-start"
-                disabled={isRetryDisabled}
-                loading={productsIsRefetching}
-                onPress={() => {
-                  if (ownershipCheckFailed) {
-                    retryOwnershipCheck();
-                  }
-                  void productsRefetch();
-                }}
-                variant="outline"
-              >
-                <Text>
-                  {productsIsRefetching ? t('kiloPass.tryingAgain') : t('common.tryAgain')}
-                </Text>
-              </Button>
-            </View>
-          )}
-
-          {!productsIsLoading &&
-            products.map(product => (
-              <Pressable
-                key={product.appleProductId}
-                accessibilityLabel={t('kiloPass.productAccessibility', {
-                  tier: formatTier(product),
-                  price: formatStorePrice(product),
-                })}
-                accessibilityRole="button"
-                accessibilityState={{
-                  busy: isPending || preflightPurchase.isPending,
-                  disabled: tilesDisabled,
-                }}
-                className={cn(
-                  'rounded-xl border border-border bg-card p-5 active:opacity-80',
-                  tilesDisabled && 'opacity-50'
-                )}
-                disabled={tilesDisabled}
-                onPress={() => {
-                  handleProductPress(product);
-                }}
-              >
-                <View className="flex-row items-start justify-between gap-4">
-                  <View className="flex-1 gap-1.5">
-                    <Text className="font-semibold text-foreground">{formatTier(product)}</Text>
-                    <Text className="text-xs text-muted-foreground">
-                      {t('kiloPass.tierDescription', {
-                        price: formatUsd(product.webMonthlyPriceUsd, i18n.language, {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 2,
-                        }),
-                      })}
-                    </Text>
-                  </View>
-                  <Text className="text-base font-semibold text-foreground tabular-nums">
-                    {formatStorePrice(product)}
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
-
-          {isAndroid && ownedGoogleProductId ? (
-            <Button
-              variant="outline"
-              onPress={() => {
-                void Haptics.selectionAsync();
-                void managePlaySubscription();
-              }}
-            >
-              <Text>{t('kiloPass.manage')}</Text>
-            </Button>
-          ) : null}
-          <RestorePurchasesButton
-            onResult={result => {
-              if (result === 'restored') {
-                setRestoreFeedback({ type: 'success', text: t('kiloPass.subscriptionRestored') });
-                ensureProfileAfterKiloPassPurchase(router);
-              } else if (result === 'empty') {
-                setRestoreFeedback({ type: 'info', text: t('kiloPass.noPurchasesToRestore') });
-              } else {
-                setRestoreFeedback(null);
-              }
-            }}
-          />
-
-          {/* Do not set a leading class here. Android applies the parent line height
-              to each nested link Text and the block grows to many times its size. */}
-          <Text className="px-1 pt-1 text-xs text-muted-foreground">
-            {kiloPassLegalDisclosure(Platform.OS)}
-            {t('kiloPass.legalConnectorTerms')}
-            <Text
-              accessibilityRole="link"
-              className="text-xs text-primary underline active:opacity-70"
-              onPress={() => {
-                void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
-              }}
-            >
-              {termsOfUseLink.label}
-            </Text>
-            {t('kiloPass.legalConnectorPrivacy')}
-            <Text
-              accessibilityRole="link"
-              className="text-xs text-primary underline active:opacity-70"
-              onPress={() => {
-                void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
-              }}
-            >
-              {privacyPolicyLink.label}
-            </Text>
-            .
-          </Text>
-        </DetailScreenScrollView>
-
-        {isPending && (
-          <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
-            <Button
-              accessibilityLabel={t('kiloPass.completingPurchaseAccessibility')}
-              accessibilityState={{ busy: true, disabled: true }}
-              className="mt-4"
-              disabled
-            >
-              <ActivityIndicator size="small" color={colors.primaryForeground} />
-              <Text>{t('kiloPass.completingPurchase')}</Text>
-            </Button>
-          </View>
-        )}
-      </View>
-    </View>
-  );
-}
-
 export function KiloPassSubscriptionScreen() {
   const trpc = useTRPC();
   const platform = Platform.OS === 'ios' ? 'ios' : 'android';
   const storefront = Platform.OS === 'ios' ? 'app_store' : 'play';
-  const isIapPlatform = Platform.OS === 'ios' || Platform.OS === 'android';
   const presentationQuery = useQuery(
     trpc.kiloPass.getPurchasePresentation.queryOptions({
       platform,
       storefront,
       product: 'kilo_pass',
-      supportsNativePlayKiloPass: true,
     })
   );
 
-  // The owner is the route entry, not a branch behind the presentation query:
-  // it must mount while the presentation is still loading so the native store
-  // connection and the store-product query overlap that request instead of
-  // queuing behind it. Only the purchasable content is gated on `native_iap`;
-  // the loading, error, and non-native variants render as its children so the
-  // owner never unmounts and remounts as the query settles.
-  const presentation = presentationQuery.data;
-  let variant: ReactNode = <KiloPassNativeIapContent />;
   if (presentationQuery.isPending) {
-    variant = <KiloPassLoadingScreen />;
-  } else if (!presentation) {
-    variant = (
+    return <KiloPassLoadingScreen />;
+  }
+  if (!presentationQuery.data) {
+    return (
       <KiloPassPresentationErrorScreen
         onRetry={() => {
           void presentationQuery.refetch();
         }}
       />
     );
-  } else if (presentation.kind !== 'native_iap' || !isIapPlatform) {
-    variant = <KiloPassUnavailableScreen presentation={presentation} />;
   }
-
-  return <KiloPassNativeIapOwner>{variant}</KiloPassNativeIapOwner>;
+  return <KiloPassUnavailableScreen presentation={presentationQuery.data} />;
 }

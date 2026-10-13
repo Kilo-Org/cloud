@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { BenchmarkProfileEntryStatus, PoolEntry } from '@kilocode/auto-routing-contracts';
 
-jest.mock('@/lib/ai-gateway/hooks', () => ({
+jest.mock('@/lib/hooks/use-openrouter-models', () => ({
   useModelSelectorList: () => ({
     data: { data: [] },
     isLoading: false,

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { type TextInput, type TextInputProps, View } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -53,13 +53,34 @@ function FormField({
 }: Readonly<FormFieldProps>) {
   const [validationError, setValidationError] = useState<string | null>(null);
   const valueRef = useRef(defaultValue ?? '');
+  const nativeInput = useRef<TextInput>(null);
   const displayedError = validate ? validationError : error;
+
+  // Write the default only on attach; later prop changes must not move the caret
+  // while the person edits an uncontrolled field.
+  useLayoutEffect(() => {
+    const next = defaultValue ?? '';
+    valueRef.current = next;
+    nativeInput.current?.setNativeProps({ text: next });
+    // defaultValue is initial content, not a controlled value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <View className="gap-1.5">
       <Text className="text-sm font-medium text-foreground">{label}</Text>
       <Input
-        ref={ref}
+        ref={instance => {
+          nativeInput.current = instance;
+          if (ref == null) {
+            return;
+          }
+          if ('current' in ref) {
+            ref.current = instance;
+          } else {
+            ref(instance);
+          }
+        }}
         {...props}
         defaultValue={defaultValue}
         editable={!disabled}
@@ -84,7 +105,7 @@ function FormField({
           }
         }}
         className={cn(
-          // The box (min-h-[44px] px-3 leading-[normal]) lives in
+          // The box (min-h-[44px] pl-3 pr-3 leading-[normal]) lives in
           // `@/components/ui/input`, so every single-line field shares it and
           // the class cannot be copied back wrong. No vertical padding: iOS
           // insets the already-centered text rect by it, drawing the value and

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useOpenRouterModelsAndProviders } from '@/lib/ai-gateway/hooks';
+import { useOpenRouterModelsAndProviders } from '@/lib/hooks/use-openrouter-models';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';

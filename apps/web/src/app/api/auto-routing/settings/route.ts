@@ -20,7 +20,7 @@ import {
   toLegacyModeApiSettingsResponse,
   validatePoolEntries,
   type AutoRoutingSettingsApiResponse,
-} from '@/lib/ai-gateway/auto-routing-pool-validation';
+} from '@/lib/auto-routing-pool-validation';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';

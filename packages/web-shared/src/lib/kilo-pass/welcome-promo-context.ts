@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { kilo_pass_issuances } from '@kilocode/db/schema';
-import { asc, eq } from 'drizzle-orm';
+import { kilo_pass_issuances, kilo_pass_subscriptions } from '@kilocode/db/schema';
+import { and, asc, eq, ne } from 'drizzle-orm';
 
 import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -53,4 +53,45 @@ export async function getInitialWelcomePromoContextForSubscription(
     .limit(1);
 
   return initialIssuance[0] ?? null;
+}
+
+export type MonthlyWelcomePromoAccountContext = {
+  isFirstTimeSubscriberEver: boolean;
+  welcomePromoPolicy: KiloPassWelcomePromoPolicy;
+  welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
+};
+
+export async function getMonthlyWelcomePromoAccountContext(
+  db: DbOrTx,
+  params: {
+    kiloUserId: string;
+    subscriptionId: string;
+    paymentProvider: KiloPassPaymentProvider;
+  }
+): Promise<MonthlyWelcomePromoAccountContext> {
+  const otherSubscription = await db
+    .select({ id: kilo_pass_subscriptions.id })
+    .from(kilo_pass_subscriptions)
+    .where(
+      and(
+        eq(kilo_pass_subscriptions.kilo_user_id, params.kiloUserId),
+        ne(kilo_pass_subscriptions.id, params.subscriptionId)
+      )
+    )
+    .limit(1);
+  const initialWelcomePromoContext =
+    params.paymentProvider === KiloPassPaymentProvider.Stripe
+      ? await getInitialWelcomePromoContextForSubscription(db, {
+          subscriptionId: params.subscriptionId,
+        })
+      : null;
+
+  return {
+    isFirstTimeSubscriberEver: otherSubscription.length === 0,
+    welcomePromoPolicy: getKiloPassWelcomePromoPolicy({
+      paymentProvider: params.paymentProvider,
+      initialIssuanceCreatedAt: initialWelcomePromoContext?.createdAt ?? null,
+    }),
+    welcomePromoEligibilityReason: initialWelcomePromoContext?.eligibilityReason ?? null,
+  };
 }

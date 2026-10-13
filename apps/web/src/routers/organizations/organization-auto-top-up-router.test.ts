@@ -238,6 +238,7 @@ describe('organization auto-top-up router', () => {
           orgId: testOrg.id,
           amountCents: 50000,
           accountCreatedAt: new Date(testOrg.created_at).toISOString(),
+          accountUsedMicrodollars: testOrg.microdollars_used,
         })
       );
     });

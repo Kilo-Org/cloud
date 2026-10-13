@@ -31,8 +31,12 @@ const CALLBACK_QUEUE_E2E = 'cloud-agent-next-callback-queue-e2e-test';
 const REPORT_QUEUE = 'cloud-agent-next-report-queue';
 const SHARED_SANDBOX_OVERRIDES_KV_ID_E2E = '4d5f651fb14b4de682204eaa9fa60a7d';
 
-const E2E_CONTAINER_CLASSES = new Set(['SandboxSmall']);
-const E2E_MAX_INSTANCES = 20;
+const E2E_CONTAINER_CLASSES = new Set(['Sandbox']);
+// The suite cold-boots a container per scenario and they linger until the
+// 15-minute idle stop, so a whole run keeps far more than 20 alive at once. The
+// old value of 20 pinned the class at the limit and left later cold boots
+// stuck in `preparing`; match the production `Sandbox` class instead.
+const E2E_MAX_INSTANCES = 40;
 
 const E2E_CALLBACK_CLASS = 'E2eCallbackSink';
 const E2E_CALLBACK_BINDING = 'E2E_CALLBACK_SINK';
@@ -85,15 +89,6 @@ function withStrictlyPublicFetch(config) {
 
 export function buildE2eWorkerConfig(sourceConfig, overrides) {
   const { workerUrl, kiloOpenRouterBase } = overrides;
-  const e2eUserId = overrides.e2eUserId?.trim();
-  if (!e2eUserId) {
-    throw new Error(
-      'E2E_USER_ID is required: this render enrolls it in CONTROL_PLANE_IDS and ' +
-        'WORKTREE_CREATION_ENABLED_IDS, and the e2e Worker writes to production ' +
-        'Postgres and R2. Pass an explicit Kilo user id; pass * only to ' +
-        'deliberately enrol every authenticated Kilo user.'
-    );
-  }
   const config = structuredClone(sourceConfig);
 
   config.$schema = '../node_modules/wrangler/config-schema.json';
@@ -164,11 +159,12 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     TOOL_CGROUP_MODE: 'enforce',
     TOOL_CGROUP_RESERVE_MB: '1024',
     TOOL_CGROUP_CPU_WEIGHT: '50',
-    CONTROL_PLANE_IDS: e2eUserId,
-    WORKTREE_CREATION_ENABLED_IDS: e2eUserId,
     CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'false',
     CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: '',
     CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: '',
+    // The suite runs every scenario through one funded test account, so its own
+    // churn would trip the per-account concurrent-container cap.
+    CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',
     CREDENTIAL_CONTAINMENT_ENABLED: 'false',
   };
 
@@ -181,11 +177,15 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     });
   }
 
-  config.kv_namespaces = (config.kv_namespaces ?? []).map(kvNamespace =>
-    kvNamespace.binding === 'SHARED_SANDBOX_OVERRIDES'
-      ? { ...kvNamespace, id: SHARED_SANDBOX_OVERRIDES_KV_ID_E2E }
-      : kvNamespace
-  );
+  // The e2e Worker keeps no `SandboxContainers` class, so it has no repository
+  // snapshots and must not provision a namespace for them.
+  config.kv_namespaces = (config.kv_namespaces ?? [])
+    .filter(kvNamespace => kvNamespace.binding !== 'REPO_SNAPSHOTS')
+    .map(kvNamespace =>
+      kvNamespace.binding === 'SHARED_SANDBOX_OVERRIDES'
+        ? { ...kvNamespace, id: SHARED_SANDBOX_OVERRIDES_KV_ID_E2E }
+        : kvNamespace
+    );
 
   config.queues = {
     ...config.queues,
@@ -359,10 +359,6 @@ export function renderLocal({
 
 if (isMain) {
   const isLocal = process.argv.includes('--local');
-  // Only the deployed render consumes it, as the enrollment id for
-  // CONTROL_PLANE_IDS / WORKTREE_CREATION_ENABLED_IDS. It no longer authorizes
-  // the surface.
-  const e2eUserId = process.env.E2E_USER_ID;
   if (isLocal) {
     try {
       renderLocal({
@@ -408,7 +404,6 @@ if (isMain) {
       rendered = buildE2eWorkerConfig(sourceConfig, {
         workerUrl,
         kiloOpenRouterBase,
-        e2eUserId,
       });
     } catch (error) {
       console.error(error instanceof Error ? error.message : error);

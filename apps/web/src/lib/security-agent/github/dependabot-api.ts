@@ -148,6 +148,9 @@ const ACCESS_BLOCKED_HINTS = ['repository access blocked'] as const;
 
 const DEPENDABOT_AVAILABILITY_CACHE_TTL_MS = 30 * 60_000;
 const DEPENDABOT_AVAILABILITY_CACHE_MAX_ENTRIES = 10_000;
+// Mobile control-plane procedures time out after 10 s. Probing stops starting new
+// GitHub requests after this budget so large installations still get a response.
+const DEPENDABOT_AVAILABILITY_CHECK_BUDGET_MS = 5_000;
 const dependabotAvailabilityCache = new Map<
   string,
   { status: DependabotAlertsAvailability; expiresAtMs: number }
@@ -199,6 +202,8 @@ export function classifyFetchAlertsError(
  * A successful request is enough to prove alerts are enabled, even when no alerts exist.
  * Ambiguous permission, authentication, and transient failures remain unknown so the UI
  * never labels a repository as disabled without a definitive GitHub response.
+ * Repositories not checked within the probing budget also remain unknown. Probes already
+ * in flight still populate the cache, so later calls cover more repositories.
  */
 export async function checkDependabotAlertsAvailability(
   installationId: string,
@@ -241,24 +246,31 @@ export async function checkDependabotAlertsAvailability(
 
   const octokit = new Octokit({ auth: token });
   const limit = pLimit(5);
-  const checkedResults = await Promise.all(
+  const checkedResultsById = new Map<number, DependabotAlertsAvailability>();
+  const probes = Promise.all(
     repositoriesToCheck.map(repository =>
-      limit(async (): Promise<RepositoryDependabotAlertsAvailability> => {
+      limit(async () => {
+        let status: DependabotAlertsAvailability;
         try {
-          const status = await checkRepositoryDependabotAlertsAvailability({
+          status = await checkRepositoryDependabotAlertsAvailability({
             installationId,
             appType,
             repositoryFullName: repository.fullName,
             octokit,
           });
-          return { id: repository.id, status };
         } catch {
-          return { id: repository.id, status: 'unknown' };
+          status = 'unknown';
         }
+        checkedResultsById.set(repository.id, status);
       })
     )
   );
-  const checkedResultsById = new Map(checkedResults.map(result => [result.id, result.status]));
+  const budgetExpired = Promise.withResolvers<void>();
+  const budgetTimer = setTimeout(budgetExpired.resolve, DEPENDABOT_AVAILABILITY_CHECK_BUDGET_MS);
+  await Promise.race([probes, budgetExpired.promise]);
+  clearTimeout(budgetTimer);
+  limit.clearQueue();
+
   const results = repositories.map(repository => ({
     id: repository.id,
     status: cachedResults.get(repository.id) ?? checkedResultsById.get(repository.id) ?? 'unknown',

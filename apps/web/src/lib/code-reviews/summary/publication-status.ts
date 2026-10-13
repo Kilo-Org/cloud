@@ -43,6 +43,13 @@ export function classifyCodeReviewPublication(
     return CodeReviewPublicationStatus.Missing;
   }
 
+  // A comment that carries only the marker and reserved sections (history,
+  // footer, council) is not a published summary, so the previous-summary
+  // short-circuit must not treat it as published.
+  if (normalizeSummaryBody(summaryBody).length === 0) {
+    return CodeReviewPublicationStatus.Missing;
+  }
+
   const baselineUnavailable =
     previousSummaryObserved === false ||
     (previousSummaryObserved === null && previousSummaryBody === null);

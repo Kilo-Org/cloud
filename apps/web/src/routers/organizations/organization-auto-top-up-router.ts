@@ -47,6 +47,7 @@ async function reportOrgAutoTopUpAttempt(params: {
     orgId: params.organizationId,
     amountCents: params.amountCents,
     accountCreatedAt: organization.created_at,
+    accountUsedMicrodollars: organization.microdollars_used,
     ip: params.ip,
     ipCountry: ipCountryFromHeaders(params.headers),
     ja4: ja4FromHeaders(params.headers),

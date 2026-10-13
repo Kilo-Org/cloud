@@ -65,7 +65,7 @@ vi.mock('@/lib/a11y/status-announcement', () => ({
 
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.com' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
-vi.mock('@/lib/kilo-pass/legal-links', () => ({
+vi.mock('@/lib/iap/legal-links', () => ({
   getStoreLegalLinks: () => [
     { url: 'https://example.com/privacy-app', label: 'Privacy Policy' },
     { url: 'https://example.com/terms-app', label: 'Terms of Use (EULA)' },

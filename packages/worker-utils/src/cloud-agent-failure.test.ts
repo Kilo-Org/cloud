@@ -377,6 +377,7 @@ const ASSISTANT_FAILURE_CODES = ['assistant_error', 'payment_required', 'model_m
  * responsibility; a deliberate classifier change updates this table.
  */
 const NON_ASSISTANT_FAILURE_CLASSIFICATIONS = {
+  container_limit_reached: { responsibility: 'user', reason: 'container_limit_reached' },
   sandbox_connect_failed: { responsibility: 'platform', reason: 'sandbox_connectivity' },
   workspace_setup_failed: { responsibility: 'unknown', reason: 'workspace_unknown' },
   kilo_server_failed: { responsibility: 'platform', reason: 'runtime_startup' },

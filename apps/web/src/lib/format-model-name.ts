@@ -20,6 +20,16 @@ export function formatShortModelName(slug: string): string {
 }
 
 /**
+ * Formats a `{ providerID, modelID }` ref into a short display name.
+ *
+ * - `{ providerID: 'kilo', modelID: 'anthropic/claude-opus-4.6' }` → `claude-opus-4.6`
+ * - `{ providerID: 'anthropic', modelID: 'claude-sonnet-4' }` → `claude-sonnet-4`
+ */
+export function formatModelRefName(model: { providerID: string; modelID: string }): string {
+  return formatShortModelName(`${model.providerID}/${model.modelID}`);
+}
+
+/**
  * Strips "Provider: " prefix from a human-readable model display name.
  *
  * - `"Anthropic: Claude Opus 4.6"` → `"Claude Opus 4.6"`

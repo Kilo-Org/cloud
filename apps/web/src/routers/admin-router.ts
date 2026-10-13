@@ -29,8 +29,8 @@ import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
-import { postTestStaleSyncAlert } from '@/lib/ai-gateway/providers/openrouter/sync-providers-stale-alert';
-import { syncAndStoreProviders } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
+import { postTestStaleSyncAlert } from '@/lib/providers/openrouter/sync-providers-stale-alert';
+import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
 import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
 import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
@@ -58,6 +58,7 @@ import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router'
 import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
 import { adminAutoFreeConfigRouter } from '@/routers/admin/auto-free-config-router';
+import { adminGatewayModelListsRouter } from '@/routers/admin/gateway-model-lists-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
@@ -70,6 +71,7 @@ import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-rou
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
+import { adminModelTrafficRouter } from '@/routers/admin/model-traffic-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
 import { adminUserDataExportsRouter } from '@/routers/admin/user-data-exports-router';
 import { adminUserDeletionQueueRouter } from '@/routers/admin/user-deletion-queue-router';
@@ -2588,6 +2590,7 @@ export const adminRouter = createTRPCRouter({
   customLlm: adminCustomLlmRouter,
   gatewayConfig: adminGatewayConfigRouter,
   autoFreeConfig: adminAutoFreeConfigRouter,
+  gatewayModelLists: adminGatewayModelListsRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   requestLoggingOptIns: adminRequestLoggingOptInsRouter,
   bulkBlock: adminBulkBlockRouter,
@@ -2600,6 +2603,7 @@ export const adminRouter = createTRPCRouter({
   // the shell-security rebrand; the key/symbol asymmetry is intentional.
   securityAdvisorContent: adminShellSecurityContentRouter,
   freeModelUsage: adminFreeModelUsageRouter,
+  modelTraffic: adminModelTrafficRouter,
   modelEvalIngest: adminModelEvalIngestRouter,
   userDataExports: adminUserDataExportsRouter,
   userDeletionQueue: adminUserDeletionQueueRouter,

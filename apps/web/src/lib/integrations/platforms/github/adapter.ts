@@ -601,8 +601,14 @@ export async function findKiloReviewComment(
 ): Promise<{ commentId: number; body: string } | null> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
+  const appId = String(getGitHubAppCredentials(appType).appId);
 
-  const comments: Array<{ id: number; body?: string | null; updated_at: string }> = [];
+  const comments: Array<{
+    id: number;
+    body?: string | null;
+    updated_at: string;
+    performed_via_github_app?: { id?: number | string } | null;
+  }> = [];
   let reachedScanLimit = false;
 
   for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
@@ -626,7 +632,11 @@ export async function findKiloReviewComment(
     totalComments: comments.length,
   });
 
-  const markedComments = comments.filter(c => c.body?.includes('<!-- kilo-review -->'));
+  const markedComments = comments.filter(
+    c =>
+      c.body?.includes('<!-- kilo-review -->') &&
+      String(c.performed_via_github_app?.id ?? '') === appId
+  );
 
   if (markedComments.length > 0) {
     const latestComment = markedComments.sort((a, b) => {
@@ -1072,7 +1082,12 @@ function getErrorMessage(error: unknown): string {
   return typeof message === 'string' ? message : '';
 }
 
-function isRateLimitError(error: unknown): boolean {
+/**
+ * Is this GitHub failure a rate limit (primary, secondary, or abuse) rather
+ * than a permission refusal? 403 carries both meanings, so callers that map
+ * 403 to a permanent error must ask this first.
+ */
+export function isGitHubRateLimitError(error: unknown): boolean {
   if (!isHttpError(error)) return false;
   // 429 is unambiguously rate limiting.
   if (error.status === 429) return true;
@@ -1194,7 +1209,7 @@ export async function fetchPullRequestByNumber(params: {
       ...(commitShas ? { commitShas } : {}),
     };
   } catch (error) {
-    if (isRateLimitError(error)) {
+    if (isGitHubRateLimitError(error)) {
       throw new GitHubRateLimitError(parseRateLimitResetAt(error));
     }
     if (isHttpError(error) && error.status === 404) {
@@ -1271,7 +1286,7 @@ export async function fetchBatchedReviewDecisions(args: {
     }
     return result;
   } catch (error) {
-    if (isRateLimitError(error)) {
+    if (isGitHubRateLimitError(error)) {
       throw new GitHubRateLimitError(parseRateLimitResetAt(error));
     }
     throw error;

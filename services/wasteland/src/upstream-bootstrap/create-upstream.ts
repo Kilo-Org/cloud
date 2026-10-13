@@ -114,7 +114,6 @@ export async function createUpstream(opts: CreateUpstreamOptions): Promise<Creat
     dolthubOrg: opts.dolthubOrg,
   });
 
-  // ── 1. Create the DoltHub database ──────────────────────────────────
   let databaseCreated: boolean;
   try {
     const result = await createDatabase(opts.token, {
@@ -135,7 +134,6 @@ export async function createUpstream(opts: CreateUpstreamOptions): Promise<Creat
     );
   }
 
-  // ── 2. Apply the commons schema onto the bootstrap branch ──────────
   // The first write uses `from=main, to=bootstrap` — DoltHub creates
   // `bootstrap` from `main` (which itself is created lazily on the
   // first write). Subsequent writes target `from=bootstrap,
@@ -199,7 +197,6 @@ export async function createUpstream(opts: CreateUpstreamOptions): Promise<Creat
     );
   }
 
-  // ── 3. Stamp the wasteland display name into _meta (best-effort) ───
   if (opts.wastelandName) {
     try {
       const metaSql = `INSERT IGNORE INTO _meta (\`key\`, value) VALUES ('wasteland_name', '${escapeSqlString(opts.wastelandName)}')`;
@@ -227,7 +224,6 @@ export async function createUpstream(opts: CreateUpstreamOptions): Promise<Creat
     }
   }
 
-  // ── 4. Register the creator as the first rig ───────────────────────
   const handle = opts.rigHandle;
   const displayName = opts.rigDisplayName || opts.rigHandle;
   const hopUri = `hop://${opts.ownerEmail}/${handle}/`;
@@ -271,7 +267,6 @@ export async function createUpstream(opts: CreateUpstreamOptions): Promise<Creat
     );
   }
 
-  // ── 5. Merge the bootstrap branch into main ────────────────────────
   try {
     const mergeResult = await mergeBranchIntoMain(opts.token, {
       owner,

@@ -4,6 +4,7 @@ import { getSandboxAllocationProvider } from '@kilocode/worker-utils/sandbox-all
 import {
   CurrentSessionMetadataSchema,
   getEffectiveCredentialContainment,
+  hasCredentialContainment,
   getSandboxProvider,
   parseSessionMetadata,
   requiresContainmentSandbox,
@@ -29,6 +30,25 @@ const profile = {
 };
 
 describe('session metadata boundary', () => {
+  it.each(['github', 'gitlab', 'bitbucket', 'kilocode'] as const)(
+    'uses the same containment predicate for computed and persisted %s flags',
+    flag => {
+      const disabled = { github: false, gitlab: false, bitbucket: false, kilocode: false };
+      expect(hasCredentialContainment(disabled)).toBe(false);
+      const enabled = { ...disabled, [flag]: true };
+      expect(hasCredentialContainment(enabled)).toBe(true);
+      expect(
+        requiresContainmentSandbox({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'agent_containment', userId: 'user_containment' },
+          auth: {},
+          workspace: { credentialContainment: enabled },
+          lifecycle: { version: 1, timestamp: 1 },
+        })
+      ).toBe(true);
+    }
+  );
+
   it('maps legacy managed SCM containment to GitHub and Kilo only', () => {
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,
@@ -324,6 +344,32 @@ describe('session metadata boundary', () => {
     expect(parseSessionMetadata(current).repository).not.toHaveProperty('githubIntegrationId');
   });
 
+  it('preserves the GitHub pull request number for a review session', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_github_review', userId: 'user_github_review' },
+      auth: {},
+      repository: { type: 'github' as const, repo: 'acme/repo', pullRequestNumber: 17 },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+    expect(parseSessionMetadata(current).repository).toMatchObject({ pullRequestNumber: 17 });
+  });
+
+  it('rejects a non-positive GitHub pull request number', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_github_review', userId: 'user_github_review' },
+      auth: {},
+      repository: { type: 'github' as const, repo: 'acme/repo', pullRequestNumber: 0 },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(() => parseSessionMetadata(current)).toThrow();
+  });
+
   it('preserves a validated worktree ID and its canonical workspace path', () => {
     const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
     const current = {
@@ -395,6 +441,24 @@ describe('session metadata boundary', () => {
     }
   );
 
+  it('round-trips a clone cut and rejects a malformed one', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_clone', userId: 'user_clone' },
+      auth: {},
+      clone: {
+        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+        cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(() =>
+      parseSessionMetadata({ ...current, clone: { ...current.clone, cloneUpToMessageId: 'x' } })
+    ).toThrow('Invalid current session metadata');
+  });
+
   it('keeps metadata without clone as an empty-session bootstrap', () => {
     const current = {
       metadataSchemaVersion: 2 as const,
@@ -405,6 +469,85 @@ describe('session metadata boundary', () => {
 
     expect(parseSessionMetadata(current)).toEqual(current);
     expect(parseSessionMetadata(current)).not.toHaveProperty('clone');
+  });
+
+  describe('placed sandbox metadata', () => {
+    const placedId = `sbx-${'a'.repeat(48)}`;
+    const base = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'workspace_placed', userId: 'user_placed', orgId: 'org-id' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+    const withWorkspace = (workspace: Record<string, unknown>) => ({ ...base, workspace });
+
+    it.each([
+      ['isolated Cloudflare', 'cloudflare', 'isolated'],
+      ['code-review Cloudflare', 'cloudflare', 'code-review'],
+      ['shared Cloudflare', 'cloudflare', 'shared'],
+      ['isolated Vercel', 'vercel', 'isolated'],
+      ['isolated Containers', 'cloudflare-containers', 'isolated'],
+    ] as const)('round-trips a placed %s sandbox', (_label, sandboxProvider, sandboxKind) => {
+      const current = withWorkspace({ sandboxId: placedId, sandboxProvider, sandboxKind });
+
+      expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
+    });
+
+    it.each([
+      ['a placed key without its kind', { sandboxId: placedId }],
+      [
+        'a kind on a legacy prefixed key',
+        { sandboxId: `ses-${'a'.repeat(48)}`, sandboxKind: 'isolated' },
+      ],
+      ['a kind without a key', { sandboxKind: 'isolated' }],
+      [
+        'a shared Vercel sandbox',
+        { sandboxId: placedId, sandboxProvider: 'vercel', sandboxKind: 'shared' },
+      ],
+      [
+        'a shared failover route on a placed key',
+        {
+          sandboxId: placedId,
+          sandboxKind: 'shared',
+          sandboxRoute: { kind: 'shared', routeKey: `usr-${'a'.repeat(48)}` },
+        },
+      ],
+      ['an unknown kind', { sandboxId: placedId, sandboxKind: 'devcontainer' }],
+    ])('rejects %s', (_label, workspace) => {
+      expect(() => parseSessionMetadata(withWorkspace(workspace))).toThrow();
+    });
+
+    it('rejects a kind on a legacy-plane session', () => {
+      expect(() =>
+        parseSessionMetadata({
+          ...withWorkspace({ sandboxId: placedId, sandboxKind: 'isolated' }),
+          identity: { sessionId: 'agent_placed', userId: 'user_placed' },
+        })
+      ).toThrow();
+    });
+
+    it.each([
+      ['cloudflare-single', 'isolated', true],
+      ['cloudflare-single', 'shared', false],
+      ['cloudflare-single', 'code-review', false],
+      ['cloudflare-shared', 'shared', true],
+      ['cloudflare-shared', 'isolated', false],
+    ] as const)(
+      'checks a %s allocation against kind %s',
+      (sandboxAllocation, sandboxKind, valid) => {
+        const current = withWorkspace({
+          sandboxId: placedId,
+          sandboxProvider: 'cloudflare',
+          sandboxAllocation,
+          sandboxKind,
+        });
+        if (valid) {
+          expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
+        } else {
+          expect(() => parseSessionMetadata(current)).toThrow();
+        }
+      }
+    );
   });
 
   it('rejects shared route metadata without a compatible assigned sandbox', () => {
@@ -482,9 +625,20 @@ describe('session metadata boundary', () => {
         };
         expect(parseSessionMetadata(implicit).workspace?.sandboxAllocation).toBe(sandboxAllocation);
       }
+      // An internally selected allocation keeps its normal identity for a Code
+      // Reviewer session, so a matching allocation/id-class is accepted.
       for (const identity of [{ ...current.identity, billingOrigin: 'code-review' }]) {
-        expect(() => parseSessionMetadata({ ...current, identity })).toThrow();
+        expect(parseSessionMetadata({ ...current, identity }).workspace?.sandboxAllocation).toBe(
+          sandboxAllocation
+        );
       }
+      // The trusted Code Reviewer namespace cannot carry a selectable allocation.
+      expect(() =>
+        parseSessionMetadata({
+          ...current,
+          workspace: { ...current.workspace, sandboxId: `crv-${'a'.repeat(48)}` },
+        })
+      ).toThrow();
       // Selectable allocations are authorized per owner (user or organization) at
       // creation, so a personal session without an org is valid metadata.
       expect(
@@ -535,29 +689,32 @@ describe('session metadata boundary', () => {
     expect(getSandboxProvider(parseSessionMetadata(current))).toBe('cloudflare');
   });
 
-  it('round-trips isolated Standard allocation metadata as Cloudflare', () => {
-    const current = {
-      metadataSchemaVersion: 2 as const,
-      identity: {
-        sessionId: 'agent_isolated_standard',
-        userId: 'user_isolated_standard',
-      },
-      auth: {},
-      workspace: {
-        sandboxId: 'istd-abcdef' as const,
-        sandboxAllocation: 'isolated-standard' as const,
-      },
-      lifecycle: {
-        version: 1,
-        timestamp: 1,
-      },
-    };
+  it.each(['agent_isolated_standard', 'workspace_isolated_standard'])(
+    'round-trips isolated Standard allocation metadata as Cloudflare for %s',
+    sessionId => {
+      const current = {
+        metadataSchemaVersion: 2 as const,
+        identity: {
+          sessionId,
+          userId: 'user_isolated_standard',
+        },
+        auth: {},
+        workspace: {
+          sandboxId: 'istd-abcdef' as const,
+          sandboxAllocation: 'isolated-standard' as const,
+        },
+        lifecycle: {
+          version: 1,
+          timestamp: 1,
+        },
+      };
 
-    const parsed = parseSessionMetadata(current);
-    expect(parsed).toEqual(current);
-    expect(getSandboxProvider(parsed)).toBe('cloudflare');
-    expect(parseSessionMetadata(serializeSessionMetadata(parsed))).toEqual(current);
-  });
+      const parsed = parseSessionMetadata(current);
+      expect(parsed).toEqual(current);
+      expect(getSandboxProvider(parsed)).toBe('cloudflare');
+      expect(parseSessionMetadata(serializeSessionMetadata(parsed))).toEqual(current);
+    }
+  );
 
   it('accepts Vercel metadata only for an isolated non-devcontainer sandbox', () => {
     const current = {

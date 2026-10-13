@@ -17,6 +17,7 @@ type OutboundEmailParams = {
   html: string;
   replyTo?: string;
   category?: string;
+  marketingTag?: 'marketing';
 };
 
 function isAutomatedTest(): boolean {
@@ -92,13 +93,18 @@ export async function sendViaMailgun(params: OutboundEmailParams): Promise<boole
     return false;
   }
 
-  const client = mailgun.client({ username: 'api', key: MAILGUN_API_KEY });
+  const client = mailgun.client({
+    username: 'api',
+    key: MAILGUN_API_KEY,
+    ...(params.marketingTag ? { timeout: 30_000 } : {}),
+  });
   await client.messages.create(MAILGUN_DOMAIN, {
     from: 'Kilo Code <hi@app.kilocode.ai>',
     'h:Reply-To': replyTo ?? 'hi@kilocode.ai',
     to,
     subject,
     html: params.html,
+    ...(params.marketingTag ? { 'o:tag': params.marketingTag } : {}),
   });
 
   if (targetEnvironment === 'staging') {

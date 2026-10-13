@@ -1,0 +1,283 @@
+name: kilo-mcp Release
+
+# One kilo-mcp release per production deploy that changed the deployed bundle.
+# deploy-production.yml calls this after deploy-workers succeeds. A release:
+#
+# - builds the bundle from the deployed commit (`wrangler deploy --dry-run`,
+#   the same build `wrangler deploy` uploads) and stops when its SHA-256
+#   matches the previous release: no bundle change, no release;
+# - writes the CycloneDX SBOM of that bundle (scripts/kilo-mcp-sbom.mjs);
+# - tags the commit `kilo-mcp-release/<date>-<sha7>` and publishes a GitHub
+#   Release with the notes and the SBOM;
+# - lands the changelog section on the `kilo-mcp-changelog` branch and opens
+#   or refreshes its one pull request, which a human merges into
+#   services/kilo-mcp/CHANGELOG.md. Main is protected, so the pull request is
+#   the only path to main, the same as the kilo-app version-bump PR.
+#
+# A rerun of a failed attempt reuses the tag that points at the deployed
+# commit, so it completes the release instead of skipping it.
+
+on:
+  workflow_call:
+    inputs:
+      source_sha:
+        description: 'The commit deploy-workers deployed'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    permissions:
+      contents: write # push the changelog branch, publish the release
+      pull-requests: write # open or refresh the changelog PR
+      issues: write # PR assignees are an Issues API operation
+    steps:
+      # Full history and tags: the release range starts at the previous tag.
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.source_sha }}
+
+      # The cheap gate, before any install. The inputs mirror the kilo-mcp row
+      # of deploy-workers.yml minus `packages`: kilo-mcp imports no workspace
+      # package. CHANGELOG.md is excluded, so a merged changelog PR never
+      # starts the next release.
+      - name: Check for kilo-mcp changes since the last release
+        id: check
+        run: |
+          set -euo pipefail
+          # A tag at this commit means an earlier attempt already decided to
+          # release it: reuse the tag and finish that release.
+          EXISTING=$(git tag --points-at HEAD --list 'kilo-mcp-release/*' | head -n 1)
+          PREVIOUS=$(git tag --list 'kilo-mcp-release/*' --sort=-creatordate --no-contains HEAD | head -n 1)
+          echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
+          echo "resume=$([ -n "$EXISTING" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          if [ -n "$EXISTING" ]; then
+            echo "tag=$EXISTING" >> "$GITHUB_OUTPUT"
+            echo "candidate=true" >> "$GITHUB_OUTPUT"
+            echo "Resuming the release $EXISTING"
+            exit 0
+          fi
+          echo "tag=kilo-mcp-release/$(date -u +%Y-%m-%d)-$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+          if [ -z "$PREVIOUS" ]; then
+            echo "candidate=true" >> "$GITHUB_OUTPUT"
+            echo "No earlier kilo-mcp release: first release"
+            exit 0
+          fi
+          CHANGES=$(git diff --name-only "$PREVIOUS" HEAD -- services/kilo-mcp/ pnpm-lock.yaml pnpm-workspace.yaml patches ':(exclude)services/kilo-mcp/CHANGELOG.md')
+          if [ -z "$CHANGES" ]; then
+            echo "candidate=false" >> "$GITHUB_OUTPUT"
+            echo "No kilo-mcp input changed since $PREVIOUS"
+          else
+            echo "candidate=true" >> "$GITHUB_OUTPUT"
+            printf 'Changed since %s:\n%s\n' "$PREVIOUS" "$CHANGES"
+          fi
+
+      - name: Setup pnpm
+        if: steps.check.outputs.candidate == 'true'
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        if: steps.check.outputs.candidate == 'true'
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      # The root package carries js-yaml for the SBOM script.
+      - name: Install dependencies
+        if: steps.check.outputs.candidate == 'true'
+        run: pnpm install --frozen-lockfile --filter kilocode-monorepo --filter kilo-mcp
+
+      - name: Build the deployed bundle
+        if: steps.check.outputs.candidate == 'true'
+        working-directory: services/kilo-mcp
+        run: pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/kilo-mcp-bundle" --metafile "$RUNNER_TEMP/kilo-mcp-bundle/meta.json"
+
+      # The lockfile can change without a change to the bundle. The previous
+      # release records its bundle hash in its tag message.
+      - name: Compare the bundle with the last release
+        id: bundle
+        if: steps.check.outputs.candidate == 'true'
+        env:
+          PREVIOUS: ${{ steps.check.outputs.previous }}
+          RESUME: ${{ steps.check.outputs.resume }}
+        run: |
+          set -euo pipefail
+          SHA=$(sha256sum "$RUNNER_TEMP/kilo-mcp-bundle/index.js" | cut -d' ' -f1)
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          # A resumed release always completes, even with an unchanged bundle.
+          LAST=""
+          if [ -n "$PREVIOUS" ]; then
+            LAST=$(git for-each-ref --format='%(contents)' "refs/tags/$PREVIOUS" | sed -n 's/^bundle-sha256=//p')
+          fi
+          if [ "$RESUME" != "true" ] && [ "$SHA" = "$LAST" ]; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::The kilo-mcp bundle is unchanged since $PREVIOUS: no release."
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notes for the changelog
+        id: notes
+        if: steps.bundle.outputs.release == 'true'
+        env:
+          PREVIOUS: ${{ steps.check.outputs.previous }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PREVIOUS" ]; then
+            node scripts/kilo-mcp-release-notes.mjs body --from "$PREVIOUS" --to HEAD > "$RUNNER_TEMP/kilo-mcp-notes.md"
+          else
+            node scripts/kilo-mcp-release-notes.mjs body > "$RUNNER_TEMP/kilo-mcp-notes.md"
+          fi
+          cat "$RUNNER_TEMP/kilo-mcp-notes.md"
+
+      - name: Generate SBOM
+        id: sbom
+        if: steps.bundle.outputs.release == 'true'
+        env:
+          TAG: ${{ steps.check.outputs.tag }}
+        run: |
+          set -euo pipefail
+          NAME="kilo-mcp-${TAG#kilo-mcp-release/}.cyclonedx.json"
+          OUT=$(node scripts/kilo-mcp-sbom.mjs \
+            --metafile "$RUNNER_TEMP/kilo-mcp-bundle/meta.json" \
+            --bundle "$RUNNER_TEMP/kilo-mcp-bundle/index.js" \
+            --worker-dir services/kilo-mcp \
+            --lockfile pnpm-lock.yaml \
+            --commit "$(git rev-parse HEAD)" \
+            --release "$TAG" \
+            --out "$RUNNER_TEMP/$NAME")
+          printf '%s\n' "$OUT"
+          echo "file=$RUNNER_TEMP/$NAME" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$OUT" | grep '^components=' >> "$GITHUB_OUTPUT"
+
+      # The retained second copy, matching sbom.yml's cloud-sbom-<sha> pattern.
+      - name: Upload SBOM
+        if: steps.bundle.outputs.release == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kilo-mcp-sbom-${{ inputs.source_sha }}
+          path: ${{ steps.sbom.outputs.file }}
+          retention-days: 90
+          if-no-files-found: error
+
+      # Same token as the kilo-app release tags: GitHub refuses a GITHUB_TOKEN
+      # tag push when the tagged commit's .github/workflows differs from every
+      # branch tip, and the deployed commit is often behind main. The token
+      # reaches only this step, never .git/config.
+      - name: Tag the release
+        if: steps.bundle.outputs.release == 'true'
+        env:
+          RELEASE_TOKEN: ${{ secrets.KILO_APP_RELEASE_TOKEN }}
+          TAG: ${{ steps.check.outputs.tag }}
+          BUNDLE_SHA256: ${{ steps.bundle.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null 2>&1; then
+            echo "Tag $TAG already exists — reusing it."
+            exit 0
+          fi
+          AUTH=$(printf 'x-access-token:%s' "$RELEASE_TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          export GIT_CONFIG_COUNT=2
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0=
+          export GIT_CONFIG_KEY_1=http.https://github.com/.extraheader GIT_CONFIG_VALUE_1="AUTHORIZATION: basic $AUTH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "$TAG" -m "bundle-sha256=$BUNDLE_SHA256"
+          git push origin "refs/tags/$TAG"
+
+      # --latest=false: a kilo-mcp release must not replace the release that
+      # GitHub shows as the repository's latest one.
+      - name: Publish the release
+        if: steps.bundle.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.check.outputs.tag }}
+          BUNDLE_SHA256: ${{ steps.bundle.outputs.sha256 }}
+          COMPONENTS: ${{ steps.sbom.outputs.components }}
+          SBOM: ${{ steps.sbom.outputs.file }}
+        run: |
+          set -euo pipefail
+          NOTES="$RUNNER_TEMP/kilo-mcp-release.md"
+          {
+            echo "## Changes"
+            echo
+            cat "$RUNNER_TEMP/kilo-mcp-notes.md"
+            echo
+            echo "## SBOM"
+            echo
+            echo "| Artifact | SHA-256 | npm components |"
+            echo "| --- | --- | --- |"
+            echo "| index.js | \`$BUNDLE_SHA256\` | $COMPONENTS |"
+            echo
+            echo "The SHA-256 names the bundle built from this commit, the same bytes the SBOM describes."
+          } > "$NOTES"
+          TITLE="kilo-mcp ${TAG#kilo-mcp-release/}"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" --notes-file "$NOTES" --latest=false
+            gh release upload "$TAG" "$SBOM" --clobber
+          else
+            gh release create "$TAG" --verify-tag --latest=false --title "$TITLE" --notes-file "$NOTES" "$SBOM"
+          fi
+
+      - name: Land the changelog section
+        if: steps.bundle.outputs.release == 'true'
+        env:
+          TAG: ${{ steps.check.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # kilo-mcp-release/2026-10-05-abc1234 -> "## 2026-10-05 (abc1234)"
+          STAMP="${TAG#kilo-mcp-release/}"
+          HEADING="## ${STAMP%-*} (${STAMP##*-})"
+          node scripts/kilo-mcp-release-notes.mjs land \
+            --heading "$HEADING" \
+            --body-file "$RUNNER_TEMP/kilo-mcp-notes.md" \
+            --branch kilo-mcp-changelog
+
+      - name: Open or refresh the changelog PR
+        if: steps.bundle.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cat > "$RUNNER_TEMP/kilo-mcp-changelog-pr.md" <<EOF
+          ## What
+
+          Adds the newest kilo-mcp release sections to services/kilo-mcp/CHANGELOG.md.
+
+          ## Why
+
+          The kilo-mcp Release job published a release after a production deploy
+          changed the kilo-mcp bundle (run: $RUN_URL). Main is protected, so the
+          sections reach main through this PR. Later releases add their sections
+          to this PR until it is merged.
+
+          ## What to do
+
+          1. Required checks show as pending: PRs opened with the default GITHUB_TOKEN
+             do not trigger workflow runs. Close and reopen this PR to start CI.
+          2. Review and merge. Only services/kilo-mcp/CHANGELOG.md changed.
+          EOF
+          # A fork PR can name its head branch kilo-mcp-changelog too; only a
+          # PR from this repository is the changelog PR.
+          PR=$(gh pr list --head kilo-mcp-changelog --state open --json number,isCrossRepository \
+            --jq '[.[] | select(.isCrossRepository | not)][0].number // empty')
+          if [ -n "$PR" ]; then
+            gh pr edit "$PR" --body-file "$RUNNER_TEMP/kilo-mcp-changelog-pr.md"
+            echo "Refreshed the changelog PR #$PR"
+          else
+            gh pr create --base main \
+              --head kilo-mcp-changelog \
+              --title "docs(kilo-mcp): update CHANGELOG.md" \
+              --body-file "$RUNNER_TEMP/kilo-mcp-changelog-pr.md" \
+              --assignee iscekic \
+              --reviewer iscekic
+          fi

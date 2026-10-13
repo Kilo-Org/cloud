@@ -123,6 +123,25 @@ describe('runLogoutCleanup', () => {
     expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
   });
 
+  it('unregisters activity tokens before the revoke ends the session auth', async () => {
+    pushOutcome('none');
+    const calls: string[] = [];
+    deliveryMock.unregisterTokens.mockImplementation(async () => {
+      calls.push('activity');
+      await Promise.resolve();
+      return { ok: true, tokens: ['activity-1'] };
+    });
+    trpcMock.revokeCurrentDeviceSession.mutate.mockImplementation(async () => {
+      calls.push('revoke');
+      await Promise.resolve();
+      return { outcome: 'revoked' };
+    });
+
+    await runLogoutCleanup();
+
+    expect(calls).toEqual(['activity', 'revoke']);
+  });
+
   it('treats a fulfilled no_identifiable_session revoke as done', async () => {
     pushOutcome('none');
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({

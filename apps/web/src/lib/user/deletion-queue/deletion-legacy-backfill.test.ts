@@ -43,6 +43,9 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'backfill-test-secret',
   KILOCLAW_API_URL: 'https://claw.test',
   SESSION_INGEST_WORKER_URL: 'https://ingest.test',
+}));
+jest.mock('@/lib/web-config.server', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@/lib/web-config.server'),
   USER_DELETION_AUDIT_HMAC_KEY: Buffer.alloc(32, 1).toString('base64'),
   USER_DELETION_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString('base64'),
 }));

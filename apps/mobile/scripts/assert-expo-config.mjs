@@ -99,7 +99,11 @@ const DEV_CLIENT_PLUGIN_OPTIONS = {
   skipOnboarding: true,
 };
 const PERMISSION_PROMPT_PLIST_KEYS = [
+  'NSCameraUsageDescription',
+  'NSPhotoLibraryUsageDescription',
+  'NSLocalNetworkUsageDescription',
   'NSMicrophoneUsageDescription',
+  'NSMotionUsageDescription',
   'NSSpeechRecognitionUsageDescription',
   'NSFaceIDUsageDescription',
   'NSLocationWhenInUseUsageDescription',
@@ -265,6 +269,15 @@ const pluginNames = (config.plugins ?? []).map(plugin =>
   Array.isArray(plugin) ? plugin[0] : plugin
 );
 check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGIN}"`);
+// Without the Sentry Android Gradle Plugin a release build uploads no NDK
+// symbols or R8 mapping, and Android native crashes reach Sentry unsymbolicated.
+const sentryPlugin = (config.plugins ?? []).find(
+  plugin => Array.isArray(plugin) && plugin[0] === SENTRY_PLUGIN
+);
+check(
+  sentryPlugin?.[1]?.experimental_android?.enableAndroidGradlePlugin === true,
+  `"${SENTRY_PLUGIN}" must set experimental_android.enableAndroidGradlePlugin`
+);
 // The rotation surface plugin pins the Android window background to the theme
 // background; without it a rotation paints the AppCompat DayNight default
 // until React's first frame lands in the new orientation.

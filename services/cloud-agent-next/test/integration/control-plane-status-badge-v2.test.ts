@@ -15,7 +15,10 @@ import type {
   ProviderCreateIntent,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
-import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+} from '../../src/shared/control-plane-protocol.js';
 import {
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
@@ -80,15 +83,13 @@ function promptPayload(id: string): ControlPlanePromptPayload {
 function createFakeProvider(): { adapter: ProviderAdapter; launchEnvs: Record<string, string>[] } {
   const provider = { adapter: null as unknown as ProviderAdapter, launchEnvs: [] };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active' as const, ...(ref === null ? {} : { providerRef: ref }) };
@@ -207,7 +208,7 @@ describe('sandbox status badge projection (B10)', () => {
       wrapperId: WRAPPER_ID,
       allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID!,
     });
-    expect(hello).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(hello).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     wrapper.send({ type: 'session.ready', sessionId });
     await waitFor(async () => {
       const snapshot = await session.getSession();

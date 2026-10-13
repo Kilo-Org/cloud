@@ -7,7 +7,7 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
-import { ImageViewerModal } from '@/components/image-viewer-modal';
+import { ImageViewer } from '@/components/ui/image-viewer';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -127,7 +127,7 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
         >
           {renderImageThumbnail()}
         </Pressable>
-        <ImageViewerModal
+        <ImageViewer
           visible={previewUrl !== null}
           uri={previewUrl}
           filename={block.filename}

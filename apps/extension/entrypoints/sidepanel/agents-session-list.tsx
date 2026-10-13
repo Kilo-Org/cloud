@@ -16,10 +16,6 @@ import {
 import { displayRepoName, relativeTime } from './agents-format';
 import { useExtensionAgents } from './agents-provider';
 
-// ---------------------------------------------------------------------------
-// Pinned query keys — same constants for queries and invalidations
-// ---------------------------------------------------------------------------
-
 const activeSessionsQueryKey = (organizationId: string | null) =>
   ['agents', 'active-sessions', organizationId] as const;
 
@@ -49,10 +45,6 @@ const ACTIVE_POLL_CONNECTED_MS = 30_000;
 const ACTIVE_POLL_DISCONNECTED_MS = 10_000;
 /** Suppress the Offline pill during the initial dial and transient blips. */
 const OFFLINE_PILL_GRACE_MS = 5000;
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 interface ActiveSessionRow {
   id: string;
@@ -109,10 +101,6 @@ export function mapHistorySessionRow(params: {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Status badge classifier
-// ---------------------------------------------------------------------------
-
 /**
  * Map a wire status to one badge vocabulary. The wire carries `busy` for a
  * cloud agent and `running` for a CLI session; both mean the same thing to a
@@ -139,10 +127,6 @@ export const sessionStatusBadge = (
     label: lowerStatus.charAt(0).toUpperCase() + lowerStatus.slice(1),
   };
 };
-
-// ---------------------------------------------------------------------------
-// Shared layout + copy
-// ---------------------------------------------------------------------------
 
 /** One vertical rhythm for both sections. */
 const sectionClass = 'space-y-2 px-4 py-2';
@@ -175,10 +159,6 @@ export const historyEmptyMessage = ({
     ? 'No past sessions yet.'
     : 'No sessions yet. Start your first session above.';
 };
-
-// ---------------------------------------------------------------------------
-// Active sessions section
-// ---------------------------------------------------------------------------
 
 const ActiveSessionsSection = ({
   onOpenSession,
@@ -373,10 +353,6 @@ const ActiveSessionsSection = ({
     </div>
   );
 };
-
-// ---------------------------------------------------------------------------
-// History sessions section
-// ---------------------------------------------------------------------------
 
 const HistorySessionsSection = ({
   onOpenSession,
@@ -608,10 +584,6 @@ const HistorySessionsSection = ({
     </div>
   );
 };
-
-// ---------------------------------------------------------------------------
-// Session list root
-// ---------------------------------------------------------------------------
 
 // eslint-disable-next-line max-lines -- Cohesive list component; splitting Active/History sections would reduce clarity
 export const AgentsSessionList = ({

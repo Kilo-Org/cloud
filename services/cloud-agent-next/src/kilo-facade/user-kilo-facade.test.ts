@@ -15,6 +15,7 @@ vi.mock('../db/pg.js', () => ({
 }));
 
 vi.mock('../session/model-preflight.js', () => ({
+  preflightSessionRuntime: vi.fn().mockResolvedValue(undefined),
   preflightExistingPromptModel: preflightExistingPromptModelMock,
 }));
 

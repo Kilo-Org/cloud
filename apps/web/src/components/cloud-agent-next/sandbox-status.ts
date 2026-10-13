@@ -10,9 +10,8 @@ import {
   containerCapacityForService,
   formatContainerCapacity,
 } from '@/lib/cloudflare/container-capacity';
-import type { FetchedSessionData, ResolvedSession } from '@kilocode/cloud-agent-sdk';
+import type { ResolvedSession } from '@kilocode/cloud-agent-sdk';
 
-export const SANDBOX_STATUS_POLL_INTERVAL_MS = 5_000;
 export const SANDBOX_STATUS_FRESHNESS_MS = 15_000;
 export const SANDBOX_SLEEP_ESTIMATE_DELAY_MS = 120_000;
 export const SANDBOX_SLEEP_SOON_MS = 60_000;
@@ -38,10 +37,11 @@ export function isSandboxStatusEligible({
   organizationId?: string;
   activeSessionType: ResolvedSession['type'] | null;
   isReadOnly: boolean;
-  fetchedSessionData: Pick<
-    FetchedSessionData,
-    'kiloSessionId' | 'cloudAgentSessionId' | 'organizationId'
-  > | null;
+  fetchedSessionData: {
+    kiloSessionId: string;
+    cloudAgentSessionId: string | null;
+    organizationId: string | null;
+  } | null;
 }): boolean {
   return Boolean(
     currentUserId &&
@@ -72,7 +72,7 @@ const sandboxTypes = {
   'isolated-small': 'Small',
   'isolated-standard': 'Large',
   'code-review': 'Code review',
-  devcontainer: 'Custom environment',
+  devcontainer: 'Retired devcontainer',
   'containers-standard-3': 'Medium',
   'containers-standard-4': 'Large',
   unknown: 'Unknown',
@@ -130,6 +130,7 @@ export function sandboxStatusPresentation({
   estimateAfter,
   sessionActive,
   now,
+  live = false,
 }: {
   data: unknown;
   observation: 'checking' | 'paused' | 'unavailable' | 'observing';
@@ -139,6 +140,7 @@ export function sandboxStatusPresentation({
   estimateAfter: number;
   sessionActive: boolean;
   now: number;
+  live?: boolean;
 }): SandboxStatusPresentation {
   const unavailable: SandboxStatusPresentation = {
     status: 'unknown',
@@ -175,7 +177,7 @@ export function sandboxStatusPresentation({
     requestedAt < freshAfter ||
     receivedAt < requestedAt ||
     receivedAt > now ||
-    now >= freshUntil
+    (!live && now >= freshUntil)
   ) {
     return { ...unavailable, detail: 'Sandbox status is out of date. Waiting for a fresh update.' };
   }
@@ -189,7 +191,7 @@ export function sandboxStatusPresentation({
     snapshot.status === 'active' &&
     snapshot.provider !== 'Unknown' &&
     snapshot.inactivityTimeoutMs !== null &&
-    requestedAt >= estimateAfter &&
+    (live || requestedAt >= estimateAfter) &&
     localSleepDeadline !== null &&
     localSleepDeadline > now
       ? localSleepDeadline
@@ -208,7 +210,7 @@ export function sandboxStatusPresentation({
       ? Math.ceil((sleepDeadline - now) / 60_000)
       : null;
   const sleepingSoon = sleepDeadline !== null && sleepDeadline - now <= SANDBOX_SLEEP_SOON_MS;
-  const deadlines = [freshUntil];
+  const deadlines = live ? [] : [freshUntil];
   if (sleepDeadline !== null) {
     deadlines.push(sleepDeadline);
     const sleepingSoonAt = sleepDeadline - SANDBOX_SLEEP_SOON_MS;
@@ -238,6 +240,6 @@ export function sandboxStatusPresentation({
     stoppedAt: runtime?.stoppedAt ?? null,
     estimatedSleepAt,
     sleepMinutesRemaining,
-    nextChangeAt: Math.min(...deadlines),
+    nextChangeAt: deadlines.length > 0 ? Math.min(...deadlines) : null,
   };
 }

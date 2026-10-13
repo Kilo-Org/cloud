@@ -24,6 +24,25 @@ import { getWorktreeWorkspacePath } from '../../workspace';
 import type { TRPCContext } from '../../types';
 import { protectedProcedure } from '../auth';
 
+const ROOT_DELETION_CONCURRENCY = 8;
+
+async function mapDeletionRoots<T, R>(
+  items: T[],
+  operation: (item: T) => Promise<R>
+): Promise<R[]> {
+  const output: R[] = [];
+  for (let index = 0; index < items.length; index += ROOT_DELETION_CONCURRENCY) {
+    const results = await Promise.allSettled(
+      items.slice(index, index + ROOT_DELETION_CONCURRENCY).map(operation)
+    );
+    for (const result of results) {
+      if (result.status === 'rejected') throw result.reason;
+      output.push(result.value);
+    }
+  }
+  return output;
+}
+
 export const DeleteWorktreeInput = z
   .object({
     worktreeId: cloudAgentWorktreeIdSchema,
@@ -51,6 +70,15 @@ export async function deleteWorktreeResources(
   };
   const startedAt = Date.now();
   let stage = 'authorize';
+  let stageStartedAt = startedAt;
+  const phaseDurations: Record<string, number> = {};
+  const setStage = (next: string): void => {
+    const now = Date.now();
+    const field = `${stage.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())}Ms`;
+    phaseDurations[field] = (phaseDurations[field] ?? 0) + Math.max(0, now - stageStartedAt);
+    stageStartedAt = now;
+    stage = next;
+  };
   let outcome = 'failed';
   let sessionCount: number | undefined;
   let locationCount: number | undefined;
@@ -67,7 +95,7 @@ export async function deleteWorktreeResources(
     ) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Worktree access denied' });
     }
-    stage = 'begin_deletion';
+    setStage('begin_deletion');
     let state = cloudAgentWorktreeDeletionStateSchema.parse(
       await ctx.env.SESSION_INGEST.beginCloudAgentWorktreeDeletion(params)
     );
@@ -81,15 +109,11 @@ export async function deleteWorktreeResources(
       };
     }
     const runtimeLocations = [...state.runtimeLocations];
-    const directory = getWorktreeWorkspacePath(
-      params.organizationId,
-      ctx.userId,
-      params.worktreeId
-    );
+    const directories = new Set<string>();
     const childSessions: NonNullable<RecordCloudAgentWorktreeCleanupParams['childSessions']> = [];
-    stage = 'collect_sessions';
-    for (const session of state.manifest.sessions) {
-      if (!session.cloudAgentSessionId) continue;
+    setStage('collect_sessions');
+    const discoveries = await mapDeletionRoots(state.manifest.sessions, async session => {
+      if (!session.cloudAgentSessionId) return null;
       const cloudAgentSessionId = session.cloudAgentSessionId;
       const rawBegin = await withDORetry(
         () => getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId),
@@ -104,6 +128,14 @@ export async function deleteWorktreeResources(
       );
       const location = cloudAgentWorktreeLocationSchema.nullable().parse(rawBegin.location);
       const children = z.array(cloudAgentChildSessionLineageSchema).parse(rawBegin.children);
+      return { cloudAgentSessionId, location, children, directory: rawBegin.directory };
+    });
+    for (const discovery of discoveries) {
+      if (!discovery) continue;
+      const { cloudAgentSessionId, location, children, directory } = discovery;
+      if (typeof directory === 'string' && directory.length > 0) {
+        directories.add(directory);
+      }
       childSessions.push(...children.map(child => ({ ...child, cloudAgentSessionId })));
       if (
         location &&
@@ -114,22 +146,28 @@ export async function deleteWorktreeResources(
         runtimeLocations.push(location);
       }
     }
-    stage = 'runtime_history';
+    const recordDirectories =
+      directories.size > 0
+        ? [...directories]
+        : [getWorktreeWorkspacePath(params.organizationId, ctx.userId, params.worktreeId)];
+    setStage('runtime_history');
     locationCount = runtimeLocations.length;
     if (runtimeLocations.length === 0) throw new Error(WORKTREE_RUNTIME_HISTORY_UNAVAILABLE);
-    stage = 'record_manifest';
-    state = cloudAgentWorktreeDeletionStateSchema.parse(
-      await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
-        ...params,
-        runtimeLocations,
-        directory,
-        ...(childSessions.length > 0 ? { childSessions } : {}),
-      })
-    );
+    setStage('record_manifest');
+    for (const directory of recordDirectories) {
+      state = cloudAgentWorktreeDeletionStateSchema.parse(
+        await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
+          ...params,
+          runtimeLocations,
+          directory,
+          ...(childSessions.length > 0 ? { childSessions } : {}),
+        })
+      );
+    }
     sessionCount = state.manifest.sessions.length;
     locationCount = state.runtimeLocations.length;
     for (const location of state.runtimeLocations) {
-      stage = 'runtime_cleanup';
+      setStage('runtime_cleanup');
       const locationStartedAt = Date.now();
       let cleanup: WorktreeDeleteResult | undefined;
       try {
@@ -159,28 +197,30 @@ export async function deleteWorktreeResources(
           cleanup ? 'info' : 'warn'
         );
       }
-      stage = 'record_cleanup';
-      state = cloudAgentWorktreeDeletionStateSchema.parse(
-        await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
-          ...params,
-          directory,
-          sessionIds: cleanup.sessionIds,
-        })
-      );
+      setStage('record_cleanup');
+      for (const directory of recordDirectories) {
+        state = cloudAgentWorktreeDeletionStateSchema.parse(
+          await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
+            ...params,
+            directory,
+            sessionIds: cleanup.sessionIds,
+          })
+        );
+      }
       sessionCount = state.manifest.sessions.length;
       locationCount = state.runtimeLocations.length;
     }
-    stage = 'finish_sessions';
-    for (const session of state.manifest.sessions) {
-      if (!session.cloudAgentSessionId) continue;
+    setStage('finish_sessions');
+    await mapDeletionRoots(state.manifest.sessions, async session => {
+      if (!session.cloudAgentSessionId) return;
       const cloudAgentSessionId = session.cloudAgentSessionId;
       await withDORetry(
         () => getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId),
         stub => stub.finishWorktreeDeletion(params.worktreeId),
         'finishWorktreeDeletion'
       );
-    }
-    stage = 'complete_deletion';
+    });
+    setStage('complete_deletion');
     const output = DeleteWorktreeOutput.parse(
       await ctx.env.SESSION_INGEST.completeCloudAgentWorktreeDeletion(params)
     );
@@ -225,6 +265,7 @@ export async function deleteWorktreeResources(
       },
     });
   } finally {
+    setStage(stage);
     logControlDiagnostic(
       'worktree_deletion',
       {
@@ -237,6 +278,7 @@ export async function deleteWorktreeResources(
         errorCode,
         retryable,
         durationMs: Date.now() - startedAt,
+        ...phaseDurations,
       },
       outcome === 'completed' || outcome === 'replayed' || outcome === 'rejected' ? 'info' : 'warn'
     );

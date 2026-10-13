@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { I18nManager, Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 import {
@@ -8,30 +8,32 @@ import {
   type LiveSessionContext,
   type LiveSessions,
 } from '@/components/home/live-session-state';
-import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
+import { Text } from '@/components/ui/text';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { createSubmitLock } from '@/lib/submit-lock';
 import { cn } from '@/lib/utils';
 
-type LiveSessionHeaderNoticeProps = Readonly<{
-  context: LiveSessionContext;
-  sessions: LiveSessions;
-  failureLabel: string;
+export type LiveSessionHeaderNoticeState = Readonly<{
+  message: string;
+  loadFailed: boolean;
+  canRetry: boolean;
+  retrying: boolean;
+  handleRetry: () => void;
 }>;
 
 /**
  * Home's one-line notice in the `Live now` header: a failed load beside
- * readable rows, then no internet, then a lost connection. The header row has
- * a fixed height, so a notice that comes and goes on its own never moves the
- * card. `LiveSessionFeedback` (with `inlineNotices={false}`) keeps the
- * screen-reader announcements, so this text is not a live region.
+ * readable rows, then no internet, then a lost connection. Null while there is
+ * nothing to report, so the header lays out its action as if no notice
+ * existed. `LiveSessionFeedback` (with `inlineNotices={false}`) keeps the
+ * screen-reader announcements, so the notice text is not a live region.
  */
-export function LiveSessionHeaderNotice({
-  context,
-  sessions,
-  failureLabel,
-}: LiveSessionHeaderNoticeProps) {
+export function useLiveSessionHeaderNotice(
+  context: LiveSessionContext,
+  sessions: LiveSessions,
+  failureLabel: string
+): LiveSessionHeaderNoticeState | null {
   const { t } = useTranslation();
   const internet = useCommittedConnectivityStatus();
   const { isConnected, reconnectExhausted } = useUserWebConnectionHealth();
@@ -54,7 +56,6 @@ export function LiveSessionHeaderNotice({
   if (message === null) {
     return null;
   }
-  const canRetry = loadFailed || (internet !== 'offline' && connectionLost);
 
   const handleRetry = () => {
     if (!loadFailed) {
@@ -74,35 +75,54 @@ export function LiveSessionHeaderNotice({
       }
     })();
   };
+  return {
+    message,
+    loadFailed,
+    canRetry: loadFailed || (internet !== 'offline' && connectionLost),
+    retrying,
+    handleRetry,
+  };
+}
 
+/**
+ * Status dot, message, and a sentence-case `Retry`: the retry must not share
+ * the header action's uppercase mono treatment, or `Retry` and `See all` read
+ * as one label.
+ */
+export function LiveSessionHeaderNotice({
+  notice,
+}: Readonly<{ notice: LiveSessionHeaderNoticeState }>) {
+  const { t } = useTranslation();
   return (
     <>
+      <View
+        className={cn(
+          'size-1.5 shrink-0 rounded-full',
+          notice.loadFailed ? 'bg-destructive' : 'bg-warn'
+        )}
+      />
       <Text
         numberOfLines={1}
-        className={cn('shrink text-xs', loadFailed ? 'text-destructive' : 'text-muted-foreground')}
+        className={cn(
+          'shrink text-xs',
+          notice.loadFailed ? 'text-destructive' : 'text-muted-foreground'
+        )}
       >
-        {message}
+        {notice.message}
       </Text>
-      {canRetry && (
+      {notice.canRetry && (
         <Pressable
-          onPress={handleRetry}
-          disabled={retrying}
-          accessibilityState={{ busy: retrying, disabled: retrying }}
+          onPress={notice.handleRetry}
+          disabled={notice.retrying}
+          accessibilityState={{ busy: notice.retrying, disabled: notice.retrying }}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={
-            loadFailed ? t('common.retry') : t('agentChat.sessionConnection.retryConnection')
+            notice.loadFailed ? t('common.retry') : t('agentChat.sessionConnection.retryConnection')
           }
           className="shrink-0 active:opacity-70"
         >
-          <Text
-            className={cn(
-              'font-mono-medium text-[11px] text-primary',
-              !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY
-            )}
-          >
-            {t('common.retry')}
-          </Text>
+          <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
         </Pressable>
       )}
     </>

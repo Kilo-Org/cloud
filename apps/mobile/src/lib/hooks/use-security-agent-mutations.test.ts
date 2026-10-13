@@ -33,6 +33,8 @@ import {
   useSetSecurityAgentEnabled,
   useTriggerSecuritySync,
 } from './use-security-agent-mutations';
+import { reportAppError } from '@/lib/telemetry/app-error-reporting';
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 const hoistedKeys = vi.hoisted(() => ({
   getKey: vi.fn(() => 'hoisted-op-key'),
@@ -105,6 +107,7 @@ vi.mock('@tanstack/react-query', () => ({
     cancelQueries: (...args: unknown[]) => cancelQueriesMock(...args),
   }),
   hashKey: (key: unknown) => JSON.stringify(key),
+  CancelledError: class CancelledError extends Error {},
 }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -243,6 +246,30 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     expect(toastErrorMock).toHaveBeenCalledWith(
       'A security sync is already in progress. Please try again.'
     );
+  });
+
+  it('surfaces the in-progress copy and sends no app-error event for it', async () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    const server = Object.assign(new Error('operation_in_progress'), {
+      name: 'TRPCClientError',
+      data: { code: 'CONFLICT', httpStatus: 409 },
+    });
+    personalTriggerSyncMutateMock.mockRejectedValueOnce(server);
+    useTriggerSecuritySync('personal');
+
+    const rejection = await lastCapturedOptions?.mutationFn?.({}).catch((error: unknown) => error);
+    // The global MutationCache onError runs this reporter after the hook's onError.
+    lastCapturedOptions?.onError?.(rejection);
+    reportAppError(rejection, { source: 'mutation' });
+    setTelemetrySink(null);
+
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      'A security sync is already in progress. Please try again.'
+    );
+    expect(events).toEqual([]);
   });
 
   it('onSuccess tracks the accepted command', () => {

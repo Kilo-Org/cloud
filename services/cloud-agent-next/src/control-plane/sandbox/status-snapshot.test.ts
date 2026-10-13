@@ -12,7 +12,8 @@ function allocation(overrides: Partial<AllocationState> = {}): AllocationState {
 
 function project(overrides: Partial<AllocationState> | null, provider: 'cloudflare' | 'vercel') {
   return projectAllocationStatusSnapshot({
-    allocation: overrides === null ? null : { ...allocation(overrides), provider },
+    allocation:
+      overrides === null ? null : { ...allocation(overrides), provider, configuration: null },
     observedAt: OBSERVED_AT,
     inactivityTimeoutMs: IDLE_MS,
   });
@@ -22,13 +23,17 @@ describe('projectAllocationStatusSnapshot', () => {
   it.each([
     ['standard-3', 'containers-standard-3'],
     ['standard-4', 'containers-standard-4'],
-    [undefined, 'containers-standard-4'],
+    [undefined, 'containers-standard-3'],
     ['PRIVATE_SENTINEL', null],
   ] as const)(
     'reports bounded Containers runtime metadata for instance %s',
     (instance, sandboxType) => {
       const snapshot = projectAllocationStatusSnapshot({
-        allocation: { ...allocation({ kind: 'connected' }), provider: 'cloudflare-containers' },
+        allocation: {
+          ...allocation({ kind: 'connected' }),
+          provider: 'cloudflare-containers',
+          configuration: null,
+        },
         containersInstance: instance,
         observedAt: OBSERVED_AT,
         inactivityTimeoutMs: IDLE_MS,
@@ -53,7 +58,10 @@ describe('projectAllocationStatusSnapshot', () => {
     'omits Containers runtime metadata without a Containers allocation: %s',
     provider => {
       const snapshot = projectAllocationStatusSnapshot({
-        allocation: provider === null ? null : { ...allocation({ kind: 'connected' }), provider },
+        allocation:
+          provider === null
+            ? null
+            : { ...allocation({ kind: 'connected' }), provider, configuration: null },
         containersInstance: 'standard-3',
         observedAt: OBSERVED_AT,
         inactivityTimeoutMs: IDLE_MS,
@@ -131,7 +139,11 @@ describe('projectAllocationStatusSnapshot', () => {
 
   it('passes the inactivity bound through for every kind', () => {
     const snapshot = projectAllocationStatusSnapshot({
-      allocation: { ...allocation({ kind: 'stopped' }), provider: 'cloudflare' },
+      allocation: {
+        ...allocation({ kind: 'stopped' }),
+        provider: 'cloudflare',
+        configuration: null,
+      },
       observedAt: OBSERVED_AT,
       inactivityTimeoutMs: 12_345,
     });

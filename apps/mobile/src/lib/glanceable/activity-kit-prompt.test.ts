@@ -14,6 +14,10 @@ import {
   _resetGlanceablePersistForTests,
   _setLastGlanceableSnapshotForTests,
 } from '@/lib/glanceable/persist';
+import {
+  _resetLiveActivitySwitchForTests,
+  setNotificationPermissionGrantedValue,
+} from '@/lib/glanceable/live-activity-switch';
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
 import {
   type GlanceableSink,
@@ -23,7 +27,7 @@ import {
 } from '@/lib/glanceable/sink-registry';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
-import { recoverGlanceableActivityKit } from './activity-kit-prompt';
+import { recoverGlanceableActivityKit, replayGlanceableLiveActivity } from './activity-kit-prompt';
 
 const mocks = vi.hoisted(() => ({
   platform: { OS: 'ios' },
@@ -142,6 +146,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   _resetGlanceablePersistForTests();
   _resetIosSinkForTests();
+  _resetLiveActivitySwitchForTests();
+  setNotificationPermissionGrantedValue(true);
   _setLastGlanceableSnapshotForTests(eligibleSnapshot());
   surface.widget = null;
   surface.activity = null;
@@ -163,6 +169,32 @@ beforeEach(() => {
 afterEach(() => {
   unregisterGlanceableSink(sink);
   unregisterGlanceableSink(iosSink);
+});
+
+describe('replayGlanceableLiveActivity', () => {
+  it('starts the card for work that was live before the notification grant', async () => {
+    _resetIosSinkForTests();
+    setNotificationPermissionGrantedValue(false);
+    iosSink.startOrUpdate(eligibleSnapshot(), { userId: 'u1', organizationId: null });
+    expect(mocks.nativeActivity).toBeNull();
+
+    setNotificationPermissionGrantedValue(true);
+    await replayGlanceableLiveActivity();
+
+    expect(mocks.nativeActivity).toMatchObject({ running: 1 });
+  });
+
+  it('replays nothing for a snapshot another account owns', async () => {
+    _resetIosSinkForTests();
+    mocks.getItemAsync.mockImplementation((key: string) =>
+      key === ACTIVE_USER_ID_KEY ? 'someone-else' : null
+    );
+
+    await replayGlanceableLiveActivity();
+
+    expect(surface.activity).toBeNull();
+    expect(mocks.nativeActivity).toBeNull();
+  });
 });
 
 describe('recoverGlanceableActivityKit', () => {

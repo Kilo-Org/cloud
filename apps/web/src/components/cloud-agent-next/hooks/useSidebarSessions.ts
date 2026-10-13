@@ -7,8 +7,15 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type QueryFunctionContext,
+} from '@tanstack/react-query';
 import { TRPCClientError } from '@trpc/client';
+import pLimit from 'p-limit';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { RootRouter } from '@/routers/root-router';
@@ -171,11 +178,25 @@ export function mergeWorktreeChatSessions(
   });
 }
 
+export function mergeSidebarFolderSessions(
+  recentSessions: StoredSession[],
+  folderSessions: StoredSession[]
+): StoredSession[] {
+  const sessions = new Map(folderSessions.map(session => [session.sessionId, session]));
+  for (const session of recentSessions) {
+    const existing = sessions.get(session.sessionId);
+    if (!existing || new Date(session.updatedAt) >= new Date(existing.updatedAt)) {
+      sessions.set(session.sessionId, session);
+    }
+  }
+  return [...sessions.values()].sort(compareStoredSessionsByUpdatedAtDesc);
+}
+
 type WorktreeDetailsQueryData = inferRouterOutputs<RootRouter>['cliSessionsV2']['worktreeDetails'];
 
 type SidebarSessionActivity = Pick<
   StoredSession,
-  'sessionId' | 'sessionStatus' | 'sessionStatusUpdatedAt'
+  'sessionId' | 'sessionStatus' | 'sessionStatusUpdatedAt' | 'updatedAt'
 >;
 
 export type SidebarForegroundSessionStatus = {
@@ -375,15 +396,18 @@ export function getSidebarWorktreeActivity(
   sessions: readonly SidebarSessionActivity[],
   activeSessionStatuses: ReadonlyMap<string, string>,
   authoritativeSessions: readonly SidebarSessionActivity[] = sessions,
-  foregroundSession?: SidebarForegroundSessionStatus | null
+  foregroundSession?: SidebarForegroundSessionStatus | null,
+  now = Date.now()
 ): SidebarWorktreeActivity {
   const sessionsById = new Map(authoritativeSessions.map(session => [session.sessionId, session]));
   for (const session of sessions) {
     const existing = sessionsById.get(session.sessionId);
     if (
       !existing ||
-      new Date(session.sessionStatusUpdatedAt ?? 0).getTime() >=
-        new Date(existing.sessionStatusUpdatedAt ?? 0).getTime()
+      new Date(session.sessionStatusUpdatedAt ?? 0).getTime() >
+        new Date(existing.sessionStatusUpdatedAt ?? 0).getTime() ||
+      (session.sessionStatusUpdatedAt === existing.sessionStatusUpdatedAt &&
+        new Date(session.updatedAt).getTime() >= new Date(existing.updatedAt).getTime())
     ) {
       sessionsById.set(session.sessionId, session);
     }
@@ -399,12 +423,17 @@ export function getSidebarWorktreeActivity(
     if (activeStatus !== undefined) isLive = true;
     const foregroundStatus =
       foregroundSession?.sessionId === session.sessionId ? foregroundSession.status : undefined;
+    const storedStatus =
+      (session.sessionStatus === 'busy' || session.sessionStatus === 'retry') &&
+      now - new Date(session.updatedAt).getTime() >= 20 * 60_000
+        ? null
+        : (session.sessionStatus ?? null);
     const statuses =
       foregroundStatus !== undefined
         ? [foregroundStatus]
         : activeStatus === 'idle'
           ? [activeStatus]
-          : [session.sessionStatus ?? null, activeStatus ?? null];
+          : [storedStatus, activeStatus ?? null];
     for (const status of statuses) {
       const priority =
         status === 'question' || status === 'permission'
@@ -427,7 +456,7 @@ export function getSidebarWorktreeActivity(
 
 export function patchSidebarWorktreeSessionStatus(
   data: WorktreeDetailsQueryData,
-  update: SidebarSessionActivity
+  update: Omit<SidebarSessionActivity, 'updatedAt'> & { updatedAt?: string }
 ): WorktreeDetailsQueryData {
   const worktrees = { ...data.worktrees };
   let changed = false;
@@ -438,7 +467,8 @@ export function patchSidebarWorktreeSessionStatus(
       new Date(update.sessionStatusUpdatedAt ?? 0).getTime() <
         new Date(existing.sessionStatusUpdatedAt ?? 0).getTime() ||
       (existing.sessionStatus === update.sessionStatus &&
-        existing.sessionStatusUpdatedAt === update.sessionStatusUpdatedAt)
+        existing.sessionStatusUpdatedAt === update.sessionStatusUpdatedAt &&
+        (update.updatedAt === undefined || existing.updatedAt === update.updatedAt))
     ) {
       continue;
     }
@@ -451,6 +481,7 @@ export function patchSidebarWorktreeSessionStatus(
               ...session,
               sessionStatus: update.sessionStatus ?? null,
               sessionStatusUpdatedAt: update.sessionStatusUpdatedAt ?? null,
+              updatedAt: update.updatedAt ?? session.updatedAt,
             }
           : session
       ),
@@ -647,6 +678,7 @@ type UseSidebarSessionsOptions = {
   searchQuery?: string;
   createdOnPlatform?: string | string[];
   gitUrl?: string | string[];
+  folderWorktreeIds?: string[];
 };
 
 type UseSidebarSessionsReturn = {
@@ -698,7 +730,13 @@ export function nextPrLinkVerification(
 }
 
 export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSidebarSessionsReturn {
-  const { organizationId, searchQuery = '', createdOnPlatform, gitUrl } = options ?? {};
+  const {
+    organizationId,
+    searchQuery = '',
+    createdOnPlatform,
+    gitUrl,
+    folderWorktreeIds,
+  } = options ?? {};
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const sharedConnection = useUserWebConnection();
@@ -734,11 +772,6 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     }),
     [updatedSince, organizationId, createdOnPlatform, gitUrl]
   );
-  const listQueryKey = useMemo(
-    () => trpc.cliSessionsV2.list.queryKey(listInput),
-    [trpc, listInput]
-  );
-
   const { data: listData, isLoading: isListLoading } = useQuery({
     ...trpc.cliSessionsV2.list.queryOptions(listInput),
     staleTime: 5000,
@@ -790,6 +823,52 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     );
     verifyPrLink({ sessionId: session.session_id });
   }, [verificationSessions, isVerifyingPrLink, verifyPrLink]);
+
+  const limitFolderQueries = useMemo(() => pLimit(4), []);
+  const folderQueries = useQueries({
+    queries: [...new Set(folderWorktreeIds ?? [])].flatMap(id => {
+      const parsed = cloudAgentWorktreeIdSchema.safeParse(id);
+      if (!parsed.success) return [];
+      const queryOptions = trpc.cliSessionsV2.list.queryOptions(
+        {
+          worktreeId: parsed.data,
+          limit: 1,
+          orderBy: 'updated_at',
+          organizationId,
+          createdOnPlatform,
+          gitUrl,
+          fetchReviewDecision: true,
+        },
+        {
+          enabled: !isSearchActive,
+          staleTime: 5000,
+          refetchInterval: query =>
+            query.state.data?.cliSessions.some(
+              session => session.associatedPr?.reviewDecisionPending === true
+            )
+              ? REVIEW_DECISION_POLL_INTERVAL_MS
+              : false,
+        }
+      );
+      const queryFn = queryOptions.queryFn;
+      return [
+        {
+          ...queryOptions,
+          queryFn:
+            typeof queryFn === 'function'
+              ? (context: QueryFunctionContext) =>
+                  limitFolderQueries(() => {
+                    context.signal.throwIfAborted();
+                    return queryFn({ ...context, queryKey: queryOptions.queryKey });
+                  })
+              : queryFn,
+        },
+      ];
+    }),
+    combine: queries => ({
+      sessions: queries.flatMap(query => query.data?.cliSessions ?? []),
+    }),
+  });
 
   // Track last processed data key to avoid unnecessary atom updates
   const lastDataKeyRef = useRef<string | null>(null);
@@ -876,7 +955,9 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     if (!sharedConnection) return;
 
     const filters = { organizationId, createdOnPlatform, gitUrl } satisfies SidebarSessionFilters;
-    const patchWorktreeStatus = (update: SidebarSessionActivity) => {
+    const patchWorktreeStatus = (
+      update: Parameters<typeof patchSidebarWorktreeSessionStatus>[1]
+    ) => {
       const queries = queryClient.getQueriesData<WorktreeDetailsQueryData>(
         trpc.cliSessionsV2.worktreeDetails.pathFilter()
       );
@@ -969,6 +1050,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
         sessionId: payload.session.sessionId,
         sessionStatus: payload.session.status,
         sessionStatusUpdatedAt: payload.session.statusUpdatedAt,
+        updatedAt: payload.session.updatedAt,
       });
       const next = eventRowToDbSession(payload.session);
       const filterResult = eventRowMatchesSidebarFilters(payload.session, filters);
@@ -1001,6 +1083,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
           sessionId: payload.sessionId,
           sessionStatus: payload.status,
           sessionStatusUpdatedAt: payload.statusUpdatedAt,
+          updatedAt: payload.updatedAt ?? undefined,
         });
         setDbSessions(prev =>
           sortSidebarDbSessions(
@@ -1047,7 +1130,18 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     trpc,
   ]);
 
-  const sessions = isSearchActive ? searchSessions : cachedSessions;
+  const sessions = useMemo(
+    () =>
+      isSearchActive
+        ? searchSessions
+        : mergeSidebarFolderSessions(
+            cachedSessions,
+            folderQueries.sessions.map(session =>
+              dbSessionToStoredSession(apiSessionToDbSession(session))
+            )
+          ),
+    [isSearchActive, searchSessions, cachedSessions, folderQueries.sessions]
+  );
   const isLoading = isSearchActive ? isSearchLoading : isListLoading;
   const worktreeIdBatches = useMemo(() => {
     const ids = [
@@ -1099,9 +1193,9 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
 
   // Refetch sessions by invalidating the query cache
   const refetchSessions = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: listQueryKey });
+    void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
     void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter());
-  }, [queryClient, listQueryKey, trpc]);
+  }, [queryClient, trpc]);
 
   // Optimistically update a session's title in the Jotai atom so the UI
   // reflects the change immediately (before the server refetch completes).

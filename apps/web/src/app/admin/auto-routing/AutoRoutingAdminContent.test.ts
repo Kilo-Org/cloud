@@ -10,7 +10,6 @@ const analytics: AutoRoutingClassifierAnalyticsResponse = {
     totalRequests: 10,
     classifiedRequests: 8,
     cachedRequests: 6,
-    fallbackRequests: 2,
     classifierErrors: 1,
     invalidRequests: 1,
     totalCostCredits: 0.0000123,
@@ -31,11 +30,10 @@ const analytics: AutoRoutingClassifierAnalyticsResponse = {
 };
 
 describe('summaryRates', () => {
-  it('computes hit and fallback rates against classified requests, not total requests', () => {
+  it('computes the cache hit rate against classified requests, not total requests', () => {
     expect(summaryRates(analytics.summary)).toEqual({
       classifiedRate: 0.8,
       cacheHitRate: 0.75,
-      fallbackRate: 0.25,
     });
   });
 
@@ -43,7 +41,6 @@ describe('summaryRates', () => {
     expect(summaryRates(undefined)).toEqual({
       classifiedRate: 0,
       cacheHitRate: 0,
-      fallbackRate: 0,
     });
   });
 });

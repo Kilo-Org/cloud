@@ -191,7 +191,10 @@ FROM runtime AS customizer-builder
 COPY --from=workspace pnpm-workspace.yaml pnpm-lock.yaml /tmp/plugin-workspace/
 COPY --from=workspace patches/ /tmp/plugin-workspace/patches/
 COPY plugins/kiloclaw-customizer/ /tmp/plugin-workspace/services/kiloclaw/plugins/kiloclaw-customizer/
-RUN cd /tmp/plugin-workspace \
+# Pin pnpm to the repository's version: pnpm 12 rejects this partial workspace's
+# frozen lockfile, and the runtime stage installs whatever pnpm is latest.
+RUN npm install --global pnpm@11.1.2 \
+    && cd /tmp/plugin-workspace \
     && pnpm install --filter @kiloclaw/kiloclaw-customizer --frozen-lockfile --ignore-scripts \
     && pnpm --dir services/kiloclaw/plugins/kiloclaw-customizer pack --out /tmp/kiloclaw-customizer.tgz \
     && pnpm store prune \
@@ -205,7 +208,8 @@ FROM runtime AS kilo-chat-builder
 COPY --from=workspace pnpm-workspace.yaml pnpm-lock.yaml /tmp/plugin-workspace/
 COPY --from=workspace patches/ /tmp/plugin-workspace/patches/
 COPY plugins/kilo-chat/ /tmp/plugin-workspace/services/kiloclaw/plugins/kilo-chat/
-RUN cd /tmp/plugin-workspace \
+RUN npm install --global pnpm@11.1.2 \
+    && cd /tmp/plugin-workspace \
     && pnpm install --filter @kiloclaw/kilo-chat --frozen-lockfile --ignore-scripts \
     && pnpm --dir services/kiloclaw/plugins/kilo-chat pack --out /tmp/kilo-chat.tgz \
     && pnpm store prune \
@@ -216,7 +220,8 @@ FROM runtime AS morning-briefing-builder
 COPY --from=workspace pnpm-workspace.yaml pnpm-lock.yaml /tmp/plugin-workspace/
 COPY --from=workspace patches/ /tmp/plugin-workspace/patches/
 COPY plugins/kiloclaw-morning-briefing/ /tmp/plugin-workspace/services/kiloclaw/plugins/kiloclaw-morning-briefing/
-RUN cd /tmp/plugin-workspace \
+RUN npm install --global pnpm@11.1.2 \
+    && cd /tmp/plugin-workspace \
     && pnpm install --filter @kiloclaw/kiloclaw-morning-briefing --frozen-lockfile --ignore-scripts \
     && pnpm --dir services/kiloclaw/plugins/kiloclaw-morning-briefing pack --out /tmp/kiloclaw-morning-briefing.tgz \
     && pnpm store prune \

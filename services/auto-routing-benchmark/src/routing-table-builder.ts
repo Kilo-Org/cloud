@@ -1,6 +1,7 @@
 import {
   CustomRoutingTableSchema,
   poolEntryKey,
+  RANKING_POLICY_VERSION,
   rankCandidates,
   RoutingTableSchema,
   TAXONOMY_ROUTE_KEYS,
@@ -38,12 +39,7 @@ export function buildRoutingTable(params: {
     deciderModels,
     summaries,
   } = params;
-  // Prefer exact (model, variant) match so two variants of one model keep
-  // distinct snapshot rows. Legacy / platform: when the snapshot has exactly
-  // one row for the model (one effort per model), bind that row even if the
-  // summary omitted variant. Multiple snapshot rows without an exact match is
-  // corrupt — throw so buildRoutingTable fails and the caller keeps the
-  // previous published table.
+  // Bind every summary to its exact measured pair; never transfer alias scores.
   const snapshotVariant = (m: BenchmarkDeciderModel): string | null =>
     m.variant !== undefined ? (m.variant ?? null) : (m.reasoningEffort ?? null);
 
@@ -54,13 +50,7 @@ export function buildRoutingTable(params: {
     const appVariant = variant ?? null;
     const exact = deciderModels.find(m => m.id === model && snapshotVariant(m) === appVariant);
     if (exact) return exact;
-    const forModel = deciderModels.filter(m => m.id === model);
-    const sole = forModel.length === 1 ? forModel[0] : undefined;
-    // Exactly one snapshot row for this model → platform/legacy shape.
-    if (sole) return sole;
-    throw new Error(
-      `no snapshot row for model ${model} variant ${JSON.stringify(appVariant)} (${forModel.length} rows for model)`
-    );
+    throw new Error(`no snapshot row for model ${model} variant ${JSON.stringify(appVariant)}`);
   };
 
   const routeCandidates = (routeKey: TaxonomyRouteKey) =>
@@ -69,16 +59,13 @@ export function buildRoutingTable(params: {
         .filter(s => s.routeKey === routeKey && s.cases > 0 && s.avgCostUsd !== null)
         .map(s => {
           const cfg = findSnapshot(s.model, s.variant);
-          const effort = cfg.reasoningEffort ?? null;
-          // Legacy enum efforts keep the exact current shape. A snapshot that only
-          // has a non-enum variant emits `variant` instead — never both.
-          const variant = effort === null ? (cfg.variant ?? null) : null;
+          const variant = snapshotVariant(cfg);
           return {
             model: s.model,
             accuracy: s.accuracy,
             avgCostUsd: s.avgCostUsd ?? 0,
-            ...(variant !== null ? { variant } : {}),
-            reasoningEffort: effort,
+            p50LatencyMs: s.p50LatencyMs,
+            variant,
           };
         }),
       minAccuracy
@@ -115,9 +102,9 @@ function fnv1aHex(input: string): string {
 
 /**
  * Deterministic version id for a table assembled from the registry: a hash of
- * the contributing (runId, model, variant) triples, so identical assembly
- * inputs produce the same id and cache-hit. Used by both the platform table and
- * each owner's sparse custom table.
+ * the contributing (runId, model, variant) triples and the ranking policy, so
+ * identical assembly inputs produce the same id and cache-hit. Used by both the
+ * platform table and each owner's sparse custom table.
  */
 export function computeRegistryRoutingTableVersion(
   contributors: readonly { runId: string; model: string; variant: string | null }[],
@@ -136,6 +123,8 @@ export function computeRegistryRoutingTableVersion(
     JSON.stringify({
       parts,
       knobs: [knobs.minAccuracy, knobs.switchCostFactor, knobs.bestAccuracySwitchThreshold],
+      // A ranking change reorders tables built from unchanged measurements.
+      policy: RANKING_POLICY_VERSION,
     })
   )}`;
 }
@@ -204,6 +193,7 @@ export function buildCustomRoutingTable(params: {
           model: s.model,
           accuracy: s.accuracy,
           avgCostUsd: s.avgCostUsd ?? 0,
+          p50LatencyMs: s.p50LatencyMs,
           // Exact-pair identity only — never emit reasoningEffort on custom tables.
           variant: s.variant ?? null,
         })),

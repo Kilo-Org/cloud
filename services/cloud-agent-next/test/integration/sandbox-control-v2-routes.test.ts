@@ -22,7 +22,10 @@ import type {
   ProviderCreateIntent,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
-import type { ControlPlaneRouteSpec } from '../../src/shared/control-plane-protocol.js';
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlaneRouteSpec,
+} from '../../src/shared/control-plane-protocol.js';
 import type { createSandboxNotificationDispatcher } from '../../src/control-plane/sandbox/notifications.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { logger } from '../../src/logger.js';
@@ -68,9 +71,6 @@ function createFakeProvider(
     stopGates: [],
   };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       provider.createCalls += 1;
@@ -84,6 +84,7 @@ function createFakeProvider(
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
@@ -234,7 +235,7 @@ async function connectAndHello(
   if (!credential || !allocationId) throw new Error('launch environment is missing identity');
   const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
   const reply = await wrapper.hello({ wrapperId, allocationId });
-  expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   return { wrapper, credential, allocationId };
 }
 
@@ -351,7 +352,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     const reconnect = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     expect(await reconnect.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     expect((await readState(stub)).kind).toBe('connected');
     await setAllocationField(stub, { last_activity_at: Date.now() - TIMERS.idleMs - 1 });
@@ -1041,7 +1042,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     const before = await readRouteRow(stub, SESSION);
     const wrapper2 = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await wrapper2.hello({ wrapperId: 'wr_2', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
 
     await waitFor(() =>
       expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
@@ -1080,7 +1081,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
 
     const wrapper2 = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await wrapper2.hello({ wrapperId: 'wr_1', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
 
     await waitFor(() => {
       const readyCount = peer
@@ -1088,6 +1089,67 @@ describe('SandboxControlV2 routes and forwarding', () => {
         .filter(update => update.state === 'ready').length;
       expect(readyCount).toBeGreaterThanOrEqual(2);
     });
+  });
+
+  it('preserves delivered work and the ready route across disconnect, eviction and same-wrapper reconnect', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, 'wr_1');
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    const messageId = 'message-before-reset';
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload(messageId)] })).toBe(
+      'sent'
+    );
+    expect(await wrapper.next()).toMatchObject({ type: 'session.prompt', payload: { messageId } });
+    const routeBefore = await readRouteRow(stub, SESSION);
+
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+    const allocationBefore = await readState(stub);
+    const alarmBefore = await readAlarm(stub);
+    await evictAllDurableObjects();
+    expect(await readState(stub)).toEqual(allocationBefore);
+    expect(await readRouteRow(stub, SESSION)).toEqual(routeBefore);
+    expect(await readAlarm(stub)).toBe(alarmBefore);
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        provider: provider.adapter,
+        sessionPeerFor: (_ownerId: string, sessionId: string) => peer.forSession(sessionId),
+      });
+    });
+
+    const reconnected = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    expect(await reconnected.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('connected'));
+    expect(await readRouteRow(stub, SESSION)).toEqual(routeBefore);
+    expect((await readState(stub)).lastActivityAt).toBe(allocationBefore.lastActivityAt);
+    expect(await reconnected.next(50)).toBeNull();
+    reconnected.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: messageId,
+    });
+    await waitFor(() =>
+      expect(peer.outcomes).toContainEqual(
+        expect.objectContaining({
+          sessionId: SESSION,
+          status: 'completed',
+          lastMessageId: messageId,
+        })
+      )
+    );
+    expect(peer.routeUpdatesFor(SESSION).some(update => update.state === 'lost')).toBe(false);
+    expect(provider.createCalls).toBe(1);
+    expect(provider.launchEnvs).toHaveLength(1);
+    expect(provider.stopCalls).toEqual([]);
+    reconnected.close();
   });
 
   it('returns the current view from prepare so a lost notification cannot wedge the session', async () => {

@@ -112,7 +112,6 @@ const safeAreaMock = vi.hoisted(() => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -125,8 +124,16 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/lib/a11y/announce', () => ({
   announceForA11y: vi.fn(),
 }));
-vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', File: 'File' }));
-vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
+vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
+  File: 'File',
+  Share: 'Share',
+}));
+vi.mock('@/components/ui/image-viewer', () => ({ ImageViewer: 'ImageViewer' }));
+vi.mock('expo-video', () => ({
+  VideoView: 'VideoView',
+  useVideoPlayer: () => ({ loop: false }),
+}));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
@@ -309,12 +316,12 @@ describe('FilePartRenderer mounted', () => {
         (button.props.onLongPress as () => void)();
       });
       expect(selected).toEqual(['message-1']);
-      expect(findByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
-      expect(findByType(renderer.root, 'Modal')).toHaveLength(0);
+      expect(findByType(renderer.root, 'ImageViewer')).toHaveLength(0);
+      expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
       expect(showActionSheetWithOptions).not.toHaveBeenCalled();
       await press(button);
       if (mime === 'image/png') {
-        expect(first(findByType(renderer.root, 'ImageViewerModal')).props.uri).toBe(url);
+        expect(first(findByType(renderer.root, 'ImageViewer')).props.uri).toBe(url);
       } else if (mime === 'text/markdown') {
         expect(first(findByType(renderer.root, 'ChatMarkdownText')).props.value).toBe(
           'Attachment body'
@@ -327,6 +334,30 @@ describe('FilePartRenderer mounted', () => {
       await unmount(renderer);
     }
   );
+
+  it('plays a video part inline with native controls and shares it from the caption row', async () => {
+    const url = 'https://example.test/clip.mp4';
+    cacheFilePart('part-1', { url, mime: 'video/mp4', filename: 'clip.mp4' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'video/mp4', filename: 'clip.mp4', url: '' })
+    );
+
+    const video = findByType(renderer.root, 'VideoView');
+    expect(video).toHaveLength(1);
+    expect(video[0]?.props.nativeControls).toBe(true);
+    expect(video[0]?.props.contentFit).toBe('contain');
+    // No full-screen viewer: the native player owns the enlarged surface.
+    expect(findByType(renderer.root, 'ImageViewer')).toHaveLength(0);
+    expect(texts(renderer.root)).toContain('clip.mp4');
+
+    await press(first(pressableByLabel(renderer.root, 'Share clip.mp4')));
+    await flushAsync();
+    expect(shareRemoteFileMock.shareRemoteFile).toHaveBeenCalledWith(
+      expect.objectContaining({ url, filename: 'clip.mp4' })
+    );
+
+    await unmount(renderer);
+  });
 
   it('forwards image-error long-press without retrying until the normal tap', async () => {
     cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
@@ -397,11 +428,11 @@ describe('FilePartRenderer mounted', () => {
     const buttons = pressableByLabel(root, 'Open shot.png full screen');
     expect(buttons).toHaveLength(1);
     expect(buttons[0]?.props.accessibilityRole).toBe('button');
-    expect(findByType(root, 'ImageViewerModal')).toHaveLength(0);
+    expect(findByType(root, 'ImageViewer')).toHaveLength(0);
 
     await press(first(buttons));
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     expect(viewers).toHaveLength(1);
     expect(viewers[0]?.props).toMatchObject({ visible: true, uri: 'https://x/a.png' });
 
@@ -580,7 +611,7 @@ describe('FilePartRenderer mounted', () => {
 
     // Open the viewer before the renew settles.
     await press(first(pressableByLabel(root, `Open ${uuid}.png full screen`)));
-    expect(findByType(root, 'ImageViewerModal')).toHaveLength(1);
+    expect(findByType(root, 'ImageViewer')).toHaveLength(1);
 
     // The image errors while the renew is in flight.
     const image = findByType(root, 'Image')[0];
@@ -600,7 +631,7 @@ describe('FilePartRenderer mounted', () => {
     });
     await flushAsync();
 
-    expect(findByType(root, 'ImageViewerModal')).toHaveLength(1);
+    expect(findByType(root, 'ImageViewer')).toHaveLength(1);
     expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(0);
     expect(pressableByLabel(root, `Open ${uuid}.png full screen`)).toHaveLength(1);
 
@@ -957,7 +988,7 @@ describe('FilePartRenderer mounted', () => {
 
     expect(toastMock.error).toHaveBeenCalledWith('Preview unavailable');
     expect(showActionSheetWithOptions).not.toHaveBeenCalled();
-    expect(findByType(root, 'Modal')).toHaveLength(0);
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
 
     await unmount(renderer);
   });
@@ -994,7 +1025,7 @@ describe('FilePartRenderer mounted', () => {
 
     await press(first(pressableByLabel(root, 'Open shot.png full screen')));
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     expect(viewers).toHaveLength(1);
     expect(viewers[0]?.props.onShare).toBeTypeOf('function');
     expect(viewers[0]?.props.sharing).toBe(false);
@@ -1029,7 +1060,7 @@ describe('FilePartRenderer mounted', () => {
 
     await press(first(pressableByLabel(root, 'Open shot.png full screen')));
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     await act(async () => {
       await Promise.resolve();
       (first(viewers).props.onShare as () => void)();
@@ -1124,14 +1155,14 @@ describe('FilePartRenderer mounted', () => {
     shareRemoteFileMock.shareRemoteFile.mockRejectedValueOnce(new Error('boom'));
     shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     await act(async () => {
       await Promise.resolve();
       (first(viewers).props.onShare as () => void)();
     });
     await flushAsync();
 
-    const updated = findByType(root, 'ImageViewerModal');
+    const updated = findByType(root, 'ImageViewer');
     expect(updated[0]?.props.shareError).not.toBeNull();
     expect(toastMock.error).not.toHaveBeenCalled();
 
@@ -1155,14 +1186,14 @@ describe('FilePartRenderer mounted', () => {
     );
     shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     await act(async () => {
       await Promise.resolve();
       (first(viewers).props.onShare as () => void)();
     });
 
     // Close the viewer while the share is in flight.
-    const openViewers = findByType(root, 'ImageViewerModal');
+    const openViewers = findByType(root, 'ImageViewer');
     await act(async () => {
       await Promise.resolve();
       (first(openViewers).props.onClose as () => void)();
@@ -1263,14 +1294,14 @@ describe('FilePartRenderer mounted', () => {
       new ShareRemoteFileError('download-failed')
     );
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     await act(async () => {
       await Promise.resolve();
       (first(viewers).props.onShare as () => void)();
     });
     await flushAsync();
 
-    const updated = findByType(root, 'ImageViewerModal');
+    const updated = findByType(root, 'ImageViewer');
     expect(updated[0]?.props.shareError).toBe('Failed to share file. Please try again.');
     expect(toastMock.error).not.toHaveBeenCalled();
 
@@ -1368,7 +1399,7 @@ describe('FilePartRenderer mounted', () => {
     // The presign is still in flight, so the chip is busy. A tap during that
     // window must open the modal once the URL lands, without a second tap.
     await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
-    expect(findByType(root, 'Modal')).toHaveLength(0);
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
 
     await act(async () => {
       presignHolder.resolve?.({
@@ -1407,7 +1438,7 @@ describe('FilePartRenderer mounted', () => {
     await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
 
     expect(toastMock.error).toHaveBeenCalledWith('Could not load this file. Try again.');
-    expect(findByType(root, 'Modal')).toHaveLength(0);
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
 
     await flushAsync();
 
@@ -1444,7 +1475,7 @@ describe('FilePartRenderer mounted', () => {
 
     await press(first(pressableByLabel(root, `Open ${uuid}.png full screen`)));
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     expect(viewers).toHaveLength(1);
     expect(viewers[0]?.props).toMatchObject({ visible: true, uri: 'https://r2.example/signed' });
 
@@ -1690,7 +1721,7 @@ describe('FilePartRenderer mounted', () => {
     const root = renderer.root;
 
     await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
-    expect(findByType(root, 'Modal')).toHaveLength(0);
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
 
     await act(async () => {
       presignHolder.reject?.(new Error('presign failed'));
@@ -1699,7 +1730,7 @@ describe('FilePartRenderer mounted', () => {
     await flushAsync();
 
     expect(toastMock.error).toHaveBeenCalledWith('Could not load this file. Try again.');
-    expect(findByType(root, 'Modal')).toHaveLength(0);
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
 
     await unmount(renderer);
   });
@@ -1721,17 +1752,18 @@ describe('FilePartRenderer preview sheet surface', () => {
     return renderer;
   }
 
-  it('renders the native pageSheet Modal on iOS', async () => {
+  it('renders the native full-window sheet on iOS', async () => {
     const renderer = await openMarkdownPreview();
 
-    const modals = findByType(renderer.root, 'Modal');
-    expect(modals).toHaveLength(1);
-    expect(modals[0]?.props.animationType).toBe('slide');
-    expect(modals[0]?.props.presentationStyle).toBe('pageSheet');
-    expect(modals[0]?.props.transparent).toBeUndefined();
+    const sheets = findByType(renderer.root, 'BottomSheet');
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0]?.props.snapPoints).toEqual(['100%']);
+    expect(sheets[0]?.props.handleComponent).toBeNull();
+    expect(sheets[0]?.props.index).toBe(0);
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
-    expect(surface[0]?.props.style).toBeUndefined();
+    // iOS presents the sheet below the status bar, so the surface pads nothing.
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 0 });
 
     await unmount(renderer);
   });
@@ -1746,15 +1778,16 @@ describe('FilePartRenderer preview sheet surface', () => {
     await unmount(renderer);
   });
 
-  it('renders an opaque full-window Modal padded by the top inset on Android', async () => {
+  it('renders an opaque full-window sheet padded by the top inset on Android', async () => {
     reactNativeMock.Platform.OS = 'android';
     safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34 });
 
     const renderer = await openMarkdownPreview();
 
-    const modals = findByType(renderer.root, 'Modal');
-    expect(modals).toHaveLength(1);
-    expect(modals[0]?.props.transparent).toBeUndefined();
+    const sheets = findByType(renderer.root, 'BottomSheet');
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0]?.props.snapPoints).toEqual(['100%']);
+    expect(sheets[0]?.props.index).toBe(0);
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
@@ -1775,20 +1808,20 @@ describe('FilePartRenderer preview sheet surface', () => {
     await unmount(renderer);
   });
 
-  it('closes the preview when Android Back fires onRequestClose', async () => {
+  it('closes the preview when the sheet is dismissed', async () => {
     reactNativeMock.Platform.OS = 'android';
     const renderer = await openMarkdownPreview();
 
-    const modal = findByType(renderer.root, 'Modal')[0];
-    if (!modal) {
-      throw new Error('Modal not found');
+    const sheet = findByType(renderer.root, 'BottomSheet')[0];
+    if (!sheet) {
+      throw new Error('BottomSheet not found');
     }
     await act(async () => {
       await Promise.resolve();
-      (modal.props.onRequestClose as () => void)();
+      (sheet.props.onClose as () => void)();
     });
 
-    expect(findByType(renderer.root, 'Modal')).toHaveLength(0);
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
 
     await unmount(renderer);
   });
@@ -1805,7 +1838,7 @@ describe('FilePartRenderer preview sheet surface', () => {
       (header.props.onDone as () => void)();
     });
 
-    expect(findByType(renderer.root, 'Modal')).toHaveLength(0);
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
 
     await unmount(renderer);
   });

@@ -86,7 +86,7 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
 jest.mock('@/app/api/organizations/hooks', () => ({ useOrganizationWithMembers: () => ({}) }));
-jest.mock('@/lib/ai-gateway/hooks', () => ({ useModelSelectorList: () => ({}) }));
+jest.mock('@/lib/hooks/use-openrouter-models', () => ({ useModelSelectorList: () => ({}) }));
 jest.mock('@/components/ui/confirm', () => ({ useConfirm: () => jest.fn() }));
 jest.mock('./DevAddGitHubInstallationCard', () => ({ DevAddGitHubInstallationCard: () => null }));
 jest.mock('./OrganizationGitHubInstallations', () => ({

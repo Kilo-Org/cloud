@@ -259,7 +259,7 @@ async function performAutoTopUpForEntity(
   // (another request may have completed a top-up while we were waiting for the lock)
   // We fetch fresh data from DB and compute balance directly to avoid
   // calling getBalanceForUser which would create a cycle (it calls maybePerformAutoTopUp)
-  const { currentBalance_USD, stripe_customer_id, accountCreatedAt } =
+  const { currentBalance_USD, stripe_customer_id, accountCreatedAt, accountUsedMicrodollars } =
     await getEntityBalanceAndStripeCustomer(entity);
   const threshold =
     entity.type === 'user' ? AUTO_TOP_UP_THRESHOLD_DOLLARS : ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS;
@@ -362,6 +362,7 @@ async function performAutoTopUpForEntity(
       orgId: bouncerOrgId,
       amountCents,
       accountCreatedAt,
+      accountUsedMicrodollars,
     });
     const paidInvoice = await client.invoices.pay(invoice.id, {
       payment_method: config.stripe_payment_method_id,
@@ -428,6 +429,7 @@ async function getEntityBalanceAndStripeCustomer(entity: AutoTopUpEntity): Promi
   currentBalance_USD: number;
   stripe_customer_id: string | null;
   accountCreatedAt: string;
+  accountUsedMicrodollars: number;
 }> {
   if (entity.type === 'user') {
     const freshUser = await findUserById(entity.user.id);
@@ -438,6 +440,7 @@ async function getEntityBalanceAndStripeCustomer(entity: AutoTopUpEntity): Promi
       currentBalance_USD,
       stripe_customer_id: freshUser.stripe_customer_id,
       accountCreatedAt: freshUser.created_at,
+      accountUsedMicrodollars: freshUser.microdollars_used,
     };
   } else {
     const freshOrg = await getOrganizationById(entity.organization.id);
@@ -448,6 +451,7 @@ async function getEntityBalanceAndStripeCustomer(entity: AutoTopUpEntity): Promi
       currentBalance_USD,
       stripe_customer_id: freshOrg.stripe_customer_id,
       accountCreatedAt: freshOrg.created_at,
+      accountUsedMicrodollars: freshOrg.microdollars_used,
     };
   }
 }

@@ -5077,6 +5077,7 @@ export const kiloclawRouter = createTRPCRouter({
           }) / 10_000
         ),
         accountCreatedAt: ctx.user.created_at,
+        accountUsedMicrodollars: ctx.user.microdollars_used,
         ip: ctx.ip,
         ipCountry: ipCountryFromHeaders(ctx.headersList),
         ja4: ja4FromHeaders(ctx.headersList),
@@ -5367,6 +5368,7 @@ export const kiloclawRouter = createTRPCRouter({
             userId: ctx.user.id,
             amountCents: session.amount_total ?? 0,
             accountCreatedAt: ctx.user.created_at,
+            accountUsedMicrodollars: ctx.user.microdollars_used,
             ip: ctx.ip,
             ipCountry: ipCountryFromHeaders(ctx.headersList),
             ja4: ja4FromHeaders(ctx.headersList),

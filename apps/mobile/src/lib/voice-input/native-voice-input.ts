@@ -17,6 +17,7 @@ import {
   type VoiceInputNative,
   type VoiceInputNativeEvent,
 } from './voice-input-controller';
+import { dropIosRepeatedFinal } from './voice-input-ios-final';
 
 const ANDROID_CONTINUOUS_MIN_API_LEVEL = 33;
 
@@ -57,9 +58,10 @@ function bindListener<K extends keyof VoiceInputNativeEvent>(
     return module.addListener('start', listener as (event: null) => void);
   }
   if (event === 'result') {
+    const resultListener = listener as (event: ExpoSpeechRecognitionResultEvent) => void;
     return module.addListener(
       'result',
-      listener as (event: ExpoSpeechRecognitionResultEvent) => void
+      Platform.OS === 'ios' ? dropIosRepeatedFinal(resultListener) : resultListener
     );
   }
   if (event === 'nomatch') {

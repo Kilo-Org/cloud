@@ -13,8 +13,9 @@
  *   `agent_restarted`, the old Kilo processes must be gone, and a follow-up
  *   must complete in the same container.
  * - `kilo-hang-recovery`: `SIGSTOP` Kilo while the fake LLM holds the first
- *   token. The wrapper must restart Kilo with a new pid and the replayed turn
- *   must complete with the user message present exactly once in Kilo history.
+ *   token after observing correlated native output. The progressed turn must
+ *   fail agent_restarted; a fresh follow-up completes on the new native process,
+ *   with the original user message present exactly once in Kilo history.
  *
  * Each declares `controlPlaneV2`, `controlPlaneRuntime`, and `sandboxFaults`, so
  * it is `unsupported` until `E2E_CONTROL_PLANE_V2=1` and requires a local Docker
@@ -24,11 +25,11 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { isRecord } from '../../src/shared/kilo-event.js';
 import {
   failureReasonFromEvent,
   fakeDirective,
   fetchFakeScenarioStatus,
-  isMessageCompleted,
   openConnectedStream,
   releaseGate,
   waitForGateEngaged,
@@ -283,11 +284,10 @@ async function waitForFakeTagRequests(
 }
 
 /**
- * Kilo hang: the fake emits one token then parks; Kilo is frozen with SIGSTOP.
- * The wrapper's silence detection must restart Kilo (a new pid) and replay the
- * turn, which the fake completes on the second request for the tag. The user
- * message must appear once in Kilo history (the B8 duplicate-parts behaviour
- * would append a second text part).
+ * Kilo hang after observed assistant output: freeze with SIGSTOP, fail the
+ * progressed turn honestly, then recover with a fresh message in the same chat.
+ * The wrapper's silence detection must restart Kilo with a new pid. The original
+ * user message must appear once in Kilo history; progressed work is not replayed.
  */
 async function runKiloHang(
   args: LifecycleArgs,
@@ -355,6 +355,34 @@ async function runKiloHang(
       stream,
     });
     await waitForFakeTagRequests(scenarioConfig.fakeLlmUrl, tag, 1, deadline);
+    const progress = await stream.waitFor(
+      event => {
+        if (event.streamEventType !== 'kilocode' || event.data.type !== 'message.part.delta')
+          return false;
+        const props = event.data.properties;
+        if (
+          !isRecord(props) ||
+          typeof props.delta !== 'string' ||
+          !props.delta.includes('held-first-token')
+        )
+          return false;
+        return stream.events.some(candidate => {
+          if (candidate.streamEventType !== 'kilocode' || candidate.data.type !== 'message.updated')
+            return false;
+          const properties = candidate.data.properties;
+          const info = isRecord(properties) ? properties.info : undefined;
+          return (
+            isRecord(info) &&
+            info.role === 'assistant' &&
+            info.parentID === sent.messageId &&
+            info.id === props.messageID
+          );
+        });
+      },
+      Math.min(HANG_PARK_BUDGET_MS, deadline.remaining('native first token'))
+    );
+    if (!progress)
+      throw new Error('Held model response did not produce correlated native assistant progress');
 
     const froze = await faults.freezeKiloServerProcess(target);
     if (!froze.frozen)
@@ -365,8 +393,8 @@ async function runKiloHang(
       Math.max(1, Math.min(HANG_RECOVERY_BUDGET_MS, deadline.remaining('hang terminal'))),
       sent.messageId
     );
-    if (!isMessageCompleted(terminal, sent.messageId)) {
-      throw new Error(`hang turn ${sent.messageId} did not complete after Kilo restart`);
+    if (failureReasonFromEvent(terminal) !== 'agent_restarted') {
+      throw new Error(`Progressed hang turn ${sent.messageId} did not fail agent_restarted`);
     }
     const status = await awaitDurableTerminal(
       scenarioConfig,
@@ -374,7 +402,7 @@ async function runKiloHang(
       sent.messageId,
       Math.max(1, Math.min(HANG_RECOVERY_BUDGET_MS, deadline.remaining('hang durable')))
     );
-    if (status !== 'completed') throw new Error(`hang turn durable status=${status}`);
+    if (status !== 'failed') throw new Error(`hang turn durable status=${status}`);
 
     const kiloAfter = await faults.captureKiloServerIdentity(target);
     if (kiloAfter.pid === kiloBefore.pid) {
@@ -391,6 +419,15 @@ async function runKiloHang(
         `user message ${sent.messageId} has ${parts.textParts} text parts, expected exactly 1`
       );
     }
+    const recovery = await sendTurn(
+      deadline,
+      scenarioConfig,
+      session.cloudAgentSessionId,
+      fakeDirective(`echo:after-hang-${runId}`),
+      'hang recovery turn',
+      RECOVERY_BUDGET_MS
+    );
+    streams.push(recovery.stream);
     await assertUnchangedAllocation(deadline, sandbox, session, allocation, 'hang allocation');
 
     result = {
@@ -399,7 +436,7 @@ async function runKiloHang(
       ok: true,
       message:
         `session=${session.cloudAgentSessionId}; frozePid=${froze.pid}; ` +
-        `restartedPid=${kiloAfter.pid}; hangTurn=${sent.messageId}/completed; ` +
+        `restartedPid=${kiloAfter.pid}; hangTurn=${sent.messageId}/agent_restarted; recovery=${recovery.messageId}/completed; ` +
         `userTextParts=${parts.textParts}; allocation=${allocation}`,
       events,
       durationMs: Date.now() - startedAt,
@@ -424,6 +461,7 @@ async function runKiloHang(
     }
     await owned.cleanup('kilo-hang-recovery');
   }
+  result.events = streams.flatMap(stream => stream.events);
   return result;
 }
 

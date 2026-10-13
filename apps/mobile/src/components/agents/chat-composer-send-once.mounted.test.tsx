@@ -127,9 +127,12 @@ vi.mock('@/components/agents/slash-command-suggestions', () => ({
   SlashCommandSuggestions: () => null,
 }));
 vi.mock('@/components/agents/suggestion-card', () => ({ SuggestionCard: () => null }));
-vi.mock('@/components/agents/remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn(async () => true),
-}));
+vi.mock('@/components/agents/remote-session-exit-alert', () => {
+  const confirmExit = vi.fn(async () => true);
+  return {
+    useRemoteSessionExitConfirmation: () => ({ confirmExit, exitDialog: null }),
+  };
+});
 vi.mock('@/components/agents/remote-session-exit-confirmation', () => ({
   confirmRemoteSessionExit: vi.fn(async (_confirm: unknown, run: () => Promise<void>) => run()),
 }));
@@ -138,7 +141,6 @@ vi.mock('@/components/agents/attachment-picker', () => ({
 }));
 vi.mock('@/components/voice-input-control', () => ({
   VoiceInputButton: 'VoiceInputButton',
-  VoiceInputStatus: () => null,
 }));
 
 // ── hooks and libs ───────────────────────────────────────────────────────────
@@ -224,10 +226,8 @@ function baseProps(overrides: Partial<Parameters<typeof ChatComposer>[0]> = {}) 
     isStreaming: false,
     model: 'model-a',
     modelOptions: [],
-    mode: 'build' as never,
     onCreateSession: vi.fn(async () => true),
     onExitSession: vi.fn(async () => undefined),
-    onModeChange: vi.fn(),
     onModelSelect: vi.fn(),
     onRestartSession: vi.fn(async () => true),
     onSend: vi.fn(async () => undefined),

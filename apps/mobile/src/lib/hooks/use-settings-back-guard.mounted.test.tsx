@@ -1,10 +1,11 @@
-import { createElement } from 'react';
+import { createElement, isValidElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useSettingsBackGuard } from './use-settings-back-guard';
+import { type DestructiveConfirmDialogProps } from '@/components/destructive-confirm-dialog';
 
-const alertMock = vi.hoisted(() => vi.fn());
+import { type SettingsBackGuardResult, useSettingsBackGuard } from './use-settings-back-guard';
+
 const dispatchMock = vi.hoisted(() => vi.fn());
 const goBackMock = vi.hoisted(() => vi.fn());
 
@@ -22,9 +23,25 @@ const usePreventRemoveMock = vi.hoisted(() =>
   })
 );
 
-vi.mock('react-native', () => ({
-  Alert: { alert: alertMock },
+// The guard builds its confirmation through the real `useConfirmDialog`, so the
+// pieces that dialog imports are stubbed: this suite reads the request it hands
+// to `confirm` (and its dismissal callback) without mounting the native dialog.
+vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('@rn-primitives/dialog', () => ({
+  Action: 'AlertDialog.Action',
+  Cancel: 'AlertDialog.Cancel',
+  Content: 'AlertDialog.Content',
+  Description: 'AlertDialog.Description',
+  Overlay: 'AlertDialog.Overlay',
+  Portal: 'AlertDialog.Portal',
+  Root: 'AlertDialog.Root',
+  Title: 'AlertDialog.Title',
 }));
+vi.mock('@/components/destructive-confirm-dialog', () => ({
+  DestructiveConfirmDialog: 'DestructiveConfirmDialog',
+}));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ dispatch: dispatchMock, goBack: goBackMock }),
@@ -35,11 +52,7 @@ vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: usePreventRemoveMock,
 }));
 
-type AlertButton = { text: string; style?: string; onPress?: () => void };
-
-type GuardResult = ReturnType<typeof useSettingsBackGuard>;
-
-let latest: GuardResult | undefined = undefined;
+let latest: SettingsBackGuardResult | undefined = undefined;
 
 function GuardHarness({
   dirty,
@@ -71,25 +84,30 @@ function mountGuard(dirty: boolean, valid: boolean, onSave: () => Promise<void>)
 
 function triggerPreventRemove(): Action {
   const action = { type: 'GO_BACK' };
-  usePreventRemoveHolder.callback?.({ data: { action } });
+  act(() => {
+    usePreventRemoveHolder.callback?.({ data: { action } });
+  });
   return action;
 }
 
-function lastAlertButtons(): AlertButton[] | undefined {
-  return alertMock.mock.calls.at(-1)?.[2] as AlertButton[] | undefined;
+/** The confirm the guard is currently showing, or undefined while none is open. */
+function currentDialog(): DestructiveConfirmDialogProps | undefined {
+  const node = latest?.dialog;
+  return isValidElement<DestructiveConfirmDialogProps>(node) ? node.props : undefined;
 }
 
 async function flushMicrotasks() {
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  setTimeout(() => {
+    resolve(undefined);
+  }, 0);
   await act(async () => {
-    await new Promise(resolve => {
-      setTimeout(resolve, 0);
-    });
+    await promise;
   });
 }
 
 describe('useSettingsBackGuard', () => {
   beforeEach(() => {
-    alertMock.mockReset();
     dispatchMock.mockReset();
     goBackMock.mockReset();
     usePreventRemoveMock.mockReset();
@@ -122,7 +140,7 @@ describe('useSettingsBackGuard', () => {
     // The removal was already prevented, so the guard replays the action.
     expect(dispatchMock).toHaveBeenCalledTimes(1);
     expect(dispatchMock).toHaveBeenCalledWith(action);
-    expect(alertMock).not.toHaveBeenCalled();
+    expect(currentDialog()).toBeUndefined();
     // The bypass is one-shot: consumed on the removal it armed.
     expect(result.skipNextGuardRef.current).toBe(false);
 
@@ -135,13 +153,15 @@ describe('useSettingsBackGuard', () => {
     const { renderer } = mountGuard(true, true, noOpSave);
 
     triggerPreventRemove();
-    expect(alertMock).toHaveBeenCalledTimes(1);
-    expect(alertMock.mock.calls[0]?.[0]).toBe('Unsaved changes');
-    expect(lastAlertButtons()?.map(button => button.text)).toEqual([
-      'Save changes',
-      'Discard',
-      'Keep editing',
-    ]);
+    const dialog = currentDialog();
+    expect(dialog?.title).toBe('Unsaved changes');
+    expect(dialog?.message).toBe('Save your changes before leaving this screen?');
+    // Keep editing is the safe side of the dialog; Save rides between it and
+    // the destructive Discard confirm.
+    expect(dialog?.cancelLabel).toBe('Keep editing');
+    expect(dialog?.extraAction?.label).toBe('Save changes');
+    expect(dialog?.confirmLabel).toBe('Discard');
+    expect(dispatchMock).not.toHaveBeenCalled();
 
     act(() => {
       renderer.unmount();
@@ -152,8 +172,11 @@ describe('useSettingsBackGuard', () => {
     const { renderer } = mountGuard(true, false, noOpSave);
 
     triggerPreventRemove();
-    expect(alertMock).toHaveBeenCalledTimes(1);
-    expect(lastAlertButtons()?.map(button => button.text)).toEqual(['Discard', 'Keep editing']);
+    const dialog = currentDialog();
+    // Nothing valid to persist, so there is no Save action to offer.
+    expect(dialog?.extraAction).toBeUndefined();
+    expect(dialog?.cancelLabel).toBe('Keep editing');
+    expect(dialog?.confirmLabel).toBe('Discard');
 
     act(() => {
       renderer.unmount();
@@ -172,11 +195,11 @@ describe('useSettingsBackGuard', () => {
     const { renderer } = mountGuard(true, true, onSave);
     triggerPreventRemove();
 
-    const save = lastAlertButtons()?.find(button => button.text === 'Save changes');
-    expect(save?.onPress).toBeDefined();
+    const save = currentDialog()?.extraAction;
+    expect(save).toBeDefined();
 
     act(() => {
-      save?.onPress?.();
+      save?.onPress();
     });
     await flushMicrotasks();
 
@@ -197,11 +220,11 @@ describe('useSettingsBackGuard', () => {
     const { renderer } = mountGuard(true, true, onSave);
     triggerPreventRemove();
 
-    const save = lastAlertButtons()?.find(button => button.text === 'Save changes');
-    expect(save?.onPress).toBeDefined();
+    const save = currentDialog()?.extraAction;
+    expect(save).toBeDefined();
 
     act(() => {
-      save?.onPress?.();
+      save?.onPress();
     });
     await flushMicrotasks();
 
@@ -218,11 +241,11 @@ describe('useSettingsBackGuard', () => {
     const { renderer } = mountGuard(true, true, noOpSave);
     triggerPreventRemove();
 
-    const discard = lastAlertButtons()?.find(button => button.text === 'Discard');
-    expect(discard?.onPress).toBeDefined();
+    const dialog = currentDialog();
+    expect(dialog?.onConfirm).toBeDefined();
 
     act(() => {
-      discard?.onPress?.();
+      dialog?.onConfirm();
     });
     expect(dispatchMock).toHaveBeenCalledTimes(1);
     expect(dispatchMock).toHaveBeenCalledWith({ type: 'GO_BACK' });
@@ -232,16 +255,23 @@ describe('useSettingsBackGuard', () => {
     });
   });
 
-  it('Keep editing leaves the screen untouched', () => {
+  it('Keep editing dismisses the confirm without saving or leaving', () => {
     const onSave = vi.fn(async () => {
       await Promise.resolve();
     });
     const { renderer } = mountGuard(true, true, onSave);
     triggerPreventRemove();
 
-    const keep = lastAlertButtons()?.find(button => button.text === 'Keep editing');
-    // The cancel button carries no handler: dismissing it must not save or leave.
-    expect(keep?.onPress).toBeUndefined();
+    const dialog = currentDialog();
+    expect(dialog).toBeDefined();
+
+    // The safe choice is the dialog's cancel side: dismissing it drops the
+    // captured leave, so nothing is saved and no navigation is replayed.
+    act(() => {
+      dialog?.onCancel();
+    });
+
+    expect(currentDialog()).toBeUndefined();
     expect(onSave).not.toHaveBeenCalled();
     expect(dispatchMock).not.toHaveBeenCalled();
 

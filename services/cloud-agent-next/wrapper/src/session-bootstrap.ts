@@ -1,3 +1,4 @@
+import { writeRuntimeSkills } from './runtime-skills.js';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -232,21 +233,6 @@ function longGitOptions(
     hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
     onOutput: gitProgressReporter(progress, step, progressPrefix),
   };
-}
-
-export class RestoredWorkspaceReconciliationError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = 'RestoredWorkspaceReconciliationError';
-  }
-}
-
-export function workspaceBootstrapErrorCode(
-  error: unknown
-): 'WORKSPACE_RECONCILIATION_FAILED' | 'WORKSPACE_SETUP_FAILED' {
-  return error instanceof RestoredWorkspaceReconciliationError
-    ? 'WORKSPACE_RECONCILIATION_FAILED'
-    : 'WORKSPACE_SETUP_FAILED';
 }
 
 function canonicalGitUrl(repo: NonNullable<WrapperSessionReadyRequest['repo']>): string {
@@ -558,11 +544,18 @@ async function branchExists(
 }
 
 function gitOutputRedactor(request: WrapperSessionReadyRequest): (text: string) => string {
-  return createSecretRedactor(process.env, request.materialized.env, {
-    ...(request.repo?.kind === 'git' && request.repo.token
-      ? { GIT_TOKEN: request.repo.token }
-      : {}),
-  });
+  return createSecretRedactor(
+    process.env,
+    [
+      request.materialized.env,
+      {
+        ...(request.repo?.kind === 'git' && request.repo.token
+          ? { GIT_TOKEN: request.repo.token }
+          : {}),
+      },
+    ],
+    request.materialized.secretEnvKeys ?? []
+  );
 }
 
 async function prepareBranch(
@@ -697,35 +690,6 @@ async function writeCloudAgentRules(request: WrapperSessionReadyRequest): Promis
   );
 }
 
-function isSafeSkillFilePath(relativePath: string): boolean {
-  if (relativePath.length === 0 || relativePath.length > 200) return false;
-  if (relativePath.startsWith('/')) return false;
-  if (relativePath.includes('..')) return false;
-  if (relativePath.includes('\\') || relativePath.includes('\0')) return false;
-  if (relativePath.toLowerCase() === 'skill.md') return false;
-  return /^[a-zA-Z0-9._\-/]+$/.test(relativePath);
-}
-
-async function writeRuntimeSkills(request: WrapperSessionReadyRequest): Promise<void> {
-  const skills = request.materialized.runtimeSkills;
-  if (!skills?.length) return;
-
-  const baseDir = path.join(request.workspace.sessionHome, '.kilocode/skills');
-  await fs.mkdir(baseDir, { recursive: true });
-
-  for (const skill of skills) {
-    const skillDir = path.join(baseDir, skill.name);
-    await fs.mkdir(skillDir, { recursive: true });
-    await fs.writeFile(path.join(skillDir, 'SKILL.md'), skill.rawMarkdown);
-    for (const [relativePath, content] of Object.entries(skill.files ?? {})) {
-      if (!isSafeSkillFilePath(relativePath)) continue;
-      const targetPath = path.join(skillDir, relativePath);
-      await fs.mkdir(path.dirname(targetPath), { recursive: true });
-      await fs.writeFile(targetPath, content);
-    }
-  }
-}
-
 async function bootstrapEmptyKiloSession(
   request: WrapperSessionReadyRequest,
   restore: typeof restoreSession
@@ -772,8 +736,7 @@ async function bootstrapEmptyKiloSession(
 
 async function restoreOrBootstrapKiloSession(
   request: WrapperSessionReadyRequest,
-  restore: typeof restoreSession,
-  restorePath: Exclude<WrapperRestoreTelemetry['path'], 'warm'>
+  restore: typeof restoreSession
 ): Promise<WrapperRestoreTelemetry | undefined> {
   if (request.workspace.preferSnapshot) {
     logToFile(
@@ -784,7 +747,7 @@ async function restoreOrBootstrapKiloSession(
       logToFile(
         `bootstrap snapshot restore ready kiloSessionId=${request.kiloSessionId} downloaded=${result.downloaded} diffsApplied=${result.diffs.applied} diffsSkipped=${result.diffs.skipped} diffsTotal=${result.diffs.total}`
       );
-      return { path: restorePath, diffs: result.diffs };
+      return { path: 'cold', diffs: result.diffs };
     }
     logToFile(
       `bootstrap snapshot restore failed kiloSessionId=${request.kiloSessionId} step=${result.step} code=${result.code ?? '(none)'} subtype=${result.subtype ?? '(none)'}`
@@ -817,60 +780,7 @@ async function restoreOrBootstrapKiloSession(
     logToFile(`bootstrap fresh session using empty import kiloSessionId=${request.kiloSessionId}`);
   }
   await bootstrapEmptyKiloSession(request, restore);
-  return { path: restorePath };
-}
-
-async function reconcileRestoredWorkspace(
-  request: WrapperSessionReadyRequest,
-  runGit: GitRunner,
-  progress: BootstrapProgress | undefined,
-  signal?: AbortSignal
-): Promise<void> {
-  const { workspacePath, branchName, upstreamBranch, strictBranch } = request.workspace;
-  if (strictBranch && isSyntheticReviewRef(branchName)) {
-    await checkoutSyntheticReviewRef({
-      runGit,
-      workspacePath,
-      branchName,
-      ...(signal ? { signal } : {}),
-      onProgress: message => progress?.('branch', message),
-      redact: gitOutputRedactor(request),
-    });
-    return;
-  }
-
-  let sourceBranch: string;
-  if (upstreamBranch) {
-    sourceBranch = upstreamBranch;
-  } else if (strictBranch) {
-    sourceBranch = branchName;
-  } else {
-    const defaultBranchResult = await runGit(
-      ['ls-remote', '--symref', 'origin', 'HEAD'],
-      longGitOptions(progress, 'branch', 'Resolving default branch...', workspacePath)
-    );
-    const defaultBranchMatch = defaultBranchResult.stdout.match(/^ref: refs\/heads\/(.+)\s+HEAD$/m);
-    if (defaultBranchResult.exitCode !== 0 || !defaultBranchMatch?.[1]) {
-      throw new Error('Failed to resolve authoritative remote default branch');
-    }
-    sourceBranch = defaultBranchMatch[1];
-  }
-
-  const fetchResult = await runGit(
-    ['fetch', 'origin', sourceBranch],
-    longGitOptions(progress, 'branch', 'Fetching authoritative state...', workspacePath)
-  );
-  if (fetchResult.exitCode !== 0) {
-    throw new Error('Failed to fetch authoritative remote state');
-  }
-
-  const checkoutResult = await runGit(
-    ['checkout', '-B', branchName, 'FETCH_HEAD'],
-    longGitOptions(progress, 'branch', 'Checking out session branch...', workspacePath)
-  );
-  if (checkoutResult.exitCode !== 0) {
-    throw new Error(`Failed to create session branch ${branchName} from origin/${sourceBranch}`);
-  }
+  return { path: 'cold' };
 }
 
 async function runSetupCommands(
@@ -879,7 +789,11 @@ async function runSetupCommands(
   progress: BootstrapProgress | undefined
 ): Promise<void> {
   const setupCommands = request.materialized.setupCommands ?? [];
-  const redact = createSecretRedactor({ ...process.env, ...request.materialized.env });
+  const redact = createSecretRedactor(
+    { ...process.env, ...request.materialized.env },
+    [],
+    request.materialized.secretEnvKeys ?? []
+  );
   logToFile(
     `bootstrap setup commands starting kiloSessionId=${request.kiloSessionId} count=${setupCommands.length} workspacePath=${request.workspace.workspacePath}`
   );
@@ -1305,12 +1219,10 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
   let workspaceNeedsBootstrap = true;
   let cloneTelemetry: WrapperCloneTelemetry | undefined;
   let restoreTelemetry: WrapperRestoreTelemetry | undefined;
-  const restoredFromBackup = request.workspace.restoredFromBackup === true;
 
   try {
     workspaceWasWarm = await isCompleteGitWorkspace(request.workspace.workspacePath);
-    workspaceNeedsBootstrap =
-      restoredFromBackup || !workspaceWasWarm || !request.workspace.preferSnapshot;
+    workspaceNeedsBootstrap = !workspaceWasWarm || !request.workspace.preferSnapshot;
     logToFile(
       `bootstrap workspace plan kiloSessionId=${request.kiloSessionId} preferSnapshot=${request.workspace.preferSnapshot} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} workspacePath=${request.workspace.workspacePath} sessionHome=${request.workspace.sessionHome} home=${process.env.HOME ?? '(unset)'} homeMatchesSessionHome=${process.env.HOME === request.workspace.sessionHome} repoKind=${request.repo?.kind ?? '(none)'} setupCommandCount=${request.materialized.setupCommands?.length ?? 0} runtimeSkillCount=${request.materialized.runtimeSkills?.length ?? 0}`
     );
@@ -1352,36 +1264,18 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       logToFile(
         `bootstrap branch preparation starting kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName} strictBranch=${request.workspace.strictBranch ?? false}`
       );
-      if (restoredFromBackup) {
-        try {
-          await reconcileRestoredWorkspace(request, runGit, progress, signal);
-        } catch (error) {
-          // A missing synthetic ref is an explicit, non-retryable request
-          // failure. Other typed Git failures are transient workspace
-          // reconciliation failures so the caller can fall back to a clean
-          // workspace before retrying.
-          if (error instanceof WrapperBootstrapError && !error.retryable) throw error;
-          const message = error instanceof Error ? error.message : String(error);
-          throw new RestoredWorkspaceReconciliationError(message, { cause: error });
-        }
-      } else {
-        await prepareBranch(request, runGit, progress, signal);
-      }
+      await prepareBranch(request, runGit, progress, signal);
       logToFile(
         `bootstrap branch preparation ready kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName}`
       );
 
-      await writeRuntimeSkills(request);
+      await writeRuntimeSkills(request.workspace.sessionHome, request.materialized.runtimeSkills);
 
       progress?.(
         'kilo_session',
         request.workspace.preferSnapshot ? 'Restoring session...' : 'Importing session...'
       );
-      restoreTelemetry = await restoreOrBootstrapKiloSession(
-        request,
-        restore,
-        restoredFromBackup ? 'backup' : 'cold'
-      );
+      restoreTelemetry = await restoreOrBootstrapKiloSession(request, restore);
       const incomplete = restoreTelemetry
         ? await reportRestoreIncomplete({
             diffs: restoreTelemetry.diffs ?? { applied: 0, skipped: 0, total: 0 },
@@ -1407,10 +1301,9 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
           })
         : undefined;
       if (!incomplete && restoreTelemetry?.diffs) {
-        const restoreLabel = restoreTelemetry.path === 'backup' ? 'Resume restore' : 'Cold restore';
         progress?.(
           'kilo_session',
-          `${restoreLabel}, snapshot applied, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
+          `Cold restore, snapshot applied, ${restoreTelemetry.diffs.applied}/${restoreTelemetry.diffs.total} files restored`
         );
       }
 
@@ -1434,7 +1327,6 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     progress?.('kilo_server', 'Starting Kilo...');
     return {
       workspaceWasWarm,
-      restoredFromBackup,
       ...(cloneTelemetry ? { clone: cloneTelemetry } : {}),
       ...(restoreTelemetry ? { restore: restoreTelemetry } : {}),
     };
@@ -1443,13 +1335,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     const bootstrapError =
       failure instanceof WrapperBootstrapError
         ? failure
-        : failure instanceof RestoredWorkspaceReconciliationError
-          ? new WrapperBootstrapError({
-              code: 'WORKSPACE_RECONCILIATION_FAILED',
-              message: redactSecrets(cleanTerminalOutput(failure.message)),
-              retryable: true,
-            })
-          : workspaceBootstrapError('workspace_setup_unknown', 'Workspace setup failed');
+        : workspaceBootstrapError('workspace_setup_unknown', 'Workspace setup failed');
     logToFile(
       `bootstrap workspace failed kiloSessionId=${request.kiloSessionId} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} willCleanup=${workspaceNeedsBootstrap} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'} error=${bootstrapError.message}${bootstrapError.detail ? ` detail=${bootstrapError.detail}` : ''}`
     );
@@ -1457,7 +1343,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       await cleanupWorkspace(request, deps.beforeFailureCleanup);
       logToFile(`bootstrap workspace cleanup finished kiloSessionId=${request.kiloSessionId}`);
     }
-    throw failure instanceof RestoredWorkspaceReconciliationError ? failure : bootstrapError;
+    throw bootstrapError;
   }
 }
 

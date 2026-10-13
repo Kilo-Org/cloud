@@ -3,6 +3,7 @@ import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { organizationsRouter } from '@/routers/organizations/organization-router';
 import { userRouter } from '@/routers/user-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
+import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { codeReviewRouter } from '@/routers/code-reviews/code-reviews-router';
@@ -19,7 +20,6 @@ import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
 import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
-import { quickChatRouter } from '@/routers/quick-chat-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
 import { agentProfilesMobileRouter } from './agent-profiles-mobile';
 
@@ -34,6 +34,7 @@ const mobileRouter = createTRPCRouter({
   organizations: organizationsRouter,
   user: userRouter,
   cliSessionsV2: cliSessionsV2Router,
+  todos: todosRouter,
   cloudAgentNext: cloudAgentNextRouter,
   githubApps: githubAppsRouter,
   codeReviews: codeReviewRouter,
@@ -50,7 +51,6 @@ const mobileRouter = createTRPCRouter({
   providerReview: providerReviewRouter,
   moderation: moderationRouter,
   kiloChat: kiloChatRouter,
-  quickChat: quickChatRouter,
   spendAlerts: spendAlertRouter,
   agentProfiles: agentProfilesMobileRouter,
 });

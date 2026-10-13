@@ -10,7 +10,6 @@ export const SECURITY_AGENT_MODELS = [
   { id: 'x-ai/grok-code-fast-1', name: 'Grok Code Fast 1 (free)', free: true },
 ] as const;
 
-export const DEFAULT_SECURITY_AGENT_MODEL = SECURITY_AGENT_MODELS[0].id;
 export const DEFAULT_SECURITY_AGENT_TRIAGE_MODEL = SECURITY_AGENT_MODELS[0].id;
 export const DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL = SECURITY_AGENT_MODELS[0].id;
 export const DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL = SECURITY_AGENT_MODELS[0].id;

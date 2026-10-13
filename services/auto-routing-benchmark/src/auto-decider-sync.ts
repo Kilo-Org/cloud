@@ -2,7 +2,7 @@ import {
   AUTO_DECIDER_DEFAULT_MAX_COST_USD,
   AUTO_DECIDER_DEFAULT_MIN_COST_USD,
   AutoBenchmarkDeciderCandidatesResponseSchema,
-  type BenchmarkDeciderModel,
+  type BenchmarkPlatformModel,
 } from '@kilocode/auto-routing-contracts';
 import { mapConfigRows } from './config';
 import { getConfigRows, replaceAutoDeciderModels, type ConfigAutoDeciderModelRow } from './db';
@@ -30,19 +30,15 @@ export type AutoDeciderSyncResult = {
   publishedVersion: string | null;
 };
 
-function modelKey(model: BenchmarkDeciderModel): string {
-  return `${model.id}\0${model.reasoningEffort ?? ''}`;
-}
-
 function diffModels(
-  before: readonly BenchmarkDeciderModel[],
-  after: readonly BenchmarkDeciderModel[]
+  before: readonly BenchmarkPlatformModel[],
+  after: readonly BenchmarkPlatformModel[]
 ): { added: string[]; removed: string[] } {
-  const beforeKeys = new Set(before.map(modelKey));
-  const afterKeys = new Set(after.map(modelKey));
+  const beforeIds = new Set(before.map(model => model.id));
+  const afterIds = new Set(after.map(model => model.id));
   return {
-    added: after.filter(model => !beforeKeys.has(modelKey(model))).map(model => model.id),
-    removed: before.filter(model => !afterKeys.has(modelKey(model))).map(model => model.id),
+    added: after.filter(model => !beforeIds.has(model.id)).map(model => model.id),
+    removed: before.filter(model => !afterIds.has(model.id)).map(model => model.id),
   };
 }
 
@@ -95,17 +91,9 @@ export async function syncAutoDeciderModels(
     maxCostUsd: beforeConfig?.autoDeciderMaxCostUsd ?? AUTO_DECIDER_DEFAULT_MAX_COST_USD,
   };
   const candidates = await fetchAutoDeciderCandidates(env, fetchImpl, costBounds);
-  const previousReasoningEffort = new Map<string, string | null>();
-  for (const row of beforeRows.autoDeciderModels) {
-    previousReasoningEffort.set(row.model, row.reasoning_effort);
-  }
-  for (const row of beforeRows.deciderModels) {
-    previousReasoningEffort.set(row.model, row.reasoning_effort);
-  }
-
   const nextAutoRows: ConfigAutoDeciderModelRow[] = candidates.map(candidate => ({
     model: candidate.id,
-    reasoning_effort: previousReasoningEffort.get(candidate.id) ?? null,
+    reasoning_effort: null,
     avg_attempt_cost_usd: candidate.avgAttemptCostUsd,
     synced_at: syncedAt,
   }));
@@ -124,12 +112,12 @@ export async function syncAutoDeciderModels(
   // Reconcile the platform queue with the (possibly changed) decider list, then
   // drain both queues. Models that already have a ready registry row — measured
   // for an owner pool or by an earlier run — are reused, never re-benchmarked.
-  const { desiredEntries } = await syncPlatformRegistry(env);
+  const { desiredEntries } = await syncPlatformRegistry(env, fetchImpl);
   const startedRuns = await drainQueues(env, 'both');
 
   // Republish from the registry: a removed model must leave the live table even
   // when no new measurement was needed.
-  const published = await publishPlatformRoutingTable(env).catch(error => {
+  const published = await publishPlatformRoutingTable(env, fetchImpl).catch(error => {
     console.warn(
       JSON.stringify({
         event: 'routing_table_publish_skipped',

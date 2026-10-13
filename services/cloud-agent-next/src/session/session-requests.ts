@@ -23,6 +23,7 @@ export type SessionRepositoryRequest =
       repo: string;
       githubIntegrationId?: string;
       githubAccessPurpose?: 'workflow' | 'agent';
+      pullRequestNumber?: number;
       branch?: string;
     }
   | {
@@ -47,7 +48,6 @@ export type SessionRepositoryRequest =
 
 export type SessionRuntimeIntent = {
   sandboxAllocation?: SandboxAllocation;
-  devcontainer?: boolean;
 };
 
 export type SessionCreateRequest = {
@@ -56,8 +56,16 @@ export type SessionCreateRequest = {
   agent: AgentSelection;
   repository: SessionRepositoryRequest;
   runtime?: SessionRuntimeIntent;
+  /**
+   * The allocation that the owner's saved settings resolved for this create,
+   * set only by the Worker and never by a client. `null` means the settings were
+   * read and none applied, so a retry does not read them again.
+   */
+  savedSandboxAllocation?: SandboxAllocation | null;
   clone?: {
     cloneFromKiloSessionId: string;
+    /** Inclusive cut: copy source messages up to and including this ID. */
+    cloneUpToMessageId?: string;
   };
   profile?: {
     id?: string;

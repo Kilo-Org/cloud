@@ -21,10 +21,17 @@ const nativeLifecycleSources: NativeLifecycleSources = {
   onConnectivityChange: listener => addEventListener(listener),
 };
 
+// A socket outlives short trips out of the app (app switcher, notification
+// shade, a quick reply). After this delay in the background it closes, and no
+// socket or ticket is opened until the app is active again, so a backgrounded
+// app streams and renders nothing.
+export const HIDDEN_SOCKET_PAUSE_DELAY_MS = 15_000;
+
 export function createNativeUserWebConnectionLifecycleHooks(
   sources: NativeLifecycleSources = nativeLifecycleSources
 ): ConnectionLifecycleHooks {
   return {
+    hiddenPauseDelayMs: HIDDEN_SOCKET_PAUSE_DELAY_MS,
     onVisibilityChange: (onResume, onHidden) => {
       let state = sources.getAppState();
       return sources.onAppStateChange(nextState => {

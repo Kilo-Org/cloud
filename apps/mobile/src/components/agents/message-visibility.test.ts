@@ -104,6 +104,17 @@ describe('partRendersContent', () => {
     expect(partRendersContent(textPart({ text: '   ' }))).toBe(false);
   });
 
+  it('answers a new part version on its own, as streaming produces one per change', () => {
+    const blank = textPart({ text: '' });
+    expect(partRendersContent(blank)).toBe(false);
+    expect(partRendersContent(blank)).toBe(false);
+    // The session storage replaces the part object when text streams in.
+    const streamed = { ...blank, text: 'hello' };
+    expect(partRendersContent(streamed)).toBe(true);
+    const sanitizedAway = { ...streamed, text: '<script>hidden</script>' };
+    expect(partRendersContent(sanitizedAway)).toBe(false);
+  });
+
   it('returns true for a bash tool part', () => {
     expect(partRendersContent(toolPart('bash'))).toBe(true);
   });

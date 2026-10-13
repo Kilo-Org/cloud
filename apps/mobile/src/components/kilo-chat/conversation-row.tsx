@@ -2,10 +2,11 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { CONVERSATION_TITLE_MAX_CHARS, type ConversationListItem } from '@kilocode/kilo-chat';
 import * as Haptics from 'expo-haptics';
 import { MessageSquare, MoreVertical } from '@/components/ui/icons';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { RenameModal } from '@/components/rename-modal';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -47,6 +48,7 @@ export function ConversationRow({
 }: Readonly<ConversationRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const client = useKiloChatClient();
@@ -60,16 +62,14 @@ export function ConversationRow({
 
   function confirmLeave() {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert(t('chat.conversation.leaveTitle'), t('chat.conversation.leaveMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('chat.conversation.leave'),
-        style: 'destructive',
-        onPress: () => {
-          onLeave(conversation.conversationId);
-        },
+    confirm({
+      title: t('chat.conversation.leaveTitle'),
+      message: t('chat.conversation.leaveMessage'),
+      confirmLabel: t('chat.conversation.leave'),
+      onConfirm: () => {
+        onLeave(conversation.conversationId);
       },
-    ]);
+    });
   }
 
   function openActions() {
@@ -148,6 +148,7 @@ export function ConversationRow({
           onClose={closeRename}
         />
       )}
+      {dialog}
     </>
   );
 }

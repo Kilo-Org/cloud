@@ -1,6 +1,8 @@
 import { hashKey, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
+import { syncFollowedSessionCards } from '@/lib/glanceable/session-follow';
+import { i18n } from '@/i18n';
 import {
   buildActiveSessionsTrayInput,
   type CachedActiveSessionsData,
@@ -13,6 +15,14 @@ import { useTRPC } from '@/lib/trpc';
 
 import { resolveAnsweredRaises } from './attention-rows';
 import { createGlanceablePublisher } from './create-publisher';
+import { getGlanceableFixtureReleases, subscribeGlanceableFixtureReleases } from './fixture-hold';
+import { setGlanceableFixtureScope } from './fixture-harness';
+import { getLastHomeWidgetData, subscribeHomeWidgetData } from './home-widget-data';
+import {
+  clearHomeWidgetRefresh,
+  restoreNativeHomeWidgetData,
+  syncHomeWidgetRefresh,
+} from './home-widget-refresh';
 import { persistGlanceableSink, restorePersistedGlanceable } from './persist';
 import { type GlanceablePublisher } from './publisher';
 import { registerGlanceableSink } from './sink-registry';
@@ -31,7 +41,7 @@ export function GlanceablePublisherMount(): null {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { organizationId, isLoaded } = useOrganization();
-  const { token } = useAuth();
+  const { token, isLoading: authLoading, restoreFailed } = useAuth();
   const { userId } = useCurrentUserId();
 
   const input = useMemo(() => buildActiveSessionsTrayInput(organizationId), [organizationId]);
@@ -44,6 +54,14 @@ export function GlanceablePublisherMount(): null {
   const attentionRevision = useSessionAttentionRevision();
 
   const signedIn = token != null;
+
+  // Dev-only: a released fixture hold rebuilds the publisher below, seeded from
+  // the persisted fixture snapshot, so its first live write supersedes the
+  // fixture on every surface. Never changes in a release build.
+  const fixtureReleases = useSyncExternalStore(
+    subscribeGlanceableFixtureReleases,
+    getGlanceableFixtureReleases
+  );
 
   // The publisher of the current signed-in context, so an ack revision can
   // re-derive without rebuilding it (a rebuild would reset its activity state).
@@ -59,6 +77,7 @@ export function GlanceablePublisherMount(): null {
     let cancelled = false;
     const restore = async (): Promise<void> => {
       await restorePersistedGlanceable();
+      await restoreNativeHomeWidgetData();
       if (!cancelled) {
         setRestored(true);
       }
@@ -77,16 +96,24 @@ export function GlanceablePublisherMount(): null {
     const publisher = createGlanceablePublisher();
     const ctx = { userId, organizationId };
     live.current = { publisher, ctx };
-    const derive = (sessions: CachedActiveSessionsData['sessions']) => {
-      publisher.handleSessions(resolveAnsweredRaises(sessions), ctx);
+    if (__DEV__) {
+      setGlanceableFixtureScope(ctx);
+    }
+    const derive = (sessions: CachedActiveSessionsData['sessions'], checkedAt: number) => {
+      // The followed session cards update first, so the aggregate card below
+      // counts a session whose card just finished. They read the raw rows: an
+      // answered raise counts as idle until its status syncs, but the session
+      // has not finished.
+      syncFollowedSessionCards(sessions, checkedAt);
+      publisher.handleSessions(resolveAnsweredRaises(sessions), ctx, checkedAt);
     };
 
     // Initial state: derive from the existing cache, or mark waiting while the
     // first fetch is in flight.
     const state = queryClient.getQueryState(queryKey);
     const data = queryClient.getQueryData<CachedActiveSessionsData>(queryKey);
-    if (data !== undefined) {
-      derive(data.sessions);
+    if (data !== undefined && state !== undefined) {
+      derive(data.sessions, state.dataUpdatedAt);
     } else if (state?.fetchStatus === 'fetching') {
       publisher.handleFetchStarted(ctx);
     }
@@ -98,7 +125,7 @@ export function GlanceablePublisherMount(): null {
       if (event.action.type === 'success') {
         const next = queryClient.getQueryData<CachedActiveSessionsData>(queryKey);
         if (next !== undefined) {
-          derive(next.sessions);
+          derive(next.sessions, event.query.state.dataUpdatedAt);
         }
       } else if (event.action.type === 'error') {
         publisher.handleFetchError(ctx);
@@ -111,8 +138,21 @@ export function GlanceablePublisherMount(): null {
       unsubscribe();
       publisher.dispose();
       live.current = null;
+      if (__DEV__) {
+        setGlanceableFixtureScope(null);
+      }
     };
-  }, [queryClient, queryKey, targetHash, isLoaded, signedIn, userId, organizationId, restored]);
+  }, [
+    queryClient,
+    queryKey,
+    targetHash,
+    isLoaded,
+    signedIn,
+    userId,
+    organizationId,
+    restored,
+    fixtureReleases,
+  ]);
 
   useEffect(() => {
     const current = live.current;
@@ -121,9 +161,51 @@ export function GlanceablePublisherMount(): null {
     }
     const data = queryClient.getQueryData<CachedActiveSessionsData>(queryKey);
     if (data !== undefined) {
-      current.publisher.handleSessions(resolveAnsweredRaises(data.sessions), current.ctx);
+      current.publisher.handleSessions(
+        resolveAnsweredRaises(data.sessions),
+        current.ctx,
+        queryClient.getQueryState(queryKey)?.dataUpdatedAt ?? 0
+      );
     }
   }, [attentionRevision, queryClient, queryKey]);
+
+  useEffect(() => {
+    if (!restored || !isLoaded || authLoading || restoreFailed) {
+      return undefined;
+    }
+    if (!signedIn || userId === undefined) {
+      void clearHomeWidgetRefresh();
+      return undefined;
+    }
+    const context = { userId, organizationId };
+    const sync = () => {
+      const data = getLastHomeWidgetData();
+      if (
+        data !== null &&
+        data.snapshot.status !== 'signed_out' &&
+        data.snapshot.status !== 'privacy'
+      ) {
+        void syncHomeWidgetRefresh(context);
+      }
+    };
+    const unsubscribe = subscribeHomeWidgetData(sync);
+    i18n.on('languageChanged', sync);
+    sync();
+    return () => {
+      unsubscribe();
+      i18n.off('languageChanged', sync);
+    };
+  }, [
+    restored,
+    isLoaded,
+    authLoading,
+    restoreFailed,
+    signedIn,
+    token,
+    userId,
+    organizationId,
+    fixtureReleases,
+  ]);
 
   return null;
 }

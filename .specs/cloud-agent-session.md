@@ -66,8 +66,8 @@ repository.
    preparation under the triggering message: the current step, and the running
    setup command's output.
 2. Steps the user MUST be able to see when they run: cloning the repository,
-   checking out the branch, restoring a previous workspace, running setup
-   commands.
+   using a prepared repository, checking out the branch, restoring a previous
+   workspace, running setup commands, saving the repository for faster starts.
 3. Preparation that only acquired and booted an environment -- warm reuse, no
    real provisioning -- MUST NOT leave a completed preparation row.
 4. Running and failed preparation MUST always be visible. Failed preparation,
@@ -103,21 +103,45 @@ repository.
    session. The repository MUST remain the one chosen at start.
 8. The user MAY change model and mode for later turns. When a profile or agent
    pins the model, the picker MUST be disabled and MUST say why.
-9. A turn that makes no real agent progress for seven minutes MUST fail, MUST
-   tell the user the turn did not complete, MUST re-enable the composer, and
-   MUST leave the session usable for a later message. Retry and offline status
-   are not real progress. A stop during a retry MUST still end the turn
+9. For legacy `agent_*` turns, seven minutes without real progress MUST fail
+   the turn, tell the user it did not complete, re-enable the composer, and
+   leave the chat usable. A tool or subagent within its own timeout holds that
+   legacy inactivity check until it completes or errors.
+   For `workspace_*`, every native Kilo execution MUST be supervised, including
+   work started without an accepted Cloud message or an open browser. Twenty
+   minutes without real assistant text/reasoning or tool output/state progress
+   MUST interrupt the affected session/tree with `no_progress`. Silent running
+   tools MUST receive the same bound. Repeated parts, metadata-only changes,
+   user messages, retry/busy status and heartbeats MUST NOT reset it. Useful
+   descendant progress MUST count for its ancestors, never unrelated roots.
+   Requests waiting on the user MUST pause only the no-progress clock when no
+   independent work is runnable. Resolving one request MUST NOT clear another.
+   A Kilo that stops answering while the sandbox reclaims at its memory cap
+   MUST be held instead of restarted, for at most ten minutes; the hold MUST
+   pause the no-progress clock and post a non-fatal notice. A turn failed by the
+   hang restart that ends an expired hold MUST say that the sandbox ran out of
+   memory. A turn failed by another hang restart MUST say that Kilo was not
+   responding, unless the restart was for exhausted activity-tracking capacity
+   while Kilo still answered.
+   The separate 120-minute execution cap MUST include user waits. Native
+   cancellation MUST be bounded and confirmed; unconfirmed cancellation MUST
+   use bounded runtime recovery. Accepted Cloud messages MUST settle once;
+   autonomous routed failures MUST remain visible without inventing new message
+   identities or rewriting earlier outcomes.
+   Any working native session or actual wrapper operation MUST keep shared
+   compute alive. Entirely waiting or idle sessions MUST permit the existing
+   10-minute idle stop and same-chat recovery. UI selection MUST have no effect.
+   Reconciliation MUST repair missed events without resetting known clocks;
+   missing or failed observations MUST trigger bounded observation recovery,
+   not a false inactivity result. A stop during retry MUST still end the turn
    immediately (rule 6).
-   For `workspace_*` sessions, the wrapper owns the seven-minute Kilo-progress
-   check and the 60-minute hard execution cap. If the control plane cannot
-   reach the wrapper, missing updates MUST NOT be treated as Kilo inactivity.
    The user MUST still be able to Stop or queue another message while the
    wrapper reconnects. If the connection returns, accepted work MUST
    NOT fail because the connection dropped. If no wrapper frame arrives for
    five minutes, the environment MUST stop and every accepted message on it
    MUST fail with a specific connection reason; queued messages MUST wait for a
    new environment in the same chat. Each affected composer MUST become usable;
-   already-terminal messages MUST stay unchanged. Do not wait for the 60-minute
+   already-terminal messages MUST stay unchanged. Do not wait for the 120-minute
    execution cap or physical stop confirmation, and do not claim that Kilo
    stalled or returned an error.
 
@@ -137,6 +161,9 @@ repository.
 1. The user MUST be able to open a terminal on the environment as a tab beside
    the chat, and close it. A read-only session MUST NOT offer terminals.
 2. A pull request the session opened MUST be visible with its current state.
+3. Open workspace tabs — the workspace terminal and file tabs, their order, and
+   the active tab — MUST survive refresh and navigation between worktrees, and
+   MUST remain scoped to the current user and personal or organization context.
 
 ### Shared Worktrees
 

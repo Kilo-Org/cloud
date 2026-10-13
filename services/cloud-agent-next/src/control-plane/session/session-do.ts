@@ -27,6 +27,8 @@ import {
   CurrentSessionMetadataSchema,
   parseSessionMetadata,
   serializeSessionMetadata,
+  hasRetiredDevcontainerRuntime,
+  DEVCONTAINER_RETIRED_MESSAGE,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import {
@@ -64,7 +66,7 @@ import {
   readPreparationSteps,
   type PreparationOutcome,
 } from '../../session/preparation-history.js';
-import type { CommandsAvailableData } from '../../shared/protocol.js';
+import type { CommandsAvailableData, SessionStatus } from '../../shared/protocol.js';
 import {
   CONTROL_PLANE_SETUP_EVENTS,
   CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
@@ -73,7 +75,7 @@ import {
   controlPlaneEventsNotificationSchema,
   controlPlaneOutcomeSchema,
   controlPlanePromptPayloadSchema,
-  controlPlaneRouteSpecSchema,
+  controlPlaneRegistrationRouteSpecSchema,
   controlPlaneRouteUpdateSchema,
   controlPlaneRouteViewSchema,
   controlPlaneSetupEventSchema,
@@ -120,6 +122,7 @@ import {
   type SessionMessageState,
 } from './messages.js';
 import { answerMessageIntent } from './answers.js';
+import { messageFailureText } from './failure-messages.js';
 import {
   createControlPlaneWorktreeChanges,
   type ControlPlaneWorktreeChanges,
@@ -170,6 +173,18 @@ const ROUTE_KEY = 'control_plane_route';
 const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
+const ROOT_STATUS_KEY = 'session_root_status';
+
+/**
+ * Kilo's last root `session.status` type; `settled` once an accepted message settled after it,
+ * so a stored `busy` no longer describes Cloud work.
+ */
+const rootStatusSchema = z.object({ type: z.string(), settled: z.boolean() });
+type RootStatus = z.infer<typeof rootStatusSchema>;
+const rootStatusEventSchema = z.object({
+  sessionID: z.string(),
+  status: z.object({ type: z.string() }),
+});
 
 /** Wrapper setup-command lifecycle events the Session DO renders itself. */
 const SETUP_EVENT_TYPES: ReadonlySet<string> = new Set([
@@ -182,19 +197,25 @@ const SETUP_EVENT_TYPES: ReadonlySet<string> = new Set([
 const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'sandbox_provision',
   sandbox_start: 'sandbox_boot',
+  snapshot_fallback: 'snapshot_fallback',
   clone: 'cloning',
+  restore: 'workspace_restore',
   checkout: 'branch',
   setup: 'setup_commands',
+  snapshot: 'workspace_backup',
   kilo_runtime: 'kilo_server',
   kilo_session: 'kilo_session',
 };
 
 const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'Creating sandbox',
-  sandbox_start: 'Starting sandbox',
+  sandbox_start: 'Starting sandbox from snapshot',
+  snapshot_fallback: 'Retrying without a snapshot',
   clone: 'Cloning repository',
+  restore: 'Updating repository',
   checkout: 'Checking out branch',
   setup: 'Running setup commands',
+  snapshot: 'Saving repository for faster starts',
   kilo_runtime: 'Starting Kilo runtime',
   kilo_session: 'Preparing Kilo session',
 };
@@ -234,7 +255,7 @@ function persistedRouteView(
 export const controlPlaneSessionRegistrationSchema = z
   .object({
     sandboxId: z.string().min(1).max(256),
-    spec: controlPlaneRouteSpecSchema,
+    spec: controlPlaneRegistrationRouteSpecSchema,
     credentials: controlPlaneCredentialSourceSchema,
     /** Worker-selected provider pin (H1/H2); the DO applies it, never re-decides it. */
     sandboxSelection: controlPlaneSandboxSelectionSchema.optional(),
@@ -313,6 +334,7 @@ export type ControlPlaneSandboxPeer = {
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
   getStatusSnapshot(): Promise<SandboxStatusSnapshot>;
+  fetch(request: Request): Promise<Response>;
 };
 
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
@@ -437,6 +459,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private transportRecoveryAt: number | null = null;
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
+  private rootStatus: RootStatus | undefined;
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
@@ -479,6 +502,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       storage: ctx.storage,
       getMetadata: () => this.metadata,
       getCallbackQueue: () => this.env.CALLBACK_QUEUE,
+      getRecentAssistantMessagesForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
+        this.eventQueries.getRecentAssistantMessagesForUserMessage(
+          sessionId,
+          kiloSessionId,
+          parentMessageId
+        ),
       getAssistantMessageForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
         this.eventQueries.getAssistantMessageForUserMessage(
           sessionId,
@@ -582,6 +611,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.pendingInteractions = pending.success ? pending.data : undefined;
     const commands = await this.ctx.storage.get<CommandsAvailableData>(AVAILABLE_COMMANDS_KEY);
     this.availableCommands = commands?.commands ? commands : { commands: [] };
+    const rootStatus = rootStatusSchema.safeParse(await this.ctx.storage.get(ROOT_STATUS_KEY));
+    this.rootStatus = rootStatus.success ? rootStatus.data : undefined;
     this.messages = await this.loadMessages();
     this.route = await this.loadRoute();
     const recoveryAt = z
@@ -865,7 +896,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.identity.orgId ?? null) === (metadata.identity.orgId ?? null) &&
       sameRepository(existing.repository, metadata.repository) &&
       this.registration.sandboxId === metadata.workspace?.sandboxId &&
-      (existing.initialMessage?.id ?? null) === (messageId ?? null)
+      (existing.initialMessage?.id ?? null) === (messageId ?? null) &&
+      (existing.clone?.cloneUpToMessageId ?? null) === (metadata.clone?.cloneUpToMessageId ?? null)
     );
   }
 
@@ -1150,6 +1182,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           this.pendingInteractions = next;
           await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
         }
+        await this.recordRootStatus(event);
         persistSandboxControlSessionEvent({
           sessionId: this.sessionId,
           payload: event,
@@ -1184,6 +1217,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           ...(parsed.providerOwnership === undefined
             ? {}
             : { providerOwnership: parsed.providerOwnership }),
+          ...(parsed.gateResult === undefined ? {} : { gateResult: parsed.gateResult }),
         },
         'wrapper_outcome'
       );
@@ -1524,11 +1558,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }): Promise<{
     location: CloudAgentWorktreeLocation | null;
     children: CloudAgentChildSessionLineage[];
+    directory: string | null;
   }> {
     await this.initialized;
     const worktreeId = cloudAgentWorktreeIdSchema.parse(input.worktreeId);
     const metadata = this.metadata;
-    if (metadata === null) return { location: null, children: [] };
+    if (metadata === null) return { location: null, children: [], directory: null };
     if (
       metadata.workspace?.worktreeId !== worktreeId ||
       metadata.auth.kiloSessionId !== input.kiloSessionId ||
@@ -1552,6 +1587,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return {
       location: location === null ? null : cloudAgentWorktreeLocationSchema.parse(location),
       children,
+      directory: registration?.spec.directory ?? null,
     };
   }
 
@@ -1624,6 +1660,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.transportRecoveryAt = null;
     this.pendingInteractions = undefined;
     this.availableCommands = { commands: [] };
+    this.rootStatus = undefined;
     this.worktreePreparationGeneration = undefined;
     this.preparationRecorders.clear();
   }
@@ -1667,6 +1704,28 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     if (pathname !== '/stream') return new Response('Not found', { status: 404 });
     if (this.registration === null) return new Response('Session not found', { status: 404 });
+    if (new URL(request.url).searchParams.get('sandboxStatus') === 'true') {
+      if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      const sandboxId = this.registration.sandboxId;
+      if (this.metadata === null) return new Response('Sandbox unavailable', { status: 503 });
+      const url = new URL('https://sandbox.internal/status-stream');
+      url.searchParams.set('sessionId', this.sessionId);
+      url.searchParams.set('ownerId', this.metadata.identity.userId);
+      try {
+        return await withDORetry(
+          () => {
+            const peer = this.sandboxPeerFor(sandboxId);
+            if (peer === null) throw new Error('Sandbox unavailable');
+            return peer;
+          },
+          peer => peer.fetch(new Request(url, { headers: { Upgrade: 'websocket' } })),
+          'sandboxStatusStream'
+        );
+      } catch {
+        return new Response('Sandbox unavailable', { status: 503 });
+      }
+    }
     return this.streamHandler().handleStreamRequest(request);
   }
 
@@ -1700,6 +1759,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return createStreamHandler(this.ctx, this.eventQueries, this.sessionId, {
       deriveCloudStatus: async () => this.deriveCloudStatus(),
       deriveQueuedMessages: async () => this.deriveQueuedMessages(),
+      deriveSessionStatus: async () => this.deriveSessionStatus(),
       readPendingInteractions: () => this.readPendingInteractions(),
       getAvailableCommands: async () => this.availableCommands,
       getPreparationSnapshots: async () => getPreparationSnapshots(this.eventQueries),
@@ -1831,6 +1891,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private async deliverQueued(pass = this.transportPass()): Promise<void> {
+    if (await this.failRetiredQueuedMessages()) return;
     const queued = this.messages.filter(message => message.state === 'queued');
     if (queued.length === 0) return;
     const peer = this.sandboxPeer();
@@ -1892,7 +1953,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.applyView(view, pass);
   }
 
+  private async failRetiredQueuedMessages(): Promise<boolean> {
+    if (this.metadata === null || !hasRetiredDevcontainerRuntime(this.metadata)) return false;
+    await this.settleMessages(
+      this.messages.filter(message => message.state === 'queued').map(message => message.messageId),
+      'failed',
+      DEVCONTAINER_RETIRED_MESSAGE
+    );
+    this.finishWorktreePreparation();
+    return true;
+  }
+
   private async prepareSandbox(pass = this.transportPass()): Promise<ControlPlaneRouteView | null> {
+    if (await this.failRetiredQueuedMessages()) return null;
     const peer = this.sandboxPeer();
     const registration = this.registration;
     if (registration === null) return null;
@@ -1905,7 +1978,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         () => this.sandboxPeer() ?? peer,
         stub =>
           stub.prepare({
-            spec: registration.spec,
+            spec: { ...registration.spec, worktreeRecovery: this.worktreeChanges.recovery() },
             credentials: registration.credentials,
             ...(registration.sandboxSelection
               ? { sandboxSelection: registration.sandboxSelection }
@@ -2195,6 +2268,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     );
     this.messages = reduction.messages;
     await this.persistMessages(reduction.changed);
+    if (reduction.changed.some(message => previousStates.get(message.messageId) === 'accepted'))
+      await this.settleRootStatus();
     for (const message of reduction.changed) {
       const lifecycleEventInserted = this.emitTerminal(message);
       this.recordReport(message, facts);
@@ -2211,7 +2286,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     // Persist the callback, attempt delivery now, then arm only what remains:
     // a failed send keeps its due time and is retried by the alarm.
-    this.persistBatchCallback(reduction.changed);
+    this.persistBatchCallback(reduction.changed, facts);
     await this.repairOutboxes();
     await this.armAlarm();
   }
@@ -2248,14 +2323,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
   }
 
-  private persistBatchCallback(changed: readonly SessionMessage[]): void {
+  private persistBatchCallback(
+    changed: readonly SessionMessage[],
+    facts?: ControlPlaneReportFacts
+  ): void {
     try {
       const newlyTerminal = new Set(
         changed
           .filter(message => isTerminalMessage(message.state))
           .map(message => message.messageId)
       );
-      this.messageCallbacks.persistDrainedBatchCallback(this.messages, newlyTerminal);
+      this.messageCallbacks.persistDrainedBatchCallback(
+        this.messages,
+        newlyTerminal,
+        undefined,
+        facts
+      );
     } catch {
       logger.withFields({ sessionId: this.sessionId }).warn('Cloud Agent callback write failed');
     }
@@ -2317,7 +2400,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               status: 'failed',
               delivery: accepted ? 'sent' : 'queued',
               accepted,
-              ...(message.reason === null ? {} : { reason: message.reason, error: message.reason }),
+              ...(message.reason === null
+                ? {}
+                : { reason: message.reason, error: messageFailureText(message.reason) }),
             };
     const timestamp = message.settledAt ?? Date.now();
     const id = this.eventQueries.insertUnique({
@@ -2389,6 +2474,34 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
   }
 
+  private async recordRootStatus(event: { type: string; properties: unknown }): Promise<void> {
+    if (event.type !== 'session.status') return;
+    const parsed = rootStatusEventSchema.safeParse(event.properties);
+    if (!parsed.success || parsed.data.sessionID !== this.registration?.spec.kiloSessionId) return;
+    this.rootStatus = { type: parsed.data.status.type, settled: false };
+    await this.ctx.storage.put(ROOT_STATUS_KEY, this.rootStatus);
+  }
+
+  private async settleRootStatus(): Promise<void> {
+    if (this.rootStatus === undefined || this.rootStatus.settled) return;
+    this.rootStatus = { ...this.rootStatus, settled: true };
+    await this.ctx.storage.put(ROOT_STATUS_KEY, this.rootStatus);
+  }
+
+  /**
+   * Kilo's stored root status can stay `busy` after a hang or kill ends the turn. A busy or
+   * retry status that an accepted message's settlement followed, with no message accepted
+   * since, is stale, so a reconnect starts idle. Otherwise Kilo's replayed status stays the
+   * source, including native work that runs without a Cloud message.
+   */
+  private deriveSessionStatus(): SessionStatus | undefined {
+    const root = this.rootStatus;
+    if (root === undefined || !root.settled) return undefined;
+    if (root.type !== 'busy' && root.type !== 'retry') return undefined;
+    if (this.messages.some(message => message.state === 'accepted')) return undefined;
+    return { type: 'idle' };
+  }
+
   private deriveQueuedMessages(): QueuedMessageSnapshot[] {
     return this.messages
       .filter(
@@ -2411,7 +2524,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             accepted: message.acceptedAt !== null,
             ...(message.reason === null
               ? { error: 'The message failed' }
-              : { reason: message.reason, error: message.reason }),
+              : { reason: message.reason, error: messageFailureText(message.reason) }),
             timestamp: message.settledAt ?? timestamp,
           };
         }

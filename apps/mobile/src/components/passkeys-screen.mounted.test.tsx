@@ -1,7 +1,8 @@
 import {
-  alertSpy,
   buttonByLabel,
+  type CapturedConfirm,
   confirmRemoval,
+  confirmSpy,
   emptyDescription,
   first,
   hasButtonLabel,
@@ -127,17 +128,17 @@ describe('PasskeysScreen', () => {
     await waitFor(() => texts(view).includes('MacBook'));
 
     await press(rowAction(view, 'Remove'));
-    expect(alertSpy).toHaveBeenCalledOnce();
-    expect(alertSpy.mock.calls[0]?.[0]).toBe('Remove passkey?');
-    expect(alertSpy.mock.calls[0]?.[2]).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ style: 'destructive', text: 'Remove passkey' }),
-      ])
-    );
+    // The confirmation is the in-app dialog, not a native alert: the request
+    // carries the labels the dialog renders and the onConfirm that removes.
+    expect(confirmSpy).toHaveBeenCalledOnce();
+    const request = confirmSpy.mock.calls[0]?.[0] as CapturedConfirm;
+    expect(request.title).toBe('Remove passkey?');
+    expect(request.message).toBe('You will no longer be able to sign in with this passkey.');
+    expect(request.confirmLabel).toBe('Remove passkey');
 
     // Removed optimistically, before the server answered: with no row left, the
     // empty state is the surface.
-    await confirmRemoval(alertSpy);
+    await confirmRemoval();
     await waitFor(() => nodes(view, 'EmptyState').length === 1);
     expect(texts(view)).not.toContain('MacBook');
 
@@ -156,7 +157,7 @@ describe('PasskeysScreen', () => {
     await waitFor(() => texts(view).includes('MacBook'));
 
     await press(rowAction(view, 'Remove'));
-    await confirmRemoval(alertSpy);
+    await confirmRemoval();
 
     // The row is back, the failure is inline beside it, and the toast carries
     // the server's own message.
@@ -332,7 +333,7 @@ describe('PasskeysScreen', () => {
     await waitFor(() => texts(view).includes('MacBook'));
 
     await press(rowAction(view, 'Remove'));
-    await confirmRemoval(alertSpy);
+    await confirmRemoval();
     await waitFor(() => texts(view).includes('Could not remove that passkey. Try again.'));
 
     // The retried delete is now in flight. While it is, the control must not be
@@ -366,7 +367,7 @@ describe('PasskeysScreen', () => {
     await waitFor(() => texts(view).includes('MacBook'));
 
     await press(rowAction(view, 'Remove'));
-    await confirmRemoval(alertSpy);
+    await confirmRemoval();
     await waitFor(() => texts(view).includes('Could not remove that passkey. Try again.'));
 
     // The passkey is gone from the server list — another device removed it, or

@@ -1,4 +1,5 @@
 import { logger } from './logger.js';
+import { isContainerConcurrencyLimitError } from './container-concurrency.js';
 import {
   SandboxCapacityInspectionError,
   WorkspaceFilesystemPreparationError,
@@ -98,6 +99,7 @@ function hasInternalServerStatus(value: unknown): boolean {
 }
 
 function isSandboxInternalServerErrorWithSeen(error: unknown, seen: WeakSet<object>): boolean {
+  if (isContainerConcurrencyLimitError(error)) return false;
   if (typeof error === 'string') {
     return messageLooksLikeSandboxInternalServerError(error);
   }
@@ -184,6 +186,7 @@ function getSandboxCapacityInspectionError(
 export function getPreparationInfrastructureFailure(
   error: unknown
 ): PreparationInfrastructureFailure | undefined {
+  if (isContainerConcurrencyLimitError(error)) return undefined;
   const cause = getNestedProperty(error, 'cause');
   const sandboxError = isSandboxInternalServerError(cause)
     ? cause

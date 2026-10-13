@@ -1,0 +1,182 @@
+{
+  "url": "kiloapp:///dev/glanceable-fixture/{name}",
+  "release": "kiloapp:///dev/glanceable-fixture/release",
+  "fixtures": [
+    {
+      "name": "signed-out",
+      "description": "Signed out: the sign-in copy, no counts, no actions."
+    },
+    {
+      "name": "waiting",
+      "description": "First load: no snapshot yet, the waiting copy."
+    },
+    {
+      "name": "empty",
+      "description": "Signed in, no agents: the empty copy with New agent."
+    },
+    {
+      "name": "privacy",
+      "description": "Locked (org switch/privacy): the open-Kilo copy, no counts."
+    },
+    {
+      "name": "expired",
+      "description": "Expired activity: the Home widget retains last-known mixed work."
+    },
+    {
+      "name": "stale",
+      "description": "Delayed: mixed work retains its last successful confirmation time."
+    },
+    {
+      "name": "needs-approval",
+      "description": "Only needs input, 2 of 3 approvable (waiting 28 min): Approve shows."
+    },
+    {
+      "name": "needs-input-question",
+      "description": "Only needs input, questions only (waiting 12 min): no Approve."
+    },
+    {
+      "name": "running-only",
+      "description": "Only running: three agents working."
+    },
+    {
+      "name": "scheduled-only",
+      "description": "Only scheduled: two agents, the soonest wake on a round clock time."
+    },
+    {
+      "name": "idle-only",
+      "description": "Only idle: two connected agents doing nothing, New agent offered."
+    },
+    {
+      "name": "mixed",
+      "description": "All four kinds (2 needs input, 3 running, 1 scheduled, 2 idle); newest is running."
+    },
+    {
+      "name": "large-counts",
+      "description": "Width stress: 128 needs input, 1,234 running, 56 scheduled, 999 idle."
+    },
+    {
+      "name": "long-title",
+      "description": "Mixed counts with a very long newest-session title."
+    },
+    {
+      "name": "approving",
+      "description": "Needs approval while the in-place Approve runs: the Approving line."
+    },
+    {
+      "name": "could-not-approve",
+      "description": "Needs approval after Approve failed: the Could-not-approve line."
+    },
+    {
+      "name": "newest-needs-input",
+      "description": "Mixed counts; newest change is needs input (large footer)."
+    },
+    {
+      "name": "newest-scheduled",
+      "description": "Mixed counts; newest change is scheduled (large footer)."
+    },
+    {
+      "name": "newest-idle",
+      "description": "Mixed counts; newest change is idle (large footer)."
+    },
+    {
+      "name": "scheduled-no-time",
+      "description": "Scheduled agents without a usable wake time."
+    },
+    {
+      "name": "scheduled-overdue",
+      "description": "The earliest scheduled wake passed without confirmation; never invent working."
+    },
+    {
+      "name": "scheduled-tomorrow",
+      "description": "Three future runs show non-today local dates and times."
+    },
+    {
+      "name": "retry-only",
+      "description": "Needs input from provider retry states, with no permission to approve."
+    },
+    {
+      "name": "untitled",
+      "description": "Waiting and scheduled rows without titles use a localized generic label."
+    },
+    {
+      "name": "stale-idle",
+      "description": "Old idle work remains useful without claiming current confirmation."
+    },
+    {
+      "name": "stale-empty",
+      "description": "A last-known empty state retains creation and an honest timestamp."
+    },
+    {
+      "name": "mix-input-running",
+      "description": "Needs input and working."
+    },
+    {
+      "name": "mix-input-scheduled",
+      "description": "Needs input and scheduled."
+    },
+    {
+      "name": "mix-input-idle",
+      "description": "Needs input and idle."
+    },
+    {
+      "name": "mix-running-scheduled",
+      "description": "Working and scheduled."
+    },
+    {
+      "name": "mix-running-idle",
+      "description": "Working and idle."
+    },
+    {
+      "name": "mix-scheduled-idle",
+      "description": "Scheduled and idle; the wake time takes priority over idle details."
+    },
+    {
+      "name": "mix-input-running-scheduled",
+      "description": "Needs input, working, and scheduled."
+    },
+    {
+      "name": "mix-input-running-idle",
+      "description": "Needs input, working, and idle."
+    },
+    {
+      "name": "mix-input-scheduled-idle",
+      "description": "Needs input, scheduled, and idle."
+    },
+    {
+      "name": "mix-running-scheduled-idle",
+      "description": "Working, scheduled, and idle."
+    },
+    {
+      "name": "session-card-running",
+      "description": "Session card: Working, with the elapsed time since the last change."
+    },
+    {
+      "name": "session-card-permission",
+      "description": "Session card: Needs input on a permission, with Approve and Open (the key matches no live request)."
+    },
+    {
+      "name": "session-card-scheduled",
+      "description": "Session card: Scheduled, with the wake time."
+    },
+    {
+      "name": "session-card-finished",
+      "description": "Session card: followed while Working, then Finished with the finish time; it leaves the Lock Screen after 15 minutes."
+    },
+    {
+      "name": "session-card-rtl-title",
+      "description": "Session card: Working with a right-to-left title. Launch the app in Arabic to mirror the card."
+    },
+    {
+      "name": "session-card-quiet",
+      "description": "Session card: Working with no activity past the quiet window."
+    },
+    {
+      "name": "session-card-question",
+      "description": "Session card: Waiting for an answer, with the step count and Open."
+    },
+    {
+      "name": "session-card-failed",
+      "description": "Session card: a finished turn that failed, with the stop reason."
+    }
+  ]
+}

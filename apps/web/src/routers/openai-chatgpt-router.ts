@@ -15,10 +15,7 @@ import {
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
-import {
-  OpenAiChatGptStatusSchema,
-  type OpenAiChatGptStatus,
-} from '@/lib/ai-gateway/openai-chatgpt/status';
+import { OpenAiChatGptStatusSchema, type OpenAiChatGptStatus } from '@/lib/openai-chatgpt/status';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 /**

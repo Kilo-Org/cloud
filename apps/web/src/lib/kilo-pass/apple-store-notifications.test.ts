@@ -15,6 +15,7 @@ import {
   kilo_pass_issuances,
   kilocode_users,
   kilo_pass_audit_log,
+  kilo_pass_pause_events,
   kilo_pass_store_events,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
@@ -201,6 +202,31 @@ async function insertProviderScopedSubscriptionRows(providerSubscriptionId: stri
   return { stripeUser, appStoreUser, stripeSubscriptionId };
 }
 
+async function insertOpenPauseForAppStoreSubscription(originalTransactionId: string) {
+  const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+    where: eq(kilo_pass_subscriptions.provider_subscription_id, originalTransactionId),
+  });
+  if (!subscription) throw new Error('App Store subscription not found');
+  await db.insert(kilo_pass_pause_events).values({
+    kilo_pass_subscription_id: subscription.id,
+    paused_at: '2026-05-01T00:00:00.000Z',
+    resumes_at: null,
+  });
+  return subscription.id;
+}
+
+async function getOpenPauseCount(subscriptionId: string): Promise<number> {
+  const rows = await db
+    .select({ id: kilo_pass_pause_events.id })
+    .from(kilo_pass_pause_events)
+    .where(
+      and(
+        eq(kilo_pass_pause_events.kilo_pass_subscription_id, subscriptionId),
+        sql`${kilo_pass_pause_events.resumed_at} IS NULL`
+      )
+    );
+  return rows.length;
+}
 describe('processAppStoreKiloPassNotification', () => {
   let dateNowSpy: jest.SpiedFunction<typeof Date.now>;
 
@@ -701,6 +727,9 @@ describe('processAppStoreKiloPassNotification', () => {
       decodeNotification: async () => notification({ notificationUUID: 'renewal' }),
       decodeTransaction: async () => decodedTransaction,
     });
+    const pausedSubscriptionId = await insertOpenPauseForAppStoreSubscription(
+      decodedTransaction.originalTransactionId
+    );
 
     await processAppStoreKiloPassNotification({
       signedPayload: 'expired',
@@ -721,6 +750,7 @@ describe('processAppStoreKiloPassNotification', () => {
     });
     expect(subscription?.status).toBe('canceled');
     expect(subscription?.ended_at).not.toBeNull();
+    expect(await getOpenPauseCount(pausedSubscriptionId)).toBe(0);
   });
 
   it('marks a subscription ended when the expiration notification transaction is expired', async () => {
@@ -2488,6 +2518,9 @@ describe('processAppStoreKiloPassNotification', () => {
         }),
       decodeTransaction: async () => decodedTransaction,
     });
+    const pausedSubscriptionId = await insertOpenPauseForAppStoreSubscription(
+      decodedTransaction.originalTransactionId
+    );
 
     const subscription = await db.query.kilo_pass_subscriptions.findFirst({
       where: eq(
@@ -2559,6 +2592,7 @@ describe('processAppStoreKiloPassNotification', () => {
       ),
     });
     expect(endedSubscription?.status).toBe('canceled');
+    expect(await getOpenPauseCount(pausedSubscriptionId)).toBe(0);
 
     const negativeCreditTransactions = await db
       .select({

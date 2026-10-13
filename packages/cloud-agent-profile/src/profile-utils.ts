@@ -1,8 +1,7 @@
-import type { WorkerDb } from '@kilocode/db';
 import { agent_environment_profiles } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import type { ProfileOwner } from './types';
+import type { ProfileDatabase, ProfileOwner } from './types';
 
 /**
  * Build ownership condition for profile queries.
@@ -17,12 +16,42 @@ export function buildOwnershipCondition(owner: ProfileOwner) {
  * Verify that a profile exists and is owned by the specified owner.
  * @throws TRPCError with NOT_FOUND if profile doesn't exist or isn't owned by the owner
  */
-export async function verifyProfileOwnership(db: WorkerDb, profileId: string, owner: ProfileOwner) {
+export async function verifyProfileOwnership(
+  db: ProfileDatabase,
+  profileId: string,
+  owner: ProfileOwner
+) {
   const [profile] = await db
     .select()
     .from(agent_environment_profiles)
     .where(and(eq(agent_environment_profiles.id, profileId), buildOwnershipCondition(owner)))
     .limit(1);
+
+  if (!profile) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Profile not found',
+    });
+  }
+
+  return profile;
+}
+
+/**
+ * Like {@link verifyProfileOwnership} but takes a row lock so a concurrent
+ * delete, bind, or settings write serializes on the profile row.
+ */
+export async function lockProfileOwnership(
+  db: ProfileDatabase,
+  profileId: string,
+  owner: ProfileOwner
+) {
+  const [profile] = await db
+    .select()
+    .from(agent_environment_profiles)
+    .where(and(eq(agent_environment_profiles.id, profileId), buildOwnershipCondition(owner)))
+    .limit(1)
+    .for('update');
 
   if (!profile) {
     throw new TRPCError({

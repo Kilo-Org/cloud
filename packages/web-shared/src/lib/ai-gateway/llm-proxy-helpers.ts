@@ -276,14 +276,35 @@ const byokErrorMessages: Record<number, string> = {
   429: '[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
 };
 
-function byokErrorMessage(
-  status: number,
+const byokUpstreamErrorSchema = z.object({
+  error: z.object({ message: z.string() }).optional().catch(undefined),
+  message: z.string().optional().catch(undefined),
+});
+
+async function byokErrorMessage(
+  response: Response,
   userByokProviderIds: UserByokProviderId[]
-): string | undefined {
-  if (status === 403 && userByokProviderIds.includes('opencode-go')) {
+): Promise<string | undefined> {
+  if (response.status === 403 && userByokProviderIds.includes('opencode-go')) {
     return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
   }
-  return byokErrorMessages[status];
+  const specificMessage = byokErrorMessages[response.status];
+  if (specificMessage) return specificMessage;
+  if (response.status < 400 || response.status >= 500) return undefined;
+
+  const body: unknown = await response
+    .clone()
+    .json()
+    .catch(() => null);
+  const parsed = byokUpstreamErrorSchema.safeParse(body);
+  const providerMessage = parsed.success ? (parsed.data.error?.message ?? parsed.data.message) : '';
+  const message = providerMessage
+    ?.replace(/\p{Cc}/gu, ' ')
+    .trim()
+    .slice(0, 300);
+  return message
+    ? `[BYOK] ${message}`
+    : '[BYOK] Your provider rejected the request. Check your provider account and settings.';
 }
 
 function vertexByokModelNotFoundResponse(
@@ -370,10 +391,22 @@ export async function makeErrorReadable({
   const vertexByokResponse = vertexByokModelNotFoundResponse(response, userByokProviderIds);
   if (vertexByokResponse) return vertexByokResponse;
 
+  const hasSpecificByokMessage =
+    userByokProviderIds !== null && byokErrorMessages[response.status] !== undefined;
+  if (!hasSpecificByokMessage) {
+    const providerErrorResponse = await providerNotAllowedResponse(providerId, response);
+    if (providerErrorResponse) return providerErrorResponse;
+
+    const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
+    if (overflowResponse) return overflowResponse;
+  }
+
   if (userByokProviderIds !== null) {
-    const byokMessage = byokErrorMessage(response.status, userByokProviderIds);
+    const byokMessage = await byokErrorMessage(response, userByokProviderIds);
     if (byokMessage) {
-      warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);
+      if (hasSpecificByokMessage) {
+        warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);
+      }
       return NextResponse.json(
         {
           error: byokMessage,
@@ -384,12 +417,6 @@ export async function makeErrorReadable({
       );
     }
   }
-
-  const providerErrorResponse = await providerNotAllowedResponse(providerId, response);
-  if (providerErrorResponse) return providerErrorResponse;
-
-  const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
-  if (overflowResponse) return overflowResponse;
 
   if (shouldRedactErrorResponse(providerId, requestedModel)) {
     return await redactedErrorResponse(response);
@@ -697,6 +724,62 @@ export function requestedLogprobs(body: unknown): boolean {
 export function requestedSamples(body: unknown): number | null {
   if (typeof body !== 'object' || body === null || !('n' in body)) return null;
   return typeof body.n === 'number' ? body.n : null;
+}
+
+function reasoningBudgetBucket(value: unknown): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  if (value <= 1_000) return 'le1k';
+  if (value <= 4_000) return 'le4k';
+  if (value <= 16_000) return 'le16k';
+  if (value <= 64_000) return 'le64k';
+  return 'gt64k';
+}
+
+function isReasoningObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Bounded labels for requested thinking, effort, and reasoning (in that order).
+ * Never persist client-provided strings. When effort aliases coexist, prefer
+ * Anthropic output_config, then Chat Completions, then the reasoning object.
+ */
+export function extractReasoningSetting(body: unknown): string | null {
+  if (!isReasoningObject(body)) return null;
+  const labels: string[] = [];
+  const thinking = isReasoningObject(body.thinking) ? body.thinking : undefined;
+  if (
+    thinking?.type === 'enabled' ||
+    thinking?.type === 'adaptive' ||
+    thinking?.type === 'disabled'
+  ) {
+    const bucket = reasoningBudgetBucket(thinking.budget_tokens);
+    labels.push(`thinking:${thinking.type}${bucket ? `:${bucket}` : ''}`);
+  }
+
+  const outputConfig = isReasoningObject(body.output_config) ? body.output_config : undefined;
+  const reasoning = isReasoningObject(body.reasoning) ? body.reasoning : undefined;
+  const effort = outputConfig?.effort ?? body.reasoning_effort ?? reasoning?.effort;
+  if (typeof effort === 'string') {
+    switch (effort) {
+      case 'none':
+      case 'minimal':
+      case 'low':
+      case 'medium':
+      case 'high':
+      case 'xhigh':
+      case 'max':
+        labels.push(`effort:${effort}`);
+        break;
+      default:
+        labels.push('effort:other');
+    }
+  }
+
+  if (reasoning?.enabled === false) labels.push('reasoning:disabled');
+  const bucket = reasoningBudgetBucket(reasoning?.max_tokens);
+  if (bucket) labels.push(`reasoning:budget:${bucket}`);
+  return labels.length > 0 ? labels.join('+') : null;
 }
 
 // ============================================================================

@@ -108,8 +108,27 @@ jobs:
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
 
+  deploy-ai-gateway:
+    needs: [check-changes, check-staging-db-startup, run-migrations]
+    if: needs.check-changes.outputs.should_deploy == 'true'
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      target_environment: staging
+      vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
+    secrets:
+      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
+
   deploy-workers:
-    needs: [check-changes, check-staging-db-startup, run-migrations, deploy-app, deploy-global-app]
+    needs:
+      [
+        check-changes,
+        check-staging-db-startup,
+        run-migrations,
+        deploy-app,
+        deploy-global-app,
+        deploy-ai-gateway,
+      ]
     if: needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/deploy-workers.yml
     with:
@@ -126,6 +145,7 @@ jobs:
         run-migrations,
         deploy-app,
         deploy-global-app,
+        deploy-ai-gateway,
         deploy-workers,
       ]
     if: >-
@@ -136,6 +156,7 @@ jobs:
         needs.run-migrations.result == 'success' &&
         needs.deploy-app.result == 'success' &&
         needs.deploy-global-app.result == 'success' &&
+        needs.deploy-ai-gateway.result == 'success' &&
         needs.deploy-workers.result == 'success'
       }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

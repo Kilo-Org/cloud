@@ -1593,6 +1593,36 @@ describe('ingest WS reconnection', () => {
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
   });
 
+  it('marks the turn failed only for a root assistant error', async () => {
+    const assistantError = (id: string, sessionID: string) => ({
+      type: 'message.updated',
+      properties: {
+        info: {
+          id,
+          parentID: 'msg_user_1',
+          role: 'assistant',
+          sessionID,
+          error: { name: 'APIError', data: { message: 'Rate limit exceeded', statusCode: 429 } },
+        },
+      },
+    });
+    const runStream = async (events: KiloEvent[]): Promise<boolean> => {
+      state = new WrapperState();
+      state.bindSession(createCodeReviewSessionContext());
+      const manager = createManagerWithClient(
+        createMockKiloClient({
+          subscribeEvents: vi.fn().mockResolvedValue({ stream: createEventStream(events) }),
+        })
+      );
+      await openConnection(manager);
+      await vi.advanceTimersByTimeAsync(0);
+      return state.consumeAssistantTurnFailure();
+    };
+
+    expect(await runStream([assistantError('msg_child_1', 'kilo_sess_child')])).toBe(false);
+    expect(await runStream([assistantError('msg_root_1', 'kilo_sess_456')])).toBe(true);
+  });
+
   it('rejects real-time code-review permissions without disconnecting', async () => {
     state = new WrapperState();
     state.bindSession(createCodeReviewSessionContext());

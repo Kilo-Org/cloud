@@ -19,6 +19,8 @@ export { formatError } from './format-error.js';
 
 export { extractBearerToken } from './extract-bearer-token.js';
 
+export { sha256Hex } from './sha256.js';
+
 export { createErrorHandler } from './error-handler.js';
 
 export { createNotFoundHandler } from './not-found-handler.js';

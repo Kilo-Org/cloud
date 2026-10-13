@@ -1,6 +1,6 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
 import { isKiloExclusiveFreeModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { detectToolCallArgumentErrors } from '@kilocode/web-shared/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -11,6 +11,7 @@ import type {
   ProviderId,
   ProviderResponseTransforms,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { UpstreamTimeoutError } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import type {
   ChatCompletionChunk,
@@ -276,6 +277,19 @@ function getResponseReadError(
       errorType: 'upstream_disconnect',
       message: withRequestId(
         'The upstream response was interrupted while streaming. The provider may have disconnected or the request may have timed out.' +
+          getReasoningEffortTimeoutSuggestion(reasoningEffort),
+        vercelRequestId
+      ),
+    };
+  }
+
+  // The gateway's own duration budget, not a provider timeout: the headers
+  // arrived, so the stream was still open when the budget ran out.
+  if (error instanceof UpstreamTimeoutError) {
+    return {
+      errorType: 'timeout',
+      message: withRequestId(
+        `The response reached the gateway's ${Math.round(error.limitMs / 1000)}-second duration limit and was stopped before it finished.` +
           getReasoningEffortTimeoutSuggestion(reasoningEffort),
         vercelRequestId
       ),

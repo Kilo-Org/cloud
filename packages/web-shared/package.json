@@ -21,6 +21,7 @@
     "@kilocode/event-service": "workspace:*",
     "@kilocode/notifications": "workspace:*",
     "@kilocode/organization-entitlement": "workspace:*",
+    "@kilocode/usage-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/api-logs": "0.208.0",

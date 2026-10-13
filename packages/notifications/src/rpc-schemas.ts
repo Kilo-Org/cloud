@@ -44,6 +44,10 @@ export type PerRecipientOutcome = z.infer<typeof perRecipientOutcomeSchema>;
 export const perRecipientResultSchema = z.object({
   userId: z.string(),
   outcome: perRecipientOutcomeSchema,
+  // Stable, content-free failure classification (e.g. 'expo_ticket_rejected'),
+  // populated by the internal dispatch path for `failed` outcomes. Optional:
+  // older workers and the conversation push path omit it.
+  reason: z.string().optional(),
 });
 export type PerRecipientResult = z.infer<typeof perRecipientResultSchema>;
 
@@ -187,6 +191,15 @@ export const refreshGlanceableSessionsInputSchema = z.object({
    * had no approval change.
    */
   approvalChangedSessionIds: z.array(z.string().min(1)).optional(),
+  /**
+   * Sessions in `cliSessionIds` whose refresh must not happen unless a session
+   * card follows them. The ingest service refreshes the card content after it
+   * persists a new summary; a session nobody follows would otherwise pay for a
+   * whole snapshot build. The notifications side checks the follow with one
+   * indexed read and skips this call when none of the named sessions is
+   * followed. Omitting the field keeps the previous behavior.
+   */
+  cardFollowSessionIds: z.array(z.string().min(1)).optional(),
 });
 export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSessionsInputSchema>;
 

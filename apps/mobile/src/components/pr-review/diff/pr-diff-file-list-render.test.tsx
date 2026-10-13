@@ -63,6 +63,7 @@ type HarnessProps = {
 // `selection` / item to force the re-render the memo has to survive.
 function Harness({ item, onLineTap, selection, show = true }: Readonly<HarnessProps>) {
   const renderItem = useDiffRenderItem({
+    source: 'pr',
     viewed: { isViewed: () => false, toggle: vi.fn() },
     onRetryPage: () => undefined,
     onFetchAll: () => undefined,

@@ -1,10 +1,10 @@
 import { Pressable, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
 
 import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { AppAwareKeyboardPaddingView } from './app-aware-keyboard-padding';
 import { ConversationHeader } from './conversation-header';
 
 type Props = {
@@ -16,13 +16,13 @@ export function ConversationHistoryLoadingView({ subtitle, title }: Props) {
   return (
     <View className="flex-1">
       <ConversationHeader title={title} subtitle={subtitle} />
-      <AppAwareKeyboardPaddingView className="flex-1">
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
         <View className="flex-1 justify-end gap-3 px-4 py-6">
           <Skeleton className="h-14 w-3/4 rounded-2xl" />
           <Skeleton className="ml-auto h-16 w-2/3 rounded-2xl" />
           <Skeleton className="h-20 w-5/6 rounded-2xl" />
         </View>
-      </AppAwareKeyboardPaddingView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -40,12 +40,12 @@ export function ConversationHistoryErrorView({
   return (
     <View className="flex-1">
       <ConversationHeader title={title} subtitle={subtitle} />
-      <AppAwareKeyboardPaddingView className="flex-1">
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
         <QueryError
           message={message ?? t('chat.conversation.couldNotLoadHistory')}
           onRetry={onRetry}
         />
-      </AppAwareKeyboardPaddingView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

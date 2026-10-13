@@ -1,5 +1,6 @@
 import { describe, expect, it, spyOn } from 'bun:test';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
+import type { WorkloadSnapshot } from '../control/workload-cgroup.js';
 import { createKiloRuntime, type KiloRuntimeScheduler } from './kilo-runtime.js';
 
 const SENTINEL = 'PRIVATE_HEALTH_SENTINEL';
@@ -86,6 +87,7 @@ function harness(
     healthRequestMs?: number;
     failReplacement?: boolean;
     isIdle?: () => Promise<boolean>;
+    latestWorkloadSnapshot?: () => WorkloadSnapshot | undefined;
   } = {}
 ) {
   let clock = 0;
@@ -101,10 +103,12 @@ function harness(
     },
   };
   const counts = { spawns: 0, stops: 0, opens: 0, restarts: 0 };
+  const restartInfos: Array<{ reason: string; outcomeReason?: string }> = [];
   const logs: string[] = [];
   const exits: Array<() => void> = [];
   let unavailable = 0;
   const runtime = createKiloRuntime({
+    readSnapshot: async () => [],
     directory: `/tmp/${SENTINEL}`,
     env: {},
     pidfileDirectory: `/tmp/${SENTINEL}/pids`,
@@ -116,6 +120,9 @@ function harness(
     prepareFilesystem: async () => {},
     readProcessStartTime: () => undefined,
     ...(options.isIdle ? { isIdle: options.isIdle } : {}),
+    ...(options.latestWorkloadSnapshot
+      ? { latestWorkloadSnapshot: options.latestWorkloadSnapshot }
+      : {}),
     spawnKilo: async () => {
       counts.spawns++;
       if (options.failReplacement && counts.spawns > 1) throw new Error('replacement failed');
@@ -143,8 +150,12 @@ function harness(
       };
     },
     log: line => logs.push(line),
-    onRestart: () => {
+    onRestart: info => {
       counts.restarts++;
+      restartInfos.push({
+        reason: info.reason,
+        ...(info.outcomeReason === undefined ? {} : { outcomeReason: info.outcomeReason }),
+      });
     },
     onUnavailable: () => {
       unavailable++;
@@ -155,6 +166,7 @@ function harness(
     logs,
     counts,
     exits,
+    restartInfos,
     unavailable: () => unavailable,
     silence(ms = 30000) {
       clock += ms;
@@ -423,7 +435,7 @@ describe('default SDK health diagnostics', () => {
         );
       }
       expect(requests).toBe(4);
-      expect(test.counts).toEqual({ spawns: 4, stops: 3, opens: 4, restarts: 3 });
+      expect(test.counts).toEqual({ spawns: 4, stops: 4, opens: 4, restarts: 3 });
       expect(parseRestartDiagnostics(test.logs.join('\n'))).toHaveLength(3);
       expect(test.logs.filter(line => line.includes(' diagnostic='))).toHaveLength(3);
     } finally {
@@ -590,12 +602,71 @@ describe('default SDK health diagnostics', () => {
       test.exits.at(-1)?.();
       await waitFor(() => test.runtime.isUnavailable());
       expect(test.unavailable()).toBe(1);
-      expect(test.counts).toEqual({ spawns: 8, stops: 7, opens: 8, restarts: 7 });
+      expect(test.counts).toEqual({ spawns: 8, stops: 8, opens: 8, restarts: 7 });
       expect(test.logs.filter(line => line.includes(' diagnostic='))).toHaveLength(3);
       expect(fetchSpy.mock.calls).toHaveLength(0);
     } finally {
       fetchSpy.mockRestore();
       await test.runtime.shutdown();
+    }
+  });
+
+  it('attaches the latest workload snapshot to a health restart without naming memory exhaustion', async () => {
+    const gib = 1024 ** 3;
+    const snapshot: WorkloadSnapshot = {
+      aggregateMaxBytes: 11 * gib,
+      toolsMaxBytes: 8 * gib,
+      containerLimitBytes: 12 * gib,
+      currentBytes: 11 * gib,
+      anonBytes: 9 * gib,
+      fileBytes: 2 * gib,
+      shmemBytes: 0,
+      toolCurrentBytes: 4 * gib,
+      serverCurrentBytes: 7 * gib,
+      pressureAvailable: true,
+      oomKills: 0,
+      oomGroupKills: 0,
+      toolOomKills: 0,
+      serverOomKills: 0,
+    };
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch() {
+        return Response.json({ healthy: false, private: SENTINEL });
+      },
+    });
+    const test = harness(String(server.url), { latestWorkloadSnapshot: () => snapshot });
+    try {
+      await test.runtime.ensure();
+      test.silence();
+      await waitFor(() => test.counts.restarts === 1);
+      const line = test.logs.find(candidate => candidate.includes(' diagnostic='));
+      expect(line).toBeDefined();
+      const marker = ' diagnostic=';
+      const serialized = line!.slice(line!.lastIndexOf(marker) + marker.length);
+      expect(Buffer.byteLength(serialized)).toBeLessThanOrEqual(512);
+      expect(serialized).not.toContain(SENTINEL);
+      const diagnostic = JSON.parse(serialized) as {
+        trigger: string;
+        workload?: Record<string, number | boolean>;
+      };
+      expect(diagnostic.trigger).toBe('health_probe_false');
+      expect(diagnostic.workload).toEqual({
+        currentBytes: 11 * gib,
+        aggregateMaxBytes: 11 * gib,
+        anonBytes: 9 * gib,
+        fileBytes: 2 * gib,
+        shmemBytes: 0,
+        toolCurrentBytes: 4 * gib,
+        serverCurrentBytes: 7 * gib,
+        pressureAvailable: true,
+      });
+      // A full cap can be reclaimable page cache; only an expired memory hold names it.
+      expect(test.restartInfos).toEqual([{ reason: 'hang' }]);
+    } finally {
+      await test.runtime.shutdown();
+      await server.stop(true);
     }
   });
 });

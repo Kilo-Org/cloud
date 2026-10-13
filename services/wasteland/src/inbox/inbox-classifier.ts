@@ -24,8 +24,6 @@ import {
   DoltHubApiError,
 } from '../util/dolthub-api.util';
 
-// ── Commit subject parser ────────────────────────────────────────────────
-
 const WL_VERBS = [
   'post',
   'claim',
@@ -108,8 +106,6 @@ export function parseCommitSubject(subject: string): ParsedCommit {
 
   return { kind: 'unknown', subject: trimmed };
 }
-
-// ── Branch-tip SQL enrichment ───────────────────────────────────────────
 
 /**
  * Permissive wanted-item id guard. The `wanted` table declares `id` as
@@ -270,8 +266,6 @@ async function fetchRigRow(
   }
 }
 
-// ── InboxItem discriminated union ───────────────────────────────────────
-
 type InboxCardBase = {
   pull_id: string;
   title: string;
@@ -354,8 +348,6 @@ export type InboxItem = InboxCardBase &
         commit_subjects: string[];
       }
   );
-
-// ── Per-PR classifier ───────────────────────────────────────────────────
 
 type ClassifyContext = {
   upstream: string;
@@ -601,8 +593,6 @@ async function classifyOne(ctx: ClassifyContext, pull: PullSummary): Promise<Inb
   };
 }
 
-// ── Public entrypoint ───────────────────────────────────────────────────
-
 export async function listInboxItems(upstream: string, token: string): Promise<InboxItem[]> {
   const pulls = await listPulls(upstream, token, { state: 'Open' });
   const summaries: PullSummary[] = pulls.map(p => ({
@@ -615,8 +605,6 @@ export async function listInboxItems(upstream: string, token: string): Promise<I
   }));
   return mapWithLimit(summaries, 4, summary => classifyOne({ upstream, token }, summary));
 }
-
-// ── Helpers ─────────────────────────────────────────────────────────────
 
 const CommitLogRow = z
   .object({

@@ -72,12 +72,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
 
   let stripeCustomerId: string | null | undefined;
   let accountCreatedAt: Date | string = currentUser.created_at;
+  let accountUsedMicrodollars = currentUser.microdollars_used;
   if (organizationId) {
     const orgContext = await getAuthorizedOrgContext(organizationId, ORGANIZATION_BILLING_ROLES);
     if (!orgContext.success) {
       return orgContext.nextResponse;
     }
     accountCreatedAt = orgContext.data.organization.created_at;
+    accountUsedMicrodollars = orgContext.data.organization.microdollars_used;
     stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
   } else {
     stripeCustomerId = currentUser.stripe_customer_id;
@@ -95,6 +97,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
     cancelPath,
     {
       accountCreatedAt,
+      accountUsedMicrodollars,
       ip: clientIpFromHeaders(request.headers),
       ipCountry: ipCountryFromHeaders(request.headers),
       ja4: ja4FromHeaders(request.headers),

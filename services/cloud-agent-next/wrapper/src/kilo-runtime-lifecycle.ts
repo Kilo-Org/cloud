@@ -1,6 +1,11 @@
 import type { WrapperKiloClient } from './kilo-api.js';
 import { kiloServerStartupError } from './bootstrap-error.js';
 import { decideKiloRuntimeStart } from './kilo-runtime-start.js';
+import {
+  GITHUB_REVIEW_TARGET_ENV,
+  parseGitHubReviewTarget,
+} from '../../src/shared/github-review-target.js';
+import { buildGitHubReviewPublishConfigContent } from './github-review-publish-config.js';
 
 export type KiloRuntimeStartInput = {
   workspacePath: string;
@@ -14,6 +19,8 @@ export type KiloRuntimeLifecycle = {
   restart(): Promise<void>;
   readonly kiloClient: WrapperKiloClient | undefined;
   readonly runtimeWorkspacePath: string | undefined;
+  /** True only when the config hook installed the publication tool in this runtime. */
+  isGitHubReviewPublicationInstalled(): boolean;
   closeServer(): boolean;
 };
 
@@ -30,6 +37,8 @@ export type KiloRuntimeLifecycleDependencies = {
   }) => Promise<CreateKiloResult>;
   bindClient: (result: CreateKiloResult, workspacePath: string) => WrapperKiloClient;
   captureEnv: () => NodeJS.Dict<string>;
+  /** Absolute path to the bundled publication MCP binary, or undefined when absent. */
+  resolveGitHubReviewPublishBinary: () => string | undefined;
   getPlatform: () => string | undefined;
   log: (message: string) => void;
   chdir: (workspacePath: string) => void;
@@ -63,6 +72,8 @@ export function createKiloRuntimeLifecycle(
   let closeKiloServer: (() => void) | undefined;
   let runtimeWorkspacePath = deps.initialWorkspacePath;
   let runtimeTransitionChain: Promise<unknown> = Promise.resolve();
+  let gitHubReviewPublishInstalled = false;
+  let lastWorkerEnv: Record<string, string> | undefined;
 
   function closeServer(): boolean {
     if (!closeKiloServer) return false;
@@ -77,9 +88,36 @@ export function createKiloRuntimeLifecycle(
     return transition;
   }
 
+  function applyGitHubReviewPublishConfig(): void {
+    const env = deps.captureEnv();
+    if (!parseGitHubReviewTarget(env[GITHUB_REVIEW_TARGET_ENV])) {
+      gitHubReviewPublishInstalled = false;
+      return;
+    }
+    const binaryPath = deps.resolveGitHubReviewPublishBinary();
+    if (!binaryPath) {
+      gitHubReviewPublishInstalled = false;
+      return;
+    }
+    const configContent = buildGitHubReviewPublishConfigContent({
+      configContentJson: env.KILO_CONFIG_CONTENT,
+      binaryPath,
+    });
+    if (!configContent) {
+      gitHubReviewPublishInstalled = false;
+      return;
+    }
+    deps.assignProcessEnv({
+      KILO_CONFIG_CONTENT: configContent,
+      OPENCODE_CONFIG_CONTENT: configContent,
+    });
+    gitHubReviewPublishInstalled = true;
+  }
+
   async function doStart(input: KiloRuntimeStartInput): Promise<void> {
     const { workspacePath, expectedSessionId } = input;
     if (deps.isShuttingDown()) throw new Error('Wrapper is shutting down');
+    applyGitHubReviewPublishConfig();
     deps.log(
       `startKiloRuntime requested workspacePath=${workspacePath} expectedSessionId=${expectedSessionId ?? '(none)'} currentSessionId=${deps.getKiloSessionId() || '(unset)'} hasClient=${Boolean(kiloClient)} runtimeWorkspacePath=${runtimeWorkspacePath ?? '(unset)'} home=${deps.captureEnv().HOME ?? '(unset)'}`
     );
@@ -160,10 +198,11 @@ export function createKiloRuntimeLifecycle(
   }
 
   async function updateEnvironment(env: Record<string, string>): Promise<void> {
-    const currentEnv = deps.captureEnv();
+    const baseline = lastWorkerEnv ?? deps.captureEnv();
     const environmentChanged = Object.entries(env).some(
-      ([name, value]) => currentEnv[name] !== value
+      ([name, value]) => baseline[name] !== value
     );
+    lastWorkerEnv = { ...env };
     deps.assignProcessEnv(env);
     const workspacePath = runtimeWorkspacePath;
     if (!workspacePath) return;
@@ -200,6 +239,7 @@ export function createKiloRuntimeLifecycle(
     get runtimeWorkspacePath() {
       return runtimeWorkspacePath;
     },
+    isGitHubReviewPublicationInstalled: () => gitHubReviewPublishInstalled,
     closeServer,
   };
 }

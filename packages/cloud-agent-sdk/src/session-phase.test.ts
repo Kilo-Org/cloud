@@ -63,6 +63,13 @@ const emptySnapshot = makeSnapshot({ id: 'test-session' });
 async function flushConnect(): Promise<void> {
   await Promise.resolve(); // resolveSession resolves
   await new Promise(r => setTimeout(r, 0)); // Promise.all([ticket, snapshot]).then settles
+  sendRaw({
+    eventId: 0,
+    sessionId: 'test-session',
+    streamEventType: 'connected',
+    timestamp: new Date().toISOString(),
+    data: {},
+  });
 }
 
 type StateCapture = { activity: SessionActivity; status: AgentStatus };

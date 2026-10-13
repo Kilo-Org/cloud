@@ -1,7 +1,10 @@
 import { modelsByProvider } from '@kilocode/db/schema';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import {
+  getSnapshotModelVariantId,
+  normalizeModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsMetadataFromDatabase,
@@ -14,10 +17,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { modelTrains } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
-import type {
-  NormalizedOpenRouterResponse,
-  OpenRouterModel,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
+import type { NormalizedOpenRouterResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { desc } from 'drizzle-orm';
 
 export type ModelIdToProviderSlugsIndex = ReadonlyMap<string, ReadonlySet<string>>;
@@ -72,16 +72,6 @@ export function narrowProviderSlugsToVariant(
     [...snapshotProviderSlugs].filter(slug => variantProviderSlugs.has(slug))
   );
   return narrowed.size > 0 ? narrowed : snapshotProviderSlugs;
-}
-
-/**
- * The exact gateway model id a snapshot entry is served as. Snapshot slugs are
- * unsuffixed; the provider's endpoint carries the variant (`standard`, `free`),
- * which the gateway exposes as `<slug>:<variant>` for anything but `standard`.
- */
-export function getSnapshotModelVariantId(model: OpenRouterModel): string {
-  const variant = model.endpoint?.variant;
-  return variant && variant !== 'standard' ? `${model.slug}:${variant}` : model.slug;
 }
 
 export function buildModelIdToProviderSlugsIndex(

@@ -195,6 +195,14 @@ export const WorkspaceFolderColor = {
 
 export type WorkspaceFolderColor = (typeof WorkspaceFolderColor)[keyof typeof WorkspaceFolderColor];
 
+export const TodoItemSessionOrigin = {
+  Started: 'started',
+  Linked: 'linked',
+} as const;
+
+export type TodoItemSessionOrigin =
+  (typeof TodoItemSessionOrigin)[keyof typeof TodoItemSessionOrigin];
+
 // --- SecurityAuditLogAction ---
 
 /**
@@ -1249,31 +1257,6 @@ export type AuthProviderId =
   | 'fake-login'
   | 'workos';
 
-// --- AbuseClassification ---
-
-export type AbuseClassification = (typeof ABUSE_CLASSIFICATION)[keyof typeof ABUSE_CLASSIFICATION];
-export const ABUSE_CLASSIFICATION = {
-  NOT_ABUSE: -100,
-  CLASSIFICATION_ERROR: -50,
-  NOT_CLASSIFIED: 0,
-  LIKELY_ABUSE: 200,
-} as const;
-
-// --- Microdollar Usage --
-
-export const GatewayApiKindSchema = z.enum([
-  'chat_completions',
-  'embeddings',
-  'fim_completions',
-  'edit_completions',
-  'messages',
-  'responses',
-  'audio_transcriptions',
-  'systemone',
-]);
-
-export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
-
 // --- Integration types ---
 
 export type IntegrationPermissions = Record<string, string>;
@@ -2266,14 +2249,13 @@ export const CustomLlmDefinitionSchema = z.object({
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
+const GatewayModelIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9./:~-]+$/, 'Model IDs may only contain lowercase letters, digits, and . / : ~ -');
+
 export const AutoFreeModelSchema = z.object({
-  model: z
-    .string()
-    .trim()
-    .regex(
-      /^[a-z0-9./:~-]+$/,
-      'Model IDs may only contain lowercase letters, digits, and . / : ~ -'
-    ),
+  model: GatewayModelIdSchema,
   weight: z.number().int().positive(),
   reasoning: z.object({
     enabled: z.boolean().optional(),
@@ -2300,6 +2282,25 @@ export const AutoFreeConfigSchema = z.object({
 });
 
 export type AutoFreeConfig = z.infer<typeof AutoFreeConfigSchema>;
+
+export const GATEWAY_MODEL_LIST_MAX_COUNT = 200;
+
+export const GatewayModelListConfigSchema = z.object({
+  models: z
+    .array(GatewayModelIdSchema)
+    .max(GATEWAY_MODEL_LIST_MAX_COUNT)
+    .superRefine((models, ctx) => {
+      const seen = new Set<string>();
+      for (const [index, model] of models.entries()) {
+        if (seen.has(model)) {
+          ctx.addIssue({ code: 'custom', message: `Duplicate model "${model}"`, path: [index] });
+        }
+        seen.add(model);
+      }
+    }),
+});
+
+export type GatewayModelListConfig = z.infer<typeof GatewayModelListConfigSchema>;
 
 // --- StoredModel ---
 
@@ -2443,6 +2444,7 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'assistant_timeout',
   'assistant_unauthorized',
   'assistant_invalid_request',
+  'assistant_invalid_request_byok',
   'assistant_context_limit',
   'assistant_output_limit',
   'assistant_content_filter',
@@ -2499,6 +2501,7 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   // unqualified 'assistant_rate_limited' also stays non-benign, since unknown
   // ownership could be either.
   'assistant_rate_limited_byok',
+  'assistant_invalid_request_byok',
   // Set only by the stale review reaper, which measures cleanup rather than the
   // fault that stranded the review, so alerting on it would count janitorial work
   // as incidents. Every stranded pending review measured on 2026-08-04 traced to

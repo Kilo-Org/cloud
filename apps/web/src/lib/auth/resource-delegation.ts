@@ -334,6 +334,7 @@ export async function getResourceDelegationAuthority(
     credentialKind: isLegacyDevice ? 'device-access' : 'human-api',
     expiresAt: claims.exp,
     isModern: false,
+    deviceSessionId: claims.deviceSessionId,
     runtimeAdmission: {
       source: 'user',
       authorizationUserId: user.id,

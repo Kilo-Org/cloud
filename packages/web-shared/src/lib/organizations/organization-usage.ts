@@ -33,22 +33,45 @@ import { subHours } from 'date-fns';
 import { maybePerformOrganizationAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
 
 /**
+ * The paying account's row as the balance check read it: the user for a personal request, the
+ * organization for an org request. Bouncer's decide uses it to judge whether an account is
+ * established.
+ */
+export type BalancePayer = {
+  createdAt: string;
+  microdollarsUsed: number;
+  totalMicrodollarsAcquired: number;
+};
+
+type BalanceAndOrgSettings = {
+  balance: number;
+  settings?: OrganizationSettings;
+  plan?: OrganizationPlan;
+  balanceLimitedByUserAllowance?: boolean;
+  /** Absent when the user is not a member of the organization. */
+  payer?: BalancePayer;
+};
+
+/**
  * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
  */
 export async function getBalanceAndOrgSettings(
   organizationId: string | undefined,
   user: User,
   fromDb: typeof db = db
-): Promise<{
-  balance: number;
-  settings?: OrganizationSettings;
-  plan?: OrganizationPlan;
-  balanceLimitedByUserAllowance?: boolean;
-}> {
+): Promise<BalanceAndOrgSettings> {
   const balanceSpan = startInactiveSpan({ name: 'balance-check' });
   const result = organizationId
     ? await getBalanceForOrganizationUser(organizationId, user.id, { fromDb })
-    : { ...(await getBalanceForUser(user)), balanceLimitedByUserAllowance: false };
+    : {
+        ...(await getBalanceForUser(user)),
+        balanceLimitedByUserAllowance: false,
+        payer: {
+          createdAt: user.created_at,
+          microdollarsUsed: user.microdollars_used,
+          totalMicrodollarsAcquired: user.total_microdollars_acquired,
+        },
+      };
   balanceSpan.end();
   return result;
 }
@@ -62,12 +85,7 @@ export async function getBalanceForOrganizationUser(
     /** Database instance to use (defaults to primary db, pass readDb for replica) */
     fromDb?: typeof db;
   } = {}
-): Promise<{
-  balance: number;
-  settings?: OrganizationSettings;
-  plan?: OrganizationPlan;
-  balanceLimitedByUserAllowance?: boolean;
-}> {
+): Promise<BalanceAndOrgSettings> {
   const { limitType = 'daily', fromDb = db } = options;
   const startTime = performance.now();
   logExceptInTest(
@@ -85,6 +103,7 @@ export async function getBalanceForOrganizationUser(
       plan: organizations.plan,
       auto_top_up_enabled: organizations.auto_top_up_enabled,
       next_credit_expiration_at: organizations.next_credit_expiration_at,
+      created_at: organizations.created_at,
     })
     .from(organizations)
     .innerJoin(
@@ -137,6 +156,7 @@ export async function getBalanceForOrganizationUser(
     plan,
     auto_top_up_enabled,
     next_credit_expiration_at,
+    created_at,
   } = result[0];
 
   let total_microdollars_acquired = initial_total_microdollars_acquired;
@@ -173,6 +193,12 @@ export async function getBalanceForOrganizationUser(
     })
   );
 
+  const payer: BalancePayer = {
+    createdAt: created_at,
+    microdollarsUsed: microdollars_used,
+    totalMicrodollarsAcquired: total_microdollars_acquired,
+  };
+
   // If organization requires seats, ignore any user limits and return full organization balance
   if (require_seats) {
     const endTime = performance.now();
@@ -186,6 +212,7 @@ export async function getBalanceForOrganizationUser(
       settings,
       plan,
       balanceLimitedByUserAllowance: false,
+      payer,
     };
   }
 
@@ -201,6 +228,7 @@ export async function getBalanceForOrganizationUser(
       settings,
       plan,
       balanceLimitedByUserAllowance: false,
+      payer,
     };
   }
 
@@ -226,6 +254,7 @@ export async function getBalanceForOrganizationUser(
     // the block only while the member still has allowance left. An exhausted
     // allowance (remainingAllowance <= 0) is a per-user limit no top-up fixes.
     balanceLimitedByUserAllowance: remainingAllowance <= 0,
+    payer,
   };
 }
 

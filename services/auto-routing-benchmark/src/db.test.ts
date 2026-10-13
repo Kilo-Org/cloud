@@ -9,11 +9,7 @@ import {
   rowsToRoutingTable,
 } from './db';
 import type { BenchmarkModelSummary } from '@kilocode/auto-routing-contracts';
-import {
-  variantFromReasoningEffort,
-  variantFromStorage,
-  variantToStorage,
-} from './reasoning-effort';
+import { variantFromStorage, variantToStorage } from './reasoning-effort';
 
 describe('variant storage helpers', () => {
   it('round-trips null and empty as the D1 null/default convention', () => {
@@ -23,11 +19,6 @@ describe('variant storage helpers', () => {
     expect(variantFromStorage('')).toBeNull();
     expect(variantFromStorage(null)).toBeNull();
     expect(variantFromStorage('xhigh')).toBe('xhigh');
-  });
-
-  it('maps platform reasoningEffort to the stored variant value', () => {
-    expect(variantFromReasoningEffort('high')).toBe('high');
-    expect(variantFromReasoningEffort(null)).toBeNull();
   });
 
   it('exactPairKey distinguishes variants of the same model', () => {
@@ -54,6 +45,7 @@ describe('mapSummaryRow', () => {
       cases: 50,
       errors: 2,
       timeouts: 0,
+      route_accuracy: null,
       carried: false,
     };
     const result = mapSummaryRow(row);
@@ -69,6 +61,7 @@ describe('mapSummaryRow', () => {
       cases: 50,
       errors: 2,
       timeouts: 0,
+      routeAccuracy: null,
     });
   });
 
@@ -86,6 +79,7 @@ describe('mapSummaryRow', () => {
       cases: 30,
       errors: 0,
       timeouts: 0,
+      route_accuracy: null,
       carried: false,
     };
     const result = mapSummaryRow(row);
@@ -131,6 +125,7 @@ describe('mapRunRow', () => {
         cases: 100,
         errors: 5,
         timeouts: 0,
+        routeAccuracy: null,
       },
     ];
     const result = mapRunRow(runRow, summaries);
@@ -174,7 +169,7 @@ const candidate = (model: string): RankedCandidate => ({
   accuracy: 0.9,
   avgCostUsd: 0.001,
   meetsThreshold: true,
-  reasoningEffort: null,
+  variant: null,
 });
 
 const sampleTable: RoutingTable = {
@@ -315,7 +310,7 @@ describe('rowsToRoutingTable', () => {
     const table = rowsToRoutingTable(tableRow, candidateRows);
     const cand = table.routes['implementation/code_generation']?.[0];
     expect(cand?.variant).toBe('max');
-    expect(cand?.reasoningEffort).toBeNull();
+    expect(cand).not.toHaveProperty('reasoningEffort');
     expect(RoutingTableSchema.parse(table)).toEqual(table);
   });
 });

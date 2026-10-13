@@ -44,9 +44,6 @@ Commands:
 
 Required environment:
   FAKE_LLM_BASE_URL  https://<fake-host>/api/openrouter
-  E2E_USER_ID        Kilo user id enrolled in CONTROL_PLANE_IDS and
-                     WORKTREE_CREATION_ENABLED_IDS. Pass * only as a deliberate
-                     opt-in to enrol every authenticated Kilo user.
 Optional environment:
   E2E_INTERNAL_API_SECRET Value uploaded as the Worker's INTERNAL_API_SECRET when supplied. Needed
                           for the first deploy or a rotation; omit it on a redeploy to keep the

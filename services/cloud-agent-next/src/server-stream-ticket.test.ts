@@ -278,6 +278,47 @@ beforeEach(() => {
 });
 
 describe('server /stream ticket nonce consume', () => {
+  it('preserves current organization authorization and one-use tickets for status subscriptions', async () => {
+    const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const env = createEnv();
+    installNonceStore(env);
+    const doFetch = vi.fn().mockResolvedValue(new Response('ok'));
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('registered-session');
+    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: doFetch });
+    const ticket = signStreamTicket({ cloudAgentSessionId: sessionId, organizationId: 'org-1' });
+    const request = () =>
+      new Request(
+        `http://worker.test/stream?cloudAgentSessionId=${sessionId}&sandboxStatus=true&ticket=${encodeURIComponent(ticket)}`,
+        { headers: { Upgrade: 'websocket' } }
+      );
+    expect((await fetchWorker(request(), env)).status).toBe(200);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kiloUserId: 'user-1',
+        cloudAgentSessionId: sessionId,
+        expectedOrganizationId: 'org-1',
+      })
+    );
+    expect(new URL(doFetch.mock.calls[0][0].url).searchParams.get('sandboxStatus')).toBe('true');
+    expect((await fetchWorker(request(), env)).status).toBe(401);
+    expect(doFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not route status subscriptions after current session access is revoked', async () => {
+    const env = createEnv();
+    installNonceStore(env);
+    requireCurrentSessionAccessMock.mockRejectedValue(
+      Object.assign(new Error('revoked'), { code: 'FORBIDDEN' })
+    );
+    const request = streamRequest(signStreamTicket());
+    const url = new URL(request.url);
+    url.searchParams.set('sandboxStatus', 'true');
+    expect((await fetchWorker(new Request(url, request), env)).status).toBe(403);
+    expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
+    expect(env.STREAM_TICKET_NONCE_DO.get).not.toHaveBeenCalled();
+  });
+
   it('accepts the first use of a stream ticket and forwards to the session DO', async () => {
     const env = createEnv();
     installNonceStore(env);

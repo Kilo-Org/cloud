@@ -17,12 +17,10 @@ import {
 } from './wrapper-manager.js';
 import { randomPort } from './ports.js';
 import {
-  buildKiloSessionXdgEnv,
   dockerSocketEnv,
   dockerSocketEnvParts,
   resolveDockerSocketPath,
 } from './sandbox-runtime.js';
-import { KILO_AGENT_SESSION_LABEL, type DevContainerHandle } from './devcontainer.js';
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
 import { KILO_BASH_DEFAULT_TIMEOUT_MS_DEFAULT } from '../shared/kilo-bash-timeout.js';
 import { shellQuote, validShellEnvEntries } from './utils.js';
@@ -70,13 +68,6 @@ export type EnsureRunningOptions = {
    */
   runtimeEnv?: Record<string, string | undefined>;
   /**
-   * When set, launch the wrapper *inside* the dev container via `devcontainer
-   * exec` instead of `session.startProcess` on the outer sandbox. The wrapper
-   * runs from the bind-mounted bundle at `/opt/kilo-cloud/kilocode-wrapper.js`
-   * and its HTTP port is reached via the publish set up by `devcontainer up`.
-   */
-  devcontainer?: DevContainerHandle;
-  /**
    * `TOOL_CGROUP_*` knobs for the wrapper's memory cgroup partition. Only
    * defined keys are included — see MEMORY_CGROUPS_PLAN.md (W4).
    */
@@ -97,16 +88,12 @@ export type EnsureWrapperOptions = {
   leasedInstance?: WrapperInstanceLease;
   /** See {@link EnsureRunningOptions.runtimeEnv}. */
   runtimeEnv?: Record<string, string | undefined>;
-  /** See {@link EnsureRunningOptions.devcontainer}. */
-  devcontainer?: DevContainerHandle;
   /** See {@link EnsureRunningOptions.toolCgroupEnv}. */
   toolCgroupEnv?: ToolCgroupEnv;
   /** See {@link EnsureRunningOptions.kiloServerEnv}. */
   kiloServerEnv?: KiloServerEnv;
   /**
    * Force the wrapper to listen on this exact port instead of a random one.
-   * Used by the devcontainer flow because the port has to be chosen *before*
-   * `devcontainer up` (the publish mapping is fixed at container create time).
    * When set, the per-attempt port-retry loop is skipped.
    */
   fixedPort?: number;
@@ -303,12 +290,6 @@ async function observationMatchesLease(
   );
 }
 
-function buildExportFileContent(env: Record<string, string | undefined>): string {
-  return `${validShellEnvEntries(env)
-    .map(([key, value]) => `export ${key}=${shellQuote(value)}`)
-    .join('\n')}\n`;
-}
-
 function mergeEnvRecords(...envs: Array<Record<string, string | undefined> | undefined>) {
   return Object.assign({}, ...envs.filter(Boolean)) as Record<string, string | undefined>;
 }
@@ -381,32 +362,6 @@ export class WrapperClient {
 
   private get port(): number {
     return this.requireCloudflareRuntime().port;
-  }
-
-  /**
-   * Wrap a wrapper-start command line so it runs inside the dev container via
-   * `devcontainer exec --workspace-folder ... --id-label kilo.agentSession=...`.
-   *
-   * The inner string (env vars + `bun run …`) is passed to `sh -c` so the
-   * env-var prefix syntax keeps working unchanged. Double-shell escaping is
-   * handled by `shellQuote`.
-   */
-  private buildDevContainerExecCommand(
-    devcontainer: DevContainerHandle,
-    innerCommand: string
-  ): string {
-    return [
-      'devcontainer exec',
-      `--workspace-folder ${shellQuote(devcontainer.workspacePath)}`,
-      // --config is required: without it the CLI re-reads the user's
-      // on-disk devcontainer.json and loses our remoteUser/remoteEnv
-      // overrides (see DevContainerHandle.overrideConfigPath).
-      `--config ${shellQuote(devcontainer.overrideConfigPath)}`,
-      `--id-label ${shellQuote(`${KILO_AGENT_SESSION_LABEL}=${devcontainer.agentSessionId}`)}`,
-      '--',
-      'sh -c',
-      shellQuote(innerCommand),
-    ].join(' ');
   }
 
   private async runPreflightChecks(options: {
@@ -614,7 +569,6 @@ export class WrapperClient {
       sessionId,
       leasedInstance,
       runtimeEnv,
-      devcontainer,
       toolCgroupEnv,
       kiloServerEnv,
     } = options;
@@ -627,26 +581,14 @@ export class WrapperClient {
       logger.debug('WrapperClient: wrapper not running, starting...');
     }
 
-    if (!devcontainer) {
-      // Outer-sandbox preflight: bun + wrapper bundle at /usr/local/bin/.
-      // For the devcontainer flow these checks would have to run inside the
-      // container (skip for now - failure surfaces clearly via waitForPort).
-      await this.runPreflightChecks({ wrapperPath, workspacePath: workspacePath ?? '/' });
-    }
+    await this.runPreflightChecks({ wrapperPath, workspacePath: workspacePath ?? '/' });
 
     // Start the wrapper process using startProcess so it's trackable via listProcesses()
     // The command includes a session marker so we can find this wrapper later
     const sessionMarker = getWrapperSessionMarker(agentSessionId);
     const wrapperLogPath = `/tmp/kilocode-wrapper-${agentSessionId}-${Date.now()}.log`;
-    // DOCKER_HOST lets the outer-sandbox wrapper (and anything kilo spawns)
-    // talk to the sandbox dockerd. Devcontainer sessions intentionally do not
-    // mount or expose that socket inside the user container.
     const dockerSocketPath = await resolveDockerSocketPath(this.session);
-    const dockerEnvParts = devcontainer ? [] : dockerSocketEnvParts(dockerSocketPath);
-    const devContainerEnv = devcontainer ? dockerSocketEnv(dockerSocketPath) : undefined;
-    // When running inside a dev container, the wrapper sees the *inner*
-    // workspace path (set by `devcontainer up`'s remoteWorkspaceFolder).
-    const innerWorkspacePath = devcontainer?.innerWorkspaceFolder ?? workspacePath;
+    const dockerEnvParts = dockerSocketEnvParts(dockerSocketPath);
     const validToolCgroupEnv = validShellEnvEntries(toolCgroupEnv ?? {}).filter(([key]) =>
       TOOL_CGROUP_ENV_KEY_SET.has(key)
     );
@@ -655,7 +597,7 @@ export class WrapperClient {
     );
     const wrapperEnv: Record<string, string | undefined> = {
       WRAPPER_PORT: String(this.port),
-      WORKSPACE_PATH: innerWorkspacePath,
+      WORKSPACE_PATH: workspacePath,
       WRAPPER_LOG_PATH: wrapperLogPath,
       KILO_SESSION_RETRY_LIMIT: '5',
       KILO_CLOUD_AGENT: '1',
@@ -672,7 +614,7 @@ export class WrapperClient {
     };
     const commandEnvParts = [
       `WRAPPER_PORT=${this.port}`,
-      ...(innerWorkspacePath ? [`WORKSPACE_PATH=${innerWorkspacePath}`] : []),
+      ...(workspacePath ? [`WORKSPACE_PATH=${workspacePath}`] : []),
       `WRAPPER_LOG_PATH=${wrapperLogPath}`,
       `KILO_SESSION_RETRY_LIMIT=5`,
       `KILO_CLOUD_AGENT=1`,
@@ -689,48 +631,21 @@ export class WrapperClient {
       ...validKiloServerEnv.map(([key, value]) => `${key}=${shellQuote(value)}`),
       ...dockerEnvParts,
     ];
-    const devContainerSessionHome =
-      devcontainer && runtimeEnv
-        ? (runtimeEnv.SESSION_HOME ?? runtimeEnv.HOME ?? '/tmp')
-        : undefined;
-    const processEnv = mergeEnvRecords(
-      runtimeEnv,
-      devContainerSessionHome ? buildKiloSessionXdgEnv(devContainerSessionHome) : undefined,
-      wrapperEnv,
-      devcontainer ? undefined : dockerSocketEnv(dockerSocketPath)
-    );
+    const processEnv = mergeEnvRecords(runtimeEnv, wrapperEnv, dockerSocketEnv(dockerSocketPath));
     const argParts = [`--user-id ${shellQuote(userId)}`];
     if (sessionId) {
       argParts.push(`--session-id ${shellQuote(sessionId)}`);
     }
 
-    // The wrapper bundle lives at `/opt/kilo-cloud/kilocode-wrapper.js` inside
-    // the dev container (bind-mounted read-only); on the outer sandbox we use
-    // the caller-provided `wrapperPath` (default `/usr/local/bin/...`).
-    const effectiveWrapperPath = devcontainer ? '/opt/kilo-cloud/kilocode-wrapper.js' : wrapperPath;
-
-    let envFilePath: string | undefined;
-    let envFileWritten = false;
-    let innerCommand = `${commandEnvParts.join(' ')} bun run ${shellQuote(effectiveWrapperPath)} ${sessionMarker} ${argParts.join(' ')}`;
-    if (devContainerSessionHome) {
-      envFilePath = `${devContainerSessionHome}/tmp/kilo-wrapper-env-${agentSessionId}-${Date.now()}.sh`;
-      await this.session.writeFile(envFilePath, buildExportFileContent(processEnv));
-      envFileWritten = true;
-      innerCommand = `. ${shellQuote(envFilePath)} && rm -f ${shellQuote(envFilePath)} && ${innerCommand}`;
-    }
-    const command = devcontainer
-      ? this.buildDevContainerExecCommand(devcontainer, innerCommand)
-      : innerCommand;
+    const command = `${commandEnvParts.join(' ')} bun run ${shellQuote(wrapperPath)} ${sessionMarker} ${argParts.join(' ')}`;
     // The outer process cwd just needs to exist — `bun run` immediately
     // re-chdirs to WORKSPACE_PATH in main.ts. Use the parent of the workspace
-    // path either way (the workspace itself may not exist outside the
-    // devcontainer if the user's `workspaceMount` differs).
+    // path.
     const cwd = workspacePath ? dirname(workspacePath) : '/';
 
     logger.debug('WrapperClient: starting wrapper process', {
       command,
       port: this.port,
-      devcontainer: devcontainer ? { containerId: devcontainer.containerId } : undefined,
     });
 
     let proc: Awaited<ReturnType<ExecutionSession['startProcess']>> | undefined;
@@ -738,7 +653,7 @@ export class WrapperClient {
     try {
       proc = await this.session.startProcess(command, {
         cwd,
-        env: devcontainer ? devContainerEnv : processEnv,
+        env: processEnv,
       });
 
       // Wait for wrapper to become healthy via port check.
@@ -760,18 +675,6 @@ export class WrapperClient {
       logger.debug('WrapperClient: wrapper is ready', { port: this.port, processId: proc.id });
       return { started: true };
     } catch {
-      if (envFileWritten && envFilePath) {
-        try {
-          await this.session.exec(`rm -f ${shellQuote(envFilePath)}`);
-        } catch {
-          logger.warn('Wrapper startup env cleanup failed', {
-            port: this.port,
-            processId: proc?.id,
-            timeoutMs: maxWaitMs,
-          });
-        }
-      }
-
       // Kill the failed process (proc.kill() is unreliable in the sandbox SDK,
       // so use pkill -f against the session marker).
       try {
@@ -867,31 +770,8 @@ export class WrapperClient {
           .warn('Existing wrapper version mismatch, restarting');
 
         try {
-          // The wrapper might be running in a dev container (different PID
-          // namespace — outer pkill can't see it). For that case kill only
-          // the inner wrapper process via `devcontainer exec ... -- pkill`
-          // so the dev container stays alive and the next attempt reuses it
-          // via its `--id-label`.
           const sessionMarker = getWrapperSessionMarker(agentSessionId);
-          if (options.devcontainer) {
-            const dc = options.devcontainer;
-            const innerPkill = `pkill -f -- ${shellQuote(sessionMarker)}`;
-            const dockerEnv = dockerSocketEnv(await resolveDockerSocketPath(sandbox));
-            await sandbox.exec(
-              [
-                'devcontainer exec',
-                `--workspace-folder ${shellQuote(dc.workspacePath)}`,
-                `--config ${shellQuote(dc.overrideConfigPath)}`,
-                `--id-label ${shellQuote(`${KILO_AGENT_SESSION_LABEL}=${dc.agentSessionId}`)}`,
-                '--',
-                'sh -c',
-                shellQuote(innerPkill),
-              ].join(' '),
-              { env: dockerEnv }
-            );
-          } else {
-            await sandbox.exec(`pkill -f -- ${shellQuote(sessionMarker)}`);
-          }
+          await sandbox.exec(`pkill -f -- ${shellQuote(sessionMarker)}`);
         } catch (error) {
           logger
             .withFields({
@@ -912,9 +792,6 @@ export class WrapperClient {
     }
 
     // 2. Try starting a new wrapper, retrying with a new random port on failure.
-    //    Port retry only applies when the caller hasn't pinned a port — the
-    //    devcontainer flow has to commit to a port at `devcontainer up` time
-    //    because the publish mapping is fixed at container create.
     let lastError: Error | undefined;
     const maxAttempts = options.fixedPort !== undefined ? 1 : MAX_PORT_ATTEMPTS;
 
@@ -945,7 +822,7 @@ export class WrapperClient {
             sandbox,
             agentSessionId,
             options.leasedInstance,
-            { inspectContainers: options.devcontainer !== undefined }
+            { inspectContainers: false }
           );
         }
         if (!healthMatchesLease(healthResponse, options.leasedInstance, allowUnreportedIdentity)) {
@@ -1096,11 +973,10 @@ export class WrapperClient {
     // called on every dispatch to a sandbox that isn't already `session-ready`,
     // including ordinary warm follow-up turns. Skip logging those to keep the
     // "bootstrap" metric scoped to calls that actually did bootstrap work (a cold
-    // clone, or a backup restore even when the marker makes the workspace look
-    // warm). Only the wrapper's `telemetry` object is logged: `workspaceReady`
+    // clone). Only the wrapper's `telemetry` object is logged: `workspaceReady`
     // carries `gitToken`. Older wrappers omit `telemetry` entirely, hence the guard.
     const telemetry = response.telemetry;
-    if (telemetry && (!telemetry.workspaceWasWarm || telemetry.restoredFromBackup)) {
+    if (telemetry && !telemetry.workspaceWasWarm) {
       logger.info('Cloud agent workspace bootstrap', {
         metric: 'cloud_agent_workspace_bootstrap',
         count: 1,
@@ -1110,7 +986,6 @@ export class WrapperClient {
         // code-review sessions impossible to isolate without trace-row guesswork.
         platform: request.materialized.env.KILO_PLATFORM ?? '(none)',
         workspaceWasWarm: telemetry.workspaceWasWarm,
-        restoredFromBackup: telemetry.restoredFromBackup,
         // Nested rather than spread: `clone` comes from the wrapper's response
         // body, which is parsed without runtime schema validation, so an
         // unexpected key must not be able to overwrite the trusted fields above.
@@ -1120,9 +995,9 @@ export class WrapperClient {
     }
     // Requirement 1: an incomplete restore must be a named, observable outcome,
     // not a wrapper progress line the worker never reads. Read independently of
-    // the bootstrap metric above: a warm workspace restored from a backup still
-    // logs the bootstrap metric, but a genuinely warm reuse does not, and a
-    // skipped diff can only happen on a restore path. Do not retry the restore.
+    // the bootstrap metric above: a genuinely warm reuse does not log the
+    // bootstrap metric, and a skipped diff can only happen on a restore path. Do
+    // not retry the restore.
     // The response body is only generically typed, so validate the optional
     // telemetry against the shared runtime schema first: a malformed value must
     // not throw here and turn the already-successful ready response into a

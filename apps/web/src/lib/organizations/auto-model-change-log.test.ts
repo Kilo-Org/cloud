@@ -4,7 +4,7 @@ import type {
   NormalizedOpenRouterResponse,
   NormalizedProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import { computeSnapshotDiff } from '@/lib/ai-gateway/providers/openrouter/snapshot-diff';
+import { computeSnapshotDiff } from '@/lib/providers/openrouter/snapshot-diff';
 import {
   buildAutoChangeMessage,
   computeRelevantChangesForOrg,

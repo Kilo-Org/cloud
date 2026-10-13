@@ -20,8 +20,10 @@ const tokenSecret = 'security-agent-token-source-test-secret';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'security-agent-token-source-test-secret',
-  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
   isResourceTokenIssuanceEnabled: () => shared.enabled,
+}));
+jest.mock('@/lib/web-config.server', () => ({
+  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
 const mockGetSecurityFindingById = jest.fn<typeof securityFindingsModule.getSecurityFindingById>();

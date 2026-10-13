@@ -56,6 +56,7 @@ describe('wrapper sealed batch lifecycle', () => {
         closeConnections,
         isConnected: () => true,
         reconnectEventSubscription: vi.fn(),
+        isGitHubReviewPublicationInstalled: () => false,
       }
     );
   });

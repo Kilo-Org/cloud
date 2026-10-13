@@ -20,6 +20,7 @@
     "./kilo-auth-middleware": "./src/kilo-auth-middleware.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./sandbox-allocation": "./src/sandbox-allocation.ts",
+    "./sha256": "./src/sha256.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./deployment-slug": "./src/deployment-slug.ts",
     "./redact-headers": "./src/redact-headers.ts",
@@ -45,12 +46,12 @@
     "./client-error": "./src/client-error.ts",
     "./review-agents": "./src/review-agents.ts",
     "./code-review-council": "./src/code-review-council.ts",
-    "./code-review-self-check": "./src/code-review-self-check.ts",
     "./scheduled-job-observability": "./src/scheduled-job-observability.ts",
     "./r2-client": "./src/r2-client.ts",
     "./direct-byok-model": "./src/direct-byok-model.ts",
     "./user-id-encoding": "./src/user-id-encoding.ts",
-    "./github-authorization": "./src/github-authorization.ts"
+    "./github-authorization": "./src/github-authorization.ts",
+    "./bounded-stream-reader": "./src/bounded-stream-reader.ts"
   },
   "scripts": {
     "test": "vitest run",

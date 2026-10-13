@@ -11,7 +11,6 @@ import {
   AlertCircle,
   Brain,
   FolderGit2,
-  Loader2,
   Lock,
   RefreshCw,
   Send,
@@ -24,28 +23,10 @@ import { startOfDay, subDays } from 'date-fns';
 import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { getSandboxAllocationKey } from '@kilocode/worker-utils/sandbox-allocation';
-import {
-  formatSandboxDestination,
-  formatSandboxDestinationWithoutTier,
-  formatSandboxInstance,
-  getSandboxSelectionGroups,
-  getSandboxSelectionOptions,
-  getPreferredInitialSandboxAllocation,
-  resolveSandboxSelection,
-  resolveSandboxSelectionSubmissionError,
-  type SandboxSelectionDraft,
-} from './sandbox-selection';
+import { resolveSandboxSelectionSubmissionError } from './sandbox-selection';
+import { NewSessionSandboxSelect } from './NewSessionSandboxSelect';
+import { useSandboxPicker } from './useSandboxPicker';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
@@ -56,7 +37,7 @@ import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
 import { commandsOrDefault } from '@cloud-agent-shared';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
-import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import {
   selectedProfileIdAtom,
   resetSessionFormAtom,
@@ -90,12 +71,7 @@ import {
   findAllGitPlatformUrls,
   detectGitPlatform,
 } from '@/components/cloud-agent-next/utils/git-utils';
-import {
-  getCloudSessionCreationOperation,
-  isAmbiguousCloudSessionCreationError,
-  type AgentMode,
-  type CloudSessionCreationOperation,
-} from './types';
+import { isAmbiguousCloudSessionCreationError, type AgentMode } from './types';
 import { formatSessionError } from '@kilocode/cloud-agent-sdk';
 import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import type { CustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
@@ -103,6 +79,14 @@ import { CloudAgentBillingError } from './CloudAgentBillingError';
 import { billingPayerPresentation } from './billing-payer-presentation';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
+import { PendingChatView } from './PendingChatView';
+import { PENDING_FIRST_CHAT_STATUS_LABEL, usePendingFirstChat } from './pending-first-chat';
+import {
+  createFirstChatCreationGuard,
+  resolveFirstChatCreationAttempt,
+  type FirstChatCreationAttempt,
+  type FirstChatCreationGuard,
+} from './first-chat-creation';
 import {
   buildCloudAgentAttachments,
   useCloudAgentAttachmentUpload,
@@ -113,20 +97,17 @@ import {
   CLOUD_AGENT_PROMPT_MAX_LENGTH,
 } from '@/lib/cloud-agent/constants';
 import {
-  getDevcontainerEnabled,
   getLastUsedModel,
   getLastUsedRepo,
-  getLastUsedSandboxAllocationKey,
   getLastUsedVariant,
   getPreferredInitialModel,
   getPreferredInitialRepo,
   getPreferredInitialVariant,
-  setDevcontainerEnabled,
   setLastUsedModel,
   setLastUsedRepo,
-  setLastUsedSandboxAllocationKey,
   setLastUsedVariant,
 } from '@/components/cloud-agent-next/model-preferences';
+import { safeLocalStorage } from '@/lib/localStorage';
 import {
   GITHUB_IDENTITY_HINT_DISMISSED_STORAGE_KEY,
   getGitHubIdentityHint,
@@ -157,7 +138,11 @@ type NewSessionPanelProps = {
   organizationId?: string;
   organizationName?: string;
   organizationRole?: OrganizationRole;
-  isDevcontainerAvailable: boolean;
+};
+
+type PendingFirstChatCreation = {
+  prompt: string;
+  attachmentNames: string[];
 };
 
 type ContextualTipProps = {
@@ -172,7 +157,6 @@ export function NewSessionPanel({
   organizationId,
   organizationName,
   organizationRole,
-  isDevcontainerAvailable,
 }: NewSessionPanelProps) {
   const router = useRouter();
   const trpc = useTRPC();
@@ -181,10 +165,21 @@ export function NewSessionPanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
-  const [firstChatCreationOperation, setFirstChatCreationOperation] = useState<
-    (CloudSessionCreationOperation & { initialMessageId: string }) | null
-  >(null);
-  const [devcontainer, setDevcontainer] = useState(false);
+  const creationGuardRef = useRef<FirstChatCreationGuard | null>(null);
+  if (creationGuardRef.current === null) {
+    creationGuardRef.current = createFirstChatCreationGuard();
+  }
+  const { setPendingFirstChat } = usePendingFirstChat();
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  const [firstChatCreationOperation, setFirstChatCreationOperation] =
+    useState<FirstChatCreationAttempt | null>(null);
+  const [pendingCreation, setPendingCreation] = useState<PendingFirstChatCreation | null>(null);
   const [isGitHubIdentityHintDismissed, setIsGitHubIdentityHintDismissed] = useState<
     boolean | null
   >(null);
@@ -254,7 +249,6 @@ export function NewSessionPanel({
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
   const [showRepositoryRequiredMessage, setShowRepositoryRequiredMessage] = useState(false);
-  const [isPreparing, setIsPreparing] = useState(false);
   const [billingFailure, setBillingFailure] = useState<CustomerBillingFailure | null>(null);
   const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => uuidv4());
   // Repo profile bindings are only keyed by GitHub/GitLab today.
@@ -295,11 +289,11 @@ export function NewSessionPanel({
 
   // Clear any lingering manual overrides whenever the page loads
   useEffect(() => {
+    safeLocalStorage.removeItem('cloud-agent:devcontainer-enabled');
     resetSessionForm();
   }, [resetSessionForm]);
 
   useEffect(() => {
-    setDevcontainer(getDevcontainerEnabled());
     setIsGitHubIdentityHintDismissed(getGitHubIdentityHintDismissed());
 
     const handleGitHubIdentityHintStorage = (event: StorageEvent) => {
@@ -311,76 +305,14 @@ export function NewSessionPanel({
     return () => window.removeEventListener('storage', handleGitHubIdentityHintStorage);
   }, []);
 
-  const handleDevcontainerChange = useCallback((enabled: boolean) => {
-    setDevcontainer(enabled);
-    setDevcontainerEnabled(enabled);
-  }, []);
-
-  const effectiveDevcontainer = isDevcontainerAvailable && devcontainer;
   const availableVariants = modelOptions.find(m => m.id === model)?.variants ?? [];
 
-  const [sandboxSelection, setSandboxSelection] = useState<SandboxSelectionDraft>({
+  const sandbox = useSandboxPicker({
     organizationId,
+    platform: selectedPlatform,
+    repository: selectedRepo,
   });
-  if (sandboxSelection.organizationId !== organizationId) {
-    setSandboxSelection({ organizationId });
-  }
-  const sandboxPreferenceOwnerRef = useRef<string | null | undefined>(undefined);
-  const sandboxSelectionQuery = useQuery({
-    ...(organizationId
-      ? trpc.organizations.cloudAgentNext.getSandboxSelectionOptions.queryOptions({
-          organizationId,
-          ...(effectiveDevcontainer ? { devcontainer: true } : {}),
-        })
-      : trpc.cloudAgentNext.getSandboxSelectionOptions.queryOptions({
-          ...(effectiveDevcontainer ? { devcontainer: true } : {}),
-        })),
-    retry: false,
-  });
-  const sandboxCapabilities = sandboxSelectionQuery.isSuccess
-    ? sandboxSelectionQuery.data
-    : undefined;
-  const showSandboxSelector =
-    sandboxCapabilities?.enabled === true ||
-    (sandboxSelection.organizationId === organizationId && !!sandboxSelection.allocation);
-  const { sandboxAllocation, error: sandboxAvailabilityError } = resolveSandboxSelection({
-    organizationId,
-    draft: sandboxSelection,
-    capabilities: sandboxCapabilities,
-    devcontainer: effectiveDevcontainer,
-  });
-  const sandboxOptions = getSandboxSelectionOptions(sandboxCapabilities);
-  const sandboxGroups = getSandboxSelectionGroups(sandboxOptions);
-  const sandboxDestination = sandboxAllocation ?? sandboxCapabilities?.defaultDestination;
-  const sandboxDestinationLabel = formatSandboxDestination(sandboxDestination);
-  const sandboxDestinationWithoutTier = formatSandboxDestinationWithoutTier(sandboxDestination);
-  const defaultSandboxLabel = sandboxCapabilities?.defaultDestination
-    ? `Default · ${formatSandboxDestination(sandboxCapabilities.defaultDestination)}`
-    : 'Default';
-
-  // ---------------------------------------------------------------------------
-  // Sandbox destination auto-selection
-  // ---------------------------------------------------------------------------
-  // Each owner restores its own saved allocation. Clear the previous owner's
-  // guard here so auto-selection cannot skip restoration when returning to an
-  // owner whose capabilities were previously unavailable.
-  useEffect(() => {
-    sandboxPreferenceOwnerRef.current = undefined;
-  }, [organizationId]);
-
-  useEffect(() => {
-    if (!sandboxCapabilities?.enabled) return;
-
-    const owner = organizationId ?? null;
-    if (sandboxPreferenceOwnerRef.current === owner) return;
-    sandboxPreferenceOwnerRef.current = owner;
-
-    const allocation = getPreferredInitialSandboxAllocation({
-      options: sandboxCapabilities.options,
-      lastUsedKey: getLastUsedSandboxAllocationKey(organizationId),
-    });
-    if (allocation) setSandboxSelection({ organizationId, allocation });
-  }, [sandboxCapabilities, organizationId]);
+  const sandboxAllocation = sandbox.picker.allocation;
 
   // ---------------------------------------------------------------------------
   // Model auto-selection
@@ -1127,7 +1059,6 @@ export function NewSessionPanel({
             },
           }
         : {}),
-      ...(effectiveDevcontainer ? { devcontainer: true } : {}),
     };
   }, [
     prompt,
@@ -1138,7 +1069,6 @@ export function NewSessionPanel({
     selectedProfileId,
     attachmentMessageUuid,
     attachmentUpload.attachments,
-    effectiveDevcontainer,
   ]);
   const creationIntent = JSON.stringify({
     ...creationInput,
@@ -1152,67 +1082,65 @@ export function NewSessionPanel({
     sandboxAllocation: sandboxAllocation ? getSandboxAllocationKey(sandboxAllocation) : undefined,
   });
   const sandboxSelectionError = resolveSandboxSelectionSubmissionError({
-    error: sandboxAvailabilityError,
+    error: sandbox.error,
     intent: creationIntent,
     pendingOperation: firstChatCreationOperation,
   });
-  const sandboxDescriptionId = sandboxSelectionError
-    ? 'new-session-sandbox-error'
-    : effectiveDevcontainer
-      ? 'new-session-sandbox-devcontainer'
-      : undefined;
+  const sandboxDescriptionId = sandboxSelectionError ? 'new-session-sandbox-error' : undefined;
 
   const isFormValid =
     prompt.trim().length > 0 &&
     !isPromptTooLong &&
     model.length > 0 &&
-    !isPreparing &&
     !sandboxSelectionError &&
     (!hasInsufficientBalance || limitedAccessModelIsAllowed) &&
     !attachmentUpload.hasUploadingAttachments;
 
   const handleStartSession = useCallback(async () => {
+    const guard = creationGuardRef.current;
+    if (!guard || !guard.tryBegin()) return;
+
     if (
       !prompt.trim() ||
       attachmentUpload.hasUploadingAttachments ||
-      isPreparing ||
-      sandboxSelectionError
-    )
-      return;
-    if (!selectedRepo) {
-      setShowRepositoryRequiredMessage(true);
-      return;
-    }
-    if (organizationId && selectedPlatform === 'github' && !selectedGitHubIntegrationId) {
-      toast.error('Select the GitHub repository again.');
-      return;
-    }
-    if (selectedPlatform === 'bitbucket' && !bitbucketRepo) {
-      toast.error('Select the Bitbucket repository again.');
-      return;
-    }
-
-    setIsPreparing(true);
-
-    try {
+      sandboxSelectionError ||
+      (creationInput.initialPayload && attachmentUpload.attachments.length > 0)
+    ) {
       if (creationInput.initialPayload && attachmentUpload.attachments.length > 0) {
         toast.error('Files cannot be attached to slash commands', {
           description: 'Remove the files or type a plain prompt instead.',
         });
-        setIsPreparing(false);
-        return;
       }
+      guard.end();
+      return;
+    }
+    if (!selectedRepo) {
+      setShowRepositoryRequiredMessage(true);
+      guard.end();
+      return;
+    }
+    if (organizationId && selectedPlatform === 'github' && !selectedGitHubIntegrationId) {
+      toast.error('Select the GitHub repository again.');
+      guard.end();
+      return;
+    }
+    if (selectedPlatform === 'bitbucket' && !bitbucketRepo) {
+      toast.error('Select the Bitbucket repository again.');
+      guard.end();
+      return;
+    }
 
-      const previousOperation = firstChatCreationOperation;
-      const pendingOperation = getCloudSessionCreationOperation(
-        previousOperation,
+    const submittedPrompt = prompt.trim();
+    const submittedAttachmentNames = attachmentUpload.attachments.map(a => a.file.name);
+    setPendingCreation({ prompt: submittedPrompt, attachmentNames: submittedAttachmentNames });
+
+    try {
+      const operation = resolveFirstChatCreationAttempt(
+        firstChatCreationOperation,
         creationIntent,
-        uuidv4
+        uuidv4,
+        generateMessageId
       );
-      const operation =
-        previousOperation?.operationKey === pendingOperation.operationKey
-          ? previousOperation
-          : { ...pendingOperation, initialMessageId: generateMessageId() };
       setFirstChatCreationOperation(operation);
       const baseInput = {
         ...creationInput,
@@ -1281,13 +1209,33 @@ export function NewSessionPanel({
       attachmentUpload.clearAttachments();
       setAttachmentMessageUuid(uuidv4());
 
+      // A completion that lands after the panel is gone must not yank the user
+      // back to this session; the created session stays reachable from the
+      // sidebar.
+      if (!mountedRef.current) return;
+
+      setPendingFirstChat({
+        operationKey: operation.operationKey,
+        initialMessageId: operation.initialMessageId,
+        prompt: submittedPrompt,
+        attachmentNames: submittedAttachmentNames,
+        kiloSessionId: result.kiloSessionId,
+      });
       const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
       setBillingFailure(null);
+      // The pending view and its single-flight lock stay in place through the
+      // route change: the panel must not flash the empty composer while the
+      // chat route loads. The lock is released only on failure.
     } catch (error) {
       if (!isAmbiguousCloudSessionCreationError(error)) {
         setFirstChatCreationOperation(null);
       }
+      // No setPendingFirstChat(null) here: this attempt publishes the shared
+      // value only after success, so clearing it could only drop another
+      // panel's newer creation.
+      setPendingCreation(null);
+      guard.end();
       const failure = parseCustomerBillingFailure(error);
       setBillingFailure(failure);
       console.error('Failed to prepare session:', error);
@@ -1296,8 +1244,6 @@ export function NewSessionPanel({
           description: formatSessionError(error),
         });
       }
-    } finally {
-      setIsPreparing(false);
     }
   }, [
     attachmentUpload,
@@ -1306,7 +1252,6 @@ export function NewSessionPanel({
     creationIntent,
     firstChatCreationOperation,
     hasAgentModelOverride,
-    isPreparing,
     sandboxAllocation,
     sandboxSelectionError,
     model,
@@ -1315,6 +1260,7 @@ export function NewSessionPanel({
     prompt,
     queryClient,
     router,
+    setPendingFirstChat,
     selectedPlatform,
     selectedRepo,
     selectedGitHubIntegrationId,
@@ -1408,6 +1354,25 @@ export function NewSessionPanel({
     );
   }
 
+  if (pendingCreation) {
+    // Full width below a gap the height of the chat route's workspace header
+    // (two rows below `sm`), so the pending turn sits where the chat route
+    // renders it and the prompt does not move on the route change.
+    return (
+      <div className="relative flex h-full flex-col pt-24 sm:pt-14">
+        <SetPageTitle title="Cloud Agent">
+          <Badge variant="new">new</Badge>
+        </SetPageTitle>
+        <MobileSidebarToggle />
+        <PendingChatView
+          prompt={pendingCreation.prompt}
+          attachmentNames={pendingCreation.attachmentNames}
+          statusLabel={PENDING_FIRST_CHAT_STATUS_LABEL}
+        />
+      </div>
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -1463,7 +1428,6 @@ export function NewSessionPanel({
         <div
           className={cn(
             'relative overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
-            isPreparing && 'pointer-events-none opacity-60',
             attachmentUpload.isDragging && 'border-transparent focus-within:ring-0'
           )}
           {...attachmentUpload.dragHandlers}
@@ -1519,7 +1483,6 @@ export function NewSessionPanel({
                 onChange={handlePromptChange}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
-                disabled={isPreparing}
                 maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
               />
             </PopoverAnchor>
@@ -1588,7 +1551,6 @@ export function NewSessionPanel({
               variant={displayVariant}
               availableVariants={displayVariants}
               onVariantChange={handleVariantChange}
-              disabled={isPreparing}
               modelPickerDisabled={hasAgentModelOverride}
               modelPickerTooltip={
                 hasAgentModelOverride ? `Locked by agent "${selectedCustomAgent?.name}"` : undefined
@@ -1608,7 +1570,6 @@ export function NewSessionPanel({
                 options={NEXT_MODE_OPTIONS}
                 customOptions={customModeOptions}
                 variant="compact"
-                disabled={isPreparing}
                 className="min-w-0"
               />
               {hasAgentModelOverride ? (
@@ -1632,7 +1593,6 @@ export function NewSessionPanel({
                   onValueChange={handleModelChange}
                   isLoading={!modelsData}
                   variant="compact"
-                  disabled={isPreparing}
                   className="min-w-0"
                 />
               )}
@@ -1656,7 +1616,6 @@ export function NewSessionPanel({
                       variants={availableVariants}
                       value={variant}
                       onValueChange={handleVariantChange}
-                      disabled={isPreparing}
                       className="min-w-0"
                     />
                   )}
@@ -1670,13 +1629,11 @@ export function NewSessionPanel({
 
             <div className="flex-1" />
 
-            {isPreparing && <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />}
             <UIButton
               type="button"
               variant="ghost"
               size="icon"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isPreparing}
               className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
               title="Attach files"
               aria-label="Attach files"
@@ -1698,7 +1655,7 @@ export function NewSessionPanel({
               variant="primary"
               size="icon"
               onClick={() => void handleStartSession()}
-              disabled={!isFormValid || isPreparing || attachmentUpload.hasUploadingAttachments}
+              disabled={!isFormValid || attachmentUpload.hasUploadingAttachments}
               className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
               aria-describedby={
                 showRepositoryRequiredMessage ? 'new-session-repository-required' : undefined
@@ -1721,7 +1678,6 @@ export function NewSessionPanel({
                   'text-muted-foreground hover:text-foreground inline-flex min-w-0 flex-1 cursor-pointer items-center gap-1 text-sm',
                   selectedRepo && 'text-foreground'
                 )}
-                disabled={isPreparing}
               >
                 <FolderGit2 className="h-3.5 w-3.5" />
                 <span className="max-w-[min(16rem,50vw)] truncate">
@@ -1888,81 +1844,14 @@ export function NewSessionPanel({
           </Popover>
 
           <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto">
-            {effectiveDevcontainer && (
-              <span className="text-muted-foreground inline-flex shrink-0 items-center rounded-md border border-border/50 bg-muted/30 px-2 py-1 text-xs">
-                Dev container on
-              </span>
-            )}
-            {showSandboxSelector && (
-              <Select
-                value={sandboxAllocation ? getSandboxAllocationKey(sandboxAllocation) : 'default'}
-                onValueChange={value => {
-                  if (value === 'default') {
-                    setSandboxSelection({ organizationId });
-                    setLastUsedSandboxAllocationKey(undefined, organizationId);
-                    return;
-                  }
-                  const selected = sandboxOptions.find(
-                    option => getSandboxAllocationKey(option.allocation) === value
-                  );
-                  if (selected) {
-                    setSandboxSelection({
-                      organizationId,
-                      allocation: selected.allocation,
-                    });
-                    setLastUsedSandboxAllocationKey(
-                      getSandboxAllocationKey(selected.allocation),
-                      organizationId
-                    );
-                  }
-                }}
-                disabled={isPreparing || effectiveDevcontainer}
-              >
-                <SelectTrigger
-                  id="new-session-sandbox"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground hover:bg-accent data-[state=open]:bg-accent min-w-0 max-w-full border-transparent bg-transparent px-2 text-xs shadow-none sm:max-w-80 [@media(pointer:coarse)]:min-h-11"
-                  aria-label={`Run on ${sandboxDestinationLabel}`}
-                  aria-describedby={sandboxDescriptionId}
-                  aria-invalid={!!sandboxSelectionError}
-                >
-                  <SelectValue className="min-w-0">
-                    <span className="truncate">{sandboxDestinationWithoutTier}</span>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent className="max-w-[calc(100vw-2rem)]">
-                  <SelectItem
-                    value="default"
-                    textValue={defaultSandboxLabel}
-                    className="[@media(pointer:coarse)]:min-h-11"
-                  >
-                    <span className="whitespace-normal">{defaultSandboxLabel}</span>
-                  </SelectItem>
-                  {sandboxGroups.length > 0 && <SelectSeparator />}
-                  {sandboxGroups.map(group => (
-                    <SelectGroup key={group.key} className="py-1">
-                      <SelectLabel className="text-foreground font-semibold">
-                        {group.label}
-                      </SelectLabel>
-                      {group.options.map(option => (
-                        <SelectItem
-                          key={getSandboxAllocationKey(option.allocation)}
-                          value={getSandboxAllocationKey(option.allocation)}
-                          textValue={formatSandboxInstance(option.allocation)}
-                          aria-label={formatSandboxDestination(option.allocation)}
-                          className="[@media(pointer:coarse)]:min-h-11"
-                        >
-                          <span className="flex min-w-0 flex-col gap-0.5 whitespace-normal">
-                            <span className="tabular-nums">
-                              {formatSandboxInstance(option.allocation)}
-                            </span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
+            {sandbox.isVisible && (
+              <NewSessionSandboxSelect
+                picker={sandbox.picker}
+                groups={sandbox.groups}
+                invalid={!!sandboxSelectionError}
+                describedBy={sandboxDescriptionId}
+                onChoose={sandbox.choose}
+              />
             )}
             <ProfilePickerPopover
               organizationId={organizationId}
@@ -1970,49 +1859,25 @@ export function NewSessionPanel({
               onOverrideProfileSelect={setSelectedProfileId}
               repoFullName={selectedRepo || undefined}
               platform={profileBindingPlatform}
-              devcontainerToggle={
-                isDevcontainerAvailable
-                  ? {
-                      checked: effectiveDevcontainer,
-                      disabled: isPreparing,
-                      onCheckedChange: handleDevcontainerChange,
-                    }
-                  : undefined
-              }
             />
           </div>
         </div>
 
-        {showSandboxSelector && effectiveDevcontainer && (
-          <p id="new-session-sandbox-devcontainer" className="text-muted-foreground text-xs">
-            Dev containers use the Default sandbox. Turn off dev containers in Profile to choose a
-            sandbox.
-          </p>
-        )}
         {sandboxSelectionError && (
           <div className="flex flex-wrap items-center gap-2">
             <p id="new-session-sandbox-error" className="text-destructive text-xs" role="alert">
               {sandboxSelectionError}
             </p>
-            <UIButton
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isPreparing}
-              onClick={() => {
-                setSandboxSelection({ organizationId });
-                setLastUsedSandboxAllocationKey(undefined, organizationId);
-              }}
-            >
-              Use Default
+            <UIButton type="button" variant="outline" size="sm" onClick={sandbox.chooseDefault}>
+              Use default sandbox
             </UIButton>
-            {sandboxSelectionQuery.isError && (
+            {sandbox.query.isError && (
               <UIButton
                 type="button"
                 variant="ghost"
                 size="sm"
-                disabled={isPreparing || sandboxSelectionQuery.isFetching}
-                onClick={() => void sandboxSelectionQuery.refetch()}
+                disabled={sandbox.query.isFetching}
+                onClick={() => void sandbox.query.refetch()}
               >
                 Retry
               </UIButton>

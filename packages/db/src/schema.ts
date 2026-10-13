@@ -25,6 +25,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { isNotNull, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
+import type { SessionLiveSummary } from '@kilocode/session-ingest-contracts';
 import {
   KiloPassTier,
   KiloPassCadence,
@@ -46,6 +47,7 @@ import {
   FeedbackSource,
   CliSessionSharedState,
   WorkspaceFolderColor,
+  TodoItemSessionOrigin,
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
@@ -134,6 +136,7 @@ import type {
   UserDeletionActivityDetails,
   CustomLlmDefinition,
   AutoFreeConfig,
+  GatewayModelListConfig,
   KiloClawAdminAuditAction,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
@@ -153,7 +156,6 @@ import type {
   AuditLogAction,
   EncryptedData,
   AuthProviderId,
-  AbuseClassification,
   PlatformRepository,
   IntegrationPermissions,
   BuildStatus,
@@ -175,9 +177,9 @@ import type {
   OpenRouterModel,
   StripeSubscriptionStatus,
   StoredModel,
-  GatewayApiKind,
   ContributorChampionTier,
 } from './schema-types';
+import type { AbuseClassification, GatewayApiKind } from '@kilocode/usage-contracts';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { INSTANCE_TYPE_VALUES } from '@kilocode/kiloclaw-instance-tiers';
 
@@ -254,6 +256,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassOrgIssuanceKind,
   CliSessionSharedState,
   WorkspaceFolderColor,
+  TodoItemSessionOrigin,
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
@@ -2807,6 +2810,7 @@ export const microdollar_usage_metadata = pgTable(
     session_id: text(),
     mode_id: integer(),
     auto_model_id: integer(),
+    reasoning_setting_id: integer(),
     market_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
     abuse_delay: integer(),
@@ -2963,6 +2967,15 @@ export const auto_model = pgTable(
   table => [uniqueIndex('UQ_auto_model').on(table.auto_model)]
 );
 
+export const reasoning_setting = pgTable(
+  'reasoning_setting',
+  {
+    reasoning_setting_id: serial().notNull().primaryKey(),
+    reasoning_setting: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_reasoning_setting').on(table.reasoning_setting)]
+);
+
 export const microdollar_usage_view = pgView('microdollar_usage_view', {
   id: uuid().notNull(),
   kilo_user_id: text().notNull(),
@@ -3012,6 +3025,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   session_id: text(),
   mode: text(),
   auto_model: text(),
+  reasoning_setting: text(),
   market_cost: bigint({ mode: 'number' }),
   is_free: boolean(),
   abuse_delay: integer(),
@@ -3066,6 +3080,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.session_id,
     md.mode,
     am.auto_model,
+    rs.reasoning_setting,
     meta.market_cost,
     meta.is_free,
     meta.abuse_delay,
@@ -3084,6 +3099,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   LEFT JOIN ${feature} feat ON meta.feature_id = feat.feature_id
   LEFT JOIN ${mode} md ON meta.mode_id = md.mode_id
   LEFT JOIN ${auto_model} am ON meta.auto_model_id = am.auto_model_id
+  LEFT JOIN ${reasoning_setting} rs ON meta.reasoning_setting_id = rs.reasoning_setting_id
 `);
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
@@ -3301,57 +3317,6 @@ export const organizations = pgTable(
 );
 
 export type Organization = typeof organizations.$inferSelect;
-
-export type OrganizationDomainClaimStatus = 'pending' | 'verified';
-
-export const organization_domain_claims = pgTable(
-  'organization_domain_claims',
-  {
-    id: idPrimaryKeyColumn,
-    organization_id: uuid()
-      .notNull()
-      .references(() => organizations.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    domain: text().notNull(),
-    status: text().$type<OrganizationDomainClaimStatus>().notNull().default('pending'),
-    workos_organization_id: text(),
-    workos_domain_id: text(),
-    verified_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    unique('UQ_organization_domain_claims_organization_domain').on(
-      table.organization_id,
-      table.domain
-    ),
-    uniqueIndex('UQ_organization_domain_claims_verified_domain')
-      .on(table.domain)
-      .where(sql`${table.status} = 'verified'`),
-    uniqueIndex('UQ_organization_domain_claims_workos_domain_id')
-      .on(table.workos_domain_id)
-      .where(sql`${table.workos_domain_id} IS NOT NULL`),
-    index('IDX_organization_domain_claims_organization_id').on(table.organization_id),
-    check(
-      'organization_domain_claims_canonical_domain_check',
-      sql`length(${table.domain}) BETWEEN 1 AND 253 AND ${table.domain} = lower(btrim(${table.domain}))`
-    ),
-    check(
-      'organization_domain_claims_status_check',
-      sql`${table.status} IN ('pending', 'verified')`
-    ),
-    check(
-      'organization_domain_claims_verification_shape_check',
-      sql`(${table.status} = 'pending' AND ${table.verified_at} IS NULL)
-        OR (${table.status} = 'verified' AND ${table.verified_at} IS NOT NULL AND ${table.workos_organization_id} IS NOT NULL AND ${table.workos_domain_id} IS NOT NULL)`
-    ),
-  ]
-);
-
-export type OrganizationDomainClaim = typeof organization_domain_claims.$inferSelect;
-export type NewOrganizationDomainClaim = typeof organization_domain_claims.$inferInsert;
 
 export const kilo_pass_org_term_versions = pgTable(
   'kilo_pass_org_term_versions',
@@ -5816,6 +5781,8 @@ export const ai_gateway_config = pgTable(
     id: integer().primaryKey().default(1),
     config: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     auto_free: jsonb().$type<AutoFreeConfig>(),
+    preferred_models: jsonb().$type<GatewayModelListConfig>(),
+    unavailable_models: jsonb().$type<GatewayModelListConfig>(),
   },
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );
@@ -6461,6 +6428,10 @@ export const cli_sessions_v2 = pgTable(
     status_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
     last_activity_at: timestamp({ withTimezone: true, mode: 'string' }),
     total_cost_microdollars: bigint({ mode: 'number' }),
+    // The small derived summary the session card shows. Derived by
+    // session-ingest from tool, todo, diff and error items; only this summary
+    // is stored, never the raw text. Null means "no summary".
+    live_summary: jsonb().$type<SessionLiveSummary>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6519,6 +6490,108 @@ export const cli_sessions_v2 = pgTable(
 export type CliSessionV2 = typeof cli_sessions_v2.$inferSelect;
 export type NewCliSessionV2 = typeof cli_sessions_v2.$inferInsert;
 
+export const todo_lists = pgTable(
+  'todo_lists',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    emoji: text(),
+    git_url: text(),
+    mode: text(),
+    model: text(),
+    variant: text(),
+    position: text().notNull(),
+    archived_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    // Target of the composite owner foreign key on `todo_items`.
+    unique('UQ_todo_lists_id_kilo_user_id').on(table.id, table.kilo_user_id),
+    index('IDX_todo_lists_owner_scope_position').on(
+      table.kilo_user_id,
+      table.organization_id,
+      table.position
+    ),
+    check(
+      'todo_lists_name_check',
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 100 AND ${table.name} = btrim(${table.name})`
+    ),
+    check('todo_lists_emoji_check', sql`char_length(${table.emoji}) <= 16`),
+  ]
+);
+
+export type TodoListRow = typeof todo_lists.$inferSelect;
+
+export const todo_items = pgTable(
+  'todo_items',
+  {
+    id: idPrimaryKeyColumn,
+    list_id: uuid().notNull(),
+    kilo_user_id: text().notNull(),
+    title: text().notNull(),
+    notes: text(),
+    done_at: timestamp({ withTimezone: true, mode: 'string' }),
+    position: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    foreignKey({
+      columns: [table.list_id, table.kilo_user_id],
+      foreignColumns: [todo_lists.id, todo_lists.kilo_user_id],
+      name: 'todo_items_list_id_kilo_user_id_fk',
+    }).onDelete('cascade'),
+    // Target of the composite owner foreign key on `todo_item_sessions`.
+    unique('UQ_todo_items_id_kilo_user_id').on(table.id, table.kilo_user_id),
+    index('IDX_todo_items_list_position').on(table.list_id, table.position),
+    check(
+      'todo_items_title_check',
+      sql`char_length(btrim(${table.title})) BETWEEN 1 AND 500 AND ${table.title} = btrim(${table.title})`
+    ),
+    check('todo_items_notes_check', sql`char_length(${table.notes}) <= 10000`),
+  ]
+);
+
+export type TodoItemRow = typeof todo_items.$inferSelect;
+
+export const todo_item_sessions = pgTable(
+  'todo_item_sessions',
+  {
+    todo_item_id: uuid().notNull(),
+    session_id: text().notNull(),
+    kilo_user_id: text().notNull(),
+    origin: text().$type<TodoItemSessionOrigin>().notNull(),
+    linked_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    // One session links to at most one to-do.
+    primaryKey({ columns: [table.session_id, table.kilo_user_id] }),
+    foreignKey({
+      columns: [table.todo_item_id, table.kilo_user_id],
+      foreignColumns: [todo_items.id, todo_items.kilo_user_id],
+      name: 'todo_item_sessions_todo_item_id_kilo_user_id_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.session_id, table.kilo_user_id],
+      foreignColumns: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
+      name: 'todo_item_sessions_session_id_kilo_user_id_fk',
+    }).onDelete('cascade'),
+    index('IDX_todo_item_sessions_todo_item_id').on(table.todo_item_id, table.kilo_user_id),
+    enumCheck('todo_item_sessions_origin_check', table.origin, TodoItemSessionOrigin),
+  ]
+);
+
 export type CloudAgentSessionFailureStage =
   | 'sandbox_identity'
   | 'registration'
@@ -6574,6 +6647,7 @@ export type CloudAgentFailureReason =
   | 'session_import_timeout'
   | 'session_import_failed'
   | 'setup_command_timeout'
+  | 'container_limit_reached'
   | 'admission_capacity'
   | 'admission_not_found'
   | 'admission_internal'
@@ -6707,6 +6781,7 @@ export type CloudAgentSessionRunFailureStage =
   | 'unknown';
 export type CloudAgentSessionRunFailureCode =
   | 'sandbox_connect_failed'
+  | 'container_limit_reached'
   | 'admission_billing_unavailable'
   | 'workspace_setup_failed'
   | 'kilo_server_failed'
@@ -8550,6 +8625,71 @@ export type AgentEnvironmentProfileRepoBinding =
 export type NewAgentEnvironmentProfileRepoBinding =
   typeof agent_environment_profile_repo_bindings.$inferInsert;
 
+// ============ CLOUD AGENT SANDBOX ALLOCATION SETTINGS ============
+// A context default (repository pair null) or a per-repository override that
+// selects the sandbox allocation for new Cloud Agent session allocations.
+
+export const cloud_agent_sandbox_allocation_settings = pgTable(
+  'cloud_agent_sandbox_allocation_settings',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    repository_full_name: text(),
+    repository_platform: text({ enum: ['github', 'gitlab'] }),
+    allocation: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_sandbox_alloc_org_context')
+      .on(table.owned_by_organization_id)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.repository_full_name} IS NULL`
+      ),
+    uniqueIndex('UQ_cloud_agent_sandbox_alloc_user_context')
+      .on(table.owned_by_user_id)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.repository_full_name} IS NULL`),
+    uniqueIndex('UQ_cloud_agent_sandbox_alloc_org_repo')
+      .on(table.owned_by_organization_id, table.repository_full_name, table.repository_platform)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.repository_full_name} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_cloud_agent_sandbox_alloc_user_repo')
+      .on(table.owned_by_user_id, table.repository_full_name, table.repository_platform)
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND ${table.repository_full_name} IS NOT NULL`
+      ),
+    index('IDX_cloud_agent_sandbox_alloc_org').on(table.owned_by_organization_id),
+    index('IDX_cloud_agent_sandbox_alloc_user').on(table.owned_by_user_id),
+    check(
+      'cloud_agent_sandbox_allocation_settings_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    check(
+      'cloud_agent_sandbox_allocation_settings_repo_pair_check',
+      sql`(
+        (${table.repository_full_name} IS NULL AND ${table.repository_platform} IS NULL) OR
+        (${table.repository_full_name} IS NOT NULL AND ${table.repository_platform} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type CloudAgentSandboxAllocationSetting =
+  typeof cloud_agent_sandbox_allocation_settings.$inferSelect;
+export type NewCloudAgentSandboxAllocationSetting =
+  typeof cloud_agent_sandbox_allocation_settings.$inferInsert;
+
 // ============ AGENT ENVIRONMENT PROFILE MCP SERVERS ============
 // MCP servers configured on an environment profile. Materialized into the
 // CLI-native KILO_CONFIG_CONTENT.mcp block at session preparation time.
@@ -10103,7 +10243,7 @@ export type NewUserPushToken = typeof user_push_tokens.$inferInsert;
 
 // ─── Activity Tokens (Live Activity / push-to-start / Android ongoing) ──
 //
-// Tokens for the glanceable surfaces (iOS Live Activity + push-to-start,
+// Tokens for glanceable surfaces (iOS Live Activity, push-to-start and WidgetKit,
 // Android ongoing notification). These are NOT Expo push tokens and never
 // share a table with `user_push_tokens`. `organization_id` is null for the
 // personal surface and is a server-only lookup key — it never enters a
@@ -10121,11 +10261,24 @@ export const user_activity_tokens = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     token: text().notNull(),
-    kind: text().$type<'ios_push_to_start' | 'ios_activity' | 'android_ongoing'>().notNull(),
+    kind: text()
+      .$type<
+        | 'ios_push_to_start'
+        | 'ios_activity'
+        | 'ios_session_activity'
+        | 'ios_widget'
+        | 'android_ongoing'
+        | 'android_session_ongoing'
+      >()
+      .notNull(),
     platform: text().$type<'ios' | 'android'>().notNull(),
     // Null means the personal surface. Server-only lookup key; never sent in a
     // glanceable payload.
     organization_id: text(),
+    // The followed session of an `ios_session_activity` card or an
+    // `android_session_ongoing` notification; null for every other kind.
+    // Server-only lookup key; never sent in an aggregate payload.
+    session_id: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -10136,7 +10289,13 @@ export const user_activity_tokens = pgTable(
     superseded_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [
-    uniqueIndex('UQ_user_activity_tokens_token').on(table.token),
+    // One row per (token, session). An Android device follows each session
+    // with its one Expo push token, so that token appears once per followed
+    // session and once for its `android_ongoing` row (session null). Nulls do
+    // not differ here, so every other kind keeps one row per token.
+    unique('UQ_user_activity_tokens_token_session')
+      .on(table.token, table.session_id)
+      .nullsNotDistinct(),
     // One live ios_activity card per (user_id, organization_id) scope. `coalesce`
     // folds the personal scope (null organization) into a single key, because
     // Postgres treats NULLs as distinct in a unique index.
@@ -10145,6 +10304,14 @@ export const user_activity_tokens = pgTable(
       .concurrently()
       .where(sql`${table.kind} = 'ios_activity' AND ${table.superseded_at} IS NULL`),
     index('IDX_user_activity_tokens_user_org').on(table.user_id, table.organization_id),
+    // Live followed sessions of one user, read by the aggregate exclusion and
+    // the session card delivery.
+    index('IDX_user_activity_tokens_live_session')
+      .on(table.user_id, table.session_id)
+      .concurrently()
+      .where(
+        sql`${table.kind} IN ('ios_session_activity', 'android_session_ongoing') AND ${table.superseded_at} IS NULL`
+      ),
   ]
 );
 
@@ -11336,6 +11503,10 @@ export const container_usage_interval = pgTable(
       table.subject_id,
       table.started_at
     ),
+    index('IDX_container_usage_interval_open_subject')
+      .on(table.subject_type, table.subject_id)
+      .concurrently()
+      .where(sql`${table.status} = 'open'`),
     uniqueIndex('UQ_container_usage_interval_single_open')
       .on(table.service, table.instance_id)
       .where(sql`${table.status} = 'open'`),
@@ -11683,6 +11854,54 @@ export const bouncer_credit_event_outbox = pgTable(
 export type BouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferSelect;
 export type NewBouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferInsert;
 
+/**
+ * Durable outbox for Bouncer usage events of requests whose decide verdict said `spendWatch`.
+ * Bouncer debits a watched account's spend bucket from these events, so they must not be lost to a
+ * Bouncer or network outage. The usage write enqueues the row in the same transaction as the
+ * `microdollar_usage` insert, the gateway then tries one immediate delivery, and the cron drainer
+ * retries failures with the same state machine as `bouncer_credit_event_outbox`. `request_id` is
+ * the bouncer request id shared by decide and the usage event; Bouncer dedupes on it, so a
+ * redelivery counts once. `payload` is the shaped usage-event wire body and carries account PII
+ * (account id, client ip, JA4 client-fingerprint digest); `user_id` is denormalized onto the row
+ * so user soft deletion can delete it.
+ */
+export type BouncerUsageEventOutboxPayload = Record<string, unknown>;
+
+export const bouncer_usage_event_outbox = pgTable(
+  'bouncer_usage_event_outbox',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    /** The bouncer request id; the dedupe key that makes enqueue idempotent. */
+    request_id: text().notNull(),
+    /** The Kilo user who made the request; not a UUID for OAuth users. */
+    user_id: text().notNull(),
+    payload: jsonb().$type<BouncerUsageEventOutboxPayload>().notNull(),
+    status: text()
+      .$type<'pending' | 'sending' | 'delivered' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    attempts: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    delivered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error: text(),
+  },
+  table => [
+    uniqueIndex('UQ_bouncer_usage_event_outbox_request_id').on(table.request_id),
+    index('IDX_bouncer_usage_event_outbox_status_next_attempt_at').on(
+      table.status,
+      table.next_attempt_at
+    ),
+    index('IDX_bouncer_usage_event_outbox_user_id').on(table.user_id),
+  ]
+);
+
+export type BouncerUsageEventOutboxRow = typeof bouncer_usage_event_outbox.$inferSelect;
+
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
 
 // Immutable metered-infrastructure debit ledger, partitioned monthly on the
@@ -11859,59 +12078,6 @@ export const user_terms_acceptances = pgTable(
 
 export type UserTermsAcceptance = typeof user_terms_acceptances.$inferSelect;
 export type NewUserTermsAcceptance = typeof user_terms_acceptances.$inferInsert;
-
-export const quick_chat_threads = pgTable(
-  'quick_chat_threads',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'restrict' }),
-    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    uniqueIndex('quick_chat_threads_user_personal_uidx')
-      .on(table.user_id)
-      .where(sql`${table.organization_id} IS NULL`),
-    uniqueIndex('quick_chat_threads_user_org_uidx')
-      .on(table.user_id, table.organization_id)
-      .where(sql`${table.organization_id} IS NOT NULL`),
-  ]
-);
-
-export type QuickChatThread = typeof quick_chat_threads.$inferSelect;
-export type NewQuickChatThread = typeof quick_chat_threads.$inferInsert;
-
-export const quick_chat_messages = pgTable(
-  'quick_chat_messages',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    thread_id: uuid()
-      .notNull()
-      .references(() => quick_chat_threads.id, { onDelete: 'cascade' }),
-    role: text().notNull(),
-    content: text().notNull(),
-    client_id: text(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    index('IDX_quick_chat_messages_thread_created_at').on(table.thread_id, table.created_at),
-  ]
-);
-
-export type QuickChatMessage = typeof quick_chat_messages.$inferSelect;
-export type NewQuickChatMessage = typeof quick_chat_messages.$inferInsert;
 
 export const organization_service_fee_exemptions = pgTable(
   'organization_service_fee_exemptions',

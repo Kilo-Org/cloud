@@ -3,7 +3,7 @@ import * as Sentry from '@sentry/react-native';
 import * as z from 'zod';
 
 import { emitNotificationTokenUpdated, getDevicePushTokenOutcome } from '@/lib/notifications';
-import { getGlanceableDelivery } from '@/lib/glanceable/sink-registry';
+import { type ActivityTokenLifetime, getGlanceableDelivery } from '@/lib/glanceable/sink-registry';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { readCachedUserId } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
@@ -117,18 +117,19 @@ export async function runLogoutCleanup(): Promise<void> {
       pushLookupFailed = true;
     }
 
+    // Unregister activity tokens (Live Activity / push-to-start) before the
+    // device session revoke: the revoke ends this token's auth, so a later
+    // delete can only answer 401. A failed unregister is tombstoned and retried
+    // at the next authenticated opportunity against the recorded tokens only.
+    const activityResult = await getGlanceableDelivery().unregisterTokens();
+    const needsActivityUnregister = !activityResult.ok;
+
     const results = await Promise.allSettled([
       trpcClient.user.revokeCurrentDeviceSession.mutate(),
       pushToken
         ? trpcClient.user.unregisterPushToken.mutate({ token: pushToken })
         : Promise.resolve(),
     ]);
-
-    // Unregister activity tokens (Live Activity / push-to-start) before the
-    // epoch bump. A failed unregister is tombstoned and retried at the next
-    // authenticated opportunity against the recorded tokens only.
-    const activityResult = await getGlanceableDelivery().unregisterTokens();
-    const needsActivityUnregister = !activityResult.ok;
 
     const unregister = results[1];
 
@@ -196,7 +197,7 @@ export async function awaitActivityCleanupSettled(): Promise<void> {
  * pending push cleanup and failed activity tokens so both survive a switch.
  */
 export async function unregisterActivityTokensAndTombstone(
-  lifetime: 'scope' | 'activity' = 'scope',
+  lifetime: ActivityTokenLifetime = 'scope',
   activityToken?: Promise<string | null>
 ): Promise<void> {
   const previous = activityCleanupInFlight;
@@ -215,7 +216,7 @@ export async function unregisterActivityTokensAndTombstone(
 
 async function runActivityCleanup(
   previous: Promise<void> | null,
-  lifetime: 'scope' | 'activity',
+  lifetime: ActivityTokenLifetime,
   activityToken?: Promise<string | null>
 ): Promise<void> {
   try {

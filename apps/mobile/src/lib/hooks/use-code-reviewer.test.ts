@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type ConfigPatch, PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 
-import { useSaveReviewConfig, useToggleReviewer } from './use-code-reviewer';
+import { useReviewConfig, useSaveReviewConfig, useToggleReviewer } from './use-code-reviewer';
 
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
@@ -49,13 +49,17 @@ const setQueryDataMock = vi.fn();
 const toastErrorMock = vi.fn();
 
 let lastCapturedOptions: MutationOptions | null = null;
+const queryCalls: { queryKey?: unknown[]; enabled?: boolean }[] = [];
 
 vi.mock('@tanstack/react-query', () => ({
   useMutation: (opts: MutationOptions) => {
     lastCapturedOptions = opts;
     return { mutate: vi.fn() };
   },
-  useQuery: () => ({ data: undefined }),
+  useQuery: (options: { queryKey?: unknown[]; enabled?: boolean }) => {
+    queryCalls.push(options);
+    return { data: undefined };
+  },
   useQueryClient: () => ({
     cancelQueries: cancelQueriesMock,
     getQueryData: getQueryDataMock,
@@ -68,11 +72,21 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     personalReviewAgent: {
-      getReviewConfig: { queryKey: () => ['personalReviewAgent', 'getReviewConfig'] },
+      getReviewConfig: {
+        queryKey: () => ['personalReviewAgent', 'getReviewConfig'],
+        queryOptions: (input: unknown) => ({
+          queryKey: ['personalReviewAgent', 'getReviewConfig', input],
+        }),
+      },
     },
     organizations: {
       reviewAgent: {
-        getReviewConfig: { queryKey: () => ['organizations', 'reviewAgent', 'getReviewConfig'] },
+        getReviewConfig: {
+          queryKey: () => ['organizations', 'reviewAgent', 'getReviewConfig'],
+          queryOptions: (input: unknown) => ({
+            queryKey: ['organizations', 'reviewAgent', 'getReviewConfig', input],
+          }),
+        },
       },
     },
   }),
@@ -140,6 +154,7 @@ function getToggleOptions(
 
 beforeEach(() => {
   lastCapturedOptions = null;
+  queryCalls.length = 0;
   personalPatchMutateMock.mockReset();
   orgPatchMutateMock.mockReset();
   personalSaveMutateMock.mockReset();
@@ -161,6 +176,41 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+describe('useReviewConfig enabled option', () => {
+  function readConfig(
+    scope: string,
+    platform: 'github' | 'gitlab' | 'bitbucket',
+    options?: { enabled?: boolean }
+  ) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useReviewConfig(scope, platform, options);
+    const [personal, org] = queryCalls;
+    return { personal, org };
+  }
+
+  it('enables only the personal query for the personal scope by default', () => {
+    const { personal, org } = readConfig(PERSONAL_SCOPE, 'gitlab');
+
+    expect(personal?.enabled).toBe(true);
+    expect(personal?.queryKey?.at(-1)).toEqual({ platform: 'gitlab' });
+    expect(org?.enabled).toBe(false);
+  });
+
+  it('sends no org query when disabled', () => {
+    const { personal, org } = readConfig('org-1', 'github', { enabled: false });
+
+    expect(personal?.enabled).toBe(false);
+    expect(org?.enabled).toBe(false);
+  });
+
+  it('does not call toPersonalPlatform for a disabled personal Bitbucket read', () => {
+    const { personal, org } = readConfig(PERSONAL_SCOPE, 'bitbucket', { enabled: false });
+
+    expect(personal?.enabled).toBe(false);
+    expect(org?.enabled).toBe(false);
+  });
 });
 
 describe('useSaveReviewConfig mutationFn payload shape', () => {

@@ -57,6 +57,7 @@ export type CloudAgentPrepareSessionInput = {
   bitbucketIntegrationId?: string;
   bitbucketPullRequestId?: number;
   bitbucketExpectedHeadSha?: string;
+  githubPullRequestNumber?: number;
   kilocodeOrganizationId?: string;
   envVars?: Record<string, string>;
   mcpServers?: Record<string, unknown>;

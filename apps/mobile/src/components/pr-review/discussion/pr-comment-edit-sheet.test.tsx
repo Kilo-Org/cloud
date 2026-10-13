@@ -16,8 +16,13 @@ import '@/i18n';
 import * as Haptics from 'expo-haptics';
 import { PrCommentEditSheet } from './pr-comment-edit-sheet';
 
-type AlertButton = { text?: string; style?: string; onPress?: () => void };
-type AlertCall = { title: string; message: string; buttons: AlertButton[] };
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+};
 type InlineErrorProps = {
   inlineError?: string;
   inlineErrorKind?: string;
@@ -31,7 +36,7 @@ const hoisted = vi.hoisted(() => ({
     refSlots: [] as { current: unknown }[],
     refCursor: 0,
   },
-  alertCalls: [] as AlertCall[],
+  confirmRequests: [] as ConfirmRequest[],
   updateCommentMocks: {
     mutateAsync: vi.fn<() => Promise<unknown>>(),
     isPending: false,
@@ -45,7 +50,7 @@ const hoisted = vi.hoisted(() => ({
   connectivity: { value: 'online' as 'online' | 'offline' | 'unknown' },
 }));
 
-const { hookState, alertCalls, updateCommentMocks, termsGateMock, backHandler, connectivity } =
+const { hookState, confirmRequests, updateCommentMocks, termsGateMock, backHandler, connectivity } =
   hoisted;
 
 vi.mock('react-i18next', async importOriginal => {
@@ -94,11 +99,6 @@ vi.mock('react', async () => {
 });
 
 vi.mock('react-native', () => ({
-  Alert: {
-    alert: (title: string, message: string, buttons: AlertCall['buttons']) => {
-      alertCalls.push({ title, message, buttons });
-    },
-  },
   BackHandler: {
     addEventListener: (event: string, handler: () => boolean) => {
       const armed = event === 'hardwareBackPress';
@@ -124,6 +124,17 @@ vi.mock('react-native', () => ({
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
   NotificationFeedbackType: { Success: 'Success' },
+}));
+
+// The sheet renders `{dialog}` from `useConfirmDialog`; stub the hook so the
+// test reads the request it was handed and drives its confirm.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: ConfirmRequest) => {
+      confirmRequests.push(request);
+    },
+    dialog: null,
+  }),
 }));
 
 // The real `useComposerInlineError` (kept below) reaches the operation-ledger
@@ -259,23 +270,13 @@ function typeBody(element: React.ReactElement, text: string): void {
   (field.props as { onChangeText?: (value: string) => void }).onChangeText?.(text);
 }
 
-/** Presses the discard Alert's Keep editing button. */
-function pressKeepEditing(call: AlertCall): void {
-  call.buttons.find(button => button.text === 'Keep editing')?.onPress?.();
-}
-
-/** Presses the discard Alert's destructive Discard button. */
-function pressDiscard(call: AlertCall): void {
-  call.buttons.find(button => button.style === 'destructive')?.onPress?.();
-}
-
-/** Returns the last recorded Alert call, failing when none was shown. */
-function lastAlert(): AlertCall {
-  const call = alertCalls.at(-1);
-  if (!call) {
-    throw new Error('No discard Alert was shown');
+/** Returns the last confirm request, failing when none was shown. */
+function lastConfirm(): ConfirmRequest {
+  const request = confirmRequests.at(-1);
+  if (!request) {
+    throw new Error('No discard confirmation was shown');
   }
-  return call;
+  return request;
 }
 
 /** Drains the microtask queue plus one macrotask tick. */
@@ -297,7 +298,7 @@ describe('PrCommentEditSheet', () => {
     hookState.cursor = 0;
     hookState.refSlots = [];
     hookState.refCursor = 0;
-    alertCalls.length = 0;
+    confirmRequests.length = 0;
     backHandler.current = null;
     updateCommentMocks.mutateAsync.mockReset();
     updateCommentMocks.isPending = false;
@@ -504,15 +505,17 @@ describe('PrCommentEditSheet', () => {
     let element = mountSheet();
     typeBody(element, 'edited body');
     pressButton(element, 'Cancel');
-    expect(lastAlert().buttons.map(button => button.text)).toEqual(['Keep editing', 'Discard']);
-
-    pressKeepEditing(lastAlert());
+    expect(lastConfirm()).toMatchObject({
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+    });
+    // Keeping editing (never confirming) leaves the sheet open.
     expect(baseProps.onDismiss).not.toHaveBeenCalled();
 
     element = mountSheet();
     typeBody(element, 'edited again');
     pressButton(element, 'Cancel');
-    pressDiscard(lastAlert());
+    lastConfirm().onConfirm();
     expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
   });
 
@@ -520,19 +523,19 @@ describe('PrCommentEditSheet', () => {
     let element = mountSheet();
     typeBody(element, 'edited body');
     (requireByType(element, 'PrFormSheetHeader').props as { onBack?: () => void }).onBack?.();
-    expect(alertCalls).toHaveLength(1);
+    expect(confirmRequests).toHaveLength(1);
 
     element = mountSheet();
     typeBody(element, 'edited again');
     expect(backHandler.current?.()).toBe(true);
-    expect(alertCalls).toHaveLength(2);
+    expect(confirmRequests).toHaveLength(2);
   });
 
   it('dismisses an unchanged body without a discard confirm', () => {
     const element = mountSheet();
     pressButton(element, 'Cancel');
 
-    expect(alertCalls).toHaveLength(0);
+    expect(confirmRequests).toHaveLength(0);
     expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
   });
 

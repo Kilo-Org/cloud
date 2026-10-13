@@ -86,6 +86,15 @@ export const SESSION_OWNER_NOT_FOUND_LITERAL = 'Session owner not found';
 const CLOUD_SESSION_NOT_FOUND_LITERAL = 'cloud session not found';
 const CLOUD_SESSION_IMPORT_UNAUTHORIZED_LITERAL = 'cloud session import unauthorized';
 const CLOUD_SESSION_IMPORT_ACCESS_DENIED_LITERAL = 'cloud session import access denied';
+// The fork cut message is not in the synced source yet: a retry can succeed.
+const CLOUD_SESSION_CUT_NOT_FOUND_LITERAL = 'cloud session cut not found';
+
+/**
+ * Inline reason for a fork cut the source has not synced yet (CLI literal
+ * above, or the cloud-destination `clone_cut_not_found` code). Unlike the
+ * other clone failures it keeps Start enabled: a retry can succeed.
+ */
+export const FORK_CUT_NOT_SYNCED_KEY = 'agentChat.newSession.forkCutNotSynced';
 
 /**
  * Map a delivered clone/import error string to the i18n key shown inline under
@@ -98,6 +107,9 @@ const CLOUD_SESSION_IMPORT_ACCESS_DENIED_LITERAL = 'cloud session import access 
 export function resolveCloneImportFailureKey(message: string): string {
   if (message === CLOUD_SESSION_NOT_FOUND_LITERAL) {
     return 'common.notFound';
+  }
+  if (message === CLOUD_SESSION_CUT_NOT_FOUND_LITERAL) {
+    return FORK_CUT_NOT_SYNCED_KEY;
   }
   if (
     message === CLOUD_SESSION_IMPORT_UNAUTHORIZED_LITERAL ||
@@ -124,6 +136,29 @@ export function resolveCloneImportFailure(outcome: CreateSessionOutcome): string
     return null;
   }
   return resolveCloneImportFailureKey(outcome.cause.message);
+}
+
+/**
+ * Capability gate for a clone spawn, checked before the spawn is sent. A full
+ * clone is optimistic: only an explicit `sessionClone: false` refuses it. A
+ * fork cut fails closed: it needs `sessionCloneAtMessage: true`, because a CLI
+ * without it ignores the cut and clones the whole session. Returns the inline
+ * i18n key for a refusal, or null when the spawn may go ahead.
+ */
+export function resolveCloneCapabilityRefusal(
+  fields: { cloneFromKiloSessionId?: string | null; cloneUpToMessageId?: string | null },
+  instance: { capabilities?: { sessionClone?: boolean; sessionCloneAtMessage?: boolean } }
+): string | null {
+  if (!fields.cloneFromKiloSessionId) {
+    return null;
+  }
+  if (instance.capabilities?.sessionClone === false) {
+    return 'agentChat.newSession.cliCannotContinue';
+  }
+  if (fields.cloneUpToMessageId && instance.capabilities?.sessionCloneAtMessage !== true) {
+    return 'agentChat.newSession.cliCannotFork';
+  }
+  return null;
 }
 
 export type CreateSessionOutcome =
@@ -218,6 +253,8 @@ export function buildCreateRemoteSessionInput(fields: {
   /** Relative launch directory; omitted when empty (the CLI falls back to its launch directory). */
   directory?: string;
   cloneFromKiloSessionId?: string | null;
+  /** Inclusive fork cut; sent only together with `cloneFromKiloSessionId`. */
+  cloneUpToMessageId?: string | null;
 }): CreateRemoteSessionInput | undefined {
   const input: CreateRemoteSessionInput = {};
   if (fields.mode) {
@@ -238,6 +275,9 @@ export function buildCreateRemoteSessionInput(fields: {
   }
   if (fields.cloneFromKiloSessionId) {
     input.cloneFromKiloSessionId = fields.cloneFromKiloSessionId;
+    if (fields.cloneUpToMessageId) {
+      input.cloneUpToMessageId = fields.cloneUpToMessageId;
+    }
   }
   return input.agent !== undefined ||
     input.model !== undefined ||

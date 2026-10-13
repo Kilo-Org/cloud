@@ -8,15 +8,14 @@ import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
 import type * as TokenOwnerModule from './token-owner';
-import { ORGANIZATION_PERSONAL_STORAGE_KEY } from '@/lib/storage-keys';
+import { CHAT_BACKENDS_KEY, ORGANIZATION_PERSONAL_STORAGE_KEY } from '@/lib/storage-keys';
 
-// Every test re-imports the auth module graph after vi.resetModules() and the
-// failure-matrix tests wait out real 250/500/1000 ms retry backoffs. On a
-// loaded machine (the full gate saturates every core) both stretch several
-// fold, so the 5 s vitest default times out healthy tests and the abandoned
-// act scopes cascade failures across the file. The file-wide timeout leaves
-// that headroom; a genuinely hung bootstrap still fails, only later.
-vi.setConfig({ testTimeout: 30_000 });
+// The mobile-app gate runs `vitest related` over ~170 files concurrently with
+// the device stack, so every real timer in this file stretches several-fold.
+// Give each test room for the load-aware settle budget below instead of the
+// 5 s default (the sibling intl-cache Hermes test carries the same node-load
+// budget for the same reason).
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 
 // ---- hoisted mocks ----
 
@@ -141,6 +140,18 @@ const logoutCleanupMock = vi.hoisted(() => ({
 // teardown without loading the consent module's SecureStore/PostHog chain.
 const consentMock = vi.hoisted(() => ({
   clearPendingConsentOutcome: vi.fn(),
+}));
+
+// Hoisted so the sign-out case can seed the remote MCP server store and assert
+// it is cleared, without loading the native-bound store chain (secure-store-
+// preference -> sonner-native -> react-native) into the node test environment.
+const remoteMcpMock = vi.hoisted(() => ({
+  servers: [] as string[],
+  forgetRemoteMcp: vi.fn(),
+  clearRemoteMcpServers: vi.fn(() => {
+    remoteMcpMock.servers.length = 0;
+  }),
+  clearSettingsToolsEnabled: vi.fn(),
 }));
 
 // Hoisted so the sign-out suite can assert the launcher-surface clears without
@@ -366,6 +377,7 @@ vi.mock('@/lib/agent-attachments/clipboard-image', () => ({
 vi.mock('@/lib/temp-file-registry', () => ({
   reapTempFiles: vi.fn(),
 }));
+vi.mock('@/lib/chat/backend-store', () => ({ clearChatBackends: vi.fn() }));
 
 // The artifact mirror members of the same teardown read expo-file-system and
 // the native provider bridge. This suite asserts the teardown ordering of the
@@ -403,8 +415,26 @@ vi.mock('@/lib/last-active-instance', () => ({
 // regression test must observe the real gate closing before any await and
 // blocking a late persist from calling SecureStore.setItem.
 
-vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
+vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
+}));
+
+vi.mock('@/lib/chat/sign-out', () => ({
+  clearChatsForSignOut: vi.fn().mockResolvedValue(undefined),
+  releaseChatsForAccountSwitch: vi.fn().mockResolvedValue(undefined),
+}));
+
+// The remote MCP connection and the stored servers behind it ride on the
+// native-bound secure-store preference chain (sonner-native -> react-native),
+// so the sign-out body's clears are stubbed here and asserted by call.
+vi.mock('@/lib/chat/remote-mcp', () => ({
+  forgetRemoteMcp: remoteMcpMock.forgetRemoteMcp,
+}));
+vi.mock('@/lib/chat/remote-mcp-store', () => ({
+  clearRemoteMcpServers: remoteMcpMock.clearRemoteMcpServers,
+}));
+vi.mock('@/lib/chat/settings-tools-switch', () => ({
+  clearSettingsToolsEnabled: remoteMcpMock.clearSettingsToolsEnabled,
 }));
 
 vi.mock('@/lib/pr-review/recent-prs', () => ({
@@ -415,13 +445,10 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
   clearViewedFiles: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/lib/home-live-shape', () => ({
-  clearLiveShapeHint: vi.fn(),
-}));
-
 vi.mock('@/lib/storage-keys', () => ({
   ACTIVE_USER_ID_KEY: 'active-user-id',
   AUTH_TOKEN_KEY: 'auth-token',
+  CHAT_BACKENDS_KEY: 'chat-backends',
   KEEP_SCREEN_ON_KEY: 'keep-session-screen-on',
   KILOCLAW_OWNED_KEY: 'kiloclaw-owned',
   LEGACY_EXCHANGE_DONE_KEY: 'legacy-exchange-done',
@@ -534,17 +561,21 @@ async function mountAndGetContext(): Promise<{
 }
 
 /** Flush act passes on real timers until bootstrap stops loading, bounded so a
- *  stuck provider fails as a timeout rather than hanging the suite. The budget
- *  is real wall-clock time, not an iteration count: a loaded machine stretches
- *  every 20 ms cycle, and an iteration-counted budget would expire while the
- *  provider's equally stretched retry backoffs (250/500/1000 ms) are still in
- *  flight. */
+ *  stuck provider fails as a timeout rather than hanging the suite.
+ *
+ *  The budget is a count of act passes, not wall-clock milliseconds: the gate
+ *  runs this file beside ~170 others and the device stack, so each 20 ms pass
+ *  can stretch several-fold while the bootstrap's own backoff timers stretch
+ *  with it. Counting passes keeps the two in step — a wall-clock deadline
+ *  would expire early on exactly the loaded machine this guards against.
+ *  1250 passes is far more than the ~90 the 1.75 s backoff needs, so a
+ *  healthy bootstrap still returns on its first pass. The whole file carries a
+ *  30 s per-test timeout (see the `vi.setConfig` at the top), above this. */
 async function settleBootstrap(
   read: () => AuthContextValue | undefined,
-  budgetMs = 30_000
+  budgetPasses = 1250
 ): Promise<void> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt <= budgetMs) {
+  for (let pass = 0; pass < budgetPasses; pass += 1) {
     // eslint-disable-next-line no-await-in-loop -- polling must flush and re-check sequentially between act cycles
     await act(async () => {
       await new Promise<void>(resolve => {
@@ -750,6 +781,24 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
+  it('ends the prior account chats on sign-in, and signs in even when that fails', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const { releaseChatsForAccountSwitch } = await import('@/lib/chat/sign-out');
+    const release = vi.mocked(releaseChatsForAccountSwitch);
+    release.mockRejectedValueOnce(new Error('the store is locked'));
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    expect(release).toHaveBeenCalledTimes(1);
+    // The rest of the switch ran: a chat that would not close cannot stop the
+    // prior account's cache being cleared.
+    expect(queryClientMock.clear).toHaveBeenCalled();
+
+    unmount();
+  });
+
   it('clears the prior account Personal-choice marker on sign-in (account switch)', async () => {
     const { ctx, unmount } = await mountAndGetContext();
 
@@ -804,6 +853,23 @@ describe('sign-out teardown ordering', () => {
     const { clearRunOnDestinationPreference } =
       await import('@/lib/hooks/use-persisted-run-on-destination');
     expect(clearRunOnDestinationPreference).toHaveBeenCalled();
+  });
+
+  it('clears the remote MCP connection, its stored servers and the group switch on sign-out', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    // The account added a remote server before signing out.
+    remoteMcpMock.servers.push('alpha');
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    expect(remoteMcpMock.forgetRemoteMcp).toHaveBeenCalled();
+    expect(remoteMcpMock.clearRemoteMcpServers).toHaveBeenCalled();
+    expect(remoteMcpMock.clearSettingsToolsEnabled).toHaveBeenCalled();
+    expect(remoteMcpMock.servers).toEqual([]);
+
+    unmount();
   });
 
   it('clears the last-opened session and the launcher surfaces on sign-out', async () => {
@@ -898,6 +964,22 @@ describe('sign-out teardown ordering', () => {
     expect(deleteIndex).toBeGreaterThanOrEqual(0);
     const deleteOrder = secureStore.deleteItemAsync.mock.invocationCallOrder[deleteIndex];
     expect(deleteOrder).toBeGreaterThan(invocationOrder(secureStore.setItemAsync));
+
+    unmount();
+  });
+
+  it("takes the account's chats off the device, and survives a wipe that fails", async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const { clearChatsForSignOut } = await import('@/lib/chat/sign-out');
+    const wipe = vi.mocked(clearChatsForSignOut);
+    wipe.mockRejectedValueOnce(new Error('database locked'));
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    expect(wipe).toHaveBeenCalledWith(null);
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
 
     unmount();
   });
@@ -1070,7 +1152,7 @@ describe('stale sign-in continuation', () => {
 
     expect(hoisted.appsflyer.trackEvent).toHaveBeenCalledTimes(1);
     const { resetPurchaseErrorToastDedup } =
-      await import('@/lib/kilo-pass/use-store-kilo-pass-purchase');
+      await import('@/lib/credits/use-store-credit-purchase');
     expect(resetPurchaseErrorToastDedup).toHaveBeenCalledTimes(1);
     // The sign-out won the race to the final state.
     expect(getCtx().token).toBeUndefined();
@@ -1098,7 +1180,7 @@ describe('stale sign-in continuation', () => {
 
     expect(hoisted.appsflyer.trackEvent).toHaveBeenCalledTimes(2);
     const { resetPurchaseErrorToastDedup } =
-      await import('@/lib/kilo-pass/use-store-kilo-pass-purchase');
+      await import('@/lib/credits/use-store-credit-purchase');
     expect(resetPurchaseErrorToastDedup).toHaveBeenCalledTimes(2);
     expect(getCtx().token).toBe('second-token');
 
@@ -2015,6 +2097,57 @@ describe('reactive auth epoch', () => {
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
   });
 
+  it('cannot restore another account with the previous backend credentials after an interrupted sign-in', async () => {
+    const { getCtx, unmount } = await mountEpochTest();
+    onTestFinished(() => act(unmount));
+    const priorBackends = JSON.stringify([{ apiKey: 'synthetic-backend-key-a' }]);
+    const disk = new Map([
+      ['auth-token', 'account-a-token'],
+      [CHAT_BACKENDS_KEY, priorBackends],
+    ]);
+    const clearStarted = Promise.withResolvers<undefined>();
+    const clearAllowed = Promise.withResolvers<undefined>();
+    const credentialSnapshots: (string | undefined)[] = [];
+    const previousSet = hoisted.secureStore.setItemAsync.getMockImplementation();
+    const previousDelete = hoisted.secureStore.deleteItemAsync.getMockImplementation();
+    onTestFinished(() => {
+      clearAllowed.resolve(undefined);
+      if (previousSet) {
+        hoisted.secureStore.setItemAsync.mockImplementation(previousSet);
+      }
+      if (previousDelete) {
+        hoisted.secureStore.deleteItemAsync.mockImplementation(previousDelete);
+      }
+    });
+    hoisted.secureStore.setItemAsync.mockImplementation(async (key: string, value: string) => {
+      await Promise.resolve();
+      disk.set(key, value);
+      if (key === 'auth-token') {
+        credentialSnapshots.push(disk.get(CHAT_BACKENDS_KEY));
+      }
+    });
+    hoisted.secureStore.deleteItemAsync.mockImplementation(async (key: string) => {
+      if (key === CHAT_BACKENDS_KEY) {
+        clearStarted.resolve(undefined);
+        await clearAllowed.promise;
+      }
+      disk.delete(key);
+    });
+    const transition = getCtx().signIn('account-b-token');
+    await act(async () => {
+      await Promise.race([clearStarted.promise, transition]);
+    });
+    expect.soft(disk.get('auth-token')).toBe('account-a-token');
+    expect.soft(disk.get(CHAT_BACKENDS_KEY)).toBe(priorBackends);
+    await act(async () => {
+      clearAllowed.resolve(undefined);
+      await transition;
+    });
+    expect(disk.get('auth-token')).toBe('account-b-token');
+    expect(disk.has(CHAT_BACKENDS_KEY)).toBe(false);
+    expect(credentialSnapshots).toEqual([undefined]);
+  });
+
   it('does not persist new credentials if removing the previous identity hint fails', async () => {
     const { getCtx, unmount } = await mountEpochTest();
     onTestFinished(() => act(unmount));
@@ -2478,7 +2611,7 @@ describe('startup credential read failure', () => {
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).not.toHaveBeenCalled();
 
     unmount();
-  }, 60_000);
+  }, 30_000);
 
   it('restores the session when retryRestore runs after the storage recovers', async () => {
     // Every attempt of the first bootstrap fails; the retry's reads succeed.
@@ -2503,7 +2636,7 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBe('stored-token');
 
     unmount();
-  }, 60_000);
+  }, 30_000);
 
   it('a failed retry settles back onto the restore error surface', async () => {
     // Four reads for the first bootstrap, four for the retry: every attempt
@@ -2529,7 +2662,7 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBeUndefined();
 
     unmount();
-  }, 60_000);
+  }, 30_000);
 
   it('sends the person to login when the retry finds no stored session', async () => {
     // Every attempt of the first bootstrap fails; the retry's reads resolve
@@ -2554,7 +2687,100 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBeUndefined();
 
     unmount();
-  }, 60_000);
+  }, 30_000);
+
+  describe('on a locked device', () => {
+    /** Mount without settling: a locked launch holds the loading state. The
+     *  gate is imported from the same fresh registry as the provider, so both
+     *  share one module instance. */
+    async function mountWithGate(
+      lockedAtLaunch: boolean,
+      beforeImport?: (setAvailable: (available: boolean) => void) => void
+    ) {
+      vi.resetModules();
+      // A registry reset per mount needs the dynamic imports: the provider's
+      // module state (the preloads) must be fresh for each case.
+      const gate = await import('@/lib/protected-data');
+      gate.setProtectedDataAvailable(!lockedAtLaunch);
+      beforeImport?.(gate.setProtectedDataAvailable);
+      const mod = await import('./auth-context');
+      let captured: AuthContextValue | undefined = undefined;
+      function Consumer(): null {
+        captured = mod.useAuth();
+        return null;
+      }
+      let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+      await act(async () => {
+        renderer = TestRenderer.create(
+          createElement(mod.AuthProvider, null, createElement(Consumer))
+        );
+        await Promise.resolve();
+      });
+      const getCtx = (): AuthContextValue => {
+        if (!captured) {
+          throw new Error('auth context not captured');
+        }
+        return captured;
+      };
+      return { gate, getCtx, unmount: () => renderer?.unmount() };
+    }
+
+    async function flushFor(ms: number): Promise<void> {
+      await act(async () => {
+        await new Promise<void>(resolve => {
+          void setTimeout(resolve, ms);
+        });
+      });
+    }
+
+    it('waits for unlock, without a keychain call or the restore error, then restores', async () => {
+      failTokenReads(0);
+
+      const { gate, getCtx, unmount } = await mountWithGate(true);
+      await flushFor(2000);
+
+      expect(hoisted.secureStore.getItemAsync).not.toHaveBeenCalled();
+      expect(getCtx().isLoading).toBe(true);
+      expect(getCtx().restoreFailed).toBe(false);
+
+      gate.setProtectedDataAvailable(true);
+      await settleBootstrap(getCtx);
+
+      expect(getCtx().restoreFailed).toBe(false);
+      expect(getCtx().token).toBe('stored-token');
+      unmount();
+    });
+
+    it('reads again after unlock when the device locks during the startup reads', async () => {
+      failTokenReads(0);
+      const healthyRead = hoisted.secureStore.getItemAsync.getMockImplementation();
+      let lockedOnce = false;
+      const { gate, getCtx, unmount } = await mountWithGate(false, setAvailable => {
+        // The preloads read the token pair. The device locks on the expiry
+        // read that follows, and the keychain refuses it.
+        hoisted.secureStore.getItemAsync.mockImplementation(async (key: string) => {
+          if (key === 'token-expires-at' && !lockedOnce) {
+            lockedOnce = true;
+            setAvailable(false);
+            throw new Error('User interaction is not allowed.');
+          }
+          return (await healthyRead?.(key)) ?? null;
+        });
+      });
+      await flushFor(2000);
+
+      expect(lockedOnce).toBe(true);
+      expect(getCtx().isLoading).toBe(true);
+      expect(getCtx().restoreFailed).toBe(false);
+
+      gate.setProtectedDataAvailable(true);
+      await settleBootstrap(getCtx);
+
+      expect(getCtx().restoreFailed).toBe(false);
+      expect(getCtx().token).toBe('stored-token');
+      unmount();
+    });
+  });
 
   it('does not resurrect the restore error surface when signOut lands mid-retry', async () => {
     // Four reads for the first bootstrap, four for the in-flight retry: the
@@ -2581,8 +2807,9 @@ describe('startup credential read failure', () => {
     // Let the abandoned retry's remaining reads exhaust (~1.75 s of backoff)
     // and flush its catch. Resurrecting the flag here would repaint the error
     // screen over the login route, where the sign-out dedupe makes a second
-    // tap a no-op — the escape hatch would be permanently dead. The budget is
-    // real wall-clock time for the same reason as settleBootstrap above.
+    // tap a no-op — the escape hatch would be permanently dead. The budget is a
+    // real wall-clock wait so a loaded machine's stretched cycles do not cut the
+    // retry's backoff short.
     const abandonedSettleStartedAt = Date.now();
     while (Date.now() - abandonedSettleStartedAt <= 30_000 && readCount() < 8) {
       // eslint-disable-next-line no-await-in-loop -- polling must flush and re-check sequentially between act cycles
@@ -2603,7 +2830,7 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBeUndefined();
 
     unmount();
-  }, 60_000);
+  }, 30_000);
 
   it('clears the restore failure when signOut is used as the escape hatch', async () => {
     failTokenReads(4);
@@ -2621,5 +2848,5 @@ describe('startup credential read failure', () => {
     expect(getCtx().token).toBeUndefined();
 
     unmount();
-  }, 60_000);
+  }, 30_000);
 });

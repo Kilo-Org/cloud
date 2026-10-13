@@ -35,7 +35,7 @@ import {
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeAttachmentChip } from '@/components/agents/attachment-chip-description';
 import { CenteredState } from '@/components/centered-state';
-import { ImageViewerModal } from '@/components/image-viewer-modal';
+import { ImageViewer } from '@/components/ui/image-viewer';
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
 import {
@@ -342,7 +342,10 @@ function AttachmentChip({
               {description.filename}
             </Text>
             <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
-              {description.message ?? `${description.sizeText} · ${description.progressText}`}
+              {description.message ??
+                (description.progressText === ''
+                  ? description.sizeText
+                  : `${description.sizeText} · ${description.progressText}`)}
             </Text>
           </View>
         </View>
@@ -461,7 +464,7 @@ function AttachmentChip({
       </GestureDetector>
 
       {viewerVisible ? (
-        <ImageViewerModal
+        <ImageViewer
           visible={viewerVisible}
           uri={attachment.localUri}
           filename={attachment.filename}

@@ -1,6 +1,6 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { z } from 'zod';
-import { fetchO11yJson, O11yRequestError } from '@/lib/ai-gateway/o11y-client';
+import { fetchO11yJson, O11yRequestError } from '@/lib/o11y-client';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { TRPCError } from '@trpc/server';
 

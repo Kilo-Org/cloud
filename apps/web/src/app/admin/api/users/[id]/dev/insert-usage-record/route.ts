@@ -95,6 +95,7 @@ export async function POST(
     session_id: null,
     mode: null,
     auto_model: null,
+    reasoning_setting: null,
     market_cost: cost_mUsd,
     is_free: false,
     abuse_delay: null,

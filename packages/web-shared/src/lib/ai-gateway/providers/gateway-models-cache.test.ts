@@ -138,11 +138,50 @@ describe('isValidOpenRouterModelId', () => {
     mockLimit.mockReset();
   });
 
-  it('accepts retained legacy aliases without consulting the database', async () => {
+  it.each([
+    'anthropic/claude-haiku-4-5',
+    'anthropic/claude-sonnet-4-5',
+    'anthropic/claude-sonnet-4-6',
+    'anthropic/claude-sonnet-5-20260630',
+    'claude-sonnet-4.5',
+    'claude-sonnet-5',
+    'deepseek-v4-flash',
+    'deepseek-v4-flash-0731',
+    'deepseek-v4-pro',
+    'gemini-2.5-flash-lite',
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-5.4',
+    'gpt-5.4-mini',
+    'gpt-5.5',
+    'gpt-5.6-luna',
+    'gpt-5.6-sol',
+    'gpt-5.6-terra',
+    'minimax-m3',
+    'minimax/minimax-m2.5-20260211',
+  ])('accepts retained legacy alias %s without consulting the database', async modelId => {
     const { isValidOpenRouterModelId } = await loadValidator();
 
-    await expect(isValidOpenRouterModelId('gpt-4o')).resolves.toBe(true);
+    await expect(isValidOpenRouterModelId(modelId)).resolves.toBe(true);
     expect(mockLimit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'claude-sonnet-4',
+    'glm-5.1',
+    'glm-5.2',
+    'gpt-4.1-mini',
+    'gpt-5.2',
+    'gpt-5.2-codex',
+    'kimi-k3',
+    'mimo-v2.5',
+    'minimax-m2.5',
+    'step-3.5-flash',
+  ])('rejects removed legacy alias %s when absent from the catalog', async modelId => {
+    const { isValidOpenRouterModelId } = await loadValidator();
+    mockLimit.mockResolvedValue([{ models: { 'openai/gpt-4o': textModel('openai/gpt-4o') } }]);
+
+    await expect(isValidOpenRouterModelId(modelId)).resolves.toBe(false);
   });
 
   it.each(['openai/gpt-4o-mini-transcribe', 'openai/gpt-4o-transcribe'])(

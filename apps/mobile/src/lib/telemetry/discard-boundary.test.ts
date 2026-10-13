@@ -39,10 +39,13 @@ const hoisted = vi.hoisted(() => {
   const device = { deviceType: null as number | null };
 
   const appsFlyer = {
-    initSdk: vi.fn(),
-    logEvent: vi.fn(),
-    stop: vi.fn(),
-    setConsentData: vi.fn(),
+    init: vi.fn().mockResolvedValue(undefined),
+    registerSessionReadyListener: vi.fn(),
+    isSessionReady: vi.fn().mockResolvedValue(false),
+    start: vi.fn().mockResolvedValue(undefined),
+    logEvent: vi.fn().mockResolvedValue(undefined),
+    stop: vi.fn().mockResolvedValue(undefined),
+    setConsentData: vi.fn().mockResolvedValue(undefined),
     create: vi.fn(),
     startObservingTransactions: vi.fn(),
     stopObservingTransactions: vi.fn(),
@@ -95,24 +98,14 @@ vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 
 vi.mock('react-native-appsflyer', () => ({
   default: {
-    initSdk: hoisted.appsFlyer.initSdk,
+    init: hoisted.appsFlyer.init,
+    registerSessionReadyListener: hoisted.appsFlyer.registerSessionReadyListener,
+    isSessionReady: hoisted.appsFlyer.isSessionReady,
+    start: hoisted.appsFlyer.start,
     logEvent: hoisted.appsFlyer.logEvent,
     stop: hoisted.appsFlyer.stop,
     setConsentData: hoisted.appsFlyer.setConsentData,
   },
-  // oxlint-disable-next-line func-names max-params
-  AppsFlyerConsent: vi.fn(function (
-    this: Record<string, unknown>,
-    isUserSubjectToGDPR?: boolean,
-    hasConsentForDataUsage?: boolean,
-    hasConsentForAdsPersonalization?: boolean,
-    hasConsentForAdStorage?: boolean
-  ) {
-    this.isUserSubjectToGDPR = isUserSubjectToGDPR;
-    this.hasConsentForDataUsage = hasConsentForDataUsage;
-    this.hasConsentForAdsPersonalization = hasConsentForAdsPersonalization;
-    this.hasConsentForAdStorage = hasConsentForAdStorage;
-  }),
   AppsFlyerPurchaseConnector: {
     create: hoisted.appsFlyer.create,
     startObservingTransactions: hoisted.appsFlyer.startObservingTransactions,
@@ -121,9 +114,17 @@ vi.mock('react-native-appsflyer', () => ({
   StoreKitVersion: { SK1: 'SK1', SK2: 'SK2' },
 }));
 
+vi.mock('expo-tracking-transparency', () => ({
+  getTrackingPermissionsAsync: vi.fn().mockResolvedValue({ status: 'granted' }),
+  PermissionStatus: { UNDETERMINED: 'undetermined' },
+}));
+
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 vi.stubGlobal('__DEV__', false);
+
+/** Gate inputs for a session, user id, and consent read that have all loaded. */
+const SETTLED = { authLoading: false, userIdLoading: false, consentCheckFailed: false };
 
 // ---- shared loaders ----
 
@@ -169,15 +170,14 @@ describe('buffer isolation between accounts', () => {
       return null;
     }
 
-    // 1. Stall initSdk — initialized stays false, callback never fires.
-    hoisted.appsFlyer.initSdk.mockImplementation(() => {
-      // deliberate no-op
-    });
+    // 1. Hold session-ready — the SDK never starts, so initialized stays false.
+    hoisted.appsFlyer.registerSessionReadyListener.mockResolvedValue(undefined);
 
     // Mount hook for account A (optionalConsent: true triggers start path).
     const rendererA = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'account-a@test.com',
@@ -200,23 +200,23 @@ describe('buffer isolation between accounts', () => {
     // 3. Unmount account A.
     rendererA.unmount();
 
-    // 4. Now let initSdk succeed for account B.
-    let accountBOnSuccessCalled = false;
-    hoisted.appsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        onSuccess('ok');
-        accountBOnSuccessCalled = true;
+    // 4. Now let the session become ready for account B.
+    hoisted.appsFlyer.registerSessionReadyListener.mockImplementation(
+      // oxlint-disable-next-line require-await -- async required by promise-function-async
+      async (onReady: () => void) => {
+        onReady();
       }
     );
 
     // Mount hook for account B. The hook calls setTelemetryDecision, which
     // bumps generation because accountId changed from 'account-a' to
-    // 'account-b'. startOptionalTelemetry → initAppsFlyer → initSdk fires
-    // onSuccess, drainPendingEvents only sends events for the current
+    // 'account-b'. startOptionalTelemetry → initAppsFlyer → session-ready →
+    // start(); drainPendingEvents only sends events for the current
     // generation — account A's buffered event is dropped.
     const rendererB = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'account-b@test.com',
@@ -230,8 +230,8 @@ describe('buffer isolation between accounts', () => {
 
     await vi.advanceTimersByTimeAsync(110);
 
-    // 5. Prove account B's init callback ran.
-    expect(accountBOnSuccessCalled).toBe(true);
+    // 5. Prove account B's SDK started.
+    expect(hoisted.appsFlyer.start).toHaveBeenCalledTimes(1);
 
     // 6. Account A's buffered event must not drain.
     expect(hoisted.appsFlyer.logEvent).toHaveBeenCalledTimes(0);
@@ -320,6 +320,7 @@ describe('optional telemetry lifecycle', () => {
     const renderer = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'test@test.com',
@@ -367,6 +368,7 @@ describe('optional telemetry lifecycle', () => {
     const renderer = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'test@test.com',
@@ -406,6 +408,7 @@ describe('optional telemetry lifecycle', () => {
     const renderer = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'test@example.com',
@@ -426,7 +429,8 @@ describe('optional telemetry lifecycle', () => {
     // Epoch mismatch after resume → initAppsFlyer, initPostHog, identifyUser
     // never called.
     expect(hoisted.holder.options).toBeUndefined();
-    expect(hoisted.appsFlyer.initSdk).not.toHaveBeenCalled();
+    expect(hoisted.appsFlyer.setConsentData).not.toHaveBeenCalled();
+    expect(hoisted.appsFlyer.init).not.toHaveBeenCalled();
 
     renderer.unmount();
     vi.useRealTimers();
@@ -441,11 +445,6 @@ describe('needsConsent gate teardown', () => {
     hoisted.holder.options = undefined;
     hoisted.device.deviceType = 1;
     hoisted.appsFlyer.create.mockResolvedValue(undefined);
-    hoisted.appsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        onSuccess('ok');
-      }
-    );
   });
 
   it('gate hook tears down AppsFlyer and PostHog when needsConsent becomes true', async () => {
@@ -471,6 +470,7 @@ describe('needsConsent gate teardown', () => {
       rendererRef.current = TestRenderer.create(
         createElement(GateWrapper, {
           hasToken: true,
+          ...SETTLED,
           consentChecked: true,
           needsConsent: true,
           email: 'test@test.com',
@@ -486,7 +486,7 @@ describe('needsConsent gate teardown', () => {
     expect(gate.ctrl.allowsOptional()).toBe(false);
 
     // resetAppsFlyerState must be called — proves the needsConsent branch.
-    expect(hoisted.appsFlyer.stop).toHaveBeenCalledWith(true);
+    expect(hoisted.appsFlyer.stop).toHaveBeenCalledWith({ shouldStop: true });
 
     // discardPostHog runs sealPostHogStorage synchronously.
     expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
@@ -513,11 +513,6 @@ describe('unsettled consent teardown', () => {
     hoisted.holder.options = undefined;
     hoisted.device.deviceType = 1;
     hoisted.appsFlyer.create.mockResolvedValue(undefined);
-    hoisted.appsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        onSuccess('ok');
-      }
-    );
   });
 
   it('tears down AppsFlyer and PostHog when the user has no token', async () => {
@@ -526,7 +521,6 @@ describe('unsettled consent teardown', () => {
     // Arm telemetry so SDKs exist when teardown runs.
     mod.ctrl.setTelemetryDecision('test-account', true);
     mod.initPostHog();
-    hoisted.appsFlyer.initSdk.mockClear();
     hoisted.storage.sealPostHogStorage.mockClear();
 
     type GateState = Parameters<typeof mod.useAnalyticsConsentGate>[0];
@@ -542,6 +536,7 @@ describe('unsettled consent teardown', () => {
       rendererRef.current = TestRenderer.create(
         createElement(GateWrapper, {
           hasToken: false,
+          ...SETTLED,
           consentChecked: true,
           needsConsent: false,
           email: 'test@test.com',
@@ -556,7 +551,7 @@ describe('unsettled consent teardown', () => {
     expect(mod.ctrl.allowsOptional()).toBe(false);
 
     // resetAppsFlyerState must be called.
-    expect(hoisted.appsFlyer.stop).toHaveBeenCalledWith(true);
+    expect(hoisted.appsFlyer.stop).toHaveBeenCalledWith({ shouldStop: true });
 
     // discardPostHog runs sealPostHogStorage synchronously.
     expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
@@ -575,7 +570,6 @@ describe('unsettled consent teardown', () => {
     const mod = await loadPostHogWithGate();
     mod.ctrl.setTelemetryDecision('test-account', true);
     mod.initPostHog();
-    hoisted.appsFlyer.initSdk.mockClear();
     hoisted.storage.sealPostHogStorage.mockClear();
 
     type GateState = Parameters<typeof mod.useAnalyticsConsentGate>[0];
@@ -591,6 +585,7 @@ describe('unsettled consent teardown', () => {
       rendererRef.current = TestRenderer.create(
         createElement(GateWrapper, {
           hasToken: true,
+          ...SETTLED,
           consentChecked: false,
           needsConsent: false,
           email: 'test@test.com',
@@ -602,7 +597,7 @@ describe('unsettled consent teardown', () => {
     });
 
     expect(mod.ctrl.allowsOptional()).toBe(false);
-    expect(hoisted.appsFlyer.stop).toHaveBeenCalledWith(true);
+    expect(hoisted.appsFlyer.stop).toHaveBeenCalledWith({ shouldStop: true });
     expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
 
     await Promise.resolve();
@@ -618,7 +613,6 @@ describe('unsettled consent teardown', () => {
     const mod = await loadPostHogWithGate();
     mod.ctrl.setTelemetryDecision('test-account', true);
     mod.initPostHog();
-    hoisted.appsFlyer.initSdk.mockClear();
     hoisted.storage.sealPostHogStorage.mockClear();
 
     type GateState = Parameters<typeof mod.useAnalyticsConsentGate>[0];
@@ -634,6 +628,7 @@ describe('unsettled consent teardown', () => {
       rendererRef.current = TestRenderer.create(
         createElement(GateWrapper, {
           hasToken: true,
+          ...SETTLED,
           consentChecked: true,
           needsConsent: false,
           email: 'test@test.com',
@@ -645,7 +640,7 @@ describe('unsettled consent teardown', () => {
     });
 
     expect(mod.ctrl.allowsOptional()).toBe(false);
-    expect(hoisted.appsFlyer.stop).toHaveBeenCalledWith(true);
+    expect(hoisted.appsFlyer.stop).toHaveBeenCalledWith({ shouldStop: true });
     expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
 
     await Promise.resolve();
@@ -680,6 +675,7 @@ describe('unsettled consent teardown', () => {
       renderer1Ref.current = TestRenderer.create(
         createElement(GateWrapper, {
           hasToken: false,
+          ...SETTLED,
           consentChecked: true,
           needsConsent: false,
           email: 'test@test.com',
@@ -702,7 +698,6 @@ describe('unsettled consent teardown', () => {
     // Clear call history so recovery assertions are clean.
     hoisted.client.capture.mockClear();
     hoisted.client.register.mockClear();
-    hoisted.appsFlyer.initSdk.mockClear();
     hoisted.storage.sealPostHogStorage.mockClear();
     hoisted.storage.purgePostHogPersistence.mockClear();
 
@@ -714,6 +709,7 @@ describe('unsettled consent teardown', () => {
       renderer2Ref.current = TestRenderer.create(
         createElement(GateWrapper, {
           hasToken: true,
+          ...SETTLED,
           consentChecked: true,
           needsConsent: false,
           email: 'test@test.com',
@@ -762,6 +758,7 @@ describe('unsettled consent teardown', () => {
     const rendererOff = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'test@test.com',
@@ -789,6 +786,7 @@ describe('unsettled consent teardown', () => {
     const rendererOn = TestRenderer.create(
       createElement(GateWrapper, {
         hasToken: true,
+        ...SETTLED,
         consentChecked: true,
         needsConsent: false,
         email: 'test@test.com',
@@ -815,5 +813,89 @@ describe('unsettled consent teardown', () => {
 
     rendererOn.unmount();
     vi.useRealTimers();
+  });
+});
+
+describe('cold start keeps SDK storage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.device.deviceType = 1;
+    hoisted.appsFlyer.create.mockResolvedValue(undefined);
+  });
+
+  it('does not seal or purge storage while auth, user id, and consent load', async () => {
+    vi.useFakeTimers();
+    const mod = await loadPostHogWithGate();
+
+    type GateState = Parameters<typeof mod.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      mod.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    const base: GateState = {
+      ...SETTLED,
+      hasToken: false,
+      consentChecked: false,
+      needsConsent: false,
+      email: undefined,
+      accountId: undefined,
+      optionalConsent: false,
+    };
+    const signedIn = { ...base, hasToken: true, email: 'test@test.com', accountId: 'test-account' };
+
+    // The order the root layout passes through on every cold start.
+    const renderer = TestRenderer.create(
+      createElement(GateWrapper, { ...base, authLoading: true })
+    );
+    async function show(step: GateState): Promise<void> {
+      await act(async () => {
+        renderer.update(createElement(GateWrapper, step));
+        await Promise.resolve();
+      });
+    }
+    await show({ ...base, hasToken: true, userIdLoading: true });
+    await show(signedIn);
+    await show({ ...signedIn, consentChecked: true, optionalConsent: true });
+    await vi.advanceTimersByTimeAsync(120);
+
+    // A seal is what lets the purge delete the files the SDK reads at init.
+    expect(hoisted.storage.sealPostHogStorage).not.toHaveBeenCalled();
+    expect(hoisted.storage.isPostHogStorageSealed()).toBe(false);
+    expect(hoisted.holder.options?.customStorage).toBe(hoisted.storage.posthogCustomStorage);
+    expect(mod.ctrl.allowsOptional()).toBe(true);
+
+    renderer.unmount();
+    vi.useRealTimers();
+  });
+
+  it('still discards when the restored session has no token', async () => {
+    const mod = await loadPostHogWithGate();
+
+    type GateState = Parameters<typeof mod.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      mod.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    const renderer = TestRenderer.create(
+      createElement(GateWrapper, {
+        ...SETTLED,
+        hasToken: false,
+        consentChecked: false,
+        needsConsent: false,
+        email: undefined,
+        accountId: undefined,
+        optionalConsent: false,
+      })
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(hoisted.storage.sealPostHogStorage).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
   });
 });

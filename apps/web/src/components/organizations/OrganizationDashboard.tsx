@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTRPC } from '@/lib/trpc/utils';
+import { useQuery } from '@tanstack/react-query';
 import { OrganizationInfoCard } from './OrganizationInfoCard';
 import { OrganizationAdminMembers } from './OrganizationMembersCard';
 import { OrganizationDataCollectionCard } from './OrganizationDataCollectionCard';
@@ -76,6 +78,15 @@ export function OrganizationDashboard({
   // Use assumed role if available, otherwise use actual role
   const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || role;
   const isKiloAdmin = assumedRole === 'KILO ADMIN';
+
+  const trpc = useTRPC();
+  const canBilling = canManageOrganizationBilling(currentRole);
+  const { data: activeKiloclaws, isError: activeKiloclawsError } = useQuery({
+    ...trpc.organizations.kiloclaw.listActiveInstances.queryOptions({ organizationId }),
+    enabled: canBilling,
+  });
+
+  const hasActiveKiloclaws = activeKiloclaws?.some(i => !i.isSuspended) ?? false;
 
   // Check localStorage on component mount to determine if welcome banners should be shown
   useEffect(() => {
@@ -180,7 +191,7 @@ export function OrganizationDashboard({
               organizationData?.parent_organization_id === null && (
                 <KiloPassUsageCard organizationId={organizationId} />
               )}
-            {canManageOrganizationBilling(currentRole) && (
+            {canBilling && (activeKiloclawsError || hasActiveKiloclaws) && (
               <OrgActiveKiloclawsCard organizationId={organizationId} />
             )}
             {organizationData?.plan === 'enterprise' && (

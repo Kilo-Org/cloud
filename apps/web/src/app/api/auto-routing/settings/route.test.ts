@@ -9,7 +9,7 @@ import {
   getAutoRoutingSettings,
   updateAutoRoutingSettings,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
-import { poolValidationMessage } from '@/lib/ai-gateway/auto-routing-pool-validation';
+import { poolValidationMessage } from '@/lib/auto-routing-pool-validation';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';

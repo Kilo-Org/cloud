@@ -35,6 +35,7 @@ export type StreamEventType =
   | 'preparing' // Lazy workspace preparation step progress
   // DO -> /stream clients (cloud infrastructure lifecycle)
   | 'cloud.status' // Cloud infrastructure status (preparing/ready/finalizing/error)
+  | 'cloud.sandbox.status'
   | 'cloud.worktree.changes.ready'
   // DO -> /stream clients (session message queue)
   | 'cloud.message.queued' // User message accepted into the pending queue
@@ -42,6 +43,7 @@ export type StreamEventType =
   | 'cloud.message.completed' // Accepted user message completed execution
   | 'cloud.message.failed' // User message delivery failed or was canceled before completion
   | 'connected' // Sent on WebSocket connect with current service state
+  | 'bootstrap.complete'
   // Wrapper -> DO -> /stream clients (slash command catalog)
   | 'commands.available'; // Catalog of kilo slash commands available in this session
 
@@ -138,6 +140,7 @@ export type PreparingStep =
   | 'workspace_backup'
   | 'sandbox_provision'
   | 'sandbox_boot'
+  | 'snapshot_fallback'
   | 'kilo_server'
   | 'kilo_session'
   | 'restore_incomplete'
@@ -243,6 +246,7 @@ export type SessionStatus =
 
 /** Data included in 'connected' events. */
 export type ConnectedEventData = {
+  bootstrapPending?: boolean;
   sessionStatus?: SessionStatus;
   cloudStatus?: { type: CloudStatusType; step?: string; message?: string };
   activeMessageId?: string | null;

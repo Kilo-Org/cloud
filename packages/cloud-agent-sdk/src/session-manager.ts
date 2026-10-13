@@ -285,6 +285,13 @@ type FetchedSessionData = {
   isInitiated: boolean;
   needsLegacyPrepare: boolean;
   isPreparingAsync: boolean;
+  /**
+   * Whether the session currently has a ready route that can own a terminal.
+   * Undefined when the adapter cannot resolve route state. Persisted
+   * `preparedAt`/`initiatedAt` are NOT readiness: a stopped sandbox clears the
+   * route while leaving both set.
+   */
+  routeReady?: boolean;
   prompt: string | null;
   initialMessageId: string | null;
   /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
@@ -344,10 +351,9 @@ type SessionManagerConfig = {
    * while the switch generation and session identity still match.
    * A missing hook, a `null` result, or an empty page is a no-op: the
    * loading skeleton stays up until the transport replays the transcript.
-   * Web/extension pass nothing, so their behavior is unchanged; the mobile
-   * adapter is the canonical provider.
    */
   readCachedSnapshotPage?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshotPage | null>;
+  writeCachedSnapshotPage?: (page: SessionSnapshotPage) => void;
   /**
    * Optional classifier for a `fetchSession` failure that means "the request
    * never answered" — a client-side deadline abort — as opposed to the server
@@ -478,6 +484,13 @@ type SessionManagerAtoms = {
   permission: W<PermissionState | null>;
   suggestion: W<SuggestionState | null>;
   pendingMessages: W<ReadonlyMap<string, MessageDeliveryState>>;
+  /**
+   * Optimistic user-message ids whose transport send has not settled, for the
+   * active session. Drives the request-pending "Sending" cue. It is empty on a
+   * fresh load and never outlives the request, so a restored or queued synthetic
+   * row cannot be shown as still sending.
+   */
+  sendingMessageIds: W<ReadonlySet<string>>;
   failedPrompt: W<string | null>;
   billingFailure: W<CustomerBillingFailure | null>;
   fetchedSessionData: W<FetchedSessionData | null>;
@@ -921,7 +934,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * or a preserved transcript across a metadata-retry) that the live transport
    * has not caught up with yet: the rows are readable, but the session's current
    * transcript is still being fetched. Drives the inline refresh indicator.
-   * Callers without a cached-page reader (web, extension) never set it, so their
+   * Callers without a cached-page reader never set it, so their
    * behavior is unchanged. It clears when the live transcript lands — the page
    * callback when one is configured, otherwise the replayed `session.created`
    * — and on an error, a transcript clear, or a session reset.
@@ -965,6 +978,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const suggestionAtom = atom<SuggestionState | null>(null);
   const activeSuggestionAtom = atom<StandaloneSuggestion | null>(null);
   const pendingMessagesAtom = atom<ReadonlyMap<string, MessageDeliveryState>>(new Map());
+  // Client-side request-pending marker for optimistic rows whose transport send
+  // has not settled. Distinct from `pendingMessagesAtom`, which is server
+  // delivery state: this set is empty on a fresh load and never outlives the
+  // request, so it cannot present a restored or queued row as still sending.
+  const sendingMessageIdsAtom = atom<ReadonlySet<string>>(new Set<string>());
   const failedPromptAtom = atom<string | null>(null);
   const billingFailureAtom = atom<CustomerBillingFailure | null>(null);
   const fetchedSessionDataAtom = atom<FetchedSessionData | null>(null);
@@ -1297,6 +1315,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * live gate recovers (or the session switches).
    */
   let postInterruptUnlock = false;
+  /**
+   * After Stop ACK the turn can stay busy/retrying until the terminal status
+   * arrives. Keep Stop disabled for that session until then so a second click
+   * cannot issue a duplicate interrupt.
+   */
+  let interruptAwaitingIdleSession: CloudAgentSession | null = null;
   let stateUnsub: (() => void) | null = null;
   let metadataRecoveryCleanups: Array<() => void> = [];
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1335,6 +1359,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   let lastPromptMode: string | null = null;
 
+  function markSending(messageId: string, sending: boolean): void {
+    const current = store.get(sendingMessageIdsAtom);
+    if (current.has(messageId) === sending) return;
+    const next = new Set(current);
+    if (sending) next.add(messageId);
+    else next.delete(messageId);
+    store.set(sendingMessageIdsAtom, next);
+  }
+
   function setIndicator(ind: SessionStatusIndicator | null): void {
     if (indicatorTimer !== null) {
       clearTimeout(indicatorTimer);
@@ -1353,6 +1386,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(sessionStorageAtom, null);
       storedMessageMemo.clear();
       store.set(rootSessionIdAtom, null);
+      store.set(chatUIAtom, { shouldAutoScroll: true });
     }
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
@@ -1367,6 +1401,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     remoteHistoryReplaying = true;
     postClearSurvivorIds = null;
     postInterruptUnlock = false;
+    interruptAwaitingIdleSession = null;
     store.set(remoteModelOverrideAtom, null);
     store.set(cloudAgentModelOverrideAtom, null);
     store.set(canSendAtom, false);
@@ -1392,12 +1427,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(suggestionAtom, null);
     store.set(activeSuggestionAtom, null);
     store.set(pendingMessagesAtom, new Map());
+    store.set(sendingMessageIdsAtom, new Set<string>());
     store.set(failedPromptAtom, null);
     store.set(billingFailureAtom, null);
     store.set(fetchedSessionDataAtom, null);
     store.set(childSessionHydrationStatesAtom, new Map());
     store.set(childSessionErrorsAtom, new Map());
-    store.set(chatUIAtom, { shouldAutoScroll: true });
     store.set(availableCommandsAtom, []);
     store.set(availableCommandsCatalogStatusAtom, null);
     store.set(worktreeChangesRefreshAtom, null);
@@ -1695,7 +1730,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     } else {
       store.set(canSendAtom, liveCanSend);
     }
-    store.set(canInterruptAtom, session.canInterrupt);
+    store.set(canInterruptAtom, session.canInterrupt && interruptAwaitingIdleSession !== session);
   }
 
   /**
@@ -1823,6 +1858,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   ): void {
     let firstActivityFired = false;
     let prevAct = '';
+    let prevRetry: Extract<SessionActivity, { type: 'retrying' }> | null = null;
+    let retryIndicator: SessionStatusIndicator | null = null;
     let prevSk = '';
     let prevCsk = '';
     let prevCloudStatusHadIndicator = false;
@@ -1869,6 +1906,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (st.type === 'disconnected') {
         postInterruptUnlock = false;
       }
+      if (
+        interruptAwaitingIdleSession === session &&
+        (st.type === 'disconnected' || (act.type !== 'busy' && act.type !== 'retrying'))
+      ) {
+        interruptAwaitingIdleSession = null;
+      }
 
       // Only update read-only state after the transport has been resolved.
       // During the 'connecting' phase the transport is null so canSend is
@@ -1890,19 +1933,31 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         setIndicator(null);
       }
 
-      if (act.type !== prevAct) {
+      if (
+        act.type !== prevAct ||
+        (act.type === 'retrying' &&
+          (act.attempt !== prevRetry?.attempt || act.message !== prevRetry?.message))
+      ) {
         if (act.type === 'busy') {
           setIndicator(null);
         } else if (act.type === 'retrying') {
-          setIndicator({
+          retryIndicator = {
             type: 'warning',
             message: `Retrying… ${act.message}`,
             timestamp: Date.now(),
-          });
+          };
+          setIndicator(retryIndicator);
         } else if (act.type === 'idle') {
+          // Only replace our own retry warning; a newer error/cloud indicator stays.
+          if (retryIndicator !== null && store.get(statusIndicatorAtom) === retryIndicator) {
+            const cloudInd = cs && cs.type !== 'ready' ? indicatorForCloudStatus(cs) : null;
+            setIndicator(cloudInd ?? indicatorForStatus(st));
+          }
           config.onComplete?.();
         }
         prevAct = act.type;
+        prevRetry = act.type === 'retrying' ? act : null;
+        if (act.type !== 'retrying') retryIndicator = null;
       }
 
       // Cloud status takes priority over agent status when active
@@ -2190,6 +2245,25 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
+    if (
+      config.writeCachedSnapshotPage &&
+      currentSession !== null &&
+      activeSessionId !== null &&
+      store.get(fetchedSessionDataAtom)?.kiloSessionId === activeSessionId &&
+      !store.get(isLoadingAtom) &&
+      !store.get(isRefreshingCachedTranscriptAtom)
+    ) {
+      try {
+        config.writeCachedSnapshotPage({
+          info: { id: activeSessionId },
+          messages: store.get(messagesListAtom),
+          nextCursor: olderMessagesCursor,
+          omittedItemCount: store.get(olderMessagesOmittedItemCountAtom),
+        });
+      } catch {
+        // A cache failure must not prevent navigation.
+      }
+    }
     // A retry of a failed metadata refresh must keep the transcript mounted.
     // A real session switch (or a caller without caching) still starts clean.
     const preserveTranscript = Boolean(
@@ -2405,9 +2479,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // and omitted-item count.
     const recordInitialPage = (page: SessionSnapshotPage): void => {
       if (applyPage({ ...page, kind: 'success' }, initialPageGeneration, true)) {
-        // The live bounded page landed: what is on screen is no longer the
-        // cached page, so the refresh indicator is done. Guarded by the
-        // applied flag so a superseded page cannot clear a newer open's state.
+        // A bounded page can lag the stream; omissions are not deletion evidence.
+        // Only an applied page can finish the current open's refresh.
         store.set(isRefreshingCachedTranscriptAtom, false);
       }
     };
@@ -2767,6 +2840,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     onOptimisticSend?: () => void;
   }): Promise<boolean> {
     store.set(errorAtom, null);
+    interruptAwaitingIdleSession = null;
     if (store.get(agentStatusAtom).type !== 'disconnected') {
       setIndicator(null);
     }
@@ -2849,23 +2923,24 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     //     authoritative user message lands (see the onEvent handler).
     const optimisticStorage = store.get(sessionStorageAtom);
     const optimisticSessionId = store.get(rootSessionIdAtom) ?? kiloSessionId;
-    if (sessionAtSend && optimisticStorage && optimisticSessionId) {
-      insertOptimisticUserMessage({
-        storage: optimisticStorage,
-        sessionId: optimisticSessionId,
-        messageId,
-        messageText,
-        ...(input.attachments ? { attachments: input.attachments } : {}),
-        ...(input.attachmentParts ? { attachmentParts: input.attachmentParts } : {}),
-      });
-      if (sessionType === 'remote') {
-        remoteOptimisticIds.add(messageId);
-      }
-      // Signal the composer exactly once, after the row is in the transcript.
-      input.onOptimisticSend?.();
-    }
-
     try {
+      if (sessionAtSend && optimisticStorage && optimisticSessionId) {
+        insertOptimisticUserMessage({
+          storage: optimisticStorage,
+          sessionId: optimisticSessionId,
+          messageId,
+          messageText,
+          ...(input.attachments ? { attachments: input.attachments } : {}),
+          ...(input.attachmentParts ? { attachmentParts: input.attachmentParts } : {}),
+        });
+        if (sessionType === 'remote') {
+          remoteOptimisticIds.add(messageId);
+        }
+        markSending(messageId, true);
+        // Signal the composer exactly once, after the row is in the transcript.
+        input.onOptimisticSend?.();
+      }
+
       if (!sessionAtSend) throw new Error('No active session');
       if (input.attachments && sessionType !== 'cloud-agent') {
         // The cloud-only `attachments` field is exclusive to cloud-agent
@@ -2948,6 +3023,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       }
       return false;
+    } finally {
+      // The request is settled either way: the Sending cue is request-pending
+      // state, so it must not outlive the call. Server delivery state (queued /
+      // failed) takes over from here.
+      markSending(messageId, false);
     }
   }
 
@@ -2972,7 +3052,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(isStreamingAtom, false);
     store.set(isReadOnlyAtom, readOnly);
     store.set(canSendAtom, !readOnly && cloudReady);
-    store.set(canInterruptAtom, session.canInterrupt);
+    store.set(canInterruptAtom, session.canInterrupt && interruptAwaitingIdleSession !== session);
   }
 
   async function interrupt(): Promise<void> {
@@ -2994,6 +3074,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         await session.interrupt();
       }
       if (currentSession === session) {
+        const activityType = session.state.getActivity().type;
+        if (activityType === 'busy' || activityType === 'retrying') {
+          interruptAwaitingIdleSession = session;
+        }
         restoreAfterInterrupt(session);
         setIndicator({
           type: 'info',
@@ -3299,6 +3383,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       suggestion: suggestionAtom,
       activeSuggestion: activeSuggestionAtom,
       pendingMessages: pendingMessagesAtom,
+      sendingMessageIds: sendingMessageIdsAtom,
       failedPrompt: failedPromptAtom,
       billingFailure: billingFailureAtom,
       fetchedSessionData: fetchedSessionDataAtom,

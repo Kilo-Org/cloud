@@ -1,5 +1,4 @@
 process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
-process.env.TURNSTILE_SECRET_KEY ||= 'test-turnstile-secret';
 
 import { beforeEach, describe, expect, test, jest } from '@jest/globals';
 import { GOOGLE_CAPABILITY } from '@/lib/integrations/google/capabilities';

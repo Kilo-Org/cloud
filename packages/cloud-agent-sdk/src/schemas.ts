@@ -896,6 +896,7 @@ export const cloudStatusDataSchema = z.object({
 export type CloudStatusData = z.infer<typeof cloudStatusDataSchema>;
 
 export const connectedDataSchema = z.object({
+  bootstrapPending: z.boolean().optional(),
   sessionStatus: sessionStatusSchema.optional().catch(undefined),
   cloudStatus: cloudStatusSchema.optional().catch(undefined),
 });

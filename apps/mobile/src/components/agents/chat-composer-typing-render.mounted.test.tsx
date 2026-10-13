@@ -135,9 +135,12 @@ vi.mock('@/components/agents/slash-command-suggestions', () => ({
   SlashCommandSuggestions: () => null,
 }));
 vi.mock('@/components/agents/suggestion-card', () => ({ SuggestionCard: () => null }));
-vi.mock('@/components/agents/remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn(async () => true),
-}));
+vi.mock('@/components/agents/remote-session-exit-alert', () => {
+  const confirmExit = vi.fn(async () => true);
+  return {
+    useRemoteSessionExitConfirmation: () => ({ confirmExit, exitDialog: null }),
+  };
+});
 vi.mock('@/components/agents/remote-session-exit-confirmation', () => ({
   confirmRemoteSessionExit: vi.fn(async (_confirm: unknown, run: () => Promise<void>) => run()),
 }));
@@ -146,7 +149,6 @@ vi.mock('@/components/agents/attachment-picker', () => ({
 }));
 vi.mock('@/components/voice-input-control', () => ({
   VoiceInputButton: 'VoiceInputButton',
-  VoiceInputStatus: () => null,
 }));
 
 // ── hooks and libs ───────────────────────────────────────────────────────────
@@ -360,11 +362,12 @@ describe('ChatComposer typing render cost', () => {
     // The commit bound alone is one-sided: a composer that never republished
     // the measurement would commit less, not more. Pin the other half of the
     // owner's growth contract — the input must still grow line by line and hold
-    // at the cap, with the row scrollable once capped. This suite never reports
-    // the real input's `onContentSizeChange`, so `nativeContentHeight` stays
-    // null, `useTextHeight` derives no native pitch, and the cap exercised here
-    // is the raw remaining-space cap (`COMPOSER_INPUT_MAX_HEIGHT`); the line
-    // snapping that only runs once a native pitch is known is not covered.
+    // at the cap, with the row scrollable once capped. This case never reports
+    // the real input's `onContentSizeChange`, so no native pitch is recorded,
+    // and the cap exercised here is the raw remaining-space cap
+    // (`COMPOSER_INPUT_MAX_HEIGHT`); the line snapping that only runs once a
+    // native pitch is known is covered by `use-text-height.mounted.test.tsx`
+    // and by the content-size report case below.
     // Each entry is one added line's published height: the 24pt vertical
     // padding plus 20pt per line from the second line on, clamped to the cap.
     expect(inputHeights).toEqual(
@@ -382,6 +385,85 @@ describe('ChatComposer typing render cost', () => {
     ).toBe(true);
     expect(lastHeight).toBe(previousHeight);
     expect(input.props.scrollEnabled).toBe(true);
+
+    renderer.unmount();
+  });
+
+  // KILO-APP-3RG. On the device the input reports its own content height
+  // through `onContentSizeChange` on every content-size event — every keystroke,
+  // every wrap, every keyboard-driven relayout — and each report re-rendered
+  // the composer, which re-rendered the input, which reported again. That chain
+  // is the nested-update cascade that ended in "Maximum update depth exceeded"
+  // once a fast burst of typing overlapped a streaming session on a large
+  // transcript. The report only sharpens the measure leaf's line pitch, so it
+  // must not commit the composer at all.
+  it('does not commit the composer for content-size reports that keep the line pitch', async () => {
+    const holder: { current?: TestRenderer.ReactTestRenderer } = {};
+    await act(async () => {
+      holder.current = TestRenderer.create(createElement(ChatComposer, baseProps()));
+    });
+    const renderer = holder.current;
+    if (renderer === undefined) {
+      throw new Error('renderer was not created');
+    }
+
+    const inputWrapper = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        typeof node.props.onLayout === 'function'
+    );
+    await act(async () => {
+      (inputWrapper.props.onLayout as (event: unknown) => void)({
+        nativeEvent: { layout: { height: 48, width: 234 } },
+      });
+      await tick();
+    });
+
+    const input = findTextInput(renderer.root);
+    const mirror = findMirror(renderer.root);
+    const report = (height: number) => {
+      (input.props.onContentSizeChange as (event: unknown) => void)({
+        nativeEvent: { contentSize: { height, width: 200 } },
+      });
+    };
+    // The draft reaches the cap, so the published height pins to the snapped cap
+    // and only a pitch move can change anything the composer renders.
+    await act(async () => {
+      (input.props.onChangeText as (value: string) => void)(DRAFT);
+      await tick();
+      (mirror.props.onLayout as (event: unknown) => void)({
+        nativeEvent: { layout: { height: lineCountOf(DRAFT) * 20, width: 200 } },
+      });
+      await tick();
+    });
+
+    // The first report is the one that legitimately establishes the pitch.
+    await act(async () => {
+      report(24 + lineCountOf(DRAFT) * 18.667);
+      await tick();
+    });
+    composerCommits.count = 0;
+
+    // 30 stream updates, each reporting the input's own content height for the
+    // same draft: the pitch it renders at does not move. The pre-change
+    // composer committed the composer once per report.
+    for (let update = 0; update < 30; update += 1) {
+      // eslint-disable-next-line no-await-in-loop -- one report per stream update is the behavior under test
+      await act(async () => {
+        report(24 + lineCountOf(DRAFT) * 18.667 + update * 0.01);
+        await tick();
+      });
+    }
+    expect(composerCommits.count).toBe(0);
+
+    // Positive control: a report that moves the pitch to another native line box
+    // must still reach the composer, so the count above cannot pass vacuously.
+    await act(async () => {
+      report(24 + lineCountOf(DRAFT) * 24);
+      await tick();
+    });
+    expect(composerCommits.count).toBeGreaterThan(0);
 
     renderer.unmount();
   });

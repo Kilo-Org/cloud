@@ -214,6 +214,7 @@ describe('wrapper batch admission', () => {
         closeConnections: vi.fn().mockResolvedValue(undefined),
         isConnected: () => true,
         reconnectEventSubscription: vi.fn(),
+        isGitHubReviewPublicationInstalled: () => false,
       }
     );
     deps.onDeliveryAcknowledged.mockImplementation(kind => lifecycle.onDeliveryAcknowledged(kind));
@@ -270,6 +271,7 @@ describe('wrapper batch admission', () => {
         closeConnections: vi.fn().mockResolvedValue(undefined),
         isConnected: () => true,
         reconnectEventSubscription: vi.fn(),
+        isGitHubReviewPublicationInstalled: () => false,
       }
     );
     deps.onDeliveryAcknowledged.mockImplementation(kind => lifecycle.onDeliveryAcknowledged(kind));
@@ -312,6 +314,7 @@ describe('wrapper batch admission', () => {
         closeConnections: vi.fn().mockResolvedValue(undefined),
         isConnected: () => true,
         reconnectEventSubscription: vi.fn(),
+        isGitHubReviewPublicationInstalled: () => false,
       }
     );
 
@@ -344,6 +347,7 @@ describe('wrapper batch admission', () => {
         closeConnections: vi.fn().mockResolvedValue(undefined),
         isConnected: () => true,
         reconnectEventSubscription: vi.fn(),
+        isGitHubReviewPublicationInstalled: () => false,
       }
     );
 

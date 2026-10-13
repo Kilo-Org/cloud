@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.test.ts",
+    "src/plugins/**/fake.ts",
+    "src/plugins/**/test-gateway.ts",
+    "src/**/*-fixture.ts"
+  ]
+}

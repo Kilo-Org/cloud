@@ -1,0 +1,340 @@
+/* eslint-disable typescript-eslint/consistent-type-assertions, typescript-eslint/no-unsafe-argument, typescript-eslint/no-unsafe-assignment, typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access, typescript-eslint/no-unsafe-return, typescript-eslint/require-await, require-await, promise/prefer-await-to-then -- a llama.rn context is a JSI object and a download is a pending promise: a test double can only be built by asserting its shape */
+import { type ModelEvent, type ModelRequest } from '@kilocode/harness-sdk';
+import { Chunk, Effect, Either, Stream } from 'effect';
+import { describe, expect, it, vi } from 'vitest';
+
+import { backendFailureKey } from './backend-target';
+import { type GgufContext, ggufModelClient } from './gguf-client';
+import { type GgufModelFile } from './gguf-records';
+
+vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
+
+const FILE: GgufModelFile = {
+  path: '/models/a.gguf',
+  contextWindow: 2048,
+  tools: true,
+  projector: undefined,
+};
+const NO_TOOLS: GgufModelFile = { ...FILE, tools: false };
+
+const chatCaps = { tools: true, toolCalls: true, systemRole: true, parallelToolCalls: false };
+const TOOL_TEMPLATE = { llamaChat: false, jinja: { default: true, defaultCaps: chatCaps } };
+const PLAIN_TEMPLATE = { llamaChat: true, jinja: { default: false } };
+
+type Completion = (params: unknown, onToken?: (data: unknown) => void) => Promise<unknown>;
+
+type Multimodal = { readonly loads: boolean; readonly vision: boolean };
+
+const READS_IMAGES: Multimodal = { loads: true, vision: true };
+
+/** A context whose model description and native call are scripted. */
+function contextOf(
+  chatTemplates: unknown,
+  completion: Completion,
+  multimodal: Multimodal = READS_IMAGES
+) {
+  const stopCompletion = vi.fn(async () => undefined);
+  const release = vi.fn(async () => undefined);
+  const initMultimodal = vi.fn(async () => multimodal.loads);
+  const context = {
+    model: { chatTemplates },
+    completion,
+    stopCompletion,
+    release,
+    initMultimodal,
+    getMultimodalSupport: async () => ({ vision: multimodal.vision, audio: false }),
+  } as unknown as GgufContext;
+  return { context, stopCompletion, release, initMultimodal };
+}
+
+function clientWith(contexts: readonly GgufContext[], file: GgufModelFile = FILE, files = ['a']) {
+  let index = 0;
+  const init = vi.fn(async () => {
+    const context = contexts[index];
+    index += 1;
+    if (context === undefined) {
+      throw new Error('no context left');
+    }
+    return context;
+  });
+  return {
+    init,
+    ...ggufModelClient({
+      runtime: { init, gpu: true },
+      fileOf: id => (files.includes(id) ? file : undefined),
+    }),
+  };
+}
+
+/**
+ * The shape llama.rn produced on the device: nulls where the schema wanted
+ * strings, and the whole answer in `text`.
+ */
+const NULL_HEAVY_ANSWER: Completion = async () => ({
+  text: 'Red\nGreen\nBlue',
+  content: null,
+  accumulated_text: null,
+  tool_calls: null,
+  tokens_evaluated: null,
+  tokens_predicted: null,
+  stopped_eos: true,
+  stopped_word: null,
+  stopped_limit: null,
+  context_full: null,
+  interrupted: null,
+});
+
+const SHORT_ANSWER: Completion = async () => ({
+  text: 'ok',
+  tokens_evaluated: 1,
+  tokens_predicted: 1,
+  stopped_eos: true,
+});
+
+const request: ModelRequest = {
+  model: 'a',
+  maxTokens: 4096,
+  tools: [{ name: 'time', description: 'now', parameters: { type: 'object', properties: {} } }],
+  prompt: {
+    system: [{ text: 'Be brief.', cache: false }],
+    messages: [{ role: 'user', cache: false, parts: [{ kind: 'text', text: 'Hi' }] }],
+  },
+};
+
+async function collect(stream: Stream.Stream<ModelEvent, unknown>) {
+  return [...Chunk.toReadonlyArray(await Effect.runPromise(Stream.runCollect(stream)))];
+}
+
+function doneOf(events: readonly ModelEvent[]) {
+  const last = events.at(-1);
+  return last?.kind === 'done' ? last : undefined;
+}
+
+function textOf(events: readonly ModelEvent[]) {
+  return events.flatMap(event => (event.kind === 'delta' ? [event.text] : []));
+}
+
+/** The promise of an answer's failure, which is how a refusal is observed. */
+async function refusal(stream: Stream.Stream<ModelEvent, unknown>) {
+  const outcome = await Effect.runPromise(Effect.either(Stream.runCollect(stream)));
+  return Either.isLeft(outcome) ? backendFailureKey(outcome.left) : 'none';
+}
+
+describe('an answer over a downloaded model', () => {
+  it('streams parsed deltas and reports the real usage and stop reason', async () => {
+    const asked: unknown[] = [];
+    const { context } = contextOf(TOOL_TEMPLATE, async (params, onToken) => {
+      asked.push(params);
+      onToken?.({ token: 'Hel', content: 'Hel', accumulated_text: 'Hel' });
+      onToken?.({ token: 'lo', content: 'Hello', accumulated_text: 'Hello' });
+      return {
+        text: 'Hello',
+        content: 'Hello',
+        accumulated_text: 'Hello',
+        tool_calls: [],
+        tokens_evaluated: 7,
+        tokens_predicted: 2,
+        interrupted: false,
+        context_full: false,
+        stopped_eos: true,
+        stopped_word: false,
+        stopped_limit: false,
+      };
+    });
+    const { client, init } = clientWith([context]);
+    const events = await collect(client.stream(request));
+
+    expect(init).toHaveBeenCalledWith({ model: '/models/a.gguf', n_ctx: 2048, n_parallel: 1 });
+    expect(textOf(events)).toEqual(['Hel', 'lo']);
+    expect(doneOf(events)?.usage).toEqual({
+      inputTokens: 7,
+      outputTokens: 2,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    });
+    expect(doneOf(events)?.stop).toBe('end');
+  });
+
+  it('answers from a result that carries null for everything optional', async () => {
+    const { client } = clientWith([contextOf(TOOL_TEMPLATE, NULL_HEAVY_ANSWER).context]);
+
+    const events = await collect(client.stream(request));
+
+    expect(textOf(events)).toEqual(['Red\nGreen\nBlue']);
+    expect(doneOf(events)).toMatchObject({
+      stop: 'end',
+      usage: { inputTokens: 0, outputTokens: 0 },
+    });
+  });
+
+  it('sends tool definitions only for a model whose template renders tools', async () => {
+    const asked: { tools?: unknown }[] = [];
+    const answer: Completion = async params => {
+      asked.push(params as { tools?: unknown });
+      return { text: 'ok', tokens_evaluated: 1, tokens_predicted: 1, stopped_eos: true };
+    };
+    await collect(clientWith([contextOf(TOOL_TEMPLATE, answer).context]).client.stream(request));
+    expect(asked[0]?.tools).toHaveLength(1);
+
+    await collect(
+      clientWith([contextOf(PLAIN_TEMPLATE, answer).context], NO_TOOLS).client.stream(request)
+    );
+    expect(asked[1]?.tools).toBeUndefined();
+  });
+
+  it('maps returned tool calls to events with stable ids', async () => {
+    const { context } = contextOf(TOOL_TEMPLATE, async () => ({
+      text: '{"name":"time"}',
+      content: '',
+      accumulated_text: '{"name":"time"}',
+      tool_calls: [
+        { id: 'call-7', function: { name: 'time', arguments: '{"zone":"UTC"}' } },
+        { function: { name: 'time', arguments: '{}' } },
+      ],
+      tokens_evaluated: 3,
+      tokens_predicted: 4,
+      stopped_eos: false,
+      stopped_limit: false,
+    }));
+    const events = await collect(clientWith([context]).client.stream(request));
+    const calls = events.flatMap(event => (event.kind === 'toolCall' ? [event.call] : []));
+    expect(calls[0]).toEqual({ id: 'call-7', name: 'time', arguments: '{"zone":"UTC"}' });
+    expect(calls[1]?.name).toBe('time');
+    expect(calls[1]?.id).toMatch(/^gguf-\d+-call-1$/);
+    expect(doneOf(events)?.stop).toBe('tools');
+  });
+});
+
+describe('a vision model', () => {
+  const VISION: GgufModelFile = { ...FILE, tools: false, projector: '/models/a.mmproj.gguf' };
+
+  const imageRequest: ModelRequest = {
+    ...request,
+    tools: [],
+    prompt: {
+      system: [],
+      messages: [
+        {
+          role: 'user',
+          cache: false,
+          parts: [
+            { kind: 'text', text: 'Describe it.' },
+            { kind: 'image', media: 'image/jpeg', data: 'AAAA' },
+          ],
+        },
+      ],
+    },
+  };
+
+  it('loads the projector with the context and sends the image to the model', async () => {
+    const asked: { messages?: unknown }[] = [];
+    const answer: Completion = async params => {
+      asked.push(params as { messages?: unknown });
+      return {
+        text: 'A red square.',
+        tokens_evaluated: 70,
+        tokens_predicted: 4,
+        stopped_eos: true,
+      };
+    };
+    const loaded = contextOf(PLAIN_TEMPLATE, answer);
+    const { client, init } = clientWith([loaded.context], VISION);
+
+    const events = await collect(client.stream(imageRequest));
+
+    // llama.rn requires a context that never shifts once media is in it.
+    expect(init).toHaveBeenCalledWith(expect.objectContaining({ ctx_shift: false, n_ctx: 2048 }));
+    expect(loaded.initMultimodal).toHaveBeenCalledWith({ path: VISION.projector, use_gpu: true });
+    expect(asked[0]?.messages).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Describe it.' },
+          { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AAAA' } },
+        ],
+      },
+    ]);
+    expect(textOf(events)).toEqual(['A red square.']);
+  });
+
+  it.each([
+    ['does not load', { loads: false, vision: false }],
+    ['loads without vision', { loads: true, vision: false }],
+  ])('frees the context and fails as unavailable when the projector %s', async (_, multimodal) => {
+    const loaded = contextOf(PLAIN_TEMPLATE, SHORT_ANSWER, multimodal);
+    const { client } = clientWith([loaded.context], VISION);
+
+    expect(await refusal(client.stream(imageRequest))).toBe('modelChat.localModels.unavailable');
+    expect(loaded.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads no projector for a text-only model', async () => {
+    const loaded = contextOf(PLAIN_TEMPLATE, SHORT_ANSWER);
+    const { client, init } = clientWith([loaded.context], NO_TOOLS);
+    await collect(client.stream(request));
+    expect(init).toHaveBeenCalledWith({ model: '/models/a.gguf', n_ctx: 2048, n_parallel: 1 });
+    expect(loaded.initMultimodal).not.toHaveBeenCalled();
+  });
+});
+
+describe('the busy rule', () => {
+  it('refuses a second answer while one runs and frees the model when it ends', async () => {
+    const gate = Promise.withResolvers<boolean>();
+    const { context } = contextOf(TOOL_TEMPLATE, async () => {
+      await gate.promise;
+      return { text: 'ok', tokens_evaluated: 1, tokens_predicted: 1, stopped_eos: true };
+    });
+    const { client } = clientWith([context]);
+    const first = collect(client.stream(request));
+    expect(await refusal(client.stream(request))).toBe('modelChat.localModels.busy');
+    gate.resolve(true);
+    expect(doneOf(await first)?.stop).toBe('end');
+    expect(doneOf(await collect(client.stream(request)))?.stop).toBe('end');
+  });
+
+  it('fails explicitly for a model that is not downloaded', async () => {
+    const { client } = clientWith([], FILE, []);
+    expect(await refusal(client.stream(request))).toBe('modelChat.localModels.unavailable');
+  });
+});
+
+describe('interrupting and releasing', () => {
+  it('stops the native call when the answer is interrupted', async () => {
+    const stopCompletion = vi.fn(async () => undefined);
+    const context = {
+      model: { chatTemplates: TOOL_TEMPLATE },
+      completion: (async (_params: unknown, onToken?: (data: unknown) => void) => {
+        onToken?.({ token: 'Hel', content: 'Hel', accumulated_text: 'Hel' });
+        const never = new Promise<never>(() => undefined);
+        return never;
+      }) as unknown as GgufContext['completion'],
+      stopCompletion,
+      release: vi.fn(async () => undefined),
+    } as unknown as GgufContext;
+    const heard: string[] = [];
+    await Effect.runPromise(
+      Stream.runForEach(clientWith([context]).client.stream(request), event =>
+        Effect.sync(() => {
+          if (event.kind === 'delta') {
+            heard.push(event.text);
+          }
+        })
+      ).pipe(Effect.timeout('50 millis'), Effect.ignore)
+    );
+    expect(heard).toEqual(['Hel']);
+    expect(stopCompletion).toHaveBeenCalled();
+  });
+
+  it('frees the loaded context on release, and only for the model it holds', async () => {
+    const first = contextOf(PLAIN_TEMPLATE, SHORT_ANSWER);
+    const second = contextOf(PLAIN_TEMPLATE, SHORT_ANSWER);
+    const { client, release, init } = clientWith([first.context, second.context]);
+    await collect(client.stream(request));
+    await release('other');
+    expect(first.release).not.toHaveBeenCalled();
+    await release('a');
+    expect(first.release).toHaveBeenCalledTimes(1);
+    await collect(client.stream(request));
+    expect(init).toHaveBeenCalledTimes(2);
+  });
+});

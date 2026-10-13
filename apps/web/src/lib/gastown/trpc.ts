@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { WrappedGastownRouter } from '@/lib/gastown/types/router';
-import { GASTOWN_URL } from '@kilocode/web-shared/lib/constants';
+import { GASTOWN_URL } from '@/lib/service-urls';
 
 // ── Type exports ──────────────────────────────────────────────────────────
 // Re-export the router type so frontend components can extract output types

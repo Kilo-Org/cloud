@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { WrapperKiloClient } from './kilo-api';
+import { GITHUB_REVIEW_MCP_TIMEOUT_MS } from '../../src/shared/github-review-target';
 import {
   createKiloRuntimeLifecycle,
   type KiloRuntimeLifecycle,
@@ -65,6 +66,7 @@ function createHarness(
     platform?: string;
     initialSessionId?: string;
     rejectVerifications?: number;
+    gitHubReviewPublishBinaryPath?: string;
   } = {}
 ) {
   const captureEnvRecord: NodeJS.Dict<string> = {
@@ -120,6 +122,7 @@ function createHarness(
     createKilo,
     bindClient: result => result.client as FakeClient,
     captureEnv: () => captureEnvRecord,
+    resolveGitHubReviewPublishBinary: () => options.gitHubReviewPublishBinaryPath,
     getPlatform: () => options.platform,
     log: message => {
       logs.push(message);
@@ -434,6 +437,27 @@ describe('KiloRuntimeLifecycle updateEnvironment', () => {
     expect(harness.readyCount).toBe(readyBefore);
   });
 
+  it('does not restart on a repeated worker env after the config was patched', async () => {
+    const workerEnv = {
+      KILO_GITHUB_REVIEW_TARGET: REVIEW_TARGET,
+      KILO_CONFIG_CONTENT: PUBLISH_CONFIG,
+    };
+    const harness = createHarness({
+      env: workerEnv,
+      gitHubReviewPublishBinaryPath: '/usr/local/bin/github-review-publish-mcp',
+    });
+    await harness.lifecycle.start({
+      workspacePath: WORKSPACE,
+      expectedSessionId: CREATED_SESSION_ID,
+    });
+    await harness.lifecycle.updateEnvironment(workerEnv);
+    const spawnsAfterFirst = harness.inheritedEnvs.length;
+
+    await harness.lifecycle.updateEnvironment(workerEnv);
+
+    expect(harness.inheritedEnvs).toHaveLength(spawnsAfterFirst);
+  });
+
   it('starts from the last runtime workspace when no client exists', async () => {
     const harness = createHarness();
     await harness.lifecycle.start({
@@ -503,5 +527,110 @@ describe('KiloRuntimeLifecycle ordering', () => {
           line.includes('startKiloRuntime runtime ready') && line.includes('platform=devcontainer')
       )
     ).toBe(true);
+  });
+});
+
+function globToRegExp(pattern: string): RegExp {
+  return new RegExp(
+    `^${pattern
+      .split('*')
+      .map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('.*')}$`
+  );
+}
+
+function resolveBashDecision(bash: Record<string, string>, command: string): string | undefined {
+  let decision: string | undefined;
+  for (const [pattern, value] of Object.entries(bash)) {
+    if (globToRegExp(pattern).test(command)) decision = value;
+  }
+  return decision;
+}
+
+const REVIEW_TARGET = JSON.stringify({
+  repo: 'acme/widgets',
+  pullRequestNumber: 42,
+  appType: 'standard',
+  botUserId: '9001',
+});
+
+const PUBLISH_CONFIG = JSON.stringify({
+  permission: {
+    bash: {
+      'gh api repos/*/issues/*/comments': 'allow',
+      'gh api repos/*/issues/*/comments *': 'allow',
+      'gh api repos/*/pulls/*/reviews --input*': 'allow',
+    },
+  },
+});
+
+describe('KiloRuntimeLifecycle github review config hook', () => {
+  it('installs the tool and denies summary writes in any flag position', async () => {
+    const binaryPath = '/usr/local/bin/github-review-publish-mcp';
+    const harness = createHarness({
+      env: {
+        KILOCODE_TOKEN: 'A',
+        KILO_GITHUB_REVIEW_TARGET: REVIEW_TARGET,
+        KILO_CONFIG_CONTENT: PUBLISH_CONFIG,
+      },
+      gitHubReviewPublishBinaryPath: binaryPath,
+    });
+    await harness.lifecycle.start({
+      workspacePath: WORKSPACE,
+      expectedSessionId: CREATED_SESSION_ID,
+    });
+
+    const amended = JSON.parse(harness.captureEnvRecord.KILO_CONFIG_CONTENT ?? '{}') as {
+      permission: { bash: Record<string, string>; code_review_publish_review_summary?: string };
+      mcp: { code_review?: { type: string; command: string[]; timeout?: number } };
+    };
+    expect(amended.mcp.code_review).toEqual({
+      type: 'local',
+      command: [binaryPath],
+      timeout: GITHUB_REVIEW_MCP_TIMEOUT_MS,
+    });
+    expect(amended.mcp.code_review?.timeout).toBeGreaterThan(75_000);
+    expect(amended.mcp.code_review?.timeout).toBeLessThan(90_000);
+    expect(amended.permission.code_review_publish_review_summary).toBe('allow');
+    expect(harness.lifecycle.isGitHubReviewPublicationInstalled()).toBe(true);
+
+    const bash = amended.permission.bash;
+    expect(
+      resolveBashDecision(bash, 'gh api repos/o/r/issues/1/comments --paginate --input -')
+    ).toBe('deny');
+    expect(
+      resolveBashDecision(bash, 'gh api repos/o/r/issues/1/comments --input - --paginate')
+    ).toBe('deny');
+    expect(resolveBashDecision(bash, 'gh api repos/o/r/issues/1/comments --paginate')).toBe(
+      'allow'
+    );
+    expect(resolveBashDecision(bash, 'gh api repos/o/r/pulls/1/reviews --input -')).toBe('allow');
+  });
+
+  it('does not install the tool or add denies without the target or the binary', async () => {
+    const withoutBinary = createHarness({
+      env: {
+        KILOCODE_TOKEN: 'A',
+        KILO_GITHUB_REVIEW_TARGET: REVIEW_TARGET,
+        KILO_CONFIG_CONTENT: PUBLISH_CONFIG,
+      },
+    });
+    await withoutBinary.lifecycle.start({
+      workspacePath: WORKSPACE,
+      expectedSessionId: CREATED_SESSION_ID,
+    });
+    expect(withoutBinary.captureEnvRecord.KILO_CONFIG_CONTENT).toBe(PUBLISH_CONFIG);
+    expect(withoutBinary.lifecycle.isGitHubReviewPublicationInstalled()).toBe(false);
+
+    const withoutTarget = createHarness({
+      env: { KILOCODE_TOKEN: 'A', KILO_CONFIG_CONTENT: PUBLISH_CONFIG },
+      gitHubReviewPublishBinaryPath: '/usr/local/bin/github-review-publish-mcp',
+    });
+    await withoutTarget.lifecycle.start({
+      workspacePath: WORKSPACE,
+      expectedSessionId: CREATED_SESSION_ID,
+    });
+    expect(withoutTarget.captureEnvRecord.KILO_CONFIG_CONTENT).toBe(PUBLISH_CONFIG);
+    expect(withoutTarget.lifecycle.isGitHubReviewPublicationInstalled()).toBe(false);
   });
 });

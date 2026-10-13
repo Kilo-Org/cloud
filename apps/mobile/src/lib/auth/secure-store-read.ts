@@ -1,5 +1,6 @@
 import { readStoredValue, type SecureStoreReadOptions } from '@/lib/auth/secure-store-value';
 import { E2E_SECURE_STORE_FAULT_MS } from '@/lib/config';
+import { isProtectedDataAvailable } from '@/lib/protected-data';
 import { E2eInjectedFaultError } from '@/lib/telemetry/e2e-fault';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
@@ -115,8 +116,13 @@ async function readWithRetry(key: string, read: RetryRead): Promise<string | nul
       if (value !== null || !read.nullIsFailure) {
         return value;
       }
-    } catch {
-      // A rejection spends this attempt; the next one issues a fresh read.
+    } catch (error) {
+      // A locked device refuses every retry too: fail now, unreported. The
+      // caller owns the locked outcome (bootstrap waits for unlock).
+      if (!isProtectedDataAvailable()) {
+        throw error;
+      }
+      // Any other rejection spends this attempt; the next one issues a fresh read.
     }
     pending = undefined;
     // eslint-disable-next-line no-await-in-loop -- backoff between attempts

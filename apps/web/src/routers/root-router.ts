@@ -10,6 +10,7 @@ import { deploymentsRouter } from '@/routers/deployments-router';
 import { cliSessionsRouter } from '@/routers/cli-sessions-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { workspaceFoldersRouter } from '@/routers/workspace-folders-router';
+import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { gitlabRouter } from '@/routers/gitlab-router';
@@ -34,6 +35,7 @@ import { appReportedMessagesRouter } from '@/routers/app-reported-messages-route
 import { kiloPassRouter } from '@/routers/kilo-pass-router';
 import { creditsRouter } from '@/routers/credits-router';
 import { agentProfilesRouter } from '@/routers/agent-profiles-router';
+import { cloudAgentSettingsRouter } from '@/routers/cloud-agent-settings-router';
 import { webhookTriggersRouter } from '@/routers/webhook-triggers-router';
 import { userFeedbackRouter } from '@/routers/user-feedback-router';
 import { feedbackRouter } from '@/routers/feedback-router';
@@ -53,7 +55,6 @@ import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
 import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
-import { quickChatRouter } from '@/routers/quick-chat-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
@@ -66,6 +67,7 @@ export const rootRouter = createTRPCRouter({
   cliSessions: cliSessionsRouter,
   cliSessionsV2: cliSessionsV2Router,
   workspaceFolders: workspaceFoldersRouter,
+  todos: todosRouter,
   githubApps: githubAppsRouter,
   gitlab: gitlabRouter,
   platformIntegrations: platformIntegrationsRouter,
@@ -90,6 +92,7 @@ export const rootRouter = createTRPCRouter({
   kiloPass: kiloPassRouter,
   credits: creditsRouter,
   agentProfiles: agentProfilesRouter,
+  cloudAgentSettings: cloudAgentSettingsRouter,
   webhookTriggers: webhookTriggersRouter,
   userFeedback: userFeedbackRouter,
   feedback: feedbackRouter,
@@ -109,7 +112,6 @@ export const rootRouter = createTRPCRouter({
   providerReview: providerReviewRouter,
   moderation: moderationRouter,
   userExports: userExportsRouter,
-  quickChat: quickChatRouter,
   spendAlerts: spendAlertRouter,
 });
 // export type definition of API

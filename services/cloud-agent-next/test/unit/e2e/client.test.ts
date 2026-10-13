@@ -397,6 +397,85 @@ describe('startSession unified repository branch', () => {
   });
 });
 
+describe('startSession allocation selection', () => {
+  const config = {
+    workerUrl: 'http://worker.test',
+    user: { id: 'user_1', email: 'user@example.test', api_token_pepper: 'pepper' },
+    nextAuthSecret: 'test-secret',
+    gitUrl: 'https://example.test/repo.git',
+    model: 'kilo/fake-deterministic',
+    fakeLlmUrl: 'http://fake.test',
+  } as const;
+
+  const startEnvelope = {
+    cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+    kiloSessionId: 'kilo_1',
+    messageId: 'message_1',
+    delivery: 'queued',
+  };
+
+  function installFetch(data: unknown): ReturnType<typeof vi.fn> {
+    const fetchMock = vi.fn().mockResolvedValue(okEnvelope(data));
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  function bodyOf(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    if (typeof request?.body !== 'string') throw new Error('Expected a JSON request body');
+    return JSON.parse(request.body) as Record<string, unknown>;
+  }
+
+  it('forwards the driver-wide allocation as a structured request for a prompt-only start', async () => {
+    const fetchMock = installFetch(startEnvelope);
+
+    await startSession({ ...config, sandboxAllocation: 'vercel-small' }, { prompt: 'echo:hi' });
+
+    expect(bodyOf(fetchMock).runtime).toEqual({
+      sandboxAllocation: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'small' },
+    });
+  });
+
+  it('omits the runtime allocation entirely when the driver selects none', async () => {
+    const fetchMock = installFetch(startEnvelope);
+
+    await startSession(config, { prompt: 'echo:hi' });
+
+    expect(bodyOf(fetchMock)).not.toHaveProperty('runtime');
+  });
+
+  it('forwards the driver-wide allocation on the browser prepare path too', async () => {
+    const fetchMock = installFetch({
+      cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+      kiloSessionId: 'kilo_1',
+    });
+
+    await prepareBrowserSession(
+      { ...config, internalApiSecret: 'secret', sandboxAllocation: 'vercel-small' },
+      { prompt: 'worktree:create' }
+    );
+
+    expect(bodyOf(fetchMock).sandboxAllocation).toEqual({
+      provider: { id: 'vercel', account: 'kilo' },
+      instanceType: 'small',
+    });
+  });
+
+  it('rejects an explicit allocation on the legacy API before any request', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      startSession(
+        { ...config, sandboxAllocation: 'vercel-small' },
+        { prompt: 'echo:hi' },
+        'legacy'
+      )
+    ).rejects.toThrow(/unified API/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('trpcCall auth headers', () => {
   it('uses bearerToken verbatim and does not mint', async () => {
     const fetchMock = vi.fn().mockResolvedValue(okEnvelope({}));
@@ -783,7 +862,7 @@ describe('prepare transport', () => {
     internalApiSecret: SECRET,
   };
 
-  type SeenRequest = { url: string; headers: Record<string, string> };
+  type SeenRequest = { url: string; headers: Record<string, string>; body: unknown };
   const seen: SeenRequest[] = [];
 
   beforeEach(() => {
@@ -798,6 +877,7 @@ describe('prepare transport', () => {
         const request = {
           url: String(url),
           headers: (init?.headers ?? {}) as Record<string, string>,
+          body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
         };
         seen.push(request);
         const respond = responses[Math.min(index, responses.length - 1)];
@@ -839,6 +919,20 @@ describe('prepare transport', () => {
     expect(seen[0].headers['x-internal-api-key']).toBe(SECRET);
     expect(prepared.cloudAgentSessionId).toBe(SESSION_ID);
   });
+
+  it.each([undefined, 'test-owner/private-repo'])(
+    'prepares browser sessions with the configured repository source %s',
+    async githubRepo => {
+      installFetch([
+        () => okEnvelope({ cloudAgentSessionId: SESSION_ID, kiloSessionId: 'ses_source' }),
+      ]);
+      await prepareBrowserSession({ ...prepareConfig, githubRepo }, { prompt: 'echo:hi' });
+      expect(seen[0].body).toMatchObject(
+        githubRepo ? { githubRepo } : { gitUrl: prepareConfig.gitUrl }
+      );
+      expect(seen[0].body).not.toHaveProperty(githubRepo ? 'gitUrl' : 'githubRepo');
+    }
+  );
 
   it('never targets the removed surface prepare route', async () => {
     installFetch([

@@ -6,7 +6,7 @@ import { type AssociatedPrData, type SessionManager } from '@kilocode/cloud-agen
 
 import { Text } from '@/components/ui/text';
 import { openExternalUrl } from '@/lib/external-link';
-import { resolveSessionPrPressTarget } from '@/lib/session-pr-navigation';
+import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
 
 import { SessionPrBadge } from './session-pr-badge';
 
@@ -44,7 +44,7 @@ export function SessionContextPrRow({
   const openPr = (targetPr: AssociatedPrData) => {
     onClose();
     void (async () => {
-      const target = await resolveSessionPrPressTarget({ url: targetPr.url });
+      const target = resolveSessionPrTapTarget({ url: targetPr.url });
       if (target.kind === 'in-app') {
         router.push(target.href);
         return;

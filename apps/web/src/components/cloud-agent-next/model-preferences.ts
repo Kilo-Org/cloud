@@ -4,7 +4,6 @@ import type { RepositoryOption, RepositoryPlatform } from '@/components/shared/R
 
 const MODEL_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-model';
 const VARIANTS_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-variants';
-const DEVCONTAINER_ENABLED_STORAGE_KEY = 'cloud-agent:devcontainer-enabled';
 const REPO_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-repo';
 const SANDBOX_ALLOCATION_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-sandbox-allocation';
 
@@ -119,22 +118,6 @@ export function getLastUsedModel(organizationId?: string) {
 
 export function setLastUsedModel(model: string, organizationId?: string) {
   safeLocalStorage.setItem(getLastUsedModelStorageKey(organizationId), model);
-}
-
-export function getDevcontainerEnabledStorageKey() {
-  return DEVCONTAINER_ENABLED_STORAGE_KEY;
-}
-
-export function parseDevcontainerEnabled(rawValue: string | null) {
-  return rawValue === 'true';
-}
-
-export function getDevcontainerEnabled() {
-  return parseDevcontainerEnabled(safeLocalStorage.getItem(DEVCONTAINER_ENABLED_STORAGE_KEY));
-}
-
-export function setDevcontainerEnabled(enabled: boolean) {
-  safeLocalStorage.setItem(DEVCONTAINER_ENABLED_STORAGE_KEY, String(enabled));
 }
 
 export function getPreferredInitialModel({

@@ -4,23 +4,20 @@ import {
   type OpenRouterChatCompletionRequest,
   type GatewayRequest,
   type GatewayMessagesRequest,
+  type OpenRouterProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   applyMistralModelSettings,
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   applyKiloExclusiveModelSettings,
   type KiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic';
-import {
-  CLAUDE_OPUS_FALLBACK_MODEL_ID,
-  isClaudeModel,
-  isFableModel,
-  isOpus5Model,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   applyMoonshotModelSettings,
@@ -32,7 +29,6 @@ import {
   ReasoningDetailsTransform,
   type BYOKResult,
   type Provider,
-  type ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { isStepModel } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
@@ -55,11 +51,10 @@ import {
   isQwenExplicitCacheModel,
   isQwenModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
 import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
-import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 
@@ -146,9 +141,8 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   }
   if (isClaudeModel(requestedModel)) {
     return [
-      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
-      OpenRouterInferenceProviderIdSchema.enum.anthropic,
       OpenRouterInferenceProviderIdSchema.enum['google-vertex'],
+      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
     ];
   }
   if (isMinimaxModel(requestedModel)) {
@@ -181,41 +175,60 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   return [];
 }
 
+/**
+ * Claude goes to Anthropic directly only for non-trial enterprise
+ * organizations; everyone else is served by the other Claude providers.
+ */
+export function getIgnoredProviders(
+  requestedModel: string,
+  isAnthropicProviderAllowed: boolean
+): string[] {
+  if (!isAnthropicProviderAllowed && isClaudeModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum.anthropic];
+  }
+  return [];
+}
+
+export function withIgnoredProviders(
+  provider: OpenRouterProviderConfig | undefined,
+  ignoredProviders: string[]
+): OpenRouterProviderConfig | undefined {
+  if (ignoredProviders.length === 0) {
+    return provider;
+  }
+  return { ...provider, ignore: [...new Set([...(provider?.ignore ?? []), ...ignoredProviders])] };
+}
+
 export function applyPreferredProvider(
   requestedModel: string,
   requestToMutate:
     | OpenRouterChatCompletionRequest
     | GatewayResponsesRequest
-    | GatewayMessagesRequest
+    | GatewayMessagesRequest,
+  isAnthropicProviderAllowed: boolean
 ) {
   const preferredProviderOrder = getPreferredProviderOrder(requestedModel);
-  if (preferredProviderOrder.length === 0) {
+  const ignoredProviders = getIgnoredProviders(requestedModel, isAnthropicProviderAllowed);
+  if (preferredProviderOrder.length === 0 && ignoredProviders.length === 0) {
     return;
   }
-  console.debug(
-    `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProviderOrder.join()}`
-  );
-  if (!isOpenRouterProviderConfig(requestToMutate.provider)) {
-    requestToMutate.provider = { order: preferredProviderOrder };
-  } else if (!requestToMutate.provider.order) {
-    requestToMutate.provider.order = preferredProviderOrder;
+  const provider = isOpenRouterProviderConfig(requestToMutate.provider)
+    ? requestToMutate.provider
+    : {};
+  if (preferredProviderOrder.length > 0 && !provider.order) {
+    console.debug(
+      `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProviderOrder.join()}`
+    );
+    provider.order = preferredProviderOrder;
   }
+  requestToMutate.provider = withIgnoredProviders(provider, ignoredProviders);
 }
 
-export async function applyGatewayModelsFallback(
-  providerId: ProviderId,
-  requestedModel: string,
-  requestToMutate: GatewayRequest
-) {
-  if (
-    !isFreeModel(requestedModel) &&
-    (isFableModel(requestedModel) || isOpus5Model(requestedModel)) &&
-    (providerId === 'openrouter' || providerId === 'vercel')
-  ) {
-    requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_FALLBACK_MODEL_ID];
-    return;
-  }
-
+/**
+ * Fallback models are not supported: a request for a free model could fall
+ * back to a paid model and be served without being charged.
+ */
+export function removeModelsFallback(requestToMutate: GatewayRequest) {
   delete requestToMutate.body.models;
 }
 
@@ -280,9 +293,10 @@ export async function applyProviderSpecificLogic(
   userId: string,
   organizationId: string | null,
   sessionId: string | null,
-  taskId: string | null
+  taskId: string | null,
+  isNonTrialEnterprise: boolean
 ) {
-  await applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
+  removeModelsFallback(requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
@@ -324,7 +338,12 @@ export async function applyProviderSpecificLogic(
   }
 
   if (provider.id === 'openrouter' || provider.id === 'vercel') {
-    applyPreferredProvider(requestedModel, requestToMutate.body);
+    // A user's own BYOK credential is never ignored.
+    applyPreferredProvider(
+      requestedModel,
+      requestToMutate.body,
+      isNonTrialEnterprise || userByok !== null
+    );
   }
 
   if (isKimiModel(requestedModel)) {
@@ -337,6 +356,10 @@ export async function applyProviderSpecificLogic(
 
   if (isQwenExplicitCacheModel(requestedModel)) {
     addCacheBreakpoints(requestToMutate);
+  }
+
+  if (provider.id === 'vercel') {
+    await applyVercelSettings(requestedModel, requestToMutate, userByok);
   }
 
   await provider.transformRequest({

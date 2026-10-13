@@ -9,9 +9,9 @@ import {
   buildModelIdToProviderSlugsIndex,
   createModelsByProviderIndexLoader,
   getEndpointProviderSlugs,
-  getSnapshotModelVariantId,
   narrowProviderSlugsToVariant,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { getSnapshotModelVariantId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 const MODEL = 'nvidia/nemotron-3.5-lightning';
 const FREE_MODEL = `${MODEL}:free`;

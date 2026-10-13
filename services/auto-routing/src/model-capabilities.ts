@@ -23,7 +23,7 @@ export type ModelCapabilitiesMap = ReadonlyMap<string, ModelCapabilities>;
 
 // Modalities the worker actively enforces against `model_stats.input_modalities`.
 // Vocabulary evidence: `image` / `image_url` folding mirrors
-// `apps/web/src/lib/ai-gateway/providers/model-capabilities.ts:34`; `file` is a
+// `apps/web/src/lib/providers/model-capabilities.ts:34`; `file` is a
 // confirmed OpenRouter `architecture.input_modalities` value (documented enum:
 // `text | image | file | audio | video`), and `model_stats.inputModalities` copies
 // that field verbatim from the OpenRouter API

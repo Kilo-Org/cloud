@@ -14,20 +14,7 @@ import {
   SystemSearchIndexSync,
   type SystemSearchIndexUpdate,
 } from '@/lib/system-search-sync';
-import { captureTelemetry } from '@/lib/telemetry/error-sink';
-
-/**
- * One report per failed sync, tagged so the subsystem is filterable. The
- * rejected error is reported as-is; the module never logs a document id or a
- * title.
- */
-function reportSystemSearchSyncFailure(error: unknown): void {
-  captureTelemetry({
-    error,
-    level: 'warning',
-    tags: { 'error.subsystem': 'system-search', 'error.operation': 'sync' },
-  });
-}
+import { reportSystemSearchFailure } from '@/lib/system-search-telemetry';
 
 /** The mount's collect dep: the cache collector bound to the app's client. */
 async function collectIndexUpdates(): Promise<SystemSearchCollection> {
@@ -57,7 +44,9 @@ export function SystemSearchIndexMount(): null {
       collect: collectIndexUpdates,
       fingerprints: indexedSystemSearchFingerprints,
       apply: applyIndexUpdate,
-      report: reportSystemSearchSyncFailure,
+      report: error => {
+        reportSystemSearchFailure('sync', error);
+      },
       isEnabled: isSystemSearchSyncEnabled,
     });
     const detach = sync.attach();

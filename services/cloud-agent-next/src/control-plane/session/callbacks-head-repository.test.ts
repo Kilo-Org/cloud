@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { parseSessionMetadata, type SessionMetadata } from '../../persistence/session-metadata.js';
 import type { LatestAssistantMessage } from '../../session/types.js';
 import {
@@ -78,6 +78,7 @@ function createHarness(metadata: SessionMetadata = metadataWithCallback()) {
     getMetadata: () => metadata,
     getCallbackQueue: () => undefined,
     getAssistantMessageForUserMessage: (): LatestAssistantMessage | null => null,
+    getRecentAssistantMessagesForUserMessage: (): LatestAssistantMessage[] => [],
   });
   return { kv, callbacks };
 }

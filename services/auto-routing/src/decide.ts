@@ -1,4 +1,5 @@
 import {
+  ClassifierOutputSchema,
   MirrorPayloadSchema,
   poolEntryKey,
   taxonomyRouteKey,
@@ -23,8 +24,8 @@ import {
 } from './conversation-identity';
 import type { ContentHashes } from './conversation-identity';
 import {
-  getCachedClassification,
-  getStickyDecision,
+  addPendingClassifierCost,
+  readConversationState,
   putCachedClassification,
   putStickyDecision,
 } from './decision-cache';
@@ -91,6 +92,22 @@ async function loadCustomRoutingTable(
 function stickyToIncumbent(sticky: StickyDecision | null): DecisionIncumbent | null {
   if (!sticky) return null;
   return { model: sticky.model, variant: sticky.variant ?? null };
+}
+
+function classificationFromRouteKey(routeKey: string): ClassifierOutput | null {
+  const [taskType, subtaskType, extra] = routeKey.split('/');
+  if (extra !== undefined) return null;
+  const parsed = ClassifierOutputSchema.safeParse({
+    taskType,
+    subtaskType,
+    contextComplexity: 'medium',
+    reasoningComplexity: 'medium',
+    riskLevel: 'low',
+    executionMode: 'answer_only',
+    requiresTools: false,
+    confidence: 0,
+  });
+  return parsed.success ? parsed.data : null;
 }
 
 function decisionVariant(decision: AutoRoutingDecision): string | null {
@@ -253,7 +270,8 @@ function recordDecision(
   outcome: DecisionOutcome,
   autoRoutingMode: string,
   decision: AutoRoutingDecision | null = null,
-  incumbent: StickyDecision | null = null
+  incumbent: StickyDecision | null = null,
+  classification: 'sync' | 'cache' | 'background' = outcome.kind === 'cache_hit' ? 'cache' : 'sync'
 ): void {
   const summary = summarizeOutcome(outcome);
   summary.details.timings = { ...ctx.timings, totalMs: durationMs };
@@ -322,6 +340,7 @@ function recordDecision(
       decidedTaskType: decision?.taskType ?? null,
       decidedSubtaskType: decision?.subtaskType ?? null,
       decisionSource: decision?.source ?? null,
+      classification,
       sticky: decision?.sticky ?? null,
       incumbentModel,
       switched,
@@ -439,7 +458,10 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     | {
         ctx: DecisionContext;
         sticky: StickyDecision | null;
-        outcome: DecisionOutcome;
+        pendingCostUsd: number;
+        outcome:
+          | DecisionOutcome
+          | { kind: 'sticky_immediate'; classifierModel: string; decision: AutoRoutingDecision };
       }
     | AutoRoutingDecision
   > => {
@@ -467,29 +489,62 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       successSampleRate,
       timings,
     };
-    // Both live in the conversation's Durable Object; fetch them together.
     const cacheReadStartedAt = performance.now();
-    const [cached, sticky] = await Promise.all([
-      getCachedClassification(c.env, ctx.conversationKey, hashes.exact, classifierModel),
-      getStickyDecision(c.env, ctx.conversationKey),
-    ]);
+    const {
+      classification: cached,
+      sticky,
+      pendingCostUsd,
+    } = await readConversationState(c.env, ctx.conversationKey, hashes.exact, classifierModel, {
+      consumePendingCost: true,
+    });
     timings.cacheReadMs = performance.now() - cacheReadStartedAt;
     if (cached) {
       return {
         ctx,
         sticky,
+        pendingCostUsd,
         outcome: { kind: 'cache_hit', classifierModel, classification: cached },
       };
+    }
+    if (sticky?.routeKey != null) {
+      const classification = classificationFromRouteKey(sticky.routeKey);
+      if (classification) {
+        const routing = await routingPrerequisites;
+        const decision = computeDecision(
+          classification,
+          routing.routingTable,
+          stickyToIncumbent(sticky),
+          deniedModelIds,
+          routing.routingMode,
+          {
+            constraints,
+            capabilityMap:
+              hasConstraints || routing.configuredPool !== null ? routing.capabilities : undefined,
+            failClosedOnInactive: routing.configuredPool !== null,
+          }
+        );
+        if (
+          decision?.model === sticky.model &&
+          (sticky.variant === null || decisionVariant(decision) === sticky.variant)
+        ) {
+          return {
+            ctx,
+            sticky,
+            pendingCostUsd,
+            outcome: { kind: 'sticky_immediate', classifierModel, decision },
+          };
+        }
+      }
     }
 
     const classifierStartedAt = performance.now();
     try {
       const classifier = await classifyNormalizedInput(c.env, payload.input, classifierModel);
-      return { ctx, sticky, outcome: { kind: 'model', classifier } };
+      return { ctx, sticky, pendingCostUsd, outcome: { kind: 'model', classifier } };
     } catch (error) {
       // Handle rejection immediately, even while routing prerequisites are
       // still pending; billed failure metadata is consumed below as before.
-      return { ctx, sticky, outcome: { kind: 'error', error } };
+      return { ctx, sticky, pendingCostUsd, outcome: { kind: 'error', error } };
     } finally {
       timings.classifierMs = performance.now() - classifierStartedAt;
     }
@@ -510,13 +565,77 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   }
 
   const { configuredPool, routingMode, capabilities, routingTable } = routing;
-  const { ctx, sticky, outcome } = prepared;
+  const { ctx, sticky, pendingCostUsd, outcome } = prepared;
   const incumbent = stickyToIncumbent(sticky);
   const decisionOptions = {
     constraints: payload.constraints,
     capabilityMap: hasConstraints || configuredPool !== null ? capabilities : undefined,
     failClosedOnInactive: configuredPool !== null,
   };
+  if (outcome.kind === 'sticky_immediate') {
+    const responseDurationMs = performance.now() - startedAt;
+    const backgroundCtx = { ...ctx, timings: { ...timings, totalMs: responseDurationMs } };
+    c.executionCtx.waitUntil(
+      (async () => {
+        const classifierStartedAt = performance.now();
+        try {
+          const classifier = await classifyNormalizedInput(
+            c.env,
+            payload.input,
+            outcome.classifierModel
+          );
+          backgroundCtx.timings.classifierMs = performance.now() - classifierStartedAt;
+          const decision = computeDecision(
+            classifier.classification,
+            routingTable,
+            incumbent,
+            deniedModelIds,
+            routingMode,
+            decisionOptions
+          );
+          await Promise.all([
+            putCachedClassification(
+              c.env,
+              ctx.conversationKey,
+              ctx.hashes.exact,
+              classifier.classifierModel,
+              classifier.classification
+            ),
+            decision
+              ? putStickyDecision(
+                  c.env,
+                  ctx.conversationKey,
+                  decision.model,
+                  decisionVariant(decision),
+                  taxonomyRouteKey(classifier.classification)
+                )
+              : Promise.resolve(),
+            addPendingClassifierCost(c.env, ctx.conversationKey, classifier.cost ?? 0),
+          ]);
+          recordDecision(
+            c.env,
+            backgroundCtx,
+            responseDurationMs,
+            { kind: 'model', classifier },
+            routingMode,
+            decision,
+            sticky,
+            'background'
+          );
+        } catch (error) {
+          console.warn(
+            JSON.stringify({
+              event: 'auto_routing_background_classify_failed',
+              hashExact: ctx.hashes.exact,
+              classifierModel: outcome.classifierModel,
+              ...formatError(error),
+            })
+          );
+        }
+      })()
+    );
+    return c.json({ cost: pendingCostUsd, decision: outcome.decision, classifierResult: null });
+  }
   if (outcome.kind === 'cache_hit') {
     const cached = outcome.classification;
     const decision = computeDecision(
@@ -547,7 +666,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       decision,
       sticky
     );
-    return c.json(decisionResponse(0, cached, payload.input, decision));
+    return c.json(decisionResponse(pendingCostUsd, cached, payload.input, decision));
   }
 
   try {
@@ -591,7 +710,12 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       sticky
     );
     return c.json(
-      decisionResponse(classifier.cost ?? 0, classifier.classification, payload.input, decision)
+      decisionResponse(
+        pendingCostUsd + (classifier.cost ?? 0),
+        classifier.classification,
+        payload.input,
+        decision
+      )
     );
   } catch (error) {
     recordDecision(
@@ -605,6 +729,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     );
     // A failed System One run can still have billed the request, so report
     // that cost even though there is no usable classifier result.
-    return c.json(emptyDecisionResponse(getClassifierFailureMetadata(error).cost ?? 0));
+    return c.json(
+      emptyDecisionResponse(pendingCostUsd + (getClassifierFailureMetadata(error).cost ?? 0))
+    );
   }
 };

@@ -40,6 +40,16 @@ export type CodingPlanPreference = z.infer<typeof CodingPlanPreferenceSchema>;
 
 type CodingPlanPreferenceEnv = Pick<Env, 'AUTO_ROUTING_CONFIG' | 'HYPERDRIVE'>;
 
+const CODING_PLAN_PREFERENCE_CACHE_MAX_ENTRIES = 1_024;
+const codingPlanPreferenceCache = new Map<
+  string,
+  { promise: Promise<CodingPlanPreference>; expiresAt: number }
+>();
+
+export function clearCodingPlanPreferenceCache(): void {
+  codingPlanPreferenceCache.clear();
+}
+
 export function codingPlanDefaultDecision(
   preference: Extract<CodingPlanPreference, { active: true }>
 ) {
@@ -133,24 +143,43 @@ export async function getCodingPlanPreference(
 
   const userIdHash = await hashIdentifierForTelemetry(userId);
   const key = `${CODING_PLAN_PREFERENCE_KEY_PREFIX}${userIdHash}`;
-  try {
-    return (
-      (await kvReadThrough({
-        kv: env.AUTO_ROUTING_CONFIG,
-        key,
-        ttlSeconds: CODING_PLAN_PREFERENCE_TTL_SECONDS,
-        fetchOrigin: () => queryCodingPlanPreference(env, userId),
-        parse: parseCodingPlanPreference,
-      })) ?? { active: false }
-    );
-  } catch (error) {
-    console.warn(
-      JSON.stringify({
-        event: 'coding_plan_preference_read_failed',
-        key,
-        ...formatError(error),
-      })
-    );
-    return { active: false };
+  const now = Date.now();
+  const cached = codingPlanPreferenceCache.get(userIdHash);
+  if (cached && cached.expiresAt > now) {
+    return cached.promise;
   }
+  codingPlanPreferenceCache.delete(userIdHash);
+  if (codingPlanPreferenceCache.size >= CODING_PLAN_PREFERENCE_CACHE_MAX_ENTRIES) {
+    const oldestKey = codingPlanPreferenceCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      codingPlanPreferenceCache.delete(oldestKey);
+    }
+  }
+  const promise = kvReadThrough({
+    kv: env.AUTO_ROUTING_CONFIG,
+    key,
+    ttlSeconds: CODING_PLAN_PREFERENCE_TTL_SECONDS,
+    fetchOrigin: () => queryCodingPlanPreference(env, userId),
+    parse: parseCodingPlanPreference,
+  })
+    .then(value => value ?? { active: false as const })
+    .catch((error: unknown) => {
+      if (codingPlanPreferenceCache.get(userIdHash) === entry) {
+        codingPlanPreferenceCache.delete(userIdHash);
+      }
+      console.warn(
+        JSON.stringify({
+          event: 'coding_plan_preference_read_failed',
+          key,
+          ...formatError(error),
+        })
+      );
+      return { active: false as const };
+    });
+  const entry = {
+    promise,
+    expiresAt: now + CODING_PLAN_PREFERENCE_TTL_SECONDS * 1_000,
+  };
+  codingPlanPreferenceCache.set(userIdHash, entry);
+  return promise;
 }

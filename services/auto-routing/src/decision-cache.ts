@@ -2,38 +2,80 @@ import { ClassifierOutputSchema, type ClassifierOutput } from '@kilocode/auto-ro
 import { DurableObject } from 'cloudflare:workers';
 import * as z from 'zod';
 
-// Mirrored agent sessions classify the same prompt prefixes on every API
-// call, so identical classifier inputs repeat heavily within a short
-// window. Reusing the previous result skips the model call entirely.
-//
-// The cache lives in a Durable Object named by the conversation (session id
-// when the client sent one, content fingerprint otherwise — see
-// conversation-identity.ts), which gives read-after-write consistency for
-// the bursts of identical requests a single session produces.
+const CLASSIFICATION_HOT_CACHE_LIMIT = 5000;
 const ENTRY_TTL_MS = 30 * 60 * 1000;
 // Cloudflare caps storage.delete() at 128 keys per call.
 const DELETE_BATCH_SIZE = 128;
 
-// The DO treats stored values as opaque — callers validate on read, since
-// entries may have been written by an older worker version. A concrete union
-// rather than unknown because the workers RPC stub maps non-serializable
-// method types to never.
-type StoredValue = ClassifierOutput | StickyDecision;
+// Workers RPC maps non-serializable method types to never, so use a concrete
+// union rather than unknown. Persisted values are still validated on read.
+type StoredValue = ClassifierOutput | StickyDecision | number;
 
 type StoredEntry = {
   value: StoredValue;
   storedAt: number;
 };
 
+type StoredConversationState = {
+  classification: StoredEntry | null;
+  sticky: StoredValue | null;
+  pendingCostUsd: StoredValue | null;
+};
+
+const STICKY_DECISION_KEY = 'sticky';
+const PENDING_COST_KEY = 'pending-cost';
+const PendingCostSchema = z.number().finite().nonnegative();
+
+const classificationHotCache = new Map<string, { value: ClassifierOutput; storedAt: number }>();
+
+function cacheClassification(key: string, value: ClassifierOutput, storedAt: number): void {
+  classificationHotCache.delete(key);
+  classificationHotCache.set(key, { value, storedAt });
+  if (classificationHotCache.size > CLASSIFICATION_HOT_CACHE_LIMIT) {
+    const oldestKey = classificationHotCache.keys().next().value;
+    if (oldestKey !== undefined) classificationHotCache.delete(oldestKey);
+  }
+}
+
+export function clearClassificationHotCache(): void {
+  classificationHotCache.clear();
+}
+
 export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
-  async getEntry(key: string): Promise<StoredValue | null> {
-    const entry = await this.ctx.storage.get<StoredEntry>(key);
-    if (!entry) return null;
-    if (Date.now() - entry.storedAt > ENTRY_TTL_MS) {
-      await this.ctx.storage.delete(key);
-      return null;
+  async readConversationState(
+    classificationKey: string,
+    consumePendingCost: boolean
+  ): Promise<StoredConversationState> {
+    const entries = await this.ctx.storage.get<StoredEntry>([
+      classificationKey,
+      STICKY_DECISION_KEY,
+      PENDING_COST_KEY,
+    ]);
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+    for (const [key, entry] of entries) {
+      if (now - entry.storedAt > ENTRY_TTL_MS) {
+        entries.delete(key);
+        keysToDelete.push(key);
+      }
     }
-    return entry.value;
+    const pendingCost = entries.get(PENDING_COST_KEY);
+    if (consumePendingCost && pendingCost) keysToDelete.push(PENDING_COST_KEY);
+    if (keysToDelete.length > 0) await this.ctx.storage.delete(keysToDelete);
+    return {
+      classification: entries.get(classificationKey) ?? null,
+      sticky: entries.get(STICKY_DECISION_KEY)?.value ?? null,
+      pendingCostUsd: pendingCost?.value ?? null,
+    };
+  }
+
+  async addPendingClassifierCost(usd: number): Promise<void> {
+    const entry = await this.ctx.storage.get<StoredEntry>(PENDING_COST_KEY);
+    const now = Date.now();
+    const pending = PendingCostSchema.safeParse(
+      entry && now - entry.storedAt <= ENTRY_TTL_MS ? entry.value : 0
+    );
+    await this.putEntry(PENDING_COST_KEY, (pending.success ? pending.data : 0) + usd);
   }
 
   async putEntry(key: string, value: StoredValue): Promise<void> {
@@ -80,12 +122,6 @@ function entryKey(contentHash: string, classifierModel: string): string {
   return `${classifierModel}:${contentHash}`;
 }
 
-// Single per-conversation slot remembering the last model the decision
-// engine served, so the session can stay on it (keeping the provider's
-// prompt cache warm) instead of ping-ponging when its route oscillates.
-// Cannot collide with classification keys, which always contain a ':'.
-const STICKY_DECISION_KEY = 'sticky';
-
 const StickyDecisionSchema = z.object({
   model: z.string().min(1),
   // Taxonomy route the model was decided on, for route-change telemetry.
@@ -97,39 +133,59 @@ const StickyDecisionSchema = z.object({
 });
 export type StickyDecision = z.infer<typeof StickyDecisionSchema>;
 
-export async function getCachedClassification(
+export type ConversationState = {
+  classification: ClassifierOutput | null;
+  sticky: StickyDecision | null;
+  pendingCostUsd: number;
+};
+
+export async function readConversationState(
   env: DecisionCacheEnv,
   conversationKey: string,
-  contentHash: string,
-  classifierModel: string
-): Promise<ClassifierOutput | null> {
+  exactHash: string,
+  classifierModel: string,
+  options: { consumePendingCost: boolean }
+): Promise<ConversationState> {
   try {
-    const value = await cacheStub(env, conversationKey).getEntry(
-      entryKey(contentHash, classifierModel)
+    const key = entryKey(exactHash, classifierModel);
+    const state = await cacheStub(env, conversationKey).readConversationState(
+      key,
+      options.consumePendingCost
     );
-    if (!value) return null;
-    // Entries may have been written by an older worker version; validate
-    // before serving.
-    const parsed = ClassifierOutputSchema.safeParse(value);
-    return parsed.success ? parsed.data : null;
+    let hotClassification = classificationHotCache.get(key);
+    if (hotClassification && Date.now() - hotClassification.storedAt > ENTRY_TTL_MS) {
+      classificationHotCache.delete(key);
+      hotClassification = undefined;
+    }
+    let classification = hotClassification?.value ?? null;
+    if (!classification) {
+      const parsed = ClassifierOutputSchema.safeParse(state.classification?.value);
+      if (parsed.success && state.classification) {
+        classification = parsed.data;
+        cacheClassification(key, classification, state.classification.storedAt);
+      }
+    }
+    const sticky = StickyDecisionSchema.safeParse(state.sticky);
+    const pendingCost = PendingCostSchema.safeParse(state.pendingCostUsd);
+    return {
+      classification,
+      sticky: sticky.success ? sticky.data : null,
+      pendingCostUsd: pendingCost.success ? pendingCost.data : 0,
+    };
   } catch {
-    return null;
+    return { classification: null, sticky: null, pendingCostUsd: 0 };
   }
 }
 
-export async function getStickyDecision(
+export async function addPendingClassifierCost(
   env: DecisionCacheEnv,
-  conversationKey: string
-): Promise<StickyDecision | null> {
+  conversationKey: string,
+  usd: number
+): Promise<void> {
   try {
-    const value = await cacheStub(env, conversationKey).getEntry(STICKY_DECISION_KEY);
-    if (!value) return null;
-    // Entries may have been written by an older worker version; validate
-    // before serving.
-    const parsed = StickyDecisionSchema.safeParse(value);
-    return parsed.success ? parsed.data : null;
+    await cacheStub(env, conversationKey).addPendingClassifierCost(usd);
   } catch {
-    return null;
+    // Cost writes must not fail the decision.
   }
 }
 
@@ -159,10 +215,10 @@ export async function putCachedClassification(
   classification: ClassifierOutput
 ): Promise<void> {
   try {
-    await cacheStub(env, conversationKey).putEntry(
-      entryKey(contentHash, classifierModel),
-      classification
-    );
+    const key = entryKey(contentHash, classifierModel);
+    const storedAt = Date.now();
+    await cacheStub(env, conversationKey).putEntry(key, classification);
+    cacheClassification(key, classification, storedAt);
   } catch {
     // Cache writes are best effort and must not fail the decision.
   }

@@ -4,8 +4,11 @@ import { clearRoutingTableCache } from './routing-table';
 import { clearModelCapabilitiesCache } from './model-capabilities';
 import type * as ModelCapabilitiesModule from './model-capabilities';
 import { clearCustomRoutingTableCache } from './decide';
+import { clearClassificationHotCache } from './decision-cache';
+import { clearAutoRoutingSettingsCache } from './routing-mode';
+import { clearCodingPlanPreferenceCache } from './coding-plan-preference';
 import { app } from './index';
-import { ClassifierRunError } from './model-classifier';
+import { ClassifierRunError, type ClassifierRunResult } from './model-classifier';
 import type * as DbModule from '@kilocode/db';
 import type * as ModelClassifierModule from './model-classifier';
 import type { AutoRoutingMode, EfficientModelPool } from '@kilocode/auto-routing-contracts';
@@ -48,7 +51,8 @@ const configGet = vi.fn();
 const configDelete = vi.fn();
 const configPut = vi.fn();
 const analyticsTokenGet = vi.fn();
-const cacheGetEntry = vi.fn();
+const cacheReadConversationState = vi.fn();
+const cacheAddPendingClassifierCost = vi.fn();
 const cachePutEntry = vi.fn();
 const cacheIdFromName = vi.fn(() => 'cache-do-id');
 const modeConfigIdFromName = vi.fn((name: string) => name);
@@ -74,7 +78,11 @@ const env = {
   },
   AUTO_ROUTING_DECISION_CACHE: {
     idFromName: cacheIdFromName,
-    get: () => ({ getEntry: cacheGetEntry, putEntry: cachePutEntry }),
+    get: () => ({
+      readConversationState: cacheReadConversationState,
+      addPendingClassifierCost: cacheAddPendingClassifierCost,
+      putEntry: cachePutEntry,
+    }),
   },
   AUTO_ROUTING_MODE_CONFIG: {
     idFromName: modeConfigIdFromName,
@@ -181,10 +189,56 @@ function mirrorPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function conversationState(
+  classification: unknown = null,
+  sticky: unknown = null,
+  pendingCostUsd = 0
+) {
+  return {
+    classification:
+      classification === null ? null : { value: classification, storedAt: Date.now() },
+    sticky,
+    pendingCostUsd,
+  };
+}
+
+const backgroundTasks: Promise<unknown>[] = [];
+
+async function drainBackgroundTasks() {
+  while (backgroundTasks.length > 0) {
+    await Promise.all(backgroundTasks.splice(0));
+  }
+}
+
+function mockStoredConversation() {
+  const store = new Map<string, unknown>();
+  let pendingCostUsd = 0;
+  cacheReadConversationState.mockImplementation(
+    async (key: string | null, consumePendingCost: boolean) => {
+      const state = conversationState(
+        key === null ? null : (store.get(key) ?? null),
+        store.get('sticky') ?? null,
+        pendingCostUsd
+      );
+      if (consumePendingCost) pendingCostUsd = 0;
+      return state;
+    }
+  );
+  cachePutEntry.mockImplementation(async (key: string, value: unknown) => {
+    store.set(key, value);
+  });
+  cacheAddPendingClassifierCost.mockImplementation(async (usd: number) => {
+    pendingCostUsd += usd;
+  });
+  return store;
+}
+
 // Node-environment tests have no workers ExecutionContext; Hono accepts a
 // substitute so handler code can use c.executionCtx.waitUntil directly.
 const executionCtx = {
-  waitUntil: () => {},
+  waitUntil: (promise: Promise<unknown>) => {
+    backgroundTasks.push(promise);
+  },
   passThroughOnException: () => {},
 } as unknown as ExecutionContext;
 
@@ -212,6 +266,10 @@ describe('auto routing worker', () => {
     clearClassifierConfigCache();
     clearRoutingTableCache();
     clearModelCapabilitiesCache();
+    clearClassificationHotCache();
+    clearAutoRoutingSettingsCache();
+    clearCodingPlanPreferenceCache();
+    backgroundTasks.length = 0;
     const actualCaps =
       await vi.importActual<typeof ModelCapabilitiesModule>('./model-capabilities');
     getModelCapabilitiesMock.mockReset();
@@ -287,8 +345,10 @@ describe('auto routing worker', () => {
     });
     analyticsTokenGet.mockReset();
     analyticsTokenGet.mockResolvedValue('analytics-token');
-    cacheGetEntry.mockReset();
-    cacheGetEntry.mockResolvedValue(null);
+    cacheReadConversationState.mockReset();
+    cacheReadConversationState.mockResolvedValue(conversationState());
+    cacheAddPendingClassifierCost.mockReset();
+    cacheAddPendingClassifierCost.mockResolvedValue(undefined);
     cachePutEntry.mockReset();
     cachePutEntry.mockResolvedValue(undefined);
     mockedFetch.mockReset();
@@ -296,7 +356,8 @@ describe('auto routing worker', () => {
     clearCustomRoutingTableCache();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await drainBackgroundTasks();
     globalThis.fetch = originalFetch;
     clearCustomRoutingTableCache();
     vi.restoreAllMocks();
@@ -331,7 +392,9 @@ describe('auto routing worker', () => {
             }),
           };
         });
-        if (cacheHit) cacheGetEntry.mockResolvedValueOnce(mockClassification);
+        if (cacheHit) {
+          cacheReadConversationState.mockResolvedValueOnce(conversationState(mockClassification));
+        }
 
         let finished = false;
         const pending = Promise.resolve(
@@ -342,7 +405,7 @@ describe('auto routing worker', () => {
         });
         try {
           await vi.waitFor(() => {
-            expect(cacheGetEntry).toHaveBeenCalledTimes(2);
+            expect(cacheReadConversationState).toHaveBeenCalledTimes(1);
             if (!cacheHit) expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
           });
           await new Promise<void>(resolve => setImmediate(resolve));
@@ -365,7 +428,7 @@ describe('auto routing worker', () => {
           },
           classifierResult: { classification: mockClassification, normalized: normalizedInput },
         });
-        expect(cacheGetEntry).toHaveBeenCalledTimes(2);
+        expect(cacheReadConversationState).toHaveBeenCalledTimes(1);
         expect(classifyNormalizedInput).toHaveBeenCalledTimes(cacheHit ? 0 : 1);
       }
     );
@@ -414,7 +477,7 @@ describe('auto routing worker', () => {
         await vi.waitFor(() => expect(getModelCapabilitiesMock).toHaveBeenCalledTimes(1));
         await new Promise<void>(resolve => setImmediate(resolve));
         expect(classifyNormalizedInput).not.toHaveBeenCalled();
-        expect(cacheGetEntry).not.toHaveBeenCalled();
+        expect(cacheReadConversationState).not.toHaveBeenCalled();
       } finally {
         capabilities.resolve(
           new Map([
@@ -440,7 +503,7 @@ describe('auto routing worker', () => {
           classifierResult: null,
         });
         expect(classifyNormalizedInput).not.toHaveBeenCalled();
-        expect(cacheGetEntry).not.toHaveBeenCalled();
+        expect(cacheReadConversationState).not.toHaveBeenCalled();
       } else {
         await expect(response.json()).resolves.toMatchObject({
           cost: mockClassifierResult.cost,
@@ -514,10 +577,44 @@ describe('auto routing worker', () => {
       });
     });
 
+    it('waits for fresh classification when the incumbent fails the current modality constraint', async () => {
+      setVisionBenchmark();
+      setVisionCaps();
+      cacheReadConversationState.mockResolvedValue(
+        conversationState(null, {
+          model: 'text-only/chat',
+          variant: null,
+          routeKey: 'implementation/feature_development',
+        })
+      );
+      const classifier = Promise.withResolvers<ClassifierRunResult>();
+      classifyNormalizedInput.mockReturnValueOnce(classifier.promise);
+      let finished = false;
+      const pending = Promise.resolve(
+        decideRequest(mirrorPayload({ constraints: { requiredInputModalities: ['image'] } }))
+      ).then(response => {
+        finished = true;
+        return response;
+      });
+      try {
+        await vi.waitFor(() => expect(classifyNormalizedInput).toHaveBeenCalledTimes(1));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(finished).toBe(false);
+      } finally {
+        classifier.resolve(mockClassifierResult as ClassifierRunResult);
+      }
+      const response = await pending;
+      await expect(response.json()).resolves.toMatchObject({
+        cost: mockClassifierResult.cost,
+        decision: { model: 'vision/chat', sticky: false },
+        classifierResult: { classification: mockClassification },
+      });
+    });
+
     it('skips a non-vision top candidate on the cached-classification-hit path', async () => {
       setVisionBenchmark();
       setVisionCaps();
-      cacheGetEntry.mockResolvedValueOnce(mockClassification);
+      cacheReadConversationState.mockResolvedValueOnce(conversationState(mockClassification));
       const response = await decideRequest(
         mirrorPayload({ constraints: { requiredInputModalities: ['image'] } })
       );
@@ -1841,7 +1938,7 @@ describe('auto routing worker', () => {
   });
 
   it('serves a cached classification for the session without calling the classifier', async () => {
-    cacheGetEntry.mockResolvedValueOnce(mockClassification);
+    cacheReadConversationState.mockResolvedValueOnce(conversationState(mockClassification));
 
     const response = await decideRequest(mirrorPayload());
 
@@ -1886,11 +1983,193 @@ describe('auto routing worker', () => {
     );
   });
 
+  it('waits for classification on the first turn', async () => {
+    const classifier = Promise.withResolvers<typeof mockClassifierResult>();
+    classifyNormalizedInput.mockReturnValueOnce(classifier.promise);
+    let finished = false;
+    const pending = Promise.resolve(decideRequest(mirrorPayload())).then(response => {
+      finished = true;
+      return response;
+    });
+    try {
+      await vi.waitFor(() => expect(classifyNormalizedInput).toHaveBeenCalledTimes(1));
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(finished).toBe(false);
+    } finally {
+      classifier.resolve(mockClassifierResult);
+    }
+    await expect((await pending).json()).resolves.toMatchObject({
+      cost: mockClassifierResult.cost,
+      classifierResult: { classification: mockClassification },
+    });
+  });
+
+  it('returns the incumbent immediately, refreshes the next route, and bills background cost once', async () => {
+    mockStoredConversation();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const classifierResult = {
+      ...mockClassifierResult,
+      classifierModel: 'typesafe/jev-1.13',
+    } as ClassifierRunResult;
+    classifyNormalizedInput.mockResolvedValue(classifierResult);
+    const first = await decideRequest(mirrorPayload());
+    await expect(first.json()).resolves.toMatchObject({
+      cost: classifierResult.cost,
+      decision: { model: 'google/gemini-2.5-flash-lite' },
+      classifierResult: { classification: mockClassification },
+    });
+    await drainBackgroundTasks();
+
+    const backgroundClassifier = Promise.withResolvers<ClassifierRunResult>();
+    classifyNormalizedInput.mockReturnValueOnce(backgroundClassifier.promise);
+    const secondPayload = mirrorPayload({
+      input: { ...normalizedInput, userPromptPrefix: 'Design the system next.' },
+    });
+    let secondResponse: Response | undefined;
+    const second = Promise.resolve(decideRequest(secondPayload)).then(response => {
+      secondResponse = response;
+      return response;
+    });
+    try {
+      await vi.waitFor(() => expect(secondResponse).toBeDefined());
+      await expect((await second).json()).resolves.toMatchObject({
+        cost: 0,
+        decision: {
+          model: 'google/gemini-2.5-flash-lite',
+          taskType: 'implementation',
+          subtaskType: 'feature_development',
+          sticky: false,
+        },
+        classifierResult: null,
+      });
+    } finally {
+      backgroundClassifier.resolve({
+        ...classifierResult,
+        classification: {
+          ...classifierResult.classification,
+          taskType: 'planning_design',
+          subtaskType: 'system_design',
+        },
+      });
+      await second;
+      await drainBackgroundTasks();
+    }
+    const backgroundLog = logSpy.mock.calls
+      .map(([message]) => JSON.parse(String(message)))
+      .find(entry => entry.classification === 'background');
+    expect(backgroundLog).toMatchObject({
+      event: 'auto_routing_decision',
+      decidedModel: 'anthropic/claude-sonnet-4.6',
+      timings: { classifierMs: expect.any(Number), totalMs: expect.any(Number) },
+    });
+
+    const thirdClassifier = Promise.withResolvers<ClassifierRunResult>();
+    classifyNormalizedInput.mockReturnValueOnce(thirdClassifier.promise);
+    let thirdResponse: Response | undefined;
+    const third = Promise.resolve(
+      decideRequest(
+        mirrorPayload({
+          input: { ...normalizedInput, userPromptPrefix: 'Continue the system design.' },
+        })
+      )
+    ).then(response => {
+      thirdResponse = response;
+      return response;
+    });
+    try {
+      await vi.waitFor(() => expect(thirdResponse).toBeDefined());
+      await expect((await third).json()).resolves.toMatchObject({
+        cost: classifierResult.cost,
+        decision: {
+          model: 'anthropic/claude-sonnet-4.6',
+          taskType: 'planning_design',
+          subtaskType: 'system_design',
+          sticky: false,
+        },
+        classifierResult: null,
+      });
+    } finally {
+      thirdClassifier.resolve({ ...classifierResult, cost: 0 });
+      await third;
+      await drainBackgroundTasks();
+    }
+    await expect((await decideRequest(secondPayload)).json()).resolves.toMatchObject({
+      cost: 0,
+      decision: { model: 'anthropic/claude-sonnet-4.6' },
+      classifierResult: { classification: { taskType: 'planning_design' } },
+    });
+  });
+
+  it.each(['cache', 'sync', 'error'] as const)(
+    'returns pending background cost exactly once on the %s path',
+    async path => {
+      mockStoredConversation();
+      const classifierResult = { ...mockClassifierResult, classifierModel: 'typesafe/jev-1.13' };
+      classifyNormalizedInput.mockResolvedValue(classifierResult);
+      if (path === 'cache') {
+        classifyNormalizedInput.mockResolvedValueOnce({ ...classifierResult, cost: 0 });
+        await decideRequest(mirrorPayload());
+        await drainBackgroundTasks();
+      } else if (path === 'error') {
+        classifyNormalizedInput.mockRejectedValueOnce(
+          new ClassifierRunError('Invalid classification', {
+            cost: classifierResult.cost,
+            classifierModel: classifierResult.classifierModel,
+            failureStage: 'invalid_response',
+          })
+        );
+      }
+      const deferredCost = 0.004;
+      await cacheAddPendingClassifierCost(deferredCost);
+      const response = await decideRequest(mirrorPayload());
+      const currentCost = path === 'cache' ? 0 : classifierResult.cost;
+      await expect(response.json()).resolves.toMatchObject({
+        cost: deferredCost + currentCost,
+        ...(path === 'error' ? { classifierResult: null } : {}),
+      });
+      await drainBackgroundTasks();
+      classifyNormalizedInput.mockResolvedValue({ ...classifierResult, cost: 0 });
+      await expect((await decideRequest(mirrorPayload())).json()).resolves.toMatchObject({
+        cost: 0,
+      });
+    }
+  );
+
+  it('leaves the sticky route and pending cost unchanged when background classification fails', async () => {
+    const store = mockStoredConversation();
+    const sticky = {
+      model: 'google/gemini-2.5-flash-lite',
+      variant: null,
+      routeKey: 'implementation/feature_development',
+    };
+    store.set('sticky', sticky);
+    classifyNormalizedInput.mockRejectedValue(new Error('classifier unavailable'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const response = await decideRequest(mirrorPayload());
+    await expect(response.json()).resolves.toMatchObject({
+      cost: 0,
+      decision: { model: sticky.model },
+      classifierResult: null,
+    });
+    await drainBackgroundTasks();
+    expect(store.get('sticky')).toEqual(sticky);
+    await expect((await decideRequest(mirrorPayload())).json()).resolves.toMatchObject({
+      cost: 0,
+      decision: { model: sticky.model },
+      classifierResult: null,
+    });
+    await drainBackgroundTasks();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"event":"auto_routing_background_classify_failed"')
+    );
+  });
+
   it('keeps the session on the incumbent model when the taxonomy route changes', async () => {
-    // Back the mocked DO stub with real storage so the sticky model written
-    // by the first request is visible to the second.
     const store = new Map<string, unknown>();
-    cacheGetEntry.mockImplementation(async (key: string) => store.get(key) ?? null);
+    cacheReadConversationState.mockImplementation(async (key: string) =>
+      conversationState(store.get(key) ?? null, store.get('sticky') ?? null)
+    );
     cachePutEntry.mockImplementation(async (key: string, value: unknown) => {
       store.set(key, value);
     });
@@ -1939,9 +2218,8 @@ describe('auto routing worker', () => {
     // 0.99 >= the 0.01 default sample rate: a routine decision would be
     // dropped, but a real switch must always be observed.
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    // Incumbent off the current route: the decision switches away from it.
-    cacheGetEntry.mockImplementation(async (key: string) =>
-      key === 'sticky' ? { model: 'gone/model', routeKey: 'planning_design/system_design' } : null
+    cacheReadConversationState.mockResolvedValue(
+      conversationState(null, { model: 'gone/model', routeKey: 'planning_design/system_design' })
     );
 
     const response = await decideRequest(mirrorPayload());
@@ -1972,9 +2250,7 @@ describe('auto routing worker', () => {
   it('leaves routeChanged unknown for sticky entries written before routeKey existed', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    cacheGetEntry.mockImplementation(async (key: string) =>
-      key === 'sticky' ? { model: 'gone/model' } : null
-    );
+    cacheReadConversationState.mockResolvedValue(conversationState(null, { model: 'gone/model' }));
 
     const response = await decideRequest(mirrorPayload());
 

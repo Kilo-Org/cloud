@@ -12,7 +12,6 @@ import {
   type CloudAgentSettingsData,
   type CloudAgentSettingsRepositoryRow,
 } from '@/hooks/useCloudAgentSettings';
-import { ProfilesListDialog } from '../ProfilesListDialog';
 import { RepositoryPicker, type RepositoryOption } from './RepositoryPicker';
 import { RepositoryRow } from './RepositoryRow';
 import {
@@ -30,6 +29,7 @@ type RowValues = {
 type RepositoryOverridesSectionProps = {
   organizationId?: string;
   settings: CloudAgentSettingsData;
+  onManageProfiles: () => void;
 };
 
 const rowKey = (row: CloudAgentSettingsRepositoryRow) =>
@@ -46,13 +46,13 @@ const toDraftRow = (repository: RepositoryOption): CloudAgentSettingsRepositoryR
 export function RepositoryOverridesSection({
   organizationId,
   settings,
+  onManageProfiles,
 }: RepositoryOverridesSectionProps) {
   const { canManage, repositories, capabilitiesByPlatform } = settings;
   const headingId = useId();
   const save = useSetRepositorySettingsMutation(organizationId);
   const remove = useRemoveRepositorySettingsMutation(organizationId);
   const [draft, setDraft] = useState<RepositoryOption | null>(null);
-  const [profilesOpen, setProfilesOpen] = useState(false);
 
   const personalProfiles = useProfiles({ organizationId: undefined, enabled: !organizationId });
   const combinedProfiles = useCombinedProfiles({
@@ -154,7 +154,7 @@ export function RepositoryOverridesSection({
               }
               onProfileChange={profileId => changeDraft(draft, { profileId })}
               onAllocationChange={allocation => changeDraft(draft, { allocation })}
-              onManageProfiles={() => setProfilesOpen(true)}
+              onManageProfiles={onManageProfiles}
             />
           )}
           {repositories.map(row => {
@@ -183,18 +183,12 @@ export function RepositoryOverridesSection({
                 }
                 onProfileChange={profileId => changeRow(shown, { profileId })}
                 onAllocationChange={allocation => changeRow(shown, { allocation })}
-                onManageProfiles={() => setProfilesOpen(true)}
+                onManageProfiles={onManageProfiles}
               />
             );
           })}
         </ul>
       )}
-
-      <ProfilesListDialog
-        organizationId={organizationId}
-        open={profilesOpen}
-        onOpenChange={setProfilesOpen}
-      />
     </section>
   );
 }

@@ -51,7 +51,7 @@ export function useCloudAgentSettingsCanManage(options: UseCloudAgentSettingsOpt
   );
 }
 
-function useInvalidateSettings(organizationId?: string) {
+export function useInvalidateCloudAgentSettings(organizationId?: string) {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
 
@@ -68,7 +68,7 @@ function useInvalidateSettings(organizationId?: string) {
 }
 
 export function useSetContextAllocationMutation(organizationId?: string) {
-  const invalidate = useInvalidateSettings(organizationId);
+  const invalidate = useInvalidateCloudAgentSettings(organizationId);
   const trpc = useTRPC();
 
   return useMutation(
@@ -79,7 +79,7 @@ export function useSetContextAllocationMutation(organizationId?: string) {
 }
 
 export function useSetRepositorySettingsMutation(organizationId?: string) {
-  const invalidate = useInvalidateSettings(organizationId);
+  const invalidate = useInvalidateCloudAgentSettings(organizationId);
   const trpc = useTRPC();
 
   return useMutation(
@@ -90,7 +90,7 @@ export function useSetRepositorySettingsMutation(organizationId?: string) {
 }
 
 export function useRemoveRepositorySettingsMutation(organizationId?: string) {
-  const invalidate = useInvalidateSettings(organizationId);
+  const invalidate = useInvalidateCloudAgentSettings(organizationId);
   const trpc = useTRPC();
 
   return useMutation(

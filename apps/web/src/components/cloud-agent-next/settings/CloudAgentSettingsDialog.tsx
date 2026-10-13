@@ -1,6 +1,7 @@
 'use client';
 
-import { Lock, SlidersHorizontal } from 'lucide-react';
+import { useState } from 'react';
+import { FolderCog, Lock, SlidersHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,7 +12,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ProfilesManager } from '@/components/cloud-agent/profile-editor/ProfilesManager';
 import { useCloudAgentSettings } from '@/hooks/useCloudAgentSettings';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { DefaultSandboxSection } from './DefaultSandboxSection';
 import { RepositoryOverridesSection } from './RepositoryOverridesSection';
 
@@ -19,23 +23,48 @@ type CloudAgentSettingsDialogProps = {
   organizationId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialSection?: 'general' | 'profiles';
+  onProfileSelect?: (profileId: string) => void;
+  openToNewProfile?: boolean;
+  initialSelectedProfileId?: string | null;
 };
 
 export function CloudAgentSettingsDialog({
   organizationId,
   open,
   onOpenChange,
+  ...profileOptions
 }: CloudAgentSettingsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(36rem,85vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[800px]">
-        <CloudAgentSettings organizationId={organizationId} />
+      <DialogContent className="flex h-[min(44rem,90vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[1120px]">
+        <CloudAgentSettings
+          key={organizationId ?? 'personal'}
+          organizationId={organizationId}
+          {...profileOptions}
+          onProfileSelect={
+            profileOptions.onProfileSelect
+              ? profileId => {
+                  profileOptions.onProfileSelect?.(profileId);
+                  onOpenChange(false);
+                }
+              : undefined
+          }
+        />
       </DialogContent>
     </Dialog>
   );
 }
 
-function CloudAgentSettings({ organizationId }: { organizationId?: string }) {
+function CloudAgentSettings({
+  organizationId,
+  initialSection = 'general',
+  onProfileSelect,
+  openToNewProfile,
+  initialSelectedProfileId,
+}: Omit<CloudAgentSettingsDialogProps, 'open' | 'onOpenChange'>) {
+  const [section, setSection] = useState(initialSection);
+  const isMobile = useIsMobile();
   const settingsQuery = useCloudAgentSettings({ organizationId });
   const settings = settingsQuery.data;
 
@@ -46,42 +75,79 @@ function CloudAgentSettings({ organizationId }: { organizationId?: string }) {
           <DialogTitle>Cloud Agent settings</DialogTitle>
           <Badge variant="secondary">{organizationId ? 'Organization' : 'Personal'}</Badge>
         </div>
-        {settings && !settings.canManage ? (
+        {section === 'general' && settings && !settings.canManage ? (
           <DialogDescription className="mt-1 flex items-center gap-1.5">
             <Lock className="size-3.5 shrink-0" aria-hidden />
             View only. Organization owners and admins can change these settings.
           </DialogDescription>
         ) : (
           <DialogDescription className="sr-only">
-            Choose the sandbox and profile used for new sessions.
+            Choose defaults for new sessions and manage environment profiles.
           </DialogDescription>
         )}
       </DialogHeader>
 
-      <div className="flex min-h-0 flex-1">
-        <nav aria-label="Settings sections" className="hidden w-44 shrink-0 border-r p-3 sm:block">
-          <span
-            aria-current="page"
-            className="bg-accent text-accent-foreground flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium"
+      <Tabs
+        value={section}
+        onValueChange={value => {
+          if (value === 'general' || value === 'profiles') setSection(value);
+        }}
+        orientation={isMobile ? 'horizontal' : 'vertical'}
+        className="flex min-h-0 flex-1 flex-col md:flex-row"
+      >
+        <TabsList
+          aria-label="Settings sections"
+          className="h-auto shrink-0 justify-start gap-1 rounded-none border-b bg-transparent p-3 md:w-36 md:flex-col md:justify-start md:border-r md:border-b-0"
+        >
+          <TabsTrigger
+            value="general"
+            className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
           >
             <SlidersHorizontal className="size-4" aria-hidden />
             General
-          </span>
-        </nav>
+          </TabsTrigger>
+          <TabsTrigger
+            value="profiles"
+            className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
+          >
+            <FolderCog className="size-4" aria-hidden />
+            Profiles
+          </TabsTrigger>
+        </TabsList>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto px-6 py-5">
-          {settings ? (
-            <>
-              <DefaultSandboxSection organizationId={organizationId} settings={settings} />
-              <RepositoryOverridesSection organizationId={organizationId} settings={settings} />
-            </>
-          ) : settingsQuery.isError ? (
-            <LoadError onRetry={() => void settingsQuery.refetch()} />
-          ) : (
-            <LoadingSkeleton />
-          )}
-        </div>
-      </div>
+        <TabsContent
+          value="general"
+          className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
+        >
+          <div className="flex flex-col gap-8">
+            {settings ? (
+              <>
+                <DefaultSandboxSection organizationId={organizationId} settings={settings} />
+                <RepositoryOverridesSection
+                  organizationId={organizationId}
+                  settings={settings}
+                  onManageProfiles={() => setSection('profiles')}
+                />
+              </>
+            ) : settingsQuery.isError ? (
+              <LoadError onRetry={() => void settingsQuery.refetch()} />
+            ) : (
+              <LoadingSkeleton />
+            )}
+          </div>
+        </TabsContent>
+        <TabsContent
+          value="profiles"
+          className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col data-[state=inactive]:hidden"
+        >
+          <ProfilesManager
+            organizationId={organizationId}
+            onProfileSelect={onProfileSelect}
+            openToNewProfile={openToNewProfile}
+            initialSelectedProfileId={initialSelectedProfileId}
+          />
+        </TabsContent>
+      </Tabs>
     </>
   );
 }

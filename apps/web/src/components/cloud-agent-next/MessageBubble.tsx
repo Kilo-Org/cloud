@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback } from 'react';
-import { Scissors, Image, FileText, AlertCircle, Clock } from 'lucide-react';
+import { Scissors, Image, FileText, AlertCircle, Clock, LoaderCircle } from 'lucide-react';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { MessageDeliveryState } from '@kilocode/cloud-agent-sdk';
@@ -198,8 +198,10 @@ function DeliveryStatusIcon({ badge }: { badge: DeliveryBadge }) {
           role="img"
           tabIndex={0}
         >
-          {badge.tone === 'error' ? (
+          {badge.label === 'Failed to deliver' ? (
             <AlertCircle className="size-3.5" />
+          ) : badge.spinner ? (
+            <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" />
           ) : (
             <Clock className="size-3.5" />
           )}
@@ -218,6 +220,8 @@ type MessageBubbleProps = {
   isStreaming?: boolean;
   /** Delivery state for this message, if any (surfaced via cloud.message.* events). */
   deliveryState?: MessageDeliveryState;
+  /** True while this message's send request has not settled. */
+  isSending?: boolean;
   /** Function to get messages for a child session ID */
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
@@ -234,12 +238,13 @@ export function MessageBubble({
   displayTimestamp,
   isStreaming: isStreamingProp,
   deliveryState,
+  isSending,
   getChildMessages,
   onOpenChildSession,
 }: MessageBubbleProps) {
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
   const timestamp = displayTimestamp ?? message.info.time.created;
-  const deliveryBadge = getDeliveryBadge(deliveryState);
+  const deliveryBadge = getDeliveryBadge(deliveryState, { sending: isSending });
 
   const getTextForCopy = useCallback(
     () =>

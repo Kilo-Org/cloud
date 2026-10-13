@@ -168,7 +168,8 @@ private actor AppleModelEngine {
     // Tool calling is part of every Foundation Models release (the Tool protocol, iOS 26).
     var result: [String: Any] = [
       "status": reason == nil ? "available" : "unavailable", "modelId": modelId,
-      "contextWindow": contextSize, "maxOutputTokens": contextSize,
+      "contextWindow": contextSize,
+      "maxOutputTokens": AppleModelBudget.outputCeiling(contextSize: contextSize),
       "systemInstructions": true, "tokenCounting": false,
       "images": Self.readsImages(model), "tools": true,
     ]
@@ -337,6 +338,23 @@ private actor AppleModelEngine {
     let reference = SessionReference()
     let tools = Self.tools(request.tools, token: token, engine: self, session: reference)
     let inputEntries = try Self.entries(request, tools: tools)
+    let inputTokens: Int
+    if #available(iOS 26.4, *) {
+      inputTokens = try await model.tokenCount(for: inputEntries)
+    } else {
+      // Before Apple's tokenizer API, one token per UTF-8 byte deliberately
+      // overestimates text, schemas, and call arguments rather than overfills.
+      inputTokens = request.system.utf8.count + request.messages.reduce(0) { count, message in
+        count + message.text.utf8.count + 16 + message.calls.reduce(0) { count, call in
+          count + call.name.utf8.count + call.arguments.utf8.count + 16
+        }
+      } + request.tools.reduce(0) { count, tool in
+        count + tool.name.utf8.count + tool.description.utf8.count + tool.parameters.utf8.count + 16
+      }
+    }
+    guard let responseLimit = AppleModelBudget.responseLimit(
+      requested: request.maxTokens, contextSize: Self.contextSize(model), inputTokens: inputTokens
+    ) else { throw AppleModelFailure(reason: "context_window_exceeded") }
     // The latest user entry is supplied through streamResponse; all earlier
     // entries are supplied verbatim, preserving role boundaries and their order.
     let session = LanguageModelSession(
@@ -345,7 +363,7 @@ private actor AppleModelEngine {
     reference.history = session.transcript.count
     reference.session = session
     var options = GenerationOptions()
-    options.maximumResponseTokens = request.maxTokens
+    options.maximumResponseTokens = responseLimit
     // validate guarantees the last message, and so the last entry, is the user's.
     let lastText = request.messages[request.messages.count - 1].text
     let prompt = Self.prompt(of: inputEntries[inputEntries.count - 1], text: lastText)
@@ -400,7 +418,7 @@ private actor AppleModelEngine {
     if refused {
       completion.stop = "refusal"
     } else if completion.usageSource == "reported",
-              let outputTokens = completion.outputTokens, outputTokens >= request.maxTokens {
+              let outputTokens = completion.outputTokens, outputTokens >= responseLimit {
       completion.stop = "maxTokens"
     }
     // maximumResponseTokens silently ends the stream at its ceiling. There is

@@ -1665,6 +1665,11 @@
       "collapse": "Zwiń cel",
       "expand": "Rozwiń cel"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Zadania, ukończono {{completed}} z {{total}}",
+      "rowAccessibility": "Zadania, ukończono {{completed}} z {{total}}. Bieżące zadanie: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Ostatnio używane",
       "couldNotLoadGithubRepositories": "Nie udało się wczytać repozytoriów z GitHub.",
@@ -1720,6 +1725,10 @@
       "importingSession": "Importowanie sesji",
       "cliCannotContinue": "Ta instancja CLI nie obsługuje kontynuowania sesji. Wybierz Cloud Agent lub inną instancję CLI.",
       "importFailed": "Nie udało się zaimportować tej sesji.",
+      "cliCannotFork": "Zaktualizuj Kilo CLI, aby rozgałęziać sesję od wiadomości.",
+      "forkCutNotSynced": "Ta wiadomość nie została jeszcze zapisana. Spróbuj ponownie za chwilę.",
+      "forkFilesFromBaseBranch": "Pliki zaczynają od stanu gałęzi bazowej.",
+      "forkFilesUnchangedOnComputer": "Pliki na tym komputerze nie zostaną zmienione.",
       "pickProfile": "Wybierz profil",
       "noProfile": "Brak profilu",
       "manageProfiles": "Zarządzaj profilami",
@@ -1843,6 +1852,7 @@
       "copyMessage": "Kopiuj wiadomość",
       "copyText": "Kopiuj tekst",
       "selectText": "Zaznacz tekst",
+      "forkFromHere": "Rozgałęź od tego miejsca",
       "reportAiResponse": "Zgłoś odpowiedź AI",
       "reportAiResponseConfirm": "Zgłosić tę odpowiedź do sprawdzenia?",
       "report": "Zgłoś",
@@ -3271,6 +3281,7 @@
     "tutorialLabel": "Samouczek"
   },
   "modelChat": {
+    "offlineFailure": "Ten model wymaga połączenia z internetem. Połącz się i spróbuj ponownie lub przełącz się na model na tym urządzeniu.",
     "empty": {
       "title": "Rozpocznij czat",
       "description": "Wyślij wiadomość, aby porozmawiać z modelem."
@@ -3282,6 +3293,11 @@
       "deleteTitle": "Usunąć ten czat?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Szukaj w sieci",
+      "description": "Pozwól temu czatowi wyszukiwać aktualne informacje przez Twoje konto Kilo. Wyszukiwania zużywają Twój miesięczny limit wyszukiwań.",
+      "allowanceExhausted": "Twoje darmowe wyszukiwania w sieci na ten miesiąc się wyczerpały. Dodaj kredyty, aby znów wyszukiwać."
+    },
     "mcp": {
       "title": "Narzędzia Kilo",
       "use": "Używaj narzędzi Kilo",
@@ -3304,7 +3320,6 @@
       "fieldName": "Wyświetlana nazwa",
       "fieldUrl": "Adres URL serwera",
       "fieldUrlInvalid": "Wprowadź prawidłowy adres URL serwera.",
-      "fieldToken": "Token Bearer (opcjonalnie)",
       "enableServer": "Włącz ten serwer: {{name}}",
       "editServer": "Edytuj serwer",
       "deleteServer": "Usuń serwer",
@@ -3324,6 +3339,18 @@
       "serverToolCount": "{{count}} narzędzi",
       "serverUnreachable": "Nie udało się połączyć z tym serwerem",
       "serverOff": "Ten serwer jest wyłączony"
+    },
+    "mcpOAuth": {
+      "authMethod": "Uwierzytelnianie",
+      "authNone": "Bez logowania",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Logowanie OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Po zapisaniu dotknij $t(modelChat.mcpOAuth.signIn) przy serwerze, aby zalogować się w przeglądarce.",
+      "serverNeedsSignIn": "Zaloguj się, aby używać tego serwera",
+      "signIn": "Zaloguj się",
+      "signInA11y": "Zaloguj się do tego serwera: {{name}}",
+      "signInFailed": "Nie udało się zalogować do {{name}}. Spróbuj ponownie."
     },
     "backends": {
       "title": "Backendy czatu",
@@ -3407,8 +3434,48 @@
         "notGguf": "Link musi wskazywać plik .gguf.",
         "space": "Brak wystarczającej ilości wolnego miejsca na ten model. Zwolnij miejsce i spróbuj ponownie.",
         "network": "Pobieranie nie zostało ukończone. Sprawdź połączenie i spróbuj ponownie.",
-        "invalidFile": "Pobrany plik nie jest modelem, który ta aplikacja może uruchomić, więc został usunięty."
+        "invalidFile": "Pobrany plik nie jest modelem, który ta aplikacja może uruchomić, więc został usunięty.",
+        "checksum": "Pobrany plik nie zgadza się z opublikowaną sumą kontrolną, więc został usunięty. Spróbuj pobrać go ponownie."
       }
+    },
+    "catalog": {
+      "browse": "Przeglądaj modele",
+      "title": "Katalog modeli",
+      "search": "Szukaj modeli Hugging Face",
+      "tabs": "Filtr modeli",
+      "fitsTab": "Pasują do urządzenia",
+      "fromHuggingFace": "Z Hugging Face",
+      "loading": "Wczytywanie modeli",
+      "noResults": "Nie znaleziono modeli",
+      "noFits": "Żaden model nie pasuje do tego urządzenia",
+      "noFitsDescription": "Większe modele znajdziesz na karcie $t(common.all).",
+      "fit": {
+        "fits": "Pasuje",
+        "tight": "Na styk",
+        "tooLarge": "Za duży",
+        "noStorage": "Za mało miejsca"
+      },
+      "parameters": "Parametry: {{value}}",
+      "downloads": "Pobrania: {{value}}",
+      "likes": "Polubienia: {{value}}",
+      "context": "Okno kontekstu: {{value}}",
+      "license": "Licencja: {{license}}",
+      "licenseUnknown": "Licencja nie jest podana",
+      "tools": "Wywoływanie narzędzi",
+      "vision": "Obsługa obrazów",
+      "hintsHelp": "Wskazówki z Hugging Face. Aplikacja sprawdzi model po pobraniu.",
+      "gated": "Ten model wymaga konta Hugging Face, więc aplikacja nie może go pobrać.",
+      "quantizations": "Kwantyzacje",
+      "quantizationsHelp": "Mniejsze pliki zajmują mniej pamięci i miejsca. Większe pliki zwykle dają lepsze odpowiedzi.",
+      "quantDetail": "Pobieranie: {{size}} · ok. {{memory}} pamięci",
+      "downloadQuant": "Pobierz {{quant}}",
+      "loadingModel": "Wczytywanie szczegółów modelu",
+      "couldNotLoadModel": "Nie udało się wczytać tego modelu",
+      "noFiles": "Brak plików, które ta aplikacja może uruchomić",
+      "noFilesDescription": "Ta aplikacja uruchamia modele w postaci jednego pliku GGUF.",
+      "tooLargeTitle": "Ten model może nie działać",
+      "tooLargeMessage": "{{name}} prawdopodobnie wymaga więcej pamięci, niż ma to urządzenie. Aplikacja może się zamknąć podczas generowania odpowiedzi. Pobrać mimo to?",
+      "downloadAnyway": "Pobierz mimo to"
     },
     "localModels": {
       "title": "Modele na urządzeniu",

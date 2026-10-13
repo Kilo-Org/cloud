@@ -77,6 +77,8 @@ export type SharedScenario = {
   defaultTimeoutMs?: number;
   /** API surface the scenario must use; callers default to `unified`. */
   defaultApi?: ApiVersion;
+  /** Why the matrix skips this scenario by default; `--only` and `run.ts` still run it. */
+  disabled?: string;
   run(args: LifecycleArgs, env: ScenarioEnvironment): Promise<LifecycleResult>;
 };
 

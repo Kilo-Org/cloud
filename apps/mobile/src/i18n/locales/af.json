@@ -2152,6 +2152,11 @@
       "collapse": "Vou doel toe",
       "expand": "Vou doel uit"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Take, {{completed}} van {{total}} voltooi",
+      "rowAccessibility": "Take, {{completed}} van {{total}} voltooi. Huidige taak: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Onlangs gebruik",
       "couldNotLoadGithubRepositories": "Die GitHub-bewaarplekke kon nie gelaai word nie.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortsit nie. Kies Cloud Agent of 'n ander CLI.",
       "importFailed": "Hierdie sessie kon nie ingevoer word nie.",
+      "cliCannotFork": "Dateer die Kilo CLI op om van 'n boodskap af te vertak.",
+      "forkCutNotSynced": "Hierdie boodskap is nog nie gestoor nie. Probeer weer oor 'n oomblik.",
+      "forkFilesFromBaseBranch": "Lêers begin vanaf die basistak.",
+      "forkFilesUnchangedOnComputer": "Lêers op hierdie rekenaar word nie verander nie.",
       "pickProfile": "Kies 'n profiel",
       "noProfile": "Geen profiel nie",
       "manageProfiles": "Bestuur profiele",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Kopieer boodskap",
       "copyText": "Kopieer teks",
       "selectText": "Kies teks",
+      "forkFromHere": "Vertak van hier af",
       "reportAiResponse": "Rapporteer AI-antwoord",
       "reportAiResponseConfirm": "Wil jy hierdie antwoord vir hersiening rapporteer?",
       "report": "Rapporteer",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Hierdie model het 'n internetverbinding nodig. Koppel en probeer weer, of skakel oor na 'n model op hierdie toestel.",
     "empty": {
       "title": "Begin 'n klets",
       "description": "Stuur 'n boodskap om met 'n model te gesels."
@@ -3200,6 +3211,11 @@
       "deleteTitle": "Skrap hierdie klets?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Deursoek die web",
+      "description": "Laat hierdie klets huidige inligting deur jou Kilo-rekening opsoek. Soektogte gebruik jou maandelikse soektoelaag.",
+      "allowanceExhausted": "Jou gratis websoektogte vir hierdie maand is opgebruik. Voeg krediete by om weer te soek."
+    },
     "mcp": {
       "title": "Kilo-nutsmiddels",
       "use": "Gebruik Kilo-nutsmiddels",
@@ -3222,7 +3238,6 @@
       "fieldName": "Vertoonnaam",
       "fieldUrl": "Bediener-URL",
       "fieldUrlInvalid": "Voer 'n geldige bediener-URL in.",
-      "fieldToken": "Draertoken (opsioneel)",
       "enableServer": "Aktiveer hierdie bediener: {{name}}",
       "editServer": "Wysig bediener",
       "deleteServer": "Skrap bediener",
@@ -3242,6 +3257,18 @@
       "serverToolCount": "{{count}} gereedskap",
       "serverUnreachable": "Kon nie hierdie bediener bereik nie",
       "serverOff": "Hierdie bediener is af"
+    },
+    "mcpOAuth": {
+      "authMethod": "Verifikasie",
+      "authNone": "Geen aanmelding",
+      "authBearer": "Draertoken",
+      "authOAuth": "OAuth-aanmelding",
+      "fieldToken": "Token",
+      "oauthHint": "Nadat jy gestoor het, tik $t(modelChat.mcpOAuth.signIn) op die bediener om met jou blaaier aan te meld.",
+      "serverNeedsSignIn": "Meld aan om hierdie bediener te gebruik",
+      "signIn": "Meld aan",
+      "signInA11y": "Meld aan by hierdie bediener: {{name}}",
+      "signInFailed": "Kon nie by {{name}} aanmeld nie. Probeer weer."
     },
     "backends": {
       "title": "Kletsagtergrondstelsels",
@@ -3325,8 +3352,48 @@
         "notGguf": "Die skakel moet na 'n .gguf-lêer wys.",
         "space": "Daar is nie genoeg gratis berging vir hierdie model nie. Maak spasie vry en probeer weer.",
         "network": "Die aflaai het nie klaargemaak nie. Kontroleer jou verbinding en probeer weer.",
-        "invalidFile": "Die afgelaaide lêer is nie 'n model wat hierdie app kan loop nie, so dit is verwyder."
+        "invalidFile": "Die afgelaaide lêer is nie 'n model wat hierdie app kan loop nie, so dit is verwyder.",
+        "checksum": "Die afgelaaide lêer stem nie ooreen met sy gepubliseerde kontrolesom nie, so dit is verwyder. Probeer die aflaai weer."
       }
+    },
+    "catalog": {
+      "browse": "Blaai deur modelle",
+      "title": "Modelkatalogus",
+      "search": "Soek Hugging Face-modelle",
+      "tabs": "Modelfilter",
+      "fitsTab": "Pas op hierdie toestel",
+      "fromHuggingFace": "Van Hugging Face",
+      "loading": "Laai tans modelle",
+      "noResults": "Geen modelle gevind nie",
+      "noFits": "Geen modelle pas op hierdie toestel nie",
+      "noFitsDescription": "Groter modelle is op die $t(common.all)-oortjie.",
+      "fit": {
+        "fits": "Pas",
+        "tight": "Pas net-net",
+        "tooLarge": "Te groot",
+        "noStorage": "Nie genoeg berging nie"
+      },
+      "parameters": "Parameters: {{value}}",
+      "downloads": "Aflaaie: {{value}}",
+      "likes": "Lourierte: {{value}}",
+      "context": "Konteksvenster: {{value}}",
+      "license": "Lisensie: {{license}}",
+      "licenseUnknown": "Die lisensie word nie vermeld nie",
+      "tools": "Gereedskapgebruik",
+      "vision": "Beeldinvoer",
+      "hintsHelp": "Wenke van Hugging Face. Die app kontroleer die model nadat dit afgelaai is.",
+      "gated": "Hierdie model vereis 'n Hugging Face-rekening, so die app kan dit nie aflaai nie.",
+      "quantizations": "Kwantiserings",
+      "quantizationsHelp": "Kleiner lêers gebruik minder geheue en berging. Groter lêers gee gewoonlik beter antwoorde.",
+      "quantDetail": "{{size}} aflaai · sowat {{memory}} geheue",
+      "downloadQuant": "Laai {{quant}} af",
+      "loadingModel": "Laai tans modelbesonderhede",
+      "couldNotLoadModel": "Kon nie hierdie model laai nie",
+      "noFiles": "Geen lêers wat hierdie app kan laat loop nie",
+      "noFilesDescription": "Hierdie app laat modelle loop wat uit een GGUF-lêer bestaan.",
+      "tooLargeTitle": "Hierdie model loop dalk nie",
+      "tooLargeMessage": "{{name}} het waarskynlik meer geheue nodig as wat hierdie toestel het. Die app kan toemaak terwyl die model antwoord. Laai dit tog af?",
+      "downloadAnyway": "Laai tog af"
     },
     "localModels": {
       "title": "Modelle op die toestel",

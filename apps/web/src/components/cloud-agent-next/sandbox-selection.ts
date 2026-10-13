@@ -49,7 +49,11 @@ const instanceLabels: Record<SandboxDestination['instanceType'], string> = {
  * halves stay visible because a BYOC account can offer the same provider as Kilo.
  */
 export function formatSandboxProvider(provider: SandboxDestination['provider']): string {
-  return `${accountLabels[provider.account]} · ${providerLabels[provider.id]}`;
+  return `${accountLabels[provider.account]} · ${formatSandboxProviderName(provider)}`;
+}
+
+export function formatSandboxProviderName(provider: SandboxDestination['provider']): string {
+  return providerLabels[provider.id];
 }
 
 /**
@@ -150,7 +154,12 @@ export function getSandboxSelectionGroups(
 export function getSandboxSelectionOptions(
   capabilities: SandboxSelectionCapabilities | undefined
 ): SandboxSelectionCapabilities['options'] {
-  const options = capabilities?.enabled ? [...capabilities.options] : [];
+  const options = capabilities?.enabled
+    ? capabilities.options.filter(
+        option =>
+          option.unavailableReason === undefined && option.repositoryUnavailableReason === undefined
+      )
+    : [];
 
   // Display order for the picker: BYOC accounts first, then one block per
   // provider, keeping each provider's instances in the order the Worker offers.
@@ -162,16 +171,75 @@ export function getSandboxSelectionOptions(
   );
 }
 
-export function getPreferredInitialSandboxAllocation({
-  options,
+/** Select value for a default that no listed option matches, such as a provider-chosen instance. */
+export const DEFAULT_SANDBOX_VALUE = 'default';
+
+export type SandboxPickerState = {
+  /** Select value: the key of the listed option, or `DEFAULT_SANDBOX_VALUE`. */
+  value: string;
+  /** Key of the option that is the default, when the default is a listed option. */
+  defaultKey: string | undefined;
+  /** Where a session starts without a choice: saved repository or owner default, else platform. */
+  defaultDestination: SandboxDestination | undefined;
+  /** The choice to send. Undefined leaves the saved default to the server. */
+  allocation: SelectableSandboxAllocationRequest | undefined;
+  /** What the trigger shows. */
+  destination: SandboxDestination | undefined;
+};
+
+/**
+ * Decides what the new session picker shows and sends. A choice made in this
+ * panel wins, then the sandbox last chosen in this browser while it is still
+ * offered for the repository, then the default. A remembered choice that the
+ * repository cannot use falls back to the default instead of raising an error.
+ */
+export function resolveSandboxPicker({
+  capabilities,
+  draftAllocation,
   lastUsedKey,
 }: {
-  options: SandboxSelectionCapabilities['options'];
+  capabilities: SandboxSelectionCapabilities | undefined;
+  draftAllocation: SelectableSandboxAllocationRequest | undefined;
   lastUsedKey: string | null;
-}): SelectableSandboxAllocationRequest | undefined {
-  if (!lastUsedKey) return undefined;
-  return options.find(option => getSandboxAllocationKey(option.allocation) === lastUsedKey)
-    ?.allocation;
+}): SandboxPickerState {
+  const defaultDestination = capabilities?.effectiveDestination ?? capabilities?.defaultDestination;
+  const options = getSandboxSelectionOptions(capabilities);
+  const defaultKey =
+    defaultDestination &&
+    options.find(option => isSameSandbox(option.allocation, defaultDestination))
+      ? getSandboxAllocationKey(defaultDestination)
+      : undefined;
+  const remembered =
+    lastUsedKey && lastUsedKey !== defaultKey
+      ? options.find(option => getSandboxAllocationKey(option.allocation) === lastUsedKey)
+          ?.allocation
+      : undefined;
+  const allocation = draftAllocation ?? remembered;
+
+  return {
+    value: allocation ? getSandboxAllocationKey(allocation) : (defaultKey ?? DEFAULT_SANDBOX_VALUE),
+    defaultKey,
+    defaultDestination,
+    allocation,
+    destination: allocation ?? defaultDestination,
+  };
+}
+
+/** Maps a picked select value to a choice. `undefined` means keep the default. */
+export function resolveSandboxChoice(
+  value: string,
+  picker: Pick<SandboxPickerState, 'defaultKey'>,
+  options: SandboxSelectionCapabilities['options']
+): { allocation: SelectableSandboxAllocationRequest | undefined } | undefined {
+  if (value === DEFAULT_SANDBOX_VALUE || value === picker.defaultKey) {
+    return { allocation: undefined };
+  }
+  const option = options.find(option => getSandboxAllocationKey(option.allocation) === value);
+  return option ? { allocation: option.allocation } : undefined;
+}
+
+function isSameSandbox(a: SandboxDestination, b: SandboxDestination): boolean {
+  return getSandboxAllocationKey(a) === getSandboxAllocationKey(b);
 }
 
 export function resolveSandboxSelectionSubmissionError({
@@ -220,6 +288,11 @@ export function resolveSandboxSelection({
       sandboxAllocation: draft.allocation,
       error: 'This sandbox is unavailable. Choose another sandbox or Default.',
     };
+  }
+
+  const unavailableReason = option.repositoryUnavailableReason ?? option.unavailableReason;
+  if (unavailableReason) {
+    return { sandboxAllocation: draft.allocation, error: unavailableReason };
   }
 
   return { sandboxAllocation: draft.allocation };

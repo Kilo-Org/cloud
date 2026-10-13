@@ -148,7 +148,17 @@ export function createCloudflareContainersProviderAdapter(deps: {
       // Lease renewal only starts once the wrapper reports ready, which the
       // recovery admission gate can delay. Establish the initial lease here so
       // the container is not reaped by its inactivity timeout before then.
-      await container.ensureLeaseAtLeast(ref, leaseAtLeastMs());
+      await container.ensureLeaseAtLeast(ref, leaseAtLeastMs()).catch(() => {
+        logControlDiagnostic(
+          'lease_renewal_failed',
+          {
+            allocationName: deps.allocationName,
+            provider: 'cloudflare-containers',
+            stage: 'launch',
+          },
+          'warn'
+        );
+      });
       return { startSource };
     },
     async captureRepository(ref, repoKey, commit) {

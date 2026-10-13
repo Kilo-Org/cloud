@@ -3,6 +3,7 @@ import {
   kilocode_users,
   kiloclaw_subscriptions,
   user_deletion_audit_events,
+  user_deletion_provider_credentials,
   user_deletion_requests,
   user_deletion_steps,
   type User,
@@ -10,6 +11,7 @@ import {
 import {
   UserDeletionAuditEventType,
   UserDeletionCloudSubjectResolution,
+  UserDeletionProviderScope,
   UserDeletionRequestStatus,
   UserDeletionStepKey,
   UserDeletionStepStatus,
@@ -561,6 +563,48 @@ describe('adminUserDeletionQueueRouter', () => {
       expect(order).toEqual(['first_completed', 'second_failed']);
       expect(errorSpy).not.toHaveBeenCalled();
       expect(fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('substack credential', () => {
+    const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+
+    afterEach(async () => {
+      await db
+        .delete(user_deletion_provider_credentials)
+        .where(
+          eq(user_deletion_provider_credentials.provider_scope, UserDeletionProviderScope.Substack)
+        );
+    });
+
+    it('stores TOTP alongside the cookie and reports it in meta', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await caller.admin.userDeletionQueue.replaceSubstackCredential({
+        material: 'connect.sid=abc',
+        totpSecret: secret,
+      });
+      await expect(caller.admin.userDeletionQueue.substackCredential()).resolves.toMatchObject({
+        configured: true,
+        totpConfigured: true,
+      });
+
+      await caller.admin.userDeletionQueue.replaceSubstackCredential({
+        material: 'connect.sid=abc',
+        totpSecret: '',
+      });
+      await expect(caller.admin.userDeletionQueue.substackCredential()).resolves.toMatchObject({
+        configured: true,
+        totpConfigured: false,
+      });
+    });
+
+    it('rejects an invalid TOTP secret without echoing it', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const error = await caller.admin.userDeletionQueue
+        .replaceSubstackCredential({ material: 'connect.sid=abc', totpSecret: 'super-secret-bad!' })
+        .catch(caught => caught);
+      expect(error?.code).toBe('BAD_REQUEST');
+      expect(String(error?.message)).not.toContain('super-secret-bad');
     });
   });
 });

@@ -2152,6 +2152,11 @@
       "collapse": "Ahenda eesmärk",
       "expand": "Laienda eesmärk"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Ülesanded, {{completed}}/{{total}} tehtud",
+      "rowAccessibility": "Ülesanded, {{completed}}/{{total}} tehtud. Praegune ülesanne: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Hiljuti kasutatud",
       "couldNotLoadGithubRepositories": "GitHubi hoidlate laadimine ebaõnnestus.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Imporditakse seanssi",
       "cliCannotContinue": "See CLI ei saa seanssi jätkata. Vali Cloud Agent või mõni muu CLI.",
       "importFailed": "Seda seanssi ei õnnestunud importida.",
+      "cliCannotFork": "Sõnumist hargnemiseks uuenda Kilo CLI-d.",
+      "forkCutNotSynced": "Seda sõnumit pole veel salvestatud. Proovi hetke pärast uuesti.",
+      "forkFilesFromBaseBranch": "Failid võetakse baasharust.",
+      "forkFilesUnchangedOnComputer": "Selle arvuti faile ei muudeta.",
       "pickProfile": "Valige profiil",
       "noProfile": "Profiili pole",
       "manageProfiles": "Profiilide haldamine",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Kopeeri sõnum",
       "copyText": "Kopeeri tekst",
       "selectText": "Vali tekst",
+      "forkFromHere": "Hargne siit",
       "reportAiResponse": "Teata AI vastusest",
       "reportAiResponseConfirm": "Kas saata see vastus kontrollimiseks?",
       "report": "Teata",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Õpetus"
   },
   "modelChat": {
+    "offlineFailure": "See mudel vajab internetiühendust. Loo ühendus ja proovi uuesti või lülitu selle seadme mudelile.",
     "empty": {
       "title": "Alusta vestlust",
       "description": "Mudeliga vestlemiseks saada sõnum."
@@ -3200,6 +3211,11 @@
       "deleteTitle": "Kas kustutada see vestlus?"
     },
     "beta": "Beeta",
+    "webSearch": {
+      "title": "Otsi veebist",
+      "description": "Luba sellel vestlusel otsida ajakohast teavet sinu Kilo konto kaudu. Otsingud kasutavad sinu igakuist otsingumahtu.",
+      "allowanceExhausted": "Selle kuu tasuta veebiotsingud on otsas. Lisa krediiti, et uuesti otsida."
+    },
     "mcp": {
       "title": "Kilo tööriistad",
       "use": "Kasuta Kilo tööriistu",
@@ -3222,7 +3238,6 @@
       "fieldName": "Kuvatav nimi",
       "fieldUrl": "Serveri URL",
       "fieldUrlInvalid": "Sisesta kehtiv serveri URL.",
-      "fieldToken": "Beareri tunnus (valikuline)",
       "enableServer": "Luba see server: {{name}}",
       "editServer": "Muuda serverit",
       "deleteServer": "Kustuta server",
@@ -3242,6 +3257,18 @@
       "serverToolCount": "{{count}} tööriista",
       "serverUnreachable": "Selle serverini ei õnnestunud jõuda",
       "serverOff": "See server on välja lülitatud"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentimine",
+      "authNone": "Sisselogimiseta",
+      "authBearer": "Beareri tunnus",
+      "authOAuth": "OAuth-sisselogimine",
+      "fieldToken": "Tunnus",
+      "oauthHint": "Pärast salvestamist puuduta serveri juures nuppu $t(modelChat.mcpOAuth.signIn), et brauseri kaudu sisse logida.",
+      "serverNeedsSignIn": "Selle serveri kasutamiseks logi sisse",
+      "signIn": "Logi sisse",
+      "signInA11y": "Logi sellesse serverisse sisse: {{name}}",
+      "signInFailed": "Serverisse {{name}} ei õnnestunud sisse logida. Proovi uuesti."
     },
     "backends": {
       "title": "Vestluse taustsüsteemid",
@@ -3325,8 +3352,48 @@
         "notGguf": "Link peab osutama .gguf failile.",
         "space": "Selle mudeli jaoks pole piisavalt vaba salvestusruumi. Vabasta ruumi ja proovi uuesti.",
         "network": "Allalaadimine ei lõppenud. Kontrolli ühendust ja proovi uuesti.",
-        "invalidFile": "Allalaaditud fail ei ole mudel, mida see rakendus saab käivitada, seega see eemaldati."
+        "invalidFile": "Allalaaditud fail ei ole mudel, mida see rakendus saab käivitada, seega see eemaldati.",
+        "checksum": "Allalaaditud fail ei vasta avaldatud kontrollsummale, seega see eemaldati. Proovige uuesti alla laadida."
       }
+    },
+    "catalog": {
+      "browse": "Sirvi mudeleid",
+      "title": "Mudelite kataloog",
+      "search": "Otsi Hugging Face'i mudeleid",
+      "tabs": "Mudelite filter",
+      "fitsTab": "Sobib sellele seadmele",
+      "fromHuggingFace": "Hugging Face'ist",
+      "loading": "Mudelite laadimine",
+      "noResults": "Mudeleid ei leitud",
+      "noFits": "Ükski mudel ei sobi sellele seadmele",
+      "noFitsDescription": "Suuremad mudelid on vahekaardil $t(common.all).",
+      "fit": {
+        "fits": "Sobib",
+        "tight": "Napilt sobib",
+        "tooLarge": "Liiga suur",
+        "noStorage": "Pole piisavalt salvestusruumi"
+      },
+      "parameters": "Parameetrid: {{value}}",
+      "downloads": "Allalaadimised: {{value}}",
+      "likes": "Meeldimised: {{value}}",
+      "context": "Kontekstiaken: {{value}}",
+      "license": "Litsents: {{license}}",
+      "licenseUnknown": "Litsentsi pole märgitud",
+      "tools": "Tööriistade kasutamine",
+      "vision": "Pildisisend",
+      "hintsHelp": "Vihjed pärinevad Hugging Face'ist. Rakendus kontrollib mudelit pärast allalaadimist.",
+      "gated": "See mudel nõuab Hugging Face'i kontot, seega ei saa rakendus seda alla laadida.",
+      "quantizations": "Kvantimised",
+      "quantizationsHelp": "Väiksemad failid kasutavad vähem mälu ja salvestusruumi. Suuremad failid annavad tavaliselt paremaid vastuseid.",
+      "quantDetail": "Allalaadimine {{size}} · umbes {{memory}} mälu",
+      "downloadQuant": "Laadi alla {{quant}}",
+      "loadingModel": "Mudeli üksikasjade laadimine",
+      "couldNotLoadModel": "Seda mudelit ei õnnestunud laadida",
+      "noFiles": "Pole faile, mida see rakendus käitada saaks",
+      "noFilesDescription": "See rakendus käitab mudeleid, mis koosnevad ühest GGUF-failist.",
+      "tooLargeTitle": "See mudel ei pruugi töötada",
+      "tooLargeMessage": "{{name}} vajab tõenäoliselt rohkem mälu, kui selles seadmes on. Rakendus võib mudeli vastamise ajal sulguda. Kas laadida see ikkagi alla?",
+      "downloadAnyway": "Laadi ikkagi alla"
     },
     "localModels": {
       "title": "Seadmesisesed mudelid",

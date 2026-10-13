@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference';
 import { REMOTE_MCP_SERVERS_KEY } from '@/lib/storage-keys';
 
+import { clearRemoteMcpOAuth, forgetRemoteMcpOAuth } from './remote-mcp-oauth-store';
 import { normalizeRemoteMcpUrl } from './remote-mcp-url';
 
 /**
@@ -20,8 +21,14 @@ import { normalizeRemoteMcpUrl } from './remote-mcp-url';
  * an edit so a rename does not churn the model's tool list.
  */
 
-/** How a server is authorized. The token is optional: `bearer` may name it later. */
-export type RemoteMcpAuth = { type: 'none' } | { type: 'bearer'; token?: string };
+/**
+ * How a server is authorized. The token is optional: `bearer` may name it later.
+ * `oauth` keeps its tokens apart, in `remote-mcp-oauth-store.ts`.
+ */
+export type RemoteMcpAuth =
+  | { type: 'none' }
+  | { type: 'bearer'; token?: string }
+  | { type: 'oauth' };
 
 /** One stored server. `id` is the callable-name part of every tool name it offers. */
 export type StoredRemoteMcpServer = {
@@ -47,6 +54,7 @@ const CALLABLE_ID = /^[A-Za-z0-9_-]+$/u;
 const remoteMcpAuthSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('none') }).strip(),
   z.object({ type: z.literal('bearer'), token: z.string().optional() }).strip(),
+  z.object({ type: z.literal('oauth') }).strip(),
 ]);
 
 const storedRemoteMcpServerSchema = z
@@ -204,7 +212,8 @@ export function addRemoteMcpServer(draft: RemoteMcpServerDraft): StoredRemoteMcp
 /**
  * Replaces one server in place, keeping its id and its position in the list.
  * A rename does not change the id, so the tool names the model already read
- * stay the same. A URL another server already uses is refused.
+ * stay the same. A URL another server already uses is refused. A new URL, or
+ * a server that no longer signs in with OAuth, drops its OAuth tokens.
  */
 export function updateRemoteMcpServer(
   id: string,
@@ -227,10 +236,13 @@ export function updateRemoteMcpServer(
     enabled: patch.enabled ?? existing.enabled,
   };
   store.set(current.map(server => (server.id === id ? updated : server)));
+  if (updated.url !== existing.url || updated.auth.type !== 'oauth') {
+    void forgetRemoteMcpOAuth(id);
+  }
   return updated;
 }
 
-/** Removes one server and returns it. */
+/** Removes one server, and its OAuth tokens with it, and returns it. */
 export function deleteRemoteMcpServer(id: string): StoredRemoteMcpServer {
   const current = store.get();
   const removed = current.find(server => server.id === id);
@@ -238,6 +250,7 @@ export function deleteRemoteMcpServer(id: string): StoredRemoteMcpServer {
     throw new Error('Remote MCP server not found.');
   }
   store.set(current.filter(server => server.id !== id));
+  void forgetRemoteMcpOAuth(id);
   return removed;
 }
 
@@ -270,12 +283,21 @@ export function getRemoteMcpServersHasLoaded(): boolean {
   return store.getHasLoaded();
 }
 
+/** Resolves once the persisted list has been read, so a caller outside React reads the real list. */
+export async function whenRemoteMcpServersLoaded(): Promise<void> {
+  await store.whenLoaded();
+}
+
 /** The list a screen draws. */
 export function useRemoteMcpServers(): StoredRemoteMcpServer[] {
   return useSyncExternalStore(store.subscribe, store.get);
 }
 
-/** Drops every server from memory and disk, which is what signing out does. */
+/**
+ * Drops every server, and the OAuth tokens behind them, from memory and disk,
+ * which is what signing out does.
+ */
 export function clearRemoteMcpServers(): void {
   store.clear();
+  clearRemoteMcpOAuth();
 }

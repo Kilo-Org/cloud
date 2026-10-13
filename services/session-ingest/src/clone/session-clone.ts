@@ -12,12 +12,14 @@ import {
   CLONE_ITEM_TYPES,
   type CloneBatchRow,
   type CloneItemType,
+  type CloneStageIdentity,
   type ExportCloneBatchResult,
   type FinalizeCloneStageResult,
   type IngestOrderCursor,
   type InspectCloneStageResult,
   type StageCloneBatchResult,
 } from '../dos/SessionIngestDO';
+import { isItemWithinMessageCut } from '../util/message-cut';
 
 const CLONE_BATCH_MAX_ROWS = 100;
 const CLONE_BATCH_MAX_MATERIALIZED_BYTES = 4 * 1024 * 1024;
@@ -36,6 +38,8 @@ export type CloneSessionParams = {
   sourceOrganizationId: string | null;
   destinationOrganizationId: string | null;
   destinationTitle?: string;
+  /** Inclusive message cut; absent clones the full transcript. */
+  upToMessageId?: string;
 };
 
 type RewrittenCloneRow = {
@@ -70,13 +74,17 @@ function sourceDigestLine(row: CloneBatchRow): string {
 }
 
 /**
- * Keep only clone-eligible item types. The source DO already filters its
- * export to `CLONE_ITEM_TYPES`; this guard keeps the helper consistent if a
- * caller ever hands it rows outside that set, so the staged count, the resume
- * digest, and the final verification digest all agree.
+ * Keep only clone-eligible item types inside the optional message cut. The
+ * source DO already filters its export to `CLONE_ITEM_TYPES`; this guard keeps
+ * the helper consistent if a caller ever hands it rows outside that set. Every
+ * pass (copy, resume digest, final verification digest) uses this predicate,
+ * so the staged count and digests all agree.
  */
-function cloneEligibleRows(rows: CloneBatchRow[]): CloneBatchRow[] {
-  return rows.filter(row => CLONE_ITEM_TYPES.includes(row.itemType));
+function isCloneEligibleRow(row: CloneBatchRow, upToMessageId: string | undefined): boolean {
+  return (
+    CLONE_ITEM_TYPES.includes(row.itemType) &&
+    (upToMessageId === undefined || isItemWithinMessageCut(row, upToMessageId))
+  );
 }
 
 function parseItemJson(value: string): unknown {
@@ -238,12 +246,16 @@ async function materializeBatchWithinBudget(
   r2: R2Bucket,
   sourceSessionId: string,
   destinationSessionId: string,
+  upToMessageId: string | undefined,
   writtenR2Keys: string[]
 ): Promise<{ rows: RewrittenCloneRow[]; nextCursor: IngestOrderCursor | null; done: boolean }> {
-  const eligible = cloneEligibleRows(exported.rows);
   const rows: RewrittenCloneRow[] = [];
   let bytes = 0;
-  for (const row of eligible) {
+  // Source rows consumed by this batch, counting rows the cut skips, so the
+  // resume cursor lands just before the first row that did not fit.
+  let consumedSourceRows = exported.rows.length;
+  for (const [index, row] of exported.rows.entries()) {
+    if (!isCloneEligibleRow(row, upToMessageId)) continue;
     const rewritten = await materializeAndRewriteRow(
       row,
       r2,
@@ -254,6 +266,7 @@ async function materializeBatchWithinBudget(
       rows.length > 0 &&
       bytes + rewritten.materializedByteLength > CLONE_BATCH_MAX_MATERIALIZED_BYTES
     ) {
+      consumedSourceRows = index;
       break;
     }
     if (rewritten.itemDataR2Key !== null) {
@@ -264,7 +277,7 @@ async function materializeBatchWithinBudget(
     bytes += rewritten.materializedByteLength;
   }
 
-  if (rows.length === eligible.length) {
+  if (consumedSourceRows === exported.rows.length) {
     return { rows, nextCursor: exported.nextCursor, done: exported.done };
   }
 
@@ -272,14 +285,15 @@ async function materializeBatchWithinBudget(
   // the correct resume cursor (the row id is not part of CloneBatchRow).
   const prefix = await withDORetry<SessionIngestDOStub, ExportCloneBatchResult>(
     sourceStub,
-    stub => stub.exportCloneBatch(cursor, rows.length),
+    stub => stub.exportCloneBatch(cursor, consumedSourceRows),
     'SessionIngestDO.exportCloneBatch'
   );
   return { rows, nextCursor: prefix.nextCursor, done: false };
 }
 
 async function exportAllSourceRows(
-  sourceStub: () => SessionIngestDOStub
+  sourceStub: () => SessionIngestDOStub,
+  upToMessageId: string | undefined
 ): Promise<{ digestLines: string[]; itemCount: number }> {
   const digestLines: string[] = [];
   let cursor: IngestOrderCursor | null = null;
@@ -290,7 +304,9 @@ async function exportAllSourceRows(
       'SessionIngestDO.exportCloneBatch'
     );
     if (exported.rows.length === 0) break;
-    for (const row of cloneEligibleRows(exported.rows)) digestLines.push(sourceDigestLine(row));
+    for (const row of exported.rows) {
+      if (isCloneEligibleRow(row, upToMessageId)) digestLines.push(sourceDigestLine(row));
+    }
     cursor = exported.nextCursor;
     if (exported.done) break;
   }
@@ -299,7 +315,8 @@ async function exportAllSourceRows(
 
 async function rebuildPrefixDigestLines(
   sourceStub: () => SessionIngestDOStub,
-  copiedItemCount: number
+  copiedItemCount: number,
+  upToMessageId: string | undefined
 ): Promise<string[]> {
   const digestLines: string[] = [];
   let cursor: IngestOrderCursor | null = null;
@@ -310,7 +327,8 @@ async function rebuildPrefixDigestLines(
       'SessionIngestDO.exportCloneBatch'
     );
     if (exported.rows.length === 0) break;
-    for (const row of cloneEligibleRows(exported.rows)) {
+    for (const row of exported.rows) {
+      if (!isCloneEligibleRow(row, upToMessageId)) continue;
       if (digestLines.length >= copiedItemCount) break;
       digestLines.push(sourceDigestLine(row));
     }
@@ -366,6 +384,7 @@ export async function cloneSessionIntoDestination(
     sourceOrganizationId,
     destinationOrganizationId,
     destinationTitle,
+    upToMessageId,
   } = params;
 
   if (sourceOrganizationId !== destinationOrganizationId) {
@@ -379,15 +398,33 @@ export async function cloneSessionIntoDestination(
   // Destination R2 keys written by this request that were never staged. Deleted
   // on reject so a failed clone leaves no orphaned destination bodies.
   const writtenDestinationR2Keys: string[] = [];
+  // The stage identity includes the cut, so a stage built for another cut is a
+  // mismatch exactly like a stage built for another source.
+  const stageIdentity: CloneStageIdentity = {
+    sourceSessionId,
+    destinationSessionId,
+    ...(upToMessageId !== undefined ? { upToMessageId } : {}),
+  };
+
+  if (upToMessageId !== undefined) {
+    const hasCutMessage = await withDORetry<SessionIngestDOStub, boolean>(
+      sourceStub,
+      stub => stub.hasMessageItem(upToMessageId),
+      'SessionIngestDO.hasMessageItem'
+    );
+    if (!hasCutMessage) {
+      return { status: 'rejected', code: 'clone_cut_not_found' };
+    }
+  }
 
   const inspected = await withDORetry<SessionIngestDOStub, InspectCloneStageResult>(
     destinationStub,
-    stub => stub.inspectCloneStage({ sourceSessionId, destinationSessionId }),
+    stub => stub.inspectCloneStage(stageIdentity),
     'SessionIngestDO.inspectCloneStage'
   );
 
   if (inspected.status === 'complete') {
-    const { itemCount } = await exportAllSourceRows(sourceStub);
+    const { itemCount } = await exportAllSourceRows(sourceStub, upToMessageId);
     return { status: 'ready', copiedItemCount: itemCount };
   }
 
@@ -399,7 +436,7 @@ export async function cloneSessionIntoDestination(
   if (inspected.status === 'in_progress') {
     cursor = inspected.nextCursor;
     copiedItemCount = inspected.copiedItemCount;
-    digestLines = await rebuildPrefixDigestLines(sourceStub, copiedItemCount);
+    digestLines = await rebuildPrefixDigestLines(sourceStub, copiedItemCount, upToMessageId);
     const rebuiltDigest = await sha256Hex(digestLines.join('\n'));
     if (rebuiltDigest !== inspected.rollingDigest) {
       await resetDestinationStage(destinationStub);
@@ -407,9 +444,9 @@ export async function cloneSessionIntoDestination(
     }
     needsCloneLoop = cursor !== null;
   } else if (inspected.status === 'mismatch') {
-    // A complete destination that belongs to another source is already
+    // A complete destination that belongs to another source or cut is already
     // published: reject terminally and never reset it. An incomplete stage from
-    // another source is unpublished and may be reset before restarting.
+    // another source or cut is unpublished and may be reset before restarting.
     if (inspected.storedStage === 'complete') {
       return { status: 'rejected', code: 'destination_conflict' };
     }
@@ -435,6 +472,7 @@ export async function cloneSessionIntoDestination(
           r2,
           sourceSessionId,
           destinationSessionId,
+          upToMessageId,
           writtenDestinationR2Keys
         );
       } catch (error) {
@@ -456,8 +494,7 @@ export async function cloneSessionIntoDestination(
         destinationStub,
         stub =>
           stub.stageCloneBatch({
-            sourceSessionId,
-            destinationSessionId,
+            ...stageIdentity,
             rows: batch.rows.map(row => ({
               itemId: row.itemId,
               itemType: row.itemType,
@@ -490,7 +527,7 @@ export async function cloneSessionIntoDestination(
 
   // Final verification: re-export the source from scratch and compare the
   // source digest and item count against the staged rolling digest and count.
-  const final = await exportAllSourceRows(sourceStub);
+  const final = await exportAllSourceRows(sourceStub, upToMessageId);
   const finalDigest = await sha256Hex(final.digestLines.join('\n'));
   const rollingDigest = await sha256Hex(digestLines.join('\n'));
 
@@ -505,8 +542,7 @@ export async function cloneSessionIntoDestination(
       destinationStub,
       stub =>
         stub.stageCloneBatch({
-          sourceSessionId,
-          destinationSessionId,
+          ...stageIdentity,
           rows: [
             {
               itemId: 'session',
@@ -532,8 +568,7 @@ export async function cloneSessionIntoDestination(
     destinationStub,
     stub =>
       stub.finalizeCloneStage({
-        sourceSessionId,
-        destinationSessionId,
+        ...stageIdentity,
         finalDigest,
         finalItemCount: copiedItemCount,
       }),

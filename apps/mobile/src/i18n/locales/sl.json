@@ -2208,6 +2208,11 @@
       "collapse": "Strni cilj",
       "expand": "Razširi cilj"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Opravila, {{completed}} od {{total}} dokončanih",
+      "rowAccessibility": "Opravila, {{completed}} od {{total}} dokončanih. Trenutno opravilo: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nedavno uporabljeno",
       "couldNotLoadGithubRepositories": "Skladišč na GitHub ni bilo mogoče naložiti.",
@@ -2263,6 +2268,10 @@
       "importingSession": "Uvažanje seje",
       "cliCannotContinue": "Ta CLI ne podpira nadaljevanja seje. Izberi Cloud Agent ali drug CLI.",
       "importFailed": "Te seje ni bilo mogoče uvoziti.",
+      "cliCannotFork": "Posodobi Kilo CLI, če želiš razcepiti sejo od sporočila.",
+      "forkCutNotSynced": "To sporočilo še ni shranjeno. Poskusi znova čez trenutek.",
+      "forkFilesFromBaseBranch": "Datoteke izhajajo iz osnovne veje.",
+      "forkFilesUnchangedOnComputer": "Datoteke na tem računalniku se ne spremenijo.",
       "pickProfile": "Izberite profil",
       "noProfile": "Brez profila",
       "manageProfiles": "Upravljanje profilov",
@@ -2386,6 +2395,7 @@
       "copyMessage": "Kopiraj sporočilo",
       "copyText": "Kopiraj besedilo",
       "selectText": "Izberi besedilo",
+      "forkFromHere": "Razcepi od tu",
       "reportAiResponse": "Prijavi odgovor AI",
       "reportAiResponseConfirm": "Želiš prijaviti ta odgovor, da ga pregledamo?",
       "report": "Prijavi",
@@ -3271,6 +3281,7 @@
     "tutorialLabel": "Vodič"
   },
   "modelChat": {
+    "offlineFailure": "Ta model potrebuje internetno povezavo. Poveži se in poskusi znova ali preklopi na model v tej napravi.",
     "empty": {
       "title": "Začni klepet",
       "description": "Pošlji sporočilo za pogovor z modelom."
@@ -3282,6 +3293,11 @@
       "deleteTitle": "Izbrišem ta klepet?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Išči po spletu",
+      "description": "Dovolite temu klepetu, da poišče aktualne informacije prek vašega računa Kilo. Iskanja porabljajo vašo mesečno kvoto iskanj.",
+      "allowanceExhausted": "Vaša brezplačna spletna iskanja za ta mesec so porabljena. Dodajte dobroimetje, da boste lahko znova iskali."
+    },
     "mcp": {
       "title": "Orodja Kilo",
       "use": "Uporabi orodja Kilo",
@@ -3304,7 +3320,6 @@
       "fieldName": "Prikazano ime",
       "fieldUrl": "URL strežnika",
       "fieldUrlInvalid": "Vnesi veljaven URL strežnika.",
-      "fieldToken": "Žeton Bearer (neobvezno)",
       "enableServer": "Omogoči ta strežnik: {{name}}",
       "editServer": "Uredi strežnik",
       "deleteServer": "Izbriši strežnik",
@@ -3324,6 +3339,18 @@
       "serverToolCount": "{{count}} orodij",
       "serverUnreachable": "Ni bilo mogoče doseči tega strežnika",
       "serverOff": "Ta strežnik je izklopljen"
+    },
+    "mcpOAuth": {
+      "authMethod": "Preverjanje pristnosti",
+      "authNone": "Brez prijave",
+      "authBearer": "Žeton Bearer",
+      "authOAuth": "Prijava OAuth",
+      "fieldToken": "Žeton",
+      "oauthHint": "Ko shraniš, tapni $t(modelChat.mcpOAuth.signIn) pri strežniku, da se prijaviš prek brskalnika.",
+      "serverNeedsSignIn": "Prijavi se, da boš lahko uporabljal ta strežnik",
+      "signIn": "Prijava",
+      "signInA11y": "Prijava v ta strežnik: {{name}}",
+      "signInFailed": "Prijava v {{name}} ni uspela. Poskusi znova."
     },
     "backends": {
       "title": "Zaledja za klepet",
@@ -3407,8 +3434,48 @@
         "notGguf": "Povezava mora kazati na datoteko .gguf.",
         "space": "Na voljo ni dovolj prostora za shranjevanje tega modela. Sprostite prostor in poskusite znova.",
         "network": "Prenos se ni dokončal. Preverite povezavo in poskusite znova.",
-        "invalidFile": "Prenesena datoteka ni model, ki bi ga ta aplikacija lahko izvajala, zato je bila odstranjena."
+        "invalidFile": "Prenesena datoteka ni model, ki bi ga ta aplikacija lahko izvajala, zato je bila odstranjena.",
+        "checksum": "Prenesena datoteka se ne ujema z objavljeno kontrolno vsoto, zato je bila odstranjena. Poskusite znova prenesti."
       }
+    },
+    "catalog": {
+      "browse": "Prebrskaj modele",
+      "title": "Katalog modelov",
+      "search": "Išči modele na Hugging Face",
+      "tabs": "Filter modelov",
+      "fitsTab": "Primerni za to napravo",
+      "fromHuggingFace": "Iz Hugging Face",
+      "loading": "Nalaganje modelov",
+      "noResults": "Ni najdenih modelov",
+      "noFits": "Noben model ni primeren za to napravo",
+      "noFitsDescription": "Večji modeli so na zavihku $t(common.all).",
+      "fit": {
+        "fits": "Primeren",
+        "tight": "Komaj primeren",
+        "tooLarge": "Prevelik",
+        "noStorage": "Premalo prostora"
+      },
+      "parameters": "Parametri: {{value}}",
+      "downloads": "Prenosi: {{value}}",
+      "likes": "Všečki: {{value}}",
+      "context": "Kontekstno okno: {{value}}",
+      "license": "Licenca: {{license}}",
+      "licenseUnknown": "Licenca ni navedena",
+      "tools": "Klicanje orodij",
+      "vision": "Vnos slik",
+      "hintsHelp": "Namigi iz Hugging Face. Aplikacija model preveri po prenosu.",
+      "gated": "Ta model zahteva račun Hugging Face, zato ga aplikacija ne more prenesti.",
+      "quantizations": "Kvantizacije",
+      "quantizationsHelp": "Manjše datoteke porabijo manj pomnilnika in prostora. Večje datoteke običajno dajejo boljše odgovore.",
+      "quantDetail": "Prenos {{size}} · približno {{memory}} pomnilnika",
+      "downloadQuant": "Prenesi {{quant}}",
+      "loadingModel": "Nalaganje podrobnosti modela",
+      "couldNotLoadModel": "Tega modela ni bilo mogoče naložiti",
+      "noFiles": "Ni datotek, ki bi jih ta aplikacija lahko zagnala",
+      "noFilesDescription": "Ta aplikacija zaganja modele, ki so ena datoteka GGUF.",
+      "tooLargeTitle": "Ta model morda ne bo deloval",
+      "tooLargeMessage": "{{name}} verjetno potrebuje več pomnilnika, kot ga ima ta naprava. Aplikacija se lahko zapre, medtem ko model odgovarja. Ga vseeno prenesem?",
+      "downloadAnyway": "Vseeno prenesi"
     },
     "localModels": {
       "title": "Modeli v napravi",

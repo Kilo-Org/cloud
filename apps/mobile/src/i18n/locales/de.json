@@ -1641,6 +1641,11 @@
       "collapse": "Ziel einklappen",
       "expand": "Ziel ausklappen"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Aufgaben, {{completed}} von {{total}} erledigt",
+      "rowAccessibility": "Aufgaben, {{completed}} von {{total}} erledigt. Aktuelle Aufgabe: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Zuletzt verwendet",
       "couldNotLoadGithubRepositories": "Die GitHub-Repositorys konnten nicht geladen werden.",
@@ -1696,6 +1701,10 @@
       "importingSession": "Sitzung wird importiert",
       "cliCannotContinue": "Diese CLI kann keine Sitzung fortsetzen. Wähle Cloud Agent oder eine andere CLI.",
       "importFailed": "Diese Sitzung konnte nicht importiert werden.",
+      "cliCannotFork": "Aktualisiere die Kilo CLI, um ab einer Nachricht abzuzweigen.",
+      "forkCutNotSynced": "Diese Nachricht ist noch nicht gespeichert. Versuche es gleich noch einmal.",
+      "forkFilesFromBaseBranch": "Die Dateien basieren auf dem Basis-Branch.",
+      "forkFilesUnchangedOnComputer": "Die Dateien auf diesem Computer werden nicht geändert.",
       "pickProfile": "Wählen Sie ein Profil",
       "noProfile": "Kein Profil",
       "manageProfiles": "Profile verwalten",
@@ -1811,6 +1820,7 @@
       "copyMessage": "Nachricht kopieren",
       "copyText": "Text kopieren",
       "selectText": "Text auswählen",
+      "forkFromHere": "Ab hier abzweigen",
       "reportAiResponse": "KI-Antwort melden",
       "reportAiResponseConfirm": "Diese Antwort zur Überprüfung melden?",
       "report": "Melden",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Dieses Modell benötigt eine Internetverbindung. Stelle eine Verbindung her und versuche es erneut, oder wechsle zu einem Modell auf diesem Gerät.",
     "empty": {
       "title": "Chat starten",
       "description": "Sende eine Nachricht, um mit einem Modell zu sprechen."
@@ -3200,6 +3211,11 @@
       "deleteTitle": "Diesen Chat löschen?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Im Web suchen",
+      "description": "Lass diesen Chat aktuelle Informationen über dein Kilo-Konto nachschlagen. Suchen verbrauchen dein monatliches Suchkontingent.",
+      "allowanceExhausted": "Deine kostenlosen Websuchen für diesen Monat sind aufgebraucht. Füge Guthaben hinzu, um wieder zu suchen."
+    },
     "mcp": {
       "title": "Kilo-Tools",
       "use": "Kilo-Tools verwenden",
@@ -3222,7 +3238,6 @@
       "fieldName": "Anzeigename",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Gib eine gültige Server-URL ein.",
-      "fieldToken": "Bearer-Token (optional)",
       "enableServer": "Diesen Server aktivieren: {{name}}",
       "editServer": "Server bearbeiten",
       "deleteServer": "Server löschen",
@@ -3242,6 +3257,18 @@
       "serverToolCount": "{{count}} Tools",
       "serverUnreachable": "Dieser Server konnte nicht erreicht werden",
       "serverOff": "Dieser Server ist ausgeschaltet"
+    },
+    "mcpOAuth": {
+      "authMethod": "Authentifizierung",
+      "authNone": "Keine Anmeldung",
+      "authBearer": "Bearer-Token",
+      "authOAuth": "OAuth-Anmeldung",
+      "fieldToken": "Token",
+      "oauthHint": "Tippe nach dem Speichern beim Server auf $t(modelChat.mcpOAuth.signIn), um dich im Browser anzumelden.",
+      "serverNeedsSignIn": "Melde dich an, um diesen Server zu verwenden",
+      "signIn": "Anmelden",
+      "signInA11y": "Bei diesem Server anmelden: {{name}}",
+      "signInFailed": "Anmeldung bei {{name}} fehlgeschlagen. Versuche es erneut."
     },
     "backends": {
       "title": "Chat-Backends",
@@ -3325,8 +3352,48 @@
         "notGguf": "Der Link muss auf eine .gguf-Datei verweisen.",
         "space": "Es ist nicht genügend freier Speicherplatz für dieses Modell vorhanden. Gib Speicherplatz frei und versuche es erneut.",
         "network": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und versuche es erneut.",
-        "invalidFile": "Die heruntergeladene Datei ist kein Modell, das diese App ausführen kann, und wurde daher entfernt."
+        "invalidFile": "Die heruntergeladene Datei ist kein Modell, das diese App ausführen kann, und wurde daher entfernt.",
+        "checksum": "Die heruntergeladene Datei stimmt nicht mit ihrer veröffentlichten Prüfsumme überein und wurde daher entfernt. Versuche den Download erneut."
       }
+    },
+    "catalog": {
+      "browse": "Modelle durchsuchen",
+      "title": "Modellkatalog",
+      "search": "Hugging Face-Modelle suchen",
+      "tabs": "Modellfilter",
+      "fitsTab": "Passt auf dieses Gerät",
+      "fromHuggingFace": "Von Hugging Face",
+      "loading": "Modelle werden geladen",
+      "noResults": "Keine Modelle gefunden",
+      "noFits": "Keine Modelle passen auf dieses Gerät",
+      "noFitsDescription": "Größere Modelle findest du im Tab „$t(common.all)“.",
+      "fit": {
+        "fits": "Passt",
+        "tight": "Knapp",
+        "tooLarge": "Zu groß",
+        "noStorage": "Nicht genug Speicherplatz"
+      },
+      "parameters": "Parameter: {{value}}",
+      "downloads": "Downloads: {{value}}",
+      "likes": "Likes: {{value}}",
+      "context": "Kontextfenster: {{value}}",
+      "license": "Lizenz: {{license}}",
+      "licenseUnknown": "Die Lizenz ist nicht angegeben",
+      "tools": "Tool-Aufrufe",
+      "vision": "Bildeingabe",
+      "hintsHelp": "Hinweise von Hugging Face. Die App prüft das Modell nach dem Herunterladen.",
+      "gated": "Dieses Modell erfordert ein Hugging Face-Konto, daher kann die App es nicht herunterladen.",
+      "quantizations": "Quantisierungen",
+      "quantizationsHelp": "Kleinere Dateien benötigen weniger Arbeitsspeicher und Speicherplatz. Größere Dateien liefern meist bessere Antworten.",
+      "quantDetail": "{{size}} Download · ca. {{memory}} Arbeitsspeicher",
+      "downloadQuant": "{{quant}} herunterladen",
+      "loadingModel": "Modelldetails werden geladen",
+      "couldNotLoadModel": "Dieses Modell konnte nicht geladen werden",
+      "noFiles": "Keine Dateien, die diese App ausführen kann",
+      "noFilesDescription": "Diese App führt Modelle aus, die aus einer einzigen GGUF-Datei bestehen.",
+      "tooLargeTitle": "Dieses Modell läuft möglicherweise nicht",
+      "tooLargeMessage": "{{name}} benötigt wahrscheinlich mehr Arbeitsspeicher, als dieses Gerät hat. Die App kann sich schließen, während das Modell antwortet. Trotzdem herunterladen?",
+      "downloadAnyway": "Trotzdem herunterladen"
     },
     "localModels": {
       "title": "Modelle auf dem Gerät",

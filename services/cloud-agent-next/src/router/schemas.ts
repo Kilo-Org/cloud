@@ -610,6 +610,7 @@ const PrepareSessionNonCloneVariant = z.object({
    * the fallback only after old clients and prepared sessions expire.
    */
   cloneFromKiloSessionId: z.undefined().optional(),
+  cloneUpToMessageId: z.undefined().optional(),
   /**
    * When `true`, `prepareSession` also enqueues the initial user message
    * (mirroring the unified `start` endpoint) so callers that navigate
@@ -650,6 +651,9 @@ const PrepareSessionCloneVariant = z.object({
   initialPayload: z.undefined().optional(),
   cloneFromKiloSessionId: kiloSessionIdSchema.describe(
     'Source Kilo session ID to clone into this Cloud Agent session'
+  ),
+  cloneUpToMessageId: MessageIdSchema.optional().describe(
+    'Inclusive cut: copy source messages up to and including this message ID; omit to copy the whole session'
   ),
   autoInitiate: z.literal(true),
   operationKey: z

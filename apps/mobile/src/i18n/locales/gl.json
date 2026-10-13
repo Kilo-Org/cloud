@@ -2152,6 +2152,11 @@
       "collapse": "Contraer o obxectivo",
       "expand": "Expandir o obxectivo"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tarefas, {{completed}} de {{total}} completadas",
+      "rowAccessibility": "Tarefas, {{completed}} de {{total}} completadas. Tarefa actual: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Usados recentemente",
       "couldNotLoadGithubRepositories": "Non se puideron cargar os repositorios de GitHub.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Importando a sesión",
       "cliCannotContinue": "Este CLI non pode continuar unha sesión. Escolle Cloud Agent ou outro CLI.",
       "importFailed": "Non se puido importar esta sesión.",
+      "cliCannotFork": "Actualiza o Kilo CLI para bifurcar desde unha mensaxe.",
+      "forkCutNotSynced": "Esta mensaxe aínda non está gardada. Téntao de novo nun momento.",
+      "forkFilesFromBaseBranch": "Os ficheiros parten da rama base.",
+      "forkFilesUnchangedOnComputer": "Os ficheiros deste ordenador non se modifican.",
       "pickProfile": "Escolle un perfil",
       "noProfile": "Sen perfil",
       "manageProfiles": "Xestionar perfís",
@@ -2326,6 +2335,7 @@
       "copyMessage": "Copiar mensaxe",
       "copyText": "Copiar texto",
       "selectText": "Seleccionar texto",
+      "forkFromHere": "Bifurcar desde aquí",
       "reportAiResponse": "Denunciar a resposta da IA",
       "reportAiResponseConfirm": "Queres denunciar esta resposta para que se revise?",
       "report": "Denunciar",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Titorial"
   },
   "modelChat": {
+    "offlineFailure": "Este modelo necesita conexión a internet. Conéctate e téntao de novo, ou cambia a un modelo deste dispositivo.",
     "empty": {
       "title": "Inicia un chat",
       "description": "Envía unha mensaxe para falar cun modelo."
@@ -3200,6 +3211,11 @@
       "deleteTitle": "Eliminar este chat?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Buscar na web",
+      "description": "Permite que este chat busque información actual a través da túa conta de Kilo. As buscas usan a túa cota mensual de buscas.",
+      "allowanceExhausted": "Esgotaches as buscas web gratuítas deste mes. Engade créditos para volver buscar."
+    },
     "mcp": {
       "title": "Ferramentas de Kilo",
       "use": "Usar as ferramentas de Kilo",
@@ -3222,7 +3238,6 @@
       "fieldName": "Nome mostrado",
       "fieldUrl": "URL do servidor",
       "fieldUrlInvalid": "Introduce un URL de servidor válido.",
-      "fieldToken": "Token Bearer (opcional)",
       "enableServer": "Activar este servidor: {{name}}",
       "editServer": "Editar o servidor",
       "deleteServer": "Eliminar o servidor",
@@ -3242,6 +3257,18 @@
       "serverToolCount": "{{count}} ferramentas",
       "serverUnreachable": "Non se puido contactar con este servidor",
       "serverOff": "Este servidor está desactivado"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autenticación",
+      "authNone": "Sen inicio de sesión",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Inicio de sesión OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Despois de gardar, toca $t(modelChat.mcpOAuth.signIn) no servidor para iniciar sesión co navegador.",
+      "serverNeedsSignIn": "Inicia sesión para usar este servidor",
+      "signIn": "Iniciar sesión",
+      "signInA11y": "Iniciar sesión neste servidor: {{name}}",
+      "signInFailed": "Non se puido iniciar sesión en {{name}}. Téntao de novo."
     },
     "backends": {
       "title": "Servizos de chat",
@@ -3325,8 +3352,48 @@
         "notGguf": "A ligazón debe apuntar a un ficheiro .gguf.",
         "space": "Non hai suficiente espazo libre para este modelo. Libera espazo e téntao de novo.",
         "network": "A descarga non rematou. Comproba a túa conexión e téntao de novo.",
-        "invalidFile": "O ficheiro descargado non é un modelo que esta aplicación poida executar, así que se eliminou."
+        "invalidFile": "O ficheiro descargado non é un modelo que esta aplicación poida executar, así que se eliminou.",
+        "checksum": "O ficheiro descargado non coincide coa súa suma de verificación publicada, así que se eliminou. Tenta descargalo de novo."
       }
+    },
+    "catalog": {
+      "browse": "Explorar modelos",
+      "title": "Catálogo de modelos",
+      "search": "Buscar modelos de Hugging Face",
+      "tabs": "Filtro de modelos",
+      "fitsTab": "Compatibles con este dispositivo",
+      "fromHuggingFace": "De Hugging Face",
+      "loading": "Cargando modelos",
+      "noResults": "Non se atoparon modelos",
+      "noFits": "Ningún modelo cabe neste dispositivo",
+      "noFitsDescription": "Os modelos máis grandes están na lapela $t(common.all).",
+      "fit": {
+        "fits": "Cabe",
+        "tight": "Cabe xusto",
+        "tooLarge": "Demasiado grande",
+        "noStorage": "Non hai espazo suficiente"
+      },
+      "parameters": "Parámetros: {{value}}",
+      "downloads": "Descargas: {{value}}",
+      "likes": "Gústames: {{value}}",
+      "context": "Xanela de contexto: {{value}}",
+      "license": "Licenza: {{license}}",
+      "licenseUnknown": "Non se indica a licenza",
+      "tools": "Chamada de ferramentas",
+      "vision": "Entrada de imaxes",
+      "hintsHelp": "Indicacións de Hugging Face. A app comproba o modelo despois de descargalo.",
+      "gated": "Este modelo require unha conta de Hugging Face, polo que a app non o pode descargar.",
+      "quantizations": "Cuantizacións",
+      "quantizationsHelp": "Os ficheiros máis pequenos usan menos memoria e almacenamento. Os máis grandes adoitan dar mellores respostas.",
+      "quantDetail": "Descarga de {{size}} · uns {{memory}} de memoria",
+      "downloadQuant": "Descargar {{quant}}",
+      "loadingModel": "Cargando os detalles do modelo",
+      "couldNotLoadModel": "Non se puido cargar este modelo",
+      "noFiles": "Non hai ficheiros que esta app poida executar",
+      "noFilesDescription": "Esta app executa modelos que son un único ficheiro GGUF.",
+      "tooLargeTitle": "Pode que este modelo non funcione",
+      "tooLargeMessage": "Probablemente {{name}} necesita máis memoria da que ten este dispositivo. A app pode pecharse mentres o modelo responde. Queres descargalo igualmente?",
+      "downloadAnyway": "Descargar igualmente"
     },
     "localModels": {
       "title": "Modelos no dispositivo",

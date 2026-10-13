@@ -17,12 +17,7 @@ import {
   type KiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic';
-import {
-  CLAUDE_OPUS_FALLBACK_MODEL_ID,
-  isClaudeModel,
-  isFableModel,
-  isOpus5Model,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   applyMoonshotModelSettings,
@@ -34,7 +29,6 @@ import {
   ReasoningDetailsTransform,
   type BYOKResult,
   type Provider,
-  type ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { isStepModel } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
@@ -57,7 +51,6 @@ import {
   isQwenExplicitCacheModel,
   isQwenModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
 import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
@@ -231,20 +224,11 @@ export function applyPreferredProvider(
   requestToMutate.provider = withIgnoredProviders(provider, ignoredProviders);
 }
 
-export async function applyGatewayModelsFallback(
-  providerId: ProviderId,
-  requestedModel: string,
-  requestToMutate: GatewayRequest
-) {
-  if (
-    !isFreeModel(requestedModel) &&
-    (isFableModel(requestedModel) || isOpus5Model(requestedModel)) &&
-    (providerId === 'openrouter' || providerId === 'vercel')
-  ) {
-    requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_FALLBACK_MODEL_ID];
-    return;
-  }
-
+/**
+ * Fallback models are not supported: a request for a free model could fall
+ * back to a paid model and be served without being charged.
+ */
+export function removeModelsFallback(requestToMutate: GatewayRequest) {
   delete requestToMutate.body.models;
 }
 
@@ -312,7 +296,7 @@ export async function applyProviderSpecificLogic(
   taskId: string | null,
   isNonTrialEnterprise: boolean
 ) {
-  await applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
+  removeModelsFallback(requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);

@@ -2032,6 +2032,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       if (existingMetadata.clone?.reportingCreatedAt !== newMetadata.clone?.reportingCreatedAt) {
         throw new Error('Clone reporting creation time cannot be changed');
       }
+      if (existingMetadata.clone?.cloneUpToMessageId !== newMetadata.clone?.cloneUpToMessageId) {
+        throw new Error('Clone cut cannot be changed');
+      }
       if (existingMetadata.clone?.reportingCreatedAt && existingMetadata.initialMessage?.id) {
         newMetadata.initialMessage = existingMetadata.initialMessage;
       }

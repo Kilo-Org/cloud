@@ -2152,6 +2152,11 @@
       "collapse": "ግብን ሰብስብ",
       "expand": "ግብን ዘርጋ"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "ግቦች፣ {{completed}} ከ{{total}} ተጠናቅቋል",
+      "rowAccessibility": "ግቦች፣ {{completed}} ከ{{total}} ተጠናቅቋል። የአሁኑ ግብ፦ {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "በቅርቡ ጥቅም ላይ የዋሉ",
       "couldNotLoadGithubRepositories": "የGitHub ማከማቻዎችን መጫን አልተቻለም።",
@@ -2207,6 +2212,10 @@
       "importingSession": "ክፍለ ጊዜውን በማስመጣት ላይ",
       "cliCannotContinue": "ይህ CLI ክፍለ ጊዜን መቀጠል አይችልም። Cloud Agent ወይም ሌላ CLI ይምረጡ።",
       "importFailed": "ይህን ክፍለ ጊዜ ማስመጣት አልተቻለም።",
+      "cliCannotFork": "ከመልእክት ቅርንጫፍ ለመፍጠር Kilo CLI ን ያዘምኑ።",
+      "forkCutNotSynced": "ይህ መልእክት ገና አልተቀመጠም። ትንሽ ቆይተው እንደገና ይሞክሩ።",
+      "forkFilesFromBaseBranch": "ፋይሎቹ ከመሠረት ቅርንጫፉ ይጀምራሉ።",
+      "forkFilesUnchangedOnComputer": "በዚህ ኮምፒውተር ላይ ያሉ ፋይሎች አይቀየሩም።",
       "pickProfile": "መገለጫ ይምረጡ",
       "noProfile": "ምንም መገለጫ የለም።",
       "manageProfiles": "መገለጫዎችን ያስተዳድሩ",
@@ -2322,6 +2331,7 @@
       "copyMessage": "መልእክቱን ይቅዱ",
       "copyText": "ጽሑፉን ይቅዱ",
       "selectText": "ጽሑፉን ይምረጡ",
+      "forkFromHere": "ከዚህ ቅርንጫፍ ይፍጠሩ",
       "reportAiResponse": "የAI ምላሽን ሪፖርት ማድረግ",
       "reportAiResponseConfirm": "ይህን ምላሽ ለግምገማ ሪፖርት ማድረግ ይፈልጋሉ?",
       "report": "ሪፖርት ያድርጉ",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "መመሪያ"
   },
   "modelChat": {
+    "offlineFailure": "ይህ ሞዴል የበይነመረብ ግንኙነት ያስፈልገዋል። ይገናኙ እና እንደገና ይሞክሩ፣ ወይም በዚህ መሣሪያ ላይ ወዳለ ሞዴል ይቀይሩ።",
     "empty": {
       "title": "ውይይት ጀምር",
       "description": "ከሞዴል ጋር ለመወያየት መልእክት ይላኩ።"
@@ -3200,6 +3211,11 @@
       "deleteTitle": "ይህ ውይይት ይሰረዝ?"
     },
     "beta": "ቤታ",
+    "webSearch": {
+      "title": "ድሩን ይፈልጉ",
+      "description": "ይህ ውይይት አሁናዊ መረጃን በKilo መለያዎ በኩል እንዲፈልግ ይፍቀዱ። ፍለጋዎች ወርሃዊ የፍለጋ ድርሻዎን ይጠቀማሉ።",
+      "allowanceExhausted": "የዚህ ወር ነፃ የድር ፍለጋዎችዎ አልቀዋል። እንደገና ለመፈለግ ክሬዲቶችን ያክሉ።"
+    },
     "mcp": {
       "title": "የKilo መሳሪያዎች",
       "use": "የKilo መሳሪያዎችን ተጠቀም",
@@ -3222,7 +3238,6 @@
       "fieldName": "የሚታይ ስም",
       "fieldUrl": "የሰርቨር URL",
       "fieldUrlInvalid": "ትክክለኛ የሰርቨር URL ያስገቡ።",
-      "fieldToken": "Bearer ቶከን (አማራጭ)",
       "enableServer": "ይህን ሰርቨር አንቃ: {{name}}",
       "editServer": "ሰርቨር አርትዕ",
       "deleteServer": "ሰርቨር ሰርዝ",
@@ -3242,6 +3257,18 @@
       "serverToolCount": "{{count}} መሳሪያዎች",
       "serverUnreachable": "ይህን ሰርቨር ማግኘት አልተቻለም",
       "serverOff": "ይህ ሰርቨር ተዘግቷል"
+    },
+    "mcpOAuth": {
+      "authMethod": "ማረጋገጫ",
+      "authNone": "መግባት አያስፈልግም",
+      "authBearer": "Bearer ቶከን",
+      "authOAuth": "በOAuth መግባት",
+      "fieldToken": "ቶከን",
+      "oauthHint": "ካስቀመጡ በኋላ በአሳሽዎ ለመግባት በሰርቨሩ ላይ $t(modelChat.mcpOAuth.signIn) የሚለውን ይንኩ።",
+      "serverNeedsSignIn": "ይህን ሰርቨር ለመጠቀም ይግቡ",
+      "signIn": "ግባ",
+      "signInA11y": "ወደዚህ ሰርቨር ግባ: {{name}}",
+      "signInFailed": "ወደ {{name}} መግባት አልተቻለም። እንደገና ይሞክሩ።"
     },
     "backends": {
       "title": "የውይይት የጀርባ አገልግሎቶች",
@@ -3325,8 +3352,48 @@
         "notGguf": "አገናኙ ወደ .gguf ፋይል የሚወስድ መሆን አለበት።",
         "space": "ለዚህ ሞዴል በቂ ነጻ ማከማቻ የለም። ቦታ ነጻ ያድርጉና እንደገና ይሞክሩ።",
         "network": "ማውረዱ አልተጠናቀቀም። ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ።",
-        "invalidFile": "የወረደው ፋይል ይህ መተግበሪያ ሊያሂደው የሚችለው ሞዴል አይደለም፤ ስለዚህ ተሰርዟል።"
+        "invalidFile": "የወረደው ፋይል ይህ መተግበሪያ ሊያሂደው የሚችለው ሞዴል አይደለም፤ ስለዚህ ተሰርዟል።",
+        "checksum": "የወረደው ፋይል ከታተመው ቼክሰም ጋር አይዛመድም፤ ስለዚህ ተሰርዟል። እባክዎ እንደገና ለማውረድ ይሞክሩ።"
       }
+    },
+    "catalog": {
+      "browse": "ሞዴሎችን አስስ",
+      "title": "የሞዴል ካታሎግ",
+      "search": "የHugging Face ሞዴሎችን ፈልግ",
+      "tabs": "የሞዴል ማጣሪያ",
+      "fitsTab": "ለዚህ መሣሪያ የሚስማሙ",
+      "fromHuggingFace": "ከHugging Face",
+      "loading": "ሞዴሎች በመጫን ላይ",
+      "noResults": "ምንም ሞዴል አልተገኘም",
+      "noFits": "ለዚህ መሣሪያ የሚስማማ ሞዴል የለም",
+      "noFitsDescription": "ትላልቅ ሞዴሎች በ$t(common.all) ትር ላይ ይገኛሉ።",
+      "fit": {
+        "fits": "ይስማማል",
+        "tight": "በጭንቅ ይስማማል",
+        "tooLarge": "በጣም ትልቅ",
+        "noStorage": "በቂ ማከማቻ የለም"
+      },
+      "parameters": "ፓራሜትሮች፦ {{value}}",
+      "downloads": "ውርዶች፦ {{value}}",
+      "likes": "መውደዶች፦ {{value}}",
+      "context": "የአውድ መስኮት፦ {{value}}",
+      "license": "ፈቃድ፦ {{license}}",
+      "licenseUnknown": "ፈቃዱ አልተገለጸም",
+      "tools": "መሣሪያ መጥራት",
+      "vision": "የምስል ግብዓት",
+      "hintsHelp": "ፍንጮች ከHugging Face የመጡ ናቸው። መተግበሪያው ሞዴሉን ከወረደ በኋላ ይፈትሸዋል።",
+      "gated": "ይህ ሞዴል የHugging Face መለያ ስለሚፈልግ መተግበሪያው ሊያወርደው አይችልም።",
+      "quantizations": "ኳንታይዜሽኖች",
+      "quantizationsHelp": "ትናንሽ ፋይሎች አነስተኛ ማህደረ ትውስታ እና ማከማቻ ይጠቀማሉ። ትላልቅ ፋይሎች ብዙውን ጊዜ የተሻሉ መልሶችን ይሰጣሉ።",
+      "quantDetail": "{{size}} ውርድ · ወደ {{memory}} ማህደረ ትውስታ",
+      "downloadQuant": "{{quant}} አውርድ",
+      "loadingModel": "የሞዴል ዝርዝሮች በመጫን ላይ",
+      "couldNotLoadModel": "ይህን ሞዴል መጫን አልተቻለም",
+      "noFiles": "ይህ መተግበሪያ ሊያሄዳቸው የሚችል ፋይሎች የሉም",
+      "noFilesDescription": "ይህ መተግበሪያ አንድ GGUF ፋይል የሆኑ ሞዴሎችን ያሄዳል።",
+      "tooLargeTitle": "ይህ ሞዴል ላይሠራ ይችላል",
+      "tooLargeMessage": "{{name}} ይህ መሣሪያ ካለው በላይ ማህደረ ትውስታ ሊፈልግ ይችላል። ሞዴሉ በሚመልስበት ጊዜ መተግበሪያው ሊዘጋ ይችላል። ቢሆንም ይውረድ?",
+      "downloadAnyway": "ቢሆንም አውርድ"
     },
     "localModels": {
       "title": "በመሣሪያ ላይ ያሉ ሞዴሎች",

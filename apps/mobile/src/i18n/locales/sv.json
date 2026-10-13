@@ -2152,6 +2152,11 @@
       "collapse": "Fäll ihop målet",
       "expand": "Fäll ut målet"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Uppgifter, {{completed}} av {{total}} klara",
+      "rowAccessibility": "Uppgifter, {{completed}} av {{total}} klara. Aktuell uppgift: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nyligen använda",
       "couldNotLoadGithubRepositories": "Det gick inte att läsa in kodarkiven från GitHub.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Importerar sessionen",
       "cliCannotContinue": "Den här CLI-versionen kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI-instans.",
       "importFailed": "Det gick inte att importera den här sessionen.",
+      "cliCannotFork": "Uppdatera Kilo CLI för att förgrena från ett meddelande.",
+      "forkCutNotSynced": "Det här meddelandet har inte sparats än. Försök igen om en stund.",
+      "forkFilesFromBaseBranch": "Filerna utgår från basgrenen.",
+      "forkFilesUnchangedOnComputer": "Filerna på den här datorn ändras inte.",
       "pickProfile": "Välj en profil",
       "noProfile": "Ingen profil",
       "manageProfiles": "Hantera profiler",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Kopiera meddelande",
       "copyText": "Kopiera text",
       "selectText": "Markera text",
+      "forkFromHere": "Förgrena härifrån",
       "reportAiResponse": "Rapportera AI-svar",
       "reportAiResponseConfirm": "Rapportera det här svaret för granskning?",
       "report": "Rapportera",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Handledning"
   },
   "modelChat": {
+    "offlineFailure": "Den här modellen kräver en internetanslutning. Anslut och försök igen, eller byt till en modell på den här enheten.",
     "empty": {
       "title": "Starta en chatt",
       "description": "Skicka ett meddelande för att prata med en modell."
@@ -3200,6 +3211,11 @@
       "deleteTitle": "Ta bort den här chatten?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Sök på webben",
+      "description": "Låt den här chatten slå upp aktuell information via ditt Kilo-konto. Sökningar använder din månatliga sökkvot.",
+      "allowanceExhausted": "Dina gratis webbsökningar för den här månaden är slut. Lägg till krediter för att söka igen."
+    },
     "mcp": {
       "title": "Kilo-verktyg",
       "use": "Använd Kilo-verktyg",
@@ -3222,7 +3238,6 @@
       "fieldName": "Visat namn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Ange en giltig server-URL.",
-      "fieldToken": "Bearer-token (valfritt)",
       "enableServer": "Aktivera denna server: {{name}}",
       "editServer": "Redigera server",
       "deleteServer": "Ta bort server",
@@ -3242,6 +3257,18 @@
       "serverToolCount": "{{count}} verktyg",
       "serverUnreachable": "Kunde inte nå denna server",
       "serverOff": "Denna server är avstängd"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentisering",
+      "authNone": "Ingen inloggning",
+      "authBearer": "Bearer-token",
+      "authOAuth": "OAuth-inloggning",
+      "fieldToken": "Token",
+      "oauthHint": "När du har sparat trycker du på $t(modelChat.mcpOAuth.signIn) på servern för att logga in med din webbläsare.",
+      "serverNeedsSignIn": "Logga in för att använda denna server",
+      "signIn": "Logga in",
+      "signInA11y": "Logga in på denna server: {{name}}",
+      "signInFailed": "Kunde inte logga in på {{name}}. Försök igen."
     },
     "backends": {
       "title": "Chattbackends",
@@ -3325,8 +3352,48 @@
         "notGguf": "Länken måste peka på en .gguf-fil.",
         "space": "Det finns inte tillräckligt med ledigt utrymme för den här modellen. Frigör utrymme och försök igen.",
         "network": "Nedladdningen slutfördes inte. Kontrollera anslutningen och försök igen.",
-        "invalidFile": "Den nedladdade filen är inte en modell som den här appen kan köra, så den har tagits bort."
+        "invalidFile": "Den nedladdade filen är inte en modell som den här appen kan köra, så den har tagits bort.",
+        "checksum": "Den nedladdade filen matchar inte sin publicerade kontrollsumma, så den har tagits bort. Försök ladda ner den igen."
       }
+    },
+    "catalog": {
+      "browse": "Bläddra bland modeller",
+      "title": "Modellkatalog",
+      "search": "Sök modeller på Hugging Face",
+      "tabs": "Modellfilter",
+      "fitsTab": "Passar enheten",
+      "fromHuggingFace": "Från Hugging Face",
+      "loading": "Läser in modeller",
+      "noResults": "Inga modeller hittades",
+      "noFits": "Inga modeller passar den här enheten",
+      "noFitsDescription": "Större modeller finns på fliken $t(common.all).",
+      "fit": {
+        "fits": "Passar",
+        "tight": "Knappt",
+        "tooLarge": "För stor",
+        "noStorage": "Inte tillräckligt med lagringsutrymme"
+      },
+      "parameters": "Parametrar: {{value}}",
+      "downloads": "Nedladdningar: {{value}}",
+      "likes": "Gillningar: {{value}}",
+      "context": "Kontextfönster: {{value}}",
+      "license": "Licens: {{license}}",
+      "licenseUnknown": "Licensen anges inte",
+      "tools": "Verktygsanrop",
+      "vision": "Bildinmatning",
+      "hintsHelp": "Tips från Hugging Face. Appen kontrollerar modellen när den har laddats ner.",
+      "gated": "Den här modellen kräver ett Hugging Face-konto, så appen kan inte ladda ner den.",
+      "quantizations": "Kvantiseringar",
+      "quantizationsHelp": "Mindre filer använder mindre minne och lagringsutrymme. Större filer ger oftast bättre svar.",
+      "quantDetail": "{{size}} nedladdning · cirka {{memory}} minne",
+      "downloadQuant": "Ladda ner {{quant}}",
+      "loadingModel": "Läser in modellinformation",
+      "couldNotLoadModel": "Det gick inte att läsa in den här modellen",
+      "noFiles": "Inga filer som appen kan köra",
+      "noFilesDescription": "Appen kör modeller som består av en enda GGUF-fil.",
+      "tooLargeTitle": "Den här modellen kanske inte fungerar",
+      "tooLargeMessage": "{{name}} behöver troligen mer minne än den här enheten har. Appen kan stängas medan modellen svarar. Vill du ladda ner den ändå?",
+      "downloadAnyway": "Ladda ner ändå"
     },
     "localModels": {
       "title": "Modeller på enheten",

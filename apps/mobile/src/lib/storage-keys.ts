@@ -75,6 +75,8 @@ export const CONDENSE_TOOL_CALLS_KEY = 'condense-tool-calls';
 export const SETTINGS_TOOLS_ENABLED_KEY = 'settings-tools-enabled';
 /** Persisted remote MCP servers: a JSON array of `StoredRemoteMcpServer`. */
 export const REMOTE_MCP_SERVERS_KEY = 'remote-mcp-servers';
+/** OAuth tokens, client registrations and PKCE verifiers of remote MCP servers, by server id. */
+export const REMOTE_MCP_OAUTH_KEY = 'remote-mcp-oauth';
 /** Account-scoped remote Quick Chat profiles, including provider credentials. */
 export const CHAT_BACKENDS_KEY = 'chat-backends';
 /** Provider platforms whose new-session "Connect <provider>" CTA the user collapsed. */

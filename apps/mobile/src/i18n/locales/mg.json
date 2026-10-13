@@ -2152,6 +2152,11 @@
       "collapse": "Aforeto ny tanjona",
       "expand": "Avelaro ny tanjona"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tanjona, {{completed}} amin'ny {{total}} vita",
+      "rowAccessibility": "Tanjona, {{completed}} amin'ny {{total}} vita. Tanjona ankehitriny: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nampiasaina vao haingana",
       "couldNotLoadGithubRepositories": "Tsy voaray ny tahirin-kaody ao amin'ny GitHub.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Manafatra fotoam-piasana",
       "cliCannotContinue": "Tsy afaka manohy fotoam-piasana ity CLI ity. Safidio ny Cloud Agent na CLI hafa.",
       "importFailed": "Tsy nahomby ny fanafarana ity fotoam-piasana ity.",
+      "cliCannotFork": "Havaozy ny Kilo CLI mba hampisarahana avy amin'ny hafatra iray.",
+      "forkCutNotSynced": "Mbola tsy voatahiry ity hafatra ity. Andramo indray afaka kelikely.",
+      "forkFilesFromBaseBranch": "Manomboka amin'ny sampana fototra ny rakitra.",
+      "forkFilesUnchangedOnComputer": "Tsy ovaina ny rakitra ao amin'ity solosaina ity.",
       "pickProfile": "Mifidiana profil",
       "noProfile": "Tsy misy mombamomba",
       "manageProfiles": "Tantano ny mombamomba",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Adikao ny hafatra",
       "copyText": "Adikao ny soratra",
       "selectText": "Safidio ny soratra",
+      "forkFromHere": "Hampisaraka avy eto",
       "reportAiResponse": "Manaova tatitra momba ny valin'ny AI",
       "reportAiResponseConfirm": "Hanao tatitra momba ity valiny ity ve mba handinihana azy?",
       "report": "Manaova tatitra",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Torolàlana"
   },
   "modelChat": {
+    "offlineFailure": "Mila fifandraisana amin'ny Internet ity Modely ity. Mifandraisa ary andramo indray, na mifindra amin'ny Modely ao amin'ity fitaovana ity.",
     "empty": {
       "title": "Atombohy resaka",
       "description": "Mandefasa hafatra mba hiresaka amin'ny Modely."
@@ -3200,6 +3211,11 @@
       "deleteTitle": "Hamafa ity resaka ity?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Mikaroka amin'ny tranonkala",
+      "description": "Avelao ity resaka ity hikaroka vaovao farany amin'ny alalan'ny kaontinao Kilo. Mampiasa ny fetran'ny fikarohanao isam-bolana ny fikarohana.",
+      "allowanceExhausted": "Lany ny fikarohana an-tranonkala maimaim-poana anao amin'ity volana ity. Ampio crédit mba hikaroka indray."
+    },
     "mcp": {
       "title": "Fitaovana Kilo",
       "use": "Mampiasa fitaovana Kilo",
@@ -3222,7 +3238,6 @@
       "fieldName": "Anarana aseho",
       "fieldUrl": "URL-n'ny server",
       "fieldUrlInvalid": "Ampidiro URL server mety.",
-      "fieldToken": "Token Bearer (tsy voatery)",
       "enableServer": "Alefaso ity server ity: {{name}}",
       "editServer": "Ovaina ny server",
       "deleteServer": "Fafao ny server",
@@ -3242,6 +3257,18 @@
       "serverToolCount": "fitaovana {{count}}",
       "serverUnreachable": "Tsy tratra ity server ity",
       "serverOff": "Mihidy ity server ity"
+    },
+    "mcpOAuth": {
+      "authMethod": "Fanamarinana",
+      "authNone": "Tsy misy fidirana",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Fidirana OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Rehefa voatahiry, tsindrio ny $t(modelChat.mcpOAuth.signIn) eo amin'ny server mba hiditra amin'ny alalan'ny navigateur-nao.",
+      "serverNeedsSignIn": "Midira mba hampiasa ity server ity",
+      "signIn": "Hiditra",
+      "signInA11y": "Hiditra amin'ity server ity: {{name}}",
+      "signInFailed": "Tsy afaka niditra tamin'ny {{name}}. Andramo indray."
     },
     "backends": {
       "title": "Rafitra mpizara ho an'ny resaka",
@@ -3325,8 +3352,48 @@
         "notGguf": "Tsy maintsy manondro rakitra .gguf ny rohy.",
         "space": "Tsy ampy ny toerana malalaka ho an'ity modely ity. Afaho ny toerana ary andramo indray.",
         "network": "Tsy vita ny fampidinana. Hamarino ny fifandraisanao ary andramo indray.",
-        "invalidFile": "Tsy modely azon'ity rindranasa ity ampiasaina ny rakitra voampidina, ka nesorina izy."
+        "invalidFile": "Tsy modely azon'ity rindranasa ity ampiasaina ny rakitra voampidina, ka nesorina izy.",
+        "checksum": "Tsy mifanaraka amin'ny checksum navoaka ho azy ny rakitra voampidina, ka nesorina izy. Andramo indray ny fampidinana."
       }
+    },
+    "catalog": {
+      "browse": "Hijery modely",
+      "title": "Katalaogin'ny modely",
+      "search": "Hikaroka modely ao amin'ny Hugging Face",
+      "tabs": "Sivana modely",
+      "fitsTab": "Mety amin'ity fitaovana ity",
+      "fromHuggingFace": "Avy amin'ny Hugging Face",
+      "loading": "Mampiditra ireo modely",
+      "noResults": "Tsy nisy modely hita",
+      "noFits": "Tsy misy modely mety amin'ity fitaovana ity",
+      "noFitsDescription": "Ao amin'ny tabilao $t(common.all) ireo modely lehibe kokoa.",
+      "fit": {
+        "fits": "Mety",
+        "tight": "Mety tery",
+        "tooLarge": "Lehibe loatra",
+        "noStorage": "Tsy ampy ny toerana fitehirizana"
+      },
+      "parameters": "Paramètres: {{value}}",
+      "downloads": "Isan'ny nandray: {{value}}",
+      "likes": "Tia: {{value}}",
+      "context": "Haben'ny contexte: {{value}}",
+      "license": "Fahazoan-dalana: {{license}}",
+      "licenseUnknown": "Tsy voalaza ny fahazoan-dalana",
+      "tools": "Fampiasana fitaovana",
+      "vision": "Fampidirana sary",
+      "hintsHelp": "Torohevitra avy amin'ny Hugging Face. Hojeren'ny app ny modely rehefa voaray.",
+      "gated": "Mila kaonty Hugging Face ity modely ity, ka tsy afaka maka azy ny app.",
+      "quantizations": "Kôantifikasiôna",
+      "quantizationsHelp": "Ny rakitra kely kokoa dia mampiasa fahatsiarovana sy toerana fitehirizana kely kokoa. Ny rakitra lehibe kokoa matetika dia manome valiny tsara kokoa.",
+      "quantDetail": "{{size}} alaina · fahatsiarovana eo amin'ny {{memory}} eo ho eo",
+      "downloadQuant": "Alaivo ny {{quant}}",
+      "loadingModel": "Mampiditra ny antsipirian'ny modely",
+      "couldNotLoadModel": "Tsy nahomby ny fampidirana ity modely ity",
+      "noFiles": "Tsy misy rakitra azon'ity app ity alefa",
+      "noFilesDescription": "Ity app ity dia mandefa modely izay rakitra GGUF tokana.",
+      "tooLargeTitle": "Mety tsy handeha ity modely ity",
+      "tooLargeMessage": "Mety mila fahatsiarovana mihoatra noho izay ananan'ity fitaovana ity i {{name}}. Mety hikatona ny app eo am-pamalian'ny modely. Alaina ihany ve?",
+      "downloadAnyway": "Alaivo ihany"
     },
     "localModels": {
       "title": "Modely ao amin'ny fitaovana",

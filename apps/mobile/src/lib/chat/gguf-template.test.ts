@@ -1,4 +1,6 @@
 import { type ModelRequest } from '@kilocode/harness-sdk';
+import { asOffered } from '@kilocode/harness-sdk/core';
+import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -128,6 +130,26 @@ describe('the llama.rn call', () => {
       },
       { role: 'tool', tool_call_id: 'c1', content: 'noon' },
     ]);
+  });
+
+  it('sends the tool list without the harness wait field, so no call goes to the background', () => {
+    const offered = asOffered({
+      definition: {
+        name: 'time',
+        description: 'now',
+        parameters: { type: 'object', properties: {} },
+      },
+      run: () => Effect.succeed('now'),
+    });
+    expect(Object.keys(offered.parameters.properties)).toEqual(['wait']);
+    const params = paramsOf(
+      { ...request, tools: [offered] },
+      { path: '/m/a.gguf', contextWindow: 4096, tools: true, projector: undefined }
+    );
+    const sent = params.tools as unknown as readonly {
+      function: { parameters: Record<string, unknown> };
+    }[];
+    expect(sent.at(0)?.function.parameters).toEqual({ type: 'object', properties: {} });
   });
 
   const imageRequest: ModelRequest = {

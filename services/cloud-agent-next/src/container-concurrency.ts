@@ -108,10 +108,14 @@ type CapacityDependencies = {
  * Cloud Agent outage.
  */
 export async function assertContainerCapacity(
-  env: Pick<Env, 'HYPERDRIVE'>,
+  env: Pick<Env, 'HYPERDRIVE' | 'CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED'>,
   request: ContainerCapacityRequest,
   dependencies: CapacityDependencies = {}
 ): Promise<void> {
+  // The e2e Worker runs one funded test account through the whole suite, so it
+  // would otherwise trip the per-account cap on the suite's own churn. Only that
+  // Worker sets the flag; production leaves it unset and stays enforced.
+  if (env.CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED === 'true') return;
   const countLive = dependencies.countLive ?? (input => countLiveContainers(getPgDb(env), input));
   let live: number;
   let limit: number;

@@ -1641,6 +1641,11 @@
       "collapse": "Ciutkan tujuan",
       "expand": "Bentangkan tujuan"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tugas, {{completed}} dari {{total}} selesai",
+      "rowAccessibility": "Tugas, {{completed}} dari {{total}} selesai. Tugas saat ini: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Terakhir digunakan",
       "couldNotLoadGithubRepositories": "Tidak dapat memuat repositori GitHub.",
@@ -1696,6 +1701,10 @@
       "importingSession": "Mengimpor sesi",
       "cliCannotContinue": "CLI ini tidak dapat melanjutkan sesi. Pilih Cloud Agent atau CLI lain.",
       "importFailed": "Tidak dapat mengimpor sesi ini.",
+      "cliCannotFork": "Perbarui Kilo CLI untuk melakukan fork dari pesan.",
+      "forkCutNotSynced": "Pesan ini belum tersimpan. Coba lagi sebentar lagi.",
+      "forkFilesFromBaseBranch": "File dimulai dari branch dasar.",
+      "forkFilesUnchangedOnComputer": "File di komputer ini tidak diubah.",
       "pickProfile": "Pilih profil",
       "noProfile": "Tidak ada profil",
       "manageProfiles": "Kelola profil",
@@ -1815,6 +1824,7 @@
       "copyMessage": "Salin pesan",
       "copyText": "Salin teks",
       "selectText": "Pilih teks",
+      "forkFromHere": "Fork dari sini",
       "reportAiResponse": "Laporkan respons AI",
       "reportAiResponseConfirm": "Laporkan respons ini untuk ditinjau?",
       "report": "Laporkan",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Model ini memerlukan koneksi internet. Sambungkan dan coba lagi, atau beralih ke model di perangkat ini.",
     "empty": {
       "title": "Mulai obrolan",
       "description": "Kirim pesan untuk berbicara dengan model."
@@ -3200,6 +3211,11 @@
       "deleteTitle": "Hapus obrolan ini?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Cari di web",
+      "description": "Izinkan chat ini mencari informasi terkini melalui akun Kilo Anda. Pencarian menggunakan jatah pencarian bulanan Anda.",
+      "allowanceExhausted": "Pencarian web gratis Anda untuk bulan ini sudah habis. Tambahkan kredit untuk mencari lagi."
+    },
     "mcp": {
       "title": "Alat Kilo",
       "use": "Gunakan alat Kilo",
@@ -3222,7 +3238,6 @@
       "fieldName": "Nama tampilan",
       "fieldUrl": "URL server",
       "fieldUrlInvalid": "Masukkan URL server yang valid.",
-      "fieldToken": "Token Bearer (opsional)",
       "enableServer": "Aktifkan server ini: {{name}}",
       "editServer": "Edit server",
       "deleteServer": "Hapus server",
@@ -3242,6 +3257,18 @@
       "serverToolCount": "{{count}} alat",
       "serverUnreachable": "Tidak dapat menjangkau server ini",
       "serverOff": "Server ini nonaktif"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentikasi",
+      "authNone": "Tanpa masuk",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Masuk dengan OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Setelah menyimpan, ketuk $t(modelChat.mcpOAuth.signIn) pada server untuk masuk dengan browser Anda.",
+      "serverNeedsSignIn": "Masuk untuk memakai server ini",
+      "signIn": "Masuk",
+      "signInA11y": "Masuk ke server ini: {{name}}",
+      "signInFailed": "Tidak dapat masuk ke {{name}}. Coba lagi."
     },
     "backends": {
       "title": "Layanan obrolan",
@@ -3325,8 +3352,48 @@
         "notGguf": "Tautan harus mengarah ke file .gguf.",
         "space": "Ruang penyimpanan tidak cukup untuk model ini. Kosongkan ruang dan coba lagi.",
         "network": "Unduhan tidak selesai. Periksa koneksi Anda dan coba lagi.",
-        "invalidFile": "File yang diunduh bukan model yang dapat dijalankan aplikasi ini, sehingga file tersebut dihapus."
+        "invalidFile": "File yang diunduh bukan model yang dapat dijalankan aplikasi ini, sehingga file tersebut dihapus.",
+        "checksum": "File yang diunduh tidak cocok dengan checksum yang dipublikasikan, sehingga file tersebut dihapus. Coba unduh lagi."
       }
+    },
+    "catalog": {
+      "browse": "Jelajahi model",
+      "title": "Katalog model",
+      "search": "Cari model Hugging Face",
+      "tabs": "Filter model",
+      "fitsTab": "Cocok untuk perangkat ini",
+      "fromHuggingFace": "Dari Hugging Face",
+      "loading": "Memuat model",
+      "noResults": "Model tidak ditemukan",
+      "noFits": "Tidak ada model yang cocok untuk perangkat ini",
+      "noFitsDescription": "Model yang lebih besar ada di tab $t(common.all).",
+      "fit": {
+        "fits": "Cocok",
+        "tight": "Hampir tidak muat",
+        "tooLarge": "Terlalu besar",
+        "noStorage": "Penyimpanan tidak cukup"
+      },
+      "parameters": "Parameter: {{value}}",
+      "downloads": "Unduhan: {{value}}",
+      "likes": "Suka: {{value}}",
+      "context": "Jendela konteks: {{value}}",
+      "license": "Lisensi: {{license}}",
+      "licenseUnknown": "Lisensi tidak disebutkan",
+      "tools": "Pemanggilan alat",
+      "vision": "Input gambar",
+      "hintsHelp": "Petunjuk dari Hugging Face. Aplikasi akan memeriksa model setelah diunduh.",
+      "gated": "Model ini memerlukan akun Hugging Face, jadi aplikasi tidak dapat mengunduhnya.",
+      "quantizations": "Kuantisasi",
+      "quantizationsHelp": "File yang lebih kecil menggunakan lebih sedikit memori dan penyimpanan. File yang lebih besar biasanya memberikan jawaban yang lebih baik.",
+      "quantDetail": "Unduhan {{size}} · sekitar {{memory}} memori",
+      "downloadQuant": "Unduh {{quant}}",
+      "loadingModel": "Memuat detail model",
+      "couldNotLoadModel": "Tidak dapat memuat model ini",
+      "noFiles": "Tidak ada file yang dapat dijalankan aplikasi ini",
+      "noFilesDescription": "Aplikasi ini menjalankan model yang berupa satu file GGUF.",
+      "tooLargeTitle": "Model ini mungkin tidak dapat berjalan",
+      "tooLargeMessage": "{{name}} kemungkinan memerlukan lebih banyak memori daripada yang dimiliki perangkat ini. Aplikasi dapat tertutup saat model menjawab. Tetap unduh?",
+      "downloadAnyway": "Tetap unduh"
     },
     "localModels": {
       "title": "Model di perangkat",

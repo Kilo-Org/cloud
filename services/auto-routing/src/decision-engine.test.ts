@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { ClassifierOutput, RoutingTable } from '@kilocode/auto-routing-contracts';
+import type {
+  CandidatePricing,
+  ClassifierOutput,
+  RankedCandidate,
+  RoutingTable,
+} from '@kilocode/auto-routing-contracts';
 import { computeDecision, type DecisionIncumbent } from './decision-engine';
 import type { ModelCapabilities, ModelCapabilitiesMap } from './model-capabilities';
 
@@ -299,6 +304,155 @@ describe('computeDecision', () => {
       // pricey/chat at 0.02 vs fresh 0.002 * 3 = 0.006: switch pays off.
       const decision = computeDecision(classification, table, inc('pricey/chat'));
       expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false, switchReason: 'cost' });
+    });
+    describe('cache-aware switching', () => {
+      const pricing: CandidatePricing = {
+        promptUsdPerToken: 3,
+        completionUsdPerToken: 1,
+        cacheReadUsdPerToken: 1,
+      };
+      const fresh: RankedCandidate = {
+        model: 'fresh/synthetic',
+        accuracy: 0.9,
+        meetsThreshold: true,
+        avgCostUsd: 1,
+        estimatedRequestCostUsd: 2,
+        pricing,
+      };
+      const incumbent: RankedCandidate = {
+        ...fresh,
+        model: 'incumbent/synthetic',
+        avgCostUsd: 4,
+        estimatedRequestCostUsd: 4,
+      };
+      const cacheAwareTable: RoutingTable = {
+        ...table,
+        switchHorizonTurns: 5,
+        routes: { 'implementation/code_generation': [fresh, incumbent] },
+      };
+
+      it.each([
+        { contextTokens: 6, model: incumbent.model, sticky: true, switchReason: null },
+        { contextTokens: 5, model: incumbent.model, sticky: true, switchReason: null },
+        { contextTokens: 4, model: fresh.model, sticky: false, switchReason: 'cost' },
+        { contextTokens: 0, model: fresh.model, sticky: false, switchReason: 'cost' },
+      ])('accounts for cache loss with $contextTokens context tokens', expected => {
+        const decision = computeDecision(
+          classification,
+          cacheAwareTable,
+          inc(incumbent.model),
+          new Set(),
+          'cost_per_accuracy',
+          { contextTokens: expected.contextTokens }
+        );
+        expect(decision).toMatchObject({
+          model: expected.model,
+          sticky: expected.sticky,
+          switchReason: expected.switchReason,
+        });
+      });
+
+      it.each([
+        'horizon',
+        'context',
+        'fresh pricing',
+        'incumbent pricing',
+        'fresh estimate',
+        'incumbent estimate',
+      ])('falls back to the factor rule when missing %s', missing => {
+        for (const avgCostUsd of [3, 4]) {
+          const fallbackTable: RoutingTable = {
+            ...cacheAwareTable,
+            switchHorizonTurns: missing === 'horizon' ? null : 5,
+            routes: {
+              'implementation/code_generation': [
+                {
+                  ...fresh,
+                  pricing: missing === 'fresh pricing' ? null : pricing,
+                  estimatedRequestCostUsd: missing === 'fresh estimate' ? null : 2,
+                },
+                {
+                  ...incumbent,
+                  avgCostUsd,
+                  pricing: missing === 'incumbent pricing' ? null : pricing,
+                  estimatedRequestCostUsd: missing === 'incumbent estimate' ? null : 4,
+                },
+              ],
+            },
+          };
+          const decision = computeDecision(
+            classification,
+            fallbackTable,
+            inc(incumbent.model),
+            new Set(),
+            'cost_per_accuracy',
+            { contextTokens: missing === 'context' ? undefined : 6 }
+          );
+          expect(decision).toMatchObject(
+            avgCostUsd === 3
+              ? { model: incumbent.model, sticky: true, switchReason: null }
+              : { model: fresh.model, sticky: false, switchReason: 'cost' }
+          );
+        }
+      });
+
+      it('uses the incumbent prompt price when its cache-read price is unknown', () => {
+        const noCachePriceTable: RoutingTable = {
+          ...cacheAwareTable,
+          routes: {
+            'implementation/code_generation': [
+              fresh,
+              { ...incumbent, pricing: { ...pricing, cacheReadUsdPerToken: null } },
+            ],
+          },
+        };
+        const decision = computeDecision(
+          classification,
+          noCachePriceTable,
+          inc(incumbent.model),
+          new Set(),
+          'cost_per_accuracy',
+          { contextTokens: 6 }
+        );
+        expect(decision).toMatchObject({ model: fresh.model, sticky: false, switchReason: 'cost' });
+      });
+
+      it('does not change best-accuracy switching when cache-loss data is present', () => {
+        const decision = computeDecision(
+          classification,
+          cacheAwareTable,
+          inc(incumbent.model),
+          new Set(),
+          'best_accuracy',
+          { contextTokens: 0 }
+        );
+        expect(decision).toMatchObject({ model: incumbent.model, sticky: true, switchReason: null });
+      });
+
+      it('forces threshold switches even when cache loss exceeds the expected saving', () => {
+        const belowThresholdTable: RoutingTable = {
+          ...cacheAwareTable,
+          routes: {
+            'implementation/code_generation': [
+              fresh,
+              { ...incumbent, accuracy: 0.5, meetsThreshold: false },
+            ],
+          },
+        };
+        const decision = computeDecision(
+          classification,
+          belowThresholdTable,
+          inc(incumbent.model),
+          new Set(),
+          'cost_per_accuracy',
+          { contextTokens: 6 }
+        );
+        expect(decision).toMatchObject({
+          model: fresh.model,
+          sticky: false,
+          switchReason: 'threshold',
+        });
+      });
     });
     it('does not keep a denied incumbent', () => {
       const decision = computeDecision(

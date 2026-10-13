@@ -3,7 +3,11 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import * as z from 'zod';
-import { BenchmarkModelSummarySchema } from '@kilocode/auto-routing-contracts';
+import {
+  BenchmarkModelSummarySchema,
+  CandidatePricingSchema,
+  ProductionTokenProfileSchema,
+} from '@kilocode/auto-routing-contracts';
 import { rowsToRoutingTable } from '../src/db';
 import { computeEngineIdentity } from '../src/run';
 import { pickClassifierWinner } from '../src/winner';
@@ -46,6 +50,47 @@ const classifierRunSchema = z.object({
   min_accuracy: z.number(),
   classifier_max_p95_latency_ms: z.number().nullable(),
 });
+
+const perTokenPriceSchema = z
+  .union([z.string().trim().min(1), z.number()])
+  .transform(value => Number(value))
+  .pipe(z.number().nonnegative());
+const pricingCatalogSchema = z
+  .object({
+    data: z.array(
+      z.object({
+        id: z.string().min(1),
+        pricing: z.object({
+          prompt: perTokenPriceSchema,
+          completion: perTokenPriceSchema,
+          input_cache_read: perTokenPriceSchema.nullish(),
+        }),
+      })
+    ),
+  })
+  .transform(catalog =>
+    Object.fromEntries(
+      catalog.data.map(model => [
+        model.id,
+        {
+          promptUsdPerToken: model.pricing.prompt,
+          completionUsdPerToken: model.pricing.completion,
+          cacheReadUsdPerToken: model.pricing.input_cache_read ?? null,
+        },
+      ])
+    )
+  );
+const pricingSchema = z.union([
+  pricingCatalogSchema,
+  z.record(z.string(), CandidatePricingSchema),
+]);
+
+async function loadPricing(path: string) {
+  if (path !== 'live') return readJson(path, pricingSchema);
+  const response = await fetch('https://app.kilo.ai/api/openrouter/models');
+  if (!response.ok) throw new Error(`Pricing catalog request failed: HTTP ${response.status}`);
+  return pricingCatalogSchema.parse(await response.json());
+}
 
 async function readJson<T>(path: string, schema: z.ZodType<T>): Promise<T> {
   return schema.parse(JSON.parse(await readFile(path, 'utf8')));
@@ -143,16 +188,19 @@ async function main() {
         prod: { type: 'string' },
         replay: { type: 'string' },
         out: { type: 'string' },
+        pricing: { type: 'string' },
+        'rerank-profile': { type: 'string' },
+        'cost-profile': { type: 'string' },
       },
       allowPositionals: true,
     });
     if (!values.label || !values.out || positionals.length > 0) {
       throw new Error(
-        'Usage: scoreboard build --label <label> [--table live|file.json] [--prod file.json] [--replay file.json] --out file.json'
+        'Usage: scoreboard build --label <label> [--table live|file.json] [--pricing live|file.json] [--cost-profile file.json] [--rerank-profile file.json] [--prod file.json] [--replay file.json] --out file.json'
       );
     }
     const tablePath = values.table ?? 'live';
-    const [source, prod, replay] = await Promise.all([
+    const [source, prod, replay, pricing, rerankProfile, costProfile] = await Promise.all([
       tablePath === 'live'
         ? loadLiveTable()
         : readJson(tablePath, ScoreboardRoutingTableSchema).then(table => ({
@@ -161,9 +209,29 @@ async function main() {
           })),
       values.prod ? readJson(values.prod, ProdMetricsSchema) : null,
       values.replay ? readJson(values.replay, ReplayMetricsSchema) : null,
+      values.pricing ? loadPricing(values.pricing) : null,
+      values['rerank-profile']
+        ? readJson(values['rerank-profile'], ProductionTokenProfileSchema)
+        : null,
+      values['cost-profile'] ? readJson(values['cost-profile'], ProductionTokenProfileSchema) : null,
     ]);
+    if (pricing) {
+      for (const candidates of Object.values(source.table.routes)) {
+        for (const candidate of candidates) {
+          candidate.pricing = pricing[candidate.model] ?? null;
+        }
+      }
+    }
     const scoreboard = ScoreboardSchema.parse(
-      buildScoreboard({ label: values.label, ...source, prod, replay, now: new Date() })
+      buildScoreboard({
+        label: values.label,
+        ...source,
+        prod,
+        replay,
+        rerankProfile,
+        costProfile,
+        now: new Date(),
+      })
     );
     await writeFile(values.out, `${JSON.stringify(scoreboard, null, 2)}\n`);
     return;

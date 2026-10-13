@@ -68,7 +68,7 @@ import {
   warmUpCliContainer,
 } from './cli-runner';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
-import { fetchPlatformRegistryEntries } from './platform-models';
+import { catalogCandidatePrices, fetchBenchmarkModelCatalog, fetchPlatformRegistryEntries, platformRegistryEntries } from './platform-models';
 import { pickClassifierWinner } from './winner';
 
 /** One exact Pool entry identity used throughout a decider/classifier run. */
@@ -361,7 +361,9 @@ export async function publishPlatformRoutingTable(
     engineIdentity: computeEngineIdentity('decider'),
     repetitions: config.deciderRepetitions,
   };
-  const desired = await fetchPlatformRegistryEntries(env, config, fetchImpl);
+  const catalog = await fetchBenchmarkModelCatalog(env, fetchImpl);
+  const desired = platformRegistryEntries(config, catalog);
+  const prices = catalogCandidatePrices(catalog);
   // Reconcile against the live catalog before the settled guard. A new effort
   // must become pending, and a removed effort must stop blocking publication.
   await syncPlatformRegistryRows(env.BENCH_DB, current, desired);
@@ -405,12 +407,18 @@ export async function publishPlatformRoutingTable(
         minAccuracy: config.minAccuracy,
         switchCostFactor: config.switchCostFactor,
         bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
+        productionTokenProfile: config.productionTokenProfile,
+        switchHorizonTurns: config.switchHorizonTurns,
+        prices,
       }
     )}-variants`,
     generatedAt,
     minAccuracy: config.minAccuracy,
     switchCostFactor: config.switchCostFactor,
     bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
+    productionTokenProfile: config.productionTokenProfile,
+    switchHorizonTurns: config.switchHorizonTurns,
+    prices,
     deciderModels,
     summaries: filterSummariesByProvenance(readyEntries, summaries),
   });

@@ -5,6 +5,7 @@ import {
   PoolEntrySchema,
   poolEntryKey,
   RoutingTableSchema,
+  ProductionTokenProfileSchema,
 } from './routing-table';
 import { ReasoningEffortSchema } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
@@ -132,6 +133,8 @@ export const BenchmarkConfigSchema = z
     // cheaper than fresh input tokens), so switching only pays off when the
     // recurring savings clearly outweigh the cache-rebuild penalty.
     switchCostFactor: z.number().min(1).max(100),
+    productionTokenProfile: ProductionTokenProfileSchema.nullable().default(null),
+    switchHorizonTurns: z.number().int().positive().nullable().default(null),
     // Absolute accuracy delta required before best-accuracy mode switches away
     // from a session incumbent that still meets the route threshold.
     bestAccuracySwitchThreshold: z.number().min(0).max(1).default(0.05),

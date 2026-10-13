@@ -1,4 +1,4 @@
-import type { BenchmarkConfig, BenchmarkPlatformModel } from '@kilocode/auto-routing-contracts';
+import type { BenchmarkConfig, BenchmarkPlatformModel, ProductionTokenProfile } from '@kilocode/auto-routing-contracts';
 import {
   getConfigRows,
   replaceConfig,
@@ -23,6 +23,8 @@ export function mapConfigRows(
     min_accuracy: number;
     switch_cost_factor: number;
     best_accuracy_switch_threshold: number;
+    production_token_profile?: ProductionTokenProfile | null;
+    switch_horizon_turns?: number | null;
     max_concurrency: number;
     user_max_concurrency: number;
     benchmark_user_id: string | null;
@@ -66,6 +68,8 @@ export function mapConfigRows(
     minAccuracy: configRow.min_accuracy,
     switchCostFactor: configRow.switch_cost_factor,
     bestAccuracySwitchThreshold: configRow.best_accuracy_switch_threshold,
+    productionTokenProfile: configRow.production_token_profile ?? null,
+    switchHorizonTurns: configRow.switch_horizon_turns ?? null,
     maxConcurrency: configRow.max_concurrency,
     userMaxConcurrency: configRow.user_max_concurrency,
     benchmarkUserId: configRow.benchmark_user_id,
@@ -109,6 +113,8 @@ export async function saveBenchmarkConfig(
       min_accuracy: config.minAccuracy,
       switch_cost_factor: config.switchCostFactor,
       best_accuracy_switch_threshold: config.bestAccuracySwitchThreshold,
+      production_token_profile: config.productionTokenProfile,
+      switch_horizon_turns: config.switchHorizonTurns,
       max_concurrency: config.maxConcurrency,
       user_max_concurrency: config.userMaxConcurrency,
       benchmark_user_id: config.benchmarkUserId,

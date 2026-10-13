@@ -78,13 +78,49 @@ latency comes from each exact model/variant's ready, current-engine/repetition
 registry profile and its measuring-run summary for that route, or is null if absent.
 Production and replay inputs are optional. Without production input, benchmark
 weights are uniform over table routes; otherwise they use the observed route mix.
-Missing routes and null metrics are excluded and the remaining weights normalized.
+Missing routes and null benchmark metrics are excluded and the remaining weights normalized.
 Quality is benchmark accuracy and classifier route accuracy, not a held-out score.
 `benchmarkP50Weighted` is the weighted benchmark model latency, not production TTFT.
 Use `--relative-only` for PR bodies so raw production measurements stay local.
 Unavailable comparisons are `n/a`; rows unavailable on both sides are omitted.
 Axis summaries are `mixed` only when metrics both improve and worsen, and `flat`
 when no comparable metric improves or worsens.
+
+Simulate production-input-aware ranking against the published table without spending
+on benchmarks or publishing a routing change:
+
+```bash
+pnpm --filter auto-routing-benchmark scoreboard build --label baseline --table live --pricing live --cost-profile p.json --out baseline.json
+pnpm --filter auto-routing-benchmark scoreboard build --label candidate --table live --pricing live --cost-profile p.json --rerank-profile p.json --out candidate.json
+pnpm --filter auto-routing-benchmark scoreboard compare baseline.json candidate.json --relative-only
+```
+
+Both profile flags take JSON with `uncachedInputTokens` and `cachedInputTokens`
+(nonnegative token counts). `--rerank-profile` re-ranks each route using the table's
+accuracy threshold and the contracts ranking policy before computing all metrics.
+Without it, the published order is preserved. `--cost-profile` only affects the
+estimated request cost; it takes precedence over the rerank profile, which otherwise
+also supplies the cost estimate. If neither flag is supplied, the estimate uses the
+table's `productionTokenProfile`, or just the benchmark cost when that is absent.
+
+`--pricing live` hydrates candidates by model id from
+`https://app.kilo.ai/api/openrouter/models`. Prompt, completion, and optional
+`input_cache_read` prices are USD **per token**, not per million tokens. A pricing
+file can be a saved catalog response (`{"data":[{"id":"fixture/model","pricing":
+{"prompt":"0.001","completion":"0.002","input_cache_read":"0.0001"}}]}`), or a
+model-id map of `CandidatePricing` objects (`promptUsdPerToken`,
+`completionUsdPerToken`, nullable `cacheReadUsdPerToken`). These example values are
+synthetic. When no pricing flag is supplied, candidate pricing already in the table
+is used. Models absent from a supplied catalog have unavailable pricing.
+
+`cost.estimatedRequestUsdWeighted` weights each first pick's benchmark cost plus
+uncached input at prompt price and cached input at cache-read price (or prompt
+price when cache pricing is absent). It is null if any included first pick lacks
+pricing. Lower estimated cost is better in comparisons. Keep the same profile,
+route mix, table, and pricing snapshot for base and head; use saved table and pricing
+files if the live inputs may change between builds. `benchmarkPerTaskUsdWeighted`
+remains the benchmark-only cost and can move differently from this production-input
+estimate.
 
 ## Admin endpoints
 

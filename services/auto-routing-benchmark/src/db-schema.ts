@@ -11,6 +11,8 @@ import {
 import { BENCHMARK_CONTAINER_BUDGET } from '@kilocode/auto-routing-contracts';
 import type {
   BenchmarkKind,
+  CandidatePricing,
+  ProductionTokenProfile,
   BenchmarkProfileStatus,
   BenchmarkRunPurpose,
   BenchmarkRunStatus,
@@ -24,6 +26,8 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   min_accuracy: real('min_accuracy').notNull(),
   switch_cost_factor: real('switch_cost_factor').notNull(),
   best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
+  production_token_profile: text('production_token_profile', { mode: 'json' }).$type<ProductionTokenProfile>(),
+  switch_horizon_turns: integer('switch_horizon_turns'),
   max_concurrency: integer('max_concurrency').notNull(),
   // Live container budget for user-queue runs, independent of max_concurrency
   // (the platform-queue budget). The two must sum to at most the platform
@@ -187,6 +191,8 @@ export const routingTables = sqliteTable('routing_tables', {
   min_accuracy: real('min_accuracy').notNull(),
   switch_cost_factor: real('switch_cost_factor').notNull(),
   best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
+  production_token_profile: text('production_token_profile', { mode: 'json' }).$type<ProductionTokenProfile>(),
+  switch_horizon_turns: integer('switch_horizon_turns'),
   source: text('source').notNull(),
 });
 
@@ -207,6 +213,8 @@ export const routingTableCandidates = sqliteTable(
     reasoning_effort: text('reasoning_effort'),
     // Exact-pair identity mirror ('' = null). Keeps rows self-describing; no PK change.
     variant: text('variant').notNull().default(''),
+    pricing: text('pricing', { mode: 'json' }).$type<CandidatePricing>(),
+    estimated_request_cost_usd: real('estimated_request_cost_usd'),
   },
   table => [primaryKey({ columns: [table.run_id, table.route_key, table.rank] })]
 );

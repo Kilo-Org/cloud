@@ -6,6 +6,7 @@ import type {
   BenchmarkRunPurpose,
   ClassifierWinner,
   RankedCandidate,
+  ProductionTokenProfile,
   RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
@@ -48,10 +49,7 @@ type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 // below the 100-variable ceiling while still batching the delete plus inserts.
 const MODEL_SUMMARY_INSERT_BATCH_SIZE = 7;
 
-// Routing table candidates bind 9 values per row (including variant). Keep each
-// INSERT comfortably under D1's 100-variable ceiling; publishing is infrequent,
-// so smaller statements are preferable to risking a skipped routing-table update.
-const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 10;
+const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 8;
 
 // Run model rows bind 5 values per row. Keep each INSERT comfortably under D1's
 // 100-variable ceiling; the profile drain claims batches of up to 33 entries,
@@ -154,6 +152,8 @@ export async function replaceConfig(
     min_accuracy: number;
     switch_cost_factor: number;
     best_accuracy_switch_threshold: number;
+    production_token_profile?: ProductionTokenProfile | null;
+    switch_horizon_turns?: number | null;
     max_concurrency: number;
     user_max_concurrency: number;
     benchmark_user_id: string | null;
@@ -1284,6 +1284,8 @@ export function routingTableToRows(
     min_accuracy: table.minAccuracy,
     switch_cost_factor: table.switchCostFactor,
     best_accuracy_switch_threshold: table.bestAccuracySwitchThreshold,
+    production_token_profile: table.productionTokenProfile ?? null,
+    switch_horizon_turns: table.switchHorizonTurns ?? null,
     source: table.source,
   };
 
@@ -1304,6 +1306,8 @@ export function routingTableToRows(
         meets_threshold: c.meetsThreshold,
         reasoning_effort: effortKey,
         variant: variantToStorage(variantKey),
+        pricing: c.pricing ?? null,
+        estimated_request_cost_usd: c.estimatedRequestCostUsd ?? null,
       });
     });
   }
@@ -1329,6 +1333,8 @@ export function rowsToRoutingTable(
       accuracy: row.accuracy,
       avgCostUsd: row.avg_cost_usd,
       meetsThreshold: row.meets_threshold,
+      ...(row.pricing != null || row.estimated_request_cost_usd != null ? { pricing: row.pricing ?? null } : {}),
+      ...(row.estimated_request_cost_usd != null ? { estimatedRequestCostUsd: row.estimated_request_cost_usd } : {}),
       ...(effort !== null
         ? { reasoningEffort: effort }
         : { variant: variantFromStorage(row.variant) }),
@@ -1340,6 +1346,9 @@ export function rowsToRoutingTable(
     minAccuracy: tableRow.min_accuracy,
     switchCostFactor: tableRow.switch_cost_factor,
     bestAccuracySwitchThreshold: tableRow.best_accuracy_switch_threshold,
+    ...(tableRow.production_token_profile != null || sorted.some(row => row.estimated_request_cost_usd != null)
+      ? { productionTokenProfile: tableRow.production_token_profile ?? null, switchHorizonTurns: tableRow.switch_horizon_turns ?? null }
+      : tableRow.switch_horizon_turns != null ? { switchHorizonTurns: tableRow.switch_horizon_turns } : {}),
     source: tableRow.source as RoutingTable['source'],
     routes: routeMap,
   };
@@ -1366,6 +1375,8 @@ export async function saveRoutingTable(
           min_accuracy: tableRow.min_accuracy,
           switch_cost_factor: tableRow.switch_cost_factor,
           best_accuracy_switch_threshold: tableRow.best_accuracy_switch_threshold,
+          production_token_profile: tableRow.production_token_profile,
+          switch_horizon_turns: tableRow.switch_horizon_turns,
           source: tableRow.source,
         },
       }),

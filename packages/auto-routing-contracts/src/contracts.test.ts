@@ -195,6 +195,8 @@ describe('BenchmarkConfigSchema defaults', () => {
     expect(result.deciderRepetitions).toBe(1);
     expect(result.classifierMaxP95LatencyMs).toBe(1000);
     expect(result.bestAccuracySwitchThreshold).toBe(0.05);
+    expect(result.productionTokenProfile).toBeNull();
+    expect(result.switchHorizonTurns).toBeNull();
     expect(result.autoDeciderMinCostUsd).toBe(15);
     expect(result.autoDeciderMaxCostUsd).toBe(25);
   });

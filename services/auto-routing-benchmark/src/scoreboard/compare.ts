@@ -91,6 +91,7 @@ export function compareScoreboards(
     'classifierPerRequestUsd',
     'switchRate',
     'benchmarkPerTaskUsdWeighted',
+    'estimatedRequestUsdWeighted',
   ] as const) {
     add(`cost.${name}`, 'cost', base.cost[name], head.cost[name], name === 'prodCacheReadShare');
   }

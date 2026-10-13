@@ -67,7 +67,8 @@ function prod(routeMix: Record<string, number>): ProdMetrics {
 function build(
   inputTable: ScoreboardRoutingTable,
   metrics: ProdMetrics | null = null,
-  replay: ReplayMetrics | null = null
+  replay: ReplayMetrics | null = null,
+  options: Pick<Parameters<typeof buildScoreboard>[0], 'costProfile' | 'rerankProfile'> = {}
 ) {
   return buildScoreboard({
     label: 'fixture',
@@ -76,6 +77,7 @@ function build(
     prod: metrics,
     replay,
     now,
+    ...options,
   });
 }
 
@@ -120,6 +122,113 @@ describe('buildScoreboard', () => {
     expect(result.cost.benchmarkPerTaskUsdWeighted).toBeCloseTo(0.04);
     expect(result.latency.modelTtftMs.benchmarkP50Weighted).toBe(200);
     expect(result.cost.prodPerRequestUsd).toEqual({ mean: null, p50: null });
+  });
+
+  it('leaves estimated request cost unavailable without candidate pricing', () => {
+    expect(build(table).cost.estimatedRequestUsdWeighted).toBeNull();
+    expect(
+      build(table, null, null, {
+        costProfile: { uncachedInputTokens: 10, cachedInputTokens: 100 },
+      }).cost.estimatedRequestUsdWeighted
+    ).toBeNull();
+  });
+
+  it('weights prompt-aware estimates without changing the published first picks', () => {
+    const pricedTable: ScoreboardRoutingTable = {
+      ...table,
+      routes: {
+        'implementation/code_generation': table.routes['implementation/code_generation'].map(
+          candidate => ({
+            ...candidate,
+            pricing: {
+              promptUsdPerToken: 0.01,
+              completionUsdPerToken: 0.02,
+              cacheReadUsdPerToken: 0.001,
+            },
+          })
+        ),
+        'debugging/bug_fixing': table.routes['debugging/bug_fixing'].map(candidate => ({
+          ...candidate,
+          pricing: {
+            promptUsdPerToken: 0.02,
+            completionUsdPerToken: 0.04,
+            cacheReadUsdPerToken: 0.002,
+          },
+        })),
+      },
+    };
+    const result = build(
+      pricedTable,
+      prod({ 'implementation/code_generation': 0.25, 'debugging/bug_fixing': 0.75 }),
+      null,
+      { costProfile: { uncachedInputTokens: 10, cachedInputTokens: 100 } }
+    );
+    expect(result.cost.estimatedRequestUsdWeighted).toBeCloseTo(0.4);
+    expect(result.cost.benchmarkPerTaskUsdWeighted).toBeCloseTo(0.05);
+    expect(result.latency.modelTtftMs.benchmarkP50Weighted).toBe(250);
+    expect(result.quality.benchmarkAccuracyWeighted).toBeCloseTo(0.65);
+
+    delete pricedTable.routes['debugging/bug_fixing'][0].pricing;
+    expect(
+      build(pricedTable, null, null, {
+        costProfile: { uncachedInputTokens: 10, cachedInputTokens: 100 },
+      }).cost.estimatedRequestUsdWeighted
+    ).toBeNull();
+  });
+
+  it('reranks for cheaper prompts and compares estimates using the same cost profile', () => {
+    const profile = { uncachedInputTokens: 10, cachedInputTokens: 100 };
+    const pricedTable: ScoreboardRoutingTable = {
+      ...table,
+      routes: {
+        'implementation/code_generation': [
+          {
+            model: 'fixture/expensive-prompt',
+            accuracy: 0.8,
+            avgCostUsd: 0.02,
+            p50LatencyMs: 100,
+            meetsThreshold: true,
+            pricing: {
+              promptUsdPerToken: 0.01,
+              completionUsdPerToken: 0.02,
+              cacheReadUsdPerToken: 0.001,
+            },
+          },
+          {
+            model: 'fixture/cheap-prompt',
+            accuracy: 0.8,
+            avgCostUsd: 0.04,
+            p50LatencyMs: 100,
+            meetsThreshold: true,
+            pricing: {
+              promptUsdPerToken: 0.001,
+              completionUsdPerToken: 0.002,
+              cacheReadUsdPerToken: 0.0001,
+            },
+          },
+        ],
+      },
+    };
+    const base = build(pricedTable, null, null, { costProfile: profile });
+    const head = build(pricedTable, null, null, {
+      costProfile: profile,
+      rerankProfile: profile,
+    });
+    expect(base.cost.benchmarkPerTaskUsdWeighted).toBe(0.02);
+    expect(head.cost.benchmarkPerTaskUsdWeighted).toBe(0.04);
+    expect(base.cost.estimatedRequestUsdWeighted).toBeCloseTo(0.22);
+    expect(head.cost.estimatedRequestUsdWeighted).toBeCloseTo(0.06);
+    expect(head.latency.modelTtftMs.benchmarkP50Weighted).toBe(100);
+    expect(head.quality.benchmarkAccuracyWeighted).toBe(0.8);
+    expect(
+      build(pricedTable, null, null, { rerankProfile: profile }).cost.estimatedRequestUsdWeighted
+    ).toBeCloseTo(0.06);
+    expect(compareScoreboards(base, head, { relativeOnly: true })).toContain(
+      '| cost.estimatedRequestUsdWeighted | -72.73% | better |'
+    );
+    expect(pricedTable.routes['implementation/code_generation'][0].model).toBe(
+      'fixture/expensive-prompt'
+    );
   });
 
   it('preserves optional file latency values without altering the published table contract', () => {

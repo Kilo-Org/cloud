@@ -211,6 +211,23 @@ describe('routingTableToRows', () => {
 });
 
 describe('rowsToRoutingTable', () => {
+  it('preserves production-cost metadata through publication storage', () => {
+    const table: RoutingTable = {
+      ...sampleTable,
+      productionTokenProfile: { uncachedInputTokens: 20, cachedInputTokens: 80 },
+      switchHorizonTurns: 4,
+      routes: {
+        'implementation/code_generation': [{
+          ...candidate('synthetic/model'),
+          pricing: { promptUsdPerToken: 0.002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: 0.0001 },
+          estimatedRequestCostUsd: 0.049,
+        }],
+      },
+    };
+    const rows = routingTableToRows(table, '2026-06-01T11:00:00.000Z');
+    expect(rowsToRoutingTable(rows.tableRow, rows.candidateRows)).toEqual(table);
+  });
+
   it('round-trips: rowsToRoutingTable(routingTableToRows(table)) === table', () => {
     const { tableRow, candidateRows } = routingTableToRows(sampleTable, '2026-06-01T11:00:00.000Z');
     const reassembled = rowsToRoutingTable(tableRow, candidateRows);
@@ -263,6 +280,8 @@ describe('rowsToRoutingTable', () => {
       min_accuracy: 0.7,
       switch_cost_factor: 3,
       best_accuracy_switch_threshold: 0.05,
+      production_token_profile: null,
+      switch_horizon_turns: null,
       source: 'benchmark',
     };
     const candidateRows = [
@@ -276,6 +295,8 @@ describe('rowsToRoutingTable', () => {
         meets_threshold: true,
         reasoning_effort: 'high',
         variant: 'high',
+        pricing: null,
+        estimated_request_cost_usd: null,
       },
     ];
     const table = rowsToRoutingTable(tableRow, candidateRows);
@@ -292,6 +313,8 @@ describe('rowsToRoutingTable', () => {
       min_accuracy: 0.7,
       switch_cost_factor: 3,
       best_accuracy_switch_threshold: 0.05,
+      production_token_profile: null,
+      switch_horizon_turns: null,
       source: 'benchmark',
     };
     const candidateRows = [
@@ -305,6 +328,8 @@ describe('rowsToRoutingTable', () => {
         meets_threshold: true,
         reasoning_effort: null,
         variant: 'max',
+        pricing: null,
+        estimated_request_cost_usd: null,
       },
     ];
     const table = rowsToRoutingTable(tableRow, candidateRows);

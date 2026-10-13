@@ -26,6 +26,38 @@ const rankInput = (
 const order = (ranked: { model: string }[]) => ranked.map(c => c.model);
 
 describe('rankCandidates', () => {
+  it('uses production prompt cost only when a profile is configured', () => {
+    const candidates = [
+      {
+        ...rankInput('cheap-output', 1, 0.01),
+        pricing: { promptUsdPerToken: 0.002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: 0.001 },
+      },
+      {
+        ...rankInput('cheap-prompt', 1, 0.02),
+        pricing: { promptUsdPerToken: 0.0002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: 0.0001 },
+      },
+    ];
+    expect(order(rankCandidates(candidates, 0.9, { profile: null }))).toEqual(['cheap-output', 'cheap-prompt']);
+    const ranked = rankCandidates(candidates, 0.9, {
+      profile: { uncachedInputTokens: 20, cachedInputTokens: 80 },
+    });
+    expect(order(ranked)).toEqual(['cheap-prompt', 'cheap-output']);
+    expect(ranked[0].estimatedRequestCostUsd).toBeCloseTo(0.032);
+  });
+
+  it('falls back to observed cost without pricing and prompt price without cache pricing', () => {
+    const ranked = rankCandidates([
+      rankInput('unpriced', 1, 0.01),
+      {
+        ...rankInput('priced', 1, 0.001),
+        pricing: { promptUsdPerToken: 0.002, completionUsdPerToken: 0.003, cacheReadUsdPerToken: null },
+      },
+    ], 0.9, { profile: { uncachedInputTokens: 20, cachedInputTokens: 80 } });
+    expect(order(ranked)).toEqual(['unpriced', 'priced']);
+    expect(ranked[0].estimatedRequestCostUsd).toBe(0.01);
+    expect(ranked[1].estimatedRequestCostUsd).toBeCloseTo(0.201);
+  });
+
   it('puts the best-value competing candidate first and the rest by accuracy', () => {
     const ranked = rankCandidates(
       [

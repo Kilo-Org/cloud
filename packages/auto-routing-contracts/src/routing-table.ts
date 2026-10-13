@@ -52,6 +52,32 @@ export const EfficientModelPoolSchema = z
   });
 export type EfficientModelPool = z.infer<typeof EfficientModelPoolSchema>;
 
+export const CandidatePricingSchema = z.object({
+  promptUsdPerToken: z.number().nonnegative(),
+  completionUsdPerToken: z.number().nonnegative(),
+  cacheReadUsdPerToken: z.number().nonnegative().nullable(),
+});
+export type CandidatePricing = z.infer<typeof CandidatePricingSchema>;
+
+export const ProductionTokenProfileSchema = z.object({
+  uncachedInputTokens: z.number().nonnegative(),
+  cachedInputTokens: z.number().nonnegative(),
+});
+export type ProductionTokenProfile = z.infer<typeof ProductionTokenProfileSchema>;
+
+export function estimateRequestCostUsd(
+  candidate: { avgCostUsd: number; pricing?: CandidatePricing | null },
+  profile: ProductionTokenProfile | null
+): number {
+  if (profile === null || candidate.pricing == null) return candidate.avgCostUsd;
+  return (
+    candidate.avgCostUsd +
+    profile.uncachedInputTokens * candidate.pricing.promptUsdPerToken +
+    profile.cachedInputTokens *
+      (candidate.pricing.cacheReadUsdPerToken ?? candidate.pricing.promptUsdPerToken)
+  );
+}
+
 /**
  * Reader precedence for candidate variant identity: prefer `variant`; when
  * absent, a valid legacy `reasoningEffort` string may be interpreted as the
@@ -66,6 +92,8 @@ export const RankedCandidateSchema = z
     // Average observed OpenRouter cost per benchmark case, in USD credits.
     avgCostUsd: z.number().nonnegative(),
     meetsThreshold: z.boolean(),
+    pricing: CandidatePricingSchema.nullable().optional(),
+    estimatedRequestCostUsd: z.number().nonnegative().nullable().optional(),
     // Canonical catalog variant key the model was benchmarked with.
     // Optional so tables published before this field existed stay valid.
     variant: z.string().trim().min(1).nullable().optional(),
@@ -95,6 +123,8 @@ const routingTableFields = {
   // In best-accuracy mode, keep a threshold-meeting incumbent unless the
   // fresh pick improves accuracy by more than this absolute delta.
   bestAccuracySwitchThreshold: z.number().min(0).max(1).default(0.05),
+  productionTokenProfile: ProductionTokenProfileSchema.nullable().optional(),
+  switchHorizonTurns: z.number().int().positive().nullable().optional(),
   source: z.enum(['benchmark']),
 } as const;
 
@@ -146,7 +176,7 @@ const LATENCY_WEIGHT = 1.5;
 const ACCURACY_WEIGHT = 15;
 // Part of every registry table version: a policy change must republish tables
 // built from unchanged measurements.
-export const RANKING_POLICY_VERSION = 'value-latency-v1';
+export const RANKING_POLICY_VERSION = 'value-latency-prodcost-v2';
 
 type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
   meetsThreshold?: boolean;
@@ -165,15 +195,19 @@ function rankValue(c: { avgCostUsd: number; accuracy: number; p50LatencyMs: numb
 // flag that sticky routing reads.
 export function rankCandidates(
   candidates: ReadonlyArray<RankInput>,
-  minAccuracy: number
+  minAccuracy: number,
+  options?: { profile?: ProductionTokenProfile | null }
 ): RankedCandidate[] {
   const floor = minAccuracy - ACCURACY_NOISE_BAND;
   return candidates
-    .map(({ p50LatencyMs, ...c }) => ({
-      candidate: { ...c, meetsThreshold: c.accuracy >= minAccuracy },
-      competes: c.accuracy > 0 && c.accuracy >= floor,
-      value: rankValue({ ...c, p50LatencyMs }),
-    }))
+    .map(({ p50LatencyMs, ...c }) => {
+      const estimatedRequestCostUsd = estimateRequestCostUsd(c, options?.profile ?? null);
+      return {
+        candidate: { ...c, estimatedRequestCostUsd, meetsThreshold: c.accuracy >= minAccuracy },
+        competes: c.accuracy > 0 && c.accuracy >= floor,
+        value: rankValue({ avgCostUsd: estimatedRequestCostUsd, accuracy: c.accuracy, p50LatencyMs }),
+      };
+    })
     .toSorted((a, b) => {
       if (a.competes !== b.competes) return a.competes ? -1 : 1;
       if (a.competes && a.value !== b.value) return a.value < b.value ? -1 : 1;

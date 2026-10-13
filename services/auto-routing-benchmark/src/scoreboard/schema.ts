@@ -77,6 +77,7 @@ export const ScoreboardSchema = z.object({
     classifierPerRequestUsd: nullableMetric,
     switchRate: nullableRate,
     benchmarkPerTaskUsdWeighted: nullableMetric,
+    estimatedRequestUsdWeighted: nullableMetric,
   }),
   quality: z.object({
     benchmarkAccuracyWeighted: nullableRate,

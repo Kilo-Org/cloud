@@ -113,9 +113,6 @@ import type { PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import type { WorkspaceTabId } from './workspace-tabs';
 import type { TerminalStatus } from './useCloudAgentTerminal';
 
-// ---------------------------------------------------------------------------
-// CloudChatPage
-// ---------------------------------------------------------------------------
 const emptyQuestionRequestIds = new Map<string, string>();
 
 /** Older pages the resume fetches while looking for a not-yet-loaded anchor. */
@@ -242,7 +239,6 @@ export default function CloudChatPage({
     setChangesViewSessionId(null);
   }, []);
 
-  // URL-driven session switching
   const sessionIdFromParams = searchParams?.get('sessionId') ?? null;
   const anchorMessageIdFromParams = searchParams?.get('at') ?? null;
   const [lastStartedSessionId, setLastStartedSessionId] = useState<string | null>(null);
@@ -261,7 +257,6 @@ export default function CloudChatPage({
     }
   }, [sessionIdFromParams, manager, closeChangesView]);
 
-  // -- Manager atoms --------------------------------------------------------
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const isLoading = useAtomValue(manager.atoms.isLoading);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
@@ -511,7 +506,6 @@ export default function CloudChatPage({
     if (target?.isConnected) target.focus({ preventScroll: true });
   }, [changesViewOpen]);
 
-  // -- Session models -------------------------------------------------------
   const sessionModels = useSessionModels({
     activeSessionType,
     remoteModelState,
@@ -545,7 +539,6 @@ export default function CloudChatPage({
   );
   const { availableCommands } = useSlashCommandSets();
 
-  // -- Sound effects --------------------------------------------------------
   const { play: playCelebrationSound, soundEnabled, setSoundEnabled } = useCelebrationSound();
 
   const prevActivityRef = useRef<string | null>(null);
@@ -557,7 +550,6 @@ export default function CloudChatPage({
     prevActivityRef.current = activity.type;
   }, [activity.type, playCelebrationSound, queryClient, trpc]);
 
-  // -- Scroll ---------------------------------------------------------------
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesContentRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -780,7 +772,6 @@ export default function CloudChatPage({
     scheduleScrollToBottom();
   }, [scheduleScrollToBottom, setChatUI]);
 
-  // -- Handlers -------------------------------------------------------------
   const worktreeChatSourceSessionId = sessionIdFromParams
     ? activeSessionType === 'cloud-agent' &&
       fetchedSessionData?.worktreeId &&
@@ -1420,7 +1411,6 @@ export default function CloudChatPage({
     return () => clearTimeout(timer);
   }, [isLoading]);
 
-  // -- Derived state --------------------------------------------------------
   const showChatInterface =
     Boolean(selectedWorktreeId) || Boolean(sessionConfig) || Boolean(sessionIdFromParams);
   const currentModelOption = modelOptions.find(model =>
@@ -1451,7 +1441,6 @@ export default function CloudChatPage({
     return byMessageId;
   }, [preparationAttempts]);
 
-  // -- Resume position (`?at=`) ---------------------------------------------
   // One shot per (session, anchor): land the anchor message at the top of the
   // transcript, loading older pages while it still sits before the loaded
   // window. A real user scroll or a send ends the attempt, and so does an
@@ -1646,7 +1635,6 @@ export default function CloudChatPage({
     />
   );
 
-  // -- Render ---------------------------------------------------------------
   return (
     <QuestionContextProvider
       questionRequestIds={emptyQuestionRequestIds}

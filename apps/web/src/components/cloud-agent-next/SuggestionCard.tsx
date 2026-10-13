@@ -6,9 +6,7 @@ import { Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { SuggestionAction } from '@kilocode/cloud-agent-sdk';
 
-// ---------------------------------------------------------------------------
 // SuggestionContext — mirrors PermissionContext pattern
-// ---------------------------------------------------------------------------
 
 type SuggestionContextValue = {
   /** When set, SuggestionCard routes through the session manager. */
@@ -37,10 +35,6 @@ export function SuggestionContextProvider({
   );
   return <SuggestionContext.Provider value={value}>{children}</SuggestionContext.Provider>;
 }
-
-// ---------------------------------------------------------------------------
-// SuggestionCard
-// ---------------------------------------------------------------------------
 
 type SuggestionCardProps = {
   requestId: string;
@@ -99,7 +93,6 @@ export function SuggestionCard({ requestId, text, actions }: SuggestionCardProps
 
   return (
     <div className="bg-muted/30 w-full rounded-md border border-l-4 border-blue-500/40">
-      {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2">
         <Sparkles className="h-4 w-4 shrink-0 text-blue-500" />
         <span className="text-sm font-medium">Suggestion</span>
@@ -110,7 +103,6 @@ export function SuggestionCard({ requestId, text, actions }: SuggestionCardProps
 
         {error && <div className="text-xs text-red-500">{error}</div>}
 
-        {/* Action buttons — one per suggested action, plus a Dismiss */}
         <div className="flex flex-wrap items-center gap-2">
           {actions.map((action, index) => {
             const isPending = pending?.kind === 'accept' && pending.index === index;

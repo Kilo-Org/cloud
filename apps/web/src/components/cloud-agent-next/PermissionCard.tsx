@@ -6,9 +6,7 @@ import { Shield, Loader2 } from 'lucide-react';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 
-// ---------------------------------------------------------------------------
 // PermissionContext — mirrors QuestionContext pattern
-// ---------------------------------------------------------------------------
 
 type PermissionContextValue = {
   cloudAgentSessionId: string | null;
@@ -45,10 +43,6 @@ export function PermissionContextProvider({
   );
   return <PermissionContext.Provider value={value}>{children}</PermissionContext.Provider>;
 }
-
-// ---------------------------------------------------------------------------
-// PermissionCard
-// ---------------------------------------------------------------------------
 
 type PermissionCardProps = {
   requestId: string;
@@ -111,12 +105,10 @@ export function PermissionCard({
 
   const isAlreadyAllowed = always.includes(permission);
 
-  // Extract command from metadata if present
   const command = typeof metadata.command === 'string' ? metadata.command : null;
 
   return (
     <div className="bg-muted/30 w-full max-w-lg rounded-md border border-l-4 border-amber-500/40">
-      {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2">
         <Shield className="h-4 w-4 shrink-0 text-amber-500" />
         <span className="text-sm font-medium capitalize">{permission}</span>
@@ -124,7 +116,6 @@ export function PermissionCard({
       </div>
 
       <div className="border-muted space-y-3 border-t px-3 py-2">
-        {/* File patterns */}
         {patterns.length > 0 && (
           <div>
             <div className="text-muted-foreground mb-1 text-xs font-medium">Patterns</div>
@@ -138,7 +129,6 @@ export function PermissionCard({
           </div>
         )}
 
-        {/* Command (from metadata) */}
         {command && (
           <div>
             <div className="text-muted-foreground mb-1 text-xs font-medium">Command</div>
@@ -148,17 +138,14 @@ export function PermissionCard({
           </div>
         )}
 
-        {/* Already allowed hint */}
         {isAlreadyAllowed && (
           <div className="text-muted-foreground text-xs italic">
             &quot;{permission}&quot; is already in the always-allow list.
           </div>
         )}
 
-        {/* Error */}
         {error && <div className="text-xs text-red-500">{error}</div>}
 
-        {/* Action buttons */}
         <div className="flex items-center gap-2">
           <Button
             size="sm"

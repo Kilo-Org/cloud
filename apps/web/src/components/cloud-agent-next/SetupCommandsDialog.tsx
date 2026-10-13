@@ -39,7 +39,6 @@ export function SetupCommandsDialog({ value, onChange }: SetupCommandsDialogProp
   const handleOpen = (isOpen: boolean) => {
     setOpen(isOpen);
     if (isOpen) {
-      // Reset to current value when opening
       setJsonText(JSON.stringify(value, null, 2));
       setError(null);
     }
@@ -49,13 +48,11 @@ export function SetupCommandsDialog({ value, onChange }: SetupCommandsDialogProp
     try {
       const parsed = JSON.parse(jsonText);
 
-      // Validate it's an array
       if (!Array.isArray(parsed)) {
         setError('Must be a valid JSON array');
         return;
       }
 
-      // Validate count
       if (parsed.length > MAX_COMMANDS) {
         setError(`Maximum ${MAX_COMMANDS} commands allowed`);
         return;

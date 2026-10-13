@@ -126,12 +126,8 @@ export type EventProcessor = {
 export function createEventProcessor(config: EventProcessorConfig = {}): EventProcessor {
   const callbacks = config.callbacks ?? {};
 
-  // State - unified storage with composite keys
-  // messagesMap: "sessionId:messageId" -> message
   const messagesMap = new Map<string, ProcessedMessage>();
-  // pendingParts: "sessionId:messageId" -> pending part entries
   const pendingParts = new Map<string, PendingPartEntry[]>();
-  // sessionParents: sessionId -> parentId (null for root session)
   const sessionParents = new Map<string, string | null>();
   // completedMessages: tracks messages that have already fired onMessageCompleted
   // so completion stays idempotent across repeated idle/complete-style signals.
@@ -286,7 +282,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     const message = messagesMap.get(key);
 
     if (!message) {
-      // Queue for later - message hasn't arrived yet
       const queue = pendingParts.get(key) ?? [];
       queue.push({ part });
       pendingParts.set(key, queue);
@@ -329,7 +324,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
       callbacks.onSessionStatusChanged?.(status);
     }
 
-    // Update streaming state based on status
     if (status.type === 'idle') {
       // Complete user messages when session becomes idle (for both root and child).
       // Streaming is NOT stopped here — the wrapper's `complete` event is the
@@ -352,7 +346,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
   function handleSessionCreated(data: EventSessionCreated['properties']): void {
     const { info } = data;
 
-    // Track parent relationship (null for root sessions)
     sessionParents.set(info.id, info.parentID ?? null);
 
     callbacks.onSessionCreated?.(info);
@@ -606,7 +599,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
       data = data.properties;
     }
 
-    // Skip unknown event types
     if (!isHandledEventType(streamEventType)) {
       return;
     }

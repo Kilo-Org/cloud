@@ -191,9 +191,6 @@ export function NewSessionPanel({
     trpc.organizations.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
 
-  // ---------------------------------------------------------------------------
-  // Eligibility
-  // ---------------------------------------------------------------------------
   const personalEligibilityQuery = useQuery({
     ...trpc.cloudAgentNext.checkEligibility.queryOptions(),
     enabled: !organizationId,
@@ -212,9 +209,6 @@ export function NewSessionPanel({
     !isEligibilityLoading && eligibilityData && !eligibilityData.isEligible;
   const hasLimitedAccess = !isEligibilityLoading && eligibilityData?.accessLevel === 'limited';
 
-  // ---------------------------------------------------------------------------
-  // Models
-  // ---------------------------------------------------------------------------
   const { data: modelsData } = useModelSelectorList(organizationId);
   const { lastSelected: serverLastSelected, setLastSelected: persistServerLastSelected } =
     useModelPreferences(organizationId);
@@ -235,9 +229,6 @@ export function NewSessionPanel({
     return options.filter(option => option.isFree || option.hasUserByokAvailable);
   }, [allModels, hasLimitedAccess]);
 
-  // ---------------------------------------------------------------------------
-  // Form state
-  // ---------------------------------------------------------------------------
   const [prompt, setPrompt] = useState('');
   const [selectedRepo, setSelectedRepo] = useState('');
   const [selectedGitHubIntegrationId, setSelectedGitHubIntegrationId] = useState<
@@ -257,9 +248,6 @@ export function NewSessionPanel({
   const profileBindingPlatform: Exclude<RepositoryPlatform, 'bitbucket'> | undefined =
     selectedPlatform === 'bitbucket' ? undefined : selectedPlatform;
 
-  // ---------------------------------------------------------------------------
-  // GitHub identity awareness
-  // ---------------------------------------------------------------------------
   const {
     data: githubUserAuthorization,
     isLoading: isGitHubUserAuthorizationLoading,
@@ -283,9 +271,6 @@ export function NewSessionPanel({
   const isAttachmentLimitReached =
     attachmentUpload.attachments.length >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT;
 
-  // ---------------------------------------------------------------------------
-  // Session form atoms (profile override)
-  // ---------------------------------------------------------------------------
   const [selectedProfileId, setSelectedProfileId] = useAtom(selectedProfileIdAtom);
   const resetSessionForm = useSetAtom(resetSessionFormAtom);
 
@@ -344,9 +329,7 @@ export function NewSessionPanel({
     ? `Default · ${formatSandboxDestination(sandboxCapabilities.defaultDestination)}`
     : 'Default';
 
-  // ---------------------------------------------------------------------------
   // Sandbox destination auto-selection
-  // ---------------------------------------------------------------------------
   // Each owner restores its own saved allocation. Clear the previous owner's
   // guard here so auto-selection cannot skip restoration when returning to an
   // owner whose capabilities were previously unavailable.
@@ -368,9 +351,6 @@ export function NewSessionPanel({
     if (allocation) setSandboxSelection({ organizationId, allocation });
   }, [sandboxCapabilities, organizationId]);
 
-  // ---------------------------------------------------------------------------
-  // Model auto-selection
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (modelOptions.length === 0) {
       if (model) {
@@ -447,10 +427,8 @@ export function NewSessionPanel({
     [model, organizationId, persistServerLastSelected]
   );
 
-  // ---------------------------------------------------------------------------
   // Profiles — used for the selector and to clear a stale selection when a
   // selected profile is deleted elsewhere.
-  // ---------------------------------------------------------------------------
   const { data: combinedProfilesData } = useCombinedProfiles({
     organizationId: organizationId ?? '',
     enabled: !!organizationId,
@@ -525,9 +503,6 @@ export function NewSessionPanel({
   const displayVariant = hasAgentModelOverride ? agentVariantOverride : variant;
   const displayVariants = hasAgentModelOverride ? [] : availableVariants;
 
-  // ---------------------------------------------------------------------------
-  // Repositories (GitHub + GitLab + Bitbucket)
-  // ---------------------------------------------------------------------------
   const {
     data: githubRepoData,
     isLoading: isLoadingGitHubRepos,
@@ -665,10 +640,8 @@ export function NewSessionPanel({
     [organizationId]
   );
 
-  // ---------------------------------------------------------------------------
   // Auto-select repo from saved preference, recent session, or the only
   // available repository, in that priority order.
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (selectedRepo || isRepoUserSelected || unifiedRepositories.length === 0) return;
 
@@ -709,9 +682,7 @@ export function NewSessionPanel({
     bitbucketRepoError,
   ]);
 
-  // ---------------------------------------------------------------------------
   // Auto-select repo from pasted GitHub/GitLab URLs
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (isRepoUserSelected) return;
 
@@ -954,9 +925,6 @@ export function NewSessionPanel({
     refreshBitbucketRepositories,
   ]);
 
-  // ---------------------------------------------------------------------------
-  // Integration missing check
-  // ---------------------------------------------------------------------------
   const githubIntegrationMissing =
     !isLoadingGitHubRepos && githubRepoData?.integrationInstalled === false;
   const gitlabIntegrationMissing =
@@ -970,9 +938,7 @@ export function NewSessionPanel({
     ? `/organizations/${organizationId}/integrations/bitbucket`
     : null;
 
-  // ---------------------------------------------------------------------------
   // Repo popover state (must be declared before early returns to satisfy Rules of Hooks)
-  // ---------------------------------------------------------------------------
   const [repoPopoverOpen, setRepoPopoverOpen] = useState(false);
 
   const repositoryKey = (repo: RepositoryOption) =>
@@ -1009,9 +975,6 @@ export function NewSessionPanel({
     [handleRepoSelect]
   );
 
-  // ---------------------------------------------------------------------------
-  // Slash commands
-  // ---------------------------------------------------------------------------
   const slashCommands = useMemo<SlashCommand[]>(() => {
     const defaults = commandsOrDefault(undefined).map(cmd => ({
       trigger: cmd.name,
@@ -1060,9 +1023,6 @@ export function NewSessionPanel({
     listRef: commandListRef,
   });
 
-  // ---------------------------------------------------------------------------
-  // Submit
-  // ---------------------------------------------------------------------------
   const isPromptTooLong = prompt.length > CLOUD_AGENT_PROMPT_MAX_LENGTH;
 
   const selectedModelOption = modelOptions.find(m => m.id === model);
@@ -1302,9 +1262,6 @@ export function NewSessionPanel({
     trpcClient,
   ]);
 
-  // ---------------------------------------------------------------------------
-  // Textarea auto-resize
-  // ---------------------------------------------------------------------------
   const resizeTextarea = useCallback(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -1366,9 +1323,6 @@ export function NewSessionPanel({
     setIsGitHubIdentityHintDismissed(true);
   }, []);
 
-  // ---------------------------------------------------------------------------
-  // Integration missing view
-  // ---------------------------------------------------------------------------
   if (isIntegrationMissing) {
     return (
       <div className="relative flex h-full flex-col items-center justify-start overflow-y-auto px-4 py-8">
@@ -1388,9 +1342,6 @@ export function NewSessionPanel({
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
   return (
     <div className="relative flex h-full flex-col items-center px-4 pt-16">
       <SetPageTitle title="Cloud Agent">
@@ -2019,9 +1970,6 @@ function ContextualTip({ body, linkLabel, href, onDismiss }: ContextualTipProps)
   );
 }
 
-// ---------------------------------------------------------------------------
-// Internal sub-component for repo items in the Command list
-// ---------------------------------------------------------------------------
 function RepoCommandItem({
   repo,
   isSelected,

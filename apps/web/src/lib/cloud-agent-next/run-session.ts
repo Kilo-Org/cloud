@@ -17,19 +17,11 @@ import type { PrepareSessionInput } from './cloud-agent-client';
  * designed for headless consumers like the Slack bot and security agent.
  */
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 const CLOUD_AGENT_NEXT_WS_URL = getEnvVariable('NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL');
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL');
 
-const DEFAULT_STREAM_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+const DEFAULT_STREAM_TIMEOUT_MS = 15 * 60 * 1000;
 const COMPLETE_GRACE_MS = 1000; // Wait 1s after 'complete' for final events
-
-// ---------------------------------------------------------------------------
-// URL resolution
-// ---------------------------------------------------------------------------
 
 /**
  * Resolve a (possibly relative) stream URL returned by initiateFromPreparedSession
@@ -57,16 +49,11 @@ export function resolveStreamUrl(streamUrl: string): string {
     url = new URL(streamUrl, baseUrl);
   }
 
-  // Upgrade HTTP(S) to WS(S)
   if (url.protocol === 'http:') url.protocol = 'ws:';
   else if (url.protocol === 'https:') url.protocol = 'wss:';
 
   return url.toString();
 }
-
-// ---------------------------------------------------------------------------
-// Text extraction
-// ---------------------------------------------------------------------------
 
 type MessagePart = ProcessedMessage['parts'][number];
 type TextMessagePart = Extract<MessagePart, { type: 'text' }>;
@@ -85,10 +72,6 @@ export function extractTextFromMessage(message: ProcessedMessage): string {
     .join('')
     .trim();
 }
-
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
 
 /** Input for runSessionToCompletion */
 export type RunSessionInput = {
@@ -124,20 +107,9 @@ export type RunSessionResult = {
   statusMessages: string[];
 };
 
-// ---------------------------------------------------------------------------
-// Main entry point
-// ---------------------------------------------------------------------------
-
 /**
  * Run a cloud-agent-next session to completion, returning the final text result.
  *
- * Steps:
- *   1. prepareSession        → cloudAgentSessionId + kiloSessionId
- *   2. initiateFromPrepared  → streamUrl
- *   3. resolveStreamUrl      → absolute wss:// URL
- *   4. signStreamTicket      → short-lived JWT for WebSocket auth
- *   5. EventProcessor + WebSocketManager  → stream events until idle/complete/error
- *   6. Return aggregated text result
  */
 export async function runSessionToCompletion(input: RunSessionInput): Promise<RunSessionResult> {
   const {
@@ -157,7 +129,6 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   let errorMessage: string | undefined;
   let hasSeenBusy = false;
 
-  // 1. Prepare
   try {
     const prepared = await client.prepareSession(prepareInput);
     sessionId = prepared.cloudAgentSessionId;
@@ -179,7 +150,6 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
     return { response: msg, sessionId, hasError: true, statusMessages };
   }
 
-  // 2. Initiate
   let streamUrl: string;
   try {
     const initiated = await client.initiateFromPreparedSession({
@@ -204,7 +174,6 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
     console.error(`${logPrefix} onSessionReady callback error:`, error);
   }
 
-  // 3. Resolve URL
   let wsUrl: string;
   try {
     wsUrl = resolveStreamUrl(streamUrl);
@@ -219,7 +188,6 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
     };
   }
 
-  // 4. Sign ticket
   const ticketFields: StreamTicketPayload = {
     userId: ticketPayload.userId,
     kiloSessionId,
@@ -228,7 +196,6 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   };
   const { ticket } = signStreamTicket(ticketFields);
 
-  // 5. Wire up EventProcessor + WebSocketManager
   let resolveStream: (() => void) | undefined;
   let completeGraceTimeoutId: ReturnType<typeof setTimeout> | undefined;
   let streamCompleted = false;
@@ -358,7 +325,6 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
     },
   });
 
-  // 6. Stream
   console.log(`${logPrefix} Connecting to stream for session ${sessionId}...`);
   wsManager.connect();
 
@@ -375,7 +341,6 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
     `${logPrefix} Stream completed. statusMessages=${statusMessages.length}, hasResult=${!!completionResult}`
   );
 
-  // 7. Build result
   if (hasError) {
     const details = [errorMessage, ...statusMessages].filter(Boolean).join('\n');
     return {

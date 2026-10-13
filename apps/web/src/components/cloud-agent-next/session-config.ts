@@ -6,7 +6,6 @@
 
 import type { SessionConfig, ResumeConfig, AgentMode } from './types';
 
-// Re-export AgentMode for backwards compatibility
 export type { AgentMode };
 
 type ResumeConfigInput = {
@@ -211,7 +210,6 @@ export function getModeModelWithSource(options: {
   let modeSource = 'default';
   let modelSource = 'default';
 
-  // Check dbSession first (lower priority)
   if (dbSession?.last_mode) {
     mode = dbSession.last_mode;
     modeSource = 'dbSession';
@@ -221,7 +219,6 @@ export function getModeModelWithSource(options: {
     modelSource = 'dbSession';
   }
 
-  // Then resumeConfig (higher priority - overwrites)
   if (resumeConfig?.mode) {
     mode = resumeConfig.mode;
     modeSource = 'resumeConfig';

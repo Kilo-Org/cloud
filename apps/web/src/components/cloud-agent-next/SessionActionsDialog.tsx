@@ -84,7 +84,6 @@ export function SessionActionsDialog({
 
   const handleClose = () => {
     onOpenChange(false);
-    // Reset state after dialog closes
     setTimeout(() => {
       setShareUrl(null);
       setIsCopied(false);

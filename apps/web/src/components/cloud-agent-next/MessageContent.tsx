@@ -62,7 +62,6 @@ export function MessageContent({
     return <CommandOutputMessage content={content} />;
   }
 
-  // Default: regular text message
   return <TextMessage content={content} isStreaming={isStreaming} />;
 }
 
@@ -84,7 +83,6 @@ function ApiRequestMessage({
       metadata.streamingFailedMessage !== undefined ||
       metadata.cancelReason !== undefined);
 
-  // Still in progress (partial, no metadata, or metadata without completion info)
   if (partial || !hasCompletionMetadata) {
     return (
       <div className="text-muted-foreground flex items-center gap-2 text-sm">

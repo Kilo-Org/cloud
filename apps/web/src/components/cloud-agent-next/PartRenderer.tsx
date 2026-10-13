@@ -46,10 +46,6 @@ import {
   isPartStreaming,
 } from './types';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export type PartRendererProps = {
   part: Part;
   isStreaming?: boolean;
@@ -59,10 +55,6 @@ export type PartRendererProps = {
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
 };
-
-// ============================================================================
-// Shared Components
-// ============================================================================
 
 function LinkRenderer({ href, children }: { href?: string; children?: ReactNode }) {
   const safeHref = toSafeHttpUrl(href);
@@ -79,13 +71,6 @@ function LinkRenderer({ href, children }: { href?: string; children?: ReactNode 
 const markdownComponents = { a: LinkRenderer };
 const remarkPlugins = [remarkGfm];
 
-// ============================================================================
-// Part Renderers
-// ============================================================================
-
-/**
- * Renders a TextPart as markdown
- */
 const TextPartRenderer = memo(function TextPartRenderer({
   text,
   isStreaming,
@@ -119,7 +104,6 @@ function hasRequiredInput(part: Extract<Part, { type: 'tool' }>): boolean {
   const input = part.state.input;
   if (!input || typeof input !== 'object') return false;
 
-  // Check required fields based on tool type
   switch (part.tool) {
     case 'read':
     case 'edit':
@@ -164,9 +148,6 @@ function hasRequiredInput(part: Extract<Part, { type: 'tool' }>): boolean {
   }
 }
 
-/**
- * Renders a placeholder while tool input is still streaming.
- */
 function StreamingToolPlaceholder({ toolName }: { toolName: string }) {
   return (
     <div className="text-muted-foreground flex min-h-6 items-center gap-2 px-2 py-1 text-xs">
@@ -268,9 +249,6 @@ function ToolPartRenderer({
 }
 
 /**
- * Renders a FilePart
- * For images, renders an img tag
- * For other files, renders a download link
  * Handles stripped file parts (where url is empty) gracefully
  */
 function FilePartRenderer({ part }: { part: Extract<Part, { type: 'file' }> }) {
@@ -303,7 +281,6 @@ function FilePartRenderer({ part }: { part: Extract<Part, { type: 'file' }> }) {
     );
   }
 
-  // Non-image file attachment
   return (
     <div className="bg-muted/30 border-muted my-2 flex items-center gap-2 rounded-md border px-3 py-2">
       <span className="text-sm">{part.filename || 'File attachment'}</span>
@@ -412,13 +389,6 @@ function UnknownPartRenderer({ part }: { part: Part }) {
   );
 }
 
-// ============================================================================
-// Main Component
-// ============================================================================
-
-/**
- * Error fallback for individual parts
- */
 function PartErrorFallback({ partType }: { partType: string }) {
   return (
     <div className="bg-destructive/10 border-destructive/50 text-destructive my-2 rounded-md border p-2">
@@ -435,7 +405,6 @@ export const PartRenderer = memo(
     getChildMessages,
     onOpenChildSession,
   }: PartRendererProps) {
-    // Text parts -> render markdown
     if (isTextPart(part)) {
       return (
         <MessageErrorBoundary fallback={<PartErrorFallback partType="text" />}>
@@ -460,7 +429,6 @@ export const PartRenderer = memo(
       );
     }
 
-    // File parts -> render file/image attachments
     if (isFilePart(part)) {
       return (
         <MessageErrorBoundary fallback={<PartErrorFallback partType="file" />}>
@@ -469,7 +437,6 @@ export const PartRenderer = memo(
       );
     }
 
-    // Reasoning parts -> collapsible reasoning display
     if (isReasoningPart(part)) {
       if (!shouldRenderReasoningPart(part)) {
         return null;
@@ -481,12 +448,10 @@ export const PartRenderer = memo(
       );
     }
 
-    // Step start/finish -> return null (no visible rendering)
     if (isStepStartPart(part) || isStepFinishPart(part)) {
       return null;
     }
 
-    // Subtask parts -> render child session indicator
     if (isSubtaskPart(part)) {
       return (
         <MessageErrorBoundary fallback={<PartErrorFallback partType="subtask" />}>
@@ -495,7 +460,6 @@ export const PartRenderer = memo(
       );
     }
 
-    // Patch parts -> render patch/commit info
     if (isPatchPart(part)) {
       return (
         <MessageErrorBoundary fallback={<PartErrorFallback partType="patch" />}>
@@ -504,7 +468,6 @@ export const PartRenderer = memo(
       );
     }
 
-    // Unknown types -> graceful fallback
     return <UnknownPartRenderer part={part} />;
   },
   (previous, next) =>

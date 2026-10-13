@@ -139,7 +139,6 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
       console.log('[WebSocketManager] Got new ticket, reconnecting...');
       currentTicket = newTicket;
       ticketRefreshAttempted = true;
-      // Reset reconnect attempts after successful ticket refresh
       connectInternal(0);
     } catch (err) {
       console.error('[WebSocketManager] Failed to refresh ticket:', err);
@@ -209,7 +208,6 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
         lastEventId = event.eventId;
       }
 
-      // Reset ticket refresh flag on successful message
       ticketRefreshAttempted = false;
 
       if (state.status !== 'connected') {

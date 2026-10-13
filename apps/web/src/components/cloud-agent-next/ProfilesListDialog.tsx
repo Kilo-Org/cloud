@@ -61,7 +61,6 @@ export function ProfilesListDialog({
   onOpenChange,
   onProfileSelect,
 }: ProfilesListDialogProps) {
-  // Use combined profiles when in org context
   const combinedQuery = useCombinedProfiles({
     organizationId: organizationId ?? '',
     enabled: open && !!organizationId,
@@ -74,14 +73,12 @@ export function ProfilesListDialog({
   const isLoading = organizationId ? combinedQuery.isLoading : regularQuery.isLoading;
   const error = organizationId ? combinedQuery.error : regularQuery.error;
 
-  // Get profiles based on context
   const orgProfiles = organizationId ? (combinedQuery.data?.orgProfiles ?? []) : [];
   const personalProfiles = organizationId
     ? (combinedQuery.data?.personalProfiles ?? [])
     : (regularQuery.data ?? []).map(p => ({ ...p, ownerType: 'user' as const }));
   const effectiveDefaultId = organizationId ? combinedQuery.data?.effectiveDefaultId : null;
 
-  // Use combined mutations when in org context
   const combinedMutations = useCombinedProfileMutations({
     organizationId: organizationId ?? '',
   });
@@ -89,7 +86,6 @@ export function ProfilesListDialog({
     organizationId: undefined,
   });
 
-  // State for creating new profile
   const [isCreating, setIsCreating] = useState(false);
   const [newProfileName, setNewProfileName] = useState('');
   const [newProfileDescription, setNewProfileDescription] = useState('');
@@ -97,15 +93,12 @@ export function ProfilesListDialog({
     organizationId ? 'organization' : 'user'
   );
 
-  // State for expanded profile (accordion - only one at a time)
   const [expandedProfileId, setExpandedProfileId] = useState<string | null>(null);
 
-  // Loading states
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [togglingDefaultId, setTogglingDefaultId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  // Reset owner type when dialog opens in org context
   useEffect(() => {
     if (open && organizationId) {
       setNewProfileOwnerType('organization');
@@ -174,7 +167,6 @@ export function ProfilesListDialog({
 
     setSavingId('new');
     try {
-      // Determine which organizationId to use based on owner type selection
       const createOrgId = newProfileOwnerType === 'organization' ? organizationId : undefined;
 
       const mutations = organizationId ? combinedMutations : regularMutations;
@@ -187,7 +179,6 @@ export function ProfilesListDialog({
       setIsCreating(false);
       setNewProfileName('');
       setNewProfileDescription('');
-      // Expand the newly created profile for editing
       if (createdProfile?.id) {
         setExpandedProfileId(createdProfile.id);
       }
@@ -406,10 +397,6 @@ export function ProfilesListDialog({
   );
 }
 
-// -------------------------------------------------------------------
-// ProfileRow - A single profile row that can be expanded/collapsed
-// -------------------------------------------------------------------
-
 type ProfileRowProps = {
   profile: ProfileSummaryWithOwner;
   organizationId?: string;
@@ -503,10 +490,6 @@ function ProfileRow({
   );
 }
 
-// -------------------------------------------------------------------
-// ProfileEditPanel - Inline editing UI for variables and commands
-// -------------------------------------------------------------------
-
 type ProfileEditPanelProps = {
   profileId: string;
   organizationId?: string;
@@ -516,40 +499,32 @@ function ProfileEditPanel({ profileId, organizationId }: ProfileEditPanelProps) 
   const { data: profile, isLoading, error } = useProfile(profileId, { organizationId });
   const { setVar, deleteVar, setCommands, updateProfile } = useProfileMutations({ organizationId });
 
-  // State for editable profile metadata
   const [profileName, setProfileName] = useState('');
   const [profileDescription, setProfileDescription] = useState('');
   const [savingMetadata, setSavingMetadata] = useState(false);
 
-  // State for adding new variable
   const [isAddingVar, setIsAddingVar] = useState(false);
   const [newVarKey, setNewVarKey] = useState('');
   const [newVarValue, setNewVarValue] = useState('');
   const [newVarIsSecret, setNewVarIsSecret] = useState(false);
   const [showNewVarValue, setShowNewVarValue] = useState(false);
 
-  // State for editing existing variable value
   const [editingVarKey, setEditingVarKey] = useState<string | null>(null);
   const [editingVarValue, setEditingVarValue] = useState('');
   const [showEditingVarValue, setShowEditingVarValue] = useState(false);
 
-  // State for adding new command
   const [isAddingCommand, setIsAddingCommand] = useState(false);
   const [newCommand, setNewCommand] = useState('');
 
-  // State for editing existing command
   const [editingCommandIndex, setEditingCommandIndex] = useState<number | null>(null);
   const [editingCommandValue, setEditingCommandValue] = useState('');
 
-  // Loading states
   const [savingVarKey, setSavingVarKey] = useState<string | null>(null);
   const [deletingVarKey, setDeletingVarKey] = useState<string | null>(null);
   const [savingCommands, setSavingCommands] = useState(false);
 
-  // Active tab
   const [activeTab, setActiveTab] = useState<'vars' | 'commands'>('vars');
 
-  // Sync profile metadata when loaded
   useEffect(() => {
     if (profile) {
       setProfileName(profile.name);
@@ -632,7 +607,6 @@ function ProfileEditPanel({ profileId, organizationId }: ProfileEditPanelProps) 
 
   const handleSaveVar = async (varItem: ProfileVar) => {
     if (!editingVarValue && varItem.isSecret) {
-      // For secrets, if no new value entered, cancel edit
       resetEditVarForm();
       return;
     }
@@ -882,7 +856,6 @@ function ProfileEditPanel({ profileId, organizationId }: ProfileEditPanelProps) 
                 className="hover:bg-accent/50 rounded-lg border p-2 transition-colors"
               >
                 {editingVarKey === varItem.key ? (
-                  // Edit mode
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <code className="bg-muted rounded px-2 py-1 font-mono text-sm">
@@ -940,7 +913,6 @@ function ProfileEditPanel({ profileId, organizationId }: ProfileEditPanelProps) 
                     </div>
                   </div>
                 ) : (
-                  // View mode
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 flex-1 items-center gap-2">
                       <code className="bg-muted shrink-0 rounded px-2 py-1 font-mono text-sm">
@@ -1082,7 +1054,6 @@ function ProfileEditPanel({ profileId, organizationId }: ProfileEditPanelProps) 
                 className="hover:bg-accent/50 rounded-lg border p-2 transition-colors"
               >
                 {editingCommandIndex === index ? (
-                  // Edit mode
                   <div className="space-y-2">
                     <Input
                       value={editingCommandValue}
@@ -1120,7 +1091,6 @@ function ProfileEditPanel({ profileId, organizationId }: ProfileEditPanelProps) 
                     </div>
                   </div>
                 ) : (
-                  // View mode
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground w-5 shrink-0 text-xs">{index + 1}.</span>
                     <code className="bg-muted flex-1 truncate rounded px-2 py-1 font-mono text-sm">

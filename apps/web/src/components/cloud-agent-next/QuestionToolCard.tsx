@@ -285,7 +285,6 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
       ? questionRequestIds.get(props.toolPart.callID)
       : undefined;
 
-  // Get answers from metadata for completed state
   const completedAnswers: string[][] = (() => {
     if (isStandalone) return [];
     const { state } = props.toolPart;

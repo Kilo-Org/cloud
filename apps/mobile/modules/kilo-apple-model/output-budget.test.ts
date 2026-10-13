@@ -47,11 +47,9 @@ it('answers replayed calls before any tool call can be emitted to JavaScript', (
     'retry.result(name: name, arguments: arguments)'
   );
   expect(answer.slice(replay, dispatch)).toContain(
-    'throw AppleModelFailure(reason: "tool_replay_unmatched")'
+    'throw AppleModelFailure(reason: "token_generation_failed")'
   );
   expect(answer.slice(replay, dispatch)).toContain('return body');
-  expect(moduleSource).toContain('Self.entries(request, tools: replayTools)');
-  expect(moduleSource).toContain('tools: replayTools, transcript: Transcript(entries: restored)');
 });
 
 it.runIf(process.platform === 'darwin')('executes the native mutation replay checks', () => {

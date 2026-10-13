@@ -278,7 +278,7 @@ private actor AppleModelEngine {
     }
     if retry.replaying {
       guard let body = retry.result(name: name, arguments: arguments) else {
-        throw AppleModelFailure(reason: "tool_replay_unmatched")
+        throw AppleModelFailure(reason: "token_generation_failed")
       }
       return body
     }
@@ -397,10 +397,7 @@ private actor AppleModelEngine {
         abandonRound(token)
         // Failed sessions may roll back their transcript. Results were saved
         // at resume, before any continuation returned them to Foundation Models.
-        let replayTools = tools.filter { tool in
-          retry.completedRounds.contains { calls in calls.contains { $0.name == tool.name } }
-        }
-        var restored = try Self.entries(request, tools: replayTools)
+        var restored = inputEntries
         var extraBytes = 0
         for calls in retry.completedRounds {
           restored.append(.toolCalls(Transcript.ToolCalls(try calls.map { call in
@@ -423,7 +420,7 @@ private actor AppleModelEngine {
         responseLimit = try await Self.responseLimit(
           request, entries: counted, extraBytes: extraBytes + continuation.utf8.count + 16, model: model
         )
-        session = LanguageModelSession(model: model, tools: replayTools, transcript: Transcript(entries: restored))
+        session = LanguageModelSession(model: model, tools: tools, transcript: Transcript(entries: restored))
         reference.history = session.transcript.count
         reference.session = session
         prompt = Prompt(continuation)

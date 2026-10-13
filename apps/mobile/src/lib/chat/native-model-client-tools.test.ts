@@ -287,6 +287,42 @@ describe('native on-device model client with tools', () => {
     ]);
   });
 
+  it('does not start again when a token generation fails after the tool calls ran', async () => {
+    const { bridge, emit } = toolBridge((native, send) => {
+      send({ id: native.id, kind: 'toolCalls', calls: [call] });
+    });
+    const client = nativeModelClient(bridge);
+    await said(client);
+    bridge.resume.mockImplementation(async resumed => {
+      await Promise.resolve();
+      emit({ id: resumed, kind: 'error', reason: 'token_generation_failed' });
+    });
+    const result = await collect(
+      bridge,
+      client.stream(answered([{ callId: call.id, body: '12:00' }]))
+    );
+    expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+      'modelChat.localModels.failed'
+    );
+    expect(bridge.resume).toHaveBeenCalledOnce();
+    expect(bridge.generate).toHaveBeenCalledOnce();
+  });
+
+  it('ends the round on the tool calls, so a later failure of that attempt starts nothing', async () => {
+    const failsTokenGeneration = Object.assign(new Error('token_generation_failed'), {
+      code: 'token_generation_failed',
+    });
+    const { bridge } = toolBridge((native, send) => {
+      send({ id: native.id, kind: 'toolCalls', calls: [call] });
+      send({ id: native.id, kind: 'error', reason: 'token_generation_failed' });
+      throw failsTokenGeneration;
+    });
+    expect(await said(nativeModelClient(bridge))).toEqual([
+      { kind: 'toolCall', call },
+      expect.objectContaining({ kind: 'done', stop: 'tools' }),
+    ]);
+    expect(bridge.generate).toHaveBeenCalledOnce();
+  });
   it('keeps a provider without the tool loop text-only', async () => {
     const { bridge } = toolBridge(answerWith({}));
     await said(nativeModelClient({ ...bridge, resume: undefined }));

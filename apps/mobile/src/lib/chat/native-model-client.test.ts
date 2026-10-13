@@ -150,6 +150,52 @@ describe('native on-device model client', () => {
     );
   });
 
+  describe('when Foundation Models fails a token generation', () => {
+    const failsTokenGeneration = Object.assign(new Error('token_generation_failed'), {
+      code: 'token_generation_failed',
+    });
+
+    it('starts once more on a new request when no text arrived, and answers', async () => {
+      let attempt = 0;
+      const { bridge } = fakeBridge((native, emit) => {
+        attempt += 1;
+        if (attempt === 1) {
+          emit({ id: native.id, kind: 'error', reason: 'token_generation_failed' });
+          throw failsTokenGeneration;
+        }
+        answerWith({})(native, emit);
+      });
+      const answered = await events(bridge);
+      expect(answered[0]).toEqual({ kind: 'delta', text: 'abcdefg' });
+      expect(answered.at(-1)).toMatchObject({ kind: 'done', stop: 'end' });
+      const [first, second] = bridge.generate.mock.calls.map(([native]) => native.id);
+      expect(bridge.generate).toHaveBeenCalledTimes(2);
+      expect(second).not.toBe(first);
+    });
+
+    it('does not start again after text arrived', async () => {
+      const { bridge } = fakeBridge((native, emit) => {
+        emit({ id: native.id, kind: 'delta', text: 'Once upon' });
+        emit({ id: native.id, kind: 'error', reason: 'token_generation_failed' });
+        throw failsTokenGeneration;
+      });
+      const result = await collect(bridge);
+      expect(Either.isLeft(result) && result.left.reason).toBe('stream');
+      expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+        'modelChat.localModels.failed'
+      );
+      expect(bridge.generate).toHaveBeenCalledOnce();
+    });
+
+    it('shows the failure copy when the second attempt fails too', async () => {
+      const { bridge } = fakeBridge(() => {
+        throw failsTokenGeneration;
+      });
+      expect(await failureKey(bridge)).toBe('modelChat.localModels.failed');
+      expect(bridge.generate).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it('cancels the native request when the stream is interrupted and emits no done', async () => {
     const running = Promise.withResolvers<undefined>();
     const { bridge, emit, listeners } = fakeBridge(

@@ -91,11 +91,17 @@ const UNAVAILABLE_REASONS = new Set([
 /** A native promise rejection carries its stable reason as an Expo error code. */
 const codedRejection = z.object({ code: z.string() });
 
-/** What the model reads for a call it makes in a round that offers no tools. */
 const TOOLS_CLOSED =
   'No tool can run for the rest of this answer. Answer now with the results you already have.';
 
+const TRANSIENT_REASON = 'token_generation_failed';
+
 let sequence = 0;
+
+function nextRequestId(): string {
+  sequence += 1;
+  return `quick-chat-${sequence}`;
+}
 
 function problemOf(reason: string | undefined): LocalModelProblem {
   if (reason === 'busy') {
@@ -154,9 +160,8 @@ function answer(
   return Stream.async<ModelEvent, ModelError>(emit => {
     const tools = availability.tools === true && bridge.resume !== undefined;
     const offersTools = tools && request.tools !== undefined && request.tools.length > 0;
-    sequence += 1;
     const native = nativeRequest(request, {
-      id: `quick-chat-${sequence}`,
+      id: nextRequestId(),
       ceiling: availability.maxOutputTokens,
       tools,
       images: availability.images === true,
@@ -172,14 +177,25 @@ function answer(
       results.every(result => waiting.calls.includes(result.callId))
         ? { id: waiting.id, results }
         : undefined;
-    const id = resumption?.id ?? native.id;
+    let id = resumption?.id ?? native.id;
     // `running` is the only state that owns a live native inference. `waiting`
-    // hands it to the next round, which answers its tool calls.
-    let state: 'running' | 'finishing' | 'waiting' | 'over' = 'running';
+    // hands it to the next round, which answers its tool calls. `retrying`
+    // waits for the failed attempt to settle before a fresh one starts.
+    let state: 'running' | 'retrying' | 'finishing' | 'waiting' | 'over' = 'running';
     let output = '';
+    // A resumed generation already ran its tool calls, and a new one cannot continue from them.
+    let retries = resumption === undefined ? 1 : 0;
     const fail = (reason: string | undefined) => {
       state = 'over';
       void emit.fail(failure(problemOf(reason), output !== ''));
+    };
+    const failOrRetry = (reason: string | undefined) => {
+      if (reason === TRANSIENT_REASON && output === '' && retries > 0) {
+        retries -= 1;
+        state = 'retrying';
+      } else {
+        fail(reason);
+      }
     };
     const finish = async (done: Extract<NativeModelEvent, { kind: 'done' }>) => {
       state = 'finishing';
@@ -265,27 +281,20 @@ function answer(
       } else if (event.kind === 'toolCalls') {
         void (offersTools ? pause(event.calls) : refuse(event.calls));
       } else if (event.kind === 'error') {
-        fail(event.reason);
+        failOrRetry(event.reason);
       } else {
         void finish(event);
       }
     });
-    const run = async () => {
+    const rejected = (error: unknown) => {
+      if (state === 'running') {
+        const coded = codedRejection.safeParse(error);
+        failOrRetry(coded.success ? coded.data.code : undefined);
+      }
+    };
+    const generate = async () => {
       try {
-        if (resumption !== undefined) {
-          await bridge.resume?.(resumption.id, resumption.results);
-          return;
-        }
-        // A waiting generation this request does not answer can never continue.
-        if (waiting !== undefined) {
-          await stopNative(waiting.id);
-        }
-        // Results with no generation waiting for them: the round they answer is gone.
-        if (results !== undefined) {
-          fail(undefined);
-          return;
-        }
-        await bridge.generate(native);
+        await bridge.generate({ ...native, id });
         // A bridge resolves only after it emitted its terminal event. A resolve
         // with none is a bridge defect: failing is what releases the caller
         // instead of leaving the answer streaming forever.
@@ -293,17 +302,35 @@ function answer(
           fail('missing_terminal_event');
         }
       } catch (error) {
-        // A rejection with no terminal event (Android reports busy this way).
-        if (state === 'running') {
-          const coded = codedRejection.safeParse(error);
-          fail(coded.success ? coded.data.code : undefined);
-        }
+        rejected(error);
+      }
+    };
+    const run = async () => {
+      if (resumption !== undefined) {
+        await bridge.resume?.(resumption.id, resumption.results).catch(rejected);
+        return;
+      }
+      // A waiting generation this request does not answer can never continue.
+      if (waiting !== undefined) {
+        await stopNative(waiting.id);
+      }
+      // Results with no generation waiting for them: the round they answer is gone.
+      if (results !== undefined) {
+        fail(undefined);
+        return;
+      }
+      await generate();
+      // The failed attempt has settled, so the native module is free for a new one.
+      if (state === 'retrying') {
+        state = 'running';
+        id = nextRequestId();
+        await generate();
       }
     };
     void run();
     return Effect.sync(() => {
       subscription.remove();
-      if (state === 'running') {
+      if (state === 'running' || state === 'retrying') {
         // Interrupted mid-answer: stop the native task. Its late events are ignored.
         state = 'over';
         void stopNative(id);

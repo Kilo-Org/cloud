@@ -1,6 +1,6 @@
 import type { Dist, Scoreboard } from './schema';
 
-type Axis = 'latency' | 'cost' | 'quality';
+type Axis = 'latency' | 'cost' | 'quality' | 'reliability';
 type Direction = 'better' | 'worse' | 'flat';
 type Metric = {
   name: string;
@@ -46,8 +46,8 @@ export function compareScoreboards(
     const after = head.latency.routerOverheadMs.replay?.[scenario] ?? null;
     addDist(`latency.routerOverheadMs.replay.${scenario}`, before, after);
     add(
-      `latency.routerOverheadMs.replay.${scenario}.errors`,
-      'latency',
+      `reliability.replay.${scenario}.errors`,
+      'reliability',
       before?.errors ?? null,
       after?.errors ?? null
     );
@@ -102,6 +102,7 @@ export function compareScoreboards(
     latency: new Set(),
     cost: new Set(),
     quality: new Set(),
+    reliability: new Set(),
   };
   const lines = relativeOnly
     ? ['| Metric | Relative delta % | Direction |', '|---|---|---|']
@@ -128,7 +129,7 @@ export function compareScoreboards(
     lines.push(`| ${cells.join(' | ')} |`);
   }
   lines.push('');
-  for (const axis of ['latency', 'cost', 'quality'] as const) {
+  for (const axis of ['latency', 'cost', 'quality', 'reliability'] as const) {
     const observed = directions[axis];
     const summary =
       observed.has('better') && !observed.has('worse')

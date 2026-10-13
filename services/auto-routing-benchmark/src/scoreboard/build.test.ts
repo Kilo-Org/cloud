@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildScoreboard } from './build';
 import { compareScoreboards } from './compare';
+import { estimateClassifiedMetrics } from './production';
 import {
   ReplayMetricsSchema,
   ScoreboardRoutingTableSchema,
@@ -122,6 +123,10 @@ describe('buildScoreboard', () => {
     expect(result.cost.prodPerRequestUsd).toEqual({ mean: null, p50: null });
   });
 
+  it('uses uniform table-route weights when production route mix is empty', () => {
+    expect(build(table, prod({}))).toEqual(build(table));
+  });
+
   it('preserves optional file latency values without altering the published table contract', () => {
     const parsed = ScoreboardRoutingTableSchema.parse(table);
     expect(parsed.routes['implementation/code_generation'][0].p50LatencyMs).toBe(100);
@@ -154,7 +159,7 @@ describe('compareScoreboards', () => {
     expect(markdown).toContain(
       '| quality.classifierRouteAccuracy | 0.75 | 0.9 | +20.00% | better |'
     );
-    expect(markdown).toMatch(/latency: better\ncost: worse\nquality: better$/);
+    expect(markdown).toMatch(/latency: better\ncost: worse\nquality: better\nreliability: flat$/);
   });
 
   it('omits absolute values in relative-only output and marks sub-percent changes flat', () => {
@@ -169,7 +174,7 @@ describe('compareScoreboards', () => {
     expect(markdown).not.toContain('199');
     expect(markdown).not.toContain('0.75');
     expect(compareScoreboards(base, base, { relativeOnly: true })).toMatch(
-      /latency: flat\ncost: flat\nquality: flat$/
+      /latency: flat\ncost: flat\nquality: flat\nreliability: flat$/
     );
   });
 
@@ -196,13 +201,35 @@ describe('compareScoreboards', () => {
     const markdown = compareScoreboards(base, head, { relativeOnly: false });
     expect(markdown).toContain('| replay.cold.costUsd | 0.02 | 0.01 | -50.00% | better |');
     expect(markdown).not.toContain('replay.warm_new_turn.costUsd');
-    expect(markdown).toMatch(/latency: flat\ncost: better\nquality: flat$/);
+    expect(markdown).toMatch(/latency: flat\ncost: better\nquality: flat\nreliability: flat$/);
     expect(() =>
       ReplayMetricsSchema.parse({
         ...replay,
         scenarios: { ...replay.scenarios, cold: { ...scenario, costUsd: -1 } },
       })
     ).toThrow();
+  });
+
+  it('compares replay errors on reliability without changing latency direction', () => {
+    const scenario = { n: 10, p50: 10, p90: 10, p99: 10, errors: 2 };
+    const replay: ReplayMetrics = {
+      kind: 'replay',
+      target: 'http://localhost:8810',
+      startedAt: now.toISOString(),
+      sessions: 10,
+      scenarios: { cold: scenario, warm_new_turn: scenario, exact_repeat: scenario },
+    };
+    const base = build(table, null, replay);
+    const head = structuredClone(base);
+    head.latency.routerOverheadMs.replay = {
+      ...replay.scenarios,
+      cold: { ...scenario, p50: 5, p90: 5, p99: 5, errors: 4 },
+    };
+    const markdown = compareScoreboards(base, head, { relativeOnly: false });
+    expect(markdown).toContain('| reliability.replay.cold.errors | 2 | 4 | +100.00% | worse |');
+    expect(markdown).not.toContain('latency.routerOverheadMs.replay.cold.errors');
+    expect(markdown).toMatch(/latency: better\ncost: flat\nquality: flat\nreliability: worse$/);
+    expect(compareScoreboards(head, base, { relativeOnly: true })).toContain('reliability: better');
   });
 
   it('handles missing and zero baselines without NaN or false improvements', () => {
@@ -214,5 +241,57 @@ describe('compareScoreboards', () => {
     expect(markdown).toContain('| cost.classifierPerRequestUsd | +∞% | worse |');
     expect(markdown).not.toContain('latency.cacheHitRate');
     expect(markdown).not.toContain('NaN');
+  });
+});
+
+describe('estimateClassifiedMetrics', () => {
+  it('weights uniform sampled successes and always-logged classified decisions together', () => {
+    const result = estimateClassifiedMetrics(
+      [
+        { n: 2, sampled: true, route: 'sampled', cacheHit: true, cost: 0 },
+        { n: 10, sampled: false, route: 'switched', cacheHit: false, cost: 0.02 },
+      ],
+      105,
+      5
+    );
+    expect(result.routeMix).toEqual({ sampled: 0.9, switched: 0.1 });
+    expect(result.cacheHitRate).toBeCloseTo(0.9);
+    expect(result.classifierPerRequestUsd).toBeCloseTo(0.002);
+  });
+
+  it('retains unsampled classified rows when no successes were sampled', () => {
+    expect(
+      estimateClassifiedMetrics(
+        [{ n: 3, sampled: false, route: 'switched', cacheHit: false, cost: 0.02 }],
+        10,
+        2
+      )
+    ).toEqual({
+      routeMix: { switched: 1 },
+      cacheHitRate: 0,
+      classifierPerRequestUsd: 0.02,
+    });
+  });
+
+  it('excludes unavailable cache and cost values from their weighted denominators', () => {
+    const result = estimateClassifiedMetrics(
+      [
+        { n: 1, sampled: true, route: 'sampled', cacheHit: null, cost: null },
+        { n: 2, sampled: false, route: 'switched', cacheHit: true, cost: 0.01 },
+      ],
+      12,
+      0
+    );
+    expect(result.routeMix.sampled).toBeCloseTo(10 / 12);
+    expect(result.cacheHitRate).toBe(1);
+    expect(result.classifierPerRequestUsd).toBe(0.01);
+  });
+
+  it('returns unavailable metrics and an empty mix when no classified decisions were logged', () => {
+    expect(estimateClassifiedMetrics([], 5, 5)).toEqual({
+      routeMix: {},
+      cacheHitRate: null,
+      classifierPerRequestUsd: null,
+    });
   });
 });

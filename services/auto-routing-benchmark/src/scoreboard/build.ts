@@ -19,7 +19,9 @@ export function buildScoreboard({
 }: BuildScoreboardInput): Scoreboard {
   const routeKeys = Object.keys(table.routes);
   const routeMix =
-    prod?.routeMix ?? Object.fromEntries(routeKeys.map(key => [key, 1 / routeKeys.length]));
+    prod && Object.keys(prod.routeMix).length > 0
+      ? prod.routeMix
+      : Object.fromEntries(routeKeys.map(key => [key, 1 / routeKeys.length]));
   const weighted = (metric: 'accuracy' | 'avgCostUsd' | 'p50LatencyMs'): number | null => {
     let total = 0;
     let weight = 0;

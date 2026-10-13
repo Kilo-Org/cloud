@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import { ProdMetricsSchema, type Dist, type ProdMetrics } from '../src/scoreboard/schema';
+import { estimateClassifiedMetrics } from '../src/scoreboard/production';
 
 const requestPrefix =
   "['cloudflare-logpush'] | where ScriptName == 'auto-routing' and ['Event.Request.URL'] endswith '/decide'";
@@ -39,6 +40,7 @@ const tabularSchema = z.object({
 });
 const countSchema = z.object({ n: z.number().int().nonnegative() });
 const groupedSchema = countSchema.extend({
+  sampled: z.boolean(),
   route: z.string(),
   cacheHit: z.boolean().nullable(),
   cost: nullableNumber,
@@ -105,11 +107,14 @@ function axiomQuery(window: Window): AxiomQuery {
 }
 
 async function workerMetrics(query: AxiomQuery): Promise<Partial<ProdMetrics>> {
-  const [groups, requests, switched, workerDuration, timings] = await Promise.all([
+  const [groups, requests, nonClassified, switched, workerDuration, timings] = await Promise.all([
     query(
-      `${sampledPrefix} | extend route=strcat(tostring(j.taskType), '/', tostring(j.subtaskType)), cacheHit=tobool(j.cacheHit), cost=todouble(j.classifierCostCredits) | summarize n=count() by route, cacheHit, cost`
+      `${decisionPrefix} | where j.status == 'classified' | extend sampled=tobool(j.sampled), route=strcat(tostring(j.taskType), '/', tostring(j.subtaskType)), cacheHit=tobool(j.cacheHit), cost=todouble(j.classifierCostCredits) | summarize n=count() by sampled, route, cacheHit, cost`
     ),
     query(`${requestPrefix} | summarize n=count()`),
+    query(
+      `${decisionPrefix} | where j.sampled == false and j.status != 'classified' | summarize n=count()`
+    ),
     query(`${decisionPrefix} | where j.switched == true | summarize n=count()`),
     query(
       `${sampledPrefix} | extend value=coalesce(toreal(j.timings.totalMs), toreal(j.classifierDurationMs)) | where isnotnull(value) ${percentiles}`
@@ -123,38 +128,20 @@ async function workerMetrics(query: AxiomQuery): Promise<Partial<ProdMetrics>> {
       })
     ),
   ]);
-  let sampledCount = 0;
-  let cacheCount = 0;
-  let cacheHits = 0;
-  let costCount = 0;
-  let costTotal = 0;
-  const routeCounts: Record<string, number> = {};
-  for (const row of groups) {
-    const group = groupedSchema.parse(row);
-    sampledCount += group.n;
-    routeCounts[group.route] = (routeCounts[group.route] ?? 0) + group.n;
-    if (group.cacheHit !== null) {
-      cacheCount += group.n;
-      if (group.cacheHit) cacheHits += group.n;
-    }
-    if (group.cost !== null) {
-      costCount += group.n;
-      costTotal += group.cost * group.n;
-    }
-  }
   const requestCount = count(requests);
+  const classifiedMetrics = estimateClassifiedMetrics(
+    groups.map(row => groupedSchema.parse(row)),
+    requestCount,
+    count(nonClassified)
+  );
   const availablePhases = timings.filter(
     (entry): entry is readonly [(typeof phases)[number], Dist] => entry[1] !== null
   );
   return {
     workerDecideMs: distribution(workerDuration),
     workerPhasesMs: availablePhases.length ? Object.fromEntries(availablePhases) : null,
-    cacheHitRate: cacheCount ? cacheHits / cacheCount : null,
-    classifierPerRequestUsd: costCount ? costTotal / costCount : null,
+    ...classifiedMetrics,
     switchRate: requestCount ? count(switched) / requestCount : null,
-    routeMix: Object.fromEntries(
-      Object.entries(routeCounts).map(([route, n]) => [route, n / sampledCount])
-    ),
   };
 }
 
@@ -217,7 +204,7 @@ SELECT
 FROM microdollar_usage_metadata meta
 JOIN auto_model am ON am.auto_model_id = meta.auto_model_id
 JOIN microdollar_usage usage ON usage.id = meta.id
-WHERE am.auto_model = 'kilo-auto/efficient'
+WHERE am.auto_model IN ('kilo-auto/efficient', 'kilo-auto/balanced')
   AND meta.created_at >= '${window.start}'::timestamptz
   AND meta.created_at < '${window.end}'::timestamptz
   AND usage.created_at >= '${window.start}'::timestamptz

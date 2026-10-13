@@ -6132,6 +6132,43 @@
     ],
     "searchBlob": "cloudAgentNext.closeTerminal Close a terminal session running in a cloud agent session. cloudagentnext closeterminal cloudagentsessionid ptyid cloudAgentSessionId ptyId"
   },
+  "cloudAgentNext.createPreview": {
+    "path": "cloudAgentNext.createPreview",
+    "kind": "mutation",
+    "summary": "Generate a temporary, expiring preview link to open a port or path of an app running in a Cloud Agent session, for sharing or viewing it in a browser.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^\\/.*"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId",
+        "port"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "createpreview",
+      "cloudagentsessionid",
+      "port",
+      "path"
+    ],
+    "searchBlob": "cloudAgentNext.createPreview Generate a temporary, expiring preview link to open a port or path of an app running in a Cloud Agent session, for sharing or viewing it in a browser. cloudagentnext createpreview cloudagentsessionid port path cloudAgentSessionId port path"
+  },
   "cloudAgentNext.createTerminal": {
     "path": "cloudAgentNext.createTerminal",
     "kind": "mutation",
@@ -6413,6 +6450,36 @@
       "cloudagentsessionid"
     ],
     "searchBlob": "cloudAgentNext.getPendingInteractions Fetch the pending interactions for a cloud agent session that are still waiting on a response, such as approvals or questions requiring user input. Use this to check whether a running agent session is blocked and needs the user to act. cloudagentnext getpendinginteractions cloudagentsessionid cloudAgentSessionId"
+  },
+  "cloudAgentNext.getPreviewOptions": {
+    "path": "cloudAgentNext.getPreviewOptions",
+    "kind": "query",
+    "summary": "Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getpreviewoptions",
+      "cloudagentsessionid",
+      "organizationid"
+    ],
+    "searchBlob": "cloudAgentNext.getPreviewOptions Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization. cloudagentnext getpreviewoptions cloudagentsessionid organizationid cloudAgentSessionId organizationId"
   },
   "cloudAgentNext.getSandboxSelectionOptions": {
     "path": "cloudAgentNext.getSandboxSelectionOptions",
@@ -18696,6 +18763,51 @@
       "ptyid"
     ],
     "searchBlob": "organizations.cloudAgentNext.closeTerminal Close an open terminal in a cloud agent session. Use to end a terminal session. organizations cloudagentnext closeterminal organizationid cloudagentsessionid ptyid organizationId cloudAgentSessionId ptyId"
+  },
+  "organizations.cloudAgentNext.createPreview": {
+    "path": "organizations.cloudAgentNext.createPreview",
+    "kind": "mutation",
+    "summary": "Generate a shareable, expiring URL for opening a preview of an app running on a specific port in an organization's cloud agent session, so you can view or share the running preview.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^\\/.*"
+        }
+      },
+      "required": [
+        "organizationId",
+        "cloudAgentSessionId",
+        "port"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "createpreview",
+      "organizationid",
+      "cloudagentsessionid",
+      "port",
+      "path"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.createPreview Generate a shareable, expiring URL for opening a preview of an app running on a specific port in an organization's cloud agent session, so you can view or share the running preview. organizations cloudagentnext createpreview organizationid cloudagentsessionid port path organizationId cloudAgentSessionId port path"
   },
   "organizations.cloudAgentNext.createTerminal": {
     "path": "organizations.cloudAgentNext.createTerminal",
@@ -37612,7 +37724,9 @@
           "enum": [
             "ios_push_to_start",
             "ios_activity",
-            "android_ongoing"
+            "ios_session_activity",
+            "android_ongoing",
+            "android_session_ongoing"
           ]
         },
         "platform": {
@@ -37632,6 +37746,10 @@
               "type": "null"
             }
           ]
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -37647,9 +37765,10 @@
       "token",
       "kind",
       "platform",
-      "organizationid"
+      "organizationid",
+      "sessionid"
     ],
-    "searchBlob": "user.registerActivityToken Register an iOS Live Activity or Android ongoing notification token for the user. user registeractivitytoken token kind platform organizationid token kind platform organizationId"
+    "searchBlob": "user.registerActivityToken Register an iOS Live Activity or Android ongoing notification token for the user. user registeractivitytoken token kind platform organizationid sessionid token kind platform organizationId sessionId"
   },
   "user.registerPushToken": {
     "path": "user.registerPushToken",
@@ -38022,6 +38141,10 @@
         "token": {
           "type": "string",
           "minLength": 1
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -38031,9 +38154,10 @@
     "tags": [
       "user",
       "unregisteractivitytoken",
-      "token"
+      "token",
+      "sessionid"
     ],
-    "searchBlob": "user.unregisterActivityToken Remove an activity token used for Live Activities or ongoing notifications. user unregisteractivitytoken token token"
+    "searchBlob": "user.unregisterActivityToken Remove an activity token used for Live Activities or ongoing notifications. user unregisteractivitytoken token sessionid token sessionId"
   },
   "user.unregisterPushToken": {
     "path": "user.unregisterPushToken",

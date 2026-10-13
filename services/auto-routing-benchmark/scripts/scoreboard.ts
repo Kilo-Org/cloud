@@ -11,6 +11,7 @@ import {
 import { rowsToRoutingTable } from '../src/db';
 import { computeEngineIdentity } from '../src/run';
 import { pickClassifierWinner } from '../src/winner';
+import { BenchmarkModelCatalogSchema, catalogCandidatePrices } from '../src/platform-models';
 import { buildScoreboard } from '../src/scoreboard/build';
 import { compareScoreboards } from '../src/scoreboard/compare';
 import {
@@ -51,35 +52,9 @@ const classifierRunSchema = z.object({
   classifier_max_p95_latency_ms: z.number().nullable(),
 });
 
-const perTokenPriceSchema = z
-  .union([z.string().trim().min(1), z.number()])
-  .transform(value => Number(value))
-  .pipe(z.number().nonnegative());
-const pricingCatalogSchema = z
-  .object({
-    data: z.array(
-      z.object({
-        id: z.string().min(1),
-        pricing: z.object({
-          prompt: perTokenPriceSchema,
-          completion: perTokenPriceSchema,
-          input_cache_read: perTokenPriceSchema.nullish(),
-        }),
-      })
-    ),
-  })
-  .transform(catalog =>
-    Object.fromEntries(
-      catalog.data.map(model => [
-        model.id,
-        {
-          promptUsdPerToken: model.pricing.prompt,
-          completionUsdPerToken: model.pricing.completion,
-          cacheReadUsdPerToken: model.pricing.input_cache_read ?? null,
-        },
-      ])
-    )
-  );
+const pricingCatalogSchema = BenchmarkModelCatalogSchema.transform(catalog =>
+  Object.fromEntries(catalogCandidatePrices(catalog))
+);
 const pricingSchema = z.union([pricingCatalogSchema, z.record(z.string(), CandidatePricingSchema)]);
 
 async function loadPricing(path: string) {

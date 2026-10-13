@@ -9,9 +9,7 @@ import { exactPairKey } from './db';
 import type { RunModelEntry } from './run';
 
 const CatalogTokenPriceSchema = z
-  .string()
-  .trim()
-  .min(1)
+  .union([z.string().trim().min(1), z.number()])
   .transform(value => Number(value))
   .pipe(z.number().nonnegative())
   .nullable()
@@ -28,6 +26,8 @@ export const BenchmarkModelCatalogSchema = z.object({
           completion: CatalogTokenPriceSchema.optional(),
           input_cache_read: CatalogTokenPriceSchema.optional(),
         })
+        .nullable()
+        .catch(null)
         .optional(),
     })
   ),

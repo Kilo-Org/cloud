@@ -8,6 +8,24 @@ import {
 } from './platform-models';
 
 describe('catalog candidate pricing', () => {
+  it('keeps normal models usable alongside variable-price virtual models', () => {
+    const catalog = BenchmarkModelCatalogSchema.parse({
+      data: [
+        { id: 'synthetic/virtual', pricing: { prompt: '-1', completion: '-1' } },
+        { id: 'synthetic/normal', pricing: { prompt: '0.002', completion: '0.003', input_cache_read: '-1' } },
+        { id: 'synthetic/malformed', pricing: 'unavailable' },
+      ],
+    });
+    const prices = catalogCandidatePrices(catalog);
+    expect(prices.get('synthetic/virtual')).toBeNull();
+    expect(prices.get('synthetic/normal')).toEqual({
+      promptUsdPerToken: 0.002,
+      completionUsdPerToken: 0.003,
+      cacheReadUsdPerToken: null,
+    });
+    expect(prices.get('synthetic/malformed')).toBeNull();
+  });
+
   it('keeps USD-per-token catalog prices and treats missing or invalid prices as unpriced', () => {
     const prices = catalogCandidatePrices(
       BenchmarkModelCatalogSchema.parse({

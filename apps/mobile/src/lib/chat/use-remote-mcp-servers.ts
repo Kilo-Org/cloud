@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { ensureRemoteMcp, remoteMcpState, subscribeRemoteMcp } from './remote-mcp';
+import { signInRemoteMcpServer } from './remote-mcp-oauth';
 import { type RemoteMcpServerState } from './remote-mcp-state';
 import {
   addRemoteMcpServer,
@@ -40,10 +41,12 @@ export type RemoteMcpServers = {
   readonly discovered: readonly RemoteMcpServerState[];
   /** The servers whose Retry is in flight, so their buttons show it is working. */
   readonly retryingIds: readonly string[];
+  /** The servers whose sign-in is in flight, so their buttons show it is working. */
+  readonly signingInIds: readonly string[];
   readonly setEnabled: (id: string, next: boolean) => void;
   /** Asks one server with no tools on hand again, with the longer deadline a Retry gets. */
   readonly retryServer: (id: string) => void;
-  /** Asks every enabled server that has no tools on hand, on the automatic deadline. */
+  readonly signInServer: (id: string) => void;
   readonly discover: () => void;
   readonly addServer: (draft: RemoteMcpServerDraft) => Promise<boolean>;
   readonly updateServer: (id: string, draft: RemoteMcpServerDraft) => Promise<boolean>;
@@ -59,6 +62,7 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
   const discovered = useSyncExternalStore(subscribeRemoteMcp, remoteMcpState);
   const [saving, setSaving] = useState(false);
   const [retryingIds, setRetryingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [signingInIds, setSigningInIds] = useState<ReadonlySet<string>>(() => new Set());
 
   /** The reason a write failed, said out loud because the store kept its value. */
   const failed = useCallback(
@@ -117,14 +121,35 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
     [failed, place]
   );
 
-  /**
-   * Asks the servers with no tools on hand, as the sheet opens.
-   *
-   * After a restart nothing has been discovered, so a sheet that only drew the
-   * snapshot would show a server with no tools and nothing running. It asks on
-   * the automatic deadline, and the registry is told so an open chat moves onto
-   * whatever the ask found.
-   */
+  const signInServer = useCallback(
+    (id: string) => {
+      const server = listRemoteMcpServers().find(one => one.id === id);
+      if (server === undefined || place === null) {
+        return;
+      }
+      setSigningInIds(current => new Set(current).add(id));
+      void (async () => {
+        try {
+          const outcome = await signInRemoteMcpServer(server);
+          if (outcome === 'failed') {
+            toast.error(t('modelChat.mcpOAuth.signInFailed', { name: server.name }));
+          }
+          await ensureRemoteMcp(place, { retry: true });
+          await refreshChatTools();
+        } catch (error) {
+          failed(error);
+        } finally {
+          setSigningInIds(current => {
+            const next = new Set(current);
+            next.delete(id);
+            return next;
+          });
+        }
+      })();
+    },
+    [failed, place, t]
+  );
+
   const discover = useCallback(() => {
     if (place === null) {
       return;
@@ -198,8 +223,10 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
     loaded,
     discovered,
     retryingIds: [...retryingIds],
+    signingInIds: [...signingInIds],
     setEnabled,
     retryServer,
+    signInServer,
     discover,
     addServer,
     updateServer,

@@ -138,7 +138,8 @@
     "dismissed": "Отхвърлено",
     "agent": "агент",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "Промени"
   },
   "language": {
     "restarting": "Рестартиране за смяна на езика",
@@ -327,6 +328,7 @@
       "collapseFile": "Свий файла",
       "expandFile": "Разгъни файла",
       "diffTooLarge": "Разликите са твърде големи, за да се покажат.",
+      "noPreview": "Няма наличен преглед за този файл",
       "openOnGitHub": "Отвори в GitHub",
       "openDiffOnGitHub": "Отвори разликите в този файл в GitHub",
       "githubDiff": "Разликите в GitHub"
@@ -2194,7 +2196,6 @@
       "retryLoadingEnvironment": "Опитай отново да заредиш средата",
       "defaultEnvironment": "Среда по подразбиране",
       "environmentSummary": "{{commands}} команди · {{mcp}} MCP · {{skills}} умения · {{agents}} агенти",
-      "changes": "Промени",
       "leaveChanges": "Остави промените",
       "commitAndPush": "Комитни и изпрати",
       "startSession": "Започни сесия",
@@ -2656,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Модел ({{displayCount}})",
       "modelsCount_other": "Модели ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Виж промените",
+      "asOf": "Към {{time}}",
+      "tooLarge": "Разликите са твърде големи, за да се покажат на мобилно устройство.",
+      "empty": "Все още няма промени във файловете в тази сесия."
     },
     "autoApprove": {
       "title": "Автоматично одобряване",
@@ -3264,7 +3271,6 @@
       "fieldName": "Показвано име",
       "fieldUrl": "URL на сървъра",
       "fieldUrlInvalid": "Въведете валиден URL на сървъра.",
-      "fieldToken": "Bearer токен (по избор)",
       "enableServer": "Активиране на този сървър: {{name}}",
       "editServer": "Редактиране на сървъра",
       "deleteServer": "Изтриване на сървъра",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} инструмента",
       "serverUnreachable": "Неуспешно свързване с този сървър",
       "serverOff": "Този сървър е изключен"
+    },
+    "mcpOAuth": {
+      "authMethod": "Удостоверяване",
+      "authNone": "Без вход",
+      "authBearer": "Bearer токен",
+      "authOAuth": "Вход с OAuth",
+      "fieldToken": "Токен",
+      "oauthHint": "След като запазиш, докосни $t(modelChat.mcpOAuth.signIn) при сървъра, за да влезеш чрез браузъра си.",
+      "serverNeedsSignIn": "Влез, за да използваш този сървър",
+      "signIn": "Вход",
+      "signInA11y": "Вход в този сървър: {{name}}",
+      "signInFailed": "Неуспешен вход в {{name}}. Опитай отново."
     },
     "backends": {
       "title": "Сървъри за чат",
@@ -3438,6 +3456,9 @@
       "downloading": "Изтегляне…",
       "downloadProgress": "Изтегляне… {{percent}}%",
       "downloadFailed": "Изтеглянето не завърши. Проверете връзката и свободното място, след което опитайте отново."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Този модел поддържа усилие за разсъждение"
     }
   },
   "settingsTools": {

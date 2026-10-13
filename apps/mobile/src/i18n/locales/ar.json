@@ -138,7 +138,8 @@
     "dismissed": "مستبعدة",
     "agent": "عامل",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "التغييرات"
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -1731,7 +1732,6 @@
       "retryLoadingEnvironment": "إعادة محاولة تحميل البيئة",
       "defaultEnvironment": "البيئة الافتراضية",
       "environmentSummary": "الأوامر: {{commands}} · MCP: {{mcp}} · المهارات: {{skills}} · الوكلاء: {{agents}}",
-      "changes": "التغييرات",
       "leaveChanges": "إبقاء التغييرات",
       "commitAndPush": "إيداع ودفع",
       "startSession": "بدء الجلسة",
@@ -2233,6 +2233,12 @@
       "modelsCount_two": "نموذجان ({{displayCount}})",
       "modelsCount_few": "نماذج ({{displayCount}})",
       "modelsCount_many": "نموذجًا ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "عرض التغييرات",
+      "asOf": "حتى {{time}}",
+      "tooLarge": "الفروق كبيرة جدًا ولا يمكن عرضها على الهاتف.",
+      "empty": "لا توجد تغييرات على الملفات في هذه الجلسة بعد."
     },
     "autoApprove": {
       "title": "الموافقة التلقائية",
@@ -2761,6 +2767,7 @@
     "fileRows": {
       "collapseFile": "طي الملف",
       "diffTooLarge": "لا يمكن عرض الفروق لكبر حجمها.",
+      "noPreview": "لا تتوفر معاينة لهذا الملف",
       "expandFile": "توسيع الملف",
       "markViewed": "تحديد {{path}} كملف تم الاطلاع عليه",
       "openDiffOnGitHub": "فتح فروق هذا الملف على GitHub",
@@ -3428,7 +3435,6 @@
       "fieldName": "الاسم المعروض",
       "fieldUrl": "عنوان URL للخادم",
       "fieldUrlInvalid": "أدخل عنوان URL صالحًا للخادم.",
-      "fieldToken": "رمز Bearer (اختياري)",
       "enableServer": "تفعيل هذا الخادم: {{name}}",
       "editServer": "تعديل الخادم",
       "deleteServer": "حذف الخادم",
@@ -3448,6 +3454,18 @@
       "serverToolCount": "{{count}} أدوات",
       "serverUnreachable": "تعذّر الوصول إلى هذا الخادم",
       "serverOff": "هذا الخادم متوقف"
+    },
+    "mcpOAuth": {
+      "authMethod": "المصادقة",
+      "authNone": "بدون تسجيل دخول",
+      "authBearer": "رمز Bearer",
+      "authOAuth": "تسجيل الدخول عبر OAuth",
+      "fieldToken": "الرمز",
+      "oauthHint": "بعد الحفظ، اضغط على $t(modelChat.mcpOAuth.signIn) في الخادم لتسجيل الدخول عبر المتصفح.",
+      "serverNeedsSignIn": "سجّل الدخول لاستخدام هذا الخادم",
+      "signIn": "تسجيل الدخول",
+      "signInA11y": "تسجيل الدخول إلى هذا الخادم: {{name}}",
+      "signInFailed": "تعذّر تسجيل الدخول إلى {{name}}. حاول مرة أخرى."
     },
     "backends": {
       "title": "خوادم الدردشة",
@@ -3602,6 +3620,9 @@
       "downloading": "جارٍ التنزيل…",
       "downloadProgress": "جارٍ التنزيل… {{percent}}%",
       "downloadFailed": "لم يكتمل التنزيل. تحقّق من اتصالك ومن توفر مساحة تخزين كافية، ثم حاول مرة أخرى."
+    },
+    "reasoningEffort": {
+      "modelFlag": "يدعم هذا النموذج جهد التفكير"
     }
   },
   "settingsTools": {

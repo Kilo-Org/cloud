@@ -138,7 +138,8 @@
     "dismissed": "Atmesta",
     "agent": "Agentas",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "Pakeitimai"
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -327,6 +328,7 @@
       "collapseFile": "Sutraukti failą",
       "expandFile": "Išskleisti failą",
       "diffTooLarge": "Pakeitimų palyginimas per didelis, kad būtų galima jį parodyti.",
+      "noPreview": "Šio failo peržiūra negalima",
       "openOnGitHub": "Atidaryti GitHub platformoje",
       "openDiffOnGitHub": "Atidaryti šio failo pakeitimų palyginimą GitHub platformoje",
       "githubDiff": "GitHub pakeitimų palyginimas"
@@ -2250,7 +2252,6 @@
       "retryLoadingEnvironment": "Bandyti įkelti aplinką iš naujo",
       "defaultEnvironment": "Numatytoji aplinka",
       "environmentSummary": "komandų: {{commands}} · MCP: {{mcp}} · įgūdžių: {{skills}} · agentų: {{agents}}",
-      "changes": "Pakeitimai",
       "leaveChanges": "Palikti pakeitimus",
       "commitAndPush": "Įrašyti ir išsiųsti",
       "startSession": "Pradėti sesiją",
@@ -2732,6 +2733,12 @@
       "modelsCount_other": "Modeliai ({{displayCount}})",
       "modelsCount_few": "Modeliai ({{displayCount}})",
       "modelsCount_many": "Modeliai ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Peržiūrėti pakeitimus",
+      "asOf": "Būsena {{time}}",
+      "tooLarge": "Šis pakeitimų palyginimas per didelis, kad būtų galima jį parodyti mobiliajame įrenginyje.",
+      "empty": "Šioje sesijoje failų pakeitimų dar nėra."
     },
     "autoApprove": {
       "title": "Automatinis tvirtinimas",
@@ -3346,7 +3353,6 @@
       "fieldName": "Rodomas pavadinimas",
       "fieldUrl": "Serverio URL",
       "fieldUrlInvalid": "Įveskite galiojantį serverio URL.",
-      "fieldToken": "Bearer prieigos raktas (neprivaloma)",
       "enableServer": "Įjungti šį serverį: {{name}}",
       "editServer": "Redaguoti serverį",
       "deleteServer": "Ištrinti serverį",
@@ -3366,6 +3372,18 @@
       "serverToolCount": "{{count}} įrankiai",
       "serverUnreachable": "Nepavyko pasiekti šio serverio",
       "serverOff": "Šis serveris išjungtas"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikavimas",
+      "authNone": "Be prisijungimo",
+      "authBearer": "Bearer prieigos raktas",
+      "authOAuth": "OAuth prisijungimas",
+      "fieldToken": "Prieigos raktas",
+      "oauthHint": "Išsaugojęs bakstelėk $t(modelChat.mcpOAuth.signIn) prie serverio, kad prisijungtum naršyklėje.",
+      "serverNeedsSignIn": "Prisijunk, kad galėtum naudoti šį serverį",
+      "signIn": "Prisijungti",
+      "signInA11y": "Prisijungti prie šio serverio: {{name}}",
+      "signInFailed": "Nepavyko prisijungti prie {{name}}. Bandyk dar kartą."
     },
     "backends": {
       "title": "Pokalbių serveriai",
@@ -3520,6 +3538,9 @@
       "downloading": "Atsisiunčiama…",
       "downloadProgress": "Atsisiunčiama… {{percent}}%",
       "downloadFailed": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir laisvą vietą saugykloje, tada bandykite dar kartą."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
     }
   },
   "settingsTools": {

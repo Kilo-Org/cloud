@@ -138,7 +138,8 @@
     "dismissed": "Avvist",
     "agent": "Agent",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "Endringer"
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -327,6 +328,7 @@
       "collapseFile": "Skjul filinnholdet",
       "expandFile": "Vis filinnholdet",
       "diffTooLarge": "Endringene er for omfattende til å vises.",
+      "noPreview": "Ingen forhåndsvisning tilgjengelig for denne filen",
       "openOnGitHub": "Åpne på GitHub",
       "openDiffOnGitHub": "Åpne endringene i denne filen på GitHub",
       "githubDiff": "Endringsvisning på GitHub"
@@ -2194,7 +2196,6 @@
       "retryLoadingEnvironment": "Prøv å laste inn miljøet på nytt",
       "defaultEnvironment": "Standardmiljø",
       "environmentSummary": "{{commands}} kommandoer · {{mcp}} MCP · {{skills}} ferdigheter · {{agents}} agenter",
-      "changes": "Endringer",
       "leaveChanges": "Behold endringer",
       "commitAndPush": "Lagre og send",
       "startSession": "Start økt",
@@ -2656,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modell ({{displayCount}})",
       "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Vis endringer",
+      "asOf": "Per {{time}}",
+      "tooLarge": "Endringene er for omfattende til å vises på mobil.",
+      "empty": "Ingen filendringer i denne økten ennå."
     },
     "autoApprove": {
       "title": "Automatisk godkjenning",
@@ -3264,7 +3271,6 @@
       "fieldName": "Vist navn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Skriv inn en gyldig server-URL.",
-      "fieldToken": "Bearer-token (valgfritt)",
       "enableServer": "Aktiver denne serveren: {{name}}",
       "editServer": "Rediger server",
       "deleteServer": "Slett server",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} verktøy",
       "serverUnreachable": "Kunne ikke nå denne serveren",
       "serverOff": "Denne serveren er av"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentisering",
+      "authNone": "Ingen innlogging",
+      "authBearer": "Bearer-token",
+      "authOAuth": "OAuth-innlogging",
+      "fieldToken": "Token",
+      "oauthHint": "Når du har lagret, trykker du på $t(modelChat.mcpOAuth.signIn) på serveren for å logge inn med nettleseren.",
+      "serverNeedsSignIn": "Logg inn for å bruke denne serveren",
+      "signIn": "Logg inn",
+      "signInA11y": "Logg inn på denne serveren: {{name}}",
+      "signInFailed": "Kunne ikke logge inn på {{name}}. Prøv igjen."
     },
     "backends": {
       "title": "Baksystemer for chat",
@@ -3438,6 +3456,9 @@
       "downloading": "Laster ned …",
       "downloadProgress": "Laster ned … {{percent}} %",
       "downloadFailed": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen og ledig lagringsplass, og prøv igjen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Denne modellen støtter resonneringsinnsats"
     }
   },
   "settingsTools": {

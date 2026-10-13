@@ -138,7 +138,8 @@
     "dismissed": "E’tiborsiz qoldirilgan",
     "agent": "Agent",
     "durationMinuteShort": "daq",
-    "durationHourShort": "soat"
+    "durationHourShort": "soat",
+    "changes": "O'zgarishlar"
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -327,6 +328,7 @@
       "collapseFile": "Faylni yig'ish",
       "expandFile": "Faylni yoyish",
       "diffTooLarge": "Farqlar hajmi juda katta, ularni ko'rsatib bo'lmaydi.",
+      "noPreview": "Bu fayl uchun oldindan ko'rish mavjud emas",
       "openOnGitHub": "GitHubda ochish",
       "openDiffOnGitHub": "Bu fayldagi farqlarni GitHubda ochish",
       "githubDiff": "GitHubdagi farqlar"
@@ -2194,7 +2196,6 @@
       "retryLoadingEnvironment": "Muhitni qayta yuklash",
       "defaultEnvironment": "Standart muhit",
       "environmentSummary": "{{commands}} buyruq · {{mcp}} MCP · {{skills}} ko'nikma · {{agents}} agent",
-      "changes": "O'zgarishlar",
       "leaveChanges": "O'zgarishlarni qoldirish",
       "commitAndPush": "Kommit va yuborish",
       "startSession": "Sessiyani boshlash",
@@ -2656,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modellar ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "O'zgarishlarni ko'rish",
+      "asOf": "{{time}} holatiga ko'ra",
+      "tooLarge": "Farqlar hajmi juda katta, ularni mobil qurilmada ko'rsatib bo'lmaydi.",
+      "empty": "Bu seansda hali fayllar o'zgartirilmagan."
     },
     "autoApprove": {
       "title": "Avtomatik tasdiqlash",
@@ -3264,7 +3271,6 @@
       "fieldName": "Koʻrsatiladigan nom",
       "fieldUrl": "Server URL manzili",
       "fieldUrlInvalid": "Toʻgʻri server URL manzilini kiriting.",
-      "fieldToken": "Bearer tokeni (ixtiyoriy)",
       "enableServer": "Bu serverni yoqish: {{name}}",
       "editServer": "Serverni tahrirlash",
       "deleteServer": "Serverni oʻchirish",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} vosita",
       "serverUnreachable": "Bu serverga yetib boʻlmadi",
       "serverOff": "Bu server oʻchirilgan"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikatsiya",
+      "authNone": "Kirishsiz",
+      "authBearer": "Bearer tokeni",
+      "authOAuth": "OAuth orqali kirish",
+      "fieldToken": "Token",
+      "oauthHint": "Saqlagandan soʻng brauzer orqali kirish uchun serverda $t(modelChat.mcpOAuth.signIn) tugmasini bosing.",
+      "serverNeedsSignIn": "Bu serverdan foydalanish uchun kiring",
+      "signIn": "Kirish",
+      "signInA11y": "Bu serverga kirish: {{name}}",
+      "signInFailed": "{{name}} serveriga kirib boʻlmadi. Qayta urinib koʻring."
     },
     "backends": {
       "title": "Suhbat serverlari",
@@ -3438,6 +3456,9 @@
       "downloading": "Yuklab olinmoqda…",
       "downloadProgress": "Yuklab olinmoqda… {{percent}}%",
       "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"
     }
   },
   "settingsTools": {

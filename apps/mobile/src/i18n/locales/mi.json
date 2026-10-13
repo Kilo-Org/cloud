@@ -138,7 +138,8 @@
     "dismissed": "Kua whakakorea",
     "agent": "Kaihoko",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "Ngā huringa"
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",
@@ -327,6 +328,7 @@
       "collapseFile": "Whakaitihia te tirohanga kōnae",
       "expandFile": "Whakawhānuitia te tirohanga kōnae",
       "diffTooLarge": "He nui rawa ngā rerekētanga hei whakaatu.",
+      "noPreview": "Kāore he arokite mō tēnei kōnae",
       "openOnGitHub": "Whakatuwheratia ki GitHub",
       "openDiffOnGitHub": "Whakatuwheratia ngā rerekētanga o tēnei kōnae ki GitHub",
       "githubDiff": "Ngā rerekētanga i GitHub"
@@ -2194,7 +2196,6 @@
       "retryLoadingEnvironment": "Whakamātau anō ki te uta i te taiao",
       "defaultEnvironment": "Te taiao taunoa",
       "environmentSummary": "{{commands}} whakahau · {{mcp}} MCP · {{skills}} pūkenga · {{agents}} māngai",
-      "changes": "Ngā huringa",
       "leaveChanges": "Waiho ngā huringa",
       "commitAndPush": "Whakapūmau, pana",
       "startSession": "Tīmataria te wātū",
@@ -2656,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Ngā tauira ({{displayCount}})",
       "modelsCount_other": "Ngā tauira ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Tirohia ngā huringa",
+      "asOf": "I te {{time}}",
+      "tooLarge": "He nui rawa ēnei rerekētanga hei whakaatu ki te waea pūkoro.",
+      "empty": "Kāore anō kia huria he kōnae i tēnei wātū."
     },
     "autoApprove": {
       "title": "Whakaae aunoa",
@@ -3264,7 +3271,6 @@
       "fieldName": "Ingoa whakaatu",
       "fieldUrl": "URL o te tūmau",
       "fieldUrlInvalid": "Whakaurua he URL tūmau tika.",
-      "fieldToken": "Tāpaepae Bearer (kōwhiringa)",
       "enableServer": "Whakahohea tēnei tūmau: {{name}}",
       "editServer": "Whakatika tūmau",
       "deleteServer": "Muku tūmau",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} taputapu",
       "serverUnreachable": "Kāore i taea te toro atu ki tēnei tūmau",
       "serverOff": "Kua weto tēnei tūmau"
+    },
+    "mcpOAuth": {
+      "authMethod": "Motuhēhēnga",
+      "authNone": "Kāore he whakaurunga",
+      "authBearer": "Tāpaepae Bearer",
+      "authOAuth": "Whakauru OAuth",
+      "fieldToken": "Tāpaepae",
+      "oauthHint": "Ina oti te tiaki, pātōtia te $t(modelChat.mcpOAuth.signIn) i te tūmau kia whakauru mā tō pūtirotiro.",
+      "serverNeedsSignIn": "Whakauru mai ki te whakamahi i tēnei tūmau",
+      "signIn": "Whakauru",
+      "signInA11y": "Whakauru ki tēnei tūmau: {{name}}",
+      "signInFailed": "Kāore i taea te whakauru ki {{name}}. Whakamātau anō."
     },
     "backends": {
       "title": "Ngā pūnaha tuarā kōrerorero",
@@ -3438,6 +3456,9 @@
       "downloading": "Kei te tikiake…",
       "downloadProgress": "Kei te tikiake… {{percent}}%",
       "downloadFailed": "Kāore i oti te tikiake. Tirohia tō hononga me te wāhi rokiroki wātea, kātahi ka ngana anō."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ka tautoko tēnei tauira i te kaha whakaaro"
     }
   },
   "settingsTools": {

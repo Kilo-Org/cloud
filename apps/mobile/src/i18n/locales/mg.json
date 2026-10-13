@@ -138,7 +138,8 @@
     "dismissed": "Nesorina",
     "agent": "mpandraharaha",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "Fiovana"
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -327,6 +328,7 @@
       "collapseFile": "Aforeto ny rakitra",
       "expandFile": "Avelaro ny rakitra",
       "diffTooLarge": "Lehibe loatra ny fahasamihafana ka tsy azo aseho.",
+      "noPreview": "Tsy misy topimaso azo jerena ho an'ity rakitra ity",
       "openOnGitHub": "Sokafy ao amin'ny GitHub",
       "openDiffOnGitHub": "Sokafy ao amin'ny GitHub ny fahasamihafan'ity rakitra ity",
       "githubDiff": "Fahasamihafana ao amin'ny GitHub"
@@ -2194,7 +2196,6 @@
       "retryLoadingEnvironment": "Andramo alaina indray ny tontolo fiasana",
       "defaultEnvironment": "Tontolo fiasana voafidy mialoha",
       "environmentSummary": "baiko {{commands}} · MCP {{mcp}} · fahaiza-manao {{skills}} · mpanampy {{agents}}",
-      "changes": "Fiovana",
       "leaveChanges": "Avelao ny fiovana",
       "commitAndPush": "Raketo sy alefaso",
       "startSession": "Atombohy ny fotoam-piasana",
@@ -2656,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modely ({{displayCount}})",
       "modelsCount_other": "Modely ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Jereo ny fiovana",
+      "asOf": "Tamin'ny {{time}}",
+      "tooLarge": "Lehibe loatra ity fahasamihafana ity ka tsy azo aseho amin'ny finday.",
+      "empty": "Mbola tsy misy rakitra niova tamin'ity fotoam-piasana ity."
     },
     "autoApprove": {
       "title": "Fankatoavana ho azy",
@@ -3264,7 +3271,6 @@
       "fieldName": "Anarana aseho",
       "fieldUrl": "URL-n'ny server",
       "fieldUrlInvalid": "Ampidiro URL server mety.",
-      "fieldToken": "Token Bearer (tsy voatery)",
       "enableServer": "Alefaso ity server ity: {{name}}",
       "editServer": "Ovaina ny server",
       "deleteServer": "Fafao ny server",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "fitaovana {{count}}",
       "serverUnreachable": "Tsy tratra ity server ity",
       "serverOff": "Mihidy ity server ity"
+    },
+    "mcpOAuth": {
+      "authMethod": "Fanamarinana",
+      "authNone": "Tsy misy fidirana",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Fidirana OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Rehefa voatahiry, tsindrio ny $t(modelChat.mcpOAuth.signIn) eo amin'ny server mba hiditra amin'ny alalan'ny navigateur-nao.",
+      "serverNeedsSignIn": "Midira mba hampiasa ity server ity",
+      "signIn": "Hiditra",
+      "signInA11y": "Hiditra amin'ity server ity: {{name}}",
+      "signInFailed": "Tsy afaka niditra tamin'ny {{name}}. Andramo indray."
     },
     "backends": {
       "title": "Rafitra mpizara ho an'ny resaka",
@@ -3438,6 +3456,9 @@
       "downloading": "Misintona…",
       "downloadProgress": "Misintona… {{percent}}%",
       "downloadFailed": "Tsy vita ny fisintonana. Hamarino ny fifandraisanao sy ny toerana malalaka amin'ny fitahirizana, dia andramo indray."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Manohana ezaka amin'ny fisainana ity modely ity"
     }
   },
   "settingsTools": {

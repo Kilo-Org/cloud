@@ -138,7 +138,8 @@
     "dismissed": "Отфрлено",
     "agent": "Агент",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "Промени"
   },
   "language": {
     "restarting": "Се рестартира за да се примени јазикот",
@@ -327,6 +328,7 @@
       "collapseFile": "Собери ја датотеката",
       "expandFile": "Прошири ја датотеката",
       "diffTooLarge": "Разликите се преголеми за да се прикажат.",
+      "noPreview": "Нема достапен преглед за оваа датотека",
       "openOnGitHub": "Отвори на GitHub",
       "openDiffOnGitHub": "Отвори ги разликите во оваа датотека на GitHub",
       "githubDiff": "Разлики на GitHub"
@@ -2194,7 +2196,6 @@
       "retryLoadingEnvironment": "Повторно вчитај ја околината",
       "defaultEnvironment": "Стандардна околина",
       "environmentSummary": "{{commands}} команди · {{mcp}} MCP · {{skills}} вештини · {{agents}} агенти",
-      "changes": "Промени",
       "leaveChanges": "Остави ги промените",
       "commitAndPush": "Комитирај и испрати",
       "startSession": "Започни сесија",
@@ -2656,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Модел ({{displayCount}})",
       "modelsCount_other": "Модели ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Прикажи промени",
+      "asOf": "Состојба од {{time}}",
+      "tooLarge": "Разликите се преголеми за да се прикажат на мобилен.",
+      "empty": "Сè уште нема промени во датотеките во оваа сесија."
     },
     "autoApprove": {
       "title": "Автоматско одобрување",
@@ -3264,7 +3271,6 @@
       "fieldName": "Прикажано име",
       "fieldUrl": "URL на серверот",
       "fieldUrlInvalid": "Внеси важечки URL на серверот.",
-      "fieldToken": "Bearer токен (изборно)",
       "enableServer": "Овозможи го овој сервер: {{name}}",
       "editServer": "Уреди сервер",
       "deleteServer": "Избриши сервер",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} алатки",
       "serverUnreachable": "Не успеа да се достигне овој сервер",
       "serverOff": "Овој сервер е исклучен"
+    },
+    "mcpOAuth": {
+      "authMethod": "Автентикација",
+      "authNone": "Без најавување",
+      "authBearer": "Bearer токен",
+      "authOAuth": "Најавување со OAuth",
+      "fieldToken": "Токен",
+      "oauthHint": "Откако ќе зачуваш, допри $t(modelChat.mcpOAuth.signIn) на серверот за да се најавиш преку прелистувачот.",
+      "serverNeedsSignIn": "Најави се за да го користиш овој сервер",
+      "signIn": "Најави се",
+      "signInA11y": "Најави се на овој сервер: {{name}}",
+      "signInFailed": "Не успеа најавувањето на {{name}}. Обиди се повторно."
     },
     "backends": {
       "title": "Сервери за разговор",
@@ -3438,6 +3456,9 @@
       "downloading": "Се презема…",
       "downloadProgress": "Се презема… {{percent}}%",
       "downloadFailed": "Преземањето не заврши. Проверете ја врската и слободниот простор, па обидете се повторно."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Овој модел поддржува ниво на размислување"
     }
   },
   "settingsTools": {

@@ -138,7 +138,8 @@
     "dismissed": "ଖାରଜ ହୋଇଛି",
     "agent": "ଏଜେଣ୍ଟ।",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "ପରିବର୍ତ୍ତନ"
   },
   "language": {
     "restarting": "ଭାଷା ବଦଳାଇବାକୁ ଆପ୍ ପୁଣି ଆରମ୍ଭ ହେଉଛି",
@@ -327,6 +328,7 @@
       "collapseFile": "ଫାଇଲ୍ ବିବରଣୀ ଲୁଚାନ୍ତୁ",
       "expandFile": "ଫାଇଲ୍ ବିବରଣୀ ଦେଖାନ୍ତୁ",
       "diffTooLarge": "ପରିବର୍ତ୍ତନ ବିବରଣୀ ଅତ୍ୟଧିକ ବଡ଼ ହୋଇଥିବାରୁ ଦେଖାଇହେବ ନାହିଁ।",
+      "noPreview": "ଏହି ଫାଇଲ୍ ପାଇଁ କୌଣସି ପ୍ରିଭ୍ୟୁ ଉପଲବ୍ଧ ନାହିଁ",
       "openOnGitHub": "GitHub ରେ ଖୋଲନ୍ତୁ",
       "openDiffOnGitHub": "GitHub ରେ ଏହି ଫାଇଲ୍‌ର ପରିବର୍ତ୍ତନ ବିବରଣୀ ଖୋଲନ୍ତୁ",
       "githubDiff": "GitHub ପରିବର୍ତ୍ତନ ବିବରଣୀ"
@@ -2194,7 +2196,6 @@
       "retryLoadingEnvironment": "ପରିବେଶ ପୁଣି ଲୋଡ୍ କରନ୍ତୁ",
       "defaultEnvironment": "ଡିଫଲ୍ଟ ପରିବେଶ",
       "environmentSummary": "{{commands}} କମାଣ୍ଡ · {{mcp}} MCP · {{skills}} ସ୍କିଲ୍ · {{agents}} ଏଜେଣ୍ଟ",
-      "changes": "ପରିବର୍ତ୍ତନ",
       "leaveChanges": "ପରିବର୍ତ୍ତନ ରଖନ୍ତୁ",
       "commitAndPush": "କମିଟ୍ ଓ ପୁଶ୍ କରନ୍ତୁ",
       "startSession": "ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ",
@@ -2656,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "ମଡେଲ୍ ({{displayCount}})",
       "modelsCount_other": "ମଡେଲ୍ ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ପରିବର୍ତ୍ତନ ଦେଖନ୍ତୁ",
+      "asOf": "{{time}} ସୁଦ୍ଧା",
+      "tooLarge": "ଏହି ପରିବର୍ତ୍ତନ ବିବରଣୀ ମୋବାଇଲରେ ଦେଖାଇବା ପାଇଁ ଅତ୍ୟଧିକ ବଡ଼।",
+      "empty": "ଏହି ସେସନରେ ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଫାଇଲ୍ ପରିବର୍ତ୍ତନ ହୋଇନାହିଁ।"
     },
     "autoApprove": {
       "title": "ସ୍ୱଚାଳିତ ଅନୁମୋଦନ",
@@ -3264,7 +3271,6 @@
       "fieldName": "ଦେଖାଯାଉଥିବା ନାମ",
       "fieldUrl": "ସର୍ଭର URL",
       "fieldUrlInvalid": "ବୈଧ ସର୍ଭର URL ଦିଅନ୍ତୁ।",
-      "fieldToken": "Bearer ଟୋକନ (ଇଚ୍ଛାଧୀନ)",
       "enableServer": "ଏହି ସର୍ଭର ସକ୍ଷମ କରନ୍ତୁ: {{name}}",
       "editServer": "ସର୍ଭର ସମ୍ପାଦନ କରନ୍ତୁ",
       "deleteServer": "ସର୍ଭର ବିଲୋପ କରନ୍ତୁ",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} ସାଧନ",
       "serverUnreachable": "ଏହି ସର୍ଭର ପର୍ଯ୍ୟନ୍ତ ପହଞ୍ଚି ପାରିଲା ନାହିଁ",
       "serverOff": "ଏହି ସର୍ଭର ବନ୍ଦ ଅଛି"
+    },
+    "mcpOAuth": {
+      "authMethod": "ପ୍ରମାଣୀକରଣ",
+      "authNone": "ସାଇନ୍ ଇନ୍ ନାହିଁ",
+      "authBearer": "Bearer ଟୋକନ",
+      "authOAuth": "OAuth ସାଇନ୍ ଇନ୍",
+      "fieldToken": "ଟୋକନ",
+      "oauthHint": "ସେଭ୍ କରିବା ପରେ, ଆପଣଙ୍କ ବ୍ରାଉଜର୍ ସହିତ ସାଇନ୍ ଇନ୍ କରିବାକୁ ସର୍ଭରରେ $t(modelChat.mcpOAuth.signIn) ଟ୍ୟାପ୍ କରନ୍ତୁ।",
+      "serverNeedsSignIn": "ଏହି ସର୍ଭର ବ୍ୟବହାର କରିବାକୁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ",
+      "signIn": "ସାଇନ୍ ଇନ୍",
+      "signInA11y": "ଏହି ସର୍ଭରରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ: {{name}}",
+      "signInFailed": "{{name}}ରେ ସାଇନ୍ ଇନ୍ କରିପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
     "backends": {
       "title": "ଚାଟ୍ ବ୍ୟାକଏଣ୍ଡଗୁଡ଼ିକ",
@@ -3438,6 +3456,9 @@
       "downloading": "ଡାଉନଲୋଡ୍ ହେଉଛି…",
       "downloadProgress": "ଡାଉନଲୋଡ୍ ହେଉଛି… {{percent}}%",
       "downloadFailed": "ଡାଉନଲୋଡ୍ ସମ୍ପୂର୍ଣ୍ଣ ହେଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଏବଂ ଖାଲି ଷ୍ଟୋରେଜ୍ ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+    },
+    "reasoningEffort": {
+      "modelFlag": "ଏହି ମଡେଲ୍ ଚିନ୍ତନର ମାତ୍ରାକୁ ସମର୍ଥନ କରେ"
     }
   },
   "settingsTools": {

@@ -55,7 +55,11 @@ const optionsOf = (stored: StoredSession): SessionOptions => ({
  */
 interface CloneOptions {
   readonly model?: string;
-  readonly effort?: Effort;
+  /**
+   * The effort the copy asks with. `'default'` clears it, so the copy asks with
+   * the model's own default: a model that takes no effort must not be sent one.
+   */
+  readonly effort?: Effort | 'default';
   /**
    * The tools the copy offers, by name, in the order the model sees them. A
    * different set is a different prefix, which is what makes this a reason to
@@ -98,14 +102,18 @@ const continueSession = (
 /**
  * The stored options with what the caller is moving the copy onto. A field the
  * caller left out is the stored one: `undefined` here means "as it was", never
- * "unset it".
+ * "unset it". Only the effort can be unset, and only by `'default'`.
  */
-const movedOnto = (options: SessionOptions, onto: CloneOptions | undefined): SessionOptions => ({
-  ...options,
-  ...(onto?.model === undefined ? {} : { model: onto.model }),
-  ...(onto?.effort === undefined ? {} : { effort: onto.effort }),
-  ...(onto?.tools === undefined ? {} : { tools: onto.tools }),
-});
+const movedOnto = (options: SessionOptions, onto: CloneOptions | undefined): SessionOptions => {
+  const { effort: stored, ...rest } = options;
+  const effort = onto?.effort ?? stored;
+  return {
+    ...rest,
+    ...(effort === undefined || effort === 'default' ? {} : { effort }),
+    ...(onto?.model === undefined ? {} : { model: onto.model }),
+    ...(onto?.tools === undefined ? {} : { tools: onto.tools }),
+  };
+};
 
 /**
  * The parts of one turn a copy may carry.

@@ -138,7 +138,8 @@
     "dismissed": "Ignorované",
     "agent": "agent",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "Zmeny"
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -327,6 +328,7 @@
       "collapseFile": "Zbaliť súbor",
       "expandFile": "Rozbaliť súbor",
       "diffTooLarge": "Prehľad zmien je príliš veľký na zobrazenie.",
+      "noPreview": "Pre tento súbor nie je k dispozícii náhľad",
       "openOnGitHub": "Otvoriť na GitHub",
       "openDiffOnGitHub": "Otvoriť prehľad zmien tohto súboru na GitHub",
       "githubDiff": "Prehľad zmien na GitHub"
@@ -2250,7 +2252,6 @@
       "retryLoadingEnvironment": "Skúsiť znova načítať prostredie",
       "defaultEnvironment": "Predvolené prostredie",
       "environmentSummary": "príkazy: {{commands}} · MCP: {{mcp}} · zručnosti: {{skills}} · agenti: {{agents}}",
-      "changes": "Zmeny",
       "leaveChanges": "Ponechať zmeny",
       "commitAndPush": "Vytvoriť commit a odoslať",
       "startSession": "Spustiť reláciu",
@@ -2732,6 +2733,12 @@
       "modelsCount_other": "Modely ({{displayCount}})",
       "modelsCount_few": "Modely ({{displayCount}})",
       "modelsCount_many": "Modely ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Zobraziť zmeny",
+      "asOf": "Stav k {{time}}",
+      "tooLarge": "Prehľad zmien je príliš veľký na zobrazenie v mobile.",
+      "empty": "V tejto relácii zatiaľ nie sú žiadne zmeny súborov."
     },
     "autoApprove": {
       "title": "Automatické schvaľovanie",
@@ -3346,7 +3353,6 @@
       "fieldName": "Zobrazovaný názov",
       "fieldUrl": "URL servera",
       "fieldUrlInvalid": "Zadajte platnú URL servera.",
-      "fieldToken": "Token Bearer (voliteľné)",
       "enableServer": "Povoliť tento server: {{name}}",
       "editServer": "Upraviť server",
       "deleteServer": "Odstrániť server",
@@ -3366,6 +3372,18 @@
       "serverToolCount": "{{count}} nástrojov",
       "serverUnreachable": "Nepodarilo sa pripojiť k tomuto serveru",
       "serverOff": "Tento server je vypnutý"
+    },
+    "mcpOAuth": {
+      "authMethod": "Overenie",
+      "authNone": "Bez prihlásenia",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Prihlásenie cez OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Po uložení ťuknite pri serveri na $t(modelChat.mcpOAuth.signIn) a prihláste sa v prehliadači.",
+      "serverNeedsSignIn": "Ak chcete používať tento server, prihláste sa",
+      "signIn": "Prihlásiť sa",
+      "signInA11y": "Prihlásiť sa k tomuto serveru: {{name}}",
+      "signInFailed": "Nepodarilo sa prihlásiť k {{name}}. Skúste to znova."
     },
     "backends": {
       "title": "Servery chatu",
@@ -3520,6 +3538,9 @@
       "downloading": "Sťahuje sa…",
       "downloadProgress": "Sťahuje sa… {{percent}} %",
       "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tento model podporuje intenzitu uvažovania"
     }
   },
   "settingsTools": {

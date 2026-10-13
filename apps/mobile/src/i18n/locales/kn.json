@@ -138,7 +138,8 @@
     "dismissed": "ಕಡೆಗಣಿಸಲಾಗಿದೆ",
     "agent": "ಏಜೆಂಟ್",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "ಬದಲಾವಣೆಗಳು"
   },
   "language": {
     "restarting": "ಆಯ್ಕೆ ಮಾಡಿದ ಭಾಷೆಯನ್ನು ಅನ್ವಯಿಸಲು ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",
@@ -327,6 +328,7 @@
       "collapseFile": "ಫೈಲ್ ಮಡಚಿ",
       "expandFile": "ಫೈಲ್ ವಿಸ್ತರಿಸಿ",
       "diffTooLarge": "ಬದಲಾವಣೆಗಳ ಹೋಲಿಕೆ ತುಂಬಾ ದೊಡ್ಡದಿರುವುದರಿಂದ ತೋರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+      "noPreview": "ಈ ಫೈಲ್‌ಗೆ ಪೂರ್ವವೀಕ್ಷಣೆ ಲಭ್ಯವಿಲ್ಲ",
       "openOnGitHub": "GitHubನಲ್ಲಿ ತೆರೆಯಿರಿ",
       "openDiffOnGitHub": "ಈ ಫೈಲ್‌ನ ಬದಲಾವಣೆಗಳ ಹೋಲಿಕೆಯನ್ನು GitHubನಲ್ಲಿ ತೆರೆಯಿರಿ",
       "githubDiff": "GitHubನಲ್ಲಿನ ಬದಲಾವಣೆಗಳ ಹೋಲಿಕೆ"
@@ -2194,7 +2196,6 @@
       "retryLoadingEnvironment": "ಪರಿಸರವನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "defaultEnvironment": "ಡೀಫಾಲ್ಟ್ ಪರಿಸರ",
       "environmentSummary": "{{commands}} ಆಜ್ಞೆಗಳು · {{mcp}} MCP · {{skills}} ಕೌಶಲ್ಯಗಳು · {{agents}} ಏಜೆಂಟ್‌ಗಳು",
-      "changes": "ಬದಲಾವಣೆಗಳು",
       "leaveChanges": "ಹಾಗೆಯೇ ಬಿಡಿ",
       "commitAndPush": "ಕಮಿಟ್ ಮಾಡಿ, ಪುಶ್ ಮಾಡಿ",
       "startSession": "ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ",
@@ -2656,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "ಮಾದರಿ ({{displayCount}})",
       "modelsCount_other": "ಮಾದರಿಗಳು ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ಬದಲಾವಣೆಗಳನ್ನು ವೀಕ್ಷಿಸಿ",
+      "asOf": "{{time}} ರ ಪ್ರಕಾರ",
+      "tooLarge": "ಈ ಬದಲಾವಣೆಗಳ ಹೋಲಿಕೆ ಮೊಬೈಲ್‌ನಲ್ಲಿ ತೋರಿಸಲು ತುಂಬಾ ದೊಡ್ಡದಾಗಿದೆ.",
+      "empty": "ಈ ಸೆಷನ್‌ನಲ್ಲಿ ಇನ್ನೂ ಯಾವುದೇ ಫೈಲ್ ಬದಲಾವಣೆಗಳಿಲ್ಲ."
     },
     "autoApprove": {
       "title": "ಸ್ವಯಂ ಅನುಮೋದನೆ",
@@ -3264,7 +3271,6 @@
       "fieldName": "ಪ್ರದರ್ಶಿತ ಹೆಸರು",
       "fieldUrl": "ಸರ್ವರ್ URL",
       "fieldUrlInvalid": "ಮಾನ್ಯ ಸರ್ವರ್ URL ನಮೂದಿಸಿ.",
-      "fieldToken": "Bearer ಟೋಕನ್ (ಐಚ್ಛಿಕ)",
       "enableServer": "ಈ ಸರ್ವರ್ ಸಕ್ರಿಯಗೊಳಿಸಿ: {{name}}",
       "editServer": "ಸರ್ವರ್ ಸಂಪಾದಿಸಿ",
       "deleteServer": "ಸರ್ವರ್ ಅಳಿಸಿ",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} ಸಾಧನಗಳು",
       "serverUnreachable": "ಈ ಸರ್ವರ್ ತಲುಪಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "serverOff": "ಈ ಸರ್ವರ್ ಆಫ್ ಆಗಿದೆ"
+    },
+    "mcpOAuth": {
+      "authMethod": "ದೃಢೀಕರಣ",
+      "authNone": "ಸೈನ್ ಇನ್ ಇಲ್ಲ",
+      "authBearer": "Bearer ಟೋಕನ್",
+      "authOAuth": "OAuth ಸೈನ್ ಇನ್",
+      "fieldToken": "ಟೋಕನ್",
+      "oauthHint": "ಉಳಿಸಿದ ನಂತರ, ನಿಮ್ಮ ಬ್ರೌಸರ್ ಮೂಲಕ ಸೈನ್ ಇನ್ ಮಾಡಲು ಸರ್ವರ್‌ನಲ್ಲಿ $t(modelChat.mcpOAuth.signIn) ಟ್ಯಾಪ್ ಮಾಡಿ.",
+      "serverNeedsSignIn": "ಈ ಸರ್ವರ್ ಬಳಸಲು ಸೈನ್ ಇನ್ ಮಾಡಿ",
+      "signIn": "ಸೈನ್ ಇನ್",
+      "signInA11y": "ಈ ಸರ್ವರ್‌ಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿ: {{name}}",
+      "signInFailed": "{{name}} ಗೆ ಸೈನ್ ಇನ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
     "backends": {
       "title": "ಚಾಟ್ ಬ್ಯಾಕೆಂಡ್‌ಗಳು",
@@ -3438,6 +3456,9 @@
       "downloading": "ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
       "downloadProgress": "ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ… {{percent}}%",
       "downloadFailed": "ಡೌನ್‌ಲೋಡ್ ಪೂರ್ಣಗೊಳ್ಳಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕ ಮತ್ತು ಖಾಲಿ ಸಂಗ್ರಹಣೆಯನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ಈ ಮಾದರಿ ಯೋಚನೆಯ ಮಟ್ಟವನ್ನು ಬೆಂಬಲಿಸುತ್ತದೆ"
     }
   },
   "settingsTools": {

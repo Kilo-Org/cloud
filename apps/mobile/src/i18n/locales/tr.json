@@ -138,7 +138,8 @@
     "dismissed": "Yok sayıldı",
     "agent": "Ajan",
     "durationMinuteShort": "dk",
-    "durationHourShort": "sa"
+    "durationHourShort": "sa",
+    "changes": "Değişiklikler"
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -1683,7 +1684,6 @@
       "retryLoadingEnvironment": "Ortamı yüklemeyi tekrar dene",
       "defaultEnvironment": "Varsayılan ortam",
       "environmentSummary": "{{commands}} komut · {{mcp}} MCP · {{skills}} beceri · {{agents}} ajan",
-      "changes": "Değişiklikler",
       "leaveChanges": "Değişiklikleri koru",
       "commitAndPush": "İşle ve gönder",
       "startSession": "Oturumu başlat",
@@ -2145,6 +2145,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Değişiklikleri görüntüle",
+      "asOf": "{{time}} itibarıyla",
+      "tooLarge": "Bu fark, mobilde gösterilemeyecek kadar büyük.",
+      "empty": "Bu oturumda henüz dosya değişikliği yok."
     },
     "autoApprove": {
       "title": "Otomatik onayla",
@@ -2649,6 +2655,7 @@
     "fileRows": {
       "collapseFile": "Dosyayı daralt",
       "diffTooLarge": "Fark, görüntülenemeyecek kadar büyük.",
+      "noPreview": "Bu dosya için önizleme yok",
       "expandFile": "Dosyayı genişlet",
       "markViewed": "{{path}} dosyasını görüntülenmiş olarak işaretle",
       "openDiffOnGitHub": "Bu dosyanın farkını GitHub'da aç",
@@ -3264,7 +3271,6 @@
       "fieldName": "Görünen ad",
       "fieldUrl": "Sunucu URL'si",
       "fieldUrlInvalid": "Geçerli bir sunucu URL'si girin.",
-      "fieldToken": "Bearer belirteci (isteğe bağlı)",
       "enableServer": "Bu sunucuyu etkinleştir: {{name}}",
       "editServer": "Sunucuyu düzenle",
       "deleteServer": "Sunucuyu sil",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} araç",
       "serverUnreachable": "Bu sunucuya ulaşılamadı",
       "serverOff": "Bu sunucu kapalı"
+    },
+    "mcpOAuth": {
+      "authMethod": "Kimlik doğrulama",
+      "authNone": "Oturum açma yok",
+      "authBearer": "Bearer belirteci",
+      "authOAuth": "OAuth ile oturum açma",
+      "fieldToken": "Belirteç",
+      "oauthHint": "Kaydettikten sonra tarayıcınla oturum açmak için sunucuda $t(modelChat.mcpOAuth.signIn) seçeneğine dokun.",
+      "serverNeedsSignIn": "Bu sunucuyu kullanmak için oturum aç",
+      "signIn": "Oturum aç",
+      "signInA11y": "Bu sunucuda oturum aç: {{name}}",
+      "signInFailed": "{{name}} sunucusunda oturum açılamadı. Tekrar dene."
     },
     "backends": {
       "title": "Sohbet arka uçları",
@@ -3438,6 +3456,9 @@
       "downloading": "İndiriliyor…",
       "downloadProgress": "İndiriliyor… %{{percent}}",
       "downloadFailed": "İndirme tamamlanamadı. Bağlantınızı ve boş depolama alanınızı kontrol edip yeniden deneyin."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Bu model düşünme düzeyini destekler"
     }
   },
   "settingsTools": {

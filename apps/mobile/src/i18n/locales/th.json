@@ -138,7 +138,8 @@
     "dismissed": "ละเว้นแล้ว",
     "agent": "ตัวแทน",
     "durationMinuteShort": "น.",
-    "durationHourShort": "ชม."
+    "durationHourShort": "ชม.",
+    "changes": "การเปลี่ยนแปลง"
   },
   "language": {
     "restarting": "กำลังเริ่มแอปใหม่เพื่อเปลี่ยนภาษา",
@@ -327,6 +328,7 @@
       "collapseFile": "ย่อไฟล์",
       "expandFile": "ขยายไฟล์",
       "diffTooLarge": "ส่วนต่างมีขนาดใหญ่เกินกว่าจะแสดงได้",
+      "noPreview": "ไม่มีตัวอย่างสำหรับไฟล์นี้",
       "openOnGitHub": "เปิดบน GitHub",
       "openDiffOnGitHub": "เปิดส่วนต่างของไฟล์นี้บน GitHub",
       "githubDiff": "ส่วนต่างบน GitHub"
@@ -2194,7 +2196,6 @@
       "retryLoadingEnvironment": "ลองโหลดสภาพแวดล้อมใหม่",
       "defaultEnvironment": "สภาพแวดล้อมเริ่มต้น",
       "environmentSummary": "{{commands}} คำสั่ง · {{mcp}} MCP · {{skills}} ทักษะ · {{agents}} เอเจนต์",
-      "changes": "การเปลี่ยนแปลง",
       "leaveChanges": "เก็บการแก้ไขไว้",
       "commitAndPush": "คอมมิตและพุช",
       "startSession": "เริ่มเซสชัน",
@@ -2656,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}} จาก {{provider}} · {{steps}} · {{cost}}",
       "modelsCount_one": "โมเดล ({{displayCount}})",
       "modelsCount_other": "โมเดล ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ดูการเปลี่ยนแปลง",
+      "asOf": "ณ เวลา {{time}}",
+      "tooLarge": "ส่วนต่างนี้มีขนาดใหญ่เกินกว่าจะแสดงบนมือถือได้",
+      "empty": "ยังไม่มีการเปลี่ยนแปลงไฟล์ในเซสชันนี้"
     },
     "autoApprove": {
       "title": "อนุมัติอัตโนมัติ",
@@ -3264,7 +3271,6 @@
       "fieldName": "ชื่อที่แสดง",
       "fieldUrl": "URL ของเซิร์ฟเวอร์",
       "fieldUrlInvalid": "ป้อน URL ของเซิร์ฟเวอร์ที่ถูกต้อง",
-      "fieldToken": "โทเค็น Bearer (ไม่บังคับ)",
       "enableServer": "เปิดใช้งานเซิร์ฟเวอร์นี้: {{name}}",
       "editServer": "แก้ไขเซิร์ฟเวอร์",
       "deleteServer": "ลบเซิร์ฟเวอร์",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} เครื่องมือ",
       "serverUnreachable": "ไม่สามารถเข้าถึงเซิร์ฟเวอร์นี้ได้",
       "serverOff": "เซิร์ฟเวอร์นี้ปิดอยู่"
+    },
+    "mcpOAuth": {
+      "authMethod": "การยืนยันตัวตน",
+      "authNone": "ไม่ต้องลงชื่อเข้าใช้",
+      "authBearer": "โทเค็น Bearer",
+      "authOAuth": "ลงชื่อเข้าใช้ด้วย OAuth",
+      "fieldToken": "โทเค็น",
+      "oauthHint": "หลังจากบันทึกแล้ว ให้แตะ $t(modelChat.mcpOAuth.signIn) ที่เซิร์ฟเวอร์เพื่อลงชื่อเข้าใช้ผ่านเบราว์เซอร์",
+      "serverNeedsSignIn": "ลงชื่อเข้าใช้เพื่อใช้เซิร์ฟเวอร์นี้",
+      "signIn": "ลงชื่อเข้าใช้",
+      "signInA11y": "ลงชื่อเข้าใช้เซิร์ฟเวอร์นี้: {{name}}",
+      "signInFailed": "ไม่สามารถลงชื่อเข้าใช้ {{name}} ได้ โปรดลองอีกครั้ง"
     },
     "backends": {
       "title": "ระบบเบื้องหลังแชท",
@@ -3438,6 +3456,9 @@
       "downloading": "กำลังดาวน์โหลด…",
       "downloadProgress": "กำลังดาวน์โหลด… {{percent}}%",
       "downloadFailed": "ดาวน์โหลดไม่สำเร็จ ตรวจสอบการเชื่อมต่อและพื้นที่ว่าง แล้วลองอีกครั้ง"
+    },
+    "reasoningEffort": {
+      "modelFlag": "โมเดลนี้รองรับระดับการใช้เหตุผล"
     }
   },
   "settingsTools": {

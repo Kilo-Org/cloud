@@ -138,7 +138,8 @@
     "dismissed": "Diabaikan",
     "agent": "Agen",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "Perubahan"
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -1683,7 +1684,6 @@
       "retryLoadingEnvironment": "Coba muat ulang lingkungan",
       "defaultEnvironment": "Lingkungan bawaan",
       "environmentSummary": "{{commands}} perintah · {{mcp}} MCP · {{skills}} keterampilan · {{agents}} agen",
-      "changes": "Perubahan",
       "leaveChanges": "Biarkan perubahan",
       "commitAndPush": "Commit dan kirim",
       "startSession": "Mulai sesi",
@@ -2145,6 +2145,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Model ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Lihat perubahan",
+      "asOf": "Per {{time}}",
+      "tooLarge": "Perbedaan kode ini terlalu besar untuk ditampilkan di perangkat seluler.",
+      "empty": "Belum ada perubahan file dalam sesi ini."
     },
     "autoApprove": {
       "title": "Setujui otomatis",
@@ -2649,6 +2655,7 @@
     "fileRows": {
       "collapseFile": "Ciutkan file",
       "diffTooLarge": "Perbedaan kode terlalu besar untuk ditampilkan.",
+      "noPreview": "Pratinjau tidak tersedia untuk file ini",
       "expandFile": "Bentangkan file",
       "markViewed": "Tandai {{path}} sebagai sudah dilihat",
       "openDiffOnGitHub": "Buka perbedaan kode file ini di GitHub",
@@ -3264,7 +3271,6 @@
       "fieldName": "Nama tampilan",
       "fieldUrl": "URL server",
       "fieldUrlInvalid": "Masukkan URL server yang valid.",
-      "fieldToken": "Token Bearer (opsional)",
       "enableServer": "Aktifkan server ini: {{name}}",
       "editServer": "Edit server",
       "deleteServer": "Hapus server",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} alat",
       "serverUnreachable": "Tidak dapat menjangkau server ini",
       "serverOff": "Server ini nonaktif"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentikasi",
+      "authNone": "Tanpa masuk",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Masuk dengan OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Setelah menyimpan, ketuk $t(modelChat.mcpOAuth.signIn) pada server untuk masuk dengan browser Anda.",
+      "serverNeedsSignIn": "Masuk untuk memakai server ini",
+      "signIn": "Masuk",
+      "signInA11y": "Masuk ke server ini: {{name}}",
+      "signInFailed": "Tidak dapat masuk ke {{name}}. Coba lagi."
     },
     "backends": {
       "title": "Layanan obrolan",
@@ -3438,6 +3456,9 @@
       "downloading": "Mengunduh…",
       "downloadProgress": "Mengunduh… {{percent}}%",
       "downloadFailed": "Unduhan tidak selesai. Periksa koneksi dan ruang penyimpanan Anda, lalu coba lagi."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Model ini mendukung tingkat penalaran"
     }
   },
   "settingsTools": {

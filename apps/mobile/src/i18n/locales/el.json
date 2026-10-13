@@ -138,7 +138,8 @@
     "dismissed": "Απορρίφθηκε",
     "agent": "Μέσο",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "Αλλαγές"
   },
   "language": {
     "restarting": "Επανεκκίνηση για εφαρμογή της νέας γλώσσας",
@@ -327,6 +328,7 @@
       "collapseFile": "Σύμπτυξη αρχείου",
       "expandFile": "Επέκταση αρχείου",
       "diffTooLarge": "Οι διαφορές είναι πολύ μεγάλες για να εμφανιστούν.",
+      "noPreview": "Δεν υπάρχει διαθέσιμη προεπισκόπηση για αυτό το αρχείο",
       "openOnGitHub": "Άνοιγμα στο GitHub",
       "openDiffOnGitHub": "Άνοιγμα των διαφορών αυτού του αρχείου στο GitHub",
       "githubDiff": "Διαφορές στο GitHub"
@@ -2194,7 +2196,6 @@
       "retryLoadingEnvironment": "Επανάληψη φόρτωσης περιβάλλοντος",
       "defaultEnvironment": "Προεπιλεγμένο περιβάλλον",
       "environmentSummary": "{{commands}} εντολές · {{mcp}} MCP · {{skills}} δεξιότητες · {{agents}} πράκτορες",
-      "changes": "Αλλαγές",
       "leaveChanges": "Διατήρηση αλλαγών",
       "commitAndPush": "Καταχώριση και αποστολή",
       "startSession": "Έναρξη συνεδρίας",
@@ -2656,6 +2657,12 @@
       "modelAccessibilityLabel": "Μοντέλο {{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Μοντέλο ({{displayCount}})",
       "modelsCount_other": "Μοντέλα ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Προβολή αλλαγών",
+      "asOf": "Στις {{time}}",
+      "tooLarge": "Οι διαφορές είναι πολύ μεγάλες για να εμφανιστούν σε κινητό.",
+      "empty": "Δεν υπάρχουν ακόμη αλλαγές αρχείων σε αυτή τη συνεδρία."
     },
     "autoApprove": {
       "title": "Αυτόματη έγκριση",
@@ -3264,7 +3271,6 @@
       "fieldName": "Εμφανιζόμενο όνομα",
       "fieldUrl": "URL διακομιστή",
       "fieldUrlInvalid": "Εισαγάγετε ένα έγκυρο URL διακομιστή.",
-      "fieldToken": "Διακριτικό Bearer (προαιρετικό)",
       "enableServer": "Ενεργοποίηση αυτού του διακομιστή: {{name}}",
       "editServer": "Επεξεργασία διακομιστή",
       "deleteServer": "Διαγραφή διακομιστή",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} εργαλεία",
       "serverUnreachable": "Δεν ήταν δυνατή η πρόσβαση σε αυτόν τον διακομιστή",
       "serverOff": "Ο διακομιστής αυτός είναι ανενεργός"
+    },
+    "mcpOAuth": {
+      "authMethod": "Έλεγχος ταυτότητας",
+      "authNone": "Χωρίς σύνδεση",
+      "authBearer": "Διακριτικό Bearer",
+      "authOAuth": "Σύνδεση μέσω OAuth",
+      "fieldToken": "Διακριτικό",
+      "oauthHint": "Μετά την αποθήκευση, πάτησε $t(modelChat.mcpOAuth.signIn) στον διακομιστή για να συνδεθείς μέσω του προγράμματος περιήγησης.",
+      "serverNeedsSignIn": "Συνδέσου για να χρησιμοποιήσεις αυτόν τον διακομιστή",
+      "signIn": "Σύνδεση",
+      "signInA11y": "Σύνδεση σε αυτόν τον διακομιστή: {{name}}",
+      "signInFailed": "Δεν ήταν δυνατή η σύνδεση στο {{name}}. Δοκίμασε ξανά."
     },
     "backends": {
       "title": "Υπηρεσίες συνομιλίας",
@@ -3438,6 +3456,9 @@
       "downloading": "Λήψη…",
       "downloadProgress": "Λήψη… {{percent}}%",
       "downloadFailed": "Η λήψη δεν ολοκληρώθηκε. Ελέγξτε τη σύνδεσή σας και τον ελεύθερο χώρο αποθήκευσης και δοκιμάστε ξανά."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Αυτό το μοντέλο υποστηρίζει ένταση σκέψης"
     }
   },
   "settingsTools": {

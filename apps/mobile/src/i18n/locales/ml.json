@@ -138,7 +138,8 @@
     "dismissed": "ഒഴിവാക്കി",
     "agent": "ഏജൻ്റ്",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "മാറ്റങ്ങൾ"
   },
   "language": {
     "restarting": "ഭാഷ മാറ്റാൻ പുനരാരംഭിക്കുന്നു",
@@ -327,6 +328,7 @@
       "collapseFile": "ഫയൽ ചുരുക്കുക",
       "expandFile": "ഫയൽ വിരിക്കുക",
       "diffTooLarge": "ഡിഫ് വളരെ വലുതായതിനാൽ കാണിക്കാനാവില്ല.",
+      "noPreview": "ഈ ഫയലിന് പ്രിവ്യൂ ലഭ്യമല്ല",
       "openOnGitHub": "GitHub-ൽ തുറക്കുക",
       "openDiffOnGitHub": "ഈ ഫയലിന്റെ ഡിഫ് GitHub-ൽ തുറക്കുക",
       "githubDiff": "GitHub ഡിഫ്"
@@ -2194,7 +2196,6 @@
       "retryLoadingEnvironment": "പ്രവർത്തനാന്തരീക്ഷം ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
       "defaultEnvironment": "ഡിഫോൾട്ട് പ്രവർത്തനാന്തരീക്ഷം",
       "environmentSummary": "{{commands}} കമാൻഡുകൾ · {{mcp}} MCP · {{skills}} സ്കില്ലുകൾ · {{agents}} ഏജന്റുകൾ",
-      "changes": "മാറ്റങ്ങൾ",
       "leaveChanges": "മാറ്റങ്ങൾ നിലനിർത്തുക",
       "commitAndPush": "കമ്മിറ്റ് ചെയ്ത് പുഷ് ചെയ്യുക",
       "startSession": "സെഷൻ ആരംഭിക്കുക",
@@ -2656,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "മോഡൽ ({{displayCount}})",
       "modelsCount_other": "മോഡലുകൾ ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "മാറ്റങ്ങൾ കാണുക",
+      "asOf": "{{time}} വരെയുള്ളത്",
+      "tooLarge": "ഈ ഡിഫ് മൊബൈലിൽ കാണിക്കാൻ കഴിയാത്തത്ര വലുതാണ്.",
+      "empty": "ഈ സെഷനിൽ ഇതുവരെ ഫയൽ മാറ്റങ്ങളൊന്നുമില്ല."
     },
     "autoApprove": {
       "title": "സ്വയം അനുമതി",
@@ -3264,7 +3271,6 @@
       "fieldName": "പ്രദർശിപ്പിക്കുന്ന പേര്",
       "fieldUrl": "സെർവർ URL",
       "fieldUrlInvalid": "സാധുവായ സെർവർ URL നൽകുക.",
-      "fieldToken": "Bearer ടോക്കൺ (ഓപ്ഷണൽ)",
       "enableServer": "ഈ സെർവർ പ്രവർത്തനക്ഷമമാക്കുക: {{name}}",
       "editServer": "സെർവർ എഡിറ്റ് ചെയ്യുക",
       "deleteServer": "സെർവർ ഇല്ലാതാക്കുക",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} ഉപകരണങ്ങൾ",
       "serverUnreachable": "ഈ സെർവറിൽ എത്തിച്ചേരാനായില്ല",
       "serverOff": "ഈ സെർവർ ഓഫാണ്"
+    },
+    "mcpOAuth": {
+      "authMethod": "ആധികാരികത",
+      "authNone": "സൈൻ ഇൻ ഇല്ല",
+      "authBearer": "Bearer ടോക്കൺ",
+      "authOAuth": "OAuth സൈൻ ഇൻ",
+      "fieldToken": "ടോക്കൺ",
+      "oauthHint": "സേവ് ചെയ്ത ശേഷം, ബ്രൗസർ ഉപയോഗിച്ച് സൈൻ ഇൻ ചെയ്യാൻ സെർവറിലെ $t(modelChat.mcpOAuth.signIn) ടാപ്പ് ചെയ്യുക.",
+      "serverNeedsSignIn": "ഈ സെർവർ ഉപയോഗിക്കാൻ സൈൻ ഇൻ ചെയ്യുക",
+      "signIn": "സൈൻ ഇൻ ചെയ്യുക",
+      "signInA11y": "ഈ സെർവറിലേക്ക് സൈൻ ഇൻ ചെയ്യുക: {{name}}",
+      "signInFailed": "{{name}}-ലേക്ക് സൈൻ ഇൻ ചെയ്യാനായില്ല. വീണ്ടും ശ്രമിക്കുക."
     },
     "backends": {
       "title": "ചാറ്റ് ബാക്കെൻഡുകൾ",
@@ -3438,6 +3456,9 @@
       "downloading": "ഡൗൺലോഡ് ചെയ്യുന്നു…",
       "downloadProgress": "ഡൗൺലോഡ് ചെയ്യുന്നു… {{percent}}%",
       "downloadFailed": "ഡൗൺലോഡ് പൂർത്തിയായില്ല. കണക്ഷനും ലഭ്യമായ സ്റ്റോറേജും പരിശോധിച്ച ശേഷം വീണ്ടും ശ്രമിക്കുക."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ഈ മോഡൽ ചിന്തയുടെ തോത് പിന്തുണയ്ക്കുന്നു"
     }
   },
   "settingsTools": {

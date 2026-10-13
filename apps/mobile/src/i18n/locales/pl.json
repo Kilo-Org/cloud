@@ -138,7 +138,8 @@
     "dismissed": "Odrzucone",
     "agent": "Agent",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "Zmiany"
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -1707,7 +1708,6 @@
       "retryLoadingEnvironment": "Wczytaj środowisko ponownie",
       "defaultEnvironment": "Domyślne środowisko",
       "environmentSummary": "polecenia: {{commands}} · MCP: {{mcp}} · umiejętności: {{skills}} · agenci: {{agents}}",
-      "changes": "Zmiany",
       "leaveChanges": "Pozostaw zmiany",
       "commitAndPush": "Zatwierdź i wypchnij",
       "startSession": "Rozpocznij sesję",
@@ -2189,6 +2189,12 @@
       "modelsCount_other": "Modele ({{displayCount}})",
       "modelsCount_few": "Modele ({{displayCount}})",
       "modelsCount_many": "Modele ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Wyświetl zmiany",
+      "asOf": "Stan na {{time}}",
+      "tooLarge": "Różnice są zbyt duże, aby je wyświetlić na urządzeniu mobilnym.",
+      "empty": "W tej sesji nie zmieniono jeszcze żadnych plików."
     },
     "autoApprove": {
       "title": "Automatyczne zatwierdzanie",
@@ -2705,6 +2711,7 @@
     "fileRows": {
       "collapseFile": "Zwiń plik",
       "diffTooLarge": "Różnice są zbyt duże, aby je wyświetlić.",
+      "noPreview": "Podgląd tego pliku jest niedostępny",
       "expandFile": "Rozwiń plik",
       "markViewed": "Oznacz {{path}} jako przejrzany",
       "openDiffOnGitHub": "Otwórz różnice w tym pliku w serwisie GitHub",
@@ -3346,7 +3353,6 @@
       "fieldName": "Wyświetlana nazwa",
       "fieldUrl": "Adres URL serwera",
       "fieldUrlInvalid": "Wprowadź prawidłowy adres URL serwera.",
-      "fieldToken": "Token Bearer (opcjonalnie)",
       "enableServer": "Włącz ten serwer: {{name}}",
       "editServer": "Edytuj serwer",
       "deleteServer": "Usuń serwer",
@@ -3366,6 +3372,18 @@
       "serverToolCount": "{{count}} narzędzi",
       "serverUnreachable": "Nie udało się połączyć z tym serwerem",
       "serverOff": "Ten serwer jest wyłączony"
+    },
+    "mcpOAuth": {
+      "authMethod": "Uwierzytelnianie",
+      "authNone": "Bez logowania",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Logowanie OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Po zapisaniu dotknij $t(modelChat.mcpOAuth.signIn) przy serwerze, aby zalogować się w przeglądarce.",
+      "serverNeedsSignIn": "Zaloguj się, aby używać tego serwera",
+      "signIn": "Zaloguj się",
+      "signInA11y": "Zaloguj się do tego serwera: {{name}}",
+      "signInFailed": "Nie udało się zalogować do {{name}}. Spróbuj ponownie."
     },
     "backends": {
       "title": "Backendy czatu",
@@ -3520,6 +3538,9 @@
       "downloading": "Pobieranie…",
       "downloadProgress": "Pobieranie… {{percent}}%",
       "downloadFailed": "Pobieranie nie zostało ukończone. Sprawdź połączenie i wolne miejsce w pamięci, a potem spróbuj ponownie."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ten model obsługuje poziom rozumowania"
     }
   },
   "settingsTools": {

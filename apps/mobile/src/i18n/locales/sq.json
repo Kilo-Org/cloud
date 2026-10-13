@@ -138,7 +138,8 @@
     "dismissed": "E hedhur poshtë",
     "agent": "Agjenti",
     "durationMinuteShort": "min",
-    "durationHourShort": "orë"
+    "durationHourShort": "orë",
+    "changes": "Ndryshimet"
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -327,6 +328,7 @@
       "collapseFile": "Fshih përmbajtjen e skedarit",
       "expandFile": "Shfaq përmbajtjen e skedarit",
       "diffTooLarge": "Ndryshimet janë tepër të mëdha për t'u shfaqur.",
+      "noPreview": "Nuk ka parapamje për këtë skedar",
       "openOnGitHub": "Hap në GitHub",
       "openDiffOnGitHub": "Hap ndryshimet e këtij skedari në GitHub",
       "githubDiff": "Ndryshimet në GitHub"
@@ -2194,7 +2196,6 @@
       "retryLoadingEnvironment": "Provo ta ngarkosh përsëri mjedisin",
       "defaultEnvironment": "Mjedisi i parazgjedhur",
       "environmentSummary": "{{commands}} komanda · {{mcp}} MCP · {{skills}} aftësi · {{agents}} agjentë",
-      "changes": "Ndryshimet",
       "leaveChanges": "Lër ndryshimet",
       "commitAndPush": "Regjistro dhe dërgo",
       "startSession": "Nis seancën",
@@ -2656,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modelet ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Shiko ndryshimet",
+      "asOf": "Deri në {{time}}",
+      "tooLarge": "Ndryshimet janë tepër të mëdha për t'u shfaqur në celular.",
+      "empty": "Ende nuk ka ndryshime skedarësh në këtë sesion."
     },
     "autoApprove": {
       "title": "Miratim automatik",
@@ -3264,7 +3271,6 @@
       "fieldName": "Emri i shfaqur",
       "fieldUrl": "URL-ja e serverit",
       "fieldUrlInvalid": "Fut një URL të vlefshme serveri.",
-      "fieldToken": "Token bartës (opsional)",
       "enableServer": "Aktivizo këtë server: {{name}}",
       "editServer": "Modifiko serverin",
       "deleteServer": "Fshi serverin",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} mjete",
       "serverUnreachable": "Nuk u arrit ky server",
       "serverOff": "Ky server është i fikur"
+    },
+    "mcpOAuth": {
+      "authMethod": "Vërtetimi",
+      "authNone": "Pa hyrje",
+      "authBearer": "Token bartës",
+      "authOAuth": "Hyrje me OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Pasi të ruash, prek $t(modelChat.mcpOAuth.signIn) te serveri për të hyrë me shfletuesin tënd.",
+      "serverNeedsSignIn": "Hyr për të përdorur këtë server",
+      "signIn": "Hyr",
+      "signInA11y": "Hyr në këtë server: {{name}}",
+      "signInFailed": "Nuk u arrit hyrja në {{name}}. Provo përsëri."
     },
     "backends": {
       "title": "Shërbimet mbështetëse të bisedës",
@@ -3438,6 +3456,9 @@
       "downloading": "Po shkarkohet…",
       "downloadProgress": "Po shkarkohet… {{percent}}%",
       "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ky model mbështet nivelin e arsyetimit"
     }
   },
   "settingsTools": {

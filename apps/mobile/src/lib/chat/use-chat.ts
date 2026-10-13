@@ -16,7 +16,7 @@ import {
   startChat,
   stopChat,
 } from './registry';
-import { type ChatState, snapshotOf, watch, watchChats } from './state';
+import { type ChatState, type ChatTarget, snapshotOf, watch, watchChats } from './state';
 import { forgetAsked } from './pending';
 import { type ChatSummary, deleteChat, listChats } from './store';
 
@@ -112,7 +112,11 @@ export function useChatList(place: ChatPlace | null): ChatList {
 /** One conversation, as a screen reads it. */
 export type OpenChat = {
   readonly state: ChatState;
-  readonly send: (text: string, model: string, images?: readonly LocalImage[]) => Promise<void>;
+  readonly send: (
+    text: string,
+    target: ChatTarget,
+    images?: readonly LocalImage[]
+  ) => Promise<void>;
   readonly stop: () => Promise<void>;
   readonly retry: () => Promise<void>;
 };
@@ -143,8 +147,8 @@ export function useChat(place: ChatPlace | null, opened: string): OpenChat {
 
   return {
     state,
-    send: async (text, model, images = []) => {
-      await say(sessionId, { text, images }, model);
+    send: async (text, target, images = []) => {
+      await say(sessionId, { text, images }, target);
     },
     stop: async () => {
       await stopChat(sessionId);

@@ -138,7 +138,8 @@
     "dismissed": "खारिज",
     "agent": "प्रतिनिधि",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "बदलाव"
   },
   "language": {
     "restarting": "भाषा बदलने के लिए ऐप फिर से शुरू हो रहा है",
@@ -1683,7 +1684,6 @@
       "retryLoadingEnvironment": "एनवायरनमेंट फिर से लोड करें",
       "defaultEnvironment": "डिफ़ॉल्ट एनवायरनमेंट",
       "environmentSummary": "{{commands}} कमांड · {{mcp}} MCP · {{skills}} स्किल · {{agents}} एजेंट",
-      "changes": "बदलाव",
       "leaveChanges": "बदलाव रहने दें",
       "commitAndPush": "कमिट और पुश करें",
       "startSession": "सत्र शुरू करें",
@@ -2112,6 +2112,12 @@
       "used": "उपयोग हुआ",
       "modelsCount_one": "मॉडल ({{displayCount}})",
       "modelsCount_other": "मॉडल ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "बदलाव देखें",
+      "asOf": "{{time}} तक",
+      "tooLarge": "यह डिफ़ मोबाइल पर दिखाने के लिए बहुत बड़ा है।",
+      "empty": "इस सत्र में अभी तक किसी फ़ाइल में बदलाव नहीं हुआ है।"
     },
     "suggestion": {
       "dismiss": "सुझाव ख़ारिज करें",
@@ -2649,6 +2655,7 @@
     "fileRows": {
       "collapseFile": "फ़ाइल समेटें",
       "diffTooLarge": "डिफ़ इतना बड़ा है कि उसे दिखाया नहीं जा सकता।",
+      "noPreview": "इस फ़ाइल का पूर्वावलोकन उपलब्ध नहीं है",
       "expandFile": "फ़ाइल फैलाएँ",
       "markViewed": "{{path}} को देखी गई फ़ाइल के रूप में चिह्नित करें",
       "openDiffOnGitHub": "GitHub पर इस फ़ाइल का डिफ़ खोलें",
@@ -3264,7 +3271,6 @@
       "fieldName": "प्रदर्शित नाम",
       "fieldUrl": "सर्वर URL",
       "fieldUrlInvalid": "मान्य सर्वर URL दर्ज करें।",
-      "fieldToken": "Bearer टोकन (वैकल्पिक)",
       "enableServer": "इस सर्वर को सक्षम करें: {{name}}",
       "editServer": "सर्वर संपादित करें",
       "deleteServer": "सर्वर हटाएँ",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} टूल",
       "serverUnreachable": "इस सर्वर तक नहीं पहुँच सका",
       "serverOff": "यह सर्वर बंद है"
+    },
+    "mcpOAuth": {
+      "authMethod": "प्रमाणीकरण",
+      "authNone": "कोई साइन इन नहीं",
+      "authBearer": "Bearer टोकन",
+      "authOAuth": "OAuth साइन इन",
+      "fieldToken": "टोकन",
+      "oauthHint": "सहेजने के बाद, अपने ब्राउज़र से साइन इन करने के लिए सर्वर पर $t(modelChat.mcpOAuth.signIn) पर टैप करें।",
+      "serverNeedsSignIn": "इस सर्वर का उपयोग करने के लिए साइन इन करें",
+      "signIn": "साइन इन करें",
+      "signInA11y": "इस सर्वर में साइन इन करें: {{name}}",
+      "signInFailed": "{{name}} में साइन इन नहीं हो सका। फिर से कोशिश करें।"
     },
     "backends": {
       "title": "चैट बैकएंड",
@@ -3438,6 +3456,9 @@
       "downloading": "डाउनलोड हो रहा है…",
       "downloadProgress": "डाउनलोड हो रहा है… {{percent}}%",
       "downloadFailed": "डाउनलोड पूरा नहीं हो सका। अपना कनेक्शन और खाली स्टोरेज जांचें, फिर से कोशिश करें।"
+    },
+    "reasoningEffort": {
+      "modelFlag": "यह मॉडल सोचने के स्तर का समर्थन करता है"
     }
   },
   "settingsTools": {

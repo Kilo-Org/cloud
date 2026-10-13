@@ -138,7 +138,8 @@
     "dismissed": "Binalewala",
     "agent": "Ahente",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "Mga pagbabago"
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -327,6 +328,7 @@
       "collapseFile": "Itago ang nilalaman ng file",
       "expandFile": "Ipakita ang nilalaman ng file",
       "diffTooLarge": "Masyadong malaki ang pagkakaiba para maipakita.",
+      "noPreview": "Walang preview para sa file na ito",
       "openOnGitHub": "Buksan sa GitHub",
       "openDiffOnGitHub": "Buksan ang pagkakaiba ng file na ito sa GitHub",
       "githubDiff": "Pagkakaiba sa GitHub"
@@ -2194,7 +2196,6 @@
       "retryLoadingEnvironment": "Subukang i-load muli ang kapaligiran",
       "defaultEnvironment": "Paunang itinakdang kapaligiran",
       "environmentSummary": "{{commands}} utos · {{mcp}} MCP · {{skills}} kasanayan · {{agents}} ahente",
-      "changes": "Mga pagbabago",
       "leaveChanges": "Iwan ang mga pagbabago",
       "commitAndPush": "I-commit at i-push",
       "startSession": "Simulan ang sesyon",
@@ -2656,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modelo ({{displayCount}})",
       "modelsCount_other": "Mga modelo ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Tingnan ang mga pagbabago",
+      "asOf": "Noong {{time}}",
+      "tooLarge": "Masyadong malaki ang pagkakaibang ito para maipakita sa mobile.",
+      "empty": "Wala pang pagbabago sa file sa session na ito."
     },
     "autoApprove": {
       "title": "Auto-apruba",
@@ -3264,7 +3271,6 @@
       "fieldName": "Pangalang ipinapakita",
       "fieldUrl": "URL ng server",
       "fieldUrlInvalid": "Maglagay ng valid na URL ng server.",
-      "fieldToken": "Bearer token (opsyonal)",
       "enableServer": "Paganahin ang server na ito: {{name}}",
       "editServer": "I-edit ang server",
       "deleteServer": "Burahin ang server",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} tool",
       "serverUnreachable": "Hindi maabot ang server na ito",
       "serverOff": "Naka-off ang server na ito"
+    },
+    "mcpOAuth": {
+      "authMethod": "Pagpapatunay",
+      "authNone": "Walang pag-sign in",
+      "authBearer": "Bearer token",
+      "authOAuth": "Pag-sign in gamit ang OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Pagkatapos mong i-save, i-tap ang $t(modelChat.mcpOAuth.signIn) sa server para mag-sign in gamit ang iyong browser.",
+      "serverNeedsSignIn": "Mag-sign in para magamit ang server na ito",
+      "signIn": "Mag-sign in",
+      "signInA11y": "Mag-sign in sa server na ito: {{name}}",
+      "signInFailed": "Hindi makapag-sign in sa {{name}}. Subukan muli."
     },
     "backends": {
       "title": "Mga sistema ng chat",
@@ -3438,6 +3456,9 @@
       "downloading": "Nagda-download…",
       "downloadProgress": "Nagda-download… {{percent}}%",
       "downloadFailed": "Hindi natapos ang pag-download. Tingnan ang iyong koneksyon at bakanteng storage, pagkatapos ay subukang muli."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Sinusuportahan ng modelong ito ang antas ng pag-iisip"
     }
   },
   "settingsTools": {

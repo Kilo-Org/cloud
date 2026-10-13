@@ -9,13 +9,14 @@ import { type StoredRemoteMcpServer } from './remote-mcp-store';
  */
 
 /** Why a server's tools are, or are not, on hand. */
-type RemoteMcpStatus = 'idle' | 'connecting' | 'ready' | 'failed';
+type RemoteMcpStatus = 'idle' | 'connecting' | 'ready' | 'failed' | 'signIn';
 
 /** One server's discovery result, keyed by the server's id. */
 export type RemoteMcpDiscovery = {
   readonly tools: readonly Tool[];
   /** True when the discovery did not reach the server, so none of its tools are offered. */
   readonly failed?: boolean;
+  readonly signIn?: boolean;
 };
 
 /** What one server looks like to whoever draws it. */
@@ -70,6 +71,9 @@ export function remoteServerStates(
     const found = discovered.get(server.id);
     if (found === undefined) {
       return stateOf(server, { status: 'idle', toolCount: 0, retryable: false });
+    }
+    if (found.signIn === true) {
+      return stateOf(server, { status: 'signIn', toolCount: 0, retryable: false });
     }
     if (found.failed === true) {
       return stateOf(server, { status: 'failed', toolCount: 0, retryable: true });

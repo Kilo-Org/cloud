@@ -138,7 +138,8 @@
     "dismissed": "Noraidīts",
     "agent": "Aģents",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "Izmaiņas"
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -327,6 +328,7 @@
       "collapseFile": "Sakļaut failu",
       "expandFile": "Izvērst failu",
       "diffTooLarge": "Izmaiņu salīdzinājums ir pārāk liels, lai to parādītu.",
+      "noPreview": "Šim failam priekšskatījums nav pieejams",
       "openOnGitHub": "Atvērt GitHub",
       "openDiffOnGitHub": "Atvērt šī faila izmaiņu salīdzinājumu GitHub",
       "githubDiff": "GitHub izmaiņu salīdzinājums"
@@ -2222,7 +2224,6 @@
       "retryLoadingEnvironment": "Mēģināt ielādēt vidi vēlreiz",
       "defaultEnvironment": "Noklusējuma vide",
       "environmentSummary": "Komandas: {{commands}} · MCP: {{mcp}} · prasmes: {{skills}} · aģenti: {{agents}}",
-      "changes": "Izmaiņas",
       "leaveChanges": "Atstāt izmaiņas",
       "commitAndPush": "Fiksēt un nosūtīt",
       "startSession": "Sākt sesiju",
@@ -2694,6 +2695,12 @@
       "modelsCount_one": "Modelis ({{displayCount}})",
       "modelsCount_other": "Modeļi ({{displayCount}})",
       "modelsCount_zero": "Modeļi ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Skatīt izmaiņas",
+      "asOf": "Stāvoklis uz {{time}}",
+      "tooLarge": "Šis izmaiņu salīdzinājums ir pārāk liels, lai to parādītu mobilajā ierīcē.",
+      "empty": "Šajā sesijā vēl nav izmaiņu failos."
     },
     "autoApprove": {
       "title": "Automātiska apstiprināšana",
@@ -3305,7 +3312,6 @@
       "fieldName": "Parādāmais nosaukums",
       "fieldUrl": "Servera URL",
       "fieldUrlInvalid": "Ievadi derīgu servera URL.",
-      "fieldToken": "Bearera pilnvara (neobligāti)",
       "enableServer": "Iespējot šo serveri: {{name}}",
       "editServer": "Rediģēt serveri",
       "deleteServer": "Dzēst serveri",
@@ -3325,6 +3331,18 @@
       "serverToolCount": "{{count}} rīki",
       "serverUnreachable": "Neizdevās sasniegt šo serveri",
       "serverOff": "Šis serveris ir izslēgts"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikācija",
+      "authNone": "Bez pieteikšanās",
+      "authBearer": "Bearera pilnvara",
+      "authOAuth": "OAuth pieteikšanās",
+      "fieldToken": "Pilnvara",
+      "oauthHint": "Pēc saglabāšanas pieskaries pie $t(modelChat.mcpOAuth.signIn) pie servera, lai pieteiktos ar pārlūku.",
+      "serverNeedsSignIn": "Piesakies, lai izmantotu šo serveri",
+      "signIn": "Pieteikties",
+      "signInA11y": "Pieteikties šajā serverī: {{name}}",
+      "signInFailed": "Neizdevās pieteikties serverī {{name}}. Mēģini vēlreiz."
     },
     "backends": {
       "title": "Tērzēšanas aizmugursistēmas",
@@ -3479,6 +3497,9 @@
       "downloading": "Notiek lejupielāde…",
       "downloadProgress": "Notiek lejupielāde… {{percent}}%",
       "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"
     }
   },
   "settingsTools": {

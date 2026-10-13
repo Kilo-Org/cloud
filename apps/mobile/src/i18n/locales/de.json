@@ -138,7 +138,8 @@
     "dismissed": "Verworfen",
     "agent": "Agent",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "Änderungen"
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",
@@ -1683,7 +1684,6 @@
       "retryLoadingEnvironment": "Umgebung erneut laden",
       "defaultEnvironment": "Standardumgebung",
       "environmentSummary": "{{commands}} Befehle · {{mcp}} MCP · {{skills}} Skills · {{agents}} Agenten",
-      "changes": "Änderungen",
       "leaveChanges": "Änderungen beibehalten",
       "commitAndPush": "Committen und pushen",
       "startSession": "Sitzung starten",
@@ -2145,6 +2145,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modell ({{displayCount}})",
       "modelsCount_other": "Modelle ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Änderungen anzeigen",
+      "asOf": "Stand: {{time}}",
+      "tooLarge": "Dieser Diff ist zu groß für die Anzeige auf dem Mobilgerät.",
+      "empty": "In dieser Sitzung wurden noch keine Dateien geändert."
     },
     "autoApprove": {
       "title": "Automatisch genehmigen",
@@ -2649,6 +2655,7 @@
     "fileRows": {
       "collapseFile": "Datei einklappen",
       "diffTooLarge": "Der Diff ist zu groß für die Anzeige.",
+      "noPreview": "Keine Vorschau für diese Datei verfügbar",
       "expandFile": "Datei ausklappen",
       "markViewed": "{{path}} als angesehen markieren",
       "openDiffOnGitHub": "Diff dieser Datei auf GitHub öffnen",
@@ -3264,7 +3271,6 @@
       "fieldName": "Anzeigename",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Gib eine gültige Server-URL ein.",
-      "fieldToken": "Bearer-Token (optional)",
       "enableServer": "Diesen Server aktivieren: {{name}}",
       "editServer": "Server bearbeiten",
       "deleteServer": "Server löschen",
@@ -3284,6 +3290,18 @@
       "serverToolCount": "{{count}} Tools",
       "serverUnreachable": "Dieser Server konnte nicht erreicht werden",
       "serverOff": "Dieser Server ist ausgeschaltet"
+    },
+    "mcpOAuth": {
+      "authMethod": "Authentifizierung",
+      "authNone": "Keine Anmeldung",
+      "authBearer": "Bearer-Token",
+      "authOAuth": "OAuth-Anmeldung",
+      "fieldToken": "Token",
+      "oauthHint": "Tippe nach dem Speichern beim Server auf $t(modelChat.mcpOAuth.signIn), um dich im Browser anzumelden.",
+      "serverNeedsSignIn": "Melde dich an, um diesen Server zu verwenden",
+      "signIn": "Anmelden",
+      "signInA11y": "Bei diesem Server anmelden: {{name}}",
+      "signInFailed": "Anmeldung bei {{name}} fehlgeschlagen. Versuche es erneut."
     },
     "backends": {
       "title": "Chat-Backends",
@@ -3438,6 +3456,9 @@
       "downloading": "Wird heruntergeladen…",
       "downloadProgress": "Wird heruntergeladen… {{percent}} %",
       "downloadFailed": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und den freien Speicherplatz und versuche es dann erneut."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Dieses Modell unterstützt Denkaufwand"
     }
   },
   "settingsTools": {

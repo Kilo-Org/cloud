@@ -185,7 +185,7 @@ describe('whether a chat offers web search', () => {
       apiKind: 'chat_completions',
       apiKey: '',
       headers: {},
-      models: [{ id: 'llama', name: 'Llama', tools: true, images: false }],
+      models: [{ id: 'llama', name: 'Llama', tools: true, images: false, reasoning: false }],
       allowLocalHttp: false,
     };
 

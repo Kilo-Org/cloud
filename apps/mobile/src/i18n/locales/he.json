@@ -138,7 +138,8 @@
     "dismissed": "סומן להתעלמות",
     "agent": "סוֹכֵן",
     "durationMinuteShort": "min",
-    "durationHourShort": "h"
+    "durationHourShort": "h",
+    "changes": "שינויים"
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -1695,7 +1696,6 @@
       "retryLoadingEnvironment": "ניסיון נוסף לטעון את הסביבה",
       "defaultEnvironment": "סביבת ברירת מחדל",
       "environmentSummary": "{{commands}} פקודות · {{mcp}} MCP · {{skills}} מיומנויות · {{agents}} סוכנים",
-      "changes": "שינויים",
       "leaveChanges": "השארת השינויים",
       "commitAndPush": "קומיט ודחיפה",
       "startSession": "התחלת סשן",
@@ -2167,6 +2167,12 @@
       "modelsCount_one": "מודל ({{displayCount}})",
       "modelsCount_other": "מודלים ({{displayCount}})",
       "modelsCount_two": "מודלים ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "הצגת השינויים",
+      "asOf": "נכון ל-{{time}}",
+      "tooLarge": "השוואת השינויים גדולה מדי להצגה בנייד.",
+      "empty": "עדיין אין שינויים בקבצים בסשן הזה."
     },
     "autoApprove": {
       "title": "אישור אוטומטי",
@@ -2677,6 +2683,7 @@
     "fileRows": {
       "collapseFile": "כיווץ הקובץ",
       "diffTooLarge": "השוואת השינויים גדולה מדי להצגה.",
+      "noPreview": "אין תצוגה מקדימה זמינה לקובץ הזה",
       "expandFile": "הרחבת הקובץ",
       "markViewed": "סימון {{path}} כנצפה",
       "openDiffOnGitHub": "פתיחת השוואת השינויים בקובץ הזה ב-GitHub",
@@ -3305,7 +3312,6 @@
       "fieldName": "שם תצוגה",
       "fieldUrl": "כתובת URL של השרת",
       "fieldUrlInvalid": "הזינו כתובת URL חוקית של שרת.",
-      "fieldToken": "אסימון Bearer (אופציונלי)",
       "enableServer": "הפעלת השרת הזה: {{name}}",
       "editServer": "עריכת השרת",
       "deleteServer": "מחיקת השרת",
@@ -3325,6 +3331,18 @@
       "serverToolCount": "{{count}} כלים",
       "serverUnreachable": "לא ניתן היה להגיע לשרת הזה",
       "serverOff": "השרת הזה כבוי"
+    },
+    "mcpOAuth": {
+      "authMethod": "אימות",
+      "authNone": "ללא כניסה",
+      "authBearer": "אסימון Bearer",
+      "authOAuth": "כניסה עם OAuth",
+      "fieldToken": "אסימון",
+      "oauthHint": "לאחר השמירה, הקש על $t(modelChat.mcpOAuth.signIn) בשרת כדי להיכנס באמצעות הדפדפן.",
+      "serverNeedsSignIn": "היכנס כדי להשתמש בשרת הזה",
+      "signIn": "כניסה",
+      "signInA11y": "כניסה לשרת הזה: {{name}}",
+      "signInFailed": "לא ניתן היה להיכנס אל {{name}}. נסה שוב."
     },
     "backends": {
       "title": "שרתי צ׳אט",
@@ -3479,6 +3497,9 @@
       "downloading": "מתבצעת הורדה…",
       "downloadProgress": "מתבצעת הורדה… {{percent}}%",
       "downloadFailed": "ההורדה לא הושלמה. יש לבדוק את החיבור לאינטרנט ואת שטח האחסון הפנוי, ולנסות שוב."
+    },
+    "reasoningEffort": {
+      "modelFlag": "המודל הזה תומך במאמץ חשיבה"
     }
   },
   "settingsTools": {

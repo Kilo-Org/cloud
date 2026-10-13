@@ -389,6 +389,31 @@ export const persistedSnapshotFileDiffsSchema = z
   .array(z.union([sdkSnapshotFileDiffSchema, historicalSnapshotFileDiffSchema]))
   .transform(diffs => diffs.filter(diff => 'patch' in diff));
 
+/**
+ * One file of the cumulative session diff, as clients read it. Unknown keys
+ * are stripped (not rejected) so a newer Kilo field cannot fail the read, and
+ * an unknown status degrades to "no status" instead of an invalid file.
+ */
+export const sessionDiffFileSchema = z.object({
+  file: z.string(),
+  patch: z.string(),
+  additions: z.number(),
+  deletions: z.number(),
+  status: z.enum(['added', 'deleted', 'modified']).optional().catch(undefined),
+});
+export type SessionDiffFile = z.infer<typeof sessionDiffFileSchema>;
+
+/** Byte bound for one read of the stored `session_diff` item. */
+export const MAX_SESSION_DIFF_READ_BYTES = 8 * 1024 * 1024;
+
+export const sessionDiffReadSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('value'), files: z.array(sessionDiffFileSchema) }),
+  z.object({ kind: z.literal('too_large'), maximumBytes: z.number() }),
+  z.object({ kind: z.literal('retryable_failure') }),
+  z.object({ kind: z.literal('invalid_data') }),
+]);
+export type SessionDiffRead = z.infer<typeof sessionDiffReadSchema>;
+
 const kiloSdkUserMessageBaseShape = {
   id: messageIdSchema,
   sessionID: sessionIdSchema,

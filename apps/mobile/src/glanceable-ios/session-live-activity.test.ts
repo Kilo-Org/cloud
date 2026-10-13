@@ -22,7 +22,7 @@ vi.mock('@expo/ui/swift-ui', () => ({
   HStack: mockComponent('HStack'),
   Image: mockComponent('Image'),
   Link: mockComponent('Link'),
-  ProgressView: mockComponent('ProgressView'),
+  RoundedRectangle: mockComponent('RoundedRectangle'),
   Spacer: mockComponent('Spacer'),
   Text: mockComponent('Text'),
   VStack: mockComponent('VStack'),
@@ -34,7 +34,6 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   activityBackgroundTint: mockModifier('activityBackgroundTint'),
   background: (style: unknown) => ({ $type: 'background', args: style }),
   buttonStyle: mockModifier('buttonStyle'),
-  clipShape: mockModifier('clipShape'),
   cornerRadius: mockModifier('cornerRadius'),
   environment: mockModifier('environment'),
   fixedSize: mockModifier('fixedSize'),
@@ -48,7 +47,6 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   padding: mockModifier('padding'),
   resizable: mockModifier('resizable'),
   shapes: { capsule: () => ({}) },
-  tint: mockModifier('tint'),
 }));
 vi.mock('@/i18n', () => ({ i18n: { on: vi.fn(), t: (key: string) => key } }));
 
@@ -77,6 +75,10 @@ function collect(node: unknown): Rendered[] {
   return [root, ...kids.flatMap(child => collect(child))];
 }
 
+/** Every element under a collected element. */
+const descendants = (item: Rendered | undefined) =>
+  item === undefined ? [] : collect(item.props.children);
+
 const texts = (node: unknown) =>
   collect(node)
     .filter(item => item.kind === 'Text' && typeof item.props.children === 'string')
@@ -87,6 +89,27 @@ const NOW = Date.parse('2026-10-12T10:00:00.000Z');
 
 function render(state: State, environment: LiveActivityEnvironment = ENVIRONMENT) {
   return sessionLiveActivityLayout(state, environment);
+}
+
+/**
+ * Render with baked copy. No widget transform runs under vitest, so the copy
+ * placeholder stays a literal and the layout parses the empty fallback; this
+ * hands the layout `copy` for that one parse instead.
+ */
+function renderWithCopy(copy: Record<string, string>) {
+  return (state: State) => {
+    const parse = JSON.parse.bind(JSON);
+    const spy = vi
+      .spyOn(JSON, 'parse')
+      .mockImplementation((text: string, reviver?: Parameters<typeof JSON.parse>[1]) =>
+        text === '{}' ? { ...copy } : parse(text, reviver)
+      );
+    try {
+      return sessionLiveActivityLayout(state, ENVIRONMENT);
+    } finally {
+      spy.mockRestore();
+    }
+  };
 }
 
 const BASE: State = {
@@ -124,8 +147,9 @@ describe('session card layout: states', () => {
     expect(shown).toContain('of');
     expect(shown).toContain('7');
     expect(shown).toContain('Write tests');
-    // The diff belongs to the expanded view and to a finished card.
-    expect(shown).not.toContain('+120');
+    // The diff size is on the Lock Screen card too (spec "Content" rule 8).
+    expect(shown).toContain('+120');
+    expect(shown).toContain('−30');
   });
 
   it('says no activity once the quiet window has passed', () => {
@@ -178,7 +202,12 @@ describe('session card layout: states', () => {
       return {
         full: shown.filter(value => value === '7').length,
         compact: shown.filter(value => value === '3/7').length,
-        bars: collect(render(state).banner).filter(item => item.kind === 'ProgressView').length,
+        // The bar is a track plus its filled segment.
+        bars: collect(render(state).banner).filter(
+          item =>
+            item.kind === 'ZStack' &&
+            descendants(item).some(child => child.kind === 'RoundedRectangle')
+        ).length,
       };
     };
     // Working: the bar and its count, once.
@@ -235,7 +264,12 @@ describe('session card layout: states', () => {
     expect(shown).toContain('Wants to run');
     expect(shown).toContain('pnpm drizzle migrate');
     expect(shown).toContain('Approve');
-    expect(shown).toContain('Open');
+    // Open is a round icon with a spoken label, so the card fits the controls.
+    const open = collect(banner).find(item => item.kind === 'Link');
+    expect(
+      descendants(open).some(item => item.kind === 'Image' && item.props.systemName !== undefined)
+    ).toBe(true);
+    expect(shown).not.toContain('Open');
     // The plan bar stays off this state: the command owns the room.
     expect(shown).not.toContain('7');
   });
@@ -283,6 +317,29 @@ describe('session card layout: states', () => {
     // The cost belongs to the expanded view and to a finished card.
     expect(shown).toContain('$0.12');
     expect(texts(expandedBottom)).toContain('$0.12');
+  });
+
+  it('writes the cost with the app language digits, decimal separator and currency template', () => {
+    const finished = (costMicrodollars: number, copy?: Record<string, string>) =>
+      texts(
+        (copy === undefined ? render : renderWithCopy(copy))({
+          ...BASE,
+          statusKind: 'idle',
+          statusSince: new Date(NOW).toISOString(),
+          outcome: { kind: 'none' },
+          costMicrodollars,
+        }).banner
+      );
+    // The app's own cost rules: two decimals from half a cent, four below it,
+    // and nothing below the four-decimal zero.
+    expect(finished(1_234_500)).toContain('$1.23');
+    expect(finished(3100)).toContain('$0.0031');
+    expect(finished(40).some(value => value.startsWith('$'))).toBe(false);
+    // A German template and an Arabic digit table, as the copy bakes them.
+    expect(finished(1_250_000, { costTemplate: '# $', costDecimal: ',' })).toContain('1,25 $');
+    expect(
+      finished(1_250_000, { costTemplate: '# US$', costDecimal: '٫', digits: '٠١٢٣٤٥٦٧٨٩' })
+    ).toContain('١٫٢٥ US$');
   });
 
   it('keeps the cost off a working Lock Screen card and shows it when finished', () => {
@@ -384,6 +441,59 @@ describe('session card layout: surfaces', () => {
     // The diff line prints its own label; the outcome line owns none on a
     // working card, so the number of files prints once.
     expect(shown).toContain('4');
+  });
+
+  it('draws the plan bar from plain shapes that render on the Lock Screen', () => {
+    const banner = render({ ...BASE, plan: { done: 3, total: 4, current: null } }).banner;
+    const kinds = collect(banner).map(item => item.kind);
+    // A ProgressView blanked the whole Lock Screen card on iOS.
+    expect(kinds).not.toContain('ProgressView');
+    const segments = collect(banner).filter(item => item.kind === 'RoundedRectangle');
+    const widths = segments.map(segment => {
+      const modifiers = segment.props.modifiers as { $type: string; args?: { width?: number } }[];
+      return modifiers.find(modifier => modifier.$type === 'frame')?.args?.width;
+    });
+    // The track and the filled three quarters of it.
+    expect(widths).toEqual([64, 48]);
+    // An empty plan draws the track alone.
+    const empty = render({ ...BASE, plan: { done: 0, total: 4, current: null } }).banner;
+    expect(collect(empty).filter(item => item.kind === 'RoundedRectangle')).toHaveLength(1);
+  });
+
+  it('fits the permission controls inside the card at the four-side padding', () => {
+    const { banner } = render({
+      ...BASE,
+      statusKind: 'needsInput',
+      awaitingPermission: true,
+      approvalKey: 'a'.repeat(64),
+      permissionCommand: 'pnpm --filter web exec next build --no-lint',
+    });
+    // The card keeps its equal 16 pt inset.
+    const root = element(banner);
+    const padding = (root?.props.modifiers as { $type: string; args?: unknown }[]).find(
+      modifier => modifier.$type === 'padding'
+    );
+    expect(padding?.args).toEqual({ all: 16 });
+    // No control reserves a minimum width: each pill takes its label's width.
+    const frames = collect(banner).flatMap(item =>
+      ((item.props.modifiers ?? []) as { $type: string; args?: { minWidth?: number } }[]).filter(
+        modifier => modifier.$type === 'frame' && modifier.args?.minWidth !== undefined
+      )
+    );
+    expect(frames).toEqual([]);
+    // The command truncates at the end instead of holding its full width.
+    const command = collect(banner).find(
+      item =>
+        item.kind === 'Text' &&
+        item.props.children === 'pnpm --filter web exec next build --no-lint'
+    );
+    const commandModifiers = (command?.props.modifiers ?? []) as { $type: string }[];
+    expect(commandModifiers.map(modifier => modifier.$type)).not.toContain('fixedSize');
+    // The status label still never truncates.
+    const label = collect(banner).find(item => item.props.children === 'Needs input');
+    expect(((label?.props.modifiers ?? []) as { $type: string }[]).map(m => m.$type)).toContain(
+      'fixedSize'
+    );
   });
 
   it('keeps the approve and open targets for a press', () => {

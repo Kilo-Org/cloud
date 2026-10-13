@@ -5,7 +5,7 @@ import {
   HStack,
   Image,
   Link,
-  ProgressView,
+  RoundedRectangle,
   Spacer,
   Text,
   VStack,
@@ -17,7 +17,6 @@ import {
   activityBackgroundTint,
   background,
   buttonStyle,
-  clipShape,
   cornerRadius,
   environment,
   fixedSize,
@@ -31,7 +30,6 @@ import {
   padding,
   resizable,
   shapes,
-  tint,
 } from '@expo/ui/swift-ui/modifiers';
 import { createLiveActivity, type LiveActivityComponent } from 'expo-widgets';
 
@@ -214,7 +212,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // labels beside it. An empty table means the language writes Western digits.
   // eslint-disable-next-line unicorn/consistent-function-scoping -- the 'widget' layout is stringified whole; a helper outside it is an undefined global in the widget process
   const DIGIT_INDEX = '0123456789';
-  const count = (value: number) => {
+  // A string keeps its leading zeros (a cost's fraction digits).
+  const count = (value: number | string) => {
     const plain = String(value);
     if (digits.length < 10) {
       return plain;
@@ -274,7 +273,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     return `${stepWords} ${stepTarget}`;
   })();
   const finished = kind === 'idle' || kind === 'failed';
-  const hasCost = (props.costMicrodollars ?? 0) > 0;
+  const hasCost = (props.costMicrodollars ?? 0) >= 50;
   const plan = props.plan ?? null;
   const planDone = plan === null ? 0 : plan.done;
   const planTotal = plan === null ? 0 : plan.total;
@@ -410,6 +409,35 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         <Text date={lastActivityAt} dateStyle="elapsed" modifiers={timeModifiers(size, color)} />
       </HStack>
     );
+  // The plan bar from plain shapes: a track and a filled segment of the same
+  // height. A `ProgressView` does not draw in the Lock Screen presentation of
+  // a Live Activity, and the banner then fails to lay out at all; shapes
+  // draw in every presentation.
+  const BAR_WIDTH = 64;
+  const BAR_HEIGHT = 4;
+  const progressBar = (scheme: Scheme) => {
+    const filled = Math.round(BAR_WIDTH * planPercent);
+    return (
+      <ZStack alignment="leading" modifiers={[frame({ width: BAR_WIDTH, height: BAR_HEIGHT })]}>
+        <RoundedRectangle
+          cornerRadius={BAR_HEIGHT / 2}
+          modifiers={[
+            frame({ width: BAR_WIDTH, height: BAR_HEIGHT }),
+            foregroundStyle(scheme.track),
+          ]}
+        />
+        {filled <= 0 ? null : (
+          <RoundedRectangle
+            cornerRadius={BAR_HEIGHT / 2}
+            modifiers={[
+              frame({ width: Math.max(BAR_HEIGHT, filled), height: BAR_HEIGHT }),
+              foregroundStyle(scheme.primary),
+            ]}
+          />
+        )}
+      </ZStack>
+    );
+  };
   // The plan line: "3 of 7" and the bar, then the step in progress on its own
   // line. The step is never repeated, so the line never shows it twice.
   const planLine = (scheme: Scheme, size: number) =>
@@ -421,14 +449,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
             {text(COPY.of ?? 'of', size, scheme.muted)}
             {number(count(planTotal), size, scheme.fg, 'semibold')}
           </HStack>
-          <ProgressView
-            value={planPercent}
-            modifiers={[
-              tint(scheme.primary),
-              frame({ width: 64, height: 4 }),
-              clipShape('capsule'),
-            ]}
-          />
+          {progressBar(scheme)}
           <Spacer minLength={0} />
         </HStack>
         {plan.current == null ? null : text(plan.current, size, scheme.muted)}
@@ -448,13 +469,28 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       </HStack>
     );
   };
-  const costLine = (scheme: Scheme, size: number) => {
+  // The cost in the app language: the app's own cost rules (two decimals
+  // from half a cent, four below it, nothing below the four-decimal zero),
+  // the language's digits and decimal separator, and the baked currency
+  // template, so the symbol matches the app's other cost labels.
+  const costText = (() => {
     const micros = props.costMicrodollars ?? 0;
-    if (micros <= 0) {
+    // Below 50 microdollars the four-decimal amount reads as a false zero.
+    if (!(micros >= 50)) {
       return null;
     }
-    return text(`$${(micros / 1_000_000).toFixed(2)}`, size, scheme.muted);
-  };
+    const usd = micros / 1_000_000;
+    const [whole, fraction] = usd.toFixed(micros >= 5000 ? 2 : 4).split('.');
+    // An empty baked slot means the template could not be read.
+    const decimal =
+      COPY.costDecimal === undefined || COPY.costDecimal === '' ? '.' : COPY.costDecimal;
+    const template =
+      COPY.costTemplate === undefined || COPY.costTemplate === '' ? '$#' : COPY.costTemplate;
+    const amount = `${count(whole ?? '0')}${decimal}${count(fraction ?? '')}`;
+    return template.split('#').join(amount);
+  })();
+  const costLine = (scheme: Scheme, size: number) =>
+    costText === null ? null : number(costText, size, scheme.muted);
   // The outcome of a finished session: the pull request it opened, its diff,
   // or nothing. The duration prints beside it when the session start is known.
   const finishedDuration = (() => {
@@ -471,18 +507,10 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   })();
   const outcomeLine = (scheme: Scheme, size: number) => {
     const outcome = props.outcome?.kind ?? null;
-    const changes = props.changes ?? null;
     if (outcome === 'pr_opened') {
       return text(COPY.prOpened ?? 'Pull request opened', size, scheme.good, 'semibold');
     }
-    if (outcome === 'changes' && changes !== null) {
-      return (
-        <HStack spacing={4}>
-          {number(count(changes.files), size, scheme.fg, 'semibold')}
-          {text(COPY.filesChanged ?? 'files changed', size, scheme.muted)}
-        </HStack>
-      );
-    }
+    // A diff outcome is the diff line itself, which every card draws once.
     return null;
   };
 
@@ -597,7 +625,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
             scheme.fg,
             'semibold'
           )}
-          {command.length > 0 ? number(command, size, scheme.muted) : null}
+          {command.length > 0 ? text(command, size, scheme.muted) : null}
           {command.length > 0 || plan === null
             ? null
             : text(`${count(planDone)}/${count(planTotal)}`, size, scheme.muted)}
@@ -634,20 +662,35 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     </VStack>
   );
 
-  const pill = (label: string, width: number, tone: { fill: string; color: string }) => (
+  // A compact pill: its label keeps its own width, so the controls take only
+  // the room their copy needs and the summary keeps the rest of the card.
+  const pill = (label: string, tone: { fill: string; color: string }) => (
     <Text
       modifiers={[
         font({ size: 13, weight: 'semibold' }),
         lineLimit(1),
         foregroundStyle(tone.color),
         fixedSize({ horizontal: true, vertical: false }),
-        padding({ horizontal: 14 }),
-        frame({ minWidth: width, height: 32 }),
+        padding({ horizontal: 12 }),
+        frame({ height: 32 }),
         background(tone.fill, shapes.capsule()),
       ]}
     >
       {label}
     </Text>
+  );
+  // Open as a round icon: the spoken label names it, and the card keeps the
+  // width a word would take.
+  const OPEN_SIZE = 32;
+  const openIcon = (tone: { fill: string; color: string }) => (
+    <ZStack
+      modifiers={[
+        frame({ width: OPEN_SIZE, height: OPEN_SIZE }),
+        background(tone.fill, shapes.capsule()),
+      ]}
+    >
+      <Image systemName="arrow.up.forward" size={13} color={tone.color} />
+    </ZStack>
   );
   // Approve (or the muted Approving… pill while the press runs) and Open. The
   // target literal must stay equal to `GLANCEABLE_APPROVE_TARGET` in
@@ -656,7 +699,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     const open =
       openUrl === null ? null : (
         <Link destination={openUrl} modifiers={[accessibilityLabel(COPY.open ?? 'Open')]}>
-          {pill(COPY.open ?? 'Open', 64, { fill: scheme.secondary, color: scheme.fg })}
+          {openIcon({ fill: scheme.secondary, color: scheme.fg })}
         </Link>
       );
     // A waiting question has nothing to approve: its card offers Open alone,
@@ -674,7 +717,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     return (
       <HStack alignment="center" spacing={4}>
         {approving ? (
-          pill(COPY.approving ?? 'Approving…', 104, {
+          pill(COPY.approving ?? 'Approving…', {
             fill: scheme.secondary,
             color: scheme.muted,
           })
@@ -683,7 +726,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
             target="approve"
             modifiers={[buttonStyle('plain'), accessibilityLabel(COPY.approve ?? 'Approve')]}
           >
-            {pill(COPY.approve ?? 'Approve', 96, { fill: scheme.primary, color: scheme.primaryFg })}
+            {pill(COPY.approve ?? 'Approve', { fill: scheme.primary, color: scheme.primaryFg })}
           </Button>
         )}
         {open}
@@ -707,19 +750,14 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
           {quietLine(13, scheme.warn)}
         </VStack>
       ) : null}
-      {expanded ? (
-        <VStack alignment="leading" spacing={6} modifiers={[padding({ top: 10 })]}>
+      {/* The diff size on every presentation (spec "Content" rule 8); the
+          cost only in the expanded island and on a finished card (rule 11). */}
+      {changesLine(scheme, 12) === null && !(hasCost && (expanded || finished)) ? null : (
+        <VStack alignment="leading" spacing={6} modifiers={[padding({ top: 8 })]}>
           {changesLine(scheme, 12)}
-          {costLine(scheme, 12)}
+          {hasCost && (expanded || finished) ? costLine(scheme, 12) : null}
         </VStack>
-      ) : null}
-      {!expanded && hasCost && finished ? (
-        // The cost belongs to the expanded island and to a finished card
-        // (spec "Content" rule 11); a working Lock Screen card keeps it off.
-        <VStack alignment="leading" spacing={0} modifiers={[padding({ top: 8 })]}>
-          {costLine(scheme, 12)}
-        </VStack>
-      ) : null}
+      )}
       {/* One plan line per card: the full bar for a working card; every other
           state prints its compact step count in the detail line instead. */}
       {planLine(scheme, expanded ? 12 : 13) === null || kind !== 'running' ? null : (

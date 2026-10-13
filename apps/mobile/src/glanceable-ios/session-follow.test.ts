@@ -295,6 +295,39 @@ describe('syncFollowedSessionCards', () => {
     expect(isSessionFollowed('session-1')).toBe(false);
   });
 
+  it('ends a failed session with its stop reason for 15 minutes', () => {
+    followSession(RUNNING, CTX, NOW);
+    const [card] = mocks.instances;
+    const failed = {
+      ...RUNNING,
+      status: 'idle',
+      statusUpdatedAt: '2026-10-12T10:05:00.000Z',
+      failure: 'provider' as const,
+      changes: { files: 3, added: 12, removed: 4 },
+    };
+
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    syncFollowedSessionCards([failed], NOW);
+
+    // The fixture's finish path ends the card with the stop reason, not with
+    // a plain Finished card and a later update that finds no card.
+    expect(card?.end).toHaveBeenCalledWith(
+      { after: new Date(now + SESSION_FINISHED_DISMISS_MS) },
+      expect.objectContaining({
+        statusKind: 'failed',
+        failure: { kind: 'provider' },
+        changes: { files: 3, added: 12, removed: 4 },
+      }),
+      expect.any(Date),
+      sessionLiveActivityRelevance('failed', failed.statusUpdatedAt)
+    );
+    vi.restoreAllMocks();
+    expect(card?.update).not.toHaveBeenCalled();
+    expect(isSessionFollowed('session-1')).toBe(false);
+  });
+
   it('leaves a card whose session the tray no longer lists to the server', () => {
     followSession(RUNNING, CTX, NOW);
     const [card] = mocks.instances;

@@ -331,7 +331,8 @@ export function syncFollowedSessionCards(
         // the ones the last push delivered instead of wiping them.
         previous: current ?? undefined,
       });
-      if (content.statusKind === 'idle') {
+      // A failed run ends like a finished one, with its stop reason.
+      if (content.statusKind === 'idle' || content.statusKind === 'failed') {
         cards.delete(sessionId);
         clearSessionCardPress(sessionId);
         ended = true;

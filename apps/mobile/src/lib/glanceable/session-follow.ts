@@ -121,10 +121,28 @@ export const finishFixtureSessionCard = (
     android().applySessionLiveUpdate('end', content);
     return;
   }
-  follow().syncFollowedSessionCards([row], checkedAt);
-  if (content !== null) {
-    applyFixtureSessionContent(content);
-  }
+  // iOS ends the card inside the tray sync, so content applied after the end
+  // finds no card. The finishing row carries the content's facts instead, and
+  // the shared builder ends the card with them (a failure reads as the
+  // stopped state with its reason).
+  follow().syncFollowedSessionCards(
+    [
+      content === null
+        ? row
+        : {
+            ...row,
+            currentStep: content.currentStep ?? null,
+            plan: content.plan ?? null,
+            changes: content.changes ?? null,
+            lastActivityAt: content.lastActivityAt ?? null,
+            costMicrodollars: content.costMicrodollars ?? null,
+            outcome: content.outcome?.kind ?? null,
+            failure: content.failure?.kind ?? null,
+            startedAt: content.startedAt ?? null,
+          },
+    ],
+    checkedAt
+  );
 };
 
 export const applyFixtureSessionContent = (content: SessionLiveActivityContentState): boolean => {

@@ -1,5 +1,6 @@
 import { i18n } from '@/i18n';
 import { GLANCEABLE_STATUS_COPY_KEY } from '@/lib/glanceable/presentation';
+import { formatCurrency } from '@/lib/format';
 import { numberFormat } from '@/lib/intl-cache';
 
 /**
@@ -105,6 +106,7 @@ export function glanceableLayoutCopy() {
     recent: i18n.t('common.recent'),
     nextScheduled: i18n.t('glanceable.nextScheduled'),
     group: glanceableGroupSeparator(),
+    ...glanceableCostFormat(),
     locale: resolveGlanceableLocale(i18n.language),
     digits: glanceableDigits(),
   };
@@ -158,6 +160,36 @@ function glanceableGroupSeparator(): string {
   const grouped = numberFormat(i18n.language, { useGrouping: true }).format(10_000);
   const separator = grouped.slice(2, -3);
   return separator.length === 1 ? separator : '';
+}
+
+/** A sample amount whose localized number part the cost template replaces. */
+const COST_SAMPLE = 1.25;
+
+/**
+ * The session cost format in the active language, for the widget process,
+ * which has no formatter: the currency template around the amount ("$#",
+ * "# $", "US$ #"), with `#` where the number goes, and the decimal separator.
+ * The template comes from the app's own cost formatter, so the card shows the
+ * currency symbol the app shows everywhere else. Empty slots mean the
+ * template could not be read, and the layout falls back to "$#" and ".".
+ */
+type GlanceableCostFormat = { costTemplate: string; costDecimal: string };
+
+function glanceableCostFormat(): GlanceableCostFormat {
+  const sample = formatCurrency(COST_SAMPLE, i18n.language, 2);
+  const amount = numberFormat(i18n.language, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: false,
+  }).format(COST_SAMPLE);
+  const at = sample.indexOf(amount);
+  if (at === -1 || amount.length !== 4) {
+    return { costTemplate: '', costDecimal: '' };
+  }
+  return {
+    costTemplate: `${sample.slice(0, at)}#${sample.slice(at + amount.length)}`,
+    costDecimal: amount.slice(1, 2),
+  };
 }
 
 /**

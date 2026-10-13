@@ -59,6 +59,28 @@ describe('withGlanceableCopy', () => {
     expect(glanceableLayoutCopy().digits).toBe('');
   });
 
+  it('bakes the session cost template and decimal separator from the app cost format', async () => {
+    expect(glanceableLayoutCopy()).toMatchObject({ costTemplate: '$#', costDecimal: '.' });
+    const previous = i18n.language;
+    try {
+      await i18n.changeLanguage('de');
+      // German writes the amount first and a decimal comma.
+      const german = glanceableLayoutCopy();
+      expect(german.costDecimal).toBe(',');
+      expect(german.costTemplate).toContain('#');
+      expect(german.costTemplate).toContain('$');
+      expect(german.costTemplate.indexOf('#')).toBeLessThan(german.costTemplate.indexOf('$'));
+      await i18n.changeLanguage('ar');
+      // The decimal separator and the template come from the same formatter
+      // that writes the app's cost labels in this language.
+      const arabic = glanceableLayoutCopy();
+      expect(arabic.costDecimal).toHaveLength(1);
+      expect(arabic.costTemplate).toContain('#');
+    } finally {
+      await i18n.changeLanguage(previous);
+    }
+  });
+
   it('bakes the locale in the form the SwiftUI modifier accepts', () => {
     // `@expo/ui` applies the locale only when `Locale.availableIdentifiers`
     // contains the value, and that list writes `zh_Hans`, not `zh-Hans`. A

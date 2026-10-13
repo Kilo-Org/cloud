@@ -4682,7 +4682,13 @@ describe('current-price canceled Stripe checkout webhook ordering', () => {
         .where(eq(credit_transactions.kilo_user_id, user.id));
       expect(
         settlementEntries.map(entry => entry.amount_microdollars).sort((a, b) => a - b)
-      ).toEqual([-55_000_000, 55_000_000]);
+      ).toEqual([-55_000_000, 0, 55_000_000]);
+      expect(
+        settlementEntries.find(entry => entry.credit_category === 'credits_expired')
+      ).toMatchObject({
+        amount_microdollars: 0,
+        original_transaction_id: settlementEntries.find(entry => entry.amount_microdollars > 0)?.id,
+      });
     }
   );
 });

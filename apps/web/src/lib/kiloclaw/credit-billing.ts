@@ -24,6 +24,7 @@ import {
 } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
 import { processTopUp } from '@kilocode/web-shared/lib/credits';
+import { fetchExpiringTransactions } from '@kilocode/web-shared/lib/creditExpiration';
 import { sendKiloClawSubscriptionStartedEmail } from '@kilocode/web-shared/lib/email';
 import {
   autoResumeIfSuspended,
@@ -729,6 +730,39 @@ export async function applyStripeFundedKiloClawPeriod(
         .set({
           total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} - ${amountMicrodollars}`,
         })
+        .where(eq(kilocode_users.id, userId));
+    }
+
+    const deposit = await tx.query.credit_transactions.findFirst({
+      where: and(
+        eq(credit_transactions.kilo_user_id, userId),
+        eq(credit_transactions.stripe_payment_id, stripePaymentId)
+      ),
+    });
+    if (deposit?.expiry_date) {
+      await tx
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: userId,
+          original_transaction_id: deposit.id,
+          credit_category: 'credits_expired',
+          amount_microdollars: 0,
+          is_free: false,
+          description: 'Closed by balance-neutral KiloClaw settlement',
+          original_baseline_microdollars_used: user.microdollars_used,
+        })
+        .onConflictDoNothing();
+      const remainingCredits = await fetchExpiringTransactions(userId, tx);
+      const nextExpiration = remainingCredits.reduce<string | null>(
+        (earliest, credit) =>
+          credit.expiry_date && (!earliest || new Date(credit.expiry_date) < new Date(earliest))
+            ? credit.expiry_date
+            : earliest,
+        null
+      );
+      await tx
+        .update(kilocode_users)
+        .set({ next_credit_expiration_at: nextExpiration })
         .where(eq(kilocode_users.id, userId));
     }
 

@@ -362,6 +362,19 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     monospacedDigit(),
     foregroundStyle(color),
   ];
+  // A self-updating date text must not take a horizontal `fixedSize`: it
+  // reports an infinite ideal width, and on the Lock Screen the whole banner
+  // then lays out at an infinite frame and draws nothing. It keeps a minimum
+  // width that holds its short forms ("59 min", "23 hr") instead, so it does
+  // not shift the line as it counts. A static time string keeps `fixedSize`.
+  const TIMER_MIN_WIDTH = 54;
+  const timerModifiers = (size: number, color: string) => [
+    font({ size }),
+    lineLimit(1),
+    monospacedDigit(),
+    foregroundStyle(color),
+    frame({ minWidth: TIMER_MIN_WIDTH, alignment: 'leading' }),
+  ];
   // The clock time alone today; another day adds the locale date.
   const clock = (date: Date, size: number, color: string) => {
     if (date.toDateString() === new Date().toDateString()) {
@@ -396,7 +409,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       return null;
     }
     if (kind === 'running') {
-      return <Text date={since} dateStyle="elapsed" modifiers={timeModifiers(size, color)} />;
+      return <Text date={since} dateStyle="elapsed" modifiers={timerModifiers(size, color)} />;
     }
     return clock(since, size, color);
   };
@@ -406,13 +419,11 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     lastActivityAt === null ? null : (
       <HStack spacing={4}>
         {text(COPY.noActivity ?? 'No activity for', size, color, 'semibold')}
-        <Text date={lastActivityAt} dateStyle="elapsed" modifiers={timeModifiers(size, color)} />
+        <Text date={lastActivityAt} dateStyle="elapsed" modifiers={timerModifiers(size, color)} />
       </HStack>
     );
   // The plan bar from plain shapes: a track and a filled segment of the same
-  // height. A `ProgressView` does not draw in the Lock Screen presentation of
-  // a Live Activity, and the banner then fails to lay out at all; shapes
-  // draw in every presentation.
+  // height, which draw in every Live Activity presentation.
   const BAR_WIDTH = 64;
   const BAR_HEIGHT = 4;
   const progressBar = (scheme: Scheme) => {
@@ -734,10 +745,11 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     );
   };
 
-  // The card body. The actions sit under the summary, centered vertically with
-  // it, so the labels keep their own width and only the trailing controls
-  // shrink when the language is long.
-  const body = (scheme: Scheme, expanded: boolean) => (
+  // The expanded island's full card. The actions sit beside the summary,
+  // centered vertically with it, so the labels keep their own width and only
+  // the trailing controls shrink when the language is long. The island has
+  // room for the plan bar, the plan step name, the diff and the cost.
+  const expandedCard = (scheme: Scheme) => (
     <VStack alignment="leading" spacing={0}>
       {header(scheme)}
       <HStack alignment="center" spacing={10} modifiers={[padding({ top: 12 })]}>
@@ -750,19 +762,18 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
           {quietLine(13, scheme.warn)}
         </VStack>
       ) : null}
-      {/* The diff size on every presentation (spec "Content" rule 8); the
-          cost only in the expanded island and on a finished card (rule 11). */}
-      {changesLine(scheme, 12) === null && !(hasCost && (expanded || finished)) ? null : (
+      {/* The diff size (spec "Content" rule 8) and the cost (rule 11). */}
+      {changesLine(scheme, 12) === null && !hasCost ? null : (
         <VStack alignment="leading" spacing={6} modifiers={[padding({ top: 8 })]}>
           {changesLine(scheme, 12)}
-          {hasCost && (expanded || finished) ? costLine(scheme, 12) : null}
+          {hasCost ? costLine(scheme, 12) : null}
         </VStack>
       )}
       {/* One plan line per card: the full bar for a working card; every other
           state prints its compact step count in the detail line instead. */}
-      {planLine(scheme, expanded ? 12 : 13) === null || kind !== 'running' ? null : (
+      {planLine(scheme, 12) === null || kind !== 'running' ? null : (
         <VStack alignment="leading" spacing={4} modifiers={[padding({ top: 8 })]}>
-          {planLine(scheme, expanded ? 12 : 13)}
+          {planLine(scheme, 12)}
         </VStack>
       )}
       {notice === null ? null : (
@@ -772,6 +783,149 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       )}
     </VStack>
   );
+
+  // The Lock Screen card is at most 160 pt tall, and ActivityKit draws
+  // nothing at all, not even the logo, when the banner is taller. So the
+  // banner keeps a hard budget of three single-line rows: the header (the
+  // mark, the title, the last-known time), the status line with the
+  // controls, and one detail line that merges the step or the state's own
+  // fact with the compact plan count and the diff. The expanded island keeps
+  // the full card, with the bar and every line.
+  const sep = (scheme: Scheme, size: number) => text('·', size, scheme.muted);
+  const compactFacts = (scheme: Scheme, size: number, withCost: boolean) => {
+    const changes = props.changes ?? null;
+    const facts = [
+      plan === null || planTotal === 0 ? null : (
+        <HStack key="plan" spacing={3}>
+          {number(count(planDone), size, scheme.fg, 'semibold')}
+          {text(COPY.of ?? 'of', size, scheme.muted)}
+          {number(count(planTotal), size, scheme.fg, 'semibold')}
+        </HStack>
+      ),
+      changes === null || changes.files === 0 ? null : (
+        <HStack key="diff" spacing={4}>
+          {number(`+${count(changes.added)}`, size, scheme.good, 'semibold')}
+          {number(`−${count(changes.removed)}`, size, scheme.warn, 'semibold')}
+        </HStack>
+      ),
+      changes === null || changes.files === 0 ? null : (
+        <HStack key="files" spacing={3}>
+          {number(count(changes.files), size, scheme.muted, 'semibold')}
+          {text(COPY.filesChanged ?? 'files changed', size, scheme.muted)}
+        </HStack>
+      ),
+      withCost && costText !== null ? (
+        <HStack key="cost" spacing={0}>
+          {number(costText, size, scheme.muted)}
+        </HStack>
+      ) : null,
+    ].filter(fact => fact !== null);
+    // A separator between two facts, never before the first one.
+    return facts.flatMap((fact, index) =>
+      index === 0
+        ? [fact]
+        : [
+            <HStack key={`sep-${index}`} spacing={0}>
+              {sep(scheme, size)}
+            </HStack>,
+            fact,
+          ]
+    );
+  };
+  // The fact a state leads its detail line with, or null for none.
+  const leadFact = (scheme: Scheme, size: number) => {
+    if (kind === 'failed') {
+      return text(failureText, size, scheme.warn, 'semibold');
+    }
+    if (kind === 'idle') {
+      const pr = props.outcome?.kind === 'pr_opened';
+      if (finishedDuration === null && !pr) {
+        return null;
+      }
+      return (
+        <HStack spacing={6}>
+          {finishedDuration === null
+            ? null
+            : text(`${COPY.finishedIn ?? 'Finished in'} ${finishedDuration}`, size, scheme.muted)}
+          {finishedDuration !== null && pr ? sep(scheme, size) : null}
+          {pr ? text(COPY.prOpened ?? 'Pull request opened', size, scheme.good, 'semibold') : null}
+        </HStack>
+      );
+    }
+    if (kind === 'needsInput') {
+      const command = (props.permissionCommand ?? '').trim();
+      return command.length > 0 ? (
+        <HStack spacing={6}>
+          {text(COPY.permissionWants ?? 'Wants to run', size, scheme.fg, 'semibold')}
+          {text(command, size, scheme.muted)}
+        </HStack>
+      ) : (
+        text(COPY.answerNeeded ?? 'Answer needed', size, scheme.fg, 'semibold')
+      );
+    }
+    if (kind === 'running' && quiet) {
+      return quietLine(size, scheme.warn);
+    }
+    if (kind === 'running' && stepLine !== null) {
+      return text(stepLine, size, scheme.fg, 'semibold');
+    }
+    return null;
+  };
+  const lockScreenDetail = (scheme: Scheme, size: number) => {
+    if (notice !== null) {
+      return text(notice, size, scheme.warn, 'semibold');
+    }
+    // A permission wait spends the line on the command Approve answers.
+    const permission = kind === 'needsInput' && (props.permissionCommand ?? '').trim().length > 0;
+    const lead = leadFact(scheme, size);
+    const facts = permission ? [] : compactFacts(scheme, size, finished);
+    if (lead === null && facts.length === 0) {
+      return null;
+    }
+    return (
+      <HStack alignment="center" spacing={6}>
+        {lead}
+        {lead === null || facts.length === 0 ? null : sep(scheme, size)}
+        {facts}
+        <Spacer minLength={0} />
+      </HStack>
+    );
+  };
+  const lockScreenCard = (scheme: Scheme) => {
+    const detail = lockScreenDetail(scheme, 13);
+    return (
+      <VStack alignment="leading" spacing={0}>
+        <HStack
+          alignment="center"
+          spacing={8}
+          modifiers={[
+            frame({ height: 20 }),
+            accessibilityElement('combine'),
+            accessibilityLabel(spoken),
+          ]}
+        >
+          {mark(18)}
+          {text(title, scheme.titleSize, scheme.fg, 'semibold')}
+          <Spacer minLength={8} />
+          {lastKnown === null ? null : (
+            <HStack spacing={3}>
+              {text(`${COPY.lastKnown ?? 'Last known'} ·`, 11, scheme.muted)}
+              {clock(lastKnown, 11, scheme.muted)}
+            </HStack>
+          )}
+        </HStack>
+        <HStack alignment="center" spacing={8} modifiers={[padding({ top: 8 })]}>
+          {statusLine(scheme, true)}
+          {actions(scheme)}
+        </HStack>
+        {detail === null ? null : (
+          <HStack alignment="center" spacing={0} modifiers={[padding({ top: 6 })]}>
+            {detail}
+          </HStack>
+        )}
+      </VStack>
+    );
+  };
 
   return {
     banner: (
@@ -787,7 +941,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
           opacity(dimmed ? 0.72 : 1),
         ]}
       >
-        {body(card, false)}
+        {lockScreenCard(card)}
       </VStack>
     ),
     // The Apple Watch and CarPlay small family: the status line and Approve.
@@ -830,7 +984,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
           environment({ key: 'locale', value: locale }),
         ]}
       >
-        {body(island, true)}
+        {expandedCard(island)}
       </VStack>
     ),
   };

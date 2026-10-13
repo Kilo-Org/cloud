@@ -146,10 +146,15 @@ describe('session card layout: states', () => {
     expect(shown).toContain('3');
     expect(shown).toContain('of');
     expect(shown).toContain('7');
-    expect(shown).toContain('Write tests');
     // The diff size is on the Lock Screen card too (spec "Content" rule 8).
     expect(shown).toContain('+120');
     expect(shown).toContain('−30');
+    // The plan step name and the bar live in the expanded island; the Lock
+    // Screen card has no room for a fourth line.
+    expect(shown).not.toContain('Write tests');
+    expect(
+      texts(render({ ...BASE, plan: { done: 3, total: 7, current: 'Write tests' } }).expandedBottom)
+    ).toContain('Write tests');
   });
 
   it('says no activity once the quiet window has passed', () => {
@@ -197,49 +202,40 @@ describe('session card layout: states', () => {
 
   it('draws one plan line per card', () => {
     const plan = { done: 3, total: 7, current: 'Write tests' };
-    const counts = (state: State) => {
-      const shown = texts(render(state).banner);
+    const isBar = (item: Rendered) =>
+      item.kind === 'ZStack' && descendants(item).some(child => child.kind === 'RoundedRectangle');
+    const counts = (node: unknown) => {
+      const shown = texts(node);
       return {
-        full: shown.filter(value => value === '7').length,
-        compact: shown.filter(value => value === '3/7').length,
-        // The bar is a track plus its filled segment.
-        bars: collect(render(state).banner).filter(
-          item =>
-            item.kind === 'ZStack' &&
-            descendants(item).some(child => child.kind === 'RoundedRectangle')
-        ).length,
+        totals: shown.filter(value => value === '7').length,
+        bars: collect(node).filter(item => isBar(item)).length,
       };
     };
-    // Working: the bar and its count, once.
-    expect(counts({ ...BASE, plan })).toEqual({ full: 1, compact: 0, bars: 1 });
-    // Every other state: the compact count alone, once.
-    for (const statusKind of ['scheduled', 'failed'] as const) {
-      expect(
-        counts({
-          ...BASE,
-          statusKind,
-          plan,
-          scheduledAt: new Date(Date.now() + 90 * 60_000).toISOString(),
-          failure: { kind: 'other' },
-        })
-      ).toEqual({ full: 0, compact: 1, bars: 0 });
-    }
-    // A finished card keeps its plan progress, as the compact count once
-    // (spec "Content" rule 6).
-    expect(
-      counts({
+    const states: State[] = [
+      { ...BASE, plan },
+      {
+        ...BASE,
+        statusKind: 'scheduled',
+        plan,
+        scheduledAt: new Date(Date.now() + 90 * 60_000).toISOString(),
+      },
+      { ...BASE, statusKind: 'failed', plan, failure: { kind: 'other' } },
+      // A finished card keeps its plan progress (spec "Content" rule 6).
+      {
         ...BASE,
         statusKind: 'idle',
         statusSince: new Date(NOW).toISOString(),
         outcome: { kind: 'none' },
         plan,
-      })
-    ).toEqual({ full: 0, compact: 1, bars: 0 });
-    expect(counts({ ...BASE, statusKind: 'needsInput', plan })).toEqual({
-      full: 0,
-      compact: 1,
-      bars: 0,
-    });
+      },
+      { ...BASE, statusKind: 'needsInput', plan },
+    ];
+    for (const state of states) {
+      // The Lock Screen card: the compact "3 of 7" once, and no bar.
+      expect(counts(render(state).banner)).toEqual({ totals: 1, bars: 0 });
+    }
+    // The expanded island: the bar and its count once, for a working card.
+    expect(counts(render({ ...BASE, plan }).expandedBottom)).toEqual({ totals: 1, bars: 1 });
   });
 
   it('shows the last-known time when a card in another state is out of date', () => {
@@ -297,7 +293,8 @@ describe('session card layout: states', () => {
     });
     const shown = texts(banner);
     expect(shown).toContain('Scheduled');
-    expect(shown).toContain('4/9');
+    expect(shown).toContain('4');
+    expect(shown).toContain('9');
     expect(shown).not.toContain('Awaiting update');
   });
 
@@ -383,7 +380,9 @@ describe('session card layout: states', () => {
     });
     const shown = texts(banner);
     expect(shown).toContain('Stopped: provider error');
-    expect(shown).toContain('2/5');
+    expect(shown).toContain('2');
+    expect(shown).toContain('5');
+    expect(shown).toContain('+12');
     // The card names when it stopped, like every other state (spec "Content" rule 3).
     expect(collect(banner).some(item => item.props.dateStyle === 'time')).toBe(true);
   });
@@ -398,6 +397,126 @@ describe('session card layout: states', () => {
     expect(both.filter(value => value.includes('pnpm'))).toHaveLength(1);
     const other = texts(render({ ...BASE, currentStep: { verb: 'other', target: 'task' } }).banner);
     expect(other).toContain('task');
+  });
+});
+
+// The Lock Screen card is at most 160 pt tall, and ActivityKit draws nothing
+// at all when its banner fails to lay out. The banner therefore keeps a hard
+// budget: three single-line rows (the header with the title, the status line
+// with the controls, one merged detail line), at most about 114 pt with the
+// 16 pt padding. The expanded island keeps the full card.
+const LOCK_SCREEN_ROWS = 3;
+const LOCK_SCREEN_ELEMENTS = 48;
+
+const QUIET_AT = new Date(NOW - SESSION_CARD_QUIET_AFTER_MS - 60_000).toISOString();
+
+const BUDGET_CASES: [string, State][] = [
+  [
+    'working',
+    {
+      ...BASE,
+      currentStep: { verb: 'editing', target: 'auth.ts' },
+      plan: { done: 3, total: 7, current: 'Write tests' },
+      changes: { files: 4, added: 120, removed: 30 },
+      costMicrodollars: 120_000,
+    },
+  ],
+  [
+    'quiet',
+    {
+      ...BASE,
+      lastActivityAt: QUIET_AT,
+      currentStep: { verb: 'reading', target: 'auth.ts' },
+      plan: { done: 3, total: 7, current: 'Write tests' },
+      changes: { files: 4, added: 120, removed: 30 },
+    },
+  ],
+  [
+    'permission',
+    {
+      ...BASE,
+      statusKind: 'needsInput',
+      awaitingPermission: true,
+      approvalKey: 'a'.repeat(64),
+      permissionCommand: 'pnpm --filter web exec next build --no-lint',
+      plan: { done: 3, total: 7, current: null },
+      notice: undefined,
+    },
+  ],
+  [
+    'finished',
+    {
+      ...BASE,
+      statusKind: 'idle',
+      statusSince: new Date(NOW).toISOString(),
+      outcome: { kind: 'pr_opened' },
+      plan: { done: 7, total: 7, current: null },
+      changes: { files: 6, added: 220, removed: 40 },
+      costMicrodollars: 123_000,
+    },
+  ],
+];
+
+describe('session card layout: Lock Screen budget', () => {
+  for (const [name, state] of BUDGET_CASES) {
+    it(`keeps a ${name} card inside the Lock Screen row and element budget`, () => {
+      const { banner } = render(state);
+      const outer = element(banner);
+      const card = element(outer?.props.children);
+      expect(card?.kind).toBe('VStack');
+      const raw = card?.props.children;
+      const rows = (Array.isArray(raw) ? raw.flat(Infinity) : [raw]).filter(
+        child => element(child) !== null
+      );
+      expect(rows.length).toBeLessThanOrEqual(LOCK_SCREEN_ROWS);
+      // Every row is one horizontal line, and no text in it wraps.
+      for (const row of rows) {
+        expect(element(row)?.kind).toBe('HStack');
+        const stacks = collect(row).filter(item => item.kind === 'VStack');
+        expect(stacks).toEqual([]);
+      }
+      for (const textItem of collect(banner).filter(item => item.kind === 'Text')) {
+        const modifiers = (textItem.props.modifiers ?? []) as { $type: string; args?: unknown }[];
+        expect(modifiers.find(modifier => modifier.$type === 'lineLimit')?.args).toBe(1);
+      }
+      expect(collect(banner).length).toBeLessThanOrEqual(LOCK_SCREEN_ELEMENTS);
+    });
+  }
+});
+
+describe('session card layout: self-updating time', () => {
+  const SELF_UPDATING = new Set(['elapsed', 'ago', 'relative', 'offset', 'timer']);
+
+  it('never gives a self-updating date text a horizontal fixedSize', () => {
+    // A horizontal fixedSize asks a self-updating date text for its ideal
+    // width, which it reports as infinite: the whole Lock Screen card then
+    // lays out at an infinite frame and draws nothing.
+    let seen = 0;
+    for (const [, state] of BUDGET_CASES) {
+      const surfaces = render(state);
+      for (const surface of Object.values(surfaces)) {
+        const live = collect(surface).filter(
+          item =>
+            item.kind === 'Text' &&
+            (SELF_UPDATING.has(String(item.props.dateStyle)) ||
+              item.props.timerInterval !== undefined)
+        );
+        for (const item of live) {
+          seen += 1;
+          const modifiers = (item.props.modifiers ?? []) as {
+            $type: string;
+            args?: { horizontal?: boolean };
+          }[];
+          expect(
+            modifiers.some(
+              modifier => modifier.$type === 'fixedSize' && modifier.args?.horizontal !== false
+            )
+          ).toBe(false);
+        }
+      }
+    }
+    // The working timer and the quiet line are both on the cards above.
+    expect(seen).toBeGreaterThan(0);
   });
 });
 
@@ -443,10 +562,9 @@ describe('session card layout: surfaces', () => {
     expect(shown).toContain('4');
   });
 
-  it('draws the plan bar from plain shapes that render on the Lock Screen', () => {
-    const banner = render({ ...BASE, plan: { done: 3, total: 4, current: null } }).banner;
+  it('draws the plan bar in the expanded island from plain shapes', () => {
+    const banner = render({ ...BASE, plan: { done: 3, total: 4, current: null } }).expandedBottom;
     const kinds = collect(banner).map(item => item.kind);
-    // A ProgressView blanked the whole Lock Screen card on iOS.
     expect(kinds).not.toContain('ProgressView');
     const segments = collect(banner).filter(item => item.kind === 'RoundedRectangle');
     const widths = segments.map(segment => {
@@ -456,7 +574,7 @@ describe('session card layout: surfaces', () => {
     // The track and the filled three quarters of it.
     expect(widths).toEqual([64, 48]);
     // An empty plan draws the track alone.
-    const empty = render({ ...BASE, plan: { done: 0, total: 4, current: null } }).banner;
+    const empty = render({ ...BASE, plan: { done: 0, total: 4, current: null } }).expandedBottom;
     expect(collect(empty).filter(item => item.kind === 'RoundedRectangle')).toHaveLength(1);
   });
 

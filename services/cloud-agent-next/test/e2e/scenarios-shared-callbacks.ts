@@ -501,18 +501,12 @@ async function runCallbackBatchFollowup(
       sessionId
     ).slice(hold.callbackBaseline);
     const queuedBatchCallbackIds = queuedBatchCallbacks.map(payload => payload.messageId);
-    // The control plane drains the two queued follow-ups as one batch: a single
-    // callback fires once the queue is empty, and Kilo keys its one assistant
-    // reply to the batch head, so the callback carries that echo (`second`)
-    // rather than the last message's (`third`). The batch callback is one
-    // callback for the whole drained batch, so either echo is correct.
-    const batchText = firstCallback?.lastAssistantMessageText;
     const batchCallbackOk =
       firstCallback !== null &&
       queuedBatchCallbacks.length === 1 &&
       firstCallback.status === 'completed' &&
       firstCallback.messageId === third.messageId &&
-      (batchText === 'second' || batchText === 'third') &&
+      firstCallback.lastAssistantMessageText === 'third' &&
       !queuedBatchCallbackIds.includes(hold.held.messageId) &&
       !queuedBatchCallbackIds.includes(second.messageId);
     if (!batchCallbackOk) {
@@ -563,7 +557,7 @@ async function runCallbackBatchFollowup(
       callbackIds[1] === afterBatch.messageId &&
       statuses[0] === 'completed' &&
       statuses[1] === 'completed' &&
-      (texts[0] === 'second' || texts[0] === 'third') &&
+      texts[0] === 'third' &&
       texts[1] === 'after-batch';
     if (!sequentialOk) {
       return fail(

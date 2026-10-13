@@ -174,36 +174,22 @@ export function createMessageCallbacks(
     message: SessionMessage,
     metadata: SessionMetadata,
     target: CallbackTarget,
-    facts?: ControlPlaneReportFacts,
-    batchParentIds: readonly string[] = []
+    facts?: ControlPlaneReportFacts
   ): CallbackJob | undefined {
     const status = callbackStatus(message);
     if (!status) return undefined;
 
     const sessionId = metadata.identity.sessionId;
     const kiloSessionId = metadata.auth.kiloSessionId;
-    // A drained batch coalesces several user messages into one Kilo turn, so the
-    // assistant reply is keyed to the batch head, not necessarily this
-    // representative message. Resolve the newest reply across the session's
-    // messages (the batch's reply is newer than any earlier turn's) so the
-    // callback still carries the answer this settlement produced.
-    const parentIds = [message.messageId, ...batchParentIds].filter(
-      (id, index, ids) => ids.indexOf(id) === index
-    );
     let lastAssistantMessageText: string | undefined;
     let recentActivity: string | undefined;
     if (status === 'completed' && kiloSessionId) {
       try {
-        const assistantMessage = parentIds
-          .map(parentMessageId =>
-            getAssistantMessageForUserMessage(sessionId, kiloSessionId, parentMessageId)
-          )
-          .filter((candidate): candidate is LatestAssistantMessage => candidate !== null)
-          .reduce<LatestAssistantMessage | null>(
-            (latest, candidate) =>
-              latest === null || candidate.timestamp >= latest.timestamp ? candidate : latest,
-            null
-          );
+        const assistantMessage = getAssistantMessageForUserMessage(
+          sessionId,
+          kiloSessionId,
+          message.messageId
+        );
         lastAssistantMessageText = assistantMessage
           ? extractAssistantText(assistantMessage)
           : undefined;
@@ -215,9 +201,7 @@ export function createMessageCallbacks(
       }
       try {
         recentActivity = renderRecentActivity(
-          parentIds.flatMap(parentMessageId =>
-            getRecentAssistantMessagesForUserMessage(sessionId, kiloSessionId, parentMessageId)
-          )
+          getRecentAssistantMessagesForUserMessage(sessionId, kiloSessionId, message.messageId)
         );
       } catch {
         logger
@@ -273,8 +257,7 @@ export function createMessageCallbacks(
   function persistTerminalCallback(
     message: SessionMessage,
     metadata = getMetadata(),
-    facts?: ControlPlaneReportFacts,
-    batchParentIds: readonly string[] = []
+    facts?: ControlPlaneReportFacts
   ): boolean {
     const target = metadata?.callback?.target;
     if (!target || callbackStatus(message) === undefined) return false;
@@ -284,7 +267,7 @@ export function createMessageCallbacks(
 
     let fittedJob: CallbackJobQueueFitResult;
     try {
-      const job = buildJob(message, metadata, target, facts, batchParentIds);
+      const job = buildJob(message, metadata, target, facts);
       if (!job) return false;
       fittedJob = fitCallbackJobToQueueLimit(job);
       if (fittedJob.status === 'too-large') {
@@ -334,12 +317,7 @@ export function createMessageCallbacks(
       facts !== undefined && newlyTerminalMessageIds.has(representative.messageId)
         ? facts
         : undefined;
-    return persistTerminalCallback(
-      representative,
-      metadata,
-      representativeFacts,
-      messages.map(message => message.messageId)
-    );
+    return persistTerminalCallback(representative, metadata, representativeFacts);
   }
 
   function pendingEntries(): Array<[string, PendingCallbackJob | undefined]> {

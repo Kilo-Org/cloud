@@ -232,7 +232,6 @@ type KiloPassCaller = {
       status: Stripe.Subscription.Status;
       cancelAtPeriodEnd: boolean;
       currentStreakMonths: number;
-      usesNewMonthlyBonusSchedule: boolean;
       nextYearlyIssueAt: string | null;
       nextBonusCreditsUsd: number | null;
       nextBillingAt: string | null;
@@ -533,7 +532,6 @@ async function insertSubscription(params: {
   currentStreakMonths?: number;
   nextYearlyIssueAt?: string | null;
   startedAt?: string | null;
-  usesNewMonthlyBonusSchedule?: boolean;
 }) {
   const now = new Date().toISOString();
   const isEnded =
@@ -562,7 +560,6 @@ async function insertSubscription(params: {
       current_streak_months: params.currentStreakMonths ?? 0,
       next_yearly_issue_at: params.nextYearlyIssueAt ?? null,
       started_at: startedAt,
-      uses_new_monthly_bonus_schedule: params.usesNewMonthlyBonusSchedule ?? false,
       ended_at: isEnded ? now : null,
     })
     .returning({ id: kilo_pass_subscriptions.id });
@@ -1837,47 +1834,15 @@ describe('kiloPassRouter', () => {
     );
 
     it.each([
-      {
-        startedAt: '2026-10-08T23:59:59.999Z',
-        usesNewMonthlyBonusSchedule: false,
-        currentPercent: 0.5,
-        nextPercent: 0.1,
-      },
-      {
-        startedAt: '2026-10-09T00:00:00.000Z',
-        usesNewMonthlyBonusSchedule: false,
-        currentPercent: 0.05,
-        nextPercent: 0.5,
-      },
-      {
-        startedAt: '2027-01-01T00:00:00.000Z',
-        usesNewMonthlyBonusSchedule: false,
-        currentPercent: 0.05,
-        nextPercent: 0.5,
-      },
-      {
-        startedAt: null,
-        usesNewMonthlyBonusSchedule: false,
-        currentPercent: 0.5,
-        nextPercent: 0.1,
-      },
-      {
-        startedAt: '2026-10-08T23:59:59.999Z',
-        usesNewMonthlyBonusSchedule: true,
-        currentPercent: 0.1,
-        nextPercent: 0.5,
-      },
-      {
-        startedAt: '2027-01-01T00:00:00.000Z',
-        usesNewMonthlyBonusSchedule: true,
-        currentPercent: 0.1,
-        nextPercent: 0.5,
-      },
+      { startedAt: '2026-10-08T23:59:59.999Z', currentPercent: 0.5, nextPercent: 0.1 },
+      { startedAt: '2026-10-09T00:00:00.000Z', currentPercent: 0.1, nextPercent: 0.5 },
+      { startedAt: '2026-10-09T00:00:00.001Z', currentPercent: 0.1, nextPercent: 0.5 },
+      { startedAt: null, currentPercent: 0.5, nextPercent: 0.1 },
     ])(
-      'projects monthly bonuses using persisted schedule $usesNewMonthlyBonusSchedule and start $startedAt',
-      async ({ startedAt, usesNewMonthlyBonusSchedule, currentPercent, nextPercent }) => {
+      'projects monthly bonuses using the welcome cutoff for start $startedAt',
+      async ({ startedAt, currentPercent, nextPercent }) => {
         const stripeMock = getStripeMock();
-        const stripeSubscriptionId = `sub_test_monthly_schedule_${usesNewMonthlyBonusSchedule}_${startedAt}`;
+        const stripeSubscriptionId = `sub_test_monthly_cutoff_${startedAt}`;
         const currentPeriodEndSeconds = 1_700_123_456;
         const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
         stripeMock.subscriptions.retrieve.mockResolvedValue({
@@ -1894,7 +1859,7 @@ describe('kiloPassRouter', () => {
         });
 
         const user = await insertTestUser({
-          google_user_email: `kilo-pass-schedule-${usesNewMonthlyBonusSchedule}-${startedAt}@example.com`,
+          google_user_email: `kilo-pass-cutoff-${startedAt}@example.com`,
         });
         const { id: subscriptionId } = await insertSubscription({
           kiloUserId: user.id,
@@ -1904,7 +1869,6 @@ describe('kiloPassRouter', () => {
           status: 'active',
           currentStreakMonths: 1,
           startedAt,
-          usesNewMonthlyBonusSchedule,
         });
         await insertBaseCreditsIssuance({
           subscriptionId,
@@ -1915,7 +1879,6 @@ describe('kiloPassRouter', () => {
 
         const caller = await createCallerForUser(user.id);
         const result = await caller.kiloPass.getState();
-        expect(result.subscription?.usesNewMonthlyBonusSchedule).toBe(usesNewMonthlyBonusSchedule);
 
         const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier199);
         expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(

@@ -203,7 +203,6 @@ const KiloPassSubscriptionStateSchema = KiloPassSubscriptionStateBaseSchema.exte
 
   /** True if the user has never had any other Kilo Pass subscription. */
   isFirstTimeSubscriberEver: z.boolean(),
-  usesNewMonthlyBonusSchedule: z.boolean(),
 
   /** Derived, per-current-period values used for the profile card UI */
   currentPeriodBaseCreditsUsd: z.number(),
@@ -434,7 +433,6 @@ function getNextKiloPassBonusCreditsUsd(params: {
     startedAtIso: params.subscription.startedAt,
     streakMonths: Math.max(1, params.subscription.currentStreakMonths + 1),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    usesNewMonthlyBonusSchedule: params.subscription.usesNewMonthlyBonusSchedule,
     welcomePromoPolicy: params.welcomePromoPolicy,
     welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
   });
@@ -452,7 +450,6 @@ function getCurrentKiloPassBonusCreditsUsd(params: {
     startedAtIso: params.subscription.startedAt,
     streakMonths: Math.max(1, params.subscription.currentStreakMonths),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    usesNewMonthlyBonusSchedule: params.subscription.usesNewMonthlyBonusSchedule,
     welcomePromoPolicy: params.welcomePromoPolicy,
     welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
   });

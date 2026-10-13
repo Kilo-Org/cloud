@@ -629,7 +629,6 @@ export async function handleKiloPassInvoicePaid(params: {
           status: subscription.status,
           started_at: dayjs.unix(subscription.start_date).utc().toISOString(),
           ended_at: derivedEndedAt,
-          uses_new_monthly_bonus_schedule: true,
         })
         .onConflictDoUpdate({
           target: kilo_pass_subscriptions.stripe_subscription_id,
@@ -646,8 +645,6 @@ export async function handleKiloPassInvoicePaid(params: {
         .returning({
           id: kilo_pass_subscriptions.id,
           status: kilo_pass_subscriptions.status,
-          uses_new_monthly_bonus_schedule: kilo_pass_subscriptions.uses_new_monthly_bonus_schedule,
-          started_at: kilo_pass_subscriptions.started_at,
         });
 
       const row = upserted[0];
@@ -864,11 +861,10 @@ export async function handleKiloPassInvoicePaid(params: {
           kiloUserId,
           subscriptionId: kiloPassSubscriptionId,
           paymentProvider: KiloPassPaymentProvider.Stripe,
-          usesNewMonthlyBonusSchedule: row.uses_new_monthly_bonus_schedule,
         });
         const isWelcomePromoIssuance = computeMonthlyKiloPassBonusDecision({
           tier,
-          startedAtIso: row.started_at,
+          startedAtIso: dayjs.unix(subscription.start_date).utc().toISOString(),
           streakMonths: monthlyStreakMonths,
           ...welcomePromoAccountContext,
           issueMonth,

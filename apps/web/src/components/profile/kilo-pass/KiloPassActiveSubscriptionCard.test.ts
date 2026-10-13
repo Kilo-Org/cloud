@@ -26,7 +26,6 @@ function buildSubscription(
     tier: KiloPassTier.Tier19,
     currentStreakMonths: 0,
     isFirstTimeSubscriberEver: false,
-    usesNewMonthlyBonusSchedule: false,
     startedAt: null,
     refillAt: null,
     nextBillingAt: null,
@@ -300,55 +299,15 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
     });
 
     test.each([
-      {
-        startedAt: '2026-10-08T00:00:00Z',
-        usesNewMonthlyBonusSchedule: false,
-        streakMonths: 0,
-        percent: 0.5,
-      },
-      {
-        startedAt: '2026-10-08T00:00:00Z',
-        usesNewMonthlyBonusSchedule: false,
-        streakMonths: 1,
-        percent: 0.1,
-      },
-      {
-        startedAt: '2027-01-01T00:00:00Z',
-        usesNewMonthlyBonusSchedule: false,
-        streakMonths: 0,
-        percent: 0.05,
-      },
-      {
-        startedAt: '2027-01-01T00:00:00Z',
-        usesNewMonthlyBonusSchedule: false,
-        streakMonths: 1,
-        percent: 0.5,
-      },
-      {
-        startedAt: '2026-10-08T00:00:00Z',
-        usesNewMonthlyBonusSchedule: true,
-        streakMonths: 0,
-        percent: 0.1,
-      },
-      {
-        startedAt: '2026-10-08T00:00:00Z',
-        usesNewMonthlyBonusSchedule: true,
-        streakMonths: 1,
-        percent: 0.5,
-      },
-      {
-        startedAt: '2026-10-08T00:00:00Z',
-        usesNewMonthlyBonusSchedule: true,
-        streakMonths: 2,
-        percent: 0.15,
-      },
+      { startedAt: '2026-10-08T23:59:59.999Z', streakMonths: 0, percent: 0.5 },
+      { startedAt: '2026-10-09T00:00:00Z', streakMonths: 0, percent: 0.1 },
+      { startedAt: '2026-10-09T00:00:00Z', streakMonths: 1, percent: 0.5 },
     ])(
-      'uses the persisted schedule for the next bonus: $usesNewMonthlyBonusSchedule, start $startedAt, streak $streakMonths',
-      ({ startedAt, usesNewMonthlyBonusSchedule, streakMonths, percent }) => {
+      'projects the next renewal bonus for start $startedAt and streak $streakMonths',
+      ({ startedAt, streakMonths, percent }) => {
         const rows = computeRenewInfoRowModel({
           subscription: buildSubscription({
             startedAt,
-            usesNewMonthlyBonusSchedule,
             currentStreakMonths: streakMonths,
             isFirstTimeSubscriberEver: true,
             refillAt: '2026-11-14T00:00:00Z',

@@ -52,7 +52,6 @@ export function computeUsageTriggeredMonthlyBonusDecision(params: {
   startedAtIso: string | null;
   currentStreakMonths: number;
   isFirstTimeSubscriberEver: boolean;
-  usesNewMonthlyBonusSchedule?: boolean;
   welcomePromoPolicy: KiloPassWelcomePromoPolicy;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
   issueMonth: string;
@@ -62,7 +61,6 @@ export function computeUsageTriggeredMonthlyBonusDecision(params: {
     startedAtIso: params.startedAtIso,
     streakMonths: params.currentStreakMonths,
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    usesNewMonthlyBonusSchedule: params.usesNewMonthlyBonusSchedule,
     welcomePromoPolicy: params.welcomePromoPolicy,
     welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
     issueMonth: params.issueMonth,
@@ -276,7 +274,6 @@ async function maybeIssueBonusFromUsageThreshold(
       kiloUserId,
       subscriptionId: subscription.subscriptionId,
       paymentProvider: subscription.paymentProvider,
-      usesNewMonthlyBonusSchedule: subscription.usesNewMonthlyBonusSchedule,
     });
     const monthlyDecision = computeUsageTriggeredMonthlyBonusDecision({
       tier: subscription.tier,

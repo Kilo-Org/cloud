@@ -45,7 +45,6 @@ export function computeMonthlyKiloPassBonusDecision(params: {
   startedAtIso: string | null;
   streakMonths: number;
   isFirstTimeSubscriberEver: boolean;
-  usesNewMonthlyBonusSchedule?: boolean;
   welcomePromoPolicy: KiloPassWelcomePromoPolicy;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
   issueMonth?: string;
@@ -61,7 +60,6 @@ export function computeMonthlyKiloPassBonusDecision(params: {
     streakMonths,
     isFirstTimeSubscriberEver: isEligibleForWelcomePromo,
     subscriptionStartedAtIso: params.startedAtIso,
-    usesNewMonthlyBonusSchedule: params.usesNewMonthlyBonusSchedule,
   });
   const shouldIssueFirstMonthPromo = bonusPercentApplied === 0.5 && streakMonths <= 2;
   const bonusKind: KiloPassMonthlyBonusKind = shouldIssueFirstMonthPromo
@@ -99,7 +97,6 @@ export function computeKiloPassBonusCreditsUsd(params: {
   startedAtIso: string | null;
   streakMonths: number;
   isFirstTimeSubscriberEver: boolean;
-  usesNewMonthlyBonusSchedule?: boolean;
   welcomePromoPolicy: KiloPassWelcomePromoPolicy;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
 }): number {
@@ -116,7 +113,6 @@ export function computeKiloPassBonusCreditsUsd(params: {
     startedAtIso: params.startedAtIso,
     streakMonths: params.streakMonths,
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    usesNewMonthlyBonusSchedule: params.usesNewMonthlyBonusSchedule,
     welcomePromoPolicy: params.welcomePromoPolicy,
     welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
   }).bonusUsd;

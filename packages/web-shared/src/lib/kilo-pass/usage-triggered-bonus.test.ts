@@ -25,7 +25,6 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import { KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
-import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { and, eq } from 'drizzle-orm';
 
 beforeEach(async () => {
@@ -41,7 +40,6 @@ async function seedBaseIssuance(params: {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAtIso?: string | null;
-  usesNewMonthlyBonusSchedule?: boolean;
   paymentProvider?: KiloPassPaymentProvider;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
   initialWelcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason;
@@ -57,7 +55,6 @@ async function seedBaseIssuance(params: {
     currentStreakMonths,
     nextYearlyIssueAt,
     startedAtIso,
-    usesNewMonthlyBonusSchedule = false,
     paymentProvider = KiloPassPaymentProvider.Stripe,
     welcomePromoEligibilityReason,
     initialWelcomePromoEligibilityReason,
@@ -81,7 +78,6 @@ async function seedBaseIssuance(params: {
       started_at: startedAtIso ?? new Date('2026-01-01T00:00:00.000Z').toISOString(),
       ended_at: null,
       current_streak_months: currentStreakMonths,
-      uses_new_monthly_bonus_schedule: usesNewMonthlyBonusSchedule,
       next_yearly_issue_at: nextYearlyIssueAt,
     })
     .returning({ id: kilo_pass_subscriptions.id });
@@ -190,23 +186,11 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
   });
 
   test.each([
-    [false, '2026-05-01T00:00:00.000Z', 1, '2026-05-01', 9_500_000],
-    [false, '2026-05-01T00:00:00.000Z', 2, '2026-06-01', 1_900_000],
-    [false, '2100-01-01T00:00:00.000Z', 1, '2100-01-01', 950_000],
-    [false, '2100-01-01T00:00:00.000Z', 2, '2100-02-01', 9_500_000],
-    [true, '2026-05-01T00:00:00.000Z', 1, '2026-05-01', 1_900_000],
-    [true, '2026-05-01T00:00:00.000Z', 2, '2026-06-01', 9_500_000],
-    [true, '2100-01-01T00:00:00.000Z', 1, '2100-01-01', 1_900_000],
-    [true, '2100-01-01T00:00:00.000Z', 2, '2100-02-01', 9_500_000],
-  ] as const)(
-    'monthly marker %s start %s month %s issuance %s grants %s after usage',
-    async (
-      usesNewMonthlyBonusSchedule,
-      startedAtIso,
-      currentStreakMonths,
-      issueMonth,
-      expectedMicrodollars
-    ) => {
+    [1, '2026-10-01', 1_900_000],
+    [2, '2026-11-01', 9_500_000],
+  ])(
+    'new monthly subscription issues the month %s bonus after usage',
+    async (currentStreakMonths, issueMonth, expectedMicrodollars) => {
       const user = await insertTestUser({
         microdollars_used: 20_000_000,
         kilo_pass_threshold: 19_000_000,
@@ -216,18 +200,17 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
         cadence: KiloPassCadence.Monthly,
         tier: KiloPassTier.Tier19,
         issueMonth,
-        stripeInvoiceId: `inv_monthly_${currentStreakMonths}`,
+        stripeInvoiceId: `inv_new_monthly_${currentStreakMonths}`,
         currentStreakMonths,
         nextYearlyIssueAt: null,
-        startedAtIso,
-        usesNewMonthlyBonusSchedule,
+        startedAtIso: '2026-10-09T00:00:00.000Z',
         initialWelcomePromoEligibilityReason:
           KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
       });
 
       await maybeIssueKiloPassBonusFromUsageThreshold({
         kiloUserId: user.id,
-        nowIso: dayjs(issueMonth).utc().add(14, 'day').toISOString(),
+        nowIso: currentStreakMonths === 1 ? '2026-10-15T00:00:00Z' : '2026-11-15T00:00:00Z',
         db,
       });
 
@@ -707,177 +690,165 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     expect(bonusTx?.amount_microdollars).toBe(950_000);
   });
 
-  test.each([false, true])(
-    'monthly: reused card keeps the normal ramp with new schedule marker %s',
-    async usesNewMonthlyBonusSchedule => {
-      const user = await insertTestUser({
-        microdollars_used: 20_000_000,
-        kilo_pass_threshold: 19_000_000,
-      });
+  test('monthly: reused card eligibility issues regular ramp bonus instead of first-month promo', async () => {
+    const user = await insertTestUser({
+      microdollars_used: 20_000_000,
+      kilo_pass_threshold: 19_000_000,
+    });
 
-      const { issuanceId } = await seedBaseIssuance({
-        kiloUserId: user.id,
-        cadence: KiloPassCadence.Monthly,
-        tier: KiloPassTier.Tier19,
-        issueMonth: '2026-01-01',
-        stripeInvoiceId: 'inv_test_reused_card',
-        currentStreakMonths: 1,
-        nextYearlyIssueAt: null,
-        usesNewMonthlyBonusSchedule,
-        welcomePromoEligibilityReason:
-          KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
-      });
+    const { issuanceId } = await seedBaseIssuance({
+      kiloUserId: user.id,
+      cadence: KiloPassCadence.Monthly,
+      tier: KiloPassTier.Tier19,
+      issueMonth: '2026-01-01',
+      stripeInvoiceId: 'inv_test_reused_card',
+      currentStreakMonths: 1,
+      nextYearlyIssueAt: null,
+      welcomePromoEligibilityReason:
+        KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
+    });
 
-      await maybeIssueKiloPassBonusFromUsageThreshold({
-        kiloUserId: user.id,
-        nowIso: new Date('2026-01-15T00:00:00.000Z').toISOString(),
-        db,
-      });
+    await maybeIssueKiloPassBonusFromUsageThreshold({
+      kiloUserId: user.id,
+      nowIso: new Date('2026-01-15T00:00:00.000Z').toISOString(),
+      db,
+    });
 
-      const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
-        where: and(
+    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+      where: and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
+      ),
+    });
+    const bonusTx = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
+    });
+
+    expect(bonusTx?.description).toBe('Kilo Pass monthly bonus (tier_19, streak=1)');
+    expect(bonusTx?.amount_microdollars).toBe(950_000);
+
+    const audit = await db.query.kilo_pass_audit_log.findFirst({
+      where: and(
+        eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.BonusCreditsIssued),
+        eq(kilo_pass_audit_log.related_monthly_issuance_id, issuanceId)
+      ),
+    });
+    const payload = audit?.payload_json;
+    expect(isRecord(payload)).toBe(true);
+    if (!isRecord(payload)) throw new Error('Expected audit payload to be an object');
+    expect(payload.bonusKind).toBe('monthly-ramp');
+  });
+
+  test('monthly: tier_19 with prior subscription and streak=1 issues regular bonus (no first-time promo) and clears kilo_pass_threshold', async () => {
+    const user = await insertTestUser({
+      microdollars_used: 20_000_000,
+      kilo_pass_threshold: 19_000_000,
+    });
+
+    // Prior subscription makes the user ineligible for the first-month promo.
+    const priorStripeSubscriptionId = `sub_prior_${Math.random()}`;
+    await db.insert(kilo_pass_subscriptions).values({
+      kilo_user_id: user.id,
+      provider_subscription_id: priorStripeSubscriptionId,
+      stripe_subscription_id: priorStripeSubscriptionId,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      status: 'canceled',
+      cancel_at_period_end: false,
+      started_at: new Date('2025-01-01T00:00:00.000Z').toISOString(),
+      ended_at: new Date('2025-02-01T00:00:00.000Z').toISOString(),
+      current_streak_months: 0,
+      next_yearly_issue_at: null,
+    });
+
+    const { issuanceId } = await seedBaseIssuance({
+      kiloUserId: user.id,
+      cadence: KiloPassCadence.Monthly,
+      tier: KiloPassTier.Tier19,
+      issueMonth: '2026-01-01',
+      stripeInvoiceId: 'inv_test_monthly_zero',
+      currentStreakMonths: 1,
+      nextYearlyIssueAt: null,
+      welcomePromoEligibilityReason: null,
+      issuanceCreatedAt: '2026-05-28T12:06:19.999Z',
+    });
+
+    await maybeIssueKiloPassBonusFromUsageThreshold({
+      kiloUserId: user.id,
+      nowIso: new Date('2026-01-15T00:00:00.000Z').toISOString(),
+      db,
+    });
+
+    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+      where: and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
+      ),
+    });
+    expect(bonusItem).toBeTruthy();
+
+    const bonusTx = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
+    });
+    // tier_19 at streak=1 => 5% of $19.00 = $0.95.
+    expect(bonusTx?.amount_microdollars).toBe(950_000);
+
+    const promoItems = await db
+      .select({ id: kilo_pass_issuance_items.id })
+      .from(kilo_pass_issuance_items)
+      .where(
+        and(
           eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
-          eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
-        ),
-      });
-      const bonusTx = await db.query.credit_transactions.findFirst({
-        where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
-      });
+          eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.PromoFirstMonth50Pct)
+        )
+      );
+    expect(promoItems).toHaveLength(0);
 
-      expect(bonusTx?.description).toBe('Kilo Pass monthly bonus (tier_19, streak=1)');
-      expect(bonusTx?.amount_microdollars).toBe(950_000);
+    const userRow = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(userRow?.kilo_pass_threshold).toBeNull();
+  });
 
-      const audit = await db.query.kilo_pass_audit_log.findFirst({
-        where: and(
-          eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.BonusCreditsIssued),
-          eq(kilo_pass_audit_log.related_monthly_issuance_id, issuanceId)
-        ),
-      });
-      const payload = audit?.payload_json;
-      expect(isRecord(payload)).toBe(true);
-      if (!isRecord(payload)) throw new Error('Expected audit payload to be an object');
-      expect(payload.bonusKind).toBe('monthly-ramp');
-    }
-  );
+  test('yearly: issues month-1 bonus (invoice issuance) when threshold is exceeded', async () => {
+    const user = await insertTestUser({
+      microdollars_used: 55_000_000,
+      kilo_pass_threshold: 49_000_000,
+    });
 
-  test.each([false, true])(
-    'monthly: returning subscriber keeps the normal ramp with new schedule marker %s',
-    async usesNewMonthlyBonusSchedule => {
-      const user = await insertTestUser({
-        microdollars_used: 20_000_000,
-        kilo_pass_threshold: 19_000_000,
-      });
+    const { issuanceId } = await seedBaseIssuance({
+      kiloUserId: user.id,
+      cadence: KiloPassCadence.Yearly,
+      tier: KiloPassTier.Tier49,
+      issueMonth: '2026-01-01',
+      stripeInvoiceId: 'inv_test_yearly',
+      currentStreakMonths: 0,
+      nextYearlyIssueAt: new Date('2026-02-01T00:00:00.000Z').toISOString(),
+    });
 
-      // Prior subscription makes the user ineligible for the first-month promo.
-      const priorStripeSubscriptionId = `sub_prior_${Math.random()}`;
-      await db.insert(kilo_pass_subscriptions).values({
-        kilo_user_id: user.id,
-        provider_subscription_id: priorStripeSubscriptionId,
-        stripe_subscription_id: priorStripeSubscriptionId,
-        tier: KiloPassTier.Tier19,
-        cadence: KiloPassCadence.Monthly,
-        status: 'canceled',
-        cancel_at_period_end: false,
-        started_at: new Date('2025-01-01T00:00:00.000Z').toISOString(),
-        ended_at: new Date('2025-02-01T00:00:00.000Z').toISOString(),
-        current_streak_months: 0,
-        next_yearly_issue_at: null,
-      });
+    await maybeIssueKiloPassBonusFromUsageThreshold({
+      kiloUserId: user.id,
+      nowIso: new Date('2026-01-15T00:00:00.000Z').toISOString(),
+      db,
+    });
 
-      const { issuanceId } = await seedBaseIssuance({
-        kiloUserId: user.id,
-        cadence: KiloPassCadence.Monthly,
-        tier: KiloPassTier.Tier19,
-        issueMonth: '2026-01-01',
-        stripeInvoiceId: 'inv_test_monthly_zero',
-        currentStreakMonths: 1,
-        nextYearlyIssueAt: null,
-        usesNewMonthlyBonusSchedule,
-        welcomePromoEligibilityReason: null,
-        issuanceCreatedAt: '2026-05-28T12:06:19.999Z',
-      });
+    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+      where: and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
+      ),
+    });
+    expect(bonusItem).toBeTruthy();
 
-      await maybeIssueKiloPassBonusFromUsageThreshold({
-        kiloUserId: user.id,
-        nowIso: new Date('2026-01-15T00:00:00.000Z').toISOString(),
-        db,
-      });
+    const bonusTx = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
+    });
+    expect(bonusTx?.is_free).toBe(true);
+    expect(bonusTx?.amount_microdollars).toBe(24_500_000);
 
-      const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
-        where: and(
-          eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
-          eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
-        ),
-      });
-      expect(bonusItem).toBeTruthy();
-
-      const bonusTx = await db.query.credit_transactions.findFirst({
-        where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
-      });
-      // tier_19 at streak=1 => 5% of $19.00 = $0.95.
-      expect(bonusTx?.amount_microdollars).toBe(950_000);
-
-      const promoItems = await db
-        .select({ id: kilo_pass_issuance_items.id })
-        .from(kilo_pass_issuance_items)
-        .where(
-          and(
-            eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
-            eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.PromoFirstMonth50Pct)
-          )
-        );
-      expect(promoItems).toHaveLength(0);
-
-      const userRow = await db.query.kilocode_users.findFirst({
-        where: eq(kilocode_users.id, user.id),
-      });
-      expect(userRow?.kilo_pass_threshold).toBeNull();
-    }
-  );
-
-  test.each([false, true])(
-    'yearly: month-1 usage bonus stays unchanged with new schedule marker %s',
-    async usesNewMonthlyBonusSchedule => {
-      const user = await insertTestUser({
-        microdollars_used: 55_000_000,
-        kilo_pass_threshold: 49_000_000,
-      });
-
-      const { issuanceId } = await seedBaseIssuance({
-        kiloUserId: user.id,
-        cadence: KiloPassCadence.Yearly,
-        tier: KiloPassTier.Tier49,
-        issueMonth: '2026-01-01',
-        stripeInvoiceId: 'inv_test_yearly',
-        currentStreakMonths: 0,
-        nextYearlyIssueAt: new Date('2026-02-01T00:00:00.000Z').toISOString(),
-        usesNewMonthlyBonusSchedule,
-      });
-
-      await maybeIssueKiloPassBonusFromUsageThreshold({
-        kiloUserId: user.id,
-        nowIso: new Date('2026-01-15T00:00:00.000Z').toISOString(),
-        db,
-      });
-
-      const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
-        where: and(
-          eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
-          eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
-        ),
-      });
-      expect(bonusItem).toBeTruthy();
-
-      const bonusTx = await db.query.credit_transactions.findFirst({
-        where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
-      });
-      expect(bonusTx?.is_free).toBe(true);
-      expect(bonusTx?.amount_microdollars).toBe(24_500_000);
-
-      const userRow = await db.query.kilocode_users.findFirst({
-        where: eq(kilocode_users.id, user.id),
-      });
-      expect(userRow?.kilo_pass_threshold).toBeNull();
-    }
-  );
+    const userRow = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(userRow?.kilo_pass_threshold).toBeNull();
+  });
 });

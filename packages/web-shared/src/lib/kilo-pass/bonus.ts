@@ -24,11 +24,8 @@ export const isKiloPassSelectionEligibleForKiloclawCommitUpsell = (params: {
 };
 
 export const getMonthlyWelcomePromoMonth = (
-  subscriptionStartedAtIso: string | null | undefined,
-  usesNewMonthlyBonusSchedule = false
+  subscriptionStartedAtIso: string | null | undefined
 ): 1 | 2 => {
-  if (usesNewMonthlyBonusSchedule) return 2;
-
   const startedAtMillis = subscriptionStartedAtIso ? Date.parse(subscriptionStartedAtIso) : NaN;
   return Number.isFinite(startedAtMillis) &&
     startedAtMillis >= KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF.valueOf()
@@ -41,29 +38,25 @@ export const computeMonthlyCadenceBonusPercent = (params: {
   streakMonths: number;
   isFirstTimeSubscriberEver: boolean;
   subscriptionStartedAtIso?: string | null;
-  usesNewMonthlyBonusSchedule?: boolean;
 }): number => {
-  const {
-    tier,
-    streakMonths,
-    isFirstTimeSubscriberEver,
-    subscriptionStartedAtIso,
-    usesNewMonthlyBonusSchedule = false,
-  } = params;
+  const { tier, streakMonths, isFirstTimeSubscriberEver, subscriptionStartedAtIso } = params;
 
   if (streakMonths < 1) {
     throw new Error('streakMonths must be >= 1');
   }
 
-  if (isFirstTimeSubscriberEver && streakMonths === 1 && usesNewMonthlyBonusSchedule) {
+  if (
+    isFirstTimeSubscriberEver &&
+    streakMonths === 1 &&
+    getMonthlyWelcomePromoMonth(subscriptionStartedAtIso) === 2
+  ) {
     return KILO_PASS_MONTHLY_FIRST_MONTH_BONUS_PERCENT;
   }
 
   if (
     isFirstTimeSubscriberEver &&
     streakMonths <= 2 &&
-    streakMonths ===
-      getMonthlyWelcomePromoMonth(subscriptionStartedAtIso, usesNewMonthlyBonusSchedule)
+    streakMonths === getMonthlyWelcomePromoMonth(subscriptionStartedAtIso)
   ) {
     return KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
   }

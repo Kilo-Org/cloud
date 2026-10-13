@@ -151,7 +151,6 @@ describe('handleKiloPassSubscriptionEvent', () => {
     expect(subRow?.cancel_at_period_end).toBe(false);
     expect(toIso(subRow?.started_at)).toBe(new Date(startDateSeconds * 1000).toISOString());
     expect(subRow?.ended_at).toBeNull();
-    expect(subRow?.uses_new_monthly_bonus_schedule).toBe(true);
 
     const auditRow = await db.query.kilo_pass_audit_log.findFirst({
       where: and(
@@ -178,7 +177,6 @@ describe('handleKiloPassSubscriptionEvent', () => {
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
     expect(toIso(replayed?.started_at)).toBe(new Date(startDateSeconds * 1000).toISOString());
-    expect(replayed?.uses_new_monthly_bonus_schedule).toBe(true);
   });
 
   test('active subscription with cancel_at_period_end=true stores cancel_at_period_end flag', async () => {
@@ -334,17 +332,9 @@ describe('handleKiloPassSubscriptionEvent', () => {
     expect(endedAtSeconds).toBeLessThanOrEqual(afterSeconds + 1);
   });
 
-  test.each(
-    ['2026-10-08T23:59:59.000Z', '2026-10-09T00:00:00.000Z', '2100-01-01T00:00:00.000Z'].flatMap(
-      startedAt =>
-        [false, true].map(usesNewMonthlyBonusSchedule => ({
-          startedAt,
-          usesNewMonthlyBonusSchedule,
-        }))
-    )
-  )(
-    'tier/cadence updates and replay preserve start $startedAt, schedule $usesNewMonthlyBonusSchedule and streak',
-    async ({ startedAt, usesNewMonthlyBonusSchedule }) => {
+  test.each(['2026-10-08T23:59:59.000Z', '2026-10-09T00:00:00.000Z'])(
+    'tier/cadence updates and replay preserve start %s and streak',
+    async startedAt => {
       const { handleKiloPassSubscriptionEvent } =
         await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
 
@@ -362,7 +352,6 @@ describe('handleKiloPassSubscriptionEvent', () => {
         started_at: startedAt,
         ended_at: null,
         current_streak_months: 7,
-        uses_new_monthly_bonus_schedule: usesNewMonthlyBonusSchedule,
       });
 
       const subscription = makeStripeSubscription({
@@ -389,7 +378,6 @@ describe('handleKiloPassSubscriptionEvent', () => {
       expect(updated?.status).toBe('active');
       expect(updated?.cancel_at_period_end).toBe(true);
       expect(updated?.current_streak_months).toBe(7);
-      expect(updated?.uses_new_monthly_bonus_schedule).toBe(usesNewMonthlyBonusSchedule);
       expect(toIso(updated?.started_at)).toBe(startedAt);
       expect(updated?.tier).toBe(KiloPassTier.Tier199);
       expect(updated?.cadence).toBe(KiloPassCadence.Yearly);
@@ -403,7 +391,6 @@ describe('handleKiloPassSubscriptionEvent', () => {
         where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
       });
       expect(toIso(replayed?.started_at)).toBe(startedAt);
-      expect(replayed?.uses_new_monthly_bonus_schedule).toBe(usesNewMonthlyBonusSchedule);
     }
   );
 

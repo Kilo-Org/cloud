@@ -139,39 +139,8 @@ describe('completeStoreKiloPassPurchase', () => {
   });
 
   it.each([KiloPassPaymentProvider.AppStore, KiloPassPaymentProvider.GooglePlay] as const)(
-    'sets the new schedule for a newly inserted %s subscription with a historical provider start',
+    '%s subscription start survives tier/cadence changes and purchase replay',
     async paymentProvider => {
-      const user = await insertTestUser();
-      const purchase = applePurchase({
-        paymentProvider,
-        subscriptionStartedAtIso: '2026-01-01T00:00:00.000Z',
-        expiresAtIso: '2100-01-01T00:00:00.000Z',
-      });
-      const result = await completeStoreKiloPassPurchase({ user, purchase });
-      const subscription = await db.query.kilo_pass_subscriptions.findFirst({
-        where: eq(kilo_pass_subscriptions.id, result.subscriptionId),
-      });
-      expect(subscription?.uses_new_monthly_bonus_schedule).toBe(true);
-      expect(
-        subscription?.started_at ? new Date(subscription.started_at).toISOString() : null
-      ).toBe('2026-01-01T00:00:00.000Z');
-    }
-  );
-
-  it.each(
-    ([KiloPassPaymentProvider.AppStore, KiloPassPaymentProvider.GooglePlay] as const).flatMap(
-      paymentProvider =>
-        [false, true].flatMap(usesNewMonthlyBonusSchedule =>
-          ['2026-01-01T00:00:00.000Z', '2100-01-01T00:00:00.000Z'].map(startedAt => ({
-            paymentProvider,
-            usesNewMonthlyBonusSchedule,
-            startedAt,
-          }))
-        )
-    )
-  )(
-    '$paymentProvider start $startedAt and schedule $usesNewMonthlyBonusSchedule survive tier/cadence changes and replay',
-    async ({ paymentProvider, usesNewMonthlyBonusSchedule, startedAt }) => {
       const user = await insertTestUser();
       const providerSubscriptionId = crypto.randomUUID();
       const [legacy] = await db
@@ -183,8 +152,7 @@ describe('completeStoreKiloPassPurchase', () => {
           tier: KiloPassTier.Tier19,
           cadence: KiloPassCadence.Monthly,
           status: 'active',
-          started_at: startedAt,
-          uses_new_monthly_bonus_schedule: usesNewMonthlyBonusSchedule,
+          started_at: '2026-01-01T00:00:00.000Z',
         })
         .returning();
       const purchase = applePurchase({
@@ -208,11 +176,10 @@ describe('completeStoreKiloPassPurchase', () => {
       expect(subscription).toMatchObject({
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Yearly,
-        uses_new_monthly_bonus_schedule: usesNewMonthlyBonusSchedule,
       });
       expect(
         subscription?.started_at ? new Date(subscription.started_at).toISOString() : null
-      ).toBe(startedAt);
+      ).toBe('2026-01-01T00:00:00.000Z');
     }
   );
 

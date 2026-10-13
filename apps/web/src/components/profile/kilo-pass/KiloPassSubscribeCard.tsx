@@ -47,7 +47,6 @@ export function KiloPassSubscribeCard(props: {
     tier: KiloPassTier.Tier19,
     isFirstTimeSubscriberEver: showFirstMonthPromo,
     subscriptionStartedAtIso,
-    usesNewMonthlyBonusSchedule: true,
   });
 
   const monthlyPromoDescription =

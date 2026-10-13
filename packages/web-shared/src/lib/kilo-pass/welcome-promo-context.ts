@@ -57,7 +57,6 @@ export async function getInitialWelcomePromoContextForSubscription(
 
 export type MonthlyWelcomePromoAccountContext = {
   isFirstTimeSubscriberEver: boolean;
-  usesNewMonthlyBonusSchedule: boolean;
   welcomePromoPolicy: KiloPassWelcomePromoPolicy;
   welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 };
@@ -68,7 +67,6 @@ export async function getMonthlyWelcomePromoAccountContext(
     kiloUserId: string;
     subscriptionId: string;
     paymentProvider: KiloPassPaymentProvider;
-    usesNewMonthlyBonusSchedule: boolean;
   }
 ): Promise<MonthlyWelcomePromoAccountContext> {
   const otherSubscription = await db
@@ -90,7 +88,6 @@ export async function getMonthlyWelcomePromoAccountContext(
 
   return {
     isFirstTimeSubscriberEver: otherSubscription.length === 0,
-    usesNewMonthlyBonusSchedule: params.usesNewMonthlyBonusSchedule,
     welcomePromoPolicy: getKiloPassWelcomePromoPolicy({
       paymentProvider: params.paymentProvider,
       initialIssuanceCreatedAt: initialWelcomePromoContext?.createdAt ?? null,

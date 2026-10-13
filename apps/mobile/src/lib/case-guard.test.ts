@@ -36,6 +36,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/voice-input/voice-input-language.ts': 'language-tag normalization',
   'lib/model-picker-rows.ts': 'model search folding',
   'lib/repo-picker-filter.ts': 'repo search folding',
+  'lib/todos/todo-model.ts': 'repository full-name comparison',
   'lib/use-new-session-repos.ts': 'repo key normalization',
   'lib/organization-invoice-download.ts': 'filename comparison',
   'lib/agent-attachments/validate.ts': 'file-extension normalization',
@@ -74,6 +75,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/profiles/agent-form-sheet.tsx': 'agent-slug normalization',
   'components/profiles/kilo-command-form-sheet.tsx': 'slash-command name normalization',
   'components/profiles/repo-bindings-model.ts': 'repository full-name search and comparison',
+  'components/todos/todo-link-session-sheet.tsx': 'repository full-name comparison',
   'app/(app)/kiloclaw/[instance-id]/settings/model-list.tsx': 'model search folding',
 };
 

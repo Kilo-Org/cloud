@@ -7,6 +7,9 @@ export type NewSessionPrefillParams = {
   mode?: string;
   model?: string;
   variant?: string;
+  prompt?: string;
+  /** The to-do the started session links to. */
+  todoId?: string;
 };
 
 export type NewSessionPrefill = {
@@ -15,6 +18,8 @@ export type NewSessionPrefill = {
   repo?: string;
   model?: string;
   variant?: string;
+  prompt?: string;
+  todoId?: string;
 };
 
 function isValidOwnerRepo(value: string): boolean {
@@ -88,6 +93,12 @@ export function appendNewSessionPrefill(base: string, params: NewSessionPrefillP
   }
   if (params.variant) {
     entries.push(['prefillVariant', params.variant]);
+  }
+  if (params.prompt) {
+    entries.push(['prefillPrompt', params.prompt]);
+  }
+  if (params.todoId) {
+    entries.push(['todoId', params.todoId]);
   }
 
   if (entries.length === 0) {
@@ -204,12 +215,16 @@ export function readNewSessionPrefill(
   const rawRepo = getFirstParam(raw, 'prefillRepo');
   const rawModel = getFirstParam(raw, 'prefillModel');
   const rawVariant = getFirstParam(raw, 'prefillVariant');
+  const rawPrompt = getFirstParam(raw, 'prefillPrompt');
+  const rawTodoId = getFirstParam(raw, 'todoId');
 
   return {
     mode: normalizeAgentMode(rawMode || undefined),
     ...(rawRepo ? { repo: rawRepo } : {}),
     ...(rawModel ? { model: rawModel } : {}),
     ...(rawVariant ? { variant: rawVariant } : {}),
+    ...(rawPrompt.trim() ? { prompt: rawPrompt } : {}),
+    ...(rawTodoId ? { todoId: rawTodoId } : {}),
   };
 }
 

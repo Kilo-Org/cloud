@@ -27,11 +27,18 @@ const activityMock = vi.hoisted(() => ({
 
 const platformMock = vi.hoisted(() => ({ OS: 'ios' as string }));
 
+const sessionCardsMock = vi.hoisted(() => ({
+  instances: [] as { getPushToken: () => Promise<string | null> }[],
+}));
+
 /* eslint-disable import/first */
 vi.mock('@/lib/auth/logout-reconciliation', () => logoutMock);
 vi.mock('@/lib/auth/logout-cleanup', () => ({
-  unregisterActivityTokensAndTombstone: async (lifetime: 'scope' | 'activity') => {
-    await getGlanceableDelivery().unregisterTokens(lifetime);
+  unregisterActivityTokensAndTombstone: async (
+    lifetime: 'scope' | 'activity' | 'session',
+    activityToken?: Promise<string | null>
+  ) => {
+    await getGlanceableDelivery().unregisterTokens(lifetime, activityToken);
   },
 }));
 vi.mock('@/lib/trpc', () => ({
@@ -55,6 +62,9 @@ vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
   ActiveAgentsLiveActivity: {
     getInstances: () => [activityMock],
   },
+}));
+vi.mock('@/glanceable-ios/session-live-activity', () => ({
+  SessionLiveActivity: { getInstances: () => sessionCardsMock.instances },
 }));
 vi.mock('react-native', () => ({
   Platform: platformMock,
@@ -86,6 +96,7 @@ import {
   _resetDeliveryRegistrationForTests,
   _setGetDevicePushTokenForTests,
 } from './delivery-registration';
+import { registerSessionActivityToken } from './session-activity-tokens';
 /* eslint-enable import/first */
 
 const NOW = 1_750_000_000_000;
@@ -982,5 +993,109 @@ describe('delivery registerTokens', () => {
 
     expect(result).toEqual({ ok: false, tokens: ['ptt-token'] });
     expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledTimes(2);
+  });
+});
+
+/** Drain the token FIFO and the cleanup it chains. */
+async function settle(): Promise<void> {
+  for (let index = 0; index < 20; index += 1) {
+    // eslint-disable-next-line no-await-in-loop -- one microtask per step
+    await Promise.resolve();
+  }
+}
+
+describe('delivery session card tokens', () => {
+  const SCOPE = { sessionId: 'session-1', organizationId: 'org-1', userId: 'user-1' };
+
+  /** A session card whose token events the test fires by hand. */
+  function sessionCard(initialToken: string | null) {
+    const listeners = new Set<(event: { activityId: string; pushToken: string }) => void>();
+    return {
+      getPushToken: vi.fn().mockResolvedValue(initialToken),
+      addPushTokenListener: vi.fn(
+        (listener: (event: { activityId: string; pushToken: string }) => void) => {
+          listeners.add(listener);
+          return { remove: () => listeners.delete(listener) };
+        }
+      ),
+      rotate(pushToken: string) {
+        for (const listener of listeners) {
+          listener({ activityId: 'session-activity-1', pushToken });
+        }
+      },
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    platformMock.OS = 'ios';
+    _resetDeliveryRegistrationForTests();
+    sessionCardsMock.instances = [];
+    trpcMock.registerActivityToken.mutate.mockResolvedValue({ success: true });
+    trpcMock.unregisterActivityToken.mutate.mockResolvedValue({ success: true });
+    logoutMock.attemptLogoutReconciliation.mockResolvedValue({ kind: 'no-tombstone' });
+    logoutMock.awaitLogoutReconciliationSettled.mockResolvedValue(undefined);
+    logoutMock.hasPendingActivityUnregister.mockResolvedValue(false);
+    setSignOutTeardownActive(false);
+    setActiveToken('access-1', null);
+  });
+
+  it('deletes the previous token once the rotated one is registered', async () => {
+    const card = sessionCard('session-token-a');
+    registerSessionActivityToken('session-activity-1', card, SCOPE);
+    await settle();
+    card.rotate('session-token-b');
+    await settle();
+
+    expect(trpcMock.registerActivityToken.mutate.mock.calls.map(([input]) => input)).toEqual([
+      expect.objectContaining({
+        token: 'session-token-a',
+        kind: 'ios_session_activity',
+        sessionId: 'session-1',
+      }),
+      expect.objectContaining({
+        token: 'session-token-b',
+        kind: 'ios_session_activity',
+        sessionId: 'session-1',
+      }),
+    ]);
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledWith({
+      token: 'session-token-a',
+    });
+    expect(trpcMock.unregisterActivityToken.mutate).not.toHaveBeenCalledWith({
+      token: 'session-token-b',
+    });
+  });
+
+  it('scope cleanup deletes every session card token, the cards a previous process started included', async () => {
+    const card = sessionCard('session-token-observed');
+    registerSessionActivityToken('session-activity-1', card, SCOPE);
+    await settle();
+    sessionCardsMock.instances = [
+      { getPushToken: vi.fn().mockResolvedValue('session-token-native') },
+    ];
+
+    const result = await getGlanceableDelivery().unregisterTokens('scope');
+
+    expect(result.ok).toBe(true);
+    const deleted = trpcMock.unregisterActivityToken.mutate.mock.calls.map(([input]) => input);
+    expect(deleted).toEqual(
+      expect.arrayContaining([
+        { token: 'session-token-observed' },
+        { token: 'session-token-native' },
+      ])
+    );
+  });
+
+  it('a session cleanup deletes only its own token', async () => {
+    sessionCardsMock.instances = [
+      { getPushToken: vi.fn().mockResolvedValue('session-token-other') },
+    ];
+
+    await getGlanceableDelivery().unregisterTokens('session', Promise.resolve('session-token-own'));
+
+    expect(trpcMock.unregisterActivityToken.mutate.mock.calls).toEqual([
+      [{ token: 'session-token-own' }],
+    ]);
   });
 });

@@ -136,7 +136,10 @@
     "working": "Besig",
     "yourOwnRepositories": "Jou eie bewaarplekke",
     "dismissed": "Verwerp",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Wysigings"
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -325,6 +328,7 @@
       "collapseFile": "Vou lêer toe",
       "expandFile": "Vou lêer uit",
       "diffTooLarge": "Die verskille is te groot om te vertoon.",
+      "noPreview": "Geen voorskou beskikbaar vir hierdie lêer nie",
       "openOnGitHub": "Maak op GitHub oop",
       "openDiffOnGitHub": "Maak hierdie lêer se verskille op GitHub oop",
       "githubDiff": "Verskille op GitHub"
@@ -831,7 +835,8 @@
       "kiloclaw": "KiloClaw-aktiwiteit",
       "balance": "Saldowaarskuwings",
       "security": "Sekuriteitsbevindings",
-      "spend": "Bestedingswaarskuwings"
+      "spend": "Bestedingswaarskuwings",
+      "followedSessions": "Gevolgde sessies"
     },
     "category": {
       "chatMessagesSubtitle": "antwoorde in jou gesprekke",
@@ -2086,6 +2091,8 @@
       "title": "Sessie",
       "copyErrorDetails": "Kopieer foutbesonderhede",
       "backToSessions": "Terug na sessies",
+      "follow": "Volg op die sluitskerm",
+      "unfollow": "Hou op volg op die sluitskerm",
       "couldNotLoad": "Die sessie kon nie gelaai word nie.",
       "failedToLoadDetails": "Die sessiebesonderhede kon nie gelaai word nie.",
       "failedToStopExecution": "Die uitvoering kon nie gestop word nie.",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "Probeer weer om die omgewing te laai",
       "defaultEnvironment": "Standaardomgewing",
       "environmentSummary": "{{commands}} opdragte · {{mcp}} MCP · {{skills}} vaardighede · {{agents}} agente",
-      "changes": "Wysigings",
       "leaveChanges": "Laat wysigings staan",
       "commitAndPush": "Lê vas en stoot op",
       "startSession": "Begin sessie",
@@ -2260,8 +2266,8 @@
       "toolList": "lys",
       "toolPatch": "pas wysiging toe",
       "toolTask": "taak",
-      "readTodos": "Lees taaklys",
-      "updateTodos": "Werk taaklys by",
+      "readTodos": "Lees plan",
+      "updateTodos": "Werk plan by",
       "linesBadge": "{{displayCount}} reëls",
       "filesBadge": "{{displayCount}} lêers",
       "matchesBadge": "{{displayCount}} treffers",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modelle ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Bekyk wysigings",
+      "asOf": "Soos teen {{time}}",
+      "tooLarge": "Hierdie verskille is te groot om op mobiel te vertoon.",
+      "empty": "Nog geen lêerwysigings in hierdie sessie nie."
     },
     "autoApprove": {
       "title": "Outo-goedkeuring",
@@ -3163,6 +3175,8 @@
     "channelName": "Aktiewe agente",
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
     "openSession": "Oop",
+    "finished": "Voltooi",
+    "followFailed": "Kon nie hierdie agent op die sluitskerm wys nie.",
     "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer.",
     "checked": "Gekontroleer",
     "lastKnown": "Laas bekend",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "Wag vir jou",
     "nextScheduled": "Volgende geskeduleerde",
     "answerNeeded": "Antwoord nodig",
-    "waitingToRetry": "Wag om weer te probeer"
+    "waitingToRetry": "Wag om weer te probeer",
+    "step": {
+      "editing": "Wysig",
+      "reading": "Lees",
+      "running": "Hardloop",
+      "searching": "Websoektog",
+      "thinking": "Dink dit deur"
+    },
+    "planOf": "van",
+    "filesChanged": "lêers verander",
+    "finishedIn": "Klaar in",
+    "noActivityFor": "Geen aktiwiteit vir",
+    "prOpened": "Trekversoek oopgemaak",
+    "permissionWants": "Wil uitvoer",
+    "failure": {
+      "provider": "Gestop: verskafferfout",
+      "tool": "Gestop: gereedskapfout",
+      "cancelled": "Gestop: gekanselleer",
+      "other": "GESTAAK"
+    }
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "Kon nie kletsgeskiedenis laai nie.",
       "new": "Nuwe klets",
-      "openHint": "Maak die klets oop. Hou lank in om te skrap.",
       "deleteTitle": "Skrap hierdie klets?"
     },
+    "rename": {
+      "title": "Hernoem klets",
+      "accessibility": "Hernoem klets: {{title}}",
+      "openHint": "Maak die klets oop. Hou lank in om te hernoem of te skrap."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Kletsbesonderhede",
+      "backend": "Agtergrondstelsel",
+      "effortDefault": "Modelverstek",
+      "noCost": "Geen koste",
+      "costUnknown": "Onbekend",
+      "costEstimatedNote": "Antwoorde wat nie 'n prys aangegee het nie, word volgens lyspryse geskat.",
+      "costUnknownNote": "Geen prys is vir hierdie model bekend nie.",
+      "costPartialNote": "Hierdie totaal sluit nie modelle in waarvoor geen prys bekend is nie.",
+      "localNote": "Modelle op die toestel loop op hierdie toestel. Hulle het geen koste en geen promptkas nie, en hul tekentellings kan skattings wees.",
+      "countedSinceNote": "Hierdie klets het begin voordat gebruik aangeteken is. Die totale wys slegs die antwoorde daarna.",
+      "remoteServersOn": "Afgeleë MCP-bedieners aan"
+    },
     "webSearch": {
       "title": "Deursoek die web",
       "description": "Laat hierdie klets huidige inligting deur jou Kilo-rekening opsoek. Soektogte gebruik jou maandelikse soektoelaag.",
@@ -3238,7 +3288,6 @@
       "fieldName": "Vertoonnaam",
       "fieldUrl": "Bediener-URL",
       "fieldUrlInvalid": "Voer 'n geldige bediener-URL in.",
-      "fieldToken": "Draertoken (opsioneel)",
       "enableServer": "Aktiveer hierdie bediener: {{name}}",
       "editServer": "Wysig bediener",
       "deleteServer": "Skrap bediener",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "{{count}} gereedskap",
       "serverUnreachable": "Kon nie hierdie bediener bereik nie",
       "serverOff": "Hierdie bediener is af"
+    },
+    "mcpOAuth": {
+      "authMethod": "Verifikasie",
+      "authNone": "Geen aanmelding",
+      "authBearer": "Draertoken",
+      "authOAuth": "OAuth-aanmelding",
+      "fieldToken": "Token",
+      "oauthHint": "Nadat jy gestoor het, tik $t(modelChat.mcpOAuth.signIn) op die bediener om met jou blaaier aan te meld.",
+      "serverNeedsSignIn": "Meld aan om hierdie bediener te gebruik",
+      "signIn": "Meld aan",
+      "signInA11y": "Meld aan by hierdie bediener: {{name}}",
+      "signInFailed": "Kon nie by {{name}} aanmeld nie. Probeer weer."
     },
     "backends": {
       "title": "Kletsagtergrondstelsels",
@@ -3412,6 +3473,9 @@
       "downloading": "Laai tans af…",
       "downloadProgress": "Laai tans af… {{percent}}%",
       "downloadFailed": "Die aflaai is nie voltooi nie. Kontroleer jou verbinding en vrye berging, en probeer dan weer."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Hierdie model ondersteun denkinspanning"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Geen passende kredietpakkette is deur Google Play terugbesorg nie.",
     "purchaseOwnedByAnotherAccount": "Die krediete op hierdie Apple Account behoort aan 'n ander Kilo-rekening. Meld by daardie Kilo-rekening aan om dit te gebruik.",
     "purchaseOwnedByAnotherAccountPlay": "Die krediete op hierdie Google Play-rekening behoort aan 'n ander Kilo-rekening. Teken in by daardie Kilo-rekening om dit te gebruik."
+  },
+  "todos": {
+    "saveAsTodo": "Stoor as taak",
+    "segment": {
+      "label": "Agente-aansig",
+      "sessions": "Sessies",
+      "todos": "Take"
+    },
+    "lists": {
+      "newList": "Nuwe lys",
+      "empty": "Nog geen lyste nie",
+      "couldNotLoad": "Kon nie lyste laai nie",
+      "noRepository": "Geen bewaarplek",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} oop",
+      "openCount_other": "{{count}} oop",
+      "archived_one": "Geargiveer ({{count}})",
+      "archived_other": "Geargiveer ({{count}})",
+      "archive": "Argiveer",
+      "unarchive": "Ontargiveer",
+      "deleteTitle": "Skrap {{name}}?",
+      "deleteMessage": "Sy take word ook geskrap. Hul sessies bly."
+    },
+    "listSettings": {
+      "title": "Lysinstellings",
+      "name": "Naam",
+      "namePlaceholder": "Foute, Idees, Vrystelling…",
+      "emoji": "Emoji",
+      "mode": "Modus",
+      "defaultsHint": "Sessies wat uit hierdie lys begin word, gebruik hierdie verstekwaardes."
+    },
+    "list": {
+      "addPlaceholder": "Voeg 'n taak by",
+      "add": "Voeg taak by",
+      "empty": "Nog geen take nie",
+      "setDefaults": "Stel bewaarplek, modus en model",
+      "completed_one": "Voltooi ({{count}})",
+      "completed_other": "Voltooi ({{count}})"
+    },
+    "item": {
+      "markDone": "Merk as klaar",
+      "markOpen": "Merk as nie klaar nie",
+      "markDonePrompt": "Merk as klaar?",
+      "deleted": "Taak geskrap",
+      "undo": "Ontdoen",
+      "runCount_one": "{{count}} lopie",
+      "runCount_other": "{{count}} lopies",
+      "startNow": "Begin sonder hersiening",
+      "startNowHint": "Druk lank om sonder hersiening te begin",
+      "titleLabel": "Taaktitel",
+      "notes": "Notas",
+      "notesPlaceholder": "Voeg notas in Markdown by",
+      "sessions": "Sessies gekoppel",
+      "noSessions": "Nog geen sessies nie",
+      "linkSession": "Koppel sessie",
+      "unlinkSession": "Ontkoppel {{title}}",
+      "linkFailed": "Kon nie die sessie aan die taak koppel nie"
+    },
+    "linkSession": {
+      "title": "Koppel 'n sessie",
+      "empty": "Geen onlangse sessies nie",
+      "emptyInRepository": "Geen onlangse sessies in {{repository}} nie"
+    },
+    "upNext": "Volgende",
+    "sessionTodo": "Taak: {{title}}",
+    "linkToTodo": "Koppel aan taak",
+    "candidates": {
+      "empty": "Geen oop take nie"
+    },
+    "saveSheet": {
+      "title": "Stoor in lys",
+      "saved": "Gestoor in {{list}}"
+    }
   }
 }

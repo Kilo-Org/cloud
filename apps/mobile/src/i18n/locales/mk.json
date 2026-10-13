@@ -136,7 +136,10 @@
     "working": "Во тек",
     "yourOwnRepositories": "Твоите репозиториуми",
     "dismissed": "Отфрлено",
-    "agent": "Агент"
+    "agent": "Агент",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Промени"
   },
   "language": {
     "restarting": "Се рестартира за да се примени јазикот",
@@ -325,6 +328,7 @@
       "collapseFile": "Собери ја датотеката",
       "expandFile": "Прошири ја датотеката",
       "diffTooLarge": "Разликите се преголеми за да се прикажат.",
+      "noPreview": "Нема достапен преглед за оваа датотека",
       "openOnGitHub": "Отвори на GitHub",
       "openDiffOnGitHub": "Отвори ги разликите во оваа датотека на GitHub",
       "githubDiff": "Разлики на GitHub"
@@ -831,7 +835,8 @@
       "kiloclaw": "Активност на KiloClaw",
       "balance": "Предупредувања за салдо",
       "security": "Безбедносни наоди",
-      "spend": "Предупредувања за трошење"
+      "spend": "Предупредувања за трошење",
+      "followedSessions": "Следени сесии"
     },
     "category": {
       "chatMessagesSubtitle": "одговори во твоите разговори",
@@ -2086,6 +2091,8 @@
       "title": "Сесија",
       "copyErrorDetails": "Копирај ги деталите за грешката",
       "backToSessions": "Назад на сесиите",
+      "follow": "Следи на заклучениот екран",
+      "unfollow": "Престани да следиш на заклучениот екран",
       "couldNotLoad": "Не успеа вчитувањето на сесијата.",
       "failedToLoadDetails": "Не успеа вчитувањето на деталите за сесијата.",
       "failedToStopExecution": "Не успеа запирањето на извршувањето.",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "Повторно вчитај ја околината",
       "defaultEnvironment": "Стандардна околина",
       "environmentSummary": "{{commands}} команди · {{mcp}} MCP · {{skills}} вештини · {{agents}} агенти",
-      "changes": "Промени",
       "leaveChanges": "Остави ги промените",
       "commitAndPush": "Комитирај и испрати",
       "startSession": "Започни сесија",
@@ -2260,8 +2266,8 @@
       "toolList": "прикажување список",
       "toolPatch": "примена на закрпа",
       "toolTask": "задача",
-      "readTodos": "Прочитај ги задачите",
-      "updateTodos": "Ажурирај ги задачите",
+      "readTodos": "Прочитај го планот",
+      "updateTodos": "Ажурирај го планот",
       "linesBadge": "{{displayCount}} редови",
       "filesBadge": "{{displayCount}} датотеки",
       "matchesBadge": "{{displayCount}} совпаѓања",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Модел ({{displayCount}})",
       "modelsCount_other": "Модели ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Прикажи промени",
+      "asOf": "Состојба од {{time}}",
+      "tooLarge": "Разликите се преголеми за да се прикажат на мобилен.",
+      "empty": "Сè уште нема промени во датотеките во оваа сесија."
     },
     "autoApprove": {
       "title": "Автоматско одобрување",
@@ -3163,6 +3175,8 @@
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран.",
     "openSession": "Отвори",
+    "finished": "Завршено",
+    "followFailed": "Агентот не може да се прикаже на заклучениот екран.",
     "approveFailed": "Одобрувањето не успеа. Допри $t(common.approve) за да се обидеш повторно.",
     "checked": "Проверено",
     "lastKnown": "Последно познато",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "Чека на вас",
     "nextScheduled": "Следни закажани",
     "answerNeeded": "Потребен е одговор",
-    "waitingToRetry": "Чека повторен обид"
+    "waitingToRetry": "Чека повторен обид",
+    "step": {
+      "editing": "Уредување",
+      "reading": "Читање",
+      "running": "Извршување",
+      "searching": "Пребарување на веб",
+      "thinking": "Размислување"
+    },
+    "planOf": "од",
+    "filesChanged": "променети датотеки",
+    "finishedIn": "Завршено за",
+    "noActivityFor": "Нема активност за",
+    "prOpened": "Отворено барање за повлекување",
+    "permissionWants": "Сака да изврши",
+    "failure": {
+      "provider": "Запрено: грешка кај провајдерот",
+      "tool": "Запрено: грешка во алатката",
+      "cancelled": "Запрено: откажано",
+      "other": "ЗАПРЕНО"
+    }
   },
   "transcriptionModel": {
     "title": "Модел за транскрипција",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "Не можев да ја вчитам историјата на разговорот.",
       "new": "Нов разговор",
-      "openHint": "Го отвора разговорот. Држете за да избришете.",
       "deleteTitle": "Да се избрише овој разговор?"
     },
+    "rename": {
+      "title": "Преименувај го разговорот",
+      "accessibility": "Преименувај го разговорот: {{title}}",
+      "openHint": "Го отвора разговорот. Држете за да преименувате или избришете."
+    },
     "beta": "Бета",
+    "details": {
+      "title": "Детали за разговорот",
+      "backend": "Сервер",
+      "effortDefault": "Стандардно за моделот",
+      "noCost": "Без трошок",
+      "costUnknown": "Непознато",
+      "costEstimatedNote": "Одговорите што не пријавија цена се проценети според ценовникот.",
+      "costUnknownNote": "Не е позната цена за овој модел.",
+      "costPartialNote": "Овој збир не ги вклучува моделите без позната цена.",
+      "localNote": "Моделите на уредот работат на овој уред. Немаат трошок ни кеш за барања, а нивниот број на токени може да е проценка.",
+      "countedSinceNote": "Овој разговор започна пред да се евидентира користењето. Збировите ги прикажуваат само одговорите по тоа.",
+      "remoteServersOn": "Вклучени оддалечени MCP сервери"
+    },
     "webSearch": {
       "title": "Пребарувај на интернет",
       "description": "Дозволете овој разговор да бара актуелни информации преку вашата Kilo сметка. Пребарувањата го користат вашиот месечен лимит за пребарување.",
@@ -3238,7 +3288,6 @@
       "fieldName": "Прикажано име",
       "fieldUrl": "URL на серверот",
       "fieldUrlInvalid": "Внеси важечки URL на серверот.",
-      "fieldToken": "Bearer токен (изборно)",
       "enableServer": "Овозможи го овој сервер: {{name}}",
       "editServer": "Уреди сервер",
       "deleteServer": "Избриши сервер",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "{{count}} алатки",
       "serverUnreachable": "Не успеа да се достигне овој сервер",
       "serverOff": "Овој сервер е исклучен"
+    },
+    "mcpOAuth": {
+      "authMethod": "Автентикација",
+      "authNone": "Без најавување",
+      "authBearer": "Bearer токен",
+      "authOAuth": "Најавување со OAuth",
+      "fieldToken": "Токен",
+      "oauthHint": "Откако ќе зачуваш, допри $t(modelChat.mcpOAuth.signIn) на серверот за да се најавиш преку прелистувачот.",
+      "serverNeedsSignIn": "Најави се за да го користиш овој сервер",
+      "signIn": "Најави се",
+      "signInA11y": "Најави се на овој сервер: {{name}}",
+      "signInFailed": "Не успеа најавувањето на {{name}}. Обиди се повторно."
     },
     "backends": {
       "title": "Сервери за разговор",
@@ -3412,6 +3473,9 @@
       "downloading": "Се презема…",
       "downloadProgress": "Се презема… {{percent}}%",
       "downloadFailed": "Преземањето не заврши. Проверете ја врската и слободниот простор, па обидете се повторно."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Овој модел поддржува ниво на размислување"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play не врати соодветни пакети со кредити.",
     "purchaseOwnedByAnotherAccount": "Кредитите на оваа Apple Account припаѓаат на друга сметка на Kilo. Најави се на таа сметка на Kilo за да ги користиш.",
     "purchaseOwnedByAnotherAccountPlay": "Кредитите на оваа Google Play сметка припаѓаат на друга Kilo сметка. Најавете се на таа Kilo сметка за да ги користите."
+  },
+  "todos": {
+    "saveAsTodo": "Зачувај како задача",
+    "segment": {
+      "label": "Приказ на агенти",
+      "sessions": "Сесии",
+      "todos": "Задачи"
+    },
+    "lists": {
+      "newList": "Нов список",
+      "empty": "Сè уште нема списоци",
+      "couldNotLoad": "Списоците не се вчитаа",
+      "noRepository": "Нема репозиториум",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} отворени",
+      "openCount_other": "{{count}} отворени",
+      "archived_one": "Архивирани ({{count}})",
+      "archived_other": "Архивирани ({{count}})",
+      "archive": "Архивирај",
+      "unarchive": "Врати од архива",
+      "deleteTitle": "Да се избрише {{name}}?",
+      "deleteMessage": "Ќе се избришат и неговите задачи. Сесиите остануваат."
+    },
+    "listSettings": {
+      "title": "Поставки за списокот",
+      "name": "Име",
+      "namePlaceholder": "Грешки, Идеи, Издание…",
+      "emoji": "Емоџи",
+      "mode": "Режим",
+      "defaultsHint": "Сесиите започнати од овој список ги користат овие стандардни поставки."
+    },
+    "list": {
+      "addPlaceholder": "Додај задача",
+      "add": "Додај задача",
+      "empty": "Сè уште нема задачи",
+      "setDefaults": "Постави репозиториум, режим и модел",
+      "completed_one": "Завршени ({{count}})",
+      "completed_other": "Завршени ({{count}})"
+    },
+    "item": {
+      "markDone": "Означи како завршена",
+      "markOpen": "Означи како незавршена",
+      "markDonePrompt": "Да се означи како завршена?",
+      "deleted": "Задачата е избришана",
+      "undo": "Отповикај",
+      "runCount_one": "{{count}} извршување",
+      "runCount_other": "{{count}} извршувања",
+      "startNow": "Започни без преглед",
+      "startNowHint": "Притиснете долго за да започнете без преглед",
+      "titleLabel": "Наслов на задачата",
+      "notes": "Белешки",
+      "notesPlaceholder": "Додај белешки во Markdown",
+      "sessions": "Поврзани сесии",
+      "noSessions": "Сè уште нема сесии",
+      "linkSession": "Поврзи сесија",
+      "unlinkSession": "Отповрзи {{title}}",
+      "linkFailed": "Не можеше да се поврзе сесијата со задачата"
+    },
+    "linkSession": {
+      "title": "Поврзи сесија",
+      "empty": "Нема скорешни сесии",
+      "emptyInRepository": "Нема скорешни сесии во {{repository}}"
+    },
+    "upNext": "Следно",
+    "sessionTodo": "Задача: {{title}}",
+    "linkToTodo": "Поврзи со задача",
+    "candidates": {
+      "empty": "Нема отворени задачи"
+    },
+    "saveSheet": {
+      "title": "Зачувај во список",
+      "saved": "Зачувано во {{list}}"
+    }
   }
 }

@@ -33,6 +33,11 @@ export type StartAgentInput = {
   repository?: string;
   /** Set, the action continues that session instead of starting a new one. */
   sessionId?: string;
+  /** In-app callers that already know the target (a to-do list's defaults) pass these. */
+  mode?: string;
+  model?: string;
+  variant?: string;
+  organizationId?: string;
 };
 
 /** The terminal codes a `StartAgent` run can report. */
@@ -63,7 +68,9 @@ export async function startAgent(input: StartAgentInput): Promise<AppActionResul
     if (!repository.ok) {
       return repository.result;
     }
-    const selection = await resolveAutoModel(runtime);
+    const selection = input.model
+      ? { model: input.model, variant: input.variant ?? '' }
+      : await resolveAutoModel(runtime);
     if (selection === null) {
       // No usable model: nothing about this intent can succeed on a retry.
       return startAgentFailure('start-failed', false, failedToCreate);
@@ -111,24 +118,27 @@ function sessionIntent(
   sessionId: string | null,
   target: StartAgentTarget
 ): PrepareAgentSessionInput {
+  const mode = input.mode ? normalizeAgentMode(input.mode) : DEFAULT_NEW_SESSION_MODE;
   if (sessionId === null) {
     return {
       kind: 'new',
       prompt: input.prompt,
       repository: target.repository,
-      mode: DEFAULT_NEW_SESSION_MODE,
+      mode,
       model: target.model,
       variant: target.variant,
       autoCommit: false,
+      organizationId: input.organizationId,
     };
   }
   return {
     kind: 'continue',
     cloneFromKiloSessionId: sessionId,
     repository: target.repository,
-    mode: DEFAULT_NEW_SESSION_MODE,
+    mode,
     model: target.model,
     variant: target.variant,
+    organizationId: input.organizationId,
   };
 }
 

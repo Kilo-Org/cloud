@@ -136,7 +136,10 @@
     "working": "У роботі",
     "yourOwnRepositories": "Власні репозиторії",
     "dismissed": "Відхилено",
-    "agent": "Агент"
+    "agent": "Агент",
+    "durationMinuteShort": "хв",
+    "durationHourShort": "год",
+    "changes": "Зміни"
   },
   "language": {
     "restarting": "Перезапуск для зміни мови",
@@ -320,7 +323,8 @@
       "kiloclaw": "Активність KiloClaw",
       "balance": "Сповіщення про баланс",
       "security": "Виявлені проблеми безпеки",
-      "spend": "Сповіщення про витрати"
+      "spend": "Сповіщення про витрати",
+      "followedSessions": "Відстежувані сеанси"
     },
     "category": {
       "chatMessagesSubtitle": "відповіді у ваших розмовах",
@@ -1599,6 +1603,8 @@
       "title": "Сеанс",
       "copyErrorDetails": "Копіювати відомості про помилку",
       "backToSessions": "Назад до сеансів",
+      "follow": "Стежити на екрані блокування",
+      "unfollow": "Не стежити на екрані блокування",
       "couldNotLoad": "Не вдалося завантажити сеанс.",
       "failedToLoadDetails": "Не вдалося завантажити відомості про сеанс.",
       "failedToStopExecution": "Не вдалося зупинити виконання.",
@@ -1702,7 +1708,6 @@
       "retryLoadingEnvironment": "Повторити завантаження середовища",
       "defaultEnvironment": "Типове середовище",
       "environmentSummary": "команд: {{commands}} · MCP: {{mcp}} · навичок: {{skills}} · агентів: {{agents}}",
-      "changes": "Зміни",
       "leaveChanges": "Залишити зміни",
       "commitAndPush": "Закомітити та надіслати",
       "startSession": "Розпочати сеанс",
@@ -1775,8 +1780,8 @@
       "toolList": "показати список",
       "toolPatch": "застосувати зміни",
       "toolTask": "завдання",
-      "readTodos": "Прочитати список завдань",
-      "updateTodos": "Оновити список завдань",
+      "readTodos": "Прочитати план",
+      "updateTodos": "Оновити план",
       "linesBadge": "рядків: {{displayCount}}",
       "filesBadge": "файлів: {{displayCount}}",
       "matchesBadge": "збігів: {{displayCount}}",
@@ -2184,6 +2189,12 @@
       "modelsCount_other": "Моделі ({{displayCount}})",
       "modelsCount_few": "Моделі ({{displayCount}})",
       "modelsCount_many": "Моделі ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Переглянути зміни",
+      "asOf": "Станом на {{time}}",
+      "tooLarge": "Обсяг змін завеликий для відображення на мобільному пристрої.",
+      "empty": "У цьому сеансі ще немає змін у файлах."
     },
     "autoApprove": {
       "title": "Автосхвалення",
@@ -2700,6 +2711,7 @@
     "fileRows": {
       "collapseFile": "Згорнути файл",
       "diffTooLarge": "Обсяг змін завеликий для відображення.",
+      "noPreview": "Попередній перегляд цього файлу недоступний",
       "expandFile": "Розгорнути файл",
       "markViewed": "Позначити {{path}} як переглянутий",
       "openDiffOnGitHub": "Відкрити зміни цього файлу на GitHub",
@@ -3245,6 +3257,8 @@
     "channelName": "Активні агенти",
     "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані.",
     "openSession": "Відкрити",
+    "finished": "Завершено",
+    "followFailed": "Не вдалося показати цього агента на екрані блокування.",
     "approveFailed": "Не вдалося схвалити. Торкніться $t(common.approve), щоб спробувати ще раз.",
     "checked": "Перевірено",
     "lastKnown": "Останній відомий стан",
@@ -3253,7 +3267,26 @@
     "waitingForYou": "Очікує на вас",
     "nextScheduled": "Наступні заплановані",
     "answerNeeded": "Очікує відповіді",
-    "waitingToRetry": "Очікує повторної спроби"
+    "waitingToRetry": "Очікує повторної спроби",
+    "step": {
+      "editing": "Редагування",
+      "reading": "Читання",
+      "running": "Запуск",
+      "searching": "Пошук в інтернеті",
+      "thinking": "Обмірковує"
+    },
+    "planOf": "з",
+    "filesChanged": "файлів змінено",
+    "finishedIn": "Завершено за",
+    "noActivityFor": "Немає активності протягом",
+    "prOpened": "Пул-реквест відкрито",
+    "permissionWants": "Хоче запустити",
+    "failure": {
+      "provider": "Зупинено: помилка провайдера",
+      "tool": "Зупинено: помилка інструмента",
+      "cancelled": "Зупинено: скасовано",
+      "other": "ЗУПИНЕНО"
+    }
   },
   "transcriptionModel": {
     "title": "Модель розпізнавання мовлення",
@@ -3289,10 +3322,27 @@
     "list": {
       "loadFailed": "Не вдалося завантажити історію чату.",
       "new": "Новий чат",
-      "openHint": "Відкриває чат. Утримуйте, щоб видалити.",
       "deleteTitle": "Видалити цей чат?"
     },
+    "rename": {
+      "title": "Перейменувати чат",
+      "accessibility": "Перейменувати чат: {{title}}",
+      "openHint": "Відкриває чат. Утримуйте, щоб перейменувати або видалити."
+    },
     "beta": "Бета",
+    "details": {
+      "title": "Відомості про чат",
+      "backend": "Сервер",
+      "effortDefault": "Типово для моделі",
+      "noCost": "Безкоштовно",
+      "costUnknown": "Невідомо",
+      "costEstimatedNote": "Вартість відповідей, для яких ціну не повідомлено, оцінено за прейскурантними цінами.",
+      "costUnknownNote": "Ціна цієї моделі невідома.",
+      "costPartialNote": "Ця сума не враховує моделі з невідомою ціною.",
+      "localNote": "Моделі на пристрої працюють на цьому пристрої. Вони безкоштовні, не мають кешу запитів, а кількість токенів для них може бути приблизною.",
+      "countedSinceNote": "Цей чат почався до того, як почали обліковувати використання. Підсумки враховують лише подальші відповіді.",
+      "remoteServersOn": "Увімкнені віддалені сервери MCP"
+    },
     "webSearch": {
       "title": "Шукати в інтернеті",
       "description": "Дозвольте цьому чату шукати актуальну інформацію через ваш обліковий запис Kilo. Пошуки використовують ваш щомісячний ліміт пошуку.",
@@ -3320,7 +3370,6 @@
       "fieldName": "Відображувана назва",
       "fieldUrl": "URL сервера",
       "fieldUrlInvalid": "Введіть дійсну URL-адресу сервера.",
-      "fieldToken": "Токен Bearer (необов’язково)",
       "enableServer": "Увімкнути цей сервер: {{name}}",
       "editServer": "Редагувати сервер",
       "deleteServer": "Видалити сервер",
@@ -3340,6 +3389,18 @@
       "serverToolCount": "{{count}} інструментів",
       "serverUnreachable": "Не вдалося зв’язатися з цим сервером",
       "serverOff": "Цей сервер вимкнено"
+    },
+    "mcpOAuth": {
+      "authMethod": "Автентифікація",
+      "authNone": "Без входу",
+      "authBearer": "Токен Bearer",
+      "authOAuth": "Вхід через OAuth",
+      "fieldToken": "Токен",
+      "oauthHint": "Після збереження торкніться «$t(modelChat.mcpOAuth.signIn)» на сервері, щоб увійти через браузер.",
+      "serverNeedsSignIn": "Увійдіть, щоб використовувати цей сервер",
+      "signIn": "Увійти",
+      "signInA11y": "Увійти на цей сервер: {{name}}",
+      "signInFailed": "Не вдалося увійти на {{name}}. Спробуйте ще раз."
     },
     "backends": {
       "title": "Сервери чату",
@@ -3494,6 +3555,9 @@
       "downloading": "Завантаження…",
       "downloadProgress": "Завантаження… {{percent}}%",
       "downloadFailed": "Завантаження не завершилося. Перевірте з'єднання та вільне місце, потім спробуйте ще раз."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ця модель підтримує рівень міркування"
     }
   },
   "settingsTools": {
@@ -3716,5 +3780,86 @@
     "noMatchingProductsPlay": "Google Play не повернув відповідні пакети кредитів.",
     "purchaseOwnedByAnotherAccount": "Кредити в цьому Apple Account належать іншому обліковому запису Kilo. Увійдіть у той обліковий запис Kilo, щоб ними користуватися.",
     "purchaseOwnedByAnotherAccountPlay": "Кредити в цьому обліковому записі Google Play належать іншому обліковому запису Kilo. Увійдіть у той обліковий запис Kilo, щоб ними користуватися."
+  },
+  "todos": {
+    "saveAsTodo": "Зберегти як завдання",
+    "segment": {
+      "label": "Подання агентів",
+      "sessions": "Сеанси",
+      "todos": "Завдання"
+    },
+    "lists": {
+      "newList": "Новий список",
+      "empty": "Списків ще немає",
+      "couldNotLoad": "Не вдалося завантажити списки.",
+      "noRepository": "Немає репозиторію",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} відкрито",
+      "openCount_few": "{{count}} відкрито",
+      "openCount_many": "{{count}} відкрито",
+      "openCount_other": "{{count}} відкрито",
+      "archived_one": "Архівовано ({{count}})",
+      "archived_few": "Архівовано ({{count}})",
+      "archived_many": "Архівовано ({{count}})",
+      "archived_other": "Архівовано ({{count}})",
+      "archive": "Архівувати",
+      "unarchive": "Розархівувати",
+      "deleteTitle": "Видалити «{{name}}»?",
+      "deleteMessage": "Його завдання теж буде видалено. Сеанси залишаться."
+    },
+    "listSettings": {
+      "title": "Налаштування списку",
+      "name": "Назва",
+      "namePlaceholder": "Помилки, ідеї, реліз…",
+      "emoji": "Емодзі",
+      "mode": "Режим",
+      "defaultsHint": "Сеанси, запущені з цього списку, використовують ці типові значення."
+    },
+    "list": {
+      "addPlaceholder": "Введіть назву завдання",
+      "add": "Додати завдання",
+      "empty": "Завдань ще немає",
+      "setDefaults": "Налаштувати репозиторій, режим і модель",
+      "completed_one": "Завершено ({{count}})",
+      "completed_few": "Завершено ({{count}})",
+      "completed_many": "Завершено ({{count}})",
+      "completed_other": "Завершено ({{count}})"
+    },
+    "item": {
+      "markDone": "Позначити виконаним",
+      "markOpen": "Позначити невиконаним",
+      "markDonePrompt": "Позначити виконаним?",
+      "deleted": "Завдання видалено",
+      "undo": "Повернути",
+      "runCount_one": "{{count}} запуск",
+      "runCount_few": "{{count}} запуски",
+      "runCount_many": "{{count}} запусків",
+      "runCount_other": "{{count}} запусків",
+      "startNow": "Запустити без перевірки",
+      "startNowHint": "Утримуйте, щоб запустити без перевірки",
+      "titleLabel": "Назва завдання",
+      "notes": "Нотатки",
+      "notesPlaceholder": "Додайте нотатки в Markdown",
+      "sessions": "Пов'язані сеанси",
+      "noSessions": "Сеансів ще немає",
+      "linkSession": "Прив'язати сеанс",
+      "unlinkSession": "Від'єднати {{title}}",
+      "linkFailed": "Не вдалося пов'язати сеанс із завданням."
+    },
+    "linkSession": {
+      "title": "Пов'язування сеансу",
+      "empty": "Останніх сеансів немає",
+      "emptyInRepository": "Немає останніх сеансів у {{repository}}"
+    },
+    "upNext": "Далі",
+    "sessionTodo": "Завдання: {{title}}",
+    "linkToTodo": "Пов'язати із завданням",
+    "candidates": {
+      "empty": "Немає відкритих завдань"
+    },
+    "saveSheet": {
+      "title": "Зберегти до списку",
+      "saved": "Збережено до списку {{list}}"
+    }
   }
 }

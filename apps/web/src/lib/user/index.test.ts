@@ -138,6 +138,8 @@ import {
   cloud_agent_pending_uploads,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  todo_items,
+  todo_lists,
   passkey_credentials,
   passkey_challenges,
   passkey_sign_in_tickets,
@@ -242,6 +244,7 @@ describe('User', () => {
   afterEach(async () => {
     await db.delete(cloud_agent_worktrees);
     await db.delete(cloud_agent_workspace_folders);
+    await db.delete(todo_lists);
     await db.delete(user_deletion_steps);
     await db.delete(user_deletion_requests);
     await db.delete(deployments_ephemeral);
@@ -2063,6 +2066,61 @@ describe('User', () => {
         .where(eq(cloud_agent_worktrees.worktree_id, otherWorktreeId));
       expect(otherWorktreeAfter).toEqual(otherWorktreeBefore);
       expect(await findUserById(user.id)).toMatchObject({ google_user_name: 'Deleted User' });
+    });
+
+    it('deletes to-do lists and their to-dos in every scope without touching another owner', async () => {
+      const user = await insertTestUser({ id: `oauth/github|todo-privacy-${randomUUID()}` });
+      const otherUser = await insertTestUser();
+      const organization = await createTestOrganization(
+        'To-do privacy organization',
+        otherUser.id,
+        0
+      );
+      const [personalList, organizationList, otherList] = await db
+        .insert(todo_lists)
+        .values([
+          { kilo_user_id: user.id, name: 'Private plans', position: 'i' },
+          {
+            kilo_user_id: user.id,
+            organization_id: organization.id,
+            name: 'Private organization plans',
+            position: 'i',
+          },
+          {
+            kilo_user_id: otherUser.id,
+            organization_id: organization.id,
+            name: 'Keep these plans',
+            position: 'i',
+          },
+        ])
+        .returning();
+      if (!personalList || !organizationList || !otherList) {
+        throw new Error('To-do list fixtures were not inserted');
+      }
+      const [, , otherItem] = await db
+        .insert(todo_items)
+        .values([
+          {
+            list_id: personalList.id,
+            kilo_user_id: user.id,
+            title: 'Private to-do',
+            notes: 'Private notes',
+            position: 'i',
+          },
+          {
+            list_id: organizationList.id,
+            kilo_user_id: user.id,
+            title: 'Private organization to-do',
+            position: 'i',
+          },
+          { list_id: otherList.id, kilo_user_id: otherUser.id, title: 'Keep me', position: 'i' },
+        ])
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      expect(await db.select().from(todo_lists)).toEqual([otherList]);
+      expect(await db.select().from(todo_items)).toEqual([otherItem]);
     });
 
     it('deletes operation ledger rows by user id and analytics outbox rows by either identity', async () => {

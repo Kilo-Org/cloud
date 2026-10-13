@@ -136,7 +136,10 @@
     "working": "កំពុងដំណើរការ",
     "yourOwnRepositories": "ឃ្លាំងកូដផ្ទាល់ខ្លួនរបស់អ្នក",
     "dismissed": "បានសម្គាល់ថាមិនអើពើ",
-    "agent": "ភ្នាក់ងារ"
+    "agent": "ភ្នាក់ងារ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "ការផ្លាស់ប្តូរ"
   },
   "language": {
     "restarting": "កំពុងចាប់ផ្តើមឡើងវិញដើម្បីប្រើភាសាដែលបានជ្រើសរើស",
@@ -325,6 +328,7 @@
       "collapseFile": "លាក់ខ្លឹមសារឯកសារ",
       "expandFile": "បង្ហាញខ្លឹមសារឯកសារ",
       "diffTooLarge": "ភាពខុសគ្នានៃកូដធំពេក មិនអាចបង្ហាញបានទេ។",
+      "noPreview": "មិនមានការមើលជាមុនសម្រាប់ឯកសារនេះទេ",
       "openOnGitHub": "បើកនៅលើ GitHub",
       "openDiffOnGitHub": "បើកភាពខុសគ្នានៃកូដក្នុងឯកសារនេះនៅលើ GitHub",
       "githubDiff": "ភាពខុសគ្នានៃកូដនៅលើ GitHub"
@@ -831,7 +835,8 @@
       "kiloclaw": "សកម្មភាព KiloClaw",
       "balance": "ការជូនដំណឹងអំពីសមតុល្យ",
       "security": "បញ្ហាសុវត្ថិភាពដែលរកឃើញ",
-      "spend": "ការជូនដំណឹងអំពីការចំណាយ"
+      "spend": "ការជូនដំណឹងអំពីការចំណាយ",
+      "followedSessions": "វគ្គដែលបានតាមដាន"
     },
     "category": {
       "chatMessagesSubtitle": "ការឆ្លើយតបនៅក្នុងការសន្ទនារបស់អ្នក",
@@ -2086,6 +2091,8 @@
       "title": "វគ្គ",
       "copyErrorDetails": "ចម្លងព័ត៌មានលម្អិតនៃកំហុស",
       "backToSessions": "ត្រឡប់ទៅបញ្ជីវគ្គ",
+      "follow": "តាមដាននៅលើអេក្រង់ចាក់សោ",
+      "unfollow": "ឈប់តាមដាននៅលើអេក្រង់ចាក់សោ",
       "couldNotLoad": "មិនអាចផ្ទុកវគ្គបានទេ។",
       "failedToLoadDetails": "មិនអាចផ្ទុកព័ត៌មានលម្អិតនៃវគ្គបានទេ។",
       "failedToStopExecution": "មិនអាចបញ្ឈប់ការដំណើរការបានទេ។",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "ព្យាយាមផ្ទុកបរិស្ថានដំណើរការម្តងទៀត",
       "defaultEnvironment": "បរិស្ថានដំណើរការលំនាំដើម",
       "environmentSummary": "ពាក្យបញ្ជា {{commands}} · MCP {{mcp}} · ជំនាញ {{skills}} · ភ្នាក់ងារ {{agents}}",
-      "changes": "ការផ្លាស់ប្តូរ",
       "leaveChanges": "ទុកការផ្លាស់ប្តូរ",
       "commitAndPush": "កត់ត្រា និងបញ្ជូនកូដ",
       "startSession": "ចាប់ផ្តើមវគ្គ",
@@ -2260,8 +2266,8 @@
       "toolList": "រាយបញ្ជី",
       "toolPatch": "អនុវត្តបំណះ",
       "toolTask": "កិច្ចការ",
-      "readTodos": "អានបញ្ជីកិច្ចការ",
-      "updateTodos": "ធ្វើបច្ចុប្បន្នភាពបញ្ជីកិច្ចការ",
+      "readTodos": "អានផែនការ",
+      "updateTodos": "ធ្វើបច្ចុប្បន្នភាពផែនការ",
       "linesBadge": "{{displayCount}} បន្ទាត់",
       "filesBadge": "ឯកសារ {{displayCount}}",
       "matchesBadge": "ត្រូវគ្នា {{displayCount}}",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "ម៉ូដែល ({{displayCount}})",
       "modelsCount_other": "ម៉ូដែល ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "មើលការផ្លាស់ប្តូរ",
+      "asOf": "គិតត្រឹម {{time}}",
+      "tooLarge": "ភាពខុសគ្នានៃកូដនេះធំពេក មិនអាចបង្ហាញនៅលើទូរស័ព្ទបានទេ។",
+      "empty": "មិនទាន់មានការផ្លាស់ប្តូរឯកសារក្នុងវគ្គនេះនៅឡើយទេ។"
     },
     "autoApprove": {
       "title": "ការអនុម័តស្វ័យប្រវត្តិ",
@@ -3163,6 +3175,8 @@
     "channelName": "ភ្នាក់ងារសកម្ម",
     "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។",
     "openSession": "បើក",
+    "finished": "បានបញ្ចប់",
+    "followFailed": "មិនអាចបង្ហាញភ្នាក់ងារនេះនៅលើអេក្រង់ចាក់សោបានទេ។",
     "approveFailed": "មិនអាចយល់ព្រមបានទេ។ ប៉ះ $t(common.approve) ដើម្បីព្យាយាមម្តងទៀត។",
     "checked": "បានពិនិត្យ",
     "lastKnown": "ស្ថានភាពដែលដឹងចុងក្រោយ",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "កំពុងរង់ចាំអ្នក",
     "nextScheduled": "កាលវិភាគបន្ទាប់",
     "answerNeeded": "ត្រូវការការឆ្លើយតប",
-    "waitingToRetry": "រង់ចាំព្យាយាមម្ដងទៀត"
+    "waitingToRetry": "រង់ចាំព្យាយាមម្ដងទៀត",
+    "step": {
+      "editing": "ការកែសម្រួល",
+      "reading": "ការអាន",
+      "running": "ដំណើរការ",
+      "searching": "ស្វែងរកតាមវេប",
+      "thinking": "ការពិចារណា"
+    },
+    "planOf": "/",
+    "filesChanged": "ឯកសារបានផ្លាស់ប្តូរ",
+    "finishedIn": "បានបញ្ចប់ក្នុង",
+    "noActivityFor": "គ្មានសកម្មភាពរយៈពេល",
+    "prOpened": "បានបើក pull request",
+    "permissionWants": "ចង់ដំណើរការ",
+    "failure": {
+      "provider": "បានឈប់: កំហុសអ្នកផ្តល់សេវា",
+      "tool": "បានឈប់: កំហុសឧបករណ៍",
+      "cancelled": "បានឈប់: បានបោះបង់",
+      "other": "បានឈប់"
+    }
   },
   "transcriptionModel": {
     "title": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទ",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "មិនអាចផ្ទុកប្រវត្តិជជែកបានទេ។",
       "new": "ការជជែកថ្មី",
-      "openHint": "បើកការជជែក។ ចុចឱ្យយូរដើម្បីលុប។",
       "deleteTitle": "លុបការជជែកនេះ?"
     },
+    "rename": {
+      "title": "ប្តូរឈ្មោះការជជែក",
+      "accessibility": "ប្តូរឈ្មោះការជជែក: {{title}}",
+      "openHint": "បើកការជជែក។ ចុចឱ្យយូរដើម្បីប្តូរឈ្មោះ ឬលុប។"
+    },
     "beta": "បេតា",
+    "details": {
+      "title": "ព័ត៌មានលម្អិតនៃការជជែក",
+      "backend": "ប្រព័ន្ធខាងក្រោយ",
+      "effortDefault": "លំនាំដើមរបស់គំរូ",
+      "noCost": "គ្មានថ្លៃចំណាយ",
+      "costUnknown": "មិនដឹង",
+      "costEstimatedNote": "ចម្លើយដែលមិនបានរាយការណ៍តម្លៃ ត្រូវបានប៉ាន់ស្មានតាមតម្លៃក្នុងបញ្ជី។",
+      "costUnknownNote": "មិនដឹងតម្លៃសម្រាប់គំរូនេះទេ។",
+      "costPartialNote": "ចំនួនសរុបនេះមិនរួមបញ្ចូលគំរូដែលមិនដឹងតម្លៃទេ។",
+      "localNote": "គំរូនៅលើឧបករណ៍ដំណើរការនៅលើឧបករណ៍នេះ។ វាគ្មានថ្លៃចំណាយ និងគ្មានឃ្លាំងបណ្ដោះអាសន្នសម្រាប់សេចក្តីណែនាំទេ ហើយចំនួនថូខិនរបស់វាអាចជាការប៉ាន់ស្មាន។",
+      "countedSinceNote": "ការជជែកនេះបានចាប់ផ្ដើមមុនពេលការប្រើប្រាស់ត្រូវបានកត់ត្រា។ ចំនួនសរុបបង្ហាញតែចម្លើយបន្ទាប់ពីនោះប៉ុណ្ណោះ។",
+      "remoteServersOn": "ម៉ាស៊ីនបម្រើ MCP ពីចម្ងាយដែលបើក"
+    },
     "webSearch": {
       "title": "ស្វែងរកលើបណ្ដាញ",
       "description": "អនុញ្ញាតឱ្យការជជែកនេះស្វែងរកព័ត៌មានថ្មីៗតាមរយៈគណនី Kilo របស់អ្នក។ ការស្វែងរកប្រើកូតាស្វែងរកប្រចាំខែរបស់អ្នក។",
@@ -3238,7 +3288,6 @@
       "fieldName": "ឈ្មោះបង្ហាញ",
       "fieldUrl": "URL ម៉ាស៊ីនបម្រើ",
       "fieldUrlInvalid": "បញ្ចូល URL ម៉ាស៊ីនបម្រើត្រឹមត្រូវ។",
-      "fieldToken": "តូកិន Bearer (ស្រេចចិត្ត)",
       "enableServer": "បើកម៉ាស៊ីនបម្រើនេះ: {{name}}",
       "editServer": "កែសម្រួលម៉ាស៊ីនបម្រើ",
       "deleteServer": "លុបម៉ាស៊ីនបម្រើ",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "ឧបករណ៍ {{count}}",
       "serverUnreachable": "មិនអាចទៅដល់ម៉ាស៊ីនបម្រើនេះបានទេ",
       "serverOff": "ម៉ាស៊ីនបម្រើនេះត្រូវបានបិទ"
+    },
+    "mcpOAuth": {
+      "authMethod": "ការផ្ទៀងផ្ទាត់",
+      "authNone": "មិនចាំបាច់ចូល",
+      "authBearer": "តូកិន Bearer",
+      "authOAuth": "ការចូលតាម OAuth",
+      "fieldToken": "តូកិន",
+      "oauthHint": "បន្ទាប់ពីរក្សាទុក សូមចុច $t(modelChat.mcpOAuth.signIn) លើម៉ាស៊ីនបម្រើ ដើម្បីចូលតាមកម្មវិធីរុករករបស់អ្នក។",
+      "serverNeedsSignIn": "ចូលដើម្បីប្រើម៉ាស៊ីនបម្រើនេះ",
+      "signIn": "ចូល",
+      "signInA11y": "ចូលទៅម៉ាស៊ីនបម្រើនេះ: {{name}}",
+      "signInFailed": "មិនអាចចូលទៅ {{name}} បានទេ។ សូមព្យាយាមម្តងទៀត។"
     },
     "backends": {
       "title": "ប្រព័ន្ធខាងក្រោយសម្រាប់ជជែក",
@@ -3412,6 +3473,9 @@
       "downloading": "កំពុងទាញយក…",
       "downloadProgress": "កំពុងទាញយក… {{percent}}%",
       "downloadFailed": "ការទាញយកមិនបានបញ្ចប់ទេ។ សូមពិនិត្យការតភ្ជាប់ និងទំហំផ្ទុកទំនេររបស់អ្នក រួចព្យាយាមម្តងទៀត។"
+    },
+    "reasoningEffort": {
+      "modelFlag": "គំរូនេះគាំទ្រកម្រិតនៃការគិត"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play មិនបានត្រឡប់កញ្ចប់ឥណទានដែលត្រូវគ្នាទេ។",
     "purchaseOwnedByAnotherAccount": "ឥណទាននៅលើ Apple Account នេះជារបស់គណនី Kilo ផ្សេង។ ចូលគណនី Kilo នោះដើម្បីប្រើវា។",
     "purchaseOwnedByAnotherAccountPlay": "ឥណទាននៅលើគណនី Google Play នេះជារបស់គណនី Kilo ផ្សេង។ ចូលគណនី Kilo នោះដើម្បីប្រើវា។"
+  },
+  "todos": {
+    "saveAsTodo": "រក្សាទុកជាកិច្ចការ",
+    "segment": {
+      "label": "ទិដ្ឋភាពភ្នាក់ងារ",
+      "sessions": "វគ្គ",
+      "todos": "កិច្ចការ"
+    },
+    "lists": {
+      "newList": "បញ្ជីថ្មី",
+      "empty": "មិនទាន់មានបញ្ជីទេ",
+      "couldNotLoad": "មិនអាចផ្ទុកបញ្ជីបានទេ",
+      "noRepository": "គ្មានឃ្លាំងកូដ",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} មិនទាន់រួច",
+      "openCount_other": "{{count}} មិនទាន់រួច",
+      "archived_one": "បានទុកក្នុងបណ្ណសារ ({{count}})",
+      "archived_other": "បានទុកក្នុងបណ្ណសារ ({{count}})",
+      "archive": "ទុកក្នុងបណ្ណសារ",
+      "unarchive": "ដកចេញពីបណ្ណសារ",
+      "deleteTitle": "លុប {{name}}?",
+      "deleteMessage": "កិច្ចការរបស់វាក៏ត្រូវលុបដែរ។ វគ្គរបស់វានៅដដែល។"
+    },
+    "listSettings": {
+      "title": "ការកំណត់បញ្ជី",
+      "name": "ឈ្មោះ",
+      "namePlaceholder": "កំហុស គំនិត ការចេញផ្សាយ…",
+      "emoji": "អេមូជី",
+      "mode": "របៀប",
+      "defaultsHint": "វគ្គដែលចាប់ផ្តើមពីបញ្ជីនេះប្រើតម្លៃលំនាំដើមទាំងនេះ។"
+    },
+    "list": {
+      "addPlaceholder": "បន្ថែមកិច្ចការថ្មី",
+      "add": "បន្ថែមកិច្ចការ",
+      "empty": "មិនទាន់មានកិច្ចការទេ",
+      "setDefaults": "កំណត់ឃ្លាំងកូដ របៀប និងគំរូ",
+      "completed_one": "បានបញ្ចប់ ({{count}})",
+      "completed_other": "បានបញ្ចប់ ({{count}})"
+    },
+    "item": {
+      "markDone": "សម្គាល់ថារួចរាល់",
+      "markOpen": "សម្គាល់ថាមិនទាន់រួច",
+      "markDonePrompt": "សម្គាល់ថារួចរាល់?",
+      "deleted": "បានលុបកិច្ចការ",
+      "undo": "មិនធ្វើវិញ",
+      "runCount_one": "{{count}} ដំណើរការ",
+      "runCount_other": "{{count}} ដំណើរការ",
+      "startNow": "ចាប់ផ្តើមដោយគ្មានការពិនិត្យ",
+      "startNowHint": "ចុចឱ្យជាប់ ដើម្បីចាប់ផ្តើមដោយគ្មានការពិនិត្យ",
+      "titleLabel": "ចំណងជើងកិច្ចការ",
+      "notes": "កំណត់ចំណាំ",
+      "notesPlaceholder": "បន្ថែមកំណត់ចំណាំជា Markdown",
+      "sessions": "វគ្គដែលបានភ្ជាប់",
+      "noSessions": "មិនទាន់មានវគ្គទេ",
+      "linkSession": "ភ្ជាប់វគ្គ",
+      "unlinkSession": "ផ្ដាច់ {{title}}",
+      "linkFailed": "មិនអាចភ្ជាប់វគ្គទៅកិច្ចការបានទេ"
+    },
+    "linkSession": {
+      "title": "ភ្ជាប់វគ្គមួយ",
+      "empty": "មិនទាន់មានវគ្គថ្មីៗទេ",
+      "emptyInRepository": "មិនទាន់មានវគ្គថ្មីៗក្នុង {{repository}} ទេ"
+    },
+    "upNext": "បន្ទាប់",
+    "sessionTodo": "កិច្ចការ៖ {{title}}",
+    "linkToTodo": "ភ្ជាប់ទៅកិច្ចការ",
+    "candidates": {
+      "empty": "គ្មានកិច្ចការបើក"
+    },
+    "saveSheet": {
+      "title": "រក្សាទុកទៅបញ្ជី",
+      "saved": "បានរក្សាទុកទៅ {{list}}"
+    }
   }
 }

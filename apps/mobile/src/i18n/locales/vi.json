@@ -136,7 +136,10 @@
     "working": "Đang xử lý",
     "yourOwnRepositories": "Kho mã nguồn của riêng bạn",
     "dismissed": "Đã bỏ qua",
-    "agent": "Đại lý"
+    "agent": "Đại lý",
+    "durationMinuteShort": "phút",
+    "durationHourShort": "giờ",
+    "changes": "Thay đổi"
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -320,7 +323,8 @@
       "kiloclaw": "Hoạt động KiloClaw",
       "balance": "Cảnh báo số dư",
       "security": "Vấn đề bảo mật",
-      "spend": "Cảnh báo chi tiêu"
+      "spend": "Cảnh báo chi tiêu",
+      "followedSessions": "Phiên đã theo dõi"
     },
     "category": {
       "chatMessagesSubtitle": "câu trả lời trong các cuộc trò chuyện của bạn",
@@ -1575,6 +1579,8 @@
       "title": "Phiên",
       "copyErrorDetails": "Sao chép chi tiết lỗi",
       "backToSessions": "Quay lại danh sách phiên",
+      "follow": "Theo dõi trên màn hình khóa",
+      "unfollow": "Dừng theo dõi trên màn hình khóa",
       "couldNotLoad": "Không thể tải phiên.",
       "failedToLoadDetails": "Không thể tải thông tin phiên.",
       "failedToStopExecution": "Không thể dừng tác vụ đang chạy.",
@@ -1678,7 +1684,6 @@
       "retryLoadingEnvironment": "Thử tải lại môi trường",
       "defaultEnvironment": "Môi trường mặc định",
       "environmentSummary": "{{commands}} lệnh · {{mcp}} MCP · {{skills}} kỹ năng · {{agents}} tác nhân",
-      "changes": "Thay đổi",
       "leaveChanges": "Giữ thay đổi",
       "commitAndPush": "Ghi nhận và đẩy",
       "startSession": "Bắt đầu phiên",
@@ -1749,8 +1754,8 @@
       "toolList": "liệt kê",
       "toolPatch": "áp dụng bản vá",
       "toolTask": "tác vụ",
-      "readTodos": "Đọc danh sách việc cần làm",
-      "updateTodos": "Cập nhật danh sách việc cần làm",
+      "readTodos": "Đọc kế hoạch",
+      "updateTodos": "Cập nhật kế hoạch",
       "linesBadge": "{{displayCount}} dòng",
       "filesBadge": "{{displayCount}} tệp",
       "matchesBadge": "{{displayCount}} kết quả khớp",
@@ -2140,6 +2145,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Mô hình ({{displayCount}})",
       "modelsCount_other": "Mô hình ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Xem thay đổi",
+      "asOf": "Tính đến {{time}}",
+      "tooLarge": "Bản so sánh này quá lớn nên không thể hiển thị trên thiết bị di động.",
+      "empty": "Phiên này chưa có thay đổi tệp nào."
     },
     "autoApprove": {
       "title": "Tự động phê duyệt",
@@ -2644,6 +2655,7 @@
     "fileRows": {
       "collapseFile": "Thu gọn tệp",
       "diffTooLarge": "Bản so sánh quá lớn nên không thể hiển thị.",
+      "noPreview": "Không có bản xem trước cho tệp này",
       "expandFile": "Mở rộng tệp",
       "markViewed": "Đánh dấu {{path}} là đã xem",
       "openDiffOnGitHub": "Mở bản so sánh của tệp này trên GitHub",
@@ -3163,6 +3175,8 @@
     "channelName": "Tác nhân đang hoạt động",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
     "openSession": "Mở",
+    "finished": "Đã hoàn tất",
+    "followFailed": "Không thể hiển thị tác nhân này trên màn hình khóa.",
     "approveFailed": "Không thể phê duyệt. Nhấn $t(common.approve) để thử lại.",
     "checked": "Đã kiểm tra",
     "lastKnown": "Ghi nhận gần nhất",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "Đang chờ bạn",
     "nextScheduled": "Lịch tiếp theo",
     "answerNeeded": "Cần trả lời",
-    "waitingToRetry": "Đang chờ thử lại"
+    "waitingToRetry": "Đang chờ thử lại",
+    "step": {
+      "editing": "Đang chỉnh sửa",
+      "reading": "Đang đọc",
+      "running": "Chạy",
+      "searching": "Tìm kiếm web",
+      "thinking": "Đang suy nghĩ kỹ"
+    },
+    "planOf": "trong",
+    "filesChanged": "tệp đã thay đổi",
+    "finishedIn": "Hoàn thành trong",
+    "noActivityFor": "Không có hoạt động trong",
+    "prOpened": "Đã mở pull request",
+    "permissionWants": "Muốn chạy",
+    "failure": {
+      "provider": "Đã dừng: lỗi nhà cung cấp",
+      "tool": "Đã dừng: lỗi công cụ",
+      "cancelled": "Đã dừng: đã hủy",
+      "other": "ĐÃ DỪNG"
+    }
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "Không thể tải lịch sử trò chuyện.",
       "new": "Cuộc trò chuyện mới",
-      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để xóa.",
       "deleteTitle": "Xóa cuộc trò chuyện này?"
     },
+    "rename": {
+      "title": "Đổi tên cuộc trò chuyện",
+      "accessibility": "Đổi tên cuộc trò chuyện: {{title}}",
+      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để đổi tên hoặc xóa."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Chi tiết cuộc trò chuyện",
+      "backend": "Máy chủ",
+      "effortDefault": "Mặc định của mô hình",
+      "noCost": "Không tốn phí",
+      "costUnknown": "Không rõ",
+      "costEstimatedNote": "Các câu trả lời không báo giá được ước tính theo giá niêm yết.",
+      "costUnknownNote": "Chưa rõ giá của mô hình này.",
+      "costPartialNote": "Tổng này không bao gồm các mô hình chưa rõ giá.",
+      "localNote": "Mô hình trên thiết bị chạy ngay trên thiết bị này. Chúng không tốn phí, không có bộ nhớ đệm lời nhắc và số token có thể là ước tính.",
+      "countedSinceNote": "Cuộc trò chuyện này bắt đầu trước khi mức sử dụng được ghi lại. Tổng chỉ tính các câu trả lời sau thời điểm đó.",
+      "remoteServersOn": "Máy chủ MCP từ xa đang bật"
+    },
     "webSearch": {
       "title": "Tìm kiếm trên web",
       "description": "Cho phép cuộc trò chuyện này tra cứu thông tin mới nhất qua tài khoản Kilo của bạn. Mỗi lần tìm kiếm dùng hạn mức tìm kiếm hằng tháng của bạn.",
@@ -3238,7 +3288,6 @@
       "fieldName": "Tên hiển thị",
       "fieldUrl": "URL máy chủ",
       "fieldUrlInvalid": "Nhập URL máy chủ hợp lệ.",
-      "fieldToken": "Mã Bearer (không bắt buộc)",
       "enableServer": "Bật máy chủ này: {{name}}",
       "editServer": "Sửa máy chủ",
       "deleteServer": "Xóa máy chủ",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "{{count}} công cụ",
       "serverUnreachable": "Không thể kết nối với máy chủ này",
       "serverOff": "Máy chủ này đang tắt"
+    },
+    "mcpOAuth": {
+      "authMethod": "Xác thực",
+      "authNone": "Không đăng nhập",
+      "authBearer": "Mã Bearer",
+      "authOAuth": "Đăng nhập OAuth",
+      "fieldToken": "Mã",
+      "oauthHint": "Sau khi lưu, nhấn $t(modelChat.mcpOAuth.signIn) trên máy chủ để đăng nhập bằng trình duyệt.",
+      "serverNeedsSignIn": "Đăng nhập để dùng máy chủ này",
+      "signIn": "Đăng nhập",
+      "signInA11y": "Đăng nhập vào máy chủ này: {{name}}",
+      "signInFailed": "Không thể đăng nhập vào {{name}}. Hãy thử lại."
     },
     "backends": {
       "title": "Máy chủ trò chuyện",
@@ -3412,6 +3473,9 @@
       "downloading": "Đang tải xuống…",
       "downloadProgress": "Đang tải xuống… {{percent}}%",
       "downloadFailed": "Quá trình tải xuống chưa hoàn tất. Hãy kiểm tra kết nối và dung lượng trống, sau đó thử lại."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play không trả về gói tín dụng phù hợp nào.",
     "purchaseOwnedByAnotherAccount": "Tín dụng trên Apple Account này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng.",
     "purchaseOwnedByAnotherAccountPlay": "Tín dụng trên Tài khoản Google Play này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng."
+  },
+  "todos": {
+    "saveAsTodo": "Lưu thành việc cần làm",
+    "segment": {
+      "label": "Chế độ xem trợ lý",
+      "sessions": "Phiên",
+      "todos": "Việc cần làm"
+    },
+    "lists": {
+      "newList": "Danh sách mới",
+      "empty": "Chưa có danh sách nào",
+      "couldNotLoad": "Không thể tải danh sách",
+      "noRepository": "Không có kho mã nguồn",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} chưa xong",
+      "openCount_other": "{{count}} chưa xong",
+      "archived_one": "Đã lưu trữ ({{count}})",
+      "archived_other": "Đã lưu trữ ({{count}})",
+      "archive": "Lưu trữ",
+      "unarchive": "Bỏ lưu trữ",
+      "deleteTitle": "Xóa {{name}}?",
+      "deleteMessage": "Việc cần làm của nó cũng bị xóa. Các phiên vẫn được giữ lại."
+    },
+    "listSettings": {
+      "title": "Cài đặt danh sách",
+      "name": "Tên",
+      "namePlaceholder": "Lỗi, Ý tưởng, Bản phát hành…",
+      "emoji": "Biểu tượng cảm xúc",
+      "mode": "Chế độ",
+      "defaultsHint": "Các phiên bắt đầu từ danh sách này dùng các giá trị mặc định này."
+    },
+    "list": {
+      "addPlaceholder": "Thêm việc cần làm",
+      "add": "Thêm",
+      "empty": "Chưa có việc cần làm nào",
+      "setDefaults": "Đặt kho mã nguồn, chế độ và mô hình",
+      "completed_one": "Đã hoàn tất ({{count}})",
+      "completed_other": "Đã hoàn tất ({{count}})"
+    },
+    "item": {
+      "markDone": "Đánh dấu đã xong",
+      "markOpen": "Đánh dấu chưa xong",
+      "markDonePrompt": "Đánh dấu đã xong?",
+      "deleted": "Đã xóa việc cần làm",
+      "undo": "Hoàn tác",
+      "runCount_one": "{{count}} lần chạy",
+      "runCount_other": "{{count}} lần chạy",
+      "startNow": "Bắt đầu không cần rà soát",
+      "startNowHint": "Nhấn giữ để bắt đầu không cần rà soát",
+      "titleLabel": "Tiêu đề việc cần làm",
+      "notes": "Ghi chú",
+      "notesPlaceholder": "Thêm ghi chú bằng Markdown",
+      "sessions": "Phiên đã liên kết",
+      "noSessions": "Chưa có phiên nào",
+      "linkSession": "Liên kết phiên",
+      "unlinkSession": "Bỏ liên kết {{title}}",
+      "linkFailed": "Không thể liên kết phiên với việc cần làm"
+    },
+    "linkSession": {
+      "title": "Liên kết một phiên",
+      "empty": "Không có phiên gần đây",
+      "emptyInRepository": "Không có phiên gần đây trong {{repository}}"
+    },
+    "upNext": "Tiếp theo",
+    "sessionTodo": "Việc cần làm: {{title}}",
+    "linkToTodo": "Liên kết với việc cần làm",
+    "candidates": {
+      "empty": "Không có việc cần làm đang mở"
+    },
+    "saveSheet": {
+      "title": "Lưu vào danh sách",
+      "saved": "Đã lưu vào {{list}}"
+    }
   }
 }

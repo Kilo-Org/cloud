@@ -1262,6 +1262,19 @@ describe('api routes', () => {
     expect(ingestStub.getAllStream).toHaveBeenCalled();
   });
 
+  it('GET /session/:sessionId/diff returns 404 without reading the DO when access is denied', async () => {
+    vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce(null);
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/diff', { method: 'GET' }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ success: false, error: 'session_not_found' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
   it('GET /session/:sessionId/export passes an upToMessageId cut to the DO export', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);

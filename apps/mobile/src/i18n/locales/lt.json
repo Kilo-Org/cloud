@@ -136,7 +136,10 @@
     "working": "Vykdoma",
     "yourOwnRepositories": "Tavo saugyklos",
     "dismissed": "Atmesta",
-    "agent": "Agentas"
+    "agent": "Agentas",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Pakeitimai"
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -325,6 +328,7 @@
       "collapseFile": "Sutraukti failą",
       "expandFile": "Išskleisti failą",
       "diffTooLarge": "Pakeitimų palyginimas per didelis, kad būtų galima jį parodyti.",
+      "noPreview": "Šio failo peržiūra negalima",
       "openOnGitHub": "Atidaryti GitHub platformoje",
       "openDiffOnGitHub": "Atidaryti šio failo pakeitimų palyginimą GitHub platformoje",
       "githubDiff": "GitHub pakeitimų palyginimas"
@@ -863,7 +867,8 @@
       "kiloclaw": "KiloClaw veikla",
       "balance": "Įspėjimai apie likutį",
       "security": "Saugos problemos",
-      "spend": "Išlaidų įspėjimai"
+      "spend": "Išlaidų įspėjimai",
+      "followedSessions": "Sekamos sesijos"
     },
     "category": {
       "chatMessagesSubtitle": "atsakymai jūsų pokalbiuose",
@@ -2142,6 +2147,8 @@
       "title": "Sesija",
       "copyErrorDetails": "Kopijuoti klaidos informaciją",
       "backToSessions": "Grįžti į sesijas",
+      "follow": "Sekti užrakinimo ekrane",
+      "unfollow": "Nebesekti užrakinimo ekrane",
       "couldNotLoad": "Nepavyko įkelti sesijos.",
       "failedToLoadDetails": "Nepavyko įkelti sesijos informacijos.",
       "failedToStopExecution": "Nepavyko sustabdyti vykdymo.",
@@ -2245,7 +2252,6 @@
       "retryLoadingEnvironment": "Bandyti įkelti aplinką iš naujo",
       "defaultEnvironment": "Numatytoji aplinka",
       "environmentSummary": "komandų: {{commands}} · MCP: {{mcp}} · įgūdžių: {{skills}} · agentų: {{agents}}",
-      "changes": "Pakeitimai",
       "leaveChanges": "Palikti pakeitimus",
       "commitAndPush": "Įrašyti ir išsiųsti",
       "startSession": "Pradėti sesiją",
@@ -2318,8 +2324,8 @@
       "toolList": "rodyti sąrašą",
       "toolPatch": "taisyti",
       "toolTask": "užduotis",
-      "readTodos": "Skaityti užduočių sąrašą",
-      "updateTodos": "Atnaujinti užduočių sąrašą",
+      "readTodos": "Skaityti planą",
+      "updateTodos": "Atnaujinti planą",
       "linesBadge": "eil.: {{displayCount}}",
       "filesBadge": "failų: {{displayCount}}",
       "matchesBadge": "atitikčių: {{displayCount}}",
@@ -2727,6 +2733,12 @@
       "modelsCount_other": "Modeliai ({{displayCount}})",
       "modelsCount_few": "Modeliai ({{displayCount}})",
       "modelsCount_many": "Modeliai ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Peržiūrėti pakeitimus",
+      "asOf": "Būsena {{time}}",
+      "tooLarge": "Šis pakeitimų palyginimas per didelis, kad būtų galima jį parodyti mobiliajame įrenginyje.",
+      "empty": "Šioje sesijoje failų pakeitimų dar nėra."
     },
     "autoApprove": {
       "title": "Automatinis tvirtinimas",
@@ -3245,6 +3257,8 @@
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
     "openSession": "Atidaryti",
+    "finished": "Baigta",
+    "followFailed": "Nepavyko parodyti šio agento užrakinimo ekrane.",
     "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą.",
     "checked": "Patikrinta",
     "lastKnown": "Paskutinė žinoma",
@@ -3253,7 +3267,26 @@
     "waitingForYou": "Laukia jūsų",
     "nextScheduled": "Artimiausi suplanuoti",
     "answerNeeded": "Laukia atsakymo",
-    "waitingToRetry": "Laukiama pakartojimo"
+    "waitingToRetry": "Laukiama pakartojimo",
+    "step": {
+      "editing": "Redagavimas",
+      "reading": "Skaitymas",
+      "running": "Vykdoma",
+      "searching": "Paieška žiniatinklyje",
+      "thinking": "Mąstoma"
+    },
+    "planOf": "iš",
+    "filesChanged": "pakeisti failai",
+    "finishedIn": "Baigta per",
+    "noActivityFor": "Nėra veiklos",
+    "prOpened": "Atidaryta pull užklausa",
+    "permissionWants": "Nori vykdyti",
+    "failure": {
+      "provider": "Sustabdyta: teikėjo klaida",
+      "tool": "Sustabdyta: įrankio klaida",
+      "cancelled": "Sustabdyta: atšaukta",
+      "other": "SUSTABDYTA"
+    }
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",
@@ -3289,10 +3322,27 @@
     "list": {
       "loadFailed": "Nepavyko įkelti pokalbio istorijos.",
       "new": "Naujas pokalbis",
-      "openHint": "Atidaro pokalbį. Palaikykite, kad ištrintumėte.",
       "deleteTitle": "Ištrinti šį pokalbį?"
     },
+    "rename": {
+      "title": "Pervadinti pokalbį",
+      "accessibility": "Pervadinti pokalbį: {{title}}",
+      "openHint": "Atidaro pokalbį. Palaikykite, kad pervadintumėte arba ištrintumėte."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Pokalbio informacija",
+      "backend": "Serveris",
+      "effortDefault": "Modelio numatytasis",
+      "noCost": "Nemokama",
+      "costUnknown": "Nežinoma",
+      "costEstimatedNote": "Atsakymų, kurie nenurodė kainos, kaina apskaičiuota pagal kainoraščio kainas.",
+      "costUnknownNote": "Šio modelio kaina nežinoma.",
+      "costPartialNote": "Į šią sumą neįtraukti modeliai, kurių kaina nežinoma.",
+      "localNote": "Įrenginio modeliai veikia šiame įrenginyje. Jie neturi kainos ir užklausų talpyklos, o jų žetonų skaičius gali būti apytikslis.",
+      "countedSinceNote": "Šis pokalbis prasidėjo prieš pradedant registruoti naudojimą. Sumos rodo tik vėlesnius atsakymus.",
+      "remoteServersOn": "Įjungti nuotoliniai MCP serveriai"
+    },
     "webSearch": {
       "title": "Ieškoti žiniatinklyje",
       "description": "Leiskite šiam pokalbiui ieškoti naujausios informacijos per jūsų Kilo paskyrą. Paieškos naudoja jūsų mėnesinį paieškų limitą.",
@@ -3320,7 +3370,6 @@
       "fieldName": "Rodomas pavadinimas",
       "fieldUrl": "Serverio URL",
       "fieldUrlInvalid": "Įveskite galiojantį serverio URL.",
-      "fieldToken": "Bearer prieigos raktas (neprivaloma)",
       "enableServer": "Įjungti šį serverį: {{name}}",
       "editServer": "Redaguoti serverį",
       "deleteServer": "Ištrinti serverį",
@@ -3340,6 +3389,18 @@
       "serverToolCount": "{{count}} įrankiai",
       "serverUnreachable": "Nepavyko pasiekti šio serverio",
       "serverOff": "Šis serveris išjungtas"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikavimas",
+      "authNone": "Be prisijungimo",
+      "authBearer": "Bearer prieigos raktas",
+      "authOAuth": "OAuth prisijungimas",
+      "fieldToken": "Prieigos raktas",
+      "oauthHint": "Išsaugojęs bakstelėk $t(modelChat.mcpOAuth.signIn) prie serverio, kad prisijungtum naršyklėje.",
+      "serverNeedsSignIn": "Prisijunk, kad galėtum naudoti šį serverį",
+      "signIn": "Prisijungti",
+      "signInA11y": "Prisijungti prie šio serverio: {{name}}",
+      "signInFailed": "Nepavyko prisijungti prie {{name}}. Bandyk dar kartą."
     },
     "backends": {
       "title": "Pokalbių serveriai",
@@ -3494,6 +3555,9 @@
       "downloading": "Atsisiunčiama…",
       "downloadProgress": "Atsisiunčiama… {{percent}}%",
       "downloadFailed": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir laisvą vietą saugykloje, tada bandykite dar kartą."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
     }
   },
   "settingsTools": {
@@ -3716,5 +3780,86 @@
     "noMatchingProductsPlay": "Google Play negrąžino jokių atitinkančių kreditų paketų.",
     "purchaseOwnedByAnotherAccount": "Šios Apple Account paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros.",
     "purchaseOwnedByAnotherAccountPlay": "Šios Google Play paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros."
+  },
+  "todos": {
+    "saveAsTodo": "Išsaugoti kaip užduotį",
+    "segment": {
+      "label": "Agentų rodinys",
+      "sessions": "Sesijos",
+      "todos": "Užduotys"
+    },
+    "lists": {
+      "newList": "Naujas sąrašas",
+      "empty": "Sąrašų dar nėra",
+      "couldNotLoad": "Sąrašų įkelti nepavyko",
+      "noRepository": "Nėra saugyklos",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "Atviros: {{count}}",
+      "openCount_few": "Atviros: {{count}}",
+      "openCount_many": "Atviros: {{count}}",
+      "openCount_other": "Atviros: {{count}}",
+      "archived_one": "Archyvuota ({{count}})",
+      "archived_few": "Archyvuota ({{count}})",
+      "archived_many": "Archyvuota ({{count}})",
+      "archived_other": "Archyvuota ({{count}})",
+      "archive": "Archyvuoti",
+      "unarchive": "Išarchyvuoti",
+      "deleteTitle": "Ištrinti {{name}}?",
+      "deleteMessage": "Jos užduotys taip pat ištrinamos. Jų sesijos lieka."
+    },
+    "listSettings": {
+      "title": "Sąrašo nustatymai",
+      "name": "Pavadinimas",
+      "namePlaceholder": "Klaidos, idėjos, leidimas…",
+      "emoji": "Emodžis",
+      "mode": "Režimas",
+      "defaultsHint": "Sesijos, pradėtos iš šio sąrašo, naudoja šias numatytąsias reikšmes."
+    },
+    "list": {
+      "addPlaceholder": "Pridėti naują užduotį",
+      "add": "Pridėti užduotį",
+      "empty": "Užduočių dar nėra",
+      "setDefaults": "Nustatyti saugyklą, režimą ir modelį",
+      "completed_one": "Baigta ({{count}})",
+      "completed_few": "Baigta ({{count}})",
+      "completed_many": "Baigta ({{count}})",
+      "completed_other": "Baigta ({{count}})"
+    },
+    "item": {
+      "markDone": "Žymėti kaip baigtą",
+      "markOpen": "Žymėti kaip nebaigtą",
+      "markDonePrompt": "Žymėti kaip baigtą?",
+      "deleted": "Užduotis ištrinta",
+      "undo": "Grąžinti atgal",
+      "runCount_one": "{{count}} paleidimas",
+      "runCount_few": "{{count}} paleidimai",
+      "runCount_many": "{{count}} paleidimo",
+      "runCount_other": "{{count}} paleidimų",
+      "startNow": "Pradėti be peržiūros",
+      "startNowHint": "Palaikykite nuspaudę, kad pradėtumėte be peržiūros",
+      "titleLabel": "Užduoties pavadinimas",
+      "notes": "Pastabos",
+      "notesPlaceholder": "Pridėti pastabų Markdown formatu",
+      "sessions": "Susietos sesijos",
+      "noSessions": "Sesijų dar nėra",
+      "linkSession": "Susieti sesiją",
+      "unlinkSession": "Atsieti {{title}}",
+      "linkFailed": "Sesijos susieti su užduotimi nepavyko"
+    },
+    "linkSession": {
+      "title": "Sesijos susiejimas",
+      "empty": "Nėra naujausių sesijų",
+      "emptyInRepository": "Saugykloje {{repository}} nėra naujausių sesijų"
+    },
+    "upNext": "Toliau",
+    "sessionTodo": "Užduotis: {{title}}",
+    "linkToTodo": "Susieti su užduotimi",
+    "candidates": {
+      "empty": "Nėra atvirų užduočių"
+    },
+    "saveSheet": {
+      "title": "Išsaugoti į sąrašą",
+      "saved": "Išsaugota į {{list}}"
+    }
   }
 }

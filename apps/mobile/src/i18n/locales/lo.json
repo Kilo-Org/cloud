@@ -136,7 +136,10 @@
     "working": "ກຳລັງເຮັດວຽກ",
     "yourOwnRepositories": "ຄັງໂຄ້ດຂອງທ່ານເອງ",
     "dismissed": "ລະເວັ້ນແລ້ວ",
-    "agent": "ຕົວແທນ"
+    "agent": "ຕົວແທນ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "ການປ່ຽນແປງ"
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -325,6 +328,7 @@
       "collapseFile": "ຍຸບໄຟລ໌",
       "expandFile": "ຂະຫຍາຍໄຟລ໌",
       "diffTooLarge": "ຄວາມແຕກຕ່າງໃຫຍ່ເກີນກວ່າຈະສະແດງໄດ້.",
+      "noPreview": "ບໍ່ມີຕົວຢ່າງສຳລັບໄຟລ໌ນີ້",
       "openOnGitHub": "ເປີດໃນ GitHub",
       "openDiffOnGitHub": "ເປີດຄວາມແຕກຕ່າງຂອງໄຟລ໌ນີ້ໃນ GitHub",
       "githubDiff": "ຄວາມແຕກຕ່າງໃນ GitHub"
@@ -831,7 +835,8 @@
       "kiloclaw": "ກິດຈະກຳ KiloClaw",
       "balance": "ການແຈ້ງເຕືອນຍອດເງິນ",
       "security": "ບັນຫາດ້ານຄວາມປອດໄພທີ່ກວດພົບ",
-      "spend": "ການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ"
+      "spend": "ການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ",
+      "followedSessions": "ເຊສຊັນທີ່ຕິດຕາມ"
     },
     "category": {
       "chatMessagesSubtitle": "ຄຳຕອບໃນການສົນທະນາຂອງທ່ານ",
@@ -2086,6 +2091,8 @@
       "title": "ເຊດຊັນ",
       "copyErrorDetails": "ຄັດລອກລາຍລະອຽດຂໍ້ຜິດພາດ",
       "backToSessions": "ກັບໄປລາຍການເຊດຊັນ",
+      "follow": "ຕິດຕາມໃນໜ້າຈໍລັອກ",
+      "unfollow": "ຢຸດຕິດຕາມໃນໜ້າຈໍລັອກ",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດເຊດຊັນໄດ້.",
       "failedToLoadDetails": "ບໍ່ສາມາດໂຫຼດລາຍລະອຽດເຊດຊັນໄດ້.",
       "failedToStopExecution": "ບໍ່ສາມາດຢຸດການເຮັດວຽກໄດ້.",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "ລອງໂຫຼດສະພາບແວດລ້ອມໃໝ່",
       "defaultEnvironment": "ສະພາບແວດລ້ອມມາດຕະຖານ",
       "environmentSummary": "{{commands}} ຄຳສັ່ງ · {{mcp}} MCP · {{skills}} ທັກສະ · {{agents}} ເອເຈນ",
-      "changes": "ການປ່ຽນແປງ",
       "leaveChanges": "ປະການປ່ຽນແປງໄວ້",
       "commitAndPush": "ບັນທຶກແລະສົ່ງຂຶ້ນ",
       "startSession": "ເລີ່ມເຊດຊັນ",
@@ -2260,8 +2266,8 @@
       "toolList": "ສະແດງລາຍການ",
       "toolPatch": "ແກ້ໄຂ",
       "toolTask": "ວຽກ",
-      "readTodos": "ອ່ານລາຍການວຽກ",
-      "updateTodos": "ອັບເດດລາຍການວຽກ",
+      "readTodos": "ອ່ານແຜນ",
+      "updateTodos": "ອັບເດດແຜນ",
       "linesBadge": "{{displayCount}} ບັນທັດ",
       "filesBadge": "{{displayCount}} ໄຟລ໌",
       "matchesBadge": "ພົບ {{displayCount}} ລາຍການ",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "ໂມເດວ ({{displayCount}})",
       "modelsCount_other": "ໂມເດວ ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ເບິ່ງການປ່ຽນແປງ",
+      "asOf": "ຮອດເວລາ {{time}}",
+      "tooLarge": "ຄວາມແຕກຕ່າງນີ້ໃຫຍ່ເກີນກວ່າຈະສະແດງໃນມືຖືໄດ້.",
+      "empty": "ຍັງບໍ່ມີການປ່ຽນແປງໄຟລ໌ໃນເຊສຊັນນີ້ເທື່ອ."
     },
     "autoApprove": {
       "title": "ການອະນຸມັດອັດຕະໂນມັດ",
@@ -3163,6 +3175,8 @@
     "channelName": "ເອເຈນທີ່ກຳລັງເຮັດວຽກ",
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ.",
     "openSession": "ເປີດ",
+    "finished": "ສຳເລັດແລ້ວ",
+    "followFailed": "ບໍ່ສາມາດສະແດງຕົວແທນນີ້ໃນໜ້າຈໍລັອກໄດ້.",
     "approveFailed": "ບໍ່ສາມາດອະນຸມັດໄດ້. ແຕະ $t(common.approve) ເພື່ອລອງອີກຄັ້ງ.",
     "checked": "ກວດສອບແລ້ວ",
     "lastKnown": "ສະຖານະຫຼ້າສຸດທີ່ຮູ້",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "ລໍທ່ານ",
     "nextScheduled": "ກຳນົດເວລາຖັດໄປ",
     "answerNeeded": "ລໍຄຳຕອບ",
-    "waitingToRetry": "ລໍລອງໃໝ່"
+    "waitingToRetry": "ລໍລອງໃໝ່",
+    "step": {
+      "editing": "ກຳລັງແກ້ໄຂ",
+      "reading": "ກຳລັງອ່ານ",
+      "running": "ຮັນ",
+      "searching": "ຄົ້ນຫາເວັບ",
+      "thinking": "ກຳລັງຄິດ"
+    },
+    "planOf": "ຈາກ",
+    "filesChanged": "ໄຟລ໌ທີ່ປ່ຽນແປງ",
+    "finishedIn": "ສຳເລັດໃນ",
+    "noActivityFor": "ບໍ່ມີການເຄື່ອນໄຫວ",
+    "prOpened": "ເປີດ pull request",
+    "permissionWants": "ຕ້ອງການຮັນ",
+    "failure": {
+      "provider": "ຢຸດ: ຂໍ້ຜິດພາດຜູ້ໃຫ້ບໍລິການ",
+      "tool": "ຢຸດ: ຂໍ້ຜິດພາດເຄື່ອງມື",
+      "cancelled": "ຢຸດ: ຍົກເລິກ",
+      "other": "ຢຸດແລ້ວ"
+    }
   },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "ບໍ່ສາມາດໂຫຼດປະຫວັດການສົນທະນາໄດ້.",
       "new": "ແຊັດໃໝ່",
-      "openHint": "ເປີດແຊັດ. ກົດຄ້າງເພື່ອລຶບ.",
       "deleteTitle": "ລຶບແຊັດນີ້ບໍ?"
     },
+    "rename": {
+      "title": "ປ່ຽນຊື່ແຊັດ",
+      "accessibility": "ປ່ຽນຊື່ແຊັດ: {{title}}",
+      "openHint": "ເປີດແຊັດ. ກົດຄ້າງເພື່ອປ່ຽນຊື່ ຫຼື ລຶບ."
+    },
     "beta": "ເບຕ້າ",
+    "details": {
+      "title": "ລາຍລະອຽດແຊັດ",
+      "backend": "ລະບົບເບື້ອງຫຼັງ",
+      "effortDefault": "ຄ່າເລີ່ມຕົ້ນຂອງໂມເດວ",
+      "noCost": "ບໍ່ມີຄ່າໃຊ້ຈ່າຍ",
+      "costUnknown": "ບໍ່ຮູ້",
+      "costEstimatedNote": "ຄຳຕອບທີ່ບໍ່ໄດ້ລາຍງານລາຄາ ຖືກປະເມີນຈາກລາຄາໃນລາຍການ.",
+      "costUnknownNote": "ບໍ່ຮູ້ລາຄາຂອງໂມເດວນີ້.",
+      "costPartialNote": "ຍອດລວມນີ້ບໍ່ລວມໂມເດວທີ່ບໍ່ຮູ້ລາຄາ.",
+      "localNote": "ໂມເດວຢູ່ໃນອຸປະກອນເຮັດວຽກຢູ່ໃນອຸປະກອນນີ້. ພວກມັນບໍ່ມີຄ່າໃຊ້ຈ່າຍ ແລະ ບໍ່ມີແຄັດສຳລັບຂໍ້ຄວາມ, ແລະ ຈຳນວນໂທເຄັນຂອງພວກມັນອາດເປັນການປະເມີນ.",
+      "countedSinceNote": "ແຊັດນີ້ເລີ່ມກ່ອນທີ່ຈະມີການບັນທຶກການໃຊ້ງານ. ຍອດລວມສະແດງສະເພາະຄຳຕອບຫຼັງຈາກນັ້ນ.",
+      "remoteServersOn": "ເຊີບເວີ MCP ທາງໄກທີ່ເປີດຢູ່"
+    },
     "webSearch": {
       "title": "ຊອກຫາໃນເວັບ",
       "description": "ອະນຸຍາດໃຫ້ແຊັດນີ້ຊອກຫາຂໍ້ມູນລ່າສຸດຜ່ານບັນຊີ Kilo ຂອງທ່ານ. ການຊອກຫາຈະໃຊ້ໂຄຕາການຊອກຫາລາຍເດືອນຂອງທ່ານ.",
@@ -3238,7 +3288,6 @@
       "fieldName": "ຊື່ທີ່ສະແດງ",
       "fieldUrl": "URL ຂອງເຊີບເວີ",
       "fieldUrlInvalid": "ປ້ອນ URL ຂອງເຊີບເວີທີ່ຖືກຕ້ອງ.",
-      "fieldToken": "ໂທເຄັນ Bearer (ທາງເລືອກ)",
       "enableServer": "ເປີດນຳໃຊ້ເຊີບເວີນີ້: {{name}}",
       "editServer": "ແກ້ໄຂເຊີບເວີ",
       "deleteServer": "ລຶບເຊີບເວີ",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "ເຄື່ອງມື {{count}}",
       "serverUnreachable": "ບໍ່ສາມາດເຂົ້າເຖິງເຊີບເວີນີ້ໄດ້",
       "serverOff": "ເຊີບເວີນີ້ປິດຢູ່"
+    },
+    "mcpOAuth": {
+      "authMethod": "ການຢືນຢັນຕົວຕົນ",
+      "authNone": "ບໍ່ຕ້ອງເຂົ້າສູ່ລະບົບ",
+      "authBearer": "ໂທເຄັນ Bearer",
+      "authOAuth": "ເຂົ້າສູ່ລະບົບດ້ວຍ OAuth",
+      "fieldToken": "ໂທເຄັນ",
+      "oauthHint": "ຫຼັງຈາກບັນທຶກແລ້ວ, ແຕະ $t(modelChat.mcpOAuth.signIn) ຢູ່ເຊີບເວີເພື່ອເຂົ້າສູ່ລະບົບຜ່ານບຣາວເຊີຂອງທ່ານ.",
+      "serverNeedsSignIn": "ເຂົ້າສູ່ລະບົບເພື່ອໃຊ້ເຊີບເວີນີ້",
+      "signIn": "ເຂົ້າສູ່ລະບົບ",
+      "signInA11y": "ເຂົ້າສູ່ລະບົບເຊີບເວີນີ້: {{name}}",
+      "signInFailed": "ບໍ່ສາມາດເຂົ້າສູ່ລະບົບ {{name}} ໄດ້. ກະລຸນາລອງໃໝ່."
     },
     "backends": {
       "title": "ລະບົບເບື້ອງຫຼັງຂອງແຊັດ",
@@ -3412,6 +3473,9 @@
       "downloading": "ກຳລັງດາວໂຫຼດ…",
       "downloadProgress": "ກຳລັງດາວໂຫຼດ… {{percent}}%",
       "downloadFailed": "ການດາວໂຫຼດບໍ່ສຳເລັດ. ກວດສອບການເຊື່ອມຕໍ່ ແລະ ພື້ນທີ່ຈັດເກັບທີ່ຫວ່າງ, ແລ້ວລອງໃໝ່."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ໂມເດວນີ້ຮອງຮັບລະດັບການຄິດ"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play ບໍ່ໄດ້ສົ່ງແພັກເຄຣດິດທີ່ກົງກັນຄືນ.",
     "purchaseOwnedByAnotherAccount": "ເຄຣດິດໃນ Apple Account ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ.",
     "purchaseOwnedByAnotherAccountPlay": "ເຄຣດິດໃນບັນຊີ Google Play ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ."
+  },
+  "todos": {
+    "saveAsTodo": "ບັນທຶກເປັນວຽກ",
+    "segment": {
+      "label": "ມຸມມອງຕົວແທນ",
+      "sessions": "ເຊດຊັນ",
+      "todos": "ວຽກ"
+    },
+    "lists": {
+      "newList": "ລາຍການໃໝ່",
+      "empty": "ຍັງບໍ່ມີລາຍການ",
+      "couldNotLoad": "ບໍ່ສາມາດໂຫຼດລາຍການໄດ້.",
+      "noRepository": "ບໍ່ມີຄັງໂຄ້ດ",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} ເປີດ",
+      "openCount_other": "{{count}} ເປີດ",
+      "archived_one": "ເກັບເຂົ້າຄັງແລ້ວ ({{count}})",
+      "archived_other": "ເກັບເຂົ້າຄັງແລ້ວ ({{count}})",
+      "archive": "ເກັບເຂົ້າຄັງ",
+      "unarchive": "ນຳອອກຈາກຄັງ",
+      "deleteTitle": "ລຶບ {{name}} ບໍ?",
+      "deleteMessage": "ວຽກໃນລາຍການນີ້ຈະຖືກລຶບນຳ. ເຊດຊັນຂອງພວກມັນຈະຍັງຢູ່."
+    },
+    "listSettings": {
+      "title": "ການຕັ້ງຄ່າລາຍການ",
+      "name": "ຊື່",
+      "namePlaceholder": "ບັກ, ແນວຄິດ, ການປ່ອຍ…",
+      "emoji": "ອີໂມຈິ",
+      "mode": "ໂໝດ",
+      "defaultsHint": "ເຊດຊັນທີ່ເລີ່ມຈາກລາຍການນີ້ຈະໃຊ້ຄ່າເລີ່ມຕົ້ນເຫຼົ່ານີ້."
+    },
+    "list": {
+      "addPlaceholder": "ພິມວຽກໃໝ່",
+      "add": "ເພີ່ມວຽກ",
+      "empty": "ຍັງບໍ່ມີວຽກ",
+      "setDefaults": "ຕັ້ງຄັງໂຄ້ດ, ໂໝດ ແລະ ໂມເດວ",
+      "completed_one": "ສຳເລັດແລ້ວ ({{count}})",
+      "completed_other": "ສຳເລັດແລ້ວ ({{count}})"
+    },
+    "item": {
+      "markDone": "ໝາຍວ່າສຳເລັດ",
+      "markOpen": "ໝາຍວ່າຍັງບໍ່ສຳເລັດ",
+      "markDonePrompt": "ໝາຍວ່າສຳເລັດບໍ?",
+      "deleted": "ລຶບວຽກແລ້ວ",
+      "undo": "ກັບຄືນ",
+      "runCount_one": "{{count}} ຄັ້ງ",
+      "runCount_other": "{{count}} ຄັ້ງ",
+      "startNow": "ເລີ່ມໂດຍບໍ່ກວດທານ",
+      "startNowHint": "ກົດຄ້າງໄວ້ເພື່ອເລີ່ມໂດຍບໍ່ກວດທານ",
+      "titleLabel": "ຫົວຂໍ້ວຽກ",
+      "notes": "ໝາຍເຫດ",
+      "notesPlaceholder": "ເພີ່ມໝາຍເຫດໃນ Markdown",
+      "sessions": "ເຊດຊັນທີ່ເຊື່ອມຕໍ່ແລ້ວ",
+      "noSessions": "ຍັງບໍ່ມີເຊດຊັນ",
+      "linkSession": "ເຊື່ອມຕໍ່ເຊດຊັນ",
+      "unlinkSession": "ຍົກເລີກການເຊື່ອມຕໍ່ {{title}}",
+      "linkFailed": "ບໍ່ສາມາດເຊື່ອມຕໍ່ເຊດຊັນກັບວຽກໄດ້."
+    },
+    "linkSession": {
+      "title": "ເຊື່ອມຕໍ່ກັບເຊດຊັນ",
+      "empty": "ບໍ່ມີເຊດຊັນຫຼ້າສຸດ",
+      "emptyInRepository": "ບໍ່ມີເຊດຊັນຫຼ້າສຸດໃນ {{repository}}"
+    },
+    "upNext": "ຕໍ່ໄປ",
+    "sessionTodo": "ວຽກ: {{title}}",
+    "linkToTodo": "ເຊື່ອມຕໍ່ກັບວຽກ",
+    "candidates": {
+      "empty": "ບໍ່ມີວຽກທີ່ເປີດຢູ່"
+    },
+    "saveSheet": {
+      "title": "ບັນທຶກໃສ່ລາຍການ",
+      "saved": "ບັນທຶກໃນ {{list}}"
+    }
   }
 }

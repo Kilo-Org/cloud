@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getLastGlanceableSnapshot: vi.fn<() => GlanceableAgentsSnapshot | null>(),
   restorePersistedGlanceable: vi.fn().mockResolvedValue(undefined),
   getItemAsync: vi.fn<(key: string) => string | null>(),
+  restoreFollowedSessionCards: vi.fn(),
 }));
 
 // The adoption hands the token to the delivery and reads the keychain; both are
@@ -23,6 +24,9 @@ vi.mock('@/lib/glanceable/persist', () => ({
 vi.mock('./ios-sink', () => ({
   adoptNativeActivity: mocks.adoptNativeActivity,
   sweepStrayActivities: mocks.sweepStrayActivities,
+}));
+vi.mock('./session-follow', () => ({
+  restoreFollowedSessionCards: mocks.restoreFollowedSessionCards,
 }));
 
 const { adoptPushStartedActivity } = await import('./adopt-activity');
@@ -62,5 +66,19 @@ describe('adoptPushStartedActivity', () => {
     expect(mocks.sweepStrayActivities.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.adoptNativeActivity.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     );
+  });
+
+  it('rebuilds the followed session cards with the stored scope, or none when unreadable', async () => {
+    await adoptPushStartedActivity();
+    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith(null);
+
+    mocks.getItemAsync.mockImplementation((key: string) =>
+      key === ACTIVE_USER_ID_KEY ? 'user-1' : null
+    );
+    await adoptPushStartedActivity();
+    expect(mocks.restoreFollowedSessionCards).toHaveBeenLastCalledWith({
+      userId: 'user-1',
+      organizationId: null,
+    });
   });
 });

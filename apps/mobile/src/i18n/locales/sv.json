@@ -136,7 +136,10 @@
     "working": "Arbetar",
     "yourOwnRepositories": "Dina egna kodarkiv",
     "dismissed": "Avskriven",
-    "agent": "Ombud"
+    "agent": "Ombud",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Ändringar"
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -325,6 +328,7 @@
       "collapseFile": "Fäll ihop filen",
       "expandFile": "Fäll ut filen",
       "diffTooLarge": "Diffen är för stor för att visas.",
+      "noPreview": "Ingen förhandsvisning tillgänglig för den här filen",
       "openOnGitHub": "Öppna på GitHub",
       "openDiffOnGitHub": "Öppna den här filens diff på GitHub",
       "githubDiff": "GitHub-diff"
@@ -831,7 +835,8 @@
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarningar",
       "security": "Säkerhetsanmärkningar",
-      "spend": "Utgiftsvarningar"
+      "spend": "Utgiftsvarningar",
+      "followedSessions": "Följda sessioner"
     },
     "category": {
       "chatMessagesSubtitle": "svar i dina konversationer",
@@ -2086,6 +2091,8 @@
       "title": "Sessionen",
       "copyErrorDetails": "Kopiera felinformation",
       "backToSessions": "Tillbaka till sessionerna",
+      "follow": "Följ på låsskärmen",
+      "unfollow": "Sluta följa på låsskärmen",
       "couldNotLoad": "Det gick inte att läsa in sessionen.",
       "failedToLoadDetails": "Det gick inte att läsa in sessionsinformationen.",
       "failedToStopExecution": "Det gick inte att stoppa körningen.",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "Försök läsa in miljön igen",
       "defaultEnvironment": "Standardmiljö",
       "environmentSummary": "{{commands}} kommandon · {{mcp}} MCP · {{skills}} färdigheter · {{agents}} agenter",
-      "changes": "Ändringar",
       "leaveChanges": "Behåll ändringar",
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",
@@ -2260,8 +2266,8 @@
       "toolList": "lista",
       "toolPatch": "tillämpa ändringar",
       "toolTask": "uppgift",
-      "readTodos": "Läs uppgiftslistan",
-      "updateTodos": "Uppdatera uppgiftslistan",
+      "readTodos": "Läs planeringen",
+      "updateTodos": "Uppdatera planeringen",
       "linesBadge": "{{displayCount}} rader",
       "filesBadge": "{{displayCount}} filer",
       "matchesBadge": "{{displayCount}} träffar",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modell ({{displayCount}})",
       "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Visa ändringar",
+      "asOf": "Per {{time}}",
+      "tooLarge": "Diffen är för stor för att visas på mobilen.",
+      "empty": "Inga filändringar i den här sessionen än."
     },
     "autoApprove": {
       "title": "Automatiskt godkännande",
@@ -3163,6 +3175,8 @@
     "channelName": "Aktiva agenter",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen.",
     "openSession": "Öppna",
+    "finished": "Slutförd",
+    "followFailed": "Det gick inte att visa agenten på låsskärmen.",
     "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen.",
     "checked": "Kontrollerad",
     "lastKnown": "Senast kända",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "Väntar på dig",
     "nextScheduled": "Nästa schemalagda",
     "answerNeeded": "Väntar på svar",
-    "waitingToRetry": "Väntar på nytt försök"
+    "waitingToRetry": "Väntar på nytt försök",
+    "step": {
+      "editing": "Redigerar",
+      "reading": "Läser",
+      "running": "Kör",
+      "searching": "Webbsökning",
+      "thinking": "Tänker igenom"
+    },
+    "planOf": "av",
+    "filesChanged": "filer ändrade",
+    "finishedIn": "Klart på",
+    "noActivityFor": "Ingen aktivitet i",
+    "prOpened": "Pull request öppnad",
+    "permissionWants": "Vill köra",
+    "failure": {
+      "provider": "Stoppad: leverantörsfel",
+      "tool": "Stoppad: verktygsfel",
+      "cancelled": "Stoppad: avbruten",
+      "other": "STOPPAD"
+    }
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "Det gick inte att läsa in chatthistoriken.",
       "new": "Ny chatt",
-      "openHint": "Öppnar chatten. Tryck länge för att ta bort.",
       "deleteTitle": "Ta bort den här chatten?"
     },
+    "rename": {
+      "title": "Byt namn på chatten",
+      "accessibility": "Byt namn på chatten: {{title}}",
+      "openHint": "Öppnar chatten. Tryck länge för att byta namn eller ta bort."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Chattinformation",
+      "backend": "Backend",
+      "effortDefault": "Modellens standard",
+      "noCost": "Ingen kostnad",
+      "costUnknown": "Okänd",
+      "costEstimatedNote": "Svar som inte rapporterade något pris har uppskattats utifrån listpriser.",
+      "costUnknownNote": "Inget pris är känt för den här modellen.",
+      "costPartialNote": "Totalen omfattar inte modeller som saknar känt pris.",
+      "localNote": "Modeller på enheten körs på den här enheten. De har ingen kostnad och ingen promptcache, och deras antal token kan vara uppskattningar.",
+      "countedSinceNote": "Den här chatten startade innan användningen registrerades. Totalerna visar bara svaren efter det.",
+      "remoteServersOn": "Aktiverade MCP-fjärrservrar"
+    },
     "webSearch": {
       "title": "Sök på webben",
       "description": "Låt den här chatten slå upp aktuell information via ditt Kilo-konto. Sökningar använder din månatliga sökkvot.",
@@ -3238,7 +3288,6 @@
       "fieldName": "Visat namn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Ange en giltig server-URL.",
-      "fieldToken": "Bearer-token (valfritt)",
       "enableServer": "Aktivera denna server: {{name}}",
       "editServer": "Redigera server",
       "deleteServer": "Ta bort server",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "{{count}} verktyg",
       "serverUnreachable": "Kunde inte nå denna server",
       "serverOff": "Denna server är avstängd"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentisering",
+      "authNone": "Ingen inloggning",
+      "authBearer": "Bearer-token",
+      "authOAuth": "OAuth-inloggning",
+      "fieldToken": "Token",
+      "oauthHint": "När du har sparat trycker du på $t(modelChat.mcpOAuth.signIn) på servern för att logga in med din webbläsare.",
+      "serverNeedsSignIn": "Logga in för att använda denna server",
+      "signIn": "Logga in",
+      "signInA11y": "Logga in på denna server: {{name}}",
+      "signInFailed": "Kunde inte logga in på {{name}}. Försök igen."
     },
     "backends": {
       "title": "Chattbackends",
@@ -3412,6 +3473,9 @@
       "downloading": "Laddar ned…",
       "downloadProgress": "Laddar ned… {{percent}} %",
       "downloadFailed": "Nedladdningen slutfördes inte. Kontrollera anslutningen och ledigt lagringsutrymme och försök sedan igen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Den här modellen stöder resonemangsnivå"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play returnerade inga matchande kreditpaket.",
     "purchaseOwnedByAnotherAccount": "Krediterna på detta Apple-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem.",
     "purchaseOwnedByAnotherAccountPlay": "Krediterna på detta Google Play-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem."
+  },
+  "todos": {
+    "saveAsTodo": "Spara som uppgift",
+    "segment": {
+      "label": "Agentvy",
+      "sessions": "Sessioner",
+      "todos": "Uppgifter"
+    },
+    "lists": {
+      "newList": "Ny lista",
+      "empty": "Inga listor ännu",
+      "couldNotLoad": "Kunde inte läsa in listorna",
+      "noRepository": "Inget kodarkiv",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} öppna",
+      "openCount_other": "{{count}} öppna",
+      "archived_one": "Arkiverade ({{count}})",
+      "archived_other": "Arkiverade ({{count}})",
+      "archive": "Arkivera",
+      "unarchive": "Återställ från arkivet",
+      "deleteTitle": "Ta bort {{name}}?",
+      "deleteMessage": "Dess uppgifter tas bort också. Sessionerna finns kvar."
+    },
+    "listSettings": {
+      "title": "Listinställningar",
+      "name": "Namn",
+      "namePlaceholder": "Buggar, Idéer, Utgåva…",
+      "emoji": "Emoji",
+      "mode": "Läge",
+      "defaultsHint": "Sessioner som startas från den här listan använder dessa standardvärden."
+    },
+    "list": {
+      "addPlaceholder": "Lägg till en uppgift",
+      "add": "Lägg till uppgift",
+      "empty": "Inga uppgifter ännu",
+      "setDefaults": "Ange kodarkiv, läge och modell",
+      "completed_one": "Slutförda ({{count}})",
+      "completed_other": "Slutförda ({{count}})"
+    },
+    "item": {
+      "markDone": "Markera som klar",
+      "markOpen": "Markera som inte klar",
+      "markDonePrompt": "Markera som klar?",
+      "deleted": "Uppgiften borttagen",
+      "undo": "Ångra",
+      "runCount_one": "{{count}} körning",
+      "runCount_other": "{{count}} körningar",
+      "startNow": "Starta utan granskning",
+      "startNowHint": "Håll nedtryckt för att starta utan granskning",
+      "titleLabel": "Uppgiftens titel",
+      "notes": "Anteckningar",
+      "notesPlaceholder": "Lägg till anteckningar i Markdown",
+      "sessions": "Länkade sessioner",
+      "noSessions": "Inga sessioner ännu",
+      "linkSession": "Länka session",
+      "unlinkSession": "Ta bort länken till {{title}}",
+      "linkFailed": "Kunde inte länka sessionen till uppgiften"
+    },
+    "linkSession": {
+      "title": "Länka en session",
+      "empty": "Inga senaste sessioner",
+      "emptyInRepository": "Inga senaste sessioner i {{repository}}"
+    },
+    "upNext": "Härnäst",
+    "sessionTodo": "Uppgift: {{title}}",
+    "linkToTodo": "Länka till uppgift",
+    "candidates": {
+      "empty": "Inga öppna uppgifter"
+    },
+    "saveSheet": {
+      "title": "Spara i lista",
+      "saved": "Sparat i {{list}}"
+    }
   }
 }

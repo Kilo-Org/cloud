@@ -136,7 +136,10 @@
     "working": "Inafanya kazi",
     "yourOwnRepositories": "Hazina zako mwenyewe",
     "dismissed": "Imepuuzwa",
-    "agent": "Wakala"
+    "agent": "Wakala",
+    "durationMinuteShort": "dk",
+    "durationHourShort": "saa",
+    "changes": "Mabadiliko"
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -325,6 +328,7 @@
       "collapseFile": "Kunja faili",
       "expandFile": "Panua faili",
       "diffTooLarge": "Tofauti za msimbo ni nyingi mno kuonyeshwa.",
+      "noPreview": "Hakuna onyesho la kukagua kwa faili hii",
       "openOnGitHub": "Fungua kwenye GitHub",
       "openDiffOnGitHub": "Fungua tofauti za msimbo wa faili hii kwenye GitHub",
       "githubDiff": "Tofauti za msimbo kwenye GitHub"
@@ -831,7 +835,8 @@
       "kiloclaw": "Shughuli za KiloClaw",
       "balance": "Tahadhari za salio",
       "security": "Matokeo ya ukaguzi wa usalama",
-      "spend": "Tahadhari za matumizi"
+      "spend": "Tahadhari za matumizi",
+      "followedSessions": "Vikao vinavyofuatiliwa"
     },
     "category": {
       "chatMessagesSubtitle": "majibu kwenye mazungumzo yako",
@@ -2086,6 +2091,8 @@
       "title": "Kikao",
       "copyErrorDetails": "Nakili maelezo ya hitilafu",
       "backToSessions": "Rudi kwenye vikao",
+      "follow": "Fuatilia kwenye skrini iliyofungwa",
+      "unfollow": "Acha kufuatilia kwenye skrini iliyofungwa",
       "couldNotLoad": "Imeshindikana kupakia kikao.",
       "failedToLoadDetails": "Imeshindikana kupakia maelezo ya kikao.",
       "failedToStopExecution": "Imeshindikana kusimamisha utekelezaji.",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "Jaribu tena kupakia mazingira",
       "defaultEnvironment": "Mazingira chaguomsingi",
       "environmentSummary": "amri {{commands}} · MCP {{mcp}} · ujuzi {{skills}} · mawakala {{agents}}",
-      "changes": "Mabadiliko",
       "leaveChanges": "Acha mabadiliko",
       "commitAndPush": "Hifadhi na utume",
       "startSession": "Anza kikao",
@@ -2260,8 +2266,8 @@
       "toolList": "orodhesha",
       "toolPatch": "rekebisha",
       "toolTask": "kazi",
-      "readTodos": "Soma orodha ya kazi",
-      "updateTodos": "Sasisha orodha ya kazi",
+      "readTodos": "Soma mpango",
+      "updateTodos": "Sasisha mpango",
       "linesBadge": "Mistari {{displayCount}}",
       "filesBadge": "Faili {{displayCount}}",
       "matchesBadge": "Matokeo {{displayCount}}",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modeli ({{displayCount}})",
       "modelsCount_other": "Modeli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Angalia mabadiliko",
+      "asOf": "Kufikia {{time}}",
+      "tooLarge": "Tofauti hizi za msimbo ni nyingi mno kuonyeshwa kwenye simu.",
+      "empty": "Bado hakuna mabadiliko ya faili katika kipindi hiki."
     },
     "autoApprove": {
       "title": "Kuidhinisha kiotomatiki",
@@ -3163,6 +3175,8 @@
     "channelName": "Mawakala wanaofanya kazi",
     "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa.",
     "openSession": "Fungua",
+    "finished": "Imekamilika",
+    "followFailed": "Imeshindwa kuonyesha wakala huyu kwenye skrini iliyofungwa.",
     "approveFailed": "Imeshindikana kuidhinisha. Gusa $t(common.approve) ili ujaribu tena.",
     "checked": "Imethibitishwa",
     "lastKnown": "Hali ya mwisho iliyojulikana",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "Inakusubiri",
     "nextScheduled": "Zilizopangwa zinazofuata",
     "answerNeeded": "Inasubiri jibu",
-    "waitingToRetry": "Inasubiri kujaribu tena"
+    "waitingToRetry": "Inasubiri kujaribu tena",
+    "step": {
+      "editing": "Kuhariri",
+      "reading": "Kusoma",
+      "running": "Kuendesha",
+      "searching": "Utafutaji wa wavuti",
+      "thinking": "Kufikiri kwa kina"
+    },
+    "planOf": "kati ya",
+    "filesChanged": "faili zilizobadilishwa",
+    "finishedIn": "Imekamilika kwa",
+    "noActivityFor": "Hakuna shughuli kwa",
+    "prOpened": "Ombi la kuvuta limefunguliwa",
+    "permissionWants": "Inataka kuendesha",
+    "failure": {
+      "provider": "Imesimama: hitilafu ya mtoa huduma",
+      "tool": "Imesimama: hitilafu ya zana",
+      "cancelled": "Imesimama: imeghairiwa",
+      "other": "IMESIMAMA"
+    }
   },
   "transcriptionModel": {
     "title": "Modeli ya unukuzi",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "Haikuweza kupakia historia ya mazungumzo.",
       "new": "Gumzo jipya",
-      "openHint": "Hufungua gumzo. Bonyeza kwa muda mrefu ili kufuta.",
       "deleteTitle": "Futa gumzo hili?"
     },
+    "rename": {
+      "title": "Badilisha jina la gumzo",
+      "accessibility": "Badilisha jina la gumzo: {{title}}",
+      "openHint": "Hufungua gumzo. Bonyeza kwa muda mrefu ili kubadilisha jina au kufuta."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Maelezo ya gumzo",
+      "backend": "Huduma",
+      "effortDefault": "Chaguo-msingi la modeli",
+      "noCost": "Hakuna gharama",
+      "costUnknown": "Haijulikani",
+      "costEstimatedNote": "Majibu ambayo hayakuripoti bei yamekadiriwa kwa bei za orodha.",
+      "costUnknownNote": "Hakuna bei inayojulikana kwa modeli hii.",
+      "costPartialNote": "Jumla hii haijumuishi modeli ambazo hazina bei inayojulikana.",
+      "localNote": "Modeli za kwenye kifaa huendeshwa kwenye kifaa hiki. Hazina gharama wala hifadhi ya muda ya maagizo, na idadi ya tokeni zake inaweza kuwa makadirio.",
+      "countedSinceNote": "Gumzo hili lilianza kabla matumizi hayajaanza kurekodiwa. Jumla zinaonyesha majibu ya baada ya hapo tu.",
+      "remoteServersOn": "Seva za MCP za mbali zilizowashwa"
+    },
     "webSearch": {
       "title": "Tafuta kwenye wavuti",
       "description": "Ruhusu gumzo hili litafute taarifa za sasa kupitia akaunti yako ya Kilo. Utafutaji hutumia kiwango chako cha utafutaji cha kila mwezi.",
@@ -3238,7 +3288,6 @@
       "fieldName": "Jina linaloonyeshwa",
       "fieldUrl": "URL ya seva",
       "fieldUrlInvalid": "Weka URL sahihi ya seva.",
-      "fieldToken": "Tokeni ya Bearer (hiari)",
       "enableServer": "Washa seva hii: {{name}}",
       "editServer": "Hariri seva",
       "deleteServer": "Futa seva",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "zana {{count}}",
       "serverUnreachable": "Haikuweza kufikia seva hii",
       "serverOff": "Seva hii imezimwa"
+    },
+    "mcpOAuth": {
+      "authMethod": "Uthibitishaji",
+      "authNone": "Bila kuingia",
+      "authBearer": "Tokeni ya Bearer",
+      "authOAuth": "Kuingia kwa OAuth",
+      "fieldToken": "Tokeni",
+      "oauthHint": "Baada ya kuhifadhi, gusa $t(modelChat.mcpOAuth.signIn) kwenye seva ili kuingia kupitia kivinjari chako.",
+      "serverNeedsSignIn": "Ingia ili kutumia seva hii",
+      "signIn": "Ingia",
+      "signInA11y": "Ingia kwenye seva hii: {{name}}",
+      "signInFailed": "Haikuweza kuingia kwenye {{name}}. Jaribu tena."
     },
     "backends": {
       "title": "Huduma za gumzo",
@@ -3412,6 +3473,9 @@
       "downloading": "Inapakua…",
       "downloadProgress": "Inapakua… {{percent}}%",
       "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play haikurudisha pakiti za salio zinazolingana.",
     "purchaseOwnedByAnotherAccount": "Salio katika Apple Account hii ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia.",
     "purchaseOwnedByAnotherAccountPlay": "Salio kwenye Akaunti hii ya Google Play ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia."
+  },
+  "todos": {
+    "saveAsTodo": "Hifadhi kama kazi",
+    "segment": {
+      "label": "Mwonekano wa mawakala",
+      "sessions": "Vikao",
+      "todos": "Kazi"
+    },
+    "lists": {
+      "newList": "Orodha mpya",
+      "empty": "Hakuna orodha bado",
+      "couldNotLoad": "Imeshindikana kupakia orodha",
+      "noRepository": "Hakuna hazina",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} wazi",
+      "openCount_other": "{{count}} wazi",
+      "archived_one": "Kumbukumbu ({{count}})",
+      "archived_other": "Kumbukumbu ({{count}})",
+      "archive": "Weka kwenye kumbukumbu",
+      "unarchive": "Toa kwenye kumbukumbu",
+      "deleteTitle": "Futa {{name}}?",
+      "deleteMessage": "Kazi zake pia zitafutwa. Vikao vyake vinabaki."
+    },
+    "listSettings": {
+      "title": "Mipangilio ya orodha",
+      "name": "Jina",
+      "namePlaceholder": "Hitilafu, Mawazo, Toleo…",
+      "emoji": "Emoji",
+      "mode": "Hali",
+      "defaultsHint": "Vikao vinavyoanzishwa kutoka orodha hii hutumia mipangilio hii chaguo-msingi."
+    },
+    "list": {
+      "addPlaceholder": "Ongeza kazi",
+      "add": "Ongeza kazi",
+      "empty": "Hakuna kazi bado",
+      "setDefaults": "Weka hazina, hali na modeli",
+      "completed_one": "Zimekamilika ({{count}})",
+      "completed_other": "Zimekamilika ({{count}})"
+    },
+    "item": {
+      "markDone": "Weka alama kama imekamilika",
+      "markOpen": "Weka alama kama haijakamilika",
+      "markDonePrompt": "Weka alama kama imekamilika?",
+      "deleted": "Kazi imefutwa",
+      "undo": "Tendua",
+      "runCount_one": "{{count}} utekelezaji",
+      "runCount_other": "{{count}} utekelezaji",
+      "startNow": "Anza bila ukaguzi",
+      "startNowHint": "Bonyeza kwa muda mrefu ili kuanza bila ukaguzi",
+      "titleLabel": "Kichwa cha kazi",
+      "notes": "Madokezo",
+      "notesPlaceholder": "Ongeza madokezo kwa Markdown",
+      "sessions": "Vikao vilivyounganishwa",
+      "noSessions": "Hakuna vikao bado",
+      "linkSession": "Unganisha kikao",
+      "unlinkSession": "Tenganisha {{title}}",
+      "linkFailed": "Imeshindikana kuunganisha kikao na kazi"
+    },
+    "linkSession": {
+      "title": "Kuunganisha kikao",
+      "empty": "Hakuna vikao vya hivi karibuni",
+      "emptyInRepository": "Hakuna vikao vya hivi karibuni katika {{repository}}"
+    },
+    "upNext": "Kinachofuata",
+    "sessionTodo": "Kazi: {{title}}",
+    "linkToTodo": "Unganisha na kazi",
+    "candidates": {
+      "empty": "Hakuna kazi zilizo wazi"
+    },
+    "saveSheet": {
+      "title": "Hifadhi kwenye orodha",
+      "saved": "Imehifadhiwa kwenye {{list}}"
+    }
   }
 }

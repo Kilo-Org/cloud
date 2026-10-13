@@ -1272,11 +1272,16 @@ describe('readCloudAgentWidgetApprovalKey', () => {
     return fetchMock;
   }
 
-  it('POSTs the exact owned scope with the internal key and returns only the binding', async () => {
+  it('POSTs the exact owned scope with the internal key and returns the binding and command', async () => {
     const key = 'b'.repeat(64);
-    const fetchMock = respond(new Response(JSON.stringify({ approvalKey: key })));
+    const fetchMock = respond(
+      new Response(JSON.stringify({ approvalKey: key, command: 'pnpm test' }))
+    );
 
-    await expect(readCloudAgentWidgetApprovalKey(input)).resolves.toBe(key);
+    await expect(readCloudAgentWidgetApprovalKey(input)).resolves.toEqual({
+      approvalKey: key,
+      command: 'pnpm test',
+    });
     expect(fetchMock).toHaveBeenCalledWith(
       'http://cloud-agent-next/internal/widgets/approval-key',
       expect.objectContaining({
@@ -1285,6 +1290,16 @@ describe('readCloudAgentWidgetApprovalKey', () => {
         body: JSON.stringify(input),
       })
     );
+  });
+
+  it('reads a newer Worker answer without a command as no command', async () => {
+    const key = 'b'.repeat(64);
+    respond(new Response(JSON.stringify({ approvalKey: key })));
+
+    await expect(readCloudAgentWidgetApprovalKey(input)).resolves.toEqual({
+      approvalKey: key,
+      command: null,
+    });
   });
 
   it('rejects a response that is not a lowercase SHA-256 binding', async () => {

@@ -150,6 +150,72 @@ describe('native on-device model client', () => {
     );
   });
 
+  it.each(['end', 'unknown', 'refusal'])(
+    'reports an empty %s completion instead of saving an empty answer',
+    async stop => {
+      const { bridge } = fakeBridge((native, emit) => {
+        emit({ id: native.id, kind: 'done', stop, usageSource: 'unavailable' });
+      });
+      expect(await failureKey(bridge)).toBe('modelChat.localModels.failed');
+    }
+  );
+
+  it('reports a whitespace-only completion instead of saving an empty answer', async () => {
+    const { bridge } = fakeBridge((native, emit) => {
+      emit({ id: native.id, kind: 'delta', text: ' \n ' });
+      emit({ id: native.id, kind: 'done', stop: 'end', usageSource: 'unavailable' });
+    });
+    expect(await failureKey(bridge)).toBe('modelChat.localModels.failed');
+  });
+
+  describe('when Foundation Models fails a token generation', () => {
+    const failsTokenGeneration = Object.assign(new Error('token_generation_failed'), {
+      code: 'token_generation_failed',
+    });
+
+    it.each(['token_generation_failed', 'empty_response'])(
+      'starts once more after %s before any text, and answers',
+      async reason => {
+        let attempt = 0;
+        const { bridge } = fakeBridge((native, emit) => {
+          attempt += 1;
+          if (attempt === 1) {
+            emit({ id: native.id, kind: 'error', reason });
+            throw Object.assign(new Error(reason), { code: reason });
+          }
+          answerWith({})(native, emit);
+        });
+        const answered = await events(bridge);
+        expect(answered[0]).toEqual({ kind: 'delta', text: 'abcdefg' });
+        expect(answered.at(-1)).toMatchObject({ kind: 'done', stop: 'end' });
+        const [first, second] = bridge.generate.mock.calls.map(([native]) => native.id);
+        expect(bridge.generate).toHaveBeenCalledTimes(2);
+        expect(second).not.toBe(first);
+      }
+    );
+
+    it('does not start again after text arrived', async () => {
+      const { bridge } = fakeBridge((native, emit) => {
+        emit({ id: native.id, kind: 'delta', text: 'Once upon' });
+        emit({ id: native.id, kind: 'error', reason: 'token_generation_failed' });
+        throw failsTokenGeneration;
+      });
+      const result = await collect(bridge);
+      expect(Either.isLeft(result) && result.left.reason).toBe('stream');
+      expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+        'modelChat.localModels.failed'
+      );
+      expect(bridge.generate).toHaveBeenCalledOnce();
+    });
+
+    it('shows the failure copy when the second attempt fails too', async () => {
+      const { bridge } = fakeBridge(() => {
+        throw failsTokenGeneration;
+      });
+      expect(await failureKey(bridge)).toBe('modelChat.localModels.failed');
+      expect(bridge.generate).toHaveBeenCalledTimes(2);
+    });
+  });
   it('cancels the native request when the stream is interrupted and emits no done', async () => {
     const running = Promise.withResolvers<undefined>();
     const { bridge, emit, listeners } = fakeBridge(

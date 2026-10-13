@@ -136,7 +136,10 @@
     "working": "Lanean",
     "yourOwnRepositories": "Zure biltegiak",
     "dismissed": "Baztertuta",
-    "agent": "Agentea"
+    "agent": "Agentea",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Aldaketak"
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -325,6 +328,7 @@
       "collapseFile": "Tolestu fitxategia",
       "expandFile": "Zabaldu fitxategia",
       "diffTooLarge": "Diferentziak handiegiak dira bistaratzeko.",
+      "noPreview": "Fitxategi honek ez du aurrebistarik",
       "openOnGitHub": "Ireki GitHub-en",
       "openDiffOnGitHub": "Ireki fitxategi honen diferentziak GitHub-en",
       "githubDiff": "GitHub-eko diferentziak"
@@ -831,7 +835,8 @@
       "kiloclaw": "KiloClaw-en jarduera",
       "balance": "Saldoari buruzko alertak",
       "security": "Antzemandako segurtasun-arazoak",
-      "spend": "Gastu-alertak"
+      "spend": "Gastu-alertak",
+      "followedSessions": "Jarraitutako saioak"
     },
     "category": {
       "chatMessagesSubtitle": "zure elkarrizketetako erantzunak",
@@ -2086,6 +2091,8 @@
       "title": "Saioa",
       "copyErrorDetails": "Kopiatu errorearen xehetasunak",
       "backToSessions": "Itzuli saioetara",
+      "follow": "Jarraitu blokeo-pantailan",
+      "unfollow": "Utzi blokeo-pantailan jarraitzeari",
       "couldNotLoad": "Ezin izan da saioa kargatu.",
       "failedToLoadDetails": "Ezin izan dira saioaren xehetasunak kargatu.",
       "failedToStopExecution": "Ezin izan da exekuzioa gelditu.",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "Saiatu berriro ingurunea kargatzen",
       "defaultEnvironment": "Ingurune lehenetsia",
       "environmentSummary": "{{commands}} komando · {{mcp}} MCP · {{skills}} trebetasun · {{agents}} agente",
-      "changes": "Aldaketak",
       "leaveChanges": "Utzi aldaketak",
       "commitAndPush": "Egin commit eta igo",
       "startSession": "Hasi saioa",
@@ -2260,8 +2266,8 @@
       "toolList": "zerrendatu",
       "toolPatch": "aplikatu adabakia",
       "toolTask": "zeregina",
-      "readTodos": "Irakurri zereginak",
-      "updateTodos": "Eguneratu zereginak",
+      "readTodos": "Irakurri plana",
+      "updateTodos": "Eguneratu plana",
       "linesBadge": "{{displayCount}} lerro",
       "filesBadge": "{{displayCount}} fitxategi",
       "matchesBadge": "{{displayCount}} bat etortze",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modelo ({{displayCount}})",
       "modelsCount_other": "Modeloak ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Ikusi aldaketak",
+      "asOf": "{{time}}(e)ko egoera",
+      "tooLarge": "Diferentzia hau handiegia da mugikorrean erakusteko.",
+      "empty": "Saio honetan ez dago fitxategi-aldaketarik oraindik."
     },
     "autoApprove": {
       "title": "Onespen automatikoa",
@@ -3163,6 +3175,8 @@
     "channelName": "Agente aktiboak",
     "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko.",
     "openSession": "Ireki",
+    "finished": "Amaituta",
+    "followFailed": "Ezin izan da agente hau blokeo-pantailan erakutsi.",
     "approveFailed": "Ezin izan da onartu. Sakatu $t(common.approve) berriro saiatzeko.",
     "checked": "Egiaztatuta",
     "lastKnown": "Azken egoera ezaguna",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "Zure zain",
     "nextScheduled": "Hurrengo programatuak",
     "answerNeeded": "Zure erantzunaren zain",
-    "waitingToRetry": "Berriro saiatzeko zain"
+    "waitingToRetry": "Berriro saiatzeko zain",
+    "step": {
+      "editing": "Editatzen",
+      "reading": "Irakurtzen",
+      "running": "Exekutatzen",
+      "searching": "Web bilaketa",
+      "thinking": "Hausnartzen"
+    },
+    "planOf": "etik",
+    "filesChanged": "fitxategiak aldatuta",
+    "finishedIn": "Amaituta",
+    "noActivityFor": "Jarduerarik gabe",
+    "prOpened": "Pull request irekita",
+    "permissionWants": "Exekutatu nahi du",
+    "failure": {
+      "provider": "Geldituta: hornitzailearen errorea",
+      "tool": "Geldituta: tresnaren errorea",
+      "cancelled": "Geldituta: bertan behera utzita",
+      "other": "GELDITUTA"
+    }
   },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "Ezin izan da txat-historia kargatu.",
       "new": "Txat berria",
-      "openHint": "Txata irekitzen du. Ezabatzeko, sakatu luze.",
       "deleteTitle": "Txat hau ezabatu?"
     },
+    "rename": {
+      "title": "Berrizendatu txata",
+      "accessibility": "Berrizendatu txata: {{title}}",
+      "openHint": "Txata irekitzen du. Berrizendatzeko edo ezabatzeko, sakatu luze."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Txataren xehetasunak",
+      "backend": "Atzeko zerbitzua",
+      "effortDefault": "Modeloaren lehenetsia",
+      "noCost": "Kosturik gabe",
+      "costUnknown": "Ezezaguna",
+      "costEstimatedNote": "Preziorik adierazi ez duten erantzunen kostua zerrendako prezioetan oinarrituta estimatu da.",
+      "costUnknownNote": "Ez da ezagutzen modelo honen preziorik.",
+      "costPartialNote": "Guztizko honek ez ditu barne hartzen prezio ezagunik ez duten modeloak.",
+      "localNote": "Gailuko modeloak gailu honetan exekutatzen dira. Ez dute kosturik ez gonbiten cachérik, eta haien token-kopuruak estimazioak izan daitezke.",
+      "countedSinceNote": "Txat hau erabilera erregistratzen hasi aurretik hasi zen. Guztizkoek ondorengo erantzunak soilik erakusten dituzte.",
+      "remoteServersOn": "Aktibatutako urruneko MCP zerbitzariak"
+    },
     "webSearch": {
       "title": "Bilatu sarean",
       "description": "Utzi txat honi informazio eguneratua bilatzen zure Kilo kontuaren bidez. Bilaketek zure hileko bilaketa-kuota erabiltzen dute.",
@@ -3238,7 +3288,6 @@
       "fieldName": "Erakusteko izena",
       "fieldUrl": "Zerbitzariaren URLa",
       "fieldUrlInvalid": "Sartu baliozko zerbitzari URLa.",
-      "fieldToken": "Bearer tokena (aukerakoa)",
       "enableServer": "Gaitu zerbitzari hau: {{name}}",
       "editServer": "Editatu zerbitzaria",
       "deleteServer": "Ezabatu zerbitzaria",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "{{count}} tresna",
       "serverUnreachable": "Ezin izan da zerbitzari honetara iritsi",
       "serverOff": "Zerbitzari hau desgaituta dago"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikazioa",
+      "authNone": "Saio-hasierarik gabe",
+      "authBearer": "Bearer tokena",
+      "authOAuth": "OAuth saio-hasiera",
+      "fieldToken": "Tokena",
+      "oauthHint": "Gorde ondoren, sakatu $t(modelChat.mcpOAuth.signIn) zerbitzarian, nabigatzailearekin saioa hasteko.",
+      "serverNeedsSignIn": "Hasi saioa zerbitzari hau erabiltzeko",
+      "signIn": "Hasi saioa",
+      "signInA11y": "Hasi saioa zerbitzari honetan: {{name}}",
+      "signInFailed": "Ezin izan da saioa hasi hemen: {{name}}. Saiatu berriro."
     },
     "backends": {
       "title": "Txaten atzeko zerbitzuak",
@@ -3412,6 +3473,9 @@
       "downloading": "Deskargatzen…",
       "downloadProgress": "Deskargatzen… %{{percent}}",
       "downloadFailed": "Deskarga ez da amaitu. Egiaztatu konexioa eta biltegiratze-toki librea, eta saiatu berriro."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Modelo honek arrazoiketa-ahalegina onartzen du"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play-k ez du bat datorren kreditu-paketerik itzuli.",
     "purchaseOwnedByAnotherAccount": "Apple Account honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan.",
     "purchaseOwnedByAnotherAccountPlay": "Google Play kontu honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan."
+  },
+  "todos": {
+    "saveAsTodo": "Gorde zeregin gisa",
+    "segment": {
+      "label": "Agenteen ikuspegia",
+      "sessions": "Saioak",
+      "todos": "Zereginak"
+    },
+    "lists": {
+      "newList": "Zerrenda berria",
+      "empty": "Oraindik ez dago zerrendarik",
+      "couldNotLoad": "Ezin izan dira zerrendak kargatu",
+      "noRepository": "Ez dago biltegirik",
+      "rowA11y": "{{name}} — {{openCount}}",
+      "openCount_one": "{{count}} irekita",
+      "openCount_other": "{{count}} irekita",
+      "archived_one": "Artxibatuta ({{count}})",
+      "archived_other": "Artxibatuta ({{count}})",
+      "archive": "Artxibatu",
+      "unarchive": "Desartxibatu",
+      "deleteTitle": "Ezabatu {{name}}?",
+      "deleteMessage": "Bere zereginak ere ezabatzen dira. Saioak mantendu egiten dira."
+    },
+    "listSettings": {
+      "title": "Zerrendaren ezarpenak",
+      "name": "Izena",
+      "namePlaceholder": "Akatsak, ideiak, argitalpena…",
+      "emoji": "Emojia",
+      "mode": "Modua",
+      "defaultsHint": "Zerrenda honetatik hasitako saioek balio lehenetsi hauek erabiltzen dituzte."
+    },
+    "list": {
+      "addPlaceholder": "Gehitu zeregin bat",
+      "add": "Zeregina gehitu",
+      "empty": "Oraindik ez dago zereginik",
+      "setDefaults": "Ezarri biltegia, modua eta eredua",
+      "completed_one": "Amaituta ({{count}})",
+      "completed_other": "Amaituta ({{count}})"
+    },
+    "item": {
+      "markDone": "Markatu eginda",
+      "markOpen": "Markatu eginda gabe",
+      "markDonePrompt": "Eginda markatu?",
+      "deleted": "Zeregina ezabatuta",
+      "undo": "Desegin",
+      "runCount_one": "{{count}} exekuzio",
+      "runCount_other": "{{count}} exekuzio",
+      "startNow": "Hasi berrikuspenik gabe",
+      "startNowHint": "Eduki sakatuta berrikuspenik gabe hasteko",
+      "titleLabel": "Zereginaren izenburua",
+      "notes": "Oharrak",
+      "notesPlaceholder": "Gehitu oharrak Markdown erabiliz",
+      "sessions": "Lotutako saioak",
+      "noSessions": "Oraindik ez dago saiorik",
+      "linkSession": "Lotu saioa",
+      "unlinkSession": "Kendu {{title}} esteka",
+      "linkFailed": "Ezin izan da saioa zereginarekin lotu"
+    },
+    "linkSession": {
+      "title": "Lotu saio bat",
+      "empty": "Ez dago azkenaldiko saiorik",
+      "emptyInRepository": "Ez dago azkenaldiko saiorik {{repository}} biltegian"
+    },
+    "upNext": "Hurrengoa",
+    "sessionTodo": "Zeregina: {{title}}",
+    "linkToTodo": "Lotu zereginarekin",
+    "candidates": {
+      "empty": "Ez dago zeregin irekirik"
+    },
+    "saveSheet": {
+      "title": "Gorde zerrendan",
+      "saved": "{{list}} zerrendan gordeta"
+    }
   }
 }

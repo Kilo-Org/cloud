@@ -210,6 +210,8 @@ vi.mock('expo-haptics', () => ({
 vi.mock('@/components/agents/mobile-session-manager', () => ({
   isCancelQueuedUpgradeRequired: vi.fn(),
 }));
+// The Follow control reads ActivityKit and the token graph; this suite renders none.
+vi.mock('@/components/agents/session-follow-button', () => ({ SessionFollowButton: () => null }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
@@ -517,6 +519,10 @@ vi.mock('@/lib/persist/use-draft-load', () => ({
 const organizations = vi.hoisted(() => [
   { organizationId: 'org-a', organizationName: 'Session organization' },
 ]);
+vi.mock('@/components/todos/session-todo-link', () => ({
+  SessionTodoChip: () => null,
+  SessionTodoLinkRow: () => null,
+}));
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {},
   useTRPC: () => ({
@@ -1470,13 +1476,13 @@ describe('session detail header right cluster', () => {
     expect(slot[0]?.props.className).toContain('shrink');
 
     // ...and the cluster inside it shrinks into that cap, so it can never paint
-    // past the slot edge. It holds the context pill and nothing else: the PR
-    // badge now shares the goal row instead.
+    // past the slot edge. It holds the Follow control and the context pill and
+    // nothing else: the PR badge now shares the goal row instead.
     const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
     expect(cluster?.props.className).toContain('min-w-0');
     expect(cluster?.props.className).toContain('shrink');
     expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
-    expect(cluster?.children).toHaveLength(1);
+    expect(cluster?.children).toHaveLength(2);
 
     // The pill is the flexible part of the cluster: it shrinks into the cap
     // with it, so the cluster can never paint past the slot edge.

@@ -11,7 +11,11 @@ import {
   deleteChat,
   listChats,
   moveChat,
+  NO_RECORD,
+  recordOfChat,
+  recordUsage,
   rememberChat,
+  renameChat,
   scopeOfChat,
   toolsOfSession,
   wipeChats,
@@ -24,10 +28,13 @@ import {
  * breaks this suite rather than passing against a copy that no longer matches.
  */
 
-const CHATS = readFileSync(
-  new URL('../../../drizzle/0001_safe_hellfire_club.sql', import.meta.url),
-  'utf8'
-);
+const CHATS = [
+  '0001_safe_hellfire_club.sql',
+  '0002_majestic_old_lace.sql',
+  '0003_quick_chat_titles.sql',
+]
+  .map(file => readFileSync(new URL(`../../../drizzle/${file}`, import.meta.url), 'utf8'))
+  .join('--> statement-breakpoint');
 
 const chatDatabase = (database: DatabaseSync): ChatDatabase => ({
   getAllSync: <T>(source: string, params: (string | number)[]) =>
@@ -153,6 +160,73 @@ describe('moveChat', () => {
     ]);
     expect(scopeOfChat(db, 'old')).toBeNull();
     expect(scopeOfChat(db, 'new')).toBe('me:personal');
+  });
+
+  it('keeps the name a person gave the chat', async () => {
+    await write(conversation('old', 'kilo/one', 'hello'));
+    await write(conversation('new', 'kilo/two', 'hello'));
+    rememberChat(db, { sessionId: 'old', scope: 'me:personal', at: 100 });
+    renameChat(db, 'old', 'Greetings');
+
+    moveChat(db, { from: 'old', to: 'new', at: 400 });
+
+    expect(listChats(db, 'me:personal')).toEqual([
+      { sessionId: 'new', model: 'kilo/two', title: 'Greetings', updatedAt: 400 },
+    ]);
+  });
+});
+
+describe('recordOfChat', () => {
+  const used = { inputTokens: 3, outputTokens: 4, cacheReadTokens: 90, cacheWriteTokens: 0 };
+
+  it('reads the start, the usage, and the SDK prompted count back', async () => {
+    await write(conversation('s1', 'kilo/one', 'hello'));
+    rememberChat(db, { sessionId: 's1', scope: 'me:personal', at: 100 });
+    recordUsage(db, 's1', { 'kilo/one': { ...used, cost: 0.01 } });
+
+    expect(recordOfChat(db, 's1')).toEqual({
+      createdAt: 100,
+      updatedAt: 100,
+      usage: { 'kilo/one': { ...used, cost: 0.01 } },
+      prompted: 10,
+      effort: null,
+    });
+  });
+
+  it('keeps the start and the usage when a model switch moves the chat', async () => {
+    await write(conversation('old', 'kilo/one', 'hello'));
+    await write(conversation('new', 'kilo/two', 'hello'));
+    rememberChat(db, { sessionId: 'old', scope: 'me:personal', at: 100 });
+    recordUsage(db, 'old', { 'kilo/one': used });
+
+    moveChat(db, { from: 'old', to: 'new', at: 400 });
+
+    expect(recordOfChat(db, 'new')).toMatchObject({
+      createdAt: 100,
+      updatedAt: 400,
+      usage: { 'kilo/one': used },
+    });
+  });
+
+  it('marks a chat that predates the count with no start', async () => {
+    await write(conversation('s1', 'kilo/one', 'hello'));
+    database
+      .prepare("insert into chats (session_id, scope, updated_at) values ('s1', 'me', 5)")
+      .run();
+
+    expect(recordOfChat(db, 's1')).toMatchObject({ createdAt: null, usage: {} });
+  });
+
+  it('reads a usage column it cannot parse as nothing used', async () => {
+    await write(conversation('s1', 'kilo/one', 'hello'));
+    rememberChat(db, { sessionId: 's1', scope: 'me:personal', at: 100 });
+    database.prepare('update chats set usage = \'{"kilo/one":{"inputTokens":-1}}\'').run();
+
+    expect(recordOfChat(db, 's1').usage).toEqual({});
+  });
+
+  it('answers no record for a chat that is not there', () => {
+    expect(recordOfChat(db, 'missing')).toBe(NO_RECORD);
   });
 });
 

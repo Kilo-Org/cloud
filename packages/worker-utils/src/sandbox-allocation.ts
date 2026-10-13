@@ -31,7 +31,7 @@ export const SELECTABLE_SANDBOX_ALLOCATIONS = [
 ] as const satisfies readonly SandboxAllocation[];
 
 /** Allocation auto-routed containers sessions run when the owner picks nothing. */
-export const CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION = 'cloudflare-containers-standard-4' as const;
+export const CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION = 'cloudflare-containers-standard-3' as const;
 
 /**
  * Native containers size for new sessions that would have used Cloudflare

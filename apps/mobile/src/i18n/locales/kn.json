@@ -136,7 +136,10 @@
     "working": "ಕೆಲಸ ಮಾಡುತ್ತಿದೆ",
     "yourOwnRepositories": "ನಿಮ್ಮ ಸ್ವಂತ ರೆಪೊಸಿಟರಿಗಳು",
     "dismissed": "ಕಡೆಗಣಿಸಲಾಗಿದೆ",
-    "agent": "ಏಜೆಂಟ್"
+    "agent": "ಏಜೆಂಟ್",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "ಬದಲಾವಣೆಗಳು"
   },
   "language": {
     "restarting": "ಆಯ್ಕೆ ಮಾಡಿದ ಭಾಷೆಯನ್ನು ಅನ್ವಯಿಸಲು ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",
@@ -325,6 +328,7 @@
       "collapseFile": "ಫೈಲ್ ಮಡಚಿ",
       "expandFile": "ಫೈಲ್ ವಿಸ್ತರಿಸಿ",
       "diffTooLarge": "ಬದಲಾವಣೆಗಳ ಹೋಲಿಕೆ ತುಂಬಾ ದೊಡ್ಡದಿರುವುದರಿಂದ ತೋರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+      "noPreview": "ಈ ಫೈಲ್‌ಗೆ ಪೂರ್ವವೀಕ್ಷಣೆ ಲಭ್ಯವಿಲ್ಲ",
       "openOnGitHub": "GitHubನಲ್ಲಿ ತೆರೆಯಿರಿ",
       "openDiffOnGitHub": "ಈ ಫೈಲ್‌ನ ಬದಲಾವಣೆಗಳ ಹೋಲಿಕೆಯನ್ನು GitHubನಲ್ಲಿ ತೆರೆಯಿರಿ",
       "githubDiff": "GitHubನಲ್ಲಿನ ಬದಲಾವಣೆಗಳ ಹೋಲಿಕೆ"
@@ -831,7 +835,8 @@
       "kiloclaw": "KiloClaw ಚಟುವಟಿಕೆ",
       "balance": "ಉಳಿಕೆ ಮೊತ್ತದ ಎಚ್ಚರಿಕೆಗಳು",
       "security": "ಪತ್ತೆಯಾದ ಭದ್ರತಾ ಸಮಸ್ಯೆಗಳು",
-      "spend": "ಖರ್ಚಿನ ಎಚ್ಚರಿಕೆಗಳು"
+      "spend": "ಖರ್ಚಿನ ಎಚ್ಚರಿಕೆಗಳು",
+      "followedSessions": "ಅನುಸರಿಸಿದ ಸೆಷನ್‌ಗಳು"
     },
     "category": {
       "chatMessagesSubtitle": "ನಿಮ್ಮ ಸಂಭಾಷಣೆಗಳಲ್ಲಿನ ಉತ್ತರಗಳು",
@@ -2086,6 +2091,8 @@
       "title": "ಸೆಶನ್",
       "copyErrorDetails": "ದೋಷ ವಿವರಗಳನ್ನು ನಕಲಿಸಿ",
       "backToSessions": "ಸೆಶನ್‌ಗಳಿಗೆ ಹಿಂತಿರುಗಿ",
+      "follow": "ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ಅನುಸರಿಸಿ",
+      "unfollow": "ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ಅನುಸರಿಸುವುದನ್ನು ನಿಲ್ಲಿಸಿ",
       "couldNotLoad": "ಸೆಶನ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "failedToLoadDetails": "ಸೆಶನ್ ವಿವರಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "failedToStopExecution": "ಕಾರ್ಯನಿರ್ವಹಣೆಯನ್ನು ನಿಲ್ಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "ಪರಿಸರವನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "defaultEnvironment": "ಡೀಫಾಲ್ಟ್ ಪರಿಸರ",
       "environmentSummary": "{{commands}} ಆಜ್ಞೆಗಳು · {{mcp}} MCP · {{skills}} ಕೌಶಲ್ಯಗಳು · {{agents}} ಏಜೆಂಟ್‌ಗಳು",
-      "changes": "ಬದಲಾವಣೆಗಳು",
       "leaveChanges": "ಹಾಗೆಯೇ ಬಿಡಿ",
       "commitAndPush": "ಕಮಿಟ್ ಮಾಡಿ, ಪುಶ್ ಮಾಡಿ",
       "startSession": "ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ",
@@ -2260,8 +2266,8 @@
       "toolList": "ಪಟ್ಟಿ ಮಾಡಿ",
       "toolPatch": "ತಿದ್ದುಪಡಿ ಮಾಡಿ",
       "toolTask": "ಕಾರ್ಯ",
-      "readTodos": "ಕಾರ್ಯಪಟ್ಟಿಯನ್ನು ಓದಿ",
-      "updateTodos": "ಕಾರ್ಯಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ",
+      "readTodos": "ಯೋಜನೆಯನ್ನು ಓದಿ",
+      "updateTodos": "ಯೋಜನೆಯನ್ನು ನವೀಕರಿಸಿ",
       "linesBadge": "{{displayCount}} ಸಾಲುಗಳು",
       "filesBadge": "{{displayCount}} ಫೈಲ್‌ಗಳು",
       "matchesBadge": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "ಮಾದರಿ ({{displayCount}})",
       "modelsCount_other": "ಮಾದರಿಗಳು ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ಬದಲಾವಣೆಗಳನ್ನು ವೀಕ್ಷಿಸಿ",
+      "asOf": "{{time}} ರ ಪ್ರಕಾರ",
+      "tooLarge": "ಈ ಬದಲಾವಣೆಗಳ ಹೋಲಿಕೆ ಮೊಬೈಲ್‌ನಲ್ಲಿ ತೋರಿಸಲು ತುಂಬಾ ದೊಡ್ಡದಾಗಿದೆ.",
+      "empty": "ಈ ಸೆಷನ್‌ನಲ್ಲಿ ಇನ್ನೂ ಯಾವುದೇ ಫೈಲ್ ಬದಲಾವಣೆಗಳಿಲ್ಲ."
     },
     "autoApprove": {
       "title": "ಸ್ವಯಂ ಅನುಮೋದನೆ",
@@ -3163,6 +3175,8 @@
     "channelName": "ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳು",
     "activityKitDisabledBody": "ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳನ್ನು ನೋಡಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಲೈವ್ ಚಟುವಟಿಕೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ.",
     "openSession": "ತೆರೆಯಿರಿ",
+    "finished": "ಪೂರ್ಣಗೊಂಡಿದೆ",
+    "followFailed": "ಈ ಏಜೆಂಟ್ ಅನ್ನು ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ತೋರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "approveFailed": "ಅನುಮೋದಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು $t(common.approve) ಟ್ಯಾಪ್ ಮಾಡಿ.",
     "checked": "ಪರಿಶೀಲಿಸಲಾಗಿದೆ",
     "lastKnown": "ಕೊನೆಯದಾಗಿ ತಿಳಿದ ಸ್ಥಿತಿ",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "ನಿಮಗಾಗಿ ಕಾಯುತ್ತಿದೆ",
     "nextScheduled": "ಮುಂದಿನ ನಿಗದಿತ ಕಾರ್ಯಗಳು",
     "answerNeeded": "ಉತ್ತರ ಅಗತ್ಯ",
-    "waitingToRetry": "ಮರುಪ್ರಯತ್ನಕ್ಕಾಗಿ ಕಾಯುತ್ತಿದೆ"
+    "waitingToRetry": "ಮರುಪ್ರಯತ್ನಕ್ಕಾಗಿ ಕಾಯುತ್ತಿದೆ",
+    "step": {
+      "editing": "ಸಂಪಾದಿಸುತ್ತಿದೆ",
+      "reading": "ಓದುತ್ತಿದೆ",
+      "running": "ರನ್",
+      "searching": "ವೆಬ್ ಹುಡುಕಾಟ",
+      "thinking": "ಆಲೋಚಿಸುತ್ತಿದೆ"
+    },
+    "planOf": "ರಲ್ಲಿ",
+    "filesChanged": "ಫೈಲ್‌ಗಳು ಬದಲಾಗಿವೆ",
+    "finishedIn": "ಮುಗಿಯಿತು",
+    "noActivityFor": "ಚಟುವಟಿಕೆ ಇಲ್ಲ",
+    "prOpened": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಲಾಗಿದೆ",
+    "permissionWants": "ರನ್ ಮಾಡಲು ಬಯಸುತ್ತದೆ",
+    "failure": {
+      "provider": "ನಿಂತಿದೆ: ಪೂರೈಕೆದಾರ ದೋಷ",
+      "tool": "ನಿಂತಿದೆ: ಉಪಕರಣ ದೋಷ",
+      "cancelled": "ನಿಂತಿದೆ: ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ",
+      "other": "ನಿಲ್ಲಿಸಲಾಗಿದೆ"
+    }
   },
   "transcriptionModel": {
     "title": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಮಾದರಿ",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "ಚಾಟ್ ಇತಿಹಾಸವನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "new": "ಹೊಸ ಚಾಟ್",
-      "openHint": "ಚಾಟ್ ತೆರೆಯುತ್ತದೆ. ಅಳಿಸಲು ದೀರ್ಘವಾಗಿ ಒತ್ತಿರಿ.",
       "deleteTitle": "ಈ ಚಾಟ್ ಅಳಿಸಬೇಕೇ?"
     },
+    "rename": {
+      "title": "ಚಾಟ್ ಹೆಸರು ಬದಲಿಸಿ",
+      "accessibility": "{{title}} ಚಾಟ್‌ನ ಹೆಸರು ಬದಲಿಸಿ",
+      "openHint": "ಚಾಟ್ ತೆರೆಯುತ್ತದೆ. ಹೆಸರು ಬದಲಿಸಲು ಅಥವಾ ಅಳಿಸಲು ದೀರ್ಘವಾಗಿ ಒತ್ತಿರಿ."
+    },
     "beta": "ಬೀಟಾ",
+    "details": {
+      "title": "ಚಾಟ್ ವಿವರಗಳು",
+      "backend": "ಬ್ಯಾಕೆಂಡ್",
+      "effortDefault": "ಮಾದರಿಯ ಪೂರ್ವನಿಯೋಜಿತ",
+      "noCost": "ವೆಚ್ಚವಿಲ್ಲ",
+      "costUnknown": "ತಿಳಿದಿಲ್ಲ",
+      "costEstimatedNote": "ಬೆಲೆ ವರದಿ ಮಾಡದ ಉತ್ತರಗಳ ವೆಚ್ಚವನ್ನು ಪಟ್ಟಿ ಬೆಲೆಗಳಿಂದ ಅಂದಾಜಿಸಲಾಗಿದೆ.",
+      "costUnknownNote": "ಈ ಮಾದರಿಗೆ ಯಾವುದೇ ಬೆಲೆ ತಿಳಿದಿಲ್ಲ.",
+      "costPartialNote": "ಈ ಒಟ್ಟು ಮೊತ್ತದಲ್ಲಿ ಬೆಲೆ ತಿಳಿದಿಲ್ಲದ ಮಾದರಿಗಳು ಸೇರಿಲ್ಲ.",
+      "localNote": "ಸಾಧನದಲ್ಲಿನ ಮಾದರಿಗಳು ಈ ಸಾಧನದಲ್ಲೇ ಚಲಿಸುತ್ತವೆ. ಅವುಗಳಿಗೆ ವೆಚ್ಚವಿಲ್ಲ ಮತ್ತು ಪ್ರಾಂಪ್ಟ್ ಕ್ಯಾಶ್ ಇಲ್ಲ, ಹಾಗೂ ಅವುಗಳ ಟೋಕನ್ ಎಣಿಕೆಗಳು ಅಂದಾಜುಗಳಾಗಿರಬಹುದು.",
+      "countedSinceNote": "ಬಳಕೆಯನ್ನು ದಾಖಲಿಸುವ ಮೊದಲೇ ಈ ಚಾಟ್ ಪ್ರಾರಂಭವಾಗಿದೆ. ಒಟ್ಟು ಮೊತ್ತಗಳು ಅದರ ನಂತರದ ಉತ್ತರಗಳನ್ನು ಮಾತ್ರ ತೋರಿಸುತ್ತವೆ.",
+      "remoteServersOn": "ಸಕ್ರಿಯ ರಿಮೋಟ್ MCP ಸರ್ವರ್‌ಗಳು"
+    },
     "webSearch": {
       "title": "ವೆಬ್‌ನಲ್ಲಿ ಹುಡುಕಿ",
       "description": "ನಿಮ್ಮ Kilo ಖಾತೆಯ ಮೂಲಕ ಪ್ರಸ್ತುತ ಮಾಹಿತಿಯನ್ನು ಹುಡುಕಲು ಈ ಚಾಟ್‌ಗೆ ಅವಕಾಶ ನೀಡಿ. ಹುಡುಕಾಟಗಳು ನಿಮ್ಮ ಮಾಸಿಕ ಹುಡುಕಾಟ ಮಿತಿಯನ್ನು ಬಳಸುತ್ತವೆ.",
@@ -3238,7 +3288,6 @@
       "fieldName": "ಪ್ರದರ್ಶಿತ ಹೆಸರು",
       "fieldUrl": "ಸರ್ವರ್ URL",
       "fieldUrlInvalid": "ಮಾನ್ಯ ಸರ್ವರ್ URL ನಮೂದಿಸಿ.",
-      "fieldToken": "Bearer ಟೋಕನ್ (ಐಚ್ಛಿಕ)",
       "enableServer": "ಈ ಸರ್ವರ್ ಸಕ್ರಿಯಗೊಳಿಸಿ: {{name}}",
       "editServer": "ಸರ್ವರ್ ಸಂಪಾದಿಸಿ",
       "deleteServer": "ಸರ್ವರ್ ಅಳಿಸಿ",
@@ -3258,6 +3307,18 @@
       "serverToolCount": "{{count}} ಸಾಧನಗಳು",
       "serverUnreachable": "ಈ ಸರ್ವರ್ ತಲುಪಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "serverOff": "ಈ ಸರ್ವರ್ ಆಫ್ ಆಗಿದೆ"
+    },
+    "mcpOAuth": {
+      "authMethod": "ದೃಢೀಕರಣ",
+      "authNone": "ಸೈನ್ ಇನ್ ಇಲ್ಲ",
+      "authBearer": "Bearer ಟೋಕನ್",
+      "authOAuth": "OAuth ಸೈನ್ ಇನ್",
+      "fieldToken": "ಟೋಕನ್",
+      "oauthHint": "ಉಳಿಸಿದ ನಂತರ, ನಿಮ್ಮ ಬ್ರೌಸರ್ ಮೂಲಕ ಸೈನ್ ಇನ್ ಮಾಡಲು ಸರ್ವರ್‌ನಲ್ಲಿ $t(modelChat.mcpOAuth.signIn) ಟ್ಯಾಪ್ ಮಾಡಿ.",
+      "serverNeedsSignIn": "ಈ ಸರ್ವರ್ ಬಳಸಲು ಸೈನ್ ಇನ್ ಮಾಡಿ",
+      "signIn": "ಸೈನ್ ಇನ್",
+      "signInA11y": "ಈ ಸರ್ವರ್‌ಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿ: {{name}}",
+      "signInFailed": "{{name}} ಗೆ ಸೈನ್ ಇನ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
     "backends": {
       "title": "ಚಾಟ್ ಬ್ಯಾಕೆಂಡ್‌ಗಳು",
@@ -3412,6 +3473,9 @@
       "downloading": "ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
       "downloadProgress": "ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ… {{percent}}%",
       "downloadFailed": "ಡೌನ್‌ಲೋಡ್ ಪೂರ್ಣಗೊಳ್ಳಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕ ಮತ್ತು ಖಾಲಿ ಸಂಗ್ರಹಣೆಯನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ಈ ಮಾದರಿ ಯೋಚನೆಯ ಮಟ್ಟವನ್ನು ಬೆಂಬಲಿಸುತ್ತದೆ"
     }
   },
   "settingsTools": {
@@ -3634,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play ಯಾವುದೇ ಹೊಂದಿಕೆಯಾಗುವ ಕ್ರೆಡಿಟ್ ಪ್ಯಾಕ್ಗಳನ್ನು ಹಿಂತಿರುಗಿಸಲಿಲ್ಲ.",
     "purchaseOwnedByAnotherAccount": "ಈ Apple Account ನಲ್ಲಿನ ಕ್ರೆಡಿಟ್ಗಳು ಬೇರೆ Kilo ಖಾತೆಗೆ ಸೇರಿವೆ. ಅವನ್ನು ಬಳಸಲು ಆ Kilo ಖಾತೆಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿ.",
     "purchaseOwnedByAnotherAccountPlay": "ಈ Google Play ಖಾತೆಯಲ್ಲಿನ ಕ್ರೆಡಿಟ್ಗಳು ಬೇರೆ Kilo ಖಾತೆಗೆ ಸೇರಿವೆ. ಅವನ್ನು ಬಳಸಲು ಆ Kilo ಖಾತೆಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿ."
+  },
+  "todos": {
+    "saveAsTodo": "ಕಾರ್ಯವಾಗಿ ಉಳಿಸಿ",
+    "segment": {
+      "label": "ಏಜೆಂಟ್ ವೀಕ್ಷಣೆ",
+      "sessions": "ಸೆಶನ್‌ಗಳು",
+      "todos": "ಕಾರ್ಯಗಳು"
+    },
+    "lists": {
+      "newList": "ಹೊಸ ಪಟ್ಟಿ",
+      "empty": "ಇನ್ನೂ ಯಾವುದೇ ಪಟ್ಟಿಗಳಿಲ್ಲ",
+      "couldNotLoad": "ಪಟ್ಟಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+      "noRepository": "ರೆಪೊಸಿಟರಿ ಇಲ್ಲ",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} ತೆರೆದಿವೆ",
+      "openCount_other": "{{count}} ತೆರೆದಿವೆ",
+      "archived_one": "ಆರ್ಕೈವ್ ಮಾಡಲಾಗಿದೆ ({{count}})",
+      "archived_other": "ಆರ್ಕೈವ್ ಮಾಡಲಾಗಿದೆ ({{count}})",
+      "archive": "ಆರ್ಕೈವ್ ಮಾಡಿ",
+      "unarchive": "ಆರ್ಕೈವ್‌ನಿಂದ ಹಿಂತಿರುಗಿಸಿ",
+      "deleteTitle": "{{name}} ಅಳಿಸಬೇಕೆ?",
+      "deleteMessage": "ಅದರ ಕಾರ್ಯಗಳೂ ಅಳಿಸಲ್ಪಡುತ್ತವೆ. ಸೆಶನ್‌ಗಳು ಉಳಿಯುತ್ತವೆ."
+    },
+    "listSettings": {
+      "title": "ಪಟ್ಟಿ ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
+      "name": "ಹೆಸರು",
+      "namePlaceholder": "ದೋಷಗಳು, ಕಲ್ಪನೆಗಳು, ಬಿಡುಗಡೆ…",
+      "emoji": "ಎಮೋಜಿ",
+      "mode": "ಮೋಡ್",
+      "defaultsHint": "ಈ ಪಟ್ಟಿಯಿಂದ ಪ್ರಾರಂಭಿಸಿದ ಸೆಶನ್‌ಗಳು ಈ ಡೀಫಾಲ್ಟ್‌ಗಳನ್ನು ಬಳಸುತ್ತವೆ."
+    },
+    "list": {
+      "addPlaceholder": "ಹೊಸ ಕಾರ್ಯ",
+      "add": "ಕಾರ್ಯ ಸೇರಿಸಿ",
+      "empty": "ಇನ್ನೂ ಯಾವುದೇ ಕಾರ್ಯಗಳಿಲ್ಲ",
+      "setDefaults": "ರೆಪೊಸಿಟರಿ, ಮೋಡ್ ಮತ್ತು ಮಾದರಿ ಹೊಂದಿಸಿ",
+      "completed_one": "ಪೂರ್ಣಗೊಂಡಿದೆ ({{count}})",
+      "completed_other": "ಪೂರ್ಣಗೊಂಡಿದೆ ({{count}})"
+    },
+    "item": {
+      "markDone": "ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸಿ",
+      "markOpen": "ಮುಗಿದಿಲ್ಲ ಎಂದು ಗುರುತಿಸಿ",
+      "markDonePrompt": "ಮುಗಿದಿದೆ ಎಂದು ಗುರುತಿಸುವುದೇ?",
+      "deleted": "ಕಾರ್ಯ ಅಳಿಸಲಾಗಿದೆ",
+      "undo": "ರದ್ದುಗೊಳಿಸಿ",
+      "runCount_one": "{{count}} ಚಾಲನೆ",
+      "runCount_other": "{{count}} ಚಾಲನೆ",
+      "startNow": "ಪರಿಶೀಲನೆ ಇಲ್ಲದೆ ಪ್ರಾರಂಭಿಸಿ",
+      "startNowHint": "ಪರಿಶೀಲನೆ ಇಲ್ಲದೆ ಪ್ರಾರಂಭಿಸಲು ಒತ್ತಿ ಹಿಡಿಯಿರಿ",
+      "titleLabel": "ಕಾರ್ಯದ ಶೀರ್ಷಿಕೆ",
+      "notes": "ಟಿಪ್ಪಣಿಗಳು",
+      "notesPlaceholder": "Markdown ನಲ್ಲಿ ಟಿಪ್ಪಣಿಗಳನ್ನು ಸೇರಿಸಿ",
+      "sessions": "ಸಂಪರ್ಕಿತ ಸೆಶನ್‌ಗಳು",
+      "noSessions": "ಇನ್ನೂ ಯಾವುದೇ ಸೆಶನ್‌ಗಳಿಲ್ಲ",
+      "linkSession": "ಸೆಶನ್ ಲಿಂಕ್ ಮಾಡಿ",
+      "unlinkSession": "{{title}} ಸಂಪರ್ಕ ಕಡಿತಗೊಳಿಸಿ",
+      "linkFailed": "ಸೆಶನ್ ಅನ್ನು ಕಾರ್ಯಕ್ಕೆ ಲಿಂಕ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
+    },
+    "linkSession": {
+      "title": "ಸೆಶನ್ ಆಯ್ಕೆಮಾಡಿ",
+      "empty": "ಇತ್ತೀಚಿನ ಸೆಶನ್‌ಗಳಿಲ್ಲ",
+      "emptyInRepository": "{{repository}} ನಲ್ಲಿ ಇತ್ತೀಚಿನ ಸೆಶನ್‌ಗಳಿಲ್ಲ"
+    },
+    "upNext": "ಮುಂದಿನದು",
+    "sessionTodo": "ಕಾರ್ಯ: {{title}}",
+    "linkToTodo": "ಕಾರ್ಯಕ್ಕೆ ಲಿಂಕ್ ಮಾಡಿ",
+    "candidates": {
+      "empty": "ಯಾವುದೇ ತೆರೆದ ಕಾರ್ಯಗಳಿಲ್ಲ"
+    },
+    "saveSheet": {
+      "title": "ಪಟ್ಟಿಗೆ ಉಳಿಸಿ",
+      "saved": "{{list}} ಪಟ್ಟಿಗೆ ಉಳಿಸಲಾಗಿದೆ"
+    }
   }
 }

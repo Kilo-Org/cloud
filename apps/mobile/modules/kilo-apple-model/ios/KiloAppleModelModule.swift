@@ -619,6 +619,14 @@ private actor AppleModelEngine {
       default: return "generation_failed"
       }
     }
+    // Foundation Models reports a failed token generation as a bare NSError, not
+    // as a GenerationError case. It is transient, so JavaScript can try again.
+    let failure = error as NSError
+    if failure.domain == "FoundationModels.LanguageModelSession.GenerationError",
+       let underlying = failure.userInfo[NSMultipleUnderlyingErrorsKey] as? [NSError],
+       underlying.contains(where: { $0.domain == "com.apple.tokengeneration" && $0.code == 10 }) {
+      return "token_generation_failed"
+    }
     // Never expose a provider exception's debugDescription, prompt, or output.
     return "generation_failed"
   }

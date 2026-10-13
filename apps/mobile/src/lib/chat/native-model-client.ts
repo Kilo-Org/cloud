@@ -66,7 +66,9 @@ export type NativeModelBridge = {
 };
 
 /** A generation that asked for tools and waits, between two harness rounds, for their results. */
-type ToolLoop = { waiting?: { readonly id: string; readonly calls: readonly string[] } };
+type ToolLoop = {
+  waiting?: { readonly id: string; readonly calls: readonly string[]; readonly hasText: boolean };
+};
 
 /** One native module and the tool round it may hold open. */
 type Provider = { readonly bridge: NativeModelBridge; readonly loop: ToolLoop };
@@ -142,6 +144,7 @@ function answer(
         ? { id: waiting.id, results }
         : undefined;
     let id = resumption?.id ?? native.id;
+    const hasPreviousText = resumption !== undefined && waiting?.hasText === true;
     // `running` is the only state that owns a live native inference. `waiting`
     // hands it to the next round, which answers its tool calls. `retrying`
     // waits for the failed attempt to settle before a fresh one starts.
@@ -151,7 +154,7 @@ function answer(
     let retries = resumption === undefined ? 1 : 0;
     const fail = (reason: string | undefined) => {
       state = 'over';
-      void emit.fail(nativeModelFailure(reason, output !== ''));
+      void emit.fail(nativeModelFailure(reason, hasPreviousText || output !== ''));
     };
     const failOrRetry = (reason: string | undefined) => {
       if (
@@ -166,7 +169,7 @@ function answer(
       }
     };
     const finish = async (done: Extract<NativeModelEvent, { kind: 'done' }>) => {
-      if (output.trim() === '') {
+      if (!hasPreviousText && output.trim() === '') {
         fail('empty_response');
         return;
       }
@@ -189,7 +192,11 @@ function answer(
     // The round ends here; the native generation waits for the next round's results.
     const pause = async (calls: readonly NativeToolCall[]) => {
       state = 'waiting';
-      loop.waiting = { id, calls: calls.map(call => call.id) };
+      loop.waiting = {
+        id,
+        calls: calls.map(call => call.id),
+        hasText: hasPreviousText || output.trim() !== '',
+      };
       output += calls.map(call => call.name + call.arguments).join('');
       await emit.chunk(
         Chunk.fromIterable(

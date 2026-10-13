@@ -1,6 +1,6 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { app_builder_feedback } from '@kilocode/db/schema';
 import { inArray, eq } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';

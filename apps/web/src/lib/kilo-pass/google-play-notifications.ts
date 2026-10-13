@@ -52,6 +52,7 @@ import {
   STORE_FULL_MILLIUNITS,
 } from '@/lib/credits/store-refund';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
+import { creditRefundAdjustment } from '@kilocode/web-shared/lib/credit-refund';
 import { reconcileGooglePlaySubscriptionState } from './google-play-subscription-state';
 
 type DbOrTx = DrizzleTransaction | typeof db;
@@ -309,6 +310,7 @@ async function insertCreditReversal(
     isFree: boolean;
     description: string;
     creditCategory: string;
+    originalTransactionId: string;
     originalBaselineMicrodollarsUsed: number;
   }
 ): Promise<{ wasInserted: boolean; creditTransactionId: string | null }> {
@@ -322,6 +324,8 @@ async function insertCreditReversal(
       is_free: params.isFree,
       description: params.description,
       credit_category: params.creditCategory,
+      refund_for_transaction_id: params.originalTransactionId,
+      created_at: new Date().toISOString(),
       check_category_uniqueness: true,
       original_baseline_microdollars_used: params.originalBaselineMicrodollarsUsed,
     })
@@ -441,6 +445,7 @@ async function reverseGooglePlayRefundCredits(
 
   const issuedItems: {
     itemId: string;
+    creditTransactionId: string;
     kind: KiloPassIssuanceItemKind;
     amountMicrodollars: number;
     isFree: boolean;
@@ -449,6 +454,7 @@ async function reverseGooglePlayRefundCredits(
   if (ownedBaseCredit) {
     issuedItems.push({
       itemId: ownedBaseCredit.creditTransactionId,
+      creditTransactionId: ownedBaseCredit.creditTransactionId,
       kind: KiloPassIssuanceItemKind.Base,
       amountMicrodollars: ownedBaseCredit.amountMicrodollars,
       isFree: ownedBaseCredit.isFree,
@@ -485,6 +491,7 @@ async function reverseGooglePlayRefundCredits(
       const bonusItems = await tx
         .select({
           itemId: kilo_pass_issuance_items.id,
+          creditTransactionId: credit_transactions.id,
           kind: kilo_pass_issuance_items.kind,
           amountMicrodollars: credit_transactions.amount_microdollars,
           isFree: credit_transactions.is_free,
@@ -515,15 +522,20 @@ async function reverseGooglePlayRefundCredits(
     // full charge to the customer and reverses its own commission, so clawing
     // back the store price would leave a customer who spent nothing at minus the
     // store margin.
-    const reversalAmountMicrodollars = item.amountMicrodollars;
+    const reversalAmountMicrodollars = -(await creditRefundAdjustment(
+      tx,
+      item.creditTransactionId,
+      -item.amountMicrodollars
+    ));
 
-    if (reversalAmountMicrodollars <= 0) {
+    if (item.amountMicrodollars <= 0) {
       continue;
     }
 
     const reversal = await insertCreditReversal(tx, {
       kiloUserId: storePurchase.kilo_user_id,
       amountMicrodollars: reversalAmountMicrodollars,
+      originalTransactionId: item.creditTransactionId,
       isFree: item.isFree,
       description: getGooglePlayRefundReversalDescription(item.kind),
       creditCategory: `kilo-pass-store-refund:${KiloPassPaymentProvider.GooglePlay}:${providerTransactionId}:${item.kind}:${item.itemId}`,

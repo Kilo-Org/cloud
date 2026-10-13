@@ -151,6 +151,10 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
     Newly issued paid base credits MUST expire one UTC calendar year after issuance, including organization base
     grants and supplements. February 29 MUST clamp to February 28 in the following year. Existing credit rows and
     their expiration dates MUST remain unchanged; replaying an issuance MUST NOT renew its expiration.
+    Refund adjustments MUST retain a link to their grant. Expiration MUST remove only unused, unrefunded value,
+    while preserving consumption already attributed before a refund so another grant cannot claim it again.
+    Refunds after expiration MUST NOT deduct expired value again. Reversals MUST preserve the original deadline;
+    after expiration they MAY restore clawed-back consumed value but MUST NOT reinstate expired unused value.
 12. A successful qualifying base grant MUST overwrite the user-global threshold with the lesser of cumulative user
     usage plus the configured monthly base amount and total acquired credits after the grant. This keeps the effective
     threshold reachable when the pre-grant balance is negative. The threshold belongs to the user, not to one

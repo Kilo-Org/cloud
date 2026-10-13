@@ -238,6 +238,7 @@ describe('recomputeUserBalances', () => {
           description: null,
           is_free: true,
           original_transaction_id: null,
+          refund_for_transaction_id: null,
         },
       ],
     });
@@ -270,6 +271,7 @@ describe('recomputeUserBalances', () => {
           description: null,
           is_free: true,
           original_transaction_id: null,
+          refund_for_transaction_id: null,
         },
       ],
     });
@@ -302,6 +304,7 @@ describe('recomputeUserBalances', () => {
           description: 'Purchase',
           is_free: false,
           original_transaction_id: null,
+          refund_for_transaction_id: null,
         },
       ],
     });
@@ -356,6 +359,7 @@ describe('recomputeUserBalances', () => {
           description: 'Grant A',
           is_free: true,
           original_transaction_id: null,
+          refund_for_transaction_id: null,
         },
         {
           id: 'grant-b',
@@ -367,6 +371,7 @@ describe('recomputeUserBalances', () => {
           description: 'Grant B',
           is_free: true,
           original_transaction_id: null,
+          refund_for_transaction_id: null,
         },
         {
           id: 'exp-a',
@@ -378,6 +383,7 @@ describe('recomputeUserBalances', () => {
           description: 'Expired: Grant A',
           is_free: true,
           original_transaction_id: 'grant-a',
+          refund_for_transaction_id: null,
         },
         {
           id: 'exp-b',
@@ -389,6 +395,7 @@ describe('recomputeUserBalances', () => {
           description: 'Expired: Grant B',
           is_free: true,
           original_transaction_id: 'grant-b',
+          refund_for_transaction_id: null,
         },
         {
           id: 'grant-c',
@@ -400,6 +407,7 @@ describe('recomputeUserBalances', () => {
           description: 'Grant C',
           is_free: true,
           original_transaction_id: null,
+          refund_for_transaction_id: null,
         },
         {
           id: 'grant-d',
@@ -411,6 +419,7 @@ describe('recomputeUserBalances', () => {
           description: 'Grant D',
           is_free: true,
           original_transaction_id: null,
+          refund_for_transaction_id: null,
         },
       ],
     });
@@ -554,6 +563,7 @@ describe('recomputeUserBalances', () => {
           description: 'Purchase',
           is_free: false,
           original_transaction_id: null,
+          refund_for_transaction_id: null,
         },
       ],
     });

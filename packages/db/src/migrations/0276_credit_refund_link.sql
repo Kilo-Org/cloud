@@ -1,0 +1,1 @@
+ALTER TABLE "credit_transactions" ADD COLUMN "refund_for_transaction_id" uuid;

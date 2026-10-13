@@ -25,6 +25,8 @@ import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
+import { creditRefundAdjustment } from '@kilocode/web-shared/lib/credit-refund';
+import { paidCreditExpiration } from '@kilocode/web-shared/lib/paid-credit-expiration';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -204,20 +206,32 @@ async function insertCreditTransactionAdjustment(
     amountMicrodollars: number;
     description: string;
     creditCategory: string;
+    originalTransactionId?: string;
     originalBaselineMicrodollarsUsed: number;
     isFree?: boolean;
   }
 ): Promise<{ wasInserted: boolean; creditTransactionId: string | null }> {
   const creditTransactionId = crypto.randomUUID();
+  const amountMicrodollars = params.originalTransactionId
+    ? await creditRefundAdjustment(tx, params.originalTransactionId, params.amountMicrodollars)
+    : params.amountMicrodollars;
+  const expiryDate =
+    amountMicrodollars > 0 && !params.isFree ? paidCreditExpiration().toISOString() : null;
   const insertResult = await tx
     .insert(credit_transactions)
     .values({
       id: creditTransactionId,
       kilo_user_id: params.kiloUserId,
-      amount_microdollars: params.amountMicrodollars,
+      amount_microdollars: amountMicrodollars,
       is_free: params.isFree ?? false,
       description: params.description,
       credit_category: params.creditCategory,
+      refund_for_transaction_id: params.originalTransactionId,
+      created_at: new Date().toISOString(),
+      expiry_date: expiryDate,
+      expiration_baseline_microdollars_used: expiryDate
+        ? params.originalBaselineMicrodollarsUsed
+        : null,
       check_category_uniqueness: true,
       original_baseline_microdollars_used: params.originalBaselineMicrodollarsUsed,
     })
@@ -240,7 +254,10 @@ async function insertCreditTransactionAdjustment(
   await tx
     .update(kilocode_users)
     .set({
-      total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${params.amountMicrodollars}`,
+      total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${amountMicrodollars}`,
+      ...(expiryDate && {
+        next_credit_expiration_at: sql`LEAST(${kilocode_users.next_credit_expiration_at}, ${expiryDate}::timestamptz)`,
+      }),
     })
     .where(eq(kilocode_users.id, params.kiloUserId));
 
@@ -344,6 +361,7 @@ async function resetIssuanceItemsForStoreUpgrade(
   const bonusItems = await tx
     .select({
       itemId: kilo_pass_issuance_items.id,
+      creditTransactionId: credit_transactions.id,
       kind: kilo_pass_issuance_items.kind,
       amountMicrodollars: credit_transactions.amount_microdollars,
     })
@@ -371,6 +389,7 @@ async function resetIssuanceItemsForStoreUpgrade(
     const reversal = await insertCreditTransactionAdjustment(tx, {
       kiloUserId: params.user.id,
       amountMicrodollars: -item.amountMicrodollars,
+      originalTransactionId: item.creditTransactionId,
       description: getUpgradeBonusReversalDescription(item.kind),
       creditCategory: `kilo-pass-upgrade-bonus-reversal:${params.purchase.paymentProvider}:${params.purchase.providerTransactionId}:${item.kind}:${item.itemId}`,
       originalBaselineMicrodollarsUsed: params.originalBaselineMicrodollarsUsed,
@@ -457,9 +476,17 @@ async function applyStoreUpgradeCreditAdjustments(
   });
 
   if (refundMicrodollars > 0) {
+    const baseItem = await tx.query.kilo_pass_issuance_items.findFirst({
+      where: and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, params.issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
+      ),
+    });
+    if (!baseItem) throw new Error('App Store upgrade base credit not found');
     const refundResult = await insertCreditTransactionAdjustment(tx, {
       kiloUserId: params.user.id,
       amountMicrodollars: -refundMicrodollars,
+      originalTransactionId: baseItem.credit_transaction_id,
       description: `Kilo Pass upgrade refund clawback (${params.oldTier})`,
       creditCategory: `kilo-pass-upgrade-refund:${params.purchase.paymentProvider}:${params.purchase.providerTransactionId}`,
       originalBaselineMicrodollarsUsed: freshUser.microdollarsUsed,

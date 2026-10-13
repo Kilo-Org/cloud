@@ -359,6 +359,7 @@ export const credit_transactions = pgTable(
     is_free: boolean().notNull(),
     description: text(),
     original_transaction_id: uuid(), // Links expiration records to their original credit transaction
+    refund_for_transaction_id: uuid(),
     stripe_payment_id: text(),
     coinbase_credit_block_id: text(),
     credit_category: text(),

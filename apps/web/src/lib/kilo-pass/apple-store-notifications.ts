@@ -67,6 +67,7 @@ import {
 } from '@/lib/credits/store-refund';
 import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
+import { creditRefundAdjustment } from '@kilocode/web-shared/lib/credit-refund';
 
 type DbOrTx = DrizzleTransaction | typeof db;
 
@@ -456,6 +457,7 @@ async function insertCreditAdjustment(
     isFree: boolean;
     description: string;
     creditCategory: string;
+    originalTransactionId: string | null;
     originalBaselineMicrodollarsUsed: number;
   }
 ): Promise<{ wasInserted: boolean; creditTransactionId: string | null }> {
@@ -469,6 +471,8 @@ async function insertCreditAdjustment(
       is_free: params.isFree,
       description: params.description,
       credit_category: params.creditCategory,
+      refund_for_transaction_id: params.originalTransactionId,
+      created_at: new Date().toISOString(),
       check_category_uniqueness: true,
       original_baseline_microdollars_used: params.originalBaselineMicrodollarsUsed,
     })
@@ -507,6 +511,7 @@ const APP_STORE_REFUND_CLAWBACK_CATEGORY_PREFIX = `kilo-pass-store-refund:${Kilo
 const APP_STORE_REFUND_RESTORATION_CATEGORY_PREFIX = `kilo-pass-store-refund-reversal:${KiloPassPaymentProvider.AppStore}:`;
 
 type RefundLedgerRow = {
+  originalTransactionId: string | null;
   creditTransactionId: string;
   amountMicrodollars: number;
   isFree: boolean;
@@ -530,6 +535,7 @@ async function readAppStoreRefundLedger(
       isFree: credit_transactions.is_free,
       description: credit_transactions.description,
       creditCategory: credit_transactions.credit_category,
+      originalTransactionId: credit_transactions.refund_for_transaction_id,
     })
     .from(credit_transactions)
     .where(
@@ -697,6 +703,7 @@ async function reverseAppStoreRefundCredits(
 
   const issuedItems: {
     itemId: string;
+    creditTransactionId: string;
     kind: KiloPassIssuanceItemKind;
     amountMicrodollars: number;
     isFree: boolean;
@@ -705,6 +712,7 @@ async function reverseAppStoreRefundCredits(
   if (ownedBaseCredit) {
     issuedItems.push({
       itemId: ownedBaseCredit.creditTransactionId,
+      creditTransactionId: ownedBaseCredit.creditTransactionId,
       kind: KiloPassIssuanceItemKind.Base,
       amountMicrodollars: ownedBaseCredit.amountMicrodollars,
       isFree: ownedBaseCredit.isFree,
@@ -741,6 +749,7 @@ async function reverseAppStoreRefundCredits(
       const bonusItems = await tx
         .select({
           itemId: kilo_pass_issuance_items.id,
+          creditTransactionId: credit_transactions.id,
           kind: kilo_pass_issuance_items.kind,
           amountMicrodollars: credit_transactions.amount_microdollars,
           isFree: credit_transactions.is_free,
@@ -770,9 +779,13 @@ async function reverseAppStoreRefundCredits(
     // Reverse what Kilo granted, never the App Store price. Apple returns the full
     // charge to the customer and reverses its own commission, so clawing back the
     // store price would leave a customer who spent nothing at minus the store margin.
-    const reversalAmountMicrodollars = item.amountMicrodollars;
+    const reversalAmountMicrodollars = -(await creditRefundAdjustment(
+      tx,
+      item.creditTransactionId,
+      -item.amountMicrodollars
+    ));
 
-    if (reversalAmountMicrodollars <= 0) {
+    if (item.amountMicrodollars <= 0) {
       continue;
     }
 
@@ -792,6 +805,7 @@ async function reverseAppStoreRefundCredits(
     const reversal = await insertCreditAdjustment(tx, {
       kiloUserId: storePurchase.kilo_user_id,
       signedAmountMicrodollars: -reversalAmountMicrodollars,
+      originalTransactionId: item.creditTransactionId,
       isFree: item.isFree,
       description: getRefundReversalDescription(item.kind),
       creditCategory: `${APP_STORE_REFUND_CLAWBACK_CATEGORY_PREFIX}${itemKey}${cycle === 0 ? '' : `:r${cycle}`}`,
@@ -837,7 +851,7 @@ function getRefundRestorationDescription(kind: KiloPassIssuanceItemKind | null):
 }
 
 /**
- * Puts back exactly the credits each open clawback removed, one positive credit transaction per
+ * Restores each open clawback without reviving expired unused value, one credit transaction per
  * clawback row. A restored clawback is closed, so a redelivered `REFUND_REVERSED` inserts nothing.
  */
 async function restoreAppStoreRefundCredits(
@@ -915,10 +929,16 @@ async function restoreAppStoreRefundCredits(
   const skippedRegrantedBaseCycleKeys: string[] = [];
   let totalRestoredMicrodollars = 0;
   for (const clawback of ledger.clawbacks) {
-    const amountMicrodollars = -clawback.amountMicrodollars;
-    if (amountMicrodollars <= 0 || ledger.restoredCycleKeys.has(clawback.cycleKey)) {
+    if (clawback.amountMicrodollars > 0 || ledger.restoredCycleKeys.has(clawback.cycleKey)) {
       continue;
     }
+    const amountMicrodollars = clawback.originalTransactionId
+      ? await creditRefundAdjustment(
+          tx,
+          clawback.originalTransactionId,
+          -clawback.amountMicrodollars
+        )
+      : -clawback.amountMicrodollars;
 
     const itemKind = getRefundCycleItemKind(clawback.cycleKey);
     // Cycle key `<tx>:base:<baseCreditTransactionId>[:r<n>]`.
@@ -934,6 +954,7 @@ async function restoreAppStoreRefundCredits(
     const restoration = await insertCreditAdjustment(tx, {
       kiloUserId: storePurchase.kilo_user_id,
       signedAmountMicrodollars: amountMicrodollars,
+      originalTransactionId: clawback.originalTransactionId,
       isFree: clawback.isFree,
       description: getRefundRestorationDescription(itemKind),
       creditCategory: `${APP_STORE_REFUND_RESTORATION_CATEGORY_PREFIX}${clawback.cycleKey}`,

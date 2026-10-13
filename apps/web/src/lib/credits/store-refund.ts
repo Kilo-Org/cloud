@@ -1,4 +1,5 @@
 import { NotificationTypeV2 } from '@apple/app-store-server-library';
+import { creditRefundAdjustment } from '@kilocode/web-shared/lib/credit-refund';
 import { and, desc, eq, or, sql } from 'drizzle-orm';
 
 import { credit_transactions, kilocode_users, kilo_pass_store_events } from '@kilocode/db/schema';
@@ -330,6 +331,7 @@ async function findStoreCreditGrant(
 ) {
   const grantedRows = await dbOrTx
     .select({
+      creditTransactionId: credit_transactions.id,
       kiloUserId: credit_transactions.kilo_user_id,
       amountMicrodollars: credit_transactions.amount_microdollars,
       microdollarsUsed: kilocode_users.microdollars_used,
@@ -387,8 +389,8 @@ export async function getStoreCreditConsumptionMilliunits(
  * `granted * refundedMilliunits / 100000` (refunded over paid), with the share
  * clamped to 0..100000 so the reversal stays within 0..granted, rounded to the
  * nearest microdollar, and is written as one negative row keyed by the store
- * transaction id. The amount depends only on the grant and the store's refund
- * share, never on the balance, and a clawback already in force makes a replayed
+ * transaction id. Already-expired value is excluded from the deduction. A
+ * clawback already in force makes a replayed
  * refund notification a no-op, so the stored amount can never change.
  *
  * The store refunded a purchase Kilo never granted against (no grant row) is a
@@ -414,10 +416,10 @@ export async function reverseStoreCreditPurchase(
     STORE_FULL_MILLIUNITS,
     Math.max(0, Math.round(params.refundedMilliunits))
   );
-  const reversalMicrodollars = Math.round(
+  const requestedReversalMicrodollars = Math.round(
     (granted.amountMicrodollars * refundedMilliunits) / STORE_FULL_MILLIUNITS
   );
-  if (reversalMicrodollars <= 0) {
+  if (requestedReversalMicrodollars <= 0) {
     return { reversed: false, creditTransactionId: null, amountMicrodollars: 0 };
   }
 
@@ -441,11 +443,18 @@ export async function reverseStoreCreditPurchase(
     ...params,
     cycle: clawbacks.length + 1,
   });
+  const reversalMicrodollars = -(await creditRefundAdjustment(
+    tx,
+    granted.creditTransactionId,
+    -requestedReversalMicrodollars
+  ));
   const insertResult = await tx
     .insert(credit_transactions)
     .values({
       id: creditTransactionId,
       kilo_user_id: granted.kiloUserId,
+      refund_for_transaction_id: granted.creditTransactionId,
+      created_at: new Date().toISOString(),
       amount_microdollars: -reversalMicrodollars,
       is_free: false,
       description: creditPackReversalDescription(params.paymentProvider),
@@ -502,8 +511,8 @@ export async function reverseStoreCreditPurchase(
  * delivery credits the balance back, and a redelivered reversal finds the pair
  * settled and does nothing, so it can never restore twice.
  *
- * The amount is the clawback's stored amount, never a recomputed share, so a
- * prorated refund restores exactly the share it took. A purchase Kilo never
+ * Before expiry the amount is the clawback's stored amount, never a recomputed
+ * share. After expiry only consumed value can be reinstated. A purchase Kilo never
  * clawed back — never granted, or refunded without a grant — restores nothing:
  * the reversal has nothing to undo. This mirrors `reverseStoreCreditPurchase`;
  * both handlers hold the same per-purchase lock, so the pair is ordered rather
@@ -524,7 +533,7 @@ export async function restoreStoreCreditPurchase(
     kiloUserId: granted.kiloUserId,
   });
   const clawback = clawbacks[restorations.length] ?? null;
-  if (!clawback || clawback.amountMicrodollars >= 0) {
+  if (!clawback || clawback.amountMicrodollars > 0) {
     // Nothing is clawed back: the pack was never granted, or this reversal
     // already settled the cycle. Return the restoration that stands, if any, so
     // the caller records the delivery without crediting the balance again.
@@ -535,7 +544,11 @@ export async function restoreStoreCreditPurchase(
     };
   }
 
-  const amountMicrodollars = -clawback.amountMicrodollars;
+  const amountMicrodollars = await creditRefundAdjustment(
+    tx,
+    granted.creditTransactionId,
+    -clawback.amountMicrodollars
+  );
   const creditTransactionId = crypto.randomUUID();
   const creditCategory = storeCreditRefundReversalCategory({
     ...params,
@@ -546,6 +559,8 @@ export async function restoreStoreCreditPurchase(
     .values({
       id: creditTransactionId,
       kilo_user_id: clawback.kiloUserId,
+      refund_for_transaction_id: granted.creditTransactionId,
+      created_at: new Date().toISOString(),
       amount_microdollars: amountMicrodollars,
       is_free: clawback.isFree,
       description: creditPackRestorationDescription(params.paymentProvider),

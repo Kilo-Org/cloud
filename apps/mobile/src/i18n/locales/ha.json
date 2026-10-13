@@ -2152,6 +2152,11 @@
       "collapse": "Ɓoye manufa",
       "expand": "Nuna manufa"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Manufofi, an kammala {{completed}} cikin {{total}}",
+      "rowAccessibility": "Manufofi, an kammala {{completed}} cikin {{total}}. Manufar yanzu: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "An yi amfani da su kwanan nan",
       "couldNotLoadGithubRepositories": "An kasa loda ma'ajiyoyin GitHub.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Ana shigo da zaman",
       "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zaman ba. Zaɓi Cloud Agent ko wani CLI.",
       "importFailed": "An kasa shigo da wannan zaman.",
+      "cliCannotFork": "Sabunta Kilo CLI don rarraba daga saƙo.",
+      "forkCutNotSynced": "Ba a adana wannan saƙon ba tukuna. Sake gwadawa nan ba da jimawa ba.",
+      "forkFilesFromBaseBranch": "Fayiloli suna farawa daga babban reshe.",
+      "forkFilesUnchangedOnComputer": "Ba a canza fayiloli a wannan kwamfutar ba.",
       "pickProfile": "Zaɓi bayanin martaba",
       "noProfile": "Babu bayanin martaba",
       "manageProfiles": "Sarrafa bayanan martaba",
@@ -2326,6 +2335,7 @@
       "copyMessage": "Kwafi saƙo",
       "copyText": "Kwafi rubutu",
       "selectText": "Zaɓi rubutu",
+      "forkFromHere": "Rarraba daga nan",
       "reportAiResponse": "Kai rahoton amsar AI",
       "reportAiResponseConfirm": "A kai rahoton wannan amsar don a duba ta?",
       "report": "Kai rahoto",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Koyarwa"
   },
   "modelChat": {
+    "offlineFailure": "Wannan samfurin yana buƙatar haɗin intanet. Haɗa ka sake gwadawa, ko ka canza zuwa samfurin da ke kan wannan na'ura.",
     "empty": {
       "title": "Fara tattaunawa",
       "description": "Aika saƙo don tattaunawa da samfurin."
@@ -3200,6 +3211,11 @@
       "deleteTitle": "A share wannan tattaunawar?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Bincika yanar gizo",
+      "description": "Bari wannan hira ta nemo bayanai na yanzu ta asusunka na Kilo. Bincike yana amfani da adadin bincikenka na wata-wata.",
+      "allowanceExhausted": "Binciken yanar gizo na kyauta na wannan watan ya ƙare. Ƙara kiredit don sake bincike."
+    },
     "mcp": {
       "title": "Kayan aikin Kilo",
       "use": "Yi amfani da kayan aikin Kilo",
@@ -3336,8 +3352,48 @@
         "notGguf": "Dole ne hanyar haɗin ta nuna fayil ɗin .gguf.",
         "space": "Babu isasshen sarari kyauta don wannan samfurin. Ka yantar da sarari sannan ka sake gwadawa.",
         "network": "Saukarwar ba ta kammala ba. Duba haɗin ka sannan ka sake gwadawa.",
-        "invalidFile": "Fayil ɗin da aka sauke ba samfurin da wannan manhajar za ta iya gudanarwa ba ne, don haka an cire shi."
+        "invalidFile": "Fayil ɗin da aka sauke ba samfurin da wannan manhajar za ta iya gudanarwa ba ne, don haka an cire shi.",
+        "checksum": "Fayil ɗin da aka sauke bai yi daidai da checksum ɗinsa da aka wallafa ba, don haka an cire shi. Sake gwada saukewa."
       }
+    },
+    "catalog": {
+      "browse": "Duba samfura",
+      "title": "Kundin samfura",
+      "search": "Nemi samfuran Hugging Face",
+      "tabs": "Tacewar samfura",
+      "fitsTab": "Sun dace da wannan na'ura",
+      "fromHuggingFace": "Daga Hugging Face",
+      "loading": "Ana loda samfura",
+      "noResults": "Ba a sami samfura ba",
+      "noFits": "Babu samfurin da ya dace da wannan na'ura",
+      "noFitsDescription": "Manyan samfura suna shafin $t(common.all).",
+      "fit": {
+        "fits": "Ya dace",
+        "tight": "Da kyar ya dace",
+        "tooLarge": "Ya yi girma sosai",
+        "noStorage": "Babu isasshen ma'ajiya"
+      },
+      "parameters": "Sigogi: {{value}}",
+      "downloads": "Saukewa: {{value}}",
+      "likes": "Masu so: {{value}}",
+      "context": "Tagar mahallin: {{value}}",
+      "license": "Lasisi: {{license}}",
+      "licenseUnknown": "Ba a bayyana lasisin ba",
+      "tools": "Kiran kayan aiki",
+      "vision": "Shigar da hoto",
+      "hintsHelp": "Bayanai daga Hugging Face. Manhajar tana duba samfurin bayan an sauke shi.",
+      "gated": "Wannan samfurin yana buƙatar asusun Hugging Face, don haka manhajar ba za ta iya sauke shi ba.",
+      "quantizations": "Nau'ikan matsawa",
+      "quantizationsHelp": "Ƙananan fayiloli suna amfani da ƙarancin ƙwaƙwalwa da ma'ajiya. Manyan fayiloli yawanci suna ba da amsoshi mafi kyau.",
+      "quantDetail": "Saukewar {{size}} · kusan {{memory}} na ƙwaƙwalwa",
+      "downloadQuant": "Sauke {{quant}}",
+      "loadingModel": "Ana loda bayanan samfuri",
+      "couldNotLoadModel": "An kasa loda wannan samfurin",
+      "noFiles": "Babu fayilolin da wannan manhaja za ta iya gudanarwa",
+      "noFilesDescription": "Wannan manhaja tana gudanar da samfuran da suke fayil ɗin GGUF guda ɗaya.",
+      "tooLargeTitle": "Wataƙila wannan samfurin ba zai yi aiki ba",
+      "tooLargeMessage": "Wataƙila {{name}} yana buƙatar ƙwaƙwalwa fiye da abin da wannan na'ura take da shi. Manhajar na iya rufewa yayin da samfurin ke amsawa. A sauke shi duk da haka?",
+      "downloadAnyway": "Sauke duk da haka"
     },
     "localModels": {
       "title": "Samfuran da ke kan na'ura",

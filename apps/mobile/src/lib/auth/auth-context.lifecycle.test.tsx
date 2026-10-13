@@ -2689,6 +2689,99 @@ describe('startup credential read failure', () => {
     unmount();
   }, 30_000);
 
+  describe('on a locked device', () => {
+    /** Mount without settling: a locked launch holds the loading state. The
+     *  gate is imported from the same fresh registry as the provider, so both
+     *  share one module instance. */
+    async function mountWithGate(
+      lockedAtLaunch: boolean,
+      beforeImport?: (setAvailable: (available: boolean) => void) => void
+    ) {
+      vi.resetModules();
+      // A registry reset per mount needs the dynamic imports: the provider's
+      // module state (the preloads) must be fresh for each case.
+      const gate = await import('@/lib/protected-data');
+      gate.setProtectedDataAvailable(!lockedAtLaunch);
+      beforeImport?.(gate.setProtectedDataAvailable);
+      const mod = await import('./auth-context');
+      let captured: AuthContextValue | undefined = undefined;
+      function Consumer(): null {
+        captured = mod.useAuth();
+        return null;
+      }
+      let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+      await act(async () => {
+        renderer = TestRenderer.create(
+          createElement(mod.AuthProvider, null, createElement(Consumer))
+        );
+        await Promise.resolve();
+      });
+      const getCtx = (): AuthContextValue => {
+        if (!captured) {
+          throw new Error('auth context not captured');
+        }
+        return captured;
+      };
+      return { gate, getCtx, unmount: () => renderer?.unmount() };
+    }
+
+    async function flushFor(ms: number): Promise<void> {
+      await act(async () => {
+        await new Promise<void>(resolve => {
+          void setTimeout(resolve, ms);
+        });
+      });
+    }
+
+    it('waits for unlock, without a keychain call or the restore error, then restores', async () => {
+      failTokenReads(0);
+
+      const { gate, getCtx, unmount } = await mountWithGate(true);
+      await flushFor(2000);
+
+      expect(hoisted.secureStore.getItemAsync).not.toHaveBeenCalled();
+      expect(getCtx().isLoading).toBe(true);
+      expect(getCtx().restoreFailed).toBe(false);
+
+      gate.setProtectedDataAvailable(true);
+      await settleBootstrap(getCtx);
+
+      expect(getCtx().restoreFailed).toBe(false);
+      expect(getCtx().token).toBe('stored-token');
+      unmount();
+    });
+
+    it('reads again after unlock when the device locks during the startup reads', async () => {
+      failTokenReads(0);
+      const healthyRead = hoisted.secureStore.getItemAsync.getMockImplementation();
+      let lockedOnce = false;
+      const { gate, getCtx, unmount } = await mountWithGate(false, setAvailable => {
+        // The preloads read the token pair. The device locks on the expiry
+        // read that follows, and the keychain refuses it.
+        hoisted.secureStore.getItemAsync.mockImplementation(async (key: string) => {
+          if (key === 'token-expires-at' && !lockedOnce) {
+            lockedOnce = true;
+            setAvailable(false);
+            throw new Error('User interaction is not allowed.');
+          }
+          return (await healthyRead?.(key)) ?? null;
+        });
+      });
+      await flushFor(2000);
+
+      expect(lockedOnce).toBe(true);
+      expect(getCtx().isLoading).toBe(true);
+      expect(getCtx().restoreFailed).toBe(false);
+
+      gate.setProtectedDataAvailable(true);
+      await settleBootstrap(getCtx);
+
+      expect(getCtx().restoreFailed).toBe(false);
+      expect(getCtx().token).toBe('stored-token');
+      unmount();
+    });
+  });
+
   it('does not resurrect the restore error surface when signOut lands mid-retry', async () => {
     // Four reads for the first bootstrap, four for the in-flight retry: the
     // abandoned retry's catch fires only after sign-out has begun.

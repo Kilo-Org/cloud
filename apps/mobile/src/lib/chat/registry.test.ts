@@ -51,6 +51,8 @@ let failHistoryFor: string | undefined = undefined;
 /** A cleanup failure after a move installed its session, before onto returned. */
 let failForgetFor: string | undefined = undefined;
 let failAnswerFor: string | undefined = undefined;
+/** The names a stored session was opened with, which must resolve for it to continue. */
+let continuesWith: readonly string[] = [];
 /** Every session whose scope was closed, so a leaked one can be told from one released. */
 const released: string[] = [];
 
@@ -149,6 +151,9 @@ vi.mock('@kilocode/harness-sdk', () => {
       if (missingToolsFor === id) {
         return Effect.fail(new FakeToolMissingError());
       }
+      if (continuesWith.some(name => !remote.tools.some(one => one.definition.name === name))) {
+        return Effect.fail(new FakeToolMissingError());
+      }
       return openInScope(id);
     },
     cloneSession: (
@@ -180,16 +185,37 @@ const settingsSwitch = vi.hoisted(() => ({ enabled: true }));
 vi.mock('./settings-tools-switch', () => ({
   isSettingsToolsEnabled: () => settingsSwitch.enabled,
 }));
+// The search itself is proved in its own suite; this one reads the names.
+vi.mock('./web-search', () => ({
+  WEB_SEARCH_TOOL_NAME: 'web_search',
+  webSearchTool: () => ({ definition: { name: 'web_search' }, run: () => undefined }),
+}));
 vi.mock('@/lib/settings/registry', () => ({
   settingsService: () => ({ settings: [], read: () => undefined, write: () => undefined }),
 }));
 vi.mock('@/lib/settings/confirm', () => ({ confirmSettingChange: () => undefined }));
 // The person's own remote servers; what is under test is the registry's use of
-// the names, not the discovery.
-const remote = vi.hoisted(() => ({
-  tools: [] as { readonly definition: { readonly name: string } }[],
-}));
+// the names, not the discovery. Nothing is discovered until a chat asks, which
+// is what a fresh start looks like.
+const remote = vi.hoisted(() => {
+  const held = {
+    tools: [] as { readonly definition: { readonly name: string } }[],
+    /** What the servers offer once asked. */
+    offered: [] as { readonly definition: { readonly name: string } }[],
+    ensure: vi.fn(async () => {
+      await Promise.resolve();
+      for (const one of held.offered) {
+        if (!held.tools.includes(one)) {
+          held.tools.push(one);
+        }
+      }
+      return [];
+    }),
+  };
+  return held;
+});
 vi.mock('./remote-mcp', () => ({
+  ensureRemoteMcp: remote.ensure,
   remoteServerTools: () => remote.tools,
   remoteServerToolNames: () => remote.tools.map(tool => tool.definition.name),
 }));
@@ -261,11 +287,12 @@ const {
   retryKiloMcp,
   say,
   setMcpEnabled,
+  setWebSearchEnabled,
   startChat,
   stopChat,
 } = await import('./registry');
 const { change, snapshotOf } = await import('./state');
-const { chatPlaceOf } = await import('./use-chat');
+const { chatPlaceOf } = await import('./scope');
 const { askedIn, forgetAsked } = await import('./pending');
 
 /** The words of the line that is waiting, which is what most of these read. */
@@ -275,6 +302,9 @@ const place = { chatScope: 'me:personal', org: { kind: 'personal' } } as const;
 
 /** The settings tools a chat is opened with while the group switch is on. */
 const SETTINGS = ['settings_list', 'settings_set'];
+
+/** What every Kilo chat is opened with: the clock, and web search, which is on by default for it. */
+const BASE = ['time', 'web_search'];
 
 /** Lets the forked reading fiber run to wherever it gets to. */
 const settled = async () => {
@@ -311,16 +341,19 @@ beforeEach(async () => {
   mcp.tools.length = 0;
   mcp.enabled.clear();
   remote.tools.length = 0;
+  remote.offered.length = 0;
+  continuesWith = [];
   backendState.profiles = [];
   opened = await startChat(place, 'kilo/one');
   await settled();
   /* Cleared after the chat above, so a test counts only its own discoveries. */
   mcp.ensure.mockClear();
+  remote.ensure.mockClear();
 });
 
 describe('what a chat is opened with', () => {
   it('offers the clock, because a model has none and answers from a stale date', () => {
-    expect(openedWith?.tools).toEqual(['time', ...SETTINGS]);
+    expect(openedWith?.tools).toEqual([...BASE, ...SETTINGS]);
   });
 
   it('moves the open chat onto the names the group switch names now, at its next use', async () => {
@@ -340,7 +373,7 @@ describe('what a chat is opened with', () => {
     await say(opened, { text: 'hello', images: [] }, 'kilo/one');
     await settled();
 
-    expect(clonedWith).toEqual({ tools: ['time'] });
+    expect(clonedWith).toEqual({ tools: BASE });
     expect(snapshotOf(opened).sessionId).toBe('s2');
   });
 
@@ -349,19 +382,19 @@ describe('what a chat is opened with', () => {
        mark. The store still holds the names it was opened with, so the next
        question compares those with the switch as it stands now rather than
        offering a tool the person just took away. */
-    storedTools = ['time', ...SETTINGS];
+    storedTools = [...BASE, ...SETTINGS];
     settingsSwitch.enabled = false;
     await say(opened, { text: 'hello', images: [] }, 'kilo/one');
     await settled();
 
-    expect(clonedWith).toEqual({ tools: ['time'] });
+    expect(clonedWith).toEqual({ tools: BASE });
     expect(snapshotOf(opened).sessionId).toBe('s2');
   });
 
   it('leaves a chat alone when the switch that moved was not its own', async () => {
     /* A server's flag flipping is not this chat's: it names none of that
        server's tools, so its set did not move and its session is not copied. */
-    storedTools = ['time', ...SETTINGS];
+    storedTools = [...BASE, ...SETTINGS];
     await refreshChatTools();
     await settled();
 
@@ -388,7 +421,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     /* The open asks for the automatic deadline, so a slow server leaves the
        chat opening rather than holding the send on it. */
     expect(mcp.ensure).toHaveBeenCalledWith(place, 'automatic');
-    expect(openedWith?.tools).toEqual(['time', ...SETTINGS, 'mcp_kilo_read-file']);
+    expect(openedWith?.tools).toEqual([...BASE, ...SETTINGS, 'mcp_kilo_read-file']);
   });
 
   it('opens a chat with the setting off on the clock alone, and reaches no server', async () => {
@@ -398,7 +431,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     opened = await startChat(place, 'kilo/one', false);
     await settled();
 
-    expect(openedWith?.tools).toEqual(['time', ...SETTINGS]);
+    expect(openedWith?.tools).toEqual([...BASE, ...SETTINGS]);
     expect(mcp.ensure).not.toHaveBeenCalled();
   });
 
@@ -421,7 +454,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
       expect.objectContaining({ chatScope: 'me:personal' }),
       'automatic'
     );
-    expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS, 'mcp_kilo_read-file'] });
+    expect(clonedWith).toEqual({ tools: [...BASE, ...SETTINGS, 'mcp_kilo_read-file'] });
     expect(snapshotOf(opened).sessionId).toBe('s2');
   });
 
@@ -437,7 +470,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
 
     /* The tool set is frozen for the life of a session, so turning it off is a
        copy onto a session without those tools, and the setting follows it. */
-    expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS] });
+    expect(clonedWith).toEqual({ tools: [...BASE, ...SETTINGS] });
     expect(snapshotOf(opened).sessionId).toBe('s2');
     expect(mcp.enabled.get('s2')).toBe(false);
   });
@@ -460,7 +493,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     finish?.();
     await settled();
 
-    expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS] });
+    expect(clonedWith).toEqual({ tools: [...BASE, ...SETTINGS] });
     expect(snapshotOf(opened).sessionId).toBe('s2');
   });
 
@@ -474,7 +507,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     /* The server's list moved on, or it is down while the session was stored
        with its tools. The chat opens either way rather than failing on a name
        nothing holds. */
-    expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS, 'mcp_kilo_read-file'] });
+    expect(clonedWith).toEqual({ tools: [...BASE, ...SETTINGS, 'mcp_kilo_read-file'] });
     expect(snapshotOf('stale').status).toBe('idle');
     expect(snapshotOf('stale').failed).toBeNull();
 
@@ -488,7 +521,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     await releaseChat(opened);
     opened = await startChat(place, 'kilo/one');
     await settled();
-    expect(openedWith?.tools).toEqual(['time', ...SETTINGS, 'mcp_kilo_read-file']);
+    expect(openedWith?.tools).toEqual([...BASE, ...SETTINGS, 'mcp_kilo_read-file']);
 
     /* A call that did not reach the server dropped the tools from the registry,
        so the session is stored naming one nothing holds. Switching the model
@@ -499,7 +532,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     await say(opened, { text: 'second', images: [] }, 'kilo/two');
     await settled();
 
-    expect(clonedWith).toEqual({ model: 'kilo/two', tools: ['time', ...SETTINGS] });
+    expect(clonedWith).toEqual({ model: 'kilo/two', tools: [...BASE, ...SETTINGS] });
     expect(snapshotOf(opened).failed).toBeNull();
     expect(snapshotOf(opened).sessionId).toBe('s2');
     expect(asked.at(-1)).toEqual({ sessionId: 's2', text: 'second' });
@@ -512,7 +545,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     await releaseChat(opened);
     opened = await startChat(place, 'kilo/one');
     await settled();
-    expect(openedWith?.tools).toEqual(['time', ...SETTINGS]);
+    expect(openedWith?.tools).toEqual([...BASE, ...SETTINGS]);
 
     mcp.tools.push(discovered);
     mcp.ensure.mockResolvedValueOnce({ status: 'ready', tools: mcp.tools });
@@ -523,7 +556,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
       expect.objectContaining({ chatScope: 'me:personal' }),
       'retry'
     );
-    expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS, 'mcp_kilo_read-file'] });
+    expect(clonedWith).toEqual({ tools: [...BASE, ...SETTINGS, 'mcp_kilo_read-file'] });
     expect(snapshotOf(opened).sessionId).toBe('s2');
   });
 
@@ -539,6 +572,58 @@ describe('the Kilo MCP tools a chat is opened with', () => {
 
     expect(clonedWith).toBeUndefined();
     expect(snapshotOf(opened).sessionId).toBe('s1');
+  });
+});
+
+describe('web search in a chat', () => {
+  const backend: StoredChatBackend = {
+    id: 'tools-server',
+    revision: 1,
+    name: 'Tools',
+    baseUrl: 'https://tools.example/v1',
+    apiKind: 'chat_completions',
+    apiKey: '',
+    headers: {},
+    models: [{ id: 'tool-model', name: 'Model', tools: true, images: false }],
+    allowLocalHttp: false,
+  };
+
+  it('is off for a new chat on a custom model, and the switch turns it on', async () => {
+    backendState.profiles = [backend];
+    const target = backendTargetId(backend, 'tool-model');
+    await releaseChat(opened);
+    opened = await startChat(place, target);
+    await settled();
+
+    expect(openedWith?.tools).toEqual(['time', ...SETTINGS]);
+
+    storedTools = ['time', ...SETTINGS];
+    await setWebSearchEnabled(opened, true);
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: [...BASE, ...SETTINGS] });
+  });
+
+  it('moves an idle Kilo chat off web search when the person turns it off', async () => {
+    storedTools = [...BASE, ...SETTINGS];
+
+    await setWebSearchEnabled(opened, false);
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: ['time', ...SETTINGS] });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
+  it('keeps the person choice when the chat moves onto another model', async () => {
+    storedTools = [...BASE, ...SETTINGS];
+    await setWebSearchEnabled(opened, false);
+    await settled();
+    storedTools = ['time', ...SETTINGS];
+
+    await say(opened, { text: 'hello', images: [] }, 'kilo/two');
+    await settled();
+
+    expect(clonedWith).toEqual({ model: 'kilo/two' });
   });
 });
 
@@ -851,7 +936,7 @@ describe('custom backend question targets', () => {
 
   it('drops all tool definitions when a queued question moves onto a text-only backend', async () => {
     backendState.profiles = [backend];
-    storedTools = ['time', ...SETTINGS];
+    storedTools = [...BASE, ...SETTINGS];
     const target = backendTargetId(backend, 'same-model');
     await say(opened, { text: 'first', images: [] }, 'kilo/one');
     await settled();
@@ -1188,5 +1273,39 @@ describe('custom backend question targets', () => {
     expect(await askedIn(opened)).toBeNull();
     expect(storedQuestions.has(`chat-asked:${opened}`)).toBe(false);
     expect(snapshotOf(opened)).toMatchObject({ asked: null, askedModel: null });
+  });
+});
+
+describe('remote servers after a restart', () => {
+  /* A registry imported again holds no chat and nothing discovered, which is
+     what the app holds after it restarts. */
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  const ALPHA = { definition: { name: 'mcp_alpha_read' } };
+
+  it('discovers the remote servers when a chat starts, so it offers their tools', async () => {
+    const fresh = await import('./registry');
+    remote.offered.push(ALPHA);
+
+    const started = await fresh.startChat(place, 'kilo/one');
+
+    expect(remote.ensure).toHaveBeenCalledWith(place);
+    expect(openedWith?.tools).toContain('mcp_alpha_read');
+    await fresh.releaseChat(started);
+  });
+
+  it('discovers the remote servers before a stored chat continues on their names', async () => {
+    const fresh = await import('./registry');
+    remote.offered.push(ALPHA);
+    continuesWith = ['mcp_alpha_read'];
+
+    await fresh.enterChat(place, 's9');
+
+    expect(remote.ensure).toHaveBeenCalledWith(place);
+    // The stored names resolved, so the chat continued rather than being moved.
+    expect(clonedWith).toBeUndefined();
+    await fresh.releaseChat('s9');
   });
 });

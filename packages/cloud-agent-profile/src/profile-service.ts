@@ -1,4 +1,5 @@
 import type { WorkerDb } from '@kilocode/db';
+import { TRPCError } from '@trpc/server';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,
@@ -10,8 +11,14 @@ import {
   type AgentEnvironmentProfile,
 } from '@kilocode/db/schema';
 import { eq, and, sql, count, inArray } from 'drizzle-orm';
-import type { ProfileOwner, ProfileSummary, ProfileResponse } from './types';
-import { buildOwnershipCondition, verifyProfileOwnership } from './profile-utils';
+import type { ProfileDatabase, ProfileOwner, ProfileSummary, ProfileResponse } from './types';
+import {
+  buildOwnershipCondition,
+  lockProfileOwnership,
+  verifyProfileOwnership,
+} from './profile-utils';
+import { withProfileTransaction } from './database';
+import { countBindingsForProfile } from './repo-binding-db';
 import { listMcpServersForProfile } from './profile-mcp-service';
 import { listSkillsForProfile } from './profile-skills-service';
 import { listAgentsForProfile } from './profile-agents-service';
@@ -75,16 +82,30 @@ export async function updateProfile(
 }
 
 /**
- * Delete a profile and cascade to vars and commands.
+ * Delete a profile and cascade to vars and commands. For an organization-owned
+ * profile that is bound to a repository, only an organization manager may
+ * delete it: the repo-binding FK cascade would otherwise let a member strip
+ * protected bindings.
  */
 export async function deleteProfile(
-  db: WorkerDb,
+  db: ProfileDatabase,
   profileId: string,
-  owner: ProfileOwner
+  owner: ProfileOwner,
+  canManageOrganizationProfiles: boolean
 ): Promise<void> {
-  await verifyProfileOwnership(db, profileId, owner);
-
-  await db.delete(agent_environment_profiles).where(eq(agent_environment_profiles.id, profileId));
+  await withProfileTransaction(db, async tx => {
+    await lockProfileOwnership(tx, profileId, owner);
+    if (owner.type === 'organization' && !canManageOrganizationProfiles) {
+      const boundCount = await countBindingsForProfile(tx, profileId);
+      if (boundCount > 0) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only organization owners and admins can delete a profile bound to a repository',
+        });
+      }
+    }
+    await tx.delete(agent_environment_profiles).where(eq(agent_environment_profiles.id, profileId));
+  });
 }
 
 /**

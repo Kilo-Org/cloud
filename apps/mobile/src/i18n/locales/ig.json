@@ -2152,6 +2152,11 @@
       "collapse": "Zoo ebumnuche",
       "expand": "Gosi ebumnuche"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Ebumnuche, emechara {{completed}} n'ime {{total}}",
+      "rowAccessibility": "Ebumnuche, emechara {{completed}} n'ime {{total}}. Ebumnuche ugbu a: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Ndị e ji mee ihe nso nso a",
       "couldNotLoadGithubRepositories": "Enweghị ike ibudata ebe nchekwa koodu GitHub.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Na-ebubata nnọkọ",
       "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",
       "importFailed": "Enweghị ike ibubata nnọkọ a.",
+      "cliCannotFork": "Melite Kilo CLI ka ị nwee ike ịkewa site n'ozi.",
+      "forkCutNotSynced": "Echekwabeghị ozi a. Nwaa ọzọ n'oge na-adịghị anya.",
+      "forkFilesFromBaseBranch": "Faịlụ na-amalite site na alaka ntọala.",
+      "forkFilesUnchangedOnComputer": "Agbanweghị faịlụ dị na kọmputa a.",
       "pickProfile": "Họrọ profaịlụ",
       "noProfile": "Enweghị profaịlụ",
       "manageProfiles": "Jikwaa profaịlụ",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Detuo ozi",
       "copyText": "Detuo ederede",
       "selectText": "Họrọ ederede",
+      "forkFromHere": "Kewaa site ebe a",
       "reportAiResponse": "Kọọ nzaghachi AI",
       "reportAiResponseConfirm": "Kọọ nzaghachi a maka nyocha?",
       "report": "Kọọ",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Ntuziaka"
   },
   "modelChat": {
+    "offlineFailure": "Ihe nlereanya a chọrọ njikọ ịntanetị. Jikọọ ma nwaa ọzọ, ma ọ bụ gbanwee gaa n'ihe nlereanya dị na ngwaọrụ a.",
     "empty": {
       "title": "Malite nkata",
       "description": "Ziga ozi ka ị soro ihe nlereanya kparịta ụka."
@@ -3200,6 +3211,11 @@
       "deleteTitle": "Hichapụ nkata a?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Chọọ na weebụ",
+      "description": "Kwe ka mkparịta ụka a chọọ ozi ọhụrụ site na akaụntụ Kilo gị. Nchọta na-eji oke nchọta gị kwa ọnwa.",
+      "allowanceExhausted": "Nchọta weebụ n'efu gị maka ọnwa a agwụla. Tinye kredit ka ịchọọ ọzọ."
+    },
     "mcp": {
       "title": "Ngwá ọrụ Kilo",
       "use": "Jiri ngwá ọrụ Kilo",
@@ -3336,8 +3352,48 @@
         "notGguf": "Njikọ ahụ ga-arụtụ aka na faịlụ .gguf.",
         "space": "Enweghị ebe nchekwa zuru ezu maka ụdị nlereanya a. Hapụ ohere ma nwaa ọzọ.",
         "network": "Ibudata ahụ agwụchaghị. Lelee njikọ gị ma nwaa ọzọ.",
-        "invalidFile": "Faịlụ e budatara abụghị ụdị nlereanya ngwa a nwere ike ịgba, ya mere ewepụrụ ya."
+        "invalidFile": "Faịlụ e budatara abụghị ụdị nlereanya ngwa a nwere ike ịgba, ya mere ewepụrụ ya.",
+        "checksum": "Faịlụ e budatara adabaghị na checksum e bipụtara maka ya, ya mere ewepụrụ ya. Gbalịa ibudata ya ọzọ."
       }
+    },
+    "catalog": {
+      "browse": "Chọgharịa ụdị nlereanya",
+      "title": "Katalọgụ ụdị nlereanya",
+      "search": "Chọọ ụdị nlereanya Hugging Face",
+      "tabs": "Nzacha ụdị nlereanya",
+      "fitsTab": "Dabara na ngwaọrụ a",
+      "fromHuggingFace": "Site na Hugging Face",
+      "loading": "Na-ebunye ụdị nlereanya",
+      "noResults": "Achọtaghị ụdị nlereanya ọ bụla",
+      "noFits": "Ọ dịghị ụdị nlereanya dabara na ngwaọrụ a",
+      "noFitsDescription": "Ụdị nlereanya ndị ka ibu dị na taabụ $t(common.all).",
+      "fit": {
+        "fits": "Dabara",
+        "tight": "Dabara nke ọma nke ọma",
+        "tooLarge": "Ọ buru ibu karịa",
+        "noStorage": "Ebe nchekwa ezughị"
+      },
+      "parameters": "Paramita: {{value}}",
+      "downloads": "Nbudata: {{value}}",
+      "likes": "Mmasị: {{value}}",
+      "context": "Windo onodu: {{value}}",
+      "license": "Ikikere: {{license}}",
+      "licenseUnknown": "Ekwughị ikikere ya",
+      "tools": "Ịkpọ ngwaọrụ",
+      "vision": "Ntinye onyonyo",
+      "hintsHelp": "Ndụmọdụ sitere na Hugging Face. Ngwa a na-enyocha ụdị nlereanya ahụ mgbe o budatachara.",
+      "gated": "Ụdị nlereanya a chọrọ akaụntụ Hugging Face, ya mere ngwa a enweghị ike ibudata ya.",
+      "quantizations": "Kwantaịzeshọn",
+      "quantizationsHelp": "Faịlụ ndị dị obere na-eji obere ebe nchekwa na ncheta. Faịlụ ndị ka ibu na-enyekarị azịza ka mma.",
+      "quantDetail": "Nbudata {{size}} · ihe dị ka {{memory}} nke ncheta",
+      "downloadQuant": "Budata {{quant}}",
+      "loadingModel": "Na-ebunye nkọwa ụdị nlereanya",
+      "couldNotLoadModel": "Enweghị ike ibunye ụdị nlereanya a",
+      "noFiles": "Ọ dịghị faịlụ ngwa a nwere ike ịgba",
+      "noFilesDescription": "Ngwa a na-agba ụdị nlereanya bụ otu faịlụ GGUF.",
+      "tooLargeTitle": "Ụdị nlereanya a nwere ike ọ gaghị arụ ọrụ",
+      "tooLargeMessage": "{{name}} nwere ike ịchọ ncheta karịa nke ngwaọrụ a nwere. Ngwa a nwere ike imechi mgbe ụdị nlereanya ahụ na-aza. Ị ka chọrọ ibudata ya?",
+      "downloadAnyway": "Budata ya agbanyeghị"
     },
     "localModels": {
       "title": "Ụdị nlereanya na ngwaọrụ",

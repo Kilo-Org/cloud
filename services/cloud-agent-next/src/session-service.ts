@@ -2689,7 +2689,7 @@ export class SessionService {
     createdOnPlatform: string,
     title?: string,
     gitUrl?: string,
-    cloneFromKiloSessionId?: string,
+    clone?: { cloneFromKiloSessionId: string; cloneUpToMessageId?: string },
     cloudAgentWorktreeId?: CloudAgentWorktreeId,
     cloudAgentWorktreeLocation?: CloudAgentWorktreeLocation
   ): Promise<CreateSessionForCloudAgentResult | undefined> {
@@ -2703,7 +2703,8 @@ export class SessionService {
         title,
         gitUrl,
         profileId,
-        cloneFromKiloSessionId,
+        cloneFromKiloSessionId: clone?.cloneFromKiloSessionId,
+        ...(clone?.cloneUpToMessageId ? { cloneUpToMessageId: clone.cloneUpToMessageId } : {}),
         ...(cloudAgentWorktreeId ? { cloudAgentWorktreeId } : {}),
         ...(cloudAgentWorktreeLocation ? { cloudAgentWorktreeLocation } : {}),
       });

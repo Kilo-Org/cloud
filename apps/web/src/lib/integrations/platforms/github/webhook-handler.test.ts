@@ -1,4 +1,4 @@
-import type { NextRequest } from 'next/server';
+import { after, type NextRequest } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 
 jest.mock('@sentry/nextjs', () => ({
@@ -92,7 +92,6 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
     mockHandlePRReviewComment(payload, platformIntegration),
   handlePullRequest: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePullRequest(payload, platformIntegration),
-  handlePushEvent: jest.fn(),
   upsertCliSessionPullRequestsFromWebhook: jest.fn(),
   upsertCliSessionPullRequestReviewFromWebhook: jest.fn(),
 }));
@@ -118,7 +117,7 @@ jest.mock('next/server', () => {
   const actual = jest.requireActual('next/server');
   return {
     ...actual,
-    after: (fn: () => unknown) => fn(),
+    after: jest.fn((fn: () => unknown) => fn()),
   };
 });
 
@@ -450,6 +449,56 @@ describe('handleGitHubWebhook', () => {
       'we_1',
       expect.objectContaining({ handlers_triggered: ['code_review', 'cli_session_pr_upsert'] })
     );
+  });
+
+  it.each([
+    { ref: 'refs/heads/main', deleted: false },
+    { ref: 'refs/heads/feature', deleted: false },
+    { ref: 'refs/tags/v1', deleted: false },
+    { ref: 'refs/heads/main', deleted: true },
+  ])('acknowledges push $ref (deleted=$deleted) without scheduling builds', async push => {
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('push', {
+        ...push,
+        installation: { id: 98765 },
+        repository: { full_name: 'acme/widgets' },
+      }),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Event received' });
+    expect(after).not.toHaveBeenCalled();
+    expect(mockHandlePullRequest).not.toHaveBeenCalled();
+    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('still rejects malformed push payloads without scheduling work', async () => {
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('push', { installation: { id: 98765 }, ref: 'refs/heads/main' }),
+      'standard'
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Invalid push event payload' });
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  it('still rejects unauthenticated pushes without scheduling work', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue(false);
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('push', {
+        installation: { id: 98765 },
+        ref: 'refs/heads/main',
+        repository: { full_name: 'acme/widgets' },
+      }),
+      'standard'
+    );
+
+    expect(response.status).toBe(401);
+    expect(after).not.toHaveBeenCalled();
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
   });
 
   it('keeps pull_request_review_comment created events on the legacy auto-fix path', async () => {

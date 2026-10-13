@@ -4,7 +4,10 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
-import type { UseCloudAgentAttachmentUploadReturn } from '@/hooks/useCloudAgentAttachmentUpload';
+import type {
+  CloudAgentAttachmentFile,
+  UseCloudAgentAttachmentUploadReturn,
+} from '@/hooks/useCloudAgentAttachmentUpload';
 import type { ChatInput as ChatInputComponent } from './ChatInput';
 
 jest.mock('sonner', () => ({
@@ -101,6 +104,7 @@ function buildMockUpload(
     addFiles: jest.fn(),
     removeAttachment: jest.fn(),
     clearAttachments: jest.fn(),
+    replaceAttachments: jest.fn(),
     hasUploadingAttachments: false,
     getAttachmentsData: jest.fn<() => CloudAgentAttachments | undefined>(),
     finalizeAttachments: jest.fn(async () => undefined),
@@ -181,6 +185,34 @@ function pressEnter(rootContainer: HTMLElement) {
   });
 }
 
+/** Drive the hidden file input's onChange the way a native picker does. */
+function changeFileInput(rootContainer: HTMLElement, files: File[]) {
+  type Fiber = {
+    type: unknown;
+    memoizedProps?: { onChange?: (event: { target: { files: File[]; value: string } }) => void };
+    child?: Fiber | null;
+    sibling?: Fiber | null;
+  };
+  const reactKey = Object.keys(rootContainer).find(key => key.startsWith('__reactContainer'));
+  const host = reactKey
+    ? (rootContainer as unknown as Record<string, { stateNode?: { current?: Fiber } }>)[reactKey]
+    : undefined;
+  const walk = (fiber: Fiber | null | undefined, visit: (f: Fiber) => void) => {
+    if (!fiber) return;
+    visit(fiber);
+    walk(fiber.child, visit);
+    walk(fiber.sibling, visit);
+  };
+  let onChange: ((event: { target: { files: File[]; value: string } }) => void) | undefined;
+  walk(host?.stateNode?.current, fiber => {
+    if (fiber.type === 'input' && typeof fiber.memoizedProps?.onChange === 'function') {
+      onChange = fiber.memoizedProps.onChange;
+    }
+  });
+  if (!onChange) throw new Error('file input onChange not found on fiber tree');
+  onChange({ target: { files, value: '' } });
+}
+
 // Runtime modules are loaded after the jest.mock registrations above so the
 // presentational children and the upload hook are stubbed before ChatInput's
 // own import graph resolves.
@@ -204,6 +236,98 @@ beforeAll(async () => {
 describe('ChatInput finalize failure', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('autosizes a hidden composer on reveal and width changes without reacting to height changes', () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const previousResizeObserver = globalThis.ResizeObserver;
+    const textareaPrototype = Object.getPrototypeOf(
+      dom.container.ownerDocument.createElement('textarea')
+    );
+    const previousClientWidth = Object.getOwnPropertyDescriptor(textareaPrototype, 'clientWidth');
+    const previousScrollHeight = Object.getOwnPropertyDescriptor(textareaPrototype, 'scrollHeight');
+    let width = 0;
+    let scrollHeight = 0;
+    const readScrollHeight = jest.fn(() => scrollHeight);
+    const observe = jest.fn();
+    const disconnect = jest.fn();
+    let notifyResize = () => {};
+    class MockResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        notifyResize = () => callback([], this);
+      }
+      observe = observe;
+      disconnect = disconnect;
+      unobserve = jest.fn();
+    }
+    Object.defineProperties(textareaPrototype, {
+      clientWidth: { configurable: true, get: () => width },
+      scrollHeight: { configurable: true, get: readScrollHeight },
+    });
+    Object.assign(globalThis, { ResizeObserver: MockResizeObserver });
+
+    try {
+      act(() => {
+        root.render(
+          createElement(ChatInput, {
+            onSend: jest.fn(async () => true),
+            attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+          })
+        );
+      });
+      const textarea = dom.container.querySelector('textarea');
+      if (!textarea) throw new Error('textarea missing');
+      expect(textarea.style.height).not.toBe('0px');
+      expect(readScrollHeight).not.toHaveBeenCalled();
+      expect(observe).toHaveBeenCalledWith(textarea);
+
+      width = 640;
+      scrollHeight = 40;
+      act(() => notifyResize());
+      expect(textarea.style.height).toBe('40px');
+      act(() => setTextareaValue(dom.container, 'Visible draft'));
+      expect(textarea.value).toBe('Visible draft');
+
+      readScrollHeight.mockClear();
+      scrollHeight = 80;
+      act(() => notifyResize());
+      expect(readScrollHeight).not.toHaveBeenCalled();
+
+      width = 320;
+      act(() => notifyResize());
+      expect(textarea.style.height).toBe('80px');
+      scrollHeight = 240;
+      act(() => setTextareaValue(dom.container, 'Longer draft'));
+      expect(textarea.style.height).toBe('200px');
+
+      width = 0;
+      scrollHeight = 0;
+      act(() => notifyResize());
+      act(() => setTextareaValue(dom.container, 'Hidden draft'));
+      expect(textarea.style.height).toBe('200px');
+      width = 640;
+      scrollHeight = 40;
+      act(() => notifyResize());
+      expect(textarea.style.height).toBe('40px');
+      expect(textarea.value).toBe('Hidden draft');
+    } finally {
+      act(() => root.unmount());
+      if (previousClientWidth) {
+        Object.defineProperty(textareaPrototype, 'clientWidth', previousClientWidth);
+      } else {
+        delete textareaPrototype.clientWidth;
+      }
+      if (previousScrollHeight) {
+        Object.defineProperty(textareaPrototype, 'scrollHeight', previousScrollHeight);
+      } else {
+        delete textareaPrototype.scrollHeight;
+      }
+      Object.assign(globalThis, { ResizeObserver: previousResizeObserver });
+      dom.cleanup();
+    }
+    expect(disconnect).toHaveBeenCalled();
   });
 
   it('gates Stop on interrupt capability independently of send availability', () => {
@@ -320,7 +444,22 @@ describe('ChatInput finalize failure', () => {
     const finalizeAttachments = jest.fn(async () => {
       throw new Error('link failed');
     });
-    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload({ finalizeAttachments }));
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(
+      buildMockUpload({
+        finalizeAttachments,
+        attachments: [
+          {
+            id: 'attachment',
+            file: new File(['notes'], 'notes.txt', { type: 'text/plain' }),
+            contentType: 'text/plain',
+            kind: 'document',
+            status: 'complete',
+            progress: 100,
+            r2Key: 'owner/cloud-agent/message/notes.txt',
+          },
+        ],
+      })
+    );
     const onSend = jest.fn(async () => true);
 
     const dom = installLinkedomDom();
@@ -417,7 +556,7 @@ describe('ChatInput finalize failure', () => {
           });
           expect(dom.container.querySelector('textarea')?.value).toBe('/new ');
         } else {
-          expect(upload.finalizeAttachments).toHaveBeenCalledTimes(1);
+          expect(upload.finalizeAttachments).not.toHaveBeenCalled();
           expect(onNewChat).toHaveBeenCalledTimes(1);
           expect(dom.container.querySelector('textarea')?.value).toBe('');
         }
@@ -436,7 +575,22 @@ describe('ChatInput finalize failure', () => {
           resolveFinalize = resolve;
         })
     );
-    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload({ finalizeAttachments }));
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(
+      buildMockUpload({
+        finalizeAttachments,
+        attachments: [
+          {
+            id: 'attachment',
+            file: new File(['notes'], 'notes.txt', { type: 'text/plain' }),
+            contentType: 'text/plain',
+            kind: 'document',
+            status: 'complete',
+            progress: 100,
+            r2Key: 'owner/cloud-agent/message/notes.txt',
+          },
+        ],
+      })
+    );
     const onSend = jest.fn(async () => true);
 
     const dom = installLinkedomDom();
@@ -471,6 +625,461 @@ describe('ChatInput finalize failure', () => {
       });
 
       expect(onSend).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => {
+        root.unmount();
+      });
+      dom.cleanup();
+    }
+  });
+
+  it('does not restore a failed send draft after the conversation changed', async () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    let resolveSend!: (value: boolean) => void;
+    const onSend = jest.fn<
+      (message: string, attachments?: CloudAgentAttachments) => Promise<boolean>
+    >(
+      () =>
+        new Promise<boolean>(resolve => {
+          resolveSend = resolve;
+        })
+    );
+
+    const dom = installLinkedomDom();
+    let root!: Root;
+    const render = (conversationKey: string) => {
+      act(() => {
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey,
+            attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+          })
+        );
+      });
+    };
+    try {
+      act(() => {
+        root = createRoot(dom.container);
+      });
+      render('chat-a');
+      act(() => {
+        setTextareaValue(dom.container, 'draft for A');
+      });
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      expect(onSend).toHaveBeenCalledWith('draft for A', undefined);
+
+      render('chat-b');
+      await act(async () => {
+        resolveSend(false);
+        await Promise.resolve();
+      });
+
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+    } finally {
+      act(() => {
+        root.unmount();
+      });
+      dom.cleanup();
+    }
+  });
+
+  it('restores the failed send draft when the conversation is unchanged', async () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    let resolveSend!: (value: boolean) => void;
+    const onSend = jest.fn<
+      (message: string, attachments?: CloudAgentAttachments) => Promise<boolean>
+    >(
+      () =>
+        new Promise<boolean>(resolve => {
+          resolveSend = resolve;
+        })
+    );
+
+    const dom = installLinkedomDom();
+    let root!: Root;
+    try {
+      act(() => {
+        root = createRoot(dom.container);
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey: 'chat-a',
+            attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+          })
+        );
+      });
+      act(() => {
+        setTextareaValue(dom.container, 'draft for A');
+      });
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+
+      await act(async () => {
+        resolveSend(false);
+        await Promise.resolve();
+      });
+
+      expect(dom.container.querySelector('textarea')?.value).toBe('draft for A');
+    } finally {
+      act(() => {
+        root.unmount();
+      });
+      dom.cleanup();
+    }
+  });
+
+  it.each([true, false])(
+    'cleans up accepted attachments and retains failed attachments after switching chats (accepted=%s)',
+    async accepted => {
+      const attachment: CloudAgentAttachmentFile = {
+        id: 'attachment',
+        file: new File(['notes'], 'notes.txt', { type: 'text/plain' }),
+        contentType: 'text/plain',
+        kind: 'document',
+        status: 'complete',
+        progress: 100,
+        r2Key: 'owner/cloud-agent/message/notes.txt',
+        previewUrl: 'blob:submitted',
+      };
+      const revokePreview = jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+      const upload = buildMockUpload({ attachments: [attachment] });
+      mockedUseCloudAgentAttachmentUpload.mockReturnValue(upload);
+      let resolveSend!: (value: boolean) => void;
+      const onSend = jest.fn<
+        (message: string, attachments?: CloudAgentAttachments) => Promise<boolean>
+      >(
+        () =>
+          new Promise<boolean>(resolve => {
+            resolveSend = resolve;
+          })
+      );
+
+      const dom = installLinkedomDom();
+      let root!: Root;
+      const render = (conversationKey: string) => {
+        act(() => {
+          root.render(
+            createElement(ChatInput, {
+              onSend,
+              conversationKey,
+              attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+            })
+          );
+        });
+      };
+      try {
+        act(() => {
+          root = createRoot(dom.container);
+        });
+        render('chat-a');
+        act(() => {
+          setTextareaValue(dom.container, 'draft for A');
+        });
+        await act(async () => {
+          pressEnter(dom.container);
+        });
+        expect(onSend).toHaveBeenCalledWith('draft for A', undefined);
+        expect(upload.finalizeAttachments).toHaveBeenCalledTimes(1);
+
+        render('chat-b');
+        expect(upload.clearAttachments).not.toHaveBeenCalled();
+        expect(upload.removeAttachment).not.toHaveBeenCalled();
+        const replaceCalls = (upload.replaceAttachments as jest.Mock).mock.calls;
+        expect(replaceCalls.at(-1)?.[0]).toEqual([]);
+
+        await act(async () => {
+          resolveSend(accepted);
+          await Promise.resolve();
+        });
+        expect(dom.container.querySelector('textarea')?.value).toBe('');
+        expect(upload.clearAttachments).not.toHaveBeenCalled();
+
+        expect(revokePreview).toHaveBeenCalledTimes(accepted ? 1 : 0);
+        if (accepted) expect(revokePreview).toHaveBeenCalledWith('blob:submitted');
+        render('chat-a');
+        expect(dom.container.querySelector('textarea')?.value).toBe(accepted ? '' : 'draft for A');
+        expect((upload.replaceAttachments as jest.Mock).mock.calls.at(-1)?.[0]).toEqual(
+          accepted ? [] : [attachment]
+        );
+        expect(upload.clearAttachments).not.toHaveBeenCalled();
+      } finally {
+        act(() => {
+          root.unmount();
+        });
+        dom.cleanup();
+        revokePreview.mockRestore();
+      }
+    }
+  );
+
+  it('starts a new chat while an ordinary send request is held', async () => {
+    const upload = buildMockUpload();
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(upload);
+    const onSend = jest.fn<
+      (message: string, attachments?: CloudAgentAttachments) => Promise<boolean>
+    >(() => new Promise<boolean>(() => {}));
+    const onNewChat = jest.fn(async () => true);
+
+    const dom = installLinkedomDom();
+    let root!: Root;
+    const render = (disabled: boolean) => {
+      act(() => {
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            onNewChat,
+            disabled,
+            attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+          })
+        );
+      });
+    };
+    try {
+      act(() => {
+        root = createRoot(dom.container);
+      });
+      render(false);
+      act(() => {
+        setTextareaValue(dom.container, 'hi');
+      });
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      expect(onSend).toHaveBeenCalledTimes(1);
+
+      render(true);
+      act(() => {
+        setTextareaValue(dom.container, '/new');
+      });
+      const newChatButton = dom.container.querySelector<HTMLButtonElement>(
+        'button[aria-label="New chat"]'
+      );
+      expect(newChatButton).not.toBeNull();
+      expect(newChatButton?.hasAttribute('disabled')).toBe(false);
+      await act(async () => {
+        newChatButton?.click();
+      });
+
+      expect(onNewChat).toHaveBeenCalledTimes(1);
+      expect(onSend).toHaveBeenCalledTimes(1);
+
+      // `/new` must not clear the ordinary send guard it bypassed.
+      const stillSending = dom.container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Sending message"]'
+      );
+      expect(stillSending).not.toBeNull();
+      expect(stillSending?.getAttribute('aria-busy')).toBe('true');
+    } finally {
+      act(() => {
+        root.unmount();
+      });
+      dom.cleanup();
+    }
+  });
+
+  it('does not treat another conversation as pending while the first request is held', async () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const onSend = jest.fn<
+      (message: string, attachments?: CloudAgentAttachments) => Promise<boolean>
+    >(() => new Promise<boolean>(() => {}));
+
+    const dom = installLinkedomDom();
+    let root!: Root;
+    const render = (conversationKey: string) => {
+      act(() => {
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey,
+            attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+          })
+        );
+      });
+    };
+    try {
+      act(() => {
+        root = createRoot(dom.container);
+      });
+      render('chat-a');
+      act(() => {
+        setTextareaValue(dom.container, 'from A');
+      });
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      expect(onSend).toHaveBeenCalledTimes(1);
+
+      render('chat-b');
+      act(() => {
+        setTextareaValue(dom.container, 'from B');
+      });
+
+      const sendButton = dom.container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Send message"]'
+      );
+      expect(sendButton).not.toBeNull();
+      expect(sendButton?.hasAttribute('disabled')).toBe(false);
+      expect(sendButton?.getAttribute('aria-busy')).toBeNull();
+      expect(dom.container.querySelector('button[aria-label="Sending message"]')).toBeNull();
+    } finally {
+      act(() => {
+        root.unmount();
+      });
+      dom.cleanup();
+    }
+  });
+
+  it('keeps the second conversation pending after the first request settles', async () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const resolvers: Array<(value: boolean) => void> = [];
+    const onSend = jest.fn<
+      (message: string, attachments?: CloudAgentAttachments) => Promise<boolean>
+    >(
+      () =>
+        new Promise<boolean>(resolve => {
+          resolvers.push(resolve);
+        })
+    );
+
+    const dom = installLinkedomDom();
+    let root!: Root;
+    const render = (conversationKey: string) => {
+      act(() => {
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey,
+            attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+          })
+        );
+      });
+    };
+    try {
+      act(() => {
+        root = createRoot(dom.container);
+      });
+      render('chat-a');
+      act(() => {
+        setTextareaValue(dom.container, 'from A');
+      });
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+
+      render('chat-b');
+      act(() => {
+        setTextareaValue(dom.container, 'from B');
+      });
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      expect(onSend).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        resolvers[0](false);
+        await Promise.resolve();
+      });
+
+      const sending = dom.container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Sending message"]'
+      );
+      expect(sending).not.toBeNull();
+      expect(sending?.getAttribute('aria-busy')).toBe('true');
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+    } finally {
+      act(() => {
+        root.unmount();
+      });
+      dom.cleanup();
+    }
+  });
+
+  it('opens the picker and accepts a file input while idle', async () => {
+    const upload = buildMockUpload();
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(upload);
+
+    const dom = installLinkedomDom();
+    let root: Root | undefined;
+    try {
+      act(() => {
+        root = createRoot(dom.container);
+        root.render(
+          createElement(ChatInput, {
+            onSend: jest.fn(async () => true),
+            attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+          })
+        );
+      });
+
+      const fileInput = dom.container.querySelector<HTMLInputElement>('input[type="file"]');
+      if (!fileInput) throw new Error('file input missing');
+      const openPicker = jest.spyOn(fileInput, 'click').mockImplementation(() => {});
+
+      act(() => {
+        dom.container
+          .querySelector<HTMLButtonElement>('button[aria-label="Attach files"]')
+          ?.click();
+      });
+      expect(openPicker).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        changeFileInput(dom.container, [new File(['notes'], 'notes.txt', { type: 'text/plain' })]);
+      });
+      expect(upload.addFiles).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => root?.unmount());
+      dom.cleanup();
+    }
+  });
+
+  it('accepts files in the second conversation while the first request is held', async () => {
+    const upload = buildMockUpload();
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(upload);
+    const onSend = jest.fn<
+      (message: string, attachments?: CloudAgentAttachments) => Promise<boolean>
+    >(() => new Promise<boolean>(() => {}));
+
+    const dom = installLinkedomDom();
+    let root!: Root;
+    const render = (conversationKey: string) => {
+      act(() => {
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey,
+            attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+          })
+        );
+      });
+    };
+    try {
+      act(() => {
+        root = createRoot(dom.container);
+      });
+      render('chat-a');
+      act(() => {
+        setTextareaValue(dom.container, 'from A');
+      });
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+
+      // The conversation that owns the held request refuses new files…
+      act(() => {
+        changeFileInput(dom.container, [new File(['a'], 'a.txt', { type: 'text/plain' })]);
+      });
+      expect(upload.addFiles).not.toHaveBeenCalled();
+
+      // …but another conversation is not blocked by it.
+      render('chat-b');
+      act(() => {
+        changeFileInput(dom.container, [new File(['b'], 'b.txt', { type: 'text/plain' })]);
+      });
+      expect(upload.addFiles).toHaveBeenCalledTimes(1);
     } finally {
       act(() => {
         root.unmount();

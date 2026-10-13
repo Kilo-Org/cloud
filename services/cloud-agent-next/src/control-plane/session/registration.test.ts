@@ -211,6 +211,51 @@ describe('runtime authorization admission', () => {
   });
 });
 
+describe('saved internal review allocation admission', () => {
+  it('admits a saved selectable allocation for a code-review origin', () => {
+    const saved = metadata({
+      identity: {
+        sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+        userId: 'usr_1',
+        createdOnPlatform: 'code-review',
+        billingOrigin: 'code-review',
+      },
+      repository: {
+        type: 'github',
+        repo: 'acme/widgets',
+        githubAppType: 'standard',
+        pullRequestNumber: 7,
+      },
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare',
+        sandboxAllocation: 'cloudflare-single',
+      },
+    });
+    expect(saved.workspace?.sandboxAllocation).toBe('cloudflare-single');
+    const registration = buildControlPlaneSessionRegistration(saved, selection);
+    expect(registration.spec.sessionId).toBe(saved.identity.sessionId);
+  });
+
+  it('still rejects a devcontainer combined with any sandbox allocation', () => {
+    expect(() =>
+      metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare',
+          sandboxAllocation: 'cloudflare-single',
+        },
+        devcontainer: {
+          workspacePath: '/workspace',
+          innerWorkspaceFolder: '/inner',
+          wrapperPort: 1234,
+          configPath: '/workspace/.devcontainer.json',
+        },
+      })
+    ).toThrow();
+  });
+});
+
 describe('buildControlPlaneSessionRegistration MCP materialization', () => {
   it('keeps materialized servers out of the spec and isolates the session', () => {
     const registration = buildControlPlaneSessionRegistration(

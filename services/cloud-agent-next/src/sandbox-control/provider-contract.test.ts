@@ -188,7 +188,9 @@ function cloudflareHarness(): ContractHarness {
   };
 }
 
-function containersHarness(): ContractHarness {
+function containersHarness(
+  options: { startSource?: ContainersStartSource; failLaunchLease?: boolean } = {}
+): ContractHarness {
   const state = {
     observation: {
       running: true,
@@ -210,10 +212,11 @@ function containersHarness(): ContractHarness {
     launchWrapper: async (input: ContainersLaunchInput) => {
       state.launchInputs.push(input);
       state.observation = { ...state.observation, currentAllocationRef: input.allocationRef };
-      return { started: true, startSource: 'image' as ContainersStartSource };
+      return { started: true, startSource: options.startSource ?? 'image' };
     },
     ensureLeaseAtLeast: async (_ref: string, ms: number) => {
       state.leaseMs.push(ms);
+      if (options.failLaunchLease) throw new Error('containers lease failed');
     },
     captureRepository: async (ref: string, repoKey: string, commit?: string) => {
       state.captures.push({ ref, repoKey, ...(commit === undefined ? {} : { commit }) });
@@ -479,6 +482,13 @@ describe.each(harnessFactories.map(factory => [factory().name, factory] as const
 );
 
 describe('provider-specific contract differences', () => {
+  it('reports the actual snapshot launch source even if its initial lease renewal fails', async () => {
+    const harness = containersHarness({ startSource: 'repository', failLaunchLease: true });
+    const ref = await harness.create();
+    await expect(harness.adapter.launch(ref, {})).resolves.toEqual({ startSource: 'repository' });
+    expect(harness.leaseCalls()).toBe(1);
+  });
+
   it('keeps Cloudflare logs as an opaque descriptor and ignores the lease duration', async () => {
     const harness = cloudflareHarness();
     const ref = await harness.create();

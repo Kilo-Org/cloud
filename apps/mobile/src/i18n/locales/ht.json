@@ -2152,6 +2152,11 @@
       "collapse": "Kache objektif la",
       "expand": "Montre objektif la"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tach, {{completed}} sou {{total}} fini",
+      "rowAccessibility": "Tach, {{completed}} sou {{total}} fini. Tach aktyèl la: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Itilize dènyèman",
       "couldNotLoadGithubRepositories": "Nou pa t ka chaje depo GitHub yo.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Ap enpòte sesyon an",
       "cliCannotContinue": "CLI sa a pa ka kontinye yon sesyon. Chwazi Cloud Agent oswa yon lòt CLI.",
       "importFailed": "Nou pa t ka enpòte sesyon sa a.",
+      "cliCannotFork": "Mete Kilo CLI a ajou pou w ka fè yon fork apati yon mesaj.",
+      "forkCutNotSynced": "Mesaj sa a poko anrejistre. Eseye ankò nan yon ti moman.",
+      "forkFilesFromBaseBranch": "Fichye yo kòmanse apati branch de baz la.",
+      "forkFilesUnchangedOnComputer": "Fichye ki sou òdinatè sa a pa chanje.",
       "pickProfile": "Chwazi yon pwofil",
       "noProfile": "Pa gen pwofil",
       "manageProfiles": "Jere pwofil yo",
@@ -2326,6 +2335,7 @@
       "copyMessage": "Kopye mesaj la",
       "copyText": "Kopye tèks la",
       "selectText": "Chwazi tèks la",
+      "forkFromHere": "Fè yon fork apati isit la",
       "reportAiResponse": "Siyale repons AI a",
       "reportAiResponseConfirm": "Siyale repons sa a pou yo egzamine li?",
       "report": "Siyale",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Gid"
   },
   "modelChat": {
+    "offlineFailure": "Modèl sa a bezwen yon koneksyon entènèt. Konekte epi eseye ankò, oswa chanje pou yon modèl ki sou aparèy sa a.",
     "empty": {
       "title": "Kòmanse yon chat",
       "description": "Voye yon mesaj pou pale ak yon modèl."
@@ -3200,6 +3211,11 @@
       "deleteTitle": "Efase chat sa a?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Chèche sou entènèt",
+      "description": "Kite chat sa a chèche enfòmasyon ki ajou atravè kont Kilo ou. Rechèch yo itilize alokasyon rechèch chak mwa ou.",
+      "allowanceExhausted": "Rechèch entènèt gratis ou pou mwa sa a fini. Ajoute kredi pou chèche ankò."
+    },
     "mcp": {
       "title": "Zouti Kilo",
       "use": "Sèvi ak zouti Kilo",
@@ -3336,8 +3352,48 @@
         "notGguf": "Lyen an dwe mennen nan yon fichye .gguf.",
         "space": "Pa gen ase espas lib pou modèl sa a. Lage espas epi eseye ankò.",
         "network": "Telechajman an pa fini. Verifye koneksyon ou epi eseye ankò.",
-        "invalidFile": "Fichye ki telechaje a pa yon modèl aplikasyon sa a ka fè mache, kidonk li te retire."
+        "invalidFile": "Fichye ki telechaje a pa yon modèl aplikasyon sa a ka fè mache, kidonk li te retire.",
+        "checksum": "Fichye ki telechaje a pa koresponn ak checksum ki pibliye pou li a, kidonk li te retire. Eseye telechaje l ankò."
       }
+    },
+    "catalog": {
+      "browse": "Gade modèl yo",
+      "title": "Katalòg modèl",
+      "search": "Chèche modèl sou Hugging Face",
+      "tabs": "Filt modèl",
+      "fitsTab": "Mache sou aparèy sa a",
+      "fromHuggingFace": "Soti nan Hugging Face",
+      "loading": "Modèl yo ap chaje",
+      "noResults": "Pa gen modèl yo jwenn",
+      "noFits": "Pa gen modèl ki mache sou aparèy sa a",
+      "noFitsDescription": "Modèl ki pi gwo yo nan onglè $t(common.all) a.",
+      "fit": {
+        "fits": "Mache",
+        "tight": "Jis jis",
+        "tooLarge": "Twò gwo",
+        "noStorage": "Pa gen ase espas"
+      },
+      "parameters": "Paramèt: {{value}}",
+      "downloads": "Telechajman: {{value}}",
+      "likes": "Jaime: {{value}}",
+      "context": "Fenèt kontèks: {{value}}",
+      "license": "Lisans: {{license}}",
+      "licenseUnknown": "Lisans lan pa endike",
+      "tools": "Apèl zouti",
+      "vision": "Antre imaj",
+      "hintsHelp": "Endikasyon ki soti nan Hugging Face. Aplikasyon an verifye modèl la apre li fin telechaje.",
+      "gated": "Modèl sa a mande yon kont Hugging Face, kidonk aplikasyon an pa ka telechaje l.",
+      "quantizations": "Kantifikasyon",
+      "quantizationsHelp": "Fichye ki pi piti yo sèvi ak mwens memwa ak espas. Fichye ki pi gwo yo bay pi bon repons anjeneral.",
+      "quantDetail": "Telechajman {{size}} · anviwon {{memory}} memwa",
+      "downloadQuant": "Telechaje {{quant}}",
+      "loadingModel": "Detay modèl la ap chaje",
+      "couldNotLoadModel": "Pa t ka chaje modèl sa a",
+      "noFiles": "Pa gen fichye aplikasyon sa a ka kouri",
+      "noFilesDescription": "Aplikasyon sa a kouri modèl ki se yon sèl fichye GGUF.",
+      "tooLargeTitle": "Modèl sa a ka pa mache",
+      "tooLargeMessage": "{{name}} gen dwa bezwen plis memwa pase aparèy sa a genyen. Aplikasyon an ka fèmen pandan modèl la ap reponn. Telechaje l kanmenm?",
+      "downloadAnyway": "Telechaje kanmenm"
     },
     "localModels": {
       "title": "Modèl sou aparèy la",

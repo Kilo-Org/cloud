@@ -2,13 +2,9 @@ import { useCallback, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
-import {
-  ensureRemoteMcp,
-  type RemoteMcpServerState,
-  remoteMcpState,
-  subscribeRemoteMcp,
-} from './remote-mcp';
+import { ensureRemoteMcp, remoteMcpState, subscribeRemoteMcp } from './remote-mcp';
 import { signInRemoteMcpServer } from './remote-mcp-oauth';
+import { type RemoteMcpServerState } from './remote-mcp-state';
 import {
   addRemoteMcpServer,
   deleteRemoteMcpServer,
@@ -48,10 +44,10 @@ export type RemoteMcpServers = {
   /** The servers whose sign-in is in flight, so their buttons show it is working. */
   readonly signingInIds: readonly string[];
   readonly setEnabled: (id: string, next: boolean) => void;
-  /** Asks one failed server again, with the longer deadline a Retry gets. */
+  /** Asks one server with no tools on hand again, with the longer deadline a Retry gets. */
   readonly retryServer: (id: string) => void;
-  /** Signs in to one OAuth server in the browser, then asks it again. */
   readonly signInServer: (id: string) => void;
+  readonly discover: () => void;
   readonly addServer: (draft: RemoteMcpServerDraft) => Promise<boolean>;
   readonly updateServer: (id: string, draft: RemoteMcpServerDraft) => Promise<boolean>;
   readonly deleteServer: (id: string) => Promise<boolean>;
@@ -125,11 +121,6 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
     [failed, place]
   );
 
-  /**
-   * Signs in in the browser, then asks the server again so the row and an open
-   * chat move onto the tools the sign-in unlocked. A person who closed the
-   * browser is told nothing: the row still offers the Sign in.
-   */
   const signInServer = useCallback(
     (id: string) => {
       const server = listRemoteMcpServers().find(one => one.id === id);
@@ -158,6 +149,20 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
     },
     [failed, place, t]
   );
+
+  const discover = useCallback(() => {
+    if (place === null) {
+      return;
+    }
+    void (async () => {
+      try {
+        await ensureRemoteMcp(place);
+        await refreshChatTools();
+      } catch (error) {
+        failed(error);
+      }
+    })();
+  }, [failed, place]);
 
   const addServer = useCallback(
     async (draft: RemoteMcpServerDraft): Promise<boolean> => {
@@ -222,6 +227,7 @@ export function useRemoteMcpServers(place: ChatPlace | null): RemoteMcpServers {
     setEnabled,
     retryServer,
     signInServer,
+    discover,
     addServer,
     updateServer,
     deleteServer,

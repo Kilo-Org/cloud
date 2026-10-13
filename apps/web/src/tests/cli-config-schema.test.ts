@@ -189,6 +189,9 @@ describe('kilo config.json schema merge', () => {
     expect(exp.properties.native_notebook_tools).toEqual(
       expect.objectContaining({ type: 'boolean' })
     );
+    expect(exp.properties.glob_include_ignored).toEqual(
+      expect.objectContaining({ type: 'array', items: { type: 'string' } })
+    );
     expect(exp.properties.openTelemetry).toBeDefined();
     expect(exp.properties.batch_tool).toBeDefined(); // upstream key preserved
   });

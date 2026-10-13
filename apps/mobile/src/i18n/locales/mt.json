@@ -2236,6 +2236,11 @@
       "collapse": "Aħbi l-għan",
       "expand": "Uri l-għan"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Kompiti, {{completed}} minn {{total}} kompluti",
+      "rowAccessibility": "Kompiti, {{completed}} minn {{total}} kompluti. Kompitu attwali: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Użati reċentement",
       "couldNotLoadGithubRepositories": "Ma setgħux jitgħabbew ir-repożitorji ta' GitHub.",
@@ -2291,6 +2296,10 @@
       "importingSession": "Qed tiġi importata s-sessjoni",
       "cliCannotContinue": "Dan il-CLI ma jistax ikompli sessjoni. Agħżel Cloud Agent jew CLI ieħor.",
       "importFailed": "Ma setgħetx tiġi importata din is-sessjoni.",
+      "cliCannotFork": "Aġġorna l-Kilo CLI biex tibda fergħa minn messaġġ.",
+      "forkCutNotSynced": "Dan il-messaġġ għadu ma ġiex issejvjat. Erġa' pprova ftit wara.",
+      "forkFilesFromBaseBranch": "Il-fajls jibdew mill-fergħa bażi.",
+      "forkFilesUnchangedOnComputer": "Il-fajls fuq dan il-kompjuter ma jinbidlux.",
       "pickProfile": "Agħżel profil",
       "noProfile": "Ebda profil",
       "manageProfiles": "Immaniġġja profili",
@@ -2418,6 +2427,7 @@
       "copyMessage": "Ikkopja l-messaġġ",
       "copyText": "Ikkopja t-test",
       "selectText": "Agħżel it-test",
+      "forkFromHere": "Ibda fergħa minn hawn",
       "reportAiResponse": "Irrapporta t-tweġiba tal-AI",
       "reportAiResponseConfirm": "Tirrapporta din it-tweġiba biex tiġi riveduta?",
       "report": "Irrapporta",
@@ -3312,6 +3322,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Dan il-mudell jeħtieġ konnessjoni tal-internet. Ikkonnettja u erġa' pprova, jew aqleb għal mudell fuq dan l-apparat.",
     "empty": {
       "title": "Ibda chat",
       "description": "Ibgħat messaġġ biex tikkellem ma' mudell."
@@ -3323,6 +3334,11 @@
       "deleteTitle": "Tħassar dan iċ-chat?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Fittex fuq il-web",
+      "description": "Ħalli din iċ-chat tfittex informazzjoni kurrenti permezz tal-kont Kilo tiegħek. It-tfittxijiet jużaw il-kwota ta' tfittxija ta' kull xahar tiegħek.",
+      "allowanceExhausted": "It-tfittxijiet web b'xejn tiegħek għal dan ix-xahar spiċċaw. Żid krediti biex terġa' tfittex."
+    },
     "mcp": {
       "title": "Għodod Kilo",
       "use": "Uża l-għodod Kilo",
@@ -3459,8 +3475,48 @@
         "notGguf": "Il-link irid jindika lejn fajl .gguf.",
         "space": "M'hemmx biżżejjed spazju ħieles għal dan il-mudell. Illibera spazju u erġa' pprova.",
         "network": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
-        "invalidFile": "Il-fajl imniżżel mhuwiex mudell li din l-app tista' tmexxi, għalhekk tneħħa."
+        "invalidFile": "Il-fajl imniżżel mhuwiex mudell li din l-app tista' tmexxi, għalhekk tneħħa.",
+        "checksum": "Il-fajl imniżżel ma jaqbilx mal-checksum ippubblikat tiegħu, għalhekk tneħħa. Erġa' pprova t-tniżżil."
       }
+    },
+    "catalog": {
+      "browse": "Ibbrawżja l-mudelli",
+      "title": "Katalgu tal-mudelli",
+      "search": "Fittex mudelli ta' Hugging Face",
+      "tabs": "Filtru tal-mudelli",
+      "fitsTab": "Jaqblu ma' dan l-apparat",
+      "fromHuggingFace": "Minn Hugging Face",
+      "loading": "Qed jitgħabbew il-mudelli",
+      "noResults": "Ma nstab l-ebda mudell",
+      "noFits": "L-ebda mudell ma jaqbel ma' dan l-apparat",
+      "noFitsDescription": "Il-mudelli akbar jinsabu fit-tab $t(common.all).",
+      "fit": {
+        "fits": "Jaqbel",
+        "tight": "Bilkemm jaqbel",
+        "tooLarge": "Kbir wisq",
+        "noStorage": "Mhemmx biżżejjed spazju"
+      },
+      "parameters": "Parametri: {{value}}",
+      "downloads": "Tniżżil: {{value}}",
+      "likes": "Likes: {{value}}",
+      "context": "Tieqa tal-kuntest: {{value}}",
+      "license": "Liċenzja: {{license}}",
+      "licenseUnknown": "Il-liċenzja mhix indikata",
+      "tools": "Sejħa tal-għodod",
+      "vision": "Input tal-istampi",
+      "hintsHelp": "Indikazzjonijiet minn Hugging Face. L-app tivverifika l-mudell wara li jitniżżel.",
+      "gated": "Dan il-mudell jeħtieġ kont ta' Hugging Face, għalhekk l-app ma tistax tniżżlu.",
+      "quantizations": "Kwantizzazzjonijiet",
+      "quantizationsHelp": "Il-fajls iżgħar jużaw inqas memorja u spazju. Il-fajls akbar normalment jagħtu tweġibiet aħjar.",
+      "quantDetail": "Tniżżil ta' {{size}} · madwar {{memory}} memorja",
+      "downloadQuant": "Niżżel {{quant}}",
+      "loadingModel": "Qed jitgħabbew id-dettalji tal-mudell",
+      "couldNotLoadModel": "Dan il-mudell ma setax jitgħabba",
+      "noFiles": "L-ebda fajl li din l-app tista' tħaddem",
+      "noFilesDescription": "Din l-app tħaddem mudelli li huma fajl GGUF wieħed.",
+      "tooLargeTitle": "Dan il-mudell jista' ma jaħdimx",
+      "tooLargeMessage": "{{name}} x'aktarx jeħtieġ aktar memorja milli għandu dan l-apparat. L-app tista' tagħlaq waqt li l-mudell iwieġeb. Trid tniżżlu xorta waħda?",
+      "downloadAnyway": "Niżżel xorta waħda"
     },
     "localModels": {
       "title": "Mudelli fuq l-apparat",

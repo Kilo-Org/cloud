@@ -283,6 +283,11 @@ export function getRemoteMcpServersHasLoaded(): boolean {
   return store.getHasLoaded();
 }
 
+/** Resolves once the persisted list has been read, so a caller outside React reads the real list. */
+export async function whenRemoteMcpServersLoaded(): Promise<void> {
+  await store.whenLoaded();
+}
+
 /** The list a screen draws. */
 export function useRemoteMcpServers(): StoredRemoteMcpServer[] {
   return useSyncExternalStore(store.subscribe, store.get);

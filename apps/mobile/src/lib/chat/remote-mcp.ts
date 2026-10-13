@@ -7,12 +7,22 @@ import {
 } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 
 import { credentialDeps, serverValue } from './remote-mcp-credentials';
 import {
+  connectingOf,
+  type RemoteMcpDiscovery,
+  type RemoteMcpServerState,
+  remoteServerStates,
+  remoteServerToolsFor,
+} from './remote-mcp-state';
+import {
+  getRemoteMcpServersHasLoaded,
   listRemoteMcpServers,
   type StoredRemoteMcpServer,
   subscribeRemoteMcpServers,
+  whenRemoteMcpServersLoaded,
 } from './remote-mcp-store';
 import { type ChatPlace } from './scope';
 
@@ -35,32 +45,6 @@ import { type ChatPlace } from './scope';
  */
 
 /**
- * Why a server's tools are, or are not, on hand. `signIn` is an OAuth server
- * that refused: only the person can fix it, in the browser.
- */
-type RemoteMcpStatus = 'idle' | 'connecting' | 'ready' | 'failed' | 'signIn';
-
-/** One server's discovery result, keyed by the server's id. */
-export type RemoteMcpDiscovery = {
-  readonly tools: readonly Tool[];
-  /** True when the discovery did not reach the server, so none of its tools are offered. */
-  readonly failed?: boolean;
-  /** True when an OAuth server refused, so a person must sign in again. */
-  readonly signIn?: boolean;
-};
-
-/** What one server looks like to whoever draws it. */
-export type RemoteMcpServerState = {
-  readonly id: string;
-  readonly name: string;
-  readonly url: string;
-  readonly enabled: boolean;
-  readonly status: RemoteMcpStatus;
-  readonly toolCount: number;
-  readonly retryable: boolean;
-};
-
-/**
  * Whether a discovery is the one an open makes or the one a person asked for.
  * A Retry gets the longer deadline because the person is waiting on it, and the
  * failure is the thing being given another chance.
@@ -75,74 +59,6 @@ const RETRY_TIMEOUT_MS = 15_000;
 /** The deadline one discovery gets: the Retry's is the caller's own ask. */
 const deadlineFor = (request: RemoteMcpRequest): number =>
   request.retry === true ? RETRY_TIMEOUT_MS : AUTOMATIC_TIMEOUT_MS;
-
-/** The state a server is drawn in, with every field named once. */
-function stateOf(
-  server: StoredRemoteMcpServer,
-  fields: {
-    readonly status: RemoteMcpStatus;
-    readonly toolCount: number;
-    readonly retryable: boolean;
-  }
-): RemoteMcpServerState {
-  return {
-    id: server.id,
-    name: server.name,
-    url: server.url,
-    enabled: server.enabled,
-    status: fields.status,
-    toolCount: fields.toolCount,
-    retryable: fields.retryable,
-  };
-}
-
-/**
- * The state of every stored server, joined with what has been discovered.
- *
- * A disabled server is always `idle` with no tools, whatever a stale entry
- * says: it is the list that decides, and the entry is left for `reconcile` to
- * drop. A server with no entry has not been asked yet. A failed discovery shows
- * as `failed` with no tools, so a screen offers a Retry rather than counting a
- * list that answers nothing.
- */
-export function remoteServerStates(
-  servers: readonly StoredRemoteMcpServer[],
-  discovered: ReadonlyMap<string, RemoteMcpDiscovery>
-): RemoteMcpServerState[] {
-  return servers.map(server => {
-    if (!server.enabled) {
-      return stateOf(server, { status: 'idle', toolCount: 0, retryable: false });
-    }
-    const found = discovered.get(server.id);
-    if (found === undefined) {
-      return stateOf(server, { status: 'idle', toolCount: 0, retryable: false });
-    }
-    if (found.signIn === true) {
-      return stateOf(server, { status: 'signIn', toolCount: 0, retryable: false });
-    }
-    if (found.failed === true) {
-      return stateOf(server, { status: 'failed', toolCount: 0, retryable: true });
-    }
-    return stateOf(server, { status: 'ready', toolCount: found.tools.length, retryable: false });
-  });
-}
-
-/**
- * The tools of the enabled servers that were discovered, in list order.
- *
- * A disabled server contributes nothing even if it has a cached entry, and a
- * failed discovery contributes nothing even when it answered with tools
- * earlier: the union is only ever a server the app can currently reach.
- */
-export function remoteServerToolsFor(
-  servers: readonly StoredRemoteMcpServer[],
-  discovered: ReadonlyMap<string, RemoteMcpDiscovery>
-): readonly Tool[] {
-  return servers.flatMap(server => {
-    const found = server.enabled ? discovered.get(server.id) : undefined;
-    return found === undefined || found.failed === true ? [] : found.tools;
-  });
-}
 
 /** The snapshot React draws. Replaced whole, so a watcher can compare it by reference. */
 let snapshot: readonly RemoteMcpServerState[] = [];
@@ -264,19 +180,6 @@ async function discover(
   publish();
 }
 
-/** The same server, drawn as one whose discovery is running now. */
-function connectingOf(state: RemoteMcpServerState): RemoteMcpServerState {
-  return {
-    id: state.id,
-    name: state.name,
-    url: state.url,
-    enabled: state.enabled,
-    status: 'connecting',
-    toolCount: 0,
-    retryable: false,
-  };
-}
-
 /** The states the module holds, with a running discovery shown as `connecting`. */
 function currentStates(): RemoteMcpServerState[] {
   const states = remoteServerStates(listRemoteMcpServers(), discovered);
@@ -317,13 +220,25 @@ function reconcile(): void {
  *
  * A server that named tools keeps them for the config and the account, so the
  * next chat does not open a second connection for the same list. A server that
- * answered with none is the one answer that must be asked again: the empty
- * state offers no Retry of its own, so a catalog that was mid-deploy when the
- * first chat asked would leave every chat after it on no tools until the app
- * was restarted. The next ask reconnects and says what the server offers now.
+ * answered with none is asked again: a catalog that was mid-deploy when the
+ * first chat asked would otherwise leave every chat after it on no tools until
+ * the app was restarted. The next ask reconnects and says what the server
+ * offers now.
  */
 function reusable(found: RemoteMcpDiscovery | undefined): boolean {
   return found !== undefined && found.failed !== true && found.tools.length > 0;
+}
+
+/**
+ * The servers an automatic ask found offline, recorded as failed rather than
+ * connected to: the row offers a Retry, and the next open asks them again.
+ */
+function failOffline(servers: readonly StoredRemoteMcpServer[]): readonly RemoteMcpServerState[] {
+  for (const server of servers) {
+    discovered.set(server.id, { tools: [], failed: true });
+  }
+  publish();
+  return snapshot;
 }
 
 /**
@@ -332,14 +247,24 @@ function reusable(found: RemoteMcpDiscovery | undefined): boolean {
  *
  * A discovery that failed is not an answer: asking again reconnects, which is
  * what a Retry and the next chat both are. Neither is an answer with no tools in
- * it, because the empty list offers no Retry and the next ask is what makes a
- * transient empty catalog recoverable. A call made while one is already running
- * for the same key joins it rather than opening a second connection.
+ * it, because the next ask is what makes a transient empty catalog recoverable.
+ * A call made while one is already running for the same key joins it rather
+ * than opening a second connection.
+ *
+ * After a cold start the stored list may not have been read yet, and an empty
+ * list then means "not read" rather than "none": the ask waits for it, or a
+ * chat opened at launch would discover nothing. An automatic ask made while
+ * the app has confirmed it is offline connects to nothing, so a chat opens at
+ * once rather than after the deadline. An unknown state, as at boot before
+ * NetInfo settles, still connects; a person's Retry always tries.
  */
 export async function ensureRemoteMcp(
   place: ChatPlace,
   request: RemoteMcpRequest = {}
 ): Promise<readonly RemoteMcpServerState[]> {
+  if (!getRemoteMcpServersHasLoaded()) {
+    await whenRemoteMcpServersLoaded();
+  }
   const key = keyFor(place);
   if (key !== cacheKey) {
     /* The config or the account changed, so a discovery started for the old one
@@ -361,6 +286,9 @@ export async function ensureRemoteMcp(
   if (inFlight?.key === key) {
     await inFlight.promise;
     return snapshot;
+  }
+  if (request.retry !== true && getCommittedConnectivityStatus() === 'offline') {
+    return failOffline(missing);
   }
   for (const server of missing) {
     discovered.delete(server.id);

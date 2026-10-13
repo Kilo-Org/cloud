@@ -370,14 +370,10 @@ export class SandboxContainers extends DurableObject<Env> {
     if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt) {
       throw new WrapperExecTimeoutError();
     }
-    const readinessDeadline =
-      start.source === 'repository' && input.deadlineAt !== undefined
-        ? Date.now() + remainingMs(input.deadlineAt) / 2
-        : input.deadlineAt;
     const started = await this.runStart(start, async () => {
       const issuedAt = Date.now();
       await this.startContainerAndActivateBilling(container, record, start.options);
-      await this.awaitSupervisorMainProcess(container, start.source, issuedAt, readinessDeadline);
+      await this.awaitSupervisorMainProcess(container, start.source, issuedAt, input.deadlineAt);
     });
     if (!started) return { started: false, startSource: 'repository', snapshotFailed: true };
     await this.writeRunning(ref, 'clear');
@@ -1058,7 +1054,7 @@ export class SandboxContainers extends DurableObject<Env> {
 
   /**
    * Confirm the native start issued the supervisor as PID 1, bounded by the
-   * existing wrapper readiness deadline. This is identity, not a wrapper-child
+   * start-source readiness deadline. This is identity, not a wrapper-child
    * poll: a deadline without a match, or a container that stops first, throws
    * and does not exec.
    *
@@ -1073,7 +1069,9 @@ export class SandboxContainers extends DurableObject<Env> {
     launchDeadlineAt?: number
   ): Promise<void> {
     const deadlineAt = Math.min(
-      Date.now() + DEADLINE_MS.wrapperReadiness,
+      source === 'repository'
+        ? issuedAt + DEADLINE_MS.repositoryStartup
+        : Date.now() + DEADLINE_MS.wrapperReadiness,
       launchDeadlineAt ?? Infinity
     );
     let checks = 0;

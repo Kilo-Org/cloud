@@ -442,6 +442,47 @@ describe('createRemoteSessionOnConnection', () => {
     });
   });
 
+  it('sends cloneUpToMessageId beside cloneFromKiloSessionId', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockResolvedValue({
+      protocolVersion: 1,
+      sessionID: VALID_SESSION_ID,
+    });
+
+    await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      cloneFromKiloSessionId: 'ses_clone_123456789012345678901',
+      cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+    });
+
+    expect(connection.sendCommandToConnection).toHaveBeenCalledWith({
+      command: 'create_session',
+      data: {
+        protocolVersion: 1,
+        cloneFromKiloSessionId: 'ses_clone_123456789012345678901',
+        cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      },
+      expectedConnectionId: 'cli-owner-1',
+    });
+  });
+
+  it('never sends cloneUpToMessageId without a clone source', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockResolvedValue({
+      protocolVersion: 1,
+      sessionID: VALID_SESSION_ID,
+    });
+
+    await createRemoteSessionOnConnection(connection, 'cli-owner-1', {
+      cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+    });
+
+    expect(connection.sendCommandToConnection).toHaveBeenCalledWith({
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+  });
+
   it('sends cloneFromKiloSessionId together with agent', async () => {
     const connection = makeFakeConnection();
     connection.sendCommandToConnection.mockResolvedValue({

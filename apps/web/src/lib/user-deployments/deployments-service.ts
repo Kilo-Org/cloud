@@ -1,46 +1,21 @@
 import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import type { Deployment } from '@kilocode/db/schema';
 import {
   deployments,
   deployment_builds,
   deployment_events,
-  platform_integrations,
   app_builder_projects,
 } from '@kilocode/db/schema';
-import { eq, and, desc, gt, inArray, or } from 'drizzle-orm';
+import { eq, and, desc, gt, or } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import type { CreateDeploymentResponse } from '@/lib/user-deployments/deployment-builder-client';
 import { apiClient as deployApiClient } from '@/lib/user-deployments/deployment-builder-client';
-import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
-import { generateGitToken as generateAppBuilderGitToken } from '@/lib/app-builder/app-builder-client';
-import { getCredentials as getAppBuilderDbCredentials } from '@/lib/app-builder/app-builder-db-proxy-client';
 import * as z from 'zod';
 import { eventSchema } from '@/lib/user-deployments/types';
-import { generateDeploymentSlug } from '@/lib/user-deployments/slug-generator';
-import type {
-  Provider,
-  DeploymentSource,
-  GitSource,
-  AppBuilderSource,
-  GitHubSource,
-} from '@/lib/user-deployments/types';
+import type { DeploymentSource } from '@/lib/user-deployments/types';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { PlaintextEnvVar } from '@/lib/user-deployments/env-vars-validation';
-import { markAsPlaintext } from '@/lib/user-deployments/env-vars-validation';
-import type { EncryptedEnvVar } from '@/lib/user-deployments/env-vars-validation';
-import * as envVarsService from '@/lib/user-deployments/env-vars-service';
-import { encryptEnvVars } from '@/lib/user-deployments/env-vars-service';
-import { isHTTPsUrl, extractRepoNameFromUrl } from './git-url-utils';
-import { encryptAuthToken, decryptAuthToken } from './auth-token-encryption';
-import {
-  hasUserEverPaid,
-  hasOrganizationEverPaid,
-} from '@kilocode/web-shared/lib/creditTransactions';
 import { slugSchema } from './validation';
 import { DispatcherSlugTakenError, dispatcherClient } from './dispatcher-client';
-
-type PaymentCheckResult = { hasPaid: true } | { hasPaid: false };
 
 /** Thrown when the dispatcher slug mapping update fails during a rename. */
 class SlugMappingError extends Error {
@@ -67,15 +42,6 @@ function isUniqueConstraintError(error: unknown, constraintName: string): boolea
   return pgCode === '23505' && pgConstraint === constraintName;
 }
 
-async function checkOwnerHasEverPaid(owner: Owner): Promise<PaymentCheckResult> {
-  const hasPaid =
-    owner.type === 'org'
-      ? await hasOrganizationEverPaid(owner.id)
-      : await hasUserEverPaid(owner.id);
-
-  return { hasPaid };
-}
-
 export type CreateDeploymentResult =
   | { success: true; deploymentId: string; deploymentSlug: string; deploymentUrl: string }
   | { success: false; error: 'payment_required' | 'invalid_slug' | 'slug_taken'; message: string };
@@ -84,16 +50,6 @@ import type {
   RenameDeploymentResult,
   CheckSlugAvailabilityResult,
 } from '@/lib/user-deployments/router-types';
-
-// Resolved source details ready for deployment
-type ResolvedSourceDetails = {
-  repositorySource: string;
-  repoName: string;
-  authToken: string | undefined;
-  encryptedToken: string | null;
-  platformIntegrationId: string | null;
-  sourceType: 'git' | 'app-builder' | 'github';
-};
 
 /**
  * List deployments with their latest builds
@@ -341,140 +297,12 @@ export async function cancelBuild(buildId: string, deploymentId: string, owner: 
   }
 }
 
-/**
- * Trigger a redeployment
- */
-export async function redeployByDeploymentId(deploymentId: string, owner: Owner) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(deployments.owned_by_user_id, owner.id)
-      : eq(deployments.owned_by_organization_id, owner.id);
-
-  // Verify deployment belongs to owner
-  const deployment = await db
-    .select()
-    .from(deployments)
-    .where(and(eq(deployments.id, deploymentId), ownershipCondition))
-    .limit(1);
-
-  if (deployment.length === 0) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Deployment not found',
-    });
-  }
-
-  await redeploy(deployment[0]);
-}
-
-async function getGithubTokenFromIntegrationId(
-  platformIntegrationId: string
-): Promise<string | undefined> {
-  const integration = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.id, platformIntegrationId),
-        eq(platform_integrations.github_connection_role, 'workflow'),
-        eq(platform_integrations.integration_status, 'active')
-      )
-    )
-    .limit(1);
-
-  if (
-    integration.length > 0 &&
-    integration[0].platform === 'github' &&
-    integration[0].platform_installation_id
-  ) {
-    const tokenData = await generateGitHubInstallationToken(
-      integration[0].platform_installation_id,
-      integration[0].github_app_type ?? 'standard',
-      integration[0].id
-    );
-    return tokenData.token;
-  }
-
-  return undefined;
-}
-
-export async function redeploy(deployment: Deployment) {
-  let accessToken: string | undefined;
-  let provider: Provider;
-
-  if (deployment.source_type === 'app-builder') {
-    // App Builder flow - generate token on the fly
-    const appId = extractAppIdFromGitUrl(deployment.repository_source);
-    const { token } = await generateAppBuilderGitToken(appId, 'ro');
-    accessToken = token;
-    provider = 'app-builder';
-  } else if (deployment.source_type === 'git') {
-    // Generic git flow - use stored encrypted token
-    accessToken = deployment.git_auth_token
-      ? decryptAuthToken(deployment.git_auth_token)
-      : undefined;
-    provider = 'git';
-  } else {
-    // GitHub flow (default/existing behavior)
-    if (!deployment.platform_integration_id) {
-      throw new Error('Platform integration ID is required for GitHub redeployment');
-    }
-    accessToken = await getGithubTokenFromIntegrationId(deployment.platform_integration_id);
-    if (!accessToken) {
-      throw new Error('GitHub token is required for redeployment');
-    }
-    provider = 'github';
-  }
-
-  // Find running builds for this deployment
-  const cancelBuildIds = (
-    await db
-      .select({ id: deployment_builds.id })
-      .from(deployment_builds)
-      .where(
-        and(
-          eq(deployment_builds.deployment_id, deployment.id),
-          inArray(deployment_builds.status, ['building', 'queued'])
-        )
-      )
-  ).map(build => build.id);
-
-  // Get stored env vars from database
-  let envVars = await envVarsService.getEnvVarsForDeployment(deployment.id);
-
-  // For app-builder deployments, fetch DB credentials dynamically and merge with stored env vars
-  if (deployment.source_type === 'app-builder') {
-    const appId = extractAppIdFromGitUrl(deployment.repository_source);
-    const dbEnvVars = await getAppBuilderDbEnvVars(appId);
-    envVars = [...envVars, ...dbEnvVars];
-  }
-
-  const builderResponse = await deployApiClient.createDeployment(
-    provider,
-    deployment.repository_source,
-    deployment.internal_worker_name,
-    deployment.branch,
-    accessToken,
-    cancelBuildIds.length > 0 ? cancelBuildIds : undefined,
-    envVars.length > 0 ? envVars : undefined
-  );
-
-  await db.transaction(async tx => {
-    // Insert the new build
-    await tx.insert(deployment_builds).values({
-      id: builderResponse.buildId,
-      deployment_id: deployment.id,
-      status: builderResponse.status,
-    });
-
-    // Update deployment's last_build_id
-    await tx
-      .update(deployments)
-      .set({ last_build_id: builderResponse.buildId })
-      .where(eq(deployments.id, deployment.id));
+export async function redeployByDeploymentId(_deploymentId: string, _owner: Owner) {
+  throw new TRPCError({
+    code: 'METHOD_NOT_SUPPORTED',
+    message:
+      'Deploy has reached end of life. New deployments and redeployments are no longer available.',
   });
-
-  return;
 }
 
 const DEFAULT_DEPLOYMENT_DOMAIN = 'd.kiloapps.io';
@@ -509,179 +337,7 @@ export async function checkSlugAvailability(slug: string): Promise<CheckSlugAvai
   return { available: true };
 }
 
-/**
- * Resolve GitHub source configuration - validates platform integration and generates token
- */
-async function resolveGitHubSource(
-  owner: Owner,
-  source: GitHubSource
-): Promise<ResolvedSourceDetails> {
-  const { platformIntegrationId, repositoryFullName } = source;
-
-  // Verify platform integration exists and belongs to the owner
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
-
-  const [platformIntegration] = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.id, platformIntegrationId),
-        ownershipCondition,
-        eq(platform_integrations.platform, 'github'),
-        eq(platform_integrations.github_connection_role, 'workflow')
-      )
-    )
-    .limit(1);
-
-  if (!platformIntegration) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Platform integration not found',
-    });
-  }
-
-  if (!platformIntegration.platform_installation_id) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Platform installation ID not found',
-    });
-  }
-
-  // Verify repository access for selected repositories
-  if (platformIntegration.repository_access === 'selected') {
-    const repositories = platformIntegration.repositories || [];
-    const hasAccess = repositories.some(repo => repo.full_name === repositoryFullName);
-
-    if (!hasAccess) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Repository not accessible by this integration',
-      });
-    }
-  }
-
-  // Generate GitHub installation token
-  const tokenData = await generateGitHubInstallationToken(
-    platformIntegration.platform_installation_id,
-    platformIntegration.github_app_type ?? 'standard',
-    platformIntegration.id
-  );
-
-  return {
-    repositorySource: repositoryFullName,
-    repoName: repositoryFullName.split('/')[1],
-    authToken: tokenData.token,
-    encryptedToken: null, // GitHub tokens are regenerated, not stored
-    platformIntegrationId,
-    sourceType: 'github',
-  };
-}
-
-/**
- * Resolve generic git source configuration - validates URL and encrypts token
- */
-function resolveGitSource(source: GitSource): ResolvedSourceDetails {
-  const { gitUrl, authToken } = source;
-
-  if (!isHTTPsUrl(gitUrl)) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Invalid git URL',
-    });
-  }
-
-  return {
-    repositorySource: gitUrl,
-    repoName: extractRepoNameFromUrl(gitUrl),
-    authToken,
-    encryptedToken: authToken ? encryptAuthToken(authToken) : null,
-    platformIntegrationId: null,
-    sourceType: 'git',
-  };
-}
-
-/**
- * Extract app/project ID from an App Builder git URL
- * Expected format: https://app-builder.example.com/apps/{projectId}.git
- */
-function extractAppIdFromGitUrl(gitUrl: string): string {
-  const match = gitUrl.match(/\/apps\/([a-f0-9-]+)\.git$/i);
-  if (!match) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Invalid App Builder git URL format',
-    });
-  }
-  return match[1];
-}
-
-/**
- * Fetch database credentials for an App Builder project and return as encrypted env vars.
- * Returns empty array if the project has no database provisioned.
- */
-async function getAppBuilderDbEnvVars(appId: string): Promise<EncryptedEnvVar[]> {
-  const dbCredentials = await getAppBuilderDbCredentials(appId);
-  if (!dbCredentials.provisioned) {
-    return [];
-  }
-
-  return encryptEnvVars([
-    markAsPlaintext({ key: 'DB_URL', value: dbCredentials.dbUrl, isSecret: false }),
-    markAsPlaintext({ key: 'DB_TOKEN', value: dbCredentials.dbToken ?? '', isSecret: true }),
-  ]);
-}
-
-/**
- * Resolve App Builder source configuration - validates URL and generates token on the fly
- */
-async function resolveAppBuilderSource(source: AppBuilderSource): Promise<ResolvedSourceDetails> {
-  const { gitUrl } = source;
-
-  if (!isHTTPsUrl(gitUrl)) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Invalid git URL',
-    });
-  }
-
-  // Extract project ID from git URL and generate a fresh read-only token
-  const appId = extractAppIdFromGitUrl(gitUrl);
-  const { token } = await generateAppBuilderGitToken(appId, 'ro');
-
-  return {
-    repositorySource: gitUrl,
-    repoName: extractRepoNameFromUrl(gitUrl),
-    authToken: token,
-    encryptedToken: null, // App Builder tokens are regenerated, not stored
-    platformIntegrationId: null,
-    sourceType: 'app-builder',
-  };
-}
-
-/**
- * Resolve deployment source based on type - dispatches to appropriate resolver
- */
-async function resolveSource(
-  owner: Owner,
-  source: DeploymentSource
-): Promise<ResolvedSourceDetails> {
-  if (source.type === 'github') {
-    return resolveGitHubSource(owner, source);
-  }
-  if (source.type === 'app-builder') {
-    return resolveAppBuilderSource(source);
-  }
-  return resolveGitSource(source);
-}
-
-/**
- * Create a new deployment from any source (git URL, GitHub integration, or app-builder)
- */
-export async function createDeployment(params: {
+export async function createDeployment(_params: {
   owner: Owner;
   source: DeploymentSource;
   branch: string;
@@ -689,146 +345,11 @@ export async function createDeployment(params: {
   createdFrom: 'deploy' | 'app-builder';
   envVars?: PlaintextEnvVar[];
 }): Promise<CreateDeploymentResult> {
-  const { owner, source, branch, createdByUserId, createdFrom, envVars } = params;
-
-  // App Builder sites are free to deploy; only check payment for the deploy page
-  if (createdFrom !== 'app-builder') {
-    const paymentCheck = await checkOwnerHasEverPaid(owner);
-    if (!paymentCheck.hasPaid) {
-      return {
-        success: false,
-        error: 'payment_required',
-        message: 'Payment required for deployments.',
-      };
-    }
-  }
-
-  const resolved = await resolveSource(owner, source);
-
-  // Encrypt user-provided env vars first
-  const encryptedUserEnvVars = envVars && envVars.length > 0 ? encryptEnvVars(envVars) : [];
-
-  // For app-builder deployments, fetch DB credentials dynamically (already encrypted)
-  let encryptedDBEnvVars: EncryptedEnvVar[] = [];
-  if (source.type === 'app-builder') {
-    const appId = extractAppIdFromGitUrl(source.gitUrl);
-    encryptedDBEnvVars = await getAppBuilderDbEnvVars(appId);
-  }
-
-  const allEncryptedEnvVars = [...encryptedUserEnvVars, ...encryptedDBEnvVars];
-
-  // Internal worker name uses a stable dpl-<uuid> format that can never collide with user slugs
-  const internalWorkerName = `dpl-${crypto.randomUUID()}`;
-
-  const slugInput = source.type === 'app-builder' ? null : resolved.repoName;
-
-  // Generate a slug that isn't already taken. The 4-digit suffix gives 10k
-  // combinations per prefix, so collisions are possible for popular repo names.
-  // Done before creating the worker so we don't need to clean it up on failure.
-  const MAX_SLUG_ATTEMPTS = 3;
-  let deploymentSlug: string | undefined;
-  for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
-    const candidate = generateDeploymentSlug(slugInput);
-    const check = await checkSlugAvailability(candidate);
-    if (check.available) {
-      deploymentSlug = candidate;
-      break;
-    }
-  }
-  if (deploymentSlug === undefined) {
-    return { success: false, error: 'slug_taken', message: 'This subdomain is already taken' };
-  }
-
-  // Call builder API — deploys the CF worker under the internal name.
-  // The worker is created once under internalWorkerName (UUID-based, always unique).
-  let builderResponse: CreateDeploymentResponse;
-  try {
-    builderResponse = await deployApiClient.createDeployment(
-      resolved.sourceType,
-      resolved.repositorySource,
-      internalWorkerName,
-      branch,
-      resolved.authToken,
-      undefined,
-      allEncryptedEnvVars.length > 0 ? allEncryptedEnvVars : undefined
-    );
-  } catch (error) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: `Failed to trigger deployment: ${error instanceof Error ? error.message : String(error)}`,
-    });
-  }
-
-  const deploymentUrl = `https://${deploymentSlug}.${DEFAULT_DEPLOYMENT_DOMAIN}`;
-
-  let deploymentId: string;
-  try {
-    // Point the public slug at the internal worker
-    await dispatcherClient.setSlugMapping(internalWorkerName, deploymentSlug);
-
-    deploymentId = await db.transaction(async tx => {
-      const [deployment] = await tx
-        .insert(deployments)
-        .values({
-          created_by_user_id: createdByUserId,
-          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-          owned_by_user_id: owner.type === 'user' ? owner.id : null,
-          deployment_slug: deploymentSlug,
-          internal_worker_name: internalWorkerName,
-          repository_source: resolved.repositorySource,
-          branch: branch,
-          deployment_url: deploymentUrl,
-          platform_integration_id: resolved.platformIntegrationId,
-          source_type: resolved.sourceType,
-          git_auth_token: resolved.encryptedToken,
-          last_build_id: builderResponse.buildId,
-          created_from: createdFrom,
-        })
-        .returning();
-
-      await tx.insert(deployment_builds).values({
-        id: builderResponse.buildId,
-        deployment_id: deployment.id,
-        status: builderResponse.status,
-      });
-
-      // Store env vars (already encrypted)
-      if (encryptedUserEnvVars.length > 0) {
-        for (const envVar of encryptedUserEnvVars) {
-          await envVarsService.setEnvVar(deployment, envVar, owner, tx);
-        }
-      }
-
-      return deployment.id;
-    });
-  } catch (error) {
-    // Stop the queued build before removing routing or any worker it may already have created.
-    await deployApiClient.cancelBuild(builderResponse.buildId).catch(() => {});
-    await dispatcherClient.deleteSlugMapping(internalWorkerName).catch(() => {});
-    await deployApiClient.deleteWorker(internalWorkerName).catch(() => {});
-
-    // Handle conflicts found in the database or dispatcher reservation layer.
-    // Everything has been torn down at this point, so ask the user to retry.
-    if (
-      error instanceof DispatcherSlugTakenError ||
-      isUniqueConstraintError(error, 'UQ_deployments_deployment_slug')
-    ) {
-      return { success: false, error: 'slug_taken', message: 'Please try again' };
-    }
-    throw error;
-  }
-
-  // Auto-enable banner for app-builder deployments
-  if (createdFrom === 'app-builder') {
-    try {
-      await dispatcherClient.enableBanner(internalWorkerName);
-    } catch (error) {
-      // Non-fatal: deployment was created successfully, banner is secondary
-      console.error('Failed to enable banner for app-builder deployment:', error);
-    }
-  }
-
-  return { success: true, deploymentId, deploymentSlug, deploymentUrl };
+  throw new TRPCError({
+    code: 'METHOD_NOT_SUPPORTED',
+    message:
+      'Deploy has reached end of life. New deployments and redeployments are no longer available.',
+  });
 }
 
 /**

@@ -28,6 +28,8 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { startOfDay, subDays } from 'date-fns';
 import { extractRepoFromGitUrl } from './utils/git-utils';
 import { ChatSidebar } from './ChatSidebar';
+import { SetPageActions } from '@/components/SetPageActions';
+import { CloudAgentSettingsButton } from './settings/CloudAgentSettingsButton';
 import {
   dbSessionToStoredSession,
   deriveForegroundSessionStatus,
@@ -904,8 +906,15 @@ export function CloudSidebarLayout({
     ]
   );
 
+  // Stable so the topbar is not rewritten on every render of this layout.
+  const topbarActions = useMemo(
+    () => <CloudAgentSettingsButton organizationId={organizationId} />,
+    [organizationId]
+  );
+
   return (
     <SidebarLayoutContext.Provider value={sidebarContext}>
+      <SetPageActions>{topbarActions}</SetPageActions>
       <div className="flex h-[calc(100dvh-3.5rem)] w-full overflow-hidden">
         {/* Mobile Sheet */}
         <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>

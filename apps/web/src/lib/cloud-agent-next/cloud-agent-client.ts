@@ -207,6 +207,9 @@ export type PrepareSessionInput = PrepareSessionNonCloneInput | PrepareSessionCl
 export type GetSandboxSelectionOptionsInput = {
   kilocodeOrganizationId?: string;
   devcontainer?: boolean;
+  repositoryType?: 'github' | 'gitlab' | 'bitbucket' | 'git';
+  /** With `repositoryType`, resolves saved repository overrides into `effectiveDestination`. */
+  repositoryFullName?: string;
 };
 
 /** Output from prepareSession procedure */

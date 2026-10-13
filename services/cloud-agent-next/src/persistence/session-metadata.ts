@@ -437,12 +437,8 @@ export const CurrentSessionMetadataSchema = z
     'Sandbox provider metadata cannot contain a devcontainer runtime'
   )
   .refine(
-    metadata =>
-      metadata.workspace?.sandboxAllocation === undefined ||
-      (!metadata.devcontainer &&
-        metadata.identity.billingOrigin !== 'code-review' &&
-        metadata.identity.createdOnPlatform !== 'code-review'),
-    'Sandbox allocations cannot be combined with specialized routing'
+    metadata => metadata.workspace?.sandboxAllocation === undefined || !metadata.devcontainer,
+    'Sandbox allocations cannot be combined with a devcontainer runtime'
   )
   .refine(
     metadata =>

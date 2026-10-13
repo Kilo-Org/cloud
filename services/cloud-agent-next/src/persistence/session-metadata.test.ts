@@ -607,9 +607,20 @@ describe('session metadata boundary', () => {
         };
         expect(parseSessionMetadata(implicit).workspace?.sandboxAllocation).toBe(sandboxAllocation);
       }
+      // An internally selected allocation keeps its normal identity for a Code
+      // Reviewer session, so a matching allocation/id-class is accepted.
       for (const identity of [{ ...current.identity, billingOrigin: 'code-review' }]) {
-        expect(() => parseSessionMetadata({ ...current, identity })).toThrow();
+        expect(parseSessionMetadata({ ...current, identity }).workspace?.sandboxAllocation).toBe(
+          sandboxAllocation
+        );
       }
+      // The trusted Code Reviewer namespace cannot carry a selectable allocation.
+      expect(() =>
+        parseSessionMetadata({
+          ...current,
+          workspace: { ...current.workspace, sandboxId: `crv-${'a'.repeat(48)}` },
+        })
+      ).toThrow();
       // Selectable allocations are authorized per owner (user or organization) at
       // creation, so a personal session without an org is valid metadata.
       expect(

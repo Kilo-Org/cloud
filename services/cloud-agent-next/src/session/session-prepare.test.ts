@@ -27,6 +27,8 @@ import {
   resolveSharedSandboxAssignment,
   SHARED_SANDBOX_FAILOVER_SUFFIX,
 } from '../shared-sandbox-route.js';
+import { getSandboxNamespace } from '../sandbox-id.js';
+import { SANDBOX_USAGE_SKUS } from '../container-usage-context.js';
 import type { OperationLedgerRow } from '@kilocode/db/schema';
 
 import type { Env } from '../types.js';
@@ -37,6 +39,7 @@ import type { SessionCreateRequest } from './session-requests.js';
 import type * as SandboxIdModule from '../sandbox-id.js';
 import type * as SharedSandboxRouteModule from '../shared-sandbox-route.js';
 import type * as MessageIdModule from './message-id.js';
+import type * as CloudAgentProfileModule from '@kilocode/cloud-agent-profile';
 import {
   assertSessionOperationIdentity,
   createSessionWithLedger,
@@ -44,6 +47,7 @@ import {
   sessionCreateIntentFingerprint,
   SESSION_CREATE_ABANDON_AFTER_SECONDS,
   SESSION_CREATE_ABANDONED_OUTCOME_CODE,
+  SESSION_CREATE_SAVED_ALLOCATION_KEY,
   SESSION_CREATE_FINALIZATION_VERSION_KEY,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
   SESSION_CREATE_TOMBSTONED_IDS_KEY,
@@ -67,6 +71,7 @@ const {
   recordSandboxIdentityMock,
   recordSessionFailureMock,
   generateSandboxRoutingTargetMock,
+  getSandboxAllocationCandidatesMock,
 } = vi.hoisted(() => ({
   admitOperationMock: vi.fn(),
   settleOperationMock: vi.fn().mockResolvedValue({ settled: true }),
@@ -81,6 +86,7 @@ const {
   recordSandboxIdentityMock: vi.fn().mockResolvedValue(undefined),
   recordSessionFailureMock: vi.fn().mockResolvedValue(undefined),
   generateSandboxRoutingTargetMock: vi.fn(),
+  getSandboxAllocationCandidatesMock: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
@@ -170,6 +176,14 @@ vi.mock('../shared-sandbox-route.js', async importOriginal => {
   return {
     ...actual,
     resolveSharedSandboxAssignment: vi.fn(),
+  };
+});
+
+vi.mock('@kilocode/cloud-agent-profile', async importOriginal => {
+  const actual = await importOriginal<typeof CloudAgentProfileModule>();
+  return {
+    ...actual,
+    getSandboxAllocationCandidates: getSandboxAllocationCandidatesMock,
   };
 });
 
@@ -1199,6 +1213,234 @@ describe('explicit sandbox session creation', () => {
     admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
     await expect(runCreate(ctx, request)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expectNoAllocation(doStub);
+  });
+
+  it('rejects a fresh explicit Vercel allocation for a GitLab repository before admission', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    // Membership recheck passes; the ledger lookup finds no existing row.
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+    const request = makeRequest({
+      repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+      runtime: { sandboxAllocation: 'vercel-small' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Vercel sandboxes support GitHub repositories only',
+    });
+    expect(admitOperationMock).not.toHaveBeenCalled();
+    expect(recordOperationProgressMock).not.toHaveBeenCalled();
+    expectNoAllocation(doStub);
+  });
+
+  it('rejects a fresh explicit Vercel allocation for a security-remediation origin before admission', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      runtime: { sandboxAllocation: 'vercel-small' },
+      options: {
+        kilocodeOrganizationId: orgId,
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'security-remediation',
+      },
+    });
+
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Vercel sandboxes do not include the security-remediation command-line tools',
+    });
+    expect(admitOperationMock).not.toHaveBeenCalled();
+    expectNoAllocation(doStub);
+  });
+
+  it('replays a settled create of a now-unavailable Vercel GitLab allocation', async () => {
+    // The early availability check lets a matching historical retry through, and a
+    // settled create replays without allocating or reading settings again.
+    const request = makeRequest({
+      repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+      runtime: { sandboxAllocation: 'vercel-small' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+    const row = makeLedgerRow({
+      organization_id: orgId,
+      status: 'completed',
+      canonical_result: {
+        cloudAgentSessionId: WORKSPACE_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+        sandboxAllocation: 'vercel-small',
+        [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+        [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+      },
+    });
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [row]]));
+    admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
+
+    await expect(runCreate(ctx, request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      replayed: true,
+    });
+    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    expectNoAllocation(doStub);
+  });
+
+  it('rejects a retry that changes an omitted allocation to an explicit unavailable one', async () => {
+    const original = makeRequest({
+      repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+    const row = makeLedgerRow({
+      organization_id: orgId,
+      canonical_result: {
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(original),
+      },
+    });
+    const retry = {
+      ...original,
+      runtime: { sandboxAllocation: 'vercel-small' as const },
+    };
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [row]]));
+    admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
+
+    await expect(runCreate(ctx, retry)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_creation_failed',
+    });
+    expect(admitOperationMock).not.toHaveBeenCalled();
+    expectNoAllocation(doStub);
+  });
+
+  it('pins a settings-resolved choice without re-reading settings', async () => {
+    // The saved default now resolves to a different value; a recorded choice
+    // from the original omitted-input request must be restored untouched.
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-shared',
+    });
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+    const row = makeLedgerRow({
+      organization_id: orgId,
+      canonical_result: {
+        sandboxAllocation: 'cloudflare-single',
+        [SESSION_CREATE_SAVED_ALLOCATION_KEY]: 'cloudflare-single',
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+      },
+    });
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [row], [{ email: 'test@example.com' }], [{ id: 'member' }]])
+    );
+    admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
+
+    await expect(runCreate(ctx, request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+    });
+    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    const metadata = createdMetadata(doStub);
+    // The pinned small sandbox runs on the native containers size.
+    expect(metadata?.workspace?.sandboxAllocation).toBe('cloudflare-containers-standard-3');
+    expect(metadata?.workspace?.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('rejects a pinned saved choice once the owner can no longer select a sandbox', async () => {
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+    const row = makeLedgerRow({
+      organization_id: orgId,
+      canonical_result: {
+        sandboxAllocation: 'cloudflare-single',
+        [SESSION_CREATE_SAVED_ALLOCATION_KEY]: 'cloudflare-single',
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+      },
+    });
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    ctx.env.SANDBOX_SELECTION_IDS = '';
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [row], [{ email: 'test@example.com' }], [{ id: 'member' }]])
+    );
+    admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
+
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    expectNoAllocation(doStub);
+  });
+
+  it('does not read settings for a legacy fingerprint row without a choice', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-shared',
+    });
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+    const row = makeLedgerRow({
+      organization_id: orgId,
+      canonical_result: {
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+      },
+    });
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [row], [{ email: 'test@example.com' }], [{ id: 'member' }]])
+    );
+    admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
+
+    await expect(runCreate(ctx, request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+    });
+    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBeUndefined();
+  });
+
+  it('admits a saved review allocation through the resolver and persists its hardware identity', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-single',
+    });
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    const smallContainmentNamespace = {
+      idFromName: vi.fn((name: string) => ({ toString: () => name })),
+      get: vi.fn(),
+    };
+    Object.assign(ctx.env, { SandboxSmallContainment: smallContainmentNamespace });
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+
+    const result = await createSessionWithLedger(request, ctx, {
+      ...CREATE_OPTIONS,
+      billingOrigin: 'code-review',
+    });
+
+    expect(result).toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+    expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledTimes(1);
+    const metadata = createdMetadata(doStub);
+    expect(metadata?.workspace?.sandboxAllocation).toBe('cloudflare-single');
+    expect(metadata?.workspace?.sandboxProvider).toBe('cloudflare');
+    const sandboxId = metadata?.workspace?.sandboxId ?? '';
+    expect(sandboxId).toMatch(/^ses-/);
+    // The saved `ses-` review session bills the contained small namespace/SKU,
+    // not the trusted code-review namespace.
+    expect(getSandboxNamespace(ctx.env, sandboxId, { managedScmContainment: true })).toBe(
+      smallContainmentNamespace
+    );
+    expect(SANDBOX_USAGE_SKUS.SandboxSmallContainment).toBe('cloud-agent-small-2026-07');
   });
 });
 

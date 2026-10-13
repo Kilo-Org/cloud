@@ -20,11 +20,36 @@ import type { Env } from './types.js';
 
 type SelectionOwner = { userId: string; orgId?: string };
 
-function sandboxAllocationUnavailableReason(
+export type SessionRepositoryType = 'github' | 'gitlab' | 'bitbucket' | 'git';
+
+/**
+ * Provider tool capability a session needs from its sandbox image. `review`
+ * publishes code-review output (gh/glab/bb and the GitHub review publisher MCP);
+ * `remediation` opens security-remediation pull requests (gh/glab/bb). The
+ * Vercel snapshot ships none of these binaries, so a Vercel choice is
+ * ineligible for either, independent of the repository platform.
+ */
+export type SandboxAllocationCapability = 'review' | 'remediation';
+
+export function sandboxAllocationProviderCapabilityReason(
+  allocation: SandboxAllocation,
+  capability: SandboxAllocationCapability | undefined
+): string | undefined {
+  if (capability === undefined) return undefined;
+  if (getSandboxAllocationProvider(allocation) !== 'vercel') return undefined;
+  return capability === 'review'
+    ? 'Vercel sandboxes do not include the code-review publishing tools'
+    : 'Vercel sandboxes do not include the security-remediation command-line tools';
+}
+
+export function sandboxAllocationUnavailableReason(
   env: Env,
   owner: SelectionOwner,
-  allocation: SandboxAllocation
+  allocation: SandboxAllocation,
+  capability?: SandboxAllocationCapability
 ): string | undefined {
+  const capabilityReason = sandboxAllocationProviderCapabilityReason(allocation, capability);
+  if (capabilityReason) return capabilityReason;
   const provider = getSandboxAllocationProvider(allocation);
   switch (provider) {
     case 'cloudflare':
@@ -47,33 +72,98 @@ function sandboxAllocationUnavailableReason(
   }
 }
 
+/**
+ * Repository-compatibility gate for an allocation. Contained Vercel resolves
+ * Git credentials only for GitHub, so a saved Vercel choice is ineligible for a
+ * GitLab/Bitbucket/Git repository and must fall through to the next candidate.
+ */
+export function sandboxAllocationRepositoryUnavailableReason(
+  allocation: SandboxAllocation,
+  repositoryType: SessionRepositoryType
+): string | undefined {
+  if (getSandboxAllocationProvider(allocation) === 'vercel' && repositoryType !== 'github') {
+    return 'Vercel sandboxes support GitHub repositories only';
+  }
+  return undefined;
+}
+
+type SelectionOption = SandboxSelectionCapabilities['options'][number];
+
+/**
+ * With credential containment, new sandbox-small sessions run on the native
+ * containers size. The picker offers that size in place of the Cloudflare
+ * single sandbox, and hides the single sandbox when the native size is already
+ * available on its own.
+ */
+function nativeSmallInPlaceOfSingle(options: SelectionOption[]): SelectionOption[] {
+  const isNative = (option: SelectionOption) =>
+    getKiloSandboxAllocation(option.allocation) === CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION;
+  const single = options.find(
+    option => getKiloSandboxAllocation(option.allocation) === 'cloudflare-single'
+  );
+  const nativeAvailable = options.some(
+    option => isNative(option) && option.unavailableReason === undefined
+  );
+  if (!single || nativeAvailable) return options.filter(option => option !== single);
+  return options
+    .filter(option => !isNative(option))
+    .map(option =>
+      option === single
+        ? {
+            ...single,
+            allocation: getSandboxAllocationRequest(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION),
+          }
+        : option
+    );
+}
+
 export function getSandboxSelectionCapabilities(
   env: Env,
-  owner: SelectionOwner
+  owner: SelectionOwner,
+  options?: {
+    repositoryType?: SessionRepositoryType;
+    capability?: SandboxAllocationCapability;
+  }
 ): SandboxSelectionCapabilities {
   if (
     !isOrgInList(env.SANDBOX_SELECTION_IDS, owner.userId) &&
     !isOrgInList(env.SANDBOX_SELECTION_IDS, owner.orgId)
   ) {
-    return { enabled: false, options: [] };
+    // Owners without selection still run somewhere; report where so the UI can
+    // show it without offering a choice.
+    return {
+      enabled: false,
+      defaultDestination: getDefaultSandboxDestination(env, owner),
+      options: [],
+    };
   }
 
-  const available = SELECTABLE_SANDBOX_ALLOCATIONS.filter(
-    allocation => sandboxAllocationUnavailableReason(env, owner, allocation) === undefined
-  );
-  const options = credentialContainmentEnabled(env)
-    ? available.flatMap(allocation => {
-        if (allocation !== 'cloudflare-single') return [allocation];
-        return available.includes(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION)
-          ? []
-          : [CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION];
-      })
-    : available;
-
+  const repositoryType = options?.repositoryType;
+  const capability = options?.capability;
+  // Report every selectable allocation with its unavailability reasons so the
+  // picker can show disabled entries; a reason-bearing option is unavailable.
+  const candidates = SELECTABLE_SANDBOX_ALLOCATIONS.map(allocation => {
+    const unavailableReason = sandboxAllocationUnavailableReason(
+      env,
+      owner,
+      allocation,
+      capability
+    );
+    const repositoryUnavailableReason = repositoryType
+      ? sandboxAllocationRepositoryUnavailableReason(allocation, repositoryType)
+      : undefined;
+    return {
+      allocation: getSandboxAllocationRequest(allocation),
+      ...(unavailableReason ? { unavailableReason } : {}),
+      ...(repositoryUnavailableReason ? { repositoryUnavailableReason } : {}),
+    };
+  });
   return {
     enabled: true,
     defaultDestination: getDefaultSandboxDestination(env, owner),
-    options: options.map(allocation => ({ allocation: getSandboxAllocationRequest(allocation) })),
+    options: credentialContainmentEnabled(env)
+      ? nativeSmallInPlaceOfSingle(candidates)
+      : candidates,
   };
 }
 
@@ -86,7 +176,10 @@ export function isSandboxAllocationAvailable(
     (allocation === 'isolated-standard' ||
       allocation === 'cloudflare-single' ||
       capabilities.options.some(
-        option => getKiloSandboxAllocation(option.allocation) === allocation
+        option =>
+          getKiloSandboxAllocation(option.allocation) === allocation &&
+          option.unavailableReason === undefined &&
+          option.repositoryUnavailableReason === undefined
       ))
   );
 }
@@ -94,9 +187,14 @@ export function isSandboxAllocationAvailable(
 export function assertSandboxAllocationAvailable(
   env: Env,
   owner: SelectionOwner,
-  allocation: SandboxAllocation
+  allocation: SandboxAllocation,
+  repositoryType?: SessionRepositoryType,
+  capability?: SandboxAllocationCapability
 ): void {
-  const capabilities = getSandboxSelectionCapabilities(env, owner);
+  const capabilities = getSandboxSelectionCapabilities(env, owner, {
+    ...(repositoryType ? { repositoryType } : {}),
+    ...(capability ? { capability } : {}),
+  });
   if (!capabilities.enabled) {
     throw new TRPCError({
       code: 'FORBIDDEN',
@@ -104,10 +202,15 @@ export function assertSandboxAllocationAvailable(
     });
   }
   if (!isSandboxAllocationAvailable(capabilities, allocation)) {
+    const option = capabilities.options.find(
+      candidate => getKiloSandboxAllocation(candidate.allocation) === allocation
+    );
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message:
-        sandboxAllocationUnavailableReason(env, owner, allocation) ??
+        option?.unavailableReason ??
+        option?.repositoryUnavailableReason ??
+        sandboxAllocationUnavailableReason(env, owner, allocation, capability) ??
         'Sandbox allocation is unavailable',
     });
   }

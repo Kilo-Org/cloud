@@ -130,7 +130,9 @@ export function getSandboxAllocationRequest<T extends SandboxAllocation>(allocat
   return allocationRequests[allocation];
 }
 
-export function getSandboxAllocationKey(allocation: SandboxAllocationRequest): string {
+export function getSandboxAllocationKey(
+  allocation: SandboxAllocationRequest | SandboxDestination
+): string {
   return `${allocation.provider.id}:${allocation.provider.account}:${allocation.instanceType}`;
 }
 
@@ -226,10 +228,19 @@ export function getSandboxAllocationResources(
 export const sandboxSelectionCapabilitiesSchema = z
   .object({
     enabled: z.boolean(),
+    /** Where a session runs when nothing is saved or chosen. Reported even when selection is disabled. */
     defaultDestination: sandboxDestinationSchema.optional(),
+    /**
+     * Where a new session in the requested repository runs: the saved repository
+     * override, else the saved owner default, else `defaultDestination`. Present
+     * only when the request named a repository type.
+     */
+    effectiveDestination: sandboxDestinationSchema.optional(),
     options: z.array(
       z.object({
         allocation: selectableSandboxAllocationInputSchema,
+        unavailableReason: z.string().optional(),
+        repositoryUnavailableReason: z.string().optional(),
       })
     ),
   })

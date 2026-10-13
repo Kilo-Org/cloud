@@ -251,8 +251,7 @@ describe('estimateClassifiedMetrics', () => {
         { n: 2, sampled: true, route: 'sampled', cacheHit: true, cost: 0 },
         { n: 10, sampled: false, route: 'switched', cacheHit: false, cost: 0.02 },
       ],
-      105,
-      5
+      2 / 90
     );
     expect(result.routeMix).toEqual({ sampled: 0.9, switched: 0.1 });
     expect(result.cacheHitRate).toBeCloseTo(0.9);
@@ -263,8 +262,7 @@ describe('estimateClassifiedMetrics', () => {
     expect(
       estimateClassifiedMetrics(
         [{ n: 3, sampled: false, route: 'switched', cacheHit: false, cost: 0.02 }],
-        10,
-        2
+        0.01
       )
     ).toEqual({
       routeMix: { switched: 1 },
@@ -279,16 +277,41 @@ describe('estimateClassifiedMetrics', () => {
         { n: 1, sampled: true, route: 'sampled', cacheHit: null, cost: null },
         { n: 2, sampled: false, route: 'switched', cacheHit: true, cost: 0.01 },
       ],
-      12,
-      0
+      0.1
     );
     expect(result.routeMix.sampled).toBeCloseTo(10 / 12);
     expect(result.cacheHitRate).toBe(1);
     expect(result.classifierPerRequestUsd).toBe(0.01);
   });
 
+  it('uses observed counts unchanged when all successes are sampled', () => {
+    const result = estimateClassifiedMetrics(
+      [
+        { n: 2, sampled: true, route: 'sampled', cacheHit: true, cost: 0 },
+        { n: 2, sampled: false, route: 'switched', cacheHit: false, cost: 0.02 },
+      ],
+      1
+    );
+    expect(result.routeMix).toEqual({ sampled: 0.5, switched: 0.5 });
+    expect(result.cacheHitRate).toBe(0.5);
+    expect(result.classifierPerRequestUsd).toBe(0.01);
+  });
+
+  it('handles disabled success sampling without division by zero', () => {
+    expect(
+      estimateClassifiedMetrics(
+        [{ n: 2, sampled: false, route: 'switched', cacheHit: false, cost: 0.02 }],
+        0
+      )
+    ).toEqual({
+      routeMix: { switched: 1 },
+      cacheHitRate: 0,
+      classifierPerRequestUsd: 0.02,
+    });
+  });
+
   it('returns unavailable metrics and an empty mix when no classified decisions were logged', () => {
-    expect(estimateClassifiedMetrics([], 5, 5)).toEqual({
+    expect(estimateClassifiedMetrics([], 0.01)).toEqual({
       routeMix: {},
       cacheHitRate: null,
       classifierPerRequestUsd: null,

@@ -1,7 +1,12 @@
 import { spawn } from 'node:child_process';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
+import { parseConfigFileTextToJson } from 'typescript';
+import {
+  DECISION_LOG_SAMPLE_RATE_CONFIG_KEY,
+  DEFAULT_DECISION_LOG_SAMPLE_RATE,
+} from '../../auto-routing/src/classifier-config';
 import { ProdMetricsSchema, type Dist, type ProdMetrics } from '../src/scoreboard/schema';
 import { estimateClassifiedMetrics } from '../src/scoreboard/production';
 
@@ -69,6 +74,58 @@ function count(rows: Record<string, unknown>[]): number {
   return countSchema.parse(rows[0]).n;
 }
 
+async function decisionLogSampleRate(): Promise<number> {
+  try {
+    const configUrl = new URL('../../auto-routing/wrangler.jsonc', import.meta.url);
+    const parsed = parseConfigFileTextToJson('wrangler.jsonc', await readFile(configUrl, 'utf8'));
+    if (parsed.error) throw new CollectionError('invalid auto-routing Wrangler config');
+    const config = z
+      .object({
+        kv_namespaces: z.array(z.object({ binding: z.string(), id: z.string() })),
+      })
+      .parse(parsed.config);
+    const namespace = config.kv_namespaces.find(item => item.binding === 'AUTO_ROUTING_CONFIG');
+    if (!namespace) throw new CollectionError('missing AUTO_ROUTING_CONFIG namespace');
+    const raw = await new Promise<string>((resolve, reject) => {
+      const child = spawn(
+        'wrangler',
+        [
+          'kv',
+          'key',
+          'get',
+          '--remote',
+          '--namespace-id',
+          namespace.id,
+          DECISION_LOG_SAMPLE_RATE_CONFIG_KEY,
+        ],
+        { stdio: ['ignore', 'pipe', 'pipe'], timeout: 65_000 }
+      );
+      let stdout = '';
+      child.stdout.setEncoding('utf8');
+      child.stdout.on('data', (chunk: string) => {
+        stdout += chunk;
+      });
+      child.stderr.resume();
+      child.on('error', () => reject(new CollectionError('could not start wrangler')));
+      child.on('close', code => {
+        if (code === 0) resolve(stdout.trim());
+        else reject(new CollectionError('could not read decision log sample rate from KV'));
+      });
+    });
+    const rate = Number(raw);
+    if (!raw || !Number.isFinite(rate) || rate < 0 || rate > 1) {
+      throw new CollectionError('missing or invalid decision log sample rate in KV');
+    }
+    return rate;
+  } catch (error) {
+    const reason = error instanceof CollectionError ? error.message : 'config read failed';
+    console.error(
+      `Warning: ${reason}; using worker default decision log sample rate ${DEFAULT_DECISION_LOG_SAMPLE_RATE}.`
+    );
+    return DEFAULT_DECISION_LOG_SAMPLE_RATE;
+  }
+}
+
 function axiomQuery(window: Window): AxiomQuery {
   const token = process.env.AXIOM_TOKEN;
   if (!token) throw new CollectionError('missing AXIOM_TOKEN');
@@ -106,15 +163,12 @@ function axiomQuery(window: Window): AxiomQuery {
   };
 }
 
-async function workerMetrics(query: AxiomQuery): Promise<Partial<ProdMetrics>> {
-  const [groups, requests, nonClassified, switched, workerDuration, timings] = await Promise.all([
+async function workerMetrics(query: AxiomQuery, sampleRate: number): Promise<Partial<ProdMetrics>> {
+  const [groups, requests, switched, workerDuration, timings] = await Promise.all([
     query(
       `${decisionPrefix} | where j.status == 'classified' | extend sampled=tobool(j.sampled), route=strcat(tostring(j.taskType), '/', tostring(j.subtaskType)), cacheHit=tobool(j.cacheHit), cost=todouble(j.classifierCostCredits) | summarize n=count() by sampled, route, cacheHit, cost`
     ),
     query(`${requestPrefix} | summarize n=count()`),
-    query(
-      `${decisionPrefix} | where j.sampled == false and j.status != 'classified' | summarize n=count()`
-    ),
     query(`${decisionPrefix} | where j.switched == true | summarize n=count()`),
     query(
       `${sampledPrefix} | extend value=coalesce(toreal(j.timings.totalMs), toreal(j.classifierDurationMs)) | where isnotnull(value) ${percentiles}`
@@ -131,8 +185,7 @@ async function workerMetrics(query: AxiomQuery): Promise<Partial<ProdMetrics>> {
   const requestCount = count(requests);
   const classifiedMetrics = estimateClassifiedMetrics(
     groups.map(row => groupedSchema.parse(row)),
-    requestCount,
-    count(nonClassified)
+    sampleRate
   );
   const availablePhases = timings.filter(
     (entry): entry is readonly [(typeof phases)[number], Dist] => entry[1] !== null
@@ -253,16 +306,34 @@ async function main(): Promise<void> {
   const options = (() => {
     try {
       return parseArgs({
-        options: { since: { type: 'string', default: '24' }, out: { type: 'string' } },
+        options: {
+          since: { type: 'string', default: '24' },
+          out: { type: 'string' },
+          'sample-rate': { type: 'string' },
+        },
       });
     } catch {
-      throw new CollectionError('usage: scoreboard:prod --since <hours> --out <file>');
+      throw new CollectionError(
+        'usage: scoreboard:prod --since <hours> --out <file> [--sample-rate <0..1>]'
+      );
     }
   })();
   const hours = Number(options.values.since);
   const out = options.values.out;
   if (!Number.isFinite(hours) || hours <= 0 || typeof out !== 'string' || !out) {
     throw new CollectionError('usage: scoreboard:prod --since <positive hours> --out <file>');
+  }
+  const sampleRateOverride = options.values['sample-rate'];
+  const sampleRate = sampleRateOverride === undefined ? undefined : Number(sampleRateOverride);
+  if (
+    sampleRateOverride !== undefined &&
+    (!sampleRateOverride.trim() ||
+      sampleRate === undefined ||
+      !Number.isFinite(sampleRate) ||
+      sampleRate < 0 ||
+      sampleRate > 1)
+  ) {
+    throw new CollectionError('--sample-rate must be a number between 0 and 1');
   }
   const end = new Date();
   const start = new Date(end.getTime() - hours * 3_600_000);
@@ -293,7 +364,8 @@ async function main(): Promise<void> {
   try {
     const query = axiomQuery(window);
     jobs.push(
-      workerMetrics(query)
+      Promise.resolve(sampleRate ?? decisionLogSampleRate())
+        .then(rate => workerMetrics(query, rate))
         .then(result => {
           Object.assign(metrics, result);
         })

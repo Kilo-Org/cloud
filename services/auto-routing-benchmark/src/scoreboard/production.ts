@@ -8,19 +8,9 @@ type ClassifiedDecisionGroup = {
 
 export function estimateClassifiedMetrics(
   groups: readonly ClassifiedDecisionGroup[],
-  requestCount: number,
-  unsampledNonClassified: number
+  sampleRate: number
 ) {
-  let sampledClassified = 0;
-  let unsampledClassified = 0;
-  for (const group of groups) {
-    if (group.sampled) sampledClassified += group.n;
-    else unsampledClassified += group.n;
-  }
-  const totalClassified = requestCount - unsampledNonClassified;
-  const sampledWeight = sampledClassified
-    ? (totalClassified - unsampledClassified) / sampledClassified
-    : 0;
+  const sampledWeight = sampleRate > 0 ? 1 / sampleRate : 0;
   let classifiedCount = 0;
   let cacheCount = 0;
   let cacheHits = 0;

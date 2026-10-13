@@ -886,6 +886,43 @@ describe('makeErrorReadable', () => {
     });
   });
 
+  it.each([
+    [401, []],
+    [402, ['anthropic']],
+    [403, ['anthropic']],
+    [403, ['opencode-go']],
+    [429, []],
+    [404, ['vertex']],
+  ] as const)(
+    'keeps the specific BYOK %i mapping ahead of an upstream overflow body for %j',
+    async (status, providerIds) => {
+      const options = {
+        providerId: 'vercel',
+        requestedModel: 'synthetic-model',
+        request,
+        userByokProviderIds: [...providerIds],
+      } satisfies Omit<Parameters<typeof makeErrorReadable>[0], 'response'>;
+      const baseline = await makeErrorReadable({
+        ...options,
+        response: Response.json({}, { status }),
+      });
+      const result = await makeErrorReadable({
+        ...options,
+        response: Response.json(
+          {
+            error: { message: 'The maximum context length is 1024 tokens. Requested 2048 tokens.' },
+          },
+          { status }
+        ),
+      });
+
+      expect(result?.status).toBe(status);
+      const body = await result?.json();
+      expect(body).toMatchObject({ error_type: 'byok_error' });
+      expect(body).toEqual(await baseline?.json());
+    }
+  );
+
   it.each([400, 500, 502, 503])(
     'leaves non-BYOK errors and BYOK outages unchanged for status %i',
     async status => {
@@ -1014,35 +1051,38 @@ describe('makeErrorReadable', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('returns an actionable error when no allowed provider serves the model', async () => {
-    const response = Response.json(
-      {
-        message: 'No allowed providers are available for the selected model.',
-        code: 404,
-        metadata: {
-          available_providers: ['alibaba'],
-          requested_providers: ['anthropic', 'openai'],
+  it.each([null, ['anthropic']] as const)(
+    'keeps provider routing errors ahead of generic BYOK rejection with provider set %j',
+    async providerIds => {
+      const response = Response.json(
+        {
+          message: 'No allowed providers are available for the selected model.',
+          code: 404,
+          metadata: {
+            available_providers: ['alibaba'],
+            requested_providers: ['anthropic', 'openai'],
+          },
         },
-      },
-      { status: 404 }
-    );
+        { status: 404 }
+      );
 
-    const result = await makeErrorReadable({
-      providerId: 'openrouter',
-      requestedModel: 'qwen/qwen3.7-plus',
-      request,
-      response,
-      userByokProviderIds: null,
-    });
+      const result = await makeErrorReadable({
+        providerId: 'openrouter',
+        requestedModel: 'qwen/qwen3.7-plus',
+        request,
+        response,
+        userByokProviderIds: providerIds === null ? null : [...providerIds],
+      });
 
-    expect(result?.status).toBe(404);
-    await expect(result?.json()).resolves.toEqual({
-      error: 'No eligible provider can serve the selected model.',
-      error_type: 'provider_not_allowed',
-      message:
-        'No eligible provider can serve the selected model. Select another model or update the provider routing settings.',
-    });
-  });
+      expect(result?.status).toBe(404);
+      await expect(result?.json()).resolves.toEqual({
+        error: 'No eligible provider can serve the selected model.',
+        error_type: 'provider_not_allowed',
+        message:
+          'No eligible provider can serve the selected model. Select another model or update the provider routing settings.',
+      });
+    }
+  );
 
   it('recognizes the wrapped OpenRouter error response', async () => {
     const response = Response.json(

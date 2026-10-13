@@ -276,22 +276,22 @@ const byokErrorMessages: Record<number, string> = {
   429: '[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
 };
 
-function byokErrorMessage(
-  status: number,
-  userByokProviderIds: UserByokProviderId[]
-): string | undefined {
-  if (status === 403 && userByokProviderIds.includes('opencode-go')) {
-    return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
-  }
-  return byokErrorMessages[status];
-}
-
 const byokUpstreamErrorSchema = z.object({
   error: z.object({ message: z.string() }).optional().catch(undefined),
   message: z.string().optional().catch(undefined),
 });
 
-async function genericByokErrorResponse(response: Response) {
+async function byokErrorMessage(
+  response: Response,
+  userByokProviderIds: UserByokProviderId[]
+): Promise<string | undefined> {
+  if (response.status === 403 && userByokProviderIds.includes('opencode-go')) {
+    return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
+  }
+  const specificMessage = byokErrorMessages[response.status];
+  if (specificMessage) return specificMessage;
+  if (response.status < 400 || response.status >= 500) return undefined;
+
   const body: unknown = await response
     .clone()
     .json()
@@ -302,13 +302,9 @@ async function genericByokErrorResponse(response: Response) {
     ?.replace(/\p{Cc}/gu, ' ')
     .trim()
     .slice(0, 300);
-  const error = message
+  return message
     ? `[BYOK] ${message}`
     : '[BYOK] Your provider rejected the request. Check your provider account and settings.';
-  return NextResponse.json(
-    { error, error_type: ProxyErrorType.byok_error, message: error },
-    { status: response.status }
-  );
 }
 
 function vertexByokModelNotFoundResponse(
@@ -395,10 +391,22 @@ export async function makeErrorReadable({
   const vertexByokResponse = vertexByokModelNotFoundResponse(response, userByokProviderIds);
   if (vertexByokResponse) return vertexByokResponse;
 
+  const hasSpecificByokMessage =
+    userByokProviderIds !== null && byokErrorMessages[response.status] !== undefined;
+  if (!hasSpecificByokMessage) {
+    const providerErrorResponse = await providerNotAllowedResponse(providerId, response);
+    if (providerErrorResponse) return providerErrorResponse;
+
+    const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
+    if (overflowResponse) return overflowResponse;
+  }
+
   if (userByokProviderIds !== null) {
-    const byokMessage = byokErrorMessage(response.status, userByokProviderIds);
+    const byokMessage = await byokErrorMessage(response, userByokProviderIds);
     if (byokMessage) {
-      warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);
+      if (hasSpecificByokMessage) {
+        warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);
+      }
       return NextResponse.json(
         {
           error: byokMessage,
@@ -408,16 +416,6 @@ export async function makeErrorReadable({
         { status: response.status }
       );
     }
-  }
-
-  const providerErrorResponse = await providerNotAllowedResponse(providerId, response);
-  if (providerErrorResponse) return providerErrorResponse;
-
-  const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
-  if (overflowResponse) return overflowResponse;
-
-  if (userByokProviderIds !== null && response.status < 500) {
-    return genericByokErrorResponse(response);
   }
 
   if (shouldRedactErrorResponse(providerId, requestedModel)) {

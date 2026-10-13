@@ -830,11 +830,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     peer.prepareView = peer.view('preparing');
     await stub.send(promptPayload('m1'));
     const phases = [
-      {
-        step: 'sandbox_create',
-        key: 'sandbox_provision',
-        detail: 'Creating sandbox from snapshot',
-      },
+      { step: 'sandbox_create', key: 'sandbox_provision', detail: 'Creating sandbox' },
       { step: 'sandbox_start', key: 'sandbox_boot', detail: 'Starting sandbox from snapshot' },
       { step: 'clone', key: 'cloning', detail: 'Cloning repository' },
       { step: 'restore', key: 'workspace_restore', detail: 'Updating repository' },

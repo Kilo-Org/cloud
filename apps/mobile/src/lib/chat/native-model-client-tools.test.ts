@@ -6,10 +6,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { backendFailureKey } from './backend-target';
 import { type NativeAvailability, nativeModelClient } from './native-model-client';
 import {
-  answerWith,
   answered,
-  call,
+  answerWith,
   AVAILABLE,
+  call,
   collect,
   fakeBridge,
   request,

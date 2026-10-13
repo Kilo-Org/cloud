@@ -6400,15 +6400,31 @@
       "properties": {
         "devcontainer": {
           "type": "boolean"
+        },
+        "repositoryType": {
+          "type": "string",
+          "enum": [
+            "github",
+            "gitlab",
+            "bitbucket",
+            "git"
+          ]
+        },
+        "repositoryFullName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
         }
       }
     },
     "tags": [
       "cloudagentnext",
       "getsandboxselectionoptions",
-      "devcontainer"
+      "devcontainer",
+      "repositorytype",
+      "repositoryfullname"
     ],
-    "searchBlob": "cloudAgentNext.getSandboxSelectionOptions List the sandbox selection options and capabilities available for a cloud agent, optionally filtered for devcontainer support. Use this to find which sandbox types a user can choose when starting an agent. cloudagentnext getsandboxselectionoptions devcontainer devcontainer"
+    "searchBlob": "cloudAgentNext.getSandboxSelectionOptions List the sandbox selection options and capabilities available for a cloud agent, optionally filtered for devcontainer support. Use this to find which sandbox types a user can choose when starting an agent. cloudagentnext getsandboxselectionoptions devcontainer repositorytype repositoryfullname devcontainer repositoryType repositoryFullName"
   },
   "cloudAgentNext.getSandboxStatus": {
     "path": "cloudAgentNext.getSandboxStatus",
@@ -8290,6 +8306,206 @@
       "recent_messages"
     ],
     "searchBlob": "cloudAgentNextFeedback.create Submit user feedback about a Cloud Agent session, including the rating text, model, repository, and recent messages. Use this to report a problem or share an opinion about a cloud agent run. cloudagentnextfeedback create cloud_agent_session_id kilo_session_id session_type organization_id feedback_text model repository is_streaming message_count recent_messages cloud_agent_session_id kilo_session_id session_type organization_id feedback_text model repository is_streaming message_count recent_messages"
+  },
+  "cloudAgentSettings.canManage": {
+    "path": "cloudAgentSettings.canManage",
+    "kind": "query",
+    "summary": "Check whether the current user has permission to manage Cloud Agent sandbox and repository settings, optionally within a specific organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "cloudagentsettings",
+      "canmanage",
+      "organizationid"
+    ],
+    "searchBlob": "cloudAgentSettings.canManage Check whether the current user has permission to manage Cloud Agent sandbox and repository settings, optionally within a specific organization. cloudagentsettings canmanage organizationid organizationId"
+  },
+  "cloudAgentSettings.get": {
+    "path": "cloudAgentSettings.get",
+    "kind": "query",
+    "summary": "Get the Cloud Agent settings for the user or organization, including the context sandbox allocation, per-repository profile allocations, and which sandbox options are available.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "cloudagentsettings",
+      "get",
+      "organizationid"
+    ],
+    "searchBlob": "cloudAgentSettings.get Get the Cloud Agent settings for the user or organization, including the context sandbox allocation, per-repository profile allocations, and which sandbox options are available. cloudagentsettings get organizationid organizationId"
+  },
+  "cloudAgentSettings.removeRepositorySettings": {
+    "path": "cloudAgentSettings.removeRepositorySettings",
+    "kind": "mutation",
+    "summary": "Delete the saved Cloud Agent settings for a specific repository.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "repoFullName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "github",
+            "gitlab"
+          ]
+        }
+      },
+      "required": [
+        "repoFullName",
+        "platform"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "removerepositorysettings",
+      "organizationid",
+      "repofullname",
+      "platform"
+    ],
+    "searchBlob": "cloudAgentSettings.removeRepositorySettings Delete the saved Cloud Agent settings for a specific repository. cloudagentsettings removerepositorysettings organizationid repofullname platform organizationId repoFullName platform"
+  },
+  "cloudAgentSettings.setContextAllocation": {
+    "path": "cloudAgentSettings.setContextAllocation",
+    "kind": "mutation",
+    "summary": "Set or clear the default sandbox allocation used for Cloud Agent context, for the current user or their organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "allocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "allocation"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "setcontextallocation",
+      "organizationid",
+      "allocation"
+    ],
+    "searchBlob": "cloudAgentSettings.setContextAllocation Set or clear the default sandbox allocation used for Cloud Agent context, for the current user or their organization. cloudagentsettings setcontextallocation organizationid allocation organizationId allocation"
+  },
+  "cloudAgentSettings.setRepositorySettings": {
+    "path": "cloudAgentSettings.setRepositorySettings",
+    "kind": "mutation",
+    "summary": "Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "repoFullName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "github",
+            "gitlab"
+          ]
+        },
+        "profileId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "allocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "repoFullName",
+        "platform"
+      ]
+    },
+    "tags": [
+      "cloudagentsettings",
+      "setrepositorysettings",
+      "organizationid",
+      "repofullname",
+      "platform",
+      "profileid",
+      "allocation"
+    ],
+    "searchBlob": "cloudAgentSettings.setRepositorySettings Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation. cloudagentsettings setrepositorysettings organizationid repofullname platform profileid allocation organizationId repoFullName platform profileId allocation"
   },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",
@@ -18792,6 +19008,20 @@
         },
         "devcontainer": {
           "type": "boolean"
+        },
+        "repositoryType": {
+          "type": "string",
+          "enum": [
+            "github",
+            "gitlab",
+            "bitbucket",
+            "git"
+          ]
+        },
+        "repositoryFullName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
         }
       },
       "required": [
@@ -18803,9 +19033,11 @@
       "cloudagentnext",
       "getsandboxselectionoptions",
       "organizationid",
-      "devcontainer"
+      "devcontainer",
+      "repositorytype",
+      "repositoryfullname"
     ],
-    "searchBlob": "organizations.cloudAgentNext.getSandboxSelectionOptions List the sandbox options available for a cloud agent, such as selectable environments and container capabilities. Use this to find which sandbox choices an agent can pick for an organization. organizations cloudagentnext getsandboxselectionoptions organizationid devcontainer organizationId devcontainer"
+    "searchBlob": "organizations.cloudAgentNext.getSandboxSelectionOptions List the sandbox options available for a cloud agent, such as selectable environments and container capabilities. Use this to find which sandbox choices an agent can pick for an organization. organizations cloudagentnext getsandboxselectionoptions organizationid devcontainer repositorytype repositoryfullname organizationId devcontainer repositoryType repositoryFullName"
   },
   "organizations.cloudAgentNext.getSandboxStatus": {
     "path": "organizations.cloudAgentNext.getSandboxStatus",

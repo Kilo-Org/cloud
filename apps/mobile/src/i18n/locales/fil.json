@@ -136,7 +136,8 @@
     "working": "Nagtatrabaho",
     "yourOwnRepositories": "Mga sarili mong repositoryo",
     "dismissed": "Binalewala",
-    "agent": "Ahente"
+    "agent": "Ahente",
+    "changes": "Mga pagbabago"
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -325,6 +326,7 @@
       "collapseFile": "Itago ang nilalaman ng file",
       "expandFile": "Ipakita ang nilalaman ng file",
       "diffTooLarge": "Masyadong malaki ang pagkakaiba para maipakita.",
+      "noPreview": "Walang preview para sa file na ito",
       "openOnGitHub": "Buksan sa GitHub",
       "openDiffOnGitHub": "Buksan ang pagkakaiba ng file na ito sa GitHub",
       "githubDiff": "Pagkakaiba sa GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Subukang i-load muli ang kapaligiran",
       "defaultEnvironment": "Paunang itinakdang kapaligiran",
       "environmentSummary": "{{commands}} utos · {{mcp}} MCP · {{skills}} kasanayan · {{agents}} ahente",
-      "changes": "Mga pagbabago",
       "leaveChanges": "Iwan ang mga pagbabago",
       "commitAndPush": "I-commit at i-push",
       "startSession": "Simulan ang sesyon",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modelo ({{displayCount}})",
       "modelsCount_other": "Mga modelo ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Tingnan ang mga pagbabago",
+      "asOf": "Noong {{time}}",
+      "tooLarge": "Masyadong malaki ang pagkakaibang ito para maipakita sa mobile.",
+      "empty": "Wala pang pagbabago sa file sa session na ito."
     },
     "autoApprove": {
       "title": "Auto-apruba",

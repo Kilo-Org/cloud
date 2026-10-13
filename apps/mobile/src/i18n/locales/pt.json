@@ -136,7 +136,8 @@
     "working": "A trabalhar",
     "yourOwnRepositories": "Os teus repositórios",
     "dismissed": "Ignorada",
-    "agent": "Agente"
+    "agent": "Agente",
+    "changes": "Alterações"
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",
@@ -325,6 +326,7 @@
       "collapseFile": "Recolher ficheiro",
       "expandFile": "Expandir ficheiro",
       "diffTooLarge": "As diferenças são demasiado extensas para serem apresentadas.",
+      "noPreview": "Pré-visualização indisponível para este ficheiro",
       "openOnGitHub": "Abrir no GitHub",
       "openDiffOnGitHub": "Abrir as diferenças deste ficheiro no GitHub",
       "githubDiff": "Diferenças no GitHub"
@@ -2217,7 +2219,6 @@
       "retryLoadingEnvironment": "Tentar carregar o ambiente novamente",
       "defaultEnvironment": "Ambiente predefinido",
       "environmentSummary": "{{commands}} comandos · {{mcp}} MCP · {{skills}} competências · {{agents}} agentes",
-      "changes": "Alterações",
       "leaveChanges": "Manter alterações",
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sessão",
@@ -2689,6 +2690,12 @@
       "modelsCount_one": "Modelo ({{displayCount}})",
       "modelsCount_other": "Modelos ({{displayCount}})",
       "modelsCount_many": "Modelos ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Ver alterações",
+      "asOf": "Às {{time}}",
+      "tooLarge": "As diferenças são demasiado extensas para serem apresentadas no telemóvel.",
+      "empty": "Ainda não há alterações de ficheiros nesta sessão."
     },
     "autoApprove": {
       "title": "Aprovação automática",

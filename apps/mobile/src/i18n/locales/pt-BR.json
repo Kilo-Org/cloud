@@ -136,7 +136,8 @@
     "working": "Em execução",
     "yourOwnRepositories": "Seus próprios repositórios",
     "dismissed": "Ignorado",
-    "agent": "Agente"
+    "agent": "Agente",
+    "changes": "Alterações"
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -1659,7 +1660,6 @@
       "retryLoadingEnvironment": "Tentar carregar o ambiente novamente",
       "defaultEnvironment": "Ambiente padrão",
       "environmentSummary": "{{commands}} comandos · {{mcp}} MCP · {{skills}} habilidades · {{agents}} agentes",
-      "changes": "Alterações",
       "leaveChanges": "Manter alterações",
       "commitAndPush": "Registrar e enviar",
       "startSession": "Iniciar sessão",
@@ -2131,6 +2131,12 @@
       "modelsCount_one": "Modelo ({{displayCount}})",
       "modelsCount_other": "Modelos ({{displayCount}})",
       "modelsCount_many": "Modelos ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Ver alterações",
+      "asOf": "Em {{time}}",
+      "tooLarge": "Esta comparação é grande demais para ser exibida no celular.",
+      "empty": "Nenhum arquivo foi alterado nesta sessão ainda."
     },
     "autoApprove": {
       "title": "Aprovação automática",
@@ -2672,6 +2678,7 @@
     "fileRows": {
       "collapseFile": "Recolher arquivo",
       "diffTooLarge": "A comparação é grande demais para ser exibida.",
+      "noPreview": "Nenhuma pré-visualização disponível para este arquivo",
       "expandFile": "Expandir arquivo",
       "markViewed": "Marcar {{path}} como visualizado",
       "openDiffOnGitHub": "Abrir a comparação deste arquivo no GitHub",

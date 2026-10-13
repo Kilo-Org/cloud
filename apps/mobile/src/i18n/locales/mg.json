@@ -136,7 +136,8 @@
     "working": "Miasa",
     "yourOwnRepositories": "Ny tahirin-kaodinao manokana",
     "dismissed": "Nesorina",
-    "agent": "mpandraharaha"
+    "agent": "mpandraharaha",
+    "changes": "Fiovana"
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -325,6 +326,7 @@
       "collapseFile": "Aforeto ny rakitra",
       "expandFile": "Avelaro ny rakitra",
       "diffTooLarge": "Lehibe loatra ny fahasamihafana ka tsy azo aseho.",
+      "noPreview": "Tsy misy topimaso azo jerena ho an'ity rakitra ity",
       "openOnGitHub": "Sokafy ao amin'ny GitHub",
       "openDiffOnGitHub": "Sokafy ao amin'ny GitHub ny fahasamihafan'ity rakitra ity",
       "githubDiff": "Fahasamihafana ao amin'ny GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Andramo alaina indray ny tontolo fiasana",
       "defaultEnvironment": "Tontolo fiasana voafidy mialoha",
       "environmentSummary": "baiko {{commands}} · MCP {{mcp}} · fahaiza-manao {{skills}} · mpanampy {{agents}}",
-      "changes": "Fiovana",
       "leaveChanges": "Avelao ny fiovana",
       "commitAndPush": "Raketo sy alefaso",
       "startSession": "Atombohy ny fotoam-piasana",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modely ({{displayCount}})",
       "modelsCount_other": "Modely ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Jereo ny fiovana",
+      "asOf": "Tamin'ny {{time}}",
+      "tooLarge": "Lehibe loatra ity fahasamihafana ity ka tsy azo aseho amin'ny finday.",
+      "empty": "Mbola tsy misy rakitra niova tamin'ity fotoam-piasana ity."
     },
     "autoApprove": {
       "title": "Fankatoavana ho azy",

@@ -136,7 +136,8 @@
     "working": "Í vinnslu",
     "yourOwnRepositories": "Þín eigin kóðasöfn",
     "dismissed": "Vísað frá",
-    "agent": "Umboðsmaður"
+    "agent": "Umboðsmaður",
+    "changes": "Breytingar"
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -325,6 +326,7 @@
       "collapseFile": "Fella saman skrá",
       "expandFile": "Fella út skrá",
       "diffTooLarge": "Breytingarnar eru of umfangsmiklar til að birta.",
+      "noPreview": "Engin forskoðun í boði fyrir þessa skrá",
       "openOnGitHub": "Opna á GitHub",
       "openDiffOnGitHub": "Opna breytingasamanburð skrárinnar á GitHub",
       "githubDiff": "Breytingasamanburður á GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Reyna að hlaða umhverfinu aftur",
       "defaultEnvironment": "Sjálfgefið umhverfi",
       "environmentSummary": "{{commands}} skipanir · {{mcp}} MCP · {{skills}} færniatriði · {{agents}} fulltrúar",
-      "changes": "Breytingar",
       "leaveChanges": "Halda breytingum",
       "commitAndPush": "Skrá og senda",
       "startSession": "Byrja lotu",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Líkan ({{displayCount}})",
       "modelsCount_other": "Líkön ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Skoða breytingar",
+      "asOf": "Staða kl. {{time}}",
+      "tooLarge": "Breytingarnar eru of umfangsmiklar til að birta í farsíma.",
+      "empty": "Engar breytingar á skrám í þessari lotu enn."
     },
     "autoApprove": {
       "title": "Sjálfvirk samþykkt",

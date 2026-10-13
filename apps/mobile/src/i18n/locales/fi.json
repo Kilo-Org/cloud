@@ -136,7 +136,8 @@
     "working": "Työn alla",
     "yourOwnRepositories": "Omat koodivarastosi",
     "dismissed": "Sivuutettu",
-    "agent": "Agentti"
+    "agent": "Agentti",
+    "changes": "Muutokset"
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -325,6 +326,7 @@
       "collapseFile": "Kutista tiedosto",
       "expandFile": "Laajenna tiedosto",
       "diffTooLarge": "Muutosvertailu on liian suuri näytettäväksi.",
+      "noPreview": "Tälle tiedostolle ei ole esikatselua",
       "openOnGitHub": "Avaa GitHubissa",
       "openDiffOnGitHub": "Avaa tämän tiedoston muutosvertailu GitHubissa",
       "githubDiff": "GitHubin muutosvertailu"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Yritä ladata ympäristö uudelleen",
       "defaultEnvironment": "Oletusympäristö",
       "environmentSummary": "{{commands}} komentoa · {{mcp}} MCP · {{skills}} taitoa · {{agents}} agenttia",
-      "changes": "Muutokset",
       "leaveChanges": "Jätä muutokset ennalleen",
       "commitAndPush": "Tallenna ja lähetä",
       "startSession": "Aloita istunto",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Malli ({{displayCount}})",
       "modelsCount_other": "Mallit ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Näytä muutokset",
+      "asOf": "Tilanne klo {{time}}",
+      "tooLarge": "Muutosvertailu on liian suuri näytettäväksi mobiilissa.",
+      "empty": "Tässä istunnossa ei ole vielä muutettu tiedostoja."
     },
     "autoApprove": {
       "title": "Automaattinen hyväksyntä",

@@ -136,7 +136,8 @@
     "working": "Na-arụ ọrụ",
     "yourOwnRepositories": "Ebe nchekwa koodu nke gị",
     "dismissed": "Elegharala anya",
-    "agent": "Onye nnọchi anya"
+    "agent": "Onye nnọchi anya",
+    "changes": "Mgbanwe"
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -325,6 +326,7 @@
       "collapseFile": "Zoo ọdịnaya faịlụ",
       "expandFile": "Gosi ọdịnaya faịlụ",
       "diffTooLarge": "Ọdịiche buru oke ibu nke na enweghị ike igosi ya.",
+      "noPreview": "Enweghị nlele maka faịlụ a",
       "openOnGitHub": "Mepee na GitHub",
       "openDiffOnGitHub": "Mepee ọdịiche faịlụ a na GitHub",
       "githubDiff": "Ọdịiche na GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Nwaa ibudata ebe ọrụ ọzọ",
       "defaultEnvironment": "Ebe ọrụ ndabara",
       "environmentSummary": "iwu {{commands}} · MCP {{mcp}} · nkà {{skills}} · ndị nnọchi anya {{agents}}",
-      "changes": "Mgbanwe",
       "leaveChanges": "Hapụ mgbanwe",
       "commitAndPush": "Chekwaa ma bulite",
       "startSession": "Malite nnọkọ",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Ihe nlereanya ({{displayCount}})",
       "modelsCount_other": "Ihe nlereanya ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Lee mgbanwe",
+      "asOf": "Dị ka nke {{time}}",
+      "tooLarge": "Ọdịiche a buru oke ibu igosi na ekwentị.",
+      "empty": "Enweghị mgbanwe faịlụ na nnọkọ a ugbu a."
     },
     "autoApprove": {
       "title": "Nkwenye akpaka",

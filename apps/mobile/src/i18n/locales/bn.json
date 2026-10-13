@@ -136,7 +136,8 @@
     "working": "কাজ চলছে",
     "yourOwnRepositories": "আপনার নিজের রিপোজিটরি",
     "dismissed": "খারিজ",
-    "agent": "এজেন্ট"
+    "agent": "এজেন্ট",
+    "changes": "পরিবর্তন"
   },
   "language": {
     "restarting": "নির্বাচিত ভাষা চালু করতে অ্যাপ আবার চালু হচ্ছে",
@@ -325,6 +326,7 @@
       "collapseFile": "ফাইল গুটিয়ে নিন",
       "expandFile": "ফাইল মেলে ধরুন",
       "diffTooLarge": "ডিফটি এত বড় যে দেখানো যাচ্ছে না।",
+      "noPreview": "এই ফাইলের কোনো প্রিভিউ নেই",
       "openOnGitHub": "GitHub-এ খুলুন",
       "openDiffOnGitHub": "GitHub-এ এই ফাইলের ডিফ খুলুন",
       "githubDiff": "GitHub ডিফ"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "পরিবেশ লোড করার জন্য আবার চেষ্টা করুন",
       "defaultEnvironment": "ডিফল্ট পরিবেশ",
       "environmentSummary": "{{commands}}টি কমান্ড · {{mcp}} MCP · {{skills}}টি স্কিল · {{agents}}টি এজেন্ট",
-      "changes": "পরিবর্তন",
       "leaveChanges": "পরিবর্তন রেখে দিন",
       "commitAndPush": "কমিট ও পুশ করুন",
       "startSession": "সেশন শুরু করুন",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "মডেল: {{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "মডেল ({{displayCount}})",
       "modelsCount_other": "মডেল ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "পরিবর্তন দেখুন",
+      "asOf": "{{time}} অনুযায়ী",
+      "tooLarge": "ডিফটি এত বড় যে মোবাইলে দেখানো যাচ্ছে না।",
+      "empty": "এই সেশনে এখনও কোনো ফাইল পরিবর্তন হয়নি।"
     },
     "autoApprove": {
       "title": "স্বয়ংক্রিয় অনুমোদন",

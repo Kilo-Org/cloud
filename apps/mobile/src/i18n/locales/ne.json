@@ -136,7 +136,8 @@
     "working": "काम गर्दै",
     "yourOwnRepositories": "तपाईंका आफ्नै रिपोजिटरीहरू",
     "dismissed": "खारेज गरियो",
-    "agent": "एजेन्ट"
+    "agent": "एजेन्ट",
+    "changes": "परिवर्तनहरू"
   },
   "language": {
     "restarting": "भाषा लागू गर्न पुनः सुरु गर्दै",
@@ -325,6 +326,7 @@
       "collapseFile": "फाइलको विवरण लुकाउनुहोस्",
       "expandFile": "फाइलको विवरण देखाउनुहोस्",
       "diffTooLarge": "परिवर्तन विवरण देखाउन नसकिने गरी ठूलो छ।",
+      "noPreview": "यो फाइलको पूर्वावलोकन उपलब्ध छैन",
       "openOnGitHub": "GitHub मा खोल्नुहोस्",
       "openDiffOnGitHub": "यो फाइलको परिवर्तन विवरण GitHub मा खोल्नुहोस्",
       "githubDiff": "GitHub मा परिवर्तन विवरण"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "वातावरण लोड गर्न पुनः प्रयास गर्नुहोस्",
       "defaultEnvironment": "पूर्वनिर्धारित वातावरण",
       "environmentSummary": "{{commands}} कमाण्ड · {{mcp}} MCP · {{skills}} सीप · {{agents}} एजेन्ट",
-      "changes": "परिवर्तनहरू",
       "leaveChanges": "परिवर्तन यथावत्",
       "commitAndPush": "कमिट र पुश",
       "startSession": "सत्र सुरु गर्नुहोस्",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "मोडेल ({{displayCount}})",
       "modelsCount_other": "मोडेलहरू ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "परिवर्तनहरू हेर्नुहोस्",
+      "asOf": "{{time}} सम्मको",
+      "tooLarge": "यो परिवर्तन विवरण मोबाइलमा देखाउन नसकिने गरी ठूलो छ।",
+      "empty": "यो सत्रमा अहिलेसम्म कुनै फाइल परिवर्तन भएको छैन।"
     },
     "autoApprove": {
       "title": "स्वतः स्वीकृति",

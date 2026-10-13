@@ -136,7 +136,8 @@
     "working": "Traballando",
     "yourOwnRepositories": "Os teus propios repositorios",
     "dismissed": "Descartado",
-    "agent": "Axente"
+    "agent": "Axente",
+    "changes": "Cambios"
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -325,6 +326,7 @@
       "collapseFile": "Contraer ficheiro",
       "expandFile": "Expandir ficheiro",
       "diffTooLarge": "Hai demasiadas diferenzas para amosalas.",
+      "noPreview": "Non hai vista previa dispoñible para este ficheiro",
       "openOnGitHub": "Abrir en GitHub",
       "openDiffOnGitHub": "Abrir as diferenzas deste ficheiro en GitHub",
       "githubDiff": "Diferenzas en GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Volver tentar cargar o contorno",
       "defaultEnvironment": "Contorno predeterminado",
       "environmentSummary": "{{commands}} comandos · {{mcp}} MCP · {{skills}} habilidades · {{agents}} axentes",
-      "changes": "Cambios",
       "leaveChanges": "Manter cambios",
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sesión",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modelo ({{displayCount}})",
       "modelsCount_other": "Modelos ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Ver cambios",
+      "asOf": "Ás {{time}}",
+      "tooLarge": "Hai demasiadas diferenzas para amosalas no móbil.",
+      "empty": "Aínda non hai cambios en ficheiros nesta sesión."
     },
     "autoApprove": {
       "title": "Aprobación automática",

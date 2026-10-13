@@ -136,7 +136,8 @@
     "working": "En curs",
     "yourOwnRepositories": "Els teus repositoris",
     "dismissed": "Descartat",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Canvis"
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -325,6 +326,7 @@
       "collapseFile": "Plega el fitxer",
       "expandFile": "Desplega el fitxer",
       "diffTooLarge": "Hi ha massa diferències per mostrar-les totes.",
+      "noPreview": "No hi ha cap previsualització disponible per a aquest fitxer",
       "openOnGitHub": "Obre a GitHub",
       "openDiffOnGitHub": "Obre les diferències d'aquest fitxer a GitHub",
       "githubDiff": "Diferències a GitHub"
@@ -2217,7 +2219,6 @@
       "retryLoadingEnvironment": "Torna a provar de carregar l'entorn",
       "defaultEnvironment": "Entorn predeterminat",
       "environmentSummary": "{{commands}} ordres · {{mcp}} MCP · {{skills}} habilitats · {{agents}} agents",
-      "changes": "Canvis",
       "leaveChanges": "Deixa els canvis",
       "commitAndPush": "Consigna i envia",
       "startSession": "Inicia la sessió",
@@ -2689,6 +2690,12 @@
       "modelsCount_one": "Model utilitzat ({{displayCount}})",
       "modelsCount_other": "Models utilitzats ({{displayCount}})",
       "modelsCount_many": "Models utilitzats ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Mostra els canvis",
+      "asOf": "A les {{time}}",
+      "tooLarge": "Aquestes diferències són massa grans per mostrar-les al mòbil.",
+      "empty": "Encara no hi ha canvis de fitxers en aquesta sessió."
     },
     "autoApprove": {
       "title": "Aprovació automàtica",

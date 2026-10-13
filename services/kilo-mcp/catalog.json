@@ -5381,6 +5381,30 @@
     ],
     "searchBlob": "cliSessionsV2.getByCloudAgentSessionId Look up a user's CLI session record by the underlying cloud agent session ID. clisessionsv2 getbycloudagentsessionid cloud_agent_session_id cloud_agent_session_id"
   },
+  "cliSessionsV2.getSessionDiff": {
+    "path": "cliSessionsV2.getSessionDiff",
+    "kind": "query",
+    "summary": "Get the file changes (diff) produced by a CLI coding session, listing the modified files or indicating the diff is too large to return. Use to see what code a session changed.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "session_id"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "getsessiondiff",
+      "session_id"
+    ],
+    "searchBlob": "cliSessionsV2.getSessionDiff Get the file changes (diff) produced by a CLI coding session, listing the modified files or indicating the diff is too large to return. Use to see what code a session changed. clisessionsv2 getsessiondiff session_id session_id"
+  },
   "cliSessionsV2.getSessionMessages": {
     "path": "cliSessionsV2.getSessionMessages",
     "kind": "query",

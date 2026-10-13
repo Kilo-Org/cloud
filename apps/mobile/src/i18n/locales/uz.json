@@ -136,7 +136,8 @@
     "working": "Ishlamoqda",
     "yourOwnRepositories": "O‘zingizga tegishli repozitoriylar",
     "dismissed": "E’tiborsiz qoldirilgan",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "O'zgarishlar"
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -325,6 +326,7 @@
       "collapseFile": "Faylni yig'ish",
       "expandFile": "Faylni yoyish",
       "diffTooLarge": "Farqlar hajmi juda katta, ularni ko'rsatib bo'lmaydi.",
+      "noPreview": "Bu fayl uchun oldindan ko'rish mavjud emas",
       "openOnGitHub": "GitHubda ochish",
       "openDiffOnGitHub": "Bu fayldagi farqlarni GitHubda ochish",
       "githubDiff": "GitHubdagi farqlar"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Muhitni qayta yuklash",
       "defaultEnvironment": "Standart muhit",
       "environmentSummary": "{{commands}} buyruq · {{mcp}} MCP · {{skills}} ko'nikma · {{agents}} agent",
-      "changes": "O'zgarishlar",
       "leaveChanges": "O'zgarishlarni qoldirish",
       "commitAndPush": "Kommit va yuborish",
       "startSession": "Sessiyani boshlash",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modellar ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "O'zgarishlarni ko'rish",
+      "asOf": "{{time}} holatiga ko'ra",
+      "tooLarge": "Farqlar hajmi juda katta, ularni mobil qurilmada ko'rsatib bo'lmaydi.",
+      "empty": "Bu seansda hali fayllar o'zgartirilmagan."
     },
     "autoApprove": {
       "title": "Avtomatik tasdiqlash",

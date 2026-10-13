@@ -136,7 +136,8 @@
     "working": "Во тек",
     "yourOwnRepositories": "Твоите репозиториуми",
     "dismissed": "Отфрлено",
-    "agent": "Агент"
+    "agent": "Агент",
+    "changes": "Промени"
   },
   "language": {
     "restarting": "Се рестартира за да се примени јазикот",
@@ -325,6 +326,7 @@
       "collapseFile": "Собери ја датотеката",
       "expandFile": "Прошири ја датотеката",
       "diffTooLarge": "Разликите се преголеми за да се прикажат.",
+      "noPreview": "Нема достапен преглед за оваа датотека",
       "openOnGitHub": "Отвори на GitHub",
       "openDiffOnGitHub": "Отвори ги разликите во оваа датотека на GitHub",
       "githubDiff": "Разлики на GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Повторно вчитај ја околината",
       "defaultEnvironment": "Стандардна околина",
       "environmentSummary": "{{commands}} команди · {{mcp}} MCP · {{skills}} вештини · {{agents}} агенти",
-      "changes": "Промени",
       "leaveChanges": "Остави ги промените",
       "commitAndPush": "Комитирај и испрати",
       "startSession": "Започни сесија",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Модел ({{displayCount}})",
       "modelsCount_other": "Модели ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Прикажи промени",
+      "asOf": "Состојба од {{time}}",
+      "tooLarge": "Разликите се преголеми за да се прикажат на мобилен.",
+      "empty": "Сè уште нема промени во датотеките во оваа сесија."
     },
     "autoApprove": {
       "title": "Автоматско одобрување",

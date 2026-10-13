@@ -136,7 +136,8 @@
     "working": "Hojjechaa jira",
     "yourOwnRepositories": "Kuusaalee koodii mataa keetii",
     "dismissed": "Dhiifame",
-    "agent": "Bakka bu'aa"
+    "agent": "Bakka bu'aa",
+    "changes": "Jijjiiramoota"
   },
   "language": {
     "restarting": "Afaan filatame fayyadamuuf irra deebi'ee jalqabaa jira",
@@ -325,6 +326,7 @@
       "collapseFile": "Faayilii cufi",
       "expandFile": "Faayilii bal'isi",
       "diffTooLarge": "Garaagarummaan agarsiisuuf garmalee guddaadha.",
+      "noPreview": "Faayilii kanaaf duraaltoon hin jiru",
       "openOnGitHub": "GitHub irratti bani",
       "openDiffOnGitHub": "Garaagarummaa faayilii kanaa GitHub irratti bani",
       "githubDiff": "Garaagarummaa GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Naannoo fe'uuf deebi'ii yaali",
       "defaultEnvironment": "Naannoo durtii",
       "environmentSummary": "ajajoota {{commands}} · MCP {{mcp}} · dandeettiiwwan {{skills}} · ergamtoota {{agents}}",
-      "changes": "Jijjiiramoota",
       "leaveChanges": "Jijjiiramoota dhiisi",
       "commitAndPush": "Galmeessiitii ol ergi",
       "startSession": "Turtii jalqabi",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Moodela ({{displayCount}})",
       "modelsCount_other": "Moodeloota ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Jijjiiramoota ilaali",
+      "asOf": "Hanga {{time}} tti",
+      "tooLarge": "Garaagarummaan kun moobaayilii irratti agarsiisuuf garmalee guddaadha.",
+      "empty": "Yeroo kana keessatti hanga ammaatti jijjiiramni faayilii hin jiru."
     },
     "autoApprove": {
       "title": "Eeyyama ofumaan",

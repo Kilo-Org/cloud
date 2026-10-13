@@ -136,7 +136,8 @@
     "working": "ಕೆಲಸ ಮಾಡುತ್ತಿದೆ",
     "yourOwnRepositories": "ನಿಮ್ಮ ಸ್ವಂತ ರೆಪೊಸಿಟರಿಗಳು",
     "dismissed": "ಕಡೆಗಣಿಸಲಾಗಿದೆ",
-    "agent": "ಏಜೆಂಟ್"
+    "agent": "ಏಜೆಂಟ್",
+    "changes": "ಬದಲಾವಣೆಗಳು"
   },
   "language": {
     "restarting": "ಆಯ್ಕೆ ಮಾಡಿದ ಭಾಷೆಯನ್ನು ಅನ್ವಯಿಸಲು ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",
@@ -325,6 +326,7 @@
       "collapseFile": "ಫೈಲ್ ಮಡಚಿ",
       "expandFile": "ಫೈಲ್ ವಿಸ್ತರಿಸಿ",
       "diffTooLarge": "ಬದಲಾವಣೆಗಳ ಹೋಲಿಕೆ ತುಂಬಾ ದೊಡ್ಡದಿರುವುದರಿಂದ ತೋರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+      "noPreview": "ಈ ಫೈಲ್‌ಗೆ ಪೂರ್ವವೀಕ್ಷಣೆ ಲಭ್ಯವಿಲ್ಲ",
       "openOnGitHub": "GitHubನಲ್ಲಿ ತೆರೆಯಿರಿ",
       "openDiffOnGitHub": "ಈ ಫೈಲ್‌ನ ಬದಲಾವಣೆಗಳ ಹೋಲಿಕೆಯನ್ನು GitHubನಲ್ಲಿ ತೆರೆಯಿರಿ",
       "githubDiff": "GitHubನಲ್ಲಿನ ಬದಲಾವಣೆಗಳ ಹೋಲಿಕೆ"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "ಪರಿಸರವನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "defaultEnvironment": "ಡೀಫಾಲ್ಟ್ ಪರಿಸರ",
       "environmentSummary": "{{commands}} ಆಜ್ಞೆಗಳು · {{mcp}} MCP · {{skills}} ಕೌಶಲ್ಯಗಳು · {{agents}} ಏಜೆಂಟ್‌ಗಳು",
-      "changes": "ಬದಲಾವಣೆಗಳು",
       "leaveChanges": "ಹಾಗೆಯೇ ಬಿಡಿ",
       "commitAndPush": "ಕಮಿಟ್ ಮಾಡಿ, ಪುಶ್ ಮಾಡಿ",
       "startSession": "ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "ಮಾದರಿ ({{displayCount}})",
       "modelsCount_other": "ಮಾದರಿಗಳು ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ಬದಲಾವಣೆಗಳನ್ನು ವೀಕ್ಷಿಸಿ",
+      "asOf": "{{time}} ರ ಪ್ರಕಾರ",
+      "tooLarge": "ಈ ಬದಲಾವಣೆಗಳ ಹೋಲಿಕೆ ಮೊಬೈಲ್‌ನಲ್ಲಿ ತೋರಿಸಲು ತುಂಬಾ ದೊಡ್ಡದಾಗಿದೆ.",
+      "empty": "ಈ ಸೆಷನ್‌ನಲ್ಲಿ ಇನ್ನೂ ಯಾವುದೇ ಫೈಲ್ ಬದಲಾವಣೆಗಳಿಲ್ಲ."
     },
     "autoApprove": {
       "title": "ಸ್ವಯಂ ಅನುಮೋದನೆ",

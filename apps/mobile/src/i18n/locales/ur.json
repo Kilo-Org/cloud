@@ -136,7 +136,8 @@
     "working": "کام جاری ہے",
     "yourOwnRepositories": "آپ کی اپنی ریپوزٹریز",
     "dismissed": "نظر انداز کردہ",
-    "agent": "ایجنٹ"
+    "agent": "ایجنٹ",
+    "changes": "تبدیلیاں"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -325,6 +326,7 @@
       "collapseFile": "فائل کی تفصیل چھپائیں",
       "expandFile": "فائل کی تفصیل دکھائیں",
       "diffTooLarge": "تبدیلیوں کا موازنہ اتنا بڑا ہے کہ اسے دکھایا نہیں جا سکتا۔",
+      "noPreview": "اس فائل کا کوئی پیش منظر دستیاب نہیں",
       "openOnGitHub": "GitHub پر کھولیں",
       "openDiffOnGitHub": "اس فائل کی تبدیلیوں کا موازنہ GitHub پر کھولیں",
       "githubDiff": "GitHub پر تبدیلیوں کا موازنہ"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "ماحول دوبارہ لوڈ کرنے کی کوشش کریں",
       "defaultEnvironment": "پہلے سے طے شدہ ماحول",
       "environmentSummary": "{{commands}} کمانڈز · {{mcp}} MCP · {{skills}} مہارتیں · {{agents}} ایجنٹ",
-      "changes": "تبدیلیاں",
       "leaveChanges": "تبدیلیاں رہنے دیں",
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
       "modelsCount_one": "ماڈل ({{displayCount}})",
       "modelsCount_other": "ماڈلز ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "تبدیلیاں دیکھیں",
+      "asOf": "{{time}} تک",
+      "tooLarge": "تبدیلیوں کا یہ موازنہ اتنا بڑا ہے کہ اسے موبائل پر دکھایا نہیں جا سکتا۔",
+      "empty": "اس سیشن میں ابھی تک فائلوں میں کوئی تبدیلی نہیں ہوئی۔"
     },
     "autoApprove": {
       "title": "خودکار منظوری",

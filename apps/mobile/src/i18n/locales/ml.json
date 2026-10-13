@@ -136,7 +136,8 @@
     "working": "പ്രവർത്തിക്കുന്നു",
     "yourOwnRepositories": "നിങ്ങളുടെ സ്വന്തം റിപ്പോസിറ്ററികൾ",
     "dismissed": "ഒഴിവാക്കി",
-    "agent": "ഏജൻ്റ്"
+    "agent": "ഏജൻ്റ്",
+    "changes": "മാറ്റങ്ങൾ"
   },
   "language": {
     "restarting": "ഭാഷ മാറ്റാൻ പുനരാരംഭിക്കുന്നു",
@@ -325,6 +326,7 @@
       "collapseFile": "ഫയൽ ചുരുക്കുക",
       "expandFile": "ഫയൽ വിരിക്കുക",
       "diffTooLarge": "ഡിഫ് വളരെ വലുതായതിനാൽ കാണിക്കാനാവില്ല.",
+      "noPreview": "ഈ ഫയലിന് പ്രിവ്യൂ ലഭ്യമല്ല",
       "openOnGitHub": "GitHub-ൽ തുറക്കുക",
       "openDiffOnGitHub": "ഈ ഫയലിന്റെ ഡിഫ് GitHub-ൽ തുറക്കുക",
       "githubDiff": "GitHub ഡിഫ്"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "പ്രവർത്തനാന്തരീക്ഷം ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
       "defaultEnvironment": "ഡിഫോൾട്ട് പ്രവർത്തനാന്തരീക്ഷം",
       "environmentSummary": "{{commands}} കമാൻഡുകൾ · {{mcp}} MCP · {{skills}} സ്കില്ലുകൾ · {{agents}} ഏജന്റുകൾ",
-      "changes": "മാറ്റങ്ങൾ",
       "leaveChanges": "മാറ്റങ്ങൾ നിലനിർത്തുക",
       "commitAndPush": "കമ്മിറ്റ് ചെയ്ത് പുഷ് ചെയ്യുക",
       "startSession": "സെഷൻ ആരംഭിക്കുക",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "മോഡൽ ({{displayCount}})",
       "modelsCount_other": "മോഡലുകൾ ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "മാറ്റങ്ങൾ കാണുക",
+      "asOf": "{{time}} വരെയുള്ളത്",
+      "tooLarge": "ഈ ഡിഫ് മൊബൈലിൽ കാണിക്കാൻ കഴിയാത്തത്ര വലുതാണ്.",
+      "empty": "ഈ സെഷനിൽ ഇതുവരെ ഫയൽ മാറ്റങ്ങളൊന്നുമില്ല."
     },
     "autoApprove": {
       "title": "സ്വയം അനുമതി",

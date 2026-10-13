@@ -136,7 +136,8 @@
     "working": "Töös",
     "yourOwnRepositories": "Sinu enda hoidlad",
     "dismissed": "Kõrvale jäetud",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Muudatused"
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -325,6 +326,7 @@
       "collapseFile": "Ahenda fail",
       "expandFile": "Laienda fail",
       "diffTooLarge": "Muudatusi on kuvamiseks liiga palju.",
+      "noPreview": "Selle faili eelvaade pole saadaval",
       "openOnGitHub": "Ava GitHubis",
       "openDiffOnGitHub": "Ava selle faili muudatuste vaade GitHubis",
       "githubDiff": "GitHubi muudatuste vaade"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Proovi keskkonna laadimist uuesti",
       "defaultEnvironment": "Vaikekeskkond",
       "environmentSummary": "{{commands}} käsku · {{mcp}} MCP · {{skills}} oskust · {{agents}} agenti",
-      "changes": "Muudatused",
       "leaveChanges": "Jäta alles",
       "commitAndPush": "Kinnista ja saada",
       "startSession": "Alusta seanssi",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Mudel ({{displayCount}})",
       "modelsCount_other": "Mudelid ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Vaata muudatusi",
+      "asOf": "Seisuga {{time}}",
+      "tooLarge": "Muudatusi on mobiilis kuvamiseks liiga palju.",
+      "empty": "Selles seansis pole veel faile muudetud."
     },
     "autoApprove": {
       "title": "Automaatne kinnitamine",

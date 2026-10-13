@@ -136,7 +136,8 @@
     "working": "Strādā",
     "yourOwnRepositories": "Tavi repozitoriji",
     "dismissed": "Noraidīts",
-    "agent": "Aģents"
+    "agent": "Aģents",
+    "changes": "Izmaiņas"
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -325,6 +326,7 @@
       "collapseFile": "Sakļaut failu",
       "expandFile": "Izvērst failu",
       "diffTooLarge": "Izmaiņu salīdzinājums ir pārāk liels, lai to parādītu.",
+      "noPreview": "Šim failam priekšskatījums nav pieejams",
       "openOnGitHub": "Atvērt GitHub",
       "openDiffOnGitHub": "Atvērt šī faila izmaiņu salīdzinājumu GitHub",
       "githubDiff": "GitHub izmaiņu salīdzinājums"
@@ -2217,7 +2219,6 @@
       "retryLoadingEnvironment": "Mēģināt ielādēt vidi vēlreiz",
       "defaultEnvironment": "Noklusējuma vide",
       "environmentSummary": "Komandas: {{commands}} · MCP: {{mcp}} · prasmes: {{skills}} · aģenti: {{agents}}",
-      "changes": "Izmaiņas",
       "leaveChanges": "Atstāt izmaiņas",
       "commitAndPush": "Fiksēt un nosūtīt",
       "startSession": "Sākt sesiju",
@@ -2689,6 +2690,12 @@
       "modelsCount_one": "Modelis ({{displayCount}})",
       "modelsCount_other": "Modeļi ({{displayCount}})",
       "modelsCount_zero": "Modeļi ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Skatīt izmaiņas",
+      "asOf": "Stāvoklis uz {{time}}",
+      "tooLarge": "Šis izmaiņu salīdzinājums ir pārāk liels, lai to parādītu mobilajā ierīcē.",
+      "empty": "Šajā sesijā vēl nav izmaiņu failos."
     },
     "autoApprove": {
       "title": "Automātiska apstiprināšana",

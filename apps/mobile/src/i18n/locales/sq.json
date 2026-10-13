@@ -136,7 +136,8 @@
     "working": "Duke punuar",
     "yourOwnRepositories": "Depot e tua",
     "dismissed": "E hedhur poshtë",
-    "agent": "Agjenti"
+    "agent": "Agjenti",
+    "changes": "Ndryshimet"
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -325,6 +326,7 @@
       "collapseFile": "Fshih përmbajtjen e skedarit",
       "expandFile": "Shfaq përmbajtjen e skedarit",
       "diffTooLarge": "Ndryshimet janë tepër të mëdha për t'u shfaqur.",
+      "noPreview": "Nuk ka parapamje për këtë skedar",
       "openOnGitHub": "Hap në GitHub",
       "openDiffOnGitHub": "Hap ndryshimet e këtij skedari në GitHub",
       "githubDiff": "Ndryshimet në GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Provo ta ngarkosh përsëri mjedisin",
       "defaultEnvironment": "Mjedisi i parazgjedhur",
       "environmentSummary": "{{commands}} komanda · {{mcp}} MCP · {{skills}} aftësi · {{agents}} agjentë",
-      "changes": "Ndryshimet",
       "leaveChanges": "Lër ndryshimet",
       "commitAndPush": "Regjistro dhe dërgo",
       "startSession": "Nis seancën",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modelet ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Shiko ndryshimet",
+      "asOf": "Deri në {{time}}",
+      "tooLarge": "Ndryshimet janë tepër të mëdha për t'u shfaqur në celular.",
+      "empty": "Ende nuk ka ndryshime skedarësh në këtë sesion."
     },
     "autoApprove": {
       "title": "Miratim automatik",

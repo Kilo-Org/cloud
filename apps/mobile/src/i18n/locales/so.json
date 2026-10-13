@@ -136,7 +136,8 @@
     "working": "Shaqaynaya",
     "yourOwnRepositories": "Kaydadkaaga shakhsiga ah",
     "dismissed": "La iska dhaafay",
-    "agent": "Wakiil"
+    "agent": "Wakiil",
+    "changes": "Isbeddellada"
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -325,6 +326,7 @@
       "collapseFile": "Isku laab faylka",
       "expandFile": "Ballaarso faylka",
       "diffTooLarge": "Kala duwanaanshuhu aad buu u weyn yahay in la muujiyo.",
+      "noPreview": "Faylkan horu-eeg looma hayo",
       "openOnGitHub": "Ku fur GitHub",
       "openDiffOnGitHub": "Ku fur GitHub kala duwanaanshaha faylkan",
       "githubDiff": "Kala duwanaanshaha GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Mar kale isku day inaad soo shubto deegaanka",
       "defaultEnvironment": "Deegaanka caadiga ah",
       "environmentSummary": "{{commands}} amar · {{mcp}} MCP · {{skills}} xirfadood · {{agents}} wakiil",
-      "changes": "Isbeddellada",
       "leaveChanges": "Ka tag isbeddellada",
       "commitAndPush": "Diiwaangeli oo dir",
       "startSession": "Bilow kalfadhiga",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Moodeel ({{displayCount}})",
       "modelsCount_other": "Moodeellada ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Eeg isbeddellada",
+      "asOf": "Laga bilaabo {{time}}",
+      "tooLarge": "Kala duwanaanshahan aad buu u weyn yahay in lagu muujiyo mobilka.",
+      "empty": "Weli wax isbeddel ah oo fayl ah kuma jiraan fadhigan."
     },
     "autoApprove": {
       "title": "Oggolaansho otomaatig ah",

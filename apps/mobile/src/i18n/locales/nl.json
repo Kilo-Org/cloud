@@ -136,7 +136,8 @@
     "working": "Bezig",
     "yourOwnRepositories": "Je eigen coderepository's",
     "dismissed": "Genegeerd",
-    "agent": "Tussenpersoon"
+    "agent": "Tussenpersoon",
+    "changes": "Wijzigingen"
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -1678,7 +1679,6 @@
       "retryLoadingEnvironment": "Omgeving opnieuw laden",
       "defaultEnvironment": "Standaardomgeving",
       "environmentSummary": "{{commands}} opdrachten · {{mcp}} MCP · {{skills}} vaardigheden · {{agents}} agents",
-      "changes": "Wijzigingen",
       "leaveChanges": "Niet committen",
       "commitAndPush": "Committen en pushen",
       "startSession": "Sessie starten",
@@ -2140,6 +2140,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modellen ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Wijzigingen bekijken",
+      "asOf": "Stand van {{time}}",
+      "tooLarge": "Deze diff is te groot om op mobiel weer te geven.",
+      "empty": "Nog geen bestandswijzigingen in deze sessie."
     },
     "autoApprove": {
       "title": "Automatisch goedkeuren",
@@ -2644,6 +2650,7 @@
     "fileRows": {
       "collapseFile": "Bestand inklappen",
       "diffTooLarge": "De diff is te groot om weer te geven.",
+      "noPreview": "Geen voorbeeld beschikbaar voor dit bestand",
       "expandFile": "Bestand uitklappen",
       "markViewed": "{{path}} markeren als bekeken",
       "openDiffOnGitHub": "De diff van dit bestand op GitHub openen",

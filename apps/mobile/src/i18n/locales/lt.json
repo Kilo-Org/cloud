@@ -136,7 +136,8 @@
     "working": "Vykdoma",
     "yourOwnRepositories": "Tavo saugyklos",
     "dismissed": "Atmesta",
-    "agent": "Agentas"
+    "agent": "Agentas",
+    "changes": "Pakeitimai"
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -325,6 +326,7 @@
       "collapseFile": "Sutraukti failą",
       "expandFile": "Išskleisti failą",
       "diffTooLarge": "Pakeitimų palyginimas per didelis, kad būtų galima jį parodyti.",
+      "noPreview": "Šio failo peržiūra negalima",
       "openOnGitHub": "Atidaryti GitHub platformoje",
       "openDiffOnGitHub": "Atidaryti šio failo pakeitimų palyginimą GitHub platformoje",
       "githubDiff": "GitHub pakeitimų palyginimas"
@@ -2245,7 +2247,6 @@
       "retryLoadingEnvironment": "Bandyti įkelti aplinką iš naujo",
       "defaultEnvironment": "Numatytoji aplinka",
       "environmentSummary": "komandų: {{commands}} · MCP: {{mcp}} · įgūdžių: {{skills}} · agentų: {{agents}}",
-      "changes": "Pakeitimai",
       "leaveChanges": "Palikti pakeitimus",
       "commitAndPush": "Įrašyti ir išsiųsti",
       "startSession": "Pradėti sesiją",
@@ -2727,6 +2728,12 @@
       "modelsCount_other": "Modeliai ({{displayCount}})",
       "modelsCount_few": "Modeliai ({{displayCount}})",
       "modelsCount_many": "Modeliai ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Peržiūrėti pakeitimus",
+      "asOf": "Būsena {{time}}",
+      "tooLarge": "Šis pakeitimų palyginimas per didelis, kad būtų galima jį parodyti mobiliajame įrenginyje.",
+      "empty": "Šioje sesijoje failų pakeitimų dar nėra."
     },
     "autoApprove": {
       "title": "Automatinis tvirtinimas",

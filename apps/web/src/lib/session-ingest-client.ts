@@ -12,7 +12,9 @@ import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service
 import type { User } from '@kilocode/db/schema';
 import {
   kiloSdkMessageHistorySchema,
+  sessionDiffReadSchema,
   type KiloSdkMessageHistory,
+  type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
 // ---------------------------------------------------------------------------
@@ -302,6 +304,68 @@ export async function fetchSessionMessagesPage(
       ? {}
       : { sessionMetadata: parsed.data.sessionMetadata }),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Session diff
+// ---------------------------------------------------------------------------
+
+const SessionDiffResponseSchema = z.object({
+  success: z.literal(true),
+  diff: sessionDiffReadSchema,
+});
+
+/**
+ * Fetch the stored cumulative diff for a Kilo session the user can read.
+ * Returns `null` for sessions the user cannot read.
+ */
+export async function fetchSessionDiff(
+  sessionId: string,
+  userId: string
+): Promise<SessionDiffRead | null> {
+  if (!SESSION_INGEST_WORKER_URL) {
+    throw new Error('SESSION_INGEST_WORKER_URL is not configured');
+  }
+
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60 * 60,
+  });
+  const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/diff`;
+  const response = await fetchSessionIngest(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    const error = new Error(
+      `Session ingest diff failed: ${response.status} ${response.statusText}${
+        errorText ? ` - ${errorText}` : ''
+      }`
+    );
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'diff' },
+      extra: { sessionId, status: response.status },
+    });
+    throw error;
+  }
+
+  const parsed = SessionDiffResponseSchema.safeParse(await response.json());
+  if (!parsed.success) {
+    const error = new Error(
+      `Session ingest diff returned an unexpected response: ${parsed.error.message}`
+    );
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'diff' },
+      extra: { sessionId, issues: parsed.error.issues },
+    });
+    throw error;
+  }
+  return parsed.data.diff;
 }
 
 // ---------------------------------------------------------------------------

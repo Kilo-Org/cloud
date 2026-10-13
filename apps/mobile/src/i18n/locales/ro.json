@@ -136,7 +136,8 @@
     "working": "În lucru",
     "yourOwnRepositories": "Depozitele tale de cod",
     "dismissed": "Ignorată",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Modificări"
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -325,6 +326,7 @@
       "collapseFile": "Restrânge fișierul",
       "expandFile": "Extinde fișierul",
       "diffTooLarge": "Diferențele sunt prea mari pentru a fi afișate.",
+      "noPreview": "Nu există previzualizare pentru acest fișier",
       "openOnGitHub": "Deschide pe GitHub",
       "openDiffOnGitHub": "Deschide comparația acestui fișier pe GitHub",
       "githubDiff": "Comparația de pe GitHub"
@@ -2217,7 +2219,6 @@
       "retryLoadingEnvironment": "Reîncearcă încărcarea mediului",
       "defaultEnvironment": "Mediu implicit",
       "environmentSummary": "{{commands}} comenzi · {{mcp}} MCP · {{skills}} competențe · {{agents}} agenți",
-      "changes": "Modificări",
       "leaveChanges": "Păstrează modificările",
       "commitAndPush": "Fă commit și trimite",
       "startSession": "Începe sesiunea",
@@ -2689,6 +2690,12 @@
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modele ({{displayCount}})",
       "modelsCount_few": "Modele ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Vezi modificările",
+      "asOf": "La {{time}}",
+      "tooLarge": "Diferențele sunt prea mari pentru a fi afișate pe mobil.",
+      "empty": "Nicio modificare de fișiere în această sesiune încă."
     },
     "autoApprove": {
       "title": "Aprobare automată",

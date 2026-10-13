@@ -136,7 +136,8 @@
     "working": "Σε εξέλιξη",
     "yourOwnRepositories": "Τα δικά σου αποθετήρια",
     "dismissed": "Απορρίφθηκε",
-    "agent": "Μέσο"
+    "agent": "Μέσο",
+    "changes": "Αλλαγές"
   },
   "language": {
     "restarting": "Επανεκκίνηση για εφαρμογή της νέας γλώσσας",
@@ -325,6 +326,7 @@
       "collapseFile": "Σύμπτυξη αρχείου",
       "expandFile": "Επέκταση αρχείου",
       "diffTooLarge": "Οι διαφορές είναι πολύ μεγάλες για να εμφανιστούν.",
+      "noPreview": "Δεν υπάρχει διαθέσιμη προεπισκόπηση για αυτό το αρχείο",
       "openOnGitHub": "Άνοιγμα στο GitHub",
       "openDiffOnGitHub": "Άνοιγμα των διαφορών αυτού του αρχείου στο GitHub",
       "githubDiff": "Διαφορές στο GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Επανάληψη φόρτωσης περιβάλλοντος",
       "defaultEnvironment": "Προεπιλεγμένο περιβάλλον",
       "environmentSummary": "{{commands}} εντολές · {{mcp}} MCP · {{skills}} δεξιότητες · {{agents}} πράκτορες",
-      "changes": "Αλλαγές",
       "leaveChanges": "Διατήρηση αλλαγών",
       "commitAndPush": "Καταχώριση και αποστολή",
       "startSession": "Έναρξη συνεδρίας",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "Μοντέλο {{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Μοντέλο ({{displayCount}})",
       "modelsCount_other": "Μοντέλα ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Προβολή αλλαγών",
+      "asOf": "Στις {{time}}",
+      "tooLarge": "Οι διαφορές είναι πολύ μεγάλες για να εμφανιστούν σε κινητό.",
+      "empty": "Δεν υπάρχουν ακόμη αλλαγές αρχείων σε αυτή τη συνεδρία."
     },
     "autoApprove": {
       "title": "Αυτόματη έγκριση",

@@ -136,7 +136,8 @@
     "working": "Ń ṣiṣẹ́",
     "yourOwnRepositories": "Àwọn ibi ìpamọ́ kóòdù tìrẹ",
     "dismissed": "A ti kọ̀ sílẹ̀",
-    "agent": "Aṣoju"
+    "agent": "Aṣoju",
+    "changes": "Àwọn àyípadà"
   },
   "language": {
     "restarting": "A ń tún bẹ̀rẹ̀ láti lo èdè tí o yàn",
@@ -325,6 +326,7 @@
       "collapseFile": "Fi àkóónú fáìlì pamọ́",
       "expandFile": "Fi àkóónú fáìlì hàn",
       "diffTooLarge": "Ìyàtọ̀ náà tóbi jù láti fihàn.",
+      "noPreview": "Kò sí àwòtẹ́lẹ̀ fún fáìlì yìí",
       "openOnGitHub": "Ṣí lórí GitHub",
       "openDiffOnGitHub": "Ṣí ìyàtọ̀ fáìlì yìí lórí GitHub",
       "githubDiff": "Ìyàtọ̀ lórí GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Gbìyànjú láti tún àyíká iṣẹ́ gbé wọlé",
       "defaultEnvironment": "Àyíká iṣẹ́ àiyípadà",
       "environmentSummary": "àṣẹ {{commands}} · {{mcp}} MCP · ọgbọ́n {{skills}} · aṣojú {{agents}}",
-      "changes": "Àwọn àyípadà",
       "leaveChanges": "Fi àyípadà sílẹ̀",
       "commitAndPush": "Ṣe àkọsílẹ̀, firánṣẹ́",
       "startSession": "Bẹ̀rẹ̀ ìgbà iṣẹ́",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Àwòṣe ({{displayCount}})",
       "modelsCount_other": "Àwọn àwòṣe ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Wo àwọn àyípadà",
+      "asOf": "Títí di {{time}}",
+      "tooLarge": "Ìyàtọ̀ yìí tóbi jù láti fihàn lórí fóònù.",
+      "empty": "Kò sí àyípadà fáìlì nínú ìjíròrò yìí síbẹ̀."
     },
     "autoApprove": {
       "title": "Ìfọwọ́sí aládàáṣiṣẹ́",

@@ -136,7 +136,8 @@
     "working": "Kei te mahi",
     "yourOwnRepositories": "Ō ake pūranga waehere",
     "dismissed": "Kua whakakorea",
-    "agent": "Kaihoko"
+    "agent": "Kaihoko",
+    "changes": "Ngā huringa"
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",
@@ -325,6 +326,7 @@
       "collapseFile": "Whakaitihia te tirohanga kōnae",
       "expandFile": "Whakawhānuitia te tirohanga kōnae",
       "diffTooLarge": "He nui rawa ngā rerekētanga hei whakaatu.",
+      "noPreview": "Kāore he arokite mō tēnei kōnae",
       "openOnGitHub": "Whakatuwheratia ki GitHub",
       "openDiffOnGitHub": "Whakatuwheratia ngā rerekētanga o tēnei kōnae ki GitHub",
       "githubDiff": "Ngā rerekētanga i GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Whakamātau anō ki te uta i te taiao",
       "defaultEnvironment": "Te taiao taunoa",
       "environmentSummary": "{{commands}} whakahau · {{mcp}} MCP · {{skills}} pūkenga · {{agents}} māngai",
-      "changes": "Ngā huringa",
       "leaveChanges": "Waiho ngā huringa",
       "commitAndPush": "Whakapūmau, pana",
       "startSession": "Tīmataria te wātū",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Ngā tauira ({{displayCount}})",
       "modelsCount_other": "Ngā tauira ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Tirohia ngā huringa",
+      "asOf": "I te {{time}}",
+      "tooLarge": "He nui rawa ēnei rerekētanga hei whakaatu ki te waea pūkoro.",
+      "empty": "Kāore anō kia huria he kōnae i tēnei wātū."
     },
     "autoApprove": {
       "title": "Whakaae aunoa",

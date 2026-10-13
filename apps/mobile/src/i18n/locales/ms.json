@@ -136,7 +136,8 @@
     "working": "Memproses…",
     "yourOwnRepositories": "Repositori anda sendiri",
     "dismissed": "Diketepikan",
-    "agent": "ejen"
+    "agent": "ejen",
+    "changes": "Perubahan"
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -325,6 +326,7 @@
       "collapseFile": "Sembunyikan kandungan fail",
       "expandFile": "Paparkan kandungan fail",
       "diffTooLarge": "Perbezaan kod terlalu besar untuk dipaparkan.",
+      "noPreview": "Tiada pratonton tersedia untuk fail ini",
       "openOnGitHub": "Buka di GitHub",
       "openDiffOnGitHub": "Buka perbezaan kod fail ini di GitHub",
       "githubDiff": "Perbezaan kod GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Cuba muatkan semula persekitaran",
       "defaultEnvironment": "Persekitaran lalai",
       "environmentSummary": "{{commands}} arahan · {{mcp}} MCP · {{skills}} kemahiran · {{agents}} ejen",
-      "changes": "Perubahan",
       "leaveChanges": "Biarkan perubahan",
       "commitAndPush": "Komit dan hantar",
       "startSession": "Mulakan sesi",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Model ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Lihat perubahan",
+      "asOf": "Setakat {{time}}",
+      "tooLarge": "Perbezaan kod ini terlalu besar untuk dipaparkan pada peranti mudah alih.",
+      "empty": "Belum ada perubahan fail dalam sesi ini."
     },
     "autoApprove": {
       "title": "Lulus automatik",

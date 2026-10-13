@@ -136,7 +136,8 @@
     "working": "W toku",
     "yourOwnRepositories": "Twoje repozytoria",
     "dismissed": "Odrzucone",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Zmiany"
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -1702,7 +1703,6 @@
       "retryLoadingEnvironment": "Wczytaj środowisko ponownie",
       "defaultEnvironment": "Domyślne środowisko",
       "environmentSummary": "polecenia: {{commands}} · MCP: {{mcp}} · umiejętności: {{skills}} · agenci: {{agents}}",
-      "changes": "Zmiany",
       "leaveChanges": "Pozostaw zmiany",
       "commitAndPush": "Zatwierdź i wypchnij",
       "startSession": "Rozpocznij sesję",
@@ -2184,6 +2184,12 @@
       "modelsCount_other": "Modele ({{displayCount}})",
       "modelsCount_few": "Modele ({{displayCount}})",
       "modelsCount_many": "Modele ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Wyświetl zmiany",
+      "asOf": "Stan na {{time}}",
+      "tooLarge": "Różnice są zbyt duże, aby je wyświetlić na urządzeniu mobilnym.",
+      "empty": "W tej sesji nie zmieniono jeszcze żadnych plików."
     },
     "autoApprove": {
       "title": "Automatyczne zatwierdzanie",
@@ -2700,6 +2706,7 @@
     "fileRows": {
       "collapseFile": "Zwiń plik",
       "diffTooLarge": "Różnice są zbyt duże, aby je wyświetlić.",
+      "noPreview": "Podgląd tego pliku jest niedostępny",
       "expandFile": "Rozwiń plik",
       "markViewed": "Oznacz {{path}} jako przejrzany",
       "openDiffOnGitHub": "Otwórz różnice w tym pliku w serwisie GitHub",

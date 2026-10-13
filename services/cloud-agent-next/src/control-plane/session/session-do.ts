@@ -207,10 +207,10 @@ const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
 };
 
 const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
-  sandbox_create: 'Creating sandbox',
-  sandbox_start: 'Starting sandbox',
+  sandbox_create: 'Creating sandbox from snapshot',
+  sandbox_start: 'Starting sandbox from snapshot',
   clone: 'Cloning repository',
-  restore: 'Using prepared repository',
+  restore: 'Updating repository',
   checkout: 'Checking out branch',
   setup: 'Running setup commands',
   snapshot: 'Saving repository for faster starts',

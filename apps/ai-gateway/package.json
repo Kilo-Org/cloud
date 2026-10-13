@@ -18,7 +18,6 @@
   },
   "devDependencies": {
     "@jest/globals": "30.3.0",
-    "@playwright/test": "1.58.2",
     "@swc/core": "1.15.18",
     "@types/jest": "30.0.0",
     "@types/node": "catalog:",

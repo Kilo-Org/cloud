@@ -298,6 +298,38 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
       expect(model.labelPrefix).toContain(model.changeSuffix);
     });
 
+    test.each([
+      { startedAt: '2026-10-08T00:00:00Z', streakMonths: 0, percent: 0.5 },
+      { startedAt: '2026-10-08T00:00:00Z', streakMonths: 1, percent: 0.1 },
+      { startedAt: '2026-10-13T00:00:00Z', streakMonths: 0, percent: 0.05 },
+      { startedAt: '2026-10-13T00:00:00Z', streakMonths: 1, percent: 0.5 },
+      { startedAt: '2026-10-14T00:00:00Z', streakMonths: 0, percent: 0.1 },
+      { startedAt: '2026-10-14T00:00:00Z', streakMonths: 1, percent: 0.5 },
+      { startedAt: '2026-10-14T00:00:00Z', streakMonths: 2, percent: 0.15 },
+    ])(
+      'uses the original subscription start for the next bonus: $startedAt, streak $streakMonths',
+      ({ startedAt, streakMonths, percent }) => {
+        const rows = computeRenewInfoRowModel({
+          subscription: buildSubscription({
+            startedAt,
+            currentStreakMonths: streakMonths,
+            isFirstTimeSubscriberEver: true,
+            refillAt: '2026-11-14T00:00:00Z',
+          }),
+          isPendingCancellation: false,
+          scheduledChange: null,
+          nowIso: '2026-11-13T00:00:00Z',
+        });
+
+        expect(rows).toHaveLength(1);
+        const model = rows[0];
+        if (model?.kind !== 'renews_and_adds_bonus') {
+          throw new Error('expected renews_and_adds_bonus');
+        }
+        expect(model.bonusUsd).toBeCloseTo(getMonthlyPriceUsd(KiloPassTier.Tier19) * percent);
+      }
+    );
+
     test('pluralizes day vs days in the label prefix', () => {
       const day1Rows = computeRenewInfoRowModel({
         subscription: buildSubscription({

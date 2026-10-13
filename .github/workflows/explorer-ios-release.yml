@@ -1,4 +1,4 @@
-# Explorer-only simulator Release builds; never signs or publishes a store app.
+# Explorer-only simulator Release builds; Xcode ad-hoc signs locally, never signs or publishes a store app.
 name: explorer-ios-release
 run-name: explorer-ios-release ${{ inputs.fingerprint }}
 on:
@@ -9,7 +9,7 @@ on:
         required: true
         type: string
       fingerprint:
-        description: Explorer commit/environment/CA build key
+        description: Explorer commit/recipe/environment/CA build key
         required: true
         type: string
       mobile_env:
@@ -66,9 +66,11 @@ jobs:
               throw new Error('Explorer telemetry must use exactly one inert value per key');
             }
           }
-          const digest = crypto.createHash('sha256').update(env).update(ca).digest('hex').slice(0, 16);
+          // Keep this recipe salt identical to explorer-ios-app.ts in the explorer supervisor.
+          const recipe = 'explorer-ios-release-v3-xcode-simulator-entitlements';
+          const digest = crypto.createHash('sha256').update(recipe).update('\0').update(env).update(ca).digest('hex').slice(0, 16);
           if (process.env.FINGERPRINT !== `explorer-${process.env.CLOUD_REF.slice(0, 12)}-${digest}`) {
-            throw new Error('Explorer build key does not match supplied env and CA');
+            throw new Error('Explorer build key does not match build recipe, supplied env and CA');
           }
           NODE
           # The env is data consumed by Expo, never sourced as shell code.
@@ -111,8 +113,68 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            CODE_SIGNING_ALLOWED=NO build
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build
           test -s "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator/Kilo.app/main.jsbundle"
+      - name: Verify linked simulator keychain entitlements
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import os
+          import pathlib
+          import plistlib
+          import subprocess
+
+          temporary = pathlib.Path(os.environ['RUNNER_TEMP'])
+          app = temporary / 'DerivedData/Build/Products/Release-iphonesimulator/Kilo.app'
+          native = pathlib.Path('apps/mobile/ios')
+          bundles = sorted(app.rglob('*.appex')) + [app]
+          for bundle in bundles:
+              with (bundle / 'Info.plist').open('rb') as source:
+                  info = plistlib.load(source)
+              identifier = info['CFBundleIdentifier']
+              executable = bundle / info['CFBundleExecutable']
+              with (native / bundle.stem / f'{bundle.stem}.entitlements').open('rb') as source:
+                  generated = plistlib.load(source)
+              architectures = subprocess.check_output(
+                  ['xcrun', 'lipo', '-archs', str(executable)], text=True
+              ).split()
+              if not architectures:
+                  raise RuntimeError(f'No simulator architecture in {identifier}')
+              for architecture in architectures:
+                  binary = executable
+                  if len(architectures) > 1:
+                      binary = temporary / f'{bundle.stem}.{architecture}.simulator'
+                      subprocess.run([
+                          'xcrun', 'lipo', str(executable), '-thin', architecture, '-output', str(binary)
+                      ], check=True)
+                  commands = subprocess.check_output(
+                      ['xcrun', 'otool', '-l', str(binary)], text=True
+                  )
+                  embedded = None
+                  # Read the real linked section, not codesign's separate signature XML:
+                  # AMFI requires simulator entitlements in __TEXT,__entitlements.
+                  for section in commands.split('Section\n')[1:]:
+                      fields = dict(line.split(None, 1) for line in section.splitlines()[:5])
+                      if fields.get('sectname') == '__entitlements' and fields.get('segname') == '__TEXT':
+                          with binary.open('rb') as source:
+                              source.seek(int(fields['offset']))
+                              data = source.read(int(fields['size'], 16))
+                          embedded = plistlib.loads(data.rstrip(b'\0'))
+                          break
+                  if embedded is None:
+                      raise RuntimeError(f'Missing linked simulator entitlements: {identifier}/{architecture}')
+                  application_id = embedded.get('application-identifier', '')
+                  groups = embedded.get('keychain-access-groups', [])
+                  if not (application_id == identifier or application_id.endswith('.' + identifier)):
+                      raise RuntimeError(f'Invalid linked application identifier: {identifier}/{architecture}')
+                  if application_id not in groups:
+                      raise RuntimeError(f'Missing linked keychain access group: {identifier}/{architecture}')
+                  app_groups = 'com.apple.security.application-groups'
+                  if set(embedded.get(app_groups, [])) != set(generated.get(app_groups, [])):
+                      raise RuntimeError(f'Generated app groups not preserved: {identifier}/{architecture}')
+                  print(f'Verified linked simulator keychain entitlements: {identifier}/{architecture}')
+          subprocess.run(['codesign', '--verify', '--deep', '--strict', str(app)], check=True)
+          PY
       - name: Package
         run: |
           set -euo pipefail

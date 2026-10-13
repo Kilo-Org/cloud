@@ -10,6 +10,7 @@ import { Chunk, Effect, Stream } from 'effect';
 import { z } from 'zod';
 
 import { nativeModelFailure } from './native-model-error';
+import { estimatedTokens, inputTokensOf } from './native-model-usage';
 import {
   nativeRequest,
   type NativeRequest,
@@ -86,36 +87,6 @@ let sequence = 0;
 function nextRequestId(): string {
   sequence += 1;
   return `quick-chat-${sequence}`;
-}
-
-/**
- * A deliberately high guess of about three characters per token. It is not a
- * count: it exists so a session on a small on-device window still compacts
- * when the provider reports no usage and cannot count tokens.
- */
-function estimatedTokens(text: string): number {
-  return Math.ceil(text.length / 3);
-}
-
-/** Input usage without native counts: the provider's token counter, else the estimate. */
-async function inputTokensOf(
-  bridge: NativeModelBridge,
-  availability: NativeAvailability,
-  request: NativeRequest
-): Promise<number> {
-  if (bridge.countTokens !== undefined && availability.tokenCounting !== false) {
-    try {
-      return await bridge.countTokens(request);
-    } catch {
-      // The count is optional; the estimate below keeps compaction working.
-    }
-  }
-  const texts = request.messages.map(message =>
-    message.role === 'toolCalls'
-      ? message.calls.map(call => call.name + call.arguments).join('')
-      : message.text
-  );
-  return estimatedTokens(request.system + texts.join(''));
 }
 
 function answer(

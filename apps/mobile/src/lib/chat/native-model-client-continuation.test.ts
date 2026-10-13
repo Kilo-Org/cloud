@@ -1,4 +1,4 @@
-import type { ModelRequest } from '@kilocode/harness-sdk';
+import { type ModelRequest } from '@kilocode/harness-sdk';
 import { Either } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -36,13 +36,16 @@ describe('native generation text across tool rounds', () => {
     'keeps prior text ownership when the final round adds no text: %j',
     async text => {
       const fake = fakeBridge((native, emit) => {
-        if (text) emit({ id: native.id, kind: 'delta', text });
+        if (text) {
+          emit({ id: native.id, kind: 'delta', text });
+        }
         emit({ id: native.id, kind: 'toolCalls', calls: [call] });
       });
       fake.bridge.availability.mockResolvedValue({ ...AVAILABLE, tools: true });
       const bridge = {
         ...fake.bridge,
         resume: vi.fn(async (id: string) => {
+          await Promise.resolve();
           fake.emit({ id, kind: 'done', stop: 'end', usageSource: 'unavailable' });
         }),
       };
@@ -70,7 +73,8 @@ describe('native generation text across tool rounds', () => {
     const bridge = {
       ...fake.bridge,
       resume: vi.fn(async (id: string) => {
-        round++;
+        await Promise.resolve();
+        round += 1;
         if (round === 1) {
           fake.emit({ id, kind: 'toolCalls', calls: [secondCall] });
         } else {

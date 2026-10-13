@@ -47,6 +47,7 @@ import {
   FeedbackSource,
   CliSessionSharedState,
   WorkspaceFolderColor,
+  TodoItemSessionOrigin,
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
@@ -255,6 +256,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassOrgIssuanceKind,
   CliSessionSharedState,
   WorkspaceFolderColor,
+  TodoItemSessionOrigin,
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
@@ -6487,6 +6489,108 @@ export const cli_sessions_v2 = pgTable(
 
 export type CliSessionV2 = typeof cli_sessions_v2.$inferSelect;
 export type NewCliSessionV2 = typeof cli_sessions_v2.$inferInsert;
+
+export const todo_lists = pgTable(
+  'todo_lists',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    emoji: text(),
+    git_url: text(),
+    mode: text(),
+    model: text(),
+    variant: text(),
+    position: text().notNull(),
+    archived_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    // Target of the composite owner foreign key on `todo_items`.
+    unique('UQ_todo_lists_id_kilo_user_id').on(table.id, table.kilo_user_id),
+    index('IDX_todo_lists_owner_scope_position').on(
+      table.kilo_user_id,
+      table.organization_id,
+      table.position
+    ),
+    check(
+      'todo_lists_name_check',
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 100 AND ${table.name} = btrim(${table.name})`
+    ),
+    check('todo_lists_emoji_check', sql`char_length(${table.emoji}) <= 16`),
+  ]
+);
+
+export type TodoListRow = typeof todo_lists.$inferSelect;
+
+export const todo_items = pgTable(
+  'todo_items',
+  {
+    id: idPrimaryKeyColumn,
+    list_id: uuid().notNull(),
+    kilo_user_id: text().notNull(),
+    title: text().notNull(),
+    notes: text(),
+    done_at: timestamp({ withTimezone: true, mode: 'string' }),
+    position: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    foreignKey({
+      columns: [table.list_id, table.kilo_user_id],
+      foreignColumns: [todo_lists.id, todo_lists.kilo_user_id],
+      name: 'todo_items_list_id_kilo_user_id_fk',
+    }).onDelete('cascade'),
+    // Target of the composite owner foreign key on `todo_item_sessions`.
+    unique('UQ_todo_items_id_kilo_user_id').on(table.id, table.kilo_user_id),
+    index('IDX_todo_items_list_position').on(table.list_id, table.position),
+    check(
+      'todo_items_title_check',
+      sql`char_length(btrim(${table.title})) BETWEEN 1 AND 500 AND ${table.title} = btrim(${table.title})`
+    ),
+    check('todo_items_notes_check', sql`char_length(${table.notes}) <= 10000`),
+  ]
+);
+
+export type TodoItemRow = typeof todo_items.$inferSelect;
+
+export const todo_item_sessions = pgTable(
+  'todo_item_sessions',
+  {
+    todo_item_id: uuid().notNull(),
+    session_id: text().notNull(),
+    kilo_user_id: text().notNull(),
+    origin: text().$type<TodoItemSessionOrigin>().notNull(),
+    linked_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    // One session links to at most one to-do.
+    primaryKey({ columns: [table.session_id, table.kilo_user_id] }),
+    foreignKey({
+      columns: [table.todo_item_id, table.kilo_user_id],
+      foreignColumns: [todo_items.id, todo_items.kilo_user_id],
+      name: 'todo_item_sessions_todo_item_id_kilo_user_id_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.session_id, table.kilo_user_id],
+      foreignColumns: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
+      name: 'todo_item_sessions_session_id_kilo_user_id_fk',
+    }).onDelete('cascade'),
+    index('IDX_todo_item_sessions_todo_item_id').on(table.todo_item_id, table.kilo_user_id),
+    enumCheck('todo_item_sessions_origin_check', table.origin, TodoItemSessionOrigin),
+  ]
+);
 
 export type CloudAgentSessionFailureStage =
   | 'sandbox_identity'

@@ -65,6 +65,7 @@ import {
   selectVisibleGoal,
 } from '@/components/agents/session-goal-actions';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
+import { SessionTodoChip } from '@/components/todos/session-todo-link';
 import {
   toggleSessionGoalCollapsed,
   useSessionGoalCollapsed,
@@ -2305,6 +2306,7 @@ export function SessionDetailContent({
               />
             </Animated.View>
           ) : null}
+          <SessionTodoChip sessionId={sessionId} />
           {sessionGoal === null && todoSummary ? (
             <Animated.View
               entering={FadeIn.duration(200)}

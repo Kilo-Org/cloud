@@ -45,6 +45,7 @@ import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
 import { copySessionId, copySessionLink } from './session-row-actions';
 import { type SessionConnectionDisplay } from './session-connection-indicator-state';
+import { SessionTodoLinkRow } from '@/components/todos/session-todo-link';
 
 type SessionContextSheetProps = {
   visible: boolean;
@@ -337,6 +338,8 @@ export function SessionContextSheet({
               {sessionTitle}
             </Text>
           </Row>
+
+          <SessionTodoLinkRow sessionId={sessionId} />
 
           {/* The pill is independent of goal and PR status: the sheet shows the
               associated PR in every state (open/draft/merged/closed) whenever

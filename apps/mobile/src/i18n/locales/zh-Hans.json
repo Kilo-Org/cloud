@@ -1754,8 +1754,8 @@
       "toolList": "列出目录",
       "toolPatch": "应用补丁",
       "toolTask": "任务",
-      "readTodos": "读取待办事项",
-      "updateTodos": "更新待办事项",
+      "readTodos": "读取计划",
+      "updateTodos": "更新计划",
       "linesBadge": "{{displayCount}} 行",
       "filesBadge": "{{displayCount}} 个文件",
       "matchesBadge": "{{displayCount}} 项匹配",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "删除这个对话？"
     },
     "beta": "测试版",
+    "details": {
+      "title": "聊天详情",
+      "backend": "后端",
+      "effortDefault": "模型默认",
+      "noCost": "无费用",
+      "costUnknown": "未知",
+      "costEstimatedNote": "未报告价格的回答按标价估算。",
+      "costUnknownNote": "此模型没有已知价格。",
+      "costPartialNote": "此总计不包括没有已知价格的模型。",
+      "localNote": "本机模型在此设备上运行。它们没有费用，也没有提示缓存，其词元数可能是估算值。",
+      "countedSinceNote": "此聊天开始于记录用量之前。总计仅包含之后的回答。",
+      "remoteServersOn": "已开启的远程 MCP 服务器"
+    },
     "webSearch": {
       "title": "搜索网络",
       "description": "允许此聊天通过你的 Kilo 账户查找最新信息。搜索会占用你每月的搜索额度。",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play 未返回匹配的额度包。",
     "purchaseOwnedByAnotherAccount": "此 Apple Account 上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 账户上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。"
+  },
+  "todos": {
+    "saveAsTodo": "保存为待办事项",
+    "segment": {
+      "label": "智能体视图",
+      "sessions": "会话",
+      "todos": "待办事项"
+    },
+    "lists": {
+      "newList": "新建列表",
+      "empty": "暂无列表",
+      "couldNotLoad": "无法加载列表",
+      "noRepository": "无仓库",
+      "rowA11y": "{{name}}，{{openCount}}",
+      "openCount_one": "{{count}} 个未完成",
+      "openCount_other": "{{count}} 个未完成",
+      "archived_one": "已归档 ({{count}})",
+      "archived_other": "已归档 ({{count}})",
+      "archive": "归档",
+      "unarchive": "取消归档",
+      "deleteTitle": "删除 {{name}}？",
+      "deleteMessage": "其中的待办事项也会被删除，关联的会话会保留。"
+    },
+    "listSettings": {
+      "title": "列表设置",
+      "name": "名称",
+      "namePlaceholder": "缺陷、想法、发布…",
+      "emoji": "表情符号",
+      "mode": "模式",
+      "defaultsHint": "从此列表启动的会话将使用这些默认设置。"
+    },
+    "list": {
+      "addPlaceholder": "添加待办事项",
+      "add": "添加待办",
+      "empty": "暂无待办事项",
+      "setDefaults": "设置仓库、模式和模型",
+      "completed_one": "已完成 ({{count}})",
+      "completed_other": "已完成 ({{count}})"
+    },
+    "item": {
+      "markDone": "标记为已完成",
+      "markOpen": "标记为未完成",
+      "markDonePrompt": "标记为已完成？",
+      "deleted": "待办事项已删除",
+      "undo": "撤销删除",
+      "runCount_one": "{{count}} 次运行",
+      "runCount_other": "{{count}} 次运行",
+      "startNow": "无需审查直接开始",
+      "startNowHint": "长按可无需审查直接开始",
+      "titleLabel": "待办事项标题",
+      "notes": "备注",
+      "notesPlaceholder": "用 Markdown 添加备注",
+      "sessions": "已关联的会话",
+      "noSessions": "暂无会话",
+      "linkSession": "关联会话",
+      "unlinkSession": "取消关联 {{title}}",
+      "linkFailed": "无法将会话关联到该待办事项"
+    },
+    "linkSession": {
+      "title": "关联会话",
+      "empty": "暂无近期会话",
+      "emptyInRepository": "{{repository}} 中暂无近期会话"
+    },
+    "upNext": "接下来",
+    "sessionTodo": "待办事项：{{title}}",
+    "linkToTodo": "关联到待办事项",
+    "candidates": {
+      "empty": "暂无未完成的待办事项"
+    },
+    "saveSheet": {
+      "title": "保存到列表",
+      "saved": "已保存到 {{list}}"
+    }
   }
 }

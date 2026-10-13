@@ -1736,8 +1736,8 @@
       "toolList": "elenca",
       "toolPatch": "applica patch",
       "toolTask": "attività",
-      "readTodos": "Leggi le attività",
-      "updateTodos": "Aggiorna le attività",
+      "readTodos": "Leggi il piano",
+      "updateTodos": "Aggiorna il piano",
       "linesBadge": "{{displayCount}} righe",
       "filesBadge": "{{displayCount}} file",
       "matchesBadge": "{{displayCount}} corrispondenze",
@@ -3285,6 +3285,19 @@
       "deleteTitle": "Eliminare questa chat?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Dettagli della chat",
+      "backend": "Servizio",
+      "effortDefault": "Predefinito del modello",
+      "noCost": "Nessun costo",
+      "costUnknown": "Non noto",
+      "costEstimatedNote": "Il costo delle risposte che non hanno indicato un prezzo è stimato in base ai prezzi di listino.",
+      "costUnknownNote": "Nessun prezzo noto per questo modello.",
+      "costPartialNote": "Questo totale non include i modelli senza un prezzo noto.",
+      "localNote": "I modelli sul dispositivo vengono eseguiti su questo dispositivo. Non hanno costi né cache dei prompt e il loro conteggio dei token può essere una stima.",
+      "countedSinceNote": "Questa chat è iniziata prima che l'utilizzo venisse registrato. I totali mostrano solo le risposte successive.",
+      "remoteServersOn": "Server MCP remoti attivi"
+    },
     "webSearch": {
       "title": "Cerca sul web",
       "description": "Consenti a questa chat di cercare informazioni aggiornate tramite il tuo account Kilo. Le ricerche usano la tua quota mensile di ricerche.",
@@ -3722,5 +3735,82 @@
     "noMatchingProductsPlay": "Google Play non ha restituito pacchetti di crediti corrispondenti.",
     "purchaseOwnedByAnotherAccount": "I crediti associati a questo Apple Account appartengono a un altro account Kilo. Accedi a quell'account Kilo per usarli.",
     "purchaseOwnedByAnotherAccountPlay": "I crediti su questo account Google Play appartengono a un account Kilo diverso. Accedi a quell'account Kilo per usarli."
+  },
+  "todos": {
+    "saveAsTodo": "Salva come attività",
+    "segment": {
+      "label": "Vista agenti",
+      "sessions": "Sessioni",
+      "todos": "Attività"
+    },
+    "lists": {
+      "newList": "Nuovo elenco",
+      "empty": "Ancora nessun elenco",
+      "couldNotLoad": "Impossibile caricare gli elenchi",
+      "noRepository": "Nessun repository",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} aperte",
+      "openCount_many": "{{count}} aperte",
+      "openCount_other": "{{count}} aperte",
+      "archived_one": "Archiviate ({{count}})",
+      "archived_many": "Archiviate ({{count}})",
+      "archived_other": "Archiviate ({{count}})",
+      "archive": "Archivia",
+      "unarchive": "Rimuovi dall'archivio",
+      "deleteTitle": "Eliminare {{name}}?",
+      "deleteMessage": "Anche le sue attività vengono eliminate. Le sessioni restano."
+    },
+    "listSettings": {
+      "title": "Impostazioni elenco",
+      "name": "Nome",
+      "namePlaceholder": "Bug, Idee, Release…",
+      "emoji": "Emoji",
+      "mode": "Modalità",
+      "defaultsHint": "Le sessioni avviate da questo elenco usano questi valori predefiniti."
+    },
+    "list": {
+      "addPlaceholder": "Aggiungi un'attività",
+      "add": "Aggiungi attività",
+      "empty": "Ancora nessuna attività",
+      "setDefaults": "Imposta repository, modalità e modello",
+      "completed_one": "Completate ({{count}})",
+      "completed_many": "Completate ({{count}})",
+      "completed_other": "Completate ({{count}})"
+    },
+    "item": {
+      "markDone": "Segna come fatta",
+      "markOpen": "Segna come non fatta",
+      "markDonePrompt": "Segnare come fatta?",
+      "deleted": "Attività eliminata",
+      "undo": "Annulla eliminazione",
+      "runCount_one": "{{count}} esecuzione",
+      "runCount_many": "{{count}} esecuzioni",
+      "runCount_other": "{{count}} esecuzioni",
+      "startNow": "Avvia senza revisione",
+      "startNowHint": "Tieni premuto per avviare senza revisione",
+      "titleLabel": "Titolo dell'attività",
+      "notes": "Note",
+      "notesPlaceholder": "Aggiungi note in Markdown",
+      "sessions": "Sessioni collegate",
+      "noSessions": "Ancora nessuna sessione",
+      "linkSession": "Collega sessione",
+      "unlinkSession": "Scollega {{title}}",
+      "linkFailed": "Impossibile collegare la sessione all'attività"
+    },
+    "linkSession": {
+      "title": "Collega una sessione",
+      "empty": "Nessuna sessione recente",
+      "emptyInRepository": "Nessuna sessione recente in {{repository}}"
+    },
+    "upNext": "Prossimo",
+    "sessionTodo": "Attività: {{title}}",
+    "linkToTodo": "Collega all'attività",
+    "candidates": {
+      "empty": "Nessuna attività aperta"
+    },
+    "saveSheet": {
+      "title": "Salva nell'elenco",
+      "saved": "Salvato in {{list}}"
+    }
   }
 }

@@ -2266,8 +2266,8 @@
       "toolList": "فہرست بنانا",
       "toolPatch": "ترمیم کرنا",
       "toolTask": "کام",
-      "readTodos": "کاموں کی فہرست پڑھیں",
-      "updateTodos": "کاموں کی فہرست اپ ڈیٹ کریں",
+      "readTodos": "منصوبہ پڑھیں",
+      "updateTodos": "منصوبہ اپ ڈیٹ کریں",
       "linesBadge": "{{displayCount}} سطریں",
       "filesBadge": "{{displayCount}} فائلیں",
       "matchesBadge": "{{displayCount}} مماثلتیں",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "یہ چیٹ حذف کریں؟"
     },
     "beta": "بیٹا",
+    "details": {
+      "title": "چیٹ کی تفصیلات",
+      "backend": "بیک اینڈ",
+      "effortDefault": "ماڈل کا ڈیفالٹ",
+      "noCost": "کوئی لاگت نہیں",
+      "costUnknown": "معلوم نہیں",
+      "costEstimatedNote": "جن جوابات نے قیمت نہیں بتائی، ان کی لاگت فہرستی قیمتوں سے اندازاً لگائی گئی ہے۔",
+      "costUnknownNote": "اس ماڈل کی کوئی قیمت معلوم نہیں۔",
+      "costPartialNote": "اس کل میں وہ ماڈلز شامل نہیں جن کی قیمت معلوم نہیں۔",
+      "localNote": "ڈیوائس پر چلنے والے ماڈلز اسی ڈیوائس پر چلتے ہیں۔ ان کی کوئی لاگت نہیں اور کوئی پرامپٹ کیش نہیں، اور ان کے ٹوکن کی تعداد تخمینہ ہو سکتی ہے۔",
+      "countedSinceNote": "یہ چیٹ استعمال ریکارڈ ہونے سے پہلے شروع ہوئی تھی۔ کل میں صرف اس کے بعد کے جوابات دکھائے جاتے ہیں۔",
+      "remoteServersOn": "فعال ریموٹ MCP سرورز"
+    },
     "webSearch": {
       "title": "ویب پر تلاش کریں",
       "description": "اس چیٹ کو اپنے Kilo اکاؤنٹ کے ذریعے تازہ معلومات تلاش کرنے دیں۔ تلاشیں آپ کی ماہانہ تلاش کی حد استعمال کرتی ہیں۔",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
     "purchaseOwnedByAnotherAccount": "اس Apple Account کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اسی Kilo اکاؤنٹ میں سائن ان کریں۔",
     "purchaseOwnedByAnotherAccountPlay": "اس Google Play اکاؤنٹ کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اس Kilo اکاؤنٹ میں سائن ان کریں۔"
+  },
+  "todos": {
+    "saveAsTodo": "کام کے طور پر محفوظ کریں",
+    "segment": {
+      "label": "ایجنٹ ویو",
+      "sessions": "سیشنز",
+      "todos": "کام"
+    },
+    "lists": {
+      "newList": "نئی فہرست",
+      "empty": "ابھی تک کوئی فہرست نہیں",
+      "couldNotLoad": "فہرستیں لوڈ نہیں ہو سکیں",
+      "noRepository": "ریپوزٹری موجود نہیں",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "کھلے: {{count}}",
+      "openCount_other": "کھلے: {{count}}",
+      "archived_one": "آرکائیو شدہ ({{count}})",
+      "archived_other": "آرکائیو شدہ ({{count}})",
+      "archive": "آرکائیو کریں",
+      "unarchive": "آرکائیو سے نکالیں",
+      "deleteTitle": "{{name}} حذف کریں؟",
+      "deleteMessage": "اس کے کام بھی حذف ہو جائیں گے۔ ان کے سیشن باقی رہیں گے۔"
+    },
+    "listSettings": {
+      "title": "فہرست کی ترتیبات",
+      "name": "نام",
+      "namePlaceholder": "بگز، آئیڈیاز، ریلیز…",
+      "emoji": "ایموجی",
+      "mode": "موڈ",
+      "defaultsHint": "اس فہرست سے شروع کیے گئے سیشن یہ طے شدہ اقدار استعمال کرتے ہیں۔"
+    },
+    "list": {
+      "addPlaceholder": "نیا کام شامل کریں",
+      "add": "کام شامل کریں",
+      "empty": "ابھی تک کوئی کام نہیں",
+      "setDefaults": "ریپوزٹری، موڈ اور ماڈل مقرر کریں",
+      "completed_one": "مکمل ({{count}})",
+      "completed_other": "مکمل ({{count}})"
+    },
+    "item": {
+      "markDone": "مکمل کے طور پر نشان زد کریں",
+      "markOpen": "نامکمل کے طور پر نشان زد کریں",
+      "markDonePrompt": "مکمل کے طور پر نشان زد کریں؟",
+      "deleted": "کام حذف ہو گیا",
+      "undo": "واپس لائیں",
+      "runCount_one": "{{count}} بار چلایا گیا",
+      "runCount_other": "{{count}} بار چلایا گیا",
+      "startNow": "بغیر جائزے کے شروع کریں",
+      "startNowHint": "بغیر جائزے کے شروع کرنے کے لیے دیر تک دبائیں",
+      "titleLabel": "کام کا عنوان",
+      "notes": "نوٹس",
+      "notesPlaceholder": "Markdown میں نوٹس شامل کریں",
+      "sessions": "منسلک سیشن",
+      "noSessions": "ابھی تک کوئی سیشن نہیں",
+      "linkSession": "سیشن لنک کریں",
+      "unlinkSession": "{{title}} کا لنک ہٹائیں",
+      "linkFailed": "سیشن کو کام سے لنک نہیں کیا جا سکا"
+    },
+    "linkSession": {
+      "title": "سیشن منسلک کریں",
+      "empty": "کوئی حالیہ سیشن نہیں",
+      "emptyInRepository": "{{repository}} میں کوئی حالیہ سیشن نہیں"
+    },
+    "upNext": "اگلا",
+    "sessionTodo": "کام: {{title}}",
+    "linkToTodo": "کام سے لنک کریں",
+    "candidates": {
+      "empty": "کوئی کھلا کام نہیں"
+    },
+    "saveSheet": {
+      "title": "فہرست میں محفوظ کریں",
+      "saved": "{{list}} میں محفوظ ہو گیا"
+    }
   }
 }

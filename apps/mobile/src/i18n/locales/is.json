@@ -2266,8 +2266,8 @@
       "toolList": "birta lista",
       "toolPatch": "lagfæra",
       "toolTask": "verkefni",
-      "readTodos": "Lesa verkefnalista",
-      "updateTodos": "Uppfæra verkefnalista",
+      "readTodos": "Lesa áætlun",
+      "updateTodos": "Uppfæra áætlun",
       "linesBadge": "{{displayCount}} línur",
       "filesBadge": "{{displayCount}} skrár",
       "matchesBadge": "{{displayCount}} samsvaranir",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "Eyða þessu spjalli?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Upplýsingar um spjall",
+      "backend": "Bakendi",
+      "effortDefault": "Sjálfgefið fyrir líkan",
+      "noCost": "Enginn kostnaður",
+      "costUnknown": "Óþekkt",
+      "costEstimatedNote": "Kostnaður svara sem gáfu ekki upp verð er áætlaður út frá listaverði.",
+      "costUnknownNote": "Ekkert verð er þekkt fyrir þetta líkan.",
+      "costPartialNote": "Þessi heildartala nær ekki til líkana sem hafa ekkert þekkt verð.",
+      "localNote": "Líkön í tækinu keyra á þessu tæki. Þau kosta ekkert og hafa ekkert skyndiminni fyrir skilaboð, og tókafjöldi þeirra getur verið áætlaður.",
+      "countedSinceNote": "Þetta spjall hófst áður en notkun var skráð. Heildartölurnar sýna aðeins svörin eftir það.",
+      "remoteServersOn": "Kveikt á fjartengdum MCP-þjónum"
+    },
     "webSearch": {
       "title": "Leita á vefnum",
       "description": "Leyfðu þessu spjalli að fletta upp nýjum upplýsingum í gegnum Kilo-reikninginn þinn. Leitir nota mánaðarlegan leitarkvóta þinn.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play skilaði engum samsvarandi inneignarpökkum.",
     "purchaseOwnedByAnotherAccount": "Inneignin á þessum Apple Account-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana.",
     "purchaseOwnedByAnotherAccountPlay": "Inneignin á þessum Google Play-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana."
+  },
+  "todos": {
+    "saveAsTodo": "Vista sem verkefni",
+    "segment": {
+      "label": "Sýn erindreka",
+      "sessions": "Lotur",
+      "todos": "Verkefni"
+    },
+    "lists": {
+      "newList": "Nýr listi",
+      "empty": "Engir listar enn",
+      "couldNotLoad": "Ekki tókst að sækja lista",
+      "noRepository": "Ekkert kóðasafn",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} opið",
+      "openCount_other": "{{count}} opið",
+      "archived_one": "Geymt ({{count}})",
+      "archived_other": "Geymt ({{count}})",
+      "archive": "Geyma",
+      "unarchive": "Taka úr geymslu",
+      "deleteTitle": "Eyða {{name}}?",
+      "deleteMessage": "Verkefnum þess er líka eytt. Loturnar þeirra haldast."
+    },
+    "listSettings": {
+      "title": "Stillingar lista",
+      "name": "Heiti",
+      "namePlaceholder": "Villur, Hugmyndir, Útgáfa…",
+      "emoji": "Emoji",
+      "mode": "Hamur",
+      "defaultsHint": "Lotur sem hefjast úr þessum lista nota þessi sjálfgefnu gildi."
+    },
+    "list": {
+      "addPlaceholder": "Bæta við verkefni",
+      "add": "Bæta við",
+      "empty": "Engin verkefni enn",
+      "setDefaults": "Stilltu kóðasafn, ham og líkan",
+      "completed_one": "Lokið ({{count}})",
+      "completed_other": "Lokið ({{count}})"
+    },
+    "item": {
+      "markDone": "Merkja sem lokið",
+      "markOpen": "Merkja sem ólokið",
+      "markDonePrompt": "Merkja sem lokið?",
+      "deleted": "Verkefni eytt",
+      "undo": "Afturkalla",
+      "runCount_one": "{{count}} keyrsla",
+      "runCount_other": "{{count}} keyrslur",
+      "startNow": "Byrja án rýni",
+      "startNowHint": "Haltu inni til að byrja án rýni",
+      "titleLabel": "Heiti verkefnis",
+      "notes": "Minnispunktar",
+      "notesPlaceholder": "Bæta við minnispunktum í Markdown",
+      "sessions": "Tengdar lotur",
+      "noSessions": "Engar lotur enn",
+      "linkSession": "Tengja lotu",
+      "unlinkSession": "Aftengja {{title}}",
+      "linkFailed": "Ekki tókst að tengja lotuna við verkefnið"
+    },
+    "linkSession": {
+      "title": "Tengja lotu við verkefni",
+      "empty": "Engar nýlegar lotur",
+      "emptyInRepository": "Engar nýlegar lotur í {{repository}}"
+    },
+    "upNext": "Næst í röðinni",
+    "sessionTodo": "Verkefni: {{title}}",
+    "linkToTodo": "Tengja við verkefni",
+    "candidates": {
+      "empty": "Engin opin verkefni"
+    },
+    "saveSheet": {
+      "title": "Vista á lista",
+      "saved": "Vistað á {{list}}"
+    }
   }
 }

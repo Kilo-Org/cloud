@@ -2266,8 +2266,8 @@
       "toolList": "መዘርዘር",
       "toolPatch": "ለውጦችን መተግበር",
       "toolTask": "ተግባር",
-      "readTodos": "የተግባር ዝርዝሩን ያንብቡ",
-      "updateTodos": "የተግባር ዝርዝሩን ያዘምኑ",
+      "readTodos": "ዕቅዱን ያንብቡ",
+      "updateTodos": "ዕቅዱን ያዘምኑ",
       "linesBadge": "{{displayCount}} መስመሮች",
       "filesBadge": "{{displayCount}} ፋይሎች",
       "matchesBadge": "{{displayCount}} ተዛማጆች",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "ይህ ውይይት ይሰረዝ?"
     },
     "beta": "ቤታ",
+    "details": {
+      "title": "የውይይት ዝርዝሮች",
+      "backend": "የጀርባ አገልግሎት",
+      "effortDefault": "የሞዴሉ ነባሪ",
+      "noCost": "ወጪ የለም",
+      "costUnknown": "አይታወቅም",
+      "costEstimatedNote": "ዋጋ ያላሳወቁ መልሶች ወጪ ከዝርዝር ዋጋዎች ተገምቷል።",
+      "costUnknownNote": "ለዚህ ሞዴል የሚታወቅ ዋጋ የለም።",
+      "costPartialNote": "ይህ ድምር የሚታወቅ ዋጋ የሌላቸውን ሞዴሎች አያካትትም።",
+      "localNote": "በመሣሪያ ላይ ያሉ ሞዴሎች በዚህ መሣሪያ ላይ ይሠራሉ። ወጪም ሆነ የጥያቄ መሸጎጫ የላቸውም፣ የቶከን ቆጠራቸውም ግምት ሊሆን ይችላል።",
+      "countedSinceNote": "ይህ ውይይት አጠቃቀም መመዝገብ ከመጀመሩ በፊት ተጀምሯል። ድምሮቹ ከዚያ በኋላ ያሉትን መልሶች ብቻ ያሳያሉ።",
+      "remoteServersOn": "የነቁ የርቀት MCP አገልጋዮች"
+    },
     "webSearch": {
       "title": "ድሩን ይፈልጉ",
       "description": "ይህ ውይይት አሁናዊ መረጃን በKilo መለያዎ በኩል እንዲፈልግ ይፍቀዱ። ፍለጋዎች ወርሃዊ የፍለጋ ድርሻዎን ይጠቀማሉ።",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "ከGoogle Play ምንም ተመሳሳይ የክሬዲት ጥቅሎች አልተመለሱም።",
     "purchaseOwnedByAnotherAccount": "በዚህ Apple Account ላይ ያለው ክሬዲት የሌላ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።",
     "purchaseOwnedByAnotherAccountPlay": "በዚህ Google Play መለያ ላይ ያለው ክሬዲት የተለየ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።"
+  },
+  "todos": {
+    "saveAsTodo": "እንደ ተግባር አስቀምጥ",
+    "segment": {
+      "label": "የወኪሎች እይታ",
+      "sessions": "ክፍለ ጊዜዎች",
+      "todos": "ተግባሮች"
+    },
+    "lists": {
+      "newList": "አዲስ ዝርዝር",
+      "empty": "እስካሁን ዝርዝር የለም",
+      "couldNotLoad": "ዝርዝሮችን መጫን አልተቻለም።",
+      "noRepository": "ማከማቻ የለም",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} ክፍት",
+      "openCount_other": "{{count}} ክፍት",
+      "archived_one": "በማህደር የተቀመጡ ({{count}})",
+      "archived_other": "በማህደር የተቀመጡ ({{count}})",
+      "archive": "ማህደር አድርግ",
+      "unarchive": "ከማህደር አውጣ",
+      "deleteTitle": "{{name}} ይሰረዝ?",
+      "deleteMessage": "ተግባሮቹም ይሰረዛሉ። ክፍለ ጊዜዎቹ ግን ይቀራሉ።"
+    },
+    "listSettings": {
+      "title": "የዝርዝር ቅንብሮች",
+      "name": "ስም",
+      "namePlaceholder": "ስህተቶች፣ ሀሳቦች፣ ልቀት…",
+      "emoji": "ኢሞጂ",
+      "mode": "ሁነታ",
+      "defaultsHint": "ከዚህ ዝርዝር የሚጀምሩ ክፍለ ጊዜዎች እነዚህን ነባሪዎች ይጠቀማሉ።"
+    },
+    "list": {
+      "addPlaceholder": "ተግባር ጨምር",
+      "add": "ተግባር ጨምር",
+      "empty": "እስካሁን ተግባር የለም",
+      "setDefaults": "ማከማቻ፣ ሁነታ እና ሞዴል ምረጥ",
+      "completed_one": "የተጠናቀቁ ({{count}})",
+      "completed_other": "የተጠናቀቁ ({{count}})"
+    },
+    "item": {
+      "markDone": "እንደተጠናቀቀ ምልክት አድርግ",
+      "markOpen": "እንዳልተጠናቀቀ ምልክት አድርግ",
+      "markDonePrompt": "እንደተጠናቀቀ ምልክት አድርግ?",
+      "deleted": "ተግባር ተሰርዟል",
+      "undo": "ቀልብስ",
+      "runCount_one": "{{count}} አፈጻጸም",
+      "runCount_other": "{{count}} አፈጻጸም",
+      "startNow": "ያለ ግምገማ ጀምር",
+      "startNowHint": "ያለ ግምገማ ለመጀመር ተጭነው ይያዙ",
+      "titleLabel": "የተግባር ርዕስ",
+      "notes": "ማስታወሻዎች",
+      "notesPlaceholder": "ማስታወሻዎችን በMarkdown ጨምር",
+      "sessions": "የተገናኙ ክፍለ ጊዜዎች",
+      "noSessions": "እስካሁን ክፍለ ጊዜ የለም",
+      "linkSession": "ክፍለ ጊዜ አገናኝ",
+      "unlinkSession": "የ{{title}} አገናኝ አስወግድ",
+      "linkFailed": "ክፍለ ጊዜውን ከተግባሩ ጋር ማገናኘት አልተቻለም"
+    },
+    "linkSession": {
+      "title": "ክፍለ ጊዜ ማገናኘት",
+      "empty": "የቅርብ ጊዜ ክፍለ ጊዜዎች የሉም",
+      "emptyInRepository": "በ{{repository}} ውስጥ የቅርብ ጊዜ ክፍለ ጊዜዎች የሉም"
+    },
+    "upNext": "ቀጣይ",
+    "sessionTodo": "ተግባር፦ {{title}}",
+    "linkToTodo": "ከተግባር ጋር አገናኝ",
+    "candidates": {
+      "empty": "ክፍት ተግባሮች የሉም"
+    },
+    "saveSheet": {
+      "title": "በዝርዝር ውስጥ አስቀምጥ",
+      "saved": "በ{{list}} ውስጥ ተቀምጧል"
+    }
   }
 }

@@ -2266,8 +2266,8 @@
       "toolList": "fè lis",
       "toolPatch": "korije",
       "toolTask": "travay",
-      "readTodos": "Li lis travay la",
-      "updateTodos": "Mete lis travay la ajou",
+      "readTodos": "Li plan an",
+      "updateTodos": "Mete plan an ajou",
       "linesBadge": "{{displayCount}} liy",
       "filesBadge": "{{displayCount}} fichye",
       "matchesBadge": "{{displayCount}} rezilta",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "Efase chat sa a?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detay chat la",
+      "backend": "Sèvis",
+      "effortDefault": "Pa defo modèl la",
+      "noCost": "Pa koute anyen",
+      "costUnknown": "Pa konnen",
+      "costEstimatedNote": "Pri repons ki pa t bay yon pri estime dapre pri katalòg yo.",
+      "costUnknownNote": "Pa gen okenn pri ki konnen pou modèl sa a.",
+      "costPartialNote": "Total sa a pa gen ladan l modèl ki pa gen yon pri ki konnen.",
+      "localNote": "Modèl sou aparèy la mache sou aparèy sa a. Yo pa koute anyen, yo pa gen kach pou enstriksyon, epi kantite jeton yo ka se yon estimasyon.",
+      "countedSinceNote": "Chat sa a te kòmanse anvan yo te kòmanse anrejistre itilizasyon. Total yo montre sèlman repons ki vini apre sa.",
+      "remoteServersOn": "Sèvè MCP aleka ki aktive"
+    },
     "webSearch": {
       "title": "Chèche sou entènèt",
       "description": "Kite chat sa a chèche enfòmasyon ki ajou atravè kont Kilo ou. Rechèch yo itilize alokasyon rechèch chak mwa ou.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play pa t retounen okenn pake kredi ki matche.",
     "purchaseOwnedByAnotherAccount": "Kredi ki sou Apple Account sa a fè pati yon lòt kont Kilo. Konekte nan kont Kilo sa a pou itilize yo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredi ki sou kont Google Play sa a fè pati yon lòt kont Kilo. Siyen nan kont Kilo sa a pou itilize yo."
+  },
+  "todos": {
+    "saveAsTodo": "Anrejistre kòm travay",
+    "segment": {
+      "label": "Vi ajan yo",
+      "sessions": "Sesyon",
+      "todos": "Travay"
+    },
+    "lists": {
+      "newList": "Nouvo lis",
+      "empty": "Poko gen lis",
+      "couldNotLoad": "Nou pa t ka chaje lis yo",
+      "noRepository": "Pa gen depo",
+      "rowA11y": "{{name}} — {{openCount}}",
+      "openCount_one": "{{count}} ouvè",
+      "openCount_other": "{{count}} ouvè",
+      "archived_one": "Achive ({{count}})",
+      "archived_other": "Achive ({{count}})",
+      "archive": "Achive",
+      "unarchive": "Retire nan achiv",
+      "deleteTitle": "Efase {{name}}?",
+      "deleteMessage": "Travay li yo efase tou. Sesyon yo rete."
+    },
+    "listSettings": {
+      "title": "Paramèt lis la",
+      "name": "Non",
+      "namePlaceholder": "Bug, Lide, Vèsyon…",
+      "emoji": "Emoji",
+      "mode": "Mòd",
+      "defaultsHint": "Sesyon ki kòmanse nan lis sa a itilize paramèt sa yo."
+    },
+    "list": {
+      "addPlaceholder": "Ajoute yon travay",
+      "add": "Ajoute travay",
+      "empty": "Poko gen travay",
+      "setDefaults": "Mete depo, mòd ak modèl",
+      "completed_one": "Fini ({{count}})",
+      "completed_other": "Fini ({{count}})"
+    },
+    "item": {
+      "markDone": "Make kòm fini",
+      "markOpen": "Make kòm pa fini",
+      "markDonePrompt": "Make kòm fini?",
+      "deleted": "Travay la efase",
+      "undo": "Defèt",
+      "runCount_one": "{{count}} egzekisyon",
+      "runCount_other": "{{count}} egzekisyon",
+      "startNow": "Kòmanse san revizyon",
+      "startNowHint": "Peze lontan pou kòmanse san revizyon",
+      "titleLabel": "Tit travay la",
+      "notes": "Nòt",
+      "notesPlaceholder": "Ajoute nòt nan Markdown",
+      "sessions": "Sesyon ki lye yo",
+      "noSessions": "Poko gen sesyon",
+      "linkSession": "Lye sesyon",
+      "unlinkSession": "Retire lyen {{title}}",
+      "linkFailed": "Nou pa t ka lye sesyon an ak travay la"
+    },
+    "linkSession": {
+      "title": "Lye yon sesyon",
+      "empty": "Pa gen sesyon resan",
+      "emptyInRepository": "Pa gen sesyon resan nan {{repository}}"
+    },
+    "upNext": "Pwochen",
+    "sessionTodo": "Travay: {{title}}",
+    "linkToTodo": "Lye ak travay",
+    "candidates": {
+      "empty": "Pa gen travay ouvè"
+    },
+    "saveSheet": {
+      "title": "Anrejistre nan lis",
+      "saved": "Anrejistre nan {{list}}"
+    }
   }
 }

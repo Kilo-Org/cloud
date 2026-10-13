@@ -2266,8 +2266,8 @@
       "toolList": "depụta",
       "toolPatch": "tinye mgbanwe",
       "toolTask": "ọrụ",
-      "readTodos": "Gụọ ndepụta ọrụ",
-      "updateTodos": "Melite ndepụta ọrụ",
+      "readTodos": "Gụọ atụmatụ",
+      "updateTodos": "Melite atụmatụ",
       "linesBadge": "ahịrị {{displayCount}}",
       "filesBadge": "faịlụ {{displayCount}}",
       "matchesBadge": "ndakọrịta {{displayCount}}",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "Hichapụ nkata a?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Nkọwa nkata",
+      "backend": "Sava",
+      "effortDefault": "Ndabara ụdị nlereanya",
+      "noCost": "Enweghị ọnụ ahịa",
+      "costUnknown": "Amaghị",
+      "costEstimatedNote": "A na-eme atụmatụ ọnụ ahịa azịza ndị na-akọghị ọnụ ahịa site na ọnụ ahịa ndepụta.",
+      "costUnknownNote": "Amaghị ọnụ ahịa ụdị nlereanya a.",
+      "costPartialNote": "Ngụkọta a agụnyeghị ụdị nlereanya ndị a na-amaghị ọnụ ahịa ha.",
+      "localNote": "Ụdị nlereanya na ngwaọrụ na-arụ ọrụ na ngwaọrụ a. Ha enweghị ọnụ ahịa, ha enweghị nchekwa nwa oge maka ihe ị dere, ọnụ ọgụgụ iberibe ederede ha nwekwara ike ịbụ atụmatụ.",
+      "countedSinceNote": "Nkata a malitere tupu e debe ojiji. Ngụkọta na-egosi naanị azịza ndị bịara mgbe nke ahụ gasịrị.",
+      "remoteServersOn": "Sava MCP dị anya gbanyere"
+    },
     "webSearch": {
       "title": "Chọọ na weebụ",
       "description": "Kwe ka mkparịta ụka a chọọ ozi ọhụrụ site na akaụntụ Kilo gị. Nchọta na-eji oke nchọta gị kwa ọnwa.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play eweghachighị ngwugwu ego ojiji dabara adaba.",
     "purchaseOwnedByAnotherAccount": "Ego ojiji dị na Apple Account a bụ nke akaụntụ Kilo ọzọ. Banye na akaụntụ Kilo ahụ iji jiri ya.",
     "purchaseOwnedByAnotherAccountPlay": "Ego ojiji dị na akaụntụ Google Play a bụ nke akaụntụ Kilo ọzọ. Banye na akaụntụ Kilo ahụ iji jiri ya."
+  },
+  "todos": {
+    "saveAsTodo": "Chekwaa dị ka ọrụ",
+    "segment": {
+      "label": "Ihu ndị enyemaka",
+      "sessions": "Nnọkọ",
+      "todos": "Ọrụ"
+    },
+    "lists": {
+      "newList": "Ndepụta ọhụrụ",
+      "empty": "Enweghị ndepụta",
+      "couldNotLoad": "Enweghị ike ibudata ndepụta",
+      "noRepository": "Enweghị ebe nchekwa koodu",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} mepere emepe",
+      "openCount_other": "{{count}} mepere emepe",
+      "archived_one": "Edebere ({{count}})",
+      "archived_other": "Edebere ({{count}})",
+      "archive": "Debe",
+      "unarchive": "Weghachite",
+      "deleteTitle": "Hichapụ {{name}}?",
+      "deleteMessage": "A na-ehichapụkwa ọrụ ya. Nnọkọ ya na-anọgide."
+    },
+    "listSettings": {
+      "title": "Ntọala ndepụta",
+      "name": "Aha",
+      "namePlaceholder": "Nsogbu, Echiche, Mwepụta…",
+      "emoji": "Akara ngosi",
+      "mode": "Ụdị ọrụ",
+      "defaultsHint": "Nnọkọ ndị a na-amalite site na ndepụta a na-eji ihe ndabara ndị a."
+    },
+    "list": {
+      "addPlaceholder": "Tinye ọrụ",
+      "add": "Tinye",
+      "empty": "Enweghị ọrụ ọ bụla",
+      "setDefaults": "Tinye ebe nchekwa koodu, ụdị ọrụ na ihe nlereanya",
+      "completed_one": "Emechara ({{count}})",
+      "completed_other": "Emechara ({{count}})"
+    },
+    "item": {
+      "markDone": "Kaa akara dị ka emechara",
+      "markOpen": "Kaa akara dị ka emechabeghị",
+      "markDonePrompt": "Kaa akara dị ka emechara?",
+      "deleted": "Ehichapụrụ ọrụ",
+      "undo": "Weghachi",
+      "runCount_one": "{{count}} mmezu",
+      "runCount_other": "{{count}} mmezu",
+      "startNow": "Malite na-enweghị nyocha",
+      "startNowHint": "Pịa ogologo oge iji malite na-enweghị nyocha",
+      "titleLabel": "Aha ọrụ",
+      "notes": "Ndetu",
+      "notesPlaceholder": "Tinye ndetu na Markdown",
+      "sessions": "Nnọkọ ejikọtara",
+      "noSessions": "Enweghị nnọkọ",
+      "linkSession": "Jikọọ nnọkọ",
+      "unlinkSession": "Wepu njikọ {{title}}",
+      "linkFailed": "Enweghị ike ijikọ nnọkọ ahụ na ọrụ ahụ"
+    },
+    "linkSession": {
+      "title": "Jikọọ nnọkọ",
+      "empty": "Enweghị nnọkọ ọhụrụ",
+      "emptyInRepository": "Enweghị nnọkọ ọhụrụ na {{repository}}"
+    },
+    "upNext": "Na-esote",
+    "sessionTodo": "Ọrụ: {{title}}",
+    "linkToTodo": "Jikọọ na ọrụ",
+    "candidates": {
+      "empty": "Enweghị ọrụ mepere emepe"
+    },
+    "saveSheet": {
+      "title": "Chekwaa na ndepụta",
+      "saved": "Echekwara na {{list}}"
+    }
   }
 }

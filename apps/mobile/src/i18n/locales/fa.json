@@ -2266,8 +2266,8 @@
       "toolList": "فهرست کردن",
       "toolPatch": "اعمال وصله",
       "toolTask": "وظیفه",
-      "readTodos": "خواندن فهرست کارها",
-      "updateTodos": "به‌روزرسانی فهرست کارها",
+      "readTodos": "خواندن طرح",
+      "updateTodos": "به‌روزرسانی طرح",
       "linesBadge": "{{displayCount}} خط",
       "filesBadge": "{{displayCount}} فایل",
       "matchesBadge": "{{displayCount}} تطابق",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "این گفتگو حذف شود؟"
     },
     "beta": "بتا",
+    "details": {
+      "title": "جزئیات گفتگو",
+      "backend": "سامانهٔ پشتیبان",
+      "effortDefault": "پیش‌فرض مدل",
+      "noCost": "بدون هزینه",
+      "costUnknown": "نامشخص",
+      "costEstimatedNote": "هزینهٔ پاسخ‌هایی که قیمتی گزارش نکرده‌اند، بر اساس قیمت‌های فهرست برآورد شده است.",
+      "costUnknownNote": "قیمتی برای این مدل مشخص نیست.",
+      "costPartialNote": "این مجموع شامل مدل‌هایی که قیمت مشخصی ندارند نمی‌شود.",
+      "localNote": "مدل‌های روی دستگاه روی همین دستگاه اجرا می‌شوند. هزینه و حافظهٔ پنهان درخواست ندارند و تعداد توکن‌هایشان ممکن است تخمینی باشد.",
+      "countedSinceNote": "این گفتگو پیش از شروع ثبت مصرف آغاز شده است. مجموع‌ها فقط پاسخ‌های پس از آن را نشان می‌دهند.",
+      "remoteServersOn": "سرورهای MCP راه دور فعال"
+    },
     "webSearch": {
       "title": "جستجو در وب",
       "description": "اجازه دهید این گفتگو اطلاعات به‌روز را از طریق حساب Kilo شما جستجو کند. جستجوها از سهمیهٔ ماهانهٔ جستجوی شما استفاده می‌کنند.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play هیچ بسته اعتبار منطبقی برنگرداند.",
     "purchaseOwnedByAnotherAccount": "اعتبار این Apple Account متعلق به حساب دیگری در Kilo است. برای استفاده از آن وارد همان حساب Kilo شوید.",
     "purchaseOwnedByAnotherAccountPlay": "اعتبار این حساب Google Play متعلق به یک حساب Kilo دیگر است. برای استفاده از آن وارد آن حساب Kilo شوید."
+  },
+  "todos": {
+    "saveAsTodo": "ذخیره به‌عنوان کار",
+    "segment": {
+      "label": "نمای عامل‌ها",
+      "sessions": "نشست‌ها",
+      "todos": "کارها"
+    },
+    "lists": {
+      "newList": "فهرست جدید",
+      "empty": "هنوز فهرستی نیست",
+      "couldNotLoad": "بارگذاری فهرست‌ها ممکن نشد.",
+      "noRepository": "بدون مخزن",
+      "rowA11y": "{{name}}، {{openCount}}",
+      "openCount_one": "{{count}} باز",
+      "openCount_other": "{{count}} باز",
+      "archived_one": "بایگانی‌شده ({{count}})",
+      "archived_other": "بایگانی‌شده ({{count}})",
+      "archive": "بایگانی",
+      "unarchive": "خروج از بایگانی",
+      "deleteTitle": "«{{name}}» حذف شود؟",
+      "deleteMessage": "کارهای آن هم حذف می‌شوند. نشست‌هایشان باقی می‌مانند."
+    },
+    "listSettings": {
+      "title": "تنظیمات فهرست",
+      "name": "نام",
+      "namePlaceholder": "باگ‌ها، ایده‌ها، انتشار…",
+      "emoji": "اموجی",
+      "mode": "حالت",
+      "defaultsHint": "نشست‌هایی که از این فهرست آغاز می‌شوند از این پیش‌فرض‌ها استفاده می‌کنند."
+    },
+    "list": {
+      "addPlaceholder": "یک کار بنویسید",
+      "add": "افزودن کار",
+      "empty": "هنوز کاری نیست",
+      "setDefaults": "تنظیم مخزن، حالت و مدل",
+      "completed_one": "تکمیل‌شده ({{count}})",
+      "completed_other": "تکمیل‌شده ({{count}})"
+    },
+    "item": {
+      "markDone": "علامت‌گذاری به‌عنوان انجام‌شده",
+      "markOpen": "علامت‌گذاری به‌عنوان انجام‌نشده",
+      "markDonePrompt": "انجام‌شده علامت‌گذاری شود؟",
+      "deleted": "کار حذف شد",
+      "undo": "واگرد",
+      "runCount_one": "{{count}} اجرا",
+      "runCount_other": "{{count}} اجرا",
+      "startNow": "شروع بدون بازبینی",
+      "startNowHint": "برای شروع بدون بازبینی، طولانی فشار دهید",
+      "titleLabel": "عنوان کار",
+      "notes": "یادداشت",
+      "notesPlaceholder": "افزودن یادداشت در Markdown",
+      "sessions": "نشست‌های پیوندشده",
+      "noSessions": "هنوز نشستی نیست",
+      "linkSession": "پیوند نشست",
+      "unlinkSession": "لغو پیوند {{title}}",
+      "linkFailed": "پیوند دادن نشست به کار ممکن نشد."
+    },
+    "linkSession": {
+      "title": "پیوند یک نشست",
+      "empty": "نشست اخیری نیست",
+      "emptyInRepository": "نشست اخیری در {{repository}} نیست"
+    },
+    "upNext": "بعدی",
+    "sessionTodo": "کار: {{title}}",
+    "linkToTodo": "پیوند به کار",
+    "candidates": {
+      "empty": "هیچ کار بازی نیست"
+    },
+    "saveSheet": {
+      "title": "ذخیره در فهرست",
+      "saved": "ذخیره در {{list}}"
+    }
   }
 }

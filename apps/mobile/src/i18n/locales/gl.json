@@ -2266,8 +2266,8 @@
       "toolList": "listar",
       "toolPatch": "aplicar parche",
       "toolTask": "tarefa",
-      "readTodos": "Ler tarefas",
-      "updateTodos": "Actualizar tarefas",
+      "readTodos": "Ler o plan",
+      "updateTodos": "Actualizar o plan",
       "linesBadge": "{{displayCount}} liñas",
       "filesBadge": "{{displayCount}} ficheiros",
       "matchesBadge": "{{displayCount}} coincidencias",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "Eliminar este chat?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detalles do chat",
+      "backend": "Servizo",
+      "effortDefault": "Predeterminado do modelo",
+      "noCost": "Sen custo",
+      "costUnknown": "Descoñecido",
+      "costEstimatedNote": "O custo das respostas que non informaron dun prezo estímase a partir dos prezos de tarifa.",
+      "costUnknownNote": "Non se coñece ningún prezo para este modelo.",
+      "costPartialNote": "Este total non inclúe os modelos sen prezo coñecido.",
+      "localNote": "Os modelos no dispositivo execútanse neste dispositivo. Non teñen custo nin caché de instrucións, e o seu reconto de unidades de texto pode ser estimado.",
+      "countedSinceNote": "Este chat comezou antes de que se rexistrase o uso. Os totais só mostran as respostas posteriores.",
+      "remoteServersOn": "Servidores MCP remotos activados"
+    },
     "webSearch": {
       "title": "Buscar na web",
       "description": "Permite que este chat busque información actual a través da túa conta de Kilo. As buscas usan a túa cota mensual de buscas.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play non devolveu ningún paquete de créditos coincidente.",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta de Google Play pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos."
+  },
+  "todos": {
+    "saveAsTodo": "Gardar como tarefa",
+    "segment": {
+      "label": "Vista de axentes",
+      "sessions": "Sesións",
+      "todos": "Tarefas"
+    },
+    "lists": {
+      "newList": "Nova lista",
+      "empty": "Aínda non hai listas",
+      "couldNotLoad": "Non se puideron cargar as listas",
+      "noRepository": "Sen repositorio",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} abertas",
+      "openCount_other": "{{count}} abertas",
+      "archived_one": "Arquivadas ({{count}})",
+      "archived_other": "Arquivadas ({{count}})",
+      "archive": "Arquivar",
+      "unarchive": "Desarquivar",
+      "deleteTitle": "Eliminar {{name}}?",
+      "deleteMessage": "As súas tarefas tamén se eliminan. As sesións mantéñense."
+    },
+    "listSettings": {
+      "title": "Axustes da lista",
+      "name": "Nome",
+      "namePlaceholder": "Erros, Ideas, Lanzamento…",
+      "emoji": "Emoji",
+      "mode": "Modo",
+      "defaultsHint": "As sesións iniciadas desde esta lista usan estes valores predeterminados."
+    },
+    "list": {
+      "addPlaceholder": "Engadir unha tarefa",
+      "add": "Engadir tarefa",
+      "empty": "Aínda non hai tarefas",
+      "setDefaults": "Define repositorio, modo e modelo",
+      "completed_one": "Rematadas ({{count}})",
+      "completed_other": "Rematadas ({{count}})"
+    },
+    "item": {
+      "markDone": "Marcar como feita",
+      "markOpen": "Marcar como non feita",
+      "markDonePrompt": "Marcar como feita?",
+      "deleted": "Tarefa eliminada",
+      "undo": "Desfacer",
+      "runCount_one": "{{count}} execución",
+      "runCount_other": "{{count}} execucións",
+      "startNow": "Iniciar sen revisión",
+      "startNowHint": "Mantén premido para iniciar sen revisión",
+      "titleLabel": "Título da tarefa",
+      "notes": "Notas",
+      "notesPlaceholder": "Engadir notas en Markdown",
+      "sessions": "Sesións vinculadas",
+      "noSessions": "Aínda non hai sesións",
+      "linkSession": "Vincular sesión",
+      "unlinkSession": "Desvincular {{title}}",
+      "linkFailed": "Non se puido vincular a sesión á tarefa"
+    },
+    "linkSession": {
+      "title": "Vincular unha sesión",
+      "empty": "Non hai sesións recentes",
+      "emptyInRepository": "Non hai sesións recentes en {{repository}}"
+    },
+    "upNext": "A continuación",
+    "sessionTodo": "Tarefa: {{title}}",
+    "linkToTodo": "Vincular á tarefa",
+    "candidates": {
+      "empty": "Non hai tarefas abertas"
+    },
+    "saveSheet": {
+      "title": "Gardar na lista",
+      "saved": "Gardada en {{list}}"
+    }
   }
 }

@@ -2266,8 +2266,8 @@
       "toolList": "ලැයිස්තුගත කරන්න",
       "toolPatch": "සංශෝධනය යොදන්න",
       "toolTask": "කාර්යය",
-      "readTodos": "කළ යුතු දේ කියවන්න",
-      "updateTodos": "කළ යුතු දේ යාවත්කාලීන කරන්න",
+      "readTodos": "සැලැස්ම කියවන්න",
+      "updateTodos": "සැලැස්ම යාවත්කාලීන කරන්න",
       "linesBadge": "පේළි {{displayCount}}",
       "filesBadge": "ගොනු {{displayCount}}",
       "matchesBadge": "ගැළපීම් {{displayCount}}",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "මෙම කතාබහ මකන්නද?"
     },
     "beta": "බීටා",
+    "details": {
+      "title": "කතාබස් විස්තර",
+      "backend": "පසුපස සේවාව",
+      "effortDefault": "ආකෘතියේ පෙරනිමිය",
+      "noCost": "පිරිවැයක් නැත",
+      "costUnknown": "නොදනී",
+      "costEstimatedNote": "මිලක් වාර්තා නොකළ පිළිතුරු ලැයිස්තු මිල අනුව ඇස්තමේන්තු කර ඇත.",
+      "costUnknownNote": "මෙම ආකෘතිය සඳහා මිලක් නොදනී.",
+      "costPartialNote": "දන්නා මිලක් නැති ආකෘති මෙම මුළු එකතුවට ඇතුළත් නොවේ.",
+      "localNote": "උපාංගයේ ආකෘති මෙම උපාංගයේ ධාවනය වේ. ඒවාට පිරිවැයක් හෝ විමසුම් හැඹිලියක් නැති අතර, ඒවායේ ටෝකන ගණන් ඇස්තමේන්තු විය හැක.",
+      "countedSinceNote": "භාවිතය වාර්තා කිරීමට පෙර මෙම කතාබස ආරම්භ විය. මුළු එකතුවේ පෙන්වන්නේ ඉන් පසු ලැබුණු පිළිතුරු පමණි.",
+      "remoteServersOn": "සක්‍රීය දුරස්ථ MCP සේවාදායක"
+    },
     "webSearch": {
       "title": "වෙබයේ සොයන්න",
       "description": "ඔබගේ Kilo ගිණුම හරහා වත්මන් තොරතුරු සෙවීමට මෙම කතාබහට ඉඩ දෙන්න. සෙවීම් ඔබගේ මාසික සෙවීම් සීමාව භාවිත කරයි.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play ගැළපෙන ක්‍රෙඩිට් පැකේජ ආපසු ලබා දුන්නේ නැත.",
     "purchaseOwnedByAnotherAccount": "මෙම Apple Account හි ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පිවිසෙන්න.",
     "purchaseOwnedByAnotherAccountPlay": "මෙම Google Play ගිණුමේ ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පුරනය වන්න."
+  },
+  "todos": {
+    "saveAsTodo": "කටයුත්තක් ලෙස සුරකින්න",
+    "segment": {
+      "label": "නියෝජිත දසුන",
+      "sessions": "සැසි",
+      "todos": "කටයුතු"
+    },
+    "lists": {
+      "newList": "නව ලැයිස්තුවක්",
+      "empty": "තවම ලැයිස්තු නැත",
+      "couldNotLoad": "ලැයිස්තු පූරණය කිරීමට නොහැකි විය.",
+      "noRepository": "කේත ගබඩාවක් නැත",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} විවෘත",
+      "openCount_other": "{{count}} විවෘත",
+      "archived_one": "සංරක්ෂිතයි ({{count}})",
+      "archived_other": "සංරක්ෂිතයි ({{count}})",
+      "archive": "සංරක්ෂණය කරන්න",
+      "unarchive": "සංරක්ෂණයෙන් ඉවත් කරන්න",
+      "deleteTitle": "{{name}} මකන්නද?",
+      "deleteMessage": "එහි කටයුතු ද මකා දැමේ. ඒවායේ සැසි රැඳී තිබේ."
+    },
+    "listSettings": {
+      "title": "ලැයිස්තු සැකසුම්",
+      "name": "නම",
+      "namePlaceholder": "දෝෂ, අදහස්, නිකුතුව…",
+      "emoji": "ඉමෝජි",
+      "mode": "ප්‍රකාරය",
+      "defaultsHint": "මෙම ලැයිස්තුවෙන් ආරම්භ කරන සැසි මෙම පෙරනිමි අගයන් භාවිත කරයි."
+    },
+    "list": {
+      "addPlaceholder": "කටයුත්තක් ලියන්න",
+      "add": "කටයුත්තක් එක් කරන්න",
+      "empty": "තවම කටයුතු නැත",
+      "setDefaults": "කේත ගබඩාව, ප්‍රකාරය සහ ආකෘතිය සකසන්න",
+      "completed_one": "සම්පූර්ණයි ({{count}})",
+      "completed_other": "සම්පූර්ණයි ({{count}})"
+    },
+    "item": {
+      "markDone": "සම්පූර්ණ ලෙස සලකුණු කරන්න",
+      "markOpen": "සම්පූර්ණ නොවූ ලෙස සලකුණු කරන්න",
+      "markDonePrompt": "සම්පූර්ණ ලෙස සලකුණු කරන්නද?",
+      "deleted": "කටයුත්ත මකා දමන ලදී",
+      "undo": "අහෝසි කරන්න",
+      "runCount_one": "{{count}} ධාවන",
+      "runCount_other": "{{count}} ධාවන",
+      "startNow": "සමාලෝචනයකින් තොරව අරඹන්න",
+      "startNowHint": "සමාලෝචනයකින් තොරව අරඹන්නට දිගට එබන්න",
+      "titleLabel": "කටයුත්තේ මාතෘකාව",
+      "notes": "සටහන්",
+      "notesPlaceholder": "Markdown හි සටහන් එක් කරන්න",
+      "sessions": "සම්බන්ධිත සැසි",
+      "noSessions": "තවම සැසි නැත",
+      "linkSession": "සැසියක් සම්බන්ධ කරන්න",
+      "unlinkSession": "{{title}} වෙන් කරන්න",
+      "linkFailed": "සැසිය කටයුත්තට සම්බන්ධ කිරීමට නොහැකි විය."
+    },
+    "linkSession": {
+      "title": "සැසියක් සම්බන්ධ කිරීම",
+      "empty": "මෑත සැසි නැත",
+      "emptyInRepository": "{{repository}} හි මෑත සැසි නැත"
+    },
+    "upNext": "ඊළඟට",
+    "sessionTodo": "කටයුත්ත: {{title}}",
+    "linkToTodo": "කටයුත්තකට සම්බන්ධ කරන්න",
+    "candidates": {
+      "empty": "විවෘත කටයුතු නැත"
+    },
+    "saveSheet": {
+      "title": "ලැයිස්තුවකට සුරකින්න",
+      "saved": "{{list}} වෙත සුරකින ලදී"
+    }
   }
 }

@@ -1,5 +1,5 @@
 {
-  "id": "f2460181-1979-49b3-be6a-cea9ff4b7022",
+  "id": "75cae9ab-b8e6-406b-bf82-fff96bf1fd23",
   "prevId": "9ec4b330-8984-4c3b-90ce-1b4bd534973c",
   "version": "7",
   "dialect": "postgresql",
@@ -4711,12 +4711,6 @@
         "total_cost_microdollars": {
           "name": "total_cost_microdollars",
           "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "live_summary": {
-          "name": "live_summary",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -38808,6 +38802,409 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.todo_item_sessions": {
+      "name": "todo_item_sessions",
+      "schema": "",
+      "columns": {
+        "todo_item_id": {
+          "name": "todo_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "origin": {
+          "name": "origin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "linked_at": {
+          "name": "linked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_todo_item_sessions_todo_item_id": {
+          "name": "IDX_todo_item_sessions_todo_item_id",
+          "columns": [
+            {
+              "expression": "todo_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "todo_item_sessions_todo_item_id_kilo_user_id_fk": {
+          "name": "todo_item_sessions_todo_item_id_kilo_user_id_fk",
+          "tableFrom": "todo_item_sessions",
+          "tableTo": "todo_items",
+          "columnsFrom": [
+            "todo_item_id",
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id",
+            "kilo_user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "todo_item_sessions_session_id_kilo_user_id_fk": {
+          "name": "todo_item_sessions_session_id_kilo_user_id_fk",
+          "tableFrom": "todo_item_sessions",
+          "tableTo": "cli_sessions_v2",
+          "columnsFrom": [
+            "session_id",
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "session_id",
+            "kilo_user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "todo_item_sessions_session_id_kilo_user_id_pk": {
+          "name": "todo_item_sessions_session_id_kilo_user_id_pk",
+          "columns": [
+            "session_id",
+            "kilo_user_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "todo_item_sessions_origin_check": {
+          "name": "todo_item_sessions_origin_check",
+          "value": "\"todo_item_sessions\".\"origin\" IN ('started', 'linked')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.todo_items": {
+      "name": "todo_items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "list_id": {
+          "name": "list_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "done_at": {
+          "name": "done_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "position": {
+          "name": "position",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_todo_items_list_position": {
+          "name": "IDX_todo_items_list_position",
+          "columns": [
+            {
+              "expression": "list_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "todo_items_list_id_kilo_user_id_fk": {
+          "name": "todo_items_list_id_kilo_user_id_fk",
+          "tableFrom": "todo_items",
+          "tableTo": "todo_lists",
+          "columnsFrom": [
+            "list_id",
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id",
+            "kilo_user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_todo_items_id_kilo_user_id": {
+          "name": "UQ_todo_items_id_kilo_user_id",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "kilo_user_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "todo_items_title_check": {
+          "name": "todo_items_title_check",
+          "value": "char_length(btrim(\"todo_items\".\"title\")) BETWEEN 1 AND 500 AND \"todo_items\".\"title\" = btrim(\"todo_items\".\"title\")"
+        },
+        "todo_items_notes_check": {
+          "name": "todo_items_notes_check",
+          "value": "char_length(\"todo_items\".\"notes\") <= 10000"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.todo_lists": {
+      "name": "todo_lists",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "emoji": {
+          "name": "emoji",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "git_url": {
+          "name": "git_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "variant": {
+          "name": "variant",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "position": {
+          "name": "position",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_todo_lists_owner_scope_position": {
+          "name": "IDX_todo_lists_owner_scope_position",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "todo_lists_kilo_user_id_kilocode_users_id_fk": {
+          "name": "todo_lists_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "todo_lists",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "todo_lists_organization_id_organizations_id_fk": {
+          "name": "todo_lists_organization_id_organizations_id_fk",
+          "tableFrom": "todo_lists",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_todo_lists_id_kilo_user_id": {
+          "name": "UQ_todo_lists_id_kilo_user_id",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "kilo_user_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "todo_lists_name_check": {
+          "name": "todo_lists_name_check",
+          "value": "char_length(btrim(\"todo_lists\".\"name\")) BETWEEN 1 AND 100 AND \"todo_lists\".\"name\" = btrim(\"todo_lists\".\"name\")"
+        },
+        "todo_lists_emoji_check": {
+          "name": "todo_lists_emoji_check",
+          "value": "char_length(\"todo_lists\".\"emoji\") <= 16"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.transactional_email_log": {
       "name": "transactional_email_log",
       "schema": "",
@@ -38984,12 +39381,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "session_id": {
-          "name": "session_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -39012,6 +39403,21 @@
         }
       },
       "indexes": {
+        "UQ_user_activity_tokens_token": {
+          "name": "UQ_user_activity_tokens_token",
+          "columns": [
+            {
+              "expression": "token",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "UQ_user_activity_tokens_live_ios_activity": {
           "name": "UQ_user_activity_tokens_live_ios_activity",
           "columns": [
@@ -39054,28 +39460,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "IDX_user_activity_tokens_live_session": {
-          "name": "IDX_user_activity_tokens_live_session",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "session_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"user_activity_tokens\".\"kind\" IN ('ios_session_activity', 'android_session_ongoing') AND \"user_activity_tokens\".\"superseded_at\" IS NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -39094,16 +39478,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "UQ_user_activity_tokens_token_session": {
-          "name": "UQ_user_activity_tokens_token_session",
-          "nullsNotDistinct": true,
-          "columns": [
-            "token",
-            "session_id"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

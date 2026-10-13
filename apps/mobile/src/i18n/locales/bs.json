@@ -2295,8 +2295,8 @@
       "toolList": "izlistavanje",
       "toolPatch": "primjena izmjena",
       "toolTask": "zadatak",
-      "readTodos": "Pročitaj zadatke",
-      "updateTodos": "Ažuriraj zadatke",
+      "readTodos": "Pročitaj plan",
+      "updateTodos": "Ažuriraj plan",
       "linesBadge": "{{displayCount}} redova",
       "filesBadge": "{{displayCount}} datoteka",
       "matchesBadge": "{{displayCount}} podudaranja",
@@ -3285,6 +3285,19 @@
       "deleteTitle": "Izbrisati ovaj razgovor?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detalji razgovora",
+      "backend": "Pozadinski servis",
+      "effortDefault": "Zadano za model",
+      "noCost": "Bez troška",
+      "costUnknown": "Nepoznato",
+      "costEstimatedNote": "Trošak odgovora koji nisu prijavili cijenu procijenjen je prema cjenovniku.",
+      "costUnknownNote": "Cijena za ovaj model nije poznata.",
+      "costPartialNote": "Ovaj ukupni iznos ne uključuje modele bez poznate cijene.",
+      "localNote": "Modeli na uređaju rade na ovom uređaju. Nemaju trošak ni keš upita, a broj tokena može biti procjena.",
+      "countedSinceNote": "Ovaj razgovor je počeo prije nego što se počela bilježiti potrošnja. Ukupni iznosi prikazuju samo odgovore nakon toga.",
+      "remoteServersOn": "Uključeni daljinski MCP serveri"
+    },
     "webSearch": {
       "title": "Pretraži web",
       "description": "Dozvolite ovom chatu da traži aktuelne informacije putem vašeg Kilo računa. Pretrage koriste vaš mjesečni limit pretraga.",
@@ -3722,5 +3735,82 @@
     "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
     "purchaseOwnedByAnotherAccount": "Krediti na ovom računu Apple Account pripadaju drugom Kilo računu. Prijavi se na taj Kilo račun da ih koristiš.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play nalogu pripadaju drugom Kilo nalogu. Prijavite se na taj Kilo nalog da biste ih koristili."
+  },
+  "todos": {
+    "saveAsTodo": "Sačuvaj kao zadatak",
+    "segment": {
+      "label": "Prikaz agenata",
+      "sessions": "Sesije",
+      "todos": "Zadaci"
+    },
+    "lists": {
+      "newList": "Nova lista",
+      "empty": "Još nema listi",
+      "couldNotLoad": "Učitavanje listi nije uspjelo",
+      "noRepository": "Bez repozitorija",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "Otvoreno: {{count}}",
+      "openCount_few": "Otvoreno: {{count}}",
+      "openCount_other": "Otvoreno: {{count}}",
+      "archived_one": "Arhivirano ({{count}})",
+      "archived_few": "Arhivirano ({{count}})",
+      "archived_other": "Arhivirano ({{count}})",
+      "archive": "Arhiviraj",
+      "unarchive": "Vrati iz arhive",
+      "deleteTitle": "Obrisati {{name}}?",
+      "deleteMessage": "Njegovi zadaci se također brišu. Njihove sesije ostaju."
+    },
+    "listSettings": {
+      "title": "Postavke liste",
+      "name": "Ime",
+      "namePlaceholder": "Greške, ideje, izdanje…",
+      "emoji": "Emotikon",
+      "mode": "Način rada",
+      "defaultsHint": "Sesije pokrenute iz ove liste koriste ove zadane postavke."
+    },
+    "list": {
+      "addPlaceholder": "Dodaj novi zadatak",
+      "add": "Dodaj zadatak",
+      "empty": "Još nema zadataka",
+      "setDefaults": "Postavi repozitorij, način rada i model",
+      "completed_one": "Završeno ({{count}})",
+      "completed_few": "Završeno ({{count}})",
+      "completed_other": "Završeno ({{count}})"
+    },
+    "item": {
+      "markDone": "Označi kao završeno",
+      "markOpen": "Označi kao nezavršeno",
+      "markDonePrompt": "Označiti kao završeno?",
+      "deleted": "Zadatak obrisan",
+      "undo": "Poništi",
+      "runCount_one": "{{count}} pokretanje",
+      "runCount_few": "{{count}} pokretanja",
+      "runCount_other": "{{count}} pokretanja",
+      "startNow": "Pokreni bez pregleda",
+      "startNowHint": "Dugi pritisak za pokretanje bez pregleda",
+      "titleLabel": "Naslov zadatka",
+      "notes": "Bilješke",
+      "notesPlaceholder": "Dodaj bilješke u Markdown formatu",
+      "sessions": "Povezane sesije",
+      "noSessions": "Još nema sesija",
+      "linkSession": "Poveži sesiju",
+      "unlinkSession": "Odveži {{title}}",
+      "linkFailed": "Povezivanje sesije sa zadatkom nije uspjelo"
+    },
+    "linkSession": {
+      "title": "Povezivanje sesije",
+      "empty": "Nema nedavnih sesija",
+      "emptyInRepository": "Nema nedavnih sesija u repozitoriju {{repository}}"
+    },
+    "upNext": "Sljedeće na redu",
+    "sessionTodo": "Zadatak: {{title}}",
+    "linkToTodo": "Poveži sa zadatkom",
+    "candidates": {
+      "empty": "Nema otvorenih zadataka"
+    },
+    "saveSheet": {
+      "title": "Sačuvaj na listu",
+      "saved": "Sačuvano na listu {{list}}"
+    }
   }
 }

@@ -519,6 +519,10 @@ vi.mock('@/lib/persist/use-draft-load', () => ({
 const organizations = vi.hoisted(() => [
   { organizationId: 'org-a', organizationName: 'Session organization' },
 ]);
+vi.mock('@/components/todos/session-todo-link', () => ({
+  SessionTodoChip: () => null,
+  SessionTodoLinkRow: () => null,
+}));
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {},
   useTRPC: () => ({

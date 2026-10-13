@@ -2266,8 +2266,8 @@
       "toolList": "ਸੂਚੀ ਦਿਖਾਓ",
       "toolPatch": "ਪੈਚ ਲਾਗੂ ਕਰੋ",
       "toolTask": "ਕੰਮ",
-      "readTodos": "ਕੰਮਾਂ ਦੀ ਸੂਚੀ ਪੜ੍ਹੋ",
-      "updateTodos": "ਕੰਮਾਂ ਦੀ ਸੂਚੀ ਅੱਪਡੇਟ ਕਰੋ",
+      "readTodos": "ਯੋਜਨਾ ਪੜ੍ਹੋ",
+      "updateTodos": "ਯੋਜਨਾ ਅੱਪਡੇਟ ਕਰੋ",
       "linesBadge": "{{displayCount}} ਲਾਈਨਾਂ",
       "filesBadge": "{{displayCount}} ਫਾਈਲਾਂ",
       "matchesBadge": "{{displayCount}} ਮੇਲ",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "ਇਹ ਚੈਟ ਮਿਟਾਉਣੀ ਹੈ?"
     },
     "beta": "ਬੀਟਾ",
+    "details": {
+      "title": "ਚੈਟ ਦੇ ਵੇਰਵੇ",
+      "backend": "ਬੈਕਐਂਡ",
+      "effortDefault": "ਮਾਡਲ ਦਾ ਡਿਫੌਲਟ",
+      "noCost": "ਕੋਈ ਲਾਗਤ ਨਹੀਂ",
+      "costUnknown": "ਪਤਾ ਨਹੀਂ",
+      "costEstimatedNote": "ਜਿਨ੍ਹਾਂ ਜਵਾਬਾਂ ਨੇ ਕੀਮਤ ਨਹੀਂ ਦੱਸੀ, ਉਨ੍ਹਾਂ ਦੀ ਲਾਗਤ ਸੂਚੀ ਕੀਮਤਾਂ ਤੋਂ ਅੰਦਾਜ਼ੇ ਨਾਲ ਲਗਾਈ ਗਈ ਹੈ।",
+      "costUnknownNote": "ਇਸ ਮਾਡਲ ਦੀ ਕੋਈ ਕੀਮਤ ਪਤਾ ਨਹੀਂ ਹੈ।",
+      "costPartialNote": "ਇਸ ਕੁੱਲ ਵਿੱਚ ਉਹ ਮਾਡਲ ਸ਼ਾਮਲ ਨਹੀਂ ਹਨ ਜਿਨ੍ਹਾਂ ਦੀ ਕੀਮਤ ਪਤਾ ਨਹੀਂ ਹੈ।",
+      "localNote": "ਡਿਵਾਈਸ 'ਤੇ ਚੱਲਣ ਵਾਲੇ ਮਾਡਲ ਇਸੇ ਡਿਵਾਈਸ 'ਤੇ ਚੱਲਦੇ ਹਨ। ਇਨ੍ਹਾਂ ਦੀ ਕੋਈ ਲਾਗਤ ਨਹੀਂ ਅਤੇ ਕੋਈ ਪ੍ਰੌਂਪਟ ਕੈਸ਼ ਨਹੀਂ ਹੁੰਦੀ, ਅਤੇ ਇਨ੍ਹਾਂ ਦੀ ਟੋਕਨ ਗਿਣਤੀ ਅੰਦਾਜ਼ਾ ਹੋ ਸਕਦੀ ਹੈ।",
+      "countedSinceNote": "ਇਹ ਚੈਟ ਵਰਤੋਂ ਦਰਜ ਹੋਣ ਤੋਂ ਪਹਿਲਾਂ ਸ਼ੁਰੂ ਹੋਈ ਸੀ। ਕੁੱਲ ਵਿੱਚ ਸਿਰਫ਼ ਉਸ ਤੋਂ ਬਾਅਦ ਦੇ ਜਵਾਬ ਦਿਖਾਏ ਜਾਂਦੇ ਹਨ।",
+      "remoteServersOn": "ਚਾਲੂ ਰਿਮੋਟ MCP ਸਰਵਰ"
+    },
     "webSearch": {
       "title": "ਵੈੱਬ 'ਤੇ ਖੋਜੋ",
       "description": "ਇਸ ਚੈਟ ਨੂੰ ਆਪਣੇ Kilo ਖਾਤੇ ਰਾਹੀਂ ਮੌਜੂਦਾ ਜਾਣਕਾਰੀ ਲੱਭਣ ਦਿਓ। ਖੋਜਾਂ ਤੁਹਾਡੀ ਮਹੀਨਾਵਾਰ ਖੋਜ ਸੀਮਾ ਵਰਤਦੀਆਂ ਹਨ।",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play ਨੇ ਕੋਈ ਮੇਲ ਖਾਂਦਾ ਕ੍ਰੈਡਿਟ ਪੈਕ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ।",
     "purchaseOwnedByAnotherAccount": "ਇਸ Apple Account ਵਾਲੇ ਕ੍ਰੈਡਿਟ ਕਿਸੇ ਹੋਰ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹਨ। ਇਹਨਾਂ ਨੂੰ ਵਰਤਣ ਲਈ ਉਸ Kilo ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ।",
     "purchaseOwnedByAnotherAccountPlay": "ਇਸ Google Play ਖਾਤੇ 'ਤੇ ਕ੍ਰੈਡਿਟ ਇੱਕ ਵੱਖਰੇ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹਨ। ਇਹਨਾਂ ਨੂੰ ਵਰਤਣ ਲਈ ਉਸ Kilo ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ।"
+  },
+  "todos": {
+    "saveAsTodo": "ਕੰਮ ਵਜੋਂ ਸੰਭਾਲੋ",
+    "segment": {
+      "label": "ਏਜੰਟ ਦ੍ਰਿਸ਼",
+      "sessions": "ਸੈਸ਼ਨ",
+      "todos": "ਕੰਮ"
+    },
+    "lists": {
+      "newList": "ਨਵੀਂ ਸੂਚੀ",
+      "empty": "ਹਾਲੇ ਕੋਈ ਸੂਚੀ ਨਹੀਂ",
+      "couldNotLoad": "ਸੂਚੀਆਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ",
+      "noRepository": "ਕੋਈ ਰਿਪੋਜ਼ਿਟਰੀ ਨਹੀਂ",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} ਖੁੱਲ੍ਹੇ",
+      "openCount_other": "{{count}} ਖੁੱਲ੍ਹੇ",
+      "archived_one": "ਆਰਕਾਈਵ ਕੀਤੇ ({{count}})",
+      "archived_other": "ਆਰਕਾਈਵ ਕੀਤੇ ({{count}})",
+      "archive": "ਆਰਕਾਈਵ ਕਰੋ",
+      "unarchive": "ਆਰਕਾਈਵ ਵਿੱਚੋਂ ਕੱਢੋ",
+      "deleteTitle": "{{name}} ਮਿਟਾਉਣੀ ਹੈ?",
+      "deleteMessage": "ਇਸ ਦੇ ਕੰਮ ਵੀ ਮਿਟ ਜਾਣਗੇ। ਇਸ ਦੇ ਸੈਸ਼ਨ ਰਹਿੰਦੇ ਹਨ।"
+    },
+    "listSettings": {
+      "title": "ਸੂਚੀ ਦੀਆਂ ਸੈਟਿੰਗਾਂ",
+      "name": "ਨਾਮ",
+      "namePlaceholder": "ਬੱਗ, ਵਿਚਾਰ, ਰਿਲੀਜ਼…",
+      "emoji": "ਇਮੋਜੀ",
+      "mode": "ਮੋਡ",
+      "defaultsHint": "ਇਸ ਸੂਚੀ ਤੋਂ ਸ਼ੁਰੂ ਕੀਤੇ ਸੈਸ਼ਨ ਇਹਨਾਂ ਡਿਫ਼ਾਲਟਾਂ ਦੀ ਵਰਤੋਂ ਕਰਦੇ ਹਨ।"
+    },
+    "list": {
+      "addPlaceholder": "ਕੰਮ ਸ਼ਾਮਲ ਕਰੋ",
+      "add": "ਕੰਮ ਸ਼ਾਮਲ ਕਰੋ",
+      "empty": "ਹਾਲੇ ਕੋਈ ਕੰਮ ਨਹੀਂ",
+      "setDefaults": "ਰਿਪੋਜ਼ਿਟਰੀ, ਮੋਡ ਅਤੇ ਮਾਡਲ ਸੈੱਟ ਕਰੋ",
+      "completed_one": "ਪੂਰੇ ਹੋਏ ({{count}})",
+      "completed_other": "ਪੂਰੇ ਹੋਏ ({{count}})"
+    },
+    "item": {
+      "markDone": "ਮੁਕੰਮਲ ਵਜੋਂ ਨਿਸ਼ਾਨ ਲਗਾਓ",
+      "markOpen": "ਅਧੂਰਾ ਵਜੋਂ ਨਿਸ਼ਾਨ ਲਗਾਓ",
+      "markDonePrompt": "ਮੁਕੰਮਲ ਵਜੋਂ ਨਿਸ਼ਾਨ ਲਗਾਉਣਾ ਹੈ?",
+      "deleted": "ਕੰਮ ਮਿਟਾਇਆ ਗਿਆ",
+      "undo": "ਵਾਪਸ ਲਓ",
+      "runCount_one": "{{count}} ਵਾਰ ਚਲਾਇਆ",
+      "runCount_other": "{{count}} ਵਾਰ ਚਲਾਏ",
+      "startNow": "ਸਮੀਖਿਆ ਤੋਂ ਬਿਨਾਂ ਸ਼ੁਰੂ ਕਰੋ",
+      "startNowHint": "ਸਮੀਖਿਆ ਤੋਂ ਬਿਨਾਂ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਦੇਰ ਤੱਕ ਦਬਾਓ",
+      "titleLabel": "ਕੰਮ ਦਾ ਸਿਰਲੇਖ",
+      "notes": "ਨੋਟਾਂ",
+      "notesPlaceholder": "Markdown ਵਿੱਚ ਨੋਟਾਂ ਸ਼ਾਮਲ ਕਰੋ",
+      "sessions": "ਲਿੰਕ ਕੀਤੇ ਸੈਸ਼ਨ",
+      "noSessions": "ਹਾਲੇ ਕੋਈ ਸੈਸ਼ਨ ਨਹੀਂ",
+      "linkSession": "ਸੈਸ਼ਨ ਲਿੰਕ ਕਰੋ",
+      "unlinkSession": "{{title}} ਦਾ ਲਿੰਕ ਹਟਾਓ",
+      "linkFailed": "ਸੈਸ਼ਨ ਨੂੰ ਕੰਮ ਨਾਲ ਲਿੰਕ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ"
+    },
+    "linkSession": {
+      "title": "ਸੈਸ਼ਨ ਲਿੰਕ ਕਰੋ",
+      "empty": "ਕੋਈ ਤਾਜ਼ਾ ਸੈਸ਼ਨ ਨਹੀਂ",
+      "emptyInRepository": "{{repository}} ਵਿੱਚ ਕੋਈ ਤਾਜ਼ਾ ਸੈਸ਼ਨ ਨਹੀਂ"
+    },
+    "upNext": "ਅੱਗੇ",
+    "sessionTodo": "ਕੰਮ: {{title}}",
+    "linkToTodo": "ਕੰਮ ਨਾਲ ਲਿੰਕ ਕਰੋ",
+    "candidates": {
+      "empty": "ਕੋਈ ਖੁੱਲ੍ਹਾ ਕੰਮ ਨਹੀਂ"
+    },
+    "saveSheet": {
+      "title": "ਸੂਚੀ ਵਿੱਚ ਸੰਭਾਲੋ",
+      "saved": "{{list}} ਵਿੱਚ ਸੰਭਾਲਿਆ"
+    }
   }
 }

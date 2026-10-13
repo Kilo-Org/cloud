@@ -2266,8 +2266,8 @@
       "toolList": "ສະແດງລາຍການ",
       "toolPatch": "ແກ້ໄຂ",
       "toolTask": "ວຽກ",
-      "readTodos": "ອ່ານລາຍການວຽກ",
-      "updateTodos": "ອັບເດດລາຍການວຽກ",
+      "readTodos": "ອ່ານແຜນ",
+      "updateTodos": "ອັບເດດແຜນ",
       "linesBadge": "{{displayCount}} ບັນທັດ",
       "filesBadge": "{{displayCount}} ໄຟລ໌",
       "matchesBadge": "ພົບ {{displayCount}} ລາຍການ",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "ລຶບແຊັດນີ້ບໍ?"
     },
     "beta": "ເບຕ້າ",
+    "details": {
+      "title": "ລາຍລະອຽດແຊັດ",
+      "backend": "ລະບົບເບື້ອງຫຼັງ",
+      "effortDefault": "ຄ່າເລີ່ມຕົ້ນຂອງໂມເດວ",
+      "noCost": "ບໍ່ມີຄ່າໃຊ້ຈ່າຍ",
+      "costUnknown": "ບໍ່ຮູ້",
+      "costEstimatedNote": "ຄຳຕອບທີ່ບໍ່ໄດ້ລາຍງານລາຄາ ຖືກປະເມີນຈາກລາຄາໃນລາຍການ.",
+      "costUnknownNote": "ບໍ່ຮູ້ລາຄາຂອງໂມເດວນີ້.",
+      "costPartialNote": "ຍອດລວມນີ້ບໍ່ລວມໂມເດວທີ່ບໍ່ຮູ້ລາຄາ.",
+      "localNote": "ໂມເດວຢູ່ໃນອຸປະກອນເຮັດວຽກຢູ່ໃນອຸປະກອນນີ້. ພວກມັນບໍ່ມີຄ່າໃຊ້ຈ່າຍ ແລະ ບໍ່ມີແຄັດສຳລັບຂໍ້ຄວາມ, ແລະ ຈຳນວນໂທເຄັນຂອງພວກມັນອາດເປັນການປະເມີນ.",
+      "countedSinceNote": "ແຊັດນີ້ເລີ່ມກ່ອນທີ່ຈະມີການບັນທຶກການໃຊ້ງານ. ຍອດລວມສະແດງສະເພາະຄຳຕອບຫຼັງຈາກນັ້ນ.",
+      "remoteServersOn": "ເຊີບເວີ MCP ທາງໄກທີ່ເປີດຢູ່"
+    },
     "webSearch": {
       "title": "ຊອກຫາໃນເວັບ",
       "description": "ອະນຸຍາດໃຫ້ແຊັດນີ້ຊອກຫາຂໍ້ມູນລ່າສຸດຜ່ານບັນຊີ Kilo ຂອງທ່ານ. ການຊອກຫາຈະໃຊ້ໂຄຕາການຊອກຫາລາຍເດືອນຂອງທ່ານ.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play ບໍ່ໄດ້ສົ່ງແພັກເຄຣດິດທີ່ກົງກັນຄືນ.",
     "purchaseOwnedByAnotherAccount": "ເຄຣດິດໃນ Apple Account ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ.",
     "purchaseOwnedByAnotherAccountPlay": "ເຄຣດິດໃນບັນຊີ Google Play ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ."
+  },
+  "todos": {
+    "saveAsTodo": "ບັນທຶກເປັນວຽກ",
+    "segment": {
+      "label": "ມຸມມອງຕົວແທນ",
+      "sessions": "ເຊດຊັນ",
+      "todos": "ວຽກ"
+    },
+    "lists": {
+      "newList": "ລາຍການໃໝ່",
+      "empty": "ຍັງບໍ່ມີລາຍການ",
+      "couldNotLoad": "ບໍ່ສາມາດໂຫຼດລາຍການໄດ້.",
+      "noRepository": "ບໍ່ມີຄັງໂຄ້ດ",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} ເປີດ",
+      "openCount_other": "{{count}} ເປີດ",
+      "archived_one": "ເກັບເຂົ້າຄັງແລ້ວ ({{count}})",
+      "archived_other": "ເກັບເຂົ້າຄັງແລ້ວ ({{count}})",
+      "archive": "ເກັບເຂົ້າຄັງ",
+      "unarchive": "ນຳອອກຈາກຄັງ",
+      "deleteTitle": "ລຶບ {{name}} ບໍ?",
+      "deleteMessage": "ວຽກໃນລາຍການນີ້ຈະຖືກລຶບນຳ. ເຊດຊັນຂອງພວກມັນຈະຍັງຢູ່."
+    },
+    "listSettings": {
+      "title": "ການຕັ້ງຄ່າລາຍການ",
+      "name": "ຊື່",
+      "namePlaceholder": "ບັກ, ແນວຄິດ, ການປ່ອຍ…",
+      "emoji": "ອີໂມຈິ",
+      "mode": "ໂໝດ",
+      "defaultsHint": "ເຊດຊັນທີ່ເລີ່ມຈາກລາຍການນີ້ຈະໃຊ້ຄ່າເລີ່ມຕົ້ນເຫຼົ່ານີ້."
+    },
+    "list": {
+      "addPlaceholder": "ພິມວຽກໃໝ່",
+      "add": "ເພີ່ມວຽກ",
+      "empty": "ຍັງບໍ່ມີວຽກ",
+      "setDefaults": "ຕັ້ງຄັງໂຄ້ດ, ໂໝດ ແລະ ໂມເດວ",
+      "completed_one": "ສຳເລັດແລ້ວ ({{count}})",
+      "completed_other": "ສຳເລັດແລ້ວ ({{count}})"
+    },
+    "item": {
+      "markDone": "ໝາຍວ່າສຳເລັດ",
+      "markOpen": "ໝາຍວ່າຍັງບໍ່ສຳເລັດ",
+      "markDonePrompt": "ໝາຍວ່າສຳເລັດບໍ?",
+      "deleted": "ລຶບວຽກແລ້ວ",
+      "undo": "ກັບຄືນ",
+      "runCount_one": "{{count}} ຄັ້ງ",
+      "runCount_other": "{{count}} ຄັ້ງ",
+      "startNow": "ເລີ່ມໂດຍບໍ່ກວດທານ",
+      "startNowHint": "ກົດຄ້າງໄວ້ເພື່ອເລີ່ມໂດຍບໍ່ກວດທານ",
+      "titleLabel": "ຫົວຂໍ້ວຽກ",
+      "notes": "ໝາຍເຫດ",
+      "notesPlaceholder": "ເພີ່ມໝາຍເຫດໃນ Markdown",
+      "sessions": "ເຊດຊັນທີ່ເຊື່ອມຕໍ່ແລ້ວ",
+      "noSessions": "ຍັງບໍ່ມີເຊດຊັນ",
+      "linkSession": "ເຊື່ອມຕໍ່ເຊດຊັນ",
+      "unlinkSession": "ຍົກເລີກການເຊື່ອມຕໍ່ {{title}}",
+      "linkFailed": "ບໍ່ສາມາດເຊື່ອມຕໍ່ເຊດຊັນກັບວຽກໄດ້."
+    },
+    "linkSession": {
+      "title": "ເຊື່ອມຕໍ່ກັບເຊດຊັນ",
+      "empty": "ບໍ່ມີເຊດຊັນຫຼ້າສຸດ",
+      "emptyInRepository": "ບໍ່ມີເຊດຊັນຫຼ້າສຸດໃນ {{repository}}"
+    },
+    "upNext": "ຕໍ່ໄປ",
+    "sessionTodo": "ວຽກ: {{title}}",
+    "linkToTodo": "ເຊື່ອມຕໍ່ກັບວຽກ",
+    "candidates": {
+      "empty": "ບໍ່ມີວຽກທີ່ເປີດຢູ່"
+    },
+    "saveSheet": {
+      "title": "ບັນທຶກໃສ່ລາຍການ",
+      "saved": "ບັນທຶກໃນ {{list}}"
+    }
   }
 }

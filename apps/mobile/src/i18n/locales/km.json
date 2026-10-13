@@ -2266,8 +2266,8 @@
       "toolList": "រាយបញ្ជី",
       "toolPatch": "អនុវត្តបំណះ",
       "toolTask": "កិច្ចការ",
-      "readTodos": "អានបញ្ជីកិច្ចការ",
-      "updateTodos": "ធ្វើបច្ចុប្បន្នភាពបញ្ជីកិច្ចការ",
+      "readTodos": "អានផែនការ",
+      "updateTodos": "ធ្វើបច្ចុប្បន្នភាពផែនការ",
       "linesBadge": "{{displayCount}} បន្ទាត់",
       "filesBadge": "ឯកសារ {{displayCount}}",
       "matchesBadge": "ត្រូវគ្នា {{displayCount}}",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "លុបការជជែកនេះ?"
     },
     "beta": "បេតា",
+    "details": {
+      "title": "ព័ត៌មានលម្អិតនៃការជជែក",
+      "backend": "ប្រព័ន្ធខាងក្រោយ",
+      "effortDefault": "លំនាំដើមរបស់គំរូ",
+      "noCost": "គ្មានថ្លៃចំណាយ",
+      "costUnknown": "មិនដឹង",
+      "costEstimatedNote": "ចម្លើយដែលមិនបានរាយការណ៍តម្លៃ ត្រូវបានប៉ាន់ស្មានតាមតម្លៃក្នុងបញ្ជី។",
+      "costUnknownNote": "មិនដឹងតម្លៃសម្រាប់គំរូនេះទេ។",
+      "costPartialNote": "ចំនួនសរុបនេះមិនរួមបញ្ចូលគំរូដែលមិនដឹងតម្លៃទេ។",
+      "localNote": "គំរូនៅលើឧបករណ៍ដំណើរការនៅលើឧបករណ៍នេះ។ វាគ្មានថ្លៃចំណាយ និងគ្មានឃ្លាំងបណ្ដោះអាសន្នសម្រាប់សេចក្តីណែនាំទេ ហើយចំនួនថូខិនរបស់វាអាចជាការប៉ាន់ស្មាន។",
+      "countedSinceNote": "ការជជែកនេះបានចាប់ផ្ដើមមុនពេលការប្រើប្រាស់ត្រូវបានកត់ត្រា។ ចំនួនសរុបបង្ហាញតែចម្លើយបន្ទាប់ពីនោះប៉ុណ្ណោះ។",
+      "remoteServersOn": "ម៉ាស៊ីនបម្រើ MCP ពីចម្ងាយដែលបើក"
+    },
     "webSearch": {
       "title": "ស្វែងរកលើបណ្ដាញ",
       "description": "អនុញ្ញាតឱ្យការជជែកនេះស្វែងរកព័ត៌មានថ្មីៗតាមរយៈគណនី Kilo របស់អ្នក។ ការស្វែងរកប្រើកូតាស្វែងរកប្រចាំខែរបស់អ្នក។",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play មិនបានត្រឡប់កញ្ចប់ឥណទានដែលត្រូវគ្នាទេ។",
     "purchaseOwnedByAnotherAccount": "ឥណទាននៅលើ Apple Account នេះជារបស់គណនី Kilo ផ្សេង។ ចូលគណនី Kilo នោះដើម្បីប្រើវា។",
     "purchaseOwnedByAnotherAccountPlay": "ឥណទាននៅលើគណនី Google Play នេះជារបស់គណនី Kilo ផ្សេង។ ចូលគណនី Kilo នោះដើម្បីប្រើវា។"
+  },
+  "todos": {
+    "saveAsTodo": "រក្សាទុកជាកិច្ចការ",
+    "segment": {
+      "label": "ទិដ្ឋភាពភ្នាក់ងារ",
+      "sessions": "វគ្គ",
+      "todos": "កិច្ចការ"
+    },
+    "lists": {
+      "newList": "បញ្ជីថ្មី",
+      "empty": "មិនទាន់មានបញ្ជីទេ",
+      "couldNotLoad": "មិនអាចផ្ទុកបញ្ជីបានទេ",
+      "noRepository": "គ្មានឃ្លាំងកូដ",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} មិនទាន់រួច",
+      "openCount_other": "{{count}} មិនទាន់រួច",
+      "archived_one": "បានទុកក្នុងបណ្ណសារ ({{count}})",
+      "archived_other": "បានទុកក្នុងបណ្ណសារ ({{count}})",
+      "archive": "ទុកក្នុងបណ្ណសារ",
+      "unarchive": "ដកចេញពីបណ្ណសារ",
+      "deleteTitle": "លុប {{name}}?",
+      "deleteMessage": "កិច្ចការរបស់វាក៏ត្រូវលុបដែរ។ វគ្គរបស់វានៅដដែល។"
+    },
+    "listSettings": {
+      "title": "ការកំណត់បញ្ជី",
+      "name": "ឈ្មោះ",
+      "namePlaceholder": "កំហុស គំនិត ការចេញផ្សាយ…",
+      "emoji": "អេមូជី",
+      "mode": "របៀប",
+      "defaultsHint": "វគ្គដែលចាប់ផ្តើមពីបញ្ជីនេះប្រើតម្លៃលំនាំដើមទាំងនេះ។"
+    },
+    "list": {
+      "addPlaceholder": "បន្ថែមកិច្ចការថ្មី",
+      "add": "បន្ថែមកិច្ចការ",
+      "empty": "មិនទាន់មានកិច្ចការទេ",
+      "setDefaults": "កំណត់ឃ្លាំងកូដ របៀប និងគំរូ",
+      "completed_one": "បានបញ្ចប់ ({{count}})",
+      "completed_other": "បានបញ្ចប់ ({{count}})"
+    },
+    "item": {
+      "markDone": "សម្គាល់ថារួចរាល់",
+      "markOpen": "សម្គាល់ថាមិនទាន់រួច",
+      "markDonePrompt": "សម្គាល់ថារួចរាល់?",
+      "deleted": "បានលុបកិច្ចការ",
+      "undo": "មិនធ្វើវិញ",
+      "runCount_one": "{{count}} ដំណើរការ",
+      "runCount_other": "{{count}} ដំណើរការ",
+      "startNow": "ចាប់ផ្តើមដោយគ្មានការពិនិត្យ",
+      "startNowHint": "ចុចឱ្យជាប់ ដើម្បីចាប់ផ្តើមដោយគ្មានការពិនិត្យ",
+      "titleLabel": "ចំណងជើងកិច្ចការ",
+      "notes": "កំណត់ចំណាំ",
+      "notesPlaceholder": "បន្ថែមកំណត់ចំណាំជា Markdown",
+      "sessions": "វគ្គដែលបានភ្ជាប់",
+      "noSessions": "មិនទាន់មានវគ្គទេ",
+      "linkSession": "ភ្ជាប់វគ្គ",
+      "unlinkSession": "ផ្ដាច់ {{title}}",
+      "linkFailed": "មិនអាចភ្ជាប់វគ្គទៅកិច្ចការបានទេ"
+    },
+    "linkSession": {
+      "title": "ភ្ជាប់វគ្គមួយ",
+      "empty": "មិនទាន់មានវគ្គថ្មីៗទេ",
+      "emptyInRepository": "មិនទាន់មានវគ្គថ្មីៗក្នុង {{repository}} ទេ"
+    },
+    "upNext": "បន្ទាប់",
+    "sessionTodo": "កិច្ចការ៖ {{title}}",
+    "linkToTodo": "ភ្ជាប់ទៅកិច្ចការ",
+    "candidates": {
+      "empty": "គ្មានកិច្ចការបើក"
+    },
+    "saveSheet": {
+      "title": "រក្សាទុកទៅបញ្ជី",
+      "saved": "បានរក្សាទុកទៅ {{list}}"
+    }
   }
 }

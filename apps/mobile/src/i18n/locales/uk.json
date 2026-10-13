@@ -1780,8 +1780,8 @@
       "toolList": "показати список",
       "toolPatch": "застосувати зміни",
       "toolTask": "завдання",
-      "readTodos": "Прочитати список завдань",
-      "updateTodos": "Оновити список завдань",
+      "readTodos": "Прочитати план",
+      "updateTodos": "Оновити план",
       "linesBadge": "рядків: {{displayCount}}",
       "filesBadge": "файлів: {{displayCount}}",
       "matchesBadge": "збігів: {{displayCount}}",
@@ -3326,6 +3326,19 @@
       "deleteTitle": "Видалити цей чат?"
     },
     "beta": "Бета",
+    "details": {
+      "title": "Відомості про чат",
+      "backend": "Сервер",
+      "effortDefault": "Типово для моделі",
+      "noCost": "Безкоштовно",
+      "costUnknown": "Невідомо",
+      "costEstimatedNote": "Вартість відповідей, для яких ціну не повідомлено, оцінено за прейскурантними цінами.",
+      "costUnknownNote": "Ціна цієї моделі невідома.",
+      "costPartialNote": "Ця сума не враховує моделі з невідомою ціною.",
+      "localNote": "Моделі на пристрої працюють на цьому пристрої. Вони безкоштовні, не мають кешу запитів, а кількість токенів для них може бути приблизною.",
+      "countedSinceNote": "Цей чат почався до того, як почали обліковувати використання. Підсумки враховують лише подальші відповіді.",
+      "remoteServersOn": "Увімкнені віддалені сервери MCP"
+    },
     "webSearch": {
       "title": "Шукати в інтернеті",
       "description": "Дозвольте цьому чату шукати актуальну інформацію через ваш обліковий запис Kilo. Пошуки використовують ваш щомісячний ліміт пошуку.",
@@ -3763,5 +3776,86 @@
     "noMatchingProductsPlay": "Google Play не повернув відповідні пакети кредитів.",
     "purchaseOwnedByAnotherAccount": "Кредити в цьому Apple Account належать іншому обліковому запису Kilo. Увійдіть у той обліковий запис Kilo, щоб ними користуватися.",
     "purchaseOwnedByAnotherAccountPlay": "Кредити в цьому обліковому записі Google Play належать іншому обліковому запису Kilo. Увійдіть у той обліковий запис Kilo, щоб ними користуватися."
+  },
+  "todos": {
+    "saveAsTodo": "Зберегти як завдання",
+    "segment": {
+      "label": "Подання агентів",
+      "sessions": "Сеанси",
+      "todos": "Завдання"
+    },
+    "lists": {
+      "newList": "Новий список",
+      "empty": "Списків ще немає",
+      "couldNotLoad": "Не вдалося завантажити списки.",
+      "noRepository": "Немає репозиторію",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} відкрито",
+      "openCount_few": "{{count}} відкрито",
+      "openCount_many": "{{count}} відкрито",
+      "openCount_other": "{{count}} відкрито",
+      "archived_one": "Архівовано ({{count}})",
+      "archived_few": "Архівовано ({{count}})",
+      "archived_many": "Архівовано ({{count}})",
+      "archived_other": "Архівовано ({{count}})",
+      "archive": "Архівувати",
+      "unarchive": "Розархівувати",
+      "deleteTitle": "Видалити «{{name}}»?",
+      "deleteMessage": "Його завдання теж буде видалено. Сеанси залишаться."
+    },
+    "listSettings": {
+      "title": "Налаштування списку",
+      "name": "Назва",
+      "namePlaceholder": "Помилки, ідеї, реліз…",
+      "emoji": "Емодзі",
+      "mode": "Режим",
+      "defaultsHint": "Сеанси, запущені з цього списку, використовують ці типові значення."
+    },
+    "list": {
+      "addPlaceholder": "Введіть назву завдання",
+      "add": "Додати завдання",
+      "empty": "Завдань ще немає",
+      "setDefaults": "Налаштувати репозиторій, режим і модель",
+      "completed_one": "Завершено ({{count}})",
+      "completed_few": "Завершено ({{count}})",
+      "completed_many": "Завершено ({{count}})",
+      "completed_other": "Завершено ({{count}})"
+    },
+    "item": {
+      "markDone": "Позначити виконаним",
+      "markOpen": "Позначити невиконаним",
+      "markDonePrompt": "Позначити виконаним?",
+      "deleted": "Завдання видалено",
+      "undo": "Повернути",
+      "runCount_one": "{{count}} запуск",
+      "runCount_few": "{{count}} запуски",
+      "runCount_many": "{{count}} запусків",
+      "runCount_other": "{{count}} запусків",
+      "startNow": "Запустити без перевірки",
+      "startNowHint": "Утримуйте, щоб запустити без перевірки",
+      "titleLabel": "Назва завдання",
+      "notes": "Нотатки",
+      "notesPlaceholder": "Додайте нотатки в Markdown",
+      "sessions": "Пов'язані сеанси",
+      "noSessions": "Сеансів ще немає",
+      "linkSession": "Прив'язати сеанс",
+      "unlinkSession": "Від'єднати {{title}}",
+      "linkFailed": "Не вдалося пов'язати сеанс із завданням."
+    },
+    "linkSession": {
+      "title": "Пов'язування сеансу",
+      "empty": "Останніх сеансів немає",
+      "emptyInRepository": "Немає останніх сеансів у {{repository}}"
+    },
+    "upNext": "Далі",
+    "sessionTodo": "Завдання: {{title}}",
+    "linkToTodo": "Пов'язати із завданням",
+    "candidates": {
+      "empty": "Немає відкритих завдань"
+    },
+    "saveSheet": {
+      "title": "Зберегти до списку",
+      "saved": "Збережено до списку {{list}}"
+    }
   }
 }

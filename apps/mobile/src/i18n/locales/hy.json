@@ -2266,8 +2266,8 @@
       "toolList": "ցուցադրել ցանկը",
       "toolPatch": "կիրառել փոփոխությունները",
       "toolTask": "առաջադրանք",
-      "readTodos": "Կարդալ անելիքները",
-      "updateTodos": "Թարմացնել անելիքները",
+      "readTodos": "Կարդալ պլանը",
+      "updateTodos": "Թարմացնել պլանը",
       "linesBadge": "{{displayCount}} տող",
       "filesBadge": "{{displayCount}} ֆայլ",
       "matchesBadge": "{{displayCount}} համընկնում",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "Ջնջե՞լ այս զրույցը:"
     },
     "beta": "Բետա",
+    "details": {
+      "title": "Զրույցի մանրամասներ",
+      "backend": "Սերվերային ծառայություն",
+      "effortDefault": "Մոդելի լռելյայն",
+      "noCost": "Անվճար",
+      "costUnknown": "Հայտնի չէ",
+      "costEstimatedNote": "Գին չհաղորդած պատասխանների արժեքը գնահատվում է ցուցակային գներով։",
+      "costUnknownNote": "Այս մոդելի գինը հայտնի չէ։",
+      "costPartialNote": "Այս ընդհանուրը չի ներառում այն մոդելները, որոնց գինը հայտնի չէ։",
+      "localNote": "Սարքում աշխատող մոդելներն աշխատում են այս սարքում։ Դրանք արժեք և հուշումների քեշ չունեն, իսկ նրանց թոքենների քանակը կարող է մոտավոր լինել։",
+      "countedSinceNote": "Այս զրույցը սկսվել է նախքան օգտագործման գրանցումը։ Ընդհանուրները ցույց են տալիս միայն դրանից հետո տրված պատասխանները։",
+      "remoteServersOn": "Միացված հեռավոր MCP սերվերներ"
+    },
     "webSearch": {
       "title": "Որոնել համացանցում",
       "description": "Թույլ տվեք այս զրույցին որոնել արդի տեղեկություններ ձեր Kilo հաշվի միջոցով։ Որոնումները օգտագործում են ձեր ամսական որոնման սահմանաչափը։",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play-ը համապատասխան կրեդիտային փաթեթներ չվերադարձրեց։",
     "purchaseOwnedByAnotherAccount": "Այս Apple Account-ի կրեդիտները պատկանում են մեկ այլ Kilo հաշվի։ Դրանք օգտագործելու համար մուտք գործեք այդ Kilo հաշիվ։",
     "purchaseOwnedByAnotherAccountPlay": "Այս Google Play հաշվի կրեդիտները պատկանում են մեկ այլ Kilo հաշվի։ Դրանք օգտագործելու համար մուտք գործեք այդ Kilo հաշիվ։"
+  },
+  "todos": {
+    "saveAsTodo": "Պահել որպես անելիք",
+    "segment": {
+      "label": "Գործակալների տեսք",
+      "sessions": "Նիստեր",
+      "todos": "Անելիքներ"
+    },
+    "lists": {
+      "newList": "Նոր ցուցակ",
+      "empty": "Ցուցակներ դեռ չկան",
+      "couldNotLoad": "Չհաջողվեց բեռնել ցուցակները",
+      "noRepository": "Պահոց չկա",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} բաց",
+      "openCount_other": "{{count}} բաց",
+      "archived_one": "Արխիվացված ({{count}})",
+      "archived_other": "Արխիվացված ({{count}})",
+      "archive": "Արխիվացնել",
+      "unarchive": "Հանել արխիվից",
+      "deleteTitle": "Ջնջե՞լ {{name}}-ը",
+      "deleteMessage": "Դրա անելիքները նույնպես կջնջվեն։ Դրանց նիստերը կմնան։"
+    },
+    "listSettings": {
+      "title": "Ցուցակի կարգավորումներ",
+      "name": "Անուն",
+      "namePlaceholder": "Սխալներ, գաղափարներ, թողարկում…",
+      "emoji": "Էմոջի",
+      "mode": "Ռեժիմ",
+      "defaultsHint": "Այս ցուցակից սկսված նիստերն օգտագործում են այս կանխադրված արժեքները։"
+    },
+    "list": {
+      "addPlaceholder": "Ավելացնել նոր անելիք",
+      "add": "Ավելացնել անելիք",
+      "empty": "Անելիքներ դեռ չկան",
+      "setDefaults": "Սահմանել պահոց, ռեժիմ և մոդել",
+      "completed_one": "Ավարտված ({{count}})",
+      "completed_other": "Ավարտված ({{count}})"
+    },
+    "item": {
+      "markDone": "Նշել որպես ավարտված",
+      "markOpen": "Նշել որպես չավարտված",
+      "markDonePrompt": "Նշե՞լ որպես ավարտված",
+      "deleted": "Անելիքը ջնջվեց",
+      "undo": "Հետարկել",
+      "runCount_one": "{{count}} գործարկում",
+      "runCount_other": "{{count}} գործարկում",
+      "startNow": "Սկսել առանց ստուգման",
+      "startNowHint": "Երկար սեղմել՝ առանց ստուգման սկսելու համար",
+      "titleLabel": "Անելիքի վերնագիր",
+      "notes": "Նշումներ",
+      "notesPlaceholder": "Ավելացնել նշումներ՝ Markdown ձևաչափով",
+      "sessions": "Կապակցված նիստեր",
+      "noSessions": "Նիստեր դեռ չկան",
+      "linkSession": "Կապել նիստ",
+      "unlinkSession": "Անջատել՝ {{title}}",
+      "linkFailed": "Չհաջողվեց նիստը կապել անելիքի հետ"
+    },
+    "linkSession": {
+      "title": "Նիստի կապում",
+      "empty": "Վերջին նիստեր չկան",
+      "emptyInRepository": "{{repository}} պահոցում վերջին նիստեր չկան"
+    },
+    "upNext": "Հաջորդը",
+    "sessionTodo": "Անելիք՝ {{title}}",
+    "linkToTodo": "Կապել անելիքի հետ",
+    "candidates": {
+      "empty": "Բաց անելիքներ չկան"
+    },
+    "saveSheet": {
+      "title": "Պահել ցուցակում",
+      "saved": "Պահվեց {{list}} ցուցակում"
+    }
   }
 }

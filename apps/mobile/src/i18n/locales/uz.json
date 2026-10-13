@@ -2266,8 +2266,8 @@
       "toolList": "ro'yxatni ko'rsatish",
       "toolPatch": "tuzatish kiritish",
       "toolTask": "vazifa",
-      "readTodos": "Vazifalar ro'yxatini o'qish",
-      "updateTodos": "Vazifalar ro'yxatini yangilash",
+      "readTodos": "Rejani o‘qish",
+      "updateTodos": "Rejani yangilash",
       "linesBadge": "{{displayCount}} qator",
       "filesBadge": "{{displayCount}} fayl",
       "matchesBadge": "{{displayCount}} natija",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "Bu chat oʻchirilsinmi?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Suhbat tafsilotlari",
+      "backend": "Server",
+      "effortDefault": "Model standarti",
+      "noCost": "Xarajatsiz",
+      "costUnknown": "Noma'lum",
+      "costEstimatedNote": "Narxni bildirmagan javoblar ro'yxatdagi narxlar bo'yicha taxminan hisoblangan.",
+      "costUnknownNote": "Bu model uchun narx ma'lum emas.",
+      "costPartialNote": "Bu jamiga narxi ma'lum bo'lmagan modellar kirmaydi.",
+      "localNote": "Qurilmadagi modellar shu qurilmada ishlaydi. Ularda xarajat ham, so'rov keshi ham yo'q, token soni esa taxminiy bo'lishi mumkin.",
+      "countedSinceNote": "Bu suhbat foydalanish qayd etila boshlanishidan oldin boshlangan. Jami qiymatlar faqat undan keyingi javoblarni ko'rsatadi.",
+      "remoteServersOn": "Yoqilgan masofaviy MCP serverlari"
+    },
     "webSearch": {
       "title": "Internetdan qidirish",
       "description": "Bu chatga Kilo hisobingiz orqali dolzarb ma’lumot qidirishga ruxsat bering. Qidiruvlar oylik qidiruv limitingizdan foydalanadi.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play mos keladigan kredit paketlarini qaytarmadi.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring."
+  },
+  "todos": {
+    "saveAsTodo": "Vazifa sifatida saqlash",
+    "segment": {
+      "label": "Agentlar ko‘rinishi",
+      "sessions": "Sessiyalar",
+      "todos": "Vazifalar"
+    },
+    "lists": {
+      "newList": "Yangi ro‘yxat",
+      "empty": "Hozircha ro‘yxatlar yo‘q",
+      "couldNotLoad": "Ro‘yxatlarni yuklab bo‘lmadi",
+      "noRepository": "Repozitoriy yo‘q",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} ochiq",
+      "openCount_other": "{{count}} ochiq",
+      "archived_one": "Arxivlangan ({{count}})",
+      "archived_other": "Arxivlangan ({{count}})",
+      "archive": "Arxivlash",
+      "unarchive": "Arxivdan chiqarish",
+      "deleteTitle": "{{name}} o‘chirilsinmi?",
+      "deleteMessage": "Uning vazifalari ham o‘chiriladi. Sessiyalar qoladi."
+    },
+    "listSettings": {
+      "title": "Ro‘yxat sozlamalari",
+      "name": "Nom",
+      "namePlaceholder": "Xatolar, g‘oyalar, relizlar…",
+      "emoji": "Emoji",
+      "mode": "Rejim",
+      "defaultsHint": "Bu ro‘yxatdan boshlangan sessiyalar shu standart sozlamalardan foydalanadi."
+    },
+    "list": {
+      "addPlaceholder": "Yangi vazifa qo‘shish",
+      "add": "Vazifa qo‘shish",
+      "empty": "Hozircha vazifalar yo‘q",
+      "setDefaults": "Repozitoriy, rejim va modelni belgilash",
+      "completed_one": "Yakunlangan ({{count}})",
+      "completed_other": "Yakunlangan ({{count}})"
+    },
+    "item": {
+      "markDone": "Bajarilgan deb belgilash",
+      "markOpen": "Bajarilmagan deb belgilash",
+      "markDonePrompt": "Bajarilgan deb belgilansinmi?",
+      "deleted": "Vazifa o‘chirildi",
+      "undo": "Ortga qaytarish",
+      "runCount_one": "{{count}} marta ishga tushirish",
+      "runCount_other": "{{count}} marta ishga tushirish",
+      "startNow": "Ko‘rib chiqmasdan boshlash",
+      "startNowHint": "Ko‘rib chiqmasdan boshlash uchun uzoq bosing",
+      "titleLabel": "Vazifa sarlavhasi",
+      "notes": "Izohlar",
+      "notesPlaceholder": "Markdown formatida izohlar qo‘shish",
+      "sessions": "Bog‘langan sessiyalar",
+      "noSessions": "Hozircha sessiyalar yo‘q",
+      "linkSession": "Sessiya bog‘lash",
+      "unlinkSession": "{{title}} bog‘lanishini uzish",
+      "linkFailed": "Sessiyani vazifaga bog‘lab bo‘lmadi"
+    },
+    "linkSession": {
+      "title": "Sessiyani bog‘lash",
+      "empty": "Oxirgi sessiyalar yo‘q",
+      "emptyInRepository": "{{repository}} ichida oxirgi sessiyalar yo‘q"
+    },
+    "upNext": "Navbatdagisi",
+    "sessionTodo": "Vazifa: {{title}}",
+    "linkToTodo": "Vazifaga bog‘lash",
+    "candidates": {
+      "empty": "Ochiq vazifalar yo‘q"
+    },
+    "saveSheet": {
+      "title": "Ro‘yxatga saqlash",
+      "saved": "{{list}} ro‘yxatiga saqlandi"
+    }
   }
 }

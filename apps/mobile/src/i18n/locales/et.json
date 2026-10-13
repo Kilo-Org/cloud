@@ -2266,8 +2266,8 @@
       "toolList": "loetle",
       "toolPatch": "rakenda paik",
       "toolTask": "ülesanne",
-      "readTodos": "Loe ülesannete loendit",
-      "updateTodos": "Uuenda ülesannete loendit",
+      "readTodos": "Loe plaani",
+      "updateTodos": "Uuenda plaani",
       "linesBadge": "{{displayCount}} rida",
       "filesBadge": "{{displayCount}} faili",
       "matchesBadge": "{{displayCount}} vastet",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "Kas kustutada see vestlus?"
     },
     "beta": "Beeta",
+    "details": {
+      "title": "Vestluse üksikasjad",
+      "backend": "Taustsüsteem",
+      "effortDefault": "Mudeli vaikeväärtus",
+      "noCost": "Kulu puudub",
+      "costUnknown": "Teadmata",
+      "costEstimatedNote": "Nende vastuste kulu, mille kohta hinda ei teatatud, on hinnatud hinnakirja alusel.",
+      "costUnknownNote": "Selle mudeli hind pole teada.",
+      "costPartialNote": "See kogusumma ei hõlma mudeleid, mille hind pole teada.",
+      "localNote": "Seadmesisesed mudelid töötavad selles seadmes. Neil pole kulu ega viibavahemälu ning nende tokenite arv võib olla hinnanguline.",
+      "countedSinceNote": "See vestlus algas enne, kui kasutust hakati salvestama. Kogusummad näitavad ainult sellele järgnenud vastuseid.",
+      "remoteServersOn": "Sisselülitatud kaug-MCP-serverid"
+    },
     "webSearch": {
       "title": "Otsi veebist",
       "description": "Luba sellel vestlusel otsida ajakohast teavet sinu Kilo konto kaudu. Otsingud kasutavad sinu igakuist otsingumahtu.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play ei tagastanud ühtegi sobivat krediidipaketti.",
     "purchaseOwnedByAnotherAccount": "Selle Apple Accountiga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse vastavale Kilo kontole.",
     "purchaseOwnedByAnotherAccountPlay": "Selle Google Play kontoga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse sellesse Kilo kontosse."
+  },
+  "todos": {
+    "saveAsTodo": "Salvesta ülesandena",
+    "segment": {
+      "label": "Agentide vaade",
+      "sessions": "Seansid",
+      "todos": "Ülesanded"
+    },
+    "lists": {
+      "newList": "Uus loend",
+      "empty": "Loendeid veel pole",
+      "couldNotLoad": "Loendeid ei õnnestunud laadida",
+      "noRepository": "Hoidlat pole",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} avatud",
+      "openCount_other": "{{count}} avatud",
+      "archived_one": "Arhiveeritud ({{count}})",
+      "archived_other": "Arhiveeritud ({{count}})",
+      "archive": "Arhiveeri",
+      "unarchive": "Taasta arhiivist",
+      "deleteTitle": "Kas kustutada {{name}}?",
+      "deleteMessage": "Selle ülesanded kustutatakse samuti. Seansid jäävad alles."
+    },
+    "listSettings": {
+      "title": "Loendi sätted",
+      "name": "Nimi",
+      "namePlaceholder": "Vead, Ideed, Väljalase…",
+      "emoji": "Emotikon",
+      "mode": "Režiim",
+      "defaultsHint": "Sellest loendist alustatud seansid kasutavad neid vaikeseadeid."
+    },
+    "list": {
+      "addPlaceholder": "Uus ülesanne",
+      "add": "Lisa ülesanne",
+      "empty": "Ülesandeid veel pole",
+      "setDefaults": "Määra hoidla, režiim ja mudel",
+      "completed_one": "Lõpetatud ({{count}})",
+      "completed_other": "Lõpetatud ({{count}})"
+    },
+    "item": {
+      "markDone": "Märgi tehtuks",
+      "markOpen": "Märgi tegemata",
+      "markDonePrompt": "Kas märkida tehtuks?",
+      "deleted": "Ülesanne kustutatud",
+      "undo": "Võta tagasi",
+      "runCount_one": "{{count}} käivitus",
+      "runCount_other": "{{count}} käivitus",
+      "startNow": "Käivita ilma ülevaatuseta",
+      "startNowHint": "Ülevaatuseta käivitamiseks vajuta pikalt",
+      "titleLabel": "Ülesande pealkiri",
+      "notes": "Märkmed",
+      "notesPlaceholder": "Lisa märkmed Markdownis",
+      "sessions": "Seotud seansid",
+      "noSessions": "Seansse veel pole",
+      "linkSession": "Seo seanss",
+      "unlinkSession": "Eemalda seos: {{title}}",
+      "linkFailed": "Seanssi ei õnnestunud ülesandega siduda"
+    },
+    "linkSession": {
+      "title": "Seansside linkimine",
+      "empty": "Hiljutisi seansse pole",
+      "emptyInRepository": "Hoidlas {{repository}} pole hiljutisi seansse"
+    },
+    "upNext": "Järgmisena",
+    "sessionTodo": "Ülesanne: {{title}}",
+    "linkToTodo": "Lingi ülesandega",
+    "candidates": {
+      "empty": "Avatud ülesandeid pole"
+    },
+    "saveSheet": {
+      "title": "Salvesta loendisse",
+      "saved": "Salvestatud loendisse {{list}}"
+    }
   }
 }

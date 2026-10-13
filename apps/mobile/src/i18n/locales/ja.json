@@ -1754,8 +1754,8 @@
       "toolList": "一覧",
       "toolPatch": "パッチ適用",
       "toolTask": "タスク",
-      "readTodos": "タスクを読み取り",
-      "updateTodos": "タスクを更新",
+      "readTodos": "プランを読み取り",
+      "updateTodos": "プランを更新",
       "linesBadge": "{{displayCount}}行",
       "filesBadge": "{{displayCount}}ファイル",
       "matchesBadge": "{{displayCount}}件",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "このチャットを削除しますか？"
     },
     "beta": "ベータ",
+    "details": {
+      "title": "チャットの詳細",
+      "backend": "バックエンド",
+      "effortDefault": "モデルのデフォルト",
+      "noCost": "コストなし",
+      "costUnknown": "不明",
+      "costEstimatedNote": "価格が報告されなかった回答は、定価から推定しています。",
+      "costUnknownNote": "このモデルの価格は不明です。",
+      "costPartialNote": "この合計には、価格が不明なモデルは含まれていません。",
+      "localNote": "オンデバイスモデルはこのデバイス上で動作します。コストもプロンプトキャッシュもなく、トークン数は推定値の場合があります。",
+      "countedSinceNote": "このチャットは使用状況の記録が始まる前に開始されました。合計にはそれ以降の回答のみが含まれます。",
+      "remoteServersOn": "オンのリモートMCPサーバー"
+    },
     "webSearch": {
       "title": "ウェブを検索",
       "description": "このチャットが Kilo アカウントを通じて最新の情報を調べられるようにします。検索には毎月の検索枠が使われます。",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Playから一致するクレジットパックが返されませんでした。",
     "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
     "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"
+  },
+  "todos": {
+    "saveAsTodo": "タスクとして保存",
+    "segment": {
+      "label": "エージェント表示",
+      "sessions": "セッション",
+      "todos": "タスク"
+    },
+    "lists": {
+      "newList": "新しいリスト",
+      "empty": "リストはまだありません",
+      "couldNotLoad": "リストを読み込めませんでした",
+      "noRepository": "リポジトリなし",
+      "rowA11y": "{{name}}、{{openCount}}",
+      "openCount_one": "未完了{{count}}件",
+      "openCount_other": "未完了{{count}}件",
+      "archived_one": "アーカイブ済み ({{count}})",
+      "archived_other": "アーカイブ済み ({{count}})",
+      "archive": "アーカイブ",
+      "unarchive": "アーカイブを解除",
+      "deleteTitle": "{{name}}を削除しますか？",
+      "deleteMessage": "そのタスクも削除されます。セッションは残ります。"
+    },
+    "listSettings": {
+      "title": "リストの設定",
+      "name": "名前",
+      "namePlaceholder": "バグ、アイデア、リリース…",
+      "emoji": "絵文字",
+      "mode": "モード",
+      "defaultsHint": "このリストから開始したセッションには、この既定値が使われます。"
+    },
+    "list": {
+      "addPlaceholder": "タスクを追加",
+      "add": "タスクを追加",
+      "empty": "タスクはまだありません",
+      "setDefaults": "リポジトリ、モード、モデルを設定",
+      "completed_one": "完了 ({{count}})",
+      "completed_other": "完了 ({{count}})"
+    },
+    "item": {
+      "markDone": "完了にする",
+      "markOpen": "未完了にする",
+      "markDonePrompt": "完了にしますか？",
+      "deleted": "タスクを削除しました",
+      "undo": "元に戻す",
+      "runCount_one": "実行{{count}}回",
+      "runCount_other": "実行{{count}}回",
+      "startNow": "レビューなしで開始",
+      "startNowHint": "長押しでレビューなしで開始",
+      "titleLabel": "タスクのタイトル",
+      "notes": "メモ",
+      "notesPlaceholder": "Markdown でメモを追加",
+      "sessions": "リンク済みのセッション",
+      "noSessions": "セッションはまだありません",
+      "linkSession": "セッションをリンク",
+      "unlinkSession": "{{title}}のリンクを解除",
+      "linkFailed": "セッションをタスクにリンクできませんでした"
+    },
+    "linkSession": {
+      "title": "セッションをリンク",
+      "empty": "最近のセッションはありません",
+      "emptyInRepository": "{{repository}}に最近のセッションはありません"
+    },
+    "upNext": "次の予定",
+    "sessionTodo": "タスク：{{title}}",
+    "linkToTodo": "タスクにリンク",
+    "candidates": {
+      "empty": "未完了のタスクはありません"
+    },
+    "saveSheet": {
+      "title": "リストに保存",
+      "saved": "{{list}}に保存しました"
+    }
   }
 }

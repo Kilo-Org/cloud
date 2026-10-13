@@ -2324,8 +2324,8 @@
       "toolList": "výpis",
       "toolPatch": "úprava",
       "toolTask": "úkol",
-      "readTodos": "Přečíst úkoly",
-      "updateTodos": "Aktualizovat úkoly",
+      "readTodos": "Přečíst plán",
+      "updateTodos": "Aktualizovat plán",
       "linesBadge": "řádky: {{displayCount}}",
       "filesBadge": "soubory: {{displayCount}}",
       "matchesBadge": "shody: {{displayCount}}",
@@ -3326,6 +3326,19 @@
       "deleteTitle": "Smazat tento chat?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Podrobnosti chatu",
+      "backend": "Server",
+      "effortDefault": "Výchozí nastavení modelu",
+      "noCost": "Bez nákladů",
+      "costUnknown": "Neznámé",
+      "costEstimatedNote": "Náklady na odpovědi, které neuvedly cenu, jsou odhadnuty podle ceníku.",
+      "costUnknownNote": "Cena tohoto modelu není známa.",
+      "costPartialNote": "Tento součet nezahrnuje modely bez známé ceny.",
+      "localNote": "Modely v zařízení běží přímo v tomto zařízení. Nemají žádné náklady ani mezipaměť promptů a jejich počty tokenů mohou být odhady.",
+      "countedSinceNote": "Tento chat začal dříve, než se začalo zaznamenávat využití. Součty zahrnují jen odpovědi od té doby.",
+      "remoteServersOn": "Zapnuté vzdálené servery MCP"
+    },
     "webSearch": {
       "title": "Hledat na webu",
       "description": "Povolte tomuto chatu vyhledávat aktuální informace přes váš účet Kilo. Vyhledávání čerpá váš měsíční limit vyhledávání.",
@@ -3763,5 +3776,86 @@
     "noMatchingProductsPlay": "Google Play nevrátil žádné odpovídající balíčky kreditů.",
     "purchaseOwnedByAnotherAccount": "Kredity na tomto účtu Apple Account patří k jinému účtu Kilo. Chcete-li je použít, přihlaste se k příslušnému účtu Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účtu Google Play patří jinému účtu Kilo. Přihlaste se k tomuto účtu Kilo pro jejich použití."
+  },
+  "todos": {
+    "saveAsTodo": "Uložit jako úkol",
+    "segment": {
+      "label": "Zobrazení agentů",
+      "sessions": "Relace",
+      "todos": "Úkoly"
+    },
+    "lists": {
+      "newList": "Nový seznam",
+      "empty": "Zatím žádné seznamy",
+      "couldNotLoad": "Seznamy se nepodařilo načíst",
+      "noRepository": "Žádný repozitář",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} otevřeno",
+      "openCount_few": "{{count}} otevřeno",
+      "openCount_many": "{{count}} otevřeno",
+      "openCount_other": "{{count}} otevřeno",
+      "archived_one": "Archivováno ({{count}})",
+      "archived_few": "Archivováno ({{count}})",
+      "archived_many": "Archivováno ({{count}})",
+      "archived_other": "Archivováno ({{count}})",
+      "archive": "Archivovat",
+      "unarchive": "Zrušit archivaci",
+      "deleteTitle": "Smazat {{name}}?",
+      "deleteMessage": "Smažou se i jeho úkoly. Jejich relace zůstanou."
+    },
+    "listSettings": {
+      "title": "Nastavení seznamu",
+      "name": "Název",
+      "namePlaceholder": "Chyby, Nápady, Vydání…",
+      "emoji": "Emoji",
+      "mode": "Režim",
+      "defaultsHint": "Relace spuštěné z tohoto seznamu použijí tato výchozí nastavení."
+    },
+    "list": {
+      "addPlaceholder": "Přidat úkol",
+      "add": "Přidat",
+      "empty": "Zatím žádné úkoly",
+      "setDefaults": "Nastavit repozitář, režim a model",
+      "completed_one": "Dokončeno ({{count}})",
+      "completed_few": "Dokončeno ({{count}})",
+      "completed_many": "Dokončeno ({{count}})",
+      "completed_other": "Dokončeno ({{count}})"
+    },
+    "item": {
+      "markDone": "Označit jako hotové",
+      "markOpen": "Označit jako nedokončené",
+      "markDonePrompt": "Označit jako hotové?",
+      "deleted": "Úkol smazán",
+      "undo": "Vrátit",
+      "runCount_one": "{{count}} spuštění",
+      "runCount_few": "{{count}} spuštění",
+      "runCount_many": "{{count}} spuštění",
+      "runCount_other": "{{count}} spuštění",
+      "startNow": "Spustit bez revize",
+      "startNowHint": "Dlouhým stisknutím spustíte bez revize",
+      "titleLabel": "Název úkolu",
+      "notes": "Poznámky",
+      "notesPlaceholder": "Přidat poznámky v Markdownu",
+      "sessions": "Připojené relace",
+      "noSessions": "Zatím žádné relace",
+      "linkSession": "Připojit relaci",
+      "unlinkSession": "Odpojit {{title}}",
+      "linkFailed": "Relaci se nepodařilo připojit k úkolu"
+    },
+    "linkSession": {
+      "title": "Připojení relace",
+      "empty": "Žádné nedávné relace",
+      "emptyInRepository": "V {{repository}} nejsou žádné nedávné relace"
+    },
+    "upNext": "Následuje",
+    "sessionTodo": "Úkol: {{title}}",
+    "linkToTodo": "Připojit k úkolu",
+    "candidates": {
+      "empty": "Žádné otevřené úkoly"
+    },
+    "saveSheet": {
+      "title": "Uložit do seznamu",
+      "saved": "Uloženo do {{list}}"
+    }
   }
 }

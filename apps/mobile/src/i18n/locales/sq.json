@@ -2266,8 +2266,8 @@
       "toolList": "listo",
       "toolPatch": "zbato ndryshimet",
       "toolTask": "detyrë",
-      "readTodos": "Lexo listën e detyrave",
-      "updateTodos": "Përditëso listën e detyrave",
+      "readTodos": "Lexo planin",
+      "updateTodos": "Përditëso planin",
       "linesBadge": "{{displayCount}} rreshta",
       "filesBadge": "{{displayCount}} skedarë",
       "matchesBadge": "{{displayCount}} përputhje",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "Ta fshini këtë bisedë?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detajet e bisedës",
+      "backend": "Shërbimi mbështetës",
+      "effortDefault": "Parazgjedhja e modelit",
+      "noCost": "Pa kosto",
+      "costUnknown": "E panjohur",
+      "costEstimatedNote": "Përgjigjet që nuk raportuan çmim janë vlerësuar sipas çmimeve të listës.",
+      "costUnknownNote": "Nuk dihet asnjë çmim për këtë model.",
+      "costPartialNote": "Ky total nuk përfshin modelet pa çmim të njohur.",
+      "localNote": "Modelet në pajisje funksionojnë në këtë pajisje. Nuk kanë kosto as memorie të përkohshme për kërkesat, dhe numri i tokenëve të tyre mund të jetë i përafërt.",
+      "countedSinceNote": "Kjo bisedë filloi para se të regjistrohej përdorimi. Totalet tregojnë vetëm përgjigjet pas asaj kohe.",
+      "remoteServersOn": "Serverë MCP në distancë të aktivizuar"
+    },
     "webSearch": {
       "title": "Kërko në internet",
       "description": "Lejo këtë bisedë të kërkojë informacion të përditësuar përmes llogarisë sate Kilo. Kërkimet përdorin kuotën tënde mujore të kërkimeve.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play nuk ktheu paketa kreditesh që përputhen.",
     "purchaseOwnedByAnotherAccount": "Kreditet në këtë Apple Account i përkasin një llogarie tjetër Kilo. Hyr në atë llogari Kilo për t'i përdorur.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditet në këtë llogari Google Play i përkasin një llogarie tjetër Kilo. Hyni në atë llogari Kilo për t'i përdorur."
+  },
+  "todos": {
+    "saveAsTodo": "Ruaj si detyrë",
+    "segment": {
+      "label": "Pamja e agjentëve",
+      "sessions": "Seancat",
+      "todos": "Detyrat"
+    },
+    "lists": {
+      "newList": "Listë e re",
+      "empty": "Ende pa lista",
+      "couldNotLoad": "Listat nuk u ngarkuan",
+      "noRepository": "Pa depo",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} hapur",
+      "openCount_other": "{{count}} hapur",
+      "archived_one": "Arkivuar ({{count}})",
+      "archived_other": "Arkivuar ({{count}})",
+      "archive": "Arkivo",
+      "unarchive": "Çarkivo",
+      "deleteTitle": "Të fshihet {{name}}?",
+      "deleteMessage": "Edhe detyrat e tij fshihen. Seancat e tyre mbeten."
+    },
+    "listSettings": {
+      "title": "Cilësimet e listës",
+      "name": "Emri",
+      "namePlaceholder": "Gabime, Ide, Publikime…",
+      "emoji": "Emoji",
+      "mode": "Mënyra",
+      "defaultsHint": "Seancat e nisura nga kjo listë përdorin këto parazgjedhje."
+    },
+    "list": {
+      "addPlaceholder": "Shto një detyrë",
+      "add": "Shto detyrë",
+      "empty": "Ende pa detyra",
+      "setDefaults": "Cakto depon, mënyrën dhe modelin",
+      "completed_one": "Përfunduar ({{count}})",
+      "completed_other": "Përfunduar ({{count}})"
+    },
+    "item": {
+      "markDone": "Shëno si të kryer",
+      "markOpen": "Shëno si të pakryer",
+      "markDonePrompt": "Të shënohet si e kryer?",
+      "deleted": "Detyra u fshi",
+      "undo": "Zhbëj",
+      "runCount_one": "{{count}} ekzekutim",
+      "runCount_other": "{{count}} ekzekutime",
+      "startNow": "Nis pa shqyrtim",
+      "startNowHint": "Shtypni gjatë për të nisur pa shqyrtim",
+      "titleLabel": "Titulli i detyrës",
+      "notes": "Shënime",
+      "notesPlaceholder": "Shto shënime në Markdown",
+      "sessions": "Seancat e lidhura",
+      "noSessions": "Ende pa seanca",
+      "linkSession": "Lidh seancën",
+      "unlinkSession": "Shkëput {{title}}",
+      "linkFailed": "Seanca nuk u lidh me detyrën"
+    },
+    "linkSession": {
+      "title": "Lidh një seancë",
+      "empty": "Pa seanca të fundit",
+      "emptyInRepository": "Pa seanca të fundit në {{repository}}"
+    },
+    "upNext": "Në vazhdim",
+    "sessionTodo": "Detyrë: {{title}}",
+    "linkToTodo": "Lidh me detyrën",
+    "candidates": {
+      "empty": "Pa detyra të hapura"
+    },
+    "saveSheet": {
+      "title": "Ruaj në listë",
+      "saved": "U ruajt në {{list}}"
+    }
   }
 }

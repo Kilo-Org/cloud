@@ -2353,8 +2353,8 @@
       "toolList": "liostaigh",
       "toolPatch": "cuir paiste i bhfeidhm",
       "toolTask": "tasc",
-      "readTodos": "Léigh tascanna",
-      "updateTodos": "Nuashonraigh tascanna",
+      "readTodos": "Léigh an plean",
+      "updateTodos": "Nuashonraigh an plean",
       "linesBadge": "{{displayCount}} líne",
       "filesBadge": "{{displayCount}} comhad",
       "matchesBadge": "{{displayCount}} toradh",
@@ -3367,6 +3367,19 @@
       "deleteTitle": "An comhrá seo a scriosadh?"
     },
     "beta": "Béite",
+    "details": {
+      "title": "Sonraí an chomhrá",
+      "backend": "Cúlchóras",
+      "effortDefault": "Réamhshocrú an tsamhla",
+      "noCost": "Gan chostas",
+      "costUnknown": "Níl sé ar eolas",
+      "costEstimatedNote": "Meastar costas na bhfreagraí nár thuairiscigh praghas ó phraghsanna liosta.",
+      "costUnknownNote": "Níl aon phraghas ar eolas don tsamhail seo.",
+      "costPartialNote": "Ní áirítear san iomlán seo samhlacha nach bhfuil praghas ar eolas dóibh.",
+      "localNote": "Ritheann samhlacha ar an ngléas ar an ngléas seo. Níl aon chostas orthu ná aon taisce leideanna, agus d'fhéadfadh gur meastacháin iad a gcomhaireamh comharthaí.",
+      "countedSinceNote": "Thosaigh an comhrá seo sular taifeadadh úsáid. Ní thaispeánann na hiomláin ach na freagraí ina dhiaidh sin.",
+      "remoteServersOn": "Freastalaithe MCP cianda ar siúl"
+    },
     "webSearch": {
       "title": "Cuardaigh an gréasán",
       "description": "Lig don chomhrá seo faisnéis reatha a lorg trí do chuntas Kilo. Úsáideann cuardaigh do liúntas cuardaigh míosúil.",
@@ -3804,5 +3817,90 @@
     "noMatchingProductsPlay": "Níor thug Google Play aon phacáistí creidmheasa comhoiriúnacha ar ais.",
     "purchaseOwnedByAnotherAccount": "Baineann na creidmheasanna ar an Apple Account seo le cuntas Kilo eile. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid.",
     "purchaseOwnedByAnotherAccountPlay": "Baineann na creidmheasanna ar an gcuntas Google Play seo le cuntas Kilo éagsúil. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid."
+  },
+  "todos": {
+    "saveAsTodo": "Sábháil mar thasc",
+    "segment": {
+      "label": "Amharc na ngníomhairí",
+      "sessions": "Seisiúin",
+      "todos": "Tascanna"
+    },
+    "lists": {
+      "newList": "Liosta nua",
+      "empty": "Níl aon liosta ann fós",
+      "couldNotLoad": "Níorbh fhéidir liostaí a lódáil",
+      "noRepository": "Gan stór",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} oscailte",
+      "openCount_two": "{{count}} oscailte",
+      "openCount_few": "{{count}} oscailte",
+      "openCount_many": "{{count}} oscailte",
+      "openCount_other": "{{count}} oscailte",
+      "archived_one": "Cartlannaithe ({{count}})",
+      "archived_two": "Cartlannaithe ({{count}})",
+      "archived_few": "Cartlannaithe ({{count}})",
+      "archived_many": "Cartlannaithe ({{count}})",
+      "archived_other": "Cartlannaithe ({{count}})",
+      "archive": "Cartlannaigh",
+      "unarchive": "Díchartlannaigh",
+      "deleteTitle": "Scrios {{name}}?",
+      "deleteMessage": "Scriostar a thascanna freisin. Fanann a seisiúin."
+    },
+    "listSettings": {
+      "title": "Socruithe liosta",
+      "name": "Ainm",
+      "namePlaceholder": "Fabhtanna, Smaointe, Eisiúintí…",
+      "emoji": "Emoji",
+      "mode": "Mód",
+      "defaultsHint": "Úsáideann seisiúin a thosaítear ón liosta seo na réamhshocruithe seo."
+    },
+    "list": {
+      "addPlaceholder": "Cuir tasc leis",
+      "add": "Cuir leis",
+      "empty": "Níl aon tasc ann fós",
+      "setDefaults": "Socraigh stór, mód agus samhail",
+      "completed_one": "Críochnaithe ({{count}})",
+      "completed_two": "Críochnaithe ({{count}})",
+      "completed_few": "Críochnaithe ({{count}})",
+      "completed_many": "Críochnaithe ({{count}})",
+      "completed_other": "Críochnaithe ({{count}})"
+    },
+    "item": {
+      "markDone": "Marcáil mar dhéanta",
+      "markOpen": "Marcáil mar neamhdhéanta",
+      "markDonePrompt": "Marcáil mar dhéanta?",
+      "deleted": "Scriosadh an tasc",
+      "undo": "Cuir ar ais",
+      "runCount_one": "{{count}} rith",
+      "runCount_two": "{{count}} rith",
+      "runCount_few": "{{count}} rith",
+      "runCount_many": "{{count}} rith",
+      "runCount_other": "{{count}} rith",
+      "startNow": "Tosaigh gan athbhreithniú",
+      "startNowHint": "Brúigh go fada chun tosú gan athbhreithniú",
+      "titleLabel": "Teideal an taisc",
+      "notes": "Nótaí",
+      "notesPlaceholder": "Cuir nótaí leis i Markdown",
+      "sessions": "Seisiúin nasctha",
+      "noSessions": "Níl aon seisiún ann fós",
+      "linkSession": "Nasc seisiún",
+      "unlinkSession": "Dínasc {{title}}",
+      "linkFailed": "Níorbh fhéidir an seisiún a nascadh leis an tasc"
+    },
+    "linkSession": {
+      "title": "Nasc le seisiún",
+      "empty": "Gan aon seisiún le déanaí",
+      "emptyInRepository": "Gan aon seisiún le déanaí i {{repository}}"
+    },
+    "upNext": "An chéad rud eile",
+    "sessionTodo": "Tasc: {{title}}",
+    "linkToTodo": "Nasc le tasc",
+    "candidates": {
+      "empty": "Gan aon tasc oscailte"
+    },
+    "saveSheet": {
+      "title": "Sábháil le liosta",
+      "saved": "Sábháilte i {{list}}"
+    }
   }
 }

@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- the registry suite pins one question at a time, the moves onto another model or tool set, and the MCP discovery around an open on one fake SDK harness. */
-import { type PartDraft } from '@kilocode/harness-sdk';
+import { type ModelEvent, type ModelUsage, type PartDraft } from '@kilocode/harness-sdk';
 import { Effect, Layer, Stream } from 'effect';
 import { type StoredChatBackend } from './backend-store';
 import { backendTargetId } from './backend-target';
@@ -54,6 +54,20 @@ let failHistoryFor: string | undefined = undefined;
 /** A cleanup failure after a move installed its session, before onto returned. */
 let failForgetFor: string | undefined = undefined;
 let failAnswerFor: string | undefined = undefined;
+/** What one answer costs in the fake, the way the gateway reports a paid call. */
+const CALL: ModelUsage = {
+  inputTokens: 10,
+  outputTokens: 2,
+  cacheReadTokens: 90,
+  cacheWriteTokens: 0,
+  cost: 0.01,
+};
+/** Each fake session's own total, which starts at zero when the session opens, as the SDK's does. */
+const totals = new Map<string, ModelUsage>();
+/** The usage column of the chats table, by session. */
+const recorded = vi.hoisted(() => new Map<string, unknown>());
+/** Makes the next usage write throw, the way a closed database does. */
+const recordFailure = vi.hoisted(() => ({ next: false }));
 /** The names a stored session was opened with, which must resolve for it to continue. */
 let continuesWith: readonly string[] = [];
 /** Every session whose scope was closed, so a leaked one can be told from one released. */
@@ -93,35 +107,48 @@ const TURN = {
   parts: [{ id: 'prt_1', kind: 'text', body: 'hi' }],
 } as const;
 
-const handleFor = (id: string) => ({
-  id,
-  ask: (input: string | readonly PartDraft[]) => {
-    const said: Asked =
-      typeof input === 'string'
-        ? { sessionId: id, text: input }
-        : {
-            sessionId: id,
-            text: input.flatMap(part => (part.kind === 'text' ? [part.body] : [])).join(''),
-            parts: input,
-          };
-    if (failAnswerFor === id) {
-      asked.push(said);
-      return Stream.fail(new Error('custom answer failed'));
-    }
-    return Stream.asyncPush<{ kind: 'delta'; text: string }>(emit =>
-      Effect.sync(() => {
+const handleFor = (id: string) => {
+  totals.set(id, { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 });
+  return {
+    id,
+    ask: (input: string | readonly PartDraft[]) => {
+      const said: Asked =
+        typeof input === 'string'
+          ? { sessionId: id, text: input }
+          : {
+              sessionId: id,
+              text: input.flatMap(part => (part.kind === 'text' ? [part.body] : [])).join(''),
+              parts: input,
+            };
+      if (failAnswerFor === id) {
         asked.push(said);
-        emit.single({ kind: 'delta', text: 'ok' });
-        finish = () => {
-          emit.end();
-        };
-        return Effect.void;
-      })
-    );
-  },
-  history:
-    failHistoryFor === id ? Effect.fail(new Error('history unreadable')) : Effect.succeed([TURN]),
-});
+        return Stream.fail(new Error('custom answer failed'));
+      }
+      return Stream.asyncPush<ModelEvent>(emit =>
+        Effect.sync(() => {
+          asked.push(said);
+          emit.single({ kind: 'delta', text: 'ok' });
+          finish = () => {
+            const held = totals.get(id);
+            totals.set(id, {
+              inputTokens: (held?.inputTokens ?? 0) + CALL.inputTokens,
+              outputTokens: (held?.outputTokens ?? 0) + CALL.outputTokens,
+              cacheReadTokens: (held?.cacheReadTokens ?? 0) + CALL.cacheReadTokens,
+              cacheWriteTokens: 0,
+              cost: (held?.cost ?? 0) + (CALL.cost ?? 0),
+            });
+            emit.single({ kind: 'done', usage: CALL, stop: 'end' });
+            emit.end();
+          };
+          return Effect.void;
+        })
+      );
+    },
+    history:
+      failHistoryFor === id ? Effect.fail(new Error('history unreadable')) : Effect.succeed([TURN]),
+    usage: Effect.sync(() => totals.get(id)),
+  };
+};
 
 /** Opens a session that is released when the scope holding it closes. */
 const openInScope = (id: string) =>
@@ -143,6 +170,7 @@ vi.mock('@kilocode/harness-sdk', () => {
     ToolMissingError: FakeToolMissingError,
     // Failure copy is read from the error itself before any model error cause.
     ModelError: Error,
+    zeroUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
     openSession: (options: { readonly tools?: readonly string[] }) => {
       openedWith = options;
       return Effect.succeed(handleFor('s1'));
@@ -277,10 +305,28 @@ vi.mock('./store', () => ({
   },
   modelOfSession: () => 'kilo/one',
   effortOfSession: () => storedEffort,
-  moveChat: () => undefined,
+  moveChat: (_database: unknown, move: { readonly from: string; readonly to: string }) => {
+    recorded.set(move.to, recorded.get(move.from));
+    recorded.delete(move.from);
+  },
   rememberChat: () => undefined,
   touchChat: () => undefined,
   toolsOfSession: () => storedTools,
+  NO_RECORD: { createdAt: null, updatedAt: null, usage: {}, prompted: 0, effort: null },
+  recordOfChat: (_database: unknown, sessionId: string) => ({
+    createdAt: 1,
+    updatedAt: 1,
+    usage: recorded.get(sessionId) ?? {},
+    prompted: 0,
+    effort: null,
+  }),
+  recordUsage: (_database: unknown, sessionId: string, usage: unknown) => {
+    if (recordFailure.next) {
+      recordFailure.next = false;
+      throw new Error('database closed');
+    }
+    recorded.set(sessionId, usage);
+  },
 }));
 
 const {
@@ -342,6 +388,8 @@ beforeEach(async () => {
   storedEffort = null;
   openedWith = undefined;
   storedTools = null;
+  recorded.clear();
+  recordFailure.next = false;
   settingsSwitch.enabled = true;
   mcp.tools.length = 0;
   mcp.enabled.clear();
@@ -1403,6 +1451,60 @@ describe('custom backend question targets', () => {
     expect(await askedIn(opened)).toBeNull();
     expect(storedQuestions.has(`chat-asked:${opened}`)).toBe(false);
     expect(snapshotOf(opened)).toMatchObject({ asked: null, askedModel: null });
+  });
+});
+
+describe('what a chat has used', () => {
+  const answer = async (text: string, model: string) => {
+    await say(opened, { text, images: [] }, { model, effort: null });
+    await settled();
+    finish?.();
+    await settled();
+  };
+
+  it('counts each answer under its model and writes it down as the answer ends', async () => {
+    await answer('one', 'kilo/one');
+    await answer('two', 'kilo/one');
+
+    const twice = { ...CALL, inputTokens: 20, outputTokens: 4, cacheReadTokens: 180, cost: 0.02 };
+    expect(snapshotOf(opened).record).toMatchObject({
+      usage: { 'kilo/one': twice },
+      prompted: 100,
+    });
+    expect(recorded.get('s1')).toEqual({ 'kilo/one': twice });
+  });
+
+  it('keeps counting across a model switch, which opens a session counting from zero', async () => {
+    await answer('one', 'kilo/one');
+    await answer('two', 'kilo/two');
+
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+    expect(snapshotOf(opened).record.usage).toEqual({ 'kilo/one': CALL, 'kilo/two': CALL });
+    expect(recorded.get('s2')).toEqual({ 'kilo/one': CALL, 'kilo/two': CALL });
+  });
+
+  it('reads the count back when a stored chat is opened again', async () => {
+    await answer('one', 'kilo/one');
+    await releaseChat(opened);
+
+    await enterChat(place, opened);
+    await answer('two', 'kilo/one');
+
+    expect(snapshotOf(opened).record.usage['kilo/one']).toMatchObject({
+      inputTokens: 20,
+      cost: 0.02,
+    });
+  });
+
+  it('keeps the answer and the count when writing the count fails', async () => {
+    recordFailure.next = true;
+    await answer('one', 'kilo/one');
+
+    expect(snapshotOf(opened)).toMatchObject({ status: 'idle', failed: null, failureKey: null });
+    expect(snapshotOf(opened).record.usage).toEqual({ 'kilo/one': CALL });
+
+    await answer('two', 'kilo/one');
+    expect(recorded.get('s1')).toMatchObject({ 'kilo/one': { inputTokens: 20 } });
   });
 });
 

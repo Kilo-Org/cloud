@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChatComposer, type ChatComposerSendOptions } from '@/components/agents/chat-composer';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
@@ -34,6 +35,8 @@ import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
 
 import { BetaPill } from './beta-pill';
+import { ChatDetailsSheet } from './chat-details-sheet';
+import { useChatDetails } from './chat-details-state';
 import { ChatFailureRow } from './chat-failure-row';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
@@ -174,6 +177,14 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const messages = asMessages(state);
   const actions = useChatMessageActions(state, messages, retry);
   const { actionsFor } = actions;
+  const details = useChatDetails({
+    model: state.model === '' ? model : state.model,
+    record: state.record,
+    modelOptions: availableOptions,
+    backends,
+    mcp,
+    hasMessages: messages.length > 0,
+  });
 
   const renderItem: ListRenderItem<StoredMessage> = useCallback(
     ({ item }) => <MessageBubble message={item} {...actionsFor(item)} />,
@@ -317,7 +328,8 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           </View>
         }
         headerRight={
-          <View className="flex-row">
+          <View className="flex-row items-center">
+            <SessionContextMetrics {...details.metrics} />
             <BackendSettingsControl />
             <Pressable
               onPress={() => {
@@ -346,6 +358,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         webSearch={webSearch}
       />
       <MessageDetailsSheet {...actions.details} modelOptions={modelOptions.options} />
+      <ChatDetailsSheet {...details.sheet} />
     </View>
   );
 }

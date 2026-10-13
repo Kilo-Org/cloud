@@ -2295,8 +2295,8 @@
       "toolList": "uzskaitīt",
       "toolPatch": "labot",
       "toolTask": "uzdevums",
-      "readTodos": "Lasīt uzdevumus",
-      "updateTodos": "Atjaunināt uzdevumus",
+      "readTodos": "Lasīt plānu",
+      "updateTodos": "Atjaunināt plānu",
       "linesBadge": "{{displayCount}} rindas",
       "filesBadge": "{{displayCount}} faili",
       "matchesBadge": "{{displayCount}} atbilstības",
@@ -3285,6 +3285,19 @@
       "deleteTitle": "Vai dzēst šo tērzēšanu?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Tērzēšanas informācija",
+      "backend": "Aizmugursistēma",
+      "effortDefault": "Modeļa noklusējums",
+      "noCost": "Bez maksas",
+      "costUnknown": "Nav zināms",
+      "costEstimatedNote": "Atbildes, kurām cena netika norādīta, ir aprēķinātas pēc cenrāža cenām.",
+      "costUnknownNote": "Šim modelim cena nav zināma.",
+      "costPartialNote": "Šajā kopsummā nav iekļauti modeļi, kuriem cena nav zināma.",
+      "localNote": "Ierīces modeļi darbojas šajā ierīcē. Tiem nav izmaksu un uzvedņu kešatmiņas, un to tokenu skaits var būt aptuvens.",
+      "countedSinceNote": "Šī tērzēšana sākās, pirms tika reģistrēts lietojums. Kopsummās ir tikai atbildes pēc tam.",
+      "remoteServersOn": "Ieslēgti attālinātie MCP serveri"
+    },
     "webSearch": {
       "title": "Meklēt tīmeklī",
       "description": "Ļaujiet šai tērzēšanai meklēt aktuālu informāciju, izmantojot jūsu Kilo kontu. Meklēšana izmanto jūsu mēneša meklēšanas limitu.",
@@ -3722,5 +3735,82 @@
     "noMatchingProductsPlay": "Google Play neatgrieza nevienu atbilstošu kredītu paketi.",
     "purchaseOwnedByAnotherAccount": "Kredīti šajā Apple Account kontā pieder citam Kilo kontam. Lai tos izmantotu, pieraksties attiecīgajā Kilo kontā.",
     "purchaseOwnedByAnotherAccountPlay": "Kredīti šajā Google Play kontā pieder citam Kilo kontam. Lai tos izmantotu, piesakieties tajā Kilo kontā."
+  },
+  "todos": {
+    "saveAsTodo": "Saglabāt kā uzdevumu",
+    "segment": {
+      "label": "Aģentu skats",
+      "sessions": "Sesijas",
+      "todos": "Uzdevumi"
+    },
+    "lists": {
+      "newList": "Jauns saraksts",
+      "empty": "Vēl nav sarakstu",
+      "couldNotLoad": "Neizdevās ielādēt sarakstus",
+      "noRepository": "Nav repozitorija",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} atvērti",
+      "openCount_other": "{{count}} atvērti",
+      "openCount_zero": "{{count}} atvērtu",
+      "archived_one": "Arhivēti ({{count}})",
+      "archived_other": "Arhivēti ({{count}})",
+      "archived_zero": "Arhivētu ({{count}})",
+      "archive": "Arhivēt",
+      "unarchive": "Atcelt arhivēšanu",
+      "deleteTitle": "Dzēst {{name}}?",
+      "deleteMessage": "Tiks dzēsti arī tā uzdevumi. Sesijas paliks."
+    },
+    "listSettings": {
+      "title": "Saraksta iestatījumi",
+      "name": "Nosaukums",
+      "namePlaceholder": "Kļūdas, idejas, laidieni…",
+      "emoji": "Emocijzīme",
+      "mode": "Režīms",
+      "defaultsHint": "Sesijas, kas sāktas no šī saraksta, izmanto šos noklusējumus."
+    },
+    "list": {
+      "addPlaceholder": "Pievienot jaunu uzdevumu",
+      "add": "Pievienot uzdevumu",
+      "empty": "Vēl nav uzdevumu",
+      "setDefaults": "Iestatīt repozitoriju, režīmu un modeli",
+      "completed_one": "Pabeigti ({{count}})",
+      "completed_other": "Pabeigti ({{count}})",
+      "completed_zero": "Pabeigtu ({{count}})"
+    },
+    "item": {
+      "markDone": "Atzīmēt kā izpildītu",
+      "markOpen": "Atzīmēt kā neizpildītu",
+      "markDonePrompt": "Atzīmēt kā izpildītu?",
+      "deleted": "Uzdevums dzēsts",
+      "undo": "Atsaukt",
+      "runCount_one": "{{count}} palaišana",
+      "runCount_other": "{{count}} palaišanas",
+      "runCount_zero": "{{count}} palaišanu",
+      "startNow": "Sākt bez pārskatīšanas",
+      "startNowHint": "Turi nospiestu, lai sāktu bez pārskatīšanas",
+      "titleLabel": "Uzdevuma nosaukums",
+      "notes": "Piezīmes",
+      "notesPlaceholder": "Pievienot piezīmes Markdown formātā",
+      "sessions": "Saistītās sesijas",
+      "noSessions": "Vēl nav sesiju",
+      "linkSession": "Saistīt sesiju",
+      "unlinkSession": "Atsaistīt {{title}}",
+      "linkFailed": "Neizdevās saistīt sesiju ar uzdevumu"
+    },
+    "linkSession": {
+      "title": "Sesijas saistīšana",
+      "empty": "Nav jaunāko sesiju",
+      "emptyInRepository": "Nav jaunāko sesiju repozitorijā {{repository}}"
+    },
+    "upNext": "Nākamais",
+    "sessionTodo": "Uzdevums: {{title}}",
+    "linkToTodo": "Saistīt ar uzdevumu",
+    "candidates": {
+      "empty": "Nav atvērtu uzdevumu"
+    },
+    "saveSheet": {
+      "title": "Saglabāt sarakstā",
+      "saved": "Saglabāts sarakstā {{list}}"
+    }
   }
 }

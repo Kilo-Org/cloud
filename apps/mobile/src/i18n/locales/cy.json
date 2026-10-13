@@ -2382,8 +2382,8 @@
       "toolList": "rhestru",
       "toolPatch": "clytio",
       "toolTask": "tasg",
-      "readTodos": "Darllen y rhestr dasgau",
-      "updateTodos": "Diweddaru'r rhestr dasgau",
+      "readTodos": "Darllen y cynllun",
+      "updateTodos": "Diweddaru'r cynllun",
       "linesBadge": "{{displayCount}} llinell",
       "filesBadge": "{{displayCount}} ffeil",
       "matchesBadge": "{{displayCount}} cyfatebiaeth",
@@ -3408,6 +3408,19 @@
       "deleteTitle": "Dileu'r sgwrs hon?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Manylion sgwrs",
+      "backend": "Ôl-ben",
+      "effortDefault": "Rhagosodiad y model",
+      "noCost": "Dim cost",
+      "costUnknown": "Anhysbys",
+      "costEstimatedNote": "Mae cost atebion na wnaeth nodi pris wedi'i amcangyfrif o'r prisiau rhestr.",
+      "costUnknownNote": "Does dim pris yn hysbys ar gyfer y model hwn.",
+      "costPartialNote": "Nid yw'r cyfanswm hwn yn cynnwys modelau heb bris hysbys.",
+      "localNote": "Mae modelau ar y ddyfais yn rhedeg ar y ddyfais hon. Does dim cost na storfa anogwyr iddyn nhw, a gall eu cyfrif tocynnau fod yn amcangyfrifon.",
+      "countedSinceNote": "Dechreuodd y sgwrs hon cyn i'r defnydd gael ei gofnodi. Mae'r cyfansymiau'n dangos yr atebion ar ôl hynny yn unig.",
+      "remoteServersOn": "Gweinyddwyr MCP anghysbell ymlaen"
+    },
     "webSearch": {
       "title": "Chwilio'r we",
       "description": "Gadewch i'r sgwrs hon chwilio am wybodaeth gyfredol drwy eich cyfrif Kilo. Mae chwiliadau'n defnyddio'ch lwfans chwilio misol.",
@@ -3845,5 +3858,94 @@
     "noMatchingProductsPlay": "Ni ddychwelodd Google Play unrhyw becynnau credydau cyfatebol.",
     "purchaseOwnedByAnotherAccount": "Mae'r credydau ar yr Apple Account hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio.",
     "purchaseOwnedByAnotherAccountPlay": "Mae'r credydau ar y cyfrif Google Play hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio."
+  },
+  "todos": {
+    "saveAsTodo": "Cadw fel tasg",
+    "segment": {
+      "label": "Golwg asiantau",
+      "sessions": "Sesiynau",
+      "todos": "Tasgau"
+    },
+    "lists": {
+      "newList": "Rhestr newydd",
+      "empty": "Dim rhestrau eto",
+      "couldNotLoad": "Ni lwyddwyd i lwytho'r rhestrau",
+      "noRepository": "Dim ystorfa",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_zero": "{{count}} ar agor",
+      "openCount_one": "{{count}} ar agor",
+      "openCount_two": "{{count}} ar agor",
+      "openCount_few": "{{count}} ar agor",
+      "openCount_many": "{{count}} ar agor",
+      "openCount_other": "{{count}} ar agor",
+      "archived_zero": "Wedi'u harchifo ({{count}})",
+      "archived_one": "Wedi'u harchifo ({{count}})",
+      "archived_two": "Wedi'u harchifo ({{count}})",
+      "archived_few": "Wedi'u harchifo ({{count}})",
+      "archived_many": "Wedi'u harchifo ({{count}})",
+      "archived_other": "Wedi'u harchifo ({{count}})",
+      "archive": "Archifio",
+      "unarchive": "Dadarchifio",
+      "deleteTitle": "Dileu {{name}}?",
+      "deleteMessage": "Caiff ei thasgau eu dileu hefyd. Mae ei sesiynau'n aros."
+    },
+    "listSettings": {
+      "title": "Gosodiadau'r rhestr",
+      "name": "Enw",
+      "namePlaceholder": "Bygiau, Syniadau, Rhyddhau…",
+      "emoji": "Emoji",
+      "mode": "Modd",
+      "defaultsHint": "Mae sesiynau sy'n dechrau o'r rhestr hon yn defnyddio'r rhagosodiadau hyn."
+    },
+    "list": {
+      "addPlaceholder": "Ychwanegu tasg",
+      "add": "Ychwanegu tasg",
+      "empty": "Dim tasgau eto",
+      "setDefaults": "Gosod ystorfa, modd a model",
+      "completed_zero": "Wedi'u cwblhau ({{count}})",
+      "completed_one": "Wedi'u cwblhau ({{count}})",
+      "completed_two": "Wedi'u cwblhau ({{count}})",
+      "completed_few": "Wedi'u cwblhau ({{count}})",
+      "completed_many": "Wedi'u cwblhau ({{count}})",
+      "completed_other": "Wedi'u cwblhau ({{count}})"
+    },
+    "item": {
+      "markDone": "Nodi fel wedi'i wneud",
+      "markOpen": "Nodi fel heb ei wneud",
+      "markDonePrompt": "Nodi fel wedi'i wneud?",
+      "deleted": "Tasg wedi'i dileu",
+      "undo": "Dadwneud",
+      "runCount_zero": "{{count}} rhediad",
+      "runCount_one": "{{count}} rhediad",
+      "runCount_two": "{{count}} rhediad",
+      "runCount_few": "{{count}} rhediad",
+      "runCount_many": "{{count}} rhediad",
+      "runCount_other": "{{count}} rhediad",
+      "startNow": "Dechrau heb adolygiad",
+      "startNowHint": "Pwyswch yn hir i ddechrau heb adolygiad",
+      "titleLabel": "Teitl y dasg",
+      "notes": "Nodiadau",
+      "notesPlaceholder": "Ychwanegu nodiadau yn Markdown",
+      "sessions": "Sesiynau wedi'u cysylltu",
+      "noSessions": "Dim sesiynau eto",
+      "linkSession": "Cysylltu sesiwn",
+      "unlinkSession": "Datgysylltu {{title}}",
+      "linkFailed": "Methu cysylltu'r sesiwn â'r dasg"
+    },
+    "linkSession": {
+      "title": "Cysylltu sesiwn",
+      "empty": "Dim sesiynau diweddar",
+      "emptyInRepository": "Dim sesiynau diweddar yn {{repository}}"
+    },
+    "upNext": "Nesaf",
+    "sessionTodo": "Tasg: {{title}}",
+    "linkToTodo": "Cysylltu â thasg",
+    "candidates": {
+      "empty": "Dim tasgau ar agor"
+    },
+    "saveSheet": {
+      "title": "Cadw i'r rhestr",
+      "saved": "Wedi'i gadw i {{list}}"
+    }
   }
 }

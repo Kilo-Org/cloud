@@ -2266,8 +2266,8 @@
       "toolList": "لېست کول",
       "toolPatch": "سمون پلي کول",
       "toolTask": "دنده",
-      "readTodos": "د دندو لېست ولولئ",
-      "updateTodos": "د دندو لېست تازه کړئ",
+      "readTodos": "پلان ولولئ",
+      "updateTodos": "پلان تازه کړئ",
       "linesBadge": "{{displayCount}} کرښې",
       "filesBadge": "{{displayCount}} فایلونه",
       "matchesBadge": "{{displayCount}} پایلې",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "دا خبرې اترې حذف کړئ؟"
     },
     "beta": "بیټا",
+    "details": {
+      "title": "د چټ جزئیات",
+      "backend": "شالید خدمت",
+      "effortDefault": "د ماډل اصلي ترتیب",
+      "noCost": "هیڅ لګښت نشته",
+      "costUnknown": "نامعلوم",
+      "costEstimatedNote": "د هغو ځوابونو لګښت چې بیه یې نه وه ښودلې، د لیست له بیو اټکل شوی دی.",
+      "costUnknownNote": "د دې ماډل لپاره کومه بیه نه ده معلومه.",
+      "costPartialNote": "په دې ټولګه کې هغه ماډلونه نه دي شامل چې بیه یې نه ده معلومه.",
+      "localNote": "په وسیله کې ماډلونه په همدې وسیله چلېږي. هېڅ لګښت او د پرامپټ زېرمه نه لري، او د ټوکنونو شمېر یې ښايي اټکل وي.",
+      "countedSinceNote": "دا چټ مخکې له دې پیل شو چې کارونه ثبت شي. ټولګې یوازې له هغې وروسته ځوابونه ښيي.",
+      "remoteServersOn": "فعال لرې MCP سرورونه"
+    },
     "webSearch": {
       "title": "په وېب کې لټون",
       "description": "دې چټ ته اجازه ورکړئ چې ستاسو د Kilo حساب له لارې تازه معلومات ولټوي. لټونونه ستاسو د میاشتني لټون برخه کاروي.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play د سمون خور کریډیټ بنډلونه بیرته را نه کړل.",
     "purchaseOwnedByAnotherAccount": "په دې Apple Account کې کریډیټونه د Kilo په بل حساب پورې اړه لري. د کارولو لپاره یې د Kilo هماغه حساب ته ننوځئ.",
     "purchaseOwnedByAnotherAccountPlay": "دا Google Play حساب باندې کریډیټونه د بل Kilo حساب پورې اړه لري. د کارولو لپاره هغه Kilo حساب ته ننوځئ."
+  },
+  "todos": {
+    "saveAsTodo": "د دندې په توګه خوندي کړئ",
+    "segment": {
+      "label": "د اجنټانو کتنه",
+      "sessions": "ناستې",
+      "todos": "دندې"
+    },
+    "lists": {
+      "newList": "نوی لېست",
+      "empty": "تر اوسه هېڅ لېست نشته",
+      "couldNotLoad": "لېستونه بار نه شول",
+      "noRepository": "زېرمتون نشته",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} پرانیستي",
+      "openCount_other": "{{count}} پرانیستي",
+      "archived_one": "آرشیف شوي ({{count}})",
+      "archived_other": "آرشیف شوي ({{count}})",
+      "archive": "آرشیف کړئ",
+      "unarchive": "له آرشیف راوباسئ",
+      "deleteTitle": "{{name}} ړنګ شي؟",
+      "deleteMessage": "د هغې دندې هم ړنګېږي. ناستې یې پاتې کېږي."
+    },
+    "listSettings": {
+      "title": "د لېست تنظیمات",
+      "name": "نوم",
+      "namePlaceholder": "بګونه، نظرونه، خپرونه…",
+      "emoji": "ایموجي",
+      "mode": "حالت",
+      "defaultsHint": "له دې لېست پیل شوې ناستې همدا اصلي تنظیمات کاروي."
+    },
+    "list": {
+      "addPlaceholder": "دنده اضافه کړئ",
+      "add": "دنده اضافه کړئ",
+      "empty": "تر اوسه هېڅ دنده نشته",
+      "setDefaults": "زېرمتون، حالت او ماډل وټاکئ",
+      "completed_one": "بشپړې شوې ({{count}})",
+      "completed_other": "بشپړې شوې ({{count}})"
+    },
+    "item": {
+      "markDone": "بشپړه په نښه کړئ",
+      "markOpen": "نابشپړه په نښه کړئ",
+      "markDonePrompt": "بشپړه په نښه کړئ؟",
+      "deleted": "دنده ړنګه شوه",
+      "undo": "بېرته راوګرځوئ",
+      "runCount_one": "{{count}} اجرا",
+      "runCount_other": "{{count}} اجرا",
+      "startNow": "بې له بیاکتنې پیل کړئ",
+      "startNowHint": "د بیاکتنې پرته د پیل لپاره اوږده کېکاږئ",
+      "titleLabel": "د دندې سرلیک",
+      "notes": "یادښتونه",
+      "notesPlaceholder": "په Markdown یادښتونه اضافه کړئ",
+      "sessions": "تړل شوې ناستې",
+      "noSessions": "تر اوسه هېڅ ناسته نشته",
+      "linkSession": "ناسته ونښلوئ",
+      "unlinkSession": "{{title}} جلا کړئ",
+      "linkFailed": "ناسته له دندې سره ونښلول نه شوه"
+    },
+    "linkSession": {
+      "title": "یوه ناسته ونښلوئ",
+      "empty": "وروستې ناستې نشته",
+      "emptyInRepository": "په {{repository}} کې وروستې ناستې نشته"
+    },
+    "upNext": "بل",
+    "sessionTodo": "دنده: {{title}}",
+    "linkToTodo": "له دندې سره ونښلوئ",
+    "candidates": {
+      "empty": "هېڅ پرانیستې دنده نشته"
+    },
+    "saveSheet": {
+      "title": "په لېست کې خوندي کړئ",
+      "saved": "په {{list}} کې خوندي شو"
+    }
   }
 }

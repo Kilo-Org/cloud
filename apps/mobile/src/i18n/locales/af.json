@@ -2266,8 +2266,8 @@
       "toolList": "lys",
       "toolPatch": "pas wysiging toe",
       "toolTask": "taak",
-      "readTodos": "Lees taaklys",
-      "updateTodos": "Werk taaklys by",
+      "readTodos": "Lees plan",
+      "updateTodos": "Werk plan by",
       "linesBadge": "{{displayCount}} reëls",
       "filesBadge": "{{displayCount}} lêers",
       "matchesBadge": "{{displayCount}} treffers",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "Skrap hierdie klets?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Kletsbesonderhede",
+      "backend": "Agtergrondstelsel",
+      "effortDefault": "Modelverstek",
+      "noCost": "Geen koste",
+      "costUnknown": "Onbekend",
+      "costEstimatedNote": "Antwoorde wat nie 'n prys aangegee het nie, word volgens lyspryse geskat.",
+      "costUnknownNote": "Geen prys is vir hierdie model bekend nie.",
+      "costPartialNote": "Hierdie totaal sluit nie modelle in waarvoor geen prys bekend is nie.",
+      "localNote": "Modelle op die toestel loop op hierdie toestel. Hulle het geen koste en geen promptkas nie, en hul tekentellings kan skattings wees.",
+      "countedSinceNote": "Hierdie klets het begin voordat gebruik aangeteken is. Die totale wys slegs die antwoorde daarna.",
+      "remoteServersOn": "Afgeleë MCP-bedieners aan"
+    },
     "webSearch": {
       "title": "Deursoek die web",
       "description": "Laat hierdie klets huidige inligting deur jou Kilo-rekening opsoek. Soektogte gebruik jou maandelikse soektoelaag.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Geen passende kredietpakkette is deur Google Play terugbesorg nie.",
     "purchaseOwnedByAnotherAccount": "Die krediete op hierdie Apple Account behoort aan 'n ander Kilo-rekening. Meld by daardie Kilo-rekening aan om dit te gebruik.",
     "purchaseOwnedByAnotherAccountPlay": "Die krediete op hierdie Google Play-rekening behoort aan 'n ander Kilo-rekening. Teken in by daardie Kilo-rekening om dit te gebruik."
+  },
+  "todos": {
+    "saveAsTodo": "Stoor as taak",
+    "segment": {
+      "label": "Agente-aansig",
+      "sessions": "Sessies",
+      "todos": "Take"
+    },
+    "lists": {
+      "newList": "Nuwe lys",
+      "empty": "Nog geen lyste nie",
+      "couldNotLoad": "Kon nie lyste laai nie",
+      "noRepository": "Geen bewaarplek",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} oop",
+      "openCount_other": "{{count}} oop",
+      "archived_one": "Geargiveer ({{count}})",
+      "archived_other": "Geargiveer ({{count}})",
+      "archive": "Argiveer",
+      "unarchive": "Ontargiveer",
+      "deleteTitle": "Skrap {{name}}?",
+      "deleteMessage": "Sy take word ook geskrap. Hul sessies bly."
+    },
+    "listSettings": {
+      "title": "Lysinstellings",
+      "name": "Naam",
+      "namePlaceholder": "Foute, Idees, Vrystelling…",
+      "emoji": "Emoji",
+      "mode": "Modus",
+      "defaultsHint": "Sessies wat uit hierdie lys begin word, gebruik hierdie verstekwaardes."
+    },
+    "list": {
+      "addPlaceholder": "Voeg 'n taak by",
+      "add": "Voeg taak by",
+      "empty": "Nog geen take nie",
+      "setDefaults": "Stel bewaarplek, modus en model",
+      "completed_one": "Voltooi ({{count}})",
+      "completed_other": "Voltooi ({{count}})"
+    },
+    "item": {
+      "markDone": "Merk as klaar",
+      "markOpen": "Merk as nie klaar nie",
+      "markDonePrompt": "Merk as klaar?",
+      "deleted": "Taak geskrap",
+      "undo": "Ontdoen",
+      "runCount_one": "{{count}} lopie",
+      "runCount_other": "{{count}} lopies",
+      "startNow": "Begin sonder hersiening",
+      "startNowHint": "Druk lank om sonder hersiening te begin",
+      "titleLabel": "Taaktitel",
+      "notes": "Notas",
+      "notesPlaceholder": "Voeg notas in Markdown by",
+      "sessions": "Sessies gekoppel",
+      "noSessions": "Nog geen sessies nie",
+      "linkSession": "Koppel sessie",
+      "unlinkSession": "Ontkoppel {{title}}",
+      "linkFailed": "Kon nie die sessie aan die taak koppel nie"
+    },
+    "linkSession": {
+      "title": "Koppel 'n sessie",
+      "empty": "Geen onlangse sessies nie",
+      "emptyInRepository": "Geen onlangse sessies in {{repository}} nie"
+    },
+    "upNext": "Volgende",
+    "sessionTodo": "Taak: {{title}}",
+    "linkToTodo": "Koppel aan taak",
+    "candidates": {
+      "empty": "Geen oop take nie"
+    },
+    "saveSheet": {
+      "title": "Stoor in lys",
+      "saved": "Gestoor in {{list}}"
+    }
   }
 }

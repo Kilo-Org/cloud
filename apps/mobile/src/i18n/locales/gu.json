@@ -2266,8 +2266,8 @@
       "toolList": "યાદી બનાવો",
       "toolPatch": "પૅચ લાગુ કરો",
       "toolTask": "કાર્ય",
-      "readTodos": "કરવાનાં કાર્યો વાંચો",
-      "updateTodos": "કરવાનાં કાર્યો અપડેટ કરો",
+      "readTodos": "યોજના વાંચો",
+      "updateTodos": "યોજના અપડેટ કરો",
       "linesBadge": "{{displayCount}} પંક્તિઓ",
       "filesBadge": "{{displayCount}} ફાઇલો",
       "matchesBadge": "{{displayCount}} મેળ",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "આ ચેટ કાઢી નાખવી?"
     },
     "beta": "બીટા",
+    "details": {
+      "title": "ચેટની વિગતો",
+      "backend": "બૅકએન્ડ",
+      "effortDefault": "મોડેલનું ડિફૉલ્ટ",
+      "noCost": "કોઈ ખર્ચ નથી",
+      "costUnknown": "જાણીતું નથી",
+      "costEstimatedNote": "જે જવાબોએ કિંમત જણાવી નથી, તેમનો ખર્ચ યાદી કિંમતો પરથી અંદાજવામાં આવે છે.",
+      "costUnknownNote": "આ મોડેલ માટે કોઈ કિંમત જાણીતી નથી.",
+      "costPartialNote": "આ કુલમાં એવા મોડેલ્સ શામેલ નથી જેમની કિંમત જાણીતી નથી.",
+      "localNote": "ઉપકરણ પરના મોડેલ્સ આ ઉપકરણ પર ચાલે છે. તેમનો કોઈ ખર્ચ નથી અને કોઈ પ્રોમ્પ્ટ કેશ નથી, અને તેમની ટોકન ગણતરી અંદાજિત હોઈ શકે છે.",
+      "countedSinceNote": "આ ચેટ વપરાશ નોંધાવાનું શરૂ થયું તે પહેલાં શરૂ થઈ હતી. કુલમાં ફક્ત તે પછીના જવાબો જ દેખાય છે.",
+      "remoteServersOn": "ચાલુ રિમોટ MCP સર્વર"
+    },
     "webSearch": {
       "title": "વેબ પર શોધો",
       "description": "આ ચેટને તમારા Kilo એકાઉન્ટ દ્વારા વર્તમાન માહિતી શોધવા દો. શોધ તમારી માસિક શોધ મર્યાદાનો ઉપયોગ કરે છે.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play એ કોઈ મેળ ખાતું ક્રેડિટ પેક પરત કર્યું નથી.",
     "purchaseOwnedByAnotherAccount": "આ Apple Account પરની ક્રેડિટ બીજા Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો.",
     "purchaseOwnedByAnotherAccountPlay": "આ Google Play ખાતા પરની ક્રેડિટ અલગ Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો."
+  },
+  "todos": {
+    "saveAsTodo": "કાર્ય તરીકે સાચવો",
+    "segment": {
+      "label": "એજન્ટ દૃશ્ય",
+      "sessions": "સત્રો",
+      "todos": "કાર્યો"
+    },
+    "lists": {
+      "newList": "નવી યાદી",
+      "empty": "હજુ કોઈ યાદી નથી",
+      "couldNotLoad": "યાદીઓ લોડ કરી શકાઈ નહીં",
+      "noRepository": "કોઈ રિપોઝિટરી નથી",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} ખુલ્લાં",
+      "openCount_other": "{{count}} ખુલ્લાં",
+      "archived_one": "આર્કાઇવ કરેલ ({{count}})",
+      "archived_other": "આર્કાઇવ કરેલ ({{count}})",
+      "archive": "આર્કાઇવ કરો",
+      "unarchive": "આર્કાઇવમાંથી કાઢો",
+      "deleteTitle": "{{name}} કાઢી નાખવી?",
+      "deleteMessage": "તેનાં કાર્યો પણ કાઢી નાખવામાં આવશે. તેનાં સત્રો રહેશે."
+    },
+    "listSettings": {
+      "title": "યાદીની સેટિંગ્સ",
+      "name": "નામ",
+      "namePlaceholder": "બગ્સ, વિચારો, રિલીઝ…",
+      "emoji": "ઇમોજી",
+      "mode": "મોડ",
+      "defaultsHint": "આ યાદીમાંથી શરૂ થતાં સત્રો આ મૂળભૂત સેટિંગ્સ વાપરે છે."
+    },
+    "list": {
+      "addPlaceholder": "કાર્ય ઉમેરો",
+      "add": "કાર્ય ઉમેરો",
+      "empty": "હજુ કોઈ કાર્ય નથી",
+      "setDefaults": "રિપોઝિટરી, મોડ અને મોડલ સેટ કરો",
+      "completed_one": "પૂર્ણ ({{count}})",
+      "completed_other": "પૂર્ણ ({{count}})"
+    },
+    "item": {
+      "markDone": "પૂર્ણ તરીકે ચિહ્નિત કરો",
+      "markOpen": "અપૂર્ણ તરીકે ચિહ્નિત કરો",
+      "markDonePrompt": "પૂર્ણ તરીકે ચિહ્નિત કરવું?",
+      "deleted": "કાર્ય કાઢી નાખ્યું",
+      "undo": "પૂર્વવત્ કરો",
+      "runCount_one": "{{count}} વાર ચલાવ્યું",
+      "runCount_other": "{{count}} વાર ચલાવ્યું",
+      "startNow": "સમીક્ષા વિના શરૂ કરો",
+      "startNowHint": "સમીક્ષા વિના શરૂ કરવા લાંબું દબાવો",
+      "titleLabel": "કાર્યનું શીર્ષક",
+      "notes": "નોંધો",
+      "notesPlaceholder": "Markdownમાં નોંધો ઉમેરો",
+      "sessions": "સત્રો જોડાયેલાં",
+      "noSessions": "હજુ કોઈ સત્ર નથી",
+      "linkSession": "સત્ર જોડો",
+      "unlinkSession": "{{title}} નું જોડાણ કાઢો",
+      "linkFailed": "સત્રને કાર્ય સાથે જોડી શકાયું નહીં"
+    },
+    "linkSession": {
+      "title": "સત્ર જોડો",
+      "empty": "કોઈ તાજેતરનું સત્ર નથી",
+      "emptyInRepository": "{{repository}} માં કોઈ તાજેતરનું સત્ર નથી"
+    },
+    "upNext": "આગળ",
+    "sessionTodo": "કાર્ય: {{title}}",
+    "linkToTodo": "કાર્ય સાથે જોડો",
+    "candidates": {
+      "empty": "કોઈ ખુલ્લું કાર્ય નથી"
+    },
+    "saveSheet": {
+      "title": "યાદીમાં સાચવો",
+      "saved": "{{list}} માં સાચવ્યું"
+    }
   }
 }

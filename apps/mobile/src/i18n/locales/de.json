@@ -1754,8 +1754,8 @@
       "toolList": "auflisten",
       "toolPatch": "änderungen anwenden",
       "toolTask": "aufgabe",
-      "readTodos": "Aufgaben lesen",
-      "updateTodos": "Aufgaben aktualisieren",
+      "readTodos": "Planung lesen",
+      "updateTodos": "Planung aktualisieren",
       "linesBadge": "{{displayCount}} Zeilen",
       "filesBadge": "{{displayCount}} Dateien",
       "matchesBadge": "{{displayCount}} Treffer",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "Diesen Chat löschen?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Chat-Details",
+      "backend": "Backend",
+      "effortDefault": "Modellstandard",
+      "noCost": "Keine Kosten",
+      "costUnknown": "Unbekannt",
+      "costEstimatedNote": "Die Kosten für Antworten ohne gemeldeten Preis wurden anhand der Listenpreise geschätzt.",
+      "costUnknownNote": "Für dieses Modell ist kein Preis bekannt.",
+      "costPartialNote": "Diese Summe enthält keine Modelle ohne bekannten Preis.",
+      "localNote": "Modelle auf dem Gerät laufen auf diesem Gerät. Sie verursachen keine Kosten, haben keinen Prompt-Cache, und ihre Token-Zahlen können Schätzungen sein.",
+      "countedSinceNote": "Dieser Chat hat begonnen, bevor die Nutzung erfasst wurde. Die Summen zeigen nur die Antworten danach.",
+      "remoteServersOn": "Aktive Remote-MCP-Server"
+    },
     "webSearch": {
       "title": "Im Web suchen",
       "description": "Lass diesen Chat aktuelle Informationen über dein Kilo-Konto nachschlagen. Suchen verbrauchen dein monatliches Suchkontingent.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play hat keine passenden Guthaben-Pakete zurückgegeben.",
     "purchaseOwnedByAnotherAccount": "Das Guthaben dieses Apple Accounts gehört zu einem anderen Kilo-Konto. Melde dich bei dem zugehörigen Kilo-Konto an, um es zu nutzen.",
     "purchaseOwnedByAnotherAccountPlay": "Das Guthaben auf diesem Google-Konto gehört zu einem anderen Kilo-Konto. Melde dich bei diesem Kilo-Konto an, um es zu nutzen."
+  },
+  "todos": {
+    "saveAsTodo": "Als Aufgabe speichern",
+    "segment": {
+      "label": "Agentenansicht",
+      "sessions": "Sitzungen",
+      "todos": "Aufgaben"
+    },
+    "lists": {
+      "newList": "Neue Liste",
+      "empty": "Noch keine Listen",
+      "couldNotLoad": "Listen konnten nicht geladen werden.",
+      "noRepository": "Kein Code-Repository",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} offen",
+      "openCount_other": "{{count}} offen",
+      "archived_one": "Archiviert ({{count}})",
+      "archived_other": "Archiviert ({{count}})",
+      "archive": "Archivieren",
+      "unarchive": "Wiederherstellen",
+      "deleteTitle": "{{name}} löschen?",
+      "deleteMessage": "Die zugehörigen Aufgaben werden ebenfalls gelöscht. Die Sitzungen bleiben erhalten."
+    },
+    "listSettings": {
+      "title": "Listeneinstellungen",
+      "name": "Name",
+      "namePlaceholder": "Bugs, Ideen, Release…",
+      "emoji": "Emoji",
+      "mode": "Modus",
+      "defaultsHint": "Sitzungen, die aus dieser Liste gestartet werden, verwenden diese Standardwerte."
+    },
+    "list": {
+      "addPlaceholder": "Aufgabe hinzufügen",
+      "add": "Aufgabe hinzufügen",
+      "empty": "Noch keine Aufgaben",
+      "setDefaults": "Repository, Modus und Modell festlegen",
+      "completed_one": "Abgeschlossen ({{count}})",
+      "completed_other": "Abgeschlossen ({{count}})"
+    },
+    "item": {
+      "markDone": "Als erledigt markieren",
+      "markOpen": "Als nicht erledigt markieren",
+      "markDonePrompt": "Als erledigt markieren?",
+      "deleted": "Aufgabe gelöscht",
+      "undo": "Rückgängig",
+      "runCount_one": "{{count}} Durchlauf",
+      "runCount_other": "{{count}} Durchläufe",
+      "startNow": "Ohne Prüfung starten",
+      "startNowHint": "Zum Starten ohne Prüfung lange drücken",
+      "titleLabel": "Titel der Aufgabe",
+      "notes": "Notizen",
+      "notesPlaceholder": "Notizen in Markdown hinzufügen",
+      "sessions": "Verknüpfte Sitzungen",
+      "noSessions": "Noch keine Sitzungen",
+      "linkSession": "Sitzung verknüpfen",
+      "unlinkSession": "{{title}} trennen",
+      "linkFailed": "Die Sitzung konnte nicht mit der Aufgabe verknüpft werden."
+    },
+    "linkSession": {
+      "title": "Eine Sitzung verknüpfen",
+      "empty": "Keine aktuellen Sitzungen",
+      "emptyInRepository": "Keine aktuellen Sitzungen in {{repository}}"
+    },
+    "upNext": "Als Nächstes",
+    "sessionTodo": "Aufgabe: {{title}}",
+    "linkToTodo": "Mit Aufgabe verknüpfen",
+    "candidates": {
+      "empty": "Keine offenen Aufgaben"
+    },
+    "saveSheet": {
+      "title": "In Liste speichern",
+      "saved": "In {{list}} gespeichert"
+    }
   }
 }

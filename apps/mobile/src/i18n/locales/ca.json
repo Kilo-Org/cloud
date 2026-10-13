@@ -2295,8 +2295,8 @@
       "toolList": "llista",
       "toolPatch": "aplica un pedaç",
       "toolTask": "tasca",
-      "readTodos": "Llegeix les tasques pendents",
-      "updateTodos": "Actualitza les tasques pendents",
+      "readTodos": "Llegeix el pla",
+      "updateTodos": "Actualitza el pla",
       "linesBadge": "{{displayCount}} línies",
       "filesBadge": "{{displayCount}} fitxers",
       "matchesBadge": "{{displayCount}} coincidències",
@@ -3285,6 +3285,19 @@
       "deleteTitle": "Vols suprimir aquest xat?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detalls del xat",
+      "backend": "Servidor",
+      "effortDefault": "Valor per defecte del model",
+      "noCost": "Sense cost",
+      "costUnknown": "Desconegut",
+      "costEstimatedNote": "El cost de les respostes que no han indicat cap preu s'ha estimat a partir dels preus de tarifa.",
+      "costUnknownNote": "No es coneix cap preu per a aquest model.",
+      "costPartialNote": "Aquest total no inclou els models que no tenen cap preu conegut.",
+      "localNote": "Els models al dispositiu s'executen en aquest dispositiu. No tenen cost ni memòria cau de peticions, i els seus recomptes de tòkens poden ser estimacions.",
+      "countedSinceNote": "Aquest xat va començar abans que es registrés l'ús. Els totals només mostren les respostes posteriors.",
+      "remoteServersOn": "Servidors MCP remots activats"
+    },
     "webSearch": {
       "title": "Cerca al web",
       "description": "Permet que aquest xat busqui informació actual a través del teu compte de Kilo. Les cerques fan servir la teva quota mensual de cerques.",
@@ -3722,5 +3735,82 @@
     "noMatchingProductsPlay": "Google Play no ha retornat cap paquet de crèdits coincident.",
     "purchaseOwnedByAnotherAccount": "Els crèdits d'aquest Apple Account pertanyen a un altre compte de Kilo. Inicia la sessió en aquell compte de Kilo per utilitzar-los.",
     "purchaseOwnedByAnotherAccountPlay": "Els crèdits d'aquest compte de Google Play pertanyen a un compte de Kilo diferent. Inicia la sessió en aquest compte de Kilo per utilitzar-los."
+  },
+  "todos": {
+    "saveAsTodo": "Desa com a tasca",
+    "segment": {
+      "label": "Vista d'agents",
+      "sessions": "Sessions",
+      "todos": "Tasques"
+    },
+    "lists": {
+      "newList": "Nova llista",
+      "empty": "Encara no hi ha llistes",
+      "couldNotLoad": "No s'han pogut carregar les llistes",
+      "noRepository": "Sense repositori",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} obertes",
+      "openCount_many": "{{count}} obertes",
+      "openCount_other": "{{count}} obertes",
+      "archived_one": "Arxivades ({{count}})",
+      "archived_many": "Arxivades ({{count}})",
+      "archived_other": "Arxivades ({{count}})",
+      "archive": "Arxiva",
+      "unarchive": "Desarxiva",
+      "deleteTitle": "Vols eliminar {{name}}?",
+      "deleteMessage": "També s'eliminen les seves tasques. Les sessions es mantenen."
+    },
+    "listSettings": {
+      "title": "Configuració de la llista",
+      "name": "Nom",
+      "namePlaceholder": "Errors, idees, versions…",
+      "emoji": "Emoji",
+      "mode": "Mode",
+      "defaultsHint": "Les sessions iniciades des d'aquesta llista utilitzen aquests valors per defecte."
+    },
+    "list": {
+      "addPlaceholder": "Afegeix una tasca",
+      "add": "Afegeix la tasca",
+      "empty": "Encara no hi ha tasques",
+      "setDefaults": "Defineix el repositori, el mode i el model",
+      "completed_one": "Completades ({{count}})",
+      "completed_many": "Completades ({{count}})",
+      "completed_other": "Completades ({{count}})"
+    },
+    "item": {
+      "markDone": "Marca com a feta",
+      "markOpen": "Marca com a no feta",
+      "markDonePrompt": "Vols marcar-la com a feta?",
+      "deleted": "Tasca eliminada",
+      "undo": "Desfés",
+      "runCount_one": "{{count}} execució",
+      "runCount_many": "{{count}} execucions",
+      "runCount_other": "{{count}} execucions",
+      "startNow": "Inicia sense revisió",
+      "startNowHint": "Mantén premut per iniciar sense revisió",
+      "titleLabel": "Títol de la tasca",
+      "notes": "Notes",
+      "notesPlaceholder": "Afegeix notes en Markdown",
+      "sessions": "Sessions vinculades",
+      "noSessions": "Encara no hi ha sessions",
+      "linkSession": "Vincula una sessió",
+      "unlinkSession": "Desvincula {{title}}",
+      "linkFailed": "No s'ha pogut vincular la sessió a la tasca"
+    },
+    "linkSession": {
+      "title": "Vincular una sessió",
+      "empty": "No hi ha sessions recents",
+      "emptyInRepository": "No hi ha sessions recents a {{repository}}"
+    },
+    "upNext": "A continuació",
+    "sessionTodo": "Tasca: {{title}}",
+    "linkToTodo": "Vincula a una tasca",
+    "candidates": {
+      "empty": "No hi ha tasques obertes"
+    },
+    "saveSheet": {
+      "title": "Desa a la llista",
+      "saved": "Desada a {{list}}"
+    }
   }
 }

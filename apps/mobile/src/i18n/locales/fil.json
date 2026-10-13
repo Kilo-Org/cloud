@@ -2266,8 +2266,8 @@
       "toolList": "ilista",
       "toolPatch": "ilapat ang pagbabago",
       "toolTask": "gawain",
-      "readTodos": "Basahin ang listahan ng gagawin",
-      "updateTodos": "I-update ang listahan ng gagawin",
+      "readTodos": "Basahin ang plano",
+      "updateTodos": "I-update ang plano",
       "linesBadge": "{{displayCount}} na linya",
       "filesBadge": "{{displayCount}} na file",
       "matchesBadge": "{{displayCount}} tugma",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "Burahin ang chat na ito?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Mga detalye ng chat",
+      "backend": "Sistema",
+      "effortDefault": "Default ng modelo",
+      "noCost": "Walang gastos",
+      "costUnknown": "Hindi alam",
+      "costEstimatedNote": "Tinantiya mula sa mga nakalistang presyo ang gastos ng mga sagot na hindi nag-ulat ng presyo.",
+      "costUnknownNote": "Walang alam na presyo para sa modelong ito.",
+      "costPartialNote": "Hindi kasama sa kabuuang ito ang mga modelong walang alam na presyo.",
+      "localNote": "Tumatakbo sa device na ito ang mga modelong nasa device. Wala silang gastos at walang prompt cache, at maaaring tantiya lang ang bilang ng kanilang mga token.",
+      "countedSinceNote": "Nagsimula ang chat na ito bago pa naitala ang paggamit. Ang mga sagot lang pagkatapos noon ang ipinapakita ng mga kabuuan.",
+      "remoteServersOn": "Mga naka-on na remote MCP server"
+    },
     "webSearch": {
       "title": "Maghanap sa web",
       "description": "Hayaan ang chat na ito na maghanap ng kasalukuyang impormasyon gamit ang iyong Kilo account. Ginagamit ng mga paghahanap ang iyong buwanang allowance sa paghahanap.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Walang katugmang credit pack na ibinalik ang Google Play.",
     "purchaseOwnedByAnotherAccount": "Ang kredito sa Apple Account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito.",
     "purchaseOwnedByAnotherAccountPlay": "Ang kredito sa Google Play account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito."
+  },
+  "todos": {
+    "saveAsTodo": "I-save bilang gagawin",
+    "segment": {
+      "label": "View ng mga ahente",
+      "sessions": "Mga sesyon",
+      "todos": "Mga gagawin"
+    },
+    "lists": {
+      "newList": "Bagong listahan",
+      "empty": "Wala pang listahan",
+      "couldNotLoad": "Hindi ma-load ang mga listahan",
+      "noRepository": "Walang repositoryo",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} bukas",
+      "openCount_other": "{{count}} bukas",
+      "archived_one": "Naka-archive ({{count}})",
+      "archived_other": "Naka-archive ({{count}})",
+      "archive": "I-archive",
+      "unarchive": "Alisin sa archive",
+      "deleteTitle": "Burahin ang {{name}}?",
+      "deleteMessage": "Burahin din ang mga gagawin nito. Nananatili ang mga sesyon nito."
+    },
+    "listSettings": {
+      "title": "Mga setting ng listahan",
+      "name": "Pangalan",
+      "namePlaceholder": "Mga bug, ideya, release…",
+      "emoji": "Emoji",
+      "mode": "Mode",
+      "defaultsHint": "Gagamitin ng mga sesyong sisimulan mula sa listahang ito ang mga default na ito."
+    },
+    "list": {
+      "addPlaceholder": "Magdagdag ng gagawin",
+      "add": "Idagdag ang gagawin",
+      "empty": "Wala pang gagawin",
+      "setDefaults": "Itakda ang repositoryo, mode at modelo",
+      "completed_one": "Nakumpleto ({{count}})",
+      "completed_other": "Nakumpleto ({{count}})"
+    },
+    "item": {
+      "markDone": "Markahan bilang tapos",
+      "markOpen": "Markahan bilang hindi pa tapos",
+      "markDonePrompt": "Markahan bilang tapos?",
+      "deleted": "Nabura ang gagawin",
+      "undo": "I-undo",
+      "runCount_one": "{{count}} pagpapatakbo",
+      "runCount_other": "{{count}} pagpapatakbo",
+      "startNow": "Simulan nang walang review",
+      "startNowHint": "Pindutin nang matagal para simulan nang walang review",
+      "titleLabel": "Pamagat ng gagawin",
+      "notes": "Mga tala",
+      "notesPlaceholder": "Magdagdag ng mga tala sa Markdown",
+      "sessions": "Mga naka-link na sesyon",
+      "noSessions": "Wala pang sesyon",
+      "linkSession": "I-link ang sesyon",
+      "unlinkSession": "Alisin ang link ng {{title}}",
+      "linkFailed": "Hindi na-link ang sesyon sa gagawin"
+    },
+    "linkSession": {
+      "title": "Mag-link ng sesyon",
+      "empty": "Walang kamakailang sesyon",
+      "emptyInRepository": "Walang kamakailang sesyon sa {{repository}}"
+    },
+    "upNext": "Susunod",
+    "sessionTodo": "Gagawin: {{title}}",
+    "linkToTodo": "I-link sa gagawin",
+    "candidates": {
+      "empty": "Walang bukas na gagawin"
+    },
+    "saveSheet": {
+      "title": "I-save sa listahan",
+      "saved": "Na-save sa {{list}}"
+    }
   }
 }

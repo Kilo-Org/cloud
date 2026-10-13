@@ -1754,8 +1754,8 @@
       "toolList": "listele",
       "toolPatch": "yama uygula",
       "toolTask": "görev",
-      "readTodos": "Görevleri oku",
-      "updateTodos": "Görevleri güncelle",
+      "readTodos": "Planı oku",
+      "updateTodos": "Planı güncelle",
       "linesBadge": "{{displayCount}} satır",
       "filesBadge": "{{displayCount}} dosya",
       "matchesBadge": "{{displayCount}} eşleşme",
@@ -3244,6 +3244,19 @@
       "deleteTitle": "Bu sohbet silinsin mi?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Sohbet ayrıntıları",
+      "backend": "Arka uç",
+      "effortDefault": "Model varsayılanı",
+      "noCost": "Maliyet yok",
+      "costUnknown": "Bilinmiyor",
+      "costEstimatedNote": "Fiyat bildirmeyen yanıtlar liste fiyatlarına göre tahmin edilmiştir.",
+      "costUnknownNote": "Bu model için bilinen bir fiyat yok.",
+      "costPartialNote": "Bu toplam, fiyatı bilinmeyen modelleri içermez.",
+      "localNote": "Cihazdaki modeller bu cihazda çalışır. Maliyetleri ve istem önbellekleri yoktur; belirteç sayıları tahmini olabilir.",
+      "countedSinceNote": "Bu sohbet, kullanım kaydedilmeye başlanmadan önce başladı. Toplamlar yalnızca bundan sonraki yanıtları gösterir.",
+      "remoteServersOn": "Açık uzak MCP sunucuları"
+    },
     "webSearch": {
       "title": "Web'de ara",
       "description": "Bu sohbetin Kilo hesabın üzerinden güncel bilgi aramasına izin ver. Aramalar aylık arama hakkını kullanır.",
@@ -3681,5 +3694,78 @@
     "noMatchingProductsPlay": "Google Play eşleşen kredi paketi döndürmedi.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account üzerindeki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum aç.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındaki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum açın."
+  },
+  "todos": {
+    "saveAsTodo": "Görev olarak kaydet",
+    "segment": {
+      "label": "Ajanlar görünümü",
+      "sessions": "Oturumlar",
+      "todos": "Görevler"
+    },
+    "lists": {
+      "newList": "Yeni liste",
+      "empty": "Henüz liste yok",
+      "couldNotLoad": "Listeler yüklenemedi",
+      "noRepository": "Depo yok",
+      "rowA11y": "{{name}} — {{openCount}}",
+      "openCount_one": "{{count}} açık",
+      "openCount_other": "{{count}} açık",
+      "archived_one": "Arşivlenenler ({{count}})",
+      "archived_other": "Arşivlenenler ({{count}})",
+      "archive": "Arşivle",
+      "unarchive": "Arşivden çıkar",
+      "deleteTitle": "{{name}} silinsin mi?",
+      "deleteMessage": "Görevleri de silinir. Oturumları kalır."
+    },
+    "listSettings": {
+      "title": "Liste ayarları",
+      "name": "Ad",
+      "namePlaceholder": "Hatalar, fikirler, sürüm…",
+      "emoji": "Emoji",
+      "mode": "Mod",
+      "defaultsHint": "Bu listeden başlatılan oturumlar bu varsayılanları kullanır."
+    },
+    "list": {
+      "addPlaceholder": "Bir görev ekle",
+      "add": "Görev ekle",
+      "empty": "Henüz görev yok",
+      "setDefaults": "Depo, mod ve model ayarla",
+      "completed_one": "Tamamlandı ({{count}})",
+      "completed_other": "Tamamlandı ({{count}})"
+    },
+    "item": {
+      "markDone": "Tamamlandı olarak işaretle",
+      "markOpen": "Tamamlanmadı olarak işaretle",
+      "markDonePrompt": "Tamamlandı olarak işaretlensin mi?",
+      "deleted": "Görev silindi",
+      "undo": "Geri al",
+      "runCount_one": "{{count}} çalıştırma",
+      "runCount_other": "{{count}} çalıştırma",
+      "startNow": "İncelemeden başlat",
+      "startNowHint": "İncelemeden başlatmak için basılı tut",
+      "titleLabel": "Görev başlığı",
+      "notes": "Notlar",
+      "notesPlaceholder": "Markdown ile not ekle",
+      "sessions": "Bağlı oturumlar",
+      "noSessions": "Henüz oturum yok",
+      "linkSession": "Oturum bağla",
+      "unlinkSession": "{{title}} bağlantısını kaldır",
+      "linkFailed": "Oturum göreve bağlanamadı"
+    },
+    "linkSession": {
+      "title": "Bir oturum bağla",
+      "empty": "Son oturum yok",
+      "emptyInRepository": "{{repository}} deposunda son oturum yok"
+    },
+    "upNext": "Sıradaki",
+    "sessionTodo": "Görev: {{title}}",
+    "linkToTodo": "Göreve bağla",
+    "candidates": {
+      "empty": "Açık görev yok"
+    },
+    "saveSheet": {
+      "title": "Listeye kaydet",
+      "saved": "{{list}} listesine kaydedildi"
+    }
   }
 }

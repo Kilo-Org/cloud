@@ -1767,8 +1767,8 @@
       "toolList": "הצגת רשימה",
       "toolPatch": "החלת תיקון",
       "toolTask": "משימה",
-      "readTodos": "קריאת משימות",
-      "updateTodos": "עדכון משימות",
+      "readTodos": "קריאת התוכנית",
+      "updateTodos": "עדכון התוכנית",
       "linesBadge": "{{displayCount}} שורות",
       "filesBadge": "{{displayCount}} קבצים",
       "matchesBadge": "{{displayCount}} התאמות",
@@ -3285,6 +3285,19 @@
       "deleteTitle": "למחוק את הצ'אט הזה?"
     },
     "beta": "בטא",
+    "details": {
+      "title": "פרטי הצ׳אט",
+      "backend": "שרת",
+      "effortDefault": "ברירת המחדל של המודל",
+      "noCost": "ללא עלות",
+      "costUnknown": "לא ידוע",
+      "costEstimatedNote": "העלות של תשובות שלא דיווחו על מחיר מוערכת לפי מחירון.",
+      "costUnknownNote": "לא ידוע מחיר למודל הזה.",
+      "costPartialNote": "הסכום הזה אינו כולל מודלים שאין להם מחיר ידוע.",
+      "localNote": "מודלים במכשיר פועלים במכשיר הזה. אין להם עלות ואין להם מטמון הנחיות, וספירת הטוקנים שלהם עשויה להיות הערכה.",
+      "countedSinceNote": "הצ׳אט הזה התחיל לפני שהשימוש תועד. הסכומים מציגים רק את התשובות שאחרי כן.",
+      "remoteServersOn": "שרתי MCP מרוחקים מופעלים"
+    },
     "webSearch": {
       "title": "חיפוש באינטרנט",
       "description": "אפשרו לצ'אט הזה לחפש מידע עדכני דרך חשבון Kilo שלכם. החיפושים מנצלים את מכסת החיפוש החודשית שלכם.",
@@ -3722,5 +3735,82 @@
     "noMatchingProductsPlay": "Google Play לא החזיר חבילות קרדיטים תואמות.",
     "purchaseOwnedByAnotherAccount": "הקרדיטים בחשבון Apple Account הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם.",
     "purchaseOwnedByAnotherAccountPlay": "הקרדיטים בחשבון Google Play הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם."
+  },
+  "todos": {
+    "saveAsTodo": "שמירה כמשימה",
+    "segment": {
+      "label": "תצוגת סוכנים",
+      "sessions": "סשנים",
+      "todos": "משימות"
+    },
+    "lists": {
+      "newList": "רשימה חדשה",
+      "empty": "אין רשימות עדיין",
+      "couldNotLoad": "לא הצלחנו לטעון רשימות",
+      "noRepository": "בלי מאגר",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} פתוח",
+      "openCount_other": "{{count}} פתוח",
+      "openCount_two": "{{count}} פתוחים",
+      "archived_one": "בארכיון ({{count}})",
+      "archived_other": "בארכיון ({{count}})",
+      "archived_two": "בארכיון ({{count}})",
+      "archive": "העברה לארכיון",
+      "unarchive": "הוצאה מהארכיון",
+      "deleteTitle": "למחוק את {{name}}?",
+      "deleteMessage": "המשימות שבה נמחקות גם כן. הסשנים שלהן נשארים."
+    },
+    "listSettings": {
+      "title": "הגדרות רשימה",
+      "name": "שם",
+      "namePlaceholder": "באגים, רעיונות, גרסה…",
+      "emoji": "אמוג׳י",
+      "mode": "מצב",
+      "defaultsHint": "סשנים שמתחילים מהרשימה הזו משתמשים בברירות המחדל האלה."
+    },
+    "list": {
+      "addPlaceholder": "הוסף משימה",
+      "add": "הוספת משימה",
+      "empty": "אין משימות עדיין",
+      "setDefaults": "הגדרת מאגר, מצב ומודל",
+      "completed_one": "הושלמו ({{count}})",
+      "completed_other": "הושלמו ({{count}})",
+      "completed_two": "הושלמו ({{count}})"
+    },
+    "item": {
+      "markDone": "סימון כבוצע",
+      "markOpen": "סימון כלא בוצע",
+      "markDonePrompt": "לסמן כבוצע?",
+      "deleted": "המשימה נמחקה",
+      "undo": "בטל",
+      "runCount_one": "{{count}} ריצה",
+      "runCount_other": "{{count}} ריצות",
+      "runCount_two": "{{count}} ריצות",
+      "startNow": "התחלה בלי סקירה",
+      "startNowHint": "לחיצה ארוכה כדי להתחיל בלי סקירה",
+      "titleLabel": "כותרת המשימה",
+      "notes": "הערות",
+      "notesPlaceholder": "הוספת הערות ב-Markdown",
+      "sessions": "סשנים מקושרים",
+      "noSessions": "אין סשנים עדיין",
+      "linkSession": "קישור סשן",
+      "unlinkSession": "ביטול הקישור של {{title}}",
+      "linkFailed": "לא הצלחנו לקשר את הסשן למשימה"
+    },
+    "linkSession": {
+      "title": "קישור לסשן",
+      "empty": "אין סשנים אחרונים",
+      "emptyInRepository": "אין סשנים אחרונים במאגר {{repository}}"
+    },
+    "upNext": "הבא בתור",
+    "sessionTodo": "משימה: {{title}}",
+    "linkToTodo": "קישור למשימה",
+    "candidates": {
+      "empty": "אין משימות פתוחות"
+    },
+    "saveSheet": {
+      "title": "שמירה ברשימה",
+      "saved": "נשמר ברשימה {{list}}"
+    }
   }
 }

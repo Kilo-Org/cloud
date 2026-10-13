@@ -129,7 +129,7 @@ export function ProfilesManager({
   return (
     <div className="flex min-h-0 flex-1 flex-col md:flex-row">
       {/* Left panel — profile list */}
-      <div className="flex max-h-40 shrink-0 flex-col border-b md:max-h-none md:w-44 md:border-r md:border-b-0">
+      <div className="flex max-h-40 shrink-0 flex-col border-b md:max-h-none md:w-64 md:border-r md:border-b-0 lg:w-72">
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">

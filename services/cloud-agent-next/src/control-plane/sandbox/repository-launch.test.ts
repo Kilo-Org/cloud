@@ -91,4 +91,44 @@ describe('repositoryLaunchOptions', () => {
     expect(decision.skipped).toBe(false);
     expect(decision.options).toEqual({ repoKey: 'repo-key' });
   });
+
+  it('skips a confirmed repository start whose preparation failed', () => {
+    const decision = repositoryLaunchOptions([preparingRoute()], {
+      allocationId: 'allocation_1',
+      startSource: 'repository',
+      confirmed: true,
+      preparationFailures: [{ sessionId: 'workspace_1', attemptId: 'attempt_1' }],
+    });
+    expect(decision.skipped).toBe(true);
+    expect(decision.options).toEqual({ repoKey: 'repo-key', skipRepository: true });
+  });
+
+  it('retains the repository skip while an image launch has not completed', () => {
+    const decision = repositoryLaunchOptions([preparingRoute()], {
+      allocationId: 'allocation_2',
+      skipRepository: true,
+      confirmed: false,
+    });
+    expect(decision.skipped).toBe(true);
+    expect(decision.options).toEqual({ repoKey: 'repo-key', skipRepository: true });
+  });
+
+  it('does not skip an image start whose preparation failed', () => {
+    const decision = repositoryLaunchOptions([preparingRoute()], {
+      allocationId: 'allocation_2',
+      startSource: 'image',
+      confirmed: true,
+      preparationFailures: [{ sessionId: 'workspace_1', attemptId: 'attempt_1' }],
+    });
+    expect(decision.skipped).toBe(false);
+  });
+
+  it('skips an unresolved launch whose preparation failed', () => {
+    const decision = repositoryLaunchOptions([preparingRoute()], {
+      allocationId: 'allocation_1',
+      confirmed: true,
+      preparationFailures: [{ sessionId: 'workspace_1', attemptId: 'attempt_1' }],
+    });
+    expect(decision.skipped).toBe(true);
+  });
 });

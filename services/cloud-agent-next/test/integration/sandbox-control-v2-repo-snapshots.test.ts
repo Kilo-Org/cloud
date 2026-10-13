@@ -1,8 +1,10 @@
-import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
+import { sessionDoName } from '../../src/session-plane.js';
 import {
   allocation as allocationTable,
   routes as routesTable,
@@ -157,14 +159,16 @@ type RouteOverrides = {
   userId?: string;
   orgId?: string | null;
   sessionId?: string;
+  kiloSessionId?: string;
 };
 
 function prepareInput(overrides: RouteOverrides = {}) {
   const sessionId = overrides.sessionId ?? SESSION;
+  const kiloSessionId = overrides.kiloSessionId ?? KILO_SESSION;
   const git = overrides.git === null ? undefined : (overrides.git ?? { url: REPO_URL });
   const spec: ControlPlaneRouteSpec = {
     sessionId,
-    kiloSessionId: KILO_SESSION,
+    kiloSessionId,
     directory: overrides.directory ?? ISOLATED_DIRECTORY,
     attemptId: `${sessionId}-requested`,
     ...(git === undefined ? {} : { git }),
@@ -175,7 +179,7 @@ function prepareInput(overrides: RouteOverrides = {}) {
     spec,
     credentials: {
       userId: overrides.userId ?? 'user_123',
-      kiloSessionId: KILO_SESSION,
+      kiloSessionId,
       kiloToken: 'native-kilo-token-user',
       orgId: overrides.orgId === null ? undefined : (overrides.orgId ?? 'org_123'),
       repository: { type: 'github' as const, repo: 'acme/widgets' },
@@ -187,9 +191,9 @@ function prepareInput(overrides: RouteOverrides = {}) {
 async function setup(
   sandboxId: string,
   provider: FakeProvider,
-  extraEnv: Record<string, unknown> = ENROLLED
+  extraEnv: Record<string, unknown> = ENROLLED,
+  peer = new FakeSessionPeer()
 ) {
-  const peer = new FakeSessionPeer();
   const stub = sandboxNamespace.getByName(sandboxId);
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
@@ -694,7 +698,7 @@ describe('repository snapshot launch', () => {
     // skips the fallback, and reuses the snapshot that just failed.
     await waitFor(async () =>
       expect(await readLaunchRecord(stub)).toMatchObject({
-        startSource: 'repository',
+        skipRepository: true,
         confirmed: false,
       })
     );
@@ -782,6 +786,458 @@ describe('repository snapshot launch', () => {
       allocationId: 'someone-else',
       confirmed: false,
     });
+  });
+});
+
+describe('repository snapshot preparation fallback', () => {
+  it('keeps queued messages through fallback and delivers their original identities once', async () => {
+    const sandboxId = 'sbx__repo_prepare_queued_messages';
+    const provider = createFakeProvider({
+      launches: [{ startSource: 'repository' }, { startSource: 'image' }],
+    });
+    const stub = await setup(sandboxId, provider);
+    const sessionNamespace = (
+      env as unknown as {
+        SANDBOX_SESSION: DurableObjectNamespace<SandboxSessionV2>;
+      }
+    ).SANDBOX_SESSION;
+    const session = sessionNamespace.getByName(sessionDoName('user_123', SESSION));
+    await session.registerSession({ sandboxId, ...prepareInput() });
+    await runInDurableObject(stub, instance => {
+      const namespace = (
+        instance.env as unknown as {
+          SANDBOX_SESSION: DurableObjectNamespace<SandboxSessionV2>;
+        }
+      ).SANDBOX_SESSION;
+      Object.assign(instance, {
+        sessionPeerFor: (ownerId: string, sessionId: string) =>
+          namespace.getByName(sessionDoName(ownerId, sessionId)),
+      });
+    });
+    for (const messageId of ['m1', 'm2']) {
+      await session.send({
+        messageId,
+        turn: { type: 'prompt', prompt: messageId },
+        agent: { mode: 'code', model: 'test/model' },
+      });
+    }
+    const { wrapper } = await connect(sandboxId, provider);
+    await prepareFrameOf(wrapper);
+    wrapper.send({
+      type: 'session.failed',
+      sessionId: SESSION,
+      reason: 'workspace_setup_failed',
+      step: 'setup',
+      subtype: 'setup_command_failed',
+    });
+    const fresh = await connect(sandboxId, provider, 2);
+    await prepareFrameOf(fresh.wrapper);
+    for (const messageId of ['m1', 'm2']) {
+      expect(await session.getMessageResult(messageId)).toMatchObject({
+        type: 'found',
+        result: { status: 'queued' },
+      });
+    }
+    fresh.wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    for (const messageId of ['m1', 'm2']) {
+      expect(await fresh.wrapper.nextSkipping(['worktree.capture'])).toMatchObject({
+        type: 'session.prompt',
+        sessionId: SESSION,
+        payload: { messageId },
+      });
+    }
+    fresh.wrapper.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: 'm2',
+    });
+    await waitFor(async () => {
+      for (const messageId of ['m1', 'm2']) {
+        expect(await session.getMessageResult(messageId)).toMatchObject({
+          type: 'found',
+          result: { status: 'completed' },
+        });
+      }
+    });
+    expect(provider.launchEnvs).toHaveLength(2);
+  });
+
+  it.each(['setup_command_failed', 'setup_command_timeout', undefined] as const)(
+    'rebuilds from the image without failing the route for %s',
+    async subtype => {
+      const sandboxId = 'sbx__repo_prepare_fallback';
+      const provider = createFakeProvider({
+        launches: [{ startSource: 'repository' }, { startSource: 'image' }],
+      });
+      const peer = new FakeSessionPeer();
+      const stub = await setup(sandboxId, provider, ENROLLED, peer);
+      const input = prepareInput({ setupCommands: ['pnpm install'] });
+      const worktreeRecovery = {
+        files: [{ path: 'changed.ts', status: 'modified' as const, patch: 'saved diff' }],
+      };
+      const view = await stub.prepare({
+        ...input,
+        spec: { ...input.spec, branch: 'feature/resume', worktreeRecovery },
+      });
+      const { wrapper, allocationId } = await connect(sandboxId, provider);
+      const original = await prepareFrameOf(wrapper);
+      const deadline = await runInDurableObject(stub, async (_instance, state) => {
+        const db = drizzle(state.storage, { logger: false });
+        const [row] = await db.select().from(routesTable);
+        return row.attempt_deadline_at;
+      });
+
+      wrapper.send({
+        type: 'session.failed',
+        sessionId: SESSION,
+        reason: 'workspace_setup_failed',
+        step: subtype === undefined ? 'restore' : 'setup',
+        ...(subtype === undefined ? {} : { subtype }),
+      });
+
+      const fresh = await connect(sandboxId, provider, 2);
+      const replacement = await prepareFrameOf(fresh.wrapper);
+      expect(fresh.allocationId).not.toBe(allocationId);
+      expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
+      expect(provider.launchOptions[1]).toEqual({
+        repoKey: await repoKeyOf(stub),
+        skipRepository: true,
+      });
+      expect(provider.launchEnvs[1].SANDBOX_CONTROL_CREDENTIAL).not.toBe(
+        provider.launchEnvs[0].SANDBOX_CONTROL_CREDENTIAL
+      );
+      expect(replacement.spec).toMatchObject({
+        sessionId: SESSION,
+        kiloSessionId: KILO_SESSION,
+        attemptId: original.spec.attemptId,
+        setupCommands: ['pnpm install'],
+        branch: 'feature/resume',
+        worktreeRecovery,
+      });
+      expect((await stub.status({ sessionId: SESSION })).view).toMatchObject({
+        state: 'preparing',
+        attemptId: view.attemptId,
+      });
+      await runInDurableObject(stub, async (_instance, state) => {
+        const db = drizzle(state.storage, { logger: false });
+        const [row] = await db.select().from(routesTable);
+        expect(row.attempt_deadline_at).toBe(deadline);
+      });
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      fresh.wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
+      );
+      expect(peer.routeUpdatesFor(SESSION).some(update => update.state === 'failed')).toBe(false);
+      expect(provider.launchEnvs).toHaveLength(2);
+    }
+  );
+
+  it.each([false, true])(
+    'surfaces image preparation failure without another retry during held launch %s',
+    async holdLaunch => {
+      const sandboxId = 'sbx__repo_prepare_image_failed';
+      const provider = createFakeProvider({
+        launches: [{ startSource: 'repository' }, { startSource: 'image' }],
+      });
+      const peer = new FakeSessionPeer();
+      const stub = await setup(sandboxId, provider, ENROLLED, peer);
+      await stub.prepare(prepareInput());
+      const { wrapper } = await connect(sandboxId, provider);
+      await prepareFrameOf(wrapper);
+      provider.launchHold = holdLaunch;
+      wrapper.send({
+        type: 'session.failed',
+        sessionId: SESSION,
+        reason: 'workspace_setup_failed',
+        step: 'setup',
+        subtype: 'setup_command_failed',
+      });
+      const fresh = await connect(sandboxId, provider, 2);
+      await prepareFrameOf(fresh.wrapper);
+      fresh.wrapper.send({
+        type: 'session.failed',
+        sessionId: SESSION,
+        reason: 'workspace_setup_failed',
+        step: 'setup',
+        subtype: 'setup_command_timeout',
+      });
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+          state: 'failed',
+          attemptId: expect.any(String),
+          reason: 'workspace_setup_failed',
+          subtype: 'setup_command_timeout',
+        })
+      );
+      expect(provider.launchEnvs).toHaveLength(2);
+      expect(provider.stopRefs).toHaveLength(1);
+      if (holdLaunch) await releaseHeld(stub, () => provider.releaseLaunch());
+    }
+  );
+
+  it.each(['repository', 'image'] as const)(
+    'waits for a slow %s launch to report its actual source before deciding recovery',
+    async startSource => {
+      const sandboxId = `sbx__repo_prepare_slow_${startSource}`;
+      const provider = createFakeProvider({
+        holdLaunch: true,
+        launches: [{ startSource }, { startSource: 'image' }],
+      });
+      const stub = await setup(sandboxId, provider);
+      await stub.prepare(prepareInput());
+      const { wrapper } = await connect(sandboxId, provider);
+      await prepareFrameOf(wrapper);
+      wrapper.send({
+        type: 'session.failed',
+        sessionId: SESSION,
+        reason: 'workspace_setup_failed',
+        step: 'setup',
+        subtype: 'setup_command_failed',
+      });
+      await waitFor(async () =>
+        expect(await readLaunchRecord(stub)).toMatchObject({
+          preparationFailures: [
+            { sessionId: SESSION, attemptId: expect.any(String), subtype: 'setup_command_failed' },
+          ],
+        })
+      );
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('preparing');
+      expect(provider.stopRefs).toEqual([]);
+
+      await releaseHeld(stub, () => {
+        provider.launchHold = false;
+        provider.releaseLaunch();
+      });
+      if (startSource === 'repository') {
+        const fresh = await connect(sandboxId, provider, 2);
+        await prepareFrameOf(fresh.wrapper);
+        expect(provider.launchOptions[1]).toMatchObject({ skipRepository: true });
+      } else {
+        await waitFor(async () =>
+          expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
+        );
+        expect(provider.launchEnvs).toHaveLength(1);
+        expect(provider.stopRefs).toEqual([]);
+      }
+    }
+  );
+
+  it('does not retry preparation on a cold image start', async () => {
+    const sandboxId = 'sbx__repo_prepare_cold_image';
+    const provider = createFakeProvider();
+    const stub = await setup(sandboxId, provider);
+    await stub.prepare(prepareInput());
+    const { wrapper } = await connect(sandboxId, provider);
+    await prepareFrameOf(wrapper);
+    wrapper.send({
+      type: 'session.failed',
+      sessionId: SESSION,
+      reason: 'workspace_setup_failed',
+      step: 'setup',
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
+    );
+    expect(provider.launchEnvs).toHaveLength(1);
+    expect(provider.stopRefs).toEqual([]);
+  });
+
+  it('settles every preparation failure reported during a slow image launch', async () => {
+    const sandboxId = 'sbx__repo_prepare_multiple_failures';
+    const provider = createFakeProvider({ holdLaunch: true });
+    const peer = new FakeSessionPeer();
+    const stub = await setup(sandboxId, provider, ENROLLED, peer);
+    await stub.prepare(prepareInput());
+    const { wrapper } = await connect(sandboxId, provider);
+    await prepareFrameOf(wrapper);
+    const sibling = 'workspace_22222222-2222-2222-2222-222222222222';
+    const input = prepareInput({
+      sessionId: sibling,
+      kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
+    });
+    await stub.prepare({ ...input, credentials: { ...input.credentials, scopeId: SESSION } });
+    expect(await wrapper.nextSkipping(['session.credentials'])).toMatchObject({
+      type: 'session.prepare',
+    });
+    for (const sessionId of [SESSION, sibling]) {
+      wrapper.send({
+        type: 'session.failed',
+        sessionId,
+        reason: 'workspace_setup_failed',
+        step: 'setup',
+      });
+    }
+    await waitFor(async () =>
+      expect(await readLaunchRecord(stub)).toMatchObject({ preparationFailures: expect.any(Array) })
+    );
+    await releaseHeld(stub, () => provider.releaseLaunch());
+    await waitFor(async () => {
+      for (const sessionId of [SESSION, sibling]) {
+        expect((await stub.status({ sessionId })).view.state).toBe('failed');
+      }
+    });
+    expect(provider.stopRefs).toEqual([]);
+    expect(provider.launchEnvs).toHaveLength(1);
+  });
+
+  it('does not retry beyond the original preparation deadline', async () => {
+    const sandboxId = 'sbx__repo_prepare_expired';
+    const provider = createFakeProvider({ startSource: 'repository' });
+    const stub = await setup(sandboxId, provider);
+    await stub.prepare(prepareInput());
+    const { wrapper } = await connect(sandboxId, provider);
+    await prepareFrameOf(wrapper);
+    await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      await db
+        .update(routesTable)
+        .set({ attempt_deadline_at: Date.now() - 1 })
+        .where(eq(routesTable.session_id, SESSION));
+    });
+    wrapper.send({
+      type: 'session.failed',
+      sessionId: SESSION,
+      reason: 'workspace_setup_failed',
+      step: 'setup',
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
+    );
+    expect(provider.stopRefs).toEqual([]);
+    expect(provider.launchEnvs).toHaveLength(1);
+  });
+
+  it.each([
+    ['repository', { startSource: 'repository' }, true],
+    ['unresolved', {}, true],
+    ['unresolved image fallback', { skipRepository: true }, false],
+  ] as const)(
+    'settles a persisted preparation failure after reconstruction with %s',
+    async (_name, launch, retry) => {
+      const sandboxId = 'sbx__repo_prepare_reconstructed';
+      const provider = createFakeProvider({
+        launches: [{ startSource: 'repository' }, { startSource: 'image' }],
+      });
+      const stub = await setup(sandboxId, provider);
+      const view = await stub.prepare(prepareInput());
+      const { wrapper, allocationId } = await connect(sandboxId, provider);
+      await prepareFrameOf(wrapper);
+      await putLaunchRecord(stub, {
+        allocationId,
+        ...launch,
+        confirmed: true,
+        preparationFailures: [
+          { sessionId: SESSION, attemptId: view.attemptId, subtype: 'setup_command_failed' },
+        ],
+      });
+      await evictAllDurableObjects();
+      const reconstructed = await setup(sandboxId, provider);
+      await runInDurableObject(reconstructed, instance => instance.alarm());
+      if (retry) {
+        const fresh = await connect(sandboxId, provider, 2);
+        const frame = await prepareFrameOf(fresh.wrapper);
+        expect(frame.spec.attemptId).toBe(view.attemptId);
+        expect(provider.launchOptions[1]).toMatchObject({ skipRepository: true });
+      } else {
+        expect((await reconstructed.status({ sessionId: SESSION })).view.state).toBe('failed');
+        expect(provider.launchEnvs).toHaveLength(1);
+        expect(provider.stopRefs).toEqual([]);
+      }
+    }
+  );
+
+  it.each([false, true])(
+    'does not destroy a sandbox with a ready sibling during held launch %s',
+    async holdLaunch => {
+      const sandboxId = 'sbx__repo_prepare_ready_sibling';
+      const provider = createFakeProvider({ startSource: 'repository', holdLaunch });
+      const stub = await setup(sandboxId, provider);
+      await stub.prepare(prepareInput());
+      const { wrapper } = await connect(sandboxId, provider);
+      await prepareFrameOf(wrapper);
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
+      );
+      const sibling = 'workspace_22222222-2222-2222-2222-222222222222';
+      const siblingInput = prepareInput({
+        sessionId: sibling,
+        kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
+      });
+      await stub.prepare({
+        ...siblingInput,
+        credentials: { ...siblingInput.credentials, scopeId: SESSION },
+      });
+      expect(await wrapper.nextSkipping(['session.credentials'])).toMatchObject({
+        type: 'session.prepare',
+      });
+      wrapper.send({
+        type: 'session.failed',
+        sessionId: sibling,
+        reason: 'workspace_setup_failed',
+        step: 'setup',
+      });
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId: sibling })).view.state).toBe('failed')
+      );
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready');
+      expect(provider.stopRefs).toEqual([]);
+      expect(provider.launchEnvs).toHaveLength(1);
+      if (holdLaunch) await releaseHeld(stub, () => provider.releaseLaunch());
+    }
+  );
+
+  it('does not fall back for a failure after the route became ready', async () => {
+    const sandboxId = 'sbx__repo_prepare_ready_failure';
+    const provider = createFakeProvider({ startSource: 'repository' });
+    const stub = await setup(sandboxId, provider);
+    await stub.prepare(prepareInput());
+    const { wrapper } = await connect(sandboxId, provider);
+    await prepareFrameOf(wrapper);
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
+    );
+    wrapper.send({
+      type: 'session.failed',
+      sessionId: SESSION,
+      reason: 'workspace_setup_failed',
+      step: 'kilo_runtime',
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
+    );
+    expect(provider.stopRefs).toEqual([]);
+    expect(provider.launchEnvs).toHaveLength(1);
+  });
+
+  it('fails preparation if snapshot cleanup exhausts without a confirmed stop', async () => {
+    const sandboxId = 'sbx__repo_prepare_unconfirmed_stop';
+    const provider = createFakeProvider({ startSource: 'repository', stopResult: 'retryable' });
+    const stub = await setup(sandboxId, provider);
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        sandboxTimers: () => ({ ...CONTROL_PLANE_TIMERS.sandbox, providerStopLadderMs: [] }),
+      });
+    });
+    await stub.prepare(prepareInput());
+    const { wrapper } = await connect(sandboxId, provider);
+    await prepareFrameOf(wrapper);
+    wrapper.send({
+      type: 'session.failed',
+      sessionId: SESSION,
+      reason: 'workspace_setup_failed',
+      step: 'setup',
+      subtype: 'setup_command_failed',
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
+    );
+    expect((await stub.getAllocationState()).unconfirmedProviderRef).toBe(provider.launchRefs[0]);
+    expect(provider.stopRefs).toHaveLength(1);
+    expect(provider.launchEnvs).toHaveLength(1);
   });
 });
 

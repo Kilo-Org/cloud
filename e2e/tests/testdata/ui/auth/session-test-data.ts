@@ -1,4 +1,4 @@
-/** NextAuth endpoints used to sign seeded users in and out without the UI. */
+/** NextAuth endpoints used to sign seeded users in without the UI. */
 export const authApiPaths = {
   csrf: '/api/auth/csrf',
   session: '/api/auth/session',

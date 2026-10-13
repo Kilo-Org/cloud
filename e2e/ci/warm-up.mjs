@@ -1,7 +1,7 @@
 // Waits for `next dev`, then requests the routes the tests open so their first (slow) compile
 // doesn't eat a test's timeout. Signs in first: signed out, most routes only redirect.
-// Usage: node e2e/ci/warm-up.mjs (URL overrides http://localhost:3000)
-const baseURL = process.env.URL ?? 'http://localhost:3000';
+// Usage: node e2e/ci/warm-up.mjs (URL overrides http://localhost:$PORT, as in start-web.mjs)
+const baseURL = process.env.URL ?? `http://localhost:${process.env.PORT ?? '3000'}`;
 const READY_TIMEOUT_MS = 5 * 60_000;
 const ROUTE_TIMEOUT_MS = 3 * 60_000;
 
@@ -50,7 +50,9 @@ const get = async (route, timeoutMs) => {
 };
 
 async function signIn() {
-  const { csrfToken } = await (await request('/api/auth/csrf', ROUTE_TIMEOUT_MS)).json();
+  const csrfRes = await request('/api/auth/csrf', ROUTE_TIMEOUT_MS);
+  const { csrfToken } = csrfRes.ok ? await csrfRes.json() : {};
+  if (!csrfToken) throw new Error(`CSRF token request failed with status ${csrfRes.status}`);
   const form = new URLSearchParams({
     csrfToken,
     // `@admin.example.com` makes fake login provision an admin, so /admin pages compile too.
@@ -63,8 +65,12 @@ async function signIn() {
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: form,
   });
-  const session = await (await request('/api/auth/session', ROUTE_TIMEOUT_MS)).json();
-  console.log(`fake login: ${res.status}, signed in: ${Boolean(session?.user)}`);
+  const sessionRes = await request('/api/auth/session', ROUTE_TIMEOUT_MS);
+  const session = sessionRes.ok ? await sessionRes.json() : null;
+  if (!session?.user) {
+    throw new Error(`Fake login did not sign in: callback status ${res.status}, session status ${sessionRes.status}`);
+  }
+  console.log(`fake login: ${res.status}, signed in`);
 }
 
 const deadline = Date.now() + READY_TIMEOUT_MS;
@@ -103,6 +109,9 @@ for (const route of signedOutRoutes) await warm(route);
 try {
   await signIn();
 } catch (error) {
-  console.log(`fake login failed, warming up signed out: ${error instanceof Error ? error.message : String(error)}`);
+  // `::warning::` surfaces it in the Actions UI; the tests' own sign-in fails with the details.
+  console.log(
+    `::warning::Fake login failed, warming up signed out: ${error instanceof Error ? error.message : String(error)}`,
+  );
 }
 for (const route of routes) await warm(route);

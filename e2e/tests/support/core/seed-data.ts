@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { query } from '@support/core/db';
 
-/** Marks users created by the dev-only fake-login provider (apps/web/src/lib/auth/constants.ts). */
+/** Marks fake-login users: `hosted_domain_specials.fake_devonly` in packages/web-shared/src/lib/auth/constants.ts. */
 const FAKE_LOGIN_HOSTED_DOMAIN = '@@fake@@';
 
 export type SeededUser = { id: string; email: string; name: string };
@@ -14,7 +14,8 @@ type UserOptions = {
 
 /**
  * Creates the rows a test needs directly in the database, so every test owns its data and never
- * depends on shared dev records. Ids and emails are unique per call.
+ * depends on shared dev records. Ids and emails are unique per call. Rows are not deleted afterwards:
+ * nothing reads another test's rows, the CI database is thrown away, and users have many FK dependents.
  */
 export class SeedData {
   /** A validated user (skips the Stytch check and the customer-source survey). */

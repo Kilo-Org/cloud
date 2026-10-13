@@ -1,5 +1,6 @@
 // Starts `next dev` for apps/web as the CI job needs it: env from the tracked apps/web/.env and
-// .env.test (a runner has no root .env.local), with the dev-only fake login enabled.
+// .env.test (a runner has no root .env.local), with the dev-only fake login enabled. Locally,
+// .env.test.local (written by `pnpm test:db`) points it at the worktree's database, as for the app's tests.
 // Usage: node e2e/ci/start-web.mjs (runs in the foreground)
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -12,7 +13,7 @@ const port = process.env.PORT ?? '3000';
 const baseURL = `http://localhost:${port}`;
 
 const fileEnv = {};
-for (const file of ['.env', '.env.test']) {
+for (const file of ['.env', '.env.test', '.env.test.local']) {
   const full = path.join(webDir, file);
   if (existsSync(full)) Object.assign(fileEnv, parseEnv(readFileSync(full, 'utf8')));
 }

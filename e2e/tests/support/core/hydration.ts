@@ -1,5 +1,5 @@
-import { STANDARD_TIMEOUT } from '@anaconda/playwright-utils';
-import { type Page, expect } from '@playwright/test';
+import { STANDARD_TIMEOUT, logger } from '@anaconda/playwright-utils';
+import { type BrowserContext, type Page, expect } from '@playwright/test';
 
 /**
  * React adds `__reactProps$…` keys to a DOM node once it has hydrated it. The app shell's
@@ -16,38 +16,48 @@ async function isHydrated(page: Page): Promise<boolean> {
 
 /**
  * Waits up to `STANDARD_TIMEOUT` for hydration and never throws: a page that never hydrates (e.g. an
- * external redirect) must not fail a navigation that succeeded; the test's own checks will fail.
+ * external redirect) must not fail a navigation that succeeded.
  */
 async function waitForHydration(page: Page): Promise<void> {
   try {
     await expect.poll(() => isHydrated(page), { timeout: STANDARD_TIMEOUT }).toBe(true);
   } catch {
-    // See above.
+    logger.warn(`Page did not hydrate within ${STANDARD_TIMEOUT}ms: ${page.url()}`);
   }
 }
 
 /**
  * `next dev` adds a `<nextjs-portal>` dev-tools overlay that can intercept clicks on the sidebar's
- * bottom-left controls. It doesn't exist in production builds, so it is made click-through.
+ * bottom-left controls. It doesn't exist in production builds, so it is made click-through in every
+ * document, redirects and popups included.
  */
-async function neutralizeNextDevOverlay(page: Page): Promise<void> {
-  try {
-    await page.addStyleTag({ content: 'nextjs-portal { pointer-events: none !important; }' });
-  } catch {
-    // The page navigated away before the style could attach.
-  }
+export async function neutralizeNextDevOverlay(context: BrowserContext): Promise<void> {
+  await context.addInitScript(() => {
+    let sheet: CSSStyleSheet | undefined;
+    const addStyle = () => {
+      if (sheet && document.adoptedStyleSheets.includes(sheet)) {
+        return;
+      }
+      sheet = new CSSStyleSheet();
+      sheet.replaceSync('nextjs-portal { pointer-events: none !important; }');
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    };
+    addStyle();
+    // A same-origin popup keeps the `window` of its initial `about:blank`, so the script ran only there.
+    window.addEventListener('DOMContentLoaded', addStyle);
+  });
 }
 
 /**
  * Makes every `goto`/`reload` on `page` wait for React hydration, because a click or keystroke
  * before hydration is silently lost. Patching the page instance means the library's `gotoURL` and
- * `reloadPage`, which call `page.goto`/`page.reload`, get the wait too.
+ * `reloadPage`, which call `page.goto`/`page.reload`, get the wait too. Navigations started by a click or
+ * form submit don't.
  */
 export function installHydrationWait(page: Page): void {
   const originalGoto = page.goto.bind(page);
   page.goto = async (...args: Parameters<Page['goto']>) => {
     const response = await originalGoto(...args);
-    await neutralizeNextDevOverlay(page);
     await waitForHydration(page);
     return response;
   };
@@ -55,7 +65,6 @@ export function installHydrationWait(page: Page): void {
   const originalReload = page.reload.bind(page);
   page.reload = async (...args: Parameters<Page['reload']>) => {
     const response = await originalReload(...args);
-    await neutralizeNextDevOverlay(page);
     await waitForHydration(page);
     return response;
   };

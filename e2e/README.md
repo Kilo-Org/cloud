@@ -34,8 +34,9 @@ Start the app from the repo root (`pnpm dev:start`), then from `e2e/`:
 | `pnpm validate` / `pnpm lint` / `pnpm format` | Type check, ESLint, Prettier |
 | `pnpm check:code-quality` | playwright-utils quality checks |
 
-`URL` overrides the base URL (default `http://localhost:3000`) and `POSTGRES_URL` the database used
-for seeding (default: the local docker Postgres).
+`URL` overrides the base URL and `POSTGRES_URL` the database used for seeding. Both default to what
+`pnpm dev:start` uses, port offset included: `http://localhost:<3000 + offset>` and `POSTGRES_URL` from
+the repo root's `.env.local`.
 
 ## CI
 
@@ -45,8 +46,10 @@ with the `ANACONDA_PACKAGES_READ_TOKEN` secret (on that step only), starts `next
 `ci/start-web.mjs`, compiles the tested routes with `ci/warm-up.mjs`, and runs `pnpm test`. The
 report, failure traces and the server log are uploaded as the `e2e-report` artifact for 7 days.
 
-To reproduce it locally: stop `pnpm dev:start`, run `node e2e/ci/start-web.mjs` and
-`node e2e/ci/warm-up.mjs` from the repo root, then `CI=1 pnpm test` in `e2e/`.
+To reproduce it locally, from the repo root: `pnpm dev:stop`, then `pnpm test:db` (starts and migrates
+this worktree's Postgres), `node e2e/ci/start-web.mjs` and `node e2e/ci/warm-up.mjs`; then
+`CI=1 URL=http://localhost:3000 pnpm test` in `e2e/`. `PORT` moves `start-web.mjs` and `warm-up.mjs`
+off 3000; set `URL` to match.
 
 ## Layout
 
@@ -56,7 +59,7 @@ tests/
   pages/{ui,api}/<product>/    # page objects (UI) and API helpers
   fixtures/fixture.ts          # registers every page object; specs import `test` from here
   support/core/                # database seeding, hydration wait
-  testdata/ui/<product>/       # paths, labels and other test data
+  testdata/{ui,api}/<product>/ # paths, labels and other test data
 ```
 
 Each test seeds its own user with plain SQL and signs in through the dev-only fake login, so nothing

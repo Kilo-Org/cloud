@@ -10,16 +10,25 @@ export class SessionPage {
    */
   async signInAs(user: SeededUser, path = defaultSignedInPath): Promise<void> {
     await this.withConnectionResetRetry(async () => {
-      const { csrfToken } = (await (await getRequest(authApiPaths.csrf)).json()) as { csrfToken: string };
+      const csrf = await getRequest(authApiPaths.csrf);
+      const { csrfToken } = csrf.ok() ? ((await csrf.json()) as { csrfToken?: string }) : {};
+      if (!csrfToken) {
+        throw new Error(`CSRF token request failed with status ${csrf.status()}: ${await csrf.text()}`);
+      }
       const callback = await postRequest(authApiPaths.fakeLoginCallback, {
         form: { csrfToken, email: user.email, callbackUrl: authApiPaths.afterSignIn, json: 'true' },
       });
       if (!callback.ok()) {
-        throw new Error(`Fake login failed with status ${callback.status()}`);
+        throw new Error(`Fake login failed with status ${callback.status()}: ${await callback.text()}`);
       }
-      const session = (await (await getRequest(authApiPaths.session)).json()) as { user?: { email?: string } };
+      const sessionResponse = await getRequest(authApiPaths.session);
+      if (!sessionResponse.ok()) {
+        throw new Error(`Session request failed with status ${sessionResponse.status()}`);
+      }
+      const session = (await sessionResponse.json()) as { user?: { email?: string } };
+      // Only the email: the session also carries values that must not reach the uploaded report.
       if (session.user?.email !== user.email) {
-        throw new Error(`Fake login did not sign in ${user.email}`);
+        throw new Error(`Fake login did not sign in ${user.email}; session user: ${session.user?.email ?? 'none'}`);
       }
     });
     await gotoURL(path);

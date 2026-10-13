@@ -74,7 +74,7 @@ export type ControlPlaneTimers = {
 // session, the pause before a failed create is retried, clone/runtime/session
 // bounds, SSE silence (Kilo heartbeats every 10-15 s), health request, the
 // real-SSE reconnect window, credential grants and the provider stop ladder.
-function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
+function buildControlPlaneTimers(divisor: number, unattended = false): ControlPlaneTimers {
   const ms = (value: number): number => Math.max(1, Math.round(value / divisor));
   const sandbox = {
     providerCreateMs: 2 * MINUTE_MS,
@@ -84,7 +84,7 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     heartbeatMs: ms(45_000),
     reconnectMs: ms(90_000),
     routePreparationMs: 12 * MINUTE_MS,
-    idleMs: ms(10 * MINUTE_MS),
+    idleMs: ms(unattended ? MINUTE_MS : 10 * MINUTE_MS),
     // Bounds one Sandbox -> Session notification; real (not scaled) like the
     // other bounds on external work.
     sessionNotifyDeadlineMs: 2_000,
@@ -147,10 +147,11 @@ export const CONTROL_PLANE_TIMERS: ControlPlaneTimers = buildControlPlaneTimers(
 
 // Positive integer divisor that shortens internal deadline timers for local E2E. Pass `env` on the Worker/DO side or `process.env` in the wrapper. Development-only by absence from production config; do not add it to wrangler.jsonc.
 export function resolveControlPlaneTimers(
-  source: Record<string, string | undefined>
+  source: Record<string, string | undefined>,
+  unattended = false
 ): ControlPlaneTimers {
   const raw = source[CONTROL_PLANE_TIMER_OVERRIDE_ENV];
-  if (raw === undefined || !/^\d+$/.test(raw)) return CONTROL_PLANE_TIMERS;
-  const divisor = Number(raw);
-  return divisor >= 1 ? buildControlPlaneTimers(divisor) : CONTROL_PLANE_TIMERS;
+  const divisor = raw !== undefined && /^\d+$/.test(raw) ? Number(raw) : 1;
+  if (!unattended && divisor <= 1) return CONTROL_PLANE_TIMERS;
+  return buildControlPlaneTimers(divisor >= 1 ? divisor : 1, unattended);
 }

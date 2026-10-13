@@ -55,6 +55,7 @@ type FakeProvider = {
   refs: string[];
   launchEnvs: Record<string, string>[];
   stopCalls: (string | null)[];
+  leaseCalls: number[];
   stopGates: Array<(result: StopResult) => void>;
 };
 
@@ -68,6 +69,7 @@ function createFakeProvider(
     refs: [],
     launchEnvs: [],
     stopCalls: [],
+    leaseCalls: [],
     stopGates: [],
   };
   provider.adapter = {
@@ -96,7 +98,9 @@ function createFakeProvider(
       }
       return 'terminal';
     },
-    async ensureLeaseAtLeast() {},
+    async ensureLeaseAtLeast(_ref, minRemainingMs) {
+      provider.leaseCalls.push(minRemainingMs);
+    },
     async logs() {
       return '';
     },
@@ -119,7 +123,7 @@ function routeSpec(sessionId: string): ControlPlaneRouteSpec {
   };
 }
 
-function prepareInput(sessionId: string) {
+function prepareInput(sessionId: string, createdOnPlatform?: string) {
   return {
     spec: routeSpec(sessionId),
     credentials: {
@@ -129,6 +133,7 @@ function prepareInput(sessionId: string) {
       orgId: 'org_123',
       repository: { type: 'github' as const, repo: 'acme/widgets' },
       scopeId: sessionId,
+      createdOnPlatform,
     },
   };
 }
@@ -1277,6 +1282,115 @@ describe('SandboxControlV2 routes and forwarding', () => {
     await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
     expect(provider.stopCalls).toEqual([provider.refs[0]]);
     expect(await readRouteRow(stub, SESSION)).toBeNull();
+  });
+
+  it.each([
+    'code-review',
+    'slack',
+    'github',
+    'linear',
+    'discord',
+    'security-agent',
+    'security-remediation',
+    'webhook',
+    'scheduled',
+    'cloud-agent-web',
+    undefined,
+  ])('applies the idle timeout for origin %s', async origin => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, origin));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    const shortIdle = origin !== undefined && origin !== 'cloud-agent-web';
+    const idleMs = shortIdle ? 60_000 : TIMERS.idleMs;
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(idleMs);
+    if (origin === 'code-review') {
+      await evictAllDurableObjects();
+      await setup(provider);
+      expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(idleMs);
+    }
+    await setAllocationField(stub, { last_activity_at: Date.now() - 59_000 });
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
+    await runAlarm(stub);
+
+    if (shortIdle) {
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+      expect(provider.stopCalls).toEqual([provider.refs[0]]);
+      expect(await readRouteRow(stub, SESSION)).toBeNull();
+      await stub.prepare(prepareInput(SESSION, origin));
+      await waitFor(() => expect(provider.createCalls).toBe(2));
+    } else {
+      expect((await readState(stub)).kind).toBe('connected');
+      expect(provider.stopCalls).toEqual([]);
+    }
+    wrapper.close();
+  });
+
+  it('keeps unattended work alive on active heartbeats but not idle heartbeats', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
+    const heartbeatAt = Date.now();
+    wrapper.heartbeat(true);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastActivityAt).toBeGreaterThanOrEqual(heartbeatAt)
+    );
+    await waitFor(() => expect(provider.leaseCalls).toEqual([120_000]));
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+
+    const lastActivityAt = Date.now() - 61_000;
+    await setAllocationField(stub, { last_activity_at: lastActivityAt });
+    const idleHeartbeatAt = Date.now();
+    wrapper.heartbeat(false);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(idleHeartbeatAt)
+    );
+    expect((await readState(stub)).lastActivityAt).toBe(lastActivityAt);
+    expect(provider.leaseCalls).toEqual([120_000]);
+    await runAlarm(stub);
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(provider.stopCalls).toEqual([provider.refs[0]]);
+  });
+
+  it('preserves the web idle window in a mixed sandbox until the web route is released', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    await stub.prepare(prepareInput(SESSION_NEXT, 'cloud-agent-web'));
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+    await waitFor(async () =>
+      expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('ready')
+    );
+
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(TIMERS.idleMs);
+    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+
+    await stub.release({ sessionId: SESSION_NEXT });
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+    expect(provider.stopCalls).toEqual([provider.refs[0]]);
   });
 
   it('removes the route on release and tells the wrapper', async () => {

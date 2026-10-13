@@ -105,6 +105,7 @@ import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
   controlPlaneAnswerPayloadSchema,
+  controlPlaneCredentialSourceSchema,
   controlPlaneDeliverPayloadSchema,
   controlPlanePrepareInputSchema,
   controlPlaneRouteSpecSchema,
@@ -137,6 +138,7 @@ import {
   CONTROL_PLANE_TIMERS,
   resolveControlPlaneTimers,
 } from '../../shared/control-plane-timers.js';
+import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import {
   controlPlaneSandboxSelectionSchema,
   type ControlPlanePrepareInputWithSelection,
@@ -4189,8 +4191,24 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private sandboxTimers(): SandboxTimers {
-    return resolveControlPlaneTimers(this.env as unknown as Record<string, string | undefined>)
-      .sandbox;
+    const routes = this.db
+      .select({ credentialSource: routesTable.credential_source })
+      .from(routesTable)
+      .all();
+    const unattended =
+      routes.length > 0 &&
+      routes.every(route => {
+        if (route.credentialSource === null) return false;
+        const source = controlPlaneCredentialSourceSchema.parse(JSON.parse(route.credentialSource));
+        return (
+          source.createdOnPlatform !== undefined &&
+          !isInteractiveSessionOrigin(source.createdOnPlatform)
+        );
+      });
+    return resolveControlPlaneTimers(
+      this.env as unknown as Record<string, string | undefined>,
+      unattended
+    ).sandbox;
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {

@@ -315,9 +315,13 @@ its own; the command's live native execution decides it. An accepted UI turn alo
 A session blocked only on questions or permissions does not need compute. Pending requests
 are tracked separately; answering one does not clear another, and an independent runnable
 tool still counts. A parent waiting on a blocked child can sleep, while another working
-session or descendant retains compute. After 10 minutes without activity the Sandbox DO
-stops the sandbox. Active heartbeats renew the provider lease (`ensureLeaseAtLeast`);
-inactive heartbeats still prove wrapper liveness. Native supervision does not schedule
+session or descendant retains compute. After 1 minute without activity the Sandbox DO
+stops an unattended-only sandbox. A sandbox with any interactive web session, a route
+with no recorded origin, or no routes retains the 10-minute idle window. Active
+heartbeats renew the provider lease (`ensureLeaseAtLeast`), using the idle window plus
+1 minute; initial launch and native runtime reconstruction retain their conservative
+provider backstops. The Sandbox DO owns the origin-specific idle stop.
+Inactive heartbeats still prove wrapper liveness. Native supervision does not schedule
 future wakeups after compute has stopped.
 
 ### Billing, credentials and deletion

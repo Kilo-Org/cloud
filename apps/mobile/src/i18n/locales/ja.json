@@ -136,7 +136,8 @@
     "working": "作業中",
     "yourOwnRepositories": "自分のリポジトリ",
     "dismissed": "却下済み",
-    "agent": "エージェント"
+    "agent": "エージェント",
+    "changes": "変更内容"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -1678,7 +1679,6 @@
       "retryLoadingEnvironment": "環境の読み込みを再試行",
       "defaultEnvironment": "デフォルト環境",
       "environmentSummary": "コマンド {{commands}}件・MCP {{mcp}}件・スキル {{skills}}件・エージェント {{agents}}件",
-      "changes": "変更内容",
       "leaveChanges": "変更を残す",
       "commitAndPush": "コミットしてプッシュ",
       "startSession": "セッションを開始",
@@ -1749,8 +1749,8 @@
       "toolList": "一覧",
       "toolPatch": "パッチ適用",
       "toolTask": "タスク",
-      "readTodos": "タスクを読み取り",
-      "updateTodos": "タスクを更新",
+      "readTodos": "プランを読み取り",
+      "updateTodos": "プランを更新",
       "linesBadge": "{{displayCount}}行",
       "filesBadge": "{{displayCount}}ファイル",
       "matchesBadge": "{{displayCount}}件",
@@ -2140,6 +2140,12 @@
       "modelAccessibilityLabel": "{{name}}、{{provider}}、{{steps}}、{{cost}}",
       "modelsCount_one": "モデル（{{displayCount}}）",
       "modelsCount_other": "モデル（{{displayCount}}）"
+    },
+    "sessionChanges": {
+      "viewChanges": "変更内容を表示",
+      "asOf": "{{time}}時点",
+      "tooLarge": "この差分は大きすぎるため、モバイルでは表示できません。",
+      "empty": "このセッションではまだファイルの変更はありません。"
     },
     "autoApprove": {
       "title": "自動承認",
@@ -2644,6 +2650,7 @@
     "fileRows": {
       "collapseFile": "ファイルを折りたたむ",
       "diffTooLarge": "差分が大きすぎるため表示できません。",
+      "noPreview": "このファイルはプレビューできません",
       "expandFile": "ファイルを展開",
       "markViewed": "{{path}}を確認済みにする",
       "openDiffOnGitHub": "このファイルの差分をGitHubで開く",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "このチャットを削除しますか？"
     },
     "beta": "ベータ",
+    "details": {
+      "title": "チャットの詳細",
+      "backend": "バックエンド",
+      "effortDefault": "モデルのデフォルト",
+      "noCost": "コストなし",
+      "costUnknown": "不明",
+      "costEstimatedNote": "価格が報告されなかった回答は、定価から推定しています。",
+      "costUnknownNote": "このモデルの価格は不明です。",
+      "costPartialNote": "この合計には、価格が不明なモデルは含まれていません。",
+      "localNote": "オンデバイスモデルはこのデバイス上で動作します。コストもプロンプトキャッシュもなく、トークン数は推定値の場合があります。",
+      "countedSinceNote": "このチャットは使用状況の記録が始まる前に開始されました。合計にはそれ以降の回答のみが含まれます。",
+      "remoteServersOn": "オンのリモートMCPサーバー"
+    },
     "webSearch": {
       "title": "ウェブを検索",
       "description": "このチャットが Kilo アカウントを通じて最新の情報を調べられるようにします。検索には毎月の検索枠が使われます。",
@@ -3423,6 +3443,9 @@
       "downloading": "ダウンロード中…",
       "downloadProgress": "ダウンロード中… {{percent}}%",
       "downloadFailed": "ダウンロードが完了しませんでした。接続と空き容量を確認してから、もう一度お試しください。"
+    },
+    "reasoningEffort": {
+      "modelFlag": "このモデルは思考量の指定に対応しています"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Playから一致するクレジットパックが返されませんでした。",
     "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
     "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"
+  },
+  "todos": {
+    "saveAsTodo": "タスクとして保存",
+    "segment": {
+      "label": "エージェント表示",
+      "sessions": "セッション",
+      "todos": "タスク"
+    },
+    "lists": {
+      "newList": "新しいリスト",
+      "empty": "リストはまだありません",
+      "couldNotLoad": "リストを読み込めませんでした",
+      "noRepository": "リポジトリなし",
+      "rowA11y": "{{name}}、{{openCount}}",
+      "openCount_one": "未完了{{count}}件",
+      "openCount_other": "未完了{{count}}件",
+      "archived_one": "アーカイブ済み ({{count}})",
+      "archived_other": "アーカイブ済み ({{count}})",
+      "archive": "アーカイブ",
+      "unarchive": "アーカイブを解除",
+      "deleteTitle": "{{name}}を削除しますか？",
+      "deleteMessage": "そのタスクも削除されます。セッションは残ります。"
+    },
+    "listSettings": {
+      "title": "リストの設定",
+      "name": "名前",
+      "namePlaceholder": "バグ、アイデア、リリース…",
+      "emoji": "絵文字",
+      "mode": "モード",
+      "defaultsHint": "このリストから開始したセッションには、この既定値が使われます。"
+    },
+    "list": {
+      "addPlaceholder": "タスクを追加",
+      "add": "タスクを追加",
+      "empty": "タスクはまだありません",
+      "setDefaults": "リポジトリ、モード、モデルを設定",
+      "completed_one": "完了 ({{count}})",
+      "completed_other": "完了 ({{count}})"
+    },
+    "item": {
+      "markDone": "完了にする",
+      "markOpen": "未完了にする",
+      "markDonePrompt": "完了にしますか？",
+      "deleted": "タスクを削除しました",
+      "undo": "元に戻す",
+      "runCount_one": "実行{{count}}回",
+      "runCount_other": "実行{{count}}回",
+      "startNow": "レビューなしで開始",
+      "startNowHint": "長押しでレビューなしで開始",
+      "titleLabel": "タスクのタイトル",
+      "notes": "メモ",
+      "notesPlaceholder": "Markdown でメモを追加",
+      "sessions": "リンク済みのセッション",
+      "noSessions": "セッションはまだありません",
+      "linkSession": "セッションをリンク",
+      "unlinkSession": "{{title}}のリンクを解除",
+      "linkFailed": "セッションをタスクにリンクできませんでした"
+    },
+    "linkSession": {
+      "title": "セッションをリンク",
+      "empty": "最近のセッションはありません",
+      "emptyInRepository": "{{repository}}に最近のセッションはありません"
+    },
+    "upNext": "次の予定",
+    "sessionTodo": "タスク：{{title}}",
+    "linkToTodo": "タスクにリンク",
+    "candidates": {
+      "empty": "未完了のタスクはありません"
+    },
+    "saveSheet": {
+      "title": "リストに保存",
+      "saved": "{{list}}に保存しました"
+    }
   }
 }

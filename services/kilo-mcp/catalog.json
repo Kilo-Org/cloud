@@ -5381,6 +5381,30 @@
     ],
     "searchBlob": "cliSessionsV2.getByCloudAgentSessionId Look up a user's CLI session record by the underlying cloud agent session ID. clisessionsv2 getbycloudagentsessionid cloud_agent_session_id cloud_agent_session_id"
   },
+  "cliSessionsV2.getSessionDiff": {
+    "path": "cliSessionsV2.getSessionDiff",
+    "kind": "query",
+    "summary": "Get the file changes (diff) produced by a CLI coding session, listing the modified files or indicating the diff is too large to return. Use to see what code a session changed.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "session_id"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "getsessiondiff",
+      "session_id"
+    ],
+    "searchBlob": "cliSessionsV2.getSessionDiff Get the file changes (diff) produced by a CLI coding session, listing the modified files or indicating the diff is too large to return. Use to see what code a session changed. clisessionsv2 getsessiondiff session_id session_id"
+  },
   "cliSessionsV2.getSessionMessages": {
     "path": "cliSessionsV2.getSessionMessages",
     "kind": "query",
@@ -35433,6 +35457,720 @@
       "rules"
     ],
     "searchBlob": "spendAlerts.save Update spend alert settings and rules for your personal account or an organization, controlling when and how you get notified about spending thresholds. spendalerts save organizationid enabled rules organizationId enabled rules"
+  },
+  "todos.items.candidatesForSession": {
+    "path": "todos.items.candidatesForSession",
+    "kind": "query",
+    "summary": "List open to-do items that could be linked to a session, prioritizing ones in the same repository.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "candidatesforsession",
+      "sessionid",
+      "organizationid"
+    ],
+    "searchBlob": "todos.items.candidatesForSession List open to-do items that could be linked to a session, prioritizing ones in the same repository. todos items candidatesforsession sessionid organizationid sessionId organizationId"
+  },
+  "todos.items.create": {
+    "path": "todos.items.create",
+    "kind": "mutation",
+    "summary": "Add a new to-do item with a title and optional notes to a list.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "listId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 10000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "listId",
+        "title"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "create",
+      "listid",
+      "title",
+      "notes"
+    ],
+    "searchBlob": "todos.items.create Add a new to-do item with a title and optional notes to a list. todos items create listid title notes listId title notes"
+  },
+  "todos.items.delete": {
+    "path": "todos.items.delete",
+    "kind": "mutation",
+    "summary": "Delete a to-do item.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "delete",
+      "id"
+    ],
+    "searchBlob": "todos.items.delete Delete a to-do item. todos items delete id id"
+  },
+  "todos.items.forSession": {
+    "path": "todos.items.forSession",
+    "kind": "query",
+    "summary": "Look up which to-do item and list an agent session is linked to.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "forsession",
+      "sessionid"
+    ],
+    "searchBlob": "todos.items.forSession Look up which to-do item and list an agent session is linked to. todos items forsession sessionid sessionId"
+  },
+  "todos.items.get": {
+    "path": "todos.items.get",
+    "kind": "query",
+    "summary": "Fetch a single to-do item by id, including its list and any linked sessions.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "get",
+      "id"
+    ],
+    "searchBlob": "todos.items.get Fetch a single to-do item by id, including its list and any linked sessions. todos items get id id"
+  },
+  "todos.items.linkSession": {
+    "path": "todos.items.linkSession",
+    "kind": "mutation",
+    "summary": "Link an existing agent session to a to-do item, optionally linking a session that was started from it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "origin": {
+          "type": "string",
+          "enum": [
+            "started",
+            "linked"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "sessionId",
+        "origin"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "linksession",
+      "id",
+      "sessionid",
+      "origin"
+    ],
+    "searchBlob": "todos.items.linkSession Link an existing agent session to a to-do item, optionally linking a session that was started from it. todos items linksession id sessionid origin id sessionId origin"
+  },
+  "todos.items.list": {
+    "path": "todos.items.list",
+    "kind": "query",
+    "summary": "List the to-do items in a specific list, both open and completed.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "listId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "listId"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "list",
+      "listid"
+    ],
+    "searchBlob": "todos.items.list List the to-do items in a specific list, both open and completed. todos items list listid listId"
+  },
+  "todos.items.move": {
+    "path": "todos.items.move",
+    "kind": "mutation",
+    "summary": "Reorder a to-do item within its list by placing it before or after another item.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "beforeId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "afterId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "move",
+      "id",
+      "beforeid",
+      "afterid"
+    ],
+    "searchBlob": "todos.items.move Reorder a to-do item within its list by placing it before or after another item. todos items move id beforeid afterid id beforeId afterId"
+  },
+  "todos.items.unlinkSession": {
+    "path": "todos.items.unlinkSession",
+    "kind": "mutation",
+    "summary": "Remove the link between an agent session and a to-do item.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "id",
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "unlinksession",
+      "id",
+      "sessionid"
+    ],
+    "searchBlob": "todos.items.unlinkSession Remove the link between an agent session and a to-do item. todos items unlinksession id sessionid id sessionId"
+  },
+  "todos.items.upNext": {
+    "path": "todos.items.upNext",
+    "kind": "query",
+    "summary": "Get the next open to-do items to work on across lists, with their list names.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      }
+    },
+    "tags": [
+      "todos",
+      "items",
+      "upnext",
+      "organizationid",
+      "limit"
+    ],
+    "searchBlob": "todos.items.upNext Get the next open to-do items to work on across lists, with their list names. todos items upnext organizationid limit organizationId limit"
+  },
+  "todos.items.update": {
+    "path": "todos.items.update",
+    "kind": "mutation",
+    "summary": "Edit a to-do item's title or notes, or mark it done or not done.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 10000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "done": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "items",
+      "update",
+      "id",
+      "title",
+      "notes",
+      "done"
+    ],
+    "searchBlob": "todos.items.update Edit a to-do item's title or notes, or mark it done or not done. todos items update id title notes done id title notes done"
+  },
+  "todos.lists.create": {
+    "path": "todos.lists.create",
+    "kind": "mutation",
+    "summary": "Create a new to-do list with a name, optional emoji, repository, and default session settings.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "emoji": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 16
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gitUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "variant": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "tags": [
+      "todos",
+      "lists",
+      "create",
+      "organizationid",
+      "name",
+      "emoji",
+      "giturl",
+      "mode",
+      "model",
+      "variant"
+    ],
+    "searchBlob": "todos.lists.create Create a new to-do list with a name, optional emoji, repository, and default session settings. todos lists create organizationid name emoji giturl mode model variant organizationId name emoji gitUrl mode model variant"
+  },
+  "todos.lists.delete": {
+    "path": "todos.lists.delete",
+    "kind": "mutation",
+    "summary": "Delete a to-do list.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "lists",
+      "delete",
+      "id"
+    ],
+    "searchBlob": "todos.lists.delete Delete a to-do list. todos lists delete id id"
+  },
+  "todos.lists.list": {
+    "path": "todos.lists.list",
+    "kind": "query",
+    "summary": "List all of the user's to-do lists, optionally including archived ones and scoped to an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "includeArchived": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tags": [
+      "todos",
+      "lists",
+      "list",
+      "organizationid",
+      "includearchived"
+    ],
+    "searchBlob": "todos.lists.list List all of the user's to-do lists, optionally including archived ones and scoped to an organization. todos lists list organizationid includearchived organizationId includeArchived"
+  },
+  "todos.lists.move": {
+    "path": "todos.lists.move",
+    "kind": "mutation",
+    "summary": "Reorder a to-do list by placing it before or after another list.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "beforeId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "afterId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "lists",
+      "move",
+      "id",
+      "beforeid",
+      "afterid"
+    ],
+    "searchBlob": "todos.lists.move Reorder a to-do list by placing it before or after another list. todos lists move id beforeid afterid id beforeId afterId"
+  },
+  "todos.lists.update": {
+    "path": "todos.lists.update",
+    "kind": "mutation",
+    "summary": "Edit a to-do list's name, emoji, repo, or defaults, or archive/unarchive it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "emoji": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 16
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gitUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "variant": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "archived": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "todos",
+      "lists",
+      "update",
+      "id",
+      "name",
+      "emoji",
+      "giturl",
+      "mode",
+      "model",
+      "variant",
+      "archived"
+    ],
+    "searchBlob": "todos.lists.update Edit a to-do list's name, emoji, repo, or defaults, or archive/unarchive it. todos lists update id name emoji giturl mode model variant archived id name emoji gitUrl mode model variant archived"
   },
   "unifiedSessions.list": {
     "path": "unifiedSessions.list",

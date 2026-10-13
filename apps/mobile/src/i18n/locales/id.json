@@ -136,7 +136,8 @@
     "working": "Bekerja",
     "yourOwnRepositories": "Repositori milikmu",
     "dismissed": "Diabaikan",
-    "agent": "Agen"
+    "agent": "Agen",
+    "changes": "Perubahan"
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -1678,7 +1679,6 @@
       "retryLoadingEnvironment": "Coba muat ulang lingkungan",
       "defaultEnvironment": "Lingkungan bawaan",
       "environmentSummary": "{{commands}} perintah · {{mcp}} MCP · {{skills}} keterampilan · {{agents}} agen",
-      "changes": "Perubahan",
       "leaveChanges": "Biarkan perubahan",
       "commitAndPush": "Commit dan kirim",
       "startSession": "Mulai sesi",
@@ -1749,8 +1749,8 @@
       "toolList": "tampilkan daftar",
       "toolPatch": "tambal",
       "toolTask": "tugas",
-      "readTodos": "Baca daftar tugas",
-      "updateTodos": "Perbarui daftar tugas",
+      "readTodos": "Baca rencana",
+      "updateTodos": "Perbarui rencana",
       "linesBadge": "{{displayCount}} baris",
       "filesBadge": "{{displayCount}} berkas",
       "matchesBadge": "{{displayCount}} kecocokan",
@@ -2140,6 +2140,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Model ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Lihat perubahan",
+      "asOf": "Per {{time}}",
+      "tooLarge": "Perbedaan kode ini terlalu besar untuk ditampilkan di perangkat seluler.",
+      "empty": "Belum ada perubahan file dalam sesi ini."
     },
     "autoApprove": {
       "title": "Setujui otomatis",
@@ -2644,6 +2650,7 @@
     "fileRows": {
       "collapseFile": "Ciutkan file",
       "diffTooLarge": "Perbedaan kode terlalu besar untuk ditampilkan.",
+      "noPreview": "Pratinjau tidak tersedia untuk file ini",
       "expandFile": "Bentangkan file",
       "markViewed": "Tandai {{path}} sebagai sudah dilihat",
       "openDiffOnGitHub": "Buka perbedaan kode file ini di GitHub",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "Hapus obrolan ini?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detail obrolan",
+      "backend": "Layanan",
+      "effortDefault": "Bawaan model",
+      "noCost": "Tanpa biaya",
+      "costUnknown": "Tidak diketahui",
+      "costEstimatedNote": "Biaya jawaban yang tidak melaporkan harga diperkirakan dari harga daftar.",
+      "costUnknownNote": "Harga untuk model ini tidak diketahui.",
+      "costPartialNote": "Total ini tidak mencakup model yang harganya tidak diketahui.",
+      "localNote": "Model di perangkat berjalan di perangkat ini. Model ini tidak memiliki biaya maupun cache instruksi, dan jumlah tokennya bisa berupa perkiraan.",
+      "countedSinceNote": "Obrolan ini dimulai sebelum penggunaan dicatat. Total hanya menampilkan jawaban setelah itu.",
+      "remoteServersOn": "Server MCP jarak jauh aktif"
+    },
     "webSearch": {
       "title": "Cari di web",
       "description": "Izinkan chat ini mencari informasi terkini melalui akun Kilo Anda. Pencarian menggunakan jatah pencarian bulanan Anda.",
@@ -3423,6 +3443,9 @@
       "downloading": "Mengunduh…",
       "downloadProgress": "Mengunduh… {{percent}}%",
       "downloadFailed": "Unduhan tidak selesai. Periksa koneksi dan ruang penyimpanan Anda, lalu coba lagi."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Model ini mendukung tingkat penalaran"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Play tidak mengembalikan paket kredit yang cocok.",
     "purchaseOwnedByAnotherAccount": "Kredit pada Apple Account ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya.",
     "purchaseOwnedByAnotherAccountPlay": "Kredit di akun Google Play ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya."
+  },
+  "todos": {
+    "saveAsTodo": "Simpan sebagai tugas",
+    "segment": {
+      "label": "Tampilan agen",
+      "sessions": "Sesi",
+      "todos": "Tugas"
+    },
+    "lists": {
+      "newList": "Daftar baru",
+      "empty": "Belum ada daftar",
+      "couldNotLoad": "Tidak dapat memuat daftar",
+      "noRepository": "Tanpa repositori",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} terbuka",
+      "openCount_other": "{{count}} terbuka",
+      "archived_one": "Diarsipkan ({{count}})",
+      "archived_other": "Diarsipkan ({{count}})",
+      "archive": "Arsipkan",
+      "unarchive": "Batalkan arsip",
+      "deleteTitle": "Hapus {{name}}?",
+      "deleteMessage": "Tugas di dalamnya juga dihapus. Sesi tetap tersimpan."
+    },
+    "listSettings": {
+      "title": "Pengaturan daftar",
+      "name": "Nama",
+      "namePlaceholder": "Bug, ide, rilis…",
+      "emoji": "Emoji",
+      "mode": "Mode",
+      "defaultsHint": "Sesi yang dimulai dari daftar ini memakai default ini."
+    },
+    "list": {
+      "addPlaceholder": "Tambahkan tugas",
+      "add": "Tambah tugas",
+      "empty": "Belum ada tugas",
+      "setDefaults": "Atur repositori, mode, dan model",
+      "completed_one": "Selesai ({{count}})",
+      "completed_other": "Selesai ({{count}})"
+    },
+    "item": {
+      "markDone": "Tandai selesai",
+      "markOpen": "Tandai belum selesai",
+      "markDonePrompt": "Tandai selesai?",
+      "deleted": "Tugas dihapus",
+      "undo": "Urungkan",
+      "runCount_one": "{{count}} eksekusi",
+      "runCount_other": "{{count}} eksekusi",
+      "startNow": "Mulai tanpa tinjauan",
+      "startNowHint": "Tekan lama untuk memulai tanpa tinjauan",
+      "titleLabel": "Judul tugas",
+      "notes": "Catatan",
+      "notesPlaceholder": "Tambahkan catatan dalam Markdown",
+      "sessions": "Sesi tertaut",
+      "noSessions": "Belum ada sesi",
+      "linkSession": "Tautkan sesi",
+      "unlinkSession": "Lepas tautan {{title}}",
+      "linkFailed": "Tidak dapat menautkan sesi ke tugas"
+    },
+    "linkSession": {
+      "title": "Tautkan sebuah sesi",
+      "empty": "Tidak ada sesi terbaru",
+      "emptyInRepository": "Tidak ada sesi terbaru di {{repository}}"
+    },
+    "upNext": "Berikutnya",
+    "sessionTodo": "Tugas: {{title}}",
+    "linkToTodo": "Tautkan ke tugas",
+    "candidates": {
+      "empty": "Tidak ada tugas terbuka"
+    },
+    "saveSheet": {
+      "title": "Simpan ke daftar",
+      "saved": "Disimpan ke {{list}}"
+    }
   }
 }

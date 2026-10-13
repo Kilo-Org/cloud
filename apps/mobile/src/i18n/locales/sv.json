@@ -136,7 +136,8 @@
     "working": "Arbetar",
     "yourOwnRepositories": "Dina egna kodarkiv",
     "dismissed": "Avskriven",
-    "agent": "Ombud"
+    "agent": "Ombud",
+    "changes": "Ändringar"
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -325,6 +326,7 @@
       "collapseFile": "Fäll ihop filen",
       "expandFile": "Fäll ut filen",
       "diffTooLarge": "Diffen är för stor för att visas.",
+      "noPreview": "Ingen förhandsvisning tillgänglig för den här filen",
       "openOnGitHub": "Öppna på GitHub",
       "openDiffOnGitHub": "Öppna den här filens diff på GitHub",
       "githubDiff": "GitHub-diff"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Försök läsa in miljön igen",
       "defaultEnvironment": "Standardmiljö",
       "environmentSummary": "{{commands}} kommandon · {{mcp}} MCP · {{skills}} färdigheter · {{agents}} agenter",
-      "changes": "Ändringar",
       "leaveChanges": "Behåll ändringar",
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",
@@ -2260,8 +2261,8 @@
       "toolList": "lista",
       "toolPatch": "tillämpa ändringar",
       "toolTask": "uppgift",
-      "readTodos": "Läs uppgiftslistan",
-      "updateTodos": "Uppdatera uppgiftslistan",
+      "readTodos": "Läs planeringen",
+      "updateTodos": "Uppdatera planeringen",
       "linesBadge": "{{displayCount}} rader",
       "filesBadge": "{{displayCount}} filer",
       "matchesBadge": "{{displayCount}} träffar",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modell ({{displayCount}})",
       "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Visa ändringar",
+      "asOf": "Per {{time}}",
+      "tooLarge": "Diffen är för stor för att visas på mobilen.",
+      "empty": "Inga filändringar i den här sessionen än."
     },
     "autoApprove": {
       "title": "Automatiskt godkännande",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "Ta bort den här chatten?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Chattinformation",
+      "backend": "Backend",
+      "effortDefault": "Modellens standard",
+      "noCost": "Ingen kostnad",
+      "costUnknown": "Okänd",
+      "costEstimatedNote": "Svar som inte rapporterade något pris har uppskattats utifrån listpriser.",
+      "costUnknownNote": "Inget pris är känt för den här modellen.",
+      "costPartialNote": "Totalen omfattar inte modeller som saknar känt pris.",
+      "localNote": "Modeller på enheten körs på den här enheten. De har ingen kostnad och ingen promptcache, och deras antal token kan vara uppskattningar.",
+      "countedSinceNote": "Den här chatten startade innan användningen registrerades. Totalerna visar bara svaren efter det.",
+      "remoteServersOn": "Aktiverade MCP-fjärrservrar"
+    },
     "webSearch": {
       "title": "Sök på webben",
       "description": "Låt den här chatten slå upp aktuell information via ditt Kilo-konto. Sökningar använder din månatliga sökkvot.",
@@ -3423,6 +3443,9 @@
       "downloading": "Laddar ned…",
       "downloadProgress": "Laddar ned… {{percent}} %",
       "downloadFailed": "Nedladdningen slutfördes inte. Kontrollera anslutningen och ledigt lagringsutrymme och försök sedan igen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Den här modellen stöder resonemangsnivå"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Play returnerade inga matchande kreditpaket.",
     "purchaseOwnedByAnotherAccount": "Krediterna på detta Apple-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem.",
     "purchaseOwnedByAnotherAccountPlay": "Krediterna på detta Google Play-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem."
+  },
+  "todos": {
+    "saveAsTodo": "Spara som uppgift",
+    "segment": {
+      "label": "Agentvy",
+      "sessions": "Sessioner",
+      "todos": "Uppgifter"
+    },
+    "lists": {
+      "newList": "Ny lista",
+      "empty": "Inga listor ännu",
+      "couldNotLoad": "Kunde inte läsa in listorna",
+      "noRepository": "Inget kodarkiv",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} öppna",
+      "openCount_other": "{{count}} öppna",
+      "archived_one": "Arkiverade ({{count}})",
+      "archived_other": "Arkiverade ({{count}})",
+      "archive": "Arkivera",
+      "unarchive": "Återställ från arkivet",
+      "deleteTitle": "Ta bort {{name}}?",
+      "deleteMessage": "Dess uppgifter tas bort också. Sessionerna finns kvar."
+    },
+    "listSettings": {
+      "title": "Listinställningar",
+      "name": "Namn",
+      "namePlaceholder": "Buggar, Idéer, Utgåva…",
+      "emoji": "Emoji",
+      "mode": "Läge",
+      "defaultsHint": "Sessioner som startas från den här listan använder dessa standardvärden."
+    },
+    "list": {
+      "addPlaceholder": "Lägg till en uppgift",
+      "add": "Lägg till uppgift",
+      "empty": "Inga uppgifter ännu",
+      "setDefaults": "Ange kodarkiv, läge och modell",
+      "completed_one": "Slutförda ({{count}})",
+      "completed_other": "Slutförda ({{count}})"
+    },
+    "item": {
+      "markDone": "Markera som klar",
+      "markOpen": "Markera som inte klar",
+      "markDonePrompt": "Markera som klar?",
+      "deleted": "Uppgiften borttagen",
+      "undo": "Ångra",
+      "runCount_one": "{{count}} körning",
+      "runCount_other": "{{count}} körningar",
+      "startNow": "Starta utan granskning",
+      "startNowHint": "Håll nedtryckt för att starta utan granskning",
+      "titleLabel": "Uppgiftens titel",
+      "notes": "Anteckningar",
+      "notesPlaceholder": "Lägg till anteckningar i Markdown",
+      "sessions": "Länkade sessioner",
+      "noSessions": "Inga sessioner ännu",
+      "linkSession": "Länka session",
+      "unlinkSession": "Ta bort länken till {{title}}",
+      "linkFailed": "Kunde inte länka sessionen till uppgiften"
+    },
+    "linkSession": {
+      "title": "Länka en session",
+      "empty": "Inga senaste sessioner",
+      "emptyInRepository": "Inga senaste sessioner i {{repository}}"
+    },
+    "upNext": "Härnäst",
+    "sessionTodo": "Uppgift: {{title}}",
+    "linkToTodo": "Länka till uppgift",
+    "candidates": {
+      "empty": "Inga öppna uppgifter"
+    },
+    "saveSheet": {
+      "title": "Spara i lista",
+      "saved": "Sparat i {{list}}"
+    }
   }
 }

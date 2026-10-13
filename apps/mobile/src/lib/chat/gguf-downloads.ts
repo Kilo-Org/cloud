@@ -16,17 +16,15 @@ import {
   STORAGE_HEADROOM_BYTES,
 } from './gguf-records';
 import {
+  type GgufActiveDownload as Active,
   activeDownload,
   currentTransfer,
   downloadProgress,
   expectedBytes,
-  type GgufActiveDownload,
   moveIntoPlace,
   readVerified,
   transfersOf,
 } from './gguf-transfers';
-
-type Active = GgufActiveDownload;
 
 /**
  * Downloaded GGUF models and the one download in progress. A download the
@@ -125,6 +123,7 @@ export function ggufDownloads({
         contextWindow: read.value.contextWindow,
         tools: read.value.tools,
         vision: projector !== undefined,
+        thinking: read.value.thinking,
       },
     ]);
     publish();

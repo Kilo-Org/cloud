@@ -75,6 +75,7 @@ export default defineProject({
       'src/lib/settings/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
       'src/lib/tool-summary-translation/**/*.test.ts',
+      'src/lib/todos/**/*.test.ts',
       'src/components/**/*.test.ts',
       'src/components/agents/**/!(*.mounted).test.tsx',
       'src/components/pr-review/**/!(*.mounted).test.tsx',

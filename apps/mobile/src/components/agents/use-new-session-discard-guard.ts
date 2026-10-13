@@ -83,12 +83,18 @@ export function useNewSessionDiscardGuard({
   dirty,
   hasUnclaimedAttachments = false,
   onDiscard,
+  onSaveAsTodo,
   skipNextGuardRef,
 }: Readonly<{
   dirty: boolean;
   /** True when the composer holds admitted-but-unsent uploads; names them in the copy. */
   hasUnclaimedAttachments?: boolean;
   onDiscard: () => Promise<void>;
+  /**
+   * Offers "Save as to-do" beside Discard. The caller saves the draft, then
+   * calls `leave`, which discards the draft and replays the intercepted leave.
+   */
+  onSaveAsTodo?: (leave: () => void) => void;
   skipNextGuardRef: RefObject<boolean>;
 }>): NewSessionDiscardGuard {
   const navigation = useNavigation();
@@ -108,6 +114,22 @@ export function useNewSessionDiscardGuard({
     setConfirmVisible(false);
   }, []);
 
+  const discardAndLeave = useCallback(
+    (action: PreventedLeaveAction) => {
+      void (async () => {
+        try {
+          await onDiscardRef.current();
+          navigation.dispatch(action);
+        } catch {
+          // The clear failed: stay on the screen so the draft is kept and the
+          // user can retry by leaving again or keep editing.
+          toast.error(i18n.t('agentChat.newSession.discardFailed'));
+        }
+      })();
+    },
+    [navigation]
+  );
+
   const confirmDiscard = useCallback(() => {
     const action = pendingActionRef.current;
     if (action === null) {
@@ -116,17 +138,19 @@ export function useNewSessionDiscardGuard({
     // Close first: the choice is made, and a second press must not clear or
     // leave twice.
     closeConfirm();
-    void (async () => {
-      try {
-        await onDiscardRef.current();
-        navigation.dispatch(action);
-      } catch {
-        // The clear failed: stay on the screen so the draft is kept and the
-        // user can retry by leaving again or keep editing.
-        toast.error(i18n.t('agentChat.newSession.discardFailed'));
-      }
-    })();
-  }, [closeConfirm, navigation]);
+    discardAndLeave(action);
+  }, [closeConfirm, discardAndLeave]);
+
+  const saveAsTodo = useCallback(() => {
+    const action = pendingActionRef.current;
+    if (action === null || !onSaveAsTodo) {
+      return;
+    }
+    closeConfirm();
+    onSaveAsTodo(() => {
+      discardAndLeave(action);
+    });
+  }, [closeConfirm, discardAndLeave, onSaveAsTodo]);
 
   usePreventRemove(dirty, ({ data }) => {
     if (skipNextGuardRef.current) {
@@ -158,6 +182,9 @@ export function useNewSessionDiscardGuard({
           ),
           confirmLabel: i18n.t('common.discard'),
           cancelLabel: i18n.t('common.keepEditing'),
+          extraAction: onSaveAsTodo
+            ? { label: i18n.t('todos.saveAsTodo'), onPress: saveAsTodo }
+            : undefined,
           onConfirm: confirmDiscard,
           onCancel: closeConfirm,
         })

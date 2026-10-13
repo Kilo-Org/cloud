@@ -136,7 +136,8 @@
     "working": "В процес",
     "yourOwnRepositories": "Личните ти хранилища",
     "dismissed": "Отхвърлено",
-    "agent": "агент"
+    "agent": "агент",
+    "changes": "Промени"
   },
   "language": {
     "restarting": "Рестартиране за смяна на езика",
@@ -325,6 +326,7 @@
       "collapseFile": "Свий файла",
       "expandFile": "Разгъни файла",
       "diffTooLarge": "Разликите са твърде големи, за да се покажат.",
+      "noPreview": "Няма наличен преглед за този файл",
       "openOnGitHub": "Отвори в GitHub",
       "openDiffOnGitHub": "Отвори разликите в този файл в GitHub",
       "githubDiff": "Разликите в GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Опитай отново да заредиш средата",
       "defaultEnvironment": "Среда по подразбиране",
       "environmentSummary": "{{commands}} команди · {{mcp}} MCP · {{skills}} умения · {{agents}} агенти",
-      "changes": "Промени",
       "leaveChanges": "Остави промените",
       "commitAndPush": "Комитни и изпрати",
       "startSession": "Започни сесия",
@@ -2260,8 +2261,8 @@
       "toolList": "изброяване",
       "toolPatch": "прилагане на корекция",
       "toolTask": "задача",
-      "readTodos": "Прочети задачите",
-      "updateTodos": "Актуализирай задачите",
+      "readTodos": "Прочети плана",
+      "updateTodos": "Актуализирай плана",
       "linesBadge": "{{displayCount}} реда",
       "filesBadge": "{{displayCount}} файла",
       "matchesBadge": "{{displayCount}} съвпадения",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Модел ({{displayCount}})",
       "modelsCount_other": "Модели ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Виж промените",
+      "asOf": "Към {{time}}",
+      "tooLarge": "Разликите са твърде големи, за да се покажат на мобилно устройство.",
+      "empty": "Все още няма промени във файловете в тази сесия."
     },
     "autoApprove": {
       "title": "Автоматично одобряване",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "Изтриване на този чат?"
     },
     "beta": "Бета",
+    "details": {
+      "title": "Подробности за чата",
+      "backend": "Сървър",
+      "effortDefault": "По подразбиране за модела",
+      "noCost": "Без разход",
+      "costUnknown": "Неизвестен",
+      "costEstimatedNote": "Разходът за отговорите без отчетена цена е изчислен приблизително по ценоразписа.",
+      "costUnknownNote": "Няма известна цена за този модел.",
+      "costPartialNote": "Тази обща сума не включва моделите без известна цена.",
+      "localNote": "Моделите на устройството работят на това устройство. Те нямат разход и кеш на заявките, а броят на токените им може да е приблизителен.",
+      "countedSinceNote": "Този чат е започнал преди отчитането на използването. Общите суми показват само отговорите след това.",
+      "remoteServersOn": "Включени дистанционни MCP сървъри"
+    },
     "webSearch": {
       "title": "Търсене в мрежата",
       "description": "Позволете на този чат да търси актуална информация чрез профила ви в Kilo. Търсенията използват месечния ви лимит за търсене.",
@@ -3423,6 +3443,9 @@
       "downloading": "Изтегляне…",
       "downloadProgress": "Изтегляне… {{percent}}%",
       "downloadFailed": "Изтеглянето не завърши. Проверете връзката и свободното място, след което опитайте отново."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Този модел поддържа усилие за разсъждение"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Play не върна съвпадащи пакети с кредити.",
     "purchaseOwnedByAnotherAccount": "Кредитите в този Apple Account принадлежат на друг акаунт в Kilo. Влез в съответния акаунт в Kilo, за да ги използваш.",
     "purchaseOwnedByAnotherAccountPlay": "Кредитите на този Google Play акаунт принадлежат на друг Kilo акаунт. Влезте в този Kilo акаунт, за да ги използвате."
+  },
+  "todos": {
+    "saveAsTodo": "Запази като задача",
+    "segment": {
+      "label": "Агентски изглед",
+      "sessions": "Сесии",
+      "todos": "Задачи"
+    },
+    "lists": {
+      "newList": "Нов списък",
+      "empty": "Все още няма списъци",
+      "couldNotLoad": "Не успяхме да заредим списъците",
+      "noRepository": "Няма хранилище",
+      "rowA11y": "{{name}} — {{openCount}}",
+      "openCount_one": "Отворени: {{count}}",
+      "openCount_other": "Отворени: {{count}}",
+      "archived_one": "Архивирани ({{count}})",
+      "archived_other": "Архивирани ({{count}})",
+      "archive": "Архивирай",
+      "unarchive": "Разархивирай",
+      "deleteTitle": "Да се изтрие ли {{name}}?",
+      "deleteMessage": "Задачите в него също се изтриват. Сесиите им остават."
+    },
+    "listSettings": {
+      "title": "Настройки на списъка",
+      "name": "Име",
+      "namePlaceholder": "Бъгове, идеи, издание…",
+      "emoji": "Емоджи",
+      "mode": "Режим",
+      "defaultsHint": "Сесиите, стартирани от този списък, използват тези стойности по подразбиране."
+    },
+    "list": {
+      "addPlaceholder": "Добави задача",
+      "add": "Добавяне на задача",
+      "empty": "Все още няма задачи",
+      "setDefaults": "Задай хранилище, режим и модел",
+      "completed_one": "Завършени ({{count}})",
+      "completed_other": "Завършени ({{count}})"
+    },
+    "item": {
+      "markDone": "Отбележи като готово",
+      "markOpen": "Отбележи като неизпълнено",
+      "markDonePrompt": "Да се отбележи ли като готово?",
+      "deleted": "Задачата е изтрита",
+      "undo": "Отмени",
+      "runCount_one": "{{count}} изпълнение",
+      "runCount_other": "{{count}} изпълнения",
+      "startNow": "Стартирай без преглед",
+      "startNowHint": "Натисни и задръж, за да стартираш без преглед",
+      "titleLabel": "Заглавие на задачата",
+      "notes": "Бележки",
+      "notesPlaceholder": "Добави бележки в Markdown",
+      "sessions": "Свързани сесии",
+      "noSessions": "Все още няма сесии",
+      "linkSession": "Свържи сесия",
+      "unlinkSession": "Премахни връзката с {{title}}",
+      "linkFailed": "Не успяхме да свържем сесията със задачата"
+    },
+    "linkSession": {
+      "title": "Свързване на сесия",
+      "empty": "Няма скорошни сесии",
+      "emptyInRepository": "Няма скорошни сесии в {{repository}}"
+    },
+    "upNext": "Следващо",
+    "sessionTodo": "Задача: {{title}}",
+    "linkToTodo": "Свържи със задача",
+    "candidates": {
+      "empty": "Няма отворени задачи"
+    },
+    "saveSheet": {
+      "title": "Запази в списък",
+      "saved": "Запазено в {{list}}"
+    }
   }
 }

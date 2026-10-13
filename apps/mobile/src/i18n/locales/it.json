@@ -136,7 +136,8 @@
     "working": "In corso",
     "yourOwnRepositories": "I tuoi repository",
     "dismissed": "Ignorato",
-    "agent": "Agente"
+    "agent": "Agente",
+    "changes": "Modifiche"
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -1659,7 +1660,6 @@
       "retryLoadingEnvironment": "Riprova a caricare l'ambiente",
       "defaultEnvironment": "Ambiente predefinito",
       "environmentSummary": "{{commands}} comandi · {{mcp}} MCP · {{skills}} competenze · {{agents}} agenti",
-      "changes": "Modifiche",
       "leaveChanges": "Mantieni modifiche",
       "commitAndPush": "Commit e push",
       "startSession": "Avvia sessione",
@@ -1731,8 +1731,8 @@
       "toolList": "elenca",
       "toolPatch": "applica patch",
       "toolTask": "attività",
-      "readTodos": "Leggi le attività",
-      "updateTodos": "Aggiorna le attività",
+      "readTodos": "Leggi il piano",
+      "updateTodos": "Aggiorna il piano",
       "linesBadge": "{{displayCount}} righe",
       "filesBadge": "{{displayCount}} file",
       "matchesBadge": "{{displayCount}} corrispondenze",
@@ -2131,6 +2131,12 @@
       "modelsCount_one": "Modello ({{displayCount}})",
       "modelsCount_other": "Modelli ({{displayCount}})",
       "modelsCount_many": "Modelli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Visualizza modifiche",
+      "asOf": "Aggiornato alle {{time}}",
+      "tooLarge": "Questo confronto è troppo esteso per essere visualizzato su dispositivi mobili.",
+      "empty": "Ancora nessuna modifica ai file in questa sessione."
     },
     "autoApprove": {
       "title": "Approvazione automatica",
@@ -2672,6 +2678,7 @@
     "fileRows": {
       "collapseFile": "Comprimi il file",
       "diffTooLarge": "Il confronto è troppo esteso per essere visualizzato.",
+      "noPreview": "Nessuna anteprima disponibile per questo file",
       "expandFile": "Espandi il file",
       "markViewed": "Segna {{path}} come visualizzato",
       "openDiffOnGitHub": "Apri il confronto delle modifiche a questo file su GitHub",
@@ -3252,6 +3259,19 @@
       "deleteTitle": "Eliminare questa chat?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Dettagli della chat",
+      "backend": "Servizio",
+      "effortDefault": "Predefinito del modello",
+      "noCost": "Nessun costo",
+      "costUnknown": "Non noto",
+      "costEstimatedNote": "Il costo delle risposte che non hanno indicato un prezzo è stimato in base ai prezzi di listino.",
+      "costUnknownNote": "Nessun prezzo noto per questo modello.",
+      "costPartialNote": "Questo totale non include i modelli senza un prezzo noto.",
+      "localNote": "I modelli sul dispositivo vengono eseguiti su questo dispositivo. Non hanno costi né cache dei prompt e il loro conteggio dei token può essere una stima.",
+      "countedSinceNote": "Questa chat è iniziata prima che l'utilizzo venisse registrato. I totali mostrano solo le risposte successive.",
+      "remoteServersOn": "Server MCP remoti attivi"
+    },
     "webSearch": {
       "title": "Cerca sul web",
       "description": "Consenti a questa chat di cercare informazioni aggiornate tramite il tuo account Kilo. Le ricerche usano la tua quota mensile di ricerche.",
@@ -3464,6 +3484,9 @@
       "downloading": "Download in corso…",
       "downloadProgress": "Download in corso… {{percent}}%",
       "downloadFailed": "Il download non è stato completato. Controlla la connessione e lo spazio libero, poi riprova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Questo modello supporta il livello di ragionamento"
     }
   },
   "settingsTools": {
@@ -3686,5 +3709,82 @@
     "noMatchingProductsPlay": "Google Play non ha restituito pacchetti di crediti corrispondenti.",
     "purchaseOwnedByAnotherAccount": "I crediti associati a questo Apple Account appartengono a un altro account Kilo. Accedi a quell'account Kilo per usarli.",
     "purchaseOwnedByAnotherAccountPlay": "I crediti su questo account Google Play appartengono a un account Kilo diverso. Accedi a quell'account Kilo per usarli."
+  },
+  "todos": {
+    "saveAsTodo": "Salva come attività",
+    "segment": {
+      "label": "Vista agenti",
+      "sessions": "Sessioni",
+      "todos": "Attività"
+    },
+    "lists": {
+      "newList": "Nuovo elenco",
+      "empty": "Ancora nessun elenco",
+      "couldNotLoad": "Impossibile caricare gli elenchi",
+      "noRepository": "Nessun repository",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} aperte",
+      "openCount_many": "{{count}} aperte",
+      "openCount_other": "{{count}} aperte",
+      "archived_one": "Archiviate ({{count}})",
+      "archived_many": "Archiviate ({{count}})",
+      "archived_other": "Archiviate ({{count}})",
+      "archive": "Archivia",
+      "unarchive": "Rimuovi dall'archivio",
+      "deleteTitle": "Eliminare {{name}}?",
+      "deleteMessage": "Anche le sue attività vengono eliminate. Le sessioni restano."
+    },
+    "listSettings": {
+      "title": "Impostazioni elenco",
+      "name": "Nome",
+      "namePlaceholder": "Bug, Idee, Release…",
+      "emoji": "Emoji",
+      "mode": "Modalità",
+      "defaultsHint": "Le sessioni avviate da questo elenco usano questi valori predefiniti."
+    },
+    "list": {
+      "addPlaceholder": "Aggiungi un'attività",
+      "add": "Aggiungi attività",
+      "empty": "Ancora nessuna attività",
+      "setDefaults": "Imposta repository, modalità e modello",
+      "completed_one": "Completate ({{count}})",
+      "completed_many": "Completate ({{count}})",
+      "completed_other": "Completate ({{count}})"
+    },
+    "item": {
+      "markDone": "Segna come fatta",
+      "markOpen": "Segna come non fatta",
+      "markDonePrompt": "Segnare come fatta?",
+      "deleted": "Attività eliminata",
+      "undo": "Annulla eliminazione",
+      "runCount_one": "{{count}} esecuzione",
+      "runCount_many": "{{count}} esecuzioni",
+      "runCount_other": "{{count}} esecuzioni",
+      "startNow": "Avvia senza revisione",
+      "startNowHint": "Tieni premuto per avviare senza revisione",
+      "titleLabel": "Titolo dell'attività",
+      "notes": "Note",
+      "notesPlaceholder": "Aggiungi note in Markdown",
+      "sessions": "Sessioni collegate",
+      "noSessions": "Ancora nessuna sessione",
+      "linkSession": "Collega sessione",
+      "unlinkSession": "Scollega {{title}}",
+      "linkFailed": "Impossibile collegare la sessione all'attività"
+    },
+    "linkSession": {
+      "title": "Collega una sessione",
+      "empty": "Nessuna sessione recente",
+      "emptyInRepository": "Nessuna sessione recente in {{repository}}"
+    },
+    "upNext": "Prossimo",
+    "sessionTodo": "Attività: {{title}}",
+    "linkToTodo": "Collega all'attività",
+    "candidates": {
+      "empty": "Nessuna attività aperta"
+    },
+    "saveSheet": {
+      "title": "Salva nell'elenco",
+      "saved": "Salvato in {{list}}"
+    }
   }
 }

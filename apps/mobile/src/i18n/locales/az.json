@@ -136,7 +136,8 @@
     "working": "İşləyir",
     "yourOwnRepositories": "Öz repozitoriyaların",
     "dismissed": "Rədd edilib",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Dəyişikliklər"
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -325,6 +326,7 @@
       "collapseFile": "Faylın məzmununu gizlət",
       "expandFile": "Faylın məzmununu göstər",
       "diffTooLarge": "Dəyişikliklərin həcmi göstərilmək üçün çox böyükdür.",
+      "noPreview": "Bu fayl üçün önizləmə mövcud deyil",
       "openOnGitHub": "GitHub-da aç",
       "openDiffOnGitHub": "Bu faylın dəyişikliklərini GitHub-da aç",
       "githubDiff": "GitHub-dakı dəyişikliklər"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Mühiti yenidən yüklə",
       "defaultEnvironment": "Standart mühit",
       "environmentSummary": "{{commands}} əmr · {{mcp}} MCP · {{skills}} bacarıq · {{agents}} agent",
-      "changes": "Dəyişikliklər",
       "leaveChanges": "Dəyişiklikləri saxla",
       "commitAndPush": "Təsdiqlə və göndər",
       "startSession": "Sessiyanı başlat",
@@ -2260,8 +2261,8 @@
       "toolList": "siyahıla",
       "toolPatch": "düzəliş et",
       "toolTask": "tapşırıq",
-      "readTodos": "Tapşırıqları oxu",
-      "updateTodos": "Tapşırıqları yenilə",
+      "readTodos": "Planı oxu",
+      "updateTodos": "Planı yenilə",
       "linesBadge": "{{displayCount}} sətir",
       "filesBadge": "{{displayCount}} fayl",
       "matchesBadge": "{{displayCount}} uyğunluq",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modellər ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Dəyişikliklərə bax",
+      "asOf": "{{time}} vəziyyətinə",
+      "tooLarge": "Dəyişikliklərin həcmi mobil cihazda göstərmək üçün çox böyükdür.",
+      "empty": "Bu sessiyada hələ fayl dəyişikliyi yoxdur."
     },
     "autoApprove": {
       "title": "Avtomatik təsdiq",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "Bu söhbət silinsin?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Söhbətin təfərrüatları",
+      "backend": "Arxa xidmət",
+      "effortDefault": "Modelin standart dəyəri",
+      "noCost": "Xərc yoxdur",
+      "costUnknown": "Məlum deyil",
+      "costEstimatedNote": "Qiymət bildirməyən cavabların xərci siyahı qiymətlərinə əsasən təxmin edilib.",
+      "costUnknownNote": "Bu model üçün məlum qiymət yoxdur.",
+      "costPartialNote": "Bu cəmə qiyməti məlum olmayan modellər daxil deyil.",
+      "localNote": "Cihazdakı modellər bu cihazda işləyir. Onların xərci və sorğu keşi yoxdur, token sayları isə təxmini ola bilər.",
+      "countedSinceNote": "Bu söhbət istifadə qeydə alınmazdan əvvəl başlayıb. Cəmlər yalnız ondan sonrakı cavabları göstərir.",
+      "remoteServersOn": "Aktiv uzaq MCP serverləri"
+    },
     "webSearch": {
       "title": "Vebdə axtar",
       "description": "Bu söhbətə Kilo hesabınız vasitəsilə aktual məlumat axtarmağa icazə verin. Axtarışlar aylıq axtarış limitinizdən istifadə edir.",
@@ -3423,6 +3443,9 @@
       "downloading": "Endirilir…",
       "downloadProgress": "Endirilir… {{percent}}%",
       "downloadFailed": "Endirmə tamamlanmadı. İnternet bağlantınızı və boş yaddaşı yoxlayın, sonra yenidən cəhd edin."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Bu model düşünmə səviyyəsini dəstəkləyir"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Play tərəfindən uyğun kredit paketi qaytarılmadı.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil ol.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil olun."
+  },
+  "todos": {
+    "saveAsTodo": "Tapşırıq kimi yadda saxla",
+    "segment": {
+      "label": "Agentlər görünüşü",
+      "sessions": "Sessiyalar",
+      "todos": "Tapşırıqlar"
+    },
+    "lists": {
+      "newList": "Yeni siyahı",
+      "empty": "Hələ siyahı yoxdur",
+      "couldNotLoad": "Siyahıları yükləmək mümkün olmadı",
+      "noRepository": "Repozitoriya yoxdur",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} açıq",
+      "openCount_other": "{{count}} açıq",
+      "archived_one": "Arxivlənib ({{count}})",
+      "archived_other": "Arxivlənib ({{count}})",
+      "archive": "Arxivləşdir",
+      "unarchive": "Arxivdən çıxar",
+      "deleteTitle": "{{name}} silinsin?",
+      "deleteMessage": "Onun tapşırıqları da silinir. Sessiyaları qalır."
+    },
+    "listSettings": {
+      "title": "Siyahı parametrləri",
+      "name": "Ad",
+      "namePlaceholder": "Xətalar, İdeyalar, Buraxılış…",
+      "emoji": "Emoji",
+      "mode": "Rejim",
+      "defaultsHint": "Bu siyahıdan başladılan sessiyalar bu standart dəyərlərdən istifadə edir."
+    },
+    "list": {
+      "addPlaceholder": "Yeni tapşırıq əlavə et",
+      "add": "Tapşırıq əlavə et",
+      "empty": "Hələ tapşırıq yoxdur",
+      "setDefaults": "Repozitoriya, rejim və model təyin et",
+      "completed_one": "Tamamlanıb ({{count}})",
+      "completed_other": "Tamamlanıb ({{count}})"
+    },
+    "item": {
+      "markDone": "Tamamlanıb kimi işarələ",
+      "markOpen": "Tamamlanmayıb kimi işarələ",
+      "markDonePrompt": "Tamamlanıb kimi işarələnsin?",
+      "deleted": "Tapşırıq silindi",
+      "undo": "Geri al",
+      "runCount_one": "{{count}} işə düşmə",
+      "runCount_other": "{{count}} işə düşmə",
+      "startNow": "Yoxlamasız başlat",
+      "startNowHint": "Yoxlamasız başlatmaq üçün basıb saxla",
+      "titleLabel": "Tapşırığın başlığı",
+      "notes": "Qeydlər",
+      "notesPlaceholder": "Markdown ilə qeyd əlavə et",
+      "sessions": "Əlaqəli sessiyalar",
+      "noSessions": "Hələ sessiya yoxdur",
+      "linkSession": "Sessiyanı əlaqələndir",
+      "unlinkSession": "{{title}} əlaqəsini sil",
+      "linkFailed": "Sessiyanı tapşırıqla əlaqələndirmək mümkün olmadı"
+    },
+    "linkSession": {
+      "title": "Sessiya əlaqələndir",
+      "empty": "Son sessiya yoxdur",
+      "emptyInRepository": "{{repository}} repozitoriyasında son sessiya yoxdur"
+    },
+    "upNext": "Sıradakı",
+    "sessionTodo": "Tapşırıq: {{title}}",
+    "linkToTodo": "Tapşırığa əlaqələndir",
+    "candidates": {
+      "empty": "Açıq tapşırıq yoxdur"
+    },
+    "saveSheet": {
+      "title": "Siyahıya yadda saxla",
+      "saved": "{{list}} siyahısına yadda saxlanıldı"
+    }
   }
 }

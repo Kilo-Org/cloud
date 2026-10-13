@@ -136,7 +136,8 @@
     "working": "Çalışıyor",
     "yourOwnRepositories": "Kendi depoların",
     "dismissed": "Yok sayıldı",
-    "agent": "Ajan"
+    "agent": "Ajan",
+    "changes": "Değişiklikler"
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -1678,7 +1679,6 @@
       "retryLoadingEnvironment": "Ortamı yüklemeyi tekrar dene",
       "defaultEnvironment": "Varsayılan ortam",
       "environmentSummary": "{{commands}} komut · {{mcp}} MCP · {{skills}} beceri · {{agents}} ajan",
-      "changes": "Değişiklikler",
       "leaveChanges": "Değişiklikleri koru",
       "commitAndPush": "İşle ve gönder",
       "startSession": "Oturumu başlat",
@@ -1749,8 +1749,8 @@
       "toolList": "listele",
       "toolPatch": "yama uygula",
       "toolTask": "görev",
-      "readTodos": "Görevleri oku",
-      "updateTodos": "Görevleri güncelle",
+      "readTodos": "Planı oku",
+      "updateTodos": "Planı güncelle",
       "linesBadge": "{{displayCount}} satır",
       "filesBadge": "{{displayCount}} dosya",
       "matchesBadge": "{{displayCount}} eşleşme",
@@ -2140,6 +2140,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Değişiklikleri görüntüle",
+      "asOf": "{{time}} itibarıyla",
+      "tooLarge": "Bu fark, mobilde gösterilemeyecek kadar büyük.",
+      "empty": "Bu oturumda henüz dosya değişikliği yok."
     },
     "autoApprove": {
       "title": "Otomatik onayla",
@@ -2644,6 +2650,7 @@
     "fileRows": {
       "collapseFile": "Dosyayı daralt",
       "diffTooLarge": "Fark, görüntülenemeyecek kadar büyük.",
+      "noPreview": "Bu dosya için önizleme yok",
       "expandFile": "Dosyayı genişlet",
       "markViewed": "{{path}} dosyasını görüntülenmiş olarak işaretle",
       "openDiffOnGitHub": "Bu dosyanın farkını GitHub'da aç",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "Bu sohbet silinsin mi?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Sohbet ayrıntıları",
+      "backend": "Arka uç",
+      "effortDefault": "Model varsayılanı",
+      "noCost": "Maliyet yok",
+      "costUnknown": "Bilinmiyor",
+      "costEstimatedNote": "Fiyat bildirmeyen yanıtlar liste fiyatlarına göre tahmin edilmiştir.",
+      "costUnknownNote": "Bu model için bilinen bir fiyat yok.",
+      "costPartialNote": "Bu toplam, fiyatı bilinmeyen modelleri içermez.",
+      "localNote": "Cihazdaki modeller bu cihazda çalışır. Maliyetleri ve istem önbellekleri yoktur; belirteç sayıları tahmini olabilir.",
+      "countedSinceNote": "Bu sohbet, kullanım kaydedilmeye başlanmadan önce başladı. Toplamlar yalnızca bundan sonraki yanıtları gösterir.",
+      "remoteServersOn": "Açık uzak MCP sunucuları"
+    },
     "webSearch": {
       "title": "Web'de ara",
       "description": "Bu sohbetin Kilo hesabın üzerinden güncel bilgi aramasına izin ver. Aramalar aylık arama hakkını kullanır.",
@@ -3423,6 +3443,9 @@
       "downloading": "İndiriliyor…",
       "downloadProgress": "İndiriliyor… %{{percent}}",
       "downloadFailed": "İndirme tamamlanamadı. Bağlantınızı ve boş depolama alanınızı kontrol edip yeniden deneyin."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Bu model düşünme düzeyini destekler"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Play eşleşen kredi paketi döndürmedi.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account üzerindeki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum aç.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındaki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum açın."
+  },
+  "todos": {
+    "saveAsTodo": "Görev olarak kaydet",
+    "segment": {
+      "label": "Ajanlar görünümü",
+      "sessions": "Oturumlar",
+      "todos": "Görevler"
+    },
+    "lists": {
+      "newList": "Yeni liste",
+      "empty": "Henüz liste yok",
+      "couldNotLoad": "Listeler yüklenemedi",
+      "noRepository": "Depo yok",
+      "rowA11y": "{{name}} — {{openCount}}",
+      "openCount_one": "{{count}} açık",
+      "openCount_other": "{{count}} açık",
+      "archived_one": "Arşivlenenler ({{count}})",
+      "archived_other": "Arşivlenenler ({{count}})",
+      "archive": "Arşivle",
+      "unarchive": "Arşivden çıkar",
+      "deleteTitle": "{{name}} silinsin mi?",
+      "deleteMessage": "Görevleri de silinir. Oturumları kalır."
+    },
+    "listSettings": {
+      "title": "Liste ayarları",
+      "name": "Ad",
+      "namePlaceholder": "Hatalar, fikirler, sürüm…",
+      "emoji": "Emoji",
+      "mode": "Mod",
+      "defaultsHint": "Bu listeden başlatılan oturumlar bu varsayılanları kullanır."
+    },
+    "list": {
+      "addPlaceholder": "Bir görev ekle",
+      "add": "Görev ekle",
+      "empty": "Henüz görev yok",
+      "setDefaults": "Depo, mod ve model ayarla",
+      "completed_one": "Tamamlandı ({{count}})",
+      "completed_other": "Tamamlandı ({{count}})"
+    },
+    "item": {
+      "markDone": "Tamamlandı olarak işaretle",
+      "markOpen": "Tamamlanmadı olarak işaretle",
+      "markDonePrompt": "Tamamlandı olarak işaretlensin mi?",
+      "deleted": "Görev silindi",
+      "undo": "Geri al",
+      "runCount_one": "{{count}} çalıştırma",
+      "runCount_other": "{{count}} çalıştırma",
+      "startNow": "İncelemeden başlat",
+      "startNowHint": "İncelemeden başlatmak için basılı tut",
+      "titleLabel": "Görev başlığı",
+      "notes": "Notlar",
+      "notesPlaceholder": "Markdown ile not ekle",
+      "sessions": "Bağlı oturumlar",
+      "noSessions": "Henüz oturum yok",
+      "linkSession": "Oturum bağla",
+      "unlinkSession": "{{title}} bağlantısını kaldır",
+      "linkFailed": "Oturum göreve bağlanamadı"
+    },
+    "linkSession": {
+      "title": "Bir oturum bağla",
+      "empty": "Son oturum yok",
+      "emptyInRepository": "{{repository}} deposunda son oturum yok"
+    },
+    "upNext": "Sıradaki",
+    "sessionTodo": "Görev: {{title}}",
+    "linkToTodo": "Göreve bağla",
+    "candidates": {
+      "empty": "Açık görev yok"
+    },
+    "saveSheet": {
+      "title": "Listeye kaydet",
+      "saved": "{{list}} listesine kaydedildi"
+    }
   }
 }

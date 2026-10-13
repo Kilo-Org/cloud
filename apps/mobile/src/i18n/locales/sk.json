@@ -136,7 +136,8 @@
     "working": "Pracuje sa",
     "yourOwnRepositories": "Tvoje vlastné repozitáre",
     "dismissed": "Ignorované",
-    "agent": "agent"
+    "agent": "agent",
+    "changes": "Zmeny"
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -325,6 +326,7 @@
       "collapseFile": "Zbaliť súbor",
       "expandFile": "Rozbaliť súbor",
       "diffTooLarge": "Prehľad zmien je príliš veľký na zobrazenie.",
+      "noPreview": "Pre tento súbor nie je k dispozícii náhľad",
       "openOnGitHub": "Otvoriť na GitHub",
       "openDiffOnGitHub": "Otvoriť prehľad zmien tohto súboru na GitHub",
       "githubDiff": "Prehľad zmien na GitHub"
@@ -2245,7 +2247,6 @@
       "retryLoadingEnvironment": "Skúsiť znova načítať prostredie",
       "defaultEnvironment": "Predvolené prostredie",
       "environmentSummary": "príkazy: {{commands}} · MCP: {{mcp}} · zručnosti: {{skills}} · agenti: {{agents}}",
-      "changes": "Zmeny",
       "leaveChanges": "Ponechať zmeny",
       "commitAndPush": "Vytvoriť commit a odoslať",
       "startSession": "Spustiť reláciu",
@@ -2318,8 +2319,8 @@
       "toolList": "zobraziť zoznam",
       "toolPatch": "použiť záplatu",
       "toolTask": "úloha",
-      "readTodos": "Prečítať úlohy",
-      "updateTodos": "Aktualizovať úlohy",
+      "readTodos": "Prečítať plán",
+      "updateTodos": "Aktualizovať plán",
       "linesBadge": "riadky: {{displayCount}}",
       "filesBadge": "súbory: {{displayCount}}",
       "matchesBadge": "zhody: {{displayCount}}",
@@ -2727,6 +2728,12 @@
       "modelsCount_other": "Modely ({{displayCount}})",
       "modelsCount_few": "Modely ({{displayCount}})",
       "modelsCount_many": "Modely ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Zobraziť zmeny",
+      "asOf": "Stav k {{time}}",
+      "tooLarge": "Prehľad zmien je príliš veľký na zobrazenie v mobile.",
+      "empty": "V tejto relácii zatiaľ nie sú žiadne zmeny súborov."
     },
     "autoApprove": {
       "title": "Automatické schvaľovanie",
@@ -3293,6 +3300,19 @@
       "deleteTitle": "Odstrániť tento chat?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Podrobnosti chatu",
+      "backend": "Server",
+      "effortDefault": "Predvolené pre model",
+      "noCost": "Bez nákladov",
+      "costUnknown": "Neznáme",
+      "costEstimatedNote": "Náklady na odpovede, ktoré neuviedli cenu, sú odhadnuté podľa cenníkových cien.",
+      "costUnknownNote": "Cena tohto modelu nie je známa.",
+      "costPartialNote": "Tento súčet nezahŕňa modely, ktorých cena nie je známa.",
+      "localNote": "Modely v zariadení bežia v tomto zariadení. Nemajú žiadne náklady ani vyrovnávaciu pamäť promptov a ich počty tokenov môžu byť odhadované.",
+      "countedSinceNote": "Tento chat sa začal pred zaznamenávaním využitia. Súčty zahŕňajú iba odpovede po tomto čase.",
+      "remoteServersOn": "Zapnuté vzdialené servery MCP"
+    },
     "webSearch": {
       "title": "Hľadať na webe",
       "description": "Povoľte tomuto četu vyhľadávať aktuálne informácie cez váš účet Kilo. Vyhľadávania čerpajú váš mesačný limit vyhľadávania.",
@@ -3505,6 +3525,9 @@
       "downloading": "Sťahuje sa…",
       "downloadProgress": "Sťahuje sa… {{percent}} %",
       "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tento model podporuje intenzitu uvažovania"
     }
   },
   "settingsTools": {
@@ -3727,5 +3750,86 @@
     "noMatchingProductsPlay": "Google Play nevrátil žiadne zodpovedajúce balíky kreditov.",
     "purchaseOwnedByAnotherAccount": "Kredity na tomto účte Apple Account patria inému účtu Kilo. Ak ich chcete použiť, prihláste sa do príslušného účtu Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účte Google Play patria inému účtu Kilo. Prihláste sa do tohto účtu Kilo, aby ste ich použili."
+  },
+  "todos": {
+    "saveAsTodo": "Uložiť ako úlohu",
+    "segment": {
+      "label": "Zobrazenie agentov",
+      "sessions": "Relácie",
+      "todos": "Úlohy"
+    },
+    "lists": {
+      "newList": "Nový zoznam",
+      "empty": "Zatiaľ žiadne zoznamy",
+      "couldNotLoad": "Zoznamy sa nepodarilo načítať",
+      "noRepository": "Žiadny repozitár",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "Otvorené: {{count}}",
+      "openCount_few": "Otvorené: {{count}}",
+      "openCount_many": "Otvorené: {{count}}",
+      "openCount_other": "Otvorené: {{count}}",
+      "archived_one": "Archivované ({{count}})",
+      "archived_few": "Archivované ({{count}})",
+      "archived_many": "Archivované ({{count}})",
+      "archived_other": "Archivované ({{count}})",
+      "archive": "Archivovať",
+      "unarchive": "Obnoviť z archívu",
+      "deleteTitle": "Odstrániť {{name}}?",
+      "deleteMessage": "Odstránia sa aj jeho úlohy. Ich relácie zostanú."
+    },
+    "listSettings": {
+      "title": "Nastavenia zoznamu",
+      "name": "Názov",
+      "namePlaceholder": "Chyby, nápady, vydanie…",
+      "emoji": "emoji",
+      "mode": "Režim",
+      "defaultsHint": "Relácie spustené z tohto zoznamu používajú tieto predvolené hodnoty."
+    },
+    "list": {
+      "addPlaceholder": "Pridať novú úlohu",
+      "add": "Pridať úlohu",
+      "empty": "Zatiaľ žiadne úlohy",
+      "setDefaults": "Nastaviť repozitár, režim a model",
+      "completed_one": "Dokončené ({{count}})",
+      "completed_few": "Dokončené ({{count}})",
+      "completed_many": "Dokončené ({{count}})",
+      "completed_other": "Dokončené ({{count}})"
+    },
+    "item": {
+      "markDone": "Označiť ako dokončené",
+      "markOpen": "Označiť ako nedokončené",
+      "markDonePrompt": "Označiť ako dokončené?",
+      "deleted": "Úloha bola odstránená",
+      "undo": "Vrátiť späť",
+      "runCount_one": "{{count}} spustenie",
+      "runCount_few": "{{count}} spustenia",
+      "runCount_many": "{{count}} spustenia",
+      "runCount_other": "{{count}} spustení",
+      "startNow": "Spustiť bez kontroly",
+      "startNowHint": "Dlhým stlačením spustíte bez kontroly",
+      "titleLabel": "Názov úlohy",
+      "notes": "Poznámky",
+      "notesPlaceholder": "Pridať poznámky v Markdowne",
+      "sessions": "Prepojené relácie",
+      "noSessions": "Zatiaľ žiadne relácie",
+      "linkSession": "Prepojiť reláciu",
+      "unlinkSession": "Zrušiť prepojenie: {{title}}",
+      "linkFailed": "Reláciu sa nepodarilo prepojiť s úlohou"
+    },
+    "linkSession": {
+      "title": "Prepojenie relácie",
+      "empty": "Žiadne nedávne relácie",
+      "emptyInRepository": "V repozitári {{repository}} nie sú žiadne nedávne relácie"
+    },
+    "upNext": "Ďalej",
+    "sessionTodo": "Úloha: {{title}}",
+    "linkToTodo": "Prepojiť s úlohou",
+    "candidates": {
+      "empty": "Žiadne otvorené úlohy"
+    },
+    "saveSheet": {
+      "title": "Uložiť do zoznamu",
+      "saved": "Uložené do zoznamu {{list}}"
+    }
   }
 }

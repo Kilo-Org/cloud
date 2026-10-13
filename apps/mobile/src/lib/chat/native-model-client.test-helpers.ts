@@ -97,6 +97,28 @@ export const request: ModelRequest = {
   },
 };
 
+export const call = { id: 'fm-call-1', name: 'time', arguments: '{}' };
+
+export const answered = (results: readonly { callId: string; body: string }[]): ModelRequest => ({
+  ...request,
+  prompt: {
+    system: request.prompt.system,
+    messages: [
+      ...request.prompt.messages,
+      {
+        role: 'assistant',
+        cache: false,
+        parts: [{ kind: 'toolCall', callId: call.id, name: 'time', arguments: '{}' }],
+      },
+      {
+        role: 'user',
+        cache: true,
+        parts: results.map(result => ({ kind: 'toolResult', ...result, failed: false }) as const),
+      },
+    ],
+  },
+});
+
 export async function collect(
   bridge: NativeModelBridge,
   stream = nativeModelClient(bridge).stream(request)

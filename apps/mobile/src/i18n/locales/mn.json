@@ -136,7 +136,8 @@
     "working": "Ажиллаж байна",
     "yourOwnRepositories": "Таны кодын сангууд",
     "dismissed": "Хасагдсан",
-    "agent": "Агент"
+    "agent": "Агент",
+    "changes": "Өөрчлөлтүүд"
   },
   "language": {
     "restarting": "Сонгосон хэлийг хэрэглэхийн тулд дахин ачаалж байна",
@@ -325,6 +326,7 @@
       "collapseFile": "Файлыг хураах",
       "expandFile": "Файлыг дэлгэх",
       "diffTooLarge": "Өөрчлөлтийн хэмжээ хэт их тул харуулах боломжгүй.",
+      "noPreview": "Энэ файлыг урьдчилан харах боломжгүй",
       "openOnGitHub": "GitHub дээр нээх",
       "openDiffOnGitHub": "Энэ файлын өөрчлөлтийг GitHub дээр нээх",
       "githubDiff": "GitHub дээрх өөрчлөлт"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Орчныг дахин ачаалах",
       "defaultEnvironment": "Үндсэн орчин",
       "environmentSummary": "{{commands}} команд · {{mcp}} MCP · {{skills}} чадвар · {{agents}} агент",
-      "changes": "Өөрчлөлтүүд",
       "leaveChanges": "Өөрчлөлтүүдийг үлдээх",
       "commitAndPush": "Коммит хийж илгээх",
       "startSession": "Сессийг эхлүүлэх",
@@ -2260,8 +2261,8 @@
       "toolList": "жагсаах",
       "toolPatch": "засвар оруулах",
       "toolTask": "даалгавар",
-      "readTodos": "Хийх ажлын жагсаалтыг унших",
-      "updateTodos": "Хийх ажлын жагсаалтыг шинэчлэх",
+      "readTodos": "Төлөвлөгөө унших",
+      "updateTodos": "Төлөвлөгөө шинэчлэх",
       "linesBadge": "{{displayCount}} мөр",
       "filesBadge": "{{displayCount}} файл",
       "matchesBadge": "{{displayCount}} илэрц",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Загвар ({{displayCount}})",
       "modelsCount_other": "Загварууд ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Өөрчлөлтүүдийг харах",
+      "asOf": "{{time}}-ийн байдлаар",
+      "tooLarge": "Энэ өөрчлөлт хэт том тул гар утсан дээр харуулах боломжгүй.",
+      "empty": "Энэ сешнд одоогоор файлын өөрчлөлт алга."
     },
     "autoApprove": {
       "title": "Автомат зөвшөөрөл",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "Энэ чатыг устгах уу?"
     },
     "beta": "Бета",
+    "details": {
+      "title": "Чатын дэлгэрэнгүй",
+      "backend": "Үйлчилгээний сервер",
+      "effortDefault": "Загварын өгөгдмөл",
+      "noCost": "Зардалгүй",
+      "costUnknown": "Тодорхойгүй",
+      "costEstimatedNote": "Үнэ мэдээлээгүй хариултуудыг жагсаалтын үнээр тооцоолсон.",
+      "costUnknownNote": "Энэ загварын үнэ тодорхойгүй.",
+      "costPartialNote": "Энэ нийт дүнд үнэ нь тодорхойгүй загварууд ороогүй.",
+      "localNote": "Төхөөрөмж дээрх загварууд энэ төхөөрөмж дээр ажилладаг. Тэдгээрт зардал болон промптын кэш байхгүй бөгөөд токены тоо нь ойролцоо байж болно.",
+      "countedSinceNote": "Энэ чат хэрэглээг бүртгэж эхлэхээс өмнө эхэлсэн. Нийт дүнд зөвхөн түүнээс хойшхи хариултууд харагдана.",
+      "remoteServersOn": "Асаалттай алсын MCP серверүүд"
+    },
     "webSearch": {
       "title": "Вэбээс хайх",
       "description": "Энэ чатад таны Kilo бүртгэлээр дамжуулан шинэ мэдээлэл хайхыг зөвшөөрнө үү. Хайлт таны сарын хайлтын хязгаарыг ашиглана.",
@@ -3423,6 +3443,9 @@
       "downloading": "Татаж байна…",
       "downloadProgress": "Татаж байна… {{percent}}%",
       "downloadFailed": "Татаж дуусгаж чадсангүй. Интернэт холболт болон сул санах ойгоо шалгаад дахин оролдоно уу."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Энэ загвар бодох түвшинг дэмждэг"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Play тохирох кредит багц буцаагаагүй.",
     "purchaseOwnedByAnotherAccount": "Энэ Apple Account дээрх кредит нь өөр Kilo бүртгэлд харьяалагдана. Ашиглахын тулд тухайн Kilo бүртгэлдээ нэвтэрнэ үү.",
     "purchaseOwnedByAnotherAccountPlay": "Энэ Google Play бүртгэл дээрх кредит нь өөр Kilo бүртгэлд харьяалагдана. Ашиглахын тулд тухайн Kilo бүртгэлдээ нэвтэрнэ үү."
+  },
+  "todos": {
+    "saveAsTodo": "Хийх ажил болгон хадгалах",
+    "segment": {
+      "label": "Агентуудын харагдац",
+      "sessions": "Сессүүд",
+      "todos": "Хийх ажлууд"
+    },
+    "lists": {
+      "newList": "Шинэ жагсаалт",
+      "empty": "Жагсаалт одоогоор алга",
+      "couldNotLoad": "Жагсаалтыг ачаалж чадсангүй",
+      "noRepository": "Кодын сан алга",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} нээлттэй",
+      "openCount_other": "{{count}} нээлттэй",
+      "archived_one": "Архивлагдсан ({{count}})",
+      "archived_other": "Архивлагдсан ({{count}})",
+      "archive": "Архивлах",
+      "unarchive": "Архиваас гаргах",
+      "deleteTitle": "{{name}}-г устгах уу?",
+      "deleteMessage": "Түүний хийх ажлууд ч бас устгагдана. Сессүүд нь үлдэнэ."
+    },
+    "listSettings": {
+      "title": "Жагсаалтын тохиргоо",
+      "name": "Нэр",
+      "namePlaceholder": "Алдаа, санаа, хувилбар…",
+      "emoji": "Эможи",
+      "mode": "Горим",
+      "defaultsHint": "Энэ жагсаалтаас эхэлсэн сессүүд эдгээр өгөгдмөл тохиргоог ашиглана."
+    },
+    "list": {
+      "addPlaceholder": "Хийх ажил нэмэх",
+      "add": "Хийх ажил нэмэх",
+      "empty": "Хийх ажил одоогоор алга",
+      "setDefaults": "Кодын сан, горим, загварыг тохируулах",
+      "completed_one": "Дууссан ({{count}})",
+      "completed_other": "Дууссан ({{count}})"
+    },
+    "item": {
+      "markDone": "Дууссан гэж тэмдэглэх",
+      "markOpen": "Дуусаагүй гэж тэмдэглэх",
+      "markDonePrompt": "Дууссан гэж тэмдэглэх үү?",
+      "deleted": "Хийх ажил устгагдсан",
+      "undo": "Буцаах",
+      "runCount_one": "{{count}} ажиллагаа",
+      "runCount_other": "{{count}} ажиллагаа",
+      "startNow": "Шалгалтгүйгээр эхлүүлэх",
+      "startNowHint": "Шалгалтгүйгээр эхлүүлэхийн тулд удаан дарна уу",
+      "titleLabel": "Хийх ажлын гарчиг",
+      "notes": "Тэмдэглэл",
+      "notesPlaceholder": "Тэмдэглэлийг Markdown-оор нэмэх",
+      "sessions": "Холбосон сессүүд",
+      "noSessions": "Сесс одоогоор алга",
+      "linkSession": "Сесс холбох",
+      "unlinkSession": "{{title}}-г салгах",
+      "linkFailed": "Сессийг хийх ажилтай холбож чадсангүй"
+    },
+    "linkSession": {
+      "title": "Сессийг холбох",
+      "empty": "Сүүлийн үеийн сесс алга",
+      "emptyInRepository": "{{repository}}-д сүүлийн үеийн сесс алга"
+    },
+    "upNext": "Дараагийнх",
+    "sessionTodo": "Хийх ажил: {{title}}",
+    "linkToTodo": "Хийх ажилтай холбох",
+    "candidates": {
+      "empty": "Нээлттэй хийх ажил алга"
+    },
+    "saveSheet": {
+      "title": "Жагсаалтад хадгалах",
+      "saved": "{{list}}-д хадгалсан"
+    }
   }
 }

@@ -26,7 +26,9 @@ const sessions = sqliteTable('sessions', {
   id: text('id').primaryKey(),
   system: text('system').notNull(),
   model: text('model').notNull(),
-  effort: text('effort', { enum: ['low', 'medium', 'high', 'xhigh', 'max'] }),
+  effort: text('effort', {
+    enum: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+  }),
   maxTokens: integer('max_tokens'),
   prompted: integer('prompted'),
   /**

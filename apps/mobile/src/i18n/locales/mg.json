@@ -136,7 +136,8 @@
     "working": "Miasa",
     "yourOwnRepositories": "Ny tahirin-kaodinao manokana",
     "dismissed": "Nesorina",
-    "agent": "mpandraharaha"
+    "agent": "mpandraharaha",
+    "changes": "Fiovana"
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -325,6 +326,7 @@
       "collapseFile": "Aforeto ny rakitra",
       "expandFile": "Avelaro ny rakitra",
       "diffTooLarge": "Lehibe loatra ny fahasamihafana ka tsy azo aseho.",
+      "noPreview": "Tsy misy topimaso azo jerena ho an'ity rakitra ity",
       "openOnGitHub": "Sokafy ao amin'ny GitHub",
       "openDiffOnGitHub": "Sokafy ao amin'ny GitHub ny fahasamihafan'ity rakitra ity",
       "githubDiff": "Fahasamihafana ao amin'ny GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Andramo alaina indray ny tontolo fiasana",
       "defaultEnvironment": "Tontolo fiasana voafidy mialoha",
       "environmentSummary": "baiko {{commands}} · MCP {{mcp}} · fahaiza-manao {{skills}} · mpanampy {{agents}}",
-      "changes": "Fiovana",
       "leaveChanges": "Avelao ny fiovana",
       "commitAndPush": "Raketo sy alefaso",
       "startSession": "Atombohy ny fotoam-piasana",
@@ -2260,8 +2261,8 @@
       "toolList": "tanisao",
       "toolPatch": "ahitsio",
       "toolTask": "asa",
-      "readTodos": "Vakio ny lisitry ny asa hatao",
-      "updateTodos": "Havaozy ny lisitry ny asa hatao",
+      "readTodos": "Vakio ny drafitra",
+      "updateTodos": "Havaozy ny drafitra",
       "linesBadge": "Andalana {{displayCount}}",
       "filesBadge": "Rakitra {{displayCount}}",
       "matchesBadge": "Valiny mifanaraka {{displayCount}}",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modely ({{displayCount}})",
       "modelsCount_other": "Modely ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Jereo ny fiovana",
+      "asOf": "Tamin'ny {{time}}",
+      "tooLarge": "Lehibe loatra ity fahasamihafana ity ka tsy azo aseho amin'ny finday.",
+      "empty": "Mbola tsy misy rakitra niova tamin'ity fotoam-piasana ity."
     },
     "autoApprove": {
       "title": "Fankatoavana ho azy",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "Hamafa ity resaka ity?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Antsipirian'ny resaka",
+      "backend": "Rafitra mpizara",
+      "effortDefault": "Mahazatra amin'ny modely",
+      "noCost": "Maimaim-poana",
+      "costUnknown": "Tsy fantatra",
+      "costEstimatedNote": "Ny valiny tsy nanome vidiny dia nobanabanaina araka ny lisitry ny vidiny.",
+      "costUnknownNote": "Tsy fantatra ny vidin'ity modely ity.",
+      "costPartialNote": "Tsy tafiditra amin'ity fitambarany ity ireo modely tsy fantatra vidiny.",
+      "localNote": "Ny modely ao amin'ny fitaovana dia mandeha amin'ity fitaovana ity. Tsy misy sarany izy ireo ary tsy misy fitehirizana vonjimaika ho an'ny baiko, ary mety ho tombantombana ny isan'ny sombin-tsoratra.",
+      "countedSinceNote": "Nanomboka talohan'ny nandraisana an-tsoratra ny fampiasana ity resaka ity. Ny valiny taorian'izay ihany no hita amin'ny fitambarany.",
+      "remoteServersOn": "Server MCP lavitra mandeha"
+    },
     "webSearch": {
       "title": "Mikaroka amin'ny tranonkala",
       "description": "Avelao ity resaka ity hikaroka vaovao farany amin'ny alalan'ny kaontinao Kilo. Mampiasa ny fetran'ny fikarohanao isam-bolana ny fikarohana.",
@@ -3423,6 +3443,9 @@
       "downloading": "Misintona…",
       "downloadProgress": "Misintona… {{percent}}%",
       "downloadFailed": "Tsy vita ny fisintonana. Hamarino ny fifandraisanao sy ny toerana malalaka amin'ny fitahirizana, dia andramo indray."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Manohana ezaka amin'ny fisainana ity modely ity"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Tsy nisy fonosana kireditra mifanaraka naverin'ny Google Play.",
     "purchaseOwnedByAnotherAccount": "Ny kireditra amin'ity Apple Account ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy.",
     "purchaseOwnedByAnotherAccountPlay": "Ny kireditra amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy."
+  },
+  "todos": {
+    "saveAsTodo": "Tehirizo ho asa",
+    "segment": {
+      "label": "Fijery mpanampy",
+      "sessions": "Fotoam-piasana",
+      "todos": "Asa"
+    },
+    "lists": {
+      "newList": "Lisitra vaovao",
+      "empty": "Mbola tsy misy lisitra",
+      "couldNotLoad": "Tsy tafiditra ny lisitra",
+      "noRepository": "Tsy misy tahirin-kaody",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} misokatra",
+      "openCount_other": "{{count}} misokatra",
+      "archived_one": "Voatahiry ({{count}})",
+      "archived_other": "Voatahiry ({{count}})",
+      "archive": "Tahiry",
+      "unarchive": "Esory amin'ny tahiry",
+      "deleteTitle": "Hamafa {{name}}?",
+      "deleteMessage": "Foana koa ny asa ao aminy. Mijanona ny fotoam-piasany."
+    },
+    "listSettings": {
+      "title": "Fikirana lisitra",
+      "name": "Anarana",
+      "namePlaceholder": "Olana, Hevitra, Fanontana…",
+      "emoji": "Sary",
+      "mode": "Fomba fiasa",
+      "defaultsHint": "Ny fotoam-piasana atomboka amin'ity lisitra ity dia mampiasa ireo safidy voafidy mialoha ireo."
+    },
+    "list": {
+      "addPlaceholder": "Ampio asa hatao",
+      "add": "Ampio",
+      "empty": "Mbola tsy misy asa",
+      "setDefaults": "Apetraho ny tahirin-kaody, ny fomba fiasa ary ny modely",
+      "completed_one": "Vita ({{count}})",
+      "completed_other": "Vita ({{count}})"
+    },
+    "item": {
+      "markDone": "Marihina ho vita",
+      "markOpen": "Marihina ho tsy vita",
+      "markDonePrompt": "Marihina ho vita?",
+      "deleted": "Voafafa ny asa",
+      "undo": "Avereno",
+      "runCount_one": "{{count}} fanatanterahana",
+      "runCount_other": "{{count}} fanatanterahana",
+      "startNow": "Atombohy tsy misy fanamarinana",
+      "startNowHint": "Tsindrio lava hanombohana tsy misy fanamarinana",
+      "titleLabel": "Lohatenin'ny asa",
+      "notes": "Fanamarihana",
+      "notesPlaceholder": "Manampia fanamarihana amin'ny Markdown",
+      "sessions": "Fotoam-piasana mifandray",
+      "noSessions": "Mbola tsy misy fotoam-piasana",
+      "linkSession": "Ampifandraiso fotoam-piasana",
+      "unlinkSession": "Esory ny fifandraisana amin'ny {{title}}",
+      "linkFailed": "Tsy afaka nampifandray ny fotoam-piasana tamin'ny asa"
+    },
+    "linkSession": {
+      "title": "Ampifandraiso fotoam-piasana",
+      "empty": "Tsy misy fotoam-piasana vao haingana",
+      "emptyInRepository": "Tsy misy fotoam-piasana vao haingana ao amin'ny {{repository}}"
+    },
+    "upNext": "Manaraka",
+    "sessionTodo": "Asa: {{title}}",
+    "linkToTodo": "Ampifandraiso amin'ny asa",
+    "candidates": {
+      "empty": "Tsy misy asa misokatra"
+    },
+    "saveSheet": {
+      "title": "Tehirizo ao amin'ny lisitra",
+      "saved": "Voatahiry ao amin'ny {{list}}"
+    }
   }
 }

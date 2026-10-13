@@ -136,7 +136,8 @@
     "working": "పని జరుగుతోంది",
     "yourOwnRepositories": "మీ స్వంత రిపోజిటరీలు",
     "dismissed": "విస్మరించారు",
-    "agent": "ఏజెంట్"
+    "agent": "ఏజెంట్",
+    "changes": "మార్పులు"
   },
   "language": {
     "restarting": "ఎంచుకున్న భాషను వర్తింపజేయడానికి పునఃప్రారంభిస్తోంది",
@@ -325,6 +326,7 @@
       "collapseFile": "ఫైల్‌ను కుదించండి",
       "expandFile": "ఫైల్‌ను విస్తరించండి",
       "diffTooLarge": "మార్పుల పరిమాణం చాలా ఎక్కువగా ఉన్నందున వాటిని చూపలేము.",
+      "noPreview": "ఈ ఫైల్‌కు ప్రివ్యూ అందుబాటులో లేదు",
       "openOnGitHub": "GitHubలో తెరవండి",
       "openDiffOnGitHub": "ఈ ఫైల్‌లోని మార్పులను GitHubలో తెరవండి",
       "githubDiff": "GitHubలోని మార్పుల పోలిక"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "పని వాతావరణాన్ని లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
       "defaultEnvironment": "డిఫాల్ట్ పని వాతావరణం",
       "environmentSummary": "{{commands}} కమాండ్‌లు · {{mcp}} MCP · {{skills}} నైపుణ్యాలు · {{agents}} ఏజెంట్లు",
-      "changes": "మార్పులు",
       "leaveChanges": "మార్పులను అలాగే ఉంచండి",
       "commitAndPush": "కమిట్ చేసి పుష్ చేయండి",
       "startSession": "సెషన్ ప్రారంభించండి",
@@ -2260,8 +2261,8 @@
       "toolList": "జాబితా చూపండి",
       "toolPatch": "సవరించండి",
       "toolTask": "పని",
-      "readTodos": "పనుల జాబితాను చదవండి",
-      "updateTodos": "పనుల జాబితాను నవీకరించండి",
+      "readTodos": "ప్లాన్ చదవండి",
+      "updateTodos": "ప్లాన్ నవీకరించండి",
       "linesBadge": "{{displayCount}} పంక్తులు",
       "filesBadge": "{{displayCount}} ఫైళ్లు",
       "matchesBadge": "{{displayCount}} సరిపోలికలు",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "మోడల్ ({{displayCount}})",
       "modelsCount_other": "మోడళ్లు ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "మార్పులను చూడండి",
+      "asOf": "{{time}} నాటికి",
+      "tooLarge": "ఈ మార్పుల పరిమాణం చాలా ఎక్కువగా ఉన్నందున మొబైల్‌లో చూపలేము.",
+      "empty": "ఈ సెషన్‌లో ఇంకా ఫైళ్లలో మార్పులు లేవు."
     },
     "autoApprove": {
       "title": "స్వయంచాలక ఆమోదం",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "ఈ చాట్‌ను తొలగించాలా?"
     },
     "beta": "బీటా",
+    "details": {
+      "title": "చాట్ వివరాలు",
+      "backend": "బ్యాకెండ్",
+      "effortDefault": "మోడల్ డిఫాల్ట్",
+      "noCost": "ఖర్చు లేదు",
+      "costUnknown": "తెలియదు",
+      "costEstimatedNote": "ధరను తెలియజేయని సమాధానాల ఖర్చు జాబితా ధరల ఆధారంగా అంచనా వేయబడింది.",
+      "costUnknownNote": "ఈ మోడల్ ధర తెలియదు.",
+      "costPartialNote": "ధర తెలియని మోడల్‌లు ఈ మొత్తంలో చేర్చబడలేదు.",
+      "localNote": "పరికరంలోని మోడల్‌లు ఈ పరికరంలోనే నడుస్తాయి. వాటికి ఖర్చు లేదు, ప్రాంప్ట్ కాష్ లేదు, వాటి టోకెన్ల సంఖ్యలు అంచనాలు కావచ్చు.",
+      "countedSinceNote": "వినియోగాన్ని నమోదు చేయడం మొదలుకాక ముందే ఈ చాట్ ప్రారంభమైంది. ఆ తర్వాతి సమాధానాలు మాత్రమే మొత్తాల్లో చూపబడతాయి.",
+      "remoteServersOn": "ప్రారంభించిన రిమోట్ MCP సర్వర్లు"
+    },
     "webSearch": {
       "title": "వెబ్‌లో వెతకండి",
       "description": "మీ Kilo ఖాతా ద్వారా ప్రస్తుత సమాచారాన్ని వెతకడానికి ఈ చాట్‌ను అనుమతించండి. శోధనలు మీ నెలవారీ శోధన పరిమితిని ఉపయోగిస్తాయి.",
@@ -3423,6 +3443,9 @@
       "downloading": "డౌన్‌లోడ్ అవుతోంది…",
       "downloadProgress": "డౌన్‌లోడ్ అవుతోంది… {{percent}}%",
       "downloadFailed": "డౌన్‌లోడ్ పూర్తి కాలేదు. మీ కనెక్షన్‌ను, ఖాళీ స్టోరేజ్‌ను తనిఖీ చేసి, మళ్లీ ప్రయత్నించండి."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ఈ మోడల్ ఆలోచనా స్థాయికి మద్దతు ఇస్తుంది"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Play సరిపోలే క్రెడిట్ ప్యాక్‌లను అందించలేదు.",
     "purchaseOwnedByAnotherAccount": "ఈ Apple Accountలోని క్రెడిట్‌లు వేరే Kilo ఖాతాకు చెందుతాయి. వాటిని ఉపయోగించడానికి ఆ Kilo ఖాతాతో సైన్ ఇన్ చేయండి.",
     "purchaseOwnedByAnotherAccountPlay": "ఈ Google Play ఖాతాలోని క్రెడిట్‌లు వేరే Kilo ఖాతాకు చెందుతాయి. వాటిని ఉపయోగించడానికి ఆ Kilo ఖాతాతో సైన్ ఇన్ చేయండి."
+  },
+  "todos": {
+    "saveAsTodo": "పనిగా సేవ్ చేయండి",
+    "segment": {
+      "label": "ఏజెంట్ల వీక్షణ",
+      "sessions": "సెషన్‌లు",
+      "todos": "పనులు"
+    },
+    "lists": {
+      "newList": "కొత్త జాబితా",
+      "empty": "ఇంకా జాబితాలు లేవు",
+      "couldNotLoad": "జాబితాలను లోడ్ చేయలేకపోయాము",
+      "noRepository": "రిపోజిటరీ లేదు",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} తెరిచి ఉన్నవి",
+      "openCount_other": "{{count}} తెరిచి ఉన్నవి",
+      "archived_one": "ఆర్కైవ్ చేయబడినవి ({{count}})",
+      "archived_other": "ఆర్కైవ్ చేయబడినవి ({{count}})",
+      "archive": "ఆర్కైవ్ చేయండి",
+      "unarchive": "ఆర్కైవ్ నుంచి తీసివేయండి",
+      "deleteTitle": "{{name}} తొలగించాలా?",
+      "deleteMessage": "దీని పనులు కూడా తొలగిపోతాయి. వాటి సెషన్‌లు అలాగే ఉంటాయి."
+    },
+    "listSettings": {
+      "title": "జాబితా సెట్టింగ్‌లు",
+      "name": "పేరు",
+      "namePlaceholder": "బగ్‌లు, ఆలోచనలు, విడుదల…",
+      "emoji": "ఇమోజీ",
+      "mode": "మోడ్",
+      "defaultsHint": "ఈ జాబితా నుంచి ప్రారంభించిన సెషన్‌లు ఈ డిఫాల్ట్‌లను ఉపయోగిస్తాయి."
+    },
+    "list": {
+      "addPlaceholder": "కొత్త పనిని జోడించండి",
+      "add": "పని జోడించండి",
+      "empty": "ఇంకా పనులు లేవు",
+      "setDefaults": "రిపోజిటరీ, మోడ్, మోడల్‌ను సెట్ చేయండి",
+      "completed_one": "పూర్తయినవి ({{count}})",
+      "completed_other": "పూర్తయినవి ({{count}})"
+    },
+    "item": {
+      "markDone": "పూర్తయినట్లు గుర్తు పెట్టండి",
+      "markOpen": "పూర్తికానట్లు గుర్తు పెట్టండి",
+      "markDonePrompt": "పూర్తయినట్లు గుర్తు పెట్టాలా?",
+      "deleted": "పని తొలగించబడింది",
+      "undo": "చర్య రద్దు చేయండి",
+      "runCount_one": "{{count}} అమలు",
+      "runCount_other": "{{count}} అమలు",
+      "startNow": "సమీక్ష లేకుండా ప్రారంభించండి",
+      "startNowHint": "సమీక్ష లేకుండా ప్రారంభించడానికి ఎక్కువసేపు నొక్కండి",
+      "titleLabel": "పని శీర్షిక",
+      "notes": "నోట్స్",
+      "notesPlaceholder": "Markdownలో నోట్స్ జోడించండి",
+      "sessions": "లింక్ చేసిన సెషన్‌లు",
+      "noSessions": "ఇంకా సెషన్‌లు లేవు",
+      "linkSession": "సెషన్‌ను లింక్ చేయండి",
+      "unlinkSession": "{{title}} లింక్‌ను తీసివేయండి",
+      "linkFailed": "సెషన్‌ను పనికి లింక్ చేయలేకపోయాము"
+    },
+    "linkSession": {
+      "title": "ఒక సెషన్‌ను లింక్ చేయండి",
+      "empty": "ఇటీవలి సెషన్‌లు లేవు",
+      "emptyInRepository": "{{repository}}లో ఇటీవలి సెషన్‌లు లేవు"
+    },
+    "upNext": "తదుపరి",
+    "sessionTodo": "పని: {{title}}",
+    "linkToTodo": "పనికి లింక్ చేయండి",
+    "candidates": {
+      "empty": "తెరిచి ఉన్న పనులు లేవు"
+    },
+    "saveSheet": {
+      "title": "జాబితాలో సేవ్ చేయండి",
+      "saved": "{{list}}లో సేవ్ చేయబడింది"
+    }
   }
 }

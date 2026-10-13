@@ -136,7 +136,8 @@
     "working": "Shaqaynaya",
     "yourOwnRepositories": "Kaydadkaaga shakhsiga ah",
     "dismissed": "La iska dhaafay",
-    "agent": "Wakiil"
+    "agent": "Wakiil",
+    "changes": "Isbeddellada"
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -325,6 +326,7 @@
       "collapseFile": "Isku laab faylka",
       "expandFile": "Ballaarso faylka",
       "diffTooLarge": "Kala duwanaanshuhu aad buu u weyn yahay in la muujiyo.",
+      "noPreview": "Faylkan horu-eeg looma hayo",
       "openOnGitHub": "Ku fur GitHub",
       "openDiffOnGitHub": "Ku fur GitHub kala duwanaanshaha faylkan",
       "githubDiff": "Kala duwanaanshaha GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Mar kale isku day inaad soo shubto deegaanka",
       "defaultEnvironment": "Deegaanka caadiga ah",
       "environmentSummary": "{{commands}} amar · {{mcp}} MCP · {{skills}} xirfadood · {{agents}} wakiil",
-      "changes": "Isbeddellada",
       "leaveChanges": "Ka tag isbeddellada",
       "commitAndPush": "Diiwaangeli oo dir",
       "startSession": "Bilow kalfadhiga",
@@ -2260,8 +2261,8 @@
       "toolList": "tax",
       "toolPatch": "wax ka beddel",
       "toolTask": "hawsha",
-      "readTodos": "Akhri liiska hawlaha",
-      "updateTodos": "Cusboonaysii liiska hawlaha",
+      "readTodos": "Akhri qorshaha",
+      "updateTodos": "Cusboonaysii qorshaha",
       "linesBadge": "{{displayCount}} sadar",
       "filesBadge": "{{displayCount}} fayl",
       "matchesBadge": "{{displayCount}} natiijo",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Moodeel ({{displayCount}})",
       "modelsCount_other": "Moodeellada ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Eeg isbeddellada",
+      "asOf": "Laga bilaabo {{time}}",
+      "tooLarge": "Kala duwanaanshahan aad buu u weyn yahay in lagu muujiyo mobilka.",
+      "empty": "Weli wax isbeddel ah oo fayl ah kuma jiraan fadhigan."
     },
     "autoApprove": {
       "title": "Oggolaansho otomaatig ah",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "Ma tirtiraa wada sheekaysigan?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Faahfaahinta wada sheekaysiga",
+      "backend": "Adeegga gadaale",
+      "effortDefault": "Caadiga moodeelka",
+      "noCost": "Kharash ma leh",
+      "costUnknown": "Lama yaqaan",
+      "costEstimatedNote": "Jawaabaha aan sheegin qiimo waxaa lagu qiyaasay qiimaha liiska.",
+      "costUnknownNote": "Moodeelkan qiimo looma yaqaan.",
+      "costPartialNote": "Wadartan kuma jiraan moodeelada aan qiimo la yaqaan lahayn.",
+      "localNote": "Moodeelada aaladda gudaheeda waxay ku shaqeeyaan aaladdan. Kharash ma laha, kayd ku meelgaar ah oo codsiyada ma laha, tirada tokenno ee ay isticmaalaanna waxay noqon kartaa qiyaas.",
+      "countedSinceNote": "Wada sheekaysigan wuxuu bilaabmay ka hor intaan isticmaalka la diiwaangelin. Wadarta waxay muujinaysaa oo keliya jawaabaha intaas ka dambeeyay.",
+      "remoteServersOn": "Serverada MCP ee fog ee shidan"
+    },
     "webSearch": {
       "title": "Ka raadi shabakadda",
       "description": "U oggolow sheekadan inay ku raadiso macluumaad cusub akoonkaaga Kilo. Raadintu waxay isticmaashaa xaddiga raadinta ee bishii.",
@@ -3423,6 +3443,9 @@
       "downloading": "Waa la soo dejinayaa…",
       "downloadProgress": "Waa la soo dejinayaa… {{percent}}%",
       "downloadFailed": "Soo dejintu ma dhammaan. Hubi xiriirkaaga iyo meesha bannaan ee kaydka, kadibna isku day mar kale."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Moodeelkani wuxuu taageeraa heerka fikirka"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Play ma soo celin xirmooyin lacag adeeg oo u dhigma.",
     "purchaseOwnedByAnotherAccount": "Lacagta adeeg ee ku jirta Apple Account-kan waxaa leh akoon kale oo Kilo ah. Isticmaalka, soo gal akoonkaas Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Lacagta adeeg ee ku yaal xisaabtan Google Play waxaa leh koonto Kilo oo kale. Isticmaalka, ku saxiix bax koontada Kilo-ga ah."
+  },
+  "todos": {
+    "saveAsTodo": "U kaydi hawl ahaan",
+    "segment": {
+      "label": "Muuqaalka wakiillada",
+      "sessions": "Kalfadhiyada",
+      "todos": "Hawlo"
+    },
+    "lists": {
+      "newList": "Liis cusub",
+      "empty": "Weli ma jiraan liisas",
+      "couldNotLoad": "Liisas lama soo rarin karin",
+      "noRepository": "Kayd ma jiro",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} furan",
+      "openCount_other": "{{count}} furan",
+      "archived_one": "La keydiyay ({{count}})",
+      "archived_other": "La keydiyay ({{count}})",
+      "archive": "Keydi",
+      "unarchive": "Ka saar keydka",
+      "deleteTitle": "Tirtir {{name}}?",
+      "deleteMessage": "Hawlaha ku jira sidoo kale waa la tirtiraa. Kalfadhiyadooda way sii jiraan."
+    },
+    "listSettings": {
+      "title": "Dejinta liiska",
+      "name": "Magac",
+      "namePlaceholder": "Cilado, Fikrado, Siideyn…",
+      "emoji": "Calaamad",
+      "mode": "Qaab",
+      "defaultsHint": "Kalfadhiyada laga bilaabo liiskan waxay isticmaalaan kuwan caadiga ah."
+    },
+    "list": {
+      "addPlaceholder": "Ku dar hawl",
+      "add": "Ku dar",
+      "empty": "Weli ma jiraan hawlo",
+      "setDefaults": "Deji kaydka, qaabka iyo moodeelka",
+      "completed_one": "La dhammeeyay ({{count}})",
+      "completed_other": "La dhammeeyay ({{count}})"
+    },
+    "item": {
+      "markDone": "Calaamadee la dhammeeyay",
+      "markOpen": "Calaamadee aan la dhammeeyn",
+      "markDonePrompt": "Calaamadee la dhammeeyay?",
+      "deleted": "Hawsha waa la tirtiray",
+      "undo": "Soo celi",
+      "runCount_one": "{{count}} socod",
+      "runCount_other": "{{count}} socod",
+      "startNow": "Bilow dib-u-eegis la'aan",
+      "startNowHint": "Riix dheer si aad u bilowdo dib-u-eegis la'aan",
+      "titleLabel": "Cinwaanka hawsha",
+      "notes": "Qoraallo",
+      "notesPlaceholder": "Ku dar qoraallo Markdown ah",
+      "sessions": "Kalfadhiyada xidhiidhsan",
+      "noSessions": "Weli ma jiraan kalfadhiyo",
+      "linkSession": "Ku xidh kalfadhi",
+      "unlinkSession": "Ka saar xiriirka {{title}}",
+      "linkFailed": "Lama xidhi karin kalfadhiga hawsha"
+    },
+    "linkSession": {
+      "title": "Ku xidh kalfadhi",
+      "empty": "Ma jiraan kalfadhiyo dhowaan",
+      "emptyInRepository": "Ma jiraan kalfadhiyo dhowaan oo ku jira {{repository}}"
+    },
+    "upNext": "Xiga",
+    "sessionTodo": "Hawl: {{title}}",
+    "linkToTodo": "Ku xidh hawl",
+    "candidates": {
+      "empty": "Ma jiraan hawlo furan"
+    },
+    "saveSheet": {
+      "title": "Ku kaydi liiska",
+      "saved": "Waxaa lagu kaydiyay {{list}}"
+    }
   }
 }

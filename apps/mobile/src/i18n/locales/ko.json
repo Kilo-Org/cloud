@@ -136,7 +136,8 @@
     "working": "작업 중",
     "yourOwnRepositories": "내 저장소",
     "dismissed": "무시됨",
-    "agent": "대리인"
+    "agent": "대리인",
+    "changes": "변경 사항"
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -1678,7 +1679,6 @@
       "retryLoadingEnvironment": "환경 불러오기 다시 시도",
       "defaultEnvironment": "기본 환경",
       "environmentSummary": "명령 {{commands}}개 · MCP {{mcp}}개 · 스킬 {{skills}}개 · 에이전트 {{agents}}개",
-      "changes": "변경 사항",
       "leaveChanges": "변경 사항 유지",
       "commitAndPush": "커밋 및 푸시",
       "startSession": "세션 시작",
@@ -1749,8 +1749,8 @@
       "toolList": "목록 보기",
       "toolPatch": "패치",
       "toolTask": "작업",
-      "readTodos": "할 일 읽기",
-      "updateTodos": "할 일 업데이트",
+      "readTodos": "플랜 읽기",
+      "updateTodos": "플랜 업데이트",
       "linesBadge": "{{displayCount}}줄",
       "filesBadge": "파일 {{displayCount}}개",
       "matchesBadge": "{{displayCount}}건 일치",
@@ -2140,6 +2140,12 @@
       "modelAccessibilityLabel": "{{name}}, 제공업체: {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "모델 ({{displayCount}})",
       "modelsCount_other": "모델 ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "변경 사항 보기",
+      "asOf": "{{time}} 기준",
+      "tooLarge": "변경 내용이 너무 커서 모바일에서 표시할 수 없습니다.",
+      "empty": "이 세션에서 아직 변경된 파일이 없습니다."
     },
     "autoApprove": {
       "title": "자동 승인",
@@ -2644,6 +2650,7 @@
     "fileRows": {
       "collapseFile": "파일 접기",
       "diffTooLarge": "변경 내용이 너무 커서 표시할 수 없습니다.",
+      "noPreview": "이 파일은 미리 보기를 사용할 수 없습니다",
       "expandFile": "파일 펼치기",
       "markViewed": "{{path}} 확인함으로 표시",
       "openDiffOnGitHub": "GitHub에서 이 파일의 변경 내용 열기",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "이 채팅을 삭제할까요?"
     },
     "beta": "베타",
+    "details": {
+      "title": "채팅 세부 정보",
+      "backend": "백엔드",
+      "effortDefault": "모델 기본값",
+      "noCost": "비용 없음",
+      "costUnknown": "알 수 없음",
+      "costEstimatedNote": "가격을 보고하지 않은 답변은 정가를 기준으로 추정했습니다.",
+      "costUnknownNote": "이 모델의 가격을 알 수 없습니다.",
+      "costPartialNote": "이 합계에는 가격을 알 수 없는 모델이 포함되지 않습니다.",
+      "localNote": "기기 내 모델은 이 기기에서 실행됩니다. 비용과 프롬프트 캐시가 없으며, 토큰 수는 추정치일 수 있습니다.",
+      "countedSinceNote": "이 채팅은 사용량 기록이 시작되기 전에 시작되었습니다. 합계에는 그 이후의 답변만 표시됩니다.",
+      "remoteServersOn": "켜진 원격 MCP 서버"
+    },
     "webSearch": {
       "title": "웹 검색",
       "description": "이 채팅이 Kilo 계정을 통해 최신 정보를 찾아보도록 허용합니다. 검색에는 월간 검색 한도가 사용됩니다.",
@@ -3423,6 +3443,9 @@
       "downloading": "다운로드 중…",
       "downloadProgress": "다운로드 중… {{percent}}%",
       "downloadFailed": "다운로드를 완료하지 못했습니다. 네트워크 연결과 저장 공간을 확인한 후 다시 시도하세요."
+    },
+    "reasoningEffort": {
+      "modelFlag": "이 모델은 추론 강도를 지원합니다"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Play에서 일치하는 크레딧 팩을 반환하지 않았습니다.",
     "purchaseOwnedByAnotherAccount": "이 Apple Account의 크레딧은 다른 Kilo 계정에 속해 있습니다. 사용하려면 해당 Kilo 계정에 로그인하세요.",
     "purchaseOwnedByAnotherAccountPlay": "이 Google Play 계정의 크레딧은 다른 Kilo 계정에 속합니다. 사용하려면 해당 Kilo 계정으로 로그인하세요."
+  },
+  "todos": {
+    "saveAsTodo": "할 일로 저장",
+    "segment": {
+      "label": "에이전트 보기",
+      "sessions": "세션",
+      "todos": "할 일"
+    },
+    "lists": {
+      "newList": "새 목록",
+      "empty": "아직 목록이 없습니다",
+      "couldNotLoad": "목록을 불러올 수 없습니다",
+      "noRepository": "저장소 없음",
+      "rowA11y": "{{name}} — {{openCount}}",
+      "openCount_one": "{{count}}개 열림",
+      "openCount_other": "{{count}}개 열림",
+      "archived_one": "보관됨 ({{count}})",
+      "archived_other": "보관됨 ({{count}})",
+      "archive": "보관",
+      "unarchive": "보관 해제",
+      "deleteTitle": "{{name}} 삭제할까요?",
+      "deleteMessage": "할 일도 함께 삭제됩니다. 세션은 유지됩니다."
+    },
+    "listSettings": {
+      "title": "목록 설정",
+      "name": "이름",
+      "namePlaceholder": "버그, 아이디어, 릴리스…",
+      "emoji": "이모지",
+      "mode": "모드",
+      "defaultsHint": "이 목록에서 시작한 세션은 이 기본값을 사용합니다."
+    },
+    "list": {
+      "addPlaceholder": "할 일 추가",
+      "add": "할 일 추가하기",
+      "empty": "아직 할 일이 없습니다",
+      "setDefaults": "저장소, 모드 및 모델 설정",
+      "completed_one": "완료 ({{count}})",
+      "completed_other": "완료 ({{count}})"
+    },
+    "item": {
+      "markDone": "완료로 표시",
+      "markOpen": "미완료로 표시",
+      "markDonePrompt": "완료로 표시할까요?",
+      "deleted": "할 일이 삭제되었습니다",
+      "undo": "실행 취소",
+      "runCount_one": "실행 {{count}}회",
+      "runCount_other": "실행 {{count}}회",
+      "startNow": "리뷰 없이 시작",
+      "startNowHint": "길게 눌러 리뷰 없이 시작",
+      "titleLabel": "할 일 제목",
+      "notes": "메모",
+      "notesPlaceholder": "Markdown으로 메모 추가",
+      "sessions": "연결된 세션",
+      "noSessions": "아직 세션이 없습니다",
+      "linkSession": "세션 연결",
+      "unlinkSession": "{{title}} 연결 해제",
+      "linkFailed": "세션을 할 일에 연결할 수 없습니다"
+    },
+    "linkSession": {
+      "title": "세션 연결하기",
+      "empty": "최근 세션 없음",
+      "emptyInRepository": "{{repository}}의 최근 세션 없음"
+    },
+    "upNext": "다음",
+    "sessionTodo": "할 일: {{title}}",
+    "linkToTodo": "할 일에 연결",
+    "candidates": {
+      "empty": "열린 할 일 없음"
+    },
+    "saveSheet": {
+      "title": "목록에 저장",
+      "saved": "{{list}}에 저장됨"
+    }
   }
 }

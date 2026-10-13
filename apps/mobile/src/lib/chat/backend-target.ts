@@ -70,6 +70,17 @@ export type ResolvedChatTarget =
     }
   | ({ readonly kind: 'local' } & LocalTarget);
 
+/**
+ * Who answers a target, read from its prefix alone. A target that no longer
+ * resolves — its backend was deleted — still says who answered it.
+ */
+export function chatTargetKind(id: string): ResolvedChatTarget['kind'] {
+  if (id.startsWith(LOCAL_PREFIX)) {
+    return 'local';
+  }
+  return id.startsWith(PREFIX) ? 'custom' : 'kilo';
+}
+
 /** `local:apple`, `local:android`, or `local:gguf:<encodeURIComponent(fileId)>`. */
 export function localTargetId(provider: 'apple' | 'android'): string;
 export function localTargetId(provider: 'gguf', fileId: string): string;

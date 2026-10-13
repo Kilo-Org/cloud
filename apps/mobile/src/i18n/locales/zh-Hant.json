@@ -136,7 +136,8 @@
     "working": "處理中",
     "yourOwnRepositories": "你自己的存放庫",
     "dismissed": "已忽略",
-    "agent": "代理人"
+    "agent": "代理人",
+    "changes": "變更"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -1678,7 +1679,6 @@
       "retryLoadingEnvironment": "重新載入環境",
       "defaultEnvironment": "預設環境",
       "environmentSummary": "{{commands}} 個指令 · {{mcp}} 個 MCP · {{skills}} 個技能 · {{agents}} 個智慧代理",
-      "changes": "變更",
       "leaveChanges": "保留變更",
       "commitAndPush": "提交並推送",
       "startSession": "開始工作階段",
@@ -1749,8 +1749,8 @@
       "toolList": "列出",
       "toolPatch": "套用修補",
       "toolTask": "任務",
-      "readTodos": "讀取待辦事項",
-      "updateTodos": "更新待辦事項",
+      "readTodos": "讀取計畫",
+      "updateTodos": "更新計畫",
       "linesBadge": "{{displayCount}} 行",
       "filesBadge": "{{displayCount}} 個檔案",
       "matchesBadge": "{{displayCount}} 筆相符結果",
@@ -2140,6 +2140,12 @@
       "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}",
       "modelsCount_one": "模型（{{displayCount}}）",
       "modelsCount_other": "模型（{{displayCount}}）"
+    },
+    "sessionChanges": {
+      "viewChanges": "檢視變更",
+      "asOf": "截至 {{time}}",
+      "tooLarge": "此差異過大，無法在行動裝置上顯示。",
+      "empty": "此工作階段尚無檔案變更。"
     },
     "autoApprove": {
       "title": "自動核准",
@@ -2644,6 +2650,7 @@
     "fileRows": {
       "collapseFile": "收合檔案",
       "diffTooLarge": "差異過大，無法顯示。",
+      "noPreview": "此檔案無法預覽",
       "expandFile": "展開檔案",
       "markViewed": "將 {{path}} 標記為已檢視",
       "openDiffOnGitHub": "在 GitHub 上開啟此檔案的差異",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "刪除這個對話？"
     },
     "beta": "測試版",
+    "details": {
+      "title": "聊天詳細資料",
+      "backend": "後端",
+      "effortDefault": "模型預設",
+      "noCost": "無費用",
+      "costUnknown": "未知",
+      "costEstimatedNote": "未回報價格的回答依牌價估算。",
+      "costUnknownNote": "此模型沒有已知價格。",
+      "costPartialNote": "此總計不包含沒有已知價格的模型。",
+      "localNote": "裝置端模型在此裝置上執行。它們沒有費用，也沒有提示快取，其詞元數可能是估算值。",
+      "countedSinceNote": "此聊天在開始記錄用量之前就已開始。總計僅包含之後的回答。",
+      "remoteServersOn": "已開啟的遠端 MCP 伺服器"
+    },
     "webSearch": {
       "title": "搜尋網路",
       "description": "允許此聊天透過你的 Kilo 帳戶查詢最新資訊。搜尋會使用你每月的搜尋額度。",
@@ -3423,6 +3443,9 @@
       "downloading": "下載中…",
       "downloadProgress": "下載中… {{percent}}%",
       "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。"
+    },
+    "reasoningEffort": {
+      "modelFlag": "此模型支援思考程度"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Play 未傳回相符的點數包。",
     "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。"
+  },
+  "todos": {
+    "saveAsTodo": "儲存為待辦事項",
+    "segment": {
+      "label": "代理程式檢視",
+      "sessions": "工作階段",
+      "todos": "待辦事項"
+    },
+    "lists": {
+      "newList": "新增清單",
+      "empty": "尚無清單",
+      "couldNotLoad": "無法載入清單",
+      "noRepository": "沒有儲存庫",
+      "rowA11y": "{{name}}，{{openCount}}",
+      "openCount_one": "未完成 {{count}} 項",
+      "openCount_other": "未完成 {{count}} 項",
+      "archived_one": "已封存 ({{count}})",
+      "archived_other": "已封存 ({{count}})",
+      "archive": "封存",
+      "unarchive": "取消封存",
+      "deleteTitle": "要刪除 {{name}} 嗎？",
+      "deleteMessage": "其中的待辦事項也會一併刪除。工作階段會保留。"
+    },
+    "listSettings": {
+      "title": "清單設定",
+      "name": "名稱",
+      "namePlaceholder": "錯誤、想法、版本…",
+      "emoji": "表情符號",
+      "mode": "模式",
+      "defaultsHint": "從此清單開始的工作階段會使用這些預設值。"
+    },
+    "list": {
+      "addPlaceholder": "新增待辦事項",
+      "add": "新增待辦事項",
+      "empty": "尚無待辦事項",
+      "setDefaults": "設定儲存庫、模式和模型",
+      "completed_one": "已完成 ({{count}})",
+      "completed_other": "已完成 ({{count}})"
+    },
+    "item": {
+      "markDone": "標記為完成",
+      "markOpen": "標記為未完成",
+      "markDonePrompt": "要標記為完成嗎？",
+      "deleted": "已刪除待辦事項",
+      "undo": "復原",
+      "runCount_one": "已執行 {{count}} 次",
+      "runCount_other": "已執行 {{count}} 次",
+      "startNow": "不經審查直接開始",
+      "startNowHint": "長按即可不經審查直接開始",
+      "titleLabel": "待辦事項標題",
+      "notes": "備註",
+      "notesPlaceholder": "使用 Markdown 新增備註",
+      "sessions": "已連結的工作階段",
+      "noSessions": "尚無工作階段",
+      "linkSession": "連結工作階段",
+      "unlinkSession": "取消連結 {{title}}",
+      "linkFailed": "無法將工作階段連結至待辦事項"
+    },
+    "linkSession": {
+      "title": "連結工作階段",
+      "empty": "沒有最近的工作階段",
+      "emptyInRepository": "{{repository}} 中沒有最近的工作階段"
+    },
+    "upNext": "接下來",
+    "sessionTodo": "待辦事項：{{title}}",
+    "linkToTodo": "連結至待辦事項",
+    "candidates": {
+      "empty": "沒有未完成的待辦事項"
+    },
+    "saveSheet": {
+      "title": "儲存至清單",
+      "saved": "已儲存至 {{list}}"
+    }
   }
 }

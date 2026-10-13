@@ -136,7 +136,8 @@
     "working": "მუშაობს",
     "yourOwnRepositories": "შენი რეპოზიტორიები",
     "dismissed": "უგულებელყოფილია",
-    "agent": "აგენტი"
+    "agent": "აგენტი",
+    "changes": "ცვლილებები"
   },
   "language": {
     "restarting": "ენის შესაცვლელად აპი ხელახლა იტვირთება",
@@ -325,6 +326,7 @@
       "collapseFile": "ფაილის ჩაკეცვა",
       "expandFile": "ფაილის გაშლა",
       "diffTooLarge": "ცვლილებების მოცულობა ზედმეტად დიდია საჩვენებლად.",
+      "noPreview": "ამ ფაილის გადახედვა მიუწვდომელია",
       "openOnGitHub": "GitHub-ზე გახსნა",
       "openDiffOnGitHub": "ამ ფაილის ცვლილებების GitHub-ზე გახსნა",
       "githubDiff": "ცვლილებები GitHub-ზე"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "გარემოს ხელახლა ჩატვირთვა",
       "defaultEnvironment": "ნაგულისხმევი გარემო",
       "environmentSummary": "{{commands}} ბრძანება · {{mcp}} MCP · {{skills}} უნარი · {{agents}} აგენტი",
-      "changes": "ცვლილებები",
       "leaveChanges": "ცვლილებების დატოვება",
       "commitAndPush": "კომიტი და ატვირთვა",
       "startSession": "სესიის დაწყება",
@@ -2260,8 +2261,8 @@
       "toolList": "ჩამოთვლა",
       "toolPatch": "ცვლილებების შეტანა",
       "toolTask": "დავალება",
-      "readTodos": "დავალებების სიის წაკითხვა",
-      "updateTodos": "დავალებების სიის განახლება",
+      "readTodos": "გეგმის წაკითხვა",
+      "updateTodos": "გეგმის განახლება",
       "linesBadge": "{{displayCount}} სტრიქონი",
       "filesBadge": "{{displayCount}} ფაილი",
       "matchesBadge": "{{displayCount}} დამთხვევა",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "მოდელი ({{displayCount}})",
       "modelsCount_other": "მოდელები ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ცვლილებების ნახვა",
+      "asOf": "მდგომარეობა: {{time}}",
+      "tooLarge": "ცვლილებების მოცულობა ზედმეტად დიდია მობილურზე საჩვენებლად.",
+      "empty": "ამ სესიაში ფაილები ჯერ არ შეცვლილა."
     },
     "autoApprove": {
       "title": "ავტომატური დადასტურება",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "წაიშალოს ეს ჩატი?"
     },
     "beta": "ბეტა",
+    "details": {
+      "title": "ჩატის დეტალები",
+      "backend": "სერვერული სისტემა",
+      "effortDefault": "მოდელის ნაგულისხმევი",
+      "noCost": "უფასო",
+      "costUnknown": "უცნობია",
+      "costEstimatedNote": "იმ პასუხების ღირებულება, რომლებმაც ფასი არ მიუთითეს, შეფასებულია საკატალოგო ფასებით.",
+      "costUnknownNote": "ამ მოდელის ფასი უცნობია.",
+      "costPartialNote": "ეს ჯამი არ მოიცავს მოდელებს, რომელთა ფასიც უცნობია.",
+      "localNote": "მოწყობილობაზე მომუშავე მოდელები ამ მოწყობილობაზე მუშაობს. მათ არ აქვთ ღირებულება და მოთხოვნების ქეში, ხოლო მათი ტოკენების რაოდენობა შეიძლება მიახლოებითი იყოს.",
+      "countedSinceNote": "ეს ჩატი გამოყენების აღრიცხვის დაწყებამდე დაიწყო. ჯამები მხოლოდ ამის შემდგომ პასუხებს აჩვენებს.",
+      "remoteServersOn": "ჩართული დისტანციური MCP სერვერები"
+    },
     "webSearch": {
       "title": "ვებში ძიება",
       "description": "ნება მიეცით ამ ჩატს, მოიძიოს აქტუალური ინფორმაცია თქვენი Kilo ანგარიშით. ძიება იყენებს თქვენს ყოველთვიურ ძიების ლიმიტს.",
@@ -3423,6 +3443,9 @@
       "downloading": "იტვირთება…",
       "downloadProgress": "იტვირთება… {{percent}}%",
       "downloadFailed": "ჩამოტვირთვა ვერ დასრულდა. შეამოწმეთ ინტერნეტკავშირი და თავისუფალი მეხსიერება, შემდეგ სცადეთ ხელახლა."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ეს მოდელი მხარს უჭერს მსჯელობის ინტენსივობას"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Play-მა შესაბამისი კრედიტის პაკეტები არ დააბრუნა.",
     "purchaseOwnedByAnotherAccount": "ამ Apple Account-ზე არსებული კრედიტები სხვა Kilo ანგარიშს ეკუთვნის. მათ გამოსაყენებლად შედი იმ Kilo ანგარიშში.",
     "purchaseOwnedByAnotherAccountPlay": "ამ Google Play ანგარიშზე არსებული კრედიტები სხვა Kilo ანგარიშს ეკუთვნის. მათ გამოსაყენებლად შედით იმ Kilo ანგარიშში."
+  },
+  "todos": {
+    "saveAsTodo": "დავალებად შენახვა",
+    "segment": {
+      "label": "აგენტების ხედი",
+      "sessions": "სესიები",
+      "todos": "დავალებები"
+    },
+    "lists": {
+      "newList": "ახალი სია",
+      "empty": "სიები ჯერ არ არის",
+      "couldNotLoad": "სიების ჩატვირთვა ვერ მოხერხდა.",
+      "noRepository": "რეპოზიტორია არ არის",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} ღია",
+      "openCount_other": "{{count}} ღია",
+      "archived_one": "დაარქივებული ({{count}})",
+      "archived_other": "დაარქივებული ({{count}})",
+      "archive": "არქივში გადატანა",
+      "unarchive": "არქივიდან ამოღება",
+      "deleteTitle": "წავშალოთ {{name}}?",
+      "deleteMessage": "მისი დავალებებიც წაიშლება. სესიები დარჩება."
+    },
+    "listSettings": {
+      "title": "სიის პარამეტრები",
+      "name": "სახელი",
+      "namePlaceholder": "ბაგები, იდეები, გამოშვება…",
+      "emoji": "ემოჯი",
+      "mode": "რეჟიმი",
+      "defaultsHint": "ამ სიიდან დაწყებული სესიები ამ ნაგულისხმევ პარამეტრებს იყენებს."
+    },
+    "list": {
+      "addPlaceholder": "დავალების დამატება",
+      "add": "დავალების დამატება",
+      "empty": "დავალებები ჯერ არ არის",
+      "setDefaults": "რეპოზიტორიის, რეჟიმისა და მოდელის დაყენება",
+      "completed_one": "დასრულებული ({{count}})",
+      "completed_other": "დასრულებული ({{count}})"
+    },
+    "item": {
+      "markDone": "დასრულებულად მონიშვნა",
+      "markOpen": "დაუსრულებლად მონიშვნა",
+      "markDonePrompt": "დასრულებულად მონიშვნა?",
+      "deleted": "დავალება წაიშალა",
+      "undo": "დაბრუნება",
+      "runCount_one": "{{count}} გაშვება",
+      "runCount_other": "{{count}} გაშვება",
+      "startNow": "შემოწმების გარეშე გაშვება",
+      "startNowHint": "შემოწმების გარეშე გასაშვებად დიდხანს დააჭირეთ",
+      "titleLabel": "დავალების სათაური",
+      "notes": "შენიშვნები",
+      "notesPlaceholder": "შენიშვნების დამატება Markdown-ით",
+      "sessions": "დაკავშირებული სესიები",
+      "noSessions": "სესიები ჯერ არ არის",
+      "linkSession": "სესიის მიბმა",
+      "unlinkSession": "{{title}}-ის მოწყვეტა",
+      "linkFailed": "სესიის დავალებასთან დაკავშირება ვერ მოხერხდა"
+    },
+    "linkSession": {
+      "title": "სესიის დაკავშირება",
+      "empty": "ბოლო სესიები არ არის",
+      "emptyInRepository": "{{repository}}-ში ბოლო სესიები არ არის"
+    },
+    "upNext": "შემდეგი",
+    "sessionTodo": "დავალება: {{title}}",
+    "linkToTodo": "დავალებასთან დაკავშირება",
+    "candidates": {
+      "empty": "ღია დავალებები არ არის"
+    },
+    "saveSheet": {
+      "title": "სიაში შენახვა",
+      "saved": "შენახულია {{list}}-ში"
+    }
   }
 }

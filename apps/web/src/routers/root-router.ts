@@ -10,6 +10,7 @@ import { deploymentsRouter } from '@/routers/deployments-router';
 import { cliSessionsRouter } from '@/routers/cli-sessions-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { workspaceFoldersRouter } from '@/routers/workspace-folders-router';
+import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { gitlabRouter } from '@/routers/gitlab-router';
@@ -66,6 +67,7 @@ export const rootRouter = createTRPCRouter({
   cliSessions: cliSessionsRouter,
   cliSessionsV2: cliSessionsV2Router,
   workspaceFolders: workspaceFoldersRouter,
+  todos: todosRouter,
   githubApps: githubAppsRouter,
   gitlab: gitlabRouter,
   platformIntegrations: platformIntegrationsRouter,

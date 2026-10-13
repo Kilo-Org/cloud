@@ -98,6 +98,22 @@ it('adds up the token counts of every call', async () => {
   expect(hitRatio(value)).toBeCloseTo(0.95);
 });
 
+it('adds up the cost the provider reported, and reports none when it never did', async () => {
+  const twice = (usage: { readonly cost?: number }) =>
+    run([{ deltas: ['x'], usage }], session =>
+      Effect.zipRight(
+        Effect.zipRight(Stream.runDrain(session.ask('a')), Stream.runDrain(session.ask('b'))),
+        session.usage
+      )
+    );
+  /* Absent is not zero: a free model and a provider that sends no cost both
+     leave it out, and a caller must not read either as a session that was free. */
+  const reported = await twice({ cost: 0.25 });
+  const silent = await twice({});
+  expect(reported.value.cost).toBe(0.5);
+  expect(silent.value).not.toHaveProperty('cost');
+});
+
 it('asks with the same effort on every question of a session', async () => {
   const model = fakeModel([{ deltas: ['x'] }]);
   const layers = Layer.mergeAll(layerAssembler, silentCatalog, layerSeededEntropy(1), model.layer);

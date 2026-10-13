@@ -138,6 +138,14 @@ function answer(
         fail(reason);
       }
     };
+    const failOrRetry = (reason: string | undefined) => {
+      if (reason === TRANSIENT_REASON && output === '' && retries > 0) {
+        retries -= 1;
+        state = 'retrying';
+      } else {
+        fail(reason);
+      }
+    };
     const finish = async (done: Extract<NativeModelEvent, { kind: 'done' }>) => {
       if (!hasPreviousText && output.trim() === '') {
         fail('empty_response');

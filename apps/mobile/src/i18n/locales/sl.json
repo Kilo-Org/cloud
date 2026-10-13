@@ -136,7 +136,8 @@
     "working": "V teku",
     "yourOwnRepositories": "Tvoji repozitoriji",
     "dismissed": "Zavrženo",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Spremembe"
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -325,6 +326,7 @@
       "collapseFile": "Strni datoteko",
       "expandFile": "Razširi datoteko",
       "diffTooLarge": "Razlike so preobsežne za prikaz.",
+      "noPreview": "Predogled te datoteke ni na voljo",
       "openOnGitHub": "Odpri na GitHubu",
       "openDiffOnGitHub": "Odpri prikaz razlik te datoteke na GitHubu",
       "githubDiff": "Prikaz razlik na GitHubu"
@@ -2245,7 +2247,6 @@
       "retryLoadingEnvironment": "Poskusi znova naložiti okolje",
       "defaultEnvironment": "Privzeto okolje",
       "environmentSummary": "Ukazi: {{commands}} · MCP: {{mcp}} · Veščine: {{skills}} · Agenti: {{agents}}",
-      "changes": "Spremembe",
       "leaveChanges": "Pusti spremembe",
       "commitAndPush": "Uveljavi in potisni",
       "startSession": "Začni sejo",
@@ -2318,8 +2319,8 @@
       "toolList": "izpiši seznam",
       "toolPatch": "uporabi popravek",
       "toolTask": "naloga",
-      "readTodos": "Preberi naloge",
-      "updateTodos": "Posodobi naloge",
+      "readTodos": "Preberi načrt",
+      "updateTodos": "Posodobi načrt",
       "linesBadge": "{{displayCount}} vrstic",
       "filesBadge": "{{displayCount}} datotek",
       "matchesBadge": "{{displayCount}} zadetkov",
@@ -2727,6 +2728,12 @@
       "modelsCount_other": "Modeli ({{displayCount}})",
       "modelsCount_two": "Modeli ({{displayCount}})",
       "modelsCount_few": "Modeli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Prikaži spremembe",
+      "asOf": "Stanje ob {{time}}",
+      "tooLarge": "Razlike so preobsežne za prikaz na mobilni napravi.",
+      "empty": "V tej seji še ni sprememb datotek."
     },
     "autoApprove": {
       "title": "Samodejna odobritev",
@@ -3293,6 +3300,19 @@
       "deleteTitle": "Izbrišem ta klepet?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Podrobnosti klepeta",
+      "backend": "Zaledje",
+      "effortDefault": "Privzeto za model",
+      "noCost": "Brez stroškov",
+      "costUnknown": "Ni znano",
+      "costEstimatedNote": "Strošek odgovorov, ki niso sporočili cene, je ocenjen po ceniku.",
+      "costUnknownNote": "Cena tega modela ni znana.",
+      "costPartialNote": "Ta skupni znesek ne vključuje modelov, katerih cena ni znana.",
+      "localNote": "Modeli v napravi se izvajajo v tej napravi. Nimajo stroškov in predpomnilnika pozivov, njihovo število žetonov pa je lahko ocenjeno.",
+      "countedSinceNote": "Ta klepet se je začel, preden se je začela beležiti poraba. Skupni zneski vključujejo samo odgovore po tem.",
+      "remoteServersOn": "Vklopljeni oddaljeni strežniki MCP"
+    },
     "webSearch": {
       "title": "Išči po spletu",
       "description": "Dovolite temu klepetu, da poišče aktualne informacije prek vašega računa Kilo. Iskanja porabljajo vašo mesečno kvoto iskanj.",
@@ -3505,6 +3525,9 @@
       "downloading": "Prenašanje …",
       "downloadProgress": "Prenašanje … {{percent}} %",
       "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ta model podpira stopnjo razmišljanja"
     }
   },
   "settingsTools": {
@@ -3727,5 +3750,86 @@
     "noMatchingProductsPlay": "Google Play ni vrnil ustreznih paketov kreditov.",
     "purchaseOwnedByAnotherAccount": "Krediti v tem računu Apple Account pripadajo drugemu računu Kilo. Za uporabo se prijavi v ta račun Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na tem Google Play računu pripadajo drugemu Kilo računu. Za uporabo se prijavite v ta Kilo račun."
+  },
+  "todos": {
+    "saveAsTodo": "Shrani kot nalogo",
+    "segment": {
+      "label": "Pogled agentov",
+      "sessions": "Seje",
+      "todos": "Naloge"
+    },
+    "lists": {
+      "newList": "Nov seznam",
+      "empty": "Ni še seznamov",
+      "couldNotLoad": "Seznamov ni bilo mogoče naložiti",
+      "noRepository": "Brez repozitorija",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} odprtih",
+      "openCount_two": "{{count}} odprta",
+      "openCount_few": "{{count}} odprti",
+      "openCount_other": "{{count}} odprtih",
+      "archived_one": "Arhivirano ({{count}})",
+      "archived_two": "Arhivirano ({{count}})",
+      "archived_few": "Arhivirano ({{count}})",
+      "archived_other": "Arhivirano ({{count}})",
+      "archive": "Arhiviraj",
+      "unarchive": "Odstrani iz arhiva",
+      "deleteTitle": "Izbrišem {{name}}?",
+      "deleteMessage": "Tudi njene naloge se izbrišejo. Seje ostanejo."
+    },
+    "listSettings": {
+      "title": "Nastavitve seznama",
+      "name": "Ime",
+      "namePlaceholder": "Hrošči, ideje, izdaje…",
+      "emoji": "Emoji",
+      "mode": "Način",
+      "defaultsHint": "Seje, začete s tega seznama, uporabijo te privzete vrednosti."
+    },
+    "list": {
+      "addPlaceholder": "Dodaj novo nalogo",
+      "add": "Dodaj nalogo",
+      "empty": "Ni še nalog",
+      "setDefaults": "Nastavi repozitorij, način in model",
+      "completed_one": "Dokončano ({{count}})",
+      "completed_two": "Dokončano ({{count}})",
+      "completed_few": "Dokončano ({{count}})",
+      "completed_other": "Dokončano ({{count}})"
+    },
+    "item": {
+      "markDone": "Označi kot opravljeno",
+      "markOpen": "Označi kot neopravljeno",
+      "markDonePrompt": "Označim kot opravljeno?",
+      "deleted": "Naloga je izbrisana",
+      "undo": "Razveljavi",
+      "runCount_one": "{{count}} zagon",
+      "runCount_two": "{{count}} zagona",
+      "runCount_few": "{{count}} zagoni",
+      "runCount_other": "{{count}} zagonov",
+      "startNow": "Začni brez pregleda",
+      "startNowHint": "Pritisni in drži za začetek brez pregleda",
+      "titleLabel": "Naslov naloge",
+      "notes": "Opombe",
+      "notesPlaceholder": "Dodaj opombe v Markdownu",
+      "sessions": "Povezane seje",
+      "noSessions": "Ni še sej",
+      "linkSession": "Poveži sejo",
+      "unlinkSession": "Prekini povezavo {{title}}",
+      "linkFailed": "Seje ni bilo mogoče povezati z nalogo"
+    },
+    "linkSession": {
+      "title": "Povezava seje",
+      "empty": "Ni nedavnih sej",
+      "emptyInRepository": "Ni nedavnih sej v {{repository}}"
+    },
+    "upNext": "Naslednje",
+    "sessionTodo": "Naloga: {{title}}",
+    "linkToTodo": "Poveži z nalogo",
+    "candidates": {
+      "empty": "Ni odprtih nalog"
+    },
+    "saveSheet": {
+      "title": "Shrani na seznam",
+      "saved": "Shranjeno na seznam {{list}}"
+    }
   }
 }

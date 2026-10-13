@@ -136,7 +136,8 @@
     "working": "لە کاردا",
     "yourOwnRepositories": "کۆگاکانی خۆت",
     "dismissed": "پشتگوێخراو",
-    "agent": "بریکار"
+    "agent": "بریکار",
+    "changes": "گۆڕانکارییەکان"
   },
   "language": {
     "restarting": "بۆ جێبەجێکردنی گۆڕینی زمان، دووبارە دەست پێ دەکاتەوە",
@@ -325,6 +326,7 @@
       "collapseFile": "فایلەکە کۆ بکەرەوە",
       "expandFile": "ناوەڕۆکی فایلەکە پیشان بدە",
       "diffTooLarge": "جیاوازییەکە هێندە گەورەیە کە ناتوانرێت پیشان بدرێت.",
+      "noPreview": "هیچ پێشبینینێک بۆ ئەم فایلە بەردەست نییە",
       "openOnGitHub": "لە GitHub بکەرەوە",
       "openDiffOnGitHub": "جیاوازییەکانی ئەم فایلە لە GitHub بکەرەوە",
       "githubDiff": "جیاوازی GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "دووبارە هەوڵدان بۆ بارکردنی ژینگە",
       "defaultEnvironment": "ژینگەی بنەڕەتی",
       "environmentSummary": "{{commands}} فەرمان · {{mcp}} MCP · {{skills}} لێهاتوویی · {{agents}} ئەجێنت",
-      "changes": "گۆڕانکارییەکان",
       "leaveChanges": "جێهێشتنی گۆڕانکارییەکان",
       "commitAndPush": "کۆمیت و ناردن",
       "startSession": "دەستپێکردنی سێشن",
@@ -2260,8 +2261,8 @@
       "toolList": "پێرستکردن",
       "toolPatch": "پینەکردن",
       "toolTask": "ئەرک",
-      "readTodos": "خوێندنەوەی لیستی ئەرکەکان",
-      "updateTodos": "نوێکردنەوەی لیستی ئەرکەکان",
+      "readTodos": "خوێندنەوەی پلان",
+      "updateTodos": "نوێکردنەوەی پلان",
       "linesBadge": "{{displayCount}} دێڕ",
       "filesBadge": "{{displayCount}} پەڕگە",
       "matchesBadge": "{{displayCount}} ئەنجام",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
       "modelsCount_one": "مۆدێلەکان ({{displayCount}})",
       "modelsCount_other": "مۆدێلەکان ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "بینینی گۆڕانکارییەکان",
+      "asOf": "تا {{time}}",
+      "tooLarge": "ئەم جیاوازییە هێندە گەورەیە کە لە مۆبایلدا پیشان نادرێت.",
+      "empty": "هێشتا هیچ گۆڕانکارییەک لە فایلەکاندا لەم دانیشتنەدا نییە."
     },
     "autoApprove": {
       "title": "پەسەندکردنی خۆکار",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "ئەم چاتە بسڕدرێتەوە؟"
     },
     "beta": "بێتا",
+    "details": {
+      "title": "وردەکارییەکانی گفتوگۆ",
+      "backend": "سێرڤەر",
+      "effortDefault": "بنەڕەتی مۆدێل",
+      "noCost": "بێ تێچوون",
+      "costUnknown": "نەزانراو",
+      "costEstimatedNote": "تێچوونی ئەو وەڵامانەی نرخیان ڕانەگەیاندووە بەپێی لیستی نرخەکان خەمڵێنراوە.",
+      "costUnknownNote": "هیچ نرخێک بۆ ئەم مۆدێلە نەزانراوە.",
+      "costPartialNote": "ئەم کۆیە ئەو مۆدێلانە ناگرێتەوە کە نرخیان نەزانراوە.",
+      "localNote": "مۆدێلەکانی سەر ئامێر لەسەر ئەم ئامێرە کار دەکەن. تێچوون و کاشی داواکارییان نییە، و لەوانەیە ژمارەی تۆکنەکانیان خەمڵاندن بێت.",
+      "countedSinceNote": "ئەم گفتوگۆیە پێش تۆمارکردنی بەکارهێنان دەستی پێکردووە. کۆکان تەنها وەڵامەکانی دوای ئەوە پیشان دەدەن.",
+      "remoteServersOn": "سێرڤەرە دوورە چالاکەکانی MCP"
+    },
     "webSearch": {
       "title": "لە وێبدا بگەڕێ",
       "description": "ڕێگە بدە ئەم چاتە زانیاریی نوێ لە ڕێگەی هەژماری Kiloـکەتەوە بدۆزێتەوە. گەڕانەکان بەشی مانگانەی گەڕانەکەت بەکاردەهێنن.",
@@ -3423,6 +3443,9 @@
       "downloading": "دادەبەزێت…",
       "downloadProgress": "دادەبەزێت… {{percent}}%",
       "downloadFailed": "داگرتنەکە تەواو نەبوو. پەیوەندییەکەت و شوێنی بەتاڵی بیرگە بپشکنە، پاشان دووبارە هەوڵ بدەرەوە."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ئەم مۆدێلە پشتگیری هەوڵی بیرکردنەوە دەکات"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "هیچ پاکێتی کرێدیتی گونجاوی لەلایەن Google Playەوە نەگەڕێندرایەوە.",
     "purchaseOwnedByAnotherAccount": "کرێدیتەکانی سەر ئەم Apple Accountە هی هەژمارێکی تری Kiloیە. بچۆ ناو ئەو هەژمارەی Kilo بۆ بەکارهێنانیان.",
     "purchaseOwnedByAnotherAccountPlay": "کرێدیتەکانی سەر ئەم هەژمارەی Google Play سەر بە هەژمارەیەکی دیکەی Kilo یە. بچۆ ژوورەوە لەو هەژمارەی Kilo بۆ بەکارهێنانیان."
+  },
+  "todos": {
+    "saveAsTodo": "پاشەکەوتکردن وەک ئەرک",
+    "segment": {
+      "label": "دیمەنی بریکارەکان",
+      "sessions": "سێشنەکان",
+      "todos": "ئەرکەکان"
+    },
+    "lists": {
+      "newList": "لیستی نوێ",
+      "empty": "هێشتا هیچ لیستێک نییە",
+      "couldNotLoad": "نەتوانرا لیستەکان بار بکرێن",
+      "noRepository": "هیچ کۆگایەک نییە",
+      "rowA11y": "{{name}}، {{openCount}}",
+      "openCount_one": "{{count}} کراوە",
+      "openCount_other": "{{count}} کراوە",
+      "archived_one": "ئەرشیفکراو ({{count}})",
+      "archived_other": "ئەرشیفکراو ({{count}})",
+      "archive": "ئەرشیف بکە",
+      "unarchive": "لە ئەرشیف دەربهێنە",
+      "deleteTitle": "{{name}} بسڕدرێتەوە؟",
+      "deleteMessage": "ئەرکەکانی ئەویش دەسڕدرێنەوە. سێشنەکانی دەمێننەوە."
+    },
+    "listSettings": {
+      "title": "ڕێکخستنەکانی لیست",
+      "name": "ناو",
+      "namePlaceholder": "کێشەکان، بیرۆکەکان، وەشان…",
+      "emoji": "ئیمۆجی",
+      "mode": "مۆد",
+      "defaultsHint": "ئەو سێشنانەی لەم لیستەوە دەست پێدەکەن ئەم بنەڕەتانە بەکار دەهێنن."
+    },
+    "list": {
+      "addPlaceholder": "ئەرکێک زیاد بکە",
+      "add": "زیادکردنی ئەرک",
+      "empty": "هێشتا هیچ ئەرکێک نییە",
+      "setDefaults": "کۆگا، مۆد و مۆدێل دابنێ",
+      "completed_one": "تەواوکراو ({{count}})",
+      "completed_other": "تەواوکراو ({{count}})"
+    },
+    "item": {
+      "markDone": "وەک تەواوکراو نیشان بکە",
+      "markOpen": "وەک تەواونەکراو نیشان بکە",
+      "markDonePrompt": "وەک تەواوکراو نیشان بکرێت؟",
+      "deleted": "ئەرک سڕایەوە",
+      "undo": "گەڕاندنەوە",
+      "runCount_one": "{{count}} جێبەجێکردن",
+      "runCount_other": "{{count}} جێبەجێکردن",
+      "startNow": "بەبێ پێداچوونەوە دەست پێبکە",
+      "startNowHint": "بە پەستانی درێژخایەن بەبێ پێداچوونەوە دەست پێبکە",
+      "titleLabel": "ناونیشانی ئەرک",
+      "notes": "تێبینی",
+      "notesPlaceholder": "تێبینی بە Markdown زیاد بکە",
+      "sessions": "سێشنە بەستراوەکان",
+      "noSessions": "هێشتا هیچ سێشنێک نییە",
+      "linkSession": "سێشن ببەستە",
+      "unlinkSession": "لابردنی بەستەری {{title}}",
+      "linkFailed": "نەتوانرا سێشن بە ئەرکەکە ببەسترێت"
+    },
+    "linkSession": {
+      "title": "سێشنێک ببەستە",
+      "empty": "هیچ سێشنێکی نوێ نییە",
+      "emptyInRepository": "هیچ سێشنێکی نوێ نییە لە {{repository}}"
+    },
+    "upNext": "دواتر",
+    "sessionTodo": "ئەرک: {{title}}",
+    "linkToTodo": "بەستن بە ئەرک",
+    "candidates": {
+      "empty": "هیچ ئەرکێکی کراوە نییە"
+    },
+    "saveSheet": {
+      "title": "پاشەکەوتکردن بۆ لیست",
+      "saved": "پاشەکەوتکرا بۆ {{list}}"
+    }
   }
 }

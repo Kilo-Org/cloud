@@ -216,7 +216,6 @@ describe('native on-device model client', () => {
       expect(bridge.generate).toHaveBeenCalledTimes(2);
     });
   });
-
   it('cancels the native request when the stream is interrupted and emits no done', async () => {
     const running = Promise.withResolvers<undefined>();
     const { bridge, emit, listeners } = fakeBridge(

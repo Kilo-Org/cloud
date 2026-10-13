@@ -1940,6 +1940,13 @@
       "when": 1791882735449,
       "tag": "0276_thin_whirlwind",
       "breakpoints": true
+    },
+    {
+      "idx": 277,
+      "version": "7",
+      "when": 1791906786083,
+      "tag": "0277_curved_joystick",
+      "breakpoints": true
     }
   ]
 }

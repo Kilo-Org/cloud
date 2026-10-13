@@ -129,6 +129,7 @@ export function ggufModelClient({
       const id = `gguf-${sequence}`;
       let state: 'running' | 'over' = 'running';
       let streamed = '';
+      let thought = '';
       let handle: GgufContext | undefined = undefined;
       const running = () => state === 'running';
       const stop = (problem: LocalModelProblem, started: boolean) => {
@@ -144,8 +145,16 @@ export function ggufModelClient({
           streamed = text;
         }
       };
+      const think = (text: string) => {
+        if (text.length > thought.length && text.startsWith(thought)) {
+          void emit.single({ kind: 'reasoning', text: text.slice(thought.length) });
+          thought = text;
+        }
+      };
       const onToken = (data: TokenData) => {
         if (running()) {
+          // With thinking on, the parser holds the thinking apart from the answer.
+          think(data.reasoning_content ?? '');
           // With the template's parser running, `content` is the answer without
           // tool-call markup, and it is absent while only a tool call is written.
           say(data.accumulated_text === undefined ? streamed + data.token : (data.content ?? ''));
@@ -153,6 +162,7 @@ export function ggufModelClient({
       };
       const finish = async (result: CompletionResult) => {
         state = 'over';
+        think(result.reasoning_content ?? '');
         say(answerOf(result));
         for (const [index, call] of result.tool_calls.entries()) {
           void emit.single({

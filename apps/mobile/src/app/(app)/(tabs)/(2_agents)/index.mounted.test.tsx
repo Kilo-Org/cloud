@@ -120,6 +120,14 @@ vi.mock('@/components/agents/session-list-screen', () => ({
   AgentSessionListScreen: () => null,
 }));
 
+vi.mock('@/components/todos/agents-view-segment', () => ({
+  AgentsViewSegment: () => null,
+}));
+
+vi.mock('@/components/todos/todo-lists-screen', () => ({
+  TodoListsScreen: () => null,
+}));
+
 type AlertButton = { text: string; onPress?: () => void };
 
 const noOp = () => undefined;

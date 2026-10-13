@@ -136,7 +136,8 @@
     "working": "I gang",
     "yourOwnRepositories": "Dine egne kodelagre",
     "dismissed": "Afvist",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Ændringer"
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -325,6 +326,7 @@
       "collapseFile": "Fold filen sammen",
       "expandFile": "Fold filen ud",
       "diffTooLarge": "Ændringerne er for omfattende til at blive vist.",
+      "noPreview": "Ingen forhåndsvisning tilgængelig for denne fil",
       "openOnGitHub": "Åbn på GitHub",
       "openDiffOnGitHub": "Åbn filens ændringsvisning på GitHub",
       "githubDiff": "Ændringsvisning på GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Prøv at indlæse miljøet igen",
       "defaultEnvironment": "Standardmiljø",
       "environmentSummary": "{{commands}} kommandoer · {{mcp}} MCP · {{skills}} færdigheder · {{agents}} agenter",
-      "changes": "Ændringer",
       "leaveChanges": "Behold ændringer",
       "commitAndPush": "Commit og push",
       "startSession": "Start en session",
@@ -2260,8 +2261,8 @@
       "toolList": "vis liste",
       "toolPatch": "anvend rettelse",
       "toolTask": "opgave",
-      "readTodos": "Læs opgavelisten",
-      "updateTodos": "Opdatér opgavelisten",
+      "readTodos": "Læs planen",
+      "updateTodos": "Opdatér planen",
       "linesBadge": "{{displayCount}} linjer",
       "filesBadge": "{{displayCount}} filer",
       "matchesBadge": "{{displayCount}} resultater",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Vis ændringer",
+      "asOf": "Pr. {{time}}",
+      "tooLarge": "Ændringerne er for omfattende til at blive vist på mobil.",
+      "empty": "Ingen filændringer i denne session endnu."
     },
     "autoApprove": {
       "title": "Automatisk godkendelse",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "Slet denne chat?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Chatoplysninger",
+      "backend": "Server",
+      "effortDefault": "Modellens standard",
+      "noCost": "Ingen pris",
+      "costUnknown": "Ukendt",
+      "costEstimatedNote": "Prisen for svar, der ikke angav en pris, er anslået ud fra listepriser.",
+      "costUnknownNote": "Der kendes ingen pris for denne model.",
+      "costPartialNote": "Denne samlede pris omfatter ikke modeller uden en kendt pris.",
+      "localNote": "Modeller på enheden kører på denne enhed. De har ingen pris og ingen prompt-cache, og deres tokenantal kan være anslået.",
+      "countedSinceNote": "Denne chat startede, før forbruget blev registreret. De samlede tal viser kun svarene efter det tidspunkt.",
+      "remoteServersOn": "Aktive eksterne MCP-servere"
+    },
     "webSearch": {
       "title": "Søg på nettet",
       "description": "Lad denne chat slå aktuelle oplysninger op via din Kilo-konto. Søgninger bruger din månedlige søgekvote.",
@@ -3423,6 +3443,9 @@
       "downloading": "Downloader…",
       "downloadProgress": "Downloader… {{percent}}%",
       "downloadFailed": "Downloaden blev ikke fuldført. Tjek din forbindelse og ledig lagerplads, og prøv igen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Denne model understøtter ræsonnementsniveau"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Play returnerede ingen matchende kreditpakker.",
     "purchaseOwnedByAnotherAccount": "Kreditterne på denne Apple-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditterne på denne Google Play-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem."
+  },
+  "todos": {
+    "saveAsTodo": "Gem som opgave",
+    "segment": {
+      "label": "Agentvisning",
+      "sessions": "Sessioner",
+      "todos": "Opgaver"
+    },
+    "lists": {
+      "newList": "Ny liste",
+      "empty": "Ingen lister endnu",
+      "couldNotLoad": "Kunne ikke indlæse lister",
+      "noRepository": "Intet kodelager",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} åbne",
+      "openCount_other": "{{count}} åbne",
+      "archived_one": "Arkiveret ({{count}})",
+      "archived_other": "Arkiveret ({{count}})",
+      "archive": "Arkivér",
+      "unarchive": "Fjern fra arkiv",
+      "deleteTitle": "Slet {{name}}?",
+      "deleteMessage": "Dens opgaver slettes også. Sessionerne bevares."
+    },
+    "listSettings": {
+      "title": "Listeindstillinger",
+      "name": "Navn",
+      "namePlaceholder": "Fejl, Idéer, Udgivelse…",
+      "emoji": "Emoji",
+      "mode": "Tilstand",
+      "defaultsHint": "Sessioner, der startes fra denne liste, bruger disse standardindstillinger."
+    },
+    "list": {
+      "addPlaceholder": "Tilføj en opgave",
+      "add": "Tilføj opgave",
+      "empty": "Ingen opgaver endnu",
+      "setDefaults": "Angiv kodelager, tilstand og model",
+      "completed_one": "Afsluttet ({{count}})",
+      "completed_other": "Afsluttet ({{count}})"
+    },
+    "item": {
+      "markDone": "Markér som færdig",
+      "markOpen": "Markér som ikke færdig",
+      "markDonePrompt": "Markér som færdig?",
+      "deleted": "Opgave slettet",
+      "undo": "Fortryd",
+      "runCount_one": "{{count}} kørsel",
+      "runCount_other": "{{count}} kørsler",
+      "startNow": "Start uden gennemgang",
+      "startNowHint": "Hold nede for at starte uden gennemgang",
+      "titleLabel": "Opgavetitel",
+      "notes": "Noter",
+      "notesPlaceholder": "Tilføj noter i Markdown",
+      "sessions": "Sessioner tilknyttet",
+      "noSessions": "Ingen sessioner endnu",
+      "linkSession": "Tilknyt session",
+      "unlinkSession": "Fjern tilknytning til {{title}}",
+      "linkFailed": "Kunne ikke tilknytte sessionen til opgaven"
+    },
+    "linkSession": {
+      "title": "Tilknyt en session",
+      "empty": "Ingen seneste sessioner",
+      "emptyInRepository": "Ingen seneste sessioner i {{repository}}"
+    },
+    "upNext": "Næste",
+    "sessionTodo": "Opgave: {{title}}",
+    "linkToTodo": "Tilknyt til opgave",
+    "candidates": {
+      "empty": "Ingen åbne opgaver"
+    },
+    "saveSheet": {
+      "title": "Gem på liste",
+      "saved": "Gemt på {{list}}"
+    }
   }
 }

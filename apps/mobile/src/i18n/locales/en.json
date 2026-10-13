@@ -136,7 +136,8 @@
     "updated": "Updated",
     "working": "Working",
     "yourOwnRepositories": "Your own repositories",
-    "dismissed": "Dismissed"
+    "dismissed": "Dismissed",
+    "changes": "Changes"
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -325,6 +326,7 @@
       "collapseFile": "Collapse file",
       "expandFile": "Expand file",
       "diffTooLarge": "Diff too large to display",
+      "noPreview": "No preview available for this file",
       "openOnGitHub": "Open on GitHub",
       "openDiffOnGitHub": "Open this file's diff on GitHub",
       "githubDiff": "GitHub diff"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Retry loading environment",
       "defaultEnvironment": "Default environment",
       "environmentSummary": "{{commands}} commands · {{mcp}} MCP · {{skills}} skills · {{agents}} agents",
-      "changes": "Changes",
       "leaveChanges": "Leave changes",
       "commitAndPush": "Commit and push",
       "startSession": "Start session",
@@ -2260,8 +2261,8 @@
       "toolList": "list",
       "toolPatch": "patch",
       "toolTask": "task",
-      "readTodos": "Read todos",
-      "updateTodos": "Update todos",
+      "readTodos": "Read plan",
+      "updateTodos": "Update plan",
       "linesBadge_one": "{{displayCount}} line",
       "linesBadge": "{{displayCount}} lines",
       "linesBadge_other": "{{displayCount}} lines",
@@ -2677,6 +2678,12 @@
       "stepsCount": "{{steps}} steps",
       "stepsCount_other": "{{steps}} steps",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "sessionChanges": {
+      "viewChanges": "View changes",
+      "asOf": "As of {{time}}",
+      "tooLarge": "This diff is too large to show on mobile.",
+      "empty": "No file changes in this session yet."
     },
     "autoApprove": {
       "title": "Auto-approve",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "Delete this chat?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Chat details",
+      "backend": "Backend",
+      "effortDefault": "Model default",
+      "noCost": "No cost",
+      "costUnknown": "Not known",
+      "costEstimatedNote": "Answers that did not report a price are estimated from list prices.",
+      "costUnknownNote": "No price is known for this model.",
+      "costPartialNote": "This total does not include models that have no known price.",
+      "localNote": "On-device models run on this device. They have no cost and no prompt cache, and their token counts can be estimates.",
+      "countedSinceNote": "This chat started before usage was recorded. The totals show only the answers after that.",
+      "remoteServersOn": "Remote MCP servers on"
+    },
     "backends": {
       "title": "Chat backends",
       "manage": "Manage backends",
@@ -3411,6 +3431,9 @@
       "serverToolCount": "{{count}} tools",
       "serverUnreachable": "Couldn't reach this server",
       "serverOff": "This server is off"
+    },
+    "reasoningEffort": {
+      "modelFlag": "This model supports thinking effort"
     },
     "mcpOAuth": {
       "authMethod": "Authentication",
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "No matching credit packs were returned by Google Play.",
     "purchaseOwnedByAnotherAccount": "The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.",
     "purchaseOwnedByAnotherAccountPlay": "The credits on this Google Play account belong to a different Kilo account. Sign in to that Kilo account to use them."
+  },
+  "todos": {
+    "saveAsTodo": "Save as to-do",
+    "segment": {
+      "label": "Agents view",
+      "sessions": "Sessions",
+      "todos": "To-dos"
+    },
+    "lists": {
+      "newList": "New list",
+      "empty": "No lists yet",
+      "couldNotLoad": "Couldn’t load lists",
+      "noRepository": "No repository",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} open",
+      "openCount_other": "{{count}} open",
+      "archived_one": "Archived ({{count}})",
+      "archived_other": "Archived ({{count}})",
+      "archive": "Archive",
+      "unarchive": "Unarchive",
+      "deleteTitle": "Delete {{name}}?",
+      "deleteMessage": "Its to-dos are deleted too. Their sessions stay."
+    },
+    "listSettings": {
+      "title": "List settings",
+      "name": "Name",
+      "namePlaceholder": "Bugs, Ideas, Release…",
+      "emoji": "Emoji",
+      "mode": "Mode",
+      "defaultsHint": "Sessions started from this list use these defaults."
+    },
+    "list": {
+      "addPlaceholder": "Add a to-do",
+      "add": "Add to-do",
+      "empty": "No to-dos yet",
+      "setDefaults": "Set repository, mode and model",
+      "completed_one": "Completed ({{count}})",
+      "completed_other": "Completed ({{count}})"
+    },
+    "item": {
+      "markDone": "Mark done",
+      "markOpen": "Mark not done",
+      "markDonePrompt": "Mark done?",
+      "deleted": "To-do deleted",
+      "undo": "Undo",
+      "runCount_one": "{{count}} run",
+      "runCount_other": "{{count}} runs",
+      "startNow": "Start without review",
+      "startNowHint": "Long-press to start without review",
+      "titleLabel": "To-do title",
+      "notes": "Notes",
+      "notesPlaceholder": "Add notes in Markdown",
+      "sessions": "Sessions linked",
+      "noSessions": "No sessions yet",
+      "linkSession": "Link session",
+      "unlinkSession": "Unlink {{title}}",
+      "linkFailed": "Couldn’t link the session to the to-do"
+    },
+    "linkSession": {
+      "title": "Link a session",
+      "empty": "No recent sessions",
+      "emptyInRepository": "No recent sessions in {{repository}}"
+    },
+    "upNext": "Up next",
+    "sessionTodo": "To-do: {{title}}",
+    "linkToTodo": "Link to to-do",
+    "candidates": {
+      "empty": "No open to-dos"
+    },
+    "saveSheet": {
+      "title": "Save to list",
+      "saved": "Saved to {{list}}"
+    }
   }
 }

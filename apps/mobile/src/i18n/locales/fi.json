@@ -136,7 +136,8 @@
     "working": "Työn alla",
     "yourOwnRepositories": "Omat koodivarastosi",
     "dismissed": "Sivuutettu",
-    "agent": "Agentti"
+    "agent": "Agentti",
+    "changes": "Muutokset"
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -325,6 +326,7 @@
       "collapseFile": "Kutista tiedosto",
       "expandFile": "Laajenna tiedosto",
       "diffTooLarge": "Muutosvertailu on liian suuri näytettäväksi.",
+      "noPreview": "Tälle tiedostolle ei ole esikatselua",
       "openOnGitHub": "Avaa GitHubissa",
       "openDiffOnGitHub": "Avaa tämän tiedoston muutosvertailu GitHubissa",
       "githubDiff": "GitHubin muutosvertailu"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Yritä ladata ympäristö uudelleen",
       "defaultEnvironment": "Oletusympäristö",
       "environmentSummary": "{{commands}} komentoa · {{mcp}} MCP · {{skills}} taitoa · {{agents}} agenttia",
-      "changes": "Muutokset",
       "leaveChanges": "Jätä muutokset ennalleen",
       "commitAndPush": "Tallenna ja lähetä",
       "startSession": "Aloita istunto",
@@ -2260,8 +2261,8 @@
       "toolList": "luettele",
       "toolPatch": "käytä korjausta",
       "toolTask": "tehtävä",
-      "readTodos": "Lue tehtävät",
-      "updateTodos": "Päivitä tehtävät",
+      "readTodos": "Lue suunnitelma",
+      "updateTodos": "Päivitä suunnitelma",
       "linesBadge": "{{displayCount}} riviä",
       "filesBadge": "{{displayCount}} tiedostoa",
       "matchesBadge": "{{displayCount}} osumaa",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Malli ({{displayCount}})",
       "modelsCount_other": "Mallit ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Näytä muutokset",
+      "asOf": "Tilanne klo {{time}}",
+      "tooLarge": "Muutosvertailu on liian suuri näytettäväksi mobiilissa.",
+      "empty": "Tässä istunnossa ei ole vielä muutettu tiedostoja."
     },
     "autoApprove": {
       "title": "Automaattinen hyväksyntä",
@@ -3211,6 +3218,19 @@
       "deleteTitle": "Poistetaanko tämä keskustelu?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Keskustelun tiedot",
+      "backend": "Taustapalvelu",
+      "effortDefault": "Mallin oletus",
+      "noCost": "Ei kustannuksia",
+      "costUnknown": "Ei tiedossa",
+      "costEstimatedNote": "Niiden vastausten kustannukset, jotka eivät ilmoittaneet hintaa, on arvioitu listahintojen perusteella.",
+      "costUnknownNote": "Tämän mallin hintaa ei tiedetä.",
+      "costPartialNote": "Tähän summaan eivät sisälly mallit, joiden hintaa ei tiedetä.",
+      "localNote": "Laitteessa toimivat mallit ajetaan tässä laitteessa. Niillä ei ole kustannuksia eikä kehotevälimuistia, ja niiden tokenimäärät voivat olla arvioita.",
+      "countedSinceNote": "Tämä keskustelu alkoi ennen käytön tallentamista. Summat näyttävät vain sen jälkeiset vastaukset.",
+      "remoteServersOn": "Käytössä olevat etä-MCP-palvelimet"
+    },
     "webSearch": {
       "title": "Hae verkosta",
       "description": "Anna tämän keskustelun hakea ajantasaista tietoa Kilo-tilisi kautta. Haut kuluttavat kuukausittaista hakukiintiötäsi.",
@@ -3423,6 +3443,9 @@
       "downloading": "Ladataan…",
       "downloadProgress": "Ladataan… {{percent}} %",
       "downloadFailed": "Lataus ei valmistunut. Tarkista verkkoyhteys ja vapaa tallennustila ja yritä sitten uudelleen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tämä malli tukee päättelyn tasoa"
     }
   },
   "settingsTools": {
@@ -3645,5 +3668,78 @@
     "noMatchingProductsPlay": "Google Play ei palauttanut yhtään sopivaa krediittipakettia.",
     "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille.",
     "purchaseOwnedByAnotherAccountPlay": "Tämän Google Play -tilin krediitit kuuluvat eri Kilo-tilille. Käytä niitä kirjautumalla siihen Kilo-tiliin."
+  },
+  "todos": {
+    "saveAsTodo": "Tallenna tehtävänä",
+    "segment": {
+      "label": "Agenttinäkymä",
+      "sessions": "Istunnot",
+      "todos": "Tehtävät"
+    },
+    "lists": {
+      "newList": "Uusi lista",
+      "empty": "Ei vielä listoja",
+      "couldNotLoad": "Listoja ei voitu ladata",
+      "noRepository": "Ei koodivarastoa",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} avoinna",
+      "openCount_other": "{{count}} avoinna",
+      "archived_one": "Arkistoitu ({{count}})",
+      "archived_other": "Arkistoitu ({{count}})",
+      "archive": "Arkistoi",
+      "unarchive": "Palauta arkistosta",
+      "deleteTitle": "Poistetaanko {{name}}?",
+      "deleteMessage": "Myös sen tehtävät poistetaan. Niiden istunnot säilyvät."
+    },
+    "listSettings": {
+      "title": "Listan asetukset",
+      "name": "Nimi",
+      "namePlaceholder": "Virheet, ideat, julkaisu…",
+      "emoji": "emoji",
+      "mode": "Tila",
+      "defaultsHint": "Tästä listasta aloitetut istunnot käyttävät näitä oletusasetuksia."
+    },
+    "list": {
+      "addPlaceholder": "Lisää uusi tehtävä",
+      "add": "Lisää tehtävä",
+      "empty": "Ei vielä tehtäviä",
+      "setDefaults": "Aseta koodivarasto, tila ja malli",
+      "completed_one": "Valmis ({{count}})",
+      "completed_other": "Valmis ({{count}})"
+    },
+    "item": {
+      "markDone": "Merkitse valmiiksi",
+      "markOpen": "Merkitse keskeneräiseksi",
+      "markDonePrompt": "Merkitäänkö valmiiksi?",
+      "deleted": "Tehtävä poistettu",
+      "undo": "Kumoa",
+      "runCount_one": "{{count}} ajo",
+      "runCount_other": "{{count}} ajoa",
+      "startNow": "Aloita ilman katselmointia",
+      "startNowHint": "Aloita ilman katselmointia pitkällä painalluksella",
+      "titleLabel": "Tehtävän otsikko",
+      "notes": "Muistiinpanot",
+      "notesPlaceholder": "Lisää muistiinpanoja Markdownina",
+      "sessions": "Linkitetyt istunnot",
+      "noSessions": "Ei vielä istuntoja",
+      "linkSession": "Linkitä istunto",
+      "unlinkSession": "Poista linkitys: {{title}}",
+      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut"
+    },
+    "linkSession": {
+      "title": "Istunnon linkittäminen",
+      "empty": "Ei viimeaikaisia istuntoja",
+      "emptyInRepository": "Ei viimeaikaisia istuntoja koodivarastossa {{repository}}"
+    },
+    "upNext": "Seuraavaksi",
+    "sessionTodo": "Tehtävä: {{title}}",
+    "linkToTodo": "Linkitä tehtävään",
+    "candidates": {
+      "empty": "Ei avoimia tehtäviä"
+    },
+    "saveSheet": {
+      "title": "Tallenna listalle",
+      "saved": "Tallennettu listalle {{list}}"
+    }
   }
 }

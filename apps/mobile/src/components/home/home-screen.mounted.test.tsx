@@ -97,6 +97,7 @@ vi.mock('expo-router', () => ({
   }),
 }));
 vi.mock('@/components/home/new-task-button', () => ({ NewTaskButton: 'NewTaskButton' }));
+vi.mock('@/components/todos/up-next-section', () => ({ UpNextSection: 'UpNextSection' }));
 vi.mock('@/components/home/new-task-from-picture-button', () => ({
   NewTaskFromPictureButton: 'NewTaskFromPictureButton',
 }));

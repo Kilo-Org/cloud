@@ -248,7 +248,7 @@ describe('Home widget design coordinates at the design frames', () => {
     expect(rect(rowRoot, 'create-glyph')).toEqual({ x: 310, y: 34.5, width: 36, height: 36 });
     expect(rect(rowRoot, 'approve-glyph')).toEqual({ x: 270, y: 34.5, width: 36, height: 36 });
     expect(rect(rowRoot, 'logo')).toEqual({ x: 14, y: 16, width: 14, height: 14 });
-    expect(byKey(rowRoot, 'footer').props.text).toBe('· Checked 8:00 PM');
+    expect(byKey(rowRoot, 'footer').props.text).toBe('Checked 8:00 PM');
     const narrowRoot = at(DESIGN.narrow);
     expect(rect(narrowRoot, 'create-glyph')).toEqual({ x: 134, y: 14, width: 24, height: 24 });
     expect(rect(narrowRoot, 'approve-glyph')).toEqual({ x: 106, y: 14, width: 24, height: 24 });

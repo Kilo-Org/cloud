@@ -64,6 +64,8 @@ type ConnectionCapabilities = {
   // Old form is absent sessionClone; treat missing as incapable until
   // every shipped CLI advertises it.
   sessionClone?: boolean;
+  // Absent means the CLI cannot clone up to a message (fork from here).
+  sessionCloneAtMessage?: boolean;
 };
 
 type WSAttachment =

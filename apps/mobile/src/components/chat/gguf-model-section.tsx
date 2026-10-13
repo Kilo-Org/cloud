@@ -5,8 +5,9 @@ import { View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
+import { PackageSearch } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { GGUF_CATALOG, GGUF_URL_ERROR_KEYS, readGgufLink } from '@/lib/chat/gguf-catalog';
+import { GGUF_URL_ERROR_KEYS, readGgufLink } from '@/lib/chat/gguf-catalog';
 import { ggufDownloadActions, ggufUrlSource, useGgufModels } from '@/lib/chat/gguf-models';
 import {
   type GgufDownload,
@@ -14,6 +15,7 @@ import {
   type GgufDownloadsSnapshot,
 } from '@/lib/chat/gguf-records';
 import { formatFileSize } from '@/lib/format';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { modelCapabilityKey } from './model-capability';
 
@@ -21,15 +23,8 @@ const FAILURE_KEYS = {
   space: 'modelChat.gguf.errors.space',
   network: 'modelChat.gguf.errors.network',
   invalidFile: 'modelChat.gguf.errors.invalidFile',
+  checksum: 'modelChat.gguf.errors.checksum',
 } as const satisfies Record<GgufDownloadProblem, string>;
-
-type RowProps = {
-  readonly fileId: string;
-  readonly name: string;
-  readonly detail: string | undefined;
-  readonly snapshot: GgufDownloadsSnapshot;
-  readonly onDownload: (() => void) | undefined;
-};
 
 function progressKey(download: GgufDownload): string {
   if (download.phase === 'verifying') {
@@ -46,7 +41,23 @@ function progressKey(download: GgufDownload): string {
   return 'modelChat.gguf.downloading';
 }
 
-function GgufModelRow({ fileId, name, detail, snapshot, onDownload }: Readonly<RowProps>) {
+type ControlsProps = {
+  readonly fileId: string;
+  readonly name: string;
+  readonly snapshot: GgufDownloadsSnapshot;
+  readonly onDownload: (() => void) | undefined;
+  /** Tells one download button from the others on the same screen. */
+  readonly downloadLabel?: string;
+};
+
+/** One model's state on the device: downloaded, downloading, or ready to download. */
+export function GgufDownloadControls({
+  fileId,
+  name,
+  snapshot,
+  onDownload,
+  downloadLabel,
+}: ControlsProps) {
   const { t, i18n } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const record = snapshot.models.find(model => model.fileId === fileId);
@@ -54,9 +65,7 @@ function GgufModelRow({ fileId, name, detail, snapshot, onDownload }: Readonly<R
   const failure = snapshot.failure?.fileId === fileId ? snapshot.failure : undefined;
   const size = (bytes: number) => formatFileSize(bytes, i18n.language);
   return (
-    <View className="gap-2 rounded-xl border border-border p-4">
-      <Text className="font-semibold">{name}</Text>
-      {detail !== undefined && <Text className="text-sm text-muted-foreground">{detail}</Text>}
+    <>
       {record !== undefined && (
         <>
           <Text className="text-sm">
@@ -121,7 +130,12 @@ function GgufModelRow({ fileId, name, detail, snapshot, onDownload }: Readonly<R
         </>
       )}
       {record === undefined && download === undefined && onDownload !== undefined && (
-        <Button variant="outline" disabled={snapshot.download !== null} onPress={onDownload}>
+        <Button
+          variant="outline"
+          disabled={snapshot.download !== null}
+          onPress={onDownload}
+          accessibilityLabel={downloadLabel}
+        >
           <Text>{t('modelChat.gguf.download')}</Text>
         </Button>
       )}
@@ -131,7 +145,7 @@ function GgufModelRow({ fileId, name, detail, snapshot, onDownload }: Readonly<R
         </Text>
       )}
       {dialog}
-    </View>
+    </>
   );
 }
 
@@ -180,64 +194,45 @@ function DirectLinkForm({ snapshot }: Readonly<{ snapshot: GgufDownloadsSnapshot
   );
 }
 
-/** Curated and linked GGUF models: download, pause, resume, cancel, and delete. */
-export function GgufModelSection() {
-  const { t, i18n } = useTranslation();
+/** Downloaded and downloading GGUF models, the catalog entry, and the direct link form. */
+export function GgufModelSection({ onBrowse }: Readonly<{ onBrowse: () => void }>) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
   const snapshot = useGgufModels();
-  const curated = new Set(GGUF_CATALOG.map(model => model.fileId));
-  const linked = [
-    ...snapshot.models
-      .filter(model => !curated.has(model.fileId))
-      .map(model => ({ fileId: model.fileId, name: model.name })),
+  const rows = [
+    ...snapshot.models.map(model => ({ fileId: model.fileId, name: model.name })),
     ...(snapshot.download === null ||
-    curated.has(snapshot.download.fileId) ||
     snapshot.models.some(model => model.fileId === snapshot.download?.fileId)
       ? []
       : [{ fileId: snapshot.download.fileId, name: snapshot.download.name }]),
   ];
-  const linkFailure =
-    snapshot.failure !== null &&
-    !curated.has(snapshot.failure.fileId) &&
-    !linked.some(model => model.fileId === snapshot.failure?.fileId)
+  const otherFailure =
+    snapshot.failure !== null && !rows.some(row => row.fileId === snapshot.failure?.fileId)
       ? snapshot.failure
       : null;
   return (
     <View className="gap-2">
       <Text className="font-semibold">{t('modelChat.gguf.title')}</Text>
       <Text className="text-sm text-muted-foreground">{t('modelChat.gguf.help')}</Text>
-      {GGUF_CATALOG.map(model => (
-        <GgufModelRow
-          key={model.fileId}
-          fileId={model.fileId}
-          name={model.name}
-          detail={t('modelChat.gguf.details', {
-            // A vision model's projector is part of the same download.
-            size: formatFileSize(
-              model.sizeBytes + (model.projector?.sizeBytes ?? 0),
-              i18n.language
-            ),
-            license: model.license,
-          })}
-          snapshot={snapshot}
-          onDownload={() => {
-            ggufDownloadActions.start({ kind: 'catalog', model });
-          }}
-        />
-      ))}
-      {linked.map(model => (
-        <GgufModelRow
-          key={model.fileId}
-          fileId={model.fileId}
-          name={model.name}
-          detail={undefined}
-          snapshot={snapshot}
-          onDownload={undefined}
-        />
+      <Button variant="outline" onPress={onBrowse}>
+        <PackageSearch size={18} color={colors.foreground} />
+        <Text>{t('modelChat.catalog.browse')}</Text>
+      </Button>
+      {rows.map(row => (
+        <View key={row.fileId} className="gap-2 rounded-xl border border-border p-4">
+          <Text className="font-semibold">{row.name}</Text>
+          <GgufDownloadControls
+            fileId={row.fileId}
+            name={row.name}
+            snapshot={snapshot}
+            onDownload={undefined}
+          />
+        </View>
       ))}
       <DirectLinkForm snapshot={snapshot} />
-      {linkFailure !== null && (
+      {otherFailure !== null && (
         <Text accessibilityRole="alert" className="text-sm text-destructive">
-          {t(FAILURE_KEYS[linkFailure.problem])}
+          {t(FAILURE_KEYS[otherFailure.problem])}
         </Text>
       )}
     </View>

@@ -1,5 +1,6 @@
 /**
- * The one matrix runner. It runs every entry in `SHARED_SCENARIOS`, one scenario
+ * The one matrix runner. It runs every entry in `SHARED_SCENARIOS` that is not
+ * marked `disabled` (`--only` can still name one), one scenario
  * per child process (`run.ts`), under one concurrency pool; `--parallel 1` is a
  * serial run. Each child gets its own `E2E_FAKE_SCOPE`, so the shared fake
  * attributes that child's completions to the scope and the `fetchFakeRequests`
@@ -24,9 +25,11 @@
  * reported as a failure.
  *
  * End-of-run output (one `unsupported:` line per capability-filtered scenario,
- * one `Summary:`, one `Wall time:`):
+ * one `disabled:` line per skipped disabled scenario, one `Summary:`, one
+ * `Wall time:`):
  *
  *   unsupported: <name>
+ *   disabled: <name> (<reason>)
  *   Summary: <pass> passed, <fail> failed, <unsupported> unsupported
  *   Wall time: <seconds>s
  *
@@ -211,6 +214,13 @@ function killTree(child: ChildProcess): void {
       // Already gone.
     }
   }
+}
+
+/** The registry scenarios a run without `--only` selects: every one not marked `disabled`. */
+export function defaultScenarioKeys(): string[] {
+  return Object.keys(SHARED_SCENARIOS).filter(
+    name => SHARED_SCENARIOS[name]?.disabled === undefined
+  );
 }
 
 export type JobSelection = {
@@ -435,7 +445,7 @@ async function main(): Promise<void> {
     );
     process.exit(2);
   }
-  const selectedKeys = parsed.only ?? Object.keys(SHARED_SCENARIOS);
+  const selectedKeys = parsed.only ?? defaultScenarioKeys();
   const { jobs, unsupported } = selectJobs(
     selectedKeys,
     profile,
@@ -502,6 +512,12 @@ async function main(): Promise<void> {
   }
 
   for (const name of unsupported) console.log(`unsupported: ${name}`);
+  for (const name of Object.keys(SHARED_SCENARIOS)) {
+    const reason = SHARED_SCENARIOS[name]?.disabled;
+    if (reason !== undefined && !selectedKeys.includes(name)) {
+      console.log(`disabled: ${name} (${reason})`);
+    }
+  }
   const summary = `Summary: ${pass.length} passed, ${failures.length} failed, ${unsupported.length} unsupported`;
   console.log(summary);
   console.log(`Wall time: ${wallSeconds}s`);

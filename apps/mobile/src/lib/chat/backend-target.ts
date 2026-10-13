@@ -1,4 +1,5 @@
 import { ModelError } from '@kilocode/harness-sdk';
+import { onlineManager } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
 
@@ -40,7 +41,9 @@ export function backendFailureKey(error: unknown): string {
       return failure.key;
     }
   }
-  return 'common.somethingWentWrong';
+  // A remote model fails with no connection, and an on-device one does not.
+  // Saying so tells the person what to change instead of only that it failed.
+  return onlineManager.isOnline() ? 'common.somethingWentWrong' : 'modelChat.offlineFailure';
 }
 
 type BackendTarget = {

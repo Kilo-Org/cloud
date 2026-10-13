@@ -2180,6 +2180,11 @@
       "collapse": "Skupi cilj",
       "expand": "Proširi cilj"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Zadaci, {{completed}} od {{total}} završeno",
+      "rowAccessibility": "Zadaci, {{completed}} od {{total}} završeno. Trenutni zadatak: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nedavno korišćeno",
       "couldNotLoadGithubRepositories": "Učitavanje GitHub repozitorijuma nije uspelo.",
@@ -2235,6 +2240,10 @@
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može da nastavi sesiju. Izaberi Cloud Agent ili drugi CLI.",
       "importFailed": "Uvoz ove sesije nije uspeo.",
+      "cliCannotFork": "Ažuriraj Kilo CLI da bi račvao sesiju od poruke.",
+      "forkCutNotSynced": "Ova poruka još nije sačuvana. Pokušaj ponovo za trenutak.",
+      "forkFilesFromBaseBranch": "Fajlovi kreću od osnovne grane.",
+      "forkFilesUnchangedOnComputer": "Fajlovi na ovom računaru se ne menjaju.",
       "pickProfile": "Izaberite profil",
       "noProfile": "Nema profila",
       "manageProfiles": "Upravljajte profilima",
@@ -2354,6 +2363,7 @@
       "copyMessage": "Kopiraj poruku",
       "copyText": "Kopiraj tekst",
       "selectText": "Označi tekst",
+      "forkFromHere": "Račvaj odavde",
       "reportAiResponse": "Prijavi AI odgovor",
       "reportAiResponseConfirm": "Želiš li da prijaviš ovaj odgovor radi provere?",
       "report": "Prijavi",
@@ -3230,6 +3240,7 @@
     "tutorialLabel": "Tutorijal"
   },
   "modelChat": {
+    "offlineFailure": "Ovaj model zahteva internet vezu. Povežite se i pokušajte ponovo ili pređite na model na ovom uređaju.",
     "empty": {
       "title": "Započnite ćaskanje",
       "description": "Pošaljite poruku da razgovarate sa modelom."
@@ -3245,6 +3256,11 @@
       "openHint": "Otvara ćaskanje. Dugo pritisnite za preimenovanje ili brisanje."
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Pretraži veb",
+      "description": "Dozvoli ovom ćaskanju da traži aktuelne informacije preko tvog Kilo naloga. Pretrage troše tvoj mesečni limit pretraga.",
+      "allowanceExhausted": "Tvoje besplatne veb pretrage za ovaj mesec su potrošene. Dodaj kredite za nove pretrage."
+    },
     "mcp": {
       "title": "Kilo alati",
       "use": "Koristi Kilo alate",
@@ -3370,8 +3386,48 @@
         "notGguf": "Link mora da vodi do .gguf fajla.",
         "space": "Nema dovoljno slobodnog prostora za ovaj model. Oslobodite prostor i pokušajte ponovo.",
         "network": "Preuzimanje nije završeno. Proverite vezu i pokušajte ponovo.",
-        "invalidFile": "Preuzeti fajl nije model koji ova aplikacija može da pokrene, pa je uklonjen."
+        "invalidFile": "Preuzeti fajl nije model koji ova aplikacija može da pokrene, pa je uklonjen.",
+        "checksum": "Preuzeti fajl se ne poklapa sa objavljenom kontrolnom sumom, pa je uklonjen. Pokušajte ponovo da ga preuzmete."
       }
+    },
+    "catalog": {
+      "browse": "Pregledajte modele",
+      "title": "Katalog modela",
+      "search": "Pretražite Hugging Face modele",
+      "tabs": "Filter modela",
+      "fitsTab": "Odgovara ovom uređaju",
+      "fromHuggingFace": "Sa Hugging Face-a",
+      "loading": "Učitavanje modela",
+      "noResults": "Nije pronađen nijedan model",
+      "noFits": "Nijedan model ne odgovara ovom uređaju",
+      "noFitsDescription": "Veći modeli su na kartici $t(common.all).",
+      "fit": {
+        "fits": "Odgovara",
+        "tight": "Jedva odgovara",
+        "tooLarge": "Prevelik",
+        "noStorage": "Nema dovoljno prostora"
+      },
+      "parameters": "Parametri: {{value}}",
+      "downloads": "Preuzimanja: {{value}}",
+      "likes": "Sviđanja: {{value}}",
+      "context": "Kontekstni prozor: {{value}}",
+      "license": "Licenca: {{license}}",
+      "licenseUnknown": "Licenca nije navedena",
+      "tools": "Pozivanje alata",
+      "vision": "Unos slika",
+      "hintsHelp": "Podaci sa Hugging Face-a. Aplikacija proverava model nakon preuzimanja.",
+      "gated": "Ovaj model zahteva Hugging Face nalog, pa ga aplikacija ne može preuzeti.",
+      "quantizations": "Kvantizacije",
+      "quantizationsHelp": "Manje datoteke koriste manje memorije i prostora. Veće datoteke obično daju bolje odgovore.",
+      "quantDetail": "Preuzimanje: {{size}} · oko {{memory}} memorije",
+      "downloadQuant": "Preuzmite {{quant}}",
+      "loadingModel": "Učitavanje detalja modela",
+      "couldNotLoadModel": "Učitavanje ovog modela nije uspelo",
+      "noFiles": "Nema datoteka koje ova aplikacija može da pokrene",
+      "noFilesDescription": "Ova aplikacija pokreće modele koji se sastoje od jedne GGUF datoteke.",
+      "tooLargeTitle": "Ovaj model možda neće raditi",
+      "tooLargeMessage": "Model {{name}} verovatno zahteva više memorije nego što ovaj uređaj ima. Aplikacija se može zatvoriti dok model odgovara. Želite li ipak da ga preuzmete?",
+      "downloadAnyway": "Ipak preuzmi"
     },
     "localModels": {
       "title": "Modeli na uređaju",

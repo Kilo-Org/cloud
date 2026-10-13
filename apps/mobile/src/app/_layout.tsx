@@ -71,6 +71,8 @@ import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate'
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
+import { getAuthenticatedOwner, subscribeAuthenticatedOwner } from '@/lib/context-scope';
 import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useSystemSearchOpenListener } from '@/lib/hooks/use-system-search-open-listener';
@@ -232,8 +234,27 @@ function RootLayoutNav({
     email,
     isLoading: userIdLoading,
     isError: userIdError,
+    isUnreachable: userIdUnreachable,
     refetch: refetchUserId,
   } = useCurrentUserId({ enabled: token != null });
+  // A cold start that cannot reach the API has no confirmed account once the
+  // read cache holding the last confirmation has expired. The identity hint
+  // names the account the restored credentials belong to (see
+  // `useRestoredAccountId`), so the app opens on it and what runs on the device
+  // — a chat with an on-device model — works with no connection. An answer
+  // that refuses the credentials is not covered and still settles on the error.
+  const authenticatedOwner = useSyncExternalStore(
+    subscribeAuthenticatedOwner,
+    getAuthenticatedOwner
+  );
+  const restoredUserId = useRestoredAccountId(
+    authenticatedOwner.authEpoch,
+    authenticatedOwner.restored
+  );
+  const offlineUserId = userId === undefined && userIdUnreachable ? restoredUserId : null;
+  const accountUserId = userId ?? offlineUserId ?? undefined;
+  const identityLoading = userIdLoading && offlineUserId === null;
+  const identityError = userIdError && offlineUserId === null;
   const [consentChecked, setConsentChecked] = useState(false);
   const [needsConsent, setNeedsConsent] = useState(false);
   const [optionalConsent, setOptionalConsentState] = useState(false);
@@ -318,7 +339,7 @@ function RootLayoutNav({
     authLoading || !fontsReady || !themeHasLoaded || !languageHasLoaded || !languageReady;
 
   // Startup phase timings (lib/startup-timing). Idempotent per mark, so this
-  // effect re-runs freely as gates settle. `userIdLoading` is false while the
+  // effect re-runs freely as gates settle. `identityLoading` is false while the
   // query is disabled, so it only counts once there is a token.
   useEffect(() => {
     if (!authLoading) {
@@ -330,13 +351,13 @@ function RootLayoutNav({
     if (themeHasLoaded) {
       markStartup('theme_ready');
     }
-    if (token != null && !userIdLoading) {
+    if (token != null && !identityLoading) {
       markStartup('user_ready');
     }
     if (consentChecked) {
       markStartup('consent_ready');
     }
-  }, [authLoading, fontsReady, themeHasLoaded, token, userIdLoading, consentChecked]);
+  }, [authLoading, fontsReady, themeHasLoaded, token, identityLoading, consentChecked]);
 
   useEffect(() => {
     if (themeHasLoaded) {
@@ -513,8 +534,8 @@ function RootLayoutNav({
     updateRequired,
     inAuthGroup,
     inForceUpdate,
-    userIdLoading,
-    userIdError,
+    userIdLoading: identityLoading,
+    userIdError: identityError,
     consentCheckError: consentCheckError != null,
     consentChecked,
     needsConsent,
@@ -526,7 +547,7 @@ function RootLayoutNav({
     let cancelled = false;
 
     async function checkConsent() {
-      if (!token || !userId) {
+      if (!token || !accountUserId) {
         setConsentChecked(false);
         setNeedsConsent(false);
         setOptionalConsentState(false);
@@ -534,7 +555,7 @@ function RootLayoutNav({
         return;
       }
 
-      const result = await checkConsentGate(userId);
+      const result = await checkConsentGate(accountUserId);
       if (cancelled) {
         return;
       }
@@ -565,15 +586,15 @@ function RootLayoutNav({
     return () => {
       cancelled = true;
     };
-  }, [token, userId, consentCheckRetryKey]);
+  }, [token, accountUserId, consentCheckRetryKey]);
 
   useEffect(() => {
-    if (!token || !userId) {
+    if (!token || !accountUserId) {
       return undefined;
     }
 
     const unsubscribe = subscribeToConsentChanges(change => {
-      if (change.userId !== userId) {
+      if (change.userId !== accountUserId) {
         return;
       }
 
@@ -583,15 +604,18 @@ function RootLayoutNav({
     });
 
     return unsubscribe;
-  }, [token, userId]);
+  }, [token, accountUserId]);
 
   useTrackingPermissionPrompt(
     optionalConsent &&
       shouldStartAnalytics({ hasToken: token != null, consentChecked, needsConsent })
   );
   useAnalyticsConsentGate({
+    authLoading,
     hasToken: token != null,
+    userIdLoading,
     consentChecked,
+    consentCheckFailed: consentCheckError != null,
     needsConsent,
     email,
     accountId: userId,
@@ -680,8 +704,8 @@ function RootLayoutNav({
       inForceUpdate,
       inAuthGroup,
       hasToken: token != null,
-      userIdLoading,
-      userIdError,
+      userIdLoading: identityLoading,
+      userIdError: identityError,
       consentCheckError: consentCheckError != null,
       consentChecked,
       needsConsent,
@@ -771,8 +795,8 @@ function RootLayoutNav({
     inAuthGroup,
     inForceUpdate,
     router,
-    userIdLoading,
-    userIdError,
+    identityLoading,
+    identityError,
     consentCheckError,
     consentChecked,
     needsConsent,
@@ -874,8 +898,8 @@ function RootLayoutNav({
     inForceUpdate,
     inAuthGroup,
     hasToken: token != null,
-    userIdLoading,
-    userIdError,
+    userIdLoading: identityLoading,
+    userIdError: identityError,
     consentCheckError: consentCheckError != null,
     consentChecked,
     needsConsent,

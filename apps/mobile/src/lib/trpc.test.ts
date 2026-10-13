@@ -404,9 +404,9 @@ describe('network error reporting', () => {
       { result: { data: 'ok' } },
       {
         error: {
-          message: 'forbidden',
-          code: -32_003,
-          data: { code: 'FORBIDDEN', httpStatus: 403, path: 'session.list' },
+          message: 'bad request',
+          code: -32_600,
+          data: { code: 'BAD_REQUEST', httpStatus: 400, path: 'session.list' },
         },
       },
     ];
@@ -424,7 +424,7 @@ describe('network error reporting', () => {
       'http.status': 207,
       'network.outcome': 'http_error',
       'trpc.procedure': 'session.list',
-      'trpc.code': 'FORBIDDEN',
+      'trpc.code': 'BAD_REQUEST',
     });
   });
 });

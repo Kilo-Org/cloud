@@ -1,3 +1,4 @@
+import { requireNativeModule } from 'expo';
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
 import { Directory, File, Paths } from 'expo-file-system';
 import { initLlama } from 'llama.rn';
@@ -31,10 +32,21 @@ function fileIn(name: string): File {
   return new File(directory, name);
 }
 
+/**
+ * Neither expo-crypto nor expo-file-system hashes a file incrementally, and a
+ * model is too large to read whole, so a local module streams the file through
+ * the platform SHA-256 on a background thread.
+ */
+const fileHash = requireNativeModule<{ sha256File(uri: string): Promise<string> }>('KiloFileHash');
+
 const storage: GgufStorage = {
   freeBytes: () => Paths.availableDiskSpace,
   list: () => (directory.exists ? directory.list().map(entry => entry.name) : []),
   size: name => fileIn(name).size,
+  sha256: async name => {
+    const hash = await fileHash.sha256File(fileIn(name).uri);
+    return hash;
+  },
   remove: name => {
     const file = fileIn(name);
     if (file.exists) {

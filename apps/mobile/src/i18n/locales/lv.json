@@ -2180,6 +2180,11 @@
       "collapse": "Sakļaut mērķi",
       "expand": "Izvērst mērķi"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Uzdevumi, {{completed}} no {{total}} izpildīti",
+      "rowAccessibility": "Uzdevumi, {{completed}} no {{total}} izpildīti. Pašreizējais uzdevums: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nesen lietotie",
       "couldNotLoadGithubRepositories": "Neizdevās ielādēt GitHub repozitorijus.",
@@ -2235,6 +2240,10 @@
       "importingSession": "Importē sesiju…",
       "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlies Cloud Agent vai citu CLI.",
       "importFailed": "Neizdevās importēt šo sesiju.",
+      "cliCannotFork": "Atjaunini Kilo CLI, lai atzarotu no ziņojuma.",
+      "forkCutNotSynced": "Šis ziņojums vēl nav saglabāts. Mēģini vēlreiz pēc brīža.",
+      "forkFilesFromBaseBranch": "Faili sākas no bāzes zara.",
+      "forkFilesUnchangedOnComputer": "Faili šajā datorā netiek mainīti.",
       "pickProfile": "Izvēlieties profilu",
       "noProfile": "Nav profila",
       "manageProfiles": "Pārvaldīt profilus",
@@ -2354,6 +2363,7 @@
       "copyMessage": "Kopēt ziņojumu",
       "copyText": "Kopēt tekstu",
       "selectText": "Atlasīt tekstu",
+      "forkFromHere": "Atzarot no šejienes",
       "reportAiResponse": "Ziņot par AI atbildi",
       "reportAiResponseConfirm": "Nosūtīt ziņojumu par šo atbildi, lai to pārbaudītu?",
       "report": "Ziņot",
@@ -3230,6 +3240,7 @@
     "tutorialLabel": "Apmācība"
   },
   "modelChat": {
+    "offlineFailure": "Šim modelim nepieciešams interneta savienojums. Izveido savienojumu un mēģini vēlreiz vai pārslēdzies uz modeli šajā ierīcē.",
     "empty": {
       "title": "Sākt tērzēšanu",
       "description": "Nosūti ziņojumu, lai sarunātos ar modeli."
@@ -3245,6 +3256,11 @@
       "openHint": "Atver tērzēšanu. Turiet nospiestu, lai pārdēvētu vai dzēstu."
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Meklēt tīmeklī",
+      "description": "Ļaujiet šai tērzēšanai meklēt aktuālu informāciju, izmantojot jūsu Kilo kontu. Meklēšana izmanto jūsu mēneša meklēšanas limitu.",
+      "allowanceExhausted": "Jūsu bezmaksas tīmekļa meklējumi šim mēnesim ir izlietoti. Pievienojiet kredītus, lai meklētu atkal."
+    },
     "mcp": {
       "title": "Kilo rīki",
       "use": "Izmantot Kilo rīkus",
@@ -3370,8 +3386,48 @@
         "notGguf": "Saitei ir jānorāda uz .gguf failu.",
         "space": "Šim modelim nav pietiekami daudz brīvas krātuves vietas. Atbrīvojiet vietu un mēģiniet vēlreiz.",
         "network": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
-        "invalidFile": "Lejupielādētais fails nav modelis, ko šī lietotne var palaist, tāpēc tas tika noņemts."
+        "invalidFile": "Lejupielādētais fails nav modelis, ko šī lietotne var palaist, tāpēc tas tika noņemts.",
+        "checksum": "Lejupielādētais fails neatbilst publicētajai kontrolsummai, tāpēc tas tika noņemts. Mēģiniet lejupielādēt vēlreiz."
       }
+    },
+    "catalog": {
+      "browse": "Pārlūkot modeļus",
+      "title": "Modeļu katalogs",
+      "search": "Meklēt Hugging Face modeļus",
+      "tabs": "Modeļu filtrs",
+      "fitsTab": "Der šai ierīcei",
+      "fromHuggingFace": "No Hugging Face",
+      "loading": "Ielādē modeļus",
+      "noResults": "Neviens modelis nav atrasts",
+      "noFits": "Neviens modelis neder šai ierīcei",
+      "noFitsDescription": "Lielāki modeļi ir cilnē $t(common.all).",
+      "fit": {
+        "fits": "Der",
+        "tight": "Knapi der",
+        "tooLarge": "Pārāk liels",
+        "noStorage": "Nepietiek krātuves"
+      },
+      "parameters": "Parametri: {{value}}",
+      "downloads": "Lejupielādes: {{value}}",
+      "likes": "Atzīmes “patīk”: {{value}}",
+      "context": "Konteksta logs: {{value}}",
+      "license": "Licence: {{license}}",
+      "licenseUnknown": "Licence nav norādīta",
+      "tools": "Rīku izsaukšana",
+      "vision": "Attēlu ievade",
+      "hintsHelp": "Norādes no Hugging Face. Lietotne pārbauda modeli pēc tā lejupielādes.",
+      "gated": "Šim modelim nepieciešams Hugging Face konts, tāpēc lietotne to nevar lejupielādēt.",
+      "quantizations": "Kvantizācijas",
+      "quantizationsHelp": "Mazāki faili izmanto mazāk atmiņas un krātuves. Lielāki faili parasti sniedz labākas atbildes.",
+      "quantDetail": "Lejupielāde: {{size}} · aptuveni {{memory}} atmiņas",
+      "downloadQuant": "Lejupielādēt {{quant}}",
+      "loadingModel": "Ielādē modeļa informāciju",
+      "couldNotLoadModel": "Neizdevās ielādēt šo modeli",
+      "noFiles": "Nav failu, ko šī lietotne var palaist",
+      "noFilesDescription": "Šī lietotne palaiž modeļus, kas sastāv no viena GGUF faila.",
+      "tooLargeTitle": "Šis modelis var nedarboties",
+      "tooLargeMessage": "{{name}}, visticamāk, nepieciešams vairāk atmiņas, nekā ir šai ierīcei. Lietotne var aizvērties, kamēr modelis atbild. Vai tomēr lejupielādēt?",
+      "downloadAnyway": "Tomēr lejupielādēt"
     },
     "localModels": {
       "title": "Ierīces modeļi",

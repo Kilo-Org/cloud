@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
+import { assertProtectedDataAvailable, isProtectedDataAvailable } from '@/lib/protected-data';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
@@ -38,11 +39,17 @@ export function secureStoreOptionsArgs(
  * caller for which an unreadable value is the same recoverable outcome as an
  * absent one uses {@link readStoredValueSafe} instead, so a keychain failure
  * cannot reject into it.
+ *
+ * Every helper here skips the keychain while the device is locked (see
+ * `lib/protected-data`): the throwing ones reject with an unreported
+ * `ProtectedDataUnavailableError`, the total ones return their failure value
+ * without a report.
  */
 export async function readStoredValue(
   key: string,
   options?: SecureStoreReadOptions
 ): Promise<string | null> {
+  assertProtectedDataAvailable();
   const value = await SecureStore.getItemAsync(key, ...secureStoreOptionsArgs(options));
   return value;
 }
@@ -63,6 +70,9 @@ export async function readStoredValueSafe(
   key: string,
   options?: SecureStoreReadOptions
 ): Promise<string | null> {
+  if (!isProtectedDataAvailable()) {
+    return null;
+  }
   try {
     return await SecureStore.getItemAsync(key, ...secureStoreOptionsArgs(options));
   } catch (error) {
@@ -74,7 +84,7 @@ export async function readStoredValueSafe(
 /**
  * The outcome of a read that feeds a read-modify-write. `'value'` carries the
  * stored string (`null` for nothing stored); `'unreadable'` means the read
- * failed and was reported at warning level.
+ * failed (reported at warning level) or the device is locked.
  */
 export type StoredValueRead =
   | { readonly status: 'value'; readonly value: string | null }
@@ -91,6 +101,9 @@ export async function readStoredValueForUpdate(
   key: string,
   options?: SecureStoreReadOptions
 ): Promise<StoredValueRead> {
+  if (!isProtectedDataAvailable()) {
+    return { status: 'unreadable' };
+  }
   try {
     const value = await SecureStore.getItemAsync(key, ...secureStoreOptionsArgs(options));
     return { status: 'value', value };
@@ -114,6 +127,9 @@ export async function writeStoredValueSafe(
   value: string,
   options?: SecureStoreReadOptions
 ): Promise<boolean> {
+  if (!isProtectedDataAvailable()) {
+    return false;
+  }
   try {
     await SecureStore.setItemAsync(key, value, ...secureStoreOptionsArgs(options));
     return true;
@@ -129,6 +145,9 @@ export async function deleteStoredValueSafe(
   key: string,
   options?: SecureStoreReadOptions
 ): Promise<boolean> {
+  if (!isProtectedDataAvailable()) {
+    return false;
+  }
   try {
     await SecureStore.deleteItemAsync(key, ...secureStoreOptionsArgs(options));
     return true;
@@ -150,6 +169,7 @@ export async function writeStoredValue(
   value: string,
   options?: SecureStoreReadOptions
 ): Promise<void> {
+  assertProtectedDataAvailable();
   try {
     await SecureStore.setItemAsync(key, value, ...secureStoreOptionsArgs(options));
   } catch (error) {
@@ -164,6 +184,7 @@ export async function deleteStoredValue(
   key: string,
   options?: SecureStoreReadOptions
 ): Promise<void> {
+  assertProtectedDataAvailable();
   try {
     await SecureStore.deleteItemAsync(key, ...secureStoreOptionsArgs(options));
   } catch (error) {

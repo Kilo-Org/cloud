@@ -9,6 +9,7 @@
 
 import { randomUUID } from 'node:crypto';
 import {
+  failureReasonFromEvent,
   fakeDirective,
   fetchFakeScenarioStatus,
   hasPreparationForMessage,
@@ -167,7 +168,9 @@ function errorMessage(error: unknown): string {
 
 /** Describe a stream wait result without relying on the guard's narrowing. */
 function terminalLabel(event: StreamEvent | null): string {
-  return event === null ? 'none' : event.streamEventType;
+  if (event === null) return 'none';
+  const reason = failureReasonFromEvent(event);
+  return reason === undefined ? event.streamEventType : `${event.streamEventType} reason=${reason}`;
 }
 
 function sleep(ms: number): Promise<void> {

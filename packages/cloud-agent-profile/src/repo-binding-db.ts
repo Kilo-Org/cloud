@@ -1,10 +1,13 @@
-import type { WorkerDb } from '@kilocode/db';
 import {
   agent_environment_profiles,
   agent_environment_profile_repo_bindings,
 } from '@kilocode/db/schema';
-import { eq, and, sql, isNotNull } from 'drizzle-orm';
-import type { ProfileOwner } from './types';
+import { eq, and, sql, isNotNull, count } from 'drizzle-orm';
+import type { ProfileDatabase, ProfileOwner, RepositoryPlatform } from './types';
+
+export function canonicalRepoFullName(repoFullName: string): string {
+  return repoFullName.trim().toLowerCase();
+}
 
 function buildBindingOwnerCondition(owner: ProfileOwner) {
   return owner.type === 'user'
@@ -29,10 +32,10 @@ function ownerColumns(owner: ProfileOwner) {
  * Uses ON CONFLICT on the partial unique index to atomically resolve races.
  */
 export async function upsertBinding(
-  db: WorkerDb,
+  db: ProfileDatabase,
   owner: ProfileOwner,
   repoFullName: string,
-  platform: 'github' | 'gitlab',
+  platform: RepositoryPlatform,
   profileId: string
 ): Promise<void> {
   const b = agent_environment_profile_repo_bindings;
@@ -72,10 +75,10 @@ export async function upsertBinding(
  * Find a binding by repo+platform+owner.
  */
 export async function findBinding(
-  db: WorkerDb,
+  db: ProfileDatabase,
   owner: ProfileOwner,
   repoFullName: string,
-  platform: 'github' | 'gitlab'
+  platform: RepositoryPlatform
 ) {
   const [row] = await db
     .select({
@@ -98,16 +101,49 @@ export async function findBinding(
 /**
  * Delete a binding by ID.
  */
-export async function deleteBinding(db: WorkerDb, bindingId: string): Promise<void> {
+export async function deleteBinding(db: ProfileDatabase, bindingId: string): Promise<void> {
   await db
     .delete(agent_environment_profile_repo_bindings)
     .where(eq(agent_environment_profile_repo_bindings.id, bindingId));
 }
 
 /**
+ * Delete the binding for an owner+repo+platform if present. Idempotent: absent
+ * bindings are a no-op so a combined remove can run without a prior read.
+ */
+export async function deleteBindingForRepo(
+  db: ProfileDatabase,
+  owner: ProfileOwner,
+  repoFullName: string,
+  platform: RepositoryPlatform
+): Promise<void> {
+  await db
+    .delete(agent_environment_profile_repo_bindings)
+    .where(
+      and(
+        eq(agent_environment_profile_repo_bindings.repo_full_name, repoFullName),
+        eq(agent_environment_profile_repo_bindings.platform, platform),
+        buildBindingOwnerCondition(owner)
+      )
+    );
+}
+
+/** Number of repository bindings that reference a profile. */
+export async function countBindingsForProfile(
+  db: ProfileDatabase,
+  profileId: string
+): Promise<number> {
+  const [row] = await db
+    .select({ value: count() })
+    .from(agent_environment_profile_repo_bindings)
+    .where(eq(agent_environment_profile_repo_bindings.profile_id, profileId));
+  return Number(row?.value ?? 0);
+}
+
+/**
  * List all bindings for an owner, joined with profile names.
  */
-export async function selectBindingsWithProfiles(db: WorkerDb, owner: ProfileOwner) {
+export async function selectBindingsWithProfiles(db: ProfileDatabase, owner: ProfileOwner) {
   return db
     .select({
       repoFullName: agent_environment_profile_repo_bindings.repo_full_name,

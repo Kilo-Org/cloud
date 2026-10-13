@@ -1653,6 +1653,11 @@
       "collapse": "כיווץ המטרה",
       "expand": "הרחבת המטרה"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "משימות, {{completed}} מתוך {{total}} הושלמו",
+      "rowAccessibility": "משימות, {{completed}} מתוך {{total}} הושלמו. המשימה הנוכחית: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "בשימוש לאחרונה",
       "couldNotLoadGithubRepositories": "לא ניתן היה לטעון את המאגרים מ-GitHub.",
@@ -1708,6 +1713,10 @@
       "importingSession": "מייבא סשן…",
       "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
       "importFailed": "לא ניתן היה לייבא את הסשן הזה.",
+      "cliCannotFork": "עדכן את ה-Kilo CLI כדי לפצל מהודעה.",
+      "forkCutNotSynced": "ההודעה הזו עדיין לא נשמרה. נסה שוב בעוד רגע.",
+      "forkFilesFromBaseBranch": "הקבצים מתחילים מענף הבסיס.",
+      "forkFilesUnchangedOnComputer": "הקבצים במחשב הזה לא משתנים.",
       "pickProfile": "בחר פרופיל",
       "noProfile": "אין פרופיל",
       "manageProfiles": "נהל פרופילים",
@@ -1831,6 +1840,7 @@
       "copyMessage": "העתקת ההודעה",
       "copyText": "העתקת טקסט",
       "selectText": "בחירת טקסט",
+      "forkFromHere": "פיצול מכאן",
       "reportAiResponse": "דיווח על תשובת AI",
       "reportAiResponseConfirm": "לדווח על התשובה הזו כדי שתיבדק?",
       "report": "דיווח",
@@ -3230,6 +3240,7 @@
     "tutorialLabel": "מדריך"
   },
   "modelChat": {
+    "offlineFailure": "מודל זה דורש חיבור לאינטרנט. התחבר ונסה שוב, או עבור למודל במכשיר זה.",
     "empty": {
       "title": "התחל שיחה",
       "description": "שלח הודעה כדי לשוחח עם מודל."
@@ -3245,6 +3256,11 @@
       "openHint": "פותח את הצ'אט. לחיצה ארוכה לשינוי שם או למחיקה."
     },
     "beta": "בטא",
+    "webSearch": {
+      "title": "חיפוש באינטרנט",
+      "description": "אפשרו לצ'אט הזה לחפש מידע עדכני דרך חשבון Kilo שלכם. החיפושים מנצלים את מכסת החיפוש החודשית שלכם.",
+      "allowanceExhausted": "החיפושים החינמיים באינטרנט לחודש הזה נוצלו. הוסיפו קרדיטים כדי לחפש שוב."
+    },
     "mcp": {
       "title": "כלי Kilo",
       "use": "שימוש בכלי Kilo",
@@ -3370,8 +3386,48 @@
         "notGguf": "הקישור חייב להצביע לקובץ .gguf.",
         "space": "אין מספיק שטח אחסון פנוי למודל הזה. פנה מקום ונסה שוב.",
         "network": "ההורדה לא הושלמה. בדוק את החיבור ונסה שוב.",
-        "invalidFile": "הקובץ שהורד אינו מודל שהאפליקציה הזו יכולה להריץ, ולכן הוא הוסר."
+        "invalidFile": "הקובץ שהורד אינו מודל שהאפליקציה הזו יכולה להריץ, ולכן הוא הוסר.",
+        "checksum": "הקובץ שהורד אינו תואם לסכום הביקורת שפורסם עבורו, ולכן הוא הוסר. נסו להוריד אותו שוב."
       }
+    },
+    "catalog": {
+      "browse": "עיון במודלים",
+      "title": "קטלוג מודלים",
+      "search": "חיפוש מודלים ב-Hugging Face",
+      "tabs": "סינון מודלים",
+      "fitsTab": "מתאימים למכשיר",
+      "fromHuggingFace": "מ-Hugging Face",
+      "loading": "טוען מודלים",
+      "noResults": "לא נמצאו מודלים",
+      "noFits": "אין מודלים שמתאימים למכשיר הזה",
+      "noFitsDescription": "מודלים גדולים יותר נמצאים בכרטיסייה $t(common.all).",
+      "fit": {
+        "fits": "מתאים",
+        "tight": "בקושי מתאים",
+        "tooLarge": "גדול מדי",
+        "noStorage": "אין מספיק אחסון"
+      },
+      "parameters": "פרמטרים: {{value}}",
+      "downloads": "הורדות: {{value}}",
+      "likes": "לייקים: {{value}}",
+      "context": "חלון הקשר: {{value}}",
+      "license": "רישיון: {{license}}",
+      "licenseUnknown": "הרישיון לא צוין",
+      "tools": "קריאה לכלים",
+      "vision": "קלט תמונה",
+      "hintsHelp": "רמזים מ-Hugging Face. האפליקציה בודקת את המודל אחרי ההורדה.",
+      "gated": "המודל הזה דורש חשבון Hugging Face, ולכן האפליקציה לא יכולה להוריד אותו.",
+      "quantizations": "קוונטיזציות",
+      "quantizationsHelp": "קבצים קטנים יותר צורכים פחות זיכרון ואחסון. קבצים גדולים יותר בדרך כלל נותנים תשובות טובות יותר.",
+      "quantDetail": "הורדה של {{size}} · כ-{{memory}} זיכרון",
+      "downloadQuant": "הורד {{quant}}",
+      "loadingModel": "טוען פרטי מודל",
+      "couldNotLoadModel": "לא ניתן לטעון את המודל הזה",
+      "noFiles": "אין קבצים שהאפליקציה יכולה להריץ",
+      "noFilesDescription": "האפליקציה מריצה מודלים שהם קובץ GGUF יחיד.",
+      "tooLargeTitle": "ייתכן שהמודל הזה לא יפעל",
+      "tooLargeMessage": "סביר ש-{{name}} צריך יותר זיכרון ממה שיש במכשיר הזה. האפליקציה עלולה להיסגר בזמן שהמודל עונה. להוריד בכל זאת?",
+      "downloadAnyway": "הורד בכל זאת"
     },
     "localModels": {
       "title": "מודלים במכשיר",

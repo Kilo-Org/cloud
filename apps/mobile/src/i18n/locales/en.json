@@ -2152,6 +2152,11 @@
       "collapse": "Collapse goal",
       "expand": "Expand goal"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tasks, {{completed}} of {{total}} done",
+      "rowAccessibility": "Tasks, {{completed}} of {{total}} done. Current task: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Recently used",
       "couldNotLoadGithubRepositories": "Couldn't load GitHub repositories",
@@ -2207,6 +2212,10 @@
       "importingSession": "Importing session",
       "cliCannotContinue": "This CLI cannot continue a session. Pick Cloud Agent or another CLI.",
       "importFailed": "Couldn't import this session.",
+      "cliCannotFork": "Update the Kilo CLI to fork from a message.",
+      "forkCutNotSynced": "This message is not saved yet. Try again in a moment.",
+      "forkFilesFromBaseBranch": "Files start from the base branch.",
+      "forkFilesUnchangedOnComputer": "Files on this computer are not changed.",
       "pickProfile": "Pick a profile",
       "noProfile": "No profile",
       "manageProfiles": "Manage profiles",
@@ -2333,6 +2342,7 @@
       "copyMessage": "Copy message",
       "copyText": "Copy Text",
       "selectText": "Select text",
+      "forkFromHere": "Fork from here",
       "reportAiResponse": "Report AI response",
       "reportAiResponseConfirm": "Report this response for review?",
       "report": "Report",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "This model needs an internet connection. Connect and try again, or switch to a model on this device.",
     "empty": {
       "title": "Start a chat",
       "description": "Send a message to talk to a model."
@@ -3286,8 +3297,48 @@
         "notGguf": "The link must point to a .gguf file.",
         "space": "There isn't enough free storage for this model. Free up space and try again.",
         "network": "The download didn't finish. Check your connection and try again.",
-        "invalidFile": "The downloaded file isn't a model this app can run, so it was removed."
+        "invalidFile": "The downloaded file isn't a model this app can run, so it was removed.",
+        "checksum": "The downloaded file doesn't match its published checksum, so it was removed. Try the download again."
       }
+    },
+    "catalog": {
+      "browse": "Browse models",
+      "title": "Model catalog",
+      "search": "Search Hugging Face models",
+      "tabs": "Model filter",
+      "fitsTab": "Fits this device",
+      "fromHuggingFace": "From Hugging Face",
+      "loading": "Loading models",
+      "noResults": "No models found",
+      "noFits": "No models fit this device",
+      "noFitsDescription": "Larger models are on the $t(common.all) tab.",
+      "fit": {
+        "fits": "Fits",
+        "tight": "Tight fit",
+        "tooLarge": "Too large",
+        "noStorage": "Not enough storage"
+      },
+      "parameters": "Parameters: {{value}}",
+      "downloads": "Downloads: {{value}}",
+      "likes": "Likes: {{value}}",
+      "context": "Context window: {{value}}",
+      "license": "License: {{license}}",
+      "licenseUnknown": "The license isn't stated",
+      "tools": "Tool calling",
+      "vision": "Image input",
+      "hintsHelp": "Hints from Hugging Face. The app checks the model after it downloads.",
+      "gated": "This model requires a Hugging Face account, so the app can't download it.",
+      "quantizations": "Quantizations",
+      "quantizationsHelp": "Smaller files use less memory and storage. Larger files usually give better answers.",
+      "quantDetail": "{{size}} download · about {{memory}} of memory",
+      "downloadQuant": "Download {{quant}}",
+      "loadingModel": "Loading model details",
+      "couldNotLoadModel": "Couldn't load this model",
+      "noFiles": "No files this app can run",
+      "noFilesDescription": "This app runs models that are one GGUF file.",
+      "tooLargeTitle": "This model may not run",
+      "tooLargeMessage": "{{name}} likely needs more memory than this device has. The app can close while the model answers. Download it anyway?",
+      "downloadAnyway": "Download anyway"
     },
     "localModels": {
       "title": "On-device models",
@@ -3317,6 +3368,11 @@
       "downloading": "Downloading…",
       "downloadProgress": "Downloading… {{percent}}%",
       "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again."
+    },
+    "webSearch": {
+      "title": "Search the web",
+      "description": "Let this chat look up current information through your Kilo account. Searches use your monthly search allowance.",
+      "allowanceExhausted": "Your free web searches for this month are used up. Add credits to search again."
     },
     "mcp": {
       "title": "Kilo tools",

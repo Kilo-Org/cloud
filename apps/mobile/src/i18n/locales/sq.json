@@ -2152,6 +2152,11 @@
       "collapse": "Palos qëllimin",
       "expand": "Shfaq qëllimin"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Qëllimet, {{completed}} nga {{total}} të përfunduara",
+      "rowAccessibility": "Qëllimet, {{completed}} nga {{total}} të përfunduara. Qëllimi aktual: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Të përdorura së fundmi",
       "couldNotLoadGithubRepositories": "Nuk u ngarkuan depot nga GitHub.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Duke importuar seancën",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidh Cloud Agent ose një CLI tjetër.",
       "importFailed": "Nuk u arrit të importohej kjo seancë.",
+      "cliCannotFork": "Përditëso Kilo CLI për të degëzuar nga një mesazh.",
+      "forkCutNotSynced": "Ky mesazh nuk është ruajtur ende. Provo përsëri pas pak.",
+      "forkFilesFromBaseBranch": "Skedarët nisin nga dega bazë.",
+      "forkFilesUnchangedOnComputer": "Skedarët në këtë kompjuter nuk ndryshohen.",
       "pickProfile": "Zgjidh një profil",
       "noProfile": "Nuk ka profil",
       "manageProfiles": "Menaxho profilet",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Kopjo mesazhin",
       "copyText": "Kopjo tekstin",
       "selectText": "Zgjidh tekstin",
+      "forkFromHere": "Degëzo nga këtu",
       "reportAiResponse": "Raporto përgjigjen e AI",
       "reportAiResponseConfirm": "Të raportohet kjo përgjigje për shqyrtim?",
       "report": "Raporto",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Tutoriali"
   },
   "modelChat": {
+    "offlineFailure": "Ky model ka nevojë për lidhje interneti. Lidhu dhe provo sërish, ose kalo te një model në këtë pajisje.",
     "empty": {
       "title": "Filloni një bisedë",
       "description": "Dërgo një mesazh për të biseduar me një model."
@@ -3204,6 +3215,11 @@
       "openHint": "Hap bisedën. Shtypni gjatë për ta riemërtuar ose fshirë."
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Kërko në internet",
+      "description": "Lejo këtë bisedë të kërkojë informacion të përditësuar përmes llogarisë sate Kilo. Kërkimet përdorin kuotën tënde mujore të kërkimeve.",
+      "allowanceExhausted": "Kërkimet e tua falas në internet për këtë muaj kanë mbaruar. Shto kredite për të kërkuar përsëri."
+    },
     "mcp": {
       "title": "Mjetet Kilo",
       "use": "Përdor mjetet Kilo",
@@ -3329,8 +3345,48 @@
         "notGguf": "Lidhja duhet të tregojë një skedar .gguf.",
         "space": "Nuk ka hapësirë të lirë të mjaftueshme për këtë model. Liro hapësirë dhe provo përsëri.",
         "network": "Shkarkimi nuk përfundoi. Kontrollo lidhjen e internetit dhe provo përsëri.",
-        "invalidFile": "Skedari i shkarkuar nuk është një model që ky aplikacion mund ta ekzekutojë, prandaj u hoq."
+        "invalidFile": "Skedari i shkarkuar nuk është një model që ky aplikacion mund ta ekzekutojë, prandaj u hoq.",
+        "checksum": "Skedari i shkarkuar nuk përputhet me shumën e kontrollit të publikuar, prandaj u hoq. Provoni ta shkarkoni përsëri."
       }
+    },
+    "catalog": {
+      "browse": "Shfleto modelet",
+      "title": "Katalogu i modeleve",
+      "search": "Kërko modele në Hugging Face",
+      "tabs": "Filtri i modeleve",
+      "fitsTab": "Të përshtatshme për pajisjen",
+      "fromHuggingFace": "Nga Hugging Face",
+      "loading": "Po ngarkohen modelet",
+      "noResults": "Nuk u gjet asnjë model",
+      "noFits": "Asnjë model nuk përshtatet me këtë pajisje",
+      "noFitsDescription": "Modelet më të mëdha janë te skeda $t(common.all).",
+      "fit": {
+        "fits": "Përshtatet",
+        "tight": "Mezi përshtatet",
+        "tooLarge": "Shumë i madh",
+        "noStorage": "Hapësirë e pamjaftueshme"
+      },
+      "parameters": "Parametra: {{value}}",
+      "downloads": "Shkarkime: {{value}}",
+      "likes": "Pëlqime: {{value}}",
+      "context": "Dritarja e kontekstit: {{value}}",
+      "license": "Licenca: {{license}}",
+      "licenseUnknown": "Licenca nuk është specifikuar",
+      "tools": "Thirrje mjetesh",
+      "vision": "Hyrje imazhesh",
+      "hintsHelp": "Sugjerime nga Hugging Face. Aplikacioni e kontrollon modelin pasi të shkarkohet.",
+      "gated": "Ky model kërkon një llogari Hugging Face, prandaj aplikacioni nuk mund ta shkarkojë.",
+      "quantizations": "Kuantizimet",
+      "quantizationsHelp": "Skedarët më të vegjël përdorin më pak memorie dhe hapësirë. Skedarët më të mëdhenj zakonisht japin përgjigje më të mira.",
+      "quantDetail": "Shkarkim {{size}} · rreth {{memory}} memorie",
+      "downloadQuant": "Shkarko {{quant}}",
+      "loadingModel": "Po ngarkohen detajet e modelit",
+      "couldNotLoadModel": "Ky model nuk u ngarkua",
+      "noFiles": "Asnjë skedar që ky aplikacion mund të ekzekutojë",
+      "noFilesDescription": "Ky aplikacion ekzekuton modele që janë një skedar i vetëm GGUF.",
+      "tooLargeTitle": "Ky model mund të mos funksionojë",
+      "tooLargeMessage": "{{name}} ka gjasa të kërkojë më shumë memorie se sa ka kjo pajisje. Aplikacioni mund të mbyllet ndërsa modeli përgjigjet. Ta shkarkoj gjithsesi?",
+      "downloadAnyway": "Shkarko gjithsesi"
     },
     "localModels": {
       "title": "Modelet në pajisje",

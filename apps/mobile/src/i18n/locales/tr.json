@@ -1641,6 +1641,11 @@
       "collapse": "Hedefi daralt",
       "expand": "Hedefi genişlet"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Görevler, {{total}} görevin {{completed}} tanesi tamamlandı",
+      "rowAccessibility": "Görevler, {{total}} görevin {{completed}} tanesi tamamlandı. Geçerli görev: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Son kullanılanlar",
       "couldNotLoadGithubRepositories": "GitHub depoları yüklenemedi.",
@@ -1696,6 +1701,10 @@
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam etmeyi desteklemiyor. Cloud Agent veya başka bir CLI seç.",
       "importFailed": "Bu oturum içe aktarılamadı.",
+      "cliCannotFork": "Bir mesajdan dallandırmak için Kilo CLI'ı güncelle.",
+      "forkCutNotSynced": "Bu mesaj henüz kaydedilmedi. Birazdan tekrar dene.",
+      "forkFilesFromBaseBranch": "Dosyalar temel daldan başlar.",
+      "forkFilesUnchangedOnComputer": "Bu bilgisayardaki dosyalar değiştirilmez.",
       "pickProfile": "Bir profil seç",
       "noProfile": "Profil yok",
       "manageProfiles": "Profilleri yönet",
@@ -1811,6 +1820,7 @@
       "copyMessage": "Mesajı kopyala",
       "copyText": "Metni kopyala",
       "selectText": "Metni seç",
+      "forkFromHere": "Buradan dallandır",
       "reportAiResponse": "AI yanıtını bildir",
       "reportAiResponseConfirm": "Bu yanıt inceleme için bildirilsin mi?",
       "report": "Bildir",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Eğitim"
   },
   "modelChat": {
+    "offlineFailure": "Bu model internet bağlantısı gerektiriyor. Bağlan ve tekrar dene ya da bu cihazdaki bir modele geç.",
     "empty": {
       "title": "Bir sohbet başlat",
       "description": "Bir modelle konuşmak için mesaj gönder."
@@ -3204,6 +3215,11 @@
       "openHint": "Sohbeti açar. Yeniden adlandırmak veya silmek için uzun basın."
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Web'de ara",
+      "description": "Bu sohbetin Kilo hesabın üzerinden güncel bilgi aramasına izin ver. Aramalar aylık arama hakkını kullanır.",
+      "allowanceExhausted": "Bu ayki ücretsiz web aramaların bitti. Yeniden aramak için kredi ekle."
+    },
     "mcp": {
       "title": "Kilo araçları",
       "use": "Kilo araçlarını kullan",
@@ -3329,8 +3345,48 @@
         "notGguf": "Bağlantı bir .gguf dosyasını göstermelidir.",
         "space": "Bu model için yeterli boş depolama alanı yok. Yer açıp yeniden deneyin.",
         "network": "İndirme tamamlanamadı. Bağlantınızı denetleyip yeniden deneyin.",
-        "invalidFile": "İndirilen dosya bu uygulamanın çalıştırabileceği bir model değil, bu yüzden kaldırıldı."
+        "invalidFile": "İndirilen dosya bu uygulamanın çalıştırabileceği bir model değil, bu yüzden kaldırıldı.",
+        "checksum": "İndirilen dosya yayımlanan sağlama toplamıyla eşleşmiyor, bu yüzden kaldırıldı. İndirmeyi yeniden deneyin."
       }
+    },
+    "catalog": {
+      "browse": "Modellere göz at",
+      "title": "Model kataloğu",
+      "search": "Hugging Face modellerinde ara",
+      "tabs": "Model filtresi",
+      "fitsTab": "Bu cihaza uygun",
+      "fromHuggingFace": "Hugging Face'ten",
+      "loading": "Modeller yükleniyor",
+      "noResults": "Model bulunamadı",
+      "noFits": "Bu cihaza uygun model yok",
+      "noFitsDescription": "Daha büyük modeller $t(common.all) sekmesinde.",
+      "fit": {
+        "fits": "Uygun",
+        "tight": "Sınırda",
+        "tooLarge": "Çok büyük",
+        "noStorage": "Yetersiz depolama alanı"
+      },
+      "parameters": "Parametre: {{value}}",
+      "downloads": "İndirme: {{value}}",
+      "likes": "Beğeni: {{value}}",
+      "context": "Bağlam penceresi: {{value}}",
+      "license": "Lisans: {{license}}",
+      "licenseUnknown": "Lisans belirtilmemiş",
+      "tools": "Araç çağırma",
+      "vision": "Görsel girişi",
+      "hintsHelp": "Bilgiler Hugging Face'ten alınır. Uygulama, modeli indirdikten sonra kontrol eder.",
+      "gated": "Bu model bir Hugging Face hesabı gerektirdiğinden uygulama onu indiremez.",
+      "quantizations": "Nicemlemeler",
+      "quantizationsHelp": "Küçük dosyalar daha az bellek ve depolama alanı kullanır. Büyük dosyalar genellikle daha iyi yanıtlar verir.",
+      "quantDetail": "{{size}} indirme · yaklaşık {{memory}} bellek",
+      "downloadQuant": "{{quant}} indir",
+      "loadingModel": "Model ayrıntıları yükleniyor",
+      "couldNotLoadModel": "Bu model yüklenemedi",
+      "noFiles": "Bu uygulamanın çalıştırabileceği dosya yok",
+      "noFilesDescription": "Bu uygulama tek bir GGUF dosyasından oluşan modelleri çalıştırır.",
+      "tooLargeTitle": "Bu model çalışmayabilir",
+      "tooLargeMessage": "{{name}} muhtemelen bu cihazdakinden daha fazla bellek gerektiriyor. Model yanıt verirken uygulama kapanabilir. Yine de indirilsin mi?",
+      "downloadAnyway": "Yine de indir"
     },
     "localModels": {
       "title": "Cihazdaki modeller",

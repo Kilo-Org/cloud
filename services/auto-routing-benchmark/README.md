@@ -50,6 +50,15 @@ The admin panel shows measured coverage and pending, running, or failed efforts 
 Each route starts collapsed with its first-ranked pair, accuracy, and cost.
 Expand a route to inspect every ranked model/effort pair.
 
+## Ranking
+
+- `rankCandidates` (`@kilocode/auto-routing-contracts`) orders every route's candidates.
+- A candidate competes when its accuracy is at most 0.05 below `minAccuracy`, the benchmark noise band.
+- Competing candidates are ordered by `avgCostUsd × p50LatencyMs^1.5 / accuracy^15`, lowest first.
+- The other candidates follow by accuracy, then cost.
+- `meetsThreshold` stays strict (`accuracy >= minAccuracy`) for sticky routing.
+- The ranking policy version is part of every registry table version, so a policy change republishes.
+
 
 ## Admin endpoints
 

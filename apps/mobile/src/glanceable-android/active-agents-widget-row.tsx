@@ -19,7 +19,7 @@ import { type Block, phaseOf, stack } from './active-agents-widget-stack';
 
 /**
  * Row (3x1, 4x1) at the 360x104 design, inside the 14dp band: a header line
- * (mark, Kilo, checked time), the status with the round actions, and one
+ * (mark, checked time), the status with the round actions, and one
  * muted line. Taller bands split the extra height across the gaps; a band too
  * short for the muted line drops it.
  */
@@ -50,17 +50,14 @@ function header(f: Frame) {
   const { copy } = f;
   const phase = phaseOf(copy);
   const baseline = centredBaseline(12, HEADER_CY);
-  const nodes = [
-    logo(f, { x: PAD, y: HEADER_CY - 7, size: 14 }),
-    label(f, 'brand', { x: PAD + 20, baseline, width: 26, value: 'Kilo', size: 12, weight: '600' }),
-  ];
+  const nodes = [logo(f, { x: PAD, y: HEADER_CY - 7, size: 14 })];
   if ((phase === 'content' || phase === 'empty') && copy.footer !== null) {
     nodes.push(
       label(f, 'footer', {
-        x: PAD + 48,
+        x: PAD + 20,
         baseline,
-        width: f.width - 2 * PAD - 48,
-        value: `· ${copy.footer}`,
+        width: f.width - 2 * PAD - 20,
+        value: copy.footer,
         size: 11,
         ink: 'muted',
       })

@@ -109,6 +109,8 @@ const { answerSessionPermission: mockedAnswerSessionPermission } =
   await import('@/lib/glanceable/approve-ask');
 const answerSessionPermissionMock = vi.mocked(mockedAnswerSessionPermission);
 const { toast: sonnerToast } = await import('sonner-native');
+const { fetchMobileSessionSnapshotPage } =
+  await import('@/components/agents/mobile-session-page-adapter');
 const {
   createMobileAgentSessionManager,
   fetchSessionWithNotFoundRetry,
@@ -881,5 +883,85 @@ describe('createMobileAgentSessionManager cold open', () => {
     expect(store.get(manager.atoms.messagesList)).toHaveLength(0);
     expect(store.get(manager.atoms.isLoading)).toBe(true);
     expect(store.get(manager.atoms.isRefreshingCachedTranscript)).toBe(false);
+  });
+});
+
+describe('createMobileAgentSessionManager cloned session first page', () => {
+  const fetchPage = vi.mocked(fetchMobileSessionSnapshotPage);
+  const emptyPage = {
+    kind: 'success' as const,
+    info: { id: SESSION_ID },
+    messages: [],
+    nextCursor: null,
+    omittedItemCount: 0,
+  };
+  const syncedPage = { ...emptyPage, messages: [{ info: { id: 'msg_1' }, parts: [] }] };
+
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+    fetchPage.mockReset();
+  });
+
+  function setup(
+    clonedSessionId?: KiloSessionId
+  ): NonNullable<SessionManagerConfig['fetchSnapshotPage']> {
+    const options = { store: {}, userWebConnection: {}, clonedSessionId };
+    createMobileAgentSessionManager(options as never);
+    const reader = configHolder.current?.fetchSnapshotPage;
+    if (reader === undefined) {
+      throw new Error('createSessionManager did not capture a page reader');
+    }
+    return reader;
+  }
+
+  it('re-reads an empty first page until the CLI sync of the clone lands', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchPage
+        .mockResolvedValueOnce(emptyPage as never)
+        .mockResolvedValueOnce(emptyPage as never)
+        .mockResolvedValueOnce(syncedPage as never);
+      const fetchSnapshotPage = setup(SESSION_ID);
+
+      const result = fetchSnapshotPage(SESSION_ID, {});
+      await vi.advanceTimersByTimeAsync(2000);
+
+      await expect(result).resolves.toBe(syncedPage);
+      expect(fetchPage).toHaveBeenCalledTimes(3);
+
+      // A later replay (reconnect) reads once, even when empty.
+      fetchPage.mockResolvedValueOnce(emptyPage as never);
+      await expect(fetchSnapshotPage(SESSION_ID, {})).resolves.toBe(emptyPage);
+      expect(fetchPage).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops re-reading after the spawned budget and keeps the empty page', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchPage.mockResolvedValue(emptyPage as never);
+      const fetchSnapshotPage = setup(SESSION_ID);
+
+      const result = fetchSnapshotPage(SESSION_ID, {});
+      await vi.advanceTimersByTimeAsync(SPAWNED_NOT_FOUND_MAX_ATTEMPTS * 1000);
+
+      await expect(result).resolves.toBe(emptyPage);
+      expect(fetchPage).toHaveBeenCalledTimes(SPAWNED_NOT_FOUND_MAX_ATTEMPTS + 1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reads an ordinary session, a child, and an older page once', async () => {
+    fetchPage.mockResolvedValue(emptyPage as never);
+    await setup()(SESSION_ID, {});
+    const cloned = setup(SESSION_ID);
+    await cloned('ses_child' as KiloSessionId, {});
+    await cloned(SESSION_ID, { cursor: 'older' });
+
+    expect(fetchPage).toHaveBeenCalledTimes(3);
   });
 });

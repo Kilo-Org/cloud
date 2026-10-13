@@ -18,6 +18,7 @@ afterEach(() => {
 describe('createDeciderJudge', () => {
   it('maps the System One request and probability response', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(Response.json(body));
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
     vi.stubGlobal('fetch', fetchMock);
     expect(await createDeciderJudge(client)(input)).toEqual({ probability: 0.83, costUsd: 0.004 });
     expect(fetchMock).toHaveBeenCalledOnce();
@@ -31,6 +32,8 @@ describe('createDeciderJudge', () => {
       'Content-Type': 'application/json',
     });
     expect(options?.signal).toBeInstanceOf(AbortSignal);
+    expect(timeout).toHaveBeenCalledWith(8_000);
+    timeout.mockRestore();
     if (typeof options?.body !== 'string') throw new Error('Expected a JSON request body');
     expect(JSON.parse(options.body)).toMatchObject({
       model: 'typesafe/jev-1.13',
@@ -86,7 +89,9 @@ describe('createDeciderJudge', () => {
       .fn<typeof fetch>()
       .mockResolvedValue(new Response('private data', { status: 401 }));
     vi.stubGlobal('fetch', fetchMock);
-    await expect(createDeciderJudge(client)(input)).rejects.toThrow('System One returned HTTP 401');
+    await expect(createDeciderJudge(client)(input)).rejects.toThrow(
+      'System One decider judge request failed'
+    );
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
@@ -98,5 +103,25 @@ describe('createDeciderJudge', () => {
     vi.stubGlobal('fetch', fetchMock);
     expect(await createDeciderJudge(client)(input)).toEqual({ probability: 0.83, costUsd: 0.004 });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not expose malformed response fragments', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValue(new Response('private malformed body'))
+    );
+    await expect(createDeciderJudge(client)(input)).rejects.toThrow(
+      'System One returned an invalid decider judge response'
+    );
+  });
+
+  it('does not expose transport error details', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockRejectedValue(new Error('private transport details'))
+    );
+    await expect(createDeciderJudge(client)(input)).rejects.toThrow(
+      'System One decider judge request failed'
+    );
   });
 });

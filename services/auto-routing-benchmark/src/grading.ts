@@ -50,15 +50,22 @@ export type DeciderJudge = (input: {
   reference?: string;
 }) => Promise<{ probability: number; costUsd: number }>;
 
+export class DeciderGraderRetryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DeciderGraderRetryError';
+  }
+}
+
 export async function gradeDeciderOutput(
   check: DeciderCheck,
   ctx: { userPrompt: string; output: string; judge: DeciderJudge | null }
-): Promise<{ score: number; costUsd: number; graderError: string | null }> {
+): Promise<{ score: number | null; costUsd: number; graderError: string | null }> {
   if (check.kind !== 'judged') {
     return { score: runDeciderCheck(check, ctx.output) ? 1 : 0, costUsd: 0, graderError: null };
   }
   if (!ctx.judge) {
-    return { score: 0, costUsd: 0, graderError: 'Decider judge is unavailable' };
+    return { score: null, costUsd: 0, graderError: 'Decider judge is unavailable' };
   }
   try {
     const result = await ctx.judge({
@@ -77,11 +84,11 @@ export async function gradeDeciderOutput(
       throw new Error('Decider judge returned an invalid probability or cost');
     }
     return { score: result.probability, costUsd: result.costUsd, graderError: null };
-  } catch (error) {
+  } catch {
     return {
-      score: 0,
+      score: null,
       costUsd: 0,
-      graderError: error instanceof Error ? error.message : 'Decider judge failed',
+      graderError: 'Decider judge failed',
     };
   }
 }

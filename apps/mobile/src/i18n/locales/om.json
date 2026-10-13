@@ -2157,6 +2157,11 @@
       "collapse": "Kaayyoo cufi",
       "expand": "Kaayyoo bal'isi"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Kaayyoo, {{total}} keessaa {{completed}} xumurame",
+      "rowAccessibility": "Kaayyoo, {{total}} keessaa {{completed}} xumurame. Kaayyoo ammaa: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Dhiheenya itti fayyadamte",
       "couldNotLoadGithubRepositories": "Kuusaawwan koodii GitHub fe'uu hin danda'amne.",
@@ -2212,6 +2217,10 @@
       "importingSession": "Turtii galchaa jira",
       "cliCannotContinue": "CLI kun turtii itti fufuu hin danda'u. Cloud Agent yookaan CLI biraa filadhu.",
       "importFailed": "Turtii kana galchuu hin danda'amne.",
+      "cliCannotFork": "Ergaa irraa damee baasuuf Kilo CLI haaromsi.",
+      "forkCutNotSynced": "Ergaan kun ammallee hin olkaa'amne. Yeroo muraasa booda irra deebi'ii yaali.",
+      "forkFilesFromBaseBranch": "Faayiloonni damee bu'uuraa irraa jalqabu.",
+      "forkFilesUnchangedOnComputer": "Faayiloonni kompiitara kana irra jiran hin jijjiiraman.",
       "pickProfile": "Profaayila tokko filadhu",
       "noProfile": "Profaayila hin qabu",
       "manageProfiles": "Profaayilii bulchuu",
@@ -2327,6 +2336,7 @@
       "copyMessage": "Ergaa kopii godhi",
       "copyText": "Barreeffama kopii godhi",
       "selectText": "Barreeffama filadhu",
+      "forkFromHere": "Asii damee baasi",
       "reportAiResponse": "Deebii AI gabaasi",
       "reportAiResponseConfirm": "Deebiin kun akka sakatta'amuuf gabaasta?",
       "report": "Gabaasi",
@@ -3215,6 +3225,7 @@
     "tutorialLabel": "Barnoota"
   },
   "modelChat": {
+    "offlineFailure": "Modeeliin kun walqunnamtii interneetii barbaada. Walqunnamii irra deebi'ii yaali, ykn gara modeelii meeshaa kana irra jiruutti jijjiiri.",
     "empty": {
       "title": "Chaat jalqabi",
       "description": "Modeelii wajjin haasa'uuf ergaa ergi."
@@ -3226,6 +3237,11 @@
       "deleteTitle": "Marii kana haquuf?"
     },
     "beta": "Beetaa",
+    "webSearch": {
+      "title": "Weebii irratti barbaadi",
+      "description": "Haasaan kun herrega Kilo keessaniin odeeffannoo haaraa akka barbaadu hayyami. Barbaacha ji'aan siif kenname barbaachi ni fayyadama.",
+      "allowanceExhausted": "Barbaachi weebii bilisaa ji'a kanaa xumurameera. Ammas barbaaduuf kireedii dabali."
+    },
     "mcp": {
       "title": "Meeshaalee Kilo",
       "use": "Meeshaalee Kilo fayyadami",
@@ -3351,8 +3367,48 @@
         "notGguf": "Liinkiin faayilii .gguf agarsiisuu qaba.",
         "space": "Moodeela kanaaf bakka duwwaa gahaan hin jiru. Bakka duwwaa uumiitii irra deebi'ii yaali.",
         "network": "Buufinsi hin xumuramne. Walqunnamtii keessan sakatta'ii irra deebi'ii yaali.",
-        "invalidFile": "Faayiliin buufame moodeela app kanaan hojjetamuu danda'u miti, kanaaf haqame."
+        "invalidFile": "Faayiliin buufame moodeela app kanaan hojjetamuu danda'u miti, kanaaf haqame.",
+        "checksum": "Faayiliin buufame checksum isaa maxxanfameen wal hin simu, kanaaf haqame. Ammas irra deebi'ii buusi."
       }
+    },
+    "catalog": {
+      "browse": "Moodeelota sakatta'i",
+      "title": "Kaataaloogii moodeelaa",
+      "search": "Moodeelota Hugging Face barbaadi",
+      "tabs": "Calalii moodeelaa",
+      "fitsTab": "Meeshaa kanaaf ta'u",
+      "fromHuggingFace": "Hugging Face irraa",
+      "loading": "Moodeelonni fe'amaa jiru",
+      "noResults": "Moodeelli hin argamne",
+      "noFits": "Moodeelli meeshaa kanaaf ta'u hin jiru",
+      "noFitsDescription": "Moodeelonni gurguddaan tarree $t(common.all) irra jiru.",
+      "fit": {
+        "fits": "Ni ta'a",
+        "tight": "Dhiphaan ta'a",
+        "tooLarge": "Baay'ee guddaa",
+        "noStorage": "Kuusaan gahaan hin jiru"
+      },
+      "parameters": "Paraameetiroota: {{value}}",
+      "downloads": "Buufamni: {{value}}",
+      "likes": "Jaalatamni: {{value}}",
+      "context": "Foddaa haala: {{value}}",
+      "license": "Hayyama: {{license}}",
+      "licenseUnknown": "Hayyamni hin ibsamne",
+      "tools": "Meeshaalee waamuu",
+      "vision": "Galtee suuraa",
+      "hintsHelp": "Akeekkachiisota Hugging Face irraa. Appichi moodeela erga buufamee booda ni mirkaneessa.",
+      "gated": "Moodeelli kun herrega Hugging Face barbaada, kanaaf appichi buusuu hin danda'u.",
+      "quantizations": "Kuwaantaayizeeshinoota",
+      "quantizationsHelp": "Faayiloonni xixiqqaan yaadannoo fi kuusaa xiqqaa fayyadamu. Faayiloonni gurguddaan yeroo baay'ee deebii fooyya'aa kennu.",
+      "quantDetail": "Buufamni {{size}} · yaadannoo gara {{memory}}",
+      "downloadQuant": "{{quant}} buufi",
+      "loadingModel": "Bal'ina moodeelaa fe'aa jira",
+      "couldNotLoadModel": "Moodeela kana fe'uun hin danda'amne",
+      "noFiles": "Faayilli appichi hojjechiisuu danda'u hin jiru",
+      "noFilesDescription": "Appichi moodeelota faayila GGUF tokko ta'an hojjechiisa.",
+      "tooLargeTitle": "Moodeelli kun hojjechuu dhiisuu danda'a",
+      "tooLargeMessage": "{{name}} yaadannoo meeshaan kun qabu caalaa barbaaduu danda'a. Yeroo moodeelli deebisu appichi cufamuu danda'a. Haa ta'u malee buufamuu?",
+      "downloadAnyway": "Haa ta'u malee buufi"
     },
     "localModels": {
       "title": "Moodeelota meeshaa irratti",

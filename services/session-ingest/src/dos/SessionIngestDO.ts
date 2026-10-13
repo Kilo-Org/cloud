@@ -16,6 +16,7 @@ import type { Env } from '../env';
 import type { IngestBatch } from '../types/session-sync';
 import type { SessionDataItem } from '../types/session-sync';
 import { getItemIdentity, getPartItemIdentityRange } from '../util/compaction';
+import { isItemWithinMessageCut } from '../util/message-cut';
 import {
   extractNormalizedGitBranchFromItem,
   extractNormalizedGitUrlFromItem,
@@ -194,7 +195,8 @@ type CloneMetaKey =
   | 'cloneNextCursor'
   | 'cloneRollingDigest'
   | 'cloneCopiedItemCount'
-  | 'cloneCompleteSourceId';
+  | 'cloneCompleteSourceId'
+  | 'cloneUpToMessageId';
 
 function readCloneMeta(db: DrizzleSqliteDODatabase, key: CloneMetaKey): string | null {
   const row = db
@@ -350,9 +352,17 @@ export type ExportCloneBatchResult = {
   digest: string;
 };
 
-export type StageCloneBatchParams = {
+/**
+ * A clone stage is identified by source, destination, and the optional
+ * inclusive message cut. Absent `upToMessageId` means the full transcript.
+ */
+export type CloneStageIdentity = {
   sourceSessionId: string;
   destinationSessionId: string;
+  upToMessageId?: string;
+};
+
+export type StageCloneBatchParams = CloneStageIdentity & {
   rows: CloneBatchRow[];
   nextCursor: IngestOrderCursor | null;
   rollingDigest: string;
@@ -375,10 +385,7 @@ export type StageCloneBatchResult =
       storedDestinationSessionId: string | null;
     };
 
-export type InspectCloneStageParams = {
-  sourceSessionId: string;
-  destinationSessionId: string;
-};
+export type InspectCloneStageParams = CloneStageIdentity;
 
 export type InspectCloneStageResult =
   | { status: 'empty' }
@@ -398,9 +405,7 @@ export type InspectCloneStageResult =
       storedStage: 'complete' | 'in_progress';
     };
 
-export type FinalizeCloneStageParams = {
-  sourceSessionId: string;
-  destinationSessionId: string;
+export type FinalizeCloneStageParams = CloneStageIdentity & {
   finalDigest: string;
   finalItemCount: number;
 };
@@ -423,15 +428,33 @@ export type FinalizeCloneStageResult =
 
 type CloneStageState =
   | { kind: 'empty' }
-  | { kind: 'complete'; sourceSessionId: string; destinationSessionId: string }
+  | {
+      kind: 'complete';
+      sourceSessionId: string;
+      destinationSessionId: string;
+      upToMessageId: string | null;
+    }
   | {
       kind: 'in_progress';
       sourceSessionId: string;
       destinationSessionId: string;
+      upToMessageId: string | null;
       nextCursor: IngestOrderCursor | null;
       rollingDigest: string;
       copiedItemCount: number;
     };
+
+/** A stage built for another source, destination, or cut is a different clone. */
+function isSameCloneStage(
+  stage: Exclude<CloneStageState, { kind: 'empty' }>,
+  params: CloneStageIdentity
+): boolean {
+  return (
+    stage.sourceSessionId === params.sourceSessionId &&
+    stage.destinationSessionId === params.destinationSessionId &&
+    stage.upToMessageId === (params.upToMessageId ?? null)
+  );
+}
 
 async function computeCloneBatchDigest(rows: CloneBatchRow[]): Promise<string> {
   const joined = rows
@@ -1035,7 +1058,12 @@ export class SessionIngestDO extends DurableObject<Env> {
     return readKiloSdkMessages(this.db, this.env.SESSION_INGEST_R2, params);
   }
 
-  async getAllStream(): Promise<ReadableStream<Uint8Array>> {
+  /**
+   * Stream the session export. With `upToMessageId`, keep only messages inside
+   * the inclusive cut (see `isItemWithinMessageCut`) and emit an empty
+   * `sessionDiff`; without it the output is the full export.
+   */
+  async getAllStream(upToMessageId?: string): Promise<ReadableStream<Uint8Array>> {
     const db = this.db;
     const r2 = this.env.SESSION_INGEST_R2;
     const encoder = new TextEncoder();
@@ -1088,6 +1116,15 @@ export class SessionIngestDO extends DurableObject<Env> {
             msgCursor = ingestOrderCursor(msgBatch[msgBatch.length - 1]);
 
             for (const msgRow of msgBatch) {
+              if (
+                upToMessageId !== undefined &&
+                !isItemWithinMessageCut(
+                  { itemType: 'message', itemId: msgRow.item_id },
+                  upToMessageId
+                )
+              ) {
+                continue;
+              }
               if (!firstMsg) controller.enqueue(encoder.encode(','));
               firstMsg = false;
 
@@ -1139,15 +1176,18 @@ export class SessionIngestDO extends DurableObject<Env> {
 
           controller.enqueue(encoder.encode(']'));
           controller.enqueue(encoder.encode(',"sessionDiff":'));
-          const diffRow = db
-            .select({
-              item_data: ingestItems.item_data,
-              item_data_r2_key: ingestItems.item_data_r2_key,
-            })
-            .from(ingestItems)
-            .where(eq(ingestItems.item_type, 'session_diff'))
-            .limit(1)
-            .get();
+          const diffRow =
+            upToMessageId === undefined
+              ? db
+                  .select({
+                    item_data: ingestItems.item_data,
+                    item_data_r2_key: ingestItems.item_data_r2_key,
+                  })
+                  .from(ingestItems)
+                  .where(eq(ingestItems.item_type, 'session_diff'))
+                  .limit(1)
+                  .get()
+              : undefined;
           if (diffRow) {
             await enqueueItemData(controller, diffRow, r2, encoder, '[]');
           } else {
@@ -1546,13 +1586,27 @@ export class SessionIngestDO extends DurableObject<Env> {
     return { rows: batchRows, nextCursor, done, digest };
   }
 
+  /** True when this session holds a `message` row with exactly this message ID. */
+  hasMessageItem(messageId: string): boolean {
+    const row = this.db
+      .select({ id: ingestItems.id })
+      .from(ingestItems)
+      .where(
+        and(eq(ingestItems.item_type, 'message'), eq(ingestItems.item_id, `message/${messageId}`))
+      )
+      .get();
+    return row !== undefined;
+  }
+
   private readCloneStage(): CloneStageState {
     const completeSource = readCloneMeta(this.db, 'cloneCompleteSourceId');
+    const upToMessageId = readCloneMeta(this.db, 'cloneUpToMessageId');
     if (completeSource !== null) {
       return {
         kind: 'complete',
         sourceSessionId: completeSource,
         destinationSessionId: readCloneMeta(this.db, 'cloneDestinationSessionId') ?? '',
+        upToMessageId,
       };
     }
 
@@ -1572,6 +1626,7 @@ export class SessionIngestDO extends DurableObject<Env> {
         kind: 'in_progress',
         sourceSessionId: source,
         destinationSessionId: destination,
+        upToMessageId,
         nextCursor,
         rollingDigest: readCloneMeta(this.db, 'cloneRollingDigest') ?? '',
         copiedItemCount: Number(readCloneMeta(this.db, 'cloneCopiedItemCount') ?? '0') || 0,
@@ -1584,18 +1639,15 @@ export class SessionIngestDO extends DurableObject<Env> {
   /**
    * Persist one batch of already-rewritten clone rows and advance the clone stage
    * state. Idempotent for the same source: re-staging the same batch upserts the
-   * same rows and rewrites the same meta. A different stored source or destination
-   * is rejected without mutation.
+   * same rows and rewrites the same meta. A different stored source, destination,
+   * or message cut is rejected without mutation.
    */
   stageCloneBatch(params: StageCloneBatchParams): StageCloneBatchResult {
     if (this.isDeleted()) throw new Error('Session deleted');
     const stage = this.readCloneStage();
 
     if (stage.kind === 'complete') {
-      if (
-        stage.sourceSessionId === params.sourceSessionId &&
-        stage.destinationSessionId === params.destinationSessionId
-      ) {
+      if (isSameCloneStage(stage, params)) {
         return {
           status: 'complete',
           sourceSessionId: stage.sourceSessionId,
@@ -1609,17 +1661,12 @@ export class SessionIngestDO extends DurableObject<Env> {
       };
     }
 
-    if (stage.kind === 'in_progress') {
-      if (
-        stage.sourceSessionId !== params.sourceSessionId ||
-        stage.destinationSessionId !== params.destinationSessionId
-      ) {
-        return {
-          status: 'mismatch',
-          storedSourceSessionId: stage.sourceSessionId,
-          storedDestinationSessionId: stage.destinationSessionId,
-        };
-      }
+    if (stage.kind === 'in_progress' && !isSameCloneStage(stage, params)) {
+      return {
+        status: 'mismatch',
+        storedSourceSessionId: stage.sourceSessionId,
+        storedDestinationSessionId: stage.destinationSessionId,
+      };
     }
 
     for (const row of params.rows) {
@@ -1646,6 +1693,13 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     writeCloneMeta(this.db, 'cloneSourceSessionId', params.sourceSessionId);
     writeCloneMeta(this.db, 'cloneDestinationSessionId', params.destinationSessionId);
+    // Keep "no cut key <=> full clone" true on every write, without relying on
+    // resets wiping the whole meta table.
+    if (params.upToMessageId !== undefined) {
+      writeCloneMeta(this.db, 'cloneUpToMessageId', params.upToMessageId);
+    } else {
+      this.db.delete(ingestMeta).where(eq(ingestMeta.key, 'cloneUpToMessageId')).run();
+    }
     writeCloneMeta(this.db, 'cloneNextCursor', JSON.stringify(params.nextCursor));
     writeCloneMeta(this.db, 'cloneRollingDigest', params.rollingDigest);
     writeCloneMeta(this.db, 'cloneCopiedItemCount', String(params.copiedItemCount));
@@ -1667,11 +1721,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       return { status: 'empty' };
     }
 
-    const sameIdentity =
-      stage.sourceSessionId === params.sourceSessionId &&
-      stage.destinationSessionId === params.destinationSessionId;
-
-    if (!sameIdentity) {
+    if (!isSameCloneStage(stage, params)) {
       return {
         status: 'mismatch',
         storedSourceSessionId: stage.sourceSessionId,
@@ -1705,10 +1755,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       return { status: 'empty' };
     }
 
-    if (
-      stage.sourceSessionId !== params.sourceSessionId ||
-      stage.destinationSessionId !== params.destinationSessionId
-    ) {
+    if (!isSameCloneStage(stage, params)) {
       return {
         status: 'mismatch',
         storedSourceSessionId: stage.sourceSessionId,

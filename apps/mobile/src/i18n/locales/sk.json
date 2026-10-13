@@ -2213,6 +2213,11 @@
       "collapse": "Zbaliť cieľ",
       "expand": "Rozbaliť cieľ"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Úlohy, dokončené {{completed}} z {{total}}",
+      "rowAccessibility": "Úlohy, dokončené {{completed}} z {{total}}. Aktuálna úloha: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Naposledy použité",
       "couldNotLoadGithubRepositories": "Repozitáre zo služby GitHub sa nepodarilo načítať.",
@@ -2268,6 +2273,10 @@
       "importingSession": "Importuje sa relácia",
       "cliCannotContinue": "Táto verzia CLI nepodporuje pokračovanie v relácii. Vyber službu Cloud Agent alebo inú inštanciu CLI.",
       "importFailed": "Túto reláciu sa nepodarilo importovať.",
+      "cliCannotFork": "Ak chceš rozvetviť reláciu od správy, aktualizuj Kilo CLI.",
+      "forkCutNotSynced": "Táto správa ešte nie je uložená. Skús to znova o chvíľu.",
+      "forkFilesFromBaseBranch": "Súbory vychádzajú zo základnej vetvy.",
+      "forkFilesUnchangedOnComputer": "Súbory v tomto počítači sa nezmenia.",
       "pickProfile": "Vyberte profil",
       "noProfile": "Žiadny profil",
       "manageProfiles": "Spravovať profily",
@@ -2391,6 +2400,7 @@
       "copyMessage": "Kopírovať správu",
       "copyText": "Kopírovať text",
       "selectText": "Vybrať text",
+      "forkFromHere": "Rozvetviť odtiaľto",
       "reportAiResponse": "Nahlásiť odpoveď AI",
       "reportAiResponseConfirm": "Nahlásiť túto odpoveď na preverenie?",
       "report": "Nahlásiť",
@@ -3297,6 +3307,7 @@
     "tutorialLabel": "Sprievodca"
   },
   "modelChat": {
+    "offlineFailure": "Tento model vyžaduje pripojenie na internet. Pripojte sa a skúste to znova alebo prepnite na model v tomto zariadení.",
     "empty": {
       "title": "Začať chat",
       "description": "Pošlite správu a porozprávajte sa s modelom."
@@ -3308,6 +3319,11 @@
       "deleteTitle": "Odstrániť tento chat?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Hľadať na webe",
+      "description": "Povoľte tomuto četu vyhľadávať aktuálne informácie cez váš účet Kilo. Vyhľadávania čerpajú váš mesačný limit vyhľadávania.",
+      "allowanceExhausted": "Vaše bezplatné webové vyhľadávania na tento mesiac sa minuli. Pridajte kredity a hľadajte znova."
+    },
     "mcp": {
       "title": "Nástroje Kilo",
       "use": "Používať nástroje Kilo",
@@ -3433,8 +3449,48 @@
         "notGguf": "Odkaz musí smerovať na súbor .gguf.",
         "space": "Na tento model nie je dostatok voľného úložiska. Uvoľnite miesto a skúste to znova.",
         "network": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a skúste to znova.",
-        "invalidFile": "Stiahnutý súbor nie je model, ktorý by táto aplikácia mohla spustiť, preto bol odstránený."
+        "invalidFile": "Stiahnutý súbor nie je model, ktorý by táto aplikácia mohla spustiť, preto bol odstránený.",
+        "checksum": "Stiahnutý súbor sa nezhoduje so zverejneným kontrolným súčtom, preto bol odstránený. Skúste ho stiahnuť znova."
       }
+    },
+    "catalog": {
+      "browse": "Prehliadať modely",
+      "title": "Katalóg modelov",
+      "search": "Hľadať modely na Hugging Face",
+      "tabs": "Filter modelov",
+      "fitsTab": "Vhodné pre toto zariadenie",
+      "fromHuggingFace": "Z Hugging Face",
+      "loading": "Načítavajú sa modely",
+      "noResults": "Nenašli sa žiadne modely",
+      "noFits": "Pre toto zariadenie nie je vhodný žiadny model",
+      "noFitsDescription": "Väčšie modely nájdete na karte $t(common.all).",
+      "fit": {
+        "fits": "Vhodný",
+        "tight": "Tesne vhodný",
+        "tooLarge": "Príliš veľký",
+        "noStorage": "Nedostatok úložiska"
+      },
+      "parameters": "Parametre: {{value}}",
+      "downloads": "Stiahnutia: {{value}}",
+      "likes": "Páči sa: {{value}}",
+      "context": "Kontextové okno: {{value}}",
+      "license": "Licencia: {{license}}",
+      "licenseUnknown": "Licencia nie je uvedená",
+      "tools": "Volanie nástrojov",
+      "vision": "Vstup obrázkov",
+      "hintsHelp": "Údaje z Hugging Face. Aplikácia model po stiahnutí skontroluje.",
+      "gated": "Tento model vyžaduje účet Hugging Face, preto ho aplikácia nemôže stiahnuť.",
+      "quantizations": "Kvantizácie",
+      "quantizationsHelp": "Menšie súbory zaberajú menej pamäte a úložiska. Väčšie súbory zvyčajne dávajú lepšie odpovede.",
+      "quantDetail": "Na stiahnutie {{size}} · približne {{memory}} pamäte",
+      "downloadQuant": "Stiahnuť {{quant}}",
+      "loadingModel": "Načítavajú sa podrobnosti modelu",
+      "couldNotLoadModel": "Tento model sa nepodarilo načítať",
+      "noFiles": "Žiadne súbory, ktoré táto aplikácia dokáže spustiť",
+      "noFilesDescription": "Táto aplikácia spúšťa modely tvorené jedným súborom GGUF.",
+      "tooLargeTitle": "Tento model nemusí fungovať",
+      "tooLargeMessage": "{{name}} pravdepodobne potrebuje viac pamäte, než má toto zariadenie. Aplikácia sa môže počas odpovedania modelu zavrieť. Chcete ho napriek tomu stiahnuť?",
+      "downloadAnyway": "Napriek tomu stiahnuť"
     },
     "localModels": {
       "title": "Modely v zariadení",

@@ -9,12 +9,55 @@ const base: ResolveTranscriptPhaseInput = {
   requestedSessionId: 'ses_b',
   lastStartedSessionId: 'ses_b',
   ownerSessionId: 'ses_b',
+  cachedSessionId: null,
   isLoading: false,
   hasMessages: false,
   terminalOpenFailure: false,
 };
 
 describe('resolveTranscriptPhase', () => {
+  it('shows the requested cached transcript before its metadata arrives', () => {
+    expect(
+      resolveTranscriptPhase({
+        ...base,
+        ownerSessionId: null,
+        cachedSessionId: 'ses_b',
+        hasMessages: true,
+      })
+    ).toBe('live');
+  });
+
+  it('does not show another session cache or an empty cached transcript', () => {
+    expect(
+      resolveTranscriptPhase({
+        ...base,
+        ownerSessionId: null,
+        cachedSessionId: 'ses_a',
+        hasMessages: true,
+      })
+    ).toBe('opening');
+    expect(
+      resolveTranscriptPhase({
+        ...base,
+        ownerSessionId: null,
+        cachedSessionId: 'ses_b',
+        hasMessages: false,
+      })
+    ).toBe('opening');
+  });
+
+  it('keeps the switch pending until it starts even with a matching cached identity', () => {
+    expect(
+      resolveTranscriptPhase({
+        ...base,
+        lastStartedSessionId: 'ses_a',
+        ownerSessionId: null,
+        cachedSessionId: 'ses_b',
+        hasMessages: true,
+      })
+    ).toBe('opening');
+  });
+
   it('is live without a requested session even while stale state remains', () => {
     expect(
       resolveTranscriptPhase({

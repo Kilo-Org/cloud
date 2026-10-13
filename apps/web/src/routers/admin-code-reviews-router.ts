@@ -113,6 +113,7 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   assistant_timeout: 'Assistant Timeout',
   assistant_unauthorized: 'Assistant Unauthorized',
   assistant_invalid_request: 'Assistant Invalid Request',
+  assistant_invalid_request_byok: 'Request Rejected (customer provider)',
   assistant_context_limit: 'Assistant Context Limit',
   assistant_output_limit: 'Assistant Output Limit',
   assistant_content_filter: 'Assistant Content Filter',

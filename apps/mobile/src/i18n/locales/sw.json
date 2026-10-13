@@ -2157,6 +2157,11 @@
       "collapse": "Kunja lengo",
       "expand": "Panua lengo"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Malengo, {{completed}} kati ya {{total}} yamekamilika",
+      "rowAccessibility": "Malengo, {{completed}} kati ya {{total}} yamekamilika. Lengo la sasa: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Zilizotumika hivi karibuni",
       "couldNotLoadGithubRepositories": "Imeshindikana kupakia hazina za GitHub.",
@@ -2212,6 +2217,10 @@
       "importingSession": "Inaingiza kikao",
       "cliCannotContinue": "CLI hii haiwezi kuendelea na kikao. Chagua Cloud Agent au CLI nyingine.",
       "importFailed": "Imeshindikana kuingiza kikao hiki.",
+      "cliCannotFork": "Sasisha Kilo CLI ili kugawanya kuanzia ujumbe.",
+      "forkCutNotSynced": "Ujumbe huu bado haujahifadhiwa. Jaribu tena baada ya muda mfupi.",
+      "forkFilesFromBaseBranch": "Faili zinaanzia kwenye tawi la msingi.",
+      "forkFilesUnchangedOnComputer": "Faili kwenye kompyuta hii hazibadilishwi.",
       "pickProfile": "Chagua wasifu",
       "noProfile": "Hakuna wasifu",
       "manageProfiles": "Dhibiti wasifu",
@@ -2327,6 +2336,7 @@
       "copyMessage": "Nakili ujumbe",
       "copyText": "Nakili maandishi",
       "selectText": "Chagua maandishi",
+      "forkFromHere": "Gawanya kuanzia hapa",
       "reportAiResponse": "Ripoti jibu la AI",
       "reportAiResponseConfirm": "Ungependa kuripoti jibu hili ili likaguliwe?",
       "report": "Ripoti",
@@ -3215,6 +3225,7 @@
     "tutorialLabel": "Mafunzo"
   },
   "modelChat": {
+    "offlineFailure": "Mfano huu unahitaji muunganisho wa intaneti. Unganisha kisha ujaribu tena, au ubadilishe utumie mfano ulio kwenye kifaa hiki.",
     "empty": {
       "title": "Anza mazungumzo",
       "description": "Tuma ujumbe ili uongee na mfano."
@@ -3226,6 +3237,11 @@
       "deleteTitle": "Futa gumzo hili?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Tafuta kwenye wavuti",
+      "description": "Ruhusu gumzo hili litafute taarifa za sasa kupitia akaunti yako ya Kilo. Utafutaji hutumia kiwango chako cha utafutaji cha kila mwezi.",
+      "allowanceExhausted": "Utafutaji wako wa bure wa wavuti kwa mwezi huu umekwisha. Ongeza salio ili kutafuta tena."
+    },
     "mcp": {
       "title": "Zana za Kilo",
       "use": "Tumia zana za Kilo",
@@ -3351,8 +3367,48 @@
         "notGguf": "Kiungo lazima kielekee faili ya .gguf.",
         "space": "Hakuna nafasi ya kutosha ya kuhifadhi kwa modeli hii. Toa nafasi na ujaribu tena.",
         "network": "Upakuaji haukukamilika. Angalia muunganisho wako na ujaribu tena.",
-        "invalidFile": "Faili iliyopakuliwa si modeli ambayo programu hii inaweza kuendesha, kwa hivyo iliondolewa."
+        "invalidFile": "Faili iliyopakuliwa si modeli ambayo programu hii inaweza kuendesha, kwa hivyo iliondolewa.",
+        "checksum": "Faili iliyopakuliwa hailingani na checksum yake iliyochapishwa, kwa hivyo iliondolewa. Jaribu kupakua tena."
       }
+    },
+    "catalog": {
+      "browse": "Vinjari modeli",
+      "title": "Katalogi ya modeli",
+      "search": "Tafuta modeli za Hugging Face",
+      "tabs": "Kichujio cha modeli",
+      "fitsTab": "Zinazotosha kifaa hiki",
+      "fromHuggingFace": "Kutoka Hugging Face",
+      "loading": "Inapakia modeli",
+      "noResults": "Hakuna modeli zilizopatikana",
+      "noFits": "Hakuna modeli zinazotosha kifaa hiki",
+      "noFitsDescription": "Modeli kubwa zaidi ziko kwenye kichupo cha $t(common.all).",
+      "fit": {
+        "fits": "Inatosha",
+        "tight": "Inatosha kwa shida",
+        "tooLarge": "Kubwa mno",
+        "noStorage": "Hifadhi haitoshi"
+      },
+      "parameters": "Vigezo: {{value}}",
+      "downloads": "Vipakuliwa: {{value}}",
+      "likes": "Zilizopendwa: {{value}}",
+      "context": "Dirisha la muktadha: {{value}}",
+      "license": "Leseni: {{license}}",
+      "licenseUnknown": "Leseni haijatajwa",
+      "tools": "Kuita zana",
+      "vision": "Ingizo la picha",
+      "hintsHelp": "Vidokezo kutoka Hugging Face. Programu hukagua modeli baada ya kupakuliwa.",
+      "gated": "Modeli hii inahitaji akaunti ya Hugging Face, kwa hivyo programu haiwezi kuipakua.",
+      "quantizations": "Ukwantishaji",
+      "quantizationsHelp": "Faili ndogo hutumia kumbukumbu na hifadhi kidogo. Faili kubwa kwa kawaida hutoa majibu bora zaidi.",
+      "quantDetail": "Upakuaji wa {{size}} · takriban {{memory}} za kumbukumbu",
+      "downloadQuant": "Pakua {{quant}}",
+      "loadingModel": "Inapakia maelezo ya modeli",
+      "couldNotLoadModel": "Imeshindwa kupakia modeli hii",
+      "noFiles": "Hakuna faili ambazo programu hii inaweza kuendesha",
+      "noFilesDescription": "Programu hii huendesha modeli zilizo katika faili moja la GGUF.",
+      "tooLargeTitle": "Huenda modeli hii isiendeshwe",
+      "tooLargeMessage": "Huenda {{name}} ikahitaji kumbukumbu zaidi kuliko iliyo kwenye kifaa hiki. Programu inaweza kufungwa wakati modeli inajibu. Ungependa kuipakua hata hivyo?",
+      "downloadAnyway": "Pakua hata hivyo"
     },
     "localModels": {
       "title": "Modeli za kwenye kifaa",

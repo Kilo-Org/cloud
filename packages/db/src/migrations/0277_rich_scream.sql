@@ -1,1 +1,0 @@
-ALTER TABLE "cli_sessions_v2" ADD COLUMN "live_summary" jsonb;

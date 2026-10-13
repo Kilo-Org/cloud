@@ -8,8 +8,10 @@ import {
   agent_environment_profiles,
   agent_environment_profile_vars,
   agent_environment_profile_commands,
+  agent_environment_profile_repo_bindings,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import { bindProfileToRepo } from '@kilocode/cloud-agent-profile';
 import type { User, Organization } from '@kilocode/db/schema';
 
 describe('Agent Profiles Router', () => {
@@ -667,6 +669,162 @@ describe('Agent Profiles Router', () => {
           })
         ).rejects.toThrow('You do not have access to this organization');
       });
+    });
+  });
+
+  describe('Repository bindings', () => {
+    async function createOrgProfile(): Promise<string> {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const { id } = await ownerCaller.agentProfiles.create({
+        organizationId: organizationA.id,
+        name: 'Bound Org Profile',
+      });
+      return id;
+    }
+
+    async function orgBindings() {
+      return db
+        .select()
+        .from(agent_environment_profile_repo_bindings)
+        .where(
+          eq(agent_environment_profile_repo_bindings.owned_by_organization_id, organizationA.id)
+        );
+    }
+
+    test('rejects a member bind and allows an admin bind', async () => {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const profileId = await createOrgProfile();
+
+      await expect(
+        memberCaller.agentProfiles.bindToRepo({
+          organizationId: organizationA.id,
+          profileId,
+          repoFullName: 'acme/web',
+          platform: 'github',
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+
+      await ownerCaller.agentProfiles.bindToRepo({
+        organizationId: organizationA.id,
+        profileId,
+        repoFullName: 'acme/web',
+        platform: 'github',
+      });
+      expect(await orgBindings()).toHaveLength(1);
+    });
+
+    test('rejects a member unbind and allows an admin unbind', async () => {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const profileId = await createOrgProfile();
+      await ownerCaller.agentProfiles.bindToRepo({
+        organizationId: organizationA.id,
+        profileId,
+        repoFullName: 'acme/web',
+        platform: 'github',
+      });
+
+      await expect(
+        memberCaller.agentProfiles.unbindRepo({
+          organizationId: organizationA.id,
+          repoFullName: 'acme/web',
+          platform: 'github',
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+
+      await ownerCaller.agentProfiles.unbindRepo({
+        organizationId: organizationA.id,
+        repoFullName: 'acme/web',
+        platform: 'github',
+      });
+      expect(await orgBindings()).toHaveLength(0);
+    });
+
+    test('denies a member deleting a bound profile but lets an admin', async () => {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const profileId = await createOrgProfile();
+      await ownerCaller.agentProfiles.bindToRepo({
+        organizationId: organizationA.id,
+        profileId,
+        repoFullName: 'acme/web',
+        platform: 'github',
+      });
+
+      await expect(
+        memberCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+      await ownerCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId });
+      expect(await orgBindings()).toHaveLength(0);
+      const profile = await db
+        .select()
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.id, profileId));
+      expect(profile).toHaveLength(0);
+    });
+
+    test('lets a member delete an unbound profile', async () => {
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const { id: profileId } = await memberCaller.agentProfiles.create({
+        organizationId: organizationA.id,
+        name: 'Unbound Org Profile',
+      });
+
+      await memberCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId });
+      const profile = await db
+        .select()
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.id, profileId));
+      expect(profile).toHaveLength(0);
+    });
+
+    test('removes the binding when its profile is deleted', async () => {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const profileId = await createOrgProfile();
+      await ownerCaller.agentProfiles.bindToRepo({
+        organizationId: organizationA.id,
+        profileId,
+        repoFullName: 'acme/web',
+        platform: 'github',
+      });
+      expect(await orgBindings()).toHaveLength(1);
+
+      await ownerCaller.agentProfiles.delete({ organizationId: organizationA.id, profileId });
+      expect(await orgBindings()).toHaveLength(0);
+    });
+
+    test('serializes a member delete behind a concurrent admin bind on the profile row lock', async () => {
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const profileId = await createOrgProfile();
+      const owner = { type: 'organization' as const, id: organizationA.id };
+
+      let pendingDelete: Promise<unknown> | undefined;
+      await db.transaction(async tx => {
+        // The admin bind holds the profile row lock for the whole transaction.
+        await bindProfileToRepo(tx, owner, 'acme/race', 'github', profileId);
+        // Start the member delete while the binding is still uncommitted; the
+        // row lock makes it wait instead of observing zero bindings.
+        pendingDelete = memberCaller.agentProfiles.delete({
+          organizationId: organizationA.id,
+          profileId,
+        });
+        await new Promise(resolve => setTimeout(resolve, 200));
+      });
+
+      await expect(pendingDelete).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+      const bindings = await db
+        .select()
+        .from(agent_environment_profile_repo_bindings)
+        .where(eq(agent_environment_profile_repo_bindings.profile_id, profileId));
+      expect(bindings).toHaveLength(1);
+      const profile = await db
+        .select()
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.id, profileId));
+      expect(profile).toHaveLength(1);
     });
   });
 });

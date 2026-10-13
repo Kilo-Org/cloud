@@ -1,6 +1,6 @@
 {
-  "id": "fb6c7a8a-e77e-419c-90c6-61ec1e9576c5",
-  "prevId": "9813e256-dc16-4ff4-94ae-e79db9014837",
+  "id": "f2460181-1979-49b3-be6a-cea9ff4b7022",
+  "prevId": "9ec4b330-8984-4c3b-90ce-1b4bd534973c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -6116,6 +6116,225 @@
         "cloud_agent_pending_uploads_status_check": {
           "name": "cloud_agent_pending_uploads_status_check",
           "value": "\"cloud_agent_pending_uploads\".\"status\" IN ('pending', 'linked', 'reaped')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.cloud_agent_sandbox_allocation_settings": {
+      "name": "cloud_agent_sandbox_allocation_settings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "repository_full_name": {
+          "name": "repository_full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "repository_platform": {
+          "name": "repository_platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "allocation": {
+          "name": "allocation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_cloud_agent_sandbox_alloc_org_context": {
+          "name": "UQ_cloud_agent_sandbox_alloc_org_context",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_sandbox_allocation_settings\".\"owned_by_organization_id\" IS NOT NULL AND \"cloud_agent_sandbox_allocation_settings\".\"repository_full_name\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_cloud_agent_sandbox_alloc_user_context": {
+          "name": "UQ_cloud_agent_sandbox_alloc_user_context",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_sandbox_allocation_settings\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_sandbox_allocation_settings\".\"repository_full_name\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_cloud_agent_sandbox_alloc_org_repo": {
+          "name": "UQ_cloud_agent_sandbox_alloc_org_repo",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repository_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repository_platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_sandbox_allocation_settings\".\"owned_by_organization_id\" IS NOT NULL AND \"cloud_agent_sandbox_allocation_settings\".\"repository_full_name\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_cloud_agent_sandbox_alloc_user_repo": {
+          "name": "UQ_cloud_agent_sandbox_alloc_user_repo",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repository_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repository_platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_sandbox_allocation_settings\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_sandbox_allocation_settings\".\"repository_full_name\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cloud_agent_sandbox_alloc_org": {
+          "name": "IDX_cloud_agent_sandbox_alloc_org",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cloud_agent_sandbox_alloc_user": {
+          "name": "IDX_cloud_agent_sandbox_alloc_user",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cloud_agent_sandbox_allocation_settings_owned_by_organization_id_organizations_id_fk": {
+          "name": "cloud_agent_sandbox_allocation_settings_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "cloud_agent_sandbox_allocation_settings",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cloud_agent_sandbox_allocation_settings_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "cloud_agent_sandbox_allocation_settings_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "cloud_agent_sandbox_allocation_settings",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cloud_agent_sandbox_allocation_settings_owner_check": {
+          "name": "cloud_agent_sandbox_allocation_settings_owner_check",
+          "value": "(\n        (\"cloud_agent_sandbox_allocation_settings\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_sandbox_allocation_settings\".\"owned_by_organization_id\" IS NULL) OR\n        (\"cloud_agent_sandbox_allocation_settings\".\"owned_by_user_id\" IS NULL AND \"cloud_agent_sandbox_allocation_settings\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
+        },
+        "cloud_agent_sandbox_allocation_settings_repo_pair_check": {
+          "name": "cloud_agent_sandbox_allocation_settings_repo_pair_check",
+          "value": "(\n        (\"cloud_agent_sandbox_allocation_settings\".\"repository_full_name\" IS NULL AND \"cloud_agent_sandbox_allocation_settings\".\"repository_platform\" IS NULL) OR\n        (\"cloud_agent_sandbox_allocation_settings\".\"repository_full_name\" IS NOT NULL AND \"cloud_agent_sandbox_allocation_settings\".\"repository_platform\" IS NOT NULL)\n      )"
         }
       },
       "isRLSEnabled": false

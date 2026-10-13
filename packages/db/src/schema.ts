@@ -8521,6 +8521,71 @@ export type AgentEnvironmentProfileRepoBinding =
 export type NewAgentEnvironmentProfileRepoBinding =
   typeof agent_environment_profile_repo_bindings.$inferInsert;
 
+// ============ CLOUD AGENT SANDBOX ALLOCATION SETTINGS ============
+// A context default (repository pair null) or a per-repository override that
+// selects the sandbox allocation for new Cloud Agent session allocations.
+
+export const cloud_agent_sandbox_allocation_settings = pgTable(
+  'cloud_agent_sandbox_allocation_settings',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    repository_full_name: text(),
+    repository_platform: text({ enum: ['github', 'gitlab'] }),
+    allocation: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cloud_agent_sandbox_alloc_org_context')
+      .on(table.owned_by_organization_id)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.repository_full_name} IS NULL`
+      ),
+    uniqueIndex('UQ_cloud_agent_sandbox_alloc_user_context')
+      .on(table.owned_by_user_id)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.repository_full_name} IS NULL`),
+    uniqueIndex('UQ_cloud_agent_sandbox_alloc_org_repo')
+      .on(table.owned_by_organization_id, table.repository_full_name, table.repository_platform)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.repository_full_name} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_cloud_agent_sandbox_alloc_user_repo')
+      .on(table.owned_by_user_id, table.repository_full_name, table.repository_platform)
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND ${table.repository_full_name} IS NOT NULL`
+      ),
+    index('IDX_cloud_agent_sandbox_alloc_org').on(table.owned_by_organization_id),
+    index('IDX_cloud_agent_sandbox_alloc_user').on(table.owned_by_user_id),
+    check(
+      'cloud_agent_sandbox_allocation_settings_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    check(
+      'cloud_agent_sandbox_allocation_settings_repo_pair_check',
+      sql`(
+        (${table.repository_full_name} IS NULL AND ${table.repository_platform} IS NULL) OR
+        (${table.repository_full_name} IS NOT NULL AND ${table.repository_platform} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type CloudAgentSandboxAllocationSetting =
+  typeof cloud_agent_sandbox_allocation_settings.$inferSelect;
+export type NewCloudAgentSandboxAllocationSetting =
+  typeof cloud_agent_sandbox_allocation_settings.$inferInsert;
+
 // ============ AGENT ENVIRONMENT PROFILE MCP SERVERS ============
 // MCP servers configured on an environment profile. Materialized into the
 // CLI-native KILO_CONFIG_CONTENT.mcp block at session preparation time.

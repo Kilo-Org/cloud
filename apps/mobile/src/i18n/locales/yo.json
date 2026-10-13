@@ -2157,6 +2157,11 @@
       "collapse": "Fi àfojúsùn pamọ́",
       "expand": "Fi àfojúsùn hàn"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Àwọn iṣẹ́, {{completed}} nínú {{total}} ti parí",
+      "rowAccessibility": "Àwọn iṣẹ́, {{completed}} nínú {{total}} ti parí. Iṣẹ́ lọ́wọ́lọ́wọ́: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Tí a lò láìpẹ́",
       "couldNotLoadGithubRepositories": "A kò lè gbé àwọn ibi ìpamọ́ kóòdù GitHub wọlé.",
@@ -2212,6 +2217,10 @@
       "importingSession": "Ń gbé ìgbà iṣẹ́ wọlé",
       "cliCannotContinue": "CLI yìí kò lè tẹ̀síwájú pẹ̀lú ìgbà iṣẹ́ kan. Yan Cloud Agent tàbí CLI mìíràn.",
       "importFailed": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
+      "cliCannotFork": "Ṣe àtúnṣe Kilo CLI láti pín ẹ̀ka láti inú ìfiránṣẹ́ kan.",
+      "forkCutNotSynced": "A kò tíì fi ìfiránṣẹ́ yìí pamọ́. Gbìyànjú lẹ́ẹ̀kan sí i láìpẹ́.",
+      "forkFilesFromBaseBranch": "Àwọn fáìlì bẹ̀rẹ̀ láti ẹ̀ka ìpìlẹ̀.",
+      "forkFilesUnchangedOnComputer": "Àwọn fáìlì tó wà lórí kọ̀ǹpútà yìí kò ní yípadà.",
       "pickProfile": "Yan profaili kan",
       "noProfile": "Ko si profaili",
       "manageProfiles": "Ṣakoso awọn profaili",
@@ -2327,6 +2336,7 @@
       "copyMessage": "Ṣe àdàkọ ìfiránṣẹ́",
       "copyText": "Ṣe àdàkọ ọ̀rọ̀",
       "selectText": "Yan ọ̀rọ̀",
+      "forkFromHere": "Pín ẹ̀ka láti ibí",
       "reportAiResponse": "Jábọ̀ ìdáhùn AI",
       "reportAiResponseConfirm": "Jábọ̀ ìdáhùn yìí fún àyẹ̀wò?",
       "report": "Jábọ̀",
@@ -3215,6 +3225,7 @@
     "tutorialLabel": "Ìtọ́sọ́nà"
   },
   "modelChat": {
+    "offlineFailure": "Awoṣe yìí nílò ìsopọ̀ íntánẹ́ẹ̀tì. Sopọ̀ kí o sì gbìyànjú lẹ́ẹ̀kan sí i, tàbí yí padà sí awoṣe kan tó wà lórí ẹ̀rọ yìí.",
     "empty": {
       "title": "Bẹ̀rẹ̀ iwiregbe kan",
       "description": "Fi ifiranṣẹ ranṣẹ láti bá awoṣe kan sọ̀rọ̀."
@@ -3226,6 +3237,11 @@
       "deleteTitle": "Pa ìjíròrò yìí rẹ́?"
     },
     "beta": "Beta",
+    "webSearch": {
+      "title": "Wá lórí wẹ́ẹ̀bù",
+      "description": "Jẹ́ kí ìjíròrò yìí wá ìsọfúnni tuntun nípasẹ̀ àkọọ́lẹ̀ Kilo rẹ. Àwọn ìwákiri ń lo ìpín ìwákiri oṣooṣù rẹ.",
+      "allowanceExhausted": "Àwọn ìwákiri wẹ́ẹ̀bù ọ̀fẹ́ rẹ fún oṣù yìí ti tán. Ṣàfikún kírẹ́dítì láti wá lẹ́ẹ̀kan sí i."
+    },
     "mcp": {
       "title": "Àwọn irinṣẹ́ Kilo",
       "use": "Lo àwọn irinṣẹ́ Kilo",
@@ -3351,8 +3367,48 @@
         "notGguf": "Ìjápọ̀ náà gbọ́dọ̀ tọ́ka sí fáìlì .gguf.",
         "space": "Kò sí ààyè tó pọ̀ tó fún awoṣe yìí. Ṣí ààyè kúrò kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
         "network": "Gbígbà sílẹ̀ kò parí. Yẹ ìsopọ̀ rẹ wò kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
-        "invalidFile": "Fáìlì tí a gbà sílẹ̀ kì í ṣe awoṣe tí app yìí lè ṣiṣẹ́, nítorí náà a yọ ọ́ kúrò."
+        "invalidFile": "Fáìlì tí a gbà sílẹ̀ kì í ṣe awoṣe tí app yìí lè ṣiṣẹ́, nítorí náà a yọ ọ́ kúrò.",
+        "checksum": "Fáìlì tí a gbà sílẹ̀ kò bá checksum rẹ̀ tí a tẹ̀ jáde mu, nítorí náà a yọ ọ́ kúrò. Tún gbìyànjú láti gbà á sílẹ̀."
       }
+    },
+    "catalog": {
+      "browse": "Ṣàwárí àwọn awoṣe",
+      "title": "Àkójọ àwọn awoṣe",
+      "search": "Wá àwọn awoṣe Hugging Face",
+      "tabs": "Àlẹ̀mọ́ awoṣe",
+      "fitsTab": "Ó bá ẹ̀rọ yìí mu",
+      "fromHuggingFace": "Láti Hugging Face",
+      "loading": "Ń gbé àwọn awoṣe wọlé",
+      "noResults": "A kò rí awoṣe kankan",
+      "noFits": "Kò sí awoṣe tí ó bá ẹ̀rọ yìí mu",
+      "noFitsDescription": "Àwọn awoṣe tí ó tóbi jù wà lórí táàbù $t(common.all).",
+      "fit": {
+        "fits": "Ó bá a mu",
+        "tight": "Ó há díẹ̀",
+        "tooLarge": "Ó tóbi jù",
+        "noStorage": "Àyè ìpamọ́ kò tó"
+      },
+      "parameters": "Àwọn pàrámítà: {{value}}",
+      "downloads": "Ìgbàsílẹ̀: {{value}}",
+      "likes": "Ìfẹ́ràn: {{value}}",
+      "context": "Fèrèsé àyíká ọ̀rọ̀: {{value}}",
+      "license": "Ìwé àṣẹ: {{license}}",
+      "licenseUnknown": "A kò sọ ìwé àṣẹ rẹ̀",
+      "tools": "Pípe irinṣẹ́",
+      "vision": "Ìfiwọlé àwòrán",
+      "hintsHelp": "Àwọn ìtọ́kasí láti Hugging Face. Áàpù náà yóò ṣàyẹ̀wò awoṣe lẹ́yìn tí ó bá gbà á sílẹ̀.",
+      "gated": "Awoṣe yìí nílò àkáǹtì Hugging Face, nítorí náà áàpù kò lè gbà á sílẹ̀.",
+      "quantizations": "Àwọn ìdínkù ìwọ̀n",
+      "quantizationsHelp": "Àwọn fáìlì kékeré ń lo ìrántí àti àyè ìpamọ́ díẹ̀. Àwọn fáìlì ńlá sábà máa ń fún ni ní ìdáhùn tí ó dára jù.",
+      "quantDetail": "Ìgbàsílẹ̀ {{size}} · nǹkan bí {{memory}} ìrántí",
+      "downloadQuant": "Gbà {{quant}} sílẹ̀",
+      "loadingModel": "Ń gbé àlàyé awoṣe wọlé",
+      "couldNotLoadModel": "Kò ṣeé ṣe láti gbé awoṣe yìí wọlé",
+      "noFiles": "Kò sí fáìlì tí áàpù yìí lè ṣiṣẹ́",
+      "noFilesDescription": "Áàpù yìí ń ṣiṣẹ́ àwọn awoṣe tí ó jẹ́ fáìlì GGUF kan ṣoṣo.",
+      "tooLargeTitle": "Awoṣe yìí lè má ṣiṣẹ́",
+      "tooLargeMessage": "{{name}} ṣeé ṣe kí ó nílò ìrántí ju èyí tí ẹ̀rọ yìí ní lọ. Áàpù lè tì nígbà tí awoṣe bá ń dáhùn. Ṣé kí o gbà á sílẹ̀ bẹ́ẹ̀ náà?",
+      "downloadAnyway": "Gbà á sílẹ̀ bẹ́ẹ̀ náà"
     },
     "localModels": {
       "title": "Àwọn awoṣe lórí ẹ̀rọ",

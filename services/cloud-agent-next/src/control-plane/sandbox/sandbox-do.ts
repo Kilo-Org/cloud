@@ -29,6 +29,7 @@ import {
   verifySandboxLaunchCredential,
 } from '../../sandbox-control/credential.js';
 import { rejectSandboxWrapperUpgrade } from '../../sandbox-control/socket-admission.js';
+import { DEADLINE_MS } from '../../sandbox-control/deadlines.js';
 import { createCloudflareContainersProviderAdapter } from '../../sandbox-control/cloudflare-containers-provider.js';
 import {
   createCloudflareProviderAdapter,
@@ -193,6 +194,7 @@ import {
   readRepositoryLaunch,
   recordRepositoryLaunch,
   repositoryLaunchOptions,
+  type RepositoryPreparationFailure,
 } from './repository-launch.js';
 import {
   beginWorktreeDeletion,
@@ -1370,6 +1372,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.initialized;
     await this.enqueue(async () => {
       this.expireUnboundSockets(Date.now());
+      await this.recoverRepositoryPreparationFailures();
       const state = await this.readAllocation();
       await failExpiredRoutes(this.routeContext(state));
       if (state.kind === 'creating' && this.createInFlight) {
@@ -1617,7 +1620,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async applyEvent(event: AllocationEvent): Promise<void> {
     const previous = await this.readAllocation();
-    const { state, effects, stopReason } = reduceAllocation(previous, event, this.sandboxTimers());
+    const timers = { ...this.sandboxTimers() };
+    if (
+      this.currentProvider() === 'cloudflare-containers' &&
+      (event.type === 'ensure' || event.type === 'tick')
+    ) {
+      const launch = repositoryLaunchOptions(
+        await listRoutes(this.db),
+        await readRepositoryLaunch(this.ctx.storage)
+      );
+      if (launch.options.repoKey !== undefined && !launch.skipped) {
+        timers.providerCreateMs = DEADLINE_MS.repositoryStartup;
+      }
+    }
+    const { state, effects, stopReason } = reduceAllocation(previous, event, timers);
     await this.writeAllocation(state, previous);
     if (
       previous.kind !== state.kind ||
@@ -1819,8 +1835,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
   /**
    * The repository snapshot key for a route, or null when none applies. It is hashed
    * from the input spec: the grant rewrites `spec.env` with per-attempt credential
-   * aliases, so the stored spec would give every session its own key. A route with
-   * setup commands has no key, so it neither restores nor captures a snapshot.
+   * aliases, so the stored spec would give every session its own key. The setup
+   * commands are folded into the key, so a snapshot is reused only by a route with
+   * the same setup; a different setup neither restores nor captures under it.
    *
    * Emits one `snapshot_key` diagnostic per route so a missing snapshot can be
    * traced to the gate that rejected it (or to a missing key secret).
@@ -1839,10 +1856,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       userId: source.userId,
       orgId: source.orgId,
     };
-    const eligibility = repoSnapshotEligibility(gate, {
-      ...route,
-      setupCommands: spec.setupCommands,
-    });
+    const eligibility = repoSnapshotEligibility(gate, route);
     if (!eligibility.eligible) {
       this.logSnapshotKey(spec.sessionId, false, eligibility.reason);
       return null;
@@ -1852,7 +1866,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       1_000,
       'Repository snapshot key secret lookup timed out'
     ).catch(() => null);
-    const key = await computeRepoKey({ secret, userId: source.userId, ...route });
+    const key = await computeRepoKey({
+      secret,
+      userId: source.userId,
+      ...route,
+      setupCommands: spec.setupCommands,
+    });
     if (key === null) {
       this.logSnapshotKey(spec.sessionId, false, 'secret_missing');
       return null;
@@ -2335,6 +2354,26 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     // A preparing route with attempt time left keeps its deadline across the
     // reallocation (spec §6).
+    const launch = await readRepositoryLaunch(this.ctx.storage);
+    if (
+      next.unconfirmedProviderRef !== null &&
+      launch?.allocationId === previous.allocationId &&
+      launch.preparationFailures !== undefined
+    ) {
+      for (const route of await listRoutes(this.db)) {
+        if (route.state !== 'preparing') continue;
+        await onRouteFailed(
+          ctx,
+          route.sessionId,
+          'workspace_setup_failed',
+          launch.preparationFailures.find(
+            failure =>
+              failure.sessionId === route.sessionId && failure.attemptId === route.attemptId
+          )?.subtype,
+          true
+        );
+      }
+    }
     const retry = await routeRetryAllowed(ctx);
     const routes = await listRoutes(this.db);
     logControlDiagnostic('allocation_stopped', {
@@ -2929,10 +2968,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
           skip: launch.skipped,
           repoKey: launch.options.repoKey?.slice(0, 16),
         });
+        if (launch.skipped) {
+          await notifyPreparingRoutes(this.routeContext(current), {
+            step: 'snapshot_fallback',
+            detail: 'Previous snapshot startup failed. Retrying without a snapshot.',
+          });
+        }
         // Persist a placeholder before the launch so a `hello` accepted while it
         // runs confirms this allocation, and that confirmation outlives the
         // allocation stopping before the launch resolves.
-        await beginRepositoryLaunch(this.ctx.storage, allocationId);
+        await beginRepositoryLaunch(this.ctx.storage, allocationId, launch.skipped);
         if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
         const launchOptions = {
           ...launch.options,
@@ -2973,6 +3018,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
             sandboxId: this.sandboxId,
             allocationId,
             reason: 'repository_start_failed',
+          });
+          await notifyPreparingRoutes(this.routeContext(afterCleanup), {
+            step: 'snapshot_fallback',
+            detail: 'Snapshot startup failed. Retrying without a snapshot.',
           });
           launched = await withTimeout(
             this.provider.launch(createdRef, imageLaunchEnv, {
@@ -3028,6 +3077,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
     } finally {
       this.createInFlight = false;
+      await this.enqueue(() => this.recoverRepositoryPreparationFailures());
     }
   }
 
@@ -3044,23 +3094,94 @@ export class SandboxControlV2 extends DurableObject<Env> {
     allocationId: string,
     startSource: ProviderStartSource
   ): Promise<void> {
+    await this.enqueue(async () => {
+      const state = await this.readAllocation();
+      const connected =
+        state.allocationId === allocationId &&
+        (state.kind === 'connected' || state.kind === 'disconnected');
+      const existing = await readRepositoryLaunch(this.ctx.storage);
+      if (existing?.allocationId !== allocationId) return;
+      const confirmed = connected || existing.confirmed;
+      await recordRepositoryLaunch(this.ctx.storage, {
+        allocationId,
+        startSource,
+        confirmed,
+        ...(existing.preparationFailures === undefined
+          ? {}
+          : { preparationFailures: existing.preparationFailures }),
+      });
+      logControlDiagnostic('snapshot_start', {
+        sandboxId: this.sandboxId,
+        allocationId,
+        source: startSource,
+        confirmed,
+      });
+    });
+  }
+
+  private async recoverRepositoryPreparationFailures(): Promise<void> {
+    if (this.createInFlight) return;
     const state = await this.readAllocation();
-    const connected =
-      state.allocationId === allocationId &&
-      (state.kind === 'connected' || state.kind === 'disconnected');
-    const existing = await readRepositoryLaunch(this.ctx.storage);
-    const confirmed = connected || (existing?.allocationId === allocationId && existing.confirmed);
-    await recordRepositoryLaunch(this.ctx.storage, {
-      allocationId,
-      startSource,
-      confirmed,
-    });
-    logControlDiagnostic('snapshot_start', {
+    if (state.kind !== 'connected' && state.kind !== 'disconnected') return;
+    const launch = await readRepositoryLaunch(this.ctx.storage);
+    if (launch?.allocationId !== state.allocationId) return;
+    for (const failure of launch.preparationFailures ?? []) {
+      const route = await readRoute(this.db, failure.sessionId);
+      if (!isCurrentPreparingAttempt(route, failure.attemptId)) continue;
+      if (await this.retryRepositoryPreparation(state, failure)) return;
+      await onRouteFailed(
+        this.routeContext(state),
+        failure.sessionId,
+        'workspace_setup_failed',
+        failure.subtype,
+        true
+      );
+    }
+  }
+
+  private async retryRepositoryPreparation(
+    state: AllocationState,
+    failure: RepositoryPreparationFailure
+  ): Promise<boolean> {
+    const launch = await readRepositoryLaunch(this.ctx.storage);
+    if (launch === undefined || launch.allocationId !== state.allocationId) return false;
+    if (launch.startSource === 'image' || launch.skipRepository === true) return false;
+    const routes = await listRoutes(this.db);
+    const route = routes.find(candidate => candidate.sessionId === failure.sessionId);
+    if (
+      route === undefined ||
+      !isCurrentPreparingAttempt(route, failure.attemptId) ||
+      route.repoKey === null ||
+      route.attemptDeadlineAt <= Date.now() ||
+      routes.some(candidate => candidate.state === 'ready')
+    )
+      return false;
+    const preparationFailures = launch.preparationFailures ?? [];
+    if (
+      !preparationFailures.some(
+        candidate =>
+          candidate.sessionId === failure.sessionId && candidate.attemptId === failure.attemptId
+      )
+    ) {
+      await recordRepositoryLaunch(this.ctx.storage, {
+        ...launch,
+        preparationFailures: [...preparationFailures, failure],
+      });
+    }
+    if (this.createInFlight) return true;
+    logControlDiagnostic('snapshot_fallback', {
       sandboxId: this.sandboxId,
-      allocationId,
-      source: startSource,
-      confirmed,
+      allocationId: state.allocationId,
+      sessionId: failure.sessionId,
+      reason: 'repository_preparation_failed',
+      subtype: failure.subtype,
     });
+    await this.applyEvent({
+      type: 'stop-requested',
+      at: Date.now(),
+      reason: 'workspace_setup_failed',
+    });
+    return true;
   }
 
   private async dispatchCreateFailed(allocationId: string): Promise<void> {
@@ -3457,6 +3578,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
             ...(frame.subtype === undefined ? {} : { subtype: frame.subtype }),
           })
           .warn('Control-plane prepare failed');
+        if (current && frame.reason === 'workspace_setup_failed') {
+          const route = await readRoute(this.db, frame.sessionId);
+          if (
+            route?.state === 'preparing' &&
+            (await this.retryRepositoryPreparation(currentState, {
+              sessionId: frame.sessionId,
+              attemptId: route.attemptId,
+              ...(frame.subtype === undefined ? {} : { subtype: frame.subtype }),
+            }))
+          )
+            return;
+        }
         await onRouteFailed(ctx, frame.sessionId, frame.reason, frame.subtype, current);
         return;
       case 'session.events':

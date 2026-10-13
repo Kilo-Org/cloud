@@ -1646,6 +1646,11 @@
       "collapse": "收合目標",
       "expand": "展開目標"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "任務，已完成 {{completed}}/{{total}} 項",
+      "rowAccessibility": "任務，已完成 {{completed}}/{{total}} 項。目前任務：{{task}}"
+    },
     "newSession": {
       "recentlyUsed": "最近使用",
       "couldNotLoadGithubRepositories": "無法載入 GitHub 儲存庫。",
@@ -1701,6 +1706,10 @@
       "importingSession": "匯入工作階段中",
       "cliCannotContinue": "此 CLI 無法繼續工作階段。請選擇 Cloud Agent 或其他 CLI。",
       "importFailed": "無法匯入此工作階段。",
+      "cliCannotFork": "請更新 Kilo CLI，才能從訊息建立分支。",
+      "forkCutNotSynced": "此訊息尚未儲存，請稍後再試。",
+      "forkFilesFromBaseBranch": "檔案將從基礎分支開始。",
+      "forkFilesUnchangedOnComputer": "此電腦上的檔案不會變更。",
       "pickProfile": "選擇個人資料",
       "noProfile": "沒有個人資料",
       "manageProfiles": "管理個人資料",
@@ -1816,6 +1825,7 @@
       "copyMessage": "複製訊息",
       "copyText": "複製文字",
       "selectText": "選取文字",
+      "forkFromHere": "從這裡分支",
       "reportAiResponse": "檢舉 AI 回覆",
       "reportAiResponseConfirm": "要檢舉這則回覆並交由審查嗎？",
       "report": "檢舉",
@@ -3215,6 +3225,7 @@
     "tutorialLabel": "教學"
   },
   "modelChat": {
+    "offlineFailure": "此模型需要網路連線。請連線後再試一次，或切換至此裝置上的模型。",
     "empty": {
       "title": "開始聊天",
       "description": "傳送訊息以與模型對話。"
@@ -3226,6 +3237,11 @@
       "deleteTitle": "刪除這個對話？"
     },
     "beta": "測試版",
+    "webSearch": {
+      "title": "搜尋網路",
+      "description": "允許此聊天透過你的 Kilo 帳戶查詢最新資訊。搜尋會使用你每月的搜尋額度。",
+      "allowanceExhausted": "你本月的免費網路搜尋已用完。新增額度即可再次搜尋。"
+    },
     "mcp": {
       "title": "Kilo 工具",
       "use": "使用 Kilo 工具",
@@ -3351,8 +3367,48 @@
         "notGguf": "連結必須指向 .gguf 檔案。",
         "space": "沒有足夠的可用儲存空間容納這個模型。請清出空間後再試一次。",
         "network": "下載未完成。請檢查網路連線後再試一次。",
-        "invalidFile": "下載的檔案不是這個應用程式可執行的模型，因此已將其移除。"
+        "invalidFile": "下載的檔案不是這個應用程式可執行的模型，因此已將其移除。",
+        "checksum": "下載的檔案與公布的校驗碼不符，因此已將其移除。請重新下載。"
       }
+    },
+    "catalog": {
+      "browse": "瀏覽模型",
+      "title": "模型目錄",
+      "search": "搜尋 Hugging Face 模型",
+      "tabs": "模型篩選",
+      "fitsTab": "適合此裝置",
+      "fromHuggingFace": "來自 Hugging Face",
+      "loading": "正在載入模型",
+      "noResults": "找不到模型",
+      "noFits": "沒有適合此裝置的模型",
+      "noFitsDescription": "較大的模型位於「$t(common.all)」分頁。",
+      "fit": {
+        "fits": "適合",
+        "tight": "勉強可用",
+        "tooLarge": "過大",
+        "noStorage": "儲存空間不足"
+      },
+      "parameters": "參數：{{value}}",
+      "downloads": "下載次數：{{value}}",
+      "likes": "按讚數：{{value}}",
+      "context": "上下文視窗：{{value}}",
+      "license": "授權條款：{{license}}",
+      "licenseUnknown": "未註明授權條款",
+      "tools": "工具呼叫",
+      "vision": "圖片輸入",
+      "hintsHelp": "提示資訊來自 Hugging Face。App 會在模型下載後進行檢查。",
+      "gated": "此模型需要 Hugging Face 帳號，因此 App 無法下載。",
+      "quantizations": "量化版本",
+      "quantizationsHelp": "較小的檔案佔用較少記憶體和儲存空間。較大的檔案通常能提供較好的回答。",
+      "quantDetail": "下載 {{size}} · 約需 {{memory}} 記憶體",
+      "downloadQuant": "下載 {{quant}}",
+      "loadingModel": "正在載入模型詳細資料",
+      "couldNotLoadModel": "無法載入此模型",
+      "noFiles": "沒有此 App 可執行的檔案",
+      "noFilesDescription": "此 App 僅能執行單一 GGUF 檔案的模型。",
+      "tooLargeTitle": "此模型可能無法執行",
+      "tooLargeMessage": "{{name}} 所需的記憶體可能超過此裝置的容量。模型回答時，App 可能會關閉。仍要下載嗎？",
+      "downloadAnyway": "仍要下載"
     },
     "localModels": {
       "title": "裝置端模型",

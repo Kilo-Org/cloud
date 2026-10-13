@@ -59,6 +59,21 @@ const KILO_REVIEW_MARKER = '<!-- kilo-review -->';
  */
 const COPY_BY_TERMINAL_REASON = new Map<CodeReviewTerminalReason, CodeReviewTerminalReasonCopy>([
   [
+    'assistant_invalid_request_byok',
+    {
+      label: 'Provider rejected request',
+      message: 'Your provider rejected the request. Check your provider account and settings.',
+      checkTitle: 'Kilo Code Review request rejected by your provider',
+      checkSummary: 'Your provider rejected the request. Check your provider account and settings.',
+      summaryBody: `${KILO_REVIEW_MARKER}
+## Code Review Summary
+
+**This review did not finish.** Your provider rejected the request. Check your
+provider account and settings, then re-run the review. Kilo does not retry
+automatically. Any inline comments below are from an earlier review.`,
+    },
+  ],
+  [
     'assistant_output_limit',
     {
       label: 'Output limit reached',

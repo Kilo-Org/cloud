@@ -80,6 +80,8 @@ import {
   useSessionAutoApproveEnabled,
 } from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
+import { SessionTasksChip, SessionTasksRow } from '@/components/agents/session-tasks-indicator';
+import { selectSessionTodoSummary } from '@/components/agents/session-todo-summary';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
@@ -205,6 +207,7 @@ import {
   buildContinueHref,
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
+import { type ForkCut, resolveForkCut } from '@/components/agents/fork-cut';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -1091,6 +1094,18 @@ export function SessionDetailContent({
   );
   const isCancelingSelected =
     detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
+  const detailsForkCut = useMemo(
+    () =>
+      detailsMessageId === null
+        ? null
+        : resolveForkCut({
+            messages: displayedMessages,
+            messageId: detailsMessageId,
+            pendingMessages,
+            isSessionStreaming: isStreaming,
+          }),
+    [displayedMessages, detailsMessageId, pendingMessages, isStreaming]
+  );
 
   const baseTranscript = useMemo(() => {
     // A superseded submission's preparation goes with its row: dropping only
@@ -1850,7 +1865,17 @@ export function SessionDetailContent({
     </View>
   );
   const associatedPr = fetchedData?.associatedPr ?? null;
-  const prBadge = associatedPr ? <SessionPrBadge pr={associatedPr} loading={false} /> : undefined;
+  const prBadge = associatedPr ? <SessionPrBadge pr={associatedPr} loading={false} /> : null;
+  // The model's latest todo list. With a goal it is a chip under the PR pill;
+  // without one it is a one-line row under the header.
+  const todoSummary = useMemo(() => selectSessionTodoSummary(messages), [messages]);
+  const goalTrailing =
+    prBadge || todoSummary ? (
+      <>
+        {prBadge}
+        {todoSummary ? <SessionTasksChip summary={todoSummary} /> : null}
+      </>
+    ) : undefined;
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   // A pending permission ask that the auto-reply is already answering is
   // suppressed: the card is gated out below (`suppressedRequestId`). Blocking
@@ -2144,30 +2169,49 @@ export function SessionDetailContent({
     })();
   }, [exitFailure]);
 
+  const pushContinue = useCallback(
+    (cut: ForkCut | null) => {
+      router.push(
+        buildContinueHref({
+          organizationId,
+          cloneFromKiloSessionId: sessionId,
+          cloneSourceTitle: rename.title,
+          cloneUpToMessageId: cut?.cloneUpToMessageId,
+          forkPrefillText: cut?.forkPrefillText,
+          forkSourceIsCloudAgent: Boolean(fetchedData?.cloudAgentSessionId),
+          prefill: buildContinuePrefillParams({
+            gitUrl: fetchedData?.gitUrl,
+            mode: currentMode,
+            model: currentModel,
+            variant: currentVariant,
+          }),
+        }) as Href
+      );
+    },
+    [
+      router,
+      organizationId,
+      sessionId,
+      rename.title,
+      fetchedData?.gitUrl,
+      fetchedData?.cloudAgentSessionId,
+      currentMode,
+      currentModel,
+      currentVariant,
+    ]
+  );
+
   const handleContinueInNewSession = useCallback(() => {
-    router.push(
-      buildContinueHref({
-        organizationId,
-        cloneFromKiloSessionId: sessionId,
-        cloneSourceTitle: rename.title,
-        prefill: buildContinuePrefillParams({
-          gitUrl: fetchedData?.gitUrl,
-          mode: currentMode,
-          model: currentModel,
-          variant: currentVariant,
-        }),
-      }) as Href
-    );
-  }, [
-    router,
-    organizationId,
-    sessionId,
-    rename.title,
-    fetchedData?.gitUrl,
-    currentMode,
-    currentModel,
-    currentVariant,
-  ]);
+    pushContinue(null);
+  }, [pushContinue]);
+
+  const handleForkFromHere = useCallback(() => {
+    if (detailsForkCut === null) {
+      return;
+    }
+    handleCloseDetails();
+    pushContinue(detailsForkCut);
+  }, [detailsForkCut, handleCloseDetails, pushContinue]);
 
   const isFocused = useIsFocused();
   const keepScreenAwake = shouldKeepSessionAwake({
@@ -2253,12 +2297,21 @@ export function SessionDetailContent({
               <SessionGoalSection
                 goal={sessionGoal}
                 collapsed={goalCollapsed}
-                trailing={prBadge}
+                trailing={goalTrailing}
                 onToggleCollapsed={() => {
                   toggleSessionGoalCollapsed(sessionId);
                 }}
                 onPress={handleOpenGoalActions}
               />
+            </Animated.View>
+          ) : null}
+          {sessionGoal === null && todoSummary ? (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(150)}
+            >
+              <SessionTasksRow summary={todoSummary} />
             </Animated.View>
           ) : null}
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
@@ -2333,6 +2386,7 @@ export function SessionDetailContent({
                 ? t('agentChat.session.cancelQueuedUpgradeRequired')
                 : null
             }
+            onForkFromHere={detailsForkCut ? handleForkFromHere : undefined}
           />
 
           {childSessionSheet.sheet ? (

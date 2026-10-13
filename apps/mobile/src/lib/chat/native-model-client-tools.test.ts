@@ -176,6 +176,34 @@ describe('native on-device model client with tools', () => {
     ]);
   });
 
+  it('answers a resumed call itself when the round offers no tools, so the model answers', async () => {
+    const { bridge, emit } = toolBridge((native, send) => {
+      send({ id: native.id, kind: 'toolCalls', calls: [call] });
+    });
+    const client = nativeModelClient(bridge);
+    await said(client);
+    const again = { id: 'fm-call-2', name: 'time', arguments: '{}' };
+    bridge.resume.mockImplementation(async (resumed, results) => {
+      await Promise.resolve();
+      if (results[0]?.callId === call.id) {
+        emit({ id: resumed, kind: 'toolCalls', calls: [again] });
+        return;
+      }
+      emit({ id: resumed, kind: 'delta', text: 'It is noon.' });
+      emit({ id: resumed, kind: 'done', stop: 'end', usageSource: 'unavailable' });
+    });
+    const last = await said(client, {
+      ...answered([{ callId: call.id, body: '12:00' }]),
+      tools: undefined,
+    });
+    expect(last.map(event => event.kind)).toEqual(['delta', 'done']);
+    expect(last.at(-1)).toMatchObject({ stop: 'end' });
+    expect(bridge.resume).toHaveBeenLastCalledWith(expect.any(String), [
+      { callId: again.id, body: expect.stringContaining('No tool can run') },
+    ]);
+    expect(bridge.resume).toHaveBeenCalledTimes(2);
+  });
+
   it('stops a waiting generation that a new question leaves behind', async () => {
     let round = 0;
     const { bridge } = toolBridge((native, send) => {

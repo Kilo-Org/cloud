@@ -7,6 +7,8 @@ import { backendFailureKey } from './backend-target';
 import { type NativeAvailability, nativeModelClient } from './native-model-client';
 import {
   answerWith,
+  answered,
+  call,
   AVAILABLE,
   collect,
   fakeBridge,
@@ -18,28 +20,6 @@ vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 
 describe('native on-device model client with tools', () => {
   const TOOLS: NativeAvailability = { ...AVAILABLE, tools: true };
-  const call = { id: 'fm-call-1', name: 'time', arguments: '{}' };
-
-  /** The request the harness sends after it ran the round's calls. */
-  const answered = (results: readonly { callId: string; body: string }[]): ModelRequest => ({
-    ...request,
-    prompt: {
-      system: request.prompt.system,
-      messages: [
-        ...request.prompt.messages,
-        {
-          role: 'assistant',
-          cache: false,
-          parts: [{ kind: 'toolCall', callId: call.id, name: 'time', arguments: '{}' }],
-        },
-        {
-          role: 'user',
-          cache: true,
-          parts: results.map(result => ({ kind: 'toolResult', ...result, failed: false }) as const),
-        },
-      ],
-    },
-  });
 
   async function said(client: ModelClientService, asked = request): Promise<ModelEvent[]> {
     const result = await Effect.runPromise(Effect.either(Stream.runCollect(client.stream(asked))));

@@ -237,6 +237,7 @@ async function loadWorktreeSource(
     metadata.auth.kiloSessionId !== input.sourceKiloSessionId ||
     metadata.identity.createdOnPlatform !== 'cloud-agent-web' ||
     metadata.identity.botId !== undefined ||
+    metadata.cloudAgentSpawn?.policy !== undefined ||
     metadata.devcontainer !== undefined ||
     workspace.devcontainerRequested === true ||
     workspace.worktreeId !== worktreeId ||

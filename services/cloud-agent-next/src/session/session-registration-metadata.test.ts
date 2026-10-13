@@ -69,6 +69,28 @@ const GITHUB_REPOSITORY = {
 };
 
 describe('session registration repository metadata', () => {
+  it('stores parent spawn policy and server-authoritative child lineage outside the profile bundle', async () => {
+    const policy = {
+      procedures: ['cloudAgentNext.prepareSession' as const],
+      repositories: ['acme/widgets'],
+      models: ['kilo/test-model'],
+      remainingDepth: 1 as const,
+    };
+    for (const cloudAgentSpawn of [{ policy }, { parentSessionId: 'workspace_parent' }]) {
+      const result = await buildSessionMetadataFromRegistration({
+        identity: { sessionId: 'workspace_child', userId: 'user_fixture' },
+        auth: {},
+        agent: { mode: 'code', model: 'kilo/test-model' },
+        repository: GITHUB_REPOSITORY,
+        cloudAgentSpawn,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error(result.error);
+      expect(result.metadata.cloudAgentSpawn).toEqual(cloudAgentSpawn);
+      expect(result.metadata.profile).toBeUndefined();
+    }
+  });
+
   it('persists the GitHub pull request number from the registration input', async () => {
     const result = await buildSessionMetadataFromRegistration({
       identity: { sessionId: 'agent_test', userId: 'user_test' },

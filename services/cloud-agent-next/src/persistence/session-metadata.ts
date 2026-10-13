@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { CloudAgentSpawnPolicySchema } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
@@ -418,6 +419,14 @@ const MetadataCloneSchema = z
 export const CurrentSessionMetadataSchema = z
   .object({
     metadataSchemaVersion: z.literal(2),
+    cloudAgentSpawn: z
+      .object({
+        policy: CloudAgentSpawnPolicySchema.optional(),
+        parentSessionId: z.string().min(1).optional(),
+      })
+      .strict()
+      .refine(value => value.policy === undefined || value.parentSessionId === undefined)
+      .optional(),
     identity: MetadataIdentitySchema,
     auth: MetadataAuthSchema,
     repository: MetadataRepositorySchema.optional(),

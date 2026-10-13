@@ -21,6 +21,7 @@ import type {
 import type { SessionRepositoryRequest } from './session-requests.js';
 
 export type GroupedRegisterSessionInput = {
+  cloudAgentSpawn?: SessionMetadata['cloudAgentSpawn'];
   identity: SessionMetadata['identity'];
   auth: SessionMetadata['auth'];
   runtimeAuthorizationSeal?: string;
@@ -187,6 +188,7 @@ export async function buildSessionMetadataFromRegistration(
   const initialMessage = initialMessageFromRegistration(input.message);
   const metadata: SessionMetadata = {
     metadataSchemaVersion: 2,
+    cloudAgentSpawn: input.cloudAgentSpawn,
     identity: input.identity,
     auth: input.auth,
     // Metadata without clone remains an empty-session bootstrap; remove

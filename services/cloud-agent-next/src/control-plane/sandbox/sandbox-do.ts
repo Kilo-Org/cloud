@@ -283,6 +283,9 @@ function materializationStage(error: unknown): PrepareFrameMaterializationStage 
  * binding exists; tests inject a fake peer instead.
  */
 export type ControlPlaneSessionPeer = {
+  issueCloudAgentMcpGrant?(): Promise<
+    { url: string; token: string; expiresAt: number } | undefined
+  >;
   onRoute(update: ControlPlaneRouteUpdate): Promise<void>;
   onEvents(notification: ControlPlaneEventsNotification): Promise<void>;
   onOutcome(outcome: ControlPlaneOutcome): Promise<void>;
@@ -2662,6 +2665,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
       // Select the socket and re-check the fence from the same allocation read, so
       // a restart between the (bind and) send cannot deliver a stale handle.
+      const cloudAgentMcp =
+        peer?.issueCloudAgentMcpGrant === undefined
+          ? undefined
+          : await withTimeout(
+              peer.issueCloudAgentMcpGrant(),
+              this.grantIssueTimeoutMs(),
+              'Cloud Agent MCP grant issuance timed out'
+            );
       const state = await this.readAllocation();
       const socket = this.boundWrapperSocket(state);
       if (socket === null) return;
@@ -2684,7 +2695,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.trySendFrame(socket, {
         type: 'session.prepare',
         spec,
-        credentials: this.prepareCredentials(route.grant, sessionId),
+        credentials: controlPlaneSessionCredentialsPayloadSchema.parse({
+          ...this.prepareCredentials(route.grant, sessionId),
+          ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
+        }),
       });
     } catch {
       // A throw here (read/parse/bind) must still fail the fenced attempt; the

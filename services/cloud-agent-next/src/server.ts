@@ -691,6 +691,8 @@ async function routeAuthenticatedKiloFacade(c: Context<HonoContext>): Promise<Re
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }
+  if (authResult.cloudAgentAuthority)
+    return c.text('Cloud Agent authority only permits preparation', 403);
   return routeToUserKiloFacade(c, authResult.userId, authResult.token);
 }
 
@@ -1129,6 +1131,7 @@ app.use(
       env: c.env,
       userId: c.get('userId'),
       authToken: c.get('authToken'),
+      cloudAgentAuthority: c.get('cloudAgentAuthority'),
       botId: c.get('botId'),
       validatedSessionAccess: c.get('validatedSessionAccess'),
       request: c.req.raw,

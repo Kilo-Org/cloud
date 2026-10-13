@@ -32,6 +32,7 @@ import {
 } from '../../session/session-registration.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { preflightSessionCreation } from './session-creation-preflight.js';
+import { validateSpawnOptInPreparation } from '../../cloud-agent-authority.js';
 
 type SessionPrepareHandlers = {
   prepareSession: typeof prepareSessionHandler;
@@ -115,6 +116,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
           };
 
   return {
+    ...(input.cloudAgentSpawn ? { cloudAgentSpawn: { policy: input.cloudAgentSpawn } } : {}),
     initialTurn,
     agent: {
       mode: input.mode,
@@ -174,12 +176,33 @@ export function createSessionPrepareHandlers(): SessionPrepareHandlers {
  * to the unified `start` endpoint which does both in one call.
  */
 const prepareSessionHandler = internalApiProtectedProcedure
+  .use(async ({ getRawInput, next }) => {
+    try {
+      validateSpawnOptInPreparation(await getRawInput());
+    } catch {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Cloud Agent spawn requires a safe auto-initiated GitHub launch',
+      });
+    }
+    return next();
+  })
   .input(PrepareSessionInput)
   .output(PrepareSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'prepareSession' }, async () => {
+      const request = prepareInputToSessionCreateRequest(input);
+      if (ctx.cloudAgentAuthority) {
+        request.cloudAgentSpawn = { parentSessionId: ctx.cloudAgentAuthority.parentSessionId };
+        request.options = { ...request.options, createdOnPlatform: 'cloud-agent' };
+      } else if (input.parentCloudAgentSessionId !== undefined) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Parent lineage requires scoped Cloud Agent authority',
+        });
+      }
       const requestWithProfile = await preflightSessionCreation(
-        prepareInputToSessionCreateRequest(input),
+        request,
         ctx,
         'prepareSession',
         resolvedRequest => {
@@ -202,6 +225,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
         userId: ctx.userId,
         authToken: ctx.authToken,
         botId: ctx.botId,
+        cloudAgentAuthority: ctx.cloudAgentAuthority,
       };
       const billingOrigin = { billingOrigin: input.createdOnPlatform };
       // Admit into the operation ledger only when the client supplied an

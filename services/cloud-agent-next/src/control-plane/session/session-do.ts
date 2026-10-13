@@ -8,6 +8,17 @@ import {
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
+  authorizeCloudAgentChild,
+  issueCloudAgentMcpGrant,
+  assertCloudAgentParentAuthority,
+  assertCloudAgentIssuedGrant,
+  CLOUD_AGENT_MCP_GRANT_KEY,
+} from '../../cloud-agent-authority.js';
+import {
+  CloudAgentAuthoritySchema,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
+import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
   type CloudAgentChildSessionLineage,
@@ -769,6 +780,101 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return this.metadata;
   }
 
+  private async cloudAgentParentIsLive(requireReady: boolean): Promise<boolean> {
+    const metadata = this.metadata;
+    const registration = this.registration;
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    if (!metadata || !registration || !kiloSessionId) return false;
+    const peer = this.sandboxPeerFor(registration.sandboxId);
+    if (!peer) return false;
+    const fence = await withDORetry(
+      () => this.sandboxPeerFor(registration.sandboxId) ?? peer,
+      stub =>
+        stub.getRuntimeCredentialProxyFence({
+          ownerId: metadata.identity.userId,
+          sessionId: metadata.identity.sessionId,
+          kiloSessionId,
+          directory: registration.spec.directory,
+        }),
+      'cloudAgentParentFence'
+    );
+    if (!fence) return false;
+    return (
+      !requireReady ||
+      (
+        await withDORetry(
+          () => this.sandboxPeerFor(registration.sandboxId) ?? peer,
+          stub => stub.status({ sessionId: metadata.identity.sessionId }),
+          'cloudAgentParentStatus'
+        )
+      ).view.state === 'ready'
+    );
+  }
+
+  async getCloudAgentSpawnRuntimeToken(authority: CloudAgentAuthority): Promise<string> {
+    await this.initialized;
+    const scope = CloudAgentAuthoritySchema.parse(authority);
+    const authorization = RuntimeAuthorizationSchema.parse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    assertCloudAgentIssuedGrant(
+      await this.ctx.storage.get<unknown>(CLOUD_AGENT_MCP_GRANT_KEY),
+      authorization,
+      scope
+    );
+    assertCloudAgentParentAuthority(this.metadata, authorization, scope);
+    if (!(await this.cloudAgentParentIsLive(true)))
+      throw new Error('Cloud Agent parent is not live');
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    const issued = await renewRuntimeAuthorization({
+      authorization,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+    });
+    const current = RuntimeAuthorizationSchema.parse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    assertCloudAgentParentAuthority(this.metadata, current, scope);
+    if (current.id !== authorization.id) throw new Error('Cloud Agent parent authority changed');
+    return issued.token;
+  }
+
+  async authorizeCloudAgentChild(input: {
+    authority: CloudAgentAuthority;
+    childSessionId: string;
+  }): Promise<{ token: string; seal: string }> {
+    await this.initialized;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return authorizeCloudAgentChild({
+      ...input,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      live: () => this.cloudAgentParentIsLive(true),
+      grant: () => this.ctx.storage.get<unknown>(CLOUD_AGENT_MCP_GRANT_KEY),
+    });
+  }
+
+  async issueCloudAgentMcpGrant(): Promise<
+    { url: string; token: string; expiresAt: number } | undefined
+  > {
+    await this.initialized;
+    if (!this.metadata?.cloudAgentSpawn?.policy) return undefined;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Authentication unavailable');
+    return issueCloudAgentMcpGrant({
+      storage: this.ctx.storage,
+      secret,
+      connectionString: this.env.HYPERDRIVE.connectionString,
+      metadata: () => this.getMetadata(),
+      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      live: () => this.cloudAgentParentIsLive(false),
+    });
+  }
+
   /**
    * H4/R1: mints and persists the runtime credential proxy handle for a connected
    * route. The Sandbox DO reads its own allocation fence and passes it in, so this
@@ -894,6 +1000,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return (
       existing.identity.userId === metadata.identity.userId &&
       (existing.identity.orgId ?? null) === (metadata.identity.orgId ?? null) &&
+      JSON.stringify(existing.cloudAgentSpawn ?? null) ===
+        JSON.stringify(metadata.cloudAgentSpawn ?? null) &&
       sameRepository(existing.repository, metadata.repository) &&
       this.registration.sandboxId === metadata.workspace?.sandboxId &&
       (existing.initialMessage?.id ?? null) === (messageId ?? null) &&

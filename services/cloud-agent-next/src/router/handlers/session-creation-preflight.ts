@@ -19,6 +19,10 @@ import { assertRepositoryAccessBeforeSessionCreation } from '../../session/valid
 import type { TRPCContext } from '../../types.js';
 import { isBuiltinMode } from '../schemas.js';
 import { assertOrganizationMembership } from './organization-membership.js';
+import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
+import { withDORetry } from '../../utils/do-retry.js';
+import { validateBalanceOnly } from '../../balance-validation.js';
+import { timingSafeEqual } from '@kilocode/encryption';
 
 const IMPLICIT_PROFILE_RESOLUTION_ORIGINS: ReadonlySet<string> = new Set([
   'cloud-agent-web',
@@ -162,7 +166,11 @@ export function assertModeAvailableForProfile(mode: string, profile: SessionProf
   });
 }
 
-type SessionCreationContext = Pick<TRPCContext, 'env' | 'userId' | 'authToken'>;
+type SessionCreationContext = Pick<
+  TRPCContext,
+  'env' | 'userId' | 'authToken' | 'cloudAgentAuthority'
+> &
+  Partial<Pick<TRPCContext, 'request'>>;
 type EndpointValidator = (request: SessionCreateRequest) => void | Promise<void>;
 
 export async function preflightSessionCreation(
@@ -171,6 +179,49 @@ export async function preflightSessionCreation(
   procedure: string,
   validateEndpoint?: EndpointValidator
 ): Promise<SessionCreateRequest> {
+  if (ctx.cloudAgentAuthority) {
+    const authority = ctx.cloudAgentAuthority;
+    if (
+      request.cloudAgentSpawn?.parentSessionId !== authority.parentSessionId ||
+      request.cloudAgentSpawn.policy !== undefined ||
+      authority.ownerId !== ctx.userId ||
+      (request.options?.kilocodeOrganizationId ?? null) !== authority.organizationId
+    ) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Cloud Agent parent binding mismatch' });
+    }
+    let token: string;
+    try {
+      token = await withDORetry(
+        () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId),
+        stub => stub.getCloudAgentSpawnRuntimeToken(authority),
+        'getCloudAgentSpawnRuntimeToken'
+      );
+    } catch {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Cloud Agent parent authorization unavailable',
+      });
+    }
+    const internalApiKey = ctx.request?.headers.get('x-internal-api-key');
+    const skipBalance =
+      ctx.request?.headers.get('x-skip-balance-check') === 'true' &&
+      typeof ctx.env.INTERNAL_API_SECRET === 'string' &&
+      internalApiKey !== undefined &&
+      internalApiKey !== null &&
+      timingSafeEqual(internalApiKey, ctx.env.INTERNAL_API_SECRET);
+    if (!skipBalance) {
+      const balance = await validateBalanceOnly(
+        token,
+        authority.organizationId ?? undefined,
+        ctx.env
+      );
+      if (!balance.success)
+        throw new TRPCError({
+          code: balance.status === 402 ? 'PAYMENT_REQUIRED' : 'INTERNAL_SERVER_ERROR',
+          message: balance.message,
+        });
+    }
+  }
   const organizationId = request.options?.kilocodeOrganizationId;
   let db: WorkerDb | undefined;
   if (organizationId) {

@@ -1045,6 +1045,34 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
       })
     );
   });
+
+  it('never copies parent opt-in or delegated lineage when copying a session profile to a sibling', async () => {
+    for (const cloudAgentSpawn of [
+      {
+        policy: {
+          procedures: ['cloudAgentNext.prepareSession' as const],
+          repositories: ['acme/repo'],
+          models: ['test-model'],
+          remainingDepth: 1 as const,
+        },
+      },
+      { parentSessionId: SOURCE_WORKSPACE_ID },
+    ]) {
+      const metadata = { ...sourceMetadata(), cloudAgentSpawn };
+      const { caller, input, destinationStub } = fixture({ metadata });
+      if ('policy' in cloudAgentSpawn) {
+        await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+        });
+        expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+        continue;
+      }
+      await caller.createWorktreeChat(input);
+      const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
+      expect(registration?.metadata.profile?.envVars).toEqual(metadata.profile?.envVars);
+      expect(registration?.metadata.cloudAgentSpawn).toBeUndefined();
+    }
+  });
 });
 
 describe('createWorktreeChat operation-ledger replay and conflict handling', () => {

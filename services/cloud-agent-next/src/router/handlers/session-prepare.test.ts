@@ -9,6 +9,7 @@
  * covered by `src/session/session-prepare.test.ts`.
  */
 import { TRPCError } from '@trpc/server';
+import jwt from 'jsonwebtoken';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
 
@@ -28,8 +29,10 @@ const {
   registerNewSessionMock,
   startNewSessionMock,
   createSessionWithLedgerMock,
+  parentRuntimeTokenMock,
 } = vi.hoisted(() => ({
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
+  parentRuntimeTokenMock: vi.fn().mockResolvedValue('trusted-parent-model-token'),
   assertKiloModelAvailableMock: vi.fn().mockResolvedValue(undefined),
   assertBitbucketRepositoryAccessMock: vi.fn().mockResolvedValue(undefined),
   assertOrganizationMembershipMock: vi.fn().mockResolvedValue(undefined),
@@ -90,6 +93,13 @@ vi.mock('../../session/session-registration.js', () => ({
   registerNewSession: registerNewSessionMock,
   startNewSession: startNewSessionMock,
   createSessionWithLedger: createSessionWithLedgerMock,
+}));
+
+vi.mock('../../sandbox-session/session-stub.js', () => ({
+  getSandboxSessionStub: () => ({ getCloudAgentSpawnRuntimeToken: parentRuntimeTokenMock }),
+}));
+vi.mock('../../balance-validation.js', () => ({
+  validateBalanceOnly: vi.fn(async () => ({ success: true })),
 }));
 
 const handlers = createSessionPrepareHandlers();
@@ -190,6 +200,113 @@ describe('prepareSession operation-ledger admission gate', () => {
         startedAt: expect.any(Number),
       })
     );
+    expect(startNewSessionMock).not.toHaveBeenCalled();
+    expect(registerNewSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps opt-in grouped separately from profile and does not enable ordinary sessions', async () => {
+    const caller = router.createCaller(createContext());
+    const cloudAgentSpawn = {
+      procedures: ['cloudAgentNext.prepareSession' as const],
+      repositories: ['acme/repo'],
+      models: ['kilo/test-model'],
+      remainingDepth: 1 as const,
+    };
+    await caller.prepareSession({
+      prompt: 'parent',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      cloudAgentSpawn,
+    });
+    expect(startNewSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSpawn: { policy: cloudAgentSpawn } }),
+      expect.anything(),
+      expect.anything()
+    );
+    const optedIn = startNewSessionMock.mock.calls[0][0];
+    expect(optedIn.profile).not.toHaveProperty('cloudAgentSpawn');
+    await caller.prepareSession({
+      prompt: 'ordinary',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+    });
+    expect(startNewSessionMock.mock.calls[1][0].cloudAgentSpawn).toBeUndefined();
+  });
+
+  it('stores verified child lineage and forces a profile-free origin without granting child spawn authority', async () => {
+    const context = createContext();
+    context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
+    context.cloudAgentAuthority = {
+      version: 1,
+      ownerId: context.userId ?? 'user-123',
+      parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+      organizationId: null,
+      procedures: ['cloudAgentNext.prepareSession'],
+      repositories: ['acme/repo'],
+      models: ['kilo/test-model'],
+      remainingDepth: 1,
+      expiresAt: Math.floor(Date.now() / 1000) + 900,
+    };
+    const caller = router.createCaller(context);
+    await caller.prepareSession({
+      prompt: 'child',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      createdOnPlatform: 'cloud-agent-web',
+      parentCloudAgentSessionId: context.cloudAgentAuthority.parentSessionId,
+    });
+    const [request, registration] = startNewSessionMock.mock.calls[0];
+    expect(request.cloudAgentSpawn).toEqual({
+      parentSessionId: context.cloudAgentAuthority.parentSessionId,
+    });
+    expect(request.cloudAgentSpawn.policy).toBeUndefined();
+    expect(request.options.createdOnPlatform).toBe('cloud-agent');
+    expect(registration.cloudAgentAuthority).toEqual(context.cloudAgentAuthority);
+  });
+
+  it('rejects unsafe opt-in and unscoped parent lineage before creation', async () => {
+    const caller = router.createCaller(createContext());
+    const cloudAgentSpawn = {
+      procedures: ['cloudAgentNext.prepareSession' as const],
+      repositories: ['acme/repo'],
+      models: ['kilo/test-model'],
+      remainingDepth: 1 as const,
+    };
+    const launch = {
+      prompt: 'parent',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      cloudAgentSpawn,
+    };
+    for (const override of [
+      { autoInitiate: false },
+      { envVars: { TOKEN: 'account-token' } },
+      { mcpServers: {} },
+      { profileId: '12345678-1234-4234-8234-123456789abc' },
+      { initialPayload: { type: 'command' as const, command: 'run', arguments: '' } },
+    ]) {
+      await expect(caller.prepareSession({ ...launch, ...override })).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+    }
+    await expect(
+      caller.prepareSession({
+        prompt: 'child',
+        mode: 'code',
+        model: 'kilo/test-model',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        parentCloudAgentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(startNewSessionMock).not.toHaveBeenCalled();
     expect(registerNewSessionMock).not.toHaveBeenCalled();
   });

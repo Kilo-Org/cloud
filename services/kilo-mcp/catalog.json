@@ -6830,6 +6830,57 @@
                 },
                 "cloneFromKiloSessionId": {},
                 "cloneUpToMessageId": {},
+                "cloudAgentSpawn": {
+                  "type": "object",
+                  "properties": {
+                    "procedures": {
+                      "minItems": 1,
+                      "maxItems": 2,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "cloudAgentNext.prepareSession",
+                          "organizations.cloudAgentNext.prepareSession"
+                        ]
+                      }
+                    },
+                    "repositories": {
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?\\/[a-z0-9._-]{1,100}$"
+                      }
+                    },
+                    "models": {
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      }
+                    },
+                    "remainingDepth": {
+                      "type": "number",
+                      "const": 1
+                    }
+                  },
+                  "required": [
+                    "procedures",
+                    "repositories",
+                    "models",
+                    "remainingDepth"
+                  ],
+                  "additionalProperties": false
+                },
+                "parentCloudAgentSessionId": {
+                  "type": "string",
+                  "minLength": 1
+                },
                 "githubRepo": {
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -7318,6 +7369,57 @@
                   "type": "string",
                   "format": "uuid",
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "cloudAgentSpawn": {
+                  "type": "object",
+                  "properties": {
+                    "procedures": {
+                      "minItems": 1,
+                      "maxItems": 2,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "cloudAgentNext.prepareSession",
+                          "organizations.cloudAgentNext.prepareSession"
+                        ]
+                      }
+                    },
+                    "repositories": {
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?\\/[a-z0-9._-]{1,100}$"
+                      }
+                    },
+                    "models": {
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      }
+                    },
+                    "remainingDepth": {
+                      "type": "number",
+                      "const": 1
+                    }
+                  },
+                  "required": [
+                    "procedures",
+                    "repositories",
+                    "models",
+                    "remainingDepth"
+                  ],
+                  "additionalProperties": false
+                },
+                "parentCloudAgentSessionId": {
+                  "type": "string",
+                  "minLength": 1
                 },
                 "githubRepo": {
                   "type": "string",
@@ -19646,6 +19748,57 @@
                     },
                     "cloneFromKiloSessionId": {},
                     "cloneUpToMessageId": {},
+                    "cloudAgentSpawn": {
+                      "type": "object",
+                      "properties": {
+                        "procedures": {
+                          "minItems": 1,
+                          "maxItems": 2,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "cloudAgentNext.prepareSession",
+                              "organizations.cloudAgentNext.prepareSession"
+                            ]
+                          }
+                        },
+                        "repositories": {
+                          "minItems": 1,
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?\\/[a-z0-9._-]{1,100}$"
+                          }
+                        },
+                        "models": {
+                          "minItems": 1,
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          }
+                        },
+                        "remainingDepth": {
+                          "type": "number",
+                          "const": 1
+                        }
+                      },
+                      "required": [
+                        "procedures",
+                        "repositories",
+                        "models",
+                        "remainingDepth"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "parentCloudAgentSessionId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
                     "githubRepo": {
                       "type": "string",
                       "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -20134,6 +20287,57 @@
                       "type": "string",
                       "format": "uuid",
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "cloudAgentSpawn": {
+                      "type": "object",
+                      "properties": {
+                        "procedures": {
+                          "minItems": 1,
+                          "maxItems": 2,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "cloudAgentNext.prepareSession",
+                              "organizations.cloudAgentNext.prepareSession"
+                            ]
+                          }
+                        },
+                        "repositories": {
+                          "minItems": 1,
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?\\/[a-z0-9._-]{1,100}$"
+                          }
+                        },
+                        "models": {
+                          "minItems": 1,
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          }
+                        },
+                        "remainingDepth": {
+                          "type": "number",
+                          "const": 1
+                        }
+                      },
+                      "required": [
+                        "procedures",
+                        "repositories",
+                        "models",
+                        "remainingDepth"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "parentCloudAgentSessionId": {
+                      "type": "string",
+                      "minLength": 1
                     },
                     "githubRepo": {
                       "type": "string",

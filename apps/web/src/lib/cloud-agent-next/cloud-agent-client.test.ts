@@ -398,6 +398,42 @@ describe('CloudAgentNextClient saved worktree files', () => {
   );
 });
 
+describe('CloudAgentNextClient scoped launch fields', () => {
+  it('forwards explicit parent opt-in and scoped child lineage without adding child spawn policy', async () => {
+    const common = {
+      githubRepo: 'acme/repo',
+      prompt: 'Launch a task',
+      mode: 'code',
+      model: 'kilo/test-model',
+      autoInitiate: true,
+    };
+    const inputs: PrepareSessionInput[] = [
+      {
+        ...common,
+        cloudAgentSpawn: {
+          procedures: ['cloudAgentNext.prepareSession'],
+          repositories: ['acme/repo'],
+          models: ['kilo/test-model'],
+          remainingDepth: 1,
+        },
+      },
+      { ...common, parentCloudAgentSessionId: 'workspace_parent' },
+    ];
+    for (const input of inputs) {
+      const mutate = jest
+        .fn<CloudAgentClientModule.CloudAgentNextClient['prepareSession']>()
+        .mockResolvedValue({
+          kiloSessionId: 'ses_12345678901234567890123456',
+          cloudAgentSessionId: 'workspace_child',
+        });
+      mockCreateTRPCClient.mockReturnValueOnce({ prepareSession: { mutate } });
+      await new CloudAgentNextClient('scoped-control-token').prepareSession(input);
+      expect(mutate).toHaveBeenCalledWith(input);
+    }
+    expect(inputs[1].cloudAgentSpawn).toBeUndefined();
+  });
+});
+
 describe('createCloudAgentNextClientForModel', () => {
   it('returns the default client when the model is paid and has no BYOK', () => {
     const result = createCloudAgentNextClientForModel('token', {

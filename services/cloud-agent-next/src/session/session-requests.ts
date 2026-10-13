@@ -1,4 +1,5 @@
 import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
+import type { CloudAgentSpawnPolicy } from '@kilocode/worker-utils/cloud-agent-authority';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type {
   AgentSelection,
@@ -51,6 +52,7 @@ export type SessionRuntimeIntent = {
 };
 
 export type SessionCreateRequest = {
+  cloudAgentSpawn?: { policy?: CloudAgentSpawnPolicy; parentSessionId?: string };
   /** Omitted for a clone-only create: the copied transcript is the session state. */
   initialTurn?: ExecutionTurnSubmission;
   agent: AgentSelection;

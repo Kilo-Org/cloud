@@ -660,6 +660,57 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle ?? '')).not.toBeNull();
   });
 
+  it('delivers a private scoped MCP grant separately from model aliases and never in launch env or persisted route specs', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createProvider();
+    const sandbox = await installSandbox(sandboxId, provider);
+    const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+    const mcpGrant = {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'private-scoped-mcp-fixture',
+      expiresAt: Math.floor(Date.now() / 1000) + 900,
+    };
+    const sessionStub = sessions.getByName(sessionDoName(USER_ID, sessionId));
+    await runInDurableObject(sandbox, instance => {
+      const peerFor = instance.sessionPeerFor.bind(instance);
+      instance.sessionPeerFor = (ownerId, id) => {
+        const peer = peerFor(ownerId, id);
+        if (!peer) return null;
+        return {
+          onRoute: update => peer.onRoute(update),
+          onEvents: notification => peer.onEvents(notification),
+          onOutcome: outcome => peer.onOutcome(outcome),
+          issueRuntimeCredentialProxyGrant: fence => peer.issueRuntimeCredentialProxyGrant(fence),
+          issueCloudAgentMcpGrant: async () => mcpGrant,
+        };
+      };
+    });
+    await createVercelSession({
+      sessionId,
+      kiloId: kiloSessionId(),
+      sandboxId,
+      kiloToken: token,
+      seal,
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+    await wrapper.hello({ wrapperId: 'wr_scoped', allocationId });
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.credentials.cloudAgentMcp).toEqual(mcpGrant);
+    expect(frame.credentials.proxy?.handle).toEqual(expect.any(String));
+    expect(frame.credentials.kilo.token).not.toBe(mcpGrant.token);
+    expect(JSON.stringify(frame.spec)).not.toContain(mcpGrant.token);
+    expect(JSON.stringify(provider.launchEnvs)).not.toContain(mcpGrant.token);
+    await runInDurableObject(sandbox, instance => {
+      const db = drizzle(instance.ctx.storage);
+      expect(JSON.stringify(db.select().from(routesTable).all())).not.toContain(mcpGrant.token);
+    });
+    expect(JSON.stringify(await sessionStub.getMetadata())).not.toContain(mcpGrant.token);
+  });
+
   it.each(['before request', 'during token resolution'] as const)(
     'authorizes the model facade while disconnected %s and completes after same-wrapper reconnect',
     async disconnectAt => {

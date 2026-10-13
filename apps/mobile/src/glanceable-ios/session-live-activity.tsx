@@ -884,6 +884,25 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     if (notice !== null) {
       return text(notice, size, scheme.warn, 'semibold');
     }
+    // A failed card spends the line on its stop reason alone, which must
+    // read in full; its counts, diff and cost stay in the expanded island.
+    if (kind === 'failed') {
+      return (
+        <HStack alignment="center" spacing={0}>
+          <Text
+            modifiers={[
+              font({ size, weight: 'semibold' }),
+              lineLimit(1),
+              foregroundStyle(scheme.warn),
+              layoutPriority(1),
+            ]}
+          >
+            {failureText}
+          </Text>
+          <Spacer minLength={0} />
+        </HStack>
+      );
+    }
     // A permission wait spends the line on the command Approve answers.
     const permission = kind === 'needsInput' && (props.permissionCommand ?? '').trim().length > 0;
     const lead = leadFact(scheme, size);

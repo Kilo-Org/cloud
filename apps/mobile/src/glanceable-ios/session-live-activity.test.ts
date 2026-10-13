@@ -219,7 +219,6 @@ describe('session card layout: states', () => {
         plan,
         scheduledAt: new Date(Date.now() + 90 * 60_000).toISOString(),
       },
-      { ...BASE, statusKind: 'failed', plan, failure: { kind: 'other' } },
       // A finished card keeps its plan progress (spec "Content" rule 6).
       {
         ...BASE,
@@ -236,6 +235,11 @@ describe('session card layout: states', () => {
     }
     // The expanded island: the bar and its count once, for a working card.
     expect(counts(render({ ...BASE, plan }).expandedBottom)).toEqual({ totals: 1, bars: 1 });
+    // A failed card keeps its Lock Screen row for the stop reason; its plan
+    // count is in the expanded island, once.
+    const failed: State = { ...BASE, statusKind: 'failed', plan, failure: { kind: 'other' } };
+    expect(counts(render(failed).banner)).toEqual({ totals: 0, bars: 0 });
+    expect(texts(render(failed).expandedBottom).filter(value => value === '3/7')).toHaveLength(1);
   });
 
   it('shows the last-known time when a card in another state is out of date', () => {
@@ -373,7 +377,9 @@ describe('session card layout: states', () => {
         costMicrodollars: 120_000,
       }).banner
     );
-    expect(stopped).toContain('$0.12');
+    // A failed card keeps its cost in the expanded island: its Lock Screen
+    // detail row is the stop reason alone.
+    expect(stopped).not.toContain('$0.12');
   });
 
   it('shows the stop reason and the files changed when the turn failed', () => {
@@ -386,10 +392,29 @@ describe('session card layout: states', () => {
       plan: { done: 2, total: 5, current: null },
     });
     const shown = texts(banner);
+    // The stop reason has the detail row alone, so it reads in full; the
+    // counts and the diff move to the expanded island for this state.
     expect(shown).toContain('Stopped: provider error');
-    expect(shown).toContain('2');
-    expect(shown).toContain('5');
-    expect(shown).toContain('+12');
+    expect(shown).not.toContain('of');
+    expect(shown).not.toContain('+12');
+    expect(shown).not.toContain('−4');
+    expect(shown.some(value => value.startsWith('$'))).toBe(false);
+    const reason = collect(banner).find(item => item.props.children === 'Stopped: provider error');
+    expect(
+      ((reason?.props.modifiers ?? []) as { $type: string }[]).map(modifier => modifier.$type)
+    ).toContain('layoutPriority');
+    const island = texts(
+      render({
+        ...BASE,
+        statusKind: 'failed',
+        statusSince: new Date().toISOString(),
+        failure: { kind: 'provider' },
+        changes: { files: 3, added: 12, removed: 4 },
+        plan: { done: 2, total: 5, current: null },
+      }).expandedBottom
+    );
+    expect(island).toContain('+12');
+    expect(island).toContain('2/5');
     // The card names when it stopped, like every other state (spec "Content" rule 3).
     expect(collect(banner).some(item => item.props.dateStyle === 'time')).toBe(true);
   });

@@ -84,6 +84,10 @@ import { WorktreeReviewDialog } from './WorktreeReviewDialog';
 import { useWorktreeReview } from './useWorktreeReview';
 import { selectTerminalOwner } from './terminal-owner';
 import type { WorktreeReviewComment } from './worktree-review';
+import {
+  worktreeFileIdentity,
+  type WorktreeFileQuery,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { canOpenWorktreeChanges } from './worktree-changes';
 import {
@@ -1141,7 +1145,11 @@ export default function CloudChatPage({
     if (!workspaceCloudSessionId) return counts;
     for (const comment of review.draft?.comments ?? []) {
       if (comment.anchor.capture.sourceCloudAgentSessionId !== workspaceCloudSessionId) continue;
-      counts.set(comment.anchor.path, (counts.get(comment.anchor.path) ?? 0) + 1);
+      const identity = worktreeFileIdentity({
+        path: comment.anchor.path,
+        scope: comment.anchor.capture.scope,
+      });
+      counts.set(identity, (counts.get(identity) ?? 0) + 1);
     }
     return counts;
   }, [review.draft?.comments, workspaceCloudSessionId]);
@@ -1152,6 +1160,7 @@ export default function CloudChatPage({
     kiloSessionId: string;
     cloudAgentSessionId: string;
     path: string;
+    scope?: WorktreeFileQuery['scope'];
   } | null>(null);
   const handleOpenReviewComment = (comment: WorktreeReviewComment) => {
     if (!review.scope || review.locked) return;
@@ -1164,7 +1173,12 @@ export default function CloudChatPage({
     if (source.sessionId === sessionIdFromParams && canOpenChanges) {
       closeChangesView();
       setWorkspaceTabs(state =>
-        setFileTabMode(openFileTab(state, comment.anchor.path), comment.anchor.path, 'diff')
+        setFileTabMode(
+          openFileTab(state, comment.anchor.path, comment.anchor.capture.scope),
+          comment.anchor.path,
+          'diff',
+          comment.anchor.capture.scope
+        )
       );
     } else {
       reviewAgainFile.current = {
@@ -1172,6 +1186,7 @@ export default function CloudChatPage({
         kiloSessionId: source.sessionId,
         cloudAgentSessionId: source.cloudAgentSessionId,
         path: comment.anchor.path,
+        scope: comment.anchor.capture.scope,
       };
       openSession(source.sessionId);
     }
@@ -1194,7 +1209,9 @@ export default function CloudChatPage({
     )
       return;
     reviewAgainFile.current = null;
-    setWorkspaceTabs(state => setFileTabMode(openFileTab(state, file.path), file.path, 'diff'));
+    setWorkspaceTabs(state =>
+      setFileTabMode(openFileTab(state, file.path, file.scope), file.path, 'diff', file.scope)
+    );
   }, [
     canOpenChanges,
     currentUserId,
@@ -1206,8 +1223,8 @@ export default function CloudChatPage({
   ]);
 
   const handleCloseFileTab = useCallback(
-    (path: string) => {
-      setWorkspaceTabs(state => closeFileTab(state, path));
+    (path: string, scope?: WorktreeFileQuery['scope']) => {
+      setWorkspaceTabs(state => closeFileTab(state, path, scope));
     },
     [setWorkspaceTabs]
   );
@@ -2171,7 +2188,7 @@ export default function CloudChatPage({
                     {filesVisible &&
                       workspaceCloudSessionId &&
                       workspaceTabs.files.map(tab => {
-                        const tabId = fileTabId(tab.path);
+                        const tabId = fileTabId(tab.path, tab.scope);
                         const active = activeWorkspaceTabId === tabId;
                         return (
                           <TabsContent key={tabId} value={tabId} className="m-0 min-h-0 flex-1">
@@ -2180,11 +2197,14 @@ export default function CloudChatPage({
                                 cloudAgentSessionId={workspaceCloudSessionId}
                                 organizationId={organizationId}
                                 path={tab.path}
+                                scope={tab.scope}
                                 mode={tab.mode}
                                 review={review.scope ? review.bindings : undefined}
                                 reviewScope={review.scope ?? undefined}
                                 onModeChange={mode =>
-                                  setWorkspaceTabs(state => setFileTabMode(state, tab.path, mode))
+                                  setWorkspaceTabs(state =>
+                                    setFileTabMode(state, tab.path, mode, tab.scope)
+                                  )
                                 }
                               />
                             )}

@@ -1,3 +1,5 @@
+import type { WorktreeFileQuery } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+
 export const CHAT_TAB_ID = 'chat' as const;
 
 export type TerminalTabId = `terminal:${string}`;
@@ -14,6 +16,7 @@ export type TerminalWorkspaceTab = {
 
 export type FileWorkspaceTab = {
   path: string;
+  scope?: WorktreeFileQuery['scope'];
   mode?: WorktreeFileViewMode;
 };
 
@@ -28,8 +31,10 @@ export function terminalTabId(terminalId: string): TerminalTabId {
   return `terminal:${terminalId}`;
 }
 
-export function fileTabId(path: string): FileTabId {
-  return `file:${encodeURIComponent(path)}`;
+export function fileTabId(path: string, scope?: FileWorkspaceTab['scope']): FileTabId {
+  return scope === undefined
+    ? `file:${encodeURIComponent(path)}`
+    : `file:${scope}:${encodeURIComponent(path)}`;
 }
 
 export function terminalIdFromTabId(tabId: WorkspaceTabId): string | null {
@@ -83,26 +88,37 @@ export function addTerminalTab(
   };
 }
 
-export function openFileTab(state: WorkspaceTabsState, path: string): WorkspaceTabsState {
-  const activeTabId = fileTabId(path);
-  if (state.files.some(tab => tab.path === path)) {
+export function openFileTab(
+  state: WorkspaceTabsState,
+  path: string,
+  scope?: FileWorkspaceTab['scope']
+): WorkspaceTabsState {
+  const activeTabId = fileTabId(path, scope);
+  if (state.files.some(tab => tab.path === path && tab.scope === scope)) {
     return state.activeTabId === activeTabId ? state : { ...state, activeTabId };
   }
 
-  return { ...state, activeTabId, files: [...state.files, { path }] };
+  return {
+    ...state,
+    activeTabId,
+    files: [...state.files, { path, ...(scope === undefined ? {} : { scope }) }],
+  };
 }
 
 export function setFileTabMode(
   state: WorkspaceTabsState,
   path: string,
-  mode: WorktreeFileViewMode
+  mode: WorktreeFileViewMode,
+  scope?: FileWorkspaceTab['scope']
 ): WorkspaceTabsState {
-  const file = state.files.find(tab => tab.path === path);
+  const file = state.files.find(tab => tab.path === path && tab.scope === scope);
   if (!file || file.mode === mode) return state;
 
   return {
     ...state,
-    files: state.files.map(tab => (tab.path === path ? { ...tab, mode } : tab)),
+    files: state.files.map(tab =>
+      tab.path === path && tab.scope === scope ? { ...tab, mode } : tab
+    ),
   };
 }
 
@@ -116,8 +132,8 @@ export function selectWorkspaceTab(
   const terminal = state.terminals.find(tab => terminalTabId(tab.id) === activeTabId);
   if (terminal) return { ...state, activeTabId: terminalTabId(terminal.id) };
 
-  const file = state.files.find(tab => fileTabId(tab.path) === activeTabId);
-  return file ? { ...state, activeTabId: fileTabId(file.path) } : state;
+  const file = state.files.find(tab => fileTabId(tab.path, tab.scope) === activeTabId);
+  return file ? { ...state, activeTabId: fileTabId(file.path, file.scope) } : state;
 }
 
 function activeTabAfterClose(
@@ -128,7 +144,7 @@ function activeTabAfterClose(
 
   const tabIds = [
     ...state.terminals.map(tab => terminalTabId(tab.id)),
-    ...state.files.map(tab => fileTabId(tab.path)),
+    ...state.files.map(tab => fileTabId(tab.path, tab.scope)),
   ];
   const closedIndex = tabIds.indexOf(closedTabId);
   return tabIds[closedIndex - 1] ?? tabIds[closedIndex + 1] ?? CHAT_TAB_ID;
@@ -150,12 +166,16 @@ export function closeTerminalTab(
   };
 }
 
-export function closeFileTab(state: WorkspaceTabsState, path: string): WorkspaceTabsState {
-  if (!state.files.some(tab => tab.path === path)) return state;
+export function closeFileTab(
+  state: WorkspaceTabsState,
+  path: string,
+  scope?: FileWorkspaceTab['scope']
+): WorkspaceTabsState {
+  if (!state.files.some(tab => tab.path === path && tab.scope === scope)) return state;
 
   return {
     ...state,
-    activeTabId: activeTabAfterClose(state, fileTabId(path)),
-    files: state.files.filter(tab => tab.path !== path),
+    activeTabId: activeTabAfterClose(state, fileTabId(path, scope)),
+    files: state.files.filter(tab => tab.path !== path || tab.scope !== scope),
   };
 }

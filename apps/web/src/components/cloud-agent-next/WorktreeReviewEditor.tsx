@@ -140,7 +140,12 @@ export function WorktreeReviewEditor({
     replace(file.path, next);
   }, [diff, file, renderStatus, review.comments, stableCapture, unavailableReason]);
   useEffect(() => {
-    if (!editor || editor.anchor.path !== file.path) return;
+    if (
+      !editor ||
+      editor.anchor.path !== file.path ||
+      editor.anchor.capture.scope !== stableCapture.scope
+    )
+      return;
     if (sameWorktreeReviewCapture(editor.anchor.capture, stableCapture)) return;
     if (renderStatus !== 'ready') return;
     if (!diff || unavailableReason) return;

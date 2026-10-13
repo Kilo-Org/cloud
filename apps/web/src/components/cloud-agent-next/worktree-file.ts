@@ -3,6 +3,7 @@ import type {
   WorktreeChangesSnapshot,
   WorktreeFileOmissionReason,
   WorktreeFileRecord,
+  WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { WorktreeFileViewMode } from './workspace-tabs';
 
@@ -10,9 +11,24 @@ export type SavedWorktreeFileState =
   | Extract<GetWorktreeFileOutput, { status: 'available' | 'omitted' }>
   | { status: 'loading' | 'error' | 'stale' | 'not_captured' | 'no_longer_listed' };
 
+export function selectSavedWorktreeFile(
+  snapshot: WorktreeChangesSnapshot | null | undefined,
+  path: string,
+  scope?: WorktreeFileQuery['scope']
+) {
+  if (scope !== undefined)
+    return snapshot?.files.find(file => file.path === path && file.scope === scope);
+  return (
+    snapshot?.files.find(file => file.path === path && file.scope === 'uncommitted') ??
+    snapshot?.files.find(file => file.path === path && file.scope === 'against-base-branch') ??
+    snapshot?.files.find(file => file.path === path)
+  );
+}
+
 export function getSavedWorktreeFileState({
   snapshot,
   path,
+  scope,
   selectedEntry,
   result,
   summaryError,
@@ -20,6 +36,7 @@ export function getSavedWorktreeFileState({
 }: {
   snapshot: WorktreeChangesSnapshot | null | undefined;
   path: string;
+  scope?: WorktreeFileQuery['scope'];
   selectedEntry: WorktreeChangesSnapshot['files'][number] | undefined;
   result: GetWorktreeFileOutput | undefined;
   summaryError: boolean;
@@ -28,11 +45,17 @@ export function getSavedWorktreeFileState({
   if (summaryError) return { status: 'error' };
   if (snapshot === undefined) return { status: 'loading' };
   if (snapshot === null) return { status: 'not_captured' };
-  if (!selectedEntry || selectedEntry.path !== path) return { status: 'no_longer_listed' };
+  if (
+    !selectedEntry ||
+    selectedEntry.path !== path ||
+    (scope !== undefined && selectedEntry.scope !== scope)
+  )
+    return { status: 'no_longer_listed' };
   if (fileError) return { status: 'error' };
   if (!result) return { status: 'loading' };
   if (result.status === 'available' || result.status === 'omitted') {
-    if (result.file.path !== path) return { status: 'error' };
+    if (result.file.path !== path || result.file.scope !== selectedEntry.scope)
+      return { status: 'error' };
     if (result.file.revision !== selectedEntry.revision) return { status: 'stale' };
     return result;
   }

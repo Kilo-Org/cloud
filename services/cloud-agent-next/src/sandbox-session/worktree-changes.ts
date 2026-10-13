@@ -4,7 +4,9 @@ import {
   finalizeWorktreeChangesSnapshot,
   worktreeChangesCaptureSchema,
   worktreeChangesSnapshotSchema,
+  worktreeChangesRevisionSchema,
   worktreeFileQuerySchema,
+  worktreeFileIdentity,
   worktreeFileRecordSchema,
   worktreeSnapshotCaptureSchema,
   type GetWorktreeChangesOutput,
@@ -13,6 +15,7 @@ import {
   type WorktreeChangesCaptureRequest,
   type WorktreeChangesSnapshot,
   type WorktreeFileRecord,
+  type WorktreeFileQuery,
   type WorktreeSnapshotCapture,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
@@ -27,6 +30,14 @@ import {
 
 export const WORKTREE_CHANGES_KEY = 'worktree_changes';
 export const WORKTREE_FILE_PREFIX = 'worktree_file:';
+export const WORKTREE_RECOVERY_KEY = 'worktree_recovery';
+
+const worktreeRecoverySnapshotSchema = z
+  .object({
+    revision: worktreeChangesRevisionSchema,
+    recovery: worktreeRecoverySchema,
+  })
+  .strict();
 
 /**
  * Transport-neutral outcome of one worktree-change request. The legacy plane
@@ -55,7 +66,13 @@ type WorktreeChangesDependencies = {
   storage: {
     kv: {
       get(key: string): unknown;
-      put(key: string, value: WorktreeChangesSnapshot | WorktreeFileRecord): void;
+      put(
+        key: string,
+        value:
+          | WorktreeChangesSnapshot
+          | WorktreeFileRecord
+          | z.infer<typeof worktreeRecoverySnapshotSchema>
+      ): void;
       delete(key: string): boolean;
       list(options: { prefix: string }): Iterable<[string, unknown]>;
     };
@@ -122,16 +139,22 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
     return parsed.success ? parsed.data : null;
   }
 
-  function readRecordAgainstManifest(snapshot: WorktreeChangesSnapshot, path: string) {
-    const listed = snapshot.files.find(file => file.path === path);
+  function readRecordAgainstManifest(
+    snapshot: WorktreeChangesSnapshot,
+    identity: Pick<WorktreeFileQuery, 'path' | 'scope'>
+  ) {
+    const listed = snapshot.files.find(
+      file => worktreeFileIdentity(file) === worktreeFileIdentity(identity)
+    );
     if (!listed) return null;
     const parsed = worktreeFileRecordSchema.safeParse(
-      deps.storage.kv.get(`${WORKTREE_FILE_PREFIX}${path}`)
+      deps.storage.kv.get(`${WORKTREE_FILE_PREFIX}${worktreeFileIdentity(identity)}`)
     );
     if (
       !parsed.success ||
       parsed.data.revision !== listed.revision ||
       parsed.data.path !== listed.path ||
+      parsed.data.scope !== listed.scope ||
       (parsed.data.content.status === 'available' &&
         parsed.data.content.source !==
           (listed.status === 'deleted' ? 'deleted-original' : 'current'))
@@ -149,16 +172,24 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
     );
   }
 
-  function replaceSnapshot(snapshot: WorktreeChangesSnapshot, files: WorktreeFileRecord[]): void {
+  function replaceSnapshot(
+    snapshot: WorktreeChangesSnapshot,
+    files: WorktreeFileRecord[],
+    recovery?: WorktreeRecovery
+  ): void {
     const broadcast = deps.storage.transactionSync(() => {
-      const keys = new Set(files.map(file => `${WORKTREE_FILE_PREFIX}${file.path}`));
+      const keys = new Set(
+        files.map(file => `${WORKTREE_FILE_PREFIX}${worktreeFileIdentity(file)}`)
+      );
       for (const [key] of deps.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })) {
         if (!keys.has(key)) deps.storage.kv.delete(key);
       }
       for (const file of files) {
-        deps.storage.kv.put(`${WORKTREE_FILE_PREFIX}${file.path}`, file);
+        deps.storage.kv.put(`${WORKTREE_FILE_PREFIX}${worktreeFileIdentity(file)}`, file);
       }
       deps.storage.kv.put(WORKTREE_CHANGES_KEY, snapshot);
+      if (recovery === undefined) deps.storage.kv.delete(WORKTREE_RECOVERY_KEY);
+      else deps.storage.kv.put(WORKTREE_RECOVERY_KEY, { revision: snapshot.revision, recovery });
       return deps.saveSnapshotEvent?.(snapshot);
     });
     broadcast?.();
@@ -205,7 +236,7 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
       }
       if (
         captured.summary.revision !== requestedRevision ||
-        new Set(captured.summary.files.map(file => file.path)).size !==
+        new Set(captured.summary.files.map(worktreeFileIdentity)).size !==
           captured.summary.files.length ||
         (context.baseRef !== undefined && captured.summary.comparison.baseRef !== context.baseRef)
       ) {
@@ -221,11 +252,13 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
       ) {
         return { status: 'failed', snapshot };
       }
-      const capturedRecords = new Map(captured.files.map(file => [file.path, file]));
+      const capturedRecords = new Map(
+        captured.files.map(file => [worktreeFileIdentity(file), file])
+      );
       const selectedFiles = captured.summary.files.map(file => {
-        const capturedRecord = capturedRecords.get(file.path);
+        const capturedRecord = capturedRecords.get(worktreeFileIdentity(file));
         const previous =
-          capturedRecord && snapshot ? readRecordAgainstManifest(snapshot, file.path) : null;
+          capturedRecord && snapshot ? readRecordAgainstManifest(snapshot, file) : null;
         const selectedRevision =
           previous && capturedRecord && canReuseFileRevision(previous.record, capturedRecord)
             ? previous.listed.revision
@@ -239,12 +272,14 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
         files: selectedFiles,
       });
       if (!saved) return { status: 'failed', snapshot };
-      const retainedRevisions = new Map(saved.files.map(file => [file.path, file.revision]));
+      const retainedRevisions = new Map(
+        saved.files.map(file => [worktreeFileIdentity(file), file.revision])
+      );
       const records = captured.files.flatMap(file => {
-        const selectedRevision = retainedRevisions.get(file.path);
+        const selectedRevision = retainedRevisions.get(worktreeFileIdentity(file));
         return selectedRevision === undefined ? [] : [{ ...file, revision: selectedRevision }];
       });
-      replaceSnapshot(saved, records);
+      replaceSnapshot(saved, records, captured.recovery);
       return { status: 'refreshed', snapshot: saved };
     } catch {
       return { status: 'failed', snapshot };
@@ -286,15 +321,26 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
   return {
     recovery(): WorktreeRecovery | undefined {
       const snapshot = readSnapshot();
-      if (!snapshot || snapshot.files.length === 0 || suppressed) return undefined;
+      if (!snapshot || suppressed) return undefined;
+      const savedRecovery = deps.storage.kv.get(WORKTREE_RECOVERY_KEY);
+      if (savedRecovery !== undefined) {
+        const parsed = worktreeRecoverySnapshotSchema.safeParse(savedRecovery);
+        return parsed.success &&
+          parsed.data.revision === snapshot.revision &&
+          parsed.data.recovery.files.length > 0
+          ? parsed.data.recovery
+          : undefined;
+      }
+      if (snapshot.files.length === 0 || snapshot.files.some(file => file.scope !== undefined))
+        return undefined;
       const files: WorktreeRecovery['files'] = snapshot.files.map(file => ({
         path: file.path,
         status: file.status,
       }));
       const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
       let remaining = MAX_WORKTREE_CHANGES_BYTES - bytes({ files });
-      for (const file of files) {
-        const record = readRecordAgainstManifest(snapshot, file.path)?.record;
+      for (const [index, file] of files.entries()) {
+        const record = readRecordAgainstManifest(snapshot, snapshot.files[index])?.record;
         if (record?.diff.status === 'available') {
           const extra = bytes({ ...file, patch: record.diff.patch }) - bytes(file);
           if (extra <= remaining) {
@@ -317,11 +363,13 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
       return deps.storage.transactionSync((): GetWorktreeFileOutput => {
         const snapshot = readSnapshot();
         if (!snapshot) return { status: 'not_captured' };
-        const listed = snapshot.files.find(file => file.path === query.data.path);
+        const listed = snapshot.files.find(
+          file => worktreeFileIdentity(file) === worktreeFileIdentity(query.data)
+        );
         if (!listed) return { status: 'no_longer_listed', currentRevision: snapshot.revision };
         if (listed.revision !== query.data.expectedRevision)
           return { status: 'stale', currentRevision: listed.revision };
-        const selected = readRecordAgainstManifest(snapshot, query.data.path);
+        const selected = readRecordAgainstManifest(snapshot, query.data);
         if (!selected) return { status: 'not_captured' };
         return {
           status: selected.record.diff.status,
@@ -388,6 +436,7 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
 
     purge(): void {
       deps.storage.kv.delete(WORKTREE_CHANGES_KEY);
+      deps.storage.kv.delete(WORKTREE_RECOVERY_KEY);
       for (const [key] of deps.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })) {
         deps.storage.kv.delete(key);
       }

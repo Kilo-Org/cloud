@@ -26,6 +26,7 @@ import { FakeWrapper } from './helpers/fake-wrapper.js';
 import {
   WORKTREE_CHANGES_KEY,
   WORKTREE_FILE_PREFIX,
+  WORKTREE_RECOVERY_KEY,
 } from '../../src/sandbox-session/worktree-changes.js';
 import { waitFor } from './wait-for.js';
 
@@ -480,6 +481,81 @@ describe('control-plane worktree changes (B10)', () => {
     expect(
       readyEvents.some(event => event.stream_event_type === 'cloud.worktree.changes.ready')
     ).toBe(true);
+    wrapper.close();
+  });
+
+  it('persists and retrieves the same path in both scopes through the wrapper and Session DO', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createFakeProvider();
+    const sessionStub = await startSessionWithSandbox({ sessionId, sandboxId, provider });
+    const wrapper = await connectAndHello(provider, sandboxId, 'wr_scoped');
+    await markRouteReady(sessionStub, wrapper, sessionId);
+    await settleCaptures(wrapper);
+    const refresh = sessionStub.refreshWorktreeChanges();
+    const frame = await awaitFrame(wrapper, 'worktree.snapshot');
+    const result = snapshotReply(frame.payload.revision, 'refs/remotes/origin/main');
+    const scopes = ['uncommitted', 'against-base-branch'] as const;
+    const summaryFiles = scopes.map(scope => ({
+      path: 'same.txt',
+      scope,
+      status: 'modified' as const,
+      additions: 1,
+      deletions: 1,
+      tracked: true,
+      binary: false,
+      countsComplete: true,
+    }));
+    wrapper.send({
+      type: 'worktree.result',
+      requestId: frame.requestId,
+      ok: true,
+      result: {
+        summary: { ...result.summary, files: summaryFiles },
+        recovery: { files: [{ path: 'same.txt', status: 'modified', patch: 'net patch' }] },
+        files: scopes.map(scope => ({
+          schemaVersion: 1,
+          revision: frame.payload.revision,
+          path: 'same.txt',
+          scope,
+          diff: { status: 'available', patch: `${scope} patch` },
+          content: { status: 'available', source: 'current', text: `${scope} content` },
+        })),
+      },
+    });
+    await expect(refresh).resolves.toMatchObject({ status: 'refreshed' });
+    for (const scope of scopes) {
+      await expect(
+        sessionStub.getWorktreeFile({
+          path: 'same.txt',
+          scope,
+          expectedRevision: frame.payload.revision,
+        })
+      ).resolves.toMatchObject({
+        status: 'available',
+        file: { scope, content: { text: `${scope} content` } },
+      });
+    }
+    await expect(
+      sessionStub.getWorktreeFile({
+        path: 'same.txt',
+        expectedRevision: frame.payload.revision,
+      })
+    ).resolves.toEqual({ status: 'no_longer_listed', currentRevision: frame.payload.revision });
+    const keys = await runInDurableObject(sessionStub, (_instance, state) =>
+      [...state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })].map(([key]) => key)
+    );
+    expect(keys).toHaveLength(2);
+    expect(keys).toContain(`${WORKTREE_FILE_PREFIX}uncommitted\0same.txt`);
+    expect(keys).toContain(`${WORKTREE_FILE_PREFIX}against-base-branch\0same.txt`);
+    expect(
+      await runInDurableObject(sessionStub, (_instance, state) =>
+        state.storage.kv.get(WORKTREE_RECOVERY_KEY)
+      )
+    ).toEqual({
+      revision: frame.payload.revision,
+      recovery: { files: [{ path: 'same.txt', status: 'modified', patch: 'net patch' }] },
+    });
     wrapper.close();
   });
 

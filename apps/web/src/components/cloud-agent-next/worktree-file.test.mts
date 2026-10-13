@@ -41,6 +41,7 @@ const {
 }: typeof import('./WorktreeFileRenderer') = require('./WorktreeFileRenderer');
 const {
   getSavedWorktreeFileState,
+  selectSavedWorktreeFile,
   getWorktreeFileViewMode,
 }: typeof import('./worktree-file') = require('./worktree-file');
 const {
@@ -1411,6 +1412,72 @@ describe('saved file response identity', () => {
 
   it('returns the matched record with its own saved timestamp and comparison', () => {
     assert.equal(getSavedWorktreeFileState(input), available);
+  });
+
+  it('prefers uncommitted then committed for standalone panes and exact scopes for scoped panes', () => {
+    const uncommitted = { ...snapshot.files[0], scope: 'uncommitted' as const };
+    const committed = { ...snapshot.files[0], scope: 'against-base-branch' as const };
+    const layered = { ...snapshot, files: [uncommitted, committed] };
+    assert.equal(selectSavedWorktreeFile(layered, file.path), uncommitted);
+    assert.equal(
+      selectSavedWorktreeFile({ ...snapshot, files: [committed, uncommitted] }, file.path),
+      uncommitted
+    );
+    assert.equal(
+      selectSavedWorktreeFile({ ...snapshot, files: [committed] }, file.path),
+      committed
+    );
+    assert.equal(selectSavedWorktreeFile(layered, file.path, 'uncommitted'), uncommitted);
+    assert.equal(selectSavedWorktreeFile(layered, file.path, 'against-base-branch'), committed);
+    assert.equal(selectSavedWorktreeFile(snapshot, file.path), snapshot.files[0]);
+    assert.equal(selectSavedWorktreeFile(snapshot, file.path, 'uncommitted'), undefined);
+  });
+
+  it('opens an untracked recreation rather than the committed deletion listed first', () => {
+    const deleted = {
+      ...snapshot.files[0],
+      scope: 'against-base-branch' as const,
+      status: 'deleted' as const,
+    };
+    const recreated = {
+      ...snapshot.files[0],
+      scope: 'uncommitted' as const,
+      status: 'added' as const,
+      tracked: false,
+    };
+    assert.equal(
+      selectSavedWorktreeFile({ ...snapshot, files: [deleted, recreated] }, file.path),
+      recreated
+    );
+  });
+
+  it('never displays a same-path body from another scope, including unscoped legacy bodies', () => {
+    for (const scope of ['uncommitted', 'against-base-branch'] as const) {
+      const selectedEntry = { ...snapshot.files[0], scope };
+      const matched: GetWorktreeFileOutput = { ...available, file: { ...file, scope } };
+      assert.equal(
+        getSavedWorktreeFileState({ ...input, scope, selectedEntry, result: matched }),
+        matched
+      );
+      for (const wrongScope of [undefined, 'uncommitted', 'against-base-branch'] as const) {
+        if (wrongScope === scope) continue;
+        assert.deepEqual(
+          getSavedWorktreeFileState({
+            ...input,
+            scope,
+            selectedEntry,
+            result: { ...available, file: { ...file, scope: wrongScope } },
+          }),
+          { status: 'error' }
+        );
+      }
+      assert.deepEqual(getSavedWorktreeFileState({ ...input, scope, result: matched }), {
+        status: 'no_longer_listed',
+      });
+      assert.deepEqual(getSavedWorktreeFileState({ ...input, result: matched }), {
+        status: 'error',
+      });
+    }
   });
 
   it('keeps a body valid when only the global snapshot revision advances', () => {

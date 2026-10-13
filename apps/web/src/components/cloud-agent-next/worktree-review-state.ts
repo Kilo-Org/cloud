@@ -110,13 +110,18 @@ export function getWorktreeReviewSourceSessionIds(draft: WorktreeReviewDraft | n
 export function currentWorktreeReviewCapture(
   scope: WorktreeReviewScope,
   sourceCloudAgentSessionId: string,
-  snapshot: WorktreeChangesSnapshot | null | undefined
+  snapshot: WorktreeChangesSnapshot | null | undefined,
+  file?: { path: string; scope?: WorktreeReviewCapture['scope'] }
 ): WorktreeReviewCapture | null {
+  const listed =
+    file && snapshot?.files.find(entry => entry.path === file.path && entry.scope === file.scope);
+  if (file && !listed) return null;
   return snapshot
     ? {
         ...scope,
         sourceCloudAgentSessionId,
-        revision: snapshot.revision,
+        revision: listed?.revision ?? snapshot.revision,
+        ...(file ? { scope: file.scope } : {}),
         capturedAt: snapshot.capturedAt,
         comparison: snapshot.comparison,
       }

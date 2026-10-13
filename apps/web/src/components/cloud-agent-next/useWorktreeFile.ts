@@ -4,16 +4,19 @@ import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useSavedWorktreeChanges } from './useSavedWorktreeChanges';
-import { getSavedWorktreeFileState } from './worktree-file';
+import { getSavedWorktreeFileState, selectSavedWorktreeFile } from './worktree-file';
+import type { WorktreeFileQuery } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
 export function useWorktreeFile({
   cloudAgentSessionId,
   organizationId,
   path,
+  scope,
 }: {
   cloudAgentSessionId: string;
   organizationId?: string;
   path: string;
+  scope?: WorktreeFileQuery['scope'];
 }) {
   const trpc = useTRPC();
   const { saved } = useSavedWorktreeChanges({
@@ -22,9 +25,10 @@ export function useWorktreeFile({
     enabled: true,
   });
   const snapshot = saved.data?.snapshot;
-  const selectedEntry = snapshot?.files.find(file => file.path === path);
+  const selectedEntry = selectSavedWorktreeFile(snapshot, path, scope);
   const expectedRevision = selectedEntry?.revision ?? 1;
-  const input = { cloudAgentSessionId, path, expectedRevision };
+  const selectedScope = selectedEntry?.scope ?? scope;
+  const input = { cloudAgentSessionId, path, scope: selectedScope, expectedRevision };
   const queryOptions = organizationId
     ? trpc.organizations.cloudAgentNext.getWorktreeFile.queryOptions({ ...input, organizationId })
     : trpc.cloudAgentNext.getWorktreeFile.queryOptions(input);
@@ -40,28 +44,36 @@ export function useWorktreeFile({
   const state = getSavedWorktreeFileState({
     snapshot,
     path,
+    scope,
     selectedEntry,
     result: file.data,
     summaryError: saved.isError,
     fileError: file.isError,
   });
-  const scope = JSON.stringify([organizationId ?? null, cloudAgentSessionId, path]);
-  const requestKey = JSON.stringify([scope, expectedRevision]);
+  const identity = JSON.stringify([
+    organizationId ?? null,
+    cloudAgentSessionId,
+    path,
+    scope ?? null,
+    selectedScope ?? null,
+  ]);
+  const requestKey = JSON.stringify([identity, expectedRevision]);
   const activeRequest = useRef<string | null>(null);
-  const retriedScope = useRef<string | null>(null);
+  const retriedIdentity = useRef<string | null>(null);
 
   useEffect(() => {
     activeRequest.current = requestKey;
     if (state.status === 'available' || state.status === 'omitted') {
-      retriedScope.current = null;
-    } else if (state.status === 'stale' && retriedScope.current !== scope) {
-      retriedScope.current = scope;
+      retriedIdentity.current = null;
+    } else if (state.status === 'stale' && retriedIdentity.current !== identity) {
+      retriedIdentity.current = identity;
       void saved.refetch().then(result => {
+        const nextEntry = selectSavedWorktreeFile(result.data?.snapshot, path, scope);
         if (
           activeRequest.current === requestKey &&
           !result.isError &&
-          result.data?.snapshot?.files.find(file => file.path === path)?.revision ===
-            expectedRevision
+          nextEntry?.scope === selectedScope &&
+          nextEntry?.revision === expectedRevision
         ) {
           void file.refetch();
         }
@@ -70,15 +82,27 @@ export function useWorktreeFile({
     return () => {
       activeRequest.current = null;
     };
-  }, [state.status, scope, requestKey, expectedRevision, saved.refetch, file.refetch]);
+  }, [
+    state.status,
+    identity,
+    requestKey,
+    path,
+    scope,
+    selectedScope,
+    expectedRevision,
+    saved.refetch,
+    file.refetch,
+  ]);
 
   async function reload() {
-    retriedScope.current = scope;
+    retriedIdentity.current = identity;
     const result = await saved.refetch();
+    const nextEntry = selectSavedWorktreeFile(result.data?.snapshot, path, scope);
     if (
       activeRequest.current === requestKey &&
       !result.isError &&
-      result.data?.snapshot?.files.find(file => file.path === path)?.revision === expectedRevision
+      nextEntry?.scope === selectedScope &&
+      nextEntry?.revision === expectedRevision
     ) {
       await file.refetch();
     }

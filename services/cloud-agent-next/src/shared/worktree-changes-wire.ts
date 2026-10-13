@@ -5,6 +5,7 @@ import type {
   WorktreeFileOmissionReason as PublicWorktreeFileOmissionReason,
   WorktreeFileRecord as PublicWorktreeFileRecord,
   WorktreeSnapshotCapture as PublicWorktreeSnapshotCapture,
+  WorktreeRecovery as PublicWorktreeRecovery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import { z } from 'zod';
 
@@ -46,9 +47,13 @@ export const worktreeRecoverySchema = z
   })
   .strict()
   .refine(
+    value => new Set(value.files.map(file => file.path)).size === value.files.length,
+    'Recovery paths must be unique'
+  )
+  .refine(
     value =>
       new TextEncoder().encode(JSON.stringify(value)).byteLength <= MAX_WORKTREE_CHANGES_BYTES
-  );
+  ) satisfies z.ZodType<PublicWorktreeRecovery>;
 
 export type WorktreeRecovery = z.infer<typeof worktreeRecoverySchema>;
 
@@ -69,10 +74,20 @@ const baseRefSchema = z
   .max(1024)
   .refine(ref => !ref.startsWith('-') && !ref.includes('\0'), 'Invalid comparison ref');
 
+const worktreeChangesScopeSchema = z.enum(['uncommitted', 'against-base-branch']);
+
+export function worktreeFileIdentity(file: {
+  path: string;
+  scope?: z.infer<typeof worktreeChangesScopeSchema>;
+}): string {
+  return file.scope === undefined ? file.path : `${file.scope}\0${file.path}`;
+}
+
 export const worktreeChangesFileSchema = z
   .object({
     path: repositoryRelativePathSchema,
     status: z.enum(['added', 'modified', 'deleted']),
+    scope: worktreeChangesScopeSchema.optional(),
     additions: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     deletions: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     tracked: z.boolean(),
@@ -103,6 +118,10 @@ export const sessionGitSummaryResultSchema = z
   })
   .strict()
   .refine(
+    capture => new Set(capture.files.map(worktreeFileIdentity)).size === capture.files.length,
+    'Worktree summary identities must be unique'
+  )
+  .refine(
     capture =>
       new TextEncoder().encode(JSON.stringify(capture)).byteLength <= MAX_WORKTREE_CHANGES_BYTES,
     'Worktree summary exceeds the size limit'
@@ -124,6 +143,7 @@ export const worktreeFileRecordSchema = z
     schemaVersion: z.literal(WORKTREE_FILE_SCHEMA_VERSION),
     revision: revisionSchema,
     path: worktreeChangesFileSchema.shape.path,
+    scope: worktreeChangesScopeSchema.optional(),
     diff: z.discriminatedUnion('status', [
       z
         .object({
@@ -171,17 +191,19 @@ export const worktreeSnapshotCaptureSchema = z
   .object({
     summary: sessionGitSummaryResultSchema,
     files: z.array(worktreeFileRecordSchema).max(MAX_WORKTREE_CHANGES_FILES),
+    recovery: worktreeRecoverySchema.optional(),
   })
   .strict()
   .refine(({ summary, files }) => {
     if (files.length !== summary.files.length) return false;
-    const listedFiles = new Map(summary.files.map(file => [file.path, file]));
+    const listedFiles = new Map(summary.files.map(file => [worktreeFileIdentity(file), file]));
     if (listedFiles.size !== summary.files.length) return false;
     const paths = new Set<string>();
     return files.every(file => {
-      const listed = listedFiles.get(file.path);
-      if (!listed || paths.has(file.path) || file.revision !== summary.revision) return false;
-      paths.add(file.path);
+      const identity = worktreeFileIdentity(file);
+      const listed = listedFiles.get(identity);
+      if (!listed || paths.has(identity) || file.revision !== summary.revision) return false;
+      paths.add(identity);
       return (
         file.content.status === 'unavailable' ||
         file.content.source === (listed.status === 'deleted' ? 'deleted-original' : 'current')

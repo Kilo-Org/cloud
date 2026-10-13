@@ -1,6 +1,7 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import {
   getWorktreeChangesOutputSchema,
+  worktreeFileIdentity,
   type GetWorktreeChangesOutput,
   type RefreshWorktreeChangesOutput,
   type WorktreeChangesSnapshot,
@@ -40,7 +41,33 @@ export function getWorktreeChangesTotals(
     countsComplete = countsComplete && file.countsComplete;
   }
 
-  return { fileCount: snapshot.files.length, additions, deletions, countsComplete };
+  return {
+    fileCount: new Set(snapshot.files.map(file => file.path)).size,
+    additions,
+    deletions,
+    countsComplete,
+  };
+}
+
+export const getWorktreeChangesFileKey = worktreeFileIdentity;
+
+export function groupWorktreeChangesByScope(files: readonly WorktreeChangesFile[]) {
+  const sections = [
+    {
+      label: 'Uncommitted',
+      scope: 'uncommitted' as const,
+      files: files.filter(file => file.scope === 'uncommitted'),
+    },
+    {
+      label: 'Against base branch',
+      scope: 'against-base-branch' as const,
+      files: files.filter(file => file.scope === 'against-base-branch'),
+    },
+  ];
+  const legacy = files.filter(file => file.scope === undefined);
+  return legacy.length > 0
+    ? [...sections, { label: 'Saved changes', scope: undefined, files: legacy }]
+    : sections;
 }
 
 export function deserializeWorktreeChangesViewMode(value: string): WorktreeChangesViewMode {
@@ -75,8 +102,13 @@ export function resolveWorktreeChangesSelection(
   selectedPath: string | null,
   files: readonly WorktreeChangesFile[]
 ): string | null {
-  if (selectedPath && files.some(file => file.path === selectedPath)) return selectedPath;
-  return groupWorktreeChangesByDirectory(files)[0]?.files[0]?.path ?? null;
+  if (selectedPath && files.some(file => getWorktreeChangesFileKey(file) === selectedPath))
+    return selectedPath;
+  for (const section of groupWorktreeChangesByScope(files)) {
+    const first = groupWorktreeChangesByDirectory(section.files)[0]?.files[0];
+    if (first) return getWorktreeChangesFileKey(first);
+  }
+  return null;
 }
 
 export function formatWorktreeChangesBaseBranch(baseRef: string): string {

@@ -367,6 +367,33 @@ describe('CloudAgentNextClient saved worktree files', () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
+  it.each(['uncommitted', 'against-base-branch'] as const)(
+    'forwards and validates %s scope',
+    async scope => {
+      const scopedInput = { ...input, scope };
+      const response = { ...saved, file: { ...file, scope } };
+      mockGetWorktreeFile.mockResolvedValue(response);
+      const client = new CloudAgentNextClient('token');
+      await expect(client.getWorktreeFile(scopedInput)).resolves.toEqual(response);
+      expect(mockGetWorktreeFile).toHaveBeenCalledWith(scopedInput);
+      for (const wrongScope of [undefined, 'uncommitted', 'against-base-branch'] as const) {
+        if (wrongScope === scope) continue;
+        mockGetWorktreeFile.mockResolvedValue({ ...saved, file: { ...file, scope: wrongScope } });
+        await expect(client.getWorktreeFile(scopedInput)).rejects.toThrow(
+          'Saved worktree file does not match the query'
+        );
+      }
+    }
+  );
+
+  it('accepts the selected scoped body for an unscoped standalone query', async () => {
+    const response = { ...saved, file: { ...file, scope: 'uncommitted' as const } };
+    mockGetWorktreeFile.mockResolvedValue(response);
+    await expect(new CloudAgentNextClient('token').getWorktreeFile(input)).resolves.toEqual(
+      response
+    );
+  });
+
   it.each(['validation', 'transport'] as const)(
     'does not propagate or log content-bearing %s errors',
     async failure => {

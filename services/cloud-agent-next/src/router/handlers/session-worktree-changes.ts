@@ -73,6 +73,7 @@ export function createSessionWorktreeChangesHandlers() {
               async session =>
                 await session.getWorktreeFile({
                   path: input.path,
+                  ...(input.scope === undefined ? {} : { scope: input.scope }),
                   expectedRevision: input.expectedRevision,
                 }),
               'getWorktreeFile'

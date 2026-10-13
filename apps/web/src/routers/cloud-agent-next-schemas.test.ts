@@ -308,8 +308,14 @@ describe('baseWorktreeFileNextSchema', () => {
     expect(baseWorktreeFileNextSchema.parse(input)).toEqual(input);
   });
 
+  it.each(['uncommitted', 'against-base-branch'])('preserves optional %s file scope', scope => {
+    expect(baseWorktreeFileNextSchema.parse({ ...input, scope })).toEqual({ ...input, scope });
+  });
+
   it.each([
     { path: '' },
+    { scope: 'committed' },
+    { scope: null },
     { path: '/absolute' },
     { path: '../outside' },
     { path: 'src/../outside' },

@@ -10,7 +10,9 @@ import {
   deserializeWorktreeChangesViewMode,
   formatWorktreeChangesBaseBranch,
   getWorktreeChangesTotals,
+  getWorktreeChangesFileKey,
   groupWorktreeChangesByDirectory,
+  groupWorktreeChangesByScope,
   preserveNewerWorktreeChanges,
   resolveWorktreeChangesSelection,
   worktreeChangesMessages,
@@ -51,6 +53,17 @@ function messages(overrides: Partial<Parameters<typeof worktreeChangesMessages>[
 }
 
 describe('getWorktreeChangesTotals', () => {
+  it('counts a file in both comparisons once', () => {
+    expect(
+      getWorktreeChangesTotals({
+        ...snapshot,
+        files: [
+          { ...snapshot.files[0], scope: 'uncommitted' },
+          { ...snapshot.files[0], scope: 'against-base-branch' },
+        ],
+      })
+    ).toEqual({ fileCount: 1, additions: 4, deletions: 2, countsComplete: true });
+  });
   it.each([null, undefined])('returns null for an unavailable snapshot: %p', missing => {
     expect(getWorktreeChangesTotals(missing)).toBeNull();
   });
@@ -179,6 +192,44 @@ describe('getWorktreeChangesTotals', () => {
         files: [{ ...snapshot.files[0], additions: 0, deletions: 0, countsComplete: false }],
       })
     ).toEqual({ fileCount: 1, additions: 0, deletions: 0, countsComplete: false });
+  });
+});
+
+describe('scoped changes sections', () => {
+  const uncommitted: WorktreeChangesFile = { ...snapshot.files[0], scope: 'uncommitted' };
+  const committed: WorktreeChangesFile = { ...snapshot.files[0], scope: 'against-base-branch' };
+
+  it('orders uncommitted before against base branch and retains the same path in both', () => {
+    expect(groupWorktreeChangesByScope([committed, uncommitted])).toEqual([
+      { label: 'Uncommitted', scope: 'uncommitted', files: [uncommitted] },
+      { label: 'Against base branch', scope: 'against-base-branch', files: [committed] },
+    ]);
+  });
+
+  it('shows both sections even when one is empty', () => {
+    expect(groupWorktreeChangesByScope([committed])[0].files).toEqual([]);
+    expect(groupWorktreeChangesByScope([])).toHaveLength(2);
+  });
+
+  it('does not mislabel legacy combined captures as either comparison', () => {
+    expect(groupWorktreeChangesByScope(snapshot.files)[2]).toEqual({
+      label: 'Saved changes',
+      scope: undefined,
+      files: snapshot.files,
+    });
+  });
+
+  it('preserves selection by comparison and prefers uncommitted on removal', () => {
+    const committedKey = getWorktreeChangesFileKey(committed);
+    expect(resolveWorktreeChangesSelection(committedKey, [committed, uncommitted])).toBe(
+      committedKey
+    );
+    expect(resolveWorktreeChangesSelection(committedKey, [uncommitted])).toBe(
+      getWorktreeChangesFileKey(uncommitted)
+    );
+    expect(resolveWorktreeChangesSelection(null, [committed, uncommitted])).toBe(
+      getWorktreeChangesFileKey(uncommitted)
+    );
   });
 });
 

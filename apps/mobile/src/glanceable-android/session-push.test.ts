@@ -55,6 +55,7 @@ vi.mock('@/lib/glanceable/approve-ask', () => ({
 // the native post arguments instead.
 vi.mock('./count-format', () => ({
   formatGlanceableClock: (at: string) => at.slice(11, 16),
+  formatGlanceableCount: String,
 }));
 
 const NOW = Date.parse('2026-10-12T10:00:00.000Z');
@@ -200,7 +201,6 @@ describe('applySessionLiveUpdate', () => {
 
     expect(lastCard()).toMatchObject({
       whenMs: Date.parse('2026-10-12T11:30:00.000Z'),
-      showWhen: true,
       chronometer: false,
     });
   });
@@ -226,7 +226,7 @@ describe('applySessionLiveUpdate', () => {
 
     expect(lastCard()).toMatchObject({
       whenMs: Date.parse('2026-10-12T10:05:00.000Z'),
-      showWhen: true,
+      chronometer: false,
     });
   });
 

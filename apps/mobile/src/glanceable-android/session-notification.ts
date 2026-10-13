@@ -30,15 +30,26 @@ export type SessionNotificationCard = {
   /** Approve is added only when `approvalKey` names the request the card shows. */
   approveLabel: string | null;
   approvalKey: string | null;
-  /** The time the card shows, in epoch milliseconds; 0 when it shows none. */
+  /**
+   * The state time, in epoch milliseconds; 0 when none is known. Only a
+   * Working card draws it, as its counting-up timer; on every other card it
+   * orders the shade, and the text names the absolute time instead.
+   */
   whenMs: number;
-  showWhen: boolean;
   /**
    * True while the card counts up from `whenMs` on the system clock. The
    * Working card carries no elapsed text of its own: the system timer is the
    * only one that stays right while nothing runs.
    */
   chronometer: boolean;
+  /**
+   * A Working card that is not quiet yet: the epoch time its quiet window ends,
+   * else 0. At that time the native side posts the card again with
+   * `quietText`, and its timer counts from `quietWhenMs` (the last activity).
+   */
+  quietAtMs: number;
+  quietWhenMs: number;
+  quietText: string | null;
   promotion: boolean;
   color: string;
 };

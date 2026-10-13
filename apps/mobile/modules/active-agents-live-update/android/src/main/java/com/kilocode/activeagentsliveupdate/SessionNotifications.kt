@@ -1,5 +1,6 @@
 package com.kilocode.activeagentsliveupdate
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -27,10 +28,9 @@ import org.json.JSONObject
  * promotion.
  *
  * The notification is silent and `setOnlyAlertOnce` at all times: a followed
- * session is a glance, never a ring. A Working card carries no system time text
- * of its own — the JS side draws the elapsed time in the text, because the
- * promoted Live Update reads better with it there — while a Scheduled, waiting,
- * finished, or failed card shows the absolute time the JS side passes.
+ * session is a glance, never a ring. A Working card counts up on the system
+ * timer. Every other card hides the system time, which draws a relative age,
+ * and its text names the absolute time the JS side formats.
  *
  * The module holds exactly one notification per session, keyed by a stable id
  * derived from the session id, tagged so a session can never take another
@@ -91,6 +91,7 @@ internal object SessionNotifications {
   fun cancel(context: Context, sessionId: String) {
     manager(context).cancel(TAG, notificationId(sessionId))
     state(context).edit().remove(KEY_PREFIX + sessionId).apply()
+    alarms(context).cancel(quietIntent(context, sessionId, 0))
   }
 
   /**
@@ -112,12 +113,66 @@ internal object SessionNotifications {
       stored.put(FINISHED_UNTIL, System.currentTimeMillis() + timeoutMs)
     }
     state(context).edit().putString(KEY_PREFIX + card.sessionId, stored.toString()).commit()
-    val builder = builder(context, card)
+    val builder = builder(context, card.shownAt(System.currentTimeMillis()))
     if (timeoutMs > 0 && Build.VERSION.SDK_INT >= 26) {
       builder.setTimeoutAfter(timeoutMs)
     }
     manager(context).notify(TAG, notificationId(card.sessionId), builder.build())
+    scheduleQuiet(context, card)
   }
+
+  /**
+   * Arm the quiet moment of a Working card, or disarm it for every other card.
+   * The alarm posts the stored card again at that moment, so the quiet warning
+   * appears with no push and no running process.
+   */
+  private fun scheduleQuiet(context: Context, card: SessionNotificationCard) {
+    val quietAt = card.quietAtMs.toLong()
+    val operation = quietIntent(context, card.sessionId, quietAt)
+    val alarmManager = alarms(context)
+    alarmManager.cancel(operation)
+    if (quietAt <= System.currentTimeMillis() || card.quietText == null) {
+      return
+    }
+    if (Build.VERSION.SDK_INT >= 31) {
+      // No exact-alarm permission: Android can defer delivery while idle.
+      alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, quietAt, operation)
+    } else {
+      alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, quietAt, operation)
+    }
+  }
+
+  /**
+   * The quiet alarm of one session fired. Post the stored card again only if it
+   * is still the card that armed this alarm: a later update, an end, or a
+   * teardown replaced or removed it, and then nothing is posted.
+   */
+  fun postQuiet(context: Context, sessionId: String, quietAtMs: Long) {
+    val stored = state(context).getString(KEY_PREFIX + sessionId, null) ?: return
+    val json = JSONObject(stored)
+    if (json.has(FINISHED_UNTIL)) {
+      return
+    }
+    val card = SessionNotificationCard().apply { fillFromJson(json) }
+    if (quietAtMs <= 0 || card.quietAtMs.toLong() != quietAtMs) {
+      return
+    }
+    post(context, card, 0)
+  }
+
+  private fun quietIntent(context: Context, sessionId: String, quietAtMs: Long): PendingIntent =
+    PendingIntent.getBroadcast(
+      context,
+      requestCode(sessionId, QUIET_OFFSET),
+      Intent(context, ActiveAgentsActionReceiver::class.java)
+        .setAction(ActiveAgentsActionReceiver.ACTION_QUIET)
+        .putExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId)
+        .putExtra(ActiveAgentsActionReceiver.EXTRA_QUIET_AT, quietAtMs),
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+  private fun alarms(context: Context): AlarmManager =
+    context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
   private fun builder(context: Context, card: SessionNotificationCard): Notification.Builder {
     val icon = smallIconId(context)
@@ -146,13 +201,15 @@ internal object SessionNotifications {
       .setCategory(Notification.CATEGORY_STATUS)
       .setDeleteIntent(deleteIntent(context, card.sessionId))
 
-    // The Working card counts up from the last status change on the system
-    // clock; every other card shows the absolute time the JS side passes.
+    // The Working card counts up on the system clock. Every other card hides
+    // the system time, which draws a relative age; its text names the absolute
+    // time, and its state time only orders the shade.
     if (card.chronometer) {
       builder.setUsesChronometer(true).setWhen(card.whenMs.toLong())
-    } else if (card.showWhen) {
-      builder.setWhen(card.whenMs.toLong())
     } else {
+      if (card.whenMs > 0) {
+        builder.setWhen(card.whenMs.toLong())
+      }
       builder.setShowWhen(false)
     }
 
@@ -237,6 +294,7 @@ internal object SessionNotifications {
   private const val OPEN_OFFSET = 0
   private const val APPROVE_OFFSET = 1
   private const val DELETE_OFFSET = 2
+  private const val QUIET_OFFSET = 3
   private const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
 }
 
@@ -253,8 +311,10 @@ class SessionNotificationCard : Record {
   @Field var approveLabel: String? = null
   @Field var approvalKey: String? = null
   @Field var whenMs: Double = 0.0
-  @Field var showWhen: Boolean = false
   @Field var chronometer: Boolean = false
+  @Field var quietAtMs: Double = 0.0
+  @Field var quietWhenMs: Double = 0.0
+  @Field var quietText: String? = null
   @Field var promotion: Boolean = false
   @Field var color: String = DEFAULT_COLOR
 
@@ -270,8 +330,10 @@ class SessionNotificationCard : Record {
     put("approveLabel", approveLabel ?: "")
     put("approvalKey", approvalKey ?: "")
     put("whenMs", whenMs)
-    put("showWhen", showWhen)
     put("chronometer", chronometer)
+    put("quietAtMs", quietAtMs)
+    put("quietWhenMs", quietWhenMs)
+    put("quietText", quietText ?: "")
     put("promotion", promotion)
     put("color", color)
   }
@@ -289,10 +351,31 @@ class SessionNotificationCard : Record {
     openLabel = json.optString("openLabel")
     openUrl = json.optString("openUrl")
     whenMs = json.optDouble("whenMs", 0.0)
-    showWhen = json.optBoolean("showWhen")
     chronometer = json.optBoolean("chronometer")
+    quietAtMs = json.optDouble("quietAtMs", 0.0)
+    quietWhenMs = json.optDouble("quietWhenMs", 0.0)
+    quietText = optionalString(json, "quietText")
     promotion = json.optBoolean("promotion")
     color = optionalString(json, "color") ?: DEFAULT_COLOR
+  }
+
+  /**
+   * The card as it shows at `nowMs`. Once a Working card's quiet window has
+   * passed, the text names the quiet warning and the timer counts from the
+   * last activity.
+   */
+  fun shownAt(nowMs: Long): SessionNotificationCard {
+    val quiet = quietText
+    if (quietAtMs <= 0.0 || quiet == null || nowMs < quietAtMs.toLong()) {
+      return this
+    }
+    return SessionNotificationCard().also { shown ->
+      shown.fillFromJson(toJson())
+      shown.text = quiet
+      shown.whenMs = quietWhenMs
+      shown.quietAtMs = 0.0
+      shown.quietText = null
+    }
   }
 
   /**

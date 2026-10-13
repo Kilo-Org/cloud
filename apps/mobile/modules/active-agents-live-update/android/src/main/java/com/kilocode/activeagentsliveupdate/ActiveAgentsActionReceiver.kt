@@ -9,8 +9,9 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 
 /**
- * Answers the ongoing notification's Approve action, and a session
- * notification's dismissal, without an Activity.
+ * Answers the ongoing notification's Approve action, a session
+ * notification's dismissal, and a session notification's quiet alarm, without
+ * an Activity.
  *
  * The receiver only enqueues and returns: a broadcast has a short budget, and a
  * background `startService` is restricted on Android 8+, so the answer runs as
@@ -27,10 +28,17 @@ import androidx.work.WorkManager
 class ActiveAgentsActionReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
     val action = intent.action ?: return
-    if (action != ACTION_APPROVE && action != ACTION_DISMISS) {
+    if (action != ACTION_APPROVE && action != ACTION_DISMISS && action != ACTION_QUIET) {
       return
     }
     val sessionId = intent.getStringExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID)
+    if (action == ACTION_QUIET) {
+      // The card itself changes, so no JS runs: the stored card has the quiet form.
+      if (sessionId != null) {
+        SessionNotifications.postQuiet(context, sessionId, intent.getLongExtra(EXTRA_QUIET_AT, 0))
+      }
+      return
+    }
     if (action == ACTION_DISMISS) {
       if (sessionId == null) {
         return
@@ -83,6 +91,12 @@ class ActiveAgentsActionReceiver : BroadcastReceiver() {
      * card is gone either way, so the app stops following that session.
      */
     const val ACTION_DISMISS = "com.kilocode.activeagentsliveupdate.action.DISMISS"
+
+    /** A Working session card reached its quiet moment; see `SessionNotifications.postQuiet`. */
+    const val ACTION_QUIET = "com.kilocode.activeagentsliveupdate.action.QUIET"
+
+    /** The quiet moment the alarm was armed for, in epoch milliseconds. */
+    const val EXTRA_QUIET_AT = "quiet_at"
 
     /** Unique work per dismissed session; see `onReceive`. */
     private const val DISMISS_WORK_PREFIX = "active-agents-dismiss:"

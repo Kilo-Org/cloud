@@ -89,8 +89,8 @@ describe('SessionNotificationCard', () => {
 });
 
 describe('SessionNotifications', () => {
-  it('defines every helper the module calls', () => {
-    const called = names(MODULE, /SessionNotifications\.(\w+)\(/g);
+  it('defines every helper the module and the receiver call', () => {
+    const called = names(MODULE + RECEIVER, /SessionNotifications\.(\w+)\(/g);
     expect(called.length).toBeGreaterThan(0);
     for (const name of called) {
       expect(NOTIFICATIONS, `SessionNotifications.${name} is never defined`).toContain(
@@ -118,6 +118,51 @@ describe('SessionNotifications', () => {
     expect(post).not.toContain('editor.remove(');
     expect(NOTIFICATIONS).toContain('private const val FINISHED_UNTIL = "finishedUntil"');
     expect(BRIDGE).toContain('finishedUntil: z.number().optional()');
+  });
+});
+
+describe('the quiet moment of a Working card', () => {
+  it('posts the card as it shows now, then arms or disarms its quiet alarm', () => {
+    const post = body(NOTIFICATIONS, 'fun post(');
+    expect(post).toContain('builder(context, card.shownAt(System.currentTimeMillis()))');
+    expect(post.indexOf('scheduleQuiet(context, card)')).toBeGreaterThan(post.indexOf('.notify('));
+    const schedule = body(NOTIFICATIONS, 'private fun scheduleQuiet(');
+    expect(schedule.indexOf('alarmManager.cancel(operation)')).toBeLessThan(
+      schedule.indexOf('setAndAllowWhileIdle')
+    );
+  });
+
+  it('swaps to the quiet text and the last-activity timer once the window passed', () => {
+    const shown = body(NOTIFICATIONS, 'fun shownAt(');
+    expect(shown).toContain('nowMs < quietAtMs.toLong()');
+    expect(shown).toContain('shown.text = quiet');
+    expect(shown).toContain('shown.whenMs = quietWhenMs');
+  });
+
+  it('re-posts only the stored card that armed the alarm', () => {
+    const quiet = body(NOTIFICATIONS, 'fun postQuiet(');
+    expect(quiet).toContain('?: return');
+    expect(quiet).toContain('json.has(FINISHED_UNTIL)');
+    expect(quiet).toContain('card.quietAtMs.toLong() != quietAtMs');
+    expect(body(NOTIFICATIONS, 'fun cancel(')).toContain('quietIntent(context, sessionId, 0)');
+  });
+
+  it('routes the quiet alarm to the re-post, with no JS', () => {
+    const receive = body(RECEIVER, 'override fun onReceive(');
+    const quiet = receive.slice(receive.indexOf('if (action == ACTION_QUIET)'));
+    expect(quiet).toMatch(
+      /SessionNotifications\.postQuiet\(context, sessionId, intent\.getLongExtra\(EXTRA_QUIET_AT, 0\)\)/
+    );
+    expect(quiet.slice(0, quiet.indexOf('return'))).not.toContain('enqueueHeadless');
+    expect(body(NOTIFICATIONS, 'private fun quietIntent(')).toContain(
+      '.setAction(ActiveAgentsActionReceiver.ACTION_QUIET)'
+    );
+  });
+
+  it('hides the relative system time on every card that does not count up', () => {
+    const build = body(NOTIFICATIONS, 'private fun builder(');
+    expect(build).toMatch(/\} else \{[^}]*\}\s+builder\.setShowWhen\(false\)/);
+    expect(NOTIFICATIONS).not.toContain('showWhen');
   });
 });
 

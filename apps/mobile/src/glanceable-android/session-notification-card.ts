@@ -1,9 +1,13 @@
-import { type SessionLiveActivityContentState } from '@kilocode/notifications';
+import {
+  SESSION_CARD_QUIET_AFTER_MS,
+  type SessionLiveActivityContentState,
+} from '@kilocode/notifications';
 
 import { i18n } from '@/i18n';
+import { formatCurrency } from '@/lib/format';
 import { launcherSessionUrl } from '@/lib/launcher-surfaces';
 
-import { formatGlanceableClock } from './count-format';
+import { formatGlanceableClock, formatGlanceableCount } from './count-format';
 import { type SessionNotificationCard } from './session-notification';
 
 /**
@@ -21,6 +25,16 @@ const LABEL_KEYS = {
   failed: 'common.failed',
 } as const satisfies Record<SessionLiveActivityContentState['statusKind'], string>;
 
+const FAILURE_KEYS = {
+  provider: 'glanceable.failure.provider',
+  tool: 'glanceable.failure.tool',
+  cancelled: 'glanceable.failure.cancelled',
+  other: 'glanceable.failure.other',
+} as const;
+
+/** The status line separator the aggregate card uses too. */
+const SEPARATOR = ' · ';
+
 function translate(key: string): string {
   return i18n.t(key);
 }
@@ -30,28 +44,43 @@ function clock(value: string | null): string {
   return value === null ? '' : formatGlanceableClock(value);
 }
 
+/** The label, then the absolute time when one is known. */
+function withTime(label: string, at: string): string {
+  return at.length > 0 ? `${label} ${at}` : label;
+}
+
 /**
- * The status line under the title. A permission wait names the command the card
- * can answer; a scheduled, finished, or failed card shows the time it is due,
- * finished, or failed; the working line is the label alone, because the elapsed
- * time is the system's counting-up timer.
+ * The label of the state. A failed card names its stop reason instead of the
+ * bare "Failed" (spec "Content" rule 3).
+ */
+function statusLabel(content: SessionLiveActivityContentState): string {
+  if (content.statusKind === 'failed') {
+    return translate(FAILURE_KEYS[content.failure?.kind ?? 'other']);
+  }
+  return translate(LABEL_KEYS[content.statusKind]);
+}
+
+/**
+ * The status line under the title. Every card except Working names the
+ * absolute time of its state in the text: the wait start, the wake time, the
+ * finish, or the stop. The system header time is hidden for those cards,
+ * because it draws a relative age ("4m"), which the glanceable design rules
+ * forbid. A permission wait then names the command the card can answer. The
+ * Working line is the label alone, because the elapsed time is the system's
+ * counting-up timer.
  */
 function statusText(content: SessionLiveActivityContentState): string {
-  const label = translate(LABEL_KEYS[content.statusKind]);
+  const label = statusLabel(content);
   const kind = content.statusKind;
   if (kind === 'running') {
     return label;
   }
-  if (kind === 'needsInput') {
-    const command = content.permissionCommand ?? '';
-    return command.length > 0 ? `${label}: ${command}` : label;
-  }
   if (kind === 'scheduled') {
-    const at = clock(content.scheduledAt);
-    return at.length > 0 ? `${label} ${at}` : label;
+    return withTime(label, clock(content.scheduledAt));
   }
-  const at = clock(content.statusSince);
-  return at.length > 0 ? `${label} ${at}` : label;
+  const line = withTime(label, clock(content.statusSince));
+  const command = kind === 'needsInput' ? (content.permissionCommand ?? '') : '';
+  return command.length > 0 ? `${line}${SEPARATOR}${command}` : line;
 }
 
 /** The one short line of a promoted Live Update: the time that fits a chip. */
@@ -64,26 +93,68 @@ function chipText(content: SessionLiveActivityContentState): string | null {
   return at.length > 0 ? at : null;
 }
 
-/** The expanded (and promoted) extra line. */
+/** The expanded (and promoted) extra line, in the app language's digits. */
 function extraText(content: SessionLiveActivityContentState): string | null {
   const plan = content.plan;
   if (plan !== null && plan !== undefined && plan.total > 0) {
-    return `${plan.done}/${plan.total}`;
+    return [
+      formatGlanceableCount(plan.done),
+      translate('glanceable.planOf'),
+      formatGlanceableCount(plan.total),
+    ].join(' ');
   }
   const cost = content.costMicrodollars;
   if (cost !== null && cost !== undefined && cost > 0) {
-    return `$${(cost / 1_000_000).toFixed(2)}`;
+    return formatCurrency(cost / 1_000_000, i18n.language, 2);
   }
   return null;
+}
+
+type QuietFields = Pick<
+  SessionNotificationCard,
+  'text' | 'whenMs' | 'quietAtMs' | 'quietWhenMs' | 'quietText'
+>;
+
+/**
+ * The quiet warning of a Working card (spec "Content" rule 7). The card has one
+ * system timer. Until the quiet window passes it counts the time since the
+ * last status change; once the agent has reported no activity for the window,
+ * the text names the warning and the timer counts the quiet time from the last
+ * activity, so the warning stays right while no process runs. A card that is
+ * not quiet yet carries the quiet form and the moment it applies, and the
+ * native side swaps to it at that moment without a push.
+ */
+function quietFields(content: SessionLiveActivityContentState, now: number): QuietFields {
+  const text = statusText(content);
+  const plain = {
+    text,
+    whenMs: Date.parse(content.statusSince),
+    quietAtMs: 0,
+    quietWhenMs: 0,
+    quietText: null,
+  };
+  const lastActivity =
+    content.lastActivityAt === null || content.lastActivityAt === undefined
+      ? Number.NaN
+      : Date.parse(content.lastActivityAt);
+  if (content.statusKind !== 'running' || !Number.isFinite(lastActivity)) {
+    return plain;
+  }
+  const quietText = `${text}${SEPARATOR}${translate('glanceable.noActivityFor')}`;
+  const quietAt = lastActivity + SESSION_CARD_QUIET_AFTER_MS;
+  if (now >= quietAt) {
+    return { ...plain, text: quietText, whenMs: lastActivity };
+  }
+  return { ...plain, quietAtMs: quietAt, quietWhenMs: lastActivity, quietText };
 }
 
 /** The system-notification card for one content state. */
 export function buildSessionNotificationCard(
   content: SessionLiveActivityContentState,
-  organizationId: string | null
+  organizationId: string | null,
+  now: number = Date.now()
 ): SessionNotificationCard {
   const title = (content.title ?? '').trim();
-  const running = content.statusKind === 'running';
   const statusSince = Date.parse(content.statusSince);
   const stateAt =
     content.statusKind === 'scheduled' && content.scheduledAt !== null
@@ -91,23 +162,29 @@ export function buildSessionNotificationCard(
       : statusSince;
   const waiting = content.statusKind === 'needsInput';
   const canApprove = waiting && content.awaitingPermission && content.approvalKey !== null;
+  const timed = content.statusKind === 'running' && Number.isFinite(statusSince);
   return {
     sessionId: content.sessionId,
     organizationId,
     title: title.length > 0 ? title : translate('common.agent'),
-    text: statusText(content),
     subText: extraText(content),
     compactText: chipText(content),
     openLabel: translate('glanceable.openSession'),
     openUrl: launcherSessionUrl(content.sessionId),
     approveLabel: canApprove ? translate('common.approve') : null,
     approvalKey: content.approvalKey,
-    // A Working card counts up from the last status change on the system clock;
-    // a Scheduled card shows its wake time; every other card the time its state
-    // began. A card with no usable time shows none.
-    whenMs: Number.isFinite(stateAt) ? stateAt : 0,
-    showWhen: !running && Number.isFinite(stateAt),
-    chronometer: running && Number.isFinite(statusSince),
+    // A Working card counts up on the system timer. Every other card draws no
+    // system time, and its state time only orders the cards in the shade.
+    ...(timed
+      ? quietFields(content, now)
+      : {
+          text: statusText(content),
+          whenMs: Number.isFinite(stateAt) ? stateAt : 0,
+          quietAtMs: 0,
+          quietWhenMs: 0,
+          quietText: null,
+        }),
+    chronometer: timed,
     promotion: true,
     color: waiting ? '#956011' : '#4F5A10',
   };

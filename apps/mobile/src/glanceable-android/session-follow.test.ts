@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => ({
 // the times are asserted through the native post arguments below instead.
 vi.mock('./count-format', () => ({
   formatGlanceableClock: (at: string) => at.slice(11, 16),
+  formatGlanceableCount: String,
 }));
 
 vi.mock('./session-notification', () => ({
@@ -152,7 +153,7 @@ describe('syncFollowedSessionCards', () => {
     expect(mocks.postSessionCard).toHaveBeenCalledTimes(1);
     expect(lastCard()).toMatchObject({
       text: expect.stringContaining('Needs input'),
-      showWhen: true,
+      chronometer: false,
     });
   });
 

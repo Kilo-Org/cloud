@@ -37,8 +37,10 @@ const CARD: SessionNotificationCard = {
   approveLabel: null,
   approvalKey: null,
   whenMs: Date.parse('2026-10-12T09:48:00.000Z'),
-  showWhen: false,
   chronometer: true,
+  quietAtMs: 0,
+  quietWhenMs: 0,
+  quietText: null,
   promotion: true,
   color: '#4F5A10',
 };

@@ -278,13 +278,17 @@ observable behavior is the same.
 4. The notification MUST show the session title, the status label, and the time
    in that state. A `running` card MUST show the elapsed time as the platform's
    own counting-up timer, so it stays right while no process runs; every other
-   card MUST show the absolute time the rules above define.
+   card MUST show the absolute time the rules above define in its text, and
+   MUST hide the platform's header time, which draws a relative age.
 5. The system MAY draw extra detail the platform can show, as the Content
    rules define it: the current step, plan progress, the permission command,
    the diff size, and the cost so far. The cost MUST appear only in the
    expanded part of the notification.
-6. The notification MUST use the platform's progress style for the plan bar,
-   and the platform's short critical text for the quiet warning.
+6. The notification MUST use the platform's progress style for the plan bar.
+   The card has one platform timer, so a quiet `running` card MUST name the
+   quiet warning in its text and MUST count that timer from the last activity,
+   which names the quiet time. The device MUST switch the card to the quiet form
+   at the end of the quiet window with no push and no running app process.
 7. The system MUST create the channel before the first post and MUST carry a
    translated channel name, as the other Android channels do.
 
@@ -363,3 +367,11 @@ observable behavior is the same.
   agent's message text stays off the card.
 - A quiet running session shows a warning after 5 minutes instead of the step.
 - The status label and every number MUST NOT truncate.
+
+### 2026-10-12 -- Android content fixes
+
+- A failed Android card names its stop reason.
+- A quiet Android Working card names the warning and counts its timer from
+  the last activity; the device switches it at the end of the quiet window.
+- Android cards other than Working show the absolute time in the text and hide
+  the relative header time.

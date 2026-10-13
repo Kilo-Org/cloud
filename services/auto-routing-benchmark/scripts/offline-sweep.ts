@@ -86,7 +86,10 @@ async function main() {
     'HTTP-Referer': OPENROUTER_HTTP_REFERER,
     'X-Title': OPENROUTER_APP_TITLE,
   };
-  const pairs = z.array(PoolEntrySchema).min(1).parse(JSON.parse(await readFile(values.pairs, 'utf8')));
+  const pairs = z
+    .array(PoolEntrySchema)
+    .min(1)
+    .parse(JSON.parse(await readFile(values.pairs, 'utf8')));
   const pairKeys = new Set(pairs.map(poolEntryKey));
   if (pairKeys.size !== pairs.length) throw new Error('Pairs must be unique');
   const catalogPath = values.catalog ?? 'live';
@@ -152,7 +155,8 @@ async function main() {
     }
     for (let rep = 0; rep < reps; rep++) {
       for (const benchCase of cases) {
-        if (!done.has(JSON.stringify([benchCase.id, rep]))) jobs.push({ pairIndex, benchCase, rep });
+        if (!done.has(JSON.stringify([benchCase.id, rep])))
+          jobs.push({ pairIndex, benchCase, rep });
       }
     }
   }
@@ -295,7 +299,9 @@ async function main() {
   for (const result of results) {
     if (result.status === 'rejected') throw result.reason;
   }
-  console.log(`Saved ${sweep.pairs.reduce((sum, pair) => sum + pair.results.length, 0)} case results to ${out}${sweep.truncated ? ' (truncated)' : ''}`);
+  console.log(
+    `Saved ${sweep.pairs.reduce((sum, pair) => sum + pair.results.length, 0)} case results to ${out}${sweep.truncated ? ' (truncated)' : ''}`
+  );
 }
 
 main().catch((error: unknown) => {

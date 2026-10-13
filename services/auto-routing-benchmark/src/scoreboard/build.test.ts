@@ -420,7 +420,9 @@ describe('buildScoreboard', () => {
     expect(base.quality.heldOut?.estimatedRequestUsdWeighted).toBeCloseTo(0.05);
     const markdown = compareScoreboards(base, head, { relativeOnly: true });
     expect(markdown).toContain('| quality.heldOut.accuracyWeighted | +350.00% | better |');
-    expect(markdown).toContain('| quality.heldOut.estimatedRequestUsdWeighted | -30.00% | better |');
+    expect(markdown).toContain(
+      '| quality.heldOut.estimatedRequestUsdWeighted | -30.00% | better |'
+    );
     expect(markdown).toContain('| quality.heldOut.p50LatencyMsWeighted | -70.00% | better |');
     expect(pricedTable.routes['implementation/code_generation'][0].model).toBe('fixture/first');
   });
@@ -459,7 +461,9 @@ describe('buildScoreboard', () => {
       p50LatencyMsWeighted: 500,
       routes: 1,
     });
-    expect(build(table, null, null, { sweep: { ...sweep, summaries: [] } }).quality.heldOut).toEqual({
+    expect(
+      build(table, null, null, { sweep: { ...sweep, summaries: [] } }).quality.heldOut
+    ).toEqual({
       accuracyWeighted: null,
       estimatedRequestUsdWeighted: null,
       p50LatencyMsWeighted: null,

@@ -140,6 +140,20 @@ function entryKey(contentHash: string, classifierModel: string): string {
   return `${classifierModel}:${contentHash}`;
 }
 
+export function getHotCachedClassification(
+  exactHash: string,
+  classifierModel: string
+): ClassifierOutput | null {
+  const key = entryKey(exactHash, classifierModel);
+  const entry = classificationHotCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.storedAt > ENTRY_TTL_MS) {
+    classificationHotCache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
 const StickyDecisionSchema = z.object({
   model: z.string().min(1),
   // Taxonomy route the model was decided on, for route-change telemetry.
@@ -170,12 +184,7 @@ export async function readConversationState(
       key,
       options.consumePendingCost
     );
-    let hotClassification = classificationHotCache.get(key);
-    if (hotClassification && Date.now() - hotClassification.storedAt > ENTRY_TTL_MS) {
-      classificationHotCache.delete(key);
-      hotClassification = undefined;
-    }
-    let classification = hotClassification?.value ?? null;
+    let classification = getHotCachedClassification(exactHash, classifierModel);
     if (!classification) {
       const parsed = ClassifierOutputSchema.safeParse(state.classification?.value);
       if (parsed.success && state.classification) {

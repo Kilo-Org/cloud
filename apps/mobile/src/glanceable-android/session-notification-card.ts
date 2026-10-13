@@ -3,8 +3,8 @@ import {
   type SessionLiveActivityContentState,
 } from '@kilocode/notifications';
 
+import { formatSessionTotalCost } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
-import { formatCurrency } from '@/lib/format';
 import { launcherSessionUrl } from '@/lib/launcher-surfaces';
 
 import { formatGlanceableClock, formatGlanceableCount } from './count-format';
@@ -106,18 +106,6 @@ function planText(content: SessionLiveActivityContentState): string | null {
   ].join(' ');
 }
 
-/**
- * The cost so far in the app language's digits, or null. It goes only to the
- * expanded part of the notification (spec "Android: the notification" rule 5).
- */
-function costText(content: SessionLiveActivityContentState): string | null {
-  const cost = content.costMicrodollars;
-  if (cost === null || cost === undefined || cost <= 0) {
-    return null;
-  }
-  return formatCurrency(cost / 1_000_000, i18n.language, 2);
-}
-
 type QuietFields = Pick<
   SessionNotificationCard,
   'text' | 'whenMs' | 'quietAtMs' | 'quietWhenMs' | 'quietText'
@@ -176,7 +164,10 @@ export function buildSessionNotificationCard(
     organizationId,
     title: title.length > 0 ? title : translate('common.agent'),
     subText: planText(content),
-    expandedText: costText(content),
+    // The cost so far, by the app's one cost rule: a small cost is exact or
+    // absent, never a false zero. It goes only to the expanded part of the
+    // notification (spec "Android: the notification" rule 5).
+    expandedText: formatSessionTotalCost(content.costMicrodollars),
     compactText: chipText(content),
     openLabel: translate('glanceable.openSession'),
     openUrl: launcherSessionUrl(content.sessionId),

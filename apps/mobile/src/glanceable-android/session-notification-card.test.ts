@@ -150,6 +150,23 @@ describe('buildSessionNotificationCard', () => {
     expect([card.subText, card.text, card.compactText].join(' ')).not.toContain('0.84');
   });
 
+  it.each([
+    [3100, '$0.0031'],
+    [4999, '$0.0050'],
+    [5000, '$0.01'],
+    [49, null],
+    [1, null],
+  ])('draws a small cost of %i microdollars truthfully, or not at all', (micros, expected) => {
+    const card = buildSessionNotificationCard(
+      content({ statusKind: 'idle', costMicrodollars: micros }),
+      null,
+      NOW
+    );
+
+    expect(card.expandedText).toBe(expected);
+    expect(card.expandedText).not.toBe('$0.00');
+  });
+
   it('keeps the cost off the header when the session has no plan', () => {
     const card = buildSessionNotificationCard(
       content({ statusKind: 'idle', costMicrodollars: 840_000 }),

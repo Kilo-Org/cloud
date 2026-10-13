@@ -21,6 +21,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 
 import { getTierName } from './utils';
+import {
+  canSchedulePlanChange,
+  getCancellationWithdrawalNotice,
+  willWithdrawCancellation,
+} from './kiloPassPlanChange.logic';
 import { useKiloPassSubscriptionInfo } from './useKiloPassSubscriptionInfo';
 import { useKiloPassChurnkeyCancelFlow } from './useKiloPassChurnkeyCancelFlow';
 import {
@@ -217,7 +222,12 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
         targetTier,
         targetCadence,
       });
-      toast(`Change scheduled for ${formatIsoDateString_UsaDateOnlyFormat(result.effectiveAt)}`);
+      const effectiveLabel = formatIsoDateString_UsaDateOnlyFormat(result.effectiveAt);
+      toast(
+        result.cancellationWithdrawn
+          ? `Cancellation withdrawn. Plan change scheduled for ${effectiveLabel}.`
+          : `Change scheduled for ${effectiveLabel}`
+      );
       closeModal();
       await queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() });
       await queryClient.invalidateQueries({
@@ -252,9 +262,12 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const resumeAction = view.actions.resume;
   const resumePausedAction = view.actions.resumePaused;
 
-  const isUpdateSubscriptionDisabled = view.status.isPendingCancellation;
+  const isUpdateSubscriptionDisabled = !canSchedulePlanChange(subscription);
 
   const pendingChange = Boolean(scheduledChange);
+  const cancellationWithdrawalNotice = willWithdrawCancellation(subscription, pendingChange)
+    ? getCancellationWithdrawalNotice({ effectiveAtLabel })
+    : null;
   const showUpdatePanel = panel === 'update' && !pendingChange;
 
   return (
@@ -290,6 +303,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
             targetCadence={targetCadence}
             isMutating={isMutating}
             updateSummary={updateSummary}
+            cancellationWithdrawalNotice={isSameSelection ? null : cancellationWithdrawalNotice}
             hasScheduledChange={Boolean(scheduledChange)}
             effectiveAtLabel={effectiveAtLabel}
             onSelectTier={setTargetTier}

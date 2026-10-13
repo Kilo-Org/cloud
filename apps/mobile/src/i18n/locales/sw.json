@@ -136,7 +136,8 @@
     "working": "Inafanya kazi",
     "yourOwnRepositories": "Hazina zako mwenyewe",
     "dismissed": "Imepuuzwa",
-    "agent": "Wakala"
+    "agent": "Wakala",
+    "changes": "Mabadiliko"
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -325,6 +326,7 @@
       "collapseFile": "Kunja faili",
       "expandFile": "Panua faili",
       "diffTooLarge": "Tofauti za msimbo ni nyingi mno kuonyeshwa.",
+      "noPreview": "Hakuna onyesho la kukagua kwa faili hii",
       "openOnGitHub": "Fungua kwenye GitHub",
       "openDiffOnGitHub": "Fungua tofauti za msimbo wa faili hii kwenye GitHub",
       "githubDiff": "Tofauti za msimbo kwenye GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Jaribu tena kupakia mazingira",
       "defaultEnvironment": "Mazingira chaguomsingi",
       "environmentSummary": "amri {{commands}} · MCP {{mcp}} · ujuzi {{skills}} · mawakala {{agents}}",
-      "changes": "Mabadiliko",
       "leaveChanges": "Acha mabadiliko",
       "commitAndPush": "Hifadhi na utume",
       "startSession": "Anza kikao",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modeli ({{displayCount}})",
       "modelsCount_other": "Modeli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Angalia mabadiliko",
+      "asOf": "Kufikia {{time}}",
+      "tooLarge": "Tofauti hizi za msimbo ni nyingi mno kuonyeshwa kwenye simu.",
+      "empty": "Bado hakuna mabadiliko ya faili katika kipindi hiki."
     },
     "autoApprove": {
       "title": "Kuidhinisha kiotomatiki",
@@ -3238,7 +3245,6 @@
       "fieldName": "Jina linaloonyeshwa",
       "fieldUrl": "URL ya seva",
       "fieldUrlInvalid": "Weka URL sahihi ya seva.",
-      "fieldToken": "Tokeni ya Bearer (hiari)",
       "enableServer": "Washa seva hii: {{name}}",
       "editServer": "Hariri seva",
       "deleteServer": "Futa seva",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "zana {{count}}",
       "serverUnreachable": "Haikuweza kufikia seva hii",
       "serverOff": "Seva hii imezimwa"
+    },
+    "mcpOAuth": {
+      "authMethod": "Uthibitishaji",
+      "authNone": "Bila kuingia",
+      "authBearer": "Tokeni ya Bearer",
+      "authOAuth": "Kuingia kwa OAuth",
+      "fieldToken": "Tokeni",
+      "oauthHint": "Baada ya kuhifadhi, gusa $t(modelChat.mcpOAuth.signIn) kwenye seva ili kuingia kupitia kivinjari chako.",
+      "serverNeedsSignIn": "Ingia ili kutumia seva hii",
+      "signIn": "Ingia",
+      "signInA11y": "Ingia kwenye seva hii: {{name}}",
+      "signInFailed": "Haikuweza kuingia kwenye {{name}}. Jaribu tena."
     },
     "backends": {
       "title": "Huduma za gumzo",
@@ -3412,6 +3430,9 @@
       "downloading": "Inapakua…",
       "downloadProgress": "Inapakua… {{percent}}%",
       "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
     }
   },
   "settingsTools": {

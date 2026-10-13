@@ -136,7 +136,8 @@
     "working": "En curs",
     "yourOwnRepositories": "Els teus repositoris",
     "dismissed": "Descartat",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Canvis"
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -325,6 +326,7 @@
       "collapseFile": "Plega el fitxer",
       "expandFile": "Desplega el fitxer",
       "diffTooLarge": "Hi ha massa diferències per mostrar-les totes.",
+      "noPreview": "No hi ha cap previsualització disponible per a aquest fitxer",
       "openOnGitHub": "Obre a GitHub",
       "openDiffOnGitHub": "Obre les diferències d'aquest fitxer a GitHub",
       "githubDiff": "Diferències a GitHub"
@@ -2217,7 +2219,6 @@
       "retryLoadingEnvironment": "Torna a provar de carregar l'entorn",
       "defaultEnvironment": "Entorn predeterminat",
       "environmentSummary": "{{commands}} ordres · {{mcp}} MCP · {{skills}} habilitats · {{agents}} agents",
-      "changes": "Canvis",
       "leaveChanges": "Deixa els canvis",
       "commitAndPush": "Consigna i envia",
       "startSession": "Inicia la sessió",
@@ -2689,6 +2690,12 @@
       "modelsCount_one": "Model utilitzat ({{displayCount}})",
       "modelsCount_other": "Models utilitzats ({{displayCount}})",
       "modelsCount_many": "Models utilitzats ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Mostra els canvis",
+      "asOf": "A les {{time}}",
+      "tooLarge": "Aquestes diferències són massa grans per mostrar-les al mòbil.",
+      "empty": "Encara no hi ha canvis de fitxers en aquesta sessió."
     },
     "autoApprove": {
       "title": "Aprovació automàtica",
@@ -3279,7 +3286,6 @@
       "fieldName": "Nom que es mostra",
       "fieldUrl": "URL del servidor",
       "fieldUrlInvalid": "Introdueix una URL de servidor vàlida.",
-      "fieldToken": "Testimoni Bearer (opcional)",
       "enableServer": "Activa aquest servidor: {{name}}",
       "editServer": "Edita el servidor",
       "deleteServer": "Elimina el servidor",
@@ -3299,6 +3305,18 @@
       "serverToolCount": "{{count}} eines",
       "serverUnreachable": "No s'ha pogut contactar amb aquest servidor",
       "serverOff": "Aquest servidor està desactivat"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autenticació",
+      "authNone": "Sense inici de sessió",
+      "authBearer": "Testimoni Bearer",
+      "authOAuth": "Inici de sessió OAuth",
+      "fieldToken": "Testimoni",
+      "oauthHint": "Després de desar, toca $t(modelChat.mcpOAuth.signIn) al servidor per iniciar la sessió amb el navegador.",
+      "serverNeedsSignIn": "Inicia la sessió per utilitzar aquest servidor",
+      "signIn": "Inicia la sessió",
+      "signInA11y": "Inicia la sessió en aquest servidor: {{name}}",
+      "signInFailed": "No s'ha pogut iniciar la sessió a {{name}}. Torna-ho a provar."
     },
     "backends": {
       "title": "Servidors de xat",
@@ -3453,6 +3471,9 @@
       "downloading": "S'està baixant…",
       "downloadProgress": "S'està baixant… {{percent}}%",
       "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Aquest model admet l'esforç de raonament"
     }
   },
   "settingsTools": {

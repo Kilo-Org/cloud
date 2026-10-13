@@ -136,7 +136,8 @@
     "working": "Fix-xogħol",
     "yourOwnRepositories": "Ir-repożitorji tiegħek stess",
     "dismissed": "Imwarrba",
-    "agent": "Aġent"
+    "agent": "Aġent",
+    "changes": "Bidliet"
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -325,6 +326,7 @@
       "collapseFile": "Aħbi l-kontenut tal-fajl",
       "expandFile": "Uri l-kontenut tal-fajl",
       "diffTooLarge": "Hemm wisq differenzi biex jintwerew.",
+      "noPreview": "M'hemmx preview disponibbli għal dan il-fajl",
       "openOnGitHub": "Iftaħ fuq GitHub",
       "openDiffOnGitHub": "Iftaħ id-differenzi ta' dan il-fajl fuq GitHub",
       "githubDiff": "Differenzi fuq GitHub"
@@ -2273,7 +2275,6 @@
       "retryLoadingEnvironment": "Erġa' pprova tgħabbi l-ambjent",
       "defaultEnvironment": "Ambjent prestabbilit",
       "environmentSummary": "{{commands}} kmandi · {{mcp}} MCP · {{skills}} ħiliet · {{agents}} aġenti",
-      "changes": "Bidliet",
       "leaveChanges": "Ħalli l-bidliet",
       "commitAndPush": "Irreġistra u tella'",
       "startSession": "Ibda s-sessjoni",
@@ -2765,6 +2766,12 @@
       "modelsCount_two": "Mudelli ({{displayCount}})",
       "modelsCount_few": "Mudelli ({{displayCount}})",
       "modelsCount_many": "Mudelli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Ara l-bidliet",
+      "asOf": "Sa {{time}}",
+      "tooLarge": "Dawn id-differenzi huma kbar wisq biex jintwerew fuq il-mobile.",
+      "empty": "Għad m'hemm l-ebda bidla fil-fajls f'din is-sessjoni."
     },
     "autoApprove": {
       "title": "Approvazzjoni awtomatika",
@@ -3361,7 +3368,6 @@
       "fieldName": "Isem muri",
       "fieldUrl": "URL tas-server",
       "fieldUrlInvalid": "Daħħal URL tas-server validu.",
-      "fieldToken": "Token Bearer (mhux obbligatorju)",
       "enableServer": "Ippermetti dan is-server: {{name}}",
       "editServer": "Editja s-server",
       "deleteServer": "Ħassar is-server",
@@ -3381,6 +3387,18 @@
       "serverToolCount": "{{count}} għodod",
       "serverUnreachable": "Ma setax jintlaħaq dan is-server",
       "serverOff": "Dan is-server huwa mitfi"
+    },
+    "mcpOAuth": {
+      "authMethod": "Awtentikazzjoni",
+      "authNone": "Mingħajr dħul",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Dħul bl-OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Wara li tissejvja, agħfas $t(modelChat.mcpOAuth.signIn) fuq is-server biex tidħol permezz tal-browser tiegħek.",
+      "serverNeedsSignIn": "Idħol biex tuża dan is-server",
+      "signIn": "Idħol",
+      "signInA11y": "Idħol f'dan is-server: {{name}}",
+      "signInFailed": "Ma stajtx tidħol f'{{name}}. Erġa' pprova."
     },
     "backends": {
       "title": "Servizzi taċ-chat",
@@ -3535,6 +3553,9 @@
       "downloading": "Qed jitniżżel…",
       "downloadProgress": "Qed jitniżżel… {{percent}}%",
       "downloadFailed": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni u l-ispazju ħieles, imbagħad erġa' pprova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"
     }
   },
   "settingsTools": {

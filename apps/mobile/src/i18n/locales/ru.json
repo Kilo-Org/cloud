@@ -136,7 +136,8 @@
     "working": "В работе",
     "yourOwnRepositories": "Личные репозитории",
     "dismissed": "Отклонено",
-    "agent": "Агент"
+    "agent": "Агент",
+    "changes": "Изменения"
   },
   "language": {
     "restarting": "Перезапуск для смены языка",
@@ -1702,7 +1703,6 @@
       "retryLoadingEnvironment": "Повторить загрузку окружения",
       "defaultEnvironment": "Окружение по умолчанию",
       "environmentSummary": "команд: {{commands}} · MCP: {{mcp}} · навыков: {{skills}} · агентов: {{agents}}",
-      "changes": "Изменения",
       "leaveChanges": "Оставить изменения",
       "commitAndPush": "Закоммитить и отправить",
       "startSession": "Начать сеанс",
@@ -2184,6 +2184,12 @@
       "modelsCount_other": "Модели ({{displayCount}})",
       "modelsCount_few": "Модели ({{displayCount}})",
       "modelsCount_many": "Модели ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Просмотреть изменения",
+      "asOf": "По состоянию на {{time}}",
+      "tooLarge": "Изменений слишком много для отображения на мобильном устройстве.",
+      "empty": "В этом сеансе файлы пока не изменялись."
     },
     "autoApprove": {
       "title": "Автоодобрение",
@@ -2700,6 +2706,7 @@
     "fileRows": {
       "collapseFile": "Свернуть файл",
       "diffTooLarge": "Изменений слишком много для отображения.",
+      "noPreview": "Предпросмотр этого файла недоступен",
       "expandFile": "Развернуть файл",
       "markViewed": "Отметить файл {{path}} как просмотренный",
       "openDiffOnGitHub": "Открыть изменения этого файла на GitHub",
@@ -3320,7 +3327,6 @@
       "fieldName": "Отображаемое имя",
       "fieldUrl": "URL сервера",
       "fieldUrlInvalid": "Введите действительный URL сервера.",
-      "fieldToken": "Токен Bearer (необязательно)",
       "enableServer": "Включить этот сервер: {{name}}",
       "editServer": "Редактировать сервер",
       "deleteServer": "Удалить сервер",
@@ -3340,6 +3346,18 @@
       "serverToolCount": "{{count}} инструментов",
       "serverUnreachable": "Не удалось связаться с этим сервером",
       "serverOff": "Этот сервер выключен"
+    },
+    "mcpOAuth": {
+      "authMethod": "Аутентификация",
+      "authNone": "Без входа",
+      "authBearer": "Токен Bearer",
+      "authOAuth": "Вход через OAuth",
+      "fieldToken": "Токен",
+      "oauthHint": "После сохранения нажмите «$t(modelChat.mcpOAuth.signIn)» у сервера, чтобы войти через браузер.",
+      "serverNeedsSignIn": "Войдите, чтобы использовать этот сервер",
+      "signIn": "Войти",
+      "signInA11y": "Войти на этот сервер: {{name}}",
+      "signInFailed": "Не удалось войти на {{name}}. Повторите попытку."
     },
     "backends": {
       "title": "Серверы чата",
@@ -3494,6 +3512,9 @@
       "downloading": "Загрузка…",
       "downloadProgress": "Загрузка… {{percent}}%",
       "downloadFailed": "Загрузка не завершилась. Проверьте подключение и свободное место, затем повторите попытку."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Эта модель поддерживает уровень рассуждений"
     }
   },
   "settingsTools": {

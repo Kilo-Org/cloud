@@ -136,7 +136,8 @@
     "working": "I gang",
     "yourOwnRepositories": "Dine egne kodelagre",
     "dismissed": "Afvist",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Ændringer"
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -325,6 +326,7 @@
       "collapseFile": "Fold filen sammen",
       "expandFile": "Fold filen ud",
       "diffTooLarge": "Ændringerne er for omfattende til at blive vist.",
+      "noPreview": "Ingen forhåndsvisning tilgængelig for denne fil",
       "openOnGitHub": "Åbn på GitHub",
       "openDiffOnGitHub": "Åbn filens ændringsvisning på GitHub",
       "githubDiff": "Ændringsvisning på GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Prøv at indlæse miljøet igen",
       "defaultEnvironment": "Standardmiljø",
       "environmentSummary": "{{commands}} kommandoer · {{mcp}} MCP · {{skills}} færdigheder · {{agents}} agenter",
-      "changes": "Ændringer",
       "leaveChanges": "Behold ændringer",
       "commitAndPush": "Commit og push",
       "startSession": "Start en session",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Vis ændringer",
+      "asOf": "Pr. {{time}}",
+      "tooLarge": "Ændringerne er for omfattende til at blive vist på mobil.",
+      "empty": "Ingen filændringer i denne session endnu."
     },
     "autoApprove": {
       "title": "Automatisk godkendelse",
@@ -3238,7 +3245,6 @@
       "fieldName": "Vist navn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Indtast en gyldig server-URL.",
-      "fieldToken": "Bearer-token (valgfrit)",
       "enableServer": "Aktivér denne server: {{name}}",
       "editServer": "Rediger server",
       "deleteServer": "Slet server",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} værktøjer",
       "serverUnreachable": "Kunne ikke nå denne server",
       "serverOff": "Denne server er slået fra"
+    },
+    "mcpOAuth": {
+      "authMethod": "Godkendelse",
+      "authNone": "Ingen login",
+      "authBearer": "Bearer-token",
+      "authOAuth": "OAuth-login",
+      "fieldToken": "Token",
+      "oauthHint": "Når du har gemt, skal du trykke på $t(modelChat.mcpOAuth.signIn) på serveren for at logge ind med din browser.",
+      "serverNeedsSignIn": "Log ind for at bruge denne server",
+      "signIn": "Log ind",
+      "signInA11y": "Log ind på denne server: {{name}}",
+      "signInFailed": "Kunne ikke logge ind på {{name}}. Prøv igen."
     },
     "backends": {
       "title": "Chatservere",
@@ -3412,6 +3430,9 @@
       "downloading": "Downloader…",
       "downloadProgress": "Downloader… {{percent}}%",
       "downloadFailed": "Downloaden blev ikke fuldført. Tjek din forbindelse og ledig lagerplads, og prøv igen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Denne model understøtter ræsonnementsniveau"
     }
   },
   "settingsTools": {

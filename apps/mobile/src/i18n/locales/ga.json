@@ -136,7 +136,8 @@
     "working": "Ag obair",
     "yourOwnRepositories": "Do stóir féin",
     "dismissed": "Curtha as an áireamh",
-    "agent": "Gníomhaire"
+    "agent": "Gníomhaire",
+    "changes": "Athruithe"
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -325,6 +326,7 @@
       "collapseFile": "Fill an comhad",
       "expandFile": "Leathnaigh an comhad",
       "diffTooLarge": "Tá an chomparáid athruithe rómhór le taispeáint.",
+      "noPreview": "Níl réamhamharc ar fáil don chomhad seo",
       "openOnGitHub": "Oscail ar GitHub",
       "openDiffOnGitHub": "Oscail comparáid athruithe an chomhaid seo ar GitHub",
       "githubDiff": "Comparáid athruithe GitHub"
@@ -2273,7 +2275,6 @@
       "retryLoadingEnvironment": "Bain triail as an timpeallacht a lódáil arís",
       "defaultEnvironment": "Timpeallacht réamhshocraithe",
       "environmentSummary": "orduithe: {{commands}} · {{mcp}} MCP · scileanna: {{skills}} · gníomhairí: {{agents}}",
-      "changes": "Athruithe",
       "leaveChanges": "Fág athruithe",
       "commitAndPush": "Taifead agus brúigh",
       "startSession": "Tosaigh seisiún",
@@ -2765,6 +2766,12 @@
       "modelsCount_two": "Samhlacha ({{displayCount}})",
       "modelsCount_few": "Samhlacha ({{displayCount}})",
       "modelsCount_many": "Samhlacha ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Féach ar athruithe",
+      "asOf": "Amhail {{time}}",
+      "tooLarge": "Tá an chomparáid athruithe seo rómhór le taispeáint ar fhón póca.",
+      "empty": "Níl aon athruithe ar chomhaid sa seisiún seo fós."
     },
     "autoApprove": {
       "title": "Ceadaigh go huathoibríoch",
@@ -3361,7 +3368,6 @@
       "fieldName": "Ainm taispeána",
       "fieldUrl": "URL an fhreastalaí",
       "fieldUrlInvalid": "Cuir URL bailí freastalaí isteach.",
-      "fieldToken": "Comhartha Bearer (roghnach)",
       "enableServer": "Cumasaigh an freastalaí seo: {{name}}",
       "editServer": "Cuir an freastalaí in eagar",
       "deleteServer": "Scrios an freastalaí",
@@ -3381,6 +3387,18 @@
       "serverToolCount": "{{count}} uirlis",
       "serverUnreachable": "Níorbh fhéidir an freastalaí seo a shroicheadh",
       "serverOff": "Tá an freastalaí seo múchta"
+    },
+    "mcpOAuth": {
+      "authMethod": "Fíordheimhniú",
+      "authNone": "Gan síniú isteach",
+      "authBearer": "Comhartha Bearer",
+      "authOAuth": "Síniú isteach OAuth",
+      "fieldToken": "Comhartha",
+      "oauthHint": "Tar éis duit sábháil, tapáil $t(modelChat.mcpOAuth.signIn) ar an bhfreastalaí chun síniú isteach le do bhrabhsálaí.",
+      "serverNeedsSignIn": "Sínigh isteach chun an freastalaí seo a úsáid",
+      "signIn": "Sínigh isteach",
+      "signInA11y": "Sínigh isteach ar an bhfreastalaí seo: {{name}}",
+      "signInFailed": "Níorbh fhéidir síniú isteach ar {{name}}. Bain triail eile as."
     },
     "backends": {
       "title": "Cúlchórais chomhrá",
@@ -3535,6 +3553,9 @@
       "downloading": "Á híoslódáil…",
       "downloadProgress": "Á híoslódáil… {{percent}}%",
       "downloadFailed": "Níor críochnaíodh an íoslódáil. Seiceáil do nasc agus an spás stórála atá saor, agus bain triail eile as."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tacaíonn an tsamhail seo le leibhéal machnaimh"
     }
   },
   "settingsTools": {

@@ -136,7 +136,8 @@
     "working": "İşləyir",
     "yourOwnRepositories": "Öz repozitoriyaların",
     "dismissed": "Rədd edilib",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Dəyişikliklər"
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -325,6 +326,7 @@
       "collapseFile": "Faylın məzmununu gizlət",
       "expandFile": "Faylın məzmununu göstər",
       "diffTooLarge": "Dəyişikliklərin həcmi göstərilmək üçün çox böyükdür.",
+      "noPreview": "Bu fayl üçün önizləmə mövcud deyil",
       "openOnGitHub": "GitHub-da aç",
       "openDiffOnGitHub": "Bu faylın dəyişikliklərini GitHub-da aç",
       "githubDiff": "GitHub-dakı dəyişikliklər"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Mühiti yenidən yüklə",
       "defaultEnvironment": "Standart mühit",
       "environmentSummary": "{{commands}} əmr · {{mcp}} MCP · {{skills}} bacarıq · {{agents}} agent",
-      "changes": "Dəyişikliklər",
       "leaveChanges": "Dəyişiklikləri saxla",
       "commitAndPush": "Təsdiqlə və göndər",
       "startSession": "Sessiyanı başlat",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modellər ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Dəyişikliklərə bax",
+      "asOf": "{{time}} vəziyyətinə",
+      "tooLarge": "Dəyişikliklərin həcmi mobil cihazda göstərmək üçün çox böyükdür.",
+      "empty": "Bu sessiyada hələ fayl dəyişikliyi yoxdur."
     },
     "autoApprove": {
       "title": "Avtomatik təsdiq",
@@ -3238,7 +3245,6 @@
       "fieldName": "Göstərilən ad",
       "fieldUrl": "Server URL-i",
       "fieldUrlInvalid": "Etibarlı server URL-i daxil edin.",
-      "fieldToken": "Bearer token (istəyə bağlı)",
       "enableServer": "Bu serveri aktiv et: {{name}}",
       "editServer": "Serveri redaktə et",
       "deleteServer": "Serveri sil",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} alət",
       "serverUnreachable": "Bu serverə çatmaq mümkün olmadı",
       "serverOff": "Bu server söndürülüb"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikasiya",
+      "authNone": "Girişsiz",
+      "authBearer": "Bearer token",
+      "authOAuth": "OAuth ilə giriş",
+      "fieldToken": "Token",
+      "oauthHint": "Yadda saxladıqdan sonra brauzerlə daxil olmaq üçün serverdə $t(modelChat.mcpOAuth.signIn) düyməsinə toxun.",
+      "serverNeedsSignIn": "Bu serverdən istifadə etmək üçün daxil ol",
+      "signIn": "Daxil ol",
+      "signInA11y": "Bu serverə daxil ol: {{name}}",
+      "signInFailed": "{{name}} serverinə daxil olmaq mümkün olmadı. Yenidən cəhd et."
     },
     "backends": {
       "title": "Söhbətin arxa xidmətləri",
@@ -3412,6 +3430,9 @@
       "downloading": "Endirilir…",
       "downloadProgress": "Endirilir… {{percent}}%",
       "downloadFailed": "Endirmə tamamlanmadı. İnternet bağlantınızı və boş yaddaşı yoxlayın, sonra yenidən cəhd edin."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Bu model düşünmə səviyyəsini dəstəkləyir"
     }
   },
   "settingsTools": {

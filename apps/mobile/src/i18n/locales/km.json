@@ -136,7 +136,8 @@
     "working": "កំពុងដំណើរការ",
     "yourOwnRepositories": "ឃ្លាំងកូដផ្ទាល់ខ្លួនរបស់អ្នក",
     "dismissed": "បានសម្គាល់ថាមិនអើពើ",
-    "agent": "ភ្នាក់ងារ"
+    "agent": "ភ្នាក់ងារ",
+    "changes": "ការផ្លាស់ប្តូរ"
   },
   "language": {
     "restarting": "កំពុងចាប់ផ្តើមឡើងវិញដើម្បីប្រើភាសាដែលបានជ្រើសរើស",
@@ -325,6 +326,7 @@
       "collapseFile": "លាក់ខ្លឹមសារឯកសារ",
       "expandFile": "បង្ហាញខ្លឹមសារឯកសារ",
       "diffTooLarge": "ភាពខុសគ្នានៃកូដធំពេក មិនអាចបង្ហាញបានទេ។",
+      "noPreview": "មិនមានការមើលជាមុនសម្រាប់ឯកសារនេះទេ",
       "openOnGitHub": "បើកនៅលើ GitHub",
       "openDiffOnGitHub": "បើកភាពខុសគ្នានៃកូដក្នុងឯកសារនេះនៅលើ GitHub",
       "githubDiff": "ភាពខុសគ្នានៃកូដនៅលើ GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "ព្យាយាមផ្ទុកបរិស្ថានដំណើរការម្តងទៀត",
       "defaultEnvironment": "បរិស្ថានដំណើរការលំនាំដើម",
       "environmentSummary": "ពាក្យបញ្ជា {{commands}} · MCP {{mcp}} · ជំនាញ {{skills}} · ភ្នាក់ងារ {{agents}}",
-      "changes": "ការផ្លាស់ប្តូរ",
       "leaveChanges": "ទុកការផ្លាស់ប្តូរ",
       "commitAndPush": "កត់ត្រា និងបញ្ជូនកូដ",
       "startSession": "ចាប់ផ្តើមវគ្គ",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "ម៉ូដែល ({{displayCount}})",
       "modelsCount_other": "ម៉ូដែល ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "មើលការផ្លាស់ប្តូរ",
+      "asOf": "គិតត្រឹម {{time}}",
+      "tooLarge": "ភាពខុសគ្នានៃកូដនេះធំពេក មិនអាចបង្ហាញនៅលើទូរស័ព្ទបានទេ។",
+      "empty": "មិនទាន់មានការផ្លាស់ប្តូរឯកសារក្នុងវគ្គនេះនៅឡើយទេ។"
     },
     "autoApprove": {
       "title": "ការអនុម័តស្វ័យប្រវត្តិ",
@@ -3238,7 +3245,6 @@
       "fieldName": "ឈ្មោះបង្ហាញ",
       "fieldUrl": "URL ម៉ាស៊ីនបម្រើ",
       "fieldUrlInvalid": "បញ្ចូល URL ម៉ាស៊ីនបម្រើត្រឹមត្រូវ។",
-      "fieldToken": "តូកិន Bearer (ស្រេចចិត្ត)",
       "enableServer": "បើកម៉ាស៊ីនបម្រើនេះ: {{name}}",
       "editServer": "កែសម្រួលម៉ាស៊ីនបម្រើ",
       "deleteServer": "លុបម៉ាស៊ីនបម្រើ",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "ឧបករណ៍ {{count}}",
       "serverUnreachable": "មិនអាចទៅដល់ម៉ាស៊ីនបម្រើនេះបានទេ",
       "serverOff": "ម៉ាស៊ីនបម្រើនេះត្រូវបានបិទ"
+    },
+    "mcpOAuth": {
+      "authMethod": "ការផ្ទៀងផ្ទាត់",
+      "authNone": "មិនចាំបាច់ចូល",
+      "authBearer": "តូកិន Bearer",
+      "authOAuth": "ការចូលតាម OAuth",
+      "fieldToken": "តូកិន",
+      "oauthHint": "បន្ទាប់ពីរក្សាទុក សូមចុច $t(modelChat.mcpOAuth.signIn) លើម៉ាស៊ីនបម្រើ ដើម្បីចូលតាមកម្មវិធីរុករករបស់អ្នក។",
+      "serverNeedsSignIn": "ចូលដើម្បីប្រើម៉ាស៊ីនបម្រើនេះ",
+      "signIn": "ចូល",
+      "signInA11y": "ចូលទៅម៉ាស៊ីនបម្រើនេះ: {{name}}",
+      "signInFailed": "មិនអាចចូលទៅ {{name}} បានទេ។ សូមព្យាយាមម្តងទៀត។"
     },
     "backends": {
       "title": "ប្រព័ន្ធខាងក្រោយសម្រាប់ជជែក",
@@ -3412,6 +3430,9 @@
       "downloading": "កំពុងទាញយក…",
       "downloadProgress": "កំពុងទាញយក… {{percent}}%",
       "downloadFailed": "ការទាញយកមិនបានបញ្ចប់ទេ។ សូមពិនិត្យការតភ្ជាប់ និងទំហំផ្ទុកទំនេររបស់អ្នក រួចព្យាយាមម្តងទៀត។"
+    },
+    "reasoningEffort": {
+      "modelFlag": "គំរូនេះគាំទ្រកម្រិតនៃការគិត"
     }
   },
   "settingsTools": {

@@ -136,7 +136,8 @@
     "working": "Hojjechaa jira",
     "yourOwnRepositories": "Kuusaalee koodii mataa keetii",
     "dismissed": "Dhiifame",
-    "agent": "Bakka bu'aa"
+    "agent": "Bakka bu'aa",
+    "changes": "Jijjiiramoota"
   },
   "language": {
     "restarting": "Afaan filatame fayyadamuuf irra deebi'ee jalqabaa jira",
@@ -325,6 +326,7 @@
       "collapseFile": "Faayilii cufi",
       "expandFile": "Faayilii bal'isi",
       "diffTooLarge": "Garaagarummaan agarsiisuuf garmalee guddaadha.",
+      "noPreview": "Faayilii kanaaf duraaltoon hin jiru",
       "openOnGitHub": "GitHub irratti bani",
       "openDiffOnGitHub": "Garaagarummaa faayilii kanaa GitHub irratti bani",
       "githubDiff": "Garaagarummaa GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Naannoo fe'uuf deebi'ii yaali",
       "defaultEnvironment": "Naannoo durtii",
       "environmentSummary": "ajajoota {{commands}} · MCP {{mcp}} · dandeettiiwwan {{skills}} · ergamtoota {{agents}}",
-      "changes": "Jijjiiramoota",
       "leaveChanges": "Jijjiiramoota dhiisi",
       "commitAndPush": "Galmeessiitii ol ergi",
       "startSession": "Turtii jalqabi",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Moodela ({{displayCount}})",
       "modelsCount_other": "Moodeloota ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Jijjiiramoota ilaali",
+      "asOf": "Hanga {{time}} tti",
+      "tooLarge": "Garaagarummaan kun moobaayilii irratti agarsiisuuf garmalee guddaadha.",
+      "empty": "Yeroo kana keessatti hanga ammaatti jijjiiramni faayilii hin jiru."
     },
     "autoApprove": {
       "title": "Eeyyama ofumaan",
@@ -3238,7 +3245,6 @@
       "fieldName": "Maqaa mul'atu",
       "fieldUrl": "URL seerverii",
       "fieldUrlInvalid": "URL seerverii sirrii galchi.",
-      "fieldToken": "Token Bearer (filannoo)",
       "enableServer": "Seerverii kana dandeessisi: {{name}}",
       "editServer": "Seerverii sirreessi",
       "deleteServer": "Seerverii balleessi",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "meeshaalee {{count}}",
       "serverUnreachable": "Seerverii kana bira ga'uun hin danda'amne",
       "serverOff": "Seerveriin kun dhaameera"
+    },
+    "mcpOAuth": {
+      "authMethod": "Mirkaneessa",
+      "authNone": "Seenuu malee",
+      "authBearer": "Token Bearer",
+      "authOAuth": "OAuth'n seenuu",
+      "fieldToken": "Token",
+      "oauthHint": "Erga olkaa'attee booda, brawuzarii keetiin seenuuf seerverii irratti $t(modelChat.mcpOAuth.signIn) tuqi.",
+      "serverNeedsSignIn": "Seerverii kana fayyadamuuf seeni",
+      "signIn": "Seeni",
+      "signInA11y": "Seerverii kanatti seeni: {{name}}",
+      "signInFailed": "{{name}} tti seenuun hin danda'amne. Irra deebi'ii yaali."
     },
     "backends": {
       "title": "Sirnoota duubaa chaat",
@@ -3412,6 +3430,9 @@
       "downloading": "Buufamaa jira…",
       "downloadProgress": "Buufamaa jira… {{percent}}%",
       "downloadFailed": "Buufachuun hin xumuramne. Walqunnamtii keessanii fi kuusaa duwwaa mirkaneessii irra deebi'ii yaali."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Moodeelli kun sadarkaa xiinxalaa ni deeggara"
     }
   },
   "settingsTools": {

@@ -136,7 +136,8 @@
     "working": "काम गर्दै",
     "yourOwnRepositories": "तपाईंका आफ्नै रिपोजिटरीहरू",
     "dismissed": "खारेज गरियो",
-    "agent": "एजेन्ट"
+    "agent": "एजेन्ट",
+    "changes": "परिवर्तनहरू"
   },
   "language": {
     "restarting": "भाषा लागू गर्न पुनः सुरु गर्दै",
@@ -325,6 +326,7 @@
       "collapseFile": "फाइलको विवरण लुकाउनुहोस्",
       "expandFile": "फाइलको विवरण देखाउनुहोस्",
       "diffTooLarge": "परिवर्तन विवरण देखाउन नसकिने गरी ठूलो छ।",
+      "noPreview": "यो फाइलको पूर्वावलोकन उपलब्ध छैन",
       "openOnGitHub": "GitHub मा खोल्नुहोस्",
       "openDiffOnGitHub": "यो फाइलको परिवर्तन विवरण GitHub मा खोल्नुहोस्",
       "githubDiff": "GitHub मा परिवर्तन विवरण"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "वातावरण लोड गर्न पुनः प्रयास गर्नुहोस्",
       "defaultEnvironment": "पूर्वनिर्धारित वातावरण",
       "environmentSummary": "{{commands}} कमाण्ड · {{mcp}} MCP · {{skills}} सीप · {{agents}} एजेन्ट",
-      "changes": "परिवर्तनहरू",
       "leaveChanges": "परिवर्तन यथावत्",
       "commitAndPush": "कमिट र पुश",
       "startSession": "सत्र सुरु गर्नुहोस्",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "मोडेल ({{displayCount}})",
       "modelsCount_other": "मोडेलहरू ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "परिवर्तनहरू हेर्नुहोस्",
+      "asOf": "{{time}} सम्मको",
+      "tooLarge": "यो परिवर्तन विवरण मोबाइलमा देखाउन नसकिने गरी ठूलो छ।",
+      "empty": "यो सत्रमा अहिलेसम्म कुनै फाइल परिवर्तन भएको छैन।"
     },
     "autoApprove": {
       "title": "स्वतः स्वीकृति",
@@ -3238,7 +3245,6 @@
       "fieldName": "देखाइने नाम",
       "fieldUrl": "सर्भर URL",
       "fieldUrlInvalid": "मान्य सर्भर URL प्रविष्ट गर्नुहोस्।",
-      "fieldToken": "Bearer टोकन (वैकल्पिक)",
       "enableServer": "यो सर्भर सक्षम गर्नुहोस्: {{name}}",
       "editServer": "सर्भर सम्पादन गर्नुहोस्",
       "deleteServer": "सर्भर मेट्नुहोस्",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} उपकरण",
       "serverUnreachable": "यो सर्भरसम्म पुग्न सकिएन",
       "serverOff": "यो सर्भर बन्द छ"
+    },
+    "mcpOAuth": {
+      "authMethod": "प्रमाणीकरण",
+      "authNone": "साइन इन आवश्यक छैन",
+      "authBearer": "Bearer टोकन",
+      "authOAuth": "OAuth साइन इन",
+      "fieldToken": "टोकन",
+      "oauthHint": "सेभ गरेपछि, आफ्नो ब्राउजरमार्फत साइन इन गर्न सर्भरमा $t(modelChat.mcpOAuth.signIn) थिच्नुहोस्।",
+      "serverNeedsSignIn": "यो सर्भर प्रयोग गर्न साइन इन गर्नुहोस्",
+      "signIn": "साइन इन",
+      "signInA11y": "यो सर्भरमा साइन इन गर्नुहोस्: {{name}}",
+      "signInFailed": "{{name}} मा साइन इन गर्न सकिएन। फेरि प्रयास गर्नुहोस्।"
     },
     "backends": {
       "title": "च्याट ब्याकएन्डहरू",
@@ -3412,6 +3430,9 @@
       "downloading": "डाउनलोड हुँदैछ…",
       "downloadProgress": "डाउनलोड हुँदैछ… {{percent}}%",
       "downloadFailed": "डाउनलोड पूरा भएन। आफ्नो इन्टरनेट जडान र खाली भण्डारण जाँच गरेर फेरि प्रयास गर्नुहोस्।"
+    },
+    "reasoningEffort": {
+      "modelFlag": "यो मोडेलले सोच्ने प्रयासको स्तर समर्थन गर्छ"
     }
   },
   "settingsTools": {

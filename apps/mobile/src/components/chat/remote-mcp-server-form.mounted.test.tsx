@@ -32,6 +32,7 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 
 const saved: RemoteMcpServerDraft[] = [];
 const onSave = (draft: RemoteMcpServerDraft): void => {
@@ -79,6 +80,23 @@ async function pressSave(): Promise<void> {
   });
 }
 
+type SegmentedProps = {
+  readonly onChange: (value: string) => void;
+};
+
+/** Picks a sign-in method, the way the segmented control reports it. */
+async function choose(method: RemoteMcpServerDraft['auth']['type']): Promise<void> {
+  if (renderer === undefined) {
+    throw new Error('not mounted');
+  }
+  const control = renderer.root.find(node => String(node.type) === 'SegmentedControl')
+    .props as SegmentedProps;
+  await act(async () => {
+    control.onChange(method);
+    await Promise.resolve();
+  });
+}
+
 afterEach(() => {
   renderer?.unmount();
   renderer = undefined;
@@ -114,6 +132,8 @@ describe('the remote MCP server form', () => {
     await mount({ onSave });
     await type(0, 'Remote');
     await type(1, 'https://remote.example/mcp');
+    await choose('bearer');
+    expect(saveButton().disabled).toBe(true);
     await type(2, 'secret');
 
     await pressSave();
@@ -128,14 +148,27 @@ describe('the remote MCP server form', () => {
     ]);
   });
 
-  it('reports no token as no auth, not as an empty credential', async () => {
+  it('reports no sign-in by default, with no token field', async () => {
     await mount({ onSave });
     await type(0, 'Remote');
     await type(1, 'https://remote.example/mcp');
 
     await pressSave();
 
+    expect(fields()).toHaveLength(2);
     expect(saved[0]?.auth).toEqual({ type: 'none' });
+  });
+
+  it('reports OAuth with no token field, so the sign-in happens after the save', async () => {
+    await mount({ onSave });
+    await type(0, 'Remote');
+    await type(1, 'https://remote.example/mcp');
+    await choose('oauth');
+
+    await pressSave();
+
+    expect(fields()).toHaveLength(2);
+    expect(saved[0]?.auth).toEqual({ type: 'oauth' });
   });
 
   it('edits a server without changing its id or its switch', async () => {

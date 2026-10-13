@@ -136,7 +136,8 @@
     "working": "કામ ચાલુ છે",
     "yourOwnRepositories": "તમારી પોતાની રિપોઝિટરીઓ",
     "dismissed": "ખારિજ કરેલું",
-    "agent": "એજન્ટ"
+    "agent": "એજન્ટ",
+    "changes": "ફેરફારો"
   },
   "language": {
     "restarting": "ભાષા લાગુ કરવા ઍપ ફરી શરૂ થઈ રહી છે",
@@ -325,6 +326,7 @@
       "collapseFile": "ફાઇલની વિગતો છુપાવો",
       "expandFile": "ફાઇલની વિગતો બતાવો",
       "diffTooLarge": "તફાવત એટલો મોટો છે કે તેને બતાવી શકાતો નથી.",
+      "noPreview": "આ ફાઇલનું પૂર્વાવલોકન ઉપલબ્ધ નથી",
       "openOnGitHub": "GitHub પર ખોલો",
       "openDiffOnGitHub": "આ ફાઇલનો તફાવત GitHub પર ખોલો",
       "githubDiff": "GitHub પરનો તફાવત"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "કાર્યપરિસર લોડ કરવા ફરી પ્રયાસ કરો",
       "defaultEnvironment": "ડિફોલ્ટ કાર્યપરિસર",
       "environmentSummary": "{{commands}} કમાન્ડ · {{mcp}} MCP · {{skills}} સ્કિલ · {{agents}} એજન્ટ",
-      "changes": "ફેરફારો",
       "leaveChanges": "ફેરફારો રાખો",
       "commitAndPush": "કમિટ અને પુશ કરો",
       "startSession": "સત્ર શરૂ કરો",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "મોડલ ({{displayCount}})",
       "modelsCount_other": "મોડલ ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ફેરફારો જુઓ",
+      "asOf": "{{time}} મુજબ",
+      "tooLarge": "આ તફાવત એટલો મોટો છે કે તેને મોબાઇલ પર બતાવી શકાતો નથી.",
+      "empty": "આ સત્રમાં હજી સુધી કોઈ ફાઇલમાં ફેરફાર થયો નથી."
     },
     "autoApprove": {
       "title": "સ્વતઃ મંજૂરી",
@@ -3238,7 +3245,6 @@
       "fieldName": "દર્શાવેલ નામ",
       "fieldUrl": "સર્વર URL",
       "fieldUrlInvalid": "માન્ય સર્વર URL દાખલ કરો.",
-      "fieldToken": "Bearer ટોકન (વૈકલ્પિક)",
       "enableServer": "આ સર્વર સક્ષમ કરો: {{name}}",
       "editServer": "સર્વર સંપાદિત કરો",
       "deleteServer": "સર્વર કાઢી નાખો",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} સાધનો",
       "serverUnreachable": "આ સર્વર સુધી પહોંચી શકાયું નથી",
       "serverOff": "આ સર્વર બંધ છે"
+    },
+    "mcpOAuth": {
+      "authMethod": "પ્રમાણીકરણ",
+      "authNone": "સાઇન ઇન વિના",
+      "authBearer": "Bearer ટોકન",
+      "authOAuth": "OAuth સાઇન ઇન",
+      "fieldToken": "ટોકન",
+      "oauthHint": "સાચવ્યા પછી, તમારા બ્રાઉઝર વડે સાઇન ઇન કરવા માટે સર્વર પર $t(modelChat.mcpOAuth.signIn) ટૅપ કરો.",
+      "serverNeedsSignIn": "આ સર્વર વાપરવા માટે સાઇન ઇન કરો",
+      "signIn": "સાઇન ઇન કરો",
+      "signInA11y": "આ સર્વરમાં સાઇન ઇન કરો: {{name}}",
+      "signInFailed": "{{name}} માં સાઇન ઇન કરી શકાયું નથી. ફરી પ્રયાસ કરો."
     },
     "backends": {
       "title": "ચેટ બૅકએન્ડ્સ",
@@ -3412,6 +3430,9 @@
       "downloading": "ડાઉનલોડ થઈ રહ્યું છે…",
       "downloadProgress": "ડાઉનલોડ થઈ રહ્યું છે… {{percent}}%",
       "downloadFailed": "ડાઉનલોડ પૂરું થયું નથી. તમારું કનેક્શન અને ખાલી સ્ટોરેજ તપાસો, પછી ફરી પ્રયાસ કરો."
+    },
+    "reasoningEffort": {
+      "modelFlag": "આ મોડેલ વિચારના સ્તરને સપોર્ટ કરે છે"
     }
   },
   "settingsTools": {

@@ -136,7 +136,8 @@
     "working": "کام جاری ہے",
     "yourOwnRepositories": "آپ کی اپنی ریپوزٹریز",
     "dismissed": "نظر انداز کردہ",
-    "agent": "ایجنٹ"
+    "agent": "ایجنٹ",
+    "changes": "تبدیلیاں"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -325,6 +326,7 @@
       "collapseFile": "فائل کی تفصیل چھپائیں",
       "expandFile": "فائل کی تفصیل دکھائیں",
       "diffTooLarge": "تبدیلیوں کا موازنہ اتنا بڑا ہے کہ اسے دکھایا نہیں جا سکتا۔",
+      "noPreview": "اس فائل کا کوئی پیش منظر دستیاب نہیں",
       "openOnGitHub": "GitHub پر کھولیں",
       "openDiffOnGitHub": "اس فائل کی تبدیلیوں کا موازنہ GitHub پر کھولیں",
       "githubDiff": "GitHub پر تبدیلیوں کا موازنہ"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "ماحول دوبارہ لوڈ کرنے کی کوشش کریں",
       "defaultEnvironment": "پہلے سے طے شدہ ماحول",
       "environmentSummary": "{{commands}} کمانڈز · {{mcp}} MCP · {{skills}} مہارتیں · {{agents}} ایجنٹ",
-      "changes": "تبدیلیاں",
       "leaveChanges": "تبدیلیاں رہنے دیں",
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
       "modelsCount_one": "ماڈل ({{displayCount}})",
       "modelsCount_other": "ماڈلز ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "تبدیلیاں دیکھیں",
+      "asOf": "{{time}} تک",
+      "tooLarge": "تبدیلیوں کا یہ موازنہ اتنا بڑا ہے کہ اسے موبائل پر دکھایا نہیں جا سکتا۔",
+      "empty": "اس سیشن میں ابھی تک فائلوں میں کوئی تبدیلی نہیں ہوئی۔"
     },
     "autoApprove": {
       "title": "خودکار منظوری",
@@ -3238,7 +3245,6 @@
       "fieldName": "دکھایا جانے والا نام",
       "fieldUrl": "سرور URL",
       "fieldUrlInvalid": "درست سرور URL درج کریں۔",
-      "fieldToken": "Bearer ٹوکن (اختیاری)",
       "enableServer": "اس سرور کو فعال کریں: {{name}}",
       "editServer": "سرور میں ترمیم کریں",
       "deleteServer": "سرور حذف کریں",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} ٹولز",
       "serverUnreachable": "اس سرور تک نہیں پہنچ سکا",
       "serverOff": "یہ سرور بند ہے"
+    },
+    "mcpOAuth": {
+      "authMethod": "تصدیق",
+      "authNone": "سائن ان کے بغیر",
+      "authBearer": "Bearer ٹوکن",
+      "authOAuth": "OAuth سائن ان",
+      "fieldToken": "ٹوکن",
+      "oauthHint": "محفوظ کرنے کے بعد، اپنے براؤزر سے سائن ان کرنے کے لیے سرور پر $t(modelChat.mcpOAuth.signIn) پر ٹیپ کریں۔",
+      "serverNeedsSignIn": "یہ سرور استعمال کرنے کے لیے سائن ان کریں",
+      "signIn": "سائن ان کریں",
+      "signInA11y": "اس سرور میں سائن ان کریں: {{name}}",
+      "signInFailed": "{{name}} میں سائن ان نہیں ہو سکا۔ دوبارہ کوشش کریں۔"
     },
     "backends": {
       "title": "چیٹ بیک اینڈز",
@@ -3412,6 +3430,9 @@
       "downloading": "ڈاؤن لوڈ ہو رہا ہے…",
       "downloadProgress": "ڈاؤن لوڈ ہو رہا ہے… {{percent}}%",
       "downloadFailed": "ڈاؤن لوڈ مکمل نہیں ہوا۔ اپنا کنکشن اور خالی اسٹوریج چیک کریں، پھر دوبارہ کوشش کریں۔"
+    },
+    "reasoningEffort": {
+      "modelFlag": "یہ ماڈل غور کی سطح کو سپورٹ کرتا ہے"
     }
   },
   "settingsTools": {

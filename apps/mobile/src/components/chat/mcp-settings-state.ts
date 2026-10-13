@@ -190,7 +190,8 @@ type RemoteMcpStatusKey =
   | 'modelChat.mcp.serverChecking'
   | 'modelChat.mcp.serverOff'
   | 'modelChat.mcp.serverToolCount'
-  | 'modelChat.mcp.serverUnreachable';
+  | 'modelChat.mcp.serverUnreachable'
+  | 'modelChat.mcpOAuth.serverNeedsSignIn';
 
 /**
  * One remote server, as a row. It always offers enable, edit and delete: the
@@ -207,6 +208,8 @@ export type RemoteMcpServerRow = {
   readonly toolCount: number;
   /** Whether the row offers a Retry: a failed discovery, or one that answered with no tools. */
   readonly retry: boolean;
+  /** Whether the row offers a Sign in: an OAuth server refused, and only the person can fix it. */
+  readonly signIn: boolean;
   readonly canEdit: true;
   readonly canDelete: true;
 };
@@ -234,6 +237,9 @@ function remoteStatusKey(
   }
   if (state.status === 'failed') {
     return 'modelChat.mcp.serverUnreachable';
+  }
+  if (state.status === 'signIn') {
+    return 'modelChat.mcpOAuth.serverNeedsSignIn';
   }
   return state.toolCount > 0 ? 'modelChat.mcp.serverToolCount' : 'modelChat.mcp.none';
 }
@@ -273,6 +279,7 @@ export function remoteServerRows(
       statusKey: remoteStatusKey(server.enabled, state),
       toolCount: server.enabled ? (state?.toolCount ?? 0) : 0,
       retry: remoteRetry(server.enabled, state),
+      signIn: server.enabled && state?.status === 'signIn',
       canEdit: true,
       canDelete: true,
     };
@@ -304,6 +311,7 @@ type McpFormErrorKey = 'common.required' | 'modelChat.mcp.fieldUrlInvalid';
 export type McpServerFormErrors = {
   readonly name?: McpFormErrorKey;
   readonly url?: McpFormErrorKey;
+  readonly token?: McpFormErrorKey;
 };
 
 /** Why a URL cannot be saved: empty, or one the store would not accept. */
@@ -325,20 +333,19 @@ function urlErrorFor(url: string): McpFormErrorKey | undefined {
  * The name and the URL are required, and the URL is put through the same
  * normalization the store uses: a form that would be refused on save is refused
  * here, so the Save is gated rather than the person's write being thrown away
- * after they made it. The token is optional and never blocks a save.
+ * after they made it. A bearer server needs its token.
  */
 export function mcpServerFormError(draft: RemoteMcpServerDraft): McpServerFormErrors | null {
-  const name: McpFormErrorKey | undefined =
-    draft.name.trim() === '' ? 'common.required' : undefined;
+  const name = draft.name.trim() === '' ? 'common.required' : undefined;
   const url = urlErrorFor(draft.url);
-  if (name !== undefined && url !== undefined) {
-    return { name, url };
+  const token =
+    draft.auth.type === 'bearer' && (draft.auth.token ?? '') === '' ? 'common.required' : undefined;
+  if (name === undefined && url === undefined && token === undefined) {
+    return null;
   }
-  if (name !== undefined) {
-    return { name };
-  }
-  if (url !== undefined) {
-    return { url };
-  }
-  return null;
+  return {
+    ...(name === undefined ? {} : { name }),
+    ...(url === undefined ? {} : { url }),
+    ...(token === undefined ? {} : { token }),
+  } satisfies McpServerFormErrors;
 }

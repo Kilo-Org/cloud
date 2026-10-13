@@ -136,7 +136,8 @@
     "working": "Pracuje",
     "yourOwnRepositories": "Tvoje vlastní repozitáře",
     "dismissed": "Zamítnuto",
-    "agent": "Činidlo"
+    "agent": "Činidlo",
+    "changes": "Změny"
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -325,6 +326,7 @@
       "collapseFile": "Sbalit soubor",
       "expandFile": "Rozbalit soubor",
       "diffTooLarge": "Přehled změn je příliš velký na zobrazení.",
+      "noPreview": "Pro tento soubor není k dispozici náhled",
       "openOnGitHub": "Otevřít na GitHubu",
       "openDiffOnGitHub": "Otevřít přehled změn tohoto souboru na GitHubu",
       "githubDiff": "Přehled změn na GitHubu"
@@ -2245,7 +2247,6 @@
       "retryLoadingEnvironment": "Znovu načíst prostředí",
       "defaultEnvironment": "Výchozí prostředí",
       "environmentSummary": "příkazy: {{commands}} · MCP: {{mcp}} · dovednosti: {{skills}} · agenti: {{agents}}",
-      "changes": "Změny",
       "leaveChanges": "Ponechat změny",
       "commitAndPush": "Vytvořit commit a odeslat",
       "startSession": "Spustit relaci",
@@ -2727,6 +2728,12 @@
       "modelsCount_other": "Modely ({{displayCount}})",
       "modelsCount_few": "Modely ({{displayCount}})",
       "modelsCount_many": "Modely ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Zobrazit změny",
+      "asOf": "Stav k {{time}}",
+      "tooLarge": "Přehled změn je příliš velký na zobrazení v mobilu.",
+      "empty": "V této relaci zatím nejsou žádné změny souborů."
     },
     "autoApprove": {
       "title": "Automatické schvalování",
@@ -3320,7 +3327,6 @@
       "fieldName": "Zobrazovaný název",
       "fieldUrl": "URL serveru",
       "fieldUrlInvalid": "Zadejte platnou URL serveru.",
-      "fieldToken": "Token Bearer (volitelné)",
       "enableServer": "Povolit tento server: {{name}}",
       "editServer": "Upravit server",
       "deleteServer": "Smazat server",
@@ -3340,6 +3346,18 @@
       "serverToolCount": "{{count}} nástrojů",
       "serverUnreachable": "Nepodařilo se připojit k tomuto serveru",
       "serverOff": "Tento server je vypnutý"
+    },
+    "mcpOAuth": {
+      "authMethod": "Ověření",
+      "authNone": "Bez přihlášení",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Přihlášení přes OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Po uložení klepněte u serveru na $t(modelChat.mcpOAuth.signIn) a přihlaste se v prohlížeči.",
+      "serverNeedsSignIn": "Pro použití tohoto serveru se přihlaste",
+      "signIn": "Přihlásit se",
+      "signInA11y": "Přihlásit se k tomuto serveru: {{name}}",
+      "signInFailed": "Nepodařilo se přihlásit k {{name}}. Zkuste to znovu."
     },
     "backends": {
       "title": "Servery chatu",
@@ -3494,6 +3512,9 @@
       "downloading": "Stahování…",
       "downloadProgress": "Stahování… {{percent}} %",
       "downloadFailed": "Stahování se nedokončilo. Zkontrolujte připojení a volné místo v úložišti a zkuste to znovu."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tento model podporuje úroveň uvažování"
     }
   },
   "settingsTools": {

@@ -136,7 +136,8 @@
     "working": "Yn gweithio",
     "yourOwnRepositories": "Dy ystorfeydd dy hun",
     "dismissed": "Wedi'i ddiystyru",
-    "agent": "Asiant"
+    "agent": "Asiant",
+    "changes": "Newidiadau"
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -325,6 +326,7 @@
       "collapseFile": "Cwympo'r ffeil",
       "expandFile": "Ehangu'r ffeil",
       "diffTooLarge": "Mae gormod o wahaniaethau i'w dangos.",
+      "noPreview": "Does dim rhagolwg ar gael ar gyfer y ffeil hon",
       "openOnGitHub": "Agor ar GitHub",
       "openDiffOnGitHub": "Agor gwahaniaethau'r ffeil hon ar GitHub",
       "githubDiff": "Gwahaniaethau ar GitHub"
@@ -2301,7 +2303,6 @@
       "retryLoadingEnvironment": "Ceisio llwytho'r amgylchedd eto",
       "defaultEnvironment": "Amgylchedd diofyn",
       "environmentSummary": "Gorchmynion: {{commands}} · MCP: {{mcp}} · Sgiliau: {{skills}} · Asiantau: {{agents}}",
-      "changes": "Newidiadau",
       "leaveChanges": "Gadael newidiadau",
       "commitAndPush": "Cyflwyno a gwthio",
       "startSession": "Dechrau sesiwn",
@@ -2803,6 +2804,12 @@
       "modelsCount_two": "Modelau ({{displayCount}})",
       "modelsCount_few": "Modelau ({{displayCount}})",
       "modelsCount_many": "Modelau ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Gweld newidiadau",
+      "asOf": "Fel ar {{time}}",
+      "tooLarge": "Mae'r gwahaniaethau hyn yn rhy fawr i'w dangos ar ffôn symudol.",
+      "empty": "Dim newidiadau i ffeiliau yn y sesiwn hon eto."
     },
     "autoApprove": {
       "title": "Cymeradwyo'n awtomatig",
@@ -3402,7 +3409,6 @@
       "fieldName": "Enw dangos",
       "fieldUrl": "URL gweinydd",
       "fieldUrlInvalid": "Rhowch URL gweinydd dilys.",
-      "fieldToken": "Tocyn Bearer (dewisol)",
       "enableServer": "Galluogi'r gweinydd hwn: {{name}}",
       "editServer": "Golygu gweinydd",
       "deleteServer": "Dileu gweinydd",
@@ -3422,6 +3428,18 @@
       "serverToolCount": "{{count}} offeryn",
       "serverUnreachable": "Ni ellid cyrraedd y gweinydd hwn",
       "serverOff": "Mae'r gweinydd hwn i ffwrdd"
+    },
+    "mcpOAuth": {
+      "authMethod": "Dilysu",
+      "authNone": "Dim mewngofnodi",
+      "authBearer": "Tocyn Bearer",
+      "authOAuth": "Mewngofnodi OAuth",
+      "fieldToken": "Tocyn",
+      "oauthHint": "Ar ôl i chi gadw, tapiwch $t(modelChat.mcpOAuth.signIn) ar y gweinydd i fewngofnodi gyda'ch porwr.",
+      "serverNeedsSignIn": "Mewngofnodwch i ddefnyddio'r gweinydd hwn",
+      "signIn": "Mewngofnodi",
+      "signInA11y": "Mewngofnodi i'r gweinydd hwn: {{name}}",
+      "signInFailed": "Ni ellid mewngofnodi i {{name}}. Rhowch gynnig arall arni."
     },
     "backends": {
       "title": "Ôl-bennau sgwrs",
@@ -3576,6 +3594,9 @@
       "downloading": "Wrthi'n llwytho i lawr…",
       "downloadProgress": "Wrthi'n llwytho i lawr… {{percent}}%",
       "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"
     }
   },
   "settingsTools": {

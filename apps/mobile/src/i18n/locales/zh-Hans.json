@@ -136,7 +136,8 @@
     "working": "处理中",
     "yourOwnRepositories": "你自己的仓库",
     "dismissed": "已忽略",
-    "agent": "代理人"
+    "agent": "代理人",
+    "changes": "更改"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -1678,7 +1679,6 @@
       "retryLoadingEnvironment": "重新加载环境",
       "defaultEnvironment": "默认环境",
       "environmentSummary": "{{commands}} 条命令 · {{mcp}} 个 MCP · {{skills}} 项技能 · {{agents}} 个智能体",
-      "changes": "更改",
       "leaveChanges": "保留更改",
       "commitAndPush": "提交并推送",
       "startSession": "开始会话",
@@ -2140,6 +2140,12 @@
       "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}",
       "modelsCount_one": "模型（{{displayCount}}）",
       "modelsCount_other": "模型（{{displayCount}}）"
+    },
+    "sessionChanges": {
+      "viewChanges": "查看更改",
+      "asOf": "截至 {{time}}",
+      "tooLarge": "差异过大，无法在移动端显示。",
+      "empty": "此会话中尚无文件更改。"
     },
     "autoApprove": {
       "title": "自动批准",
@@ -2644,6 +2650,7 @@
     "fileRows": {
       "collapseFile": "折叠文件",
       "diffTooLarge": "差异过大，无法显示。",
+      "noPreview": "此文件无法预览",
       "expandFile": "展开文件",
       "markViewed": "将 {{path}} 标记为已查看",
       "openDiffOnGitHub": "在 GitHub 上打开此文件的差异",
@@ -3238,7 +3245,6 @@
       "fieldName": "显示名称",
       "fieldUrl": "服务器 URL",
       "fieldUrlInvalid": "请输入有效的服务器 URL。",
-      "fieldToken": "Bearer 令牌（可选）",
       "enableServer": "启用此服务器：{{name}}",
       "editServer": "编辑服务器",
       "deleteServer": "删除服务器",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} 个工具",
       "serverUnreachable": "无法连接此服务器",
       "serverOff": "此服务器已关闭"
+    },
+    "mcpOAuth": {
+      "authMethod": "身份验证",
+      "authNone": "无需登录",
+      "authBearer": "Bearer 令牌",
+      "authOAuth": "OAuth 登录",
+      "fieldToken": "令牌",
+      "oauthHint": "保存后，在服务器上点按“$t(modelChat.mcpOAuth.signIn)”，即可通过浏览器登录。",
+      "serverNeedsSignIn": "登录后即可使用此服务器",
+      "signIn": "登录",
+      "signInA11y": "登录此服务器：{{name}}",
+      "signInFailed": "无法登录 {{name}}，请重试。"
     },
     "backends": {
       "title": "聊天后端",
@@ -3412,6 +3430,9 @@
       "downloading": "正在下载…",
       "downloadProgress": "正在下载… {{percent}}%",
       "downloadFailed": "下载未完成。请检查网络连接和可用存储空间，然后重试。"
+    },
+    "reasoningEffort": {
+      "modelFlag": "此模型支持思考强度"
     }
   },
   "settingsTools": {

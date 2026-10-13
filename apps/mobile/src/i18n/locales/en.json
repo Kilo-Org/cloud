@@ -136,7 +136,8 @@
     "updated": "Updated",
     "working": "Working",
     "yourOwnRepositories": "Your own repositories",
-    "dismissed": "Dismissed"
+    "dismissed": "Dismissed",
+    "changes": "Changes"
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -325,6 +326,7 @@
       "collapseFile": "Collapse file",
       "expandFile": "Expand file",
       "diffTooLarge": "Diff too large to display",
+      "noPreview": "No preview available for this file",
       "openOnGitHub": "Open on GitHub",
       "openDiffOnGitHub": "Open this file's diff on GitHub",
       "githubDiff": "GitHub diff"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Retry loading environment",
       "defaultEnvironment": "Default environment",
       "environmentSummary": "{{commands}} commands · {{mcp}} MCP · {{skills}} skills · {{agents}} agents",
-      "changes": "Changes",
       "leaveChanges": "Leave changes",
       "commitAndPush": "Commit and push",
       "startSession": "Start session",
@@ -2677,6 +2678,12 @@
       "stepsCount": "{{steps}} steps",
       "stepsCount_other": "{{steps}} steps",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+    },
+    "sessionChanges": {
+      "viewChanges": "View changes",
+      "asOf": "As of {{time}}",
+      "tooLarge": "This diff is too large to show on mobile.",
+      "empty": "No file changes in this session yet."
     },
     "autoApprove": {
       "title": "Auto-approve",
@@ -3392,7 +3399,6 @@
       "fieldName": "Display name",
       "fieldUrl": "Server URL",
       "fieldUrlInvalid": "Enter a valid server URL.",
-      "fieldToken": "Bearer token (optional)",
       "enableServer": "Enable this server: {{name}}",
       "editServer": "Edit server",
       "deleteServer": "Delete server",
@@ -3412,6 +3418,21 @@
       "serverToolCount": "{{count}} tools",
       "serverUnreachable": "Couldn't reach this server",
       "serverOff": "This server is off"
+    },
+    "reasoningEffort": {
+      "modelFlag": "This model supports thinking effort"
+    },
+    "mcpOAuth": {
+      "authMethod": "Authentication",
+      "authNone": "No sign-in",
+      "authBearer": "Bearer token",
+      "authOAuth": "OAuth sign-in",
+      "fieldToken": "Token",
+      "oauthHint": "After you save, tap $t(modelChat.mcpOAuth.signIn) on the server to sign in with your browser.",
+      "serverNeedsSignIn": "Sign in to use this server",
+      "signIn": "Sign in",
+      "signInA11y": "Sign in to this server: {{name}}",
+      "signInFailed": "Couldn't sign in to {{name}}. Try again."
     }
   },
   "settingsTools": {

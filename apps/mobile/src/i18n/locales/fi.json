@@ -136,7 +136,8 @@
     "working": "Työn alla",
     "yourOwnRepositories": "Omat koodivarastosi",
     "dismissed": "Sivuutettu",
-    "agent": "Agentti"
+    "agent": "Agentti",
+    "changes": "Muutokset"
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -325,6 +326,7 @@
       "collapseFile": "Kutista tiedosto",
       "expandFile": "Laajenna tiedosto",
       "diffTooLarge": "Muutosvertailu on liian suuri näytettäväksi.",
+      "noPreview": "Tälle tiedostolle ei ole esikatselua",
       "openOnGitHub": "Avaa GitHubissa",
       "openDiffOnGitHub": "Avaa tämän tiedoston muutosvertailu GitHubissa",
       "githubDiff": "GitHubin muutosvertailu"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Yritä ladata ympäristö uudelleen",
       "defaultEnvironment": "Oletusympäristö",
       "environmentSummary": "{{commands}} komentoa · {{mcp}} MCP · {{skills}} taitoa · {{agents}} agenttia",
-      "changes": "Muutokset",
       "leaveChanges": "Jätä muutokset ennalleen",
       "commitAndPush": "Tallenna ja lähetä",
       "startSession": "Aloita istunto",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Malli ({{displayCount}})",
       "modelsCount_other": "Mallit ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Näytä muutokset",
+      "asOf": "Tilanne klo {{time}}",
+      "tooLarge": "Muutosvertailu on liian suuri näytettäväksi mobiilissa.",
+      "empty": "Tässä istunnossa ei ole vielä muutettu tiedostoja."
     },
     "autoApprove": {
       "title": "Automaattinen hyväksyntä",
@@ -3238,7 +3245,6 @@
       "fieldName": "Näyttönimi",
       "fieldUrl": "Palvelimen URL",
       "fieldUrlInvalid": "Anna kelvollinen palvelimen URL.",
-      "fieldToken": "Bearer-tunnus (valinnainen)",
       "enableServer": "Ota tämä palvelin käyttöön: {{name}}",
       "editServer": "Muokkaa palvelinta",
       "deleteServer": "Poista palvelin",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} työkalua",
       "serverUnreachable": "Tähän palvelimeen ei saatu yhteyttä",
       "serverOff": "Tämä palvelin on pois päältä"
+    },
+    "mcpOAuth": {
+      "authMethod": "Todennus",
+      "authNone": "Ei kirjautumista",
+      "authBearer": "Bearer-tunnus",
+      "authOAuth": "OAuth-kirjautuminen",
+      "fieldToken": "Tunnus",
+      "oauthHint": "Kun olet tallentanut, napauta palvelimen kohdalla $t(modelChat.mcpOAuth.signIn) kirjautuaksesi sisään selaimella.",
+      "serverNeedsSignIn": "Kirjaudu sisään käyttääksesi tätä palvelinta",
+      "signIn": "Kirjaudu sisään",
+      "signInA11y": "Kirjaudu sisään tähän palvelimeen: {{name}}",
+      "signInFailed": "Kirjautuminen palvelimeen {{name}} epäonnistui. Yritä uudelleen."
     },
     "backends": {
       "title": "Keskustelujen taustapalvelut",
@@ -3412,6 +3430,9 @@
       "downloading": "Ladataan…",
       "downloadProgress": "Ladataan… {{percent}} %",
       "downloadFailed": "Lataus ei valmistunut. Tarkista verkkoyhteys ja vapaa tallennustila ja yritä sitten uudelleen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tämä malli tukee päättelyn tasoa"
     }
   },
   "settingsTools": {

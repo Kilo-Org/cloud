@@ -136,7 +136,8 @@
     "working": "Shaqaynaya",
     "yourOwnRepositories": "Kaydadkaaga shakhsiga ah",
     "dismissed": "La iska dhaafay",
-    "agent": "Wakiil"
+    "agent": "Wakiil",
+    "changes": "Isbeddellada"
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -325,6 +326,7 @@
       "collapseFile": "Isku laab faylka",
       "expandFile": "Ballaarso faylka",
       "diffTooLarge": "Kala duwanaanshuhu aad buu u weyn yahay in la muujiyo.",
+      "noPreview": "Faylkan horu-eeg looma hayo",
       "openOnGitHub": "Ku fur GitHub",
       "openDiffOnGitHub": "Ku fur GitHub kala duwanaanshaha faylkan",
       "githubDiff": "Kala duwanaanshaha GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Mar kale isku day inaad soo shubto deegaanka",
       "defaultEnvironment": "Deegaanka caadiga ah",
       "environmentSummary": "{{commands}} amar · {{mcp}} MCP · {{skills}} xirfadood · {{agents}} wakiil",
-      "changes": "Isbeddellada",
       "leaveChanges": "Ka tag isbeddellada",
       "commitAndPush": "Diiwaangeli oo dir",
       "startSession": "Bilow kalfadhiga",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Moodeel ({{displayCount}})",
       "modelsCount_other": "Moodeellada ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Eeg isbeddellada",
+      "asOf": "Laga bilaabo {{time}}",
+      "tooLarge": "Kala duwanaanshahan aad buu u weyn yahay in lagu muujiyo mobilka.",
+      "empty": "Weli wax isbeddel ah oo fayl ah kuma jiraan fadhigan."
     },
     "autoApprove": {
       "title": "Oggolaansho otomaatig ah",
@@ -3238,7 +3245,6 @@
       "fieldName": "Magaca la muujiyo",
       "fieldUrl": "URL-ka serverka",
       "fieldUrlInvalid": "Geli URL server sax ah.",
-      "fieldToken": "Token Bearer (ikhtiyaari)",
       "enableServer": "Daar serverkan: {{name}}",
       "editServer": "Wax ka beddel serverka",
       "deleteServer": "Tirtir serverka",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} qalab",
       "serverUnreachable": "Lama gaari karin serverkan",
       "serverOff": "Serverkan waa dammaan"
+    },
+    "mcpOAuth": {
+      "authMethod": "Xaqiijinta",
+      "authNone": "Gelitaan la'aan",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Gelitaanka OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Kadib markaad keydiso, ku dhufo $t(modelChat.mcpOAuth.signIn) serverka si aad ugu gasho biraawsarkaaga.",
+      "serverNeedsSignIn": "Gal si aad u isticmaasho serverkan",
+      "signIn": "Gal",
+      "signInA11y": "Gal serverkan: {{name}}",
+      "signInFailed": "Laguma guulaysan in la galo {{name}}. Mar kale isku day."
     },
     "backends": {
       "title": "Adeegyada gadaale ee wada sheekaysiga",
@@ -3412,6 +3430,9 @@
       "downloading": "Waa la soo dejinayaa…",
       "downloadProgress": "Waa la soo dejinayaa… {{percent}}%",
       "downloadFailed": "Soo dejintu ma dhammaan. Hubi xiriirkaaga iyo meesha bannaan ee kaydka, kadibna isku day mar kale."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Moodeelkani wuxuu taageeraa heerka fikirka"
     }
   },
   "settingsTools": {

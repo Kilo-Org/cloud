@@ -136,7 +136,8 @@
     "working": "Na-arụ ọrụ",
     "yourOwnRepositories": "Ebe nchekwa koodu nke gị",
     "dismissed": "Elegharala anya",
-    "agent": "Onye nnọchi anya"
+    "agent": "Onye nnọchi anya",
+    "changes": "Mgbanwe"
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -325,6 +326,7 @@
       "collapseFile": "Zoo ọdịnaya faịlụ",
       "expandFile": "Gosi ọdịnaya faịlụ",
       "diffTooLarge": "Ọdịiche buru oke ibu nke na enweghị ike igosi ya.",
+      "noPreview": "Enweghị nlele maka faịlụ a",
       "openOnGitHub": "Mepee na GitHub",
       "openDiffOnGitHub": "Mepee ọdịiche faịlụ a na GitHub",
       "githubDiff": "Ọdịiche na GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Nwaa ibudata ebe ọrụ ọzọ",
       "defaultEnvironment": "Ebe ọrụ ndabara",
       "environmentSummary": "iwu {{commands}} · MCP {{mcp}} · nkà {{skills}} · ndị nnọchi anya {{agents}}",
-      "changes": "Mgbanwe",
       "leaveChanges": "Hapụ mgbanwe",
       "commitAndPush": "Chekwaa ma bulite",
       "startSession": "Malite nnọkọ",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Ihe nlereanya ({{displayCount}})",
       "modelsCount_other": "Ihe nlereanya ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Lee mgbanwe",
+      "asOf": "Dị ka nke {{time}}",
+      "tooLarge": "Ọdịiche a buru oke ibu igosi na ekwentị.",
+      "empty": "Enweghị mgbanwe faịlụ na nnọkọ a ugbu a."
     },
     "autoApprove": {
       "title": "Nkwenye akpaka",
@@ -3238,7 +3245,6 @@
       "fieldName": "Aha a na-egosi",
       "fieldUrl": "URL sava",
       "fieldUrlInvalid": "Tinye URL sava ziri ezi.",
-      "fieldToken": "Token Bearer (nhọrọ)",
       "enableServer": "Mee ka sava a rụọ ọrụ: {{name}}",
       "editServer": "Dezie sava",
       "deleteServer": "Hichapụ sava",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "ngwá ọrụ {{count}}",
       "serverUnreachable": "Enweghị ike iru sava a",
       "serverOff": "Sava a agbanyụrụ"
+    },
+    "mcpOAuth": {
+      "authMethod": "Nkwenye njirimara",
+      "authNone": "Enweghị ịbanye",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Ịbanye OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Mgbe ị chekwasịrị, pịa $t(modelChat.mcpOAuth.signIn) na sava ahụ iji banye site na ihe nchọgharị gị.",
+      "serverNeedsSignIn": "Banye iji sava a",
+      "signIn": "Banye",
+      "signInA11y": "Banye na sava a: {{name}}",
+      "signInFailed": "Enweghị ike ịbanye na {{name}}. Nwaa ọzọ."
     },
     "backends": {
       "title": "Sava nkata",
@@ -3412,6 +3430,9 @@
       "downloading": "Na-ebudata…",
       "downloadProgress": "Na-ebudata… {{percent}}%",
       "downloadFailed": "Nbudata ahụ emezughị. Lelee njikọ gị na ebe nchekwa tọgbọrọ chakoo, wee nwaa ọzọ."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ihe nlereanya a na-akwado mgbalị iche echiche"
     }
   },
   "settingsTools": {

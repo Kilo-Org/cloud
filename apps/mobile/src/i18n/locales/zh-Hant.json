@@ -136,7 +136,8 @@
     "working": "處理中",
     "yourOwnRepositories": "你自己的存放庫",
     "dismissed": "已忽略",
-    "agent": "代理人"
+    "agent": "代理人",
+    "changes": "變更"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -1678,7 +1679,6 @@
       "retryLoadingEnvironment": "重新載入環境",
       "defaultEnvironment": "預設環境",
       "environmentSummary": "{{commands}} 個指令 · {{mcp}} 個 MCP · {{skills}} 個技能 · {{agents}} 個智慧代理",
-      "changes": "變更",
       "leaveChanges": "保留變更",
       "commitAndPush": "提交並推送",
       "startSession": "開始工作階段",
@@ -2140,6 +2140,12 @@
       "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}",
       "modelsCount_one": "模型（{{displayCount}}）",
       "modelsCount_other": "模型（{{displayCount}}）"
+    },
+    "sessionChanges": {
+      "viewChanges": "檢視變更",
+      "asOf": "截至 {{time}}",
+      "tooLarge": "此差異過大，無法在行動裝置上顯示。",
+      "empty": "此工作階段尚無檔案變更。"
     },
     "autoApprove": {
       "title": "自動核准",
@@ -2644,6 +2650,7 @@
     "fileRows": {
       "collapseFile": "收合檔案",
       "diffTooLarge": "差異過大，無法顯示。",
+      "noPreview": "此檔案無法預覽",
       "expandFile": "展開檔案",
       "markViewed": "將 {{path}} 標記為已檢視",
       "openDiffOnGitHub": "在 GitHub 上開啟此檔案的差異",
@@ -3238,7 +3245,6 @@
       "fieldName": "顯示名稱",
       "fieldUrl": "伺服器 URL",
       "fieldUrlInvalid": "請輸入有效的伺服器 URL。",
-      "fieldToken": "Bearer 權杖（選填）",
       "enableServer": "啟用此伺服器：{{name}}",
       "editServer": "編輯伺服器",
       "deleteServer": "刪除伺服器",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} 個工具",
       "serverUnreachable": "無法連線至此伺服器",
       "serverOff": "此伺服器已關閉"
+    },
+    "mcpOAuth": {
+      "authMethod": "驗證",
+      "authNone": "不需登入",
+      "authBearer": "Bearer 權杖",
+      "authOAuth": "OAuth 登入",
+      "fieldToken": "權杖",
+      "oauthHint": "儲存後，請點選伺服器上的「$t(modelChat.mcpOAuth.signIn)」，透過瀏覽器登入。",
+      "serverNeedsSignIn": "請登入以使用此伺服器",
+      "signIn": "登入",
+      "signInA11y": "登入此伺服器：{{name}}",
+      "signInFailed": "無法登入 {{name}}，請再試一次。"
     },
     "backends": {
       "title": "聊天後端",
@@ -3412,6 +3430,9 @@
       "downloading": "下載中…",
       "downloadProgress": "下載中… {{percent}}%",
       "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。"
+    },
+    "reasoningEffort": {
+      "modelFlag": "此模型支援思考程度"
     }
   },
   "settingsTools": {

@@ -136,7 +136,8 @@
     "working": "En cours",
     "yourOwnRepositories": "Vos propres dépôts",
     "dismissed": "Ignoré",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Modifications"
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -1591,7 +1592,6 @@
       "retryLoadingEnvironment": "Réessayer de charger l'environnement",
       "defaultEnvironment": "Environnement par défaut",
       "environmentSummary": "{{commands}} commandes · {{mcp}} MCP · {{skills}} compétences · {{agents}} agents",
-      "changes": "Modifications",
       "leaveChanges": "Conserver en l'état",
       "commitAndPush": "Valider et envoyer",
       "startSession": "Démarrer la session",
@@ -2063,6 +2063,12 @@
       "modelsCount_one": "Modèle ({{displayCount}})",
       "modelsCount_other": "Modèles ({{displayCount}})",
       "modelsCount_many": "Modèles ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Voir les modifications",
+      "asOf": "À {{time}}",
+      "tooLarge": "Les différences sont trop volumineuses pour être affichées sur mobile.",
+      "empty": "Aucune modification de fichier dans cette session pour l'instant."
     },
     "autoApprove": {
       "title": "Approbation automatique",
@@ -2672,6 +2678,7 @@
     "fileRows": {
       "collapseFile": "Réduire le fichier",
       "diffTooLarge": "Les différences sont trop volumineuses pour être affichées.",
+      "noPreview": "Aucun aperçu disponible pour ce fichier",
       "expandFile": "Développer le fichier",
       "markViewed": "Marquer {{path}} comme consulté",
       "openDiffOnGitHub": "Ouvrir les différences de ce fichier sur GitHub",
@@ -3279,7 +3286,6 @@
       "fieldName": "Nom affiché",
       "fieldUrl": "URL du serveur",
       "fieldUrlInvalid": "Saisissez une URL de serveur valide.",
-      "fieldToken": "Jeton Bearer (facultatif)",
       "enableServer": "Activer ce serveur : {{name}}",
       "editServer": "Modifier le serveur",
       "deleteServer": "Supprimer le serveur",
@@ -3299,6 +3305,18 @@
       "serverToolCount": "{{count}} outils",
       "serverUnreachable": "Impossible de joindre ce serveur",
       "serverOff": "Ce serveur est désactivé"
+    },
+    "mcpOAuth": {
+      "authMethod": "Authentification",
+      "authNone": "Sans connexion",
+      "authBearer": "Jeton Bearer",
+      "authOAuth": "Connexion OAuth",
+      "fieldToken": "Jeton",
+      "oauthHint": "Après l'enregistrement, appuyez sur $t(modelChat.mcpOAuth.signIn) sur le serveur pour vous connecter avec votre navigateur.",
+      "serverNeedsSignIn": "Connectez-vous pour utiliser ce serveur",
+      "signIn": "Se connecter",
+      "signInA11y": "Se connecter à ce serveur : {{name}}",
+      "signInFailed": "Impossible de se connecter à {{name}}. Réessayez."
     },
     "backends": {
       "title": "Services de discussion",
@@ -3453,6 +3471,9 @@
       "downloading": "Téléchargement…",
       "downloadProgress": "Téléchargement… {{percent}} %",
       "downloadFailed": "Le téléchargement n'a pas abouti. Vérifiez votre connexion et l'espace de stockage disponible, puis réessayez."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ce modèle prend en charge le niveau de réflexion"
     }
   },
   "settingsTools": {

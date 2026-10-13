@@ -136,7 +136,8 @@
     "working": "У роботі",
     "yourOwnRepositories": "Власні репозиторії",
     "dismissed": "Відхилено",
-    "agent": "Агент"
+    "agent": "Агент",
+    "changes": "Зміни"
   },
   "language": {
     "restarting": "Перезапуск для зміни мови",
@@ -1702,7 +1703,6 @@
       "retryLoadingEnvironment": "Повторити завантаження середовища",
       "defaultEnvironment": "Типове середовище",
       "environmentSummary": "команд: {{commands}} · MCP: {{mcp}} · навичок: {{skills}} · агентів: {{agents}}",
-      "changes": "Зміни",
       "leaveChanges": "Залишити зміни",
       "commitAndPush": "Закомітити та надіслати",
       "startSession": "Розпочати сеанс",
@@ -2184,6 +2184,12 @@
       "modelsCount_other": "Моделі ({{displayCount}})",
       "modelsCount_few": "Моделі ({{displayCount}})",
       "modelsCount_many": "Моделі ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Переглянути зміни",
+      "asOf": "Станом на {{time}}",
+      "tooLarge": "Обсяг змін завеликий для відображення на мобільному пристрої.",
+      "empty": "У цьому сеансі ще немає змін у файлах."
     },
     "autoApprove": {
       "title": "Автосхвалення",
@@ -2700,6 +2706,7 @@
     "fileRows": {
       "collapseFile": "Згорнути файл",
       "diffTooLarge": "Обсяг змін завеликий для відображення.",
+      "noPreview": "Попередній перегляд цього файлу недоступний",
       "expandFile": "Розгорнути файл",
       "markViewed": "Позначити {{path}} як переглянутий",
       "openDiffOnGitHub": "Відкрити зміни цього файлу на GitHub",
@@ -3320,7 +3327,6 @@
       "fieldName": "Відображувана назва",
       "fieldUrl": "URL сервера",
       "fieldUrlInvalid": "Введіть дійсну URL-адресу сервера.",
-      "fieldToken": "Токен Bearer (необов’язково)",
       "enableServer": "Увімкнути цей сервер: {{name}}",
       "editServer": "Редагувати сервер",
       "deleteServer": "Видалити сервер",
@@ -3340,6 +3346,18 @@
       "serverToolCount": "{{count}} інструментів",
       "serverUnreachable": "Не вдалося зв’язатися з цим сервером",
       "serverOff": "Цей сервер вимкнено"
+    },
+    "mcpOAuth": {
+      "authMethod": "Автентифікація",
+      "authNone": "Без входу",
+      "authBearer": "Токен Bearer",
+      "authOAuth": "Вхід через OAuth",
+      "fieldToken": "Токен",
+      "oauthHint": "Після збереження торкніться «$t(modelChat.mcpOAuth.signIn)» на сервері, щоб увійти через браузер.",
+      "serverNeedsSignIn": "Увійдіть, щоб використовувати цей сервер",
+      "signIn": "Увійти",
+      "signInA11y": "Увійти на цей сервер: {{name}}",
+      "signInFailed": "Не вдалося увійти на {{name}}. Спробуйте ще раз."
     },
     "backends": {
       "title": "Сервери чату",
@@ -3494,6 +3512,9 @@
       "downloading": "Завантаження…",
       "downloadProgress": "Завантаження… {{percent}}%",
       "downloadFailed": "Завантаження не завершилося. Перевірте з'єднання та вільне місце, потім спробуйте ще раз."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ця модель підтримує рівень міркування"
     }
   },
   "settingsTools": {

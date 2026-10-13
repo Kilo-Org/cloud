@@ -136,7 +136,8 @@
     "working": "በመሥራት ላይ",
     "yourOwnRepositories": "የራስህ ማከማቻዎች",
     "dismissed": "ተወግዷል",
-    "agent": "ወኪል"
+    "agent": "ወኪል",
+    "changes": "ለውጦች"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -325,6 +326,7 @@
       "collapseFile": "የፋይሉን ዝርዝር ሰብስብ",
       "expandFile": "የፋይሉን ዝርዝር ዘርጋ",
       "diffTooLarge": "ልዩነቱ በጣም ትልቅ ስለሆነ ማሳየት አይቻልም።",
+      "noPreview": "ለዚህ ፋይል ቅድመ እይታ የለም",
       "openOnGitHub": "በGitHub ክፈት",
       "openDiffOnGitHub": "የዚህን ፋይል ልዩነት በGitHub ክፈት",
       "githubDiff": "በGitHub ያለው ልዩነት"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "የሥራ አካባቢውን ለመጫን እንደገና ይሞክሩ",
       "defaultEnvironment": "ነባሪ የሥራ አካባቢ",
       "environmentSummary": "{{commands}} ትዕዛዞች · {{mcp}} MCP · {{skills}} ክህሎቶች · {{agents}} ወኪሎች",
-      "changes": "ለውጦች",
       "leaveChanges": "ለውጦችን ይተዉ",
       "commitAndPush": "መዝግበው ይላኩ",
       "startSession": "ክፍለ ጊዜውን ያስጀምሩ",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}፣ {{provider}}፣ {{steps}}፣ {{cost}}",
       "modelsCount_one": "ሞዴል ({{displayCount}})",
       "modelsCount_other": "ሞዴሎች ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ለውጦችን ይመልከቱ",
+      "asOf": "ከ{{time}} ጀምሮ",
+      "tooLarge": "ይህ ልዩነት በሞባይል ላይ ለማሳየት በጣም ትልቅ ነው።",
+      "empty": "በዚህ ክፍለ ጊዜ እስካሁን ምንም የፋይል ለውጦች የሉም።"
     },
     "autoApprove": {
       "title": "ራስ-ሰር ማጽደቅ",
@@ -3238,7 +3245,6 @@
       "fieldName": "የሚታይ ስም",
       "fieldUrl": "የሰርቨር URL",
       "fieldUrlInvalid": "ትክክለኛ የሰርቨር URL ያስገቡ።",
-      "fieldToken": "Bearer ቶከን (አማራጭ)",
       "enableServer": "ይህን ሰርቨር አንቃ: {{name}}",
       "editServer": "ሰርቨር አርትዕ",
       "deleteServer": "ሰርቨር ሰርዝ",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} መሳሪያዎች",
       "serverUnreachable": "ይህን ሰርቨር ማግኘት አልተቻለም",
       "serverOff": "ይህ ሰርቨር ተዘግቷል"
+    },
+    "mcpOAuth": {
+      "authMethod": "ማረጋገጫ",
+      "authNone": "መግባት አያስፈልግም",
+      "authBearer": "Bearer ቶከን",
+      "authOAuth": "በOAuth መግባት",
+      "fieldToken": "ቶከን",
+      "oauthHint": "ካስቀመጡ በኋላ በአሳሽዎ ለመግባት በሰርቨሩ ላይ $t(modelChat.mcpOAuth.signIn) የሚለውን ይንኩ።",
+      "serverNeedsSignIn": "ይህን ሰርቨር ለመጠቀም ይግቡ",
+      "signIn": "ግባ",
+      "signInA11y": "ወደዚህ ሰርቨር ግባ: {{name}}",
+      "signInFailed": "ወደ {{name}} መግባት አልተቻለም። እንደገና ይሞክሩ።"
     },
     "backends": {
       "title": "የውይይት የጀርባ አገልግሎቶች",
@@ -3412,6 +3430,9 @@
       "downloading": "በመውረድ ላይ…",
       "downloadProgress": "በመውረድ ላይ… {{percent}}%",
       "downloadFailed": "ማውረዱ አልተጠናቀቀም። ግንኙነትዎን እና ነፃ የማከማቻ ቦታዎን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"
+    },
+    "reasoningEffort": {
+      "modelFlag": "ይህ ሞዴል የማሰብ ጥረትን ይደግፋል"
     }
   },
   "settingsTools": {

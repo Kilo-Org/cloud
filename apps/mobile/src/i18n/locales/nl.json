@@ -136,7 +136,8 @@
     "working": "Bezig",
     "yourOwnRepositories": "Je eigen coderepository's",
     "dismissed": "Genegeerd",
-    "agent": "Tussenpersoon"
+    "agent": "Tussenpersoon",
+    "changes": "Wijzigingen"
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -1678,7 +1679,6 @@
       "retryLoadingEnvironment": "Omgeving opnieuw laden",
       "defaultEnvironment": "Standaardomgeving",
       "environmentSummary": "{{commands}} opdrachten · {{mcp}} MCP · {{skills}} vaardigheden · {{agents}} agents",
-      "changes": "Wijzigingen",
       "leaveChanges": "Niet committen",
       "commitAndPush": "Committen en pushen",
       "startSession": "Sessie starten",
@@ -2140,6 +2140,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modellen ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Wijzigingen bekijken",
+      "asOf": "Stand van {{time}}",
+      "tooLarge": "Deze diff is te groot om op mobiel weer te geven.",
+      "empty": "Nog geen bestandswijzigingen in deze sessie."
     },
     "autoApprove": {
       "title": "Automatisch goedkeuren",
@@ -2644,6 +2650,7 @@
     "fileRows": {
       "collapseFile": "Bestand inklappen",
       "diffTooLarge": "De diff is te groot om weer te geven.",
+      "noPreview": "Geen voorbeeld beschikbaar voor dit bestand",
       "expandFile": "Bestand uitklappen",
       "markViewed": "{{path}} markeren als bekeken",
       "openDiffOnGitHub": "De diff van dit bestand op GitHub openen",
@@ -3238,7 +3245,6 @@
       "fieldName": "Weergavenaam",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Voer een geldige server-URL in.",
-      "fieldToken": "Bearer-token (optioneel)",
       "enableServer": "Deze server inschakelen: {{name}}",
       "editServer": "Server bewerken",
       "deleteServer": "Server verwijderen",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} tools",
       "serverUnreachable": "Kon deze server niet bereiken",
       "serverOff": "Deze server staat uit"
+    },
+    "mcpOAuth": {
+      "authMethod": "Authenticatie",
+      "authNone": "Geen aanmelding",
+      "authBearer": "Bearer-token",
+      "authOAuth": "OAuth-aanmelding",
+      "fieldToken": "Token",
+      "oauthHint": "Tik na het opslaan op $t(modelChat.mcpOAuth.signIn) bij de server om je aan te melden via je browser.",
+      "serverNeedsSignIn": "Meld je aan om deze server te gebruiken",
+      "signIn": "Aanmelden",
+      "signInA11y": "Aanmelden bij deze server: {{name}}",
+      "signInFailed": "Kon niet aanmelden bij {{name}}. Probeer het opnieuw."
     },
     "backends": {
       "title": "Chatservers",
@@ -3412,6 +3430,9 @@
       "downloading": "Downloaden…",
       "downloadProgress": "Downloaden… {{percent}}%",
       "downloadFailed": "Het downloaden is niet voltooid. Controleer je verbinding en vrije opslagruimte en probeer het opnieuw."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Dit model ondersteunt denkinspanning"
     }
   },
   "settingsTools": {

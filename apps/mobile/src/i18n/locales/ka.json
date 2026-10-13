@@ -136,7 +136,8 @@
     "working": "მუშაობს",
     "yourOwnRepositories": "შენი რეპოზიტორიები",
     "dismissed": "უგულებელყოფილია",
-    "agent": "აგენტი"
+    "agent": "აგენტი",
+    "changes": "ცვლილებები"
   },
   "language": {
     "restarting": "ენის შესაცვლელად აპი ხელახლა იტვირთება",
@@ -325,6 +326,7 @@
       "collapseFile": "ფაილის ჩაკეცვა",
       "expandFile": "ფაილის გაშლა",
       "diffTooLarge": "ცვლილებების მოცულობა ზედმეტად დიდია საჩვენებლად.",
+      "noPreview": "ამ ფაილის გადახედვა მიუწვდომელია",
       "openOnGitHub": "GitHub-ზე გახსნა",
       "openDiffOnGitHub": "ამ ფაილის ცვლილებების GitHub-ზე გახსნა",
       "githubDiff": "ცვლილებები GitHub-ზე"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "გარემოს ხელახლა ჩატვირთვა",
       "defaultEnvironment": "ნაგულისხმევი გარემო",
       "environmentSummary": "{{commands}} ბრძანება · {{mcp}} MCP · {{skills}} უნარი · {{agents}} აგენტი",
-      "changes": "ცვლილებები",
       "leaveChanges": "ცვლილებების დატოვება",
       "commitAndPush": "კომიტი და ატვირთვა",
       "startSession": "სესიის დაწყება",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "მოდელი ({{displayCount}})",
       "modelsCount_other": "მოდელები ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ცვლილებების ნახვა",
+      "asOf": "მდგომარეობა: {{time}}",
+      "tooLarge": "ცვლილებების მოცულობა ზედმეტად დიდია მობილურზე საჩვენებლად.",
+      "empty": "ამ სესიაში ფაილები ჯერ არ შეცვლილა."
     },
     "autoApprove": {
       "title": "ავტომატური დადასტურება",
@@ -3238,7 +3245,6 @@
       "fieldName": "ნაჩვენები სახელი",
       "fieldUrl": "სერვერის URL",
       "fieldUrlInvalid": "შეიყვანეთ სერვერის სწორი URL.",
-      "fieldToken": "Bearer ტოკენი (არასავალდებულო)",
       "enableServer": "ამ სერვერის ჩართვა: {{name}}",
       "editServer": "სერვერის რედაქტირება",
       "deleteServer": "სერვერის წაშლა",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} ხელსაწყო",
       "serverUnreachable": "ამ სერვერთან დაკავშირება ვერ მოხერხდა",
       "serverOff": "ეს სერვერი გამორთულია"
+    },
+    "mcpOAuth": {
+      "authMethod": "ავთენტიფიკაცია",
+      "authNone": "შესვლის გარეშე",
+      "authBearer": "Bearer ტოკენი",
+      "authOAuth": "OAuth-ით შესვლა",
+      "fieldToken": "ტოკენი",
+      "oauthHint": "შენახვის შემდეგ სერვერზე შეეხე „$t(modelChat.mcpOAuth.signIn)“-ს, რომ ბრაუზერით შეხვიდე.",
+      "serverNeedsSignIn": "შედი, რომ ეს სერვერი გამოიყენო",
+      "signIn": "შესვლა",
+      "signInA11y": "ამ სერვერზე შესვლა: {{name}}",
+      "signInFailed": "{{name}}-ზე შესვლა ვერ მოხერხდა. სცადე ხელახლა."
     },
     "backends": {
       "title": "ჩატის სერვერული სისტემები",
@@ -3412,6 +3430,9 @@
       "downloading": "იტვირთება…",
       "downloadProgress": "იტვირთება… {{percent}}%",
       "downloadFailed": "ჩამოტვირთვა ვერ დასრულდა. შეამოწმეთ ინტერნეტკავშირი და თავისუფალი მეხსიერება, შემდეგ სცადეთ ხელახლა."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ეს მოდელი მხარს უჭერს მსჯელობის ინტენსივობას"
     }
   },
   "settingsTools": {

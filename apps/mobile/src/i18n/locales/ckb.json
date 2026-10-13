@@ -136,7 +136,8 @@
     "working": "لە کاردا",
     "yourOwnRepositories": "کۆگاکانی خۆت",
     "dismissed": "پشتگوێخراو",
-    "agent": "بریکار"
+    "agent": "بریکار",
+    "changes": "گۆڕانکارییەکان"
   },
   "language": {
     "restarting": "بۆ جێبەجێکردنی گۆڕینی زمان، دووبارە دەست پێ دەکاتەوە",
@@ -325,6 +326,7 @@
       "collapseFile": "فایلەکە کۆ بکەرەوە",
       "expandFile": "ناوەڕۆکی فایلەکە پیشان بدە",
       "diffTooLarge": "جیاوازییەکە هێندە گەورەیە کە ناتوانرێت پیشان بدرێت.",
+      "noPreview": "هیچ پێشبینینێک بۆ ئەم فایلە بەردەست نییە",
       "openOnGitHub": "لە GitHub بکەرەوە",
       "openDiffOnGitHub": "جیاوازییەکانی ئەم فایلە لە GitHub بکەرەوە",
       "githubDiff": "جیاوازی GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "دووبارە هەوڵدان بۆ بارکردنی ژینگە",
       "defaultEnvironment": "ژینگەی بنەڕەتی",
       "environmentSummary": "{{commands}} فەرمان · {{mcp}} MCP · {{skills}} لێهاتوویی · {{agents}} ئەجێنت",
-      "changes": "گۆڕانکارییەکان",
       "leaveChanges": "جێهێشتنی گۆڕانکارییەکان",
       "commitAndPush": "کۆمیت و ناردن",
       "startSession": "دەستپێکردنی سێشن",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
       "modelsCount_one": "مۆدێلەکان ({{displayCount}})",
       "modelsCount_other": "مۆدێلەکان ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "بینینی گۆڕانکارییەکان",
+      "asOf": "تا {{time}}",
+      "tooLarge": "ئەم جیاوازییە هێندە گەورەیە کە لە مۆبایلدا پیشان نادرێت.",
+      "empty": "هێشتا هیچ گۆڕانکارییەک لە فایلەکاندا لەم دانیشتنەدا نییە."
     },
     "autoApprove": {
       "title": "پەسەندکردنی خۆکار",
@@ -3238,7 +3245,6 @@
       "fieldName": "ناوی پیشاندراو",
       "fieldUrl": "URL ی سێرڤەر",
       "fieldUrlInvalid": "URLی سێرڤەری دروست بنووسە.",
-      "fieldToken": "تۆکنی Bearer (ئارەزوومەندانە)",
       "enableServer": "چالاککردنی ئەم سێرڤەرە: {{name}}",
       "editServer": "دەستکاریکردنی سێرڤەر",
       "deleteServer": "سڕینەوەی سێرڤەر",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} ئامراز",
       "serverUnreachable": "نەتوانرا بگەیت بەم سێرڤەرە",
       "serverOff": "ئەم سێرڤەرە ناچالاکە"
+    },
+    "mcpOAuth": {
+      "authMethod": "ناسینەوە",
+      "authNone": "بێ چوونەژوورەوە",
+      "authBearer": "تۆکنی Bearer",
+      "authOAuth": "چوونەژوورەوە بە OAuth",
+      "fieldToken": "تۆکن",
+      "oauthHint": "دوای پاشەکەوتکردن، لەسەر سێرڤەرەکە کرتە لە $t(modelChat.mcpOAuth.signIn) بکە بۆ چوونەژوورەوە لە ڕێگەی وێبگەڕەکەتەوە.",
+      "serverNeedsSignIn": "بچۆ ژوورەوە بۆ بەکارهێنانی ئەم سێرڤەرە",
+      "signIn": "چوونەژوورەوە",
+      "signInA11y": "چوونەژوورەوە بۆ ئەم سێرڤەرە: {{name}}",
+      "signInFailed": "نەتوانرا بچیتە ژوورەوەی {{name}}. دووبارە هەوڵ بدەرەوە."
     },
     "backends": {
       "title": "سێرڤەرەکانی گفتوگۆ",
@@ -3412,6 +3430,9 @@
       "downloading": "دادەبەزێت…",
       "downloadProgress": "دادەبەزێت… {{percent}}%",
       "downloadFailed": "داگرتنەکە تەواو نەبوو. پەیوەندییەکەت و شوێنی بەتاڵی بیرگە بپشکنە، پاشان دووبارە هەوڵ بدەرەوە."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ئەم مۆدێلە پشتگیری هەوڵی بیرکردنەوە دەکات"
     }
   },
   "settingsTools": {

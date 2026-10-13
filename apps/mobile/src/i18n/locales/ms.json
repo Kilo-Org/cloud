@@ -136,7 +136,8 @@
     "working": "Memproses…",
     "yourOwnRepositories": "Repositori anda sendiri",
     "dismissed": "Diketepikan",
-    "agent": "ejen"
+    "agent": "ejen",
+    "changes": "Perubahan"
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -325,6 +326,7 @@
       "collapseFile": "Sembunyikan kandungan fail",
       "expandFile": "Paparkan kandungan fail",
       "diffTooLarge": "Perbezaan kod terlalu besar untuk dipaparkan.",
+      "noPreview": "Tiada pratonton tersedia untuk fail ini",
       "openOnGitHub": "Buka di GitHub",
       "openDiffOnGitHub": "Buka perbezaan kod fail ini di GitHub",
       "githubDiff": "Perbezaan kod GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Cuba muatkan semula persekitaran",
       "defaultEnvironment": "Persekitaran lalai",
       "environmentSummary": "{{commands}} arahan · {{mcp}} MCP · {{skills}} kemahiran · {{agents}} ejen",
-      "changes": "Perubahan",
       "leaveChanges": "Biarkan perubahan",
       "commitAndPush": "Komit dan hantar",
       "startSession": "Mulakan sesi",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Model ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Lihat perubahan",
+      "asOf": "Setakat {{time}}",
+      "tooLarge": "Perbezaan kod ini terlalu besar untuk dipaparkan pada peranti mudah alih.",
+      "empty": "Belum ada perubahan fail dalam sesi ini."
     },
     "autoApprove": {
       "title": "Lulus automatik",
@@ -3238,7 +3245,6 @@
       "fieldName": "Nama paparan",
       "fieldUrl": "URL pelayan",
       "fieldUrlInvalid": "Masukkan URL pelayan yang sah.",
-      "fieldToken": "Token Bearer (pilihan)",
       "enableServer": "Dayakan pelayan ini: {{name}}",
       "editServer": "Edit pelayan",
       "deleteServer": "Padam pelayan",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "{{count}} alat",
       "serverUnreachable": "Tidak dapat menghubungi pelayan ini",
       "serverOff": "Pelayan ini dimatikan"
+    },
+    "mcpOAuth": {
+      "authMethod": "Pengesahan",
+      "authNone": "Tiada log masuk",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Log masuk OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Selepas anda menyimpan, ketik $t(modelChat.mcpOAuth.signIn) pada pelayan untuk log masuk dengan pelayar anda.",
+      "serverNeedsSignIn": "Log masuk untuk menggunakan pelayan ini",
+      "signIn": "Log masuk",
+      "signInA11y": "Log masuk ke pelayan ini: {{name}}",
+      "signInFailed": "Tidak dapat log masuk ke {{name}}. Cuba lagi."
     },
     "backends": {
       "title": "Sistem pelayan sembang",
@@ -3412,6 +3430,9 @@
       "downloading": "Memuat turun…",
       "downloadProgress": "Memuat turun… {{percent}}%",
       "downloadFailed": "Muat turun tidak selesai. Semak sambungan dan ruang storan kosong anda, kemudian cuba lagi."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Model ini menyokong tahap pemikiran"
     }
   },
   "settingsTools": {

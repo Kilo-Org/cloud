@@ -136,7 +136,8 @@
     "working": "A trabalhar",
     "yourOwnRepositories": "Os teus repositórios",
     "dismissed": "Ignorada",
-    "agent": "Agente"
+    "agent": "Agente",
+    "changes": "Alterações"
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",
@@ -325,6 +326,7 @@
       "collapseFile": "Recolher ficheiro",
       "expandFile": "Expandir ficheiro",
       "diffTooLarge": "As diferenças são demasiado extensas para serem apresentadas.",
+      "noPreview": "Pré-visualização indisponível para este ficheiro",
       "openOnGitHub": "Abrir no GitHub",
       "openDiffOnGitHub": "Abrir as diferenças deste ficheiro no GitHub",
       "githubDiff": "Diferenças no GitHub"
@@ -2217,7 +2219,6 @@
       "retryLoadingEnvironment": "Tentar carregar o ambiente novamente",
       "defaultEnvironment": "Ambiente predefinido",
       "environmentSummary": "{{commands}} comandos · {{mcp}} MCP · {{skills}} competências · {{agents}} agentes",
-      "changes": "Alterações",
       "leaveChanges": "Manter alterações",
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sessão",
@@ -2689,6 +2690,12 @@
       "modelsCount_one": "Modelo ({{displayCount}})",
       "modelsCount_other": "Modelos ({{displayCount}})",
       "modelsCount_many": "Modelos ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Ver alterações",
+      "asOf": "Às {{time}}",
+      "tooLarge": "As diferenças são demasiado extensas para serem apresentadas no telemóvel.",
+      "empty": "Ainda não há alterações de ficheiros nesta sessão."
     },
     "autoApprove": {
       "title": "Aprovação automática",
@@ -3279,7 +3286,6 @@
       "fieldName": "Nome apresentado",
       "fieldUrl": "URL do servidor",
       "fieldUrlInvalid": "Introduza um URL de servidor válido.",
-      "fieldToken": "Token Bearer (opcional)",
       "enableServer": "Ativar este servidor: {{name}}",
       "editServer": "Editar servidor",
       "deleteServer": "Eliminar servidor",
@@ -3299,6 +3305,18 @@
       "serverToolCount": "{{count}} ferramentas",
       "serverUnreachable": "Não foi possível contactar este servidor",
       "serverOff": "Este servidor está desativado"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autenticação",
+      "authNone": "Sem início de sessão",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Início de sessão OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Depois de guardares, toca em $t(modelChat.mcpOAuth.signIn) no servidor para iniciares sessão com o teu navegador.",
+      "serverNeedsSignIn": "Inicia sessão para usar este servidor",
+      "signIn": "Iniciar sessão",
+      "signInA11y": "Iniciar sessão neste servidor: {{name}}",
+      "signInFailed": "Não foi possível iniciar sessão em {{name}}. Tenta novamente."
     },
     "backends": {
       "title": "Serviços de chat",
@@ -3453,6 +3471,9 @@
       "downloading": "A descarregar…",
       "downloadProgress": "A descarregar… {{percent}}%",
       "downloadFailed": "A transferência não foi concluída. Verifique a ligação e o armazenamento livre e tente novamente."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Este modelo suporta esforço de raciocínio"
     }
   },
   "settingsTools": {

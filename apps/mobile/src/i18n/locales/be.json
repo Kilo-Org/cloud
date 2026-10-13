@@ -136,7 +136,8 @@
     "working": "Працуе",
     "yourOwnRepositories": "Твае рэпазіторыі",
     "dismissed": "Адхілена",
-    "agent": "Агент"
+    "agent": "Агент",
+    "changes": "Змены"
   },
   "language": {
     "restarting": "Перазапуск для змены мовы",
@@ -325,6 +326,7 @@
       "collapseFile": "Згарнуць файл",
       "expandFile": "Разгарнуць файл",
       "diffTooLarge": "Змен занадта шмат для паказу.",
+      "noPreview": "Папярэдні прагляд гэтага файла недаступны",
       "openOnGitHub": "Адкрыць на GitHub",
       "openDiffOnGitHub": "Адкрыць змены гэтага файла на GitHub",
       "githubDiff": "Змены на GitHub"
@@ -2245,7 +2247,6 @@
       "retryLoadingEnvironment": "Паўтарыць загрузку асяроддзя",
       "defaultEnvironment": "Прадвызначанае асяроддзе",
       "environmentSummary": "каманд: {{commands}} · MCP: {{mcp}} · навыкаў: {{skills}} · агентаў: {{agents}}",
-      "changes": "Змены",
       "leaveChanges": "Пакінуць змены",
       "commitAndPush": "Закаміціць і адправіць",
       "startSession": "Пачаць сеанс",
@@ -2727,6 +2728,12 @@
       "modelsCount_other": "Мадэлі ({{displayCount}})",
       "modelsCount_few": "Мадэлі ({{displayCount}})",
       "modelsCount_many": "Мадэлі ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Паглядзець змены",
+      "asOf": "Па стане на {{time}}",
+      "tooLarge": "Змен занадта шмат для паказу на мабільнай прыладзе.",
+      "empty": "У гэтым сеансе пакуль няма змен у файлах."
     },
     "autoApprove": {
       "title": "Аўтаматычнае адабрэнне",
@@ -3320,7 +3327,6 @@
       "fieldName": "Бачная назва",
       "fieldUrl": "URL сервера",
       "fieldUrlInvalid": "Увядзіце сапраўдны URL сервера.",
-      "fieldToken": "Токен Bearer (неабавязкова)",
       "enableServer": "Уключыць гэты сервер: {{name}}",
       "editServer": "Рэдагаваць сервер",
       "deleteServer": "Выдаліць сервер",
@@ -3340,6 +3346,18 @@
       "serverToolCount": "{{count}} інструментаў",
       "serverUnreachable": "Не ўдалося дасягнуць гэтага сервера",
       "serverOff": "Гэты сервер выключаны"
+    },
+    "mcpOAuth": {
+      "authMethod": "Аўтэнтыфікацыя",
+      "authNone": "Без уваходу",
+      "authBearer": "Токен Bearer",
+      "authOAuth": "Уваход праз OAuth",
+      "fieldToken": "Токен",
+      "oauthHint": "Пасля захавання націсніце $t(modelChat.mcpOAuth.signIn) на серверы, каб увайсці праз браўзер.",
+      "serverNeedsSignIn": "Увайдзіце, каб выкарыстоўваць гэты сервер",
+      "signIn": "Увайсці",
+      "signInA11y": "Увайсці на гэты сервер: {{name}}",
+      "signInFailed": "Не ўдалося ўвайсці ў {{name}}. Паспрабуйце зноў."
     },
     "backends": {
       "title": "Серверныя часткі чата",
@@ -3494,6 +3512,9 @@
       "downloading": "Спампоўванне…",
       "downloadProgress": "Спампоўванне… {{percent}}%",
       "downloadFailed": "Спампоўванне не завяршылася. Праверце злучэнне і вольнае месца, потым паспрабуйце зноў."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Гэтая мадэль падтрымлівае ўзровень разважанняў"
     }
   },
   "settingsTools": {

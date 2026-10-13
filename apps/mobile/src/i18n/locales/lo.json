@@ -136,7 +136,8 @@
     "working": "ກຳລັງເຮັດວຽກ",
     "yourOwnRepositories": "ຄັງໂຄ້ດຂອງທ່ານເອງ",
     "dismissed": "ລະເວັ້ນແລ້ວ",
-    "agent": "ຕົວແທນ"
+    "agent": "ຕົວແທນ",
+    "changes": "ການປ່ຽນແປງ"
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -325,6 +326,7 @@
       "collapseFile": "ຍຸບໄຟລ໌",
       "expandFile": "ຂະຫຍາຍໄຟລ໌",
       "diffTooLarge": "ຄວາມແຕກຕ່າງໃຫຍ່ເກີນກວ່າຈະສະແດງໄດ້.",
+      "noPreview": "ບໍ່ມີຕົວຢ່າງສຳລັບໄຟລ໌ນີ້",
       "openOnGitHub": "ເປີດໃນ GitHub",
       "openDiffOnGitHub": "ເປີດຄວາມແຕກຕ່າງຂອງໄຟລ໌ນີ້ໃນ GitHub",
       "githubDiff": "ຄວາມແຕກຕ່າງໃນ GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "ລອງໂຫຼດສະພາບແວດລ້ອມໃໝ່",
       "defaultEnvironment": "ສະພາບແວດລ້ອມມາດຕະຖານ",
       "environmentSummary": "{{commands}} ຄຳສັ່ງ · {{mcp}} MCP · {{skills}} ທັກສະ · {{agents}} ເອເຈນ",
-      "changes": "ການປ່ຽນແປງ",
       "leaveChanges": "ປະການປ່ຽນແປງໄວ້",
       "commitAndPush": "ບັນທຶກແລະສົ່ງຂຶ້ນ",
       "startSession": "ເລີ່ມເຊດຊັນ",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "ໂມເດວ ({{displayCount}})",
       "modelsCount_other": "ໂມເດວ ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ເບິ່ງການປ່ຽນແປງ",
+      "asOf": "ຮອດເວລາ {{time}}",
+      "tooLarge": "ຄວາມແຕກຕ່າງນີ້ໃຫຍ່ເກີນກວ່າຈະສະແດງໃນມືຖືໄດ້.",
+      "empty": "ຍັງບໍ່ມີການປ່ຽນແປງໄຟລ໌ໃນເຊສຊັນນີ້ເທື່ອ."
     },
     "autoApprove": {
       "title": "ການອະນຸມັດອັດຕະໂນມັດ",
@@ -3238,7 +3245,6 @@
       "fieldName": "ຊື່ທີ່ສະແດງ",
       "fieldUrl": "URL ຂອງເຊີບເວີ",
       "fieldUrlInvalid": "ປ້ອນ URL ຂອງເຊີບເວີທີ່ຖືກຕ້ອງ.",
-      "fieldToken": "ໂທເຄັນ Bearer (ທາງເລືອກ)",
       "enableServer": "ເປີດນຳໃຊ້ເຊີບເວີນີ້: {{name}}",
       "editServer": "ແກ້ໄຂເຊີບເວີ",
       "deleteServer": "ລຶບເຊີບເວີ",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "ເຄື່ອງມື {{count}}",
       "serverUnreachable": "ບໍ່ສາມາດເຂົ້າເຖິງເຊີບເວີນີ້ໄດ້",
       "serverOff": "ເຊີບເວີນີ້ປິດຢູ່"
+    },
+    "mcpOAuth": {
+      "authMethod": "ການຢືນຢັນຕົວຕົນ",
+      "authNone": "ບໍ່ຕ້ອງເຂົ້າສູ່ລະບົບ",
+      "authBearer": "ໂທເຄັນ Bearer",
+      "authOAuth": "ເຂົ້າສູ່ລະບົບດ້ວຍ OAuth",
+      "fieldToken": "ໂທເຄັນ",
+      "oauthHint": "ຫຼັງຈາກບັນທຶກແລ້ວ, ແຕະ $t(modelChat.mcpOAuth.signIn) ຢູ່ເຊີບເວີເພື່ອເຂົ້າສູ່ລະບົບຜ່ານບຣາວເຊີຂອງທ່ານ.",
+      "serverNeedsSignIn": "ເຂົ້າສູ່ລະບົບເພື່ອໃຊ້ເຊີບເວີນີ້",
+      "signIn": "ເຂົ້າສູ່ລະບົບ",
+      "signInA11y": "ເຂົ້າສູ່ລະບົບເຊີບເວີນີ້: {{name}}",
+      "signInFailed": "ບໍ່ສາມາດເຂົ້າສູ່ລະບົບ {{name}} ໄດ້. ກະລຸນາລອງໃໝ່."
     },
     "backends": {
       "title": "ລະບົບເບື້ອງຫຼັງຂອງແຊັດ",
@@ -3412,6 +3430,9 @@
       "downloading": "ກຳລັງດາວໂຫຼດ…",
       "downloadProgress": "ກຳລັງດາວໂຫຼດ… {{percent}}%",
       "downloadFailed": "ການດາວໂຫຼດບໍ່ສຳເລັດ. ກວດສອບການເຊື່ອມຕໍ່ ແລະ ພື້ນທີ່ຈັດເກັບທີ່ຫວ່າງ, ແລ້ວລອງໃໝ່."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ໂມເດວນີ້ຮອງຮັບລະດັບການຄິດ"
     }
   },
   "settingsTools": {

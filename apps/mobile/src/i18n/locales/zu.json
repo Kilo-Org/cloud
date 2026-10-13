@@ -136,7 +136,8 @@
     "working": "Kuyasebenza",
     "yourOwnRepositories": "Izinqolobane zakho zekhodi",
     "dismissed": "Kuchithiwe",
-    "agent": "Umenzeli"
+    "agent": "Umenzeli",
+    "changes": "Izinguquko"
   },
   "language": {
     "restarting": "Kuqaliswa kabusha ukuze kusetshenziswe ulimi olukhethiwe",
@@ -325,6 +326,7 @@
       "collapseFile": "Goqa ifayela",
       "expandFile": "Nweba ifayela",
       "diffTooLarge": "Umehluko mkhulu kakhulu ukuba uboniswe.",
+      "noPreview": "Akukho ukubuka kuqala okutholakalayo kwaleli fayela",
       "openOnGitHub": "Vula ku-GitHub",
       "openDiffOnGitHub": "Vula umehluko waleli fayela ku-GitHub",
       "githubDiff": "Umehluko ku-GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Zama ukulayisha indawo yokusebenza futhi",
       "defaultEnvironment": "Indawo yokusebenza ezenzakalelayo",
       "environmentSummary": "imiyalo engu-{{commands}} · MCP {{mcp}} · amakhono angu-{{skills}} · abenzeli abangu-{{agents}}",
-      "changes": "Izinguquko",
       "leaveChanges": "Shiya izinguquko",
       "commitAndPush": "Qopha bese uthumela",
       "startSession": "Qala iseshini",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Imodeli ({{displayCount}})",
       "modelsCount_other": "Amamodeli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Buka izinguquko",
+      "asOf": "Kusukela ngo-{{time}}",
+      "tooLarge": "Lo mehluko mkhulu kakhulu ukuba uboniswe kuselula.",
+      "empty": "Azikho izinguquko zamafayela kule seshini okwamanje."
     },
     "autoApprove": {
       "title": "Ukuvumela okuzenzakalelayo",
@@ -3238,7 +3245,6 @@
       "fieldName": "Igama eliboniswayo",
       "fieldUrl": "URL yeseva",
       "fieldUrlInvalid": "Faka i-URL yeseva evumelekile.",
-      "fieldToken": "Ithokheni ye-Bearer (okukhethayo)",
       "enableServer": "Nika amandla le seve: {{name}}",
       "editServer": "Hlela iseva",
       "deleteServer": "Susa iseva",
@@ -3258,6 +3264,18 @@
       "serverToolCount": "amathuluzi angu-{{count}}",
       "serverUnreachable": "Ayikwazanga ukufinyelela le seve",
       "serverOff": "Le seve ivaliwe"
+    },
+    "mcpOAuth": {
+      "authMethod": "Ukuqinisekisa",
+      "authNone": "Akukho ukungena",
+      "authBearer": "Ithokheni ye-Bearer",
+      "authOAuth": "Ukungena nge-OAuth",
+      "fieldToken": "Ithokheni",
+      "oauthHint": "Ngemva kokulondoloza, thepha u-$t(modelChat.mcpOAuth.signIn) kuseve ukuze ungene ngesiphequluli sakho.",
+      "serverNeedsSignIn": "Ngena ukuze usebenzise le seve",
+      "signIn": "Ngena",
+      "signInA11y": "Ngena kule seve: {{name}}",
+      "signInFailed": "Ayikwazanga ukungena ku-{{name}}. Zama futhi."
     },
     "backends": {
       "title": "Izinhlelo ezingemuva zengxoxo",
@@ -3412,6 +3430,9 @@
       "downloading": "Iyadawuniloda…",
       "downloadProgress": "Iyadawuniloda… {{percent}}%",
       "downloadFailed": "Ukudawuniloda akuqedanga. Hlola uxhumano lwakho nendawo yokugcina ekhululekile, bese uzama futhi."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Le modeli isekela umzamo wokucabanga"
     }
   },
   "settingsTools": {

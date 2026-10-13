@@ -136,7 +136,8 @@
     "working": "U radu",
     "yourOwnRepositories": "Tvoji repozitorijumi",
     "dismissed": "Odbačeno",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Izmene"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promene jezika",
@@ -325,6 +326,7 @@
       "collapseFile": "Skupi datoteku",
       "expandFile": "Proširi datoteku",
       "diffTooLarge": "Ima previše izmena za prikaz.",
+      "noPreview": "Pregled ove datoteke nije dostupan",
       "openOnGitHub": "Otvori na GitHub-u",
       "openDiffOnGitHub": "Otvori prikaz izmena ove datoteke na GitHub-u",
       "githubDiff": "Prikaz izmena na GitHub-u"
@@ -2217,7 +2219,6 @@
       "retryLoadingEnvironment": "Pokušaj ponovo da učitaš okruženje",
       "defaultEnvironment": "Podrazumevano okruženje",
       "environmentSummary": "komande: {{commands}} · MCP: {{mcp}} · veštine: {{skills}} · agenti: {{agents}}",
-      "changes": "Izmene",
       "leaveChanges": "Ostavi izmene",
       "commitAndPush": "Komituj i pošalji",
       "startSession": "Pokreni sesiju",
@@ -2689,6 +2690,12 @@
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeli ({{displayCount}})",
       "modelsCount_few": "Modeli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Prikaži izmene",
+      "asOf": "Stanje u {{time}}",
+      "tooLarge": "Ima previše izmena za prikaz na mobilnom uređaju.",
+      "empty": "U ovoj sesiji još nema izmena datoteka."
     },
     "autoApprove": {
       "title": "Automatsko odobravanje",
@@ -3279,7 +3286,6 @@
       "fieldName": "Prikazano ime",
       "fieldUrl": "URL servera",
       "fieldUrlInvalid": "Unesi važeći URL servera.",
-      "fieldToken": "Bearer token (opciono)",
       "enableServer": "Omogući ovaj server: {{name}}",
       "editServer": "Uredi server",
       "deleteServer": "Obriši server",
@@ -3299,6 +3305,18 @@
       "serverToolCount": "{{count}} alata",
       "serverUnreachable": "Nije bilo moguće doći do ovog servera",
       "serverOff": "Ovaj server je isključen"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikacija",
+      "authNone": "Bez prijave",
+      "authBearer": "Bearer token",
+      "authOAuth": "OAuth prijava",
+      "fieldToken": "Token",
+      "oauthHint": "Nakon čuvanja, dodirni $t(modelChat.mcpOAuth.signIn) na serveru da se prijaviš putem pregledača.",
+      "serverNeedsSignIn": "Prijavi se da koristiš ovaj server",
+      "signIn": "Prijavi se",
+      "signInA11y": "Prijavi se na ovaj server: {{name}}",
+      "signInFailed": "Prijava na {{name}} nije uspela. Pokušaj ponovo."
     },
     "backends": {
       "title": "Pozadinski servisi za ćaskanje",
@@ -3453,6 +3471,9 @@
       "downloading": "Preuzimanje…",
       "downloadProgress": "Preuzimanje… {{percent}}%",
       "downloadFailed": "Preuzimanje nije završeno. Proverite vezu i slobodan prostor, pa pokušajte ponovo."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ovaj model podržava nivo razmišljanja"
     }
   },
   "settingsTools": {

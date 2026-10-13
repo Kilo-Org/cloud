@@ -7,6 +7,8 @@ import { pushGapItems } from '@/lib/pr-review/diff/pr-diff-gap-builder';
 import {
   buildGithubFileUrl,
   type BuildItemsArgs,
+  type DiffFileItemsArgs,
+  type DiffFileSource,
   type DiffViewMode,
   type ListItem,
   type PaginationRowItem,
@@ -27,7 +29,7 @@ type ParsedHunk = ParsedFile['hunks'][number];
 // `item.line` reference-stable so `DiffLine`'s memo comparator can hit.
 const parsedPatchCache = new WeakMap<object, ParsedFile>();
 
-function parsedPatchFor(file: BuildItemsArgs['files'][number]): ParsedFile {
+function parsedPatchFor(file: DiffFileItemsArgs['files'][number]): ParsedFile {
   const cached = parsedPatchCache.get(file);
   if (cached) {
     return cached;
@@ -39,7 +41,7 @@ function parsedPatchFor(file: BuildItemsArgs['files'][number]): ParsedFile {
 
 function pushSideBySideHunk(args: {
   items: ListItem[];
-  file: BuildItemsArgs['files'][number];
+  file: DiffFileItemsArgs['files'][number];
   hunk: ParsedHunk;
   hunkIndex: number;
   language: string | null;
@@ -75,7 +77,7 @@ function pushSideBySideHunk(args: {
 
 function pushUnifiedHunk(args: {
   items: ListItem[];
-  file: BuildItemsArgs['files'][number];
+  file: DiffFileItemsArgs['files'][number];
   hunk: ParsedHunk;
   hunkIndex: number;
   parsed: ParsedFile;
@@ -107,43 +109,47 @@ function pushUnifiedHunk(args: {
   }
 }
 
-function pushPatchMissingItems(args: {
-  items: ListItem[];
-  file: BuildItemsArgs['files'][number];
-  viewed: boolean;
-  githubUrl: string;
-}): void {
-  args.items.push({
+function pushPatchMissingItems(
+  items: ListItem[],
+  file: DiffFileItemsArgs['files'][number],
+  source: DiffFileSource
+): void {
+  const pr = source.kind === 'pr' ? source : null;
+  items.push({
     kind: 'file-patch-missing',
-    key: `file-pm:${args.file.path}`,
-    file: args.file,
-    viewed: args.viewed,
-    githubUrl: args.githubUrl,
+    key: `file-pm:${file.path}`,
+    file,
+    viewed: pr ? pr.viewed(file.path) : null,
+    githubUrl: pr
+      ? buildGithubFileUrl({ owner: pr.owner, repo: pr.repo, number: pr.number, path: file.path })
+      : null,
   });
 }
 
 function pushExpandedFileItems(
   items: ListItem[],
-  file: BuildItemsArgs['files'][number],
-  args: BuildItemsArgs
+  file: DiffFileItemsArgs['files'][number],
+  args: DiffFileItemsArgs
 ): void {
-  const githubUrl = buildGithubFileUrl({
-    owner: args.owner,
-    repo: args.repo,
-    number: args.number,
-    path: file.path,
-  });
   const parsed: ParsedFile = parsedPatchFor(file);
   const hunks = parsed.hunks;
 
   if (file.patchMissing || hunks.length === 0) {
-    pushPatchMissingItems({ items, file, viewed: args.viewed(file.path), githubUrl });
+    pushPatchMissingItems(items, file, args.source);
     return;
   }
 
   const language = languageForPath(file.path);
-  const fileContext = args.expandedContext[file.path] ?? {};
   const viewMode: DiffViewMode = args.viewMode ?? 'unified';
+  // Gap expansion reads file contents at the PR head; a session snapshot has
+  // no ref to read, so its hunks render without expand separators.
+  const gaps =
+    args.source.kind === 'pr'
+      ? {
+          headSha: args.source.headSha,
+          fileContext: args.source.expandedContext[file.path] ?? {},
+        }
+      : null;
 
   for (let hunkIndex = 0; hunkIndex < hunks.length; hunkIndex += 1) {
     const hunk = hunks[hunkIndex];
@@ -151,7 +157,7 @@ function pushExpandedFileItems(
       break;
     }
 
-    if (hunkIndex === 0 && hunk.newStart > 1) {
+    if (gaps && hunkIndex === 0 && hunk.newStart > 1) {
       pushGapItems({
         items,
         file,
@@ -159,15 +165,15 @@ function pushExpandedFileItems(
         endLine: hunk.newStart - 1,
         gapIndex: -1,
         hunkIndex: 0,
-        fileContext,
+        fileContext: gaps.fileContext,
         parsed,
         language,
-        headSha: args.headSha,
+        headSha: gaps.headSha,
         viewMode,
       });
     }
 
-    if (hunkIndex > 0) {
+    if (gaps && hunkIndex > 0) {
       const prevHunk = hunks[hunkIndex - 1];
       if (prevHunk) {
         const prevNewEnd = prevHunk.newStart + prevHunk.newLines - 1;
@@ -180,10 +186,10 @@ function pushExpandedFileItems(
             endLine: hunk.newStart - 1,
             gapIndex: hunkIndex - 1,
             hunkIndex,
-            fileContext,
+            fileContext: gaps.fileContext,
             parsed,
             language,
-            headSha: args.headSha,
+            headSha: gaps.headSha,
             viewMode,
           });
         }
@@ -198,7 +204,7 @@ function pushExpandedFileItems(
   }
 
   const lastHunk = hunks.at(-1);
-  if (lastHunk) {
+  if (gaps && lastHunk) {
     pushGapItems({
       items,
       file,
@@ -206,10 +212,10 @@ function pushExpandedFileItems(
       endLine: Infinity,
       gapIndex: hunks.length,
       hunkIndex: hunks.length - 1,
-      fileContext,
+      fileContext: gaps.fileContext,
       parsed,
       language,
-      headSha: args.headSha,
+      headSha: gaps.headSha,
       viewMode,
     });
   }
@@ -253,7 +259,7 @@ function buildPaginationItem(args: BuildItemsArgs): PaginationRowItem {
   return buildPaginationStateItem('all-loaded', args);
 }
 
-export function buildFileItems(args: BuildItemsArgs): ListItem[] {
+export function buildFileItems(args: DiffFileItemsArgs): ListItem[] {
   const items: ListItem[] = [];
 
   if (shouldShowTruncationBanner(args.changedFiles)) {
@@ -272,7 +278,7 @@ export function buildFileItems(args: BuildItemsArgs): ListItem[] {
       file,
       expanded: isExpanded,
       hasDiff: !file.patchMissing,
-      viewed: args.viewed(file.path),
+      viewed: args.source.kind === 'pr' ? args.source.viewed(file.path) : null,
     });
     if (isExpanded) {
       pushExpandedFileItems(items, file, args);
@@ -284,8 +290,27 @@ export function buildFileItems(args: BuildItemsArgs): ListItem[] {
 
 export { buildPaginationItem };
 
+/** The file-row args of a PR review list. */
+function prFileItemsArgs(args: BuildItemsArgs): DiffFileItemsArgs {
+  return {
+    files: args.files,
+    expanded: args.expanded,
+    changedFiles: args.changedFiles,
+    viewMode: args.viewMode,
+    source: {
+      kind: 'pr',
+      owner: args.owner,
+      repo: args.repo,
+      number: args.number,
+      headSha: args.headSha,
+      expandedContext: args.expandedContext,
+      viewed: args.viewed,
+    },
+  };
+}
+
 export function buildItems(args: BuildItemsArgs): ListItem[] {
-  const items = buildFileItems(args);
+  const items = buildFileItems(prFileItemsArgs(args));
   items.push(buildPaginationItem(args));
   return items;
 }

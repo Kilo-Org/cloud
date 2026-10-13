@@ -9,7 +9,9 @@ import {
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   messageIdSchema,
   persistedKiloSdkMessageHistorySchema,
+  sessionDiffReadSchema,
   sessionIdSchema,
+  type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
 
 import type { Env } from '../env';
@@ -506,6 +508,42 @@ api.get('/session/:sessionId/export', async c => {
   return c.body(result.stream, 200, {
     'content-type': 'application/json; charset=utf-8',
   });
+});
+
+/**
+ * The stored cumulative session diff (`session_diff` item) for one Kilo
+ * session the user can read. Reads only that row, never the transcript.
+ */
+api.get('/session/:sessionId/diff', async c => {
+  const parsed = sessionIdSchema.safeParse(c.req.param('sessionId'));
+  if (!parsed.success) {
+    return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
+  }
+
+  const kiloUserId = c.get('user_id');
+  const session = await resolveAccessibleKiloSession(c.env, {
+    kiloUserId,
+    kiloSessionId: parsed.data,
+  });
+  if (!session) {
+    return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
+
+  const rawDiff = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+    () => getSessionIngestDO(c.env, { kiloUserId, sessionId: parsed.data }),
+    stub => stub.readSessionDiff(),
+    'SessionIngestDO.readSessionDiff'
+  );
+  const read = sessionDiffReadSchema.safeParse(rawDiff);
+  const diff: SessionDiffRead = read.success ? read.data : { kind: 'invalid_data' };
+  console.log({
+    event: 'session_diff_read',
+    sessionId: parsed.data,
+    outcome: diff.kind,
+    fileCount: diff.kind === 'value' ? diff.files.length : 0,
+  });
+
+  return c.json({ success: true, kiloSessionId: parsed.data, diff }, 200);
 });
 
 /**

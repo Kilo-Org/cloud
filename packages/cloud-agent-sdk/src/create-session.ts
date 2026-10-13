@@ -86,7 +86,12 @@ export async function createRemoteSessionOnConnection(
     ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
     ...(input?.directory !== undefined ? { directory: input.directory } : {}),
     ...(input?.cloneFromKiloSessionId !== undefined
-      ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
+      ? {
+          cloneFromKiloSessionId: input.cloneFromKiloSessionId,
+          ...(input.cloneUpToMessageId !== undefined
+            ? { cloneUpToMessageId: input.cloneUpToMessageId }
+            : {}),
+        }
       : {}),
   };
   // `directory` is an extended field; the `:bare` retry omits it for old CLIs.

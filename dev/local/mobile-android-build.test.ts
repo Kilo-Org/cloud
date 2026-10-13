@@ -202,6 +202,27 @@ test('Android cache miss builds once, publishes, then reuses the APK', async () 
   assert.equal(installed[0], installed[1]);
 });
 
+test('Android remote miss with requireRemote fails without a local build', async () => {
+  const d = deps();
+  const serial = 'emulator-required';
+  writeClaim(d.claimRoot, serial, d.worktreeRoot);
+  let builds = 0;
+  let installs = 0;
+  d.fetchRemote = async () => undefined;
+  d.requireRemote = true;
+  d.build = async () => {
+    builds += 1;
+    throw new Error('local build must not run');
+  };
+  d.install = () => {
+    installs += 1;
+  };
+
+  await assert.rejects(() => runAndroidBuild(serial, d), /KILO_REMOTE_NATIVE=required/);
+  assert.equal(builds, 0);
+  assert.equal(installs, 0);
+});
+
 test('Android cache hit with the wrong actual package id rebuilds before install', async () => {
   const d = deps();
   const serial = 'emulator-package';

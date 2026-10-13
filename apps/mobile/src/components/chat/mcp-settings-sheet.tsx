@@ -36,14 +36,16 @@ import {
 } from './mcp-settings-state';
 import { McpServerFormSheet, type McpServerFormTarget } from './mcp-server-form-sheet';
 import { McpServersSection } from './mcp-servers-section';
+import { WebSearchRow, type WebSearchSetting } from './web-search-row';
 
 /**
  * The chat-tools sheet.
  *
- * One sheet, one scroll: the switch for the app-settings tools, the Kilo MCP
- * control, and the remote MCP servers the person added. The state the sheet
- * draws comes from the pure mappings in `mcp-settings-state.ts`, so the same
- * views drive the dot on the header control and every row here.
+ * One sheet, one scroll: the web search switch, the switch for the
+ * app-settings tools, the Kilo MCP control, and the remote MCP servers the
+ * person added. The state the sheet draws comes from the pure mappings in
+ * `mcp-settings-state.ts`, so the same views drive the dot on the header
+ * control and every row here.
  *
  * The hook returns the whole sheet model. It subscribes to the stores rather
  * than copying them, so a switch an agent flips — or a server another screen
@@ -71,8 +73,10 @@ export type McpSettings = {
   readonly setServerEnabled: (id: string, next: boolean) => void;
   /** The servers whose Retry is in flight, so only those buttons show it. */
   readonly retryingServerIds: readonly string[];
-  /** Asks one failed server again, with the longer deadline a Retry gets. */
+  /** Asks one server with no tools on hand again, with the longer deadline a Retry gets. */
   readonly retryServer: (id: string) => void;
+  /** Asks every enabled server with no tools on hand, as the sheet opens. */
+  readonly discoverServers: () => void;
   /** Adds a server, discovers it, and answers whether the write landed. */
   readonly addServer: (draft: RemoteMcpServerDraft) => Promise<boolean>;
   /** Replaces one server, discovers it, and answers whether the write landed. */
@@ -186,6 +190,7 @@ export function useMcpSettings(place: ChatPlace | null, sessionId: string): McpS
     setServerEnabled: remote.setEnabled,
     retryingServerIds: remote.retryingIds,
     retryServer: remote.retryServer,
+    discoverServers: remote.discover,
     addServer: remote.addServer,
     updateServer: remote.updateServer,
     deleteServer: remote.deleteServer,
@@ -197,9 +202,15 @@ type McpSettingsSheetProps = {
   visible: boolean;
   onClose: () => void;
   settings: McpSettings;
+  webSearch: WebSearchSetting;
 };
 
-export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSettingsSheetProps>) {
+export function McpSettingsSheet({
+  visible,
+  onClose,
+  settings,
+  webSearch,
+}: Readonly<McpSettingsSheetProps>) {
   const { confirm, dialog } = useConfirmDialog();
   const { t } = useTranslation();
   const [form, setForm] = useState<McpServerFormTarget | null>(null);
@@ -207,8 +218,16 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
   // mounts of the same add sheet, so the second open would otherwise keep the
   // previous name and URL and a type-in would concatenate them.
   const formGeneration = useRef(0);
-  const { view, settingsTools } = settings;
+  const { view, settingsTools, discoverServers } = settings;
   const kilo = kiloServerRow(view);
+
+  // A restart keeps no discovered tool, so the sheet asks the servers as it
+  // opens rather than showing a server with no tools and nothing running.
+  useEffect(() => {
+    if (visible) {
+      discoverServers();
+    }
+  }, [visible, discoverServers]);
 
   // Closing the sheet closes whatever it had open, so reopening it starts on
   // the list rather than on a form the person had already left.
@@ -281,6 +300,8 @@ export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSet
         contentContainerClassName="gap-4 px-6 pb-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
+        <WebSearchRow setting={webSearch} />
+
         {/* 1. The one switch for the settings-changing tools. */}
         <View className="gap-2">
           <PreferenceRow

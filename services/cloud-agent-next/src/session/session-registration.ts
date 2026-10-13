@@ -20,6 +20,7 @@ import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
 import {
+  CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   isSelectableSandboxAllocation,
   sandboxAllocationRequiresControlPlane,
   sandboxAllocationSchema,
@@ -56,6 +57,7 @@ import {
   getControlPlaneCredentialContainment,
   DEVCONTAINER_RETIRED_MESSAGE,
   CurrentSessionMetadataSchema,
+  hasCredentialContainment,
   type CredentialContainment,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
@@ -89,7 +91,10 @@ import {
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
 import {
+  cloudflareSandboxSmallNativeReplacement,
   generateSandboxRoutingTarget,
+  recordedSandboxAllocationMatchesRequest,
+  resolveNewSessionSandboxAllocation,
   selectSandboxProvider,
   type SandboxSelection,
 } from '../sandbox-id.js';
@@ -112,6 +117,11 @@ import type {
   SessionMessageAdmissionResult,
 } from '../execution/types.js';
 import { throwAdmissionError } from './queue-message.js';
+import {
+  allocationCapabilityFor,
+  requestedSandboxAllocation,
+  withSavedSandboxAllocation,
+} from './sandbox-allocation-resolution.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
 
 export type SessionRegistrationInput = SessionCreateRequest;
@@ -132,7 +142,7 @@ function sessionPlaneForCreate(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): SessionPlane {
-  return sandboxAllocationRequiresControlPlane(input.runtime?.sandboxAllocation)
+  return sandboxAllocationRequiresControlPlane(requestedSandboxAllocation(input))
     ? 'control'
     : sessionPlaneForNewOwner(
         ctx.env,
@@ -623,6 +633,24 @@ async function assertSandboxAllocationMembership(
   await assertOrganizationMembership(getPgDb(ctx.env), ctx.userId, orgId);
 }
 
+function sandboxSmallReplacementForSession(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  sessionId: string,
+  options?: { billingOrigin?: string }
+): SandboxAllocation | undefined {
+  return cloudflareSandboxSmallNativeReplacement({
+    env: ctx.env,
+    orgId: input.options?.kilocodeOrganizationId,
+    userId: ctx.userId,
+    sessionId,
+    requestedAllocation: requestedSandboxAllocation(input),
+    contained: hasCredentialContainment(computeCredentialContainment(sessionId, input, ctx.env)),
+    createdOnPlatform: input.options?.createdOnPlatform,
+    billingOrigin: options?.billingOrigin,
+  });
+}
+
 async function allocateNewSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
@@ -630,14 +658,35 @@ async function allocateNewSession(
   ledger?: SessionCreationLedgerHooks
 ): Promise<NewSessionAllocation> {
   await assertSandboxAllocationMembership(input, ctx);
-  const sandboxAllocation = input.runtime?.sandboxAllocation;
+  const requestedAllocation = requestedSandboxAllocation(input);
   const orgId = input.options?.kilocodeOrganizationId;
-  if (sandboxAllocation !== undefined) {
-    assertSandboxAllocationAvailable(ctx.env, { userId: ctx.userId, orgId }, sandboxAllocation);
+  // Every allocation is validated when it is allocated, whether the client chose
+  // it or saved settings resolved it, so a pinned retry cannot outlive the
+  // owner's access to sandbox selection.
+  if (requestedAllocation !== undefined) {
+    assertSandboxAllocationAvailable(
+      ctx.env,
+      { userId: ctx.userId, orgId },
+      requestedAllocation,
+      input.repository.type,
+      allocationCapabilityFor(input, options?.billingOrigin)
+    );
   }
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
   const cloudAgentSessionId = generateSessionId(sessionPlaneForCreate(input, ctx, options));
+  const sandboxAllocation = resolveNewSessionSandboxAllocation({
+    env: ctx.env,
+    orgId,
+    userId: ctx.userId,
+    sessionId: cloudAgentSessionId,
+    requestedAllocation,
+    contained: hasCredentialContainment(
+      computeCredentialContainment(cloudAgentSessionId, input, ctx.env)
+    ),
+    createdOnPlatform: input.options?.createdOnPlatform,
+    billingOrigin: options?.billingOrigin,
+  });
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =
     input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
@@ -675,6 +724,9 @@ async function allocateNewSession(
         [SESSION_CREATE_WORKTREE_ENABLED_KEY]: worktreeId !== undefined,
         [SESSION_CREATE_FINALIZATION_VERSION_KEY]: ledger.finalizationVersion,
         [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(input),
+        ...(isSelectableSandboxAllocation(input.savedSandboxAllocation ?? undefined)
+          ? { [SESSION_CREATE_SAVED_ALLOCATION_KEY]: input.savedSandboxAllocation }
+          : {}),
         ...(isSelectableSandboxAllocation(sandboxAllocation) ? { sandboxAllocation } : {}),
       });
     }
@@ -706,7 +758,7 @@ async function allocateNewSession(
       ctx.botId,
       {
         createdOnPlatform: options?.billingOrigin === 'code-review' ? 'code-review' : undefined,
-        sandboxAllocation,
+        sandboxAllocation: requestedAllocation,
       }
     );
     if (target.kind === 'shared') {
@@ -722,14 +774,18 @@ async function allocateNewSession(
       };
     } else {
       sandboxId = target.sandboxId;
-      sandboxProvider = selectSandboxProvider({
-        env: ctx.env,
-        orgId,
-        userId: ctx.userId,
-        sandboxId,
-        sessionId: cloudAgentSessionId,
-        sandboxAllocation,
-      });
+      sandboxProvider =
+        sandboxAllocation === CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION &&
+        requestedAllocation !== CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION
+          ? 'cloudflare-containers'
+          : selectSandboxProvider({
+              env: ctx.env,
+              orgId,
+              userId: ctx.userId,
+              sandboxId,
+              sessionId: cloudAgentSessionId,
+              sandboxAllocation: requestedAllocation,
+            });
     }
   } catch (error) {
     await recordPostSetupFailure(() =>
@@ -790,7 +846,7 @@ async function allocateNewSession(
       createdOnPlatform,
       defaultTitle,
       canonicalRepositoryUrl,
-      cloneFromKiloSessionId,
+      input.clone,
     ];
     if (worktreeId) {
       ingestArgs.push(worktreeId, { sandboxId, provider: sandboxProvider });
@@ -905,7 +961,8 @@ async function allocateNewSession(
 function rebuildRecordedSessionAllocation(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
-  row: OperationLedgerRow
+  row: OperationLedgerRow,
+  options?: { billingOrigin?: string }
 ): NewSessionAllocation {
   const canonical = row.canonical_result ?? {};
   const cloudAgentSessionId = canonical.cloudAgentSessionId;
@@ -924,11 +981,17 @@ function rebuildRecordedSessionAllocation(
     throw creationInProgressError();
   }
   const sandboxKind = recordedKind.data;
-  const requested = isSelectableSandboxAllocation(input.runtime?.sandboxAllocation)
-    ? input.runtime?.sandboxAllocation
-    : undefined;
+  const requestedChoice = requestedSandboxAllocation(input);
+  const requested = isSelectableSandboxAllocation(requestedChoice) ? requestedChoice : undefined;
   const recorded = sandboxAllocationSchema.optional().safeParse(canonical.sandboxAllocation);
-  if (!recorded.success || recorded.data !== requested) {
+  const replacement =
+    typeof cloudAgentSessionId === 'string'
+      ? sandboxSmallReplacementForSession(input, ctx, cloudAgentSessionId, options)
+      : undefined;
+  if (
+    !recorded.success ||
+    !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement)
+  ) {
     throw creationInProgressError();
   }
   if (recorded.data !== undefined) {
@@ -1073,6 +1136,9 @@ function buildSessionRegistrationCommand(
     clone: input.clone
       ? {
           cloneFromKiloSessionId: input.clone.cloneFromKiloSessionId,
+          ...(input.clone.cloneUpToMessageId
+            ? { cloneUpToMessageId: input.clone.cloneUpToMessageId }
+            : {}),
           ...(allocation.reportingCreatedAt
             ? { reportingCreatedAt: allocation.reportingCreatedAt }
             : {}),
@@ -1112,9 +1178,11 @@ function buildSessionRegistrationCommand(
       ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
       ...(allocation.sandboxKind ? { sandboxKind: allocation.sandboxKind } : {}),
       credentialContainment: allocation.credentialContainment,
-      ...(input.runtime?.sandboxAllocation
-        ? { sandboxAllocation: input.runtime.sandboxAllocation }
-        : {}),
+      ...(allocation.sandboxAllocation
+        ? { sandboxAllocation: allocation.sandboxAllocation }
+        : requestedSandboxAllocation(input)
+          ? { sandboxAllocation: requestedSandboxAllocation(input) }
+          : {}),
     },
   };
 }
@@ -1155,11 +1223,12 @@ async function registerControlPlaneSession(
  * ownership row because the metadata write may have committed.
  */
 export async function registerNewSession(
-  input: SessionRegistrationInput,
+  rawInput: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): Promise<SessionRegistrationResult> {
-  assertSupportedSandboxAllocation(input, options);
+  assertSupportedSandboxAllocation(rawInput, options);
+  const input = await withSavedSandboxAllocation(rawInput, savedAllocationArgs(ctx, options));
   const allocation = await allocateNewSession(input, ctx, options);
   const stub = resolveLegacySessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId);
   let registerResult: { success: boolean; error?: string };
@@ -1469,12 +1538,14 @@ async function registerAllocatedSession(
  * durably admit the canonical initial turn.
  */
 export async function startNewSession(
-  input: SessionRegistrationInput,
+  rawInput: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string },
   ledger?: SessionCreationLedgerHooks
 ): Promise<StartedSessionResult> {
-  assertSupportedSandboxAllocation(input, options);
+  assertSupportedSandboxAllocation(rawInput, options);
+  // A ledger create has resolved the saved allocation already; this is a no-op then.
+  const input = await withSavedSandboxAllocation(rawInput, savedAllocationArgs(ctx, options));
   const allocation = await allocateSessionForCreate(input, ctx, options, ledger);
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
@@ -1490,6 +1561,43 @@ export async function startNewSession(
 export const SESSION_CREATE_INTENT_FINGERPRINT_KEY = 'createIntentFingerprint';
 export const SESSION_CREATE_WORKTREE_ENABLED_KEY = 'worktreeEnabled';
 export const SESSION_CREATE_FINALIZATION_VERSION_KEY = 'finalizationVersion';
+/**
+ * The allocation that saved settings resolved for the create, recorded with the
+ * original caller fingerprint so a retry restores it instead of reading settings
+ * again.
+ */
+export const SESSION_CREATE_SAVED_ALLOCATION_KEY = 'savedSandboxAllocation';
+
+function savedAllocationArgs(
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
+) {
+  return {
+    db: getPgDb(ctx.env),
+    env: ctx.env,
+    userId: ctx.userId,
+    ...(options?.billingOrigin ? { billingOrigin: options.billingOrigin } : {}),
+  };
+}
+
+/**
+ * Settings are read only while the row has recorded no progress. After that, the
+ * choice the row pinned (or none) applies, so a retry never follows a settings
+ * change.
+ */
+async function withLedgerSavedAllocation(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  row: OperationLedgerRow,
+  options: SessionLedgerCreateOptions
+): Promise<SessionRegistrationInput> {
+  const pinned = row.canonical_result?.[SESSION_CREATE_SAVED_ALLOCATION_KEY];
+  if (typeof pinned === 'string' && isSelectableSandboxAllocation(pinned as SandboxAllocation)) {
+    return { ...input, savedSandboxAllocation: pinned as SandboxAllocation };
+  }
+  if (row.canonical_result !== null) return { ...input, savedSandboxAllocation: null };
+  return withSavedSandboxAllocation(input, savedAllocationArgs(ctx, options));
+}
 
 /**
  * Deterministic JSON serialization: object keys are sorted and undefined
@@ -1618,8 +1726,14 @@ export async function sessionCreateIntentFingerprint(
   return sha256Hex(
     canonicalJson({
       initialTurn,
+      // A different cut is a different intent: a same-key retry conflicts.
       clone: input.clone
-        ? { cloneFromKiloSessionId: input.clone.cloneFromKiloSessionId }
+        ? {
+            cloneFromKiloSessionId: input.clone.cloneFromKiloSessionId,
+            ...(input.clone.cloneUpToMessageId
+              ? { cloneUpToMessageId: input.clone.cloneUpToMessageId }
+              : {}),
+          }
         : undefined,
       agent: {
         mode: input.agent.mode,
@@ -1659,15 +1773,28 @@ export async function sessionCreateIntentFingerprint(
  */
 async function assertCreateIntentUnchanged(
   input: SessionRegistrationInput,
-  row: OperationLedgerRow
+  row: OperationLedgerRow,
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
 ): Promise<void> {
   if (row.canonical_result === null) return;
   const stored = row.canonical_result?.[SESSION_CREATE_INTENT_FINGERPRINT_KEY];
   const selectable = isSelectableSandboxAllocation(input.runtime?.sandboxAllocation)
     ? input.runtime?.sandboxAllocation
     : undefined;
+  const requestedChoice = requestedSandboxAllocation(input);
+  const requested = isSelectableSandboxAllocation(requestedChoice) ? requestedChoice : undefined;
+  const recorded = sandboxAllocationSchema
+    .optional()
+    .safeParse(row.canonical_result?.sandboxAllocation);
+  const sessionId = row.canonical_result?.cloudAgentSessionId;
+  const replacement =
+    typeof sessionId === 'string'
+      ? sandboxSmallReplacementForSession(input, ctx, sessionId, options)
+      : undefined;
   if (
-    row.canonical_result?.sandboxAllocation !== selectable ||
+    !recorded.success ||
+    !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement) ||
     (selectable !== undefined && (typeof stored !== 'string' || stored.length === 0))
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
@@ -1699,8 +1826,12 @@ export async function createSessionWithLedger(
   const allocation = input.runtime?.sandboxAllocation;
   if (allocation !== undefined) {
     const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
+    const capability = allocationCapabilityFor(input, options.billingOrigin);
     const available = isSandboxAllocationAvailable(
-      getSandboxSelectionCapabilities(ctx.env, owner),
+      getSandboxSelectionCapabilities(ctx.env, owner, {
+        repositoryType: input.repository.type,
+        ...(capability ? { capability } : {}),
+      }),
       allocation
     );
     if (!available) {
@@ -1716,7 +1847,13 @@ export async function createSessionWithLedger(
         )
         .limit(1);
       if (!existing || new Date(existing.expires_at).getTime() <= Date.now()) {
-        assertSandboxAllocationAvailable(ctx.env, owner, allocation);
+        assertSandboxAllocationAvailable(
+          ctx.env,
+          owner,
+          allocation,
+          input.repository.type,
+          capability
+        );
       } else {
         assertSessionOperationIdentity(existing, {
           userId: ctx.userId,
@@ -1730,7 +1867,9 @@ export async function createSessionWithLedger(
             worktreeEnabledForCreate(input, ctx, existing),
             finalizationVersionForCreate(existing)
           ),
-          existing
+          existing,
+          ctx,
+          options
         );
       }
     }
@@ -1750,9 +1889,10 @@ export async function createSessionWithLedger(
     organizationId: input.options?.kilocodeOrganizationId,
     resourceKey: null,
   });
+  const resolvedInput = await withLedgerSavedAllocation(input, ctx, admission.row, options);
   const effectiveInput = effectiveSessionRegistrationInput(
-    input,
-    worktreeEnabledForCreate(input, ctx, admission.row),
+    resolvedInput,
+    worktreeEnabledForCreate(resolvedInput, ctx, admission.row),
     finalizationVersionForCreate(admission.row)
   );
 
@@ -1760,7 +1900,7 @@ export async function createSessionWithLedger(
     case 'admitted':
       return executeLedgerCreate(effectiveInput, ctx, options, db, admission.row, 'new');
     case 'duplicate_settled':
-      return replaySettledCreate(admission.row, effectiveInput);
+      return replaySettledCreate(admission.row, effectiveInput, ctx, options);
     case 'duplicate_in_flight':
     case 'duplicate_reconcile_in_progress':
       throw creationInProgressError();
@@ -1772,7 +1912,9 @@ export async function createSessionWithLedger(
 
 async function replaySettledCreate(
   row: OperationLedgerRow,
-  input: SessionRegistrationInput
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
 ): Promise<LedgerSessionCreateResult> {
   // Only a `completed` settle may replay a successful create. Failed, no_op,
   // interrupted, and superseded terminal rows must surface the typed
@@ -1783,7 +1925,7 @@ async function replaySettledCreate(
   }
   // A changed same-key create intent must never replay the prior session; the
   // typed non-retryable failure lets the client clear the key and start fresh.
-  await assertCreateIntentUnchanged(input, row);
+  await assertCreateIntentUnchanged(input, row, ctx, options);
   const ids = canonicalSessionIds(row);
   if (!ids) {
     // A completed settle without canonical IDs has no session to replay. Treat
@@ -1974,7 +2116,7 @@ async function resumeCloneCreate(
     throw creationInProgressError();
   }
 
-  const allocation = rebuildRecordedSessionAllocation(input, ctx, row);
+  const allocation = rebuildRecordedSessionAllocation(input, ctx, row, options);
   const hooks = await buildLedgerHooks(input, ctx, options, db, row, 'takeover');
   const sessionService = new SessionService();
   const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
@@ -1993,7 +2135,7 @@ async function resumeCloneCreate(
       createdOnPlatform,
       defaultTitle,
       canonicalRepositoryUrl,
-      cloneFromKiloSessionId
+      input.clone
     );
   } catch (error) {
     await recordPostSetupFailure(() =>
@@ -2192,7 +2334,7 @@ async function reconcileLedgerCreate(
 ): Promise<LedgerSessionCreateResult> {
   // A changed same-key create intent is rejected before ANY reconcile step: no
   // fresh create, no ownership-row lookup, and no DO metadata read.
-  await assertCreateIntentUnchanged(input, row);
+  await assertCreateIntentUnchanged(input, row, ctx, options);
 
   const ids = canonicalSessionIds(row);
 
@@ -2202,7 +2344,7 @@ async function reconcileLedgerCreate(
   }
 
   const worktreeAllocation = worktreeEnabledForCreate(input, ctx, row)
-    ? rebuildRecordedSessionAllocation(input, ctx, row)
+    ? rebuildRecordedSessionAllocation(input, ctx, row, options)
     : undefined;
 
   // (b) Ownership row lookup by kiloSessionId.

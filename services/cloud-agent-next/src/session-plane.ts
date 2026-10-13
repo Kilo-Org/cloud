@@ -110,6 +110,27 @@ export function isCodeReviewSession(origin?: SessionCreateOrigin): boolean {
   return origin?.billingOrigin === CODE_REVIEW_PLATFORM;
 }
 
+/**
+ * Provider tool capability a session needs from its sandbox image, from the two
+ * independent trusted origin signals. The code-review publisher is identified by
+ * the trusted `billingOrigin`; security remediation by the runtime
+ * `createdOnPlatform`. A public `start` stamps `billingOrigin: 'cloud-agent'`,
+ * which must not mask a remediation runtime origin, so the two checks stay
+ * separate.
+ */
+export function requiredProviderCapability(
+  origin?: SessionCreateOrigin
+): 'review' | 'remediation' | undefined {
+  if (origin?.createdOnPlatform === 'security-remediation') return 'remediation';
+  if (
+    origin?.billingOrigin === CODE_REVIEW_PLATFORM ||
+    origin?.createdOnPlatform === CODE_REVIEW_PLATFORM
+  ) {
+    return 'review';
+  }
+  return undefined;
+}
+
 export function isCodeReviewControlPlaneOwner(
   env: ControlPlaneOwnerEnv,
   owner: { userId: string; orgId?: string }

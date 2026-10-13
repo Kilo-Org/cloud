@@ -4,19 +4,23 @@ import type {
   ProviderStartSource,
 } from '../../sandbox-control/provider.js';
 import type { RouteRecord } from './routes.js';
+import type { ControlPlaneWorkspaceFailureSubtype } from '../../shared/control-plane-protocol.js';
 
 const LAUNCH_KEY = 'repository_launch';
 
-/**
- * How the most recent allocation's container started, and whether its wrapper ever
- * connected. It is the one piece of durable memory the "first start only" rule
- * needs: a repository start whose wrapper never connected must fall back to the image.
- */
+export type RepositoryPreparationFailure = {
+  sessionId: string;
+  attemptId: string;
+  subtype?: ControlPlaneWorkspaceFailureSubtype;
+};
+
 export type RepositoryLaunchRecord = {
   allocationId: string;
   /** Absent in the placeholder written before `launch` reports the source. */
   startSource?: ProviderStartSource;
+  skipRepository?: true;
   confirmed: boolean;
+  preparationFailures?: RepositoryPreparationFailure[];
 };
 
 export async function readRepositoryLaunch(
@@ -32,33 +36,20 @@ export async function recordRepositoryLaunch(
   await storage.put(LAUNCH_KEY, record);
 }
 
-/**
- * Write the placeholder for `allocationId` before its launch runs. The launch
- * can be slow, so a `hello` that arrives while it is still returning confirms
- * this allocation; `recordRepositoryLaunch` later fills in the start source and
- * keeps that confirmation even if the allocation stops first.
- *
- * The previous `startSource` is carried over but `confirmed` is not: if this
- * launch fails before `recordLaunch` runs, the record must still describe the
- * last completed start, or a failed snapshot this launch was asked to skip
- * would be forgotten and reused. Keeping `confirmed` false is what lets
- * `recordLaunch` treat a never-connected wrapper as unconfirmed; only
- * `confirmRepositoryLaunch`, called on `hello`, promotes it.
- */
+/** A pending image fallback must remain snapshot-free if its launch never reports a source. */
 export async function beginRepositoryLaunch(
-  storage: Pick<DurableObjectStorage, 'get' | 'put'>,
-  allocationId: string
+  storage: Pick<DurableObjectStorage, 'put'>,
+  allocationId: string,
+  skipRepository: boolean
 ): Promise<void> {
-  const previous = await readRepositoryLaunch(storage);
-  const startSource = previous?.startSource;
   await recordRepositoryLaunch(storage, {
     allocationId,
-    ...(startSource === undefined ? {} : { startSource }),
+    ...(skipRepository ? { skipRepository: true } : {}),
     confirmed: false,
   });
 }
 
-/** The wrapper of `allocationId` connected, so its start source was sound. */
+/** A connection confirms launch, not workspace preparation. */
 export async function confirmRepositoryLaunch(
   storage: Pick<DurableObjectStorage, 'get' | 'put'>,
   allocationId: string
@@ -85,15 +76,15 @@ export type RepositoryLaunchDecision = {
   preparingRouteCount: number;
   /** Distinct keys across preparing routes; `> 1` is why a snapshot was not used. */
   distinctKeyCount: number;
-  /** The previous repository start was never confirmed, so this start skips it. */
+  /** The previous repository launch or preparation failed. */
   skipped: boolean;
 };
 
 /**
  * The launch options for a new allocation. The key comes from the routes waiting
  * for it: exactly one key shared by all of them, else no snapshot. When the
- * previous allocation started from a repository snapshot and its wrapper never
- * connected, the snapshot is retained for debugging and this start is from the image.
+ * previous repository allocation never connected or failed preparation, this
+ * start uses the image without deleting the snapshot.
  */
 export function repositoryLaunchOptions(
   routes: readonly RouteRecord[],
@@ -131,7 +122,10 @@ export function repositoryLaunchOptions(
       skipped: false,
     };
   }
-  const previousStartFailed = previous?.startSource === 'repository' && !previous.confirmed;
+  const previousStartFailed =
+    previous?.skipRepository === true ||
+    (previous?.startSource === 'repository' && !previous.confirmed) ||
+    (previous?.startSource !== 'image' && (previous?.preparationFailures?.length ?? 0) > 0);
   return {
     options: { repoKey, ...(previousStartFailed ? { skipRepository: true as const } : {}) },
     reason: 'repository',

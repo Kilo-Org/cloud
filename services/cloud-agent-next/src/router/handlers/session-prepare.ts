@@ -115,6 +115,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
           };
 
   return {
+    allowSubagentSessions: input.allowSubagentSessions ?? false,
     initialTurn,
     agent: {
       mode: input.mode,
@@ -188,8 +189,13 @@ const prepareSessionHandler = internalApiProtectedProcedure
   .output(PrepareSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'prepareSession' }, async () => {
+      const request = prepareInputToSessionCreateRequest(input);
+      if (ctx.cloudAgentAuthority) {
+        request.parentCloudAgentSessionId = ctx.cloudAgentAuthority.parentSessionId;
+        request.options = { ...request.options, createdOnPlatform: 'cloud-agent' };
+      }
       const requestWithProfile = await preflightSessionCreation(
-        prepareInputToSessionCreateRequest(input),
+        request,
         ctx,
         'prepareSession',
         resolvedRequest => {
@@ -212,6 +218,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
         userId: ctx.userId,
         authToken: ctx.authToken,
         botId: ctx.botId,
+        cloudAgentAuthority: ctx.cloudAgentAuthority,
       };
       const billingOrigin = { billingOrigin: input.createdOnPlatform };
       // Admit into the operation ledger only when the client supplied an

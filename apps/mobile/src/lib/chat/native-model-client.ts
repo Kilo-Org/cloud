@@ -81,7 +81,6 @@ const TOOLS_CLOSED =
   'No tool can run for the rest of this answer. Answer now with the results you already have.';
 
 const TRANSIENT_REASON = 'token_generation_failed';
-
 let sequence = 0;
 
 function nextRequestId(): string {

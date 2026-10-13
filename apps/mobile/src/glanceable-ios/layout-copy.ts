@@ -1,5 +1,6 @@
 import { i18n } from '@/i18n';
 import { GLANCEABLE_STATUS_COPY_KEY } from '@/lib/glanceable/presentation';
+import { formatCurrency } from '@/lib/format';
 import { numberFormat } from '@/lib/intl-cache';
 
 /**
@@ -56,6 +57,9 @@ export function glanceableLayoutCopy() {
     running: i18n.t('common.working'),
     scheduled: i18n.t('common.scheduled'),
     idle: i18n.t('common.idle'),
+    // The session card's idle label and its Open control.
+    finished: i18n.t('glanceable.finished'),
+    open: i18n.t('glanceable.openSession'),
     openAgents: i18n.t('glanceable.openAgents'),
     // The Live Activity's button and the widget's in-place actions all read
     // `common.approve`: the permission card, the wrist control, and the widget
@@ -77,12 +81,32 @@ export function glanceableLayoutCopy() {
     answerNeeded: i18n.t('glanceable.answerNeeded'),
     waitingToRetry: i18n.t('glanceable.waitingToRetry'),
     // Home widget slots added with the redesign; the Live Activity reads none of them.
+    // The session card's step, plan, outcome and failure copy.
+    editing: i18n.t('glanceable.step.editing'),
+    reading: i18n.t('glanceable.step.reading'),
+    stepRunning: i18n.t('glanceable.step.running'),
+    searching: i18n.t('glanceable.step.searching'),
+    thinking: i18n.t('glanceable.step.thinking'),
+    of: i18n.t('glanceable.planOf'),
+    filesChanged: i18n.t('glanceable.filesChanged'),
+    finishedIn: i18n.t('glanceable.finishedIn'),
+    minute: i18n.t('common.durationMinuteShort'),
+    hour: i18n.t('common.durationHourShort'),
+    noActivity: i18n.t('glanceable.noActivityFor'),
+    prOpened: i18n.t('glanceable.prOpened'),
+    failed: i18n.t('common.failed'),
+    failureProvider: i18n.t('glanceable.failure.provider'),
+    failureTool: i18n.t('glanceable.failure.tool'),
+    failureCancelled: i18n.t('glanceable.failure.cancelled'),
+    failureOther: i18n.t('glanceable.failure.other'),
+    permissionWants: i18n.t('glanceable.permissionWants'),
     approving: i18n.t('glanceable.approving'),
     couldNotApprove: i18n.t('glanceable.couldNotApprove'),
     approveFailed: i18n.t('glanceable.approveFailed'),
     recent: i18n.t('common.recent'),
     nextScheduled: i18n.t('glanceable.nextScheduled'),
     group: glanceableGroupSeparator(),
+    ...glanceableCostFormat(),
     locale: resolveGlanceableLocale(i18n.language),
     digits: glanceableDigits(),
   };
@@ -136,6 +160,36 @@ function glanceableGroupSeparator(): string {
   const grouped = numberFormat(i18n.language, { useGrouping: true }).format(10_000);
   const separator = grouped.slice(2, -3);
   return separator.length === 1 ? separator : '';
+}
+
+/** A sample amount whose localized number part the cost template replaces. */
+const COST_SAMPLE = 1.25;
+
+/**
+ * The session cost format in the active language, for the widget process,
+ * which has no formatter: the currency template around the amount ("$#",
+ * "# $", "US$ #"), with `#` where the number goes, and the decimal separator.
+ * The template comes from the app's own cost formatter, so the card shows the
+ * currency symbol the app shows everywhere else. Empty slots mean the
+ * template could not be read, and the layout falls back to "$#" and ".".
+ */
+type GlanceableCostFormat = { costTemplate: string; costDecimal: string };
+
+function glanceableCostFormat(): GlanceableCostFormat {
+  const sample = formatCurrency(COST_SAMPLE, i18n.language, 2);
+  const amount = numberFormat(i18n.language, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: false,
+  }).format(COST_SAMPLE);
+  const at = sample.indexOf(amount);
+  if (at === -1 || amount.length !== 4) {
+    return { costTemplate: '', costDecimal: '' };
+  }
+  return {
+    costTemplate: `${sample.slice(0, at)}#${sample.slice(at + amount.length)}`,
+    costDecimal: amount.slice(1, 2),
+  };
 }
 
 /**

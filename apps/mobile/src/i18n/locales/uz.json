@@ -136,7 +136,10 @@
     "working": "Ishlamoqda",
     "yourOwnRepositories": "O‘zingizga tegishli repozitoriylar",
     "dismissed": "E’tiborsiz qoldirilgan",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "daq",
+    "durationHourShort": "soat",
+    "changes": "O'zgarishlar"
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -325,6 +328,7 @@
       "collapseFile": "Faylni yig'ish",
       "expandFile": "Faylni yoyish",
       "diffTooLarge": "Farqlar hajmi juda katta, ularni ko'rsatib bo'lmaydi.",
+      "noPreview": "Bu fayl uchun oldindan ko'rish mavjud emas",
       "openOnGitHub": "GitHubda ochish",
       "openDiffOnGitHub": "Bu fayldagi farqlarni GitHubda ochish",
       "githubDiff": "GitHubdagi farqlar"
@@ -831,7 +835,8 @@
       "kiloclaw": "KiloClaw faoliyati",
       "balance": "Balans haqida ogohlantirishlar",
       "security": "Aniqlangan xavfsizlik muammolari",
-      "spend": "Xarajat bildirishnomalari"
+      "spend": "Xarajat bildirishnomalari",
+      "followedSessions": "Kuzatilayotgan seanslar"
     },
     "category": {
       "chatMessagesSubtitle": "suhbatlaringizdagi javoblar",
@@ -2086,6 +2091,8 @@
       "title": "Sessiya",
       "copyErrorDetails": "Xato tafsilotlarini nusxalash",
       "backToSessions": "Sessiyalarga qaytish",
+      "follow": "Qulflangan ekranda kuzatish",
+      "unfollow": "Qulflangan ekranda kuzatishni to'xtatish",
       "couldNotLoad": "Sessiyani yuklab bo'lmadi.",
       "failedToLoadDetails": "Sessiya tafsilotlarini yuklab bo'lmadi.",
       "failedToStopExecution": "Bajarishni to'xtatib bo'lmadi.",
@@ -2152,6 +2159,11 @@
       "collapse": "Maqsadni yig'ish",
       "expand": "Maqsadni yoyish"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Vazifalar, {{total}} tadan {{completed}} tasi bajarildi",
+      "rowAccessibility": "Vazifalar, {{total}} tadan {{completed}} tasi bajarildi. Joriy vazifa: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Yaqinda ishlatilgan",
       "couldNotLoadGithubRepositories": "GitHub repozitoriyalarini yuklab bo'lmadi.",
@@ -2184,7 +2196,6 @@
       "retryLoadingEnvironment": "Muhitni qayta yuklash",
       "defaultEnvironment": "Standart muhit",
       "environmentSummary": "{{commands}} buyruq · {{mcp}} MCP · {{skills}} ko'nikma · {{agents}} agent",
-      "changes": "O'zgarishlar",
       "leaveChanges": "O'zgarishlarni qoldirish",
       "commitAndPush": "Kommit va yuborish",
       "startSession": "Sessiyani boshlash",
@@ -2207,6 +2218,10 @@
       "importingSession": "Sessiya import qilinmoqda",
       "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent xizmatini yoki boshqa CLI dasturini tanlang.",
       "importFailed": "Bu sessiyani import qilib bo'lmadi.",
+      "cliCannotFork": "Xabardan tarmoqlash uchun Kilo CLI dasturini yangilang.",
+      "forkCutNotSynced": "Bu xabar hali saqlanmagan. Birozdan so'ng qayta urinib ko'ring.",
+      "forkFilesFromBaseBranch": "Fayllar asosiy branchdan boshlanadi.",
+      "forkFilesUnchangedOnComputer": "Bu kompyuterdagi fayllar o'zgartirilmaydi.",
       "pickProfile": "Profilni tanlang",
       "noProfile": "Profil yo'q",
       "manageProfiles": "Profillarni boshqarish",
@@ -2251,8 +2266,8 @@
       "toolList": "ro'yxatni ko'rsatish",
       "toolPatch": "tuzatish kiritish",
       "toolTask": "vazifa",
-      "readTodos": "Vazifalar ro'yxatini o'qish",
-      "updateTodos": "Vazifalar ro'yxatini yangilash",
+      "readTodos": "Rejani o‘qish",
+      "updateTodos": "Rejani yangilash",
       "linesBadge": "{{displayCount}} qator",
       "filesBadge": "{{displayCount}} fayl",
       "matchesBadge": "{{displayCount}} natija",
@@ -2322,6 +2337,7 @@
       "copyMessage": "Xabarni nusxalash",
       "copyText": "Matnni nusxalash",
       "selectText": "Matnni tanlash",
+      "forkFromHere": "Shu yerdan tarmoqlash",
       "reportAiResponse": "AI javobi haqida shikoyat qilish",
       "reportAiResponseConfirm": "Bu javob tekshirish uchun yuborilsinmi?",
       "report": "Shikoyat qilish",
@@ -2641,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modellar ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "O'zgarishlarni ko'rish",
+      "asOf": "{{time}} holatiga ko'ra",
+      "tooLarge": "Farqlar hajmi juda katta, ularni mobil qurilmada ko'rsatib bo'lmaydi.",
+      "empty": "Bu seansda hali fayllar o'zgartirilmagan."
     },
     "autoApprove": {
       "title": "Avtomatik tasdiqlash",
@@ -3153,6 +3175,8 @@
     "channelName": "Faol agentlar",
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing.",
     "openSession": "Ochish",
+    "finished": "Yakunlandi",
+    "followFailed": "Bu agentni qulflangan ekranda ko'rsatib bo'lmadi.",
     "approveFailed": "Tasdiqlab bo'lmadi. Qayta urinish uchun $t(common.approve) ga teging.",
     "checked": "Tekshirilgan",
     "lastKnown": "So‘nggi ma’lum holat",
@@ -3161,7 +3185,26 @@
     "waitingForYou": "Sizni kutmoqda",
     "nextScheduled": "Keyingi rejalashtirilganlar",
     "answerNeeded": "Javob kutilmoqda",
-    "waitingToRetry": "Qayta urinish kutilmoqda"
+    "waitingToRetry": "Qayta urinish kutilmoqda",
+    "step": {
+      "editing": "Tahrirlanmoqda",
+      "reading": "O'qilmoqda",
+      "running": "Ishga tushirish",
+      "searching": "Veb qidiruv",
+      "thinking": "O'ylab ko'rmoqda"
+    },
+    "planOf": "/",
+    "filesChanged": "fayl o'zgardi",
+    "finishedIn": "Tugatish vaqti",
+    "noActivityFor": "Faoliyat yo'q",
+    "prOpened": "Pull request ochildi",
+    "permissionWants": "Ishga tushirmoqchi",
+    "failure": {
+      "provider": "To'xtatildi: provayder xatosi",
+      "tool": "To'xtatildi: vosita xatosi",
+      "cancelled": "To'xtatildi: bekor qilindi",
+      "other": "TO'XTATILGAN"
+    }
   },
   "transcriptionModel": {
     "title": "Matnga aylantirish modeli",
@@ -3197,10 +3240,32 @@
     "list": {
       "loadFailed": "Suhbat tarixini yuklab bo'lmadi.",
       "new": "Yangi chat",
-      "openHint": "Chatni ochadi. Oʻchirish uchun bosib turing.",
       "deleteTitle": "Bu chat oʻchirilsinmi?"
     },
+    "rename": {
+      "title": "Chat nomini o‘zgartirish",
+      "accessibility": "Chat nomini o‘zgartirish: {{title}}",
+      "openHint": "Chatni ochadi. Nomini o‘zgartirish yoki o‘chirish uchun bosib turing."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Suhbat tafsilotlari",
+      "backend": "Server",
+      "effortDefault": "Model standarti",
+      "noCost": "Xarajatsiz",
+      "costUnknown": "Noma'lum",
+      "costEstimatedNote": "Narxni bildirmagan javoblar ro'yxatdagi narxlar bo'yicha taxminan hisoblangan.",
+      "costUnknownNote": "Bu model uchun narx ma'lum emas.",
+      "costPartialNote": "Bu jamiga narxi ma'lum bo'lmagan modellar kirmaydi.",
+      "localNote": "Qurilmadagi modellar shu qurilmada ishlaydi. Ularda xarajat ham, so'rov keshi ham yo'q, token soni esa taxminiy bo'lishi mumkin.",
+      "countedSinceNote": "Bu suhbat foydalanish qayd etila boshlanishidan oldin boshlangan. Jami qiymatlar faqat undan keyingi javoblarni ko'rsatadi.",
+      "remoteServersOn": "Yoqilgan masofaviy MCP serverlari"
+    },
+    "webSearch": {
+      "title": "Internetdan qidirish",
+      "description": "Bu chatga Kilo hisobingiz orqali dolzarb ma’lumot qidirishga ruxsat bering. Qidiruvlar oylik qidiruv limitingizdan foydalanadi.",
+      "allowanceExhausted": "Bu oy uchun bepul veb qidiruvlaringiz tugadi. Qayta qidirish uchun kredit qo‘shing."
+    },
     "mcp": {
       "title": "Kilo vositalari",
       "use": "Kilo vositalaridan foydalanish",
@@ -3223,7 +3288,6 @@
       "fieldName": "Koʻrsatiladigan nom",
       "fieldUrl": "Server URL manzili",
       "fieldUrlInvalid": "Toʻgʻri server URL manzilini kiriting.",
-      "fieldToken": "Bearer tokeni (ixtiyoriy)",
       "enableServer": "Bu serverni yoqish: {{name}}",
       "editServer": "Serverni tahrirlash",
       "deleteServer": "Serverni oʻchirish",
@@ -3243,6 +3307,18 @@
       "serverToolCount": "{{count}} vosita",
       "serverUnreachable": "Bu serverga yetib boʻlmadi",
       "serverOff": "Bu server oʻchirilgan"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikatsiya",
+      "authNone": "Kirishsiz",
+      "authBearer": "Bearer tokeni",
+      "authOAuth": "OAuth orqali kirish",
+      "fieldToken": "Token",
+      "oauthHint": "Saqlagandan soʻng brauzer orqali kirish uchun serverda $t(modelChat.mcpOAuth.signIn) tugmasini bosing.",
+      "serverNeedsSignIn": "Bu serverdan foydalanish uchun kiring",
+      "signIn": "Kirish",
+      "signInA11y": "Bu serverga kirish: {{name}}",
+      "signInFailed": "{{name}} serveriga kirib boʻlmadi. Qayta urinib koʻring."
     },
     "backends": {
       "title": "Suhbat serverlari",
@@ -3326,8 +3402,48 @@
         "notGguf": "Havola .gguf faylga ishora qilishi kerak.",
         "space": "Bu model uchun yetarli bo‘sh joy yo‘q. Joy bo‘shatib, qayta urinib ko‘ring.",
         "network": "Yuklab olish tugallanmadi. Ulanishni tekshirib, qayta urinib ko‘ring.",
-        "invalidFile": "Yuklab olingan fayl bu ilova ishga tushira oladigan model emas, shuning uchun u o‘chirildi."
+        "invalidFile": "Yuklab olingan fayl bu ilova ishga tushira oladigan model emas, shuning uchun u o‘chirildi.",
+        "checksum": "Yuklab olingan fayl e’lon qilingan nazorat summasiga mos kelmaydi, shuning uchun u o‘chirildi. Qayta yuklab olib ko‘ring."
       }
+    },
+    "catalog": {
+      "browse": "Modellarni ko‘rish",
+      "title": "Modellar katalogi",
+      "search": "Hugging Face modellarini qidirish",
+      "tabs": "Model filtri",
+      "fitsTab": "Bu qurilmaga mos",
+      "fromHuggingFace": "Hugging Face’dan",
+      "loading": "Modellar yuklanmoqda",
+      "noResults": "Hech qanday model topilmadi",
+      "noFits": "Bu qurilmaga mos model yo‘q",
+      "noFitsDescription": "Kattaroq modellar “$t(common.all)” bo‘limida.",
+      "fit": {
+        "fits": "Mos",
+        "tight": "Zo‘rg‘a sig‘adi",
+        "tooLarge": "Juda katta",
+        "noStorage": "Xotira yetarli emas"
+      },
+      "parameters": "Parametrlar: {{value}}",
+      "downloads": "Yuklab olishlar: {{value}}",
+      "likes": "Yoqtirishlar: {{value}}",
+      "context": "Kontekst oynasi: {{value}}",
+      "license": "Litsenziya: {{license}}",
+      "licenseUnknown": "Litsenziya ko‘rsatilmagan",
+      "tools": "Vositalarni chaqirish",
+      "vision": "Rasm kiritish",
+      "hintsHelp": "Hugging Face’dan olingan maslahatlar. Ilova modelni yuklab olingandan keyin tekshiradi.",
+      "gated": "Bu model uchun Hugging Face hisobi kerak, shuning uchun ilova uni yuklab ololmaydi.",
+      "quantizations": "Kvantlashlar",
+      "quantizationsHelp": "Kichikroq fayllar kamroq operativ va doimiy xotira egallaydi. Kattaroq fayllar odatda yaxshiroq javob beradi.",
+      "quantDetail": "Yuklab olish: {{size}} · taxminan {{memory}} operativ xotira",
+      "downloadQuant": "{{quant}} yuklab olish",
+      "loadingModel": "Model tafsilotlari yuklanmoqda",
+      "couldNotLoadModel": "Bu modelni yuklab bo‘lmadi",
+      "noFiles": "Bu ilova ishga tushira oladigan fayllar yo‘q",
+      "noFilesDescription": "Bu ilova bitta GGUF faylidan iborat modellarni ishga tushiradi.",
+      "tooLargeTitle": "Bu model ishlamasligi mumkin",
+      "tooLargeMessage": "{{name}} uchun bu qurilmadagidan ko‘proq operativ xotira kerak bo‘lishi mumkin. Model javob berayotganda ilova yopilib qolishi mumkin. Baribir yuklab olinsinmi?",
+      "downloadAnyway": "Baribir yuklab olish"
     },
     "localModels": {
       "title": "Qurilmadagi modellar",
@@ -3357,6 +3473,9 @@
       "downloading": "Yuklab olinmoqda…",
       "downloadProgress": "Yuklab olinmoqda… {{percent}}%",
       "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"
     }
   },
   "settingsTools": {
@@ -3579,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play mos keladigan kredit paketlarini qaytarmadi.",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring."
+  },
+  "todos": {
+    "saveAsTodo": "Vazifa sifatida saqlash",
+    "segment": {
+      "label": "Agentlar ko‘rinishi",
+      "sessions": "Sessiyalar",
+      "todos": "Vazifalar"
+    },
+    "lists": {
+      "newList": "Yangi ro‘yxat",
+      "empty": "Hozircha ro‘yxatlar yo‘q",
+      "couldNotLoad": "Ro‘yxatlarni yuklab bo‘lmadi",
+      "noRepository": "Repozitoriy yo‘q",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} ochiq",
+      "openCount_other": "{{count}} ochiq",
+      "archived_one": "Arxivlangan ({{count}})",
+      "archived_other": "Arxivlangan ({{count}})",
+      "archive": "Arxivlash",
+      "unarchive": "Arxivdan chiqarish",
+      "deleteTitle": "{{name}} o‘chirilsinmi?",
+      "deleteMessage": "Uning vazifalari ham o‘chiriladi. Sessiyalar qoladi."
+    },
+    "listSettings": {
+      "title": "Ro‘yxat sozlamalari",
+      "name": "Nom",
+      "namePlaceholder": "Xatolar, g‘oyalar, relizlar…",
+      "emoji": "Emoji",
+      "mode": "Rejim",
+      "defaultsHint": "Bu ro‘yxatdan boshlangan sessiyalar shu standart sozlamalardan foydalanadi."
+    },
+    "list": {
+      "addPlaceholder": "Yangi vazifa qo‘shish",
+      "add": "Vazifa qo‘shish",
+      "empty": "Hozircha vazifalar yo‘q",
+      "setDefaults": "Repozitoriy, rejim va modelni belgilash",
+      "completed_one": "Yakunlangan ({{count}})",
+      "completed_other": "Yakunlangan ({{count}})"
+    },
+    "item": {
+      "markDone": "Bajarilgan deb belgilash",
+      "markOpen": "Bajarilmagan deb belgilash",
+      "markDonePrompt": "Bajarilgan deb belgilansinmi?",
+      "deleted": "Vazifa o‘chirildi",
+      "undo": "Ortga qaytarish",
+      "runCount_one": "{{count}} marta ishga tushirish",
+      "runCount_other": "{{count}} marta ishga tushirish",
+      "startNow": "Ko‘rib chiqmasdan boshlash",
+      "startNowHint": "Ko‘rib chiqmasdan boshlash uchun uzoq bosing",
+      "titleLabel": "Vazifa sarlavhasi",
+      "notes": "Izohlar",
+      "notesPlaceholder": "Markdown formatida izohlar qo‘shish",
+      "sessions": "Bog‘langan sessiyalar",
+      "noSessions": "Hozircha sessiyalar yo‘q",
+      "linkSession": "Sessiya bog‘lash",
+      "unlinkSession": "{{title}} bog‘lanishini uzish",
+      "linkFailed": "Sessiyani vazifaga bog‘lab bo‘lmadi"
+    },
+    "linkSession": {
+      "title": "Sessiyani bog‘lash",
+      "empty": "Oxirgi sessiyalar yo‘q",
+      "emptyInRepository": "{{repository}} ichida oxirgi sessiyalar yo‘q"
+    },
+    "upNext": "Navbatdagisi",
+    "sessionTodo": "Vazifa: {{title}}",
+    "linkToTodo": "Vazifaga bog‘lash",
+    "candidates": {
+      "empty": "Ochiq vazifalar yo‘q"
+    },
+    "saveSheet": {
+      "title": "Ro‘yxatga saqlash",
+      "saved": "{{list}} ro‘yxatiga saqlandi"
+    }
   }
 }

@@ -26,6 +26,7 @@ import {
   cloud_agent_webhook_triggers,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  todo_lists,
   enrichment_data,
   source_embeddings,
   code_indexing_search,
@@ -56,6 +57,7 @@ import {
   openai_chatgpt_connections,
   agent_configs,
   agent_environment_profiles,
+  cloud_agent_sandbox_allocation_settings,
   security_findings,
   security_finding_notifications,
   security_remediation_attempts,
@@ -1126,6 +1128,7 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(cloud_agent_workspace_folders)
     .where(eq(cloud_agent_workspace_folders.kilo_user_id, userId));
+  await tx.delete(todo_lists).where(eq(todo_lists.kilo_user_id, userId));
   await tx
     .update(cloud_agent_worktrees)
     .set({ name: null, folder_id: null })
@@ -1256,6 +1259,9 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(agent_environment_profiles)
     .where(eq(agent_environment_profiles.owned_by_user_id, userId));
+  await tx
+    .delete(cloud_agent_sandbox_allocation_settings)
+    .where(eq(cloud_agent_sandbox_allocation_settings.owned_by_user_id, userId));
 
   const authorizedOAuthIntegrationIds = tx
     .select({ id: platform_oauth_credentials.platform_integration_id })

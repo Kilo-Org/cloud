@@ -136,7 +136,10 @@
     "working": "В процес",
     "yourOwnRepositories": "Личните ти хранилища",
     "dismissed": "Отхвърлено",
-    "agent": "агент"
+    "agent": "агент",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Промени"
   },
   "language": {
     "restarting": "Рестартиране за смяна на езика",
@@ -325,6 +328,7 @@
       "collapseFile": "Свий файла",
       "expandFile": "Разгъни файла",
       "diffTooLarge": "Разликите са твърде големи, за да се покажат.",
+      "noPreview": "Няма наличен преглед за този файл",
       "openOnGitHub": "Отвори в GitHub",
       "openDiffOnGitHub": "Отвори разликите в този файл в GitHub",
       "githubDiff": "Разликите в GitHub"
@@ -831,7 +835,8 @@
       "kiloclaw": "Активност на KiloClaw",
       "balance": "Известия за салдото",
       "security": "Проблеми със сигурността",
-      "spend": "Известия за разходи"
+      "spend": "Известия за разходи",
+      "followedSessions": "Следвани сесии"
     },
     "category": {
       "chatMessagesSubtitle": "отговори в разговорите ти",
@@ -2086,6 +2091,8 @@
       "title": "Сесия",
       "copyErrorDetails": "Копирай подробностите за грешката",
       "backToSessions": "Обратно към сесиите",
+      "follow": "Следи на заключения екран",
+      "unfollow": "Спри следенето на заключения екран",
       "couldNotLoad": "Не успяхме да заредим сесията.",
       "failedToLoadDetails": "Не успяхме да заредим подробностите за сесията.",
       "failedToStopExecution": "Не успяхме да спрем изпълнението.",
@@ -2152,6 +2159,11 @@
       "collapse": "Свий целта",
       "expand": "Разгъни целта"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Задачи, {{completed}} от {{total}} изпълнени",
+      "rowAccessibility": "Задачи, {{completed}} от {{total}} изпълнени. Текуща задача: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Наскоро използвани",
       "couldNotLoadGithubRepositories": "Не успяхме да заредим хранилищата в GitHub.",
@@ -2184,7 +2196,6 @@
       "retryLoadingEnvironment": "Опитай отново да заредиш средата",
       "defaultEnvironment": "Среда по подразбиране",
       "environmentSummary": "{{commands}} команди · {{mcp}} MCP · {{skills}} умения · {{agents}} агенти",
-      "changes": "Промени",
       "leaveChanges": "Остави промените",
       "commitAndPush": "Комитни и изпрати",
       "startSession": "Започни сесия",
@@ -2207,6 +2218,10 @@
       "importingSession": "Импортиране на сесията",
       "cliCannotContinue": "Този CLI не може да продължи сесия. Избери Cloud Agent или друг CLI.",
       "importFailed": "Тази сесия не можа да бъде импортирана.",
+      "cliCannotFork": "Обнови Kilo CLI, за да разклониш от съобщение.",
+      "forkCutNotSynced": "Това съобщение още не е запазено. Опитай отново след малко.",
+      "forkFilesFromBaseBranch": "Файловете започват от основния клон.",
+      "forkFilesUnchangedOnComputer": "Файловете на този компютър не се променят.",
       "pickProfile": "Изберете профил",
       "noProfile": "Няма профил",
       "manageProfiles": "Управление на профили",
@@ -2251,8 +2266,8 @@
       "toolList": "изброяване",
       "toolPatch": "прилагане на корекция",
       "toolTask": "задача",
-      "readTodos": "Прочети задачите",
-      "updateTodos": "Актуализирай задачите",
+      "readTodos": "Прочети плана",
+      "updateTodos": "Актуализирай плана",
       "linesBadge": "{{displayCount}} реда",
       "filesBadge": "{{displayCount}} файла",
       "matchesBadge": "{{displayCount}} съвпадения",
@@ -2322,6 +2337,7 @@
       "copyMessage": "Копирай съобщението",
       "copyText": "Копирай текста",
       "selectText": "Маркирай текст",
+      "forkFromHere": "Разклони оттук",
       "reportAiResponse": "Докладване на отговор от AI",
       "reportAiResponseConfirm": "Да се докладва ли този отговор за проверка?",
       "report": "Докладвай",
@@ -2641,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Модел ({{displayCount}})",
       "modelsCount_other": "Модели ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Виж промените",
+      "asOf": "Към {{time}}",
+      "tooLarge": "Разликите са твърде големи, за да се покажат на мобилно устройство.",
+      "empty": "Все още няма промени във файловете в тази сесия."
     },
     "autoApprove": {
       "title": "Автоматично одобряване",
@@ -3153,6 +3175,8 @@
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран.",
     "openSession": "Отвори",
+    "finished": "Завършено",
+    "followFailed": "Агентът не може да се покаже на заключения екран.",
     "approveFailed": "Не успяхме да одобрим. Докосни $t(common.approve), за да опиташ отново.",
     "checked": "Проверено",
     "lastKnown": "Последно известно",
@@ -3161,7 +3185,26 @@
     "waitingForYou": "Очаква ви",
     "nextScheduled": "Следващи планирани",
     "answerNeeded": "Нужен е отговор",
-    "waitingToRetry": "Изчаква повторен опит"
+    "waitingToRetry": "Изчаква повторен опит",
+    "step": {
+      "editing": "Редактиране",
+      "reading": "Четене",
+      "running": "Изпълнение",
+      "searching": "Търсене в мрежата",
+      "thinking": "Обмисляне"
+    },
+    "planOf": "от",
+    "filesChanged": "променени файла",
+    "finishedIn": "Завършено за",
+    "noActivityFor": "Няма активност за",
+    "prOpened": "Отворена заявка за сливане",
+    "permissionWants": "Иска да изпълни",
+    "failure": {
+      "provider": "Спряно: грешка при доставчика",
+      "tool": "Спряно: грешка в инструмента",
+      "cancelled": "Спряно: отменено",
+      "other": "СПРЯНА"
+    }
   },
   "transcriptionModel": {
     "title": "Модел за транскрипция",
@@ -3197,10 +3240,32 @@
     "list": {
       "loadFailed": "Не можа да се зареди историята на чата.",
       "new": "Нов чат",
-      "openHint": "Отваря чата. Задръжте, за да изтриете.",
       "deleteTitle": "Изтриване на този чат?"
     },
+    "rename": {
+      "title": "Преименувай чата",
+      "accessibility": "Преименувай чата: {{title}}",
+      "openHint": "Отваря чата. Задръжте, за да преименувате или изтриете."
+    },
     "beta": "Бета",
+    "details": {
+      "title": "Подробности за чата",
+      "backend": "Сървър",
+      "effortDefault": "По подразбиране за модела",
+      "noCost": "Без разход",
+      "costUnknown": "Неизвестен",
+      "costEstimatedNote": "Разходът за отговорите без отчетена цена е изчислен приблизително по ценоразписа.",
+      "costUnknownNote": "Няма известна цена за този модел.",
+      "costPartialNote": "Тази обща сума не включва моделите без известна цена.",
+      "localNote": "Моделите на устройството работят на това устройство. Те нямат разход и кеш на заявките, а броят на токените им може да е приблизителен.",
+      "countedSinceNote": "Този чат е започнал преди отчитането на използването. Общите суми показват само отговорите след това.",
+      "remoteServersOn": "Включени дистанционни MCP сървъри"
+    },
+    "webSearch": {
+      "title": "Търсене в мрежата",
+      "description": "Позволете на този чат да търси актуална информация чрез профила ви в Kilo. Търсенията използват месечния ви лимит за търсене.",
+      "allowanceExhausted": "Безплатните ви уеб търсения за този месец са изчерпани. Добавете кредити, за да търсите отново."
+    },
     "mcp": {
       "title": "Инструменти на Kilo",
       "use": "Използване на инструментите на Kilo",
@@ -3223,7 +3288,6 @@
       "fieldName": "Показвано име",
       "fieldUrl": "URL на сървъра",
       "fieldUrlInvalid": "Въведете валиден URL на сървъра.",
-      "fieldToken": "Bearer токен (по избор)",
       "enableServer": "Активиране на този сървър: {{name}}",
       "editServer": "Редактиране на сървъра",
       "deleteServer": "Изтриване на сървъра",
@@ -3243,6 +3307,18 @@
       "serverToolCount": "{{count}} инструмента",
       "serverUnreachable": "Неуспешно свързване с този сървър",
       "serverOff": "Този сървър е изключен"
+    },
+    "mcpOAuth": {
+      "authMethod": "Удостоверяване",
+      "authNone": "Без вход",
+      "authBearer": "Bearer токен",
+      "authOAuth": "Вход с OAuth",
+      "fieldToken": "Токен",
+      "oauthHint": "След като запазиш, докосни $t(modelChat.mcpOAuth.signIn) при сървъра, за да влезеш чрез браузъра си.",
+      "serverNeedsSignIn": "Влез, за да използваш този сървър",
+      "signIn": "Вход",
+      "signInA11y": "Вход в този сървър: {{name}}",
+      "signInFailed": "Неуспешен вход в {{name}}. Опитай отново."
     },
     "backends": {
       "title": "Сървъри за чат",
@@ -3326,8 +3402,48 @@
         "notGguf": "Връзката трябва да сочи към .gguf файл.",
         "space": "Няма достатъчно свободно място за този модел. Освободете място и опитайте отново.",
         "network": "Изтеглянето не завърши. Проверете интернет връзката си и опитайте отново.",
-        "invalidFile": "Изтегленият файл не е модел, който това приложение може да стартира, затова беше премахнат."
+        "invalidFile": "Изтегленият файл не е модел, който това приложение може да стартира, затова беше премахнат.",
+        "checksum": "Изтегленият файл не съвпада с публикуваната си контролна сума, затова беше премахнат. Опитайте да го изтеглите отново."
       }
+    },
+    "catalog": {
+      "browse": "Разгледай модели",
+      "title": "Каталог с модели",
+      "search": "Търси модели в Hugging Face",
+      "tabs": "Филтър за модели",
+      "fitsTab": "Подходящи за устройството",
+      "fromHuggingFace": "От Hugging Face",
+      "loading": "Зареждане на модели",
+      "noResults": "Няма намерени модели",
+      "noFits": "Няма модели, подходящи за това устройство",
+      "noFitsDescription": "По-големите модели са в раздела „$t(common.all)“.",
+      "fit": {
+        "fits": "Подходящ",
+        "tight": "На ръба",
+        "tooLarge": "Твърде голям",
+        "noStorage": "Няма достатъчно място"
+      },
+      "parameters": "Параметри: {{value}}",
+      "downloads": "Изтегляния: {{value}}",
+      "likes": "Харесвания: {{value}}",
+      "context": "Контекстен прозорец: {{value}}",
+      "license": "Лиценз: {{license}}",
+      "licenseUnknown": "Лицензът не е посочен",
+      "tools": "Извикване на инструменти",
+      "vision": "Въвеждане на изображения",
+      "hintsHelp": "Подсказки от Hugging Face. Приложението проверява модела след изтеглянето му.",
+      "gated": "Този модел изисква профил в Hugging Face, затова приложението не може да го изтегли.",
+      "quantizations": "Квантизации",
+      "quantizationsHelp": "По-малките файлове използват по-малко памет и място. По-големите файлове обикновено дават по-добри отговори.",
+      "quantDetail": "Изтегляне: {{size}} · около {{memory}} памет",
+      "downloadQuant": "Изтегли {{quant}}",
+      "loadingModel": "Зареждане на данни за модела",
+      "couldNotLoadModel": "Този модел не може да се зареди",
+      "noFiles": "Няма файлове, които приложението може да изпълни",
+      "noFilesDescription": "Приложението изпълнява модели, които са един GGUF файл.",
+      "tooLargeTitle": "Този модел може да не работи",
+      "tooLargeMessage": "{{name}} вероятно изисква повече памет, отколкото има това устройство. Приложението може да се затвори, докато моделът отговаря. Да се изтегли ли въпреки това?",
+      "downloadAnyway": "Изтегли въпреки това"
     },
     "localModels": {
       "title": "Модели на устройството",
@@ -3357,6 +3473,9 @@
       "downloading": "Изтегляне…",
       "downloadProgress": "Изтегляне… {{percent}}%",
       "downloadFailed": "Изтеглянето не завърши. Проверете връзката и свободното място, след което опитайте отново."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Този модел поддържа усилие за разсъждение"
     }
   },
   "settingsTools": {
@@ -3579,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play не върна съвпадащи пакети с кредити.",
     "purchaseOwnedByAnotherAccount": "Кредитите в този Apple Account принадлежат на друг акаунт в Kilo. Влез в съответния акаунт в Kilo, за да ги използваш.",
     "purchaseOwnedByAnotherAccountPlay": "Кредитите на този Google Play акаунт принадлежат на друг Kilo акаунт. Влезте в този Kilo акаунт, за да ги използвате."
+  },
+  "todos": {
+    "saveAsTodo": "Запази като задача",
+    "segment": {
+      "label": "Агентски изглед",
+      "sessions": "Сесии",
+      "todos": "Задачи"
+    },
+    "lists": {
+      "newList": "Нов списък",
+      "empty": "Все още няма списъци",
+      "couldNotLoad": "Не успяхме да заредим списъците",
+      "noRepository": "Няма хранилище",
+      "rowA11y": "{{name}} — {{openCount}}",
+      "openCount_one": "Отворени: {{count}}",
+      "openCount_other": "Отворени: {{count}}",
+      "archived_one": "Архивирани ({{count}})",
+      "archived_other": "Архивирани ({{count}})",
+      "archive": "Архивирай",
+      "unarchive": "Разархивирай",
+      "deleteTitle": "Да се изтрие ли {{name}}?",
+      "deleteMessage": "Задачите в него също се изтриват. Сесиите им остават."
+    },
+    "listSettings": {
+      "title": "Настройки на списъка",
+      "name": "Име",
+      "namePlaceholder": "Бъгове, идеи, издание…",
+      "emoji": "Емоджи",
+      "mode": "Режим",
+      "defaultsHint": "Сесиите, стартирани от този списък, използват тези стойности по подразбиране."
+    },
+    "list": {
+      "addPlaceholder": "Добави задача",
+      "add": "Добавяне на задача",
+      "empty": "Все още няма задачи",
+      "setDefaults": "Задай хранилище, режим и модел",
+      "completed_one": "Завършени ({{count}})",
+      "completed_other": "Завършени ({{count}})"
+    },
+    "item": {
+      "markDone": "Отбележи като готово",
+      "markOpen": "Отбележи като неизпълнено",
+      "markDonePrompt": "Да се отбележи ли като готово?",
+      "deleted": "Задачата е изтрита",
+      "undo": "Отмени",
+      "runCount_one": "{{count}} изпълнение",
+      "runCount_other": "{{count}} изпълнения",
+      "startNow": "Стартирай без преглед",
+      "startNowHint": "Натисни и задръж, за да стартираш без преглед",
+      "titleLabel": "Заглавие на задачата",
+      "notes": "Бележки",
+      "notesPlaceholder": "Добави бележки в Markdown",
+      "sessions": "Свързани сесии",
+      "noSessions": "Все още няма сесии",
+      "linkSession": "Свържи сесия",
+      "unlinkSession": "Премахни връзката с {{title}}",
+      "linkFailed": "Не успяхме да свържем сесията със задачата"
+    },
+    "linkSession": {
+      "title": "Свързване на сесия",
+      "empty": "Няма скорошни сесии",
+      "emptyInRepository": "Няма скорошни сесии в {{repository}}"
+    },
+    "upNext": "Следващо",
+    "sessionTodo": "Задача: {{title}}",
+    "linkToTodo": "Свържи със задача",
+    "candidates": {
+      "empty": "Няма отворени задачи"
+    },
+    "saveSheet": {
+      "title": "Запази в списък",
+      "saved": "Запазено в {{list}}"
+    }
   }
 }

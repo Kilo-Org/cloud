@@ -136,7 +136,10 @@
     "working": "કામ ચાલુ છે",
     "yourOwnRepositories": "તમારી પોતાની રિપોઝિટરીઓ",
     "dismissed": "ખારિજ કરેલું",
-    "agent": "એજન્ટ"
+    "agent": "એજન્ટ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "ફેરફારો"
   },
   "language": {
     "restarting": "ભાષા લાગુ કરવા ઍપ ફરી શરૂ થઈ રહી છે",
@@ -325,6 +328,7 @@
       "collapseFile": "ફાઇલની વિગતો છુપાવો",
       "expandFile": "ફાઇલની વિગતો બતાવો",
       "diffTooLarge": "તફાવત એટલો મોટો છે કે તેને બતાવી શકાતો નથી.",
+      "noPreview": "આ ફાઇલનું પૂર્વાવલોકન ઉપલબ્ધ નથી",
       "openOnGitHub": "GitHub પર ખોલો",
       "openDiffOnGitHub": "આ ફાઇલનો તફાવત GitHub પર ખોલો",
       "githubDiff": "GitHub પરનો તફાવત"
@@ -831,7 +835,8 @@
       "kiloclaw": "KiloClawની પ્રવૃત્તિ",
       "balance": "બેલેન્સ અંગેની ચેતવણીઓ",
       "security": "સુરક્ષા તપાસનાં તારણો",
-      "spend": "ખર્ચની ચેતવણીઓ"
+      "spend": "ખર્ચની ચેતવણીઓ",
+      "followedSessions": "ફોલો કરેલ સેશન્સ"
     },
     "category": {
       "chatMessagesSubtitle": "તમારી વાતચીતમાં જવાબો",
@@ -2086,6 +2091,8 @@
       "title": "સત્ર",
       "copyErrorDetails": "ભૂલની વિગતોની નકલ કરો",
       "backToSessions": "સત્રો પર પાછા જાઓ",
+      "follow": "લૉક સ્ક્રીન પર ફૉલો કરો",
+      "unfollow": "લૉક સ્ક્રીન પર ફૉલો કરવાનું બંધ કરો",
       "couldNotLoad": "સત્ર લોડ કરી શકાયું નહીં.",
       "failedToLoadDetails": "સત્રની વિગતો લોડ કરી શકાઈ નહીં.",
       "failedToStopExecution": "ચાલી રહેલું કાર્ય રોકી શકાયું નહીં.",
@@ -2152,6 +2159,11 @@
       "collapse": "ધ્યેય છુપાવો",
       "expand": "ધ્યેય બતાવો"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "કાર્યો, {{total}}માંથી {{completed}} પૂર્ણ",
+      "rowAccessibility": "કાર્યો, {{total}}માંથી {{completed}} પૂર્ણ. વર્તમાન કાર્ય: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું",
       "couldNotLoadGithubRepositories": "GitHub રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં.",
@@ -2184,7 +2196,6 @@
       "retryLoadingEnvironment": "કાર્યપરિસર લોડ કરવા ફરી પ્રયાસ કરો",
       "defaultEnvironment": "ડિફોલ્ટ કાર્યપરિસર",
       "environmentSummary": "{{commands}} કમાન્ડ · {{mcp}} MCP · {{skills}} સ્કિલ · {{agents}} એજન્ટ",
-      "changes": "ફેરફારો",
       "leaveChanges": "ફેરફારો રાખો",
       "commitAndPush": "કમિટ અને પુશ કરો",
       "startSession": "સત્ર શરૂ કરો",
@@ -2207,6 +2218,10 @@
       "importingSession": "સત્ર આયાત થઈ રહ્યું છે",
       "cliCannotContinue": "આ CLI સત્ર ચાલુ રાખી શકતું નથી. Cloud Agent અથવા બીજું CLI પસંદ કરો.",
       "importFailed": "આ સત્ર આયાત કરી શકાયું નહીં.",
+      "cliCannotFork": "સંદેશમાંથી ફોર્ક કરવા માટે Kilo CLI અપડેટ કરો.",
+      "forkCutNotSynced": "આ સંદેશ હજી સાચવાયો નથી. થોડી વારમાં ફરી પ્રયાસ કરો.",
+      "forkFilesFromBaseBranch": "ફાઇલો બેઝ બ્રાન્ચથી શરૂ થાય છે.",
+      "forkFilesUnchangedOnComputer": "આ કમ્પ્યુટર પરની ફાઇલોમાં કોઈ ફેરફાર થતો નથી.",
       "pickProfile": "પ્રોફાઇલ ચૂંટો",
       "noProfile": "કોઈ પ્રોફાઇલ નથી",
       "manageProfiles": "પ્રોફાઇલ મેનેજ કરો",
@@ -2251,8 +2266,8 @@
       "toolList": "યાદી બનાવો",
       "toolPatch": "પૅચ લાગુ કરો",
       "toolTask": "કાર્ય",
-      "readTodos": "કરવાનાં કાર્યો વાંચો",
-      "updateTodos": "કરવાનાં કાર્યો અપડેટ કરો",
+      "readTodos": "યોજના વાંચો",
+      "updateTodos": "યોજના અપડેટ કરો",
       "linesBadge": "{{displayCount}} પંક્તિઓ",
       "filesBadge": "{{displayCount}} ફાઇલો",
       "matchesBadge": "{{displayCount}} મેળ",
@@ -2326,6 +2341,7 @@
       "copyMessage": "સંદેશની નકલ કરો",
       "copyText": "લખાણની નકલ કરો",
       "selectText": "લખાણ પસંદ કરો",
+      "forkFromHere": "અહીંથી ફોર્ક કરો",
       "reportAiResponse": "AIના જવાબ વિશે જાણ કરો",
       "reportAiResponseConfirm": "આ જવાબની સમીક્ષા માટે જાણ કરવી છે?",
       "report": "જાણ કરો",
@@ -2641,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "મોડલ ({{displayCount}})",
       "modelsCount_other": "મોડલ ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ફેરફારો જુઓ",
+      "asOf": "{{time}} મુજબ",
+      "tooLarge": "આ તફાવત એટલો મોટો છે કે તેને મોબાઇલ પર બતાવી શકાતો નથી.",
+      "empty": "આ સત્રમાં હજી સુધી કોઈ ફાઇલમાં ફેરફાર થયો નથી."
     },
     "autoApprove": {
       "title": "સ્વતઃ મંજૂરી",
@@ -3153,6 +3175,8 @@
     "channelName": "સક્રિય એજન્ટો",
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો.",
     "openSession": "ખોલો",
+    "finished": "સમાપ્ત",
+    "followFailed": "આ એજન્ટને લૉક સ્ક્રીન પર બતાવી શકાયો નથી.",
     "approveFailed": "મંજૂર કરી શકાયું નહીં. ફરી પ્રયાસ કરવા $t(common.approve) પર ટૅપ કરો.",
     "checked": "ચકાસ્યું",
     "lastKnown": "છેલ્લે જાણીતું",
@@ -3161,7 +3185,26 @@
     "waitingForYou": "તમારી રાહમાં",
     "nextScheduled": "આગામી નિર્ધારિત",
     "answerNeeded": "જવાબ જરૂરી",
-    "waitingToRetry": "ફરી પ્રયાસની રાહમાં"
+    "waitingToRetry": "ફરી પ્રયાસની રાહમાં",
+    "step": {
+      "editing": "સંપાદન",
+      "reading": "વાંચન",
+      "running": "ચલાવો",
+      "searching": "વેબ શોધ",
+      "thinking": "વિચારી રહ્યું છે"
+    },
+    "planOf": "માંથી",
+    "filesChanged": "ફાઇલો બદલાઈ",
+    "finishedIn": "માં પૂર્ણ",
+    "noActivityFor": "કોઈ પ્રવૃત્તિ નથી",
+    "prOpened": "પુલ રિક્વેસ્ટ ખૂલી",
+    "permissionWants": "ચલાવવા માંગે છે",
+    "failure": {
+      "provider": "બંધ થયું: પ્રદાતા ભૂલ",
+      "tool": "બંધ થયું: સાધન ભૂલ",
+      "cancelled": "બંધ થયું: રદ કર્યું",
+      "other": "રોકાયેલું"
+    }
   },
   "transcriptionModel": {
     "title": "અવાજને લખાણમાં ફેરવવાનું મોડેલ",
@@ -3197,10 +3240,32 @@
     "list": {
       "loadFailed": "વાતચીત ઇતિહાસ લોડ કરી શકાયો નહીં.",
       "new": "નવી ચેટ",
-      "openHint": "ચેટ ખોલે છે. કાઢી નાખવા માટે લાંબું દબાવો.",
       "deleteTitle": "આ ચેટ કાઢી નાખવી?"
     },
+    "rename": {
+      "title": "ચેટનું નામ બદલો",
+      "accessibility": "ચેટનું નામ બદલો: {{title}}",
+      "openHint": "ચેટ ખોલે છે. નામ બદલવા કે કાઢી નાખવા માટે લાંબું દબાવો."
+    },
     "beta": "બીટા",
+    "details": {
+      "title": "ચેટની વિગતો",
+      "backend": "બૅકએન્ડ",
+      "effortDefault": "મોડેલનું ડિફૉલ્ટ",
+      "noCost": "કોઈ ખર્ચ નથી",
+      "costUnknown": "જાણીતું નથી",
+      "costEstimatedNote": "જે જવાબોએ કિંમત જણાવી નથી, તેમનો ખર્ચ યાદી કિંમતો પરથી અંદાજવામાં આવે છે.",
+      "costUnknownNote": "આ મોડેલ માટે કોઈ કિંમત જાણીતી નથી.",
+      "costPartialNote": "આ કુલમાં એવા મોડેલ્સ શામેલ નથી જેમની કિંમત જાણીતી નથી.",
+      "localNote": "ઉપકરણ પરના મોડેલ્સ આ ઉપકરણ પર ચાલે છે. તેમનો કોઈ ખર્ચ નથી અને કોઈ પ્રોમ્પ્ટ કેશ નથી, અને તેમની ટોકન ગણતરી અંદાજિત હોઈ શકે છે.",
+      "countedSinceNote": "આ ચેટ વપરાશ નોંધાવાનું શરૂ થયું તે પહેલાં શરૂ થઈ હતી. કુલમાં ફક્ત તે પછીના જવાબો જ દેખાય છે.",
+      "remoteServersOn": "ચાલુ રિમોટ MCP સર્વર"
+    },
+    "webSearch": {
+      "title": "વેબ પર શોધો",
+      "description": "આ ચેટને તમારા Kilo એકાઉન્ટ દ્વારા વર્તમાન માહિતી શોધવા દો. શોધ તમારી માસિક શોધ મર્યાદાનો ઉપયોગ કરે છે.",
+      "allowanceExhausted": "આ મહિના માટેની તમારી મફત વેબ શોધ પૂરી થઈ ગઈ છે. ફરીથી શોધવા માટે ક્રેડિટ ઉમેરો."
+    },
     "mcp": {
       "title": "Kilo સાધનો",
       "use": "Kilo સાધનો વાપરો",
@@ -3223,7 +3288,6 @@
       "fieldName": "દર્શાવેલ નામ",
       "fieldUrl": "સર્વર URL",
       "fieldUrlInvalid": "માન્ય સર્વર URL દાખલ કરો.",
-      "fieldToken": "Bearer ટોકન (વૈકલ્પિક)",
       "enableServer": "આ સર્વર સક્ષમ કરો: {{name}}",
       "editServer": "સર્વર સંપાદિત કરો",
       "deleteServer": "સર્વર કાઢી નાખો",
@@ -3243,6 +3307,18 @@
       "serverToolCount": "{{count}} સાધનો",
       "serverUnreachable": "આ સર્વર સુધી પહોંચી શકાયું નથી",
       "serverOff": "આ સર્વર બંધ છે"
+    },
+    "mcpOAuth": {
+      "authMethod": "પ્રમાણીકરણ",
+      "authNone": "સાઇન ઇન વિના",
+      "authBearer": "Bearer ટોકન",
+      "authOAuth": "OAuth સાઇન ઇન",
+      "fieldToken": "ટોકન",
+      "oauthHint": "સાચવ્યા પછી, તમારા બ્રાઉઝર વડે સાઇન ઇન કરવા માટે સર્વર પર $t(modelChat.mcpOAuth.signIn) ટૅપ કરો.",
+      "serverNeedsSignIn": "આ સર્વર વાપરવા માટે સાઇન ઇન કરો",
+      "signIn": "સાઇન ઇન કરો",
+      "signInA11y": "આ સર્વરમાં સાઇન ઇન કરો: {{name}}",
+      "signInFailed": "{{name}} માં સાઇન ઇન કરી શકાયું નથી. ફરી પ્રયાસ કરો."
     },
     "backends": {
       "title": "ચેટ બૅકએન્ડ્સ",
@@ -3326,8 +3402,48 @@
         "notGguf": "લિંક .gguf ફાઇલ તરફ નિર્દેશ કરવી જોઈએ.",
         "space": "આ મોડેલ માટે પૂરતી ખાલી સ્ટોરેજ નથી. જગ્યા ખાલી કરો અને ફરી પ્રયાસ કરો.",
         "network": "ડાઉનલોડ પૂર્ણ થયું નથી. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
-        "invalidFile": "ડાઉનલોડ કરેલ ફાઇલ એ મોડેલ નથી જે આ એપ ચલાવી શકે, તેથી તેને દૂર કરવામાં આવી છે."
+        "invalidFile": "ડાઉનલોડ કરેલ ફાઇલ એ મોડેલ નથી જે આ એપ ચલાવી શકે, તેથી તેને દૂર કરવામાં આવી છે.",
+        "checksum": "ડાઉનલોડ કરેલ ફાઇલ તેના પ્રકાશિત ચેકસમ સાથે મેળ ખાતી નથી, તેથી તેને દૂર કરવામાં આવી છે. ફરીથી ડાઉનલોડ કરવાનો પ્રયાસ કરો."
       }
+    },
+    "catalog": {
+      "browse": "મોડેલ્સ બ્રાઉઝ કરો",
+      "title": "મોડેલ કેટલોગ",
+      "search": "Hugging Face મોડેલ્સ શોધો",
+      "tabs": "મોડેલ ફિલ્ટર",
+      "fitsTab": "આ ડિવાઇસમાં બંધબેસે",
+      "fromHuggingFace": "Hugging Face પરથી",
+      "loading": "મોડેલ્સ લોડ થઈ રહ્યા છે",
+      "noResults": "કોઈ મોડેલ મળ્યું નહીં",
+      "noFits": "આ ડિવાઇસમાં કોઈ મોડેલ બંધબેસતું નથી",
+      "noFitsDescription": "મોટા મોડેલ્સ $t(common.all) ટૅબમાં છે.",
+      "fit": {
+        "fits": "બંધબેસે છે",
+        "tight": "માંડ બંધબેસે છે",
+        "tooLarge": "ખૂબ મોટું",
+        "noStorage": "પૂરતો સ્ટોરેજ નથી"
+      },
+      "parameters": "પેરામીટર્સ: {{value}}",
+      "downloads": "ડાઉનલોડ્સ: {{value}}",
+      "likes": "લાઇક્સ: {{value}}",
+      "context": "કોન્ટેક્સ્ટ વિન્ડો: {{value}}",
+      "license": "લાઇસન્સ: {{license}}",
+      "licenseUnknown": "લાઇસન્સ દર્શાવેલ નથી",
+      "tools": "ટૂલ કૉલિંગ",
+      "vision": "છબી ઇનપુટ",
+      "hintsHelp": "Hugging Face તરફથી સંકેતો. ઍપ ડાઉનલોડ પછી મોડેલ તપાસે છે.",
+      "gated": "આ મોડેલ માટે Hugging Face એકાઉન્ટ જરૂરી છે, તેથી ઍપ તેને ડાઉનલોડ કરી શકતી નથી.",
+      "quantizations": "ક્વૉન્ટાઇઝેશન્સ",
+      "quantizationsHelp": "નાની ફાઇલો ઓછી મેમરી અને સ્ટોરેજ વાપરે છે. મોટી ફાઇલો સામાન્ય રીતે વધુ સારા જવાબો આપે છે.",
+      "quantDetail": "{{size}} ડાઉનલોડ · આશરે {{memory}} મેમરી",
+      "downloadQuant": "{{quant}} ડાઉનલોડ કરો",
+      "loadingModel": "મોડેલની વિગતો લોડ થઈ રહી છે",
+      "couldNotLoadModel": "આ મોડેલ લોડ કરી શકાયું નહીં",
+      "noFiles": "આ ઍપ ચલાવી શકે એવી કોઈ ફાઇલ નથી",
+      "noFilesDescription": "આ ઍપ એવા મોડેલ્સ ચલાવે છે જે એક જ GGUF ફાઇલ હોય.",
+      "tooLargeTitle": "આ મોડેલ કદાચ નહીં ચાલે",
+      "tooLargeMessage": "{{name}} ને કદાચ આ ડિવાઇસમાં છે તેના કરતાં વધુ મેમરીની જરૂર પડશે. મોડેલ જવાબ આપતું હોય ત્યારે ઍપ બંધ થઈ શકે છે. છતાં ડાઉનલોડ કરવું છે?",
+      "downloadAnyway": "છતાં ડાઉનલોડ કરો"
     },
     "localModels": {
       "title": "ઉપકરણ પરના મોડેલ્સ",
@@ -3357,6 +3473,9 @@
       "downloading": "ડાઉનલોડ થઈ રહ્યું છે…",
       "downloadProgress": "ડાઉનલોડ થઈ રહ્યું છે… {{percent}}%",
       "downloadFailed": "ડાઉનલોડ પૂરું થયું નથી. તમારું કનેક્શન અને ખાલી સ્ટોરેજ તપાસો, પછી ફરી પ્રયાસ કરો."
+    },
+    "reasoningEffort": {
+      "modelFlag": "આ મોડેલ વિચારના સ્તરને સપોર્ટ કરે છે"
     }
   },
   "settingsTools": {
@@ -3579,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play એ કોઈ મેળ ખાતું ક્રેડિટ પેક પરત કર્યું નથી.",
     "purchaseOwnedByAnotherAccount": "આ Apple Account પરની ક્રેડિટ બીજા Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો.",
     "purchaseOwnedByAnotherAccountPlay": "આ Google Play ખાતા પરની ક્રેડિટ અલગ Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો."
+  },
+  "todos": {
+    "saveAsTodo": "કાર્ય તરીકે સાચવો",
+    "segment": {
+      "label": "એજન્ટ દૃશ્ય",
+      "sessions": "સત્રો",
+      "todos": "કાર્યો"
+    },
+    "lists": {
+      "newList": "નવી યાદી",
+      "empty": "હજુ કોઈ યાદી નથી",
+      "couldNotLoad": "યાદીઓ લોડ કરી શકાઈ નહીં",
+      "noRepository": "કોઈ રિપોઝિટરી નથી",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} ખુલ્લાં",
+      "openCount_other": "{{count}} ખુલ્લાં",
+      "archived_one": "આર્કાઇવ કરેલ ({{count}})",
+      "archived_other": "આર્કાઇવ કરેલ ({{count}})",
+      "archive": "આર્કાઇવ કરો",
+      "unarchive": "આર્કાઇવમાંથી કાઢો",
+      "deleteTitle": "{{name}} કાઢી નાખવી?",
+      "deleteMessage": "તેનાં કાર્યો પણ કાઢી નાખવામાં આવશે. તેનાં સત્રો રહેશે."
+    },
+    "listSettings": {
+      "title": "યાદીની સેટિંગ્સ",
+      "name": "નામ",
+      "namePlaceholder": "બગ્સ, વિચારો, રિલીઝ…",
+      "emoji": "ઇમોજી",
+      "mode": "મોડ",
+      "defaultsHint": "આ યાદીમાંથી શરૂ થતાં સત્રો આ મૂળભૂત સેટિંગ્સ વાપરે છે."
+    },
+    "list": {
+      "addPlaceholder": "કાર્ય ઉમેરો",
+      "add": "કાર્ય ઉમેરો",
+      "empty": "હજુ કોઈ કાર્ય નથી",
+      "setDefaults": "રિપોઝિટરી, મોડ અને મોડલ સેટ કરો",
+      "completed_one": "પૂર્ણ ({{count}})",
+      "completed_other": "પૂર્ણ ({{count}})"
+    },
+    "item": {
+      "markDone": "પૂર્ણ તરીકે ચિહ્નિત કરો",
+      "markOpen": "અપૂર્ણ તરીકે ચિહ્નિત કરો",
+      "markDonePrompt": "પૂર્ણ તરીકે ચિહ્નિત કરવું?",
+      "deleted": "કાર્ય કાઢી નાખ્યું",
+      "undo": "પૂર્વવત્ કરો",
+      "runCount_one": "{{count}} વાર ચલાવ્યું",
+      "runCount_other": "{{count}} વાર ચલાવ્યું",
+      "startNow": "સમીક્ષા વિના શરૂ કરો",
+      "startNowHint": "સમીક્ષા વિના શરૂ કરવા લાંબું દબાવો",
+      "titleLabel": "કાર્યનું શીર્ષક",
+      "notes": "નોંધો",
+      "notesPlaceholder": "Markdownમાં નોંધો ઉમેરો",
+      "sessions": "સત્રો જોડાયેલાં",
+      "noSessions": "હજુ કોઈ સત્ર નથી",
+      "linkSession": "સત્ર જોડો",
+      "unlinkSession": "{{title}} નું જોડાણ કાઢો",
+      "linkFailed": "સત્રને કાર્ય સાથે જોડી શકાયું નહીં"
+    },
+    "linkSession": {
+      "title": "સત્ર જોડો",
+      "empty": "કોઈ તાજેતરનું સત્ર નથી",
+      "emptyInRepository": "{{repository}} માં કોઈ તાજેતરનું સત્ર નથી"
+    },
+    "upNext": "આગળ",
+    "sessionTodo": "કાર્ય: {{title}}",
+    "linkToTodo": "કાર્ય સાથે જોડો",
+    "candidates": {
+      "empty": "કોઈ ખુલ્લું કાર્ય નથી"
+    },
+    "saveSheet": {
+      "title": "યાદીમાં સાચવો",
+      "saved": "{{list}} માં સાચવ્યું"
+    }
   }
 }

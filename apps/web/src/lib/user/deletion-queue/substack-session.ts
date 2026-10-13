@@ -17,7 +17,7 @@ export type SubstackReauthFailure =
   | { kind: 'invalid_totp_secret' };
 
 export type SubstackReauthResult =
-  | { ok: true; cookie: string; cookieChanged: boolean; method: 'totp' }
+  | { ok: true; cookie: string; cookieChanged: boolean; method: 'totp' | null }
   | { ok: false; cookie: string; cookieChanged: boolean; failure: SubstackReauthFailure };
 
 export function parseCookieHeader(cookie: string): Map<string, string> {
@@ -43,6 +43,16 @@ export function applyResponseCookies(cookie: string, response: Response): string
   const jar = parseCookieHeader(cookie);
   const changed = applySetCookies(jar, responseSetCookies(response), Date.now());
   return changed ? serializeCookieJar(jar) : cookie;
+}
+
+export async function isSubstackReauthRequired(response: Response): Promise<boolean> {
+  if (response.ok) return false;
+  try {
+    const payload: unknown = await response.clone().json();
+    return isRecord(payload) && payload.type === 'reauthentication_required';
+  } catch {
+    return false;
+  }
 }
 
 export async function reauthenticateSubstackSession(params: {
@@ -89,7 +99,22 @@ export async function reauthenticateSubstackSession(params: {
     return failure({ kind: 'http', status: start.response.status });
   }
 
-  if (!isRecord(start.payload) || start.payload.method !== 'totp') {
+  if (!isRecord(start.payload)) return failure({ kind: 'incomplete' });
+  if (
+    'error' in start.payload ||
+    start.payload.success === false ||
+    (Array.isArray(start.payload.errors) && start.payload.errors.length > 0)
+  ) {
+    return failure({ kind: 'error_payload' });
+  }
+  if (
+    start.payload.method === undefined ||
+    start.payload.method === null ||
+    start.payload.method === ''
+  ) {
+    return { ok: true, cookie, cookieChanged: cookie !== originalCookie, method: null };
+  }
+  if (start.payload.method !== 'totp') {
     return failure({ kind: 'method_unsupported' });
   }
 

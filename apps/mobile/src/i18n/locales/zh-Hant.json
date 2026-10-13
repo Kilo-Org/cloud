@@ -136,7 +136,10 @@
     "working": "處理中",
     "yourOwnRepositories": "你自己的存放庫",
     "dismissed": "已忽略",
-    "agent": "代理人"
+    "agent": "代理人",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "變更"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -320,7 +323,8 @@
       "kiloclaw": "KiloClaw 活動",
       "balance": "餘額提醒",
       "security": "資安問題",
-      "spend": "支出提醒"
+      "spend": "支出提醒",
+      "followedSessions": "已關注的會話"
     },
     "category": {
       "chatMessagesSubtitle": "對話中的回覆",
@@ -1575,6 +1579,8 @@
       "title": "工作階段",
       "copyErrorDetails": "複製錯誤詳細資料",
       "backToSessions": "返回工作階段清單",
+      "follow": "在鎖定畫面上追蹤",
+      "unfollow": "停止在鎖定畫面上追蹤",
       "couldNotLoad": "無法載入工作階段。",
       "failedToLoadDetails": "無法載入工作階段詳細資料。",
       "failedToStopExecution": "無法停止執行。",
@@ -1641,6 +1647,11 @@
       "collapse": "收合目標",
       "expand": "展開目標"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "任務，已完成 {{completed}}/{{total}} 項",
+      "rowAccessibility": "任務，已完成 {{completed}}/{{total}} 項。目前任務：{{task}}"
+    },
     "newSession": {
       "recentlyUsed": "最近使用",
       "couldNotLoadGithubRepositories": "無法載入 GitHub 儲存庫。",
@@ -1673,7 +1684,6 @@
       "retryLoadingEnvironment": "重新載入環境",
       "defaultEnvironment": "預設環境",
       "environmentSummary": "{{commands}} 個指令 · {{mcp}} 個 MCP · {{skills}} 個技能 · {{agents}} 個智慧代理",
-      "changes": "變更",
       "leaveChanges": "保留變更",
       "commitAndPush": "提交並推送",
       "startSession": "開始工作階段",
@@ -1696,6 +1706,10 @@
       "importingSession": "匯入工作階段中",
       "cliCannotContinue": "此 CLI 無法繼續工作階段。請選擇 Cloud Agent 或其他 CLI。",
       "importFailed": "無法匯入此工作階段。",
+      "cliCannotFork": "請更新 Kilo CLI，才能從訊息建立分支。",
+      "forkCutNotSynced": "此訊息尚未儲存，請稍後再試。",
+      "forkFilesFromBaseBranch": "檔案將從基礎分支開始。",
+      "forkFilesUnchangedOnComputer": "此電腦上的檔案不會變更。",
       "pickProfile": "選擇個人資料",
       "noProfile": "沒有個人資料",
       "manageProfiles": "管理個人資料",
@@ -1740,8 +1754,8 @@
       "toolList": "列出",
       "toolPatch": "套用修補",
       "toolTask": "任務",
-      "readTodos": "讀取待辦事項",
-      "updateTodos": "更新待辦事項",
+      "readTodos": "讀取計畫",
+      "updateTodos": "更新計畫",
       "linesBadge": "{{displayCount}} 行",
       "filesBadge": "{{displayCount}} 個檔案",
       "matchesBadge": "{{displayCount}} 筆相符結果",
@@ -1811,6 +1825,7 @@
       "copyMessage": "複製訊息",
       "copyText": "複製文字",
       "selectText": "選取文字",
+      "forkFromHere": "從這裡分支",
       "reportAiResponse": "檢舉 AI 回覆",
       "reportAiResponseConfirm": "要檢舉這則回覆並交由審查嗎？",
       "report": "檢舉",
@@ -2130,6 +2145,12 @@
       "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}",
       "modelsCount_one": "模型（{{displayCount}}）",
       "modelsCount_other": "模型（{{displayCount}}）"
+    },
+    "sessionChanges": {
+      "viewChanges": "檢視變更",
+      "asOf": "截至 {{time}}",
+      "tooLarge": "此差異過大，無法在行動裝置上顯示。",
+      "empty": "此工作階段尚無檔案變更。"
     },
     "autoApprove": {
       "title": "自動核准",
@@ -2634,6 +2655,7 @@
     "fileRows": {
       "collapseFile": "收合檔案",
       "diffTooLarge": "差異過大，無法顯示。",
+      "noPreview": "此檔案無法預覽",
       "expandFile": "展開檔案",
       "markViewed": "將 {{path}} 標記為已檢視",
       "openDiffOnGitHub": "在 GitHub 上開啟此檔案的差異",
@@ -3153,6 +3175,8 @@
     "channelName": "執行中的代理程式",
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。",
     "openSession": "開啟",
+    "finished": "已完成",
+    "followFailed": "無法在鎖定畫面上顯示此代理程式。",
     "approveFailed": "無法核准。點一下$t(common.approve)再試一次。",
     "checked": "上次確認",
     "lastKnown": "最後已知",
@@ -3161,7 +3185,26 @@
     "waitingForYou": "等待你回應",
     "nextScheduled": "下次排程",
     "answerNeeded": "等待回答",
-    "waitingToRetry": "等待重試"
+    "waitingToRetry": "等待重試",
+    "step": {
+      "editing": "編輯中",
+      "reading": "讀取中",
+      "running": "執行",
+      "searching": "網頁搜尋",
+      "thinking": "正在思考"
+    },
+    "planOf": "/",
+    "filesChanged": "個檔案已變更",
+    "finishedIn": "耗時",
+    "noActivityFor": "無活動",
+    "prOpened": "拉取請求已開啟",
+    "permissionWants": "想要執行",
+    "failure": {
+      "provider": "已停止：供應商錯誤",
+      "tool": "已停止：工具錯誤",
+      "cancelled": "已停止：已取消",
+      "other": "已停止"
+    }
   },
   "transcriptionModel": {
     "title": "轉錄模型",
@@ -3197,10 +3240,32 @@
     "list": {
       "loadFailed": "無法載入聊天記錄。",
       "new": "新對話",
-      "openHint": "開啟對話。長按可刪除。",
       "deleteTitle": "刪除這個對話？"
     },
+    "rename": {
+      "title": "重新命名聊天",
+      "accessibility": "重新命名聊天：{{title}}",
+      "openHint": "開啟對話。長按可重新命名或刪除。"
+    },
     "beta": "測試版",
+    "details": {
+      "title": "聊天詳細資料",
+      "backend": "後端",
+      "effortDefault": "模型預設",
+      "noCost": "無費用",
+      "costUnknown": "未知",
+      "costEstimatedNote": "未回報價格的回答依牌價估算。",
+      "costUnknownNote": "此模型沒有已知價格。",
+      "costPartialNote": "此總計不包含沒有已知價格的模型。",
+      "localNote": "裝置端模型在此裝置上執行。它們沒有費用，也沒有提示快取，其詞元數可能是估算值。",
+      "countedSinceNote": "此聊天在開始記錄用量之前就已開始。總計僅包含之後的回答。",
+      "remoteServersOn": "已開啟的遠端 MCP 伺服器"
+    },
+    "webSearch": {
+      "title": "搜尋網路",
+      "description": "允許此聊天透過你的 Kilo 帳戶查詢最新資訊。搜尋會使用你每月的搜尋額度。",
+      "allowanceExhausted": "你本月的免費網路搜尋已用完。新增額度即可再次搜尋。"
+    },
     "mcp": {
       "title": "Kilo 工具",
       "use": "使用 Kilo 工具",
@@ -3223,7 +3288,6 @@
       "fieldName": "顯示名稱",
       "fieldUrl": "伺服器 URL",
       "fieldUrlInvalid": "請輸入有效的伺服器 URL。",
-      "fieldToken": "Bearer 權杖（選填）",
       "enableServer": "啟用此伺服器：{{name}}",
       "editServer": "編輯伺服器",
       "deleteServer": "刪除伺服器",
@@ -3243,6 +3307,18 @@
       "serverToolCount": "{{count}} 個工具",
       "serverUnreachable": "無法連線至此伺服器",
       "serverOff": "此伺服器已關閉"
+    },
+    "mcpOAuth": {
+      "authMethod": "驗證",
+      "authNone": "不需登入",
+      "authBearer": "Bearer 權杖",
+      "authOAuth": "OAuth 登入",
+      "fieldToken": "權杖",
+      "oauthHint": "儲存後，請點選伺服器上的「$t(modelChat.mcpOAuth.signIn)」，透過瀏覽器登入。",
+      "serverNeedsSignIn": "請登入以使用此伺服器",
+      "signIn": "登入",
+      "signInA11y": "登入此伺服器：{{name}}",
+      "signInFailed": "無法登入 {{name}}，請再試一次。"
     },
     "backends": {
       "title": "聊天後端",
@@ -3326,8 +3402,48 @@
         "notGguf": "連結必須指向 .gguf 檔案。",
         "space": "沒有足夠的可用儲存空間容納這個模型。請清出空間後再試一次。",
         "network": "下載未完成。請檢查網路連線後再試一次。",
-        "invalidFile": "下載的檔案不是這個應用程式可執行的模型，因此已將其移除。"
+        "invalidFile": "下載的檔案不是這個應用程式可執行的模型，因此已將其移除。",
+        "checksum": "下載的檔案與公布的校驗碼不符，因此已將其移除。請重新下載。"
       }
+    },
+    "catalog": {
+      "browse": "瀏覽模型",
+      "title": "模型目錄",
+      "search": "搜尋 Hugging Face 模型",
+      "tabs": "模型篩選",
+      "fitsTab": "適合此裝置",
+      "fromHuggingFace": "來自 Hugging Face",
+      "loading": "正在載入模型",
+      "noResults": "找不到模型",
+      "noFits": "沒有適合此裝置的模型",
+      "noFitsDescription": "較大的模型位於「$t(common.all)」分頁。",
+      "fit": {
+        "fits": "適合",
+        "tight": "勉強可用",
+        "tooLarge": "過大",
+        "noStorage": "儲存空間不足"
+      },
+      "parameters": "參數：{{value}}",
+      "downloads": "下載次數：{{value}}",
+      "likes": "按讚數：{{value}}",
+      "context": "上下文視窗：{{value}}",
+      "license": "授權條款：{{license}}",
+      "licenseUnknown": "未註明授權條款",
+      "tools": "工具呼叫",
+      "vision": "圖片輸入",
+      "hintsHelp": "提示資訊來自 Hugging Face。App 會在模型下載後進行檢查。",
+      "gated": "此模型需要 Hugging Face 帳號，因此 App 無法下載。",
+      "quantizations": "量化版本",
+      "quantizationsHelp": "較小的檔案佔用較少記憶體和儲存空間。較大的檔案通常能提供較好的回答。",
+      "quantDetail": "下載 {{size}} · 約需 {{memory}} 記憶體",
+      "downloadQuant": "下載 {{quant}}",
+      "loadingModel": "正在載入模型詳細資料",
+      "couldNotLoadModel": "無法載入此模型",
+      "noFiles": "沒有此 App 可執行的檔案",
+      "noFilesDescription": "此 App 僅能執行單一 GGUF 檔案的模型。",
+      "tooLargeTitle": "此模型可能無法執行",
+      "tooLargeMessage": "{{name}} 所需的記憶體可能超過此裝置的容量。模型回答時，App 可能會關閉。仍要下載嗎？",
+      "downloadAnyway": "仍要下載"
     },
     "localModels": {
       "title": "裝置端模型",
@@ -3357,6 +3473,9 @@
       "downloading": "下載中…",
       "downloadProgress": "下載中… {{percent}}%",
       "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。"
+    },
+    "reasoningEffort": {
+      "modelFlag": "此模型支援思考程度"
     }
   },
   "settingsTools": {
@@ -3579,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play 未傳回相符的點數包。",
     "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。"
+  },
+  "todos": {
+    "saveAsTodo": "儲存為待辦事項",
+    "segment": {
+      "label": "代理程式檢視",
+      "sessions": "工作階段",
+      "todos": "待辦事項"
+    },
+    "lists": {
+      "newList": "新增清單",
+      "empty": "尚無清單",
+      "couldNotLoad": "無法載入清單",
+      "noRepository": "沒有儲存庫",
+      "rowA11y": "{{name}}，{{openCount}}",
+      "openCount_one": "未完成 {{count}} 項",
+      "openCount_other": "未完成 {{count}} 項",
+      "archived_one": "已封存 ({{count}})",
+      "archived_other": "已封存 ({{count}})",
+      "archive": "封存",
+      "unarchive": "取消封存",
+      "deleteTitle": "要刪除 {{name}} 嗎？",
+      "deleteMessage": "其中的待辦事項也會一併刪除。工作階段會保留。"
+    },
+    "listSettings": {
+      "title": "清單設定",
+      "name": "名稱",
+      "namePlaceholder": "錯誤、想法、版本…",
+      "emoji": "表情符號",
+      "mode": "模式",
+      "defaultsHint": "從此清單開始的工作階段會使用這些預設值。"
+    },
+    "list": {
+      "addPlaceholder": "新增待辦事項",
+      "add": "新增待辦事項",
+      "empty": "尚無待辦事項",
+      "setDefaults": "設定儲存庫、模式和模型",
+      "completed_one": "已完成 ({{count}})",
+      "completed_other": "已完成 ({{count}})"
+    },
+    "item": {
+      "markDone": "標記為完成",
+      "markOpen": "標記為未完成",
+      "markDonePrompt": "要標記為完成嗎？",
+      "deleted": "已刪除待辦事項",
+      "undo": "復原",
+      "runCount_one": "已執行 {{count}} 次",
+      "runCount_other": "已執行 {{count}} 次",
+      "startNow": "不經審查直接開始",
+      "startNowHint": "長按即可不經審查直接開始",
+      "titleLabel": "待辦事項標題",
+      "notes": "備註",
+      "notesPlaceholder": "使用 Markdown 新增備註",
+      "sessions": "已連結的工作階段",
+      "noSessions": "尚無工作階段",
+      "linkSession": "連結工作階段",
+      "unlinkSession": "取消連結 {{title}}",
+      "linkFailed": "無法將工作階段連結至待辦事項"
+    },
+    "linkSession": {
+      "title": "連結工作階段",
+      "empty": "沒有最近的工作階段",
+      "emptyInRepository": "{{repository}} 中沒有最近的工作階段"
+    },
+    "upNext": "接下來",
+    "sessionTodo": "待辦事項：{{title}}",
+    "linkToTodo": "連結至待辦事項",
+    "candidates": {
+      "empty": "沒有未完成的待辦事項"
+    },
+    "saveSheet": {
+      "title": "儲存至清單",
+      "saved": "已儲存至 {{list}}"
+    }
   }
 }

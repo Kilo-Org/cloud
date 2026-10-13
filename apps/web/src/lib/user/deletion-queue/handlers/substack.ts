@@ -25,6 +25,7 @@ import {
 } from '@/lib/user/deletion-queue/deletion-substack-credential';
 import {
   applyResponseCookies,
+  isSubstackReauthRequired,
   reauthenticateSubstackSession,
   type SubstackReauthFailure,
 } from '@/lib/user/deletion-queue/substack-session';
@@ -227,6 +228,52 @@ export const handleSubstack: DeletionHandler = async ({ request, step, context }
       'User-Agent': USER_DELETION_SUBSTACK_USER_AGENT,
     });
 
+    const fetchWithReauth = async (
+      url: string,
+      init: Omit<RequestInit, 'headers'> & { headers: Record<string, string> }
+    ): Promise<{ response: Response } | { outcome: DeletionHandlerOutcome }> => {
+      const fetchOriginal = () =>
+        substackFetch(context, url, {
+          ...init,
+          headers: { ...init.headers, Cookie: currentCookie },
+        });
+      const first = await fetchOriginal();
+      if ('outcome' in first) return first;
+      syncCookies(first.response);
+      if (!(await isSubstackReauthRequired(first.response))) return first;
+      if (!totpSecret) {
+        return {
+          outcome: { kind: 'manual_action_required', errorCode: 'substack_reauth_required' },
+        };
+      }
+      const reauth = await reauthenticateSubstackSession({
+        publication,
+        cookie: currentCookie,
+        totpSecret,
+        guard: () => !shouldStopStarting(context),
+        signal: context.signal,
+        timeoutMs: USER_DELETION_SUBSTACK_TIMEOUT_MS,
+      });
+      if (reauth.cookie !== currentCookie) {
+        currentCookie = reauth.cookie;
+        cookieChanged = true;
+      }
+      if (!reauth.ok) {
+        return { outcome: reauthFailureOutcome(reauth.failure, step.progress_json) };
+      }
+      const stop = continueIfLowTime(context, step.progress_json);
+      if (stop) return { outcome: stop };
+      const retry = await fetchOriginal();
+      if ('outcome' in retry) return retry;
+      syncCookies(retry.response);
+      if (await isSubstackReauthRequired(retry.response)) {
+        return {
+          outcome: { kind: 'manual_action_required', errorCode: 'substack_reauth_required' },
+        };
+      }
+      return retry;
+    };
+
     const targetEmail = emailOrOutcome.trim().toLowerCase();
     let found = false;
     let count: number | undefined;
@@ -235,7 +282,7 @@ export const handleSubstack: DeletionHandler = async ({ request, step, context }
     for (let page = 0; page < 100; page += 1) {
       const reserve = continueIfLowTime(context, step.progress_json);
       if (reserve) return reserve;
-      const lookup = await substackFetch(context, `${publication}/api/v1/subscriber-stats`, {
+      const lookup = await fetchWithReauth(`${publication}/api/v1/subscriber-stats`, {
         method: 'POST',
         headers: { ...headers(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -246,7 +293,6 @@ export const handleSubstack: DeletionHandler = async ({ request, step, context }
         }),
       });
       if ('outcome' in lookup) return lookup.outcome;
-      syncCookies(lookup.response);
       if (lookup.response.status === 401) {
         return { kind: 'manual_action_required', errorCode: 'credential_expired' };
       }
@@ -309,27 +355,7 @@ export const handleSubstack: DeletionHandler = async ({ request, step, context }
     const reserve = continueIfLowTime(context, step.progress_json);
     if (reserve) return reserve;
 
-    if (totpSecret) {
-      const reauth = await reauthenticateSubstackSession({
-        publication,
-        cookie: currentCookie,
-        totpSecret,
-        guard: () => !shouldStopStarting(context),
-        signal: context.signal,
-        timeoutMs: USER_DELETION_SUBSTACK_TIMEOUT_MS,
-      });
-      if (reauth.cookie !== currentCookie) {
-        currentCookie = reauth.cookie;
-        cookieChanged = true;
-      }
-      if (!reauth.ok) return reauthFailureOutcome(reauth.failure, step.progress_json);
-
-      const afterReauth = continueIfLowTime(context, step.progress_json);
-      if (afterReauth) return afterReauth;
-    }
-
-    const remove = await substackFetch(
-      context,
+    const remove = await fetchWithReauth(
       `${publication}/api/v1/subscriber/${encodeURIComponent(targetEmail)}?disable_email=true`,
       {
         method: 'DELETE',
@@ -337,7 +363,6 @@ export const handleSubstack: DeletionHandler = async ({ request, step, context }
       }
     );
     if ('outcome' in remove) return remove.outcome;
-    syncCookies(remove.response);
     if (remove.response.status === 401) {
       return { kind: 'manual_action_required', errorCode: 'credential_expired' };
     }

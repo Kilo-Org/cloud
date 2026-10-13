@@ -252,6 +252,7 @@ describe('handleSubstack', () => {
     [401, 'credential_expired'],
     [403, 'substack_forbidden'],
   ])('keeps a present subscriber blocked when DELETE returns %s', async (status, errorCode) => {
+    withTotpSecret();
     const { request, step, context, email } = await setupSubstackRequest();
     const fetchSpy = jest
       .spyOn(globalThis, 'fetch')
@@ -490,6 +491,9 @@ describe('handleSubstack', () => {
         return Response.json({ method: 'totp' }, { headers: { 'set-cookie': 'session=rotated' } });
       }
       if (String(url).endsWith('/complete')) return Response.json({});
+      if (calls.filter(call => call.init.method === 'DELETE').length === 1) {
+        return reauthChallenge();
+      }
       return new Response('', { status: 200 });
     });
 
@@ -499,14 +503,20 @@ describe('handleSubstack', () => {
 
     expect(calls.map(call => call.url)).toEqual([
       `${USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL}/api/v1/subscriber-stats`,
+      `${USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL}/api/v1/subscriber/${encodeURIComponent(email)}?disable_email=true`,
       `${USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL}/api/v1/reauthenticate/start`,
       `${USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL}/api/v1/reauthenticate/complete`,
       `${USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL}/api/v1/subscriber/${encodeURIComponent(email)}?disable_email=true`,
     ]);
-    const completeHeaders = calls[2].init.headers as Record<string, string>;
+    const completeHeaders = calls[3].init.headers as Record<string, string>;
     expect(completeHeaders.Cookie).toContain('session=rotated');
-    const deleteHeaders = calls[3].init.headers as Record<string, string>;
+    const deleteHeaders = calls[4].init.headers as Record<string, string>;
     expect(deleteHeaders.Cookie).toContain('session=rotated');
+    expect(calls[4].init).toEqual({
+      ...calls[1].init,
+      headers: { ...calls[1].init.headers, Cookie: 'substack.sid=test-cookie; session=rotated' },
+      signal: expect.any(AbortSignal),
+    });
     expect(credentialMock.persistRefreshedSubstackCookie).toHaveBeenCalledWith({
       originalEncryptedMaterial: 'test-material',
       cookie: 'substack.sid=test-cookie; session=rotated',
@@ -517,8 +527,12 @@ describe('handleSubstack', () => {
   it('preserves the DELETE outcome when refreshed cookie persistence fails, reporting a sanitized diagnostic', async () => {
     withTotpSecret();
     const { request, step, context, email } = await setupSubstackRequest();
+    let lookupAttempts = 0;
     jest.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
-      if (String(url).endsWith('/subscriber-stats')) return subscriberPage([email]);
+      if (String(url).endsWith('/subscriber-stats')) {
+        lookupAttempts += 1;
+        return lookupAttempts === 1 ? reauthChallenge() : subscriberPage([email]);
+      }
       if (String(url).endsWith('/start')) {
         return Response.json({ method: 'totp' }, { headers: { 'set-cookie': 'session=rotated' } });
       }
@@ -544,14 +558,14 @@ describe('handleSubstack', () => {
 
   it('treats an aborted complete body as a retry without DELETE', async () => {
     withTotpSecret();
-    const { request, step, context, email } = await setupSubstackRequest();
+    const { request, step, context } = await setupSubstackRequest();
     const completeResponse = Response.json({});
     jest
       .spyOn(completeResponse, 'json')
       .mockRejectedValue(new DOMException('aborted', 'AbortError'));
     const fetchSpy = jest
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(subscriberPage([email]))
+      .mockResolvedValueOnce(reauthChallenge())
       .mockResolvedValueOnce(
         Response.json({ method: 'totp' }, { headers: { 'set-cookie': 'session=rotated' } })
       )
@@ -573,10 +587,10 @@ describe('handleSubstack', () => {
     [422, 'substack_reauth_rejected'],
   ])('never DELETEs when completion returns HTTP %s', async (status, errorCode) => {
     withTotpSecret();
-    const { request, step, context, email } = await setupSubstackRequest();
+    const { request, step, context } = await setupSubstackRequest();
     const fetchSpy = jest
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(subscriberPage([email]))
+      .mockResolvedValueOnce(reauthChallenge())
       .mockResolvedValueOnce(Response.json({ method: 'totp' }))
       .mockResolvedValueOnce(new Response('', { status }));
 
@@ -589,10 +603,10 @@ describe('handleSubstack', () => {
 
   it.each([429, 500])('classifies completion HTTP %s as transient', async status => {
     withTotpSecret();
-    const { request, step, context, email } = await setupSubstackRequest();
+    const { request, step, context } = await setupSubstackRequest();
     const fetchSpy = jest
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(subscriberPage([email]))
+      .mockResolvedValueOnce(reauthChallenge())
       .mockResolvedValueOnce(Response.json({ method: 'totp' }))
       .mockResolvedValueOnce(new Response('', { status }));
 
@@ -601,12 +615,40 @@ describe('handleSubstack', () => {
     expect(fetchSpy.mock.calls.some(call => call[1]?.method === 'DELETE')).toBe(false);
   });
 
-  it('blocks an unsupported reauth method without DELETE', async () => {
+  it('does not reauthenticate a healthy request even with a configured TOTP secret', async () => {
     withTotpSecret();
     const { request, step, context, email } = await setupSubstackRequest();
     const fetchSpy = jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(subscriberPage([email]))
+      .mockResolvedValueOnce(
+        new Response('', { status: 200, headers: { 'set-cookie': 'session=rotated' } })
+      );
+
+    await expect(handleSubstack({ request, step, context })).resolves.toMatchObject({
+      kind: 'succeeded',
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenLastCalledWith(
+      `${USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL}/api/v1/subscriber/${encodeURIComponent(email)}?disable_email=true`,
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: expect.objectContaining({ Cookie: 'substack.sid=test-cookie' }),
+      })
+    );
+    expect(credentialMock.persistRefreshedSubstackCookie).toHaveBeenCalledWith({
+      originalEncryptedMaterial: 'test-material',
+      cookie: 'substack.sid=test-cookie; session=rotated',
+      totpSecret: RFC_SECRET,
+    });
+  });
+
+  it('blocks an unsupported reauth method without DELETE', async () => {
+    withTotpSecret();
+    const { request, step, context } = await setupSubstackRequest();
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(reauthChallenge())
       .mockResolvedValueOnce(Response.json({ method: 'email' }));
 
     await expect(handleSubstack({ request, step, context })).resolves.toEqual({
@@ -614,6 +656,74 @@ describe('handleSubstack', () => {
       errorCode: 'substack_reauth_method_unsupported',
     });
     expect(fetchSpy.mock.calls.some(call => call[1]?.method === 'DELETE')).toBe(false);
+  });
+
+  it('reauthenticates a challenged lookup and retries its original body', async () => {
+    withTotpSecret();
+    const { request, step, context, email } = await setupSubstackRequest();
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(reauthChallenge())
+      .mockResolvedValueOnce(Response.json({ method: 'totp' }))
+      .mockResolvedValueOnce(Response.json({}))
+      .mockResolvedValueOnce(subscriberPage([email]))
+      .mockResolvedValueOnce(new Response('', { status: 200 }));
+
+    await expect(handleSubstack({ request, step, context })).resolves.toMatchObject({
+      kind: 'succeeded',
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(5);
+    expect(fetchSpy.mock.calls[3]?.[0]).toEqual(fetchSpy.mock.calls[0]?.[0]);
+    expect(fetchSpy.mock.calls[3]?.[1]?.body).toEqual(fetchSpy.mock.calls[0]?.[1]?.body);
+  });
+
+  it('stops after a repeated challenge instead of reauthenticating again', async () => {
+    withTotpSecret();
+    const { request, step, context } = await setupSubstackRequest();
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(reauthChallenge())
+      .mockResolvedValueOnce(Response.json({ method: 'totp' }))
+      .mockResolvedValueOnce(Response.json({}))
+      .mockResolvedValueOnce(reauthChallenge());
+
+    await expect(handleSubstack({ request, step, context })).resolves.toEqual({
+      kind: 'manual_action_required',
+      errorCode: 'substack_reauth_required',
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(4);
+    expect(fetchSpy.mock.calls.some(call => call[1]?.method === 'DELETE')).toBe(false);
+  });
+
+  it('requires manual action for a challenge without a configured TOTP secret', async () => {
+    const { request, step, context, email } = await setupSubstackRequest();
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(subscriberPage([email]))
+      .mockResolvedValueOnce(reauthChallenge());
+
+    await expect(handleSubstack({ request, step, context })).resolves.toEqual({
+      kind: 'manual_action_required',
+      errorCode: 'substack_reauth_required',
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not start reauth when the challenge leaves insufficient time', async () => {
+    withTotpSecret();
+    const { request, step, context } = await setupSubstackRequest();
+    let remainingMs = 60_000;
+    context.remainingMs = () => remainingMs;
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
+      remainingMs = 0;
+      return reauthChallenge();
+    });
+
+    await expect(handleSubstack({ request, step, context })).resolves.toEqual({
+      kind: 'continue',
+      progress: step.progress_json,
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it('does not reauthenticate when low time remains after a match', async () => {
@@ -634,6 +744,10 @@ describe('handleSubstack', () => {
     expect(credentialMock.persistRefreshedSubstackCookie).not.toHaveBeenCalled();
   });
 });
+
+function reauthChallenge() {
+  return Response.json({ type: 'reauthentication_required' }, { status: 403 });
+}
 
 function subscriberPage(emails: string[], count = emails.length) {
   return Response.json({

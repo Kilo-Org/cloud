@@ -136,7 +136,10 @@
     "working": "Nagtatrabaho",
     "yourOwnRepositories": "Mga sarili mong repositoryo",
     "dismissed": "Binalewala",
-    "agent": "Ahente"
+    "agent": "Ahente",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Mga pagbabago"
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -325,6 +328,7 @@
       "collapseFile": "Itago ang nilalaman ng file",
       "expandFile": "Ipakita ang nilalaman ng file",
       "diffTooLarge": "Masyadong malaki ang pagkakaiba para maipakita.",
+      "noPreview": "Walang preview para sa file na ito",
       "openOnGitHub": "Buksan sa GitHub",
       "openDiffOnGitHub": "Buksan ang pagkakaiba ng file na ito sa GitHub",
       "githubDiff": "Pagkakaiba sa GitHub"
@@ -831,7 +835,8 @@
       "kiloclaw": "Aktibidad ng KiloClaw",
       "balance": "Mga babala sa balanse",
       "security": "Mga natukoy na isyu sa seguridad",
-      "spend": "Mga babala sa gastos"
+      "spend": "Mga babala sa gastos",
+      "followedSessions": "Mga sinusubaybayang sesyon"
     },
     "category": {
       "chatMessagesSubtitle": "mga tugon sa iyong mga pag-uusap",
@@ -2086,6 +2091,8 @@
       "title": "Sesyon",
       "copyErrorDetails": "Kopyahin ang mga detalye ng error",
       "backToSessions": "Bumalik sa mga sesyon",
+      "follow": "Subaybayan sa naka-lock na screen",
+      "unfollow": "Ihinto ang pagsubaybay sa naka-lock na screen",
       "couldNotLoad": "Hindi ma-load ang sesyon.",
       "failedToLoadDetails": "Hindi ma-load ang mga detalye ng sesyon.",
       "failedToStopExecution": "Hindi maihinto ang pagpapatakbo.",
@@ -2152,6 +2159,11 @@
       "collapse": "Itago ang layunin",
       "expand": "Ipakita ang layunin"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Layunin, {{completed}} sa {{total}} ang natapos",
+      "rowAccessibility": "Layunin, {{completed}} sa {{total}} ang natapos. Kasalukuyang layunin: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Mga ginamit kamakailan",
       "couldNotLoadGithubRepositories": "Hindi ma-load ang mga imbakan ng code sa GitHub.",
@@ -2184,7 +2196,6 @@
       "retryLoadingEnvironment": "Subukang i-load muli ang kapaligiran",
       "defaultEnvironment": "Paunang itinakdang kapaligiran",
       "environmentSummary": "{{commands}} utos · {{mcp}} MCP · {{skills}} kasanayan · {{agents}} ahente",
-      "changes": "Mga pagbabago",
       "leaveChanges": "Iwan ang mga pagbabago",
       "commitAndPush": "I-commit at i-push",
       "startSession": "Simulan ang sesyon",
@@ -2207,6 +2218,10 @@
       "importingSession": "Ini-import ang sesyon",
       "cliCannotContinue": "Hindi kayang magpatuloy ng sesyon ang CLI na ito. Pumili ng Cloud Agent o ibang CLI.",
       "importFailed": "Hindi ma-import ang sesyong ito.",
+      "cliCannotFork": "I-update ang Kilo CLI para makapag-fork mula sa isang mensahe.",
+      "forkCutNotSynced": "Hindi pa naka-save ang mensaheng ito. Subukang muli maya-maya.",
+      "forkFilesFromBaseBranch": "Magsisimula ang mga file mula sa base branch.",
+      "forkFilesUnchangedOnComputer": "Hindi mababago ang mga file sa computer na ito.",
       "pickProfile": "Pumili ng profile",
       "noProfile": "Walang profile",
       "manageProfiles": "Pamahalaan ang mga profile",
@@ -2251,8 +2266,8 @@
       "toolList": "ilista",
       "toolPatch": "ilapat ang pagbabago",
       "toolTask": "gawain",
-      "readTodos": "Basahin ang listahan ng gagawin",
-      "updateTodos": "I-update ang listahan ng gagawin",
+      "readTodos": "Basahin ang plano",
+      "updateTodos": "I-update ang plano",
       "linesBadge": "{{displayCount}} na linya",
       "filesBadge": "{{displayCount}} na file",
       "matchesBadge": "{{displayCount}} tugma",
@@ -2322,6 +2337,7 @@
       "copyMessage": "Kopyahin ang mensahe",
       "copyText": "Kopyahin ang teksto",
       "selectText": "Piliin ang teksto",
+      "forkFromHere": "I-fork mula rito",
       "reportAiResponse": "Iulat ang tugon ng AI",
       "reportAiResponseConfirm": "Iulat ang tugong ito para masuri?",
       "report": "Iulat",
@@ -2641,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modelo ({{displayCount}})",
       "modelsCount_other": "Mga modelo ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Tingnan ang mga pagbabago",
+      "asOf": "Noong {{time}}",
+      "tooLarge": "Masyadong malaki ang pagkakaibang ito para maipakita sa mobile.",
+      "empty": "Wala pang pagbabago sa file sa session na ito."
     },
     "autoApprove": {
       "title": "Auto-apruba",
@@ -3153,6 +3175,8 @@
     "channelName": "Mga aktibong agent",
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
     "openSession": "Buksan",
+    "finished": "Natapos",
+    "followFailed": "Hindi maipakita ang ahenteng ito sa naka-lock na screen.",
     "approveFailed": "Hindi maaprubahan. I-tap ang $t(common.approve) para subukang muli.",
     "checked": "Nakumpirma",
     "lastKnown": "Huling nalaman",
@@ -3161,7 +3185,26 @@
     "waitingForYou": "Hinihintay ka",
     "nextScheduled": "Susunod na naka-iskedyul",
     "answerNeeded": "Kailangan ng sagot",
-    "waitingToRetry": "Naghihintay ng muling pagsubok"
+    "waitingToRetry": "Naghihintay ng muling pagsubok",
+    "step": {
+      "editing": "Nag-e-edit",
+      "reading": "Nagbabasa",
+      "running": "Tumatakbo",
+      "searching": "Paghahanap sa web",
+      "thinking": "Pinag-iisipan"
+    },
+    "planOf": "ng",
+    "filesChanged": "mga file na binago",
+    "finishedIn": "Natapos sa",
+    "noActivityFor": "Walang aktibidad sa loob ng",
+    "prOpened": "Nabuksan ang pull request",
+    "permissionWants": "Gustong patakbuhin",
+    "failure": {
+      "provider": "Huminto: error ng provider",
+      "tool": "Huminto: error ng tool",
+      "cancelled": "Huminto: kinansela",
+      "other": "NAKAHINTO"
+    }
   },
   "transcriptionModel": {
     "title": "Modelo para sa pagsasalin ng boses sa teksto",
@@ -3197,10 +3240,32 @@
     "list": {
       "loadFailed": "Hindi ma-load ang kasaysayan ng chat.",
       "new": "Bagong chat",
-      "openHint": "Binubuksan ang chat. Pindutin nang matagal para burahin.",
       "deleteTitle": "Burahin ang chat na ito?"
     },
+    "rename": {
+      "title": "Palitan ang pangalan ng chat",
+      "accessibility": "Palitan ang pangalan ng chat: {{title}}",
+      "openHint": "Binubuksan ang chat. Pindutin nang matagal para palitan ang pangalan o burahin."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Mga detalye ng chat",
+      "backend": "Sistema",
+      "effortDefault": "Default ng modelo",
+      "noCost": "Walang gastos",
+      "costUnknown": "Hindi alam",
+      "costEstimatedNote": "Tinantiya mula sa mga nakalistang presyo ang gastos ng mga sagot na hindi nag-ulat ng presyo.",
+      "costUnknownNote": "Walang alam na presyo para sa modelong ito.",
+      "costPartialNote": "Hindi kasama sa kabuuang ito ang mga modelong walang alam na presyo.",
+      "localNote": "Tumatakbo sa device na ito ang mga modelong nasa device. Wala silang gastos at walang prompt cache, at maaaring tantiya lang ang bilang ng kanilang mga token.",
+      "countedSinceNote": "Nagsimula ang chat na ito bago pa naitala ang paggamit. Ang mga sagot lang pagkatapos noon ang ipinapakita ng mga kabuuan.",
+      "remoteServersOn": "Mga naka-on na remote MCP server"
+    },
+    "webSearch": {
+      "title": "Maghanap sa web",
+      "description": "Hayaan ang chat na ito na maghanap ng kasalukuyang impormasyon gamit ang iyong Kilo account. Ginagamit ng mga paghahanap ang iyong buwanang allowance sa paghahanap.",
+      "allowanceExhausted": "Naubos na ang iyong libreng web search para sa buwang ito. Magdagdag ng credits para makapaghanap ulit."
+    },
     "mcp": {
       "title": "Mga tool ng Kilo",
       "use": "Gamitin ang mga tool ng Kilo",
@@ -3223,7 +3288,6 @@
       "fieldName": "Pangalang ipinapakita",
       "fieldUrl": "URL ng server",
       "fieldUrlInvalid": "Maglagay ng valid na URL ng server.",
-      "fieldToken": "Bearer token (opsyonal)",
       "enableServer": "Paganahin ang server na ito: {{name}}",
       "editServer": "I-edit ang server",
       "deleteServer": "Burahin ang server",
@@ -3243,6 +3307,18 @@
       "serverToolCount": "{{count}} tool",
       "serverUnreachable": "Hindi maabot ang server na ito",
       "serverOff": "Naka-off ang server na ito"
+    },
+    "mcpOAuth": {
+      "authMethod": "Pagpapatunay",
+      "authNone": "Walang pag-sign in",
+      "authBearer": "Bearer token",
+      "authOAuth": "Pag-sign in gamit ang OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Pagkatapos mong i-save, i-tap ang $t(modelChat.mcpOAuth.signIn) sa server para mag-sign in gamit ang iyong browser.",
+      "serverNeedsSignIn": "Mag-sign in para magamit ang server na ito",
+      "signIn": "Mag-sign in",
+      "signInA11y": "Mag-sign in sa server na ito: {{name}}",
+      "signInFailed": "Hindi makapag-sign in sa {{name}}. Subukan muli."
     },
     "backends": {
       "title": "Mga sistema ng chat",
@@ -3326,8 +3402,48 @@
         "notGguf": "Dapat nakaturo ang link sa isang .gguf file.",
         "space": "Walang sapat na libreng storage para sa modelong ito. Magbakante ng espasyo at subukan muli.",
         "network": "Hindi natapos ang pag-download. Suriin ang iyong koneksyon at subukan muli.",
-        "invalidFile": "Ang na-download na file ay hindi modelong kayang patakbuhin ng app na ito, kaya inalis ito."
+        "invalidFile": "Ang na-download na file ay hindi modelong kayang patakbuhin ng app na ito, kaya inalis ito.",
+        "checksum": "Ang na-download na file ay hindi tumutugma sa nakalathalang checksum nito, kaya inalis ito. Subukang i-download itong muli."
       }
+    },
+    "catalog": {
+      "browse": "Mag-browse ng mga modelo",
+      "title": "Katalogo ng modelo",
+      "search": "Maghanap ng mga modelo sa Hugging Face",
+      "tabs": "Filter ng modelo",
+      "fitsTab": "Kasya sa device na ito",
+      "fromHuggingFace": "Mula sa Hugging Face",
+      "loading": "Nilo-load ang mga modelo",
+      "noResults": "Walang nakitang modelo",
+      "noFits": "Walang modelong kasya sa device na ito",
+      "noFitsDescription": "Nasa tab na $t(common.all) ang mas malalaking modelo.",
+      "fit": {
+        "fits": "Kasya",
+        "tight": "Halos kasya",
+        "tooLarge": "Masyadong malaki",
+        "noStorage": "Kulang ang storage"
+      },
+      "parameters": "Mga parameter: {{value}}",
+      "downloads": "Mga download: {{value}}",
+      "likes": "Mga like: {{value}}",
+      "context": "Context window: {{value}}",
+      "license": "Lisensya: {{license}}",
+      "licenseUnknown": "Hindi nakasaad ang lisensya",
+      "tools": "Pagtawag ng tool",
+      "vision": "Input na larawan",
+      "hintsHelp": "Mga pahiwatig mula sa Hugging Face. Sinusuri ng app ang modelo pagkatapos itong ma-download.",
+      "gated": "Nangangailangan ang modelong ito ng Hugging Face account, kaya hindi ito ma-download ng app.",
+      "quantizations": "Mga quantization",
+      "quantizationsHelp": "Mas kaunting memory at storage ang ginagamit ng mas maliliit na file. Kadalasang mas mahusay ang sagot ng mas malalaking file.",
+      "quantDetail": "{{size}} na download · mga {{memory}} ng memory",
+      "downloadQuant": "I-download ang {{quant}}",
+      "loadingModel": "Nilo-load ang mga detalye ng modelo",
+      "couldNotLoadModel": "Hindi ma-load ang modelong ito",
+      "noFiles": "Walang file na kayang patakbuhin ng app na ito",
+      "noFilesDescription": "Nagpapatakbo ang app na ito ng mga modelong iisang GGUF file.",
+      "tooLargeTitle": "Maaaring hindi tumakbo ang modelong ito",
+      "tooLargeMessage": "Malamang na mas maraming memory ang kailangan ng {{name}} kaysa sa mayroon ang device na ito. Maaaring magsara ang app habang sumasagot ang modelo. I-download pa rin?",
+      "downloadAnyway": "I-download pa rin"
     },
     "localModels": {
       "title": "Mga modelong nasa device",
@@ -3357,6 +3473,9 @@
       "downloading": "Nagda-download…",
       "downloadProgress": "Nagda-download… {{percent}}%",
       "downloadFailed": "Hindi natapos ang pag-download. Tingnan ang iyong koneksyon at bakanteng storage, pagkatapos ay subukang muli."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Sinusuportahan ng modelong ito ang antas ng pag-iisip"
     }
   },
   "settingsTools": {
@@ -3579,5 +3698,78 @@
     "noMatchingProductsPlay": "Walang katugmang credit pack na ibinalik ang Google Play.",
     "purchaseOwnedByAnotherAccount": "Ang kredito sa Apple Account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito.",
     "purchaseOwnedByAnotherAccountPlay": "Ang kredito sa Google Play account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito."
+  },
+  "todos": {
+    "saveAsTodo": "I-save bilang gagawin",
+    "segment": {
+      "label": "View ng mga ahente",
+      "sessions": "Mga sesyon",
+      "todos": "Mga gagawin"
+    },
+    "lists": {
+      "newList": "Bagong listahan",
+      "empty": "Wala pang listahan",
+      "couldNotLoad": "Hindi ma-load ang mga listahan",
+      "noRepository": "Walang repositoryo",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} bukas",
+      "openCount_other": "{{count}} bukas",
+      "archived_one": "Naka-archive ({{count}})",
+      "archived_other": "Naka-archive ({{count}})",
+      "archive": "I-archive",
+      "unarchive": "Alisin sa archive",
+      "deleteTitle": "Burahin ang {{name}}?",
+      "deleteMessage": "Burahin din ang mga gagawin nito. Nananatili ang mga sesyon nito."
+    },
+    "listSettings": {
+      "title": "Mga setting ng listahan",
+      "name": "Pangalan",
+      "namePlaceholder": "Mga bug, ideya, release…",
+      "emoji": "Emoji",
+      "mode": "Mode",
+      "defaultsHint": "Gagamitin ng mga sesyong sisimulan mula sa listahang ito ang mga default na ito."
+    },
+    "list": {
+      "addPlaceholder": "Magdagdag ng gagawin",
+      "add": "Idagdag ang gagawin",
+      "empty": "Wala pang gagawin",
+      "setDefaults": "Itakda ang repositoryo, mode at modelo",
+      "completed_one": "Nakumpleto ({{count}})",
+      "completed_other": "Nakumpleto ({{count}})"
+    },
+    "item": {
+      "markDone": "Markahan bilang tapos",
+      "markOpen": "Markahan bilang hindi pa tapos",
+      "markDonePrompt": "Markahan bilang tapos?",
+      "deleted": "Nabura ang gagawin",
+      "undo": "I-undo",
+      "runCount_one": "{{count}} pagpapatakbo",
+      "runCount_other": "{{count}} pagpapatakbo",
+      "startNow": "Simulan nang walang review",
+      "startNowHint": "Pindutin nang matagal para simulan nang walang review",
+      "titleLabel": "Pamagat ng gagawin",
+      "notes": "Mga tala",
+      "notesPlaceholder": "Magdagdag ng mga tala sa Markdown",
+      "sessions": "Mga naka-link na sesyon",
+      "noSessions": "Wala pang sesyon",
+      "linkSession": "I-link ang sesyon",
+      "unlinkSession": "Alisin ang link ng {{title}}",
+      "linkFailed": "Hindi na-link ang sesyon sa gagawin"
+    },
+    "linkSession": {
+      "title": "Mag-link ng sesyon",
+      "empty": "Walang kamakailang sesyon",
+      "emptyInRepository": "Walang kamakailang sesyon sa {{repository}}"
+    },
+    "upNext": "Susunod",
+    "sessionTodo": "Gagawin: {{title}}",
+    "linkToTodo": "I-link sa gagawin",
+    "candidates": {
+      "empty": "Walang bukas na gagawin"
+    },
+    "saveSheet": {
+      "title": "I-save sa listahan",
+      "saved": "Na-save sa {{list}}"
+    }
   }
 }

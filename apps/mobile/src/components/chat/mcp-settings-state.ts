@@ -1,5 +1,5 @@
 import { type KiloMcpState } from '@/lib/chat/kilo-mcp';
-import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp';
+import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp-state';
 import { type RemoteMcpServerDraft, type StoredRemoteMcpServer } from '@/lib/chat/remote-mcp-store';
 import { normalizeRemoteMcpUrl } from '@/lib/chat/remote-mcp-url';
 
@@ -190,13 +190,14 @@ type RemoteMcpStatusKey =
   | 'modelChat.mcp.serverChecking'
   | 'modelChat.mcp.serverOff'
   | 'modelChat.mcp.serverToolCount'
-  | 'modelChat.mcp.serverUnreachable';
+  | 'modelChat.mcp.serverUnreachable'
+  | 'modelChat.mcpOAuth.serverNeedsSignIn';
 
 /**
  * One remote server, as a row. It always offers enable, edit and delete: the
  * person added it, so the person may change it or take it away. A server whose
- * discovery failed also offers a Retry, because that is the one thing the row
- * can do about it.
+ * discovery failed or answered with no tools also offers a Retry, because that
+ * is the one thing the row can do about it.
  */
 export type RemoteMcpServerRow = {
   readonly id: string;
@@ -205,8 +206,10 @@ export type RemoteMcpServerRow = {
   readonly enabled: boolean;
   readonly statusKey: RemoteMcpStatusKey;
   readonly toolCount: number;
-  /** Whether the row offers a Retry. Only a failed discovery can be asked again. */
+  /** Whether the row offers a Retry: a failed discovery, or one that answered with no tools. */
   readonly retry: boolean;
+  /** Whether the row offers a Sign in: an OAuth server refused, and only the person can fix it. */
+  readonly signIn: boolean;
   readonly canEdit: true;
   readonly canDelete: true;
 };
@@ -235,19 +238,23 @@ function remoteStatusKey(
   if (state.status === 'failed') {
     return 'modelChat.mcp.serverUnreachable';
   }
+  if (state.status === 'signIn') {
+    return 'modelChat.mcpOAuth.serverNeedsSignIn';
+  }
   return state.toolCount > 0 ? 'modelChat.mcp.serverToolCount' : 'modelChat.mcp.none';
 }
 
 /**
  * Whether a row offers a Retry.
  *
- * Every failed discovery is retryable — the server was down, the credential was
- * refused, or the protocol was answered wrong — so the failure itself is the
- * whole condition. A server that is off is asked nothing and a server that
- * answered is already the answer, so neither offers one.
+ * The discovery decides. A failed one — the server was down, the credential was
+ * refused, or the protocol was answered wrong — and one that answered with no
+ * tools can each be asked again. A server that is off is asked nothing, one
+ * that named tools is already the answer, and one not asked yet is about to be:
+ * the sheet asks as it opens.
  */
 function remoteRetry(enabled: boolean, state: RemoteMcpServerState | undefined): boolean {
-  return enabled && state?.status === 'failed';
+  return enabled && state?.retryable === true;
 }
 
 /**
@@ -272,6 +279,7 @@ export function remoteServerRows(
       statusKey: remoteStatusKey(server.enabled, state),
       toolCount: server.enabled ? (state?.toolCount ?? 0) : 0,
       retry: remoteRetry(server.enabled, state),
+      signIn: server.enabled && state?.status === 'signIn',
       canEdit: true,
       canDelete: true,
     };
@@ -303,6 +311,7 @@ type McpFormErrorKey = 'common.required' | 'modelChat.mcp.fieldUrlInvalid';
 export type McpServerFormErrors = {
   readonly name?: McpFormErrorKey;
   readonly url?: McpFormErrorKey;
+  readonly token?: McpFormErrorKey;
 };
 
 /** Why a URL cannot be saved: empty, or one the store would not accept. */
@@ -324,20 +333,19 @@ function urlErrorFor(url: string): McpFormErrorKey | undefined {
  * The name and the URL are required, and the URL is put through the same
  * normalization the store uses: a form that would be refused on save is refused
  * here, so the Save is gated rather than the person's write being thrown away
- * after they made it. The token is optional and never blocks a save.
+ * after they made it. A bearer server needs its token.
  */
 export function mcpServerFormError(draft: RemoteMcpServerDraft): McpServerFormErrors | null {
-  const name: McpFormErrorKey | undefined =
-    draft.name.trim() === '' ? 'common.required' : undefined;
+  const name = draft.name.trim() === '' ? 'common.required' : undefined;
   const url = urlErrorFor(draft.url);
-  if (name !== undefined && url !== undefined) {
-    return { name, url };
+  const token =
+    draft.auth.type === 'bearer' && (draft.auth.token ?? '') === '' ? 'common.required' : undefined;
+  if (name === undefined && url === undefined && token === undefined) {
+    return null;
   }
-  if (name !== undefined) {
-    return { name };
-  }
-  if (url !== undefined) {
-    return { url };
-  }
-  return null;
+  return {
+    ...(name === undefined ? {} : { name }),
+    ...(url === undefined ? {} : { url }),
+    ...(token === undefined ? {} : { token }),
+  } satisfies McpServerFormErrors;
 }

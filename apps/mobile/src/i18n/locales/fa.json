@@ -136,7 +136,10 @@
     "working": "در حال کار",
     "yourOwnRepositories": "مخازن خودتان",
     "dismissed": "نادیده‌گرفته‌شده",
-    "agent": "عامل"
+    "agent": "عامل",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "تغییرات"
   },
   "language": {
     "restarting": "در حال راه‌اندازی مجدد برای تغییر زبان",
@@ -325,6 +328,7 @@
       "collapseFile": "جمع کردن فایل",
       "expandFile": "باز کردن فایل",
       "diffTooLarge": "حجم تغییرات برای نمایش بیش از حد است.",
+      "noPreview": "پیش‌نمایشی برای این فایل موجود نیست",
       "openOnGitHub": "باز کردن در GitHub",
       "openDiffOnGitHub": "باز کردن تغییرات این فایل در GitHub",
       "githubDiff": "تغییرات در GitHub"
@@ -831,7 +835,8 @@
       "kiloclaw": "فعالیت KiloClaw",
       "balance": "هشدارهای موجودی",
       "security": "یافته‌های امنیتی",
-      "spend": "هشدارهای هزینه"
+      "spend": "هشدارهای هزینه",
+      "followedSessions": "نشست‌های دنبال‌شده"
     },
     "category": {
       "chatMessagesSubtitle": "پاسخ‌های گفت‌وگوهای شما",
@@ -2086,6 +2091,8 @@
       "title": "نشست",
       "copyErrorDetails": "کپی جزئیات خطا",
       "backToSessions": "بازگشت به نشست‌ها",
+      "follow": "دنبال کردن در صفحهٔ قفل",
+      "unfollow": "توقف دنبال کردن در صفحهٔ قفل",
       "couldNotLoad": "بارگذاری نشست ممکن نشد.",
       "failedToLoadDetails": "بارگذاری جزئیات نشست ممکن نشد.",
       "failedToStopExecution": "توقف اجرا ممکن نشد.",
@@ -2152,6 +2159,11 @@
       "collapse": "جمع کردن هدف",
       "expand": "باز کردن هدف"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "کارها، {{completed}} از {{total}} انجام شده",
+      "rowAccessibility": "کارها، {{completed}} از {{total}} انجام شده. کار فعلی: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "موارد استفاده‌شدهٔ اخیر",
       "couldNotLoadGithubRepositories": "بارگذاری مخزن‌های GitHub ممکن نشد.",
@@ -2184,7 +2196,6 @@
       "retryLoadingEnvironment": "تلاش دوباره برای بارگذاری محیط",
       "defaultEnvironment": "محیط پیش‌فرض",
       "environmentSummary": "{{commands}} دستور · {{mcp}} MCP · {{skills}} مهارت · {{agents}} عامل",
-      "changes": "تغییرات",
       "leaveChanges": "حفظ تغییرات",
       "commitAndPush": "کامیت و پوش",
       "startSession": "شروع نشست",
@@ -2207,6 +2218,10 @@
       "importingSession": "در حال وارد کردن نشست",
       "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
       "importFailed": "وارد کردن این نشست ممکن نشد.",
+      "cliCannotFork": "برای انشعاب از یک پیام، Kilo CLI را به‌روزرسانی کنید.",
+      "forkCutNotSynced": "این پیام هنوز ذخیره نشده است. چند لحظه دیگر دوباره امتحان کنید.",
+      "forkFilesFromBaseBranch": "فایل‌ها از شاخهٔ پایه شروع می‌شوند.",
+      "forkFilesUnchangedOnComputer": "فایل‌های این رایانه تغییر نمی‌کنند.",
       "pickProfile": "یک نمایه انتخاب کنید",
       "noProfile": "بدون پروفایل",
       "manageProfiles": "مدیریت پروفایل ها",
@@ -2251,8 +2266,8 @@
       "toolList": "فهرست کردن",
       "toolPatch": "اعمال وصله",
       "toolTask": "وظیفه",
-      "readTodos": "خواندن فهرست کارها",
-      "updateTodos": "به‌روزرسانی فهرست کارها",
+      "readTodos": "خواندن طرح",
+      "updateTodos": "به‌روزرسانی طرح",
       "linesBadge": "{{displayCount}} خط",
       "filesBadge": "{{displayCount}} فایل",
       "matchesBadge": "{{displayCount}} تطابق",
@@ -2322,6 +2337,7 @@
       "copyMessage": "کپی پیام",
       "copyText": "کپی متن",
       "selectText": "انتخاب متن",
+      "forkFromHere": "انشعاب از اینجا",
       "reportAiResponse": "گزارش پاسخ AI",
       "reportAiResponseConfirm": "این پاسخ برای بررسی گزارش شود؟",
       "report": "گزارش",
@@ -2641,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
       "modelsCount_one": "مدل ({{displayCount}})",
       "modelsCount_other": "مدل‌ها ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "مشاهده تغییرات",
+      "asOf": "تا ساعت {{time}}",
+      "tooLarge": "حجم این تغییرات برای نمایش در موبایل بیش از حد است.",
+      "empty": "هنوز هیچ فایلی در این جلسه تغییر نکرده است."
     },
     "autoApprove": {
       "title": "تأیید خودکار",
@@ -3153,6 +3175,8 @@
     "channelName": "عامل‌های فعال",
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید.",
     "openSession": "باز کن",
+    "finished": "پایان یافت",
+    "followFailed": "نمایش این عامل در صفحهٔ قفل ممکن نشد.",
     "approveFailed": "تأیید ممکن نشد. برای تلاش دوباره روی $t(common.approve) ضربه بزنید.",
     "checked": "آخرین بررسی",
     "lastKnown": "آخرین وضعیت شناخته‌شده",
@@ -3161,7 +3185,26 @@
     "waitingForYou": "در انتظار شما",
     "nextScheduled": "زمانبندی‌های بعدی",
     "answerNeeded": "نیازمند پاسخ",
-    "waitingToRetry": "در انتظار تلاش مجدد"
+    "waitingToRetry": "در انتظار تلاش مجدد",
+    "step": {
+      "editing": "ویرایش",
+      "reading": "خواندن",
+      "running": "اجرا",
+      "searching": "جستجوی وب",
+      "thinking": "در حال تفکر"
+    },
+    "planOf": "از",
+    "filesChanged": "فایل‌های تغییریافته",
+    "finishedIn": "تمام‌شده در",
+    "noActivityFor": "بدون فعالیت برای",
+    "prOpened": "پول ریکوئست باز شد",
+    "permissionWants": "می‌خواهد اجرا کند",
+    "failure": {
+      "provider": "متوقف شد: خطای ارائه‌دهنده",
+      "tool": "متوقف شد: خطای ابزار",
+      "cancelled": "متوقف شد: لغو شد",
+      "other": "متوقف"
+    }
   },
   "transcriptionModel": {
     "title": "مدل تبدیل گفتار به متن",
@@ -3197,10 +3240,32 @@
     "list": {
       "loadFailed": "تاریخچه گفتگو بارگذاری نشد.",
       "new": "گفتگوی جدید",
-      "openHint": "گفتگو را باز می‌کند. برای حذف، لمس کنید و نگه دارید.",
       "deleteTitle": "این گفتگو حذف شود؟"
     },
+    "rename": {
+      "title": "تغییر نام گفتگو",
+      "accessibility": "تغییر نام گفتگو: {{title}}",
+      "openHint": "گفتگو را باز می‌کند. برای تغییر نام یا حذف، لمس کنید و نگه دارید."
+    },
     "beta": "بتا",
+    "details": {
+      "title": "جزئیات گفتگو",
+      "backend": "سامانهٔ پشتیبان",
+      "effortDefault": "پیش‌فرض مدل",
+      "noCost": "بدون هزینه",
+      "costUnknown": "نامشخص",
+      "costEstimatedNote": "هزینهٔ پاسخ‌هایی که قیمتی گزارش نکرده‌اند، بر اساس قیمت‌های فهرست برآورد شده است.",
+      "costUnknownNote": "قیمتی برای این مدل مشخص نیست.",
+      "costPartialNote": "این مجموع شامل مدل‌هایی که قیمت مشخصی ندارند نمی‌شود.",
+      "localNote": "مدل‌های روی دستگاه روی همین دستگاه اجرا می‌شوند. هزینه و حافظهٔ پنهان درخواست ندارند و تعداد توکن‌هایشان ممکن است تخمینی باشد.",
+      "countedSinceNote": "این گفتگو پیش از شروع ثبت مصرف آغاز شده است. مجموع‌ها فقط پاسخ‌های پس از آن را نشان می‌دهند.",
+      "remoteServersOn": "سرورهای MCP راه دور فعال"
+    },
+    "webSearch": {
+      "title": "جستجو در وب",
+      "description": "اجازه دهید این گفتگو اطلاعات به‌روز را از طریق حساب Kilo شما جستجو کند. جستجوها از سهمیهٔ ماهانهٔ جستجوی شما استفاده می‌کنند.",
+      "allowanceExhausted": "جستجوهای رایگان وب شما برای این ماه تمام شده است. برای جستجوی دوباره اعتبار اضافه کنید."
+    },
     "mcp": {
       "title": "ابزارهای Kilo",
       "use": "استفاده از ابزارهای Kilo",
@@ -3223,7 +3288,6 @@
       "fieldName": "نام نمایشی",
       "fieldUrl": "نشانی URL سرور",
       "fieldUrlInvalid": "یک نشانی URL معتبر سرور وارد کنید.",
-      "fieldToken": "توکن Bearer (اختیاری)",
       "enableServer": "فعال‌کردن این سرور: {{name}}",
       "editServer": "ویرایش سرور",
       "deleteServer": "حذف سرور",
@@ -3243,6 +3307,18 @@
       "serverToolCount": "{{count}} ابزار",
       "serverUnreachable": "دسترسی به این سرور ممکن نشد",
       "serverOff": "این سرور خاموش است"
+    },
+    "mcpOAuth": {
+      "authMethod": "احراز هویت",
+      "authNone": "بدون ورود",
+      "authBearer": "توکن Bearer",
+      "authOAuth": "ورود با OAuth",
+      "fieldToken": "توکن",
+      "oauthHint": "بعد از ذخیره، روی $t(modelChat.mcpOAuth.signIn) در سرور بزن تا با مرورگرت وارد شوی.",
+      "serverNeedsSignIn": "برای استفاده از این سرور وارد شو",
+      "signIn": "ورود",
+      "signInA11y": "ورود به این سرور: {{name}}",
+      "signInFailed": "ورود به {{name}} ممکن نشد. دوباره تلاش کن."
     },
     "backends": {
       "title": "سامانه‌های پشتیبان گفتگو",
@@ -3326,8 +3402,48 @@
         "notGguf": "پیوند باید به یک فایل .gguf اشاره کند.",
         "space": "فضای خالی کافی برای این مدل وجود ندارد. فضا آزاد کنید و دوباره تلاش کنید.",
         "network": "دانلود کامل نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
-        "invalidFile": "فایل دانلودشده مدلی نیست که این برنامه بتواند اجرا کند، بنابراین حذف شد."
+        "invalidFile": "فایل دانلودشده مدلی نیست که این برنامه بتواند اجرا کند، بنابراین حذف شد.",
+        "checksum": "فایل دانلودشده با کد بررسی منتشرشده‌اش مطابقت ندارد، بنابراین حذف شد. دوباره دانلود را امتحان کنید."
       }
+    },
+    "catalog": {
+      "browse": "مرور مدل‌ها",
+      "title": "کاتالوگ مدل‌ها",
+      "search": "جستجوی مدل‌های Hugging Face",
+      "tabs": "فیلتر مدل",
+      "fitsTab": "مناسب این دستگاه",
+      "fromHuggingFace": "از Hugging Face",
+      "loading": "در حال بارگیری مدل‌ها",
+      "noResults": "مدلی پیدا نشد",
+      "noFits": "هیچ مدلی مناسب این دستگاه نیست",
+      "noFitsDescription": "مدل‌های بزرگ‌تر در زبانهٔ «$t(common.all)» هستند.",
+      "fit": {
+        "fits": "مناسب",
+        "tight": "به‌سختی جا می‌شود",
+        "tooLarge": "بیش از حد بزرگ",
+        "noStorage": "فضای ذخیره‌سازی کافی نیست"
+      },
+      "parameters": "پارامترها: {{value}}",
+      "downloads": "دانلودها: {{value}}",
+      "likes": "پسندها: {{value}}",
+      "context": "پنجرهٔ متن: {{value}}",
+      "license": "مجوز: {{license}}",
+      "licenseUnknown": "مجوز مشخص نشده است",
+      "tools": "فراخوانی ابزار",
+      "vision": "ورودی تصویر",
+      "hintsHelp": "راهنمایی‌ها از Hugging Face هستند. برنامه پس از دانلود، مدل را بررسی می‌کند.",
+      "gated": "این مدل به حساب Hugging Face نیاز دارد، بنابراین برنامه نمی‌تواند آن را دانلود کند.",
+      "quantizations": "کوانتیزاسیون‌ها",
+      "quantizationsHelp": "فایل‌های کوچک‌تر حافظه و فضای ذخیره‌سازی کمتری مصرف می‌کنند. فایل‌های بزرگ‌تر معمولاً پاسخ‌های بهتری می‌دهند.",
+      "quantDetail": "دانلود {{size}} · حدود {{memory}} حافظه",
+      "downloadQuant": "دانلود {{quant}}",
+      "loadingModel": "در حال بارگیری جزئیات مدل",
+      "couldNotLoadModel": "بارگیری این مدل ممکن نشد",
+      "noFiles": "فایلی که این برنامه بتواند اجرا کند وجود ندارد",
+      "noFilesDescription": "این برنامه مدل‌هایی را اجرا می‌کند که یک فایل GGUF هستند.",
+      "tooLargeTitle": "این مدل ممکن است اجرا نشود",
+      "tooLargeMessage": "{{name}} احتمالاً به حافظه‌ای بیش از حافظهٔ این دستگاه نیاز دارد. ممکن است برنامه هنگام پاسخ دادن مدل بسته شود. با این حال دانلود شود؟",
+      "downloadAnyway": "در هر صورت دانلود شود"
     },
     "localModels": {
       "title": "مدل‌های روی دستگاه",
@@ -3357,6 +3473,9 @@
       "downloading": "در حال بارگیری…",
       "downloadProgress": "در حال بارگیری… {{percent}}%",
       "downloadFailed": "بارگیری کامل نشد. اتصال اینترنت و فضای خالی دستگاه را بررسی کنید و دوباره امتحان کنید."
+    },
+    "reasoningEffort": {
+      "modelFlag": "این مدل از میزان تفکر پشتیبانی می‌کند"
     }
   },
   "settingsTools": {
@@ -3579,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play هیچ بسته اعتبار منطبقی برنگرداند.",
     "purchaseOwnedByAnotherAccount": "اعتبار این Apple Account متعلق به حساب دیگری در Kilo است. برای استفاده از آن وارد همان حساب Kilo شوید.",
     "purchaseOwnedByAnotherAccountPlay": "اعتبار این حساب Google Play متعلق به یک حساب Kilo دیگر است. برای استفاده از آن وارد آن حساب Kilo شوید."
+  },
+  "todos": {
+    "saveAsTodo": "ذخیره به‌عنوان کار",
+    "segment": {
+      "label": "نمای عامل‌ها",
+      "sessions": "نشست‌ها",
+      "todos": "کارها"
+    },
+    "lists": {
+      "newList": "فهرست جدید",
+      "empty": "هنوز فهرستی نیست",
+      "couldNotLoad": "بارگذاری فهرست‌ها ممکن نشد.",
+      "noRepository": "بدون مخزن",
+      "rowA11y": "{{name}}، {{openCount}}",
+      "openCount_one": "{{count}} باز",
+      "openCount_other": "{{count}} باز",
+      "archived_one": "بایگانی‌شده ({{count}})",
+      "archived_other": "بایگانی‌شده ({{count}})",
+      "archive": "بایگانی",
+      "unarchive": "خروج از بایگانی",
+      "deleteTitle": "«{{name}}» حذف شود؟",
+      "deleteMessage": "کارهای آن هم حذف می‌شوند. نشست‌هایشان باقی می‌مانند."
+    },
+    "listSettings": {
+      "title": "تنظیمات فهرست",
+      "name": "نام",
+      "namePlaceholder": "باگ‌ها، ایده‌ها، انتشار…",
+      "emoji": "اموجی",
+      "mode": "حالت",
+      "defaultsHint": "نشست‌هایی که از این فهرست آغاز می‌شوند از این پیش‌فرض‌ها استفاده می‌کنند."
+    },
+    "list": {
+      "addPlaceholder": "یک کار بنویسید",
+      "add": "افزودن کار",
+      "empty": "هنوز کاری نیست",
+      "setDefaults": "تنظیم مخزن، حالت و مدل",
+      "completed_one": "تکمیل‌شده ({{count}})",
+      "completed_other": "تکمیل‌شده ({{count}})"
+    },
+    "item": {
+      "markDone": "علامت‌گذاری به‌عنوان انجام‌شده",
+      "markOpen": "علامت‌گذاری به‌عنوان انجام‌نشده",
+      "markDonePrompt": "انجام‌شده علامت‌گذاری شود؟",
+      "deleted": "کار حذف شد",
+      "undo": "واگرد",
+      "runCount_one": "{{count}} اجرا",
+      "runCount_other": "{{count}} اجرا",
+      "startNow": "شروع بدون بازبینی",
+      "startNowHint": "برای شروع بدون بازبینی، طولانی فشار دهید",
+      "titleLabel": "عنوان کار",
+      "notes": "یادداشت",
+      "notesPlaceholder": "افزودن یادداشت در Markdown",
+      "sessions": "نشست‌های پیوندشده",
+      "noSessions": "هنوز نشستی نیست",
+      "linkSession": "پیوند نشست",
+      "unlinkSession": "لغو پیوند {{title}}",
+      "linkFailed": "پیوند دادن نشست به کار ممکن نشد."
+    },
+    "linkSession": {
+      "title": "پیوند یک نشست",
+      "empty": "نشست اخیری نیست",
+      "emptyInRepository": "نشست اخیری در {{repository}} نیست"
+    },
+    "upNext": "بعدی",
+    "sessionTodo": "کار: {{title}}",
+    "linkToTodo": "پیوند به کار",
+    "candidates": {
+      "empty": "هیچ کار بازی نیست"
+    },
+    "saveSheet": {
+      "title": "ذخیره در فهرست",
+      "saved": "ذخیره در {{list}}"
+    }
   }
 }

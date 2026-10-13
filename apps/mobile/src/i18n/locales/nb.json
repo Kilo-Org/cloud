@@ -136,7 +136,10 @@
     "working": "Jobber",
     "yourOwnRepositories": "Dine egne kodelagre",
     "dismissed": "Avvist",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Endringer"
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -325,6 +328,7 @@
       "collapseFile": "Skjul filinnholdet",
       "expandFile": "Vis filinnholdet",
       "diffTooLarge": "Endringene er for omfattende til å vises.",
+      "noPreview": "Ingen forhåndsvisning tilgjengelig for denne filen",
       "openOnGitHub": "Åpne på GitHub",
       "openDiffOnGitHub": "Åpne endringene i denne filen på GitHub",
       "githubDiff": "Endringsvisning på GitHub"
@@ -831,7 +835,8 @@
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarsler",
       "security": "Sikkerhetsfunn",
-      "spend": "Forbruksvarsler"
+      "spend": "Forbruksvarsler",
+      "followedSessions": "Fulgte økter"
     },
     "category": {
       "chatMessagesSubtitle": "svar i samtalene dine",
@@ -2086,6 +2091,8 @@
       "title": "Økt",
       "copyErrorDetails": "Kopier feildetaljer",
       "backToSessions": "Tilbake til økter",
+      "follow": "Følg på låseskjermen",
+      "unfollow": "Slutt å følge på låseskjermen",
       "couldNotLoad": "Kunne ikke laste inn økten.",
       "failedToLoadDetails": "Kunne ikke laste inn øktdetaljene.",
       "failedToStopExecution": "Kunne ikke stoppe kjøringen.",
@@ -2152,6 +2159,11 @@
       "collapse": "Skjul målet",
       "expand": "Vis målet"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Oppgaver, {{completed}} av {{total}} fullført",
+      "rowAccessibility": "Oppgaver, {{completed}} av {{total}} fullført. Gjeldende oppgave: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nylig brukt",
       "couldNotLoadGithubRepositories": "Kunne ikke laste inn kodelagre fra GitHub.",
@@ -2184,7 +2196,6 @@
       "retryLoadingEnvironment": "Prøv å laste inn miljøet på nytt",
       "defaultEnvironment": "Standardmiljø",
       "environmentSummary": "{{commands}} kommandoer · {{mcp}} MCP · {{skills}} ferdigheter · {{agents}} agenter",
-      "changes": "Endringer",
       "leaveChanges": "Behold endringer",
       "commitAndPush": "Lagre og send",
       "startSession": "Start økt",
@@ -2207,6 +2218,10 @@
       "importingSession": "Importerer økten",
       "cliCannotContinue": "Denne CLI-en kan ikke fortsette en økt. Velg Cloud Agent eller en annen CLI.",
       "importFailed": "Kunne ikke importere denne økten.",
+      "cliCannotFork": "Oppdater Kilo CLI for å forgrene fra en melding.",
+      "forkCutNotSynced": "Denne meldingen er ikke lagret ennå. Prøv igjen om et øyeblikk.",
+      "forkFilesFromBaseBranch": "Filene starter fra basegrenen.",
+      "forkFilesUnchangedOnComputer": "Filene på denne datamaskinen blir ikke endret.",
       "pickProfile": "Velg en profil",
       "noProfile": "Ingen profil",
       "manageProfiles": "Administrer profiler",
@@ -2251,8 +2266,8 @@
       "toolList": "list opp",
       "toolPatch": "bruk endringer",
       "toolTask": "oppgave",
-      "readTodos": "Les oppgavelisten",
-      "updateTodos": "Oppdater oppgavelisten",
+      "readTodos": "Les planen",
+      "updateTodos": "Oppdater planen",
       "linesBadge": "{{displayCount}} linjer",
       "filesBadge": "{{displayCount}} filer",
       "matchesBadge": "{{displayCount}} treff",
@@ -2322,6 +2337,7 @@
       "copyMessage": "Kopier melding",
       "copyText": "Kopier tekst",
       "selectText": "Marker tekst",
+      "forkFromHere": "Forgren herfra",
       "reportAiResponse": "Rapporter AI-svar",
       "reportAiResponseConfirm": "Vil du rapportere dette svaret for vurdering?",
       "report": "Rapporter",
@@ -2641,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modell ({{displayCount}})",
       "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Vis endringer",
+      "asOf": "Per {{time}}",
+      "tooLarge": "Endringene er for omfattende til å vises på mobil.",
+      "empty": "Ingen filendringer i denne økten ennå."
     },
     "autoApprove": {
       "title": "Automatisk godkjenning",
@@ -3153,6 +3175,8 @@
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen.",
     "openSession": "Åpne",
+    "finished": "Fullført",
+    "followFailed": "Kunne ikke vise denne agenten på låseskjermen.",
     "approveFailed": "Kunne ikke godkjenne. Trykk på $t(common.approve) for å prøve igjen.",
     "checked": "Sjekket",
     "lastKnown": "Sist kjent",
@@ -3161,7 +3185,26 @@
     "waitingForYou": "Venter på deg",
     "nextScheduled": "Neste planlagte",
     "answerNeeded": "Venter på svar",
-    "waitingToRetry": "Venter på nytt forsøk"
+    "waitingToRetry": "Venter på nytt forsøk",
+    "step": {
+      "editing": "Redigerer",
+      "reading": "Leser",
+      "running": "Kjører",
+      "searching": "Nettsøk",
+      "thinking": "Tenker gjennom"
+    },
+    "planOf": "av",
+    "filesChanged": "filer endret",
+    "finishedIn": "Fullført på",
+    "noActivityFor": "Ingen aktivitet i",
+    "prOpened": "Pull request åpnet",
+    "permissionWants": "Vil kjøre",
+    "failure": {
+      "provider": "Stoppet: leverandørfeil",
+      "tool": "Stoppet: verktøyfeil",
+      "cancelled": "Stoppet: avbrutt",
+      "other": "STOPPET"
+    }
   },
   "transcriptionModel": {
     "title": "Transkripsjonsmodell",
@@ -3197,10 +3240,32 @@
     "list": {
       "loadFailed": "Kunne ikke laste inn chathistorikken.",
       "new": "Ny chat",
-      "openHint": "Åpner chatten. Trykk og hold for å slette.",
       "deleteTitle": "Slette denne chatten?"
     },
+    "rename": {
+      "title": "Gi chatten nytt navn",
+      "accessibility": "Gi chatten nytt navn: {{title}}",
+      "openHint": "Åpner chatten. Trykk og hold for å gi nytt navn eller slette."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Chatdetaljer",
+      "backend": "Baksystem",
+      "effortDefault": "Modellens standard",
+      "noCost": "Ingen kostnad",
+      "costUnknown": "Ukjent",
+      "costEstimatedNote": "Svar som ikke oppga en pris, er beregnet ut fra listepriser.",
+      "costUnknownNote": "Ingen pris er kjent for denne modellen.",
+      "costPartialNote": "Denne summen inkluderer ikke modeller uten kjent pris.",
+      "localNote": "Modeller på enheten kjører på denne enheten. De har ingen kostnad og ingen ledetekstbuffer, og tokenantallet kan være anslag.",
+      "countedSinceNote": "Denne chatten startet før bruk ble registrert. Summene viser bare svarene etter det.",
+      "remoteServersOn": "Eksterne MCP-servere på"
+    },
+    "webSearch": {
+      "title": "Søk på nettet",
+      "description": "La denne chatten slå opp oppdatert informasjon via Kilo-kontoen din. Søk bruker den månedlige søkekvoten din.",
+      "allowanceExhausted": "De gratis nettsøkene dine for denne måneden er brukt opp. Legg til kreditter for å søke igjen."
+    },
     "mcp": {
       "title": "Kilo-verktøy",
       "use": "Bruk Kilo-verktøy",
@@ -3223,7 +3288,6 @@
       "fieldName": "Vist navn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Skriv inn en gyldig server-URL.",
-      "fieldToken": "Bearer-token (valgfritt)",
       "enableServer": "Aktiver denne serveren: {{name}}",
       "editServer": "Rediger server",
       "deleteServer": "Slett server",
@@ -3243,6 +3307,18 @@
       "serverToolCount": "{{count}} verktøy",
       "serverUnreachable": "Kunne ikke nå denne serveren",
       "serverOff": "Denne serveren er av"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentisering",
+      "authNone": "Ingen innlogging",
+      "authBearer": "Bearer-token",
+      "authOAuth": "OAuth-innlogging",
+      "fieldToken": "Token",
+      "oauthHint": "Når du har lagret, trykker du på $t(modelChat.mcpOAuth.signIn) på serveren for å logge inn med nettleseren.",
+      "serverNeedsSignIn": "Logg inn for å bruke denne serveren",
+      "signIn": "Logg inn",
+      "signInA11y": "Logg inn på denne serveren: {{name}}",
+      "signInFailed": "Kunne ikke logge inn på {{name}}. Prøv igjen."
     },
     "backends": {
       "title": "Baksystemer for chat",
@@ -3326,8 +3402,48 @@
         "notGguf": "Lenken må peke til en .gguf-fil.",
         "space": "Det er ikke nok ledig lagringsplass til denne modellen. Frigjør plass, og prøv igjen.",
         "network": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen, og prøv igjen.",
-        "invalidFile": "Den nedlastede filen er ikke en modell denne appen kan kjøre, så den ble fjernet."
+        "invalidFile": "Den nedlastede filen er ikke en modell denne appen kan kjøre, så den ble fjernet.",
+        "checksum": "Den nedlastede filen samsvarer ikke med den publiserte kontrollsummen, så den ble fjernet. Prøv nedlastingen på nytt."
       }
+    },
+    "catalog": {
+      "browse": "Utforsk modeller",
+      "title": "Modellkatalog",
+      "search": "Søk i Hugging Face-modeller",
+      "tabs": "Modellfilter",
+      "fitsTab": "Passer denne enheten",
+      "fromHuggingFace": "Fra Hugging Face",
+      "loading": "Laster inn modeller",
+      "noResults": "Fant ingen modeller",
+      "noFits": "Ingen modeller passer denne enheten",
+      "noFitsDescription": "Større modeller finner du i fanen $t(common.all).",
+      "fit": {
+        "fits": "Passer",
+        "tight": "Så vidt",
+        "tooLarge": "For stor",
+        "noStorage": "Ikke nok lagringsplass"
+      },
+      "parameters": "Parametere: {{value}}",
+      "downloads": "Nedlastinger: {{value}}",
+      "likes": "Likerklikk: {{value}}",
+      "context": "Kontekstvindu: {{value}}",
+      "license": "Lisens: {{license}}",
+      "licenseUnknown": "Lisensen er ikke oppgitt",
+      "tools": "Verktøykall",
+      "vision": "Bildeinndata",
+      "hintsHelp": "Hint fra Hugging Face. Appen sjekker modellen etter at den er lastet ned.",
+      "gated": "Denne modellen krever en Hugging Face-konto, så appen kan ikke laste den ned.",
+      "quantizations": "Kvantiseringer",
+      "quantizationsHelp": "Mindre filer bruker mindre minne og lagringsplass. Større filer gir vanligvis bedre svar.",
+      "quantDetail": "{{size}} nedlasting · omtrent {{memory}} minne",
+      "downloadQuant": "Last ned {{quant}}",
+      "loadingModel": "Laster inn modelldetaljer",
+      "couldNotLoadModel": "Kunne ikke laste inn denne modellen",
+      "noFiles": "Ingen filer denne appen kan kjøre",
+      "noFilesDescription": "Denne appen kjører modeller som består av én GGUF-fil.",
+      "tooLargeTitle": "Denne modellen kjører kanskje ikke",
+      "tooLargeMessage": "{{name}} trenger sannsynligvis mer minne enn denne enheten har. Appen kan lukkes mens modellen svarer. Vil du laste den ned likevel?",
+      "downloadAnyway": "Last ned likevel"
     },
     "localModels": {
       "title": "Modeller på enheten",
@@ -3357,6 +3473,9 @@
       "downloading": "Laster ned …",
       "downloadProgress": "Laster ned … {{percent}} %",
       "downloadFailed": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen og ledig lagringsplass, og prøv igjen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Denne modellen støtter resonneringsinnsats"
     }
   },
   "settingsTools": {
@@ -3579,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play returnerte ingen samsvarende kredittpakker.",
     "purchaseOwnedByAnotherAccount": "Kredittene på denne Apple-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å bruke dem.",
     "purchaseOwnedByAnotherAccountPlay": "Kredittene på denne Google Play-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å bruke dem."
+  },
+  "todos": {
+    "saveAsTodo": "Lagre som gjøremål",
+    "segment": {
+      "label": "Agentvisning",
+      "sessions": "Økter",
+      "todos": "Gjøremål"
+    },
+    "lists": {
+      "newList": "Ny liste",
+      "empty": "Ingen lister ennå",
+      "couldNotLoad": "Kunne ikke laste inn listene.",
+      "noRepository": "Ingen kodelager",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} åpne",
+      "openCount_other": "{{count}} åpne",
+      "archived_one": "Arkivert ({{count}})",
+      "archived_other": "Arkivert ({{count}})",
+      "archive": "Arkiver",
+      "unarchive": "Avarkiver",
+      "deleteTitle": "Slette {{name}}?",
+      "deleteMessage": "Gjøremålene i den slettes også. Øktene deres består."
+    },
+    "listSettings": {
+      "title": "Listeinnstillinger",
+      "name": "Navn",
+      "namePlaceholder": "Feil, ideer, utgivelse…",
+      "emoji": "Emoji",
+      "mode": "Modus",
+      "defaultsHint": "Økter som startes fra denne listen, bruker disse standardverdiene."
+    },
+    "list": {
+      "addPlaceholder": "Legg inn et gjøremål",
+      "add": "Legg til gjøremål",
+      "empty": "Ingen gjøremål ennå",
+      "setDefaults": "Angi kodelager, modus og modell",
+      "completed_one": "Fullført ({{count}})",
+      "completed_other": "Fullført ({{count}})"
+    },
+    "item": {
+      "markDone": "Merk som fullført",
+      "markOpen": "Merk som ikke fullført",
+      "markDonePrompt": "Merke som fullført?",
+      "deleted": "Gjøremålet er slettet",
+      "undo": "Angre",
+      "runCount_one": "{{count}} kjøring",
+      "runCount_other": "{{count}} kjøringer",
+      "startNow": "Start uten gjennomgang",
+      "startNowHint": "Trykk og hold for å starte uten gjennomgang",
+      "titleLabel": "Tittel på gjøremålet",
+      "notes": "Notater",
+      "notesPlaceholder": "Legg til notater i Markdown",
+      "sessions": "Tilknyttede økter",
+      "noSessions": "Ingen økter ennå",
+      "linkSession": "Koble til økt",
+      "unlinkSession": "Fjern koblingen til {{title}}",
+      "linkFailed": "Kunne ikke koble økten til gjøremålet."
+    },
+    "linkSession": {
+      "title": "Koble til en økt",
+      "empty": "Ingen nylige økter",
+      "emptyInRepository": "Ingen nylige økter i {{repository}}"
+    },
+    "upNext": "Neste",
+    "sessionTodo": "Gjøremål: {{title}}",
+    "linkToTodo": "Koble til gjøremål",
+    "candidates": {
+      "empty": "Ingen åpne gjøremål"
+    },
+    "saveSheet": {
+      "title": "Lagre i liste",
+      "saved": "Lagret i {{list}}"
+    }
   }
 }

@@ -50,6 +50,12 @@ export function KiloPassBonusRampDialog(props: {
   const promoMonth = getMonthlyWelcomePromoMonth(subscriptionStartedAtIso);
   const showPromoCallout = showSlider && showFirstMonthPromo && resolvedMonth <= promoMonth;
   const promoMonthLabel = promoMonth === 1 ? 'first paid month' : 'second paid month';
+  const firstMonthPercent = computeMonthlyCadenceBonusPercent({
+    tier,
+    streakMonths: 1,
+    isFirstTimeSubscriberEver: showFirstMonthPromo,
+    subscriptionStartedAtIso,
+  });
 
   const sliderPercent = computeMonthlyCadenceBonusPercent({
     tier,
@@ -172,6 +178,13 @@ export function KiloPassBonusRampDialog(props: {
                   +{formatPercent(KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT)} free bonus credits
                 </strong>{' '}
                 (instead of the regular ramp).
+                {promoMonth === 2 && (
+                  <>
+                    {' '}
+                    Your first paid month earns +{formatPercent(firstMonthPercent)} free bonus
+                    credits.
+                  </>
+                )}
               </div>
             )}
 

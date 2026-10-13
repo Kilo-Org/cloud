@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { type Tool } from '@kilocode/harness-sdk';
 
-import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp';
+import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp-state';
 import { type RemoteMcpServerDraft, type StoredRemoteMcpServer } from '@/lib/chat/remote-mcp-store';
 
 import {
@@ -170,6 +170,7 @@ describe('the remote server rows', () => {
         statusKey: 'modelChat.mcp.serverToolCount',
         toolCount: 3,
         retry: false,
+        signIn: false,
         canEdit: true,
         canDelete: true,
       },
@@ -233,10 +234,30 @@ describe('the remote server rows', () => {
     expect(rows[0]?.retry).toBe(false);
   });
 
-  it('says a server answered with no tools', () => {
-    const rows = remoteServerRows([stored()], [discovered({ status: 'ready', toolCount: 0 })]);
+  it('offers a Sign in, and no Retry, on an OAuth server that needs the person', () => {
+    const rows = remoteServerRows(
+      [stored({ auth: { type: 'oauth' } }), stored({ id: 'off', enabled: false })],
+      [
+        discovered({ status: 'signIn' }),
+        discovered({ id: 'off', enabled: false, status: 'signIn' }),
+      ]
+    );
 
-    expect(rows[0]).toMatchObject({ statusKey: 'modelChat.mcp.none', toolCount: 0 });
+    expect(rows[0]).toMatchObject({
+      statusKey: 'modelChat.mcpOAuth.serverNeedsSignIn',
+      signIn: true,
+      retry: false,
+    });
+    expect(rows[1]?.signIn).toBe(false);
+  });
+
+  it('says a server answered with no tools, and offers a Retry', () => {
+    const rows = remoteServerRows(
+      [stored()],
+      [discovered({ status: 'ready', toolCount: 0, retryable: true })]
+    );
+
+    expect(rows[0]).toMatchObject({ statusKey: 'modelChat.mcp.none', toolCount: 0, retry: true });
   });
 
   it('keeps the stored order and one row per server', () => {
@@ -299,8 +320,15 @@ describe('the server form', () => {
     });
   });
 
-  it('passes a draft that is ready to save, with or without a token', () => {
+  it('passes a draft that is ready to save, with no sign-in, a token, or OAuth', () => {
     expect(mcpServerFormError(draft())).toBeNull();
     expect(mcpServerFormError(draft({ auth: { type: 'bearer', token: 'secret' } }))).toBeNull();
+    expect(mcpServerFormError(draft({ auth: { type: 'oauth' } }))).toBeNull();
+  });
+
+  it('asks for the token of a bearer server', () => {
+    expect(mcpServerFormError(draft({ auth: { type: 'bearer' } }))).toEqual({
+      token: 'common.required',
+    });
   });
 });

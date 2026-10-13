@@ -136,7 +136,10 @@
     "working": "Em execução",
     "yourOwnRepositories": "Seus próprios repositórios",
     "dismissed": "Ignorado",
-    "agent": "Agente"
+    "agent": "Agente",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Alterações"
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -262,7 +265,8 @@
       "kiloclaw": "Atividade do KiloClaw",
       "balance": "Alertas de saldo",
       "security": "Problemas de segurança",
-      "spend": "Alertas de gastos"
+      "spend": "Alertas de gastos",
+      "followedSessions": "Sessões seguidas"
     },
     "liveActivities": "Atividades ao vivo",
     "liveActivitySubtitle": "Mostrar agentes ativos na tela de bloqueio",
@@ -1556,6 +1560,8 @@
       "title": "Sessão",
       "copyErrorDetails": "Copiar detalhes do erro",
       "backToSessions": "Voltar para as sessões",
+      "follow": "Acompanhar na tela de bloqueio",
+      "unfollow": "Parar de acompanhar na tela de bloqueio",
       "couldNotLoad": "Não foi possível carregar a sessão.",
       "failedToLoadDetails": "Não foi possível carregar os detalhes da sessão.",
       "failedToStopExecution": "Não foi possível interromper a execução.",
@@ -1622,6 +1628,11 @@
       "collapse": "Recolher meta",
       "expand": "Expandir meta"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tarefas, {{completed}} de {{total}} concluídas",
+      "rowAccessibility": "Tarefas, {{completed}} de {{total}} concluídas. Tarefa atual: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Usados recentemente",
       "couldNotLoadGithubRepositories": "Não foi possível carregar os repositórios do GitHub.",
@@ -1654,7 +1665,6 @@
       "retryLoadingEnvironment": "Tentar carregar o ambiente novamente",
       "defaultEnvironment": "Ambiente padrão",
       "environmentSummary": "{{commands}} comandos · {{mcp}} MCP · {{skills}} habilidades · {{agents}} agentes",
-      "changes": "Alterações",
       "leaveChanges": "Manter alterações",
       "commitAndPush": "Registrar e enviar",
       "startSession": "Iniciar sessão",
@@ -1677,6 +1687,10 @@
       "importingSession": "Importando sessão",
       "cliCannotContinue": "Esta CLI não permite continuar uma sessão. Escolha o Cloud Agent ou outra CLI.",
       "importFailed": "Não foi possível importar esta sessão.",
+      "cliCannotFork": "Atualize a Kilo CLI para criar um fork a partir de uma mensagem.",
+      "forkCutNotSynced": "Esta mensagem ainda não foi salva. Tente novamente em instantes.",
+      "forkFilesFromBaseBranch": "Os arquivos começam a partir do branch base.",
+      "forkFilesUnchangedOnComputer": "Os arquivos neste computador não são alterados.",
       "pickProfile": "Escolha um perfil",
       "noProfile": "Sem perfil",
       "manageProfiles": "Gerenciar perfis",
@@ -1722,8 +1736,8 @@
       "toolList": "listar",
       "toolPatch": "aplicar alterações",
       "toolTask": "tarefa",
-      "readTodos": "Ler tarefas",
-      "updateTodos": "Atualizar tarefas",
+      "readTodos": "Ler plano",
+      "updateTodos": "Atualizar plano",
       "linesBadge": "{{displayCount}} linhas",
       "filesBadge": "{{displayCount}} arquivos",
       "matchesBadge": "{{displayCount}} resultados",
@@ -1796,6 +1810,7 @@
       "copyMessage": "Copiar mensagem",
       "copyText": "Copiar texto",
       "selectText": "Selecionar texto",
+      "forkFromHere": "Criar fork a partir daqui",
       "reportAiResponse": "Denunciar resposta da IA",
       "reportAiResponseConfirm": "Denunciar esta resposta para análise?",
       "report": "Denunciar",
@@ -2121,6 +2136,12 @@
       "modelsCount_one": "Modelo ({{displayCount}})",
       "modelsCount_other": "Modelos ({{displayCount}})",
       "modelsCount_many": "Modelos ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Ver alterações",
+      "asOf": "Em {{time}}",
+      "tooLarge": "Esta comparação é grande demais para ser exibida no celular.",
+      "empty": "Nenhum arquivo foi alterado nesta sessão ainda."
     },
     "autoApprove": {
       "title": "Aprovação automática",
@@ -2662,6 +2683,7 @@
     "fileRows": {
       "collapseFile": "Recolher arquivo",
       "diffTooLarge": "A comparação é grande demais para ser exibida.",
+      "noPreview": "Nenhuma pré-visualização disponível para este arquivo",
       "expandFile": "Expandir arquivo",
       "markViewed": "Marcar {{path}} como visualizado",
       "openDiffOnGitHub": "Abrir a comparação deste arquivo no GitHub",
@@ -3194,6 +3216,8 @@
     "channelName": "Agentes ativos",
     "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada.",
     "openSession": "Abrir",
+    "finished": "Concluído",
+    "followFailed": "Não foi possível mostrar este agente na tela de bloqueio.",
     "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente.",
     "checked": "Verificado",
     "lastKnown": "Último status conhecido",
@@ -3202,7 +3226,26 @@
     "waitingForYou": "Aguardando você",
     "nextScheduled": "Próximas agendadas",
     "answerNeeded": "Aguardando resposta",
-    "waitingToRetry": "Aguardando nova tentativa"
+    "waitingToRetry": "Aguardando nova tentativa",
+    "step": {
+      "editing": "Editando",
+      "reading": "Lendo",
+      "running": "Executando",
+      "searching": "Pesquisa na Web",
+      "thinking": "Pensando"
+    },
+    "planOf": "de",
+    "filesChanged": "arquivos alterados",
+    "finishedIn": "Concluído em",
+    "noActivityFor": "Sem atividade há",
+    "prOpened": "Pull request aberto",
+    "permissionWants": "Quer executar",
+    "failure": {
+      "provider": "Parado: erro do provedor",
+      "tool": "Parado: erro da ferramenta",
+      "cancelled": "Parado: cancelado",
+      "other": "PARADO"
+    }
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",
@@ -3238,10 +3281,32 @@
     "list": {
       "loadFailed": "Não foi possível carregar o histórico do chat.",
       "new": "Nova conversa",
-      "openHint": "Abre a conversa. Toque e segure para excluir.",
       "deleteTitle": "Excluir esta conversa?"
     },
+    "rename": {
+      "title": "Renomear chat",
+      "accessibility": "Renomear chat: {{title}}",
+      "openHint": "Abre a conversa. Toque e segure para renomear ou excluir."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Detalhes do chat",
+      "backend": "Servidor",
+      "effortDefault": "Padrão do modelo",
+      "noCost": "Sem custo",
+      "costUnknown": "Desconhecido",
+      "costEstimatedNote": "As respostas que não informaram preço foram estimadas com base nos preços de tabela.",
+      "costUnknownNote": "Nenhum preço é conhecido para este modelo.",
+      "costPartialNote": "Este total não inclui modelos sem preço conhecido.",
+      "localNote": "Os modelos no dispositivo rodam neste dispositivo. Eles não têm custo nem cache de prompt, e as contagens de tokens podem ser estimativas.",
+      "countedSinceNote": "Este chat começou antes de o uso ser registrado. Os totais mostram apenas as respostas depois disso.",
+      "remoteServersOn": "Servidores MCP remotos ativados"
+    },
+    "webSearch": {
+      "title": "Pesquisar na web",
+      "description": "Permita que este chat busque informações atuais pela sua conta Kilo. As pesquisas usam sua cota mensal de pesquisas.",
+      "allowanceExhausted": "Suas pesquisas na web gratuitas deste mês acabaram. Adicione créditos para pesquisar de novo."
+    },
     "mcp": {
       "title": "Ferramentas do Kilo",
       "use": "Usar as ferramentas do Kilo",
@@ -3264,7 +3329,6 @@
       "fieldName": "Nome de exibição",
       "fieldUrl": "URL do servidor",
       "fieldUrlInvalid": "Insira uma URL de servidor válida.",
-      "fieldToken": "Token Bearer (opcional)",
       "enableServer": "Ativar este servidor: {{name}}",
       "editServer": "Editar servidor",
       "deleteServer": "Excluir servidor",
@@ -3284,6 +3348,18 @@
       "serverToolCount": "{{count}} ferramentas",
       "serverUnreachable": "Não foi possível alcançar este servidor",
       "serverOff": "Este servidor está desativado"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autenticação",
+      "authNone": "Sem login",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Login com OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Depois de salvar, toque em $t(modelChat.mcpOAuth.signIn) no servidor para entrar pelo navegador.",
+      "serverNeedsSignIn": "Entre para usar este servidor",
+      "signIn": "Entrar",
+      "signInA11y": "Entrar neste servidor: {{name}}",
+      "signInFailed": "Não foi possível entrar em {{name}}. Tente novamente."
     },
     "backends": {
       "title": "Servidores de chat",
@@ -3367,8 +3443,48 @@
         "notGguf": "O link deve apontar para um arquivo .gguf.",
         "space": "Não há espaço livre suficiente para este modelo. Libere espaço e tente novamente.",
         "network": "O download não foi concluído. Verifique sua conexão e tente novamente.",
-        "invalidFile": "O arquivo baixado não é um modelo que este app pode executar, então ele foi removido."
+        "invalidFile": "O arquivo baixado não é um modelo que este app pode executar, então ele foi removido.",
+        "checksum": "O arquivo baixado não corresponde à soma de verificação publicada, então ele foi removido. Tente baixar novamente."
       }
+    },
+    "catalog": {
+      "browse": "Explorar modelos",
+      "title": "Catálogo de modelos",
+      "search": "Pesquisar modelos do Hugging Face",
+      "tabs": "Filtro de modelos",
+      "fitsTab": "Cabem neste dispositivo",
+      "fromHuggingFace": "Do Hugging Face",
+      "loading": "Carregando modelos",
+      "noResults": "Nenhum modelo encontrado",
+      "noFits": "Nenhum modelo cabe neste dispositivo",
+      "noFitsDescription": "Modelos maiores estão na aba $t(common.all).",
+      "fit": {
+        "fits": "Cabe",
+        "tight": "Cabe por pouco",
+        "tooLarge": "Grande demais",
+        "noStorage": "Armazenamento insuficiente"
+      },
+      "parameters": "Parâmetros: {{value}}",
+      "downloads": "Downloads: {{value}}",
+      "likes": "Curtidas: {{value}}",
+      "context": "Janela de contexto: {{value}}",
+      "license": "Licença: {{license}}",
+      "licenseUnknown": "A licença não foi informada",
+      "tools": "Chamada de ferramentas",
+      "vision": "Entrada de imagem",
+      "hintsHelp": "Indicações do Hugging Face. O app verifica o modelo depois que ele é baixado.",
+      "gated": "Este modelo exige uma conta do Hugging Face, então o app não pode baixá-lo.",
+      "quantizations": "Quantizações",
+      "quantizationsHelp": "Arquivos menores usam menos memória e armazenamento. Arquivos maiores geralmente dão respostas melhores.",
+      "quantDetail": "Download de {{size}} · cerca de {{memory}} de memória",
+      "downloadQuant": "Baixar {{quant}}",
+      "loadingModel": "Carregando detalhes do modelo",
+      "couldNotLoadModel": "Não foi possível carregar este modelo",
+      "noFiles": "Nenhum arquivo que este app possa executar",
+      "noFilesDescription": "Este app executa modelos que são um único arquivo GGUF.",
+      "tooLargeTitle": "Este modelo pode não funcionar",
+      "tooLargeMessage": "{{name}} provavelmente precisa de mais memória do que este dispositivo tem. O app pode fechar enquanto o modelo responde. Baixar mesmo assim?",
+      "downloadAnyway": "Baixar mesmo assim"
     },
     "localModels": {
       "title": "Modelos no dispositivo",
@@ -3398,6 +3514,9 @@
       "downloading": "Baixando…",
       "downloadProgress": "Baixando… {{percent}}%",
       "downloadFailed": "O download não foi concluído. Verifique sua conexão e o espaço livre e tente novamente."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Este modelo aceita esforço de raciocínio"
     }
   },
   "settingsTools": {
@@ -3620,5 +3739,82 @@
     "noMatchingProductsPlay": "O Google Play não retornou nenhum pacote de créditos correspondente.",
     "purchaseOwnedByAnotherAccount": "Os créditos desta Conta Apple pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los.",
     "purchaseOwnedByAnotherAccountPlay": "Os créditos nesta conta do Google Play pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los."
+  },
+  "todos": {
+    "saveAsTodo": "Salvar como tarefa",
+    "segment": {
+      "label": "Visão de agentes",
+      "sessions": "Sessões",
+      "todos": "Tarefas"
+    },
+    "lists": {
+      "newList": "Nova lista",
+      "empty": "Ainda não há listas",
+      "couldNotLoad": "Não foi possível carregar as listas",
+      "noRepository": "Sem repositório",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} abertas",
+      "openCount_other": "{{count}} abertas",
+      "openCount_many": "{{count}} abertas",
+      "archived_one": "Arquivadas ({{count}})",
+      "archived_other": "Arquivadas ({{count}})",
+      "archived_many": "Arquivadas ({{count}})",
+      "archive": "Arquivar",
+      "unarchive": "Desarquivar",
+      "deleteTitle": "Excluir {{name}}?",
+      "deleteMessage": "As tarefas dela também são excluídas. As sessões permanecem."
+    },
+    "listSettings": {
+      "title": "Configurações da lista",
+      "name": "Nome",
+      "namePlaceholder": "Bugs, Ideias, Versão…",
+      "emoji": "Emoji",
+      "mode": "Modo",
+      "defaultsHint": "As sessões iniciadas a partir desta lista usam estes padrões."
+    },
+    "list": {
+      "addPlaceholder": "Adicionar uma tarefa",
+      "add": "Adicionar tarefa",
+      "empty": "Ainda não há tarefas",
+      "setDefaults": "Definir repositório, modo e modelo",
+      "completed_one": "Concluídas ({{count}})",
+      "completed_other": "Concluídas ({{count}})",
+      "completed_many": "Concluídas ({{count}})"
+    },
+    "item": {
+      "markDone": "Marcar como concluída",
+      "markOpen": "Marcar como não concluída",
+      "markDonePrompt": "Marcar como concluída?",
+      "deleted": "Tarefa excluída",
+      "undo": "Desfazer",
+      "runCount_one": "{{count}} execução",
+      "runCount_other": "{{count}} execuções",
+      "runCount_many": "{{count}} execuções",
+      "startNow": "Iniciar sem revisão",
+      "startNowHint": "Pressione e segure para iniciar sem revisão",
+      "titleLabel": "Título da tarefa",
+      "notes": "Notas",
+      "notesPlaceholder": "Adicionar notas em Markdown",
+      "sessions": "Sessões vinculadas",
+      "noSessions": "Ainda não há sessões",
+      "linkSession": "Vincular sessão",
+      "unlinkSession": "Desvincular {{title}}",
+      "linkFailed": "Não foi possível vincular a sessão à tarefa"
+    },
+    "linkSession": {
+      "title": "Vincular uma sessão",
+      "empty": "Ainda não há sessões recentes",
+      "emptyInRepository": "Ainda não há sessões recentes em {{repository}}"
+    },
+    "upNext": "A seguir",
+    "sessionTodo": "Tarefa: {{title}}",
+    "linkToTodo": "Vincular a uma tarefa",
+    "candidates": {
+      "empty": "Não há tarefas abertas"
+    },
+    "saveSheet": {
+      "title": "Salvar em uma lista",
+      "saved": "Salvo em {{list}}"
+    }
   }
 }

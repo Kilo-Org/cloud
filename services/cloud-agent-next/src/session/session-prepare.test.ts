@@ -37,6 +37,7 @@ import type { SessionCreateRequest } from './session-requests.js';
 import type * as SandboxIdModule from '../sandbox-id.js';
 import type * as SharedSandboxRouteModule from '../shared-sandbox-route.js';
 import type * as MessageIdModule from './message-id.js';
+import type * as CloudAgentProfileModule from '@kilocode/cloud-agent-profile';
 import {
   assertSessionOperationIdentity,
   createSessionWithLedger,
@@ -44,6 +45,7 @@ import {
   sessionCreateIntentFingerprint,
   SESSION_CREATE_ABANDON_AFTER_SECONDS,
   SESSION_CREATE_ABANDONED_OUTCOME_CODE,
+  SESSION_CREATE_SAVED_ALLOCATION_KEY,
   SESSION_CREATE_FINALIZATION_VERSION_KEY,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
   SESSION_CREATE_TOMBSTONED_IDS_KEY,
@@ -67,6 +69,7 @@ const {
   recordSandboxIdentityMock,
   recordSessionFailureMock,
   generateSandboxRoutingTargetMock,
+  getSandboxAllocationCandidatesMock,
 } = vi.hoisted(() => ({
   admitOperationMock: vi.fn(),
   settleOperationMock: vi.fn().mockResolvedValue({ settled: true }),
@@ -81,6 +84,7 @@ const {
   recordSandboxIdentityMock: vi.fn().mockResolvedValue(undefined),
   recordSessionFailureMock: vi.fn().mockResolvedValue(undefined),
   generateSandboxRoutingTargetMock: vi.fn(),
+  getSandboxAllocationCandidatesMock: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
@@ -170,6 +174,14 @@ vi.mock('../shared-sandbox-route.js', async importOriginal => {
   return {
     ...actual,
     resolveSharedSandboxAssignment: vi.fn(),
+  };
+});
+
+vi.mock('@kilocode/cloud-agent-profile', async importOriginal => {
+  const actual = await importOriginal<typeof CloudAgentProfileModule>();
+  return {
+    ...actual,
+    getSandboxAllocationCandidates: getSandboxAllocationCandidatesMock,
   };
 });
 
@@ -1199,6 +1211,221 @@ describe('explicit sandbox session creation', () => {
     admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
     await expect(runCreate(ctx, request)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expectNoAllocation(doStub);
+  });
+
+  it('rejects a fresh explicit Vercel allocation for a GitLab repository before admission', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    // Membership recheck passes; the ledger lookup finds no existing row.
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+    const request = makeRequest({
+      repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+      runtime: { sandboxAllocation: 'vercel-small' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Vercel sandboxes support GitHub repositories only',
+    });
+    expect(admitOperationMock).not.toHaveBeenCalled();
+    expect(recordOperationProgressMock).not.toHaveBeenCalled();
+    expectNoAllocation(doStub);
+  });
+
+  it('rejects a fresh explicit Vercel allocation for a security-remediation origin before admission', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      runtime: { sandboxAllocation: 'vercel-small' },
+      options: {
+        kilocodeOrganizationId: orgId,
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'security-remediation',
+      },
+    });
+
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Vercel sandboxes do not include the security-remediation command-line tools',
+    });
+    expect(admitOperationMock).not.toHaveBeenCalled();
+    expectNoAllocation(doStub);
+  });
+
+  it('replays a settled create of a now-unavailable Vercel GitLab allocation', async () => {
+    // The early availability check lets a matching historical retry through, and a
+    // settled create replays without allocating or reading settings again.
+    const request = makeRequest({
+      repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+      runtime: { sandboxAllocation: 'vercel-small' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+    const row = makeLedgerRow({
+      organization_id: orgId,
+      status: 'completed',
+      canonical_result: {
+        cloudAgentSessionId: WORKSPACE_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+        sandboxAllocation: 'vercel-small',
+        [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+        [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+      },
+    });
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [row]]));
+    admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
+
+    await expect(runCreate(ctx, request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      replayed: true,
+    });
+    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    expectNoAllocation(doStub);
+  });
+
+  it('rejects a retry that changes an omitted allocation to an explicit unavailable one', async () => {
+    const original = makeRequest({
+      repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+    const row = makeLedgerRow({
+      organization_id: orgId,
+      canonical_result: {
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(original),
+      },
+    });
+    const retry = {
+      ...original,
+      runtime: { sandboxAllocation: 'vercel-small' as const },
+    };
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [row]]));
+    admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
+
+    await expect(runCreate(ctx, retry)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_creation_failed',
+    });
+    expect(admitOperationMock).not.toHaveBeenCalled();
+    expectNoAllocation(doStub);
+  });
+
+  it('pins a settings-resolved choice without re-reading settings', async () => {
+    // The saved default now resolves to a different value; a recorded choice
+    // from the original omitted-input request must be restored untouched.
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-shared',
+    });
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+    const row = makeLedgerRow({
+      organization_id: orgId,
+      canonical_result: {
+        sandboxAllocation: 'cloudflare-single',
+        [SESSION_CREATE_SAVED_ALLOCATION_KEY]: 'cloudflare-single',
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+      },
+    });
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [row], [{ email: 'test@example.com' }], [{ id: 'member' }]])
+    );
+    admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
+
+    await expect(runCreate(ctx, request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+    });
+    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    const metadata = createdMetadata(doStub);
+    // The pinned small sandbox runs on the native containers size.
+    expect(metadata?.workspace?.sandboxAllocation).toBe('cloudflare-containers-standard-3');
+    expect(metadata?.workspace?.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('rejects a pinned saved choice once the owner can no longer select a sandbox', async () => {
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+    const row = makeLedgerRow({
+      organization_id: orgId,
+      canonical_result: {
+        sandboxAllocation: 'cloudflare-single',
+        [SESSION_CREATE_SAVED_ALLOCATION_KEY]: 'cloudflare-single',
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+      },
+    });
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    ctx.env.SANDBOX_SELECTION_IDS = '';
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [row], [{ email: 'test@example.com' }], [{ id: 'member' }]])
+    );
+    admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
+
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    expectNoAllocation(doStub);
+  });
+
+  it('does not read settings for a legacy fingerprint row without a choice', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-shared',
+    });
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+    const row = makeLedgerRow({
+      organization_id: orgId,
+      canonical_result: {
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+      },
+    });
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    getPgDbMock.mockReturnValue(
+      makeDb([[{ id: 'member' }], [row], [{ email: 'test@example.com' }], [{ id: 'member' }]])
+    );
+    admitOperationMock.mockResolvedValue({ admission: 'takeover', row });
+
+    await expect(runCreate(ctx, request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+    });
+    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBeUndefined();
+  });
+
+  it('ignores saved settings for a code review and keeps its trusted crv sandbox', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-single',
+    });
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+
+    const result = await createSessionWithLedger(request, ctx, {
+      ...CREATE_OPTIONS,
+      billingOrigin: 'code-review',
+    });
+
+    expect(result).toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    const metadata = createdMetadata(doStub);
+    expect(metadata?.workspace?.sandboxAllocation).toBeUndefined();
+    expect(metadata?.workspace?.sandboxId).toMatch(/^crv-/);
   });
 });
 
@@ -3971,6 +4198,38 @@ describe('createSessionWithLedger changed-intent rejection', () => {
         options: ORIGINAL_OPTIONS,
       }),
     },
+    {
+      // A fork cut is part of the clone intent: another cut is a conflict.
+      name: 'the clone cut',
+      original: makeRequest({
+        clone: {
+          cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+          cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+      retry: makeRequest({
+        clone: {
+          cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+          cloneUpToMessageId: 'msg_018f1e2d3c4cAbCdEfGhIjKlMn',
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+    },
+    {
+      name: 'a full clone into a cut clone',
+      original: makeRequest({
+        clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+        options: ORIGINAL_OPTIONS,
+      }),
+      retry: makeRequest({
+        clone: {
+          cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+          cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+    },
   ];
 
   it.each(changedIntentCases)(
@@ -4163,7 +4422,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       'cloud-agent',
       expect.any(String),
       'https://github.com/acme/repo',
-      SOURCE_KILO_SESSION_ID
+      { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID }
     );
     expect(
       doStub.registerSession.mock.calls.length +
@@ -4176,6 +4435,42 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     expect(result).toEqual({
       cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
+    });
+  });
+
+  it('forwards the clone cut into the ingest call and the stored metadata', async () => {
+    const cut = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 2 },
+    });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        initialTurn: undefined,
+        clone: { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID, cloneUpToMessageId: cut },
+        options: { operationKey: OPERATION_KEY },
+      })
+    );
+
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      CLOUD_AGENT_SESSION_ID,
+      USER_ID,
+      expect.any(Object),
+      undefined,
+      undefined,
+      'cloud-agent',
+      expect.any(String),
+      'https://github.com/acme/repo',
+      { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID, cloneUpToMessageId: cut }
+    );
+    expect(createdMetadata(doStub)?.clone).toMatchObject({
+      cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
+      cloneUpToMessageId: cut,
     });
   });
 
@@ -4768,7 +5063,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         'cloud-agent',
         expect.any(String),
         'https://github.com/acme/repo',
-        SOURCE_KILO_SESSION_ID
+        { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID }
       );
       expect(
         doStub.registerSession.mock.calls.length +
@@ -4980,7 +5275,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       'cloud-agent',
       expect.any(String),
       'https://github.com/acme/repo',
-      SOURCE_KILO_SESSION_ID
+      { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID }
     );
     expect(
       doStub.registerSession.mock.calls.length +
@@ -5093,7 +5388,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       'cloud-agent',
       expect.any(String),
       'https://github.com/acme/repo',
-      SOURCE_KILO_SESSION_ID
+      { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID }
     );
     expect(
       doStub.registerSession.mock.calls.length +
@@ -5150,7 +5445,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       'cloud-agent',
       expect.any(String),
       'https://github.com/acme/repo',
-      SOURCE_KILO_SESSION_ID
+      { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID }
     );
     expect(recordOperationProgressMock).toHaveBeenCalledWith(expect.any(Object), ROW_ID, {
       [SESSION_CREATE_TOMBSTONED_IDS_KEY]: {
@@ -5192,7 +5487,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
       'cloud-agent',
       expect.any(String),
       'https://github.com/acme/repo',
-      SOURCE_KILO_SESSION_ID
+      { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID }
     );
     expect(
       doStub.registerSession.mock.calls.length +
@@ -5257,6 +5552,25 @@ describe('prepareInputToSessionCreateRequest clone mapping', () => {
 
     expect(request.clone).toEqual({ cloneFromKiloSessionId: SOURCE_SESSION_ID });
     expect(request.initialTurn).toBeUndefined();
+  });
+
+  it('maps the clone cut into the grouped clone object', () => {
+    const request = prepareInputToSessionCreateRequest({
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      shallow: false,
+      devcontainer: false,
+      autoInitiate: true,
+      operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      cloneFromKiloSessionId: SOURCE_SESSION_ID,
+      cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+    });
+
+    expect(request.clone).toEqual({
+      cloneFromKiloSessionId: SOURCE_SESSION_ID,
+      cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+    });
   });
 
   it('omits clone when cloneFromKiloSessionId is absent', () => {

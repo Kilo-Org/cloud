@@ -2,6 +2,8 @@
 export type {
   ProfileOwner,
   ProfileOwnerType,
+  ProfileDatabase,
+  RepositoryPlatform,
   ProfileVarResponse,
   ProfileCommandResponse,
   ProfileMcpServerResponse,
@@ -162,6 +164,28 @@ export {
 export {
   bindProfileToRepo,
   unbindRepo,
+  removeRepoBinding,
   getBindingForRepo,
   listBindings,
 } from './repo-binding-service';
+export { canonicalRepoFullName } from './repo-binding-db';
+
+// Combined repository settings (profile binding + allocation override)
+export {
+  setRepositorySettings,
+  removeRepositorySettings,
+  type RepositorySettingsInput,
+} from './repository-settings-service';
+
+// Sandbox allocation settings (context default + per-repository overrides)
+export {
+  getSandboxAllocationSettings,
+  getSandboxAllocationCandidates,
+  setContextSandboxAllocation,
+  clearContextSandboxAllocation,
+  setRepoSandboxAllocation,
+  clearRepoSandboxAllocation,
+  type SandboxAllocationSettings,
+  type SandboxAllocationCandidates,
+  type RepositoryAllocationSetting,
+} from './sandbox-allocation-settings-service';

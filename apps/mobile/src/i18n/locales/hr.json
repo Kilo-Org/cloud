@@ -136,7 +136,10 @@
     "working": "U radu",
     "yourOwnRepositories": "Tvoji repozitoriji",
     "dismissed": "Odbačeno",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Izmjene"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promjene jezika",
@@ -325,6 +328,7 @@
       "collapseFile": "Sažmi datoteku",
       "expandFile": "Proširi datoteku",
       "diffTooLarge": "Razlike su prevelike za prikaz.",
+      "noPreview": "Pregled ove datoteke nije dostupan",
       "openOnGitHub": "Otvori na GitHubu",
       "openDiffOnGitHub": "Otvori prikaz razlika ove datoteke na GitHubu",
       "githubDiff": "Prikaz razlika na GitHubu"
@@ -847,7 +851,8 @@
       "kiloclaw": "Aktivnost u KiloClawu",
       "balance": "Upozorenja o stanju računa",
       "security": "Sigurnosni nalazi",
-      "spend": "Upozorenja o potrošnji"
+      "spend": "Upozorenja o potrošnji",
+      "followedSessions": "Praćene sesije"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",
@@ -2114,6 +2119,8 @@
       "title": "Sesija",
       "copyErrorDetails": "Kopiraj pojedinosti pogreške",
       "backToSessions": "Natrag na sesije",
+      "follow": "Prati na zaključanom zaslonu",
+      "unfollow": "Prestani pratiti na zaključanom zaslonu",
       "couldNotLoad": "Nije moguće učitati sesiju.",
       "failedToLoadDetails": "Učitavanje pojedinosti sesije nije uspjelo.",
       "failedToStopExecution": "Zaustavljanje izvođenja nije uspjelo.",
@@ -2180,6 +2187,11 @@
       "collapse": "Sažmi cilj",
       "expand": "Proširi cilj"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Zadaci, dovršeno {{completed}} od {{total}}",
+      "rowAccessibility": "Zadaci, dovršeno {{completed}} od {{total}}. Trenutačni zadatak: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nedavno korišteno",
       "couldNotLoadGithubRepositories": "Učitavanje GitHub repozitorija nije uspjelo.",
@@ -2212,7 +2224,6 @@
       "retryLoadingEnvironment": "Pokušaj ponovno učitati okruženje",
       "defaultEnvironment": "Zadano okruženje",
       "environmentSummary": "naredbe: {{commands}} · MCP: {{mcp}} · vještine: {{skills}} · agenti: {{agents}}",
-      "changes": "Izmjene",
       "leaveChanges": "Ostavi izmjene",
       "commitAndPush": "Potvrdi i pošalji",
       "startSession": "Započni sesiju",
@@ -2235,6 +2246,10 @@
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberi Cloud Agent ili drugi CLI.",
       "importFailed": "Uvoz ove sesije nije uspio.",
+      "cliCannotFork": "Ažuriraj Kilo CLI da bi mogao odvojiti sesiju od poruke.",
+      "forkCutNotSynced": "Ova poruka još nije spremljena. Pokušaj ponovno za trenutak.",
+      "forkFilesFromBaseBranch": "Datoteke kreću od osnovne grane.",
+      "forkFilesUnchangedOnComputer": "Datoteke na ovom računalu ostaju nepromijenjene.",
       "pickProfile": "Odaberite profil",
       "noProfile": "Bez profila",
       "manageProfiles": "Upravljanje profilima",
@@ -2280,8 +2295,8 @@
       "toolList": "prikaži popis",
       "toolPatch": "primijeni izmjene",
       "toolTask": "zadatak",
-      "readTodos": "Pročitaj zadatke",
-      "updateTodos": "Ažuriraj zadatke",
+      "readTodos": "Pročitaj plan",
+      "updateTodos": "Ažuriraj plan",
       "linesBadge": "redaka: {{displayCount}}",
       "filesBadge": "datoteka: {{displayCount}}",
       "matchesBadge": "podudaranja: {{displayCount}}",
@@ -2358,6 +2373,7 @@
       "copyMessage": "Kopiraj poruku",
       "copyText": "Kopiraj tekst",
       "selectText": "Odaberi tekst",
+      "forkFromHere": "Odvoji odavde",
       "reportAiResponse": "Prijavi odgovor AI-ja",
       "reportAiResponseConfirm": "Poslati prijavu ovog odgovora na provjeru?",
       "report": "Prijavi",
@@ -2679,6 +2695,12 @@
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeli ({{displayCount}})",
       "modelsCount_few": "Modeli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Prikaži izmjene",
+      "asOf": "Stanje u {{time}}",
+      "tooLarge": "Razlike su prevelike za prikaz na mobitelu.",
+      "empty": "U ovoj sesiji još nema izmjena datoteka."
     },
     "autoApprove": {
       "title": "Automatsko odobravanje",
@@ -3194,6 +3216,8 @@
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama za prikaz aktivnih agenata na zaključanom zaslonu.",
     "openSession": "Otvori",
+    "finished": "Završeno",
+    "followFailed": "Prikaz ovog agenta na zaključanom zaslonu nije uspio.",
     "approveFailed": "Odobravanje nije uspjelo. Dodirni $t(common.approve) da pokušaš ponovno.",
     "checked": "Provjereno",
     "lastKnown": "Posljednje poznato",
@@ -3202,7 +3226,26 @@
     "waitingForYou": "Čeka vas",
     "nextScheduled": "Sljedeće zakazano",
     "answerNeeded": "Potreban odgovor",
-    "waitingToRetry": "Čeka ponovni pokušaj"
+    "waitingToRetry": "Čeka ponovni pokušaj",
+    "step": {
+      "editing": "Uređivanje",
+      "reading": "Čitanje",
+      "running": "Pokretanje",
+      "searching": "Web pretraga",
+      "thinking": "Razmišljanje"
+    },
+    "planOf": "od",
+    "filesChanged": "datoteke promijenjene",
+    "finishedIn": "Završeno za",
+    "noActivityFor": "Nema aktivnosti već",
+    "prOpened": "Zahtjev za povlačenje otvoren",
+    "permissionWants": "Želi pokrenuti",
+    "failure": {
+      "provider": "Zaustavljeno: pogreška pružatelja",
+      "tool": "Zaustavljeno: pogreška alata",
+      "cancelled": "Zaustavljeno: otkazano",
+      "other": "ZAUSTAVLJENO"
+    }
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",
@@ -3238,10 +3281,32 @@
     "list": {
       "loadFailed": "Nije moguće učitati povijest razgovora.",
       "new": "Novi razgovor",
-      "openHint": "Otvara razgovor. Dugo pritisnite za brisanje.",
       "deleteTitle": "Izbrisati ovaj razgovor?"
     },
+    "rename": {
+      "title": "Preimenuj razgovor",
+      "accessibility": "Preimenuj razgovor: {{title}}",
+      "openHint": "Otvara razgovor. Dugo pritisnite za preimenovanje ili brisanje."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Pojedinosti razgovora",
+      "backend": "Pozadinski sustav",
+      "effortDefault": "Zadano za model",
+      "noCost": "Bez troška",
+      "costUnknown": "Nepoznato",
+      "costEstimatedNote": "Trošak odgovora koji nisu prijavili cijenu procijenjen je prema cjeniku.",
+      "costUnknownNote": "Za ovaj model nije poznata cijena.",
+      "costPartialNote": "Ovaj zbroj ne uključuje modele bez poznate cijene.",
+      "localNote": "Modeli na uređaju rade na ovom uređaju. Nemaju trošak ni predmemoriju upita, a broj njihovih tokena može biti procjena.",
+      "countedSinceNote": "Ovaj je razgovor započeo prije nego što se počela bilježiti upotreba. Zbrojevi prikazuju samo odgovore nakon toga.",
+      "remoteServersOn": "Uključeni udaljeni MCP poslužitelji"
+    },
+    "webSearch": {
+      "title": "Pretraži web",
+      "description": "Dopustite ovom chatu da traži aktualne informacije putem vašeg Kilo računa. Pretraživanja troše vaš mjesečni limit pretraživanja.",
+      "allowanceExhausted": "Vaša besplatna web pretraživanja za ovaj mjesec su potrošena. Dodajte kredite da biste ponovno pretraživali."
+    },
     "mcp": {
       "title": "Kilo alati",
       "use": "Koristi Kilo alate",
@@ -3264,7 +3329,6 @@
       "fieldName": "Prikazani naziv",
       "fieldUrl": "URL poslužitelja",
       "fieldUrlInvalid": "Unesite važeći URL poslužitelja.",
-      "fieldToken": "Bearer token (neobavezno)",
       "enableServer": "Omogući ovaj poslužitelj: {{name}}",
       "editServer": "Uredi poslužitelj",
       "deleteServer": "Izbriši poslužitelj",
@@ -3284,6 +3348,18 @@
       "serverToolCount": "{{count}} alata",
       "serverUnreachable": "Nije bilo moguće doći do ovog poslužitelja",
       "serverOff": "Ovaj poslužitelj je isključen"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikacija",
+      "authNone": "Bez prijave",
+      "authBearer": "Bearer token",
+      "authOAuth": "OAuth prijava",
+      "fieldToken": "Token",
+      "oauthHint": "Nakon spremanja dodirni $t(modelChat.mcpOAuth.signIn) na poslužitelju da bi se prijavio putem preglednika.",
+      "serverNeedsSignIn": "Prijavi se da bi koristio ovaj poslužitelj",
+      "signIn": "Prijavi se",
+      "signInA11y": "Prijavi se na ovaj poslužitelj: {{name}}",
+      "signInFailed": "Prijava na {{name}} nije uspjela. Pokušaj ponovno."
     },
     "backends": {
       "title": "Pozadinski sustavi za razgovor",
@@ -3367,8 +3443,48 @@
         "notGguf": "Poveznica mora pokazivati na .gguf datoteku.",
         "space": "Nema dovoljno slobodnog prostora za ovaj model. Oslobodite prostor i pokušajte ponovno.",
         "network": "Preuzimanje nije dovršeno. Provjerite vezu i pokušajte ponovno.",
-        "invalidFile": "Preuzeta datoteka nije model koji ova aplikacija može pokrenuti, pa je uklonjena."
+        "invalidFile": "Preuzeta datoteka nije model koji ova aplikacija može pokrenuti, pa je uklonjena.",
+        "checksum": "Preuzeta datoteka ne odgovara objavljenom kontrolnom zbroju, pa je uklonjena. Pokušajte ponovno preuzeti."
       }
+    },
+    "catalog": {
+      "browse": "Pregledaj modele",
+      "title": "Katalog modela",
+      "search": "Pretraži Hugging Face modele",
+      "tabs": "Filtar modela",
+      "fitsTab": "Odgovara ovom uređaju",
+      "fromHuggingFace": "S Hugging Facea",
+      "loading": "Učitavanje modela",
+      "noResults": "Nema pronađenih modela",
+      "noFits": "Nijedan model ne odgovara ovom uređaju",
+      "noFitsDescription": "Veći modeli nalaze se na kartici $t(common.all).",
+      "fit": {
+        "fits": "Odgovara",
+        "tight": "Jedva stane",
+        "tooLarge": "Prevelik",
+        "noStorage": "Nedovoljno prostora"
+      },
+      "parameters": "Parametri: {{value}}",
+      "downloads": "Preuzimanja: {{value}}",
+      "likes": "Sviđanja: {{value}}",
+      "context": "Kontekstni prozor: {{value}}",
+      "license": "Licenca: {{license}}",
+      "licenseUnknown": "Licenca nije navedena",
+      "tools": "Pozivanje alata",
+      "vision": "Unos slika",
+      "hintsHelp": "Savjeti s Hugging Facea. Aplikacija provjerava model nakon preuzimanja.",
+      "gated": "Ovaj model zahtijeva Hugging Face račun pa ga aplikacija ne može preuzeti.",
+      "quantizations": "Kvantizacije",
+      "quantizationsHelp": "Manje datoteke troše manje memorije i prostora. Veće datoteke obično daju bolje odgovore.",
+      "quantDetail": "Preuzimanje {{size}} · oko {{memory}} memorije",
+      "downloadQuant": "Preuzmi {{quant}}",
+      "loadingModel": "Učitavanje pojedinosti o modelu",
+      "couldNotLoadModel": "Učitavanje ovog modela nije uspjelo",
+      "noFiles": "Nema datoteka koje ova aplikacija može pokrenuti",
+      "noFilesDescription": "Ova aplikacija pokreće modele koji se sastoje od jedne GGUF datoteke.",
+      "tooLargeTitle": "Ovaj model možda neće raditi",
+      "tooLargeMessage": "{{name}} vjerojatno treba više memorije nego što ovaj uređaj ima. Aplikacija se može zatvoriti dok model odgovara. Svejedno preuzeti?",
+      "downloadAnyway": "Svejedno preuzmi"
     },
     "localModels": {
       "title": "Modeli na uređaju",
@@ -3398,6 +3514,9 @@
       "downloading": "Preuzimanje…",
       "downloadProgress": "Preuzimanje… {{percent}} %",
       "downloadFailed": "Preuzimanje nije dovršeno. Provjerite vezu i slobodnu pohranu pa pokušajte ponovno."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ovaj model podržava intenzitet razmišljanja"
     }
   },
   "settingsTools": {
@@ -3620,5 +3739,82 @@
     "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
     "purchaseOwnedByAnotherAccount": "Krediti na ovom računu Apple Account pripadaju drugom Kilo računu. Prijavi se na taj Kilo račun da ih koristiš.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play računu pripadaju drugom Kilo računu. Prijavite se na taj Kilo račun da biste ih koristili."
+  },
+  "todos": {
+    "saveAsTodo": "Spremi kao zadatak",
+    "segment": {
+      "label": "Prikaz agenata",
+      "sessions": "Sesije",
+      "todos": "Zadaci"
+    },
+    "lists": {
+      "newList": "Novi popis",
+      "empty": "Još nema popisa",
+      "couldNotLoad": "Nije moguće učitati popise",
+      "noRepository": "Nema repozitorija",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} otvorenih",
+      "openCount_other": "{{count}} otvorenih",
+      "openCount_few": "{{count}} otvorena",
+      "archived_one": "Arhivirano ({{count}})",
+      "archived_other": "Arhivirano ({{count}})",
+      "archived_few": "Arhivirana ({{count}})",
+      "archive": "Arhiviraj",
+      "unarchive": "Vrati iz arhive",
+      "deleteTitle": "Izbrisati {{name}}?",
+      "deleteMessage": "Njegovi se zadaci također brišu. Sesije ostaju."
+    },
+    "listSettings": {
+      "title": "Postavke popisa",
+      "name": "Naziv",
+      "namePlaceholder": "Greške, Ideje, Izdanje…",
+      "emoji": "Emotikon",
+      "mode": "Način",
+      "defaultsHint": "Sesije pokrenute s ovog popisa koriste ove zadane postavke."
+    },
+    "list": {
+      "addPlaceholder": "Novi zadatak",
+      "add": "Dodaj zadatak",
+      "empty": "Još nema zadataka",
+      "setDefaults": "Postavi repozitorij, način i model",
+      "completed_one": "Dovršeno ({{count}})",
+      "completed_other": "Dovršeno ({{count}})",
+      "completed_few": "Dovršena ({{count}})"
+    },
+    "item": {
+      "markDone": "Označi kao dovršeno",
+      "markOpen": "Označi kao nedovršeno",
+      "markDonePrompt": "Označiti kao dovršeno?",
+      "deleted": "Zadatak izbrisan",
+      "undo": "Poništi",
+      "runCount_one": "{{count}} pokretanja",
+      "runCount_other": "{{count}} pokretanja",
+      "runCount_few": "{{count}} pokretanja",
+      "startNow": "Pokreni bez pregleda",
+      "startNowHint": "Pritisni i zadrži za pokretanje bez pregleda",
+      "titleLabel": "Naslov zadatka",
+      "notes": "Bilješke",
+      "notesPlaceholder": "Dodaj bilješke u Markdownu",
+      "sessions": "Povezane sesije",
+      "noSessions": "Još nema sesija",
+      "linkSession": "Poveži sesiju",
+      "unlinkSession": "Odspoji {{title}}",
+      "linkFailed": "Sesiju nije bilo moguće povezati sa zadatkom"
+    },
+    "linkSession": {
+      "title": "Povezivanje sesije",
+      "empty": "Nema nedavnih sesija",
+      "emptyInRepository": "Nema nedavnih sesija u repozitoriju {{repository}}"
+    },
+    "upNext": "Sljedeće",
+    "sessionTodo": "Zadatak: {{title}}",
+    "linkToTodo": "Poveži sa zadatkom",
+    "candidates": {
+      "empty": "Nema otvorenih zadataka"
+    },
+    "saveSheet": {
+      "title": "Spremi na popis",
+      "saved": "Spremljeno na popis {{list}}"
+    }
   }
 }

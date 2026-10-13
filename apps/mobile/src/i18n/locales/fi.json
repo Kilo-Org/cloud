@@ -136,7 +136,10 @@
     "working": "Työn alla",
     "yourOwnRepositories": "Omat koodivarastosi",
     "dismissed": "Sivuutettu",
-    "agent": "Agentti"
+    "agent": "Agentti",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Muutokset"
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -325,6 +328,7 @@
       "collapseFile": "Kutista tiedosto",
       "expandFile": "Laajenna tiedosto",
       "diffTooLarge": "Muutosvertailu on liian suuri näytettäväksi.",
+      "noPreview": "Tälle tiedostolle ei ole esikatselua",
       "openOnGitHub": "Avaa GitHubissa",
       "openDiffOnGitHub": "Avaa tämän tiedoston muutosvertailu GitHubissa",
       "githubDiff": "GitHubin muutosvertailu"
@@ -831,7 +835,8 @@
       "kiloclaw": "KiloClaw-tapahtumat",
       "balance": "Saldoilmoitukset",
       "security": "Tietoturvahavainnot",
-      "spend": "Kulutusvaroitukset"
+      "spend": "Kulutusvaroitukset",
+      "followedSessions": "Seuratut istunnot"
     },
     "category": {
       "chatMessagesSubtitle": "vastaukset keskusteluissasi",
@@ -2086,6 +2091,8 @@
       "title": "Istunto",
       "copyErrorDetails": "Kopioi virheen tiedot",
       "backToSessions": "Takaisin istuntoihin",
+      "follow": "Seuraa lukitusnäytöllä",
+      "unfollow": "Lopeta seuraaminen lukitusnäytöllä",
       "couldNotLoad": "Istuntoa ei voitu ladata.",
       "failedToLoadDetails": "Istunnon tietojen lataus epäonnistui.",
       "failedToStopExecution": "Suorituksen pysäyttäminen epäonnistui.",
@@ -2152,6 +2159,11 @@
       "collapse": "Kutista tavoite",
       "expand": "Laajenna tavoite"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tehtävät, {{completed}}/{{total}} valmiina",
+      "rowAccessibility": "Tehtävät, {{completed}}/{{total}} valmiina. Nykyinen tehtävä: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Äskettäin käytetyt",
       "couldNotLoadGithubRepositories": "GitHub-repositorioiden lataus epäonnistui.",
@@ -2184,7 +2196,6 @@
       "retryLoadingEnvironment": "Yritä ladata ympäristö uudelleen",
       "defaultEnvironment": "Oletusympäristö",
       "environmentSummary": "{{commands}} komentoa · {{mcp}} MCP · {{skills}} taitoa · {{agents}} agenttia",
-      "changes": "Muutokset",
       "leaveChanges": "Jätä muutokset ennalleen",
       "commitAndPush": "Tallenna ja lähetä",
       "startSession": "Aloita istunto",
@@ -2207,6 +2218,10 @@
       "importingSession": "Tuodaan istuntoa",
       "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
       "importFailed": "Tätä istuntoa ei voitu tuoda.",
+      "cliCannotFork": "Päivitä Kilo CLI, jotta voit haaroittaa viestistä.",
+      "forkCutNotSynced": "Tätä viestiä ei ole vielä tallennettu. Yritä hetken kuluttua uudelleen.",
+      "forkFilesFromBaseBranch": "Tiedostot otetaan perushaarasta.",
+      "forkFilesUnchangedOnComputer": "Tämän tietokoneen tiedostoja ei muuteta.",
       "pickProfile": "Valitse profiili",
       "noProfile": "Ei profiilia",
       "manageProfiles": "Hallitse profiileja",
@@ -2251,8 +2266,8 @@
       "toolList": "luettele",
       "toolPatch": "käytä korjausta",
       "toolTask": "tehtävä",
-      "readTodos": "Lue tehtävät",
-      "updateTodos": "Päivitä tehtävät",
+      "readTodos": "Lue suunnitelma",
+      "updateTodos": "Päivitä suunnitelma",
       "linesBadge": "{{displayCount}} riviä",
       "filesBadge": "{{displayCount}} tiedostoa",
       "matchesBadge": "{{displayCount}} osumaa",
@@ -2322,6 +2337,7 @@
       "copyMessage": "Kopioi viesti",
       "copyText": "Kopioi teksti",
       "selectText": "Valitse teksti",
+      "forkFromHere": "Haaroita tästä",
       "reportAiResponse": "Ilmoita AI-vastauksesta",
       "reportAiResponseConfirm": "Lähetetäänkö tämä vastaus tarkistettavaksi?",
       "report": "Ilmoita",
@@ -2641,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Malli ({{displayCount}})",
       "modelsCount_other": "Mallit ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Näytä muutokset",
+      "asOf": "Tilanne klo {{time}}",
+      "tooLarge": "Muutosvertailu on liian suuri näytettäväksi mobiilissa.",
+      "empty": "Tässä istunnossa ei ole vielä muutettu tiedostoja."
     },
     "autoApprove": {
       "title": "Automaattinen hyväksyntä",
@@ -3153,6 +3175,8 @@
     "channelName": "Aktiiviset agentit",
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
     "openSession": "Avaa",
+    "finished": "Valmis",
+    "followFailed": "Tätä agenttia ei voitu näyttää lukitusnäytöllä.",
     "approveFailed": "Hyväksyminen ei onnistunut. Yritä uudelleen napauttamalla $t(common.approve).",
     "checked": "Tarkistettu",
     "lastKnown": "Viimeisin tiedossa oleva",
@@ -3161,7 +3185,26 @@
     "waitingForYou": "Odottaa sinua",
     "nextScheduled": "Seuraavaksi ajastetut",
     "answerNeeded": "Odottaa vastausta",
-    "waitingToRetry": "Odottaa uutta yritystä"
+    "waitingToRetry": "Odottaa uutta yritystä",
+    "step": {
+      "editing": "Muokkaus",
+      "reading": "Lukeminen",
+      "running": "Suoritus",
+      "searching": "Verkkohaku",
+      "thinking": "Pohdinta"
+    },
+    "planOf": "viidestä",
+    "filesChanged": "tiedostoa muutettu",
+    "finishedIn": "Valmis",
+    "noActivityFor": "Ei toimintaa",
+    "prOpened": "Pull request avattu",
+    "permissionWants": "Haluaa suorittaa",
+    "failure": {
+      "provider": "Pysäytetty: tarjoajan virhe",
+      "tool": "Pysäytetty: työkalun virhe",
+      "cancelled": "Pysäytetty: peruutettu",
+      "other": "PYSÄYTETTY"
+    }
   },
   "transcriptionModel": {
     "title": "Puheentunnistusmalli",
@@ -3197,10 +3240,32 @@
     "list": {
       "loadFailed": "Keskusteluhistoriaa ei voitu ladata.",
       "new": "Uusi keskustelu",
-      "openHint": "Avaa keskustelun. Poista painamalla pitkään.",
       "deleteTitle": "Poistetaanko tämä keskustelu?"
     },
+    "rename": {
+      "title": "Nimeä keskustelu uudelleen",
+      "accessibility": "Nimeä keskustelu uudelleen: {{title}}",
+      "openHint": "Avaa keskustelun. Nimeä uudelleen tai poista painamalla pitkään."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Keskustelun tiedot",
+      "backend": "Taustapalvelu",
+      "effortDefault": "Mallin oletus",
+      "noCost": "Ei kustannuksia",
+      "costUnknown": "Ei tiedossa",
+      "costEstimatedNote": "Niiden vastausten kustannukset, jotka eivät ilmoittaneet hintaa, on arvioitu listahintojen perusteella.",
+      "costUnknownNote": "Tämän mallin hintaa ei tiedetä.",
+      "costPartialNote": "Tähän summaan eivät sisälly mallit, joiden hintaa ei tiedetä.",
+      "localNote": "Laitteessa toimivat mallit ajetaan tässä laitteessa. Niillä ei ole kustannuksia eikä kehotevälimuistia, ja niiden tokenimäärät voivat olla arvioita.",
+      "countedSinceNote": "Tämä keskustelu alkoi ennen käytön tallentamista. Summat näyttävät vain sen jälkeiset vastaukset.",
+      "remoteServersOn": "Käytössä olevat etä-MCP-palvelimet"
+    },
+    "webSearch": {
+      "title": "Hae verkosta",
+      "description": "Anna tämän keskustelun hakea ajantasaista tietoa Kilo-tilisi kautta. Haut kuluttavat kuukausittaista hakukiintiötäsi.",
+      "allowanceExhausted": "Tämän kuun ilmaiset verkkohakusi on käytetty. Lisää krediittejä hakeaksesi uudelleen."
+    },
     "mcp": {
       "title": "Kilon työkalut",
       "use": "Käytä Kilon työkaluja",
@@ -3223,7 +3288,6 @@
       "fieldName": "Näyttönimi",
       "fieldUrl": "Palvelimen URL",
       "fieldUrlInvalid": "Anna kelvollinen palvelimen URL.",
-      "fieldToken": "Bearer-tunnus (valinnainen)",
       "enableServer": "Ota tämä palvelin käyttöön: {{name}}",
       "editServer": "Muokkaa palvelinta",
       "deleteServer": "Poista palvelin",
@@ -3243,6 +3307,18 @@
       "serverToolCount": "{{count}} työkalua",
       "serverUnreachable": "Tähän palvelimeen ei saatu yhteyttä",
       "serverOff": "Tämä palvelin on pois päältä"
+    },
+    "mcpOAuth": {
+      "authMethod": "Todennus",
+      "authNone": "Ei kirjautumista",
+      "authBearer": "Bearer-tunnus",
+      "authOAuth": "OAuth-kirjautuminen",
+      "fieldToken": "Tunnus",
+      "oauthHint": "Kun olet tallentanut, napauta palvelimen kohdalla $t(modelChat.mcpOAuth.signIn) kirjautuaksesi sisään selaimella.",
+      "serverNeedsSignIn": "Kirjaudu sisään käyttääksesi tätä palvelinta",
+      "signIn": "Kirjaudu sisään",
+      "signInA11y": "Kirjaudu sisään tähän palvelimeen: {{name}}",
+      "signInFailed": "Kirjautuminen palvelimeen {{name}} epäonnistui. Yritä uudelleen."
     },
     "backends": {
       "title": "Keskustelujen taustapalvelut",
@@ -3326,8 +3402,48 @@
         "notGguf": "Linkin täytyy osoittaa .gguf-tiedostoon.",
         "space": "Laitteessa ei ole tarpeeksi vapaata tallennustilaa tälle mallille. Vapauta tilaa ja yritä uudelleen.",
         "network": "Lataus ei valmistunut. Tarkista yhteytesi ja yritä uudelleen.",
-        "invalidFile": "Ladattu tiedosto ei ole malli, jota tämä sovellus voi ajaa, joten se poistettiin."
+        "invalidFile": "Ladattu tiedosto ei ole malli, jota tämä sovellus voi ajaa, joten se poistettiin.",
+        "checksum": "Ladattu tiedosto ei vastaa julkaistua tarkistussummaansa, joten se poistettiin. Yritä latausta uudelleen."
       }
+    },
+    "catalog": {
+      "browse": "Selaa malleja",
+      "title": "Mallikatalogi",
+      "search": "Hae Hugging Face -malleja",
+      "tabs": "Mallisuodatin",
+      "fitsTab": "Sopii tälle laitteelle",
+      "fromHuggingFace": "Lähde: Hugging Face",
+      "loading": "Ladataan malleja",
+      "noResults": "Malleja ei löytynyt",
+      "noFits": "Mikään malli ei sovi tälle laitteelle",
+      "noFitsDescription": "Suuremmat mallit ovat välilehdellä $t(common.all).",
+      "fit": {
+        "fits": "Sopii",
+        "tight": "Mahtuu niukasti",
+        "tooLarge": "Liian suuri",
+        "noStorage": "Tallennustila ei riitä"
+      },
+      "parameters": "Parametrit: {{value}}",
+      "downloads": "Lataukset: {{value}}",
+      "likes": "Tykkäykset: {{value}}",
+      "context": "Kontekstiikkuna: {{value}}",
+      "license": "Lisenssi: {{license}}",
+      "licenseUnknown": "Lisenssiä ei ole ilmoitettu",
+      "tools": "Työkalukutsut",
+      "vision": "Kuvasyöte",
+      "hintsHelp": "Vihjeet ovat peräisin Hugging Facesta. Sovellus tarkistaa mallin latauksen jälkeen.",
+      "gated": "Tämä malli vaatii Hugging Face -tilin, joten sovellus ei voi ladata sitä.",
+      "quantizations": "Kvantisoinnit",
+      "quantizationsHelp": "Pienemmät tiedostot vievät vähemmän muistia ja tallennustilaa. Suuremmat tiedostot antavat yleensä parempia vastauksia.",
+      "quantDetail": "Lataus {{size}} · noin {{memory}} muistia",
+      "downloadQuant": "Lataa {{quant}}",
+      "loadingModel": "Ladataan mallin tietoja",
+      "couldNotLoadModel": "Tämän mallin lataaminen epäonnistui",
+      "noFiles": "Ei tiedostoja, joita tämä sovellus voi ajaa",
+      "noFilesDescription": "Tämä sovellus ajaa malleja, jotka ovat yksi GGUF-tiedosto.",
+      "tooLargeTitle": "Tämä malli ei ehkä toimi",
+      "tooLargeMessage": "{{name}} tarvitsee todennäköisesti enemmän muistia kuin tässä laitteessa on. Sovellus voi sulkeutua, kun malli vastaa. Ladataanko silti?",
+      "downloadAnyway": "Lataa silti"
     },
     "localModels": {
       "title": "Laitteessa toimivat mallit",
@@ -3357,6 +3473,9 @@
       "downloading": "Ladataan…",
       "downloadProgress": "Ladataan… {{percent}} %",
       "downloadFailed": "Lataus ei valmistunut. Tarkista verkkoyhteys ja vapaa tallennustila ja yritä sitten uudelleen."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tämä malli tukee päättelyn tasoa"
     }
   },
   "settingsTools": {
@@ -3579,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play ei palauttanut yhtään sopivaa krediittipakettia.",
     "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille.",
     "purchaseOwnedByAnotherAccountPlay": "Tämän Google Play -tilin krediitit kuuluvat eri Kilo-tilille. Käytä niitä kirjautumalla siihen Kilo-tiliin."
+  },
+  "todos": {
+    "saveAsTodo": "Tallenna tehtävänä",
+    "segment": {
+      "label": "Agenttinäkymä",
+      "sessions": "Istunnot",
+      "todos": "Tehtävät"
+    },
+    "lists": {
+      "newList": "Uusi lista",
+      "empty": "Ei vielä listoja",
+      "couldNotLoad": "Listoja ei voitu ladata",
+      "noRepository": "Ei koodivarastoa",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} avoinna",
+      "openCount_other": "{{count}} avoinna",
+      "archived_one": "Arkistoitu ({{count}})",
+      "archived_other": "Arkistoitu ({{count}})",
+      "archive": "Arkistoi",
+      "unarchive": "Palauta arkistosta",
+      "deleteTitle": "Poistetaanko {{name}}?",
+      "deleteMessage": "Myös sen tehtävät poistetaan. Niiden istunnot säilyvät."
+    },
+    "listSettings": {
+      "title": "Listan asetukset",
+      "name": "Nimi",
+      "namePlaceholder": "Virheet, ideat, julkaisu…",
+      "emoji": "emoji",
+      "mode": "Tila",
+      "defaultsHint": "Tästä listasta aloitetut istunnot käyttävät näitä oletusasetuksia."
+    },
+    "list": {
+      "addPlaceholder": "Lisää uusi tehtävä",
+      "add": "Lisää tehtävä",
+      "empty": "Ei vielä tehtäviä",
+      "setDefaults": "Aseta koodivarasto, tila ja malli",
+      "completed_one": "Valmis ({{count}})",
+      "completed_other": "Valmis ({{count}})"
+    },
+    "item": {
+      "markDone": "Merkitse valmiiksi",
+      "markOpen": "Merkitse keskeneräiseksi",
+      "markDonePrompt": "Merkitäänkö valmiiksi?",
+      "deleted": "Tehtävä poistettu",
+      "undo": "Kumoa",
+      "runCount_one": "{{count}} ajo",
+      "runCount_other": "{{count}} ajoa",
+      "startNow": "Aloita ilman katselmointia",
+      "startNowHint": "Aloita ilman katselmointia pitkällä painalluksella",
+      "titleLabel": "Tehtävän otsikko",
+      "notes": "Muistiinpanot",
+      "notesPlaceholder": "Lisää muistiinpanoja Markdownina",
+      "sessions": "Linkitetyt istunnot",
+      "noSessions": "Ei vielä istuntoja",
+      "linkSession": "Linkitä istunto",
+      "unlinkSession": "Poista linkitys: {{title}}",
+      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut"
+    },
+    "linkSession": {
+      "title": "Istunnon linkittäminen",
+      "empty": "Ei viimeaikaisia istuntoja",
+      "emptyInRepository": "Ei viimeaikaisia istuntoja koodivarastossa {{repository}}"
+    },
+    "upNext": "Seuraavaksi",
+    "sessionTodo": "Tehtävä: {{title}}",
+    "linkToTodo": "Linkitä tehtävään",
+    "candidates": {
+      "empty": "Ei avoimia tehtäviä"
+    },
+    "saveSheet": {
+      "title": "Tallenna listalle",
+      "saved": "Tallennettu listalle {{list}}"
+    }
   }
 }

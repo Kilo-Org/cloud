@@ -680,6 +680,18 @@ token comes from an accessor asked per call, so a refreshed credential is used
 rather than the one the process started with, and the credential is never part
 of a message or a log.
 
+An `oauth` server takes the library's own `OAuthClientProvider` as
+`deps.authProvider`, re-exported as `RemoteMcpOAuthProvider`. The provider keeps
+the tokens, the client registration and the PKCE verifier wherever the caller
+keeps secrets. The transport adds the stored access token and refreshes it on a
+401. When only a person can sign in again, the operation fails `unauthorized`.
+`remoteMcpSignIn(server, deps)` is that sign-in: the library discovers the
+authorization server (RFC 9728, RFC 8414), registers the app (RFC 7591), and
+calls the provider's `redirectToAuthorization`. The code the redirect brings
+back is exchanged for tokens. PKCE reads `crypto.subtle` and
+`crypto.getRandomValues` through `pkce-challenge`, so a runtime without them
+supplies that module.
+
 A server that refuses the credential, has gone away, or answers an error is a
 failed tool result rather than the end of the conversation: the model reads what
 happened and decides what to do about it. A caller wiring the client by hand

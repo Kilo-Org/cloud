@@ -1628,7 +1628,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         vi.spyOn(provider.adapter, 'ensureBillingAdmission'),
       ];
       const expectedRuntime = {
-        sandboxType: instance === 'standard-3' ? 'containers-standard-3' : 'containers-standard-4',
+        sandboxType: instance === 'standard-4' ? 'containers-standard-4' : 'containers-standard-3',
         kiloCliVersion: null,
         wrapperVersion: null,
         startedAt: null,

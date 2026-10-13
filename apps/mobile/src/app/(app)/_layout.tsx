@@ -147,6 +147,7 @@ export default function AppLayout() {
             />
             <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
             <Stack.Screen name="agent-chat/[session-id]" />
+            <Stack.Screen name="session-changes/[session-id]" options={{ headerShown: false }} />
             <Stack.Screen name="agent-chat/model-picker" options={searchSheetOptions} />
             <Stack.Screen name="agent-chat/repo-picker" options={searchSheetOptions} />
             <Stack.Screen name="agent-chat/branch-picker" options={sheetOptions} />
@@ -157,6 +158,9 @@ export default function AppLayout() {
             <Stack.Screen name="agent-chat/instance-picker" options={sheetOptions} />
             <Stack.Screen name="agent-chat/folder-picker" options={sheetOptions} />
             <Stack.Screen name="agent-chat/profile-picker" options={sheetOptions} />
+            <Stack.Screen name="todos/[list-id]" />
+            <Stack.Screen name="todos/item/[item-id]" />
+            <Stack.Screen name="todos/list-settings" options={sheetOptions} />
             <Stack.Screen name="share-gate" options={sheetOptions} />
             <Stack.Screen name="language-picker" options={searchSheetOptions} />
             <Stack.Screen name="transcription-model-picker" options={sheetOptions} />

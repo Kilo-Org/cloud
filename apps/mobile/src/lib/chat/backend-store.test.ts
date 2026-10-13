@@ -20,7 +20,9 @@ const draft: ChatBackendDraft = {
   apiKey: 'old-account-secret',
   headers: {},
   allowLocalHttp: false,
-  models: [{ id: 'same-name', name: 'Manual model', tools: false, images: false }],
+  models: [
+    { id: 'same-name', name: 'Manual model', tools: false, images: false, reasoning: false },
+  ],
 };
 const firstId = '00000000-0000-4000-8000-000000000001';
 const secondId = '00000000-0000-4000-8000-000000000002';
@@ -178,12 +180,12 @@ describe('secure backend profiles', () => {
       revision: 1,
       models: [
         { id: 'old', name: 'Stored before images', tools: true },
-        { id: 'vision', name: 'Reads images', tools: false, images: true },
+        { id: 'vision', name: 'Reads images', tools: false, images: true, reasoning: false },
       ],
     };
     expect(store.parseChatBackends(JSON.stringify([stored]))[0]?.models).toEqual([
-      { id: 'old', name: 'Stored before images', tools: true, images: false },
-      { id: 'vision', name: 'Reads images', tools: false, images: true },
+      { id: 'old', name: 'Stored before images', tools: true, images: false, reasoning: false },
+      { id: 'vision', name: 'Reads images', tools: false, images: true, reasoning: false },
     ]);
   });
 });

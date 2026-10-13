@@ -4,11 +4,13 @@ import { type UserInteractionEvent } from 'expo-widgets';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
+import { readStoredValue } from '@/lib/auth/secure-store-value';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { type GlanceableApproveResult, runGlanceableApprove } from '@/lib/glanceable/approve-ask';
 import { restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
 import { readWaitingAsk, recordWaitingAsk } from '@/lib/glanceable/waiting-ask';
+import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 import { ActiveAgentsLiveActivity, LIVE_ACTIVITY_NAME } from './active-agents-live-activity';
 import {
@@ -16,6 +18,11 @@ import {
   setGlanceableActionApproving,
   setGlanceableActionNotice,
 } from './ios-sink';
+import {
+  findSessionCard,
+  renderSessionCardPress,
+  type SessionActivity,
+} from './session-card-press';
 
 /**
  * What a button press on the Live Activity does.
@@ -25,8 +32,9 @@ import {
  * (`ios/Widgets/WidgetsEvents.swift`), and the app's subscription forwards it to
  * `handleGlanceableInteraction`. Approve answers the ask without the app, through
  * the same `runGlanceableApprove` body the in-app control uses, so the surface
- * and the app cannot disagree. The card's body opens the agents list on its own
- * deep link; the card has no other control.
+ * and the app cannot disagree. The aggregate card's body opens the agents list
+ * on its own deep link. A session card's Approve answers the request that card
+ * shows; its body and its Open control open that session by deep link.
  */
 
 /** The Approve target the layout's button carries. */
@@ -180,16 +188,67 @@ async function approveFromCard(): Promise<GlanceableInteractionOutcome> {
   }
 }
 
+/**
+ * Answer one session card's request. Every session card ends on an
+ * organization switch, so the stored selection is the scope the card was
+ * started in. A locked keychain throws, which is a failed press the user can
+ * retry.
+ */
+async function answerSessionCard(
+  kiloSessionId: string,
+  approvalKey: string
+): Promise<GlanceableApproveResult> {
+  try {
+    const organizationId = await readStoredValue(ORGANIZATION_STORAGE_KEY);
+    return await runGlanceableApprove({
+      now: () => Date.now(),
+      target: { kiloSessionId, organizationId, approvalKey },
+    });
+  } catch {
+    return { kind: 'retryable' };
+  }
+}
+
+/**
+ * Answer the exact request one session card shows. The card names its session
+ * and the approval key of that request; `runGlanceableApprove` revalidates the
+ * key before it answers, so a stale or already-answered request is never
+ * approved. The card shows Approving…, then drops Approve once the request is
+ * answered or gone, or shows the failure line and keeps Approve for a retry.
+ */
+async function approveFromSessionCard(activity: SessionActivity): Promise<GlanceableApproveResult> {
+  await applyStoredLanguage();
+  const props = activity.getProps();
+  const sessionId = props?.sessionId ?? '';
+  const approvalKey = props?.approvalKey ?? '';
+  if (sessionId.length === 0 || approvalKey.length === 0 || props?.awaitingPermission !== true) {
+    return { kind: 'none' };
+  }
+  await renderSessionCardPress(activity, { approving: true });
+  const result = await answerSessionCard(sessionId, approvalKey);
+  if (result.kind === 'retryable') {
+    toast.error(i18n.t(APPROVE_FAILED_KEY));
+    await renderSessionCardPress(activity, { notice: i18n.t(APPROVE_FAILED_KEY) });
+    return result;
+  }
+  await renderSessionCardPress(activity, null, result.kind !== 'none');
+  return result;
+}
+
 /** Route one button press from the Live Activity. */
 export async function handleGlanceableInteraction(
   event: UserInteractionEvent
 ): Promise<GlanceableInteractionOutcome> {
-  if (!isActiveAgentsLiveActivity(event.source)) {
+  // A session card press reports its own ActivityKit id, which no aggregate
+  // instance carries, so one press is answered by exactly one of the two.
+  const aggregate = isActiveAgentsLiveActivity(event.source);
+  const sessionCard = aggregate ? null : findSessionCard(event.source);
+  if (!aggregate && sessionCard === null) {
     return { kind: 'ignored' };
   }
   try {
     if (event.target === GLANCEABLE_APPROVE_TARGET) {
-      return await approveFromCard();
+      return await (sessionCard === null ? approveFromCard() : approveFromSessionCard(sessionCard));
     }
   } catch {
     // An escaping throw is a failed press, not a crash: the card keeps its

@@ -58,9 +58,11 @@ export function notificationPathForData(data: PushData): string {
     case 'scheduled-action': {
       return chatSandboxRoute(data.sandboxId);
     }
-    case 'active_agents_glanceable': {
-      // The aggregate glanceable payload never opens a session chat; it lands
-      // on the agents tab.
+    case 'active_agents_glanceable':
+    case 'session_live_update': {
+      // Neither glanceable payload opens a session chat by itself: the
+      // aggregate carrier lands on the agents tab, and the session notification
+      // the second one draws carries its own session deep link.
       return '/(app)/(tabs)/(2_agents)';
     }
     default: {

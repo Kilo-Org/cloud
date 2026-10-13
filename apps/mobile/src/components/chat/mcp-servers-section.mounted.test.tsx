@@ -38,6 +38,7 @@ const row = (over: Partial<RemoteMcpServerRow> = {}): RemoteMcpServerRow => ({
   statusKey: 'modelChat.mcp.serverToolCount',
   toolCount: 3,
   retry: false,
+  signIn: false,
   canEdit: true,
   canDelete: true,
   ...over,
@@ -50,10 +51,12 @@ async function mount(over: Partial<Props> = {}): Promise<void> {
     loaded: true,
     servers: [],
     retryingIds: [],
+    signingInIds: [],
     onToggle: () => undefined,
     onEdit: () => undefined,
     onDelete: () => undefined,
     onRetry: () => undefined,
+    onSignIn: () => undefined,
     onAdd: () => undefined,
     ...over,
   };
@@ -160,6 +163,28 @@ describe('the remote servers section', () => {
     });
 
     expect(required(buttonFor('Retry'), 'Retry').props.loading).toBe(true);
+  });
+
+  it('offers a Sign in on a row whose OAuth server refused, and asks for that server', async () => {
+    const onSignIn = vi.fn<(id: string) => void>();
+    await mount({
+      servers: [
+        row({ signIn: true, statusKey: 'modelChat.mcpOAuth.serverNeedsSignIn', toolCount: 0 }),
+      ],
+      onSignIn,
+    });
+
+    const signIn = required(buttonFor('Sign in'), 'Sign in');
+    expect(signIn.props.accessibilityLabel).toBe(
+      i18n.t('modelChat.mcpOAuth.signInA11y', { name: 'Alpha' })
+    );
+    expect(buttonFor('Retry')).toBeUndefined();
+    await act(async () => {
+      (signIn.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(onSignIn).toHaveBeenCalledWith('alpha');
   });
 
   it('gives every control a name that says which server it acts on', async () => {

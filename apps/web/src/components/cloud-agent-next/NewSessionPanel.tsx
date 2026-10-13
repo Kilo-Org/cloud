@@ -23,28 +23,10 @@ import { startOfDay, subDays } from 'date-fns';
 import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { getSandboxAllocationKey } from '@kilocode/worker-utils/sandbox-allocation';
-import {
-  formatSandboxDestination,
-  formatSandboxDestinationWithoutTier,
-  formatSandboxInstance,
-  getSandboxSelectionGroups,
-  getSandboxSelectionOptions,
-  getPreferredInitialSandboxAllocation,
-  resolveSandboxSelection,
-  resolveSandboxSelectionSubmissionError,
-  type SandboxSelectionDraft,
-} from './sandbox-selection';
+import { resolveSandboxSelectionSubmissionError } from './sandbox-selection';
+import { NewSessionSandboxSelect } from './NewSessionSandboxSelect';
+import { useSandboxPicker } from './useSandboxPicker';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
@@ -117,14 +99,12 @@ import {
 import {
   getLastUsedModel,
   getLastUsedRepo,
-  getLastUsedSandboxAllocationKey,
   getLastUsedVariant,
   getPreferredInitialModel,
   getPreferredInitialRepo,
   getPreferredInitialVariant,
   setLastUsedModel,
   setLastUsedRepo,
-  setLastUsedSandboxAllocationKey,
   setLastUsedVariant,
 } from '@/components/cloud-agent-next/model-preferences';
 import { safeLocalStorage } from '@/lib/localStorage';
@@ -327,64 +307,12 @@ export function NewSessionPanel({
 
   const availableVariants = modelOptions.find(m => m.id === model)?.variants ?? [];
 
-  const [sandboxSelection, setSandboxSelection] = useState<SandboxSelectionDraft>({
+  const sandbox = useSandboxPicker({
     organizationId,
+    platform: selectedPlatform,
+    repository: selectedRepo,
   });
-  if (sandboxSelection.organizationId !== organizationId) {
-    setSandboxSelection({ organizationId });
-  }
-  const sandboxPreferenceOwnerRef = useRef<string | null | undefined>(undefined);
-  const sandboxSelectionQuery = useQuery({
-    ...(organizationId
-      ? trpc.organizations.cloudAgentNext.getSandboxSelectionOptions.queryOptions({
-          organizationId,
-        })
-      : trpc.cloudAgentNext.getSandboxSelectionOptions.queryOptions({})),
-    retry: false,
-  });
-  const sandboxCapabilities = sandboxSelectionQuery.isSuccess
-    ? sandboxSelectionQuery.data
-    : undefined;
-  const showSandboxSelector =
-    sandboxCapabilities?.enabled === true ||
-    (sandboxSelection.organizationId === organizationId && !!sandboxSelection.allocation);
-  const { sandboxAllocation, error: sandboxAvailabilityError } = resolveSandboxSelection({
-    organizationId,
-    draft: sandboxSelection,
-    capabilities: sandboxCapabilities,
-  });
-  const sandboxOptions = getSandboxSelectionOptions(sandboxCapabilities);
-  const sandboxGroups = getSandboxSelectionGroups(sandboxOptions);
-  const sandboxDestination = sandboxAllocation ?? sandboxCapabilities?.defaultDestination;
-  const sandboxDestinationLabel = formatSandboxDestination(sandboxDestination);
-  const sandboxDestinationWithoutTier = formatSandboxDestinationWithoutTier(sandboxDestination);
-  const defaultSandboxLabel = sandboxCapabilities?.defaultDestination
-    ? `Default · ${formatSandboxDestination(sandboxCapabilities.defaultDestination)}`
-    : 'Default';
-
-  // ---------------------------------------------------------------------------
-  // Sandbox destination auto-selection
-  // ---------------------------------------------------------------------------
-  // Each owner restores its own saved allocation. Clear the previous owner's
-  // guard here so auto-selection cannot skip restoration when returning to an
-  // owner whose capabilities were previously unavailable.
-  useEffect(() => {
-    sandboxPreferenceOwnerRef.current = undefined;
-  }, [organizationId]);
-
-  useEffect(() => {
-    if (!sandboxCapabilities?.enabled) return;
-
-    const owner = organizationId ?? null;
-    if (sandboxPreferenceOwnerRef.current === owner) return;
-    sandboxPreferenceOwnerRef.current = owner;
-
-    const allocation = getPreferredInitialSandboxAllocation({
-      options: sandboxCapabilities.options,
-      lastUsedKey: getLastUsedSandboxAllocationKey(organizationId),
-    });
-    if (allocation) setSandboxSelection({ organizationId, allocation });
-  }, [sandboxCapabilities, organizationId]);
+  const sandboxAllocation = sandbox.picker.allocation;
 
   // ---------------------------------------------------------------------------
   // Model auto-selection
@@ -1154,7 +1082,7 @@ export function NewSessionPanel({
     sandboxAllocation: sandboxAllocation ? getSandboxAllocationKey(sandboxAllocation) : undefined,
   });
   const sandboxSelectionError = resolveSandboxSelectionSubmissionError({
-    error: sandboxAvailabilityError,
+    error: sandbox.error,
     intent: creationIntent,
     pendingOperation: firstChatCreationOperation,
   });
@@ -1916,75 +1844,14 @@ export function NewSessionPanel({
           </Popover>
 
           <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto">
-            {showSandboxSelector && (
-              <Select
-                value={sandboxAllocation ? getSandboxAllocationKey(sandboxAllocation) : 'default'}
-                onValueChange={value => {
-                  if (value === 'default') {
-                    setSandboxSelection({ organizationId });
-                    setLastUsedSandboxAllocationKey(undefined, organizationId);
-                    return;
-                  }
-                  const selected = sandboxOptions.find(
-                    option => getSandboxAllocationKey(option.allocation) === value
-                  );
-                  if (selected) {
-                    setSandboxSelection({
-                      organizationId,
-                      allocation: selected.allocation,
-                    });
-                    setLastUsedSandboxAllocationKey(
-                      getSandboxAllocationKey(selected.allocation),
-                      organizationId
-                    );
-                  }
-                }}
-              >
-                <SelectTrigger
-                  id="new-session-sandbox"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground hover:bg-accent data-[state=open]:bg-accent min-w-0 max-w-full border-transparent bg-transparent px-2 text-xs shadow-none sm:max-w-80 [@media(pointer:coarse)]:min-h-11"
-                  aria-label={`Run on ${sandboxDestinationLabel}`}
-                  aria-describedby={sandboxDescriptionId}
-                  aria-invalid={!!sandboxSelectionError}
-                >
-                  <SelectValue className="min-w-0">
-                    <span className="truncate">{sandboxDestinationWithoutTier}</span>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent className="max-w-[calc(100vw-2rem)]">
-                  <SelectItem
-                    value="default"
-                    textValue={defaultSandboxLabel}
-                    className="[@media(pointer:coarse)]:min-h-11"
-                  >
-                    <span className="whitespace-normal">{defaultSandboxLabel}</span>
-                  </SelectItem>
-                  {sandboxGroups.length > 0 && <SelectSeparator />}
-                  {sandboxGroups.map(group => (
-                    <SelectGroup key={group.key} className="py-1">
-                      <SelectLabel className="text-foreground font-semibold">
-                        {group.label}
-                      </SelectLabel>
-                      {group.options.map(option => (
-                        <SelectItem
-                          key={getSandboxAllocationKey(option.allocation)}
-                          value={getSandboxAllocationKey(option.allocation)}
-                          textValue={formatSandboxInstance(option.allocation)}
-                          aria-label={formatSandboxDestination(option.allocation)}
-                          className="[@media(pointer:coarse)]:min-h-11"
-                        >
-                          <span className="flex min-w-0 flex-col gap-0.5 whitespace-normal">
-                            <span className="tabular-nums">
-                              {formatSandboxInstance(option.allocation)}
-                            </span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
+            {sandbox.isVisible && (
+              <NewSessionSandboxSelect
+                picker={sandbox.picker}
+                groups={sandbox.groups}
+                invalid={!!sandboxSelectionError}
+                describedBy={sandboxDescriptionId}
+                onChoose={sandbox.choose}
+              />
             )}
             <ProfilePickerPopover
               organizationId={organizationId}
@@ -2001,24 +1868,16 @@ export function NewSessionPanel({
             <p id="new-session-sandbox-error" className="text-destructive text-xs" role="alert">
               {sandboxSelectionError}
             </p>
-            <UIButton
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSandboxSelection({ organizationId });
-                setLastUsedSandboxAllocationKey(undefined, organizationId);
-              }}
-            >
-              Use Default
+            <UIButton type="button" variant="outline" size="sm" onClick={sandbox.chooseDefault}>
+              Use default sandbox
             </UIButton>
-            {sandboxSelectionQuery.isError && (
+            {sandbox.query.isError && (
               <UIButton
                 type="button"
                 variant="ghost"
                 size="sm"
-                disabled={sandboxSelectionQuery.isFetching}
-                onClick={() => void sandboxSelectionQuery.refetch()}
+                disabled={sandbox.query.isFetching}
+                onClick={() => void sandbox.query.refetch()}
               >
                 Retry
               </UIButton>

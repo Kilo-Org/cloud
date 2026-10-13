@@ -41,7 +41,10 @@ import { cn } from '@/lib/utils';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
 
-export function AgentSessionListScreen() {
+/** `segmentControl` renders under the header: the Agents tab's Sessions | To-dos switch. */
+export function AgentSessionListScreen({
+  segmentControl,
+}: Readonly<{ segmentControl?: ReactNode }> = {}) {
   const router = useRouter();
   const navigation = useNavigation();
   const { t } = useTranslation();
@@ -500,6 +503,7 @@ export function AgentSessionListScreen() {
           inlineActions={content === 'empty' ? undefined : headerActions}
           inlineActionsWidth={inlineActionsWidth}
         />
+        {segmentControl}
         {hasLiveRows || isSearching ? (
           <SessionListSearchHeader
             inputRef={query.searchInputRef}

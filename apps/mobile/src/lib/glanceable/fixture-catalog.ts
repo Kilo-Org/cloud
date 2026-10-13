@@ -1,5 +1,7 @@
 import { type GlanceableAgentsSnapshotStatus } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { APPROVAL_ROWS, combinationRows, many, mixedRows, roundWake } from './fixture-rows';
+import { SESSION_CARD_FIXTURES } from './session-fixture-catalog';
 import { type GlanceableActionFeedback } from './surface-extras';
 
 /**
@@ -12,6 +14,25 @@ import { type GlanceableActionFeedback } from './surface-extras';
  * `apps/mobile/scripts/glanceable-fixtures.json` lists the names and
  * descriptions for capture scripts; regenerate it after a catalog change.
  */
+
+/** The richer session card facts a fixture applies, as a server push would. */
+const MINUTE_MS = 60_000;
+
+type SessionCardFacts = {
+  step?: {
+    verb: 'editing' | 'reading' | 'running' | 'searching' | 'thinking' | 'other';
+    target: string | null;
+  };
+  plan?: { done: number; total: number; current: string | null };
+  changes?: { files: number; added: number; removed: number };
+  permissionCommand?: string;
+  outcome?: 'pr_opened' | 'changes' | 'none';
+  failure?: 'provider' | 'tool' | 'cancelled' | 'other';
+  /** Minutes since the last activity the server saw. */
+  activityAgo?: number;
+  costMicrodollars?: number;
+  startedAgo?: number;
+};
 
 export type GlanceableFixtureRow = {
   /** Tray status: `permission`/`question` (needs input), `busy`, `scheduled`, `idle`. */
@@ -31,79 +52,19 @@ export type GlanceableFixture = {
   checkedAgo?: number;
   rows?: (now: number) => GlanceableFixtureRow[];
   actionFeedback?: Exclude<GlanceableActionFeedback, null>;
+  /**
+   * Follow one row with a session card. `approvalKey` adds the key a server
+   * push carries for a permission wait; `finish` follows the row while it
+   * works, then reports it finished; `card` applies the richer facts a server
+   * push carries (the step, the plan, the diff, the outcome, the stop reason).
+   */
+  follow?: {
+    index: number;
+    approvalKey?: boolean;
+    finish?: boolean;
+    card?: SessionCardFacts;
+  };
 };
-
-const MINUTE_MS = 60_000;
-
-/** `count` rows of one status, the newest `ago` minutes back, each a minute older. */
-function many(
-  spec: Omit<GlanceableFixtureRow, 'title'> & { count: number }
-): GlanceableFixtureRow[] {
-  const { count, ago, ...rest } = spec;
-  return Array.from({ length: count }, (_, index) => ({
-    ...rest,
-    ago: ago + index,
-    title: `Agent ${spec.status} ${index + 1}`,
-  }));
-}
-
-/**
- * A wake on a round clock time at least two hours out, so the scheduled row
- * reads like a real schedule ("14:30") rather than an odd minute.
- */
-function roundWake(now: number): string {
-  const wake = new Date(now + 120 * MINUTE_MS);
-  wake.setMinutes(wake.getMinutes() <= 30 ? 30 : 60, 0, 0);
-  return wake.toISOString();
-}
-
-const APPROVAL_ROWS = (): GlanceableFixtureRow[] => [
-  { status: 'permission', ago: 28, title: 'Migrate the billing webhooks' },
-  { status: 'permission', ago: 9, title: 'Bump the Expo SDK' },
-  { status: 'question', ago: 3, title: 'Fix the flaky login test' },
-];
-
-/** All four kinds; `newest` picks which kind changed last (the large footer). */
-function mixedRows(
-  now: number,
-  newest: 'needsInput' | 'running' | 'scheduled' | 'idle'
-): GlanceableFixtureRow[] {
-  const ago = (kind: typeof newest, otherwise: number): number => (kind === newest ? 1 : otherwise);
-  return [
-    { status: 'permission', ago: ago('needsInput', 28), title: 'Migrate the billing webhooks' },
-    { status: 'question', ago: 31, title: 'Pick a color for the badge' },
-    { status: 'busy', ago: ago('running', 6), title: 'Fix the flaky login test' },
-    { status: 'busy', ago: 14, title: 'Write the release notes' },
-    { status: 'busy', ago: 22, title: 'Profile the session list' },
-    {
-      status: 'scheduled',
-      ago: ago('scheduled', 40),
-      title: 'Nightly dependency audit',
-      scheduledAt: roundWake(now),
-    },
-    { status: 'idle', ago: ago('idle', 55), title: 'Review the onboarding copy' },
-    { status: 'idle', ago: 70, title: 'Triage new issues' },
-  ];
-}
-
-const COMBINATION_STATUS = {
-  needsInput: 'permission',
-  running: 'busy',
-  scheduled: 'scheduled',
-  idle: 'idle',
-} as const;
-
-function combinationRows(
-  kinds: readonly (keyof typeof COMBINATION_STATUS)[]
-): (now: number) => GlanceableFixtureRow[] {
-  return now =>
-    kinds.map(kind => ({
-      status: COMBINATION_STATUS[kind],
-      ago: 12,
-      title: kind === 'scheduled' ? 'Nightly dependency audit' : 'Review authentication changes',
-      ...(kind === 'scheduled' ? { scheduledAt: roundWake(now) } : {}),
-    }));
-}
 
 export const GLANCEABLE_FIXTURES = {
   'signed-out': {
@@ -321,6 +282,7 @@ export const GLANCEABLE_FIXTURES = {
     description: 'Working, scheduled, and idle.',
     rows: combinationRows(['running', 'scheduled', 'idle']),
   },
+  ...SESSION_CARD_FIXTURES,
 } satisfies Record<string, GlanceableFixture>;
 
 export type GlanceableFixtureName = keyof typeof GLANCEABLE_FIXTURES;

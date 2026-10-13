@@ -25,6 +25,7 @@ const {
   mergeProfileConfigurationMock,
   organizationMembershipLimitMock,
   assertKiloModelAvailableMock,
+  getSandboxAllocationCandidatesMock,
 } = vi.hoisted(() => ({
   generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
   generateSandboxRoutingTargetMock: vi
@@ -52,6 +53,7 @@ const {
   mergeProfileConfigurationMock: vi.fn(),
   organizationMembershipLimitMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
+  getSandboxAllocationCandidatesMock: vi.fn(),
 }));
 
 vi.mock('@kilocode/cloud-agent-profile', async importActual => {
@@ -59,6 +61,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
   return {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
+    getSandboxAllocationCandidates: getSandboxAllocationCandidatesMock,
   };
 });
 
@@ -67,7 +70,9 @@ vi.mock('./db/pg.js', () => ({
     mockedDb: true,
     select: vi.fn(() => ({
       from: vi.fn(() => ({
-        where: vi.fn(() => ({ limit: organizationMembershipLimitMock })),
+        where: vi.fn(() =>
+          Object.assign(Promise.resolve([]), { limit: organizationMembershipLimitMock })
+        ),
       })),
     })),
   })),
@@ -289,6 +294,7 @@ describe('sandbox selection Worker API', () => {
     organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership' }]);
     mergeProfileConfigurationMock.mockResolvedValue({});
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
+    getSandboxAllocationCandidatesMock.mockResolvedValue({});
   });
 
   it('requires authentication for capability discovery', async () => {
@@ -326,11 +332,15 @@ describe('sandbox selection Worker API', () => {
     const caller = appRouter.createCaller(ctx);
     await expect(
       caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId })
-    ).resolves.toEqual({ enabled: false, options: [] });
+    ).resolves.toMatchObject({ enabled: false, options: [] });
     ctx.env.SANDBOX_SELECTION_IDS = orgId;
     const result = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId });
     expect(result.enabled).toBe(true);
-    expect(result.options.map(option => option.allocation)).toEqual([
+    expect(
+      result.options
+        .filter(option => option.unavailableReason === undefined)
+        .map(option => option.allocation)
+    ).toEqual([
       getSandboxAllocationRequest('cloudflare-containers-standard-3'),
       getSandboxAllocationRequest('cloudflare-shared'),
     ]);
@@ -351,6 +361,69 @@ describe('sandbox selection Worker API', () => {
       expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
     }
   );
+
+  it('reports the default destination even when selection is disabled', async () => {
+    const caller = appRouter.createCaller(createInternalApiContext({}));
+    const result = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId });
+    expect(result).toMatchObject({
+      enabled: false,
+      options: [],
+      defaultDestination: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+    });
+    expect(result.effectiveDestination).toBeUndefined();
+  });
+
+  describe('effective destination', () => {
+    const enrolledCaller = (owner: 'org' | 'personal' = 'org') => {
+      const ctx = createInternalApiContext({});
+      ctx.env.SANDBOX_SELECTION_IDS = owner === 'org' ? orgId : 'test-user-123';
+      return appRouter.createCaller(ctx);
+    };
+    const input = {
+      kilocodeOrganizationId: orgId,
+      repositoryType: 'github' as const,
+      repositoryFullName: 'Acme/Repo',
+    };
+
+    it('falls back to the default destination when nothing is saved', async () => {
+      const result = await enrolledCaller().getSandboxSelectionOptions(input);
+      expect(result.effectiveDestination).toEqual(result.defaultDestination);
+    });
+
+    it('prefers the repository override over the owner default', async () => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue({
+        repositoryAllocation: 'cloudflare-shared',
+        contextAllocation: 'cloudflare-single',
+      });
+      const result = await enrolledCaller().getSandboxSelectionOptions(input);
+      expect(result.effectiveDestination).toEqual(getSandboxAllocationRequest('cloudflare-shared'));
+      expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledWith(
+        expect.anything(),
+        { type: 'organization', id: orgId },
+        { platform: 'github', fullName: 'Acme/Repo' }
+      );
+    });
+
+    it('skips a saved allocation that is unavailable', async () => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue({
+        repositoryAllocation: 'vercel-small',
+        contextAllocation: 'cloudflare-shared',
+      });
+      const result = await enrolledCaller().getSandboxSelectionOptions({
+        ...input,
+        repositoryType: 'gitlab',
+      });
+      expect(result.effectiveDestination).toEqual(getSandboxAllocationRequest('cloudflare-shared'));
+    });
+
+    it('is not computed without a repository type', async () => {
+      const result = await enrolledCaller().getSandboxSelectionOptions({
+        kilocodeOrganizationId: orgId,
+      });
+      expect(result.effectiveDestination).toBeUndefined();
+      expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    });
+  });
 
   it('exposes personal capabilities without membership when the user is enrolled', async () => {
     const ctx = createInternalApiContext({});

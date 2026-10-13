@@ -192,11 +192,14 @@ export type PrepareSessionNonCloneInput = PrepareSessionSharedFields & {
   /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey?: string;
   cloneFromKiloSessionId?: undefined;
+  cloneUpToMessageId?: undefined;
 };
 
 /** Clone-only prepare input: copies the source session and forbids a synthetic initial turn. */
 export type PrepareSessionCloneInput = PrepareSessionSharedFields & {
   cloneFromKiloSessionId: string;
+  /** Inclusive cut: copy source messages up to and including this ID. */
+  cloneUpToMessageId?: string;
   autoInitiate: true;
   operationKey: string;
 };
@@ -207,6 +210,9 @@ export type PrepareSessionInput = PrepareSessionNonCloneInput | PrepareSessionCl
 export type GetSandboxSelectionOptionsInput = {
   kilocodeOrganizationId?: string;
   devcontainer?: boolean;
+  repositoryType?: 'github' | 'gitlab' | 'bitbucket' | 'git';
+  /** With `repositoryType`, resolves saved repository overrides into `effectiveDestination`. */
+  repositoryFullName?: string;
 };
 
 /** Output from prepareSession procedure */
@@ -1315,15 +1321,21 @@ const widgetApprovalKeyResponseSchema = z.object({
     .string()
     .regex(/^[a-f0-9]{64}$/)
     .nullable(),
+  // Absent when an older Worker answers; the session card then shows no command.
+  command: z.string().max(60).nullable().optional(),
 });
 
+/** The approval binding and the pending request's command, both null when none waits. */
+export type CloudAgentWidgetApproval = { approvalKey: string | null; command: string | null };
+
 /**
- * The Home widget's binding of the oldest pending permission on one owned
- * control-plane session: SHA-256 of `JSON.stringify([kiloSessionId,
- * permissionId])`, computed in the Worker so the raw permission never reaches
- * this process. The Worker re-checks user, organization scope and the
- * Kilo/cloud session pairing; the key grants no authority. Bounded, and throws
- * on any non-OK answer so the caller can drop the key while keeping counts.
+ * The binding of the oldest pending permission on one owned control-plane
+ * session: SHA-256 of `JSON.stringify([kiloSessionId, permissionId])`, computed
+ * in the Worker so the raw permission never reaches this process, plus that
+ * request's command (one trimmed line, at most 60 characters) for the session
+ * card. The Worker re-checks user, organization scope and the Kilo/cloud
+ * session pairing; the key grants no authority. Bounded, and throws on any
+ * non-OK answer so the caller can drop the identity while keeping counts.
  */
 export async function readCloudAgentWidgetApprovalKey(
   input: {
@@ -1333,7 +1345,7 @@ export async function readCloudAgentWidgetApprovalKey(
     cloudAgentSessionId: string;
   },
   signal?: AbortSignal
-): Promise<string | null> {
+): Promise<CloudAgentWidgetApproval> {
   const budget = AbortSignal.timeout(WIDGET_APPROVAL_KEY_BUDGET_MS);
   const response = await fetchWithinBudget(
     `${CLOUD_AGENT_NEXT_API_URL}/internal/widgets/approval-key`,
@@ -1351,5 +1363,6 @@ export async function readCloudAgentWidgetApprovalKey(
   if (!response.ok) {
     throw new Error(`Cloud Agent widget approval key failed: ${response.status}`);
   }
-  return widgetApprovalKeyResponseSchema.parse(await response.json()).approvalKey;
+  const parsed = widgetApprovalKeyResponseSchema.parse(await response.json());
+  return { approvalKey: parsed.approvalKey, command: parsed.command ?? null };
 }

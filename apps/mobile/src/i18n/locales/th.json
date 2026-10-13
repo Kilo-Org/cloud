@@ -136,7 +136,10 @@
     "working": "กำลังทำงาน",
     "yourOwnRepositories": "คลังโค้ดของคุณเอง",
     "dismissed": "ละเว้นแล้ว",
-    "agent": "ตัวแทน"
+    "agent": "ตัวแทน",
+    "durationMinuteShort": "น.",
+    "durationHourShort": "ชม.",
+    "changes": "การเปลี่ยนแปลง"
   },
   "language": {
     "restarting": "กำลังเริ่มแอปใหม่เพื่อเปลี่ยนภาษา",
@@ -325,6 +328,7 @@
       "collapseFile": "ย่อไฟล์",
       "expandFile": "ขยายไฟล์",
       "diffTooLarge": "ส่วนต่างมีขนาดใหญ่เกินกว่าจะแสดงได้",
+      "noPreview": "ไม่มีตัวอย่างสำหรับไฟล์นี้",
       "openOnGitHub": "เปิดบน GitHub",
       "openDiffOnGitHub": "เปิดส่วนต่างของไฟล์นี้บน GitHub",
       "githubDiff": "ส่วนต่างบน GitHub"
@@ -831,7 +835,8 @@
       "kiloclaw": "กิจกรรม KiloClaw",
       "balance": "การแจ้งเตือนยอดเงิน",
       "security": "ข้อค้นพบด้านความปลอดภัย",
-      "spend": "การแจ้งเตือนการใช้จ่าย"
+      "spend": "การแจ้งเตือนการใช้จ่าย",
+      "followedSessions": "เซสชันที่ติดตาม"
     },
     "category": {
       "chatMessagesSubtitle": "การตอบกลับในการสนทนาของคุณ",
@@ -2086,6 +2091,8 @@
       "title": "เซสชัน",
       "copyErrorDetails": "คัดลอกรายละเอียดข้อผิดพลาด",
       "backToSessions": "กลับไปที่เซสชัน",
+      "follow": "ติดตามบนหน้าจอล็อก",
+      "unfollow": "หยุดติดตามบนหน้าจอล็อก",
       "couldNotLoad": "ไม่สามารถโหลดเซสชันได้",
       "failedToLoadDetails": "ไม่สามารถโหลดรายละเอียดเซสชันได้",
       "failedToStopExecution": "ไม่สามารถหยุดการทำงานได้",
@@ -2152,6 +2159,11 @@
       "collapse": "ย่อเป้าหมาย",
       "expand": "ขยายเป้าหมาย"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "งาน เสร็จแล้ว {{completed}} จาก {{total}}",
+      "rowAccessibility": "งาน เสร็จแล้ว {{completed}} จาก {{total}} งานปัจจุบัน: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "ที่ใช้ล่าสุด",
       "couldNotLoadGithubRepositories": "ไม่สามารถโหลดคลังโค้ดจาก GitHub ได้",
@@ -2184,7 +2196,6 @@
       "retryLoadingEnvironment": "ลองโหลดสภาพแวดล้อมใหม่",
       "defaultEnvironment": "สภาพแวดล้อมเริ่มต้น",
       "environmentSummary": "{{commands}} คำสั่ง · {{mcp}} MCP · {{skills}} ทักษะ · {{agents}} เอเจนต์",
-      "changes": "การเปลี่ยนแปลง",
       "leaveChanges": "เก็บการแก้ไขไว้",
       "commitAndPush": "คอมมิตและพุช",
       "startSession": "เริ่มเซสชัน",
@@ -2207,6 +2218,10 @@
       "importingSession": "กำลังนำเข้าเซสชัน",
       "cliCannotContinue": "CLI นี้ไม่สามารถทำงานต่อจากเซสชันเดิมได้ เลือก Cloud Agent หรือ CLI อื่น",
       "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้",
+      "cliCannotFork": "อัปเดต Kilo CLI เพื่อแยกเซสชันจากข้อความ",
+      "forkCutNotSynced": "ข้อความนี้ยังไม่ได้บันทึก ลองอีกครั้งในอีกสักครู่",
+      "forkFilesFromBaseBranch": "ไฟล์จะเริ่มจาก base branch",
+      "forkFilesUnchangedOnComputer": "ไฟล์ในคอมพิวเตอร์เครื่องนี้จะไม่ถูกเปลี่ยนแปลง",
       "pickProfile": "เลือกโปรไฟล์",
       "noProfile": "ไม่มีโปรไฟล์",
       "manageProfiles": "จัดการโปรไฟล์",
@@ -2251,8 +2266,8 @@
       "toolList": "แสดงรายการ",
       "toolPatch": "ใช้แพตช์",
       "toolTask": "งาน",
-      "readTodos": "อ่านรายการงาน",
-      "updateTodos": "อัปเดตรายการงาน",
+      "readTodos": "อ่านแผน",
+      "updateTodos": "อัปเดตแผน",
       "linesBadge": "{{displayCount}} บรรทัด",
       "filesBadge": "{{displayCount}} ไฟล์",
       "matchesBadge": "พบ {{displayCount}} รายการ",
@@ -2322,6 +2337,7 @@
       "copyMessage": "คัดลอกข้อความ",
       "copyText": "คัดลอกข้อความ",
       "selectText": "เลือกข้อความ",
+      "forkFromHere": "แยกเซสชันจากตรงนี้",
       "reportAiResponse": "รายงานคำตอบของ AI",
       "reportAiResponseConfirm": "รายงานคำตอบนี้เพื่อตรวจสอบหรือไม่?",
       "report": "รายงาน",
@@ -2641,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}} จาก {{provider}} · {{steps}} · {{cost}}",
       "modelsCount_one": "โมเดล ({{displayCount}})",
       "modelsCount_other": "โมเดล ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ดูการเปลี่ยนแปลง",
+      "asOf": "ณ เวลา {{time}}",
+      "tooLarge": "ส่วนต่างนี้มีขนาดใหญ่เกินกว่าจะแสดงบนมือถือได้",
+      "empty": "ยังไม่มีการเปลี่ยนแปลงไฟล์ในเซสชันนี้"
     },
     "autoApprove": {
       "title": "อนุมัติอัตโนมัติ",
@@ -3153,6 +3175,8 @@
     "channelName": "เอเจนต์ที่กำลังทำงาน",
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก",
     "openSession": "เปิด",
+    "finished": "เสร็จแล้ว",
+    "followFailed": "ไม่สามารถแสดงเอเจนต์นี้บนหน้าจอล็อกได้",
     "approveFailed": "อนุมัติไม่สำเร็จ แตะ $t(common.approve) เพื่อลองอีกครั้ง",
     "checked": "ตรวจสอบล่าสุด",
     "lastKnown": "สถานะล่าสุดที่ทราบ",
@@ -3161,7 +3185,26 @@
     "waitingForYou": "รอคุณ",
     "nextScheduled": "กำหนดการถัดไป",
     "answerNeeded": "รอคำตอบ",
-    "waitingToRetry": "รอลองใหม่"
+    "waitingToRetry": "รอลองใหม่",
+    "step": {
+      "editing": "กำลังแก้ไข",
+      "reading": "กำลังอ่าน",
+      "running": "รัน",
+      "searching": "ค้นหาเว็บ",
+      "thinking": "กำลังคิดทบทวน"
+    },
+    "planOf": "จาก",
+    "filesChanged": "ไฟล์ที่เปลี่ยนแปลง",
+    "finishedIn": "เสร็จใน",
+    "noActivityFor": "ไม่มีกิจกรรมเป็นเวลา",
+    "prOpened": "เปิดพูลรีเควสต์แล้ว",
+    "permissionWants": "ต้องการรัน",
+    "failure": {
+      "provider": "หยุด: ผู้ให้บริการเกิดข้อผิดพลาด",
+      "tool": "หยุด: เครื่องมือเกิดข้อผิดพลาด",
+      "cancelled": "หยุด: ถูกยกเลิก",
+      "other": "หยุดแล้ว"
+    }
   },
   "transcriptionModel": {
     "title": "โมเดลถอดเสียง",
@@ -3197,10 +3240,32 @@
     "list": {
       "loadFailed": "ไม่สามารถโหลดประวัติแชทได้",
       "new": "แชทใหม่",
-      "openHint": "เปิดแชท กดค้างเพื่อลบ",
       "deleteTitle": "ลบแชทนี้ไหม"
     },
+    "rename": {
+      "title": "เปลี่ยนชื่อแชท",
+      "accessibility": "เปลี่ยนชื่อแชท: {{title}}",
+      "openHint": "เปิดแชท กดค้างเพื่อเปลี่ยนชื่อหรือลบ"
+    },
     "beta": "เบต้า",
+    "details": {
+      "title": "รายละเอียดแชท",
+      "backend": "ระบบเบื้องหลัง",
+      "effortDefault": "ค่าเริ่มต้นของโมเดล",
+      "noCost": "ไม่มีค่าใช้จ่าย",
+      "costUnknown": "ไม่ทราบ",
+      "costEstimatedNote": "คำตอบที่ไม่ได้รายงานราคาจะประมาณค่าจากราคาตามรายการ",
+      "costUnknownNote": "ไม่ทราบราคาของโมเดลนี้",
+      "costPartialNote": "ยอดรวมนี้ไม่รวมโมเดลที่ไม่ทราบราคา",
+      "localNote": "โมเดลบนอุปกรณ์ทำงานบนอุปกรณ์นี้ ไม่มีค่าใช้จ่ายและไม่มีแคชพรอมต์ และจำนวนโทเค็นอาจเป็นค่าประมาณ",
+      "countedSinceNote": "แชทนี้เริ่มก่อนที่จะมีการบันทึกการใช้งาน ยอดรวมจึงแสดงเฉพาะคำตอบหลังจากนั้น",
+      "remoteServersOn": "เซิร์ฟเวอร์ MCP ระยะไกลที่เปิดอยู่"
+    },
+    "webSearch": {
+      "title": "ค้นหาบนเว็บ",
+      "description": "อนุญาตให้แชทนี้ค้นหาข้อมูลล่าสุดผ่านบัญชี Kilo ของคุณ การค้นหาจะใช้โควตาการค้นหารายเดือนของคุณ",
+      "allowanceExhausted": "การค้นหาเว็บฟรีของคุณสำหรับเดือนนี้หมดแล้ว เพิ่มเครดิตเพื่อค้นหาอีกครั้ง"
+    },
     "mcp": {
       "title": "เครื่องมือ Kilo",
       "use": "ใช้เครื่องมือ Kilo",
@@ -3223,7 +3288,6 @@
       "fieldName": "ชื่อที่แสดง",
       "fieldUrl": "URL ของเซิร์ฟเวอร์",
       "fieldUrlInvalid": "ป้อน URL ของเซิร์ฟเวอร์ที่ถูกต้อง",
-      "fieldToken": "โทเค็น Bearer (ไม่บังคับ)",
       "enableServer": "เปิดใช้งานเซิร์ฟเวอร์นี้: {{name}}",
       "editServer": "แก้ไขเซิร์ฟเวอร์",
       "deleteServer": "ลบเซิร์ฟเวอร์",
@@ -3243,6 +3307,18 @@
       "serverToolCount": "{{count}} เครื่องมือ",
       "serverUnreachable": "ไม่สามารถเข้าถึงเซิร์ฟเวอร์นี้ได้",
       "serverOff": "เซิร์ฟเวอร์นี้ปิดอยู่"
+    },
+    "mcpOAuth": {
+      "authMethod": "การยืนยันตัวตน",
+      "authNone": "ไม่ต้องลงชื่อเข้าใช้",
+      "authBearer": "โทเค็น Bearer",
+      "authOAuth": "ลงชื่อเข้าใช้ด้วย OAuth",
+      "fieldToken": "โทเค็น",
+      "oauthHint": "หลังจากบันทึกแล้ว ให้แตะ $t(modelChat.mcpOAuth.signIn) ที่เซิร์ฟเวอร์เพื่อลงชื่อเข้าใช้ผ่านเบราว์เซอร์",
+      "serverNeedsSignIn": "ลงชื่อเข้าใช้เพื่อใช้เซิร์ฟเวอร์นี้",
+      "signIn": "ลงชื่อเข้าใช้",
+      "signInA11y": "ลงชื่อเข้าใช้เซิร์ฟเวอร์นี้: {{name}}",
+      "signInFailed": "ไม่สามารถลงชื่อเข้าใช้ {{name}} ได้ โปรดลองอีกครั้ง"
     },
     "backends": {
       "title": "ระบบเบื้องหลังแชท",
@@ -3326,8 +3402,48 @@
         "notGguf": "ลิงก์ต้องชี้ไปยังไฟล์ .gguf",
         "space": "พื้นที่ว่างไม่เพียงพอสำหรับโมเดลนี้ โปรดเพิ่มพื้นที่ว่างแล้วลองอีกครั้ง",
         "network": "การดาวน์โหลดไม่เสร็จสิ้น ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
-        "invalidFile": "ไฟล์ที่ดาวน์โหลดไม่ใช่โมเดลที่แอปนี้รันได้ จึงถูกลบออก"
+        "invalidFile": "ไฟล์ที่ดาวน์โหลดไม่ใช่โมเดลที่แอปนี้รันได้ จึงถูกลบออก",
+        "checksum": "ไฟล์ที่ดาวน์โหลดไม่ตรงกับค่าตรวจสอบที่เผยแพร่ไว้ จึงถูกลบออก ลองดาวน์โหลดอีกครั้ง"
       }
+    },
+    "catalog": {
+      "browse": "เรียกดูโมเดล",
+      "title": "แคตตาล็อกโมเดล",
+      "search": "ค้นหาโมเดลบน Hugging Face",
+      "tabs": "ตัวกรองโมเดล",
+      "fitsTab": "เหมาะกับอุปกรณ์นี้",
+      "fromHuggingFace": "จาก Hugging Face",
+      "loading": "กำลังโหลดโมเดล",
+      "noResults": "ไม่พบโมเดล",
+      "noFits": "ไม่มีโมเดลที่เหมาะกับอุปกรณ์นี้",
+      "noFitsDescription": "โมเดลที่ใหญ่กว่าอยู่ในแท็บ$t(common.all)",
+      "fit": {
+        "fits": "เหมาะสม",
+        "tight": "พอดีเกือบเต็ม",
+        "tooLarge": "ใหญ่เกินไป",
+        "noStorage": "พื้นที่จัดเก็บไม่พอ"
+      },
+      "parameters": "พารามิเตอร์: {{value}}",
+      "downloads": "ยอดดาวน์โหลด: {{value}}",
+      "likes": "ยอดถูกใจ: {{value}}",
+      "context": "หน้าต่างบริบท: {{value}}",
+      "license": "สัญญาอนุญาต: {{license}}",
+      "licenseUnknown": "ไม่ได้ระบุสัญญาอนุญาต",
+      "tools": "การเรียกใช้เครื่องมือ",
+      "vision": "รับอินพุตรูปภาพ",
+      "hintsHelp": "ข้อมูลแนะนำจาก Hugging Face แอปจะตรวจสอบโมเดลหลังดาวน์โหลดเสร็จ",
+      "gated": "โมเดลนี้ต้องใช้บัญชี Hugging Face แอปจึงดาวน์โหลดไม่ได้",
+      "quantizations": "ควอนไทซ์",
+      "quantizationsHelp": "ไฟล์ที่เล็กกว่าใช้หน่วยความจำและพื้นที่จัดเก็บน้อยกว่า ไฟล์ที่ใหญ่กว่ามักให้คำตอบที่ดีกว่า",
+      "quantDetail": "ดาวน์โหลด {{size}} · ใช้หน่วยความจำประมาณ {{memory}}",
+      "downloadQuant": "ดาวน์โหลด {{quant}}",
+      "loadingModel": "กำลังโหลดรายละเอียดโมเดล",
+      "couldNotLoadModel": "โหลดโมเดลนี้ไม่ได้",
+      "noFiles": "ไม่มีไฟล์ที่แอปนี้เรียกใช้ได้",
+      "noFilesDescription": "แอปนี้เรียกใช้ได้เฉพาะโมเดลที่เป็นไฟล์ GGUF ไฟล์เดียว",
+      "tooLargeTitle": "โมเดลนี้อาจทำงานไม่ได้",
+      "tooLargeMessage": "{{name}} อาจต้องใช้หน่วยความจำมากกว่าที่อุปกรณ์นี้มี แอปอาจปิดตัวลงขณะที่โมเดลกำลังตอบ ต้องการดาวน์โหลดต่อหรือไม่",
+      "downloadAnyway": "ดาวน์โหลดต่อ"
     },
     "localModels": {
       "title": "โมเดลบนอุปกรณ์",
@@ -3357,6 +3473,9 @@
       "downloading": "กำลังดาวน์โหลด…",
       "downloadProgress": "กำลังดาวน์โหลด… {{percent}}%",
       "downloadFailed": "ดาวน์โหลดไม่สำเร็จ ตรวจสอบการเชื่อมต่อและพื้นที่ว่าง แล้วลองอีกครั้ง"
+    },
+    "reasoningEffort": {
+      "modelFlag": "โมเดลนี้รองรับระดับการใช้เหตุผล"
     }
   },
   "settingsTools": {
@@ -3579,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play ไม่ได้ส่งแพ็กเกจเครดิตที่ตรงกันกลับมา",
     "purchaseOwnedByAnotherAccount": "เครดิตใน Apple Account นี้เป็นของบัญชี Kilo อื่น ลงชื่อเข้าใช้บัญชี Kilo นั้นเพื่อใช้งาน",
     "purchaseOwnedByAnotherAccountPlay": "เครดิตในบัญชี Google Play นี้เป็นของบัญชี Kilo อื่น ลงชื่อเข้าใช้บัญชี Kilo นั้นเพื่อใช้งาน"
+  },
+  "todos": {
+    "saveAsTodo": "บันทึกเป็นงาน",
+    "segment": {
+      "label": "มุมมองเอเจนต์",
+      "sessions": "เซสชัน",
+      "todos": "งาน"
+    },
+    "lists": {
+      "newList": "รายการใหม่",
+      "empty": "ยังไม่มีรายการ",
+      "couldNotLoad": "ไม่สามารถโหลดรายการได้",
+      "noRepository": "ไม่มีคลังโค้ด",
+      "rowA11y": "{{name}} {{openCount}}",
+      "openCount_one": "เปิดอยู่ {{count}}",
+      "openCount_other": "เปิดอยู่ {{count}}",
+      "archived_one": "เก็บถาวรแล้ว ({{count}})",
+      "archived_other": "เก็บถาวรแล้ว ({{count}})",
+      "archive": "เก็บถาวร",
+      "unarchive": "นำออกจากที่เก็บถาวร",
+      "deleteTitle": "ลบ {{name}} หรือไม่?",
+      "deleteMessage": "งานในรายการนี้จะถูกลบด้วย เซสชันยังคงอยู่"
+    },
+    "listSettings": {
+      "title": "การตั้งค่ารายการ",
+      "name": "ชื่อ",
+      "namePlaceholder": "บั๊ก ไอเดีย รีลีส…",
+      "emoji": "อีโมจิ",
+      "mode": "โหมด",
+      "defaultsHint": "เซสชันที่เริ่มจากรายการนี้จะใช้ค่าเริ่มต้นเหล่านี้"
+    },
+    "list": {
+      "addPlaceholder": "งานใหม่",
+      "add": "เพิ่มงาน",
+      "empty": "ยังไม่มีงาน",
+      "setDefaults": "ตั้งค่าคลังโค้ด โหมด และโมเดล",
+      "completed_one": "เสร็จสิ้น ({{count}})",
+      "completed_other": "เสร็จสิ้น ({{count}})"
+    },
+    "item": {
+      "markDone": "ทำเครื่องหมายว่าเสร็จ",
+      "markOpen": "ทำเครื่องหมายว่ายังไม่เสร็จ",
+      "markDonePrompt": "ทำเครื่องหมายว่าเสร็จหรือไม่?",
+      "deleted": "ลบงานแล้ว",
+      "undo": "เลิกทำ",
+      "runCount_one": "รัน {{count}} ครั้ง",
+      "runCount_other": "รัน {{count}} ครั้ง",
+      "startNow": "เริ่มโดยไม่ต้องตรวจสอบ",
+      "startNowHint": "กดค้างเพื่อเริ่มโดยไม่ต้องตรวจสอบ",
+      "titleLabel": "ชื่องาน",
+      "notes": "บันทึก",
+      "notesPlaceholder": "เพิ่มบันทึกใน Markdown",
+      "sessions": "เซสชันที่เชื่อมโยง",
+      "noSessions": "ยังไม่มีเซสชัน",
+      "linkSession": "เชื่อมโยงเซสชัน",
+      "unlinkSession": "ยกเลิกการเชื่อมโยง {{title}}",
+      "linkFailed": "ไม่สามารถเชื่อมโยงเซสชันกับงานได้"
+    },
+    "linkSession": {
+      "title": "เลือกเซสชันที่จะเชื่อมโยง",
+      "empty": "ไม่มีเซสชันล่าสุด",
+      "emptyInRepository": "ไม่มีเซสชันล่าสุดใน {{repository}}"
+    },
+    "upNext": "ถัดไป",
+    "sessionTodo": "งาน: {{title}}",
+    "linkToTodo": "เชื่อมโยงกับงาน",
+    "candidates": {
+      "empty": "ไม่มีงานที่เปิดอยู่"
+    },
+    "saveSheet": {
+      "title": "บันทึกในรายการ",
+      "saved": "บันทึกใน {{list}} แล้ว"
+    }
   }
 }

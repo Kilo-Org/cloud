@@ -136,7 +136,10 @@
     "working": "בפעולה",
     "yourOwnRepositories": "המאגרים שלך",
     "dismissed": "סומן להתעלמות",
-    "agent": "סוֹכֵן"
+    "agent": "סוֹכֵן",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "שינויים"
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -320,7 +323,8 @@
       "kiloclaw": "פעילות KiloClaw",
       "balance": "התראות על היתרה",
       "security": "ממצאי אבטחה",
-      "spend": "התראות הוצאות"
+      "spend": "התראות הוצאות",
+      "followedSessions": "הפעלות במעקב"
     },
     "category": {
       "chatMessagesSubtitle": "תשובות בשיחות שלך",
@@ -1587,6 +1591,8 @@
       "title": "סשן",
       "copyErrorDetails": "העתקת פרטי השגיאה",
       "backToSessions": "חזרה לסשנים",
+      "follow": "מעקב במסך הנעילה",
+      "unfollow": "הפסקת מעקב במסך הנעילה",
       "couldNotLoad": "לא ניתן היה לטעון את הסשן.",
       "failedToLoadDetails": "לא ניתן היה לטעון את פרטי הסשן.",
       "failedToStopExecution": "לא ניתן היה לעצור את ההרצה.",
@@ -1653,6 +1659,11 @@
       "collapse": "כיווץ המטרה",
       "expand": "הרחבת המטרה"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "משימות, {{completed}} מתוך {{total}} הושלמו",
+      "rowAccessibility": "משימות, {{completed}} מתוך {{total}} הושלמו. המשימה הנוכחית: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "בשימוש לאחרונה",
       "couldNotLoadGithubRepositories": "לא ניתן היה לטעון את המאגרים מ-GitHub.",
@@ -1685,7 +1696,6 @@
       "retryLoadingEnvironment": "ניסיון נוסף לטעון את הסביבה",
       "defaultEnvironment": "סביבת ברירת מחדל",
       "environmentSummary": "{{commands}} פקודות · {{mcp}} MCP · {{skills}} מיומנויות · {{agents}} סוכנים",
-      "changes": "שינויים",
       "leaveChanges": "השארת השינויים",
       "commitAndPush": "קומיט ודחיפה",
       "startSession": "התחלת סשן",
@@ -1708,6 +1718,10 @@
       "importingSession": "מייבא סשן…",
       "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
       "importFailed": "לא ניתן היה לייבא את הסשן הזה.",
+      "cliCannotFork": "עדכן את ה-Kilo CLI כדי לפצל מהודעה.",
+      "forkCutNotSynced": "ההודעה הזו עדיין לא נשמרה. נסה שוב בעוד רגע.",
+      "forkFilesFromBaseBranch": "הקבצים מתחילים מענף הבסיס.",
+      "forkFilesUnchangedOnComputer": "הקבצים במחשב הזה לא משתנים.",
       "pickProfile": "בחר פרופיל",
       "noProfile": "אין פרופיל",
       "manageProfiles": "נהל פרופילים",
@@ -1753,8 +1767,8 @@
       "toolList": "הצגת רשימה",
       "toolPatch": "החלת תיקון",
       "toolTask": "משימה",
-      "readTodos": "קריאת משימות",
-      "updateTodos": "עדכון משימות",
+      "readTodos": "קריאת התוכנית",
+      "updateTodos": "עדכון התוכנית",
       "linesBadge": "{{displayCount}} שורות",
       "filesBadge": "{{displayCount}} קבצים",
       "matchesBadge": "{{displayCount}} התאמות",
@@ -1831,6 +1845,7 @@
       "copyMessage": "העתקת ההודעה",
       "copyText": "העתקת טקסט",
       "selectText": "בחירת טקסט",
+      "forkFromHere": "פיצול מכאן",
       "reportAiResponse": "דיווח על תשובת AI",
       "reportAiResponseConfirm": "לדווח על התשובה הזו כדי שתיבדק?",
       "report": "דיווח",
@@ -2152,6 +2167,12 @@
       "modelsCount_one": "מודל ({{displayCount}})",
       "modelsCount_other": "מודלים ({{displayCount}})",
       "modelsCount_two": "מודלים ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "הצגת השינויים",
+      "asOf": "נכון ל-{{time}}",
+      "tooLarge": "השוואת השינויים גדולה מדי להצגה בנייד.",
+      "empty": "עדיין אין שינויים בקבצים בסשן הזה."
     },
     "autoApprove": {
       "title": "אישור אוטומטי",
@@ -2662,6 +2683,7 @@
     "fileRows": {
       "collapseFile": "כיווץ הקובץ",
       "diffTooLarge": "השוואת השינויים גדולה מדי להצגה.",
+      "noPreview": "אין תצוגה מקדימה זמינה לקובץ הזה",
       "expandFile": "הרחבת הקובץ",
       "markViewed": "סימון {{path}} כנצפה",
       "openDiffOnGitHub": "פתיחת השוואת השינויים בקובץ הזה ב-GitHub",
@@ -3194,6 +3216,8 @@
     "channelName": "סוכנים פעילים",
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה.",
     "openSession": "פתח",
+    "finished": "הסתיים",
+    "followFailed": "לא ניתן להציג את הסוכן הזה במסך הנעילה.",
     "approveFailed": "לא ניתן היה לאשר. הקש על $t(common.approve) כדי לנסות שוב.",
     "checked": "נבדק",
     "lastKnown": "מצב אחרון ידוע",
@@ -3202,7 +3226,26 @@
     "waitingForYou": "ממתין לך",
     "nextScheduled": "התזמונים הבאים",
     "answerNeeded": "נדרשת תשובה",
-    "waitingToRetry": "ממתין לניסיון חוזר"
+    "waitingToRetry": "ממתין לניסיון חוזר",
+    "step": {
+      "editing": "עריכה",
+      "reading": "קריאה",
+      "running": "הרצה",
+      "searching": "חיפוש באינטרנט",
+      "thinking": "חשיבה מעמיקה"
+    },
+    "planOf": "מתוך",
+    "filesChanged": "קבצים שונו",
+    "finishedIn": "הסתיים תוך",
+    "noActivityFor": "אין פעילות במשך",
+    "prOpened": "בקשת משיכה נפתחה",
+    "permissionWants": "רוצה להריץ",
+    "failure": {
+      "provider": "נעצר: שגיאת ספק",
+      "tool": "נעצר: שגיאת כלי",
+      "cancelled": "נעצר: בוטל",
+      "other": "עצור"
+    }
   },
   "transcriptionModel": {
     "title": "מודל תמלול",
@@ -3238,10 +3281,32 @@
     "list": {
       "loadFailed": "לא ניתן היה לטעון את היסטוריית השיחה.",
       "new": "צ'אט חדש",
-      "openHint": "פותח את הצ'אט. לחיצה ארוכה למחיקה.",
       "deleteTitle": "למחוק את הצ'אט הזה?"
     },
+    "rename": {
+      "title": "שינוי שם הצ׳אט",
+      "accessibility": "שינוי שם הצ׳אט: {{title}}",
+      "openHint": "פותח את הצ'אט. לחיצה ארוכה לשינוי שם או למחיקה."
+    },
     "beta": "בטא",
+    "details": {
+      "title": "פרטי הצ׳אט",
+      "backend": "שרת",
+      "effortDefault": "ברירת המחדל של המודל",
+      "noCost": "ללא עלות",
+      "costUnknown": "לא ידוע",
+      "costEstimatedNote": "העלות של תשובות שלא דיווחו על מחיר מוערכת לפי מחירון.",
+      "costUnknownNote": "לא ידוע מחיר למודל הזה.",
+      "costPartialNote": "הסכום הזה אינו כולל מודלים שאין להם מחיר ידוע.",
+      "localNote": "מודלים במכשיר פועלים במכשיר הזה. אין להם עלות ואין להם מטמון הנחיות, וספירת הטוקנים שלהם עשויה להיות הערכה.",
+      "countedSinceNote": "הצ׳אט הזה התחיל לפני שהשימוש תועד. הסכומים מציגים רק את התשובות שאחרי כן.",
+      "remoteServersOn": "שרתי MCP מרוחקים מופעלים"
+    },
+    "webSearch": {
+      "title": "חיפוש באינטרנט",
+      "description": "אפשרו לצ'אט הזה לחפש מידע עדכני דרך חשבון Kilo שלכם. החיפושים מנצלים את מכסת החיפוש החודשית שלכם.",
+      "allowanceExhausted": "החיפושים החינמיים באינטרנט לחודש הזה נוצלו. הוסיפו קרדיטים כדי לחפש שוב."
+    },
     "mcp": {
       "title": "כלי Kilo",
       "use": "שימוש בכלי Kilo",
@@ -3264,7 +3329,6 @@
       "fieldName": "שם תצוגה",
       "fieldUrl": "כתובת URL של השרת",
       "fieldUrlInvalid": "הזינו כתובת URL חוקית של שרת.",
-      "fieldToken": "אסימון Bearer (אופציונלי)",
       "enableServer": "הפעלת השרת הזה: {{name}}",
       "editServer": "עריכת השרת",
       "deleteServer": "מחיקת השרת",
@@ -3284,6 +3348,18 @@
       "serverToolCount": "{{count}} כלים",
       "serverUnreachable": "לא ניתן היה להגיע לשרת הזה",
       "serverOff": "השרת הזה כבוי"
+    },
+    "mcpOAuth": {
+      "authMethod": "אימות",
+      "authNone": "ללא כניסה",
+      "authBearer": "אסימון Bearer",
+      "authOAuth": "כניסה עם OAuth",
+      "fieldToken": "אסימון",
+      "oauthHint": "לאחר השמירה, הקש על $t(modelChat.mcpOAuth.signIn) בשרת כדי להיכנס באמצעות הדפדפן.",
+      "serverNeedsSignIn": "היכנס כדי להשתמש בשרת הזה",
+      "signIn": "כניסה",
+      "signInA11y": "כניסה לשרת הזה: {{name}}",
+      "signInFailed": "לא ניתן היה להיכנס אל {{name}}. נסה שוב."
     },
     "backends": {
       "title": "שרתי צ׳אט",
@@ -3367,8 +3443,48 @@
         "notGguf": "הקישור חייב להצביע לקובץ .gguf.",
         "space": "אין מספיק שטח אחסון פנוי למודל הזה. פנה מקום ונסה שוב.",
         "network": "ההורדה לא הושלמה. בדוק את החיבור ונסה שוב.",
-        "invalidFile": "הקובץ שהורד אינו מודל שהאפליקציה הזו יכולה להריץ, ולכן הוא הוסר."
+        "invalidFile": "הקובץ שהורד אינו מודל שהאפליקציה הזו יכולה להריץ, ולכן הוא הוסר.",
+        "checksum": "הקובץ שהורד אינו תואם לסכום הביקורת שפורסם עבורו, ולכן הוא הוסר. נסו להוריד אותו שוב."
       }
+    },
+    "catalog": {
+      "browse": "עיון במודלים",
+      "title": "קטלוג מודלים",
+      "search": "חיפוש מודלים ב-Hugging Face",
+      "tabs": "סינון מודלים",
+      "fitsTab": "מתאימים למכשיר",
+      "fromHuggingFace": "מ-Hugging Face",
+      "loading": "טוען מודלים",
+      "noResults": "לא נמצאו מודלים",
+      "noFits": "אין מודלים שמתאימים למכשיר הזה",
+      "noFitsDescription": "מודלים גדולים יותר נמצאים בכרטיסייה $t(common.all).",
+      "fit": {
+        "fits": "מתאים",
+        "tight": "בקושי מתאים",
+        "tooLarge": "גדול מדי",
+        "noStorage": "אין מספיק אחסון"
+      },
+      "parameters": "פרמטרים: {{value}}",
+      "downloads": "הורדות: {{value}}",
+      "likes": "לייקים: {{value}}",
+      "context": "חלון הקשר: {{value}}",
+      "license": "רישיון: {{license}}",
+      "licenseUnknown": "הרישיון לא צוין",
+      "tools": "קריאה לכלים",
+      "vision": "קלט תמונה",
+      "hintsHelp": "רמזים מ-Hugging Face. האפליקציה בודקת את המודל אחרי ההורדה.",
+      "gated": "המודל הזה דורש חשבון Hugging Face, ולכן האפליקציה לא יכולה להוריד אותו.",
+      "quantizations": "קוונטיזציות",
+      "quantizationsHelp": "קבצים קטנים יותר צורכים פחות זיכרון ואחסון. קבצים גדולים יותר בדרך כלל נותנים תשובות טובות יותר.",
+      "quantDetail": "הורדה של {{size}} · כ-{{memory}} זיכרון",
+      "downloadQuant": "הורד {{quant}}",
+      "loadingModel": "טוען פרטי מודל",
+      "couldNotLoadModel": "לא ניתן לטעון את המודל הזה",
+      "noFiles": "אין קבצים שהאפליקציה יכולה להריץ",
+      "noFilesDescription": "האפליקציה מריצה מודלים שהם קובץ GGUF יחיד.",
+      "tooLargeTitle": "ייתכן שהמודל הזה לא יפעל",
+      "tooLargeMessage": "סביר ש-{{name}} צריך יותר זיכרון ממה שיש במכשיר הזה. האפליקציה עלולה להיסגר בזמן שהמודל עונה. להוריד בכל זאת?",
+      "downloadAnyway": "הורד בכל זאת"
     },
     "localModels": {
       "title": "מודלים במכשיר",
@@ -3398,6 +3514,9 @@
       "downloading": "מתבצעת הורדה…",
       "downloadProgress": "מתבצעת הורדה… {{percent}}%",
       "downloadFailed": "ההורדה לא הושלמה. יש לבדוק את החיבור לאינטרנט ואת שטח האחסון הפנוי, ולנסות שוב."
+    },
+    "reasoningEffort": {
+      "modelFlag": "המודל הזה תומך במאמץ חשיבה"
     }
   },
   "settingsTools": {
@@ -3620,5 +3739,82 @@
     "noMatchingProductsPlay": "Google Play לא החזיר חבילות קרדיטים תואמות.",
     "purchaseOwnedByAnotherAccount": "הקרדיטים בחשבון Apple Account הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם.",
     "purchaseOwnedByAnotherAccountPlay": "הקרדיטים בחשבון Google Play הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם."
+  },
+  "todos": {
+    "saveAsTodo": "שמירה כמשימה",
+    "segment": {
+      "label": "תצוגת סוכנים",
+      "sessions": "סשנים",
+      "todos": "משימות"
+    },
+    "lists": {
+      "newList": "רשימה חדשה",
+      "empty": "אין רשימות עדיין",
+      "couldNotLoad": "לא הצלחנו לטעון רשימות",
+      "noRepository": "בלי מאגר",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} פתוח",
+      "openCount_other": "{{count}} פתוח",
+      "openCount_two": "{{count}} פתוחים",
+      "archived_one": "בארכיון ({{count}})",
+      "archived_other": "בארכיון ({{count}})",
+      "archived_two": "בארכיון ({{count}})",
+      "archive": "העברה לארכיון",
+      "unarchive": "הוצאה מהארכיון",
+      "deleteTitle": "למחוק את {{name}}?",
+      "deleteMessage": "המשימות שבה נמחקות גם כן. הסשנים שלהן נשארים."
+    },
+    "listSettings": {
+      "title": "הגדרות רשימה",
+      "name": "שם",
+      "namePlaceholder": "באגים, רעיונות, גרסה…",
+      "emoji": "אמוג׳י",
+      "mode": "מצב",
+      "defaultsHint": "סשנים שמתחילים מהרשימה הזו משתמשים בברירות המחדל האלה."
+    },
+    "list": {
+      "addPlaceholder": "הוסף משימה",
+      "add": "הוספת משימה",
+      "empty": "אין משימות עדיין",
+      "setDefaults": "הגדרת מאגר, מצב ומודל",
+      "completed_one": "הושלמו ({{count}})",
+      "completed_other": "הושלמו ({{count}})",
+      "completed_two": "הושלמו ({{count}})"
+    },
+    "item": {
+      "markDone": "סימון כבוצע",
+      "markOpen": "סימון כלא בוצע",
+      "markDonePrompt": "לסמן כבוצע?",
+      "deleted": "המשימה נמחקה",
+      "undo": "בטל",
+      "runCount_one": "{{count}} ריצה",
+      "runCount_other": "{{count}} ריצות",
+      "runCount_two": "{{count}} ריצות",
+      "startNow": "התחלה בלי סקירה",
+      "startNowHint": "לחיצה ארוכה כדי להתחיל בלי סקירה",
+      "titleLabel": "כותרת המשימה",
+      "notes": "הערות",
+      "notesPlaceholder": "הוספת הערות ב-Markdown",
+      "sessions": "סשנים מקושרים",
+      "noSessions": "אין סשנים עדיין",
+      "linkSession": "קישור סשן",
+      "unlinkSession": "ביטול הקישור של {{title}}",
+      "linkFailed": "לא הצלחנו לקשר את הסשן למשימה"
+    },
+    "linkSession": {
+      "title": "קישור לסשן",
+      "empty": "אין סשנים אחרונים",
+      "emptyInRepository": "אין סשנים אחרונים במאגר {{repository}}"
+    },
+    "upNext": "הבא בתור",
+    "sessionTodo": "משימה: {{title}}",
+    "linkToTodo": "קישור למשימה",
+    "candidates": {
+      "empty": "אין משימות פתוחות"
+    },
+    "saveSheet": {
+      "title": "שמירה ברשימה",
+      "saved": "נשמר ברשימה {{list}}"
+    }
   }
 }

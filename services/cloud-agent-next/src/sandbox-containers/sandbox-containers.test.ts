@@ -2229,7 +2229,7 @@ describe('SandboxContainers repository snapshots', () => {
       startSource: 'image',
     });
     await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
-    await vi.advanceTimersByTimeAsync(90_000);
+    await vi.advanceTimersByTimeAsync(300_000);
     await launched;
     expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual({ snapshotId: 'snap-broken' });
     expect(readRecord().repositoryStartFailures).toEqual({
@@ -2305,7 +2305,56 @@ describe('SandboxContainers repository snapshots', () => {
     expect(store.data.has(key)).toBe(true);
   });
 
-  it('bounds snapshot confirmation by the supplied deadline so the owner can fall back', async () => {
+  it.each([undefined, 310_000])(
+    'allows a cold snapshot to become ready after four minutes with deadline %s',
+    async deadlineAt => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10_000);
+      const key = await indexKeyFor();
+      const store = fakeKv({ [key]: { snapshotId: 'snap-cold' } });
+      const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+      container.identityAfterStart = 'ambiguous';
+
+      const launched = expect(launchFromRepo(instance, REF_A, { deadlineAt })).resolves.toEqual({
+        started: true,
+        startSource: 'repository',
+      });
+      await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
+      await vi.advanceTimersByTimeAsync(240_000);
+      container.mainProcess = 'supervisor';
+      await vi.advanceTimersByTimeAsync(1_000);
+      await launched;
+      expect(container.startCalls).toHaveLength(1);
+      expect(readRecord().repositoryStartFailures).toBeUndefined();
+    }
+  );
+
+  it.each(['repository', 'image'] as const)(
+    'bounds %s confirmation by its start-source timeout',
+    async source => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10_000);
+      const { diagnostics } = captureLogs();
+      const key = await indexKeyFor();
+      const store = fakeKv(source === 'repository' ? { [key]: { snapshotId: 'snap-cold' } } : {});
+      const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+      container.identityAfterStart = 'ambiguous';
+      const launch = launchFromRepo(instance, REF_A);
+      const failed =
+        source === 'repository'
+          ? expect(launch).resolves.toMatchObject({ snapshotFailed: true })
+          : expect(launch).rejects.toThrow('wrapper exec timed out');
+      await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
+      const budget = source === 'repository' ? 300_000 : 90_000;
+      await vi.advanceTimersByTimeAsync(budget - 1_000);
+      expect(container.startCalls).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await failed;
+      expect(diagnostics('supervisor_confirm')[0].fields.elapsedMs).toBe(budget);
+    }
+  );
+
+  it('bounds snapshot confirmation by the supplied creation deadline', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(10_000);
     const { diagnostics } = captureLogs();
@@ -2320,7 +2369,8 @@ describe('SandboxContainers repository snapshots', () => {
     await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
     await vi.advanceTimersByTimeAsync(5_000);
     await failed;
-    expect(diagnostics('supervisor_confirm')[0].fields.elapsedMs).toBeLessThanOrEqual(2_500);
+    expect(diagnostics('supervisor_confirm')[0].fields.elapsedMs).toBeGreaterThan(4_000);
+    expect(diagnostics('supervisor_confirm')[0].fields.elapsedMs).toBeLessThanOrEqual(5_000);
     expect(container.destroyCalls).toBe(0);
   });
 

@@ -136,7 +136,10 @@
     "working": "Працуе",
     "yourOwnRepositories": "Твае рэпазіторыі",
     "dismissed": "Адхілена",
-    "agent": "Агент"
+    "agent": "Агент",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Змены"
   },
   "language": {
     "restarting": "Перазапуск для змены мовы",
@@ -325,6 +328,7 @@
       "collapseFile": "Згарнуць файл",
       "expandFile": "Разгарнуць файл",
       "diffTooLarge": "Змен занадта шмат для паказу.",
+      "noPreview": "Папярэдні прагляд гэтага файла недаступны",
       "openOnGitHub": "Адкрыць на GitHub",
       "openDiffOnGitHub": "Адкрыць змены гэтага файла на GitHub",
       "githubDiff": "Змены на GitHub"
@@ -863,7 +867,8 @@
       "kiloclaw": "Актыўнасць KiloClaw",
       "balance": "Апавяшчэнні аб балансе",
       "security": "Выяўленыя праблемы бяспекі",
-      "spend": "Апавяшчэнні аб выдатаках"
+      "spend": "Апавяшчэнні аб выдатаках",
+      "followedSessions": "Адсочваемыя сеансы"
     },
     "category": {
       "chatMessagesSubtitle": "адказы ў вашых размовах",
@@ -2142,6 +2147,8 @@
       "title": "Сеанс",
       "copyErrorDetails": "Капіяваць падрабязнасці памылкі",
       "backToSessions": "Назад да сеансаў",
+      "follow": "Сачыць на экране блакіроўкі",
+      "unfollow": "Перастаць сачыць на экране блакіроўкі",
       "couldNotLoad": "Не ўдалося загрузіць сеанс.",
       "failedToLoadDetails": "Не ўдалося загрузіць падрабязнасці сеанса.",
       "failedToStopExecution": "Не ўдалося спыніць выкананне.",
@@ -2208,6 +2215,11 @@
       "collapse": "Згарнуць мэту",
       "expand": "Разгарнуць мэту"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Мэты, {{completed}} з {{total}} выканана",
+      "rowAccessibility": "Мэты, {{completed}} з {{total}} выканана. Бягучая мэта: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Нядаўна выкарыстаныя",
       "couldNotLoadGithubRepositories": "Не ўдалося загрузіць рэпазіторыі GitHub.",
@@ -2240,7 +2252,6 @@
       "retryLoadingEnvironment": "Паўтарыць загрузку асяроддзя",
       "defaultEnvironment": "Прадвызначанае асяроддзе",
       "environmentSummary": "каманд: {{commands}} · MCP: {{mcp}} · навыкаў: {{skills}} · агентаў: {{agents}}",
-      "changes": "Змены",
       "leaveChanges": "Пакінуць змены",
       "commitAndPush": "Закаміціць і адправіць",
       "startSession": "Пачаць сеанс",
@@ -2263,6 +2274,10 @@
       "importingSession": "Імпартаванне сеанса",
       "cliCannotContinue": "Гэты CLI не падтрымлівае працяг сеанса. Выберыце Cloud Agent або іншы CLI.",
       "importFailed": "Не ўдалося імпартаваць гэты сеанс.",
+      "cliCannotFork": "Абнавіце Kilo CLI, каб адгалінаваць сеанс ад паведамлення.",
+      "forkCutNotSynced": "Гэта паведамленне яшчэ не захавана. Паспрабуйце крыху пазней.",
+      "forkFilesFromBaseBranch": "Файлы бяруцца з базавай галіны.",
+      "forkFilesUnchangedOnComputer": "Файлы на гэтым камп'ютары не змяняюцца.",
       "pickProfile": "Выберыце профіль",
       "noProfile": "Няма профілю",
       "manageProfiles": "Кіраванне профілямі",
@@ -2309,8 +2324,8 @@
       "toolList": "спіс файлаў",
       "toolPatch": "выпраўленне",
       "toolTask": "задача",
-      "readTodos": "Прачытаць спіс задач",
-      "updateTodos": "Абнавіць спіс задач",
+      "readTodos": "Прачытаць план",
+      "updateTodos": "Абнавіць план",
       "linesBadge": "радкоў: {{displayCount}}",
       "filesBadge": "файлаў: {{displayCount}}",
       "matchesBadge": "супадзенняў: {{displayCount}}",
@@ -2386,6 +2401,7 @@
       "copyMessage": "Капіяваць паведамленне",
       "copyText": "Капіяваць тэкст",
       "selectText": "Вылучыць тэкст",
+      "forkFromHere": "Адгалінаваць адсюль",
       "reportAiResponse": "Паскардзіцца на адказ AI",
       "reportAiResponseConfirm": "Адправіць скаргу на гэты адказ для праверкі?",
       "report": "Паскардзіцца",
@@ -2717,6 +2733,12 @@
       "modelsCount_other": "Мадэлі ({{displayCount}})",
       "modelsCount_few": "Мадэлі ({{displayCount}})",
       "modelsCount_many": "Мадэлі ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Паглядзець змены",
+      "asOf": "Па стане на {{time}}",
+      "tooLarge": "Змен занадта шмат для паказу на мабільнай прыладзе.",
+      "empty": "У гэтым сеансе пакуль няма змен у файлах."
     },
     "autoApprove": {
       "title": "Аўтаматычнае адабрэнне",
@@ -3235,6 +3257,8 @@
     "channelName": "Актыўныя агенты",
     "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі.",
     "openSession": "Адкрыць",
+    "finished": "Скончыў",
+    "followFailed": "Не ўдалося паказаць гэтага агента на экране блакіроўкі.",
     "approveFailed": "Не ўдалося ўхваліць. Націсніце $t(common.approve), каб паспрабаваць яшчэ раз.",
     "checked": "Праверана",
     "lastKnown": "Апошні вядомы стан",
@@ -3243,7 +3267,26 @@
     "waitingForYou": "Чакае вас",
     "nextScheduled": "Наступныя запланаваныя",
     "answerNeeded": "Патрэбны адказ",
-    "waitingToRetry": "Чакае паўторнай спробы"
+    "waitingToRetry": "Чакае паўторнай спробы",
+    "step": {
+      "editing": "Рэдагаванне",
+      "reading": "Чытанне",
+      "running": "Запуск",
+      "searching": "Вэб-пошук",
+      "thinking": "Абдумванне"
+    },
+    "planOf": "з",
+    "filesChanged": "файлаў зменена",
+    "finishedIn": "Завершана за",
+    "noActivityFor": "Няма актыўнасці за",
+    "prOpened": "Запыт на зліццё адкрыты",
+    "permissionWants": "Хоча запусціць",
+    "failure": {
+      "provider": "Спынена: памылка правайдэра",
+      "tool": "Спынена: памылка інструмента",
+      "cancelled": "Спынена: скасавана",
+      "other": "СПЫНЕНЫ"
+    }
   },
   "transcriptionModel": {
     "title": "Мадэль распазнавання маўлення",
@@ -3279,10 +3322,32 @@
     "list": {
       "loadFailed": "Не атрымалася загрузіць гісторыю чата.",
       "new": "Новы чат",
-      "openHint": "Адкрывае чат. Утрымлівайце, каб выдаліць.",
       "deleteTitle": "Выдаліць гэты чат?"
     },
+    "rename": {
+      "title": "Перайменаваць чат",
+      "accessibility": "Перайменаваць чат: {{title}}",
+      "openHint": "Адкрывае чат. Утрымлівайце, каб перайменаваць або выдаліць."
+    },
     "beta": "Бэта",
+    "details": {
+      "title": "Падрабязнасці чата",
+      "backend": "Серверная частка",
+      "effortDefault": "Па змаўчанні для мадэлі",
+      "noCost": "Без кошту",
+      "costUnknown": "Невядома",
+      "costEstimatedNote": "Кошт адказаў, для якіх цана не была паведамлена, ацэнены па прэйскуранце.",
+      "costUnknownNote": "Цана гэтай мадэлі невядомая.",
+      "costPartialNote": "Гэтая сума не ўключае мадэлі, цана якіх невядомая.",
+      "localNote": "Мадэлі на прыладзе працуюць на гэтай прыладзе. У іх няма кошту і кэша запытаў, а колькасць токенаў можа быць прыблізнай.",
+      "countedSinceNote": "Гэты чат пачаўся да таго, як пачалі запісваць выкарыстанне. Сумы паказваюць толькі адказы пасля гэтага.",
+      "remoteServersOn": "Уключаныя дыстанцыйныя серверы MCP"
+    },
+    "webSearch": {
+      "title": "Шукаць у інтэрнэце",
+      "description": "Дазвольце гэтаму чату шукаць актуальную інфармацыю праз ваш уліковы запіс Kilo. Пошукі выкарыстоўваюць ваш штомесячны ліміт пошуку.",
+      "allowanceExhausted": "Вашы бясплатныя вэб-пошукі на гэты месяц скончыліся. Дадайце крэдыты, каб шукаць зноў."
+    },
     "mcp": {
       "title": "Інструменты Kilo",
       "use": "Выкарыстоўваць інструменты Kilo",
@@ -3305,7 +3370,6 @@
       "fieldName": "Бачная назва",
       "fieldUrl": "URL сервера",
       "fieldUrlInvalid": "Увядзіце сапраўдны URL сервера.",
-      "fieldToken": "Токен Bearer (неабавязкова)",
       "enableServer": "Уключыць гэты сервер: {{name}}",
       "editServer": "Рэдагаваць сервер",
       "deleteServer": "Выдаліць сервер",
@@ -3325,6 +3389,18 @@
       "serverToolCount": "{{count}} інструментаў",
       "serverUnreachable": "Не ўдалося дасягнуць гэтага сервера",
       "serverOff": "Гэты сервер выключаны"
+    },
+    "mcpOAuth": {
+      "authMethod": "Аўтэнтыфікацыя",
+      "authNone": "Без уваходу",
+      "authBearer": "Токен Bearer",
+      "authOAuth": "Уваход праз OAuth",
+      "fieldToken": "Токен",
+      "oauthHint": "Пасля захавання націсніце $t(modelChat.mcpOAuth.signIn) на серверы, каб увайсці праз браўзер.",
+      "serverNeedsSignIn": "Увайдзіце, каб выкарыстоўваць гэты сервер",
+      "signIn": "Увайсці",
+      "signInA11y": "Увайсці на гэты сервер: {{name}}",
+      "signInFailed": "Не ўдалося ўвайсці ў {{name}}. Паспрабуйце зноў."
     },
     "backends": {
       "title": "Серверныя часткі чата",
@@ -3408,8 +3484,48 @@
         "notGguf": "Спасылка павінна паказваць на файл .gguf.",
         "space": "Не хапае вольнага месца для гэтай мадэлі. Вызваліце месца і паспрабуйце зноў.",
         "network": "Спампоўванне не завяршылася. Праверце злучэнне і паспрабуйце зноў.",
-        "invalidFile": "Спампаваны файл не з'яўляецца мадэллю, якую можа запусціць гэта праграма, таму ён быў выдалены."
+        "invalidFile": "Спампаваны файл не з'яўляецца мадэллю, якую можа запусціць гэта праграма, таму ён быў выдалены.",
+        "checksum": "Спампаваны файл не адпавядае апублікаванай кантрольнай суме, таму ён быў выдалены. Паспрабуйце спампаваць яго яшчэ раз."
       }
+    },
+    "catalog": {
+      "browse": "Агляд мадэляў",
+      "title": "Каталог мадэляў",
+      "search": "Пошук мадэляў на Hugging Face",
+      "tabs": "Фільтр мадэляў",
+      "fitsTab": "Падыходзяць гэтай прыладзе",
+      "fromHuggingFace": "З Hugging Face",
+      "loading": "Загрузка мадэляў",
+      "noResults": "Мадэлі не знойдзены",
+      "noFits": "Няма мадэляў, якія падыходзяць гэтай прыладзе",
+      "noFitsDescription": "Большыя мадэлі знаходзяцца на ўкладцы «$t(common.all)».",
+      "fit": {
+        "fits": "Падыходзіць",
+        "tight": "Ледзь падыходзіць",
+        "tooLarge": "Занадта вялікая",
+        "noStorage": "Недастаткова месца"
+      },
+      "parameters": "Параметры: {{value}}",
+      "downloads": "Спампоўкі: {{value}}",
+      "likes": "Упадабанні: {{value}}",
+      "context": "Кантэкстнае акно: {{value}}",
+      "license": "Ліцэнзія: {{license}}",
+      "licenseUnknown": "Ліцэнзія не пазначана",
+      "tools": "Выклік інструментаў",
+      "vision": "Увод выяў",
+      "hintsHelp": "Падказкі з Hugging Face. Праграма правярае мадэль пасля спампоўкі.",
+      "gated": "Для гэтай мадэлі патрэбны ўліковы запіс Hugging Face, таму праграма не можа яе спампаваць.",
+      "quantizations": "Квантаванні",
+      "quantizationsHelp": "Меншыя файлы выкарыстоўваюць менш памяці і месца. Большыя файлы звычайна даюць лепшыя адказы.",
+      "quantDetail": "Спампоўка {{size}} · каля {{memory}} памяці",
+      "downloadQuant": "Спампаваць {{quant}}",
+      "loadingModel": "Загрузка звестак пра мадэль",
+      "couldNotLoadModel": "Не ўдалося загрузіць гэту мадэль",
+      "noFiles": "Няма файлаў, якія можа запусціць гэта праграма",
+      "noFilesDescription": "Гэта праграма запускае мадэлі, якія складаюцца з аднаго файла GGUF.",
+      "tooLargeTitle": "Гэта мадэль можа не запусціцца",
+      "tooLargeMessage": "Мадэлі {{name}}, верагодна, патрэбна больш памяці, чым ёсць на гэтай прыладзе. Праграма можа закрыцца, пакуль мадэль адказвае. Усё роўна спампаваць?",
+      "downloadAnyway": "Усё роўна спампаваць"
     },
     "localModels": {
       "title": "Мадэлі на прыладзе",
@@ -3439,6 +3555,9 @@
       "downloading": "Спампоўванне…",
       "downloadProgress": "Спампоўванне… {{percent}}%",
       "downloadFailed": "Спампоўванне не завяршылася. Праверце злучэнне і вольнае месца, потым паспрабуйце зноў."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Гэтая мадэль падтрымлівае ўзровень разважанняў"
     }
   },
   "settingsTools": {
@@ -3661,5 +3780,86 @@
     "noMatchingProductsPlay": "Google Play не вярнуў адпаведных набораў крэдытаў.",
     "purchaseOwnedByAnotherAccount": "Крэдыты на гэтым Apple Account належаць іншаму ўліковаму запісу Kilo. Увайдзіце ў той уліковы запіс Kilo, каб імі карыстацца.",
     "purchaseOwnedByAnotherAccountPlay": "Крэдыты на гэтым Google Play належаць іншаму ўліковаму запісу Kilo. Увайдзіце ў той уліковы запіс Kilo, каб імі карыстацца."
+  },
+  "todos": {
+    "saveAsTodo": "Захаваць як задачу",
+    "segment": {
+      "label": "Выгляд агентаў",
+      "sessions": "Сеансы",
+      "todos": "Задачы"
+    },
+    "lists": {
+      "newList": "Новы спіс",
+      "empty": "Спісаў пакуль няма",
+      "couldNotLoad": "Не атрымалася загрузіць спісы",
+      "noRepository": "Няма рэпазіторыя",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} адкрытых",
+      "openCount_other": "{{count}} адкрытых",
+      "openCount_few": "{{count}} адкрытыя",
+      "openCount_many": "{{count}} адкрытых",
+      "archived_one": "У архіве ({{count}})",
+      "archived_other": "У архіве ({{count}})",
+      "archived_few": "У архіве ({{count}})",
+      "archived_many": "У архіве ({{count}})",
+      "archive": "Архіваваць",
+      "unarchive": "Вярнуць з архіва",
+      "deleteTitle": "Выдаліць {{name}}?",
+      "deleteMessage": "Яго задачы таксама будуць выдалены. Сеансы застануцца."
+    },
+    "listSettings": {
+      "title": "Налады спіса",
+      "name": "Назва",
+      "namePlaceholder": "Памылкі, Ідэі, Выпуск…",
+      "emoji": "Эмодзі",
+      "mode": "Рэжым",
+      "defaultsHint": "Сеансы, запушчаныя з гэтага спіса, выкарыстоўваюць гэтыя параметры па змаўчанні."
+    },
+    "list": {
+      "addPlaceholder": "Новая задача",
+      "add": "Дадаць задачу",
+      "empty": "Задач пакуль няма",
+      "setDefaults": "Задаць рэпазіторый, рэжым і мадэль",
+      "completed_one": "Завершана ({{count}})",
+      "completed_other": "Завершана ({{count}})",
+      "completed_few": "Завершаны ({{count}})",
+      "completed_many": "Завершана ({{count}})"
+    },
+    "item": {
+      "markDone": "Пазначыць як выкананую",
+      "markOpen": "Пазначыць як невыкананую",
+      "markDonePrompt": "Пазначыць як выкананую?",
+      "deleted": "Задача выдалена",
+      "undo": "Вярнуць",
+      "runCount_one": "{{count}} запуск",
+      "runCount_other": "{{count}} запуск",
+      "runCount_few": "{{count}} запускі",
+      "runCount_many": "{{count}} запускаў",
+      "startNow": "Запусціць без праверкі",
+      "startNowHint": "Націсніце і ўтрымлівайце, каб запусціць без праверкі",
+      "titleLabel": "Назва задачы",
+      "notes": "Заўвагі",
+      "notesPlaceholder": "Дадаць заўвагі ў Markdown",
+      "sessions": "Звязаныя сеансы",
+      "noSessions": "Сеансаў пакуль няма",
+      "linkSession": "Звязаць сеанс",
+      "unlinkSession": "Адвязаць {{title}}",
+      "linkFailed": "Не атрымалася звязаць сеанс з задачай"
+    },
+    "linkSession": {
+      "title": "Прывязаць сеанс",
+      "empty": "Нядаўніх сеансаў няма",
+      "emptyInRepository": "Няма нядаўніх сеансаў у {{repository}}"
+    },
+    "upNext": "Далей",
+    "sessionTodo": "Задача: {{title}}",
+    "linkToTodo": "Звязаць з задачай",
+    "candidates": {
+      "empty": "Няма адкрытых задач"
+    },
+    "saveSheet": {
+      "title": "Захаваць у спіс",
+      "saved": "Захавана ў {{list}}"
+    }
   }
 }

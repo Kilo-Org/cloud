@@ -34,10 +34,13 @@ type McpServersSectionProps = {
   readonly servers: readonly RemoteMcpServerRow[];
   /** The servers whose Retry is in flight, so only those buttons show it. */
   readonly retryingIds: readonly string[];
+  /** The servers whose sign-in is in flight, so only those buttons show it. */
+  readonly signingInIds: readonly string[];
   readonly onToggle: (id: string, next: boolean) => void;
   readonly onEdit: (id: string) => void;
   readonly onDelete: (id: string) => void;
   readonly onRetry: (id: string) => void;
+  readonly onSignIn: (id: string) => void;
   readonly onAdd: () => void;
 };
 
@@ -45,10 +48,12 @@ export function McpServersSection({
   loaded,
   servers,
   retryingIds,
+  signingInIds,
   onToggle,
   onEdit,
   onDelete,
   onRetry,
+  onSignIn,
   onAdd,
 }: Readonly<McpServersSectionProps>) {
   const { t } = useTranslation();
@@ -73,6 +78,7 @@ export function McpServersSection({
         key={row.id}
         row={row}
         retrying={retryingIds.includes(row.id)}
+        signingIn={signingInIds.includes(row.id)}
         onToggle={next => {
           onToggle(row.id, next);
         }}
@@ -84,6 +90,9 @@ export function McpServersSection({
         }}
         onRetry={() => {
           onRetry(row.id);
+        }}
+        onSignIn={() => {
+          onSignIn(row.id);
         }}
       />
     ));
@@ -133,20 +142,25 @@ type McpServerRowProps = {
   readonly row: RemoteMcpServerRow;
   /** This row's Retry is in flight, so its button shows it is working. */
   readonly retrying: boolean;
+  /** This row's sign-in is in flight, so its button shows it is working. */
+  readonly signingIn: boolean;
   readonly onToggle: (next: boolean) => void;
   readonly onEdit: () => void;
   readonly onDelete: () => void;
   readonly onRetry: () => void;
+  readonly onSignIn: () => void;
 };
 
 /** One remote server: what it is, what it answered, and what may be done to it. */
 function McpServerRow({
   row,
   retrying,
+  signingIn,
   onToggle,
   onEdit,
   onDelete,
   onRetry,
+  onSignIn,
 }: Readonly<McpServerRowProps>) {
   const { t } = useTranslation();
   return (
@@ -192,6 +206,17 @@ function McpServerRow({
             onPress={onRetry}
           >
             <Text>{t('common.retry')}</Text>
+          </Button>
+        ) : null}
+        {row.signIn || signingIn ? (
+          <Button
+            key={signingIn ? 'signing-in' : 'idle'}
+            size="sm"
+            loading={signingIn}
+            accessibilityLabel={t('modelChat.mcpOAuth.signInA11y', { name: row.name })}
+            onPress={onSignIn}
+          >
+            <Text>{t('modelChat.mcpOAuth.signIn')}</Text>
           </Button>
         ) : null}
         <Button

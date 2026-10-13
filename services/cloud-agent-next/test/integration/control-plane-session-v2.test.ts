@@ -854,6 +854,35 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     stream.close();
   });
 
+  it('persists and replays the snapshot fallback preparation step', async () => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onRoute({
+      state: 'preparing',
+      step: 'snapshot_fallback',
+      detail: 'Snapshot startup failed. Retrying without a snapshot.',
+      attemptId: peer.attemptId,
+    });
+
+    const stream = await connectStream(sessionId);
+    const connected = await waitForStreamEvent(stream, 'connected');
+    expect(connected.data).toMatchObject({
+      cloudStatus: { type: 'preparing', step: 'snapshot_fallback' },
+    });
+    const replayed = preparingRows(await drainStream(stream));
+    expect(
+      replayed.find(
+        row => row.action === 'step_snapshot' && row.stepSnapshot?.key === 'snapshot_fallback'
+      )?.stepSnapshot
+    ).toMatchObject({
+      key: 'snapshot_fallback',
+      status: 'running',
+      latestDetail: 'Snapshot startup failed. Retrying without a snapshot.',
+    });
+    stream.close();
+  });
+
   it('shows live step detail and keeps it across a stepless repeated prepare', async () => {
     const { sessionId, stub, peer } = await setup();
     peer.prepareView = peer.view('preparing');

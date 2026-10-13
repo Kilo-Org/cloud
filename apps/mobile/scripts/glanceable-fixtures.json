@@ -145,6 +145,38 @@
     {
       "name": "mix-running-scheduled-idle",
       "description": "Working, scheduled, and idle."
+    },
+    {
+      "name": "session-card-running",
+      "description": "Session card: Working, with the elapsed time since the last change."
+    },
+    {
+      "name": "session-card-permission",
+      "description": "Session card: Needs input on a permission, with Approve and Open (the key matches no live request)."
+    },
+    {
+      "name": "session-card-scheduled",
+      "description": "Session card: Scheduled, with the wake time."
+    },
+    {
+      "name": "session-card-finished",
+      "description": "Session card: followed while Working, then Finished with the finish time; it leaves the Lock Screen after 15 minutes."
+    },
+    {
+      "name": "session-card-rtl-title",
+      "description": "Session card: Working with a right-to-left title. Launch the app in Arabic to mirror the card."
+    },
+    {
+      "name": "session-card-quiet",
+      "description": "Session card: Working with no activity past the quiet window."
+    },
+    {
+      "name": "session-card-question",
+      "description": "Session card: Waiting for an answer, with the step count and Open."
+    },
+    {
+      "name": "session-card-failed",
+      "description": "Session card: a finished turn that failed, with the stop reason."
     }
   ]
 }

@@ -16,6 +16,11 @@ export type GgufModelRecord = {
    * it reads images. A record saved before projectors existed reads false.
    */
   readonly vision: boolean;
+  /**
+   * True only when the model's chat template reads `enable_thinking`. A record
+   * saved before the switch existed reads false.
+   */
+  readonly thinking: boolean;
 };
 
 /** A downloaded model as the inference client needs it. */
@@ -40,7 +45,7 @@ export type GgufDownload = {
   readonly total: number;
 };
 
-export type GgufDownloadProblem = 'space' | 'network' | 'invalidFile';
+export type GgufDownloadProblem = 'space' | 'network' | 'invalidFile' | 'checksum';
 
 export type GgufDownloadsSnapshot = {
   readonly models: readonly GgufModelRecord[];
@@ -64,6 +69,8 @@ export type GgufStorage = {
   readonly freeBytes: () => number;
   readonly list: () => readonly string[];
   readonly size: (name: string) => number;
+  /** The file's SHA-256 as lowercase hex. */
+  readonly sha256: (name: string) => Promise<string>;
   readonly remove: (name: string) => void;
   readonly move: (from: string, to: string) => void;
   readonly path: (name: string) => string;
@@ -82,6 +89,7 @@ export type GgufInspection = {
   readonly tools: boolean;
   /** False without a projector. */
   readonly vision: boolean;
+  readonly thinking: boolean;
 };
 
 /** Throws for a file llama.cpp cannot load, and for a projector it cannot load with the model. */
@@ -130,6 +138,8 @@ const modelRecord = z.object({
   tools: z.boolean(),
   // Saved before projectors existed: the model reads text only.
   vision: z.boolean().default(false),
+  // Saved before the thinking switch existed: the model is offered without it.
+  thinking: z.boolean().default(false),
 });
 
 /** The files a record keeps on the device. */

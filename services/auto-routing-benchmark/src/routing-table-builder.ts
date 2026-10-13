@@ -1,6 +1,7 @@
 import {
   CustomRoutingTableSchema,
   poolEntryKey,
+  RANKING_POLICY_VERSION,
   rankCandidates,
   RoutingTableSchema,
   TAXONOMY_ROUTE_KEYS,
@@ -63,6 +64,7 @@ export function buildRoutingTable(params: {
             model: s.model,
             accuracy: s.accuracy,
             avgCostUsd: s.avgCostUsd ?? 0,
+            p50LatencyMs: s.p50LatencyMs,
             variant,
           };
         }),
@@ -100,9 +102,9 @@ function fnv1aHex(input: string): string {
 
 /**
  * Deterministic version id for a table assembled from the registry: a hash of
- * the contributing (runId, model, variant) triples, so identical assembly
- * inputs produce the same id and cache-hit. Used by both the platform table and
- * each owner's sparse custom table.
+ * the contributing (runId, model, variant) triples and the ranking policy, so
+ * identical assembly inputs produce the same id and cache-hit. Used by both the
+ * platform table and each owner's sparse custom table.
  */
 export function computeRegistryRoutingTableVersion(
   contributors: readonly { runId: string; model: string; variant: string | null }[],
@@ -121,6 +123,8 @@ export function computeRegistryRoutingTableVersion(
     JSON.stringify({
       parts,
       knobs: [knobs.minAccuracy, knobs.switchCostFactor, knobs.bestAccuracySwitchThreshold],
+      // A ranking change reorders tables built from unchanged measurements.
+      policy: RANKING_POLICY_VERSION,
     })
   )}`;
 }
@@ -189,6 +193,7 @@ export function buildCustomRoutingTable(params: {
           model: s.model,
           accuracy: s.accuracy,
           avgCostUsd: s.avgCostUsd ?? 0,
+          p50LatencyMs: s.p50LatencyMs,
           // Exact-pair identity only — never emit reasoningEffort on custom tables.
           variant: s.variant ?? null,
         })),

@@ -5,6 +5,8 @@
 // adds no runtime import of the package barrel.
 export type { LucideIcon } from 'lucide-react-native';
 export { default as Activity } from 'lucide-react-native/icons/activity';
+export { default as Archive } from 'lucide-react-native/icons/archive';
+export { default as ArchiveRestore } from 'lucide-react-native/icons/archive-restore';
 export { default as AlertCircle } from 'lucide-react-native/icons/circle-alert';
 export { default as AlertTriangle } from 'lucide-react-native/icons/triangle-alert';
 export { default as ArrowRight } from 'lucide-react-native/icons/arrow-right';
@@ -72,6 +74,7 @@ export { default as Globe } from 'lucide-react-native/icons/globe';
 export { default as HelpCircle } from 'lucide-react-native/icons/circle-question-mark';
 export { default as History } from 'lucide-react-native/icons/rotate-ccw-clock';
 export { default as House } from 'lucide-react-native/icons/house';
+export { default as ImageIcon } from 'lucide-react-native/icons/image';
 export { default as ImageOff } from 'lucide-react-native/icons/image-off';
 export { default as Inbox } from 'lucide-react-native/icons/inbox';
 export { default as Info } from 'lucide-react-native/icons/info';
@@ -150,6 +153,7 @@ export { default as Terminal } from 'lucide-react-native/icons/terminal';
 export { default as Trash2 } from 'lucide-react-native/icons/trash';
 export { default as TriangleAlert } from 'lucide-react-native/icons/triangle-alert';
 export { default as Unlock } from 'lucide-react-native/icons/lock-open';
+export { default as Unlink } from 'lucide-react-native/icons/unlink';
 export { default as Unplug } from 'lucide-react-native/icons/unplug';
 export { default as User } from 'lucide-react-native/icons/user';
 export { default as UserPlus } from 'lucide-react-native/icons/user-plus';

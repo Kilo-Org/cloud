@@ -1,12 +1,14 @@
-import type { WorkerDb } from '@kilocode/db';
+import type { ProfileDatabase, ProfileOwner, RepositoryPlatform } from './types';
 import { TRPCError } from '@trpc/server';
-import type { ProfileOwner } from './types';
-import { verifyProfileOwnership } from './profile-utils';
+import { lockProfileOwnership } from './profile-utils';
+import { withProfileTransaction } from './database';
 import {
   upsertBinding,
   findBinding,
   deleteBinding,
+  deleteBindingForRepo,
   selectBindingsWithProfiles,
+  canonicalRepoFullName,
 } from './repo-binding-db';
 
 type RepoBinding = {
@@ -17,30 +19,32 @@ type RepoBinding = {
 };
 
 /**
- * Bind an environment profile to a repository.
- * Atomic upsert — safe against concurrent calls for the same owner+repo+platform.
+ * Bind an environment profile to a repository. Locks the profile row before the
+ * insert so a concurrent profile delete cannot cascade the new binding.
  */
 export async function bindProfileToRepo(
-  db: WorkerDb,
+  db: ProfileDatabase,
   owner: ProfileOwner,
   repoFullName: string,
-  platform: 'github' | 'gitlab',
+  platform: RepositoryPlatform,
   profileId: string
 ): Promise<void> {
-  await verifyProfileOwnership(db, profileId, owner);
-  await upsertBinding(db, owner, repoFullName.toLowerCase(), platform, profileId);
+  await withProfileTransaction(db, async tx => {
+    await lockProfileOwnership(tx, profileId, owner);
+    await upsertBinding(tx, owner, canonicalRepoFullName(repoFullName), platform, profileId);
+  });
 }
 
 /**
  * Remove the profile binding for a repository.
  */
 export async function unbindRepo(
-  db: WorkerDb,
+  db: ProfileDatabase,
   owner: ProfileOwner,
   repoFullName: string,
-  platform: 'github' | 'gitlab'
+  platform: RepositoryPlatform
 ): Promise<void> {
-  const repoLower = repoFullName.toLowerCase();
+  const repoLower = canonicalRepoFullName(repoFullName);
   const binding = await findBinding(db, owner, repoLower, platform);
 
   if (!binding) {
@@ -54,16 +58,28 @@ export async function unbindRepo(
 }
 
 /**
+ * Idempotent remove for a repository binding. Absent bindings are a no-op.
+ */
+export async function removeRepoBinding(
+  db: ProfileDatabase,
+  owner: ProfileOwner,
+  repoFullName: string,
+  platform: RepositoryPlatform
+): Promise<void> {
+  await deleteBindingForRepo(db, owner, canonicalRepoFullName(repoFullName), platform);
+}
+
+/**
  * Look up which profile is bound to a repo for the given owner.
  * Returns the profile_id if found, null otherwise.
  */
 export async function getBindingForRepo(
-  db: WorkerDb,
+  db: ProfileDatabase,
   owner: ProfileOwner,
   repoFullName: string,
-  platform: 'github' | 'gitlab'
+  platform: RepositoryPlatform
 ): Promise<string | null> {
-  const repoLower = repoFullName.toLowerCase();
+  const repoLower = canonicalRepoFullName(repoFullName);
   const binding = await findBinding(db, owner, repoLower, platform);
   return binding?.profileId ?? null;
 }
@@ -71,6 +87,9 @@ export async function getBindingForRepo(
 /**
  * List all repo-profile bindings for the given owner.
  */
-export async function listBindings(db: WorkerDb, owner: ProfileOwner): Promise<RepoBinding[]> {
+export async function listBindings(
+  db: ProfileDatabase,
+  owner: ProfileOwner
+): Promise<RepoBinding[]> {
   return selectBindingsWithProfiles(db, owner);
 }

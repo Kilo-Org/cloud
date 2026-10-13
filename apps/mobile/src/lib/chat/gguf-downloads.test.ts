@@ -131,6 +131,37 @@ describe('pausing, resuming and cancelling', () => {
     expect(h.store.snapshot().failure).toEqual({ fileId: 'small', problem: 'invalidFile' });
     expect(h.files.size).toBe(0);
   });
+
+  it('refuses a file whose bytes do not match the published SHA-256, and keeps nothing', async () => {
+    const h = harness({ checksums: { [ggufPartialName('small')]: 'f'.repeat(64) } });
+    h.store.start(CATALOG);
+    await finish(taskAt(h.tasks, 0), 1000);
+    expect(h.store.snapshot().failure).toEqual({ fileId: 'small', problem: 'checksum' });
+    expect(h.inspected).toEqual([]);
+    expect(h.files.size).toBe(0);
+    expect(h.store.model('small')).toBeUndefined();
+  });
+
+  it('refuses a file the hash cannot read, and keeps nothing', async () => {
+    const h = harness({ unreadable: ggufPartialName('small') });
+    h.store.start(CATALOG);
+    await finish(taskAt(h.tasks, 0), 1000);
+    expect(h.store.snapshot().failure).toEqual({ fileId: 'small', problem: 'checksum' });
+    expect(h.inspected).toEqual([]);
+    expect(h.files.size).toBe(0);
+  });
+
+  it('checks no hash for a direct link, which publishes none', async () => {
+    const h = harness({ checksums: { [ggufPartialName('linked')]: 'f'.repeat(64) } });
+    h.store.start({
+      kind: 'url',
+      fileId: 'linked',
+      name: 'Linked',
+      url: 'https://example.com/l.gguf',
+    });
+    await finish(taskAt(h.tasks, 0), 1000);
+    expect(h.store.model('linked')).toBeDefined();
+  });
 });
 
 describe('the saved list', () => {
@@ -144,6 +175,7 @@ describe('the saved list', () => {
       contextWindow: 4096,
       tools: false,
       vision: false,
+      thinking: false,
     };
     // The second entry has a shape this build cannot read, and still names a file.
     h.index.text = JSON.stringify([saved, { fileId: 'other', name: 'Other' }]);

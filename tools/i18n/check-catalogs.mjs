@@ -94,6 +94,7 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'agentChat.toolCard.toolGlob',
   'agentChat.toolCard.toolGrep',
   'agentChat.modelCost.perMillion',
+  'agentChat.tasks.progress',
   'agentChat.questionCard.option',
   'agentChat.sessionFilter.platformCli',
   'agentChat.sessionFilter.platformSlack',
@@ -133,6 +134,9 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // Pure $t() references in the tour: they name another key's label, so every
   // locale resolves them to its own translation through i18next nesting.
   'tour.cloudOptionTitle',
+  // A placeholder-only accessibility label: the list's name and its open
+  // counter joined by a comma, so a catalog may keep English punctuation.
+  'todos.lists.rowA11y',
 ]);
 
 /** The supported tags, read from the one source of truth. */

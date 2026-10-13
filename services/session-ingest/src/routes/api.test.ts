@@ -245,6 +245,9 @@ describe('api routes', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(getSessionIngestDO).mockImplementation(env => r2StagingStub(env) as never);
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      clearSession: vi.fn(async () => undefined),
+    } as never);
     vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
       organizationId: null,
@@ -2061,6 +2064,8 @@ describe('api routes', () => {
     vi.mocked(getSessionIngestDO).mockReturnValue(
       ingestStub as unknown as ReturnType<typeof getSessionIngestDO>
     );
+    const connectionStub = { clearSession: vi.fn(async () => undefined) };
+    vi.mocked(getUserConnectionDO).mockReturnValue(connectionStub as never);
 
     const app = makeApiApp();
     const env = makeTestEnv();
@@ -2113,6 +2118,8 @@ describe('api routes', () => {
       sessionId: parentSessionId,
     });
     expect(ingestStub.clear).toHaveBeenCalledTimes(2);
+    expect(getUserConnectionDO).toHaveBeenCalledWith(env, { kiloUserId: 'usr_test' });
+    expect(connectionStub.clearSession.mock.calls).toEqual([[childSessionId], [parentSessionId]]);
     expect(notifyUserSessionEvent).toHaveBeenNthCalledWith(1, env, 'usr_test', {
       type: 'session.deleted',
       data: {

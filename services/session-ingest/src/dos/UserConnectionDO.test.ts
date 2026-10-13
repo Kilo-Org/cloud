@@ -4253,6 +4253,17 @@ describe('UserConnectionDO', () => {
       expect(result).toEqual([]);
     });
 
+    it('keeps a cleared session out of the list while its CLI still reports it', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')]);
+
+      await doInstance.clearSession('s1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')]);
+
+      expect(doInstance.getActiveSessions().map(session => session.id)).toEqual(['s2']);
+    });
+
     it('excludes child sessions reported with parentSessionId in heartbeat', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');

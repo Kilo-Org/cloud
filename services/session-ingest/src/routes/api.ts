@@ -92,6 +92,11 @@ async function clearSessionLocalState(
     stub => stub.clear(),
     'SessionIngestDO.clear'
   );
+  await withDORetry(
+    () => getUserConnectionDO(env, { kiloUserId }),
+    stub => stub.clearSession(sessionId),
+    'UserConnectionDO.clearSession'
+  );
 }
 
 function notifySessionDeleted(

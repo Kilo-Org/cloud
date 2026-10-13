@@ -395,6 +395,43 @@ describe('adminCodeReviewsRouter', () => {
     expect(categoryNames).not.toContain('Upstream Server Error');
   });
 
+  it('labels BYOK invalid requests distinctly in final outcomes and attempts', async () => {
+    const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'failed',
+          createdAt: timestamp(800),
+          terminalReason: 'assistant_invalid_request_byok',
+          errorMessage:
+            'Your provider rejected the request. Check your provider account and settings.',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: review.id,
+      attempt_number: 1,
+      status: 'failed',
+      terminal_reason: 'assistant_invalid_request_byok',
+      error_message:
+        'Your provider rejected the request. Check your provider account and settings.',
+      created_at: timestamp(801),
+      started_at: timestamp(802),
+      completed_at: timestamp(803),
+    });
+    const caller = await createCallerForUser(adminUser.id);
+    for (const retryAccountingMode of ['final_outcome', 'all_attempts'] as const) {
+      const errors = await caller.admin.codeReviews.getErrorAnalysis(
+        filterInput({ retryAccountingMode })
+      );
+      expect(errors.categories).toEqual([
+        expect.objectContaining({ category: 'Request Rejected (customer provider)', count: 1 }),
+      ]);
+    }
+  });
+
   // The status-code branches used bare substring matches ('%429%', '%500%'),
   // so any digits embedded in an id, byte count or duration were bucketed as an
   // HTTP failure. These rows carry no terminal_reason, so they exercise the

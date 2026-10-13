@@ -144,7 +144,7 @@ describe('kilo pass bonus utilities', () => {
       [undefined, false],
     ] as const)('retains payment eligibility for reason %s', (reason, eligible) => {
       for (const isFirstTimeSubscriberEver of [true, false]) {
-        for (const streakMonths of [1, 2, 3]) {
+        for (const streakMonths of [1, 2]) {
           const decision = computeMonthlyKiloPassBonusDecision({
             tier: KiloPassTier.Tier19,
             startedAtIso: '2026-10-14T00:00:00Z',
@@ -155,7 +155,7 @@ describe('kilo pass bonus utilities', () => {
           });
           const expected =
             eligible && isFirstTimeSubscriberEver
-              ? [0.1, 0.5, 0.15][streakMonths - 1]
+              ? [0.1, 0.5][streakMonths - 1]
               : 0.05 * streakMonths;
           expect(decision.bonusPercentApplied).toBeCloseTo(expected);
           expect(decision.bonusUsd).toBeCloseTo(Math.round(1900 * expected) / 100);

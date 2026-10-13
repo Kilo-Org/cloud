@@ -2,6 +2,7 @@ import { KiloPassCadence, type KiloPassTier } from '@kilocode/web-shared/lib/kil
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
   KILO_PASS_MONTHLY_FIRST_MONTH_10_PERCENT_CUTOFF,
+  KILO_PASS_MONTHLY_FIRST_MONTH_BONUS_PERCENT,
   KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF,
   KILO_PASS_TIER_CONFIG,
   KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
@@ -52,7 +53,7 @@ export const computeMonthlyCadenceBonusPercent = (params: {
     Date.parse(subscriptionStartedAtIso) >=
       KILO_PASS_MONTHLY_FIRST_MONTH_10_PERCENT_CUTOFF.valueOf()
   ) {
-    return 0.1;
+    return KILO_PASS_MONTHLY_FIRST_MONTH_BONUS_PERCENT;
   }
 
   if (

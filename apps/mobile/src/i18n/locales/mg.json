@@ -3238,7 +3238,6 @@
       "fieldName": "Anarana aseho",
       "fieldUrl": "URL-n'ny server",
       "fieldUrlInvalid": "Ampidiro URL server mety.",
-      "fieldToken": "Token Bearer (tsy voatery)",
       "enableServer": "Alefaso ity server ity: {{name}}",
       "editServer": "Ovaina ny server",
       "deleteServer": "Fafao ny server",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "fitaovana {{count}}",
       "serverUnreachable": "Tsy tratra ity server ity",
       "serverOff": "Mihidy ity server ity"
+    },
+    "mcpOAuth": {
+      "authMethod": "Fanamarinana",
+      "authNone": "Tsy misy fidirana",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Fidirana OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Rehefa voatahiry, tsindrio ny $t(modelChat.mcpOAuth.signIn) eo amin'ny server mba hiditra amin'ny alalan'ny navigateur-nao.",
+      "serverNeedsSignIn": "Midira mba hampiasa ity server ity",
+      "signIn": "Hiditra",
+      "signInA11y": "Hiditra amin'ity server ity: {{name}}",
+      "signInFailed": "Tsy afaka niditra tamin'ny {{name}}. Andramo indray."
     },
     "backends": {
       "title": "Rafitra mpizara ho an'ny resaka",

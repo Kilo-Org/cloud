@@ -3279,7 +3279,6 @@
       "fieldName": "שם תצוגה",
       "fieldUrl": "כתובת URL של השרת",
       "fieldUrlInvalid": "הזינו כתובת URL חוקית של שרת.",
-      "fieldToken": "אסימון Bearer (אופציונלי)",
       "enableServer": "הפעלת השרת הזה: {{name}}",
       "editServer": "עריכת השרת",
       "deleteServer": "מחיקת השרת",
@@ -3299,6 +3298,18 @@
       "serverToolCount": "{{count}} כלים",
       "serverUnreachable": "לא ניתן היה להגיע לשרת הזה",
       "serverOff": "השרת הזה כבוי"
+    },
+    "mcpOAuth": {
+      "authMethod": "אימות",
+      "authNone": "ללא כניסה",
+      "authBearer": "אסימון Bearer",
+      "authOAuth": "כניסה עם OAuth",
+      "fieldToken": "אסימון",
+      "oauthHint": "לאחר השמירה, הקש על $t(modelChat.mcpOAuth.signIn) בשרת כדי להיכנס באמצעות הדפדפן.",
+      "serverNeedsSignIn": "היכנס כדי להשתמש בשרת הזה",
+      "signIn": "כניסה",
+      "signInA11y": "כניסה לשרת הזה: {{name}}",
+      "signInFailed": "לא ניתן היה להיכנס אל {{name}}. נסה שוב."
     },
     "backends": {
       "title": "שרתי צ׳אט",

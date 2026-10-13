@@ -3238,7 +3238,6 @@
       "fieldName": "Прикажано име",
       "fieldUrl": "URL на серверот",
       "fieldUrlInvalid": "Внеси важечки URL на серверот.",
-      "fieldToken": "Bearer токен (изборно)",
       "enableServer": "Овозможи го овој сервер: {{name}}",
       "editServer": "Уреди сервер",
       "deleteServer": "Избриши сервер",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} алатки",
       "serverUnreachable": "Не успеа да се достигне овој сервер",
       "serverOff": "Овој сервер е исклучен"
+    },
+    "mcpOAuth": {
+      "authMethod": "Автентикација",
+      "authNone": "Без најавување",
+      "authBearer": "Bearer токен",
+      "authOAuth": "Најавување со OAuth",
+      "fieldToken": "Токен",
+      "oauthHint": "Откако ќе зачуваш, допри $t(modelChat.mcpOAuth.signIn) на серверот за да се најавиш преку прелистувачот.",
+      "serverNeedsSignIn": "Најави се за да го користиш овој сервер",
+      "signIn": "Најави се",
+      "signInA11y": "Најави се на овој сервер: {{name}}",
+      "signInFailed": "Не успеа најавувањето на {{name}}. Обиди се повторно."
     },
     "backends": {
       "title": "Сервери за разговор",

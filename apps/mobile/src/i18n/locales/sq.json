@@ -3238,7 +3238,6 @@
       "fieldName": "Emri i shfaqur",
       "fieldUrl": "URL-ja e serverit",
       "fieldUrlInvalid": "Fut një URL të vlefshme serveri.",
-      "fieldToken": "Token bartës (opsional)",
       "enableServer": "Aktivizo këtë server: {{name}}",
       "editServer": "Modifiko serverin",
       "deleteServer": "Fshi serverin",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} mjete",
       "serverUnreachable": "Nuk u arrit ky server",
       "serverOff": "Ky server është i fikur"
+    },
+    "mcpOAuth": {
+      "authMethod": "Vërtetimi",
+      "authNone": "Pa hyrje",
+      "authBearer": "Token bartës",
+      "authOAuth": "Hyrje me OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Pasi të ruash, prek $t(modelChat.mcpOAuth.signIn) te serveri për të hyrë me shfletuesin tënd.",
+      "serverNeedsSignIn": "Hyr për të përdorur këtë server",
+      "signIn": "Hyr",
+      "signInA11y": "Hyr në këtë server: {{name}}",
+      "signInFailed": "Nuk u arrit hyrja në {{name}}. Provo përsëri."
     },
     "backends": {
       "title": "Shërbimet mbështetëse të bisedës",

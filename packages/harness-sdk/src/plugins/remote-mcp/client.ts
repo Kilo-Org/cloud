@@ -1,15 +1,19 @@
+import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import {
-  StreamableHTTPClientTransport,
-  StreamableHTTPError,
-} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { CallToolResultSchema, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import type {
   jsonSchemaValidator,
   JsonSchemaValidator,
 } from '@modelcontextprotocol/sdk/validation/types.js';
 import { Effect, unsafeCoerce } from 'effect';
-import { credentialFor, type RemoteMcpToken } from './credential.js';
+import {
+  authProviderFor,
+  credentialFor,
+  type RemoteMcpOAuthOption,
+  type RemoteMcpToken,
+} from './credential.js';
+import { failed } from './failure.js';
 import {
   bounded,
   defaultCallTimeoutMs,
@@ -20,7 +24,7 @@ import {
   type RemoteMcpAbort,
   type RemoteMcpRequest,
 } from './http.js';
-import { RemoteMcpError, type RemoteMcpFailure, type RemoteMcpServer } from './server.js';
+import { RemoteMcpError, type RemoteMcpServer } from './server.js';
 
 /**
  * The remote MCP client, over the transport the specification defines: the MCP
@@ -79,6 +83,14 @@ interface RemoteMcpClientDeps {
    * `bearer`.
    */
   token?: RemoteMcpToken;
+  /**
+   * The library's OAuth provider for this server: where its tokens, client
+   * registration and PKCE verifier are kept. Read only for `oauth`. The
+   * transport refreshes an expired token through it, and a server that needs a
+   * person to sign in again calls its `redirectToAuthorization` and fails
+   * `unauthorized`.
+   */
+  authProvider?: OAuthClientProvider;
   /** The caller's own signal, linked into the deadline of every request. */
   signal?: RemoteMcpAbort;
   /**
@@ -107,33 +119,6 @@ interface RemoteMcpClient {
   ) => Effect.Effect<string, RemoteMcpError>;
 }
 
-/** Whether a thrown value is one of the library's own schema refusals. */
-const isSchemaError = (cause: unknown): boolean =>
-  cause instanceof Error && cause.name === 'ZodError';
-
-/**
- * What a failure was, read off the library rather than off a status of our own.
- *
- * The transport throws `StreamableHTTPError` carrying the status. Anything else
- * — a dropped connection, an abort, a refused stream — is a server that could
- * not be reached, the only honest reading of a rejection with nothing in it.
- */
-const kindOf = (cause: unknown): RemoteMcpFailure => {
-  if (cause instanceof StreamableHTTPError) {
-    if (cause.code === 401 || cause.code === 403) {
-      return 'unauthorized';
-    }
-    if (cause.code === 404 || cause.code === 410) {
-      return 'missing';
-    }
-    return 'unreachable';
-  }
-  return cause instanceof McpError || isSchemaError(cause) ? 'protocol' : 'unreachable';
-};
-
-const failed = (server: RemoteMcpServer, cause: unknown): RemoteMcpError =>
-  new RemoteMcpError({ serverId: server.id, kind: kindOf(cause), cause });
-
 /** Everything one operation needs, opened once and closed at the end. */
 interface Connection {
   readonly client: Client;
@@ -145,13 +130,15 @@ interface Opening {
   readonly server: RemoteMcpServer;
   readonly deps: RemoteMcpClientDeps;
   readonly credential: Readonly<Record<string, string>>;
+  readonly oauth: RemoteMcpOAuthOption;
   readonly deadline: Deadline;
 }
 
-const open = ({ server, deps, credential, deadline }: Opening): Connection => {
+const open = ({ server, deps, credential, oauth, deadline }: Opening): Connection => {
   const transport: RemoteMcpTransport = new StreamableHTTPClientTransport(new URL(server.url), {
     fetch: bounded(deps, deadline),
     requestInit: { headers: headersFor(server, credential) },
+    ...oauth,
   });
   const client = new Client(
     { name: 'kilo-harness', version: '0.0.0' },
@@ -239,8 +226,9 @@ const withServer = <A>(
         made => Effect.sync(made.stop)
       );
       const credential = yield* credentialFor(server, deps.token, deadline);
+      const oauth = yield* authProviderFor(server, deps.authProvider);
       const connection = yield* Effect.acquireRelease(
-        Effect.sync(() => open({ server, deps, credential, deadline })),
+        Effect.sync(() => open({ server, deps, credential, oauth, deadline })),
         closed => Effect.ignore(Effect.tryPromise(() => closed.client.close()))
       );
       yield* connected(connection, server);

@@ -3238,7 +3238,6 @@
       "fieldName": "نام نمایشی",
       "fieldUrl": "نشانی URL سرور",
       "fieldUrlInvalid": "یک نشانی URL معتبر سرور وارد کنید.",
-      "fieldToken": "توکن Bearer (اختیاری)",
       "enableServer": "فعال‌کردن این سرور: {{name}}",
       "editServer": "ویرایش سرور",
       "deleteServer": "حذف سرور",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} ابزار",
       "serverUnreachable": "دسترسی به این سرور ممکن نشد",
       "serverOff": "این سرور خاموش است"
+    },
+    "mcpOAuth": {
+      "authMethod": "احراز هویت",
+      "authNone": "بدون ورود",
+      "authBearer": "توکن Bearer",
+      "authOAuth": "ورود با OAuth",
+      "fieldToken": "توکن",
+      "oauthHint": "بعد از ذخیره، روی $t(modelChat.mcpOAuth.signIn) در سرور بزن تا با مرورگرت وارد شوی.",
+      "serverNeedsSignIn": "برای استفاده از این سرور وارد شو",
+      "signIn": "ورود",
+      "signInA11y": "ورود به این سرور: {{name}}",
+      "signInFailed": "ورود به {{name}} ممکن نشد. دوباره تلاش کن."
     },
     "backends": {
       "title": "سامانه‌های پشتیبان گفتگو",

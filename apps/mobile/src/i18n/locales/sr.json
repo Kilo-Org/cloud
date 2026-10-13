@@ -3279,7 +3279,6 @@
       "fieldName": "Prikazano ime",
       "fieldUrl": "URL servera",
       "fieldUrlInvalid": "Unesi važeći URL servera.",
-      "fieldToken": "Bearer token (opciono)",
       "enableServer": "Omogući ovaj server: {{name}}",
       "editServer": "Uredi server",
       "deleteServer": "Obriši server",
@@ -3299,6 +3298,18 @@
       "serverToolCount": "{{count}} alata",
       "serverUnreachable": "Nije bilo moguće doći do ovog servera",
       "serverOff": "Ovaj server je isključen"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikacija",
+      "authNone": "Bez prijave",
+      "authBearer": "Bearer token",
+      "authOAuth": "OAuth prijava",
+      "fieldToken": "Token",
+      "oauthHint": "Nakon čuvanja, dodirni $t(modelChat.mcpOAuth.signIn) na serveru da se prijaviš putem pregledača.",
+      "serverNeedsSignIn": "Prijavi se da koristiš ovaj server",
+      "signIn": "Prijavi se",
+      "signInA11y": "Prijavi se na ovaj server: {{name}}",
+      "signInFailed": "Prijava na {{name}} nije uspela. Pokušaj ponovo."
     },
     "backends": {
       "title": "Pozadinski servisi za ćaskanje",

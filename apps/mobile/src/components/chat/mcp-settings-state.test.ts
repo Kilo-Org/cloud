@@ -170,6 +170,7 @@ describe('the remote server rows', () => {
         statusKey: 'modelChat.mcp.serverToolCount',
         toolCount: 3,
         retry: false,
+        signIn: false,
         canEdit: true,
         canDelete: true,
       },
@@ -231,6 +232,23 @@ describe('the remote server rows', () => {
     const rows = remoteServerRows([stored()], []);
 
     expect(rows[0]?.retry).toBe(false);
+  });
+
+  it('offers a Sign in, and no Retry, on an OAuth server that needs the person', () => {
+    const rows = remoteServerRows(
+      [stored({ auth: { type: 'oauth' } }), stored({ id: 'off', enabled: false })],
+      [
+        discovered({ status: 'signIn' }),
+        discovered({ id: 'off', enabled: false, status: 'signIn' }),
+      ]
+    );
+
+    expect(rows[0]).toMatchObject({
+      statusKey: 'modelChat.mcpOAuth.serverNeedsSignIn',
+      signIn: true,
+      retry: false,
+    });
+    expect(rows[1]?.signIn).toBe(false);
   });
 
   it('says a server answered with no tools, and offers a Retry', () => {
@@ -302,8 +320,15 @@ describe('the server form', () => {
     });
   });
 
-  it('passes a draft that is ready to save, with or without a token', () => {
+  it('passes a draft that is ready to save, with no sign-in, a token, or OAuth', () => {
     expect(mcpServerFormError(draft())).toBeNull();
     expect(mcpServerFormError(draft({ auth: { type: 'bearer', token: 'secret' } }))).toBeNull();
+    expect(mcpServerFormError(draft({ auth: { type: 'oauth' } }))).toBeNull();
+  });
+
+  it('asks for the token of a bearer server', () => {
+    expect(mcpServerFormError(draft({ auth: { type: 'bearer' } }))).toEqual({
+      token: 'common.required',
+    });
   });
 });

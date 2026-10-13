@@ -3279,7 +3279,6 @@
       "fieldName": "Nom affiché",
       "fieldUrl": "URL du serveur",
       "fieldUrlInvalid": "Saisissez une URL de serveur valide.",
-      "fieldToken": "Jeton Bearer (facultatif)",
       "enableServer": "Activer ce serveur : {{name}}",
       "editServer": "Modifier le serveur",
       "deleteServer": "Supprimer le serveur",
@@ -3299,6 +3298,18 @@
       "serverToolCount": "{{count}} outils",
       "serverUnreachable": "Impossible de joindre ce serveur",
       "serverOff": "Ce serveur est désactivé"
+    },
+    "mcpOAuth": {
+      "authMethod": "Authentification",
+      "authNone": "Sans connexion",
+      "authBearer": "Jeton Bearer",
+      "authOAuth": "Connexion OAuth",
+      "fieldToken": "Jeton",
+      "oauthHint": "Après l'enregistrement, appuyez sur $t(modelChat.mcpOAuth.signIn) sur le serveur pour vous connecter avec votre navigateur.",
+      "serverNeedsSignIn": "Connectez-vous pour utiliser ce serveur",
+      "signIn": "Se connecter",
+      "signInA11y": "Se connecter à ce serveur : {{name}}",
+      "signInFailed": "Impossible de se connecter à {{name}}. Réessayez."
     },
     "backends": {
       "title": "Services de discussion",

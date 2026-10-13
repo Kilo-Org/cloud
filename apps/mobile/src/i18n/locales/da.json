@@ -3238,7 +3238,6 @@
       "fieldName": "Vist navn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Indtast en gyldig server-URL.",
-      "fieldToken": "Bearer-token (valgfrit)",
       "enableServer": "Aktivér denne server: {{name}}",
       "editServer": "Rediger server",
       "deleteServer": "Slet server",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} værktøjer",
       "serverUnreachable": "Kunne ikke nå denne server",
       "serverOff": "Denne server er slået fra"
+    },
+    "mcpOAuth": {
+      "authMethod": "Godkendelse",
+      "authNone": "Ingen login",
+      "authBearer": "Bearer-token",
+      "authOAuth": "OAuth-login",
+      "fieldToken": "Token",
+      "oauthHint": "Når du har gemt, skal du trykke på $t(modelChat.mcpOAuth.signIn) på serveren for at logge ind med din browser.",
+      "serverNeedsSignIn": "Log ind for at bruge denne server",
+      "signIn": "Log ind",
+      "signInA11y": "Log ind på denne server: {{name}}",
+      "signInFailed": "Kunne ikke logge ind på {{name}}. Prøv igen."
     },
     "backends": {
       "title": "Chatservere",

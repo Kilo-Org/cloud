@@ -3238,7 +3238,6 @@
       "fieldName": "Sunan da ake nunawa",
       "fieldUrl": "URL na sabar",
       "fieldUrlInvalid": "Shigar da ingantaccen URL na sabar.",
-      "fieldToken": "Token Bearer (na zaɓi)",
       "enableServer": "Kunna wannan sabar: {{name}}",
       "editServer": "Gyara sabar",
       "deleteServer": "Share sabar",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "kayan aiki {{count}}",
       "serverUnreachable": "Ba a iya isa wannan sabar ba",
       "serverOff": "An kashe wannan sabar"
+    },
+    "mcpOAuth": {
+      "authMethod": "Tantancewa",
+      "authNone": "Babu shiga",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Shiga ta OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Bayan ka adana, matsa $t(modelChat.mcpOAuth.signIn) a kan sabar don shiga ta burauzarka.",
+      "serverNeedsSignIn": "Shiga don amfani da wannan sabar",
+      "signIn": "Shiga",
+      "signInA11y": "Shiga wannan sabar: {{name}}",
+      "signInFailed": "Ba a iya shiga {{name}} ba. Sake gwadawa."
     },
     "backends": {
       "title": "Uwar garken tattaunawa",

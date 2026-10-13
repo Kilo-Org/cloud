@@ -3238,7 +3238,6 @@
       "fieldName": "ឈ្មោះបង្ហាញ",
       "fieldUrl": "URL ម៉ាស៊ីនបម្រើ",
       "fieldUrlInvalid": "បញ្ចូល URL ម៉ាស៊ីនបម្រើត្រឹមត្រូវ។",
-      "fieldToken": "តូកិន Bearer (ស្រេចចិត្ត)",
       "enableServer": "បើកម៉ាស៊ីនបម្រើនេះ: {{name}}",
       "editServer": "កែសម្រួលម៉ាស៊ីនបម្រើ",
       "deleteServer": "លុបម៉ាស៊ីនបម្រើ",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "ឧបករណ៍ {{count}}",
       "serverUnreachable": "មិនអាចទៅដល់ម៉ាស៊ីនបម្រើនេះបានទេ",
       "serverOff": "ម៉ាស៊ីនបម្រើនេះត្រូវបានបិទ"
+    },
+    "mcpOAuth": {
+      "authMethod": "ការផ្ទៀងផ្ទាត់",
+      "authNone": "មិនចាំបាច់ចូល",
+      "authBearer": "តូកិន Bearer",
+      "authOAuth": "ការចូលតាម OAuth",
+      "fieldToken": "តូកិន",
+      "oauthHint": "បន្ទាប់ពីរក្សាទុក សូមចុច $t(modelChat.mcpOAuth.signIn) លើម៉ាស៊ីនបម្រើ ដើម្បីចូលតាមកម្មវិធីរុករករបស់អ្នក។",
+      "serverNeedsSignIn": "ចូលដើម្បីប្រើម៉ាស៊ីនបម្រើនេះ",
+      "signIn": "ចូល",
+      "signInA11y": "ចូលទៅម៉ាស៊ីនបម្រើនេះ: {{name}}",
+      "signInFailed": "មិនអាចចូលទៅ {{name}} បានទេ។ សូមព្យាយាមម្តងទៀត។"
     },
     "backends": {
       "title": "ប្រព័ន្ធខាងក្រោយសម្រាប់ជជែក",

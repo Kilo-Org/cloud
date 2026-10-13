@@ -3320,7 +3320,6 @@
       "fieldName": "Rodomas pavadinimas",
       "fieldUrl": "Serverio URL",
       "fieldUrlInvalid": "Įveskite galiojantį serverio URL.",
-      "fieldToken": "Bearer prieigos raktas (neprivaloma)",
       "enableServer": "Įjungti šį serverį: {{name}}",
       "editServer": "Redaguoti serverį",
       "deleteServer": "Ištrinti serverį",
@@ -3340,6 +3339,18 @@
       "serverToolCount": "{{count}} įrankiai",
       "serverUnreachable": "Nepavyko pasiekti šio serverio",
       "serverOff": "Šis serveris išjungtas"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikavimas",
+      "authNone": "Be prisijungimo",
+      "authBearer": "Bearer prieigos raktas",
+      "authOAuth": "OAuth prisijungimas",
+      "fieldToken": "Prieigos raktas",
+      "oauthHint": "Išsaugojęs bakstelėk $t(modelChat.mcpOAuth.signIn) prie serverio, kad prisijungtum naršyklėje.",
+      "serverNeedsSignIn": "Prisijunk, kad galėtum naudoti šį serverį",
+      "signIn": "Prisijungti",
+      "signInA11y": "Prisijungti prie šio serverio: {{name}}",
+      "signInFailed": "Nepavyko prisijungti prie {{name}}. Bandyk dar kartą."
     },
     "backends": {
       "title": "Pokalbių serveriai",

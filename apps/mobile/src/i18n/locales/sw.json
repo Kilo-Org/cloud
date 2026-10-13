@@ -3238,7 +3238,6 @@
       "fieldName": "Jina linaloonyeshwa",
       "fieldUrl": "URL ya seva",
       "fieldUrlInvalid": "Weka URL sahihi ya seva.",
-      "fieldToken": "Tokeni ya Bearer (hiari)",
       "enableServer": "Washa seva hii: {{name}}",
       "editServer": "Hariri seva",
       "deleteServer": "Futa seva",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "zana {{count}}",
       "serverUnreachable": "Haikuweza kufikia seva hii",
       "serverOff": "Seva hii imezimwa"
+    },
+    "mcpOAuth": {
+      "authMethod": "Uthibitishaji",
+      "authNone": "Bila kuingia",
+      "authBearer": "Tokeni ya Bearer",
+      "authOAuth": "Kuingia kwa OAuth",
+      "fieldToken": "Tokeni",
+      "oauthHint": "Baada ya kuhifadhi, gusa $t(modelChat.mcpOAuth.signIn) kwenye seva ili kuingia kupitia kivinjari chako.",
+      "serverNeedsSignIn": "Ingia ili kutumia seva hii",
+      "signIn": "Ingia",
+      "signInA11y": "Ingia kwenye seva hii: {{name}}",
+      "signInFailed": "Haikuweza kuingia kwenye {{name}}. Jaribu tena."
     },
     "backends": {
       "title": "Huduma za gumzo",

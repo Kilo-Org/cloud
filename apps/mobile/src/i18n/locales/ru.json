@@ -3320,7 +3320,6 @@
       "fieldName": "Отображаемое имя",
       "fieldUrl": "URL сервера",
       "fieldUrlInvalid": "Введите действительный URL сервера.",
-      "fieldToken": "Токен Bearer (необязательно)",
       "enableServer": "Включить этот сервер: {{name}}",
       "editServer": "Редактировать сервер",
       "deleteServer": "Удалить сервер",
@@ -3340,6 +3339,18 @@
       "serverToolCount": "{{count}} инструментов",
       "serverUnreachable": "Не удалось связаться с этим сервером",
       "serverOff": "Этот сервер выключен"
+    },
+    "mcpOAuth": {
+      "authMethod": "Аутентификация",
+      "authNone": "Без входа",
+      "authBearer": "Токен Bearer",
+      "authOAuth": "Вход через OAuth",
+      "fieldToken": "Токен",
+      "oauthHint": "После сохранения нажмите «$t(modelChat.mcpOAuth.signIn)» у сервера, чтобы войти через браузер.",
+      "serverNeedsSignIn": "Войдите, чтобы использовать этот сервер",
+      "signIn": "Войти",
+      "signInA11y": "Войти на этот сервер: {{name}}",
+      "signInFailed": "Не удалось войти на {{name}}. Повторите попытку."
     },
     "backends": {
       "title": "Серверы чата",

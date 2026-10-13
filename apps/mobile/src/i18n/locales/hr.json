@@ -3279,7 +3279,6 @@
       "fieldName": "Prikazani naziv",
       "fieldUrl": "URL poslužitelja",
       "fieldUrlInvalid": "Unesite važeći URL poslužitelja.",
-      "fieldToken": "Bearer token (neobavezno)",
       "enableServer": "Omogući ovaj poslužitelj: {{name}}",
       "editServer": "Uredi poslužitelj",
       "deleteServer": "Izbriši poslužitelj",
@@ -3299,6 +3298,18 @@
       "serverToolCount": "{{count}} alata",
       "serverUnreachable": "Nije bilo moguće doći do ovog poslužitelja",
       "serverOff": "Ovaj poslužitelj je isključen"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikacija",
+      "authNone": "Bez prijave",
+      "authBearer": "Bearer token",
+      "authOAuth": "OAuth prijava",
+      "fieldToken": "Token",
+      "oauthHint": "Nakon spremanja dodirni $t(modelChat.mcpOAuth.signIn) na poslužitelju da bi se prijavio putem preglednika.",
+      "serverNeedsSignIn": "Prijavi se da bi koristio ovaj poslužitelj",
+      "signIn": "Prijavi se",
+      "signInA11y": "Prijavi se na ovaj poslužitelj: {{name}}",
+      "signInFailed": "Prijava na {{name}} nije uspjela. Pokušaj ponovno."
     },
     "backends": {
       "title": "Pozadinski sustavi za razgovor",

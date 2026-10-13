@@ -3238,7 +3238,6 @@
       "fieldName": "Visat namn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Ange en giltig server-URL.",
-      "fieldToken": "Bearer-token (valfritt)",
       "enableServer": "Aktivera denna server: {{name}}",
       "editServer": "Redigera server",
       "deleteServer": "Ta bort server",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} verktyg",
       "serverUnreachable": "Kunde inte nå denna server",
       "serverOff": "Denna server är avstängd"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentisering",
+      "authNone": "Ingen inloggning",
+      "authBearer": "Bearer-token",
+      "authOAuth": "OAuth-inloggning",
+      "fieldToken": "Token",
+      "oauthHint": "När du har sparat trycker du på $t(modelChat.mcpOAuth.signIn) på servern för att logga in med din webbläsare.",
+      "serverNeedsSignIn": "Logga in för att använda denna server",
+      "signIn": "Logga in",
+      "signInA11y": "Logga in på denna server: {{name}}",
+      "signInFailed": "Kunde inte logga in på {{name}}. Försök igen."
     },
     "backends": {
       "title": "Chattbackends",

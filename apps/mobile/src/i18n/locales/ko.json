@@ -3238,7 +3238,6 @@
       "fieldName": "표시 이름",
       "fieldUrl": "서버 URL",
       "fieldUrlInvalid": "유효한 서버 URL을 입력하세요.",
-      "fieldToken": "Bearer 토큰(선택 사항)",
       "enableServer": "이 서버 사용: {{name}}",
       "editServer": "서버 편집",
       "deleteServer": "서버 삭제",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "도구 {{count}}개",
       "serverUnreachable": "이 서버에 연결할 수 없습니다",
       "serverOff": "이 서버는 꺼져 있습니다"
+    },
+    "mcpOAuth": {
+      "authMethod": "인증",
+      "authNone": "로그인 안 함",
+      "authBearer": "Bearer 토큰",
+      "authOAuth": "OAuth 로그인",
+      "fieldToken": "토큰",
+      "oauthHint": "저장한 후 서버에서 $t(modelChat.mcpOAuth.signIn)을(를) 탭하여 브라우저로 로그인하세요.",
+      "serverNeedsSignIn": "이 서버를 사용하려면 로그인하세요",
+      "signIn": "로그인",
+      "signInA11y": "이 서버에 로그인: {{name}}",
+      "signInFailed": "{{name}}에 로그인할 수 없습니다. 다시 시도하세요."
     },
     "backends": {
       "title": "채팅 백엔드",

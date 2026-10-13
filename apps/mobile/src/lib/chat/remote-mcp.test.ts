@@ -53,6 +53,10 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => world.connectivity,
 }));
 
+/** The provider an OAuth server is discovered with; its storage is its own module's. */
+const { oauthProvider } = vi.hoisted(() => ({ oauthProvider: { redirectUrl: 'kiloapp:///x' } }));
+vi.mock('./remote-mcp-oauth-provider', () => ({ remoteMcpOAuthProvider: () => oauthProvider }));
+
 /** The one discovery function, answering from a `let` so a test can change it. */
 let answer: () => Effect.Effect<readonly Tool[], RemoteMcpError> = () => Effect.succeed([]);
 
@@ -169,6 +173,23 @@ describe('the discovered state', () => {
     }
     await ensureRemoteMcp(place);
     expect(world.calls).toHaveLength(1);
+  });
+
+  it('asks the person to sign in when an OAuth server refuses, and offers no Retry', async () => {
+    const oauth = server({ id: 'gamma', auth: { type: 'oauth' } });
+    world.servers = [oauth];
+    answer = () =>
+      Effect.fail(
+        new RemoteMcpError({ serverId: 'gamma', kind: 'unauthorized', cause: 'sign in' })
+      );
+
+    await ensureRemoteMcp(place);
+
+    expect(world.calls[0]?.deps.authProvider).toBe(oauthProvider);
+    expect(world.calls[0]?.deps.token).toBeUndefined();
+    expect(remoteMcpState()).toEqual([
+      stateOf(oauth, { status: 'signIn', toolCount: 0, retryable: false }),
+    ]);
   });
 
   it('asks again when the account changes, never serving the old answer', async () => {

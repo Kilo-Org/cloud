@@ -3238,7 +3238,6 @@
       "fieldName": "የሚታይ ስም",
       "fieldUrl": "የሰርቨር URL",
       "fieldUrlInvalid": "ትክክለኛ የሰርቨር URL ያስገቡ።",
-      "fieldToken": "Bearer ቶከን (አማራጭ)",
       "enableServer": "ይህን ሰርቨር አንቃ: {{name}}",
       "editServer": "ሰርቨር አርትዕ",
       "deleteServer": "ሰርቨር ሰርዝ",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} መሳሪያዎች",
       "serverUnreachable": "ይህን ሰርቨር ማግኘት አልተቻለም",
       "serverOff": "ይህ ሰርቨር ተዘግቷል"
+    },
+    "mcpOAuth": {
+      "authMethod": "ማረጋገጫ",
+      "authNone": "መግባት አያስፈልግም",
+      "authBearer": "Bearer ቶከን",
+      "authOAuth": "በOAuth መግባት",
+      "fieldToken": "ቶከን",
+      "oauthHint": "ካስቀመጡ በኋላ በአሳሽዎ ለመግባት በሰርቨሩ ላይ $t(modelChat.mcpOAuth.signIn) የሚለውን ይንኩ።",
+      "serverNeedsSignIn": "ይህን ሰርቨር ለመጠቀም ይግቡ",
+      "signIn": "ግባ",
+      "signInA11y": "ወደዚህ ሰርቨር ግባ: {{name}}",
+      "signInFailed": "ወደ {{name}} መግባት አልተቻለም። እንደገና ይሞክሩ።"
     },
     "backends": {
       "title": "የውይይት የጀርባ አገልግሎቶች",

@@ -3238,7 +3238,6 @@
       "fieldName": "Sýnt heiti",
       "fieldUrl": "Slóð þjóns",
       "fieldUrlInvalid": "Sláðu inn gilda slóð þjóns.",
-      "fieldToken": "Bearer-tákn (valfrjálst)",
       "enableServer": "Virkja þennan þjón: {{name}}",
       "editServer": "Breyta þjóni",
       "deleteServer": "Eyða þjóni",
@@ -3258,6 +3257,18 @@
       "serverToolCount": "{{count}} verkfæri",
       "serverUnreachable": "Náði ekki sambandi við þennan þjón",
       "serverOff": "Þessi þjónn er óvirkur"
+    },
+    "mcpOAuth": {
+      "authMethod": "Auðkenning",
+      "authNone": "Engin innskráning",
+      "authBearer": "Bearer-tákn",
+      "authOAuth": "OAuth-innskráning",
+      "fieldToken": "Tákn",
+      "oauthHint": "Eftir að þú vistar skaltu ýta á $t(modelChat.mcpOAuth.signIn) á þjóninum til að skrá þig inn í vafranum.",
+      "serverNeedsSignIn": "Skráðu þig inn til að nota þennan þjón",
+      "signIn": "Skrá inn",
+      "signInA11y": "Skrá inn á þennan þjón: {{name}}",
+      "signInFailed": "Ekki tókst að skrá inn á {{name}}. Reyndu aftur."
     },
     "backends": {
       "title": "Bakendar spjalls",

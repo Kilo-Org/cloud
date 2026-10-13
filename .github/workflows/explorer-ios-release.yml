@@ -167,8 +167,15 @@ jobs:
                   groups = embedded.get('keychain-access-groups', [])
                   if not (application_id == identifier or application_id.endswith('.' + identifier)):
                       raise RuntimeError(f'Invalid linked application identifier: {identifier}/{architecture}')
-                  if application_id not in groups:
-                      raise RuntimeError(f'Missing linked keychain access group: {identifier}/{architecture}')
+                  if bundle == app and application_id not in groups:
+                      raise RuntimeError(f'Missing main-app keychain access group: {identifier}/{architecture}')
+                  prefix = application_id[:-len(identifier)]
+                  declared_groups = [
+                      value.replace('$(AppIdentifierPrefix)', prefix)
+                      for value in generated.get('keychain-access-groups', [])
+                  ]
+                  if not set(declared_groups).issubset(groups):
+                      raise RuntimeError(f'Generated keychain groups not preserved: {identifier}/{architecture}')
                   app_groups = 'com.apple.security.application-groups'
                   if set(embedded.get(app_groups, [])) != set(generated.get(app_groups, [])):
                       raise RuntimeError(f'Generated app groups not preserved: {identifier}/{architecture}')

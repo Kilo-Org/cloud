@@ -136,7 +136,8 @@
     "working": "பணியில்",
     "yourOwnRepositories": "உங்கள் சொந்தக் களஞ்சியங்கள்",
     "dismissed": "புறக்கணிக்கப்பட்டது",
-    "agent": "முகவர்"
+    "agent": "முகவர்",
+    "changes": "மாற்றங்கள்"
   },
   "language": {
     "restarting": "மொழி மாற்றத்தைப் பயன்படுத்த மறுதொடக்கம் செய்கிறது",
@@ -325,6 +326,7 @@
       "collapseFile": "கோப்பைச் சுருக்கவும்",
       "expandFile": "கோப்பை விரிக்கவும்",
       "diffTooLarge": "மாற்ற ஒப்பீடு மிகப் பெரியதாக இருப்பதால் அதைக் காட்ட முடியவில்லை.",
+      "noPreview": "இந்தக் கோப்புக்கு முன்னோட்டம் இல்லை",
       "openOnGitHub": "GitHub-இல் திறக்கவும்",
       "openDiffOnGitHub": "இந்தக் கோப்பின் மாற்ற ஒப்பீட்டை GitHub-இல் திறக்கவும்",
       "githubDiff": "GitHub மாற்ற ஒப்பீடு"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "சூழலை மீண்டும் ஏற்ற முயற்சிக்கவும்",
       "defaultEnvironment": "இயல்புநிலை சூழல்",
       "environmentSummary": "{{commands}} கட்டளைகள் · {{mcp}} MCP · {{skills}} திறன்கள் · {{agents}} ஏஜென்ட்கள்",
-      "changes": "மாற்றங்கள்",
       "leaveChanges": "அப்படியே விடவும்",
       "commitAndPush": "கமிட் செய்து புஷ் செய்யவும்",
       "startSession": "அமர்வைத் தொடங்கவும்",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "மாதிரி ({{displayCount}})",
       "modelsCount_other": "மாதிரிகள் ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "மாற்றங்களைக் காட்டவும்",
+      "asOf": "{{time}} நிலவரப்படி",
+      "tooLarge": "இந்த மாற்ற ஒப்பீடு மொபைலில் காட்ட முடியாத அளவுக்குப் பெரியது.",
+      "empty": "இந்த அமர்வில் இதுவரை கோப்பு மாற்றங்கள் எதுவும் இல்லை."
     },
     "autoApprove": {
       "title": "தானியங்கி ஒப்புதல்",

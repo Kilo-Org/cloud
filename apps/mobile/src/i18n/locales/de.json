@@ -136,7 +136,8 @@
     "working": "In Bearbeitung",
     "yourOwnRepositories": "Deine eigenen Code-Repositories",
     "dismissed": "Verworfen",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Änderungen"
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",
@@ -1678,7 +1679,6 @@
       "retryLoadingEnvironment": "Umgebung erneut laden",
       "defaultEnvironment": "Standardumgebung",
       "environmentSummary": "{{commands}} Befehle · {{mcp}} MCP · {{skills}} Skills · {{agents}} Agenten",
-      "changes": "Änderungen",
       "leaveChanges": "Änderungen beibehalten",
       "commitAndPush": "Committen und pushen",
       "startSession": "Sitzung starten",
@@ -2140,6 +2140,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modell ({{displayCount}})",
       "modelsCount_other": "Modelle ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Änderungen anzeigen",
+      "asOf": "Stand: {{time}}",
+      "tooLarge": "Dieser Diff ist zu groß für die Anzeige auf dem Mobilgerät.",
+      "empty": "In dieser Sitzung wurden noch keine Dateien geändert."
     },
     "autoApprove": {
       "title": "Automatisch genehmigen",
@@ -2644,6 +2650,7 @@
     "fileRows": {
       "collapseFile": "Datei einklappen",
       "diffTooLarge": "Der Diff ist zu groß für die Anzeige.",
+      "noPreview": "Keine Vorschau für diese Datei verfügbar",
       "expandFile": "Datei ausklappen",
       "markViewed": "{{path}} als angesehen markieren",
       "openDiffOnGitHub": "Diff dieser Datei auf GitHub öffnen",

@@ -136,7 +136,8 @@
     "working": "ກຳລັງເຮັດວຽກ",
     "yourOwnRepositories": "ຄັງໂຄ້ດຂອງທ່ານເອງ",
     "dismissed": "ລະເວັ້ນແລ້ວ",
-    "agent": "ຕົວແທນ"
+    "agent": "ຕົວແທນ",
+    "changes": "ການປ່ຽນແປງ"
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -325,6 +326,7 @@
       "collapseFile": "ຍຸບໄຟລ໌",
       "expandFile": "ຂະຫຍາຍໄຟລ໌",
       "diffTooLarge": "ຄວາມແຕກຕ່າງໃຫຍ່ເກີນກວ່າຈະສະແດງໄດ້.",
+      "noPreview": "ບໍ່ມີຕົວຢ່າງສຳລັບໄຟລ໌ນີ້",
       "openOnGitHub": "ເປີດໃນ GitHub",
       "openDiffOnGitHub": "ເປີດຄວາມແຕກຕ່າງຂອງໄຟລ໌ນີ້ໃນ GitHub",
       "githubDiff": "ຄວາມແຕກຕ່າງໃນ GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "ລອງໂຫຼດສະພາບແວດລ້ອມໃໝ່",
       "defaultEnvironment": "ສະພາບແວດລ້ອມມາດຕະຖານ",
       "environmentSummary": "{{commands}} ຄຳສັ່ງ · {{mcp}} MCP · {{skills}} ທັກສະ · {{agents}} ເອເຈນ",
-      "changes": "ການປ່ຽນແປງ",
       "leaveChanges": "ປະການປ່ຽນແປງໄວ້",
       "commitAndPush": "ບັນທຶກແລະສົ່ງຂຶ້ນ",
       "startSession": "ເລີ່ມເຊດຊັນ",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "ໂມເດວ ({{displayCount}})",
       "modelsCount_other": "ໂມເດວ ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ເບິ່ງການປ່ຽນແປງ",
+      "asOf": "ຮອດເວລາ {{time}}",
+      "tooLarge": "ຄວາມແຕກຕ່າງນີ້ໃຫຍ່ເກີນກວ່າຈະສະແດງໃນມືຖືໄດ້.",
+      "empty": "ຍັງບໍ່ມີການປ່ຽນແປງໄຟລ໌ໃນເຊສຊັນນີ້ເທື່ອ."
     },
     "autoApprove": {
       "title": "ການອະນຸມັດອັດຕະໂນມັດ",

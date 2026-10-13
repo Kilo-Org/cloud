@@ -136,7 +136,8 @@
     "working": "กำลังทำงาน",
     "yourOwnRepositories": "คลังโค้ดของคุณเอง",
     "dismissed": "ละเว้นแล้ว",
-    "agent": "ตัวแทน"
+    "agent": "ตัวแทน",
+    "changes": "การเปลี่ยนแปลง"
   },
   "language": {
     "restarting": "กำลังเริ่มแอปใหม่เพื่อเปลี่ยนภาษา",
@@ -325,6 +326,7 @@
       "collapseFile": "ย่อไฟล์",
       "expandFile": "ขยายไฟล์",
       "diffTooLarge": "ส่วนต่างมีขนาดใหญ่เกินกว่าจะแสดงได้",
+      "noPreview": "ไม่มีตัวอย่างสำหรับไฟล์นี้",
       "openOnGitHub": "เปิดบน GitHub",
       "openDiffOnGitHub": "เปิดส่วนต่างของไฟล์นี้บน GitHub",
       "githubDiff": "ส่วนต่างบน GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "ลองโหลดสภาพแวดล้อมใหม่",
       "defaultEnvironment": "สภาพแวดล้อมเริ่มต้น",
       "environmentSummary": "{{commands}} คำสั่ง · {{mcp}} MCP · {{skills}} ทักษะ · {{agents}} เอเจนต์",
-      "changes": "การเปลี่ยนแปลง",
       "leaveChanges": "เก็บการแก้ไขไว้",
       "commitAndPush": "คอมมิตและพุช",
       "startSession": "เริ่มเซสชัน",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}} จาก {{provider}} · {{steps}} · {{cost}}",
       "modelsCount_one": "โมเดล ({{displayCount}})",
       "modelsCount_other": "โมเดล ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ดูการเปลี่ยนแปลง",
+      "asOf": "ณ เวลา {{time}}",
+      "tooLarge": "ส่วนต่างนี้มีขนาดใหญ่เกินกว่าจะแสดงบนมือถือได้",
+      "empty": "ยังไม่มีการเปลี่ยนแปลงไฟล์ในเซสชันนี้"
     },
     "autoApprove": {
       "title": "อนุมัติอัตโนมัติ",

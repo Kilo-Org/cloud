@@ -136,7 +136,8 @@
     "working": "V teku",
     "yourOwnRepositories": "Tvoji repozitoriji",
     "dismissed": "Zavrženo",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Spremembe"
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -325,6 +326,7 @@
       "collapseFile": "Strni datoteko",
       "expandFile": "Razširi datoteko",
       "diffTooLarge": "Razlike so preobsežne za prikaz.",
+      "noPreview": "Predogled te datoteke ni na voljo",
       "openOnGitHub": "Odpri na GitHubu",
       "openDiffOnGitHub": "Odpri prikaz razlik te datoteke na GitHubu",
       "githubDiff": "Prikaz razlik na GitHubu"
@@ -2245,7 +2247,6 @@
       "retryLoadingEnvironment": "Poskusi znova naložiti okolje",
       "defaultEnvironment": "Privzeto okolje",
       "environmentSummary": "Ukazi: {{commands}} · MCP: {{mcp}} · Veščine: {{skills}} · Agenti: {{agents}}",
-      "changes": "Spremembe",
       "leaveChanges": "Pusti spremembe",
       "commitAndPush": "Uveljavi in potisni",
       "startSession": "Začni sejo",
@@ -2727,6 +2728,12 @@
       "modelsCount_other": "Modeli ({{displayCount}})",
       "modelsCount_two": "Modeli ({{displayCount}})",
       "modelsCount_few": "Modeli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Prikaži spremembe",
+      "asOf": "Stanje ob {{time}}",
+      "tooLarge": "Razlike so preobsežne za prikaz na mobilni napravi.",
+      "empty": "V tej seji še ni sprememb datotek."
     },
     "autoApprove": {
       "title": "Samodejna odobritev",

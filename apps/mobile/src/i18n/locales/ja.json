@@ -136,7 +136,8 @@
     "working": "作業中",
     "yourOwnRepositories": "自分のリポジトリ",
     "dismissed": "却下済み",
-    "agent": "エージェント"
+    "agent": "エージェント",
+    "changes": "変更内容"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -1678,7 +1679,6 @@
       "retryLoadingEnvironment": "環境の読み込みを再試行",
       "defaultEnvironment": "デフォルト環境",
       "environmentSummary": "コマンド {{commands}}件・MCP {{mcp}}件・スキル {{skills}}件・エージェント {{agents}}件",
-      "changes": "変更内容",
       "leaveChanges": "変更を残す",
       "commitAndPush": "コミットしてプッシュ",
       "startSession": "セッションを開始",
@@ -2140,6 +2140,12 @@
       "modelAccessibilityLabel": "{{name}}、{{provider}}、{{steps}}、{{cost}}",
       "modelsCount_one": "モデル（{{displayCount}}）",
       "modelsCount_other": "モデル（{{displayCount}}）"
+    },
+    "sessionChanges": {
+      "viewChanges": "変更内容を表示",
+      "asOf": "{{time}}時点",
+      "tooLarge": "この差分は大きすぎるため、モバイルでは表示できません。",
+      "empty": "このセッションではまだファイルの変更はありません。"
     },
     "autoApprove": {
       "title": "自動承認",
@@ -2644,6 +2650,7 @@
     "fileRows": {
       "collapseFile": "ファイルを折りたたむ",
       "diffTooLarge": "差分が大きすぎるため表示できません。",
+      "noPreview": "このファイルはプレビューできません",
       "expandFile": "ファイルを展開",
       "markViewed": "{{path}}を確認済みにする",
       "openDiffOnGitHub": "このファイルの差分をGitHubで開く",

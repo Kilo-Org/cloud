@@ -136,7 +136,8 @@
     "working": "Ana aiki",
     "yourOwnRepositories": "Ma'ajiyoyinka",
     "dismissed": "An yi watsi da shi",
-    "agent": "Wakili"
+    "agent": "Wakili",
+    "changes": "Canje-canje"
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -325,6 +326,7 @@
       "collapseFile": "Ɓoye bayanan fayil",
       "expandFile": "Nuna bayanan fayil",
       "diffTooLarge": "Bambancin fayil ya yi yawa don a nuna shi.",
+      "noPreview": "Babu samfoti ga wannan fayil",
       "openOnGitHub": "Buɗe a GitHub",
       "openDiffOnGitHub": "Buɗe bambancin wannan fayil ɗin a GitHub",
       "githubDiff": "Bambancin fayil a GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Sake gwada loda muhallin aiki",
       "defaultEnvironment": "Muhallin aiki na asali",
       "environmentSummary": "umarni {{commands}} · MCP {{mcp}} · ƙwarewa {{skills}} · wakilai {{agents}}",
-      "changes": "Canje-canje",
       "leaveChanges": "Bar canje-canje",
       "commitAndPush": "Adana ka tura",
       "startSession": "Fara zama",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Samfur ({{displayCount}})",
       "modelsCount_other": "Samfura ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Duba canje-canje",
+      "asOf": "Zuwa {{time}}",
+      "tooLarge": "Wannan bambancin ya yi yawa don a nuna shi a wayar hannu.",
+      "empty": "Babu canje-canjen fayil a wannan zama tukuna."
     },
     "autoApprove": {
       "title": "Amincewa ta atomatik",

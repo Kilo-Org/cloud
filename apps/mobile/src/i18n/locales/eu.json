@@ -136,7 +136,8 @@
     "working": "Lanean",
     "yourOwnRepositories": "Zure biltegiak",
     "dismissed": "Baztertuta",
-    "agent": "Agentea"
+    "agent": "Agentea",
+    "changes": "Aldaketak"
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -325,6 +326,7 @@
       "collapseFile": "Tolestu fitxategia",
       "expandFile": "Zabaldu fitxategia",
       "diffTooLarge": "Diferentziak handiegiak dira bistaratzeko.",
+      "noPreview": "Fitxategi honek ez du aurrebistarik",
       "openOnGitHub": "Ireki GitHub-en",
       "openDiffOnGitHub": "Ireki fitxategi honen diferentziak GitHub-en",
       "githubDiff": "GitHub-eko diferentziak"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Saiatu berriro ingurunea kargatzen",
       "defaultEnvironment": "Ingurune lehenetsia",
       "environmentSummary": "{{commands}} komando · {{mcp}} MCP · {{skills}} trebetasun · {{agents}} agente",
-      "changes": "Aldaketak",
       "leaveChanges": "Utzi aldaketak",
       "commitAndPush": "Egin commit eta igo",
       "startSession": "Hasi saioa",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modelo ({{displayCount}})",
       "modelsCount_other": "Modeloak ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Ikusi aldaketak",
+      "asOf": "{{time}}(e)ko egoera",
+      "tooLarge": "Diferentzia hau handiegia da mugikorrean erakusteko.",
+      "empty": "Saio honetan ez dago fitxategi-aldaketarik oraindik."
     },
     "autoApprove": {
       "title": "Onespen automatikoa",

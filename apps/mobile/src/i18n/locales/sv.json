@@ -136,7 +136,8 @@
     "working": "Arbetar",
     "yourOwnRepositories": "Dina egna kodarkiv",
     "dismissed": "Avskriven",
-    "agent": "Ombud"
+    "agent": "Ombud",
+    "changes": "Ändringar"
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -325,6 +326,7 @@
       "collapseFile": "Fäll ihop filen",
       "expandFile": "Fäll ut filen",
       "diffTooLarge": "Diffen är för stor för att visas.",
+      "noPreview": "Ingen förhandsvisning tillgänglig för den här filen",
       "openOnGitHub": "Öppna på GitHub",
       "openDiffOnGitHub": "Öppna den här filens diff på GitHub",
       "githubDiff": "GitHub-diff"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Försök läsa in miljön igen",
       "defaultEnvironment": "Standardmiljö",
       "environmentSummary": "{{commands}} kommandon · {{mcp}} MCP · {{skills}} färdigheter · {{agents}} agenter",
-      "changes": "Ändringar",
       "leaveChanges": "Behåll ändringar",
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modell ({{displayCount}})",
       "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Visa ändringar",
+      "asOf": "Per {{time}}",
+      "tooLarge": "Diffen är för stor för att visas på mobilen.",
+      "empty": "Inga filändringar i den här sessionen än."
     },
     "autoApprove": {
       "title": "Automatiskt godkännande",

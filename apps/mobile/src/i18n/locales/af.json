@@ -136,7 +136,8 @@
     "working": "Besig",
     "yourOwnRepositories": "Jou eie bewaarplekke",
     "dismissed": "Verwerp",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Wysigings"
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -325,6 +326,7 @@
       "collapseFile": "Vou lêer toe",
       "expandFile": "Vou lêer uit",
       "diffTooLarge": "Die verskille is te groot om te vertoon.",
+      "noPreview": "Geen voorskou beskikbaar vir hierdie lêer nie",
       "openOnGitHub": "Maak op GitHub oop",
       "openDiffOnGitHub": "Maak hierdie lêer se verskille op GitHub oop",
       "githubDiff": "Verskille op GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Probeer weer om die omgewing te laai",
       "defaultEnvironment": "Standaardomgewing",
       "environmentSummary": "{{commands}} opdragte · {{mcp}} MCP · {{skills}} vaardighede · {{agents}} agente",
-      "changes": "Wysigings",
       "leaveChanges": "Laat wysigings staan",
       "commitAndPush": "Lê vas en stoot op",
       "startSession": "Begin sessie",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modelle ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Bekyk wysigings",
+      "asOf": "Soos teen {{time}}",
+      "tooLarge": "Hierdie verskille is te groot om op mobiel te vertoon.",
+      "empty": "Nog geen lêerwysigings in hierdie sessie nie."
     },
     "autoApprove": {
       "title": "Outo-goedkeuring",

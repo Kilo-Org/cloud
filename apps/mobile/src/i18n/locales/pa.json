@@ -136,7 +136,8 @@
     "working": "ਕੰਮ ਜਾਰੀ",
     "yourOwnRepositories": "ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਰਿਪੋਜ਼ਿਟਰੀਆਂ",
     "dismissed": "ਖਾਰਜ",
-    "agent": "ਏਜੰਟ"
+    "agent": "ਏਜੰਟ",
+    "changes": "ਤਬਦੀਲੀਆਂ"
   },
   "language": {
     "restarting": "ਭਾਸ਼ਾ ਲਾਗੂ ਕਰਨ ਲਈ ਮੁੜ ਚਾਲੂ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
@@ -325,6 +326,7 @@
       "collapseFile": "ਫਾਈਲ ਸਮੇਟੋ",
       "expandFile": "ਫਾਈਲ ਫੈਲਾਓ",
       "diffTooLarge": "ਡਿਫ਼ ਇੰਨਾ ਵੱਡਾ ਹੈ ਕਿ ਦਿਖਾਇਆ ਨਹੀਂ ਜਾ ਸਕਦਾ।",
+      "noPreview": "ਇਸ ਫਾਈਲ ਲਈ ਕੋਈ ਝਲਕ ਉਪਲਬਧ ਨਹੀਂ",
       "openOnGitHub": "GitHub 'ਤੇ ਖੋਲ੍ਹੋ",
       "openDiffOnGitHub": "GitHub 'ਤੇ ਇਸ ਫਾਈਲ ਦਾ ਡਿਫ਼ ਖੋਲ੍ਹੋ",
       "githubDiff": "GitHub ਡਿਫ਼"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "ਵਾਤਾਵਰਣ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
       "defaultEnvironment": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਵਾਤਾਵਰਣ",
       "environmentSummary": "{{commands}} ਕਮਾਂਡਾਂ · {{mcp}} MCP · {{skills}} ਹੁਨਰ · {{agents}} ਏਜੰਟ",
-      "changes": "ਤਬਦੀਲੀਆਂ",
       "leaveChanges": "ਤਬਦੀਲੀਆਂ ਰਹਿਣ ਦਿਓ",
       "commitAndPush": "ਕਮਿਟ ਤੇ ਪੁਸ਼ ਕਰੋ",
       "startSession": "ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "ਮਾਡਲ ({{displayCount}})",
       "modelsCount_other": "ਮਾਡਲ ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ਤਬਦੀਲੀਆਂ ਵੇਖੋ",
+      "asOf": "{{time}} ਤੱਕ",
+      "tooLarge": "ਇਹ ਡਿਫ਼ ਮੋਬਾਈਲ 'ਤੇ ਦਿਖਾਉਣ ਲਈ ਬਹੁਤ ਵੱਡਾ ਹੈ।",
+      "empty": "ਇਸ ਸੈਸ਼ਨ ਵਿੱਚ ਹਾਲੇ ਤੱਕ ਕੋਈ ਫਾਈਲ ਤਬਦੀਲੀ ਨਹੀਂ।"
     },
     "autoApprove": {
       "title": "ਆਟੋ-ਪ੍ਰਵਾਨਗੀ",

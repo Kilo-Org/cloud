@@ -136,7 +136,8 @@
     "working": "په کار بوخت",
     "yourOwnRepositories": "ستاسو خپل زېرمتونونه",
     "dismissed": "له پامه غورځول شوی",
-    "agent": "اجنټ"
+    "agent": "اجنټ",
+    "changes": "بدلونونه"
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -325,6 +326,7 @@
       "collapseFile": "د فایل منځپانګه پټه کړئ",
       "expandFile": "د فایل منځپانګه ښکاره کړئ",
       "diffTooLarge": "توپیر دومره لوی دی چې نه شي ښودل کېدای.",
+      "noPreview": "د دې فایل لپاره مخکتنه نشته",
       "openOnGitHub": "په GitHub کې پرانیزئ",
       "openDiffOnGitHub": "د دې فایل توپیر په GitHub کې پرانیزئ",
       "githubDiff": "د GitHub توپیر"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "د چاپېریال بارولو بیا هڅه کړئ",
       "defaultEnvironment": "تلواله چاپېریال",
       "environmentSummary": "{{commands}} کمانډونه · {{mcp}} MCP · {{skills}} مهارتونه · {{agents}} ایجنټونه",
-      "changes": "بدلونونه",
       "leaveChanges": "بدلونونه پرېږدئ",
       "commitAndPush": "کمیټ او پش کړئ",
       "startSession": "ناسته پیل کړئ",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
       "modelsCount_one": "ماډل ({{displayCount}})",
       "modelsCount_other": "ماډلونه ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "بدلونونه وګورئ",
+      "asOf": "تر {{time}} پورې",
+      "tooLarge": "دا توپیر دومره لوی دی چې په موبایل کې نه شي ښودل کېدای.",
+      "empty": "په دې ناسته کې تر اوسه په فایلونو کې هېڅ بدلون نه دی راغلی."
     },
     "autoApprove": {
       "title": "اتوماتیک تصویب",

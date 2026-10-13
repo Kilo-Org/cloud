@@ -136,7 +136,8 @@
     "working": "Jobber",
     "yourOwnRepositories": "Dine egne kodelagre",
     "dismissed": "Avvist",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Endringer"
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -325,6 +326,7 @@
       "collapseFile": "Skjul filinnholdet",
       "expandFile": "Vis filinnholdet",
       "diffTooLarge": "Endringene er for omfattende til å vises.",
+      "noPreview": "Ingen forhåndsvisning tilgjengelig for denne filen",
       "openOnGitHub": "Åpne på GitHub",
       "openDiffOnGitHub": "Åpne endringene i denne filen på GitHub",
       "githubDiff": "Endringsvisning på GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Prøv å laste inn miljøet på nytt",
       "defaultEnvironment": "Standardmiljø",
       "environmentSummary": "{{commands}} kommandoer · {{mcp}} MCP · {{skills}} ferdigheter · {{agents}} agenter",
-      "changes": "Endringer",
       "leaveChanges": "Behold endringer",
       "commitAndPush": "Lagre og send",
       "startSession": "Start økt",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modell ({{displayCount}})",
       "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Vis endringer",
+      "asOf": "Per {{time}}",
+      "tooLarge": "Endringene er for omfattende til å vises på mobil.",
+      "empty": "Ingen filendringer i denne økten ennå."
     },
     "autoApprove": {
       "title": "Automatisk godkjenning",

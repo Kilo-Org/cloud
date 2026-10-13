@@ -136,7 +136,8 @@
     "working": "Ag obair",
     "yourOwnRepositories": "Do stóir féin",
     "dismissed": "Curtha as an áireamh",
-    "agent": "Gníomhaire"
+    "agent": "Gníomhaire",
+    "changes": "Athruithe"
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -325,6 +326,7 @@
       "collapseFile": "Fill an comhad",
       "expandFile": "Leathnaigh an comhad",
       "diffTooLarge": "Tá an chomparáid athruithe rómhór le taispeáint.",
+      "noPreview": "Níl réamhamharc ar fáil don chomhad seo",
       "openOnGitHub": "Oscail ar GitHub",
       "openDiffOnGitHub": "Oscail comparáid athruithe an chomhaid seo ar GitHub",
       "githubDiff": "Comparáid athruithe GitHub"
@@ -2273,7 +2275,6 @@
       "retryLoadingEnvironment": "Bain triail as an timpeallacht a lódáil arís",
       "defaultEnvironment": "Timpeallacht réamhshocraithe",
       "environmentSummary": "orduithe: {{commands}} · {{mcp}} MCP · scileanna: {{skills}} · gníomhairí: {{agents}}",
-      "changes": "Athruithe",
       "leaveChanges": "Fág athruithe",
       "commitAndPush": "Taifead agus brúigh",
       "startSession": "Tosaigh seisiún",
@@ -2765,6 +2766,12 @@
       "modelsCount_two": "Samhlacha ({{displayCount}})",
       "modelsCount_few": "Samhlacha ({{displayCount}})",
       "modelsCount_many": "Samhlacha ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Féach ar athruithe",
+      "asOf": "Amhail {{time}}",
+      "tooLarge": "Tá an chomparáid athruithe seo rómhór le taispeáint ar fhón póca.",
+      "empty": "Níl aon athruithe ar chomhaid sa seisiún seo fós."
     },
     "autoApprove": {
       "title": "Ceadaigh go huathoibríoch",

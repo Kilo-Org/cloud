@@ -136,7 +136,8 @@
     "working": "Yn gweithio",
     "yourOwnRepositories": "Dy ystorfeydd dy hun",
     "dismissed": "Wedi'i ddiystyru",
-    "agent": "Asiant"
+    "agent": "Asiant",
+    "changes": "Newidiadau"
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -325,6 +326,7 @@
       "collapseFile": "Cwympo'r ffeil",
       "expandFile": "Ehangu'r ffeil",
       "diffTooLarge": "Mae gormod o wahaniaethau i'w dangos.",
+      "noPreview": "Does dim rhagolwg ar gael ar gyfer y ffeil hon",
       "openOnGitHub": "Agor ar GitHub",
       "openDiffOnGitHub": "Agor gwahaniaethau'r ffeil hon ar GitHub",
       "githubDiff": "Gwahaniaethau ar GitHub"
@@ -2301,7 +2303,6 @@
       "retryLoadingEnvironment": "Ceisio llwytho'r amgylchedd eto",
       "defaultEnvironment": "Amgylchedd diofyn",
       "environmentSummary": "Gorchmynion: {{commands}} · MCP: {{mcp}} · Sgiliau: {{skills}} · Asiantau: {{agents}}",
-      "changes": "Newidiadau",
       "leaveChanges": "Gadael newidiadau",
       "commitAndPush": "Cyflwyno a gwthio",
       "startSession": "Dechrau sesiwn",
@@ -2803,6 +2804,12 @@
       "modelsCount_two": "Modelau ({{displayCount}})",
       "modelsCount_few": "Modelau ({{displayCount}})",
       "modelsCount_many": "Modelau ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Gweld newidiadau",
+      "asOf": "Fel ar {{time}}",
+      "tooLarge": "Mae'r gwahaniaethau hyn yn rhy fawr i'w dangos ar ffôn symudol.",
+      "empty": "Dim newidiadau i ffeiliau yn y sesiwn hon eto."
     },
     "autoApprove": {
       "title": "Cymeradwyo'n awtomatig",

@@ -136,7 +136,8 @@
     "working": "İşləyir",
     "yourOwnRepositories": "Öz repozitoriyaların",
     "dismissed": "Rədd edilib",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Dəyişikliklər"
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -325,6 +326,7 @@
       "collapseFile": "Faylın məzmununu gizlət",
       "expandFile": "Faylın məzmununu göstər",
       "diffTooLarge": "Dəyişikliklərin həcmi göstərilmək üçün çox böyükdür.",
+      "noPreview": "Bu fayl üçün önizləmə mövcud deyil",
       "openOnGitHub": "GitHub-da aç",
       "openDiffOnGitHub": "Bu faylın dəyişikliklərini GitHub-da aç",
       "githubDiff": "GitHub-dakı dəyişikliklər"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Mühiti yenidən yüklə",
       "defaultEnvironment": "Standart mühit",
       "environmentSummary": "{{commands}} əmr · {{mcp}} MCP · {{skills}} bacarıq · {{agents}} agent",
-      "changes": "Dəyişikliklər",
       "leaveChanges": "Dəyişiklikləri saxla",
       "commitAndPush": "Təsdiqlə və göndər",
       "startSession": "Sessiyanı başlat",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modellər ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Dəyişikliklərə bax",
+      "asOf": "{{time}} vəziyyətinə",
+      "tooLarge": "Dəyişikliklərin həcmi mobil cihazda göstərmək üçün çox böyükdür.",
+      "empty": "Bu sessiyada hələ fayl dəyişikliyi yoxdur."
     },
     "autoApprove": {
       "title": "Avtomatik təsdiq",

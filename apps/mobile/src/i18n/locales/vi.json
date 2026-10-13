@@ -136,7 +136,8 @@
     "working": "Đang xử lý",
     "yourOwnRepositories": "Kho mã nguồn của riêng bạn",
     "dismissed": "Đã bỏ qua",
-    "agent": "Đại lý"
+    "agent": "Đại lý",
+    "changes": "Thay đổi"
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -1678,7 +1679,6 @@
       "retryLoadingEnvironment": "Thử tải lại môi trường",
       "defaultEnvironment": "Môi trường mặc định",
       "environmentSummary": "{{commands}} lệnh · {{mcp}} MCP · {{skills}} kỹ năng · {{agents}} tác nhân",
-      "changes": "Thay đổi",
       "leaveChanges": "Giữ thay đổi",
       "commitAndPush": "Ghi nhận và đẩy",
       "startSession": "Bắt đầu phiên",
@@ -2140,6 +2140,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Mô hình ({{displayCount}})",
       "modelsCount_other": "Mô hình ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Xem thay đổi",
+      "asOf": "Tính đến {{time}}",
+      "tooLarge": "Bản so sánh này quá lớn nên không thể hiển thị trên thiết bị di động.",
+      "empty": "Phiên này chưa có thay đổi tệp nào."
     },
     "autoApprove": {
       "title": "Tự động phê duyệt",
@@ -2644,6 +2650,7 @@
     "fileRows": {
       "collapseFile": "Thu gọn tệp",
       "diffTooLarge": "Bản so sánh quá lớn nên không thể hiển thị.",
+      "noPreview": "Không có bản xem trước cho tệp này",
       "expandFile": "Mở rộng tệp",
       "markViewed": "Đánh dấu {{path}} là đã xem",
       "openDiffOnGitHub": "Mở bản so sánh của tệp này trên GitHub",

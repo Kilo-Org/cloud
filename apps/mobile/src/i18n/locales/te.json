@@ -136,7 +136,8 @@
     "working": "పని జరుగుతోంది",
     "yourOwnRepositories": "మీ స్వంత రిపోజిటరీలు",
     "dismissed": "విస్మరించారు",
-    "agent": "ఏజెంట్"
+    "agent": "ఏజెంట్",
+    "changes": "మార్పులు"
   },
   "language": {
     "restarting": "ఎంచుకున్న భాషను వర్తింపజేయడానికి పునఃప్రారంభిస్తోంది",
@@ -325,6 +326,7 @@
       "collapseFile": "ఫైల్‌ను కుదించండి",
       "expandFile": "ఫైల్‌ను విస్తరించండి",
       "diffTooLarge": "మార్పుల పరిమాణం చాలా ఎక్కువగా ఉన్నందున వాటిని చూపలేము.",
+      "noPreview": "ఈ ఫైల్‌కు ప్రివ్యూ అందుబాటులో లేదు",
       "openOnGitHub": "GitHubలో తెరవండి",
       "openDiffOnGitHub": "ఈ ఫైల్‌లోని మార్పులను GitHubలో తెరవండి",
       "githubDiff": "GitHubలోని మార్పుల పోలిక"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "పని వాతావరణాన్ని లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
       "defaultEnvironment": "డిఫాల్ట్ పని వాతావరణం",
       "environmentSummary": "{{commands}} కమాండ్‌లు · {{mcp}} MCP · {{skills}} నైపుణ్యాలు · {{agents}} ఏజెంట్లు",
-      "changes": "మార్పులు",
       "leaveChanges": "మార్పులను అలాగే ఉంచండి",
       "commitAndPush": "కమిట్ చేసి పుష్ చేయండి",
       "startSession": "సెషన్ ప్రారంభించండి",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "మోడల్ ({{displayCount}})",
       "modelsCount_other": "మోడళ్లు ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "మార్పులను చూడండి",
+      "asOf": "{{time}} నాటికి",
+      "tooLarge": "ఈ మార్పుల పరిమాణం చాలా ఎక్కువగా ఉన్నందున మొబైల్‌లో చూపలేము.",
+      "empty": "ఈ సెషన్‌లో ఇంకా ఫైళ్లలో మార్పులు లేవు."
     },
     "autoApprove": {
       "title": "స్వయంచాలక ఆమోదం",

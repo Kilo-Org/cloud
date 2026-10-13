@@ -136,7 +136,8 @@
     "working": "လုပ်ဆောင်နေ",
     "yourOwnRepositories": "သင့်ကိုယ်ပိုင် ကုဒ်သိုလှောင်ရာများ",
     "dismissed": "ပယ်ချပြီး",
-    "agent": "အေးဂျင့်"
+    "agent": "အေးဂျင့်",
+    "changes": "အပြောင်းအလဲများ"
   },
   "language": {
     "restarting": "ရွေးထားသော ဘာသာစကားကို သုံးရန် ပြန်စတင်နေသည်",
@@ -325,6 +326,7 @@
       "collapseFile": "ဖိုင်ကို ခေါက်သိမ်းပါ",
       "expandFile": "ဖိုင်ကို ဖြန့်ပြပါ",
       "diffTooLarge": "ကွာခြားချက် ကြီးလွန်းသဖြင့် ပြသ၍မရပါ။",
+      "noPreview": "ဤဖိုင်အတွက် အစမ်းကြည့်ရှုမှု မရှိပါ",
       "openOnGitHub": "GitHub တွင် ဖွင့်ပါ",
       "openDiffOnGitHub": "ဒီဖိုင်၏ ကွာခြားချက်ကို GitHub တွင် ဖွင့်ပါ",
       "githubDiff": "GitHub ပေါ်ရှိ ကွာခြားချက်"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "လုပ်ဆောင်မှုပတ်ဝန်းကျင်ကို ထပ်ရယူကြည့်ပါ",
       "defaultEnvironment": "မူလလုပ်ဆောင်မှုပတ်ဝန်းကျင်",
       "environmentSummary": "အမိန့် {{commands}} ခု · MCP {{mcp}} ခု · ကျွမ်းကျင်မှု {{skills}} ခု · အေးဂျင့် {{agents}} ခု",
-      "changes": "အပြောင်းအလဲများ",
       "leaveChanges": "မပြောင်းဘဲထား",
       "commitAndPush": "မှတ်တမ်းတင်ပြီး တင်ပို့",
       "startSession": "စက်ရှင် စတင်ပါ",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}၊ {{provider}}၊ {{steps}}၊ {{cost}}",
       "modelsCount_one": "မော်ဒယ် ({{displayCount}})",
       "modelsCount_other": "မော်ဒယ်များ ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "အပြောင်းအလဲများကို ကြည့်ပါ",
+      "asOf": "{{time}} အချိန်အထိ",
+      "tooLarge": "ဤကွာခြားချက်သည် မိုဘိုင်းတွင် ပြသရန် ကြီးလွန်းပါသည်။",
+      "empty": "ဤဆက်ရှင်တွင် ဖိုင်အပြောင်းအလဲ မရှိသေးပါ။"
     },
     "autoApprove": {
       "title": "အလိုအလျောက် အတည်ပြုခြင်း",

@@ -136,7 +136,8 @@
     "working": "Dolgozik",
     "yourOwnRepositories": "Saját adattáraid",
     "dismissed": "Elvetve",
-    "agent": "Ügynök"
+    "agent": "Ügynök",
+    "changes": "Változtatások"
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -325,6 +326,7 @@
       "collapseFile": "Fájl összecsukása",
       "expandFile": "Fájl kibontása",
       "diffTooLarge": "A különbségnézet túl nagy a megjelenítéshez.",
+      "noPreview": "Ehhez a fájlhoz nem érhető el előnézet",
       "openOnGitHub": "Megnyitás a GitHubon",
       "openDiffOnGitHub": "A fájl különbségnézetének megnyitása a GitHubon",
       "githubDiff": "GitHub-különbségnézet"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Környezet betöltésének újrapróbálása",
       "defaultEnvironment": "Alapértelmezett környezet",
       "environmentSummary": "{{commands}} parancs · {{mcp}} MCP · {{skills}} készség · {{agents}} ügynök",
-      "changes": "Változtatások",
       "leaveChanges": "Változtatások megtartása",
       "commitAndPush": "Véglegesítés és feltöltés",
       "startSession": "Munkamenet indítása",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modell ({{displayCount}})",
       "modelsCount_other": "Modellek ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Változtatások megtekintése",
+      "asOf": "Állapot: {{time}}",
+      "tooLarge": "Ez a különbségnézet túl nagy a mobilon való megjelenítéshez.",
+      "empty": "Ebben a munkamenetben még nincsenek fájlváltoztatások."
     },
     "autoApprove": {
       "title": "Automatikus jóváhagyás",

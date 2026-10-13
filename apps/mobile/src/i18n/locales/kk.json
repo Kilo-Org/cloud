@@ -136,7 +136,8 @@
     "working": "Орындалуда",
     "yourOwnRepositories": "Өзіңіздің репозиторийлеріңіз",
     "dismissed": "Еленбейді",
-    "agent": "Агент"
+    "agent": "Агент",
+    "changes": "Өзгерістер"
   },
   "language": {
     "restarting": "Тілді қолдану үшін қайта іске қосылуда",
@@ -325,6 +326,7 @@
       "collapseFile": "Файлды жию",
       "expandFile": "Файлды ашу",
       "diffTooLarge": "Өзгерістер көлемі тым үлкен болғандықтан, оларды көрсету мүмкін емес.",
+      "noPreview": "Бұл файлды алдын ала қарау мүмкін емес",
       "openOnGitHub": "GitHub-та ашу",
       "openDiffOnGitHub": "Осы файлдағы өзгерістерді GitHub-та ашу",
       "githubDiff": "GitHub-тағы өзгерістер"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Ортаны жүктеуді қайталау",
       "defaultEnvironment": "Әдепкі орта",
       "environmentSummary": "{{commands}} пәрмен · {{mcp}} MCP · {{skills}} дағды · {{agents}} агент",
-      "changes": "Өзгерістер",
       "leaveChanges": "Өзгерістерді қалдыру",
       "commitAndPush": "Коммит жасап, жіберу",
       "startSession": "Сессияны бастау",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Модель ({{displayCount}})",
       "modelsCount_other": "Модельдер ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Өзгерістерді қарау",
+      "asOf": "{{time}} жағдайы бойынша",
+      "tooLarge": "Бұл өзгерістер көлемі мобильді құрылғыда көрсету үшін тым үлкен.",
+      "empty": "Бұл сессияда әзірге файл өзгерістері жоқ."
     },
     "autoApprove": {
       "title": "Автоматты мақұлдау",

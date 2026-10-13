@@ -136,7 +136,8 @@
     "working": "Աշխատում է",
     "yourOwnRepositories": "Քո սեփական պահոցները",
     "dismissed": "Անտեսված",
-    "agent": "Գործակալ"
+    "agent": "Գործակալ",
+    "changes": "Փոփոխություններ"
   },
   "language": {
     "restarting": "Վերագործարկվում է՝ լեզվի փոփոխությունը կիրառելու համար",
@@ -325,6 +326,7 @@
       "collapseFile": "Ծալել ֆայլը",
       "expandFile": "Բացել ֆայլը",
       "diffTooLarge": "Փոփոխությունների ծավալը չափազանց մեծ է ցուցադրելու համար։",
+      "noPreview": "Այս ֆայլի նախադիտումը հասանելի չէ",
       "openOnGitHub": "Բացել GitHub-ում",
       "openDiffOnGitHub": "Բացել այս ֆայլի փոփոխությունները GitHub-ում",
       "githubDiff": "GitHub-ի փոփոխություններ"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Կրկին փորձել բեռնել միջավայրը",
       "defaultEnvironment": "Լռելյայն միջավայր",
       "environmentSummary": "{{commands}} հրաման · {{mcp}} MCP · {{skills}} հմտություն · {{agents}} գործակալ",
-      "changes": "Փոփոխություններ",
       "leaveChanges": "Թողնել անփոփոխ",
       "commitAndPush": "Ամրագրել և ուղարկել",
       "startSession": "Սկսել նիստը",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Մոդել ({{displayCount}})",
       "modelsCount_other": "Մոդելներ ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Դիտել փոփոխությունները",
+      "asOf": "{{time}}-ի դրությամբ",
+      "tooLarge": "Փոփոխությունների ծավալը չափազանց մեծ է բջջային սարքում ցուցադրելու համար։",
+      "empty": "Այս սեսիայում դեռ ֆայլերի փոփոխություններ չկան։"
     },
     "autoApprove": {
       "title": "Ավտոմատ հաստատում",

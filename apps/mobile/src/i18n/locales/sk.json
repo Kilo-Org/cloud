@@ -136,7 +136,8 @@
     "working": "Pracuje sa",
     "yourOwnRepositories": "Tvoje vlastné repozitáre",
     "dismissed": "Ignorované",
-    "agent": "agent"
+    "agent": "agent",
+    "changes": "Zmeny"
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -325,6 +326,7 @@
       "collapseFile": "Zbaliť súbor",
       "expandFile": "Rozbaliť súbor",
       "diffTooLarge": "Prehľad zmien je príliš veľký na zobrazenie.",
+      "noPreview": "Pre tento súbor nie je k dispozícii náhľad",
       "openOnGitHub": "Otvoriť na GitHub",
       "openDiffOnGitHub": "Otvoriť prehľad zmien tohto súboru na GitHub",
       "githubDiff": "Prehľad zmien na GitHub"
@@ -2245,7 +2247,6 @@
       "retryLoadingEnvironment": "Skúsiť znova načítať prostredie",
       "defaultEnvironment": "Predvolené prostredie",
       "environmentSummary": "príkazy: {{commands}} · MCP: {{mcp}} · zručnosti: {{skills}} · agenti: {{agents}}",
-      "changes": "Zmeny",
       "leaveChanges": "Ponechať zmeny",
       "commitAndPush": "Vytvoriť commit a odoslať",
       "startSession": "Spustiť reláciu",
@@ -2727,6 +2728,12 @@
       "modelsCount_other": "Modely ({{displayCount}})",
       "modelsCount_few": "Modely ({{displayCount}})",
       "modelsCount_many": "Modely ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Zobraziť zmeny",
+      "asOf": "Stav k {{time}}",
+      "tooLarge": "Prehľad zmien je príliš veľký na zobrazenie v mobile.",
+      "empty": "V tejto relácii zatiaľ nie sú žiadne zmeny súborov."
     },
     "autoApprove": {
       "title": "Automatické schvaľovanie",

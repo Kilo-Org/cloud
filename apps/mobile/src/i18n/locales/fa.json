@@ -136,7 +136,8 @@
     "working": "در حال کار",
     "yourOwnRepositories": "مخازن خودتان",
     "dismissed": "نادیده‌گرفته‌شده",
-    "agent": "عامل"
+    "agent": "عامل",
+    "changes": "تغییرات"
   },
   "language": {
     "restarting": "در حال راه‌اندازی مجدد برای تغییر زبان",
@@ -325,6 +326,7 @@
       "collapseFile": "جمع کردن فایل",
       "expandFile": "باز کردن فایل",
       "diffTooLarge": "حجم تغییرات برای نمایش بیش از حد است.",
+      "noPreview": "پیش‌نمایشی برای این فایل موجود نیست",
       "openOnGitHub": "باز کردن در GitHub",
       "openDiffOnGitHub": "باز کردن تغییرات این فایل در GitHub",
       "githubDiff": "تغییرات در GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "تلاش دوباره برای بارگذاری محیط",
       "defaultEnvironment": "محیط پیش‌فرض",
       "environmentSummary": "{{commands}} دستور · {{mcp}} MCP · {{skills}} مهارت · {{agents}} عامل",
-      "changes": "تغییرات",
       "leaveChanges": "حفظ تغییرات",
       "commitAndPush": "کامیت و پوش",
       "startSession": "شروع نشست",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
       "modelsCount_one": "مدل ({{displayCount}})",
       "modelsCount_other": "مدل‌ها ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "مشاهده تغییرات",
+      "asOf": "تا ساعت {{time}}",
+      "tooLarge": "حجم این تغییرات برای نمایش در موبایل بیش از حد است.",
+      "empty": "هنوز هیچ فایلی در این جلسه تغییر نکرده است."
     },
     "autoApprove": {
       "title": "تأیید خودکار",

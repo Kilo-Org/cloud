@@ -136,7 +136,8 @@
     "working": "ක්‍රියාත්මකයි",
     "yourOwnRepositories": "ඔබේම කේත ගබඩා",
     "dismissed": "ඉවතලා ඇත",
-    "agent": "නියෝජිතයා"
+    "agent": "නියෝජිතයා",
+    "changes": "වෙනස්කම්"
   },
   "language": {
     "restarting": "භාෂාව යෙදීමට නැවත ආරම්භ කරමින්",
@@ -325,6 +326,7 @@
       "collapseFile": "ගොනුව හකුළන්න",
       "expandFile": "ගොනුව පුළුල් කරන්න",
       "diffTooLarge": "වෙනස්කම් ප්‍රමාණය පෙන්වීමට නොහැකි තරම් විශාලයි.",
+      "noPreview": "මෙම ගොනුව සඳහා පෙරදසුනක් නොමැත",
       "openOnGitHub": "GitHub හි විවෘත කරන්න",
       "openDiffOnGitHub": "මෙම ගොනුවේ වෙනස්කම් GitHub හි විවෘත කරන්න",
       "githubDiff": "GitHub හි වෙනස්කම්"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "පරිසරය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
       "defaultEnvironment": "පෙරනිමි පරිසරය",
       "environmentSummary": "විධාන {{commands}} · MCP {{mcp}} · කුසලතා {{skills}} · නියෝජිතයන් {{agents}}",
-      "changes": "වෙනස්කම්",
       "leaveChanges": "වෙනස්කම් තබන්න",
       "commitAndPush": "කමිට් කර පුෂ් කරන්න",
       "startSession": "සැසිය ආරම්භ කරන්න",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "මාදිලිය ({{displayCount}})",
       "modelsCount_other": "මාදිලි ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "වෙනස්කම් බලන්න",
+      "asOf": "{{time}} වන විට",
+      "tooLarge": "මෙම වෙනස්කම් ජංගම උපාංගයේ පෙන්වීමට නොහැකි තරම් විශාලයි.",
+      "empty": "මෙම සැසියේ තවම ගොනු වෙනස්කම් නොමැත."
     },
     "autoApprove": {
       "title": "ස්වයංක්‍රීය අනුමැතිය",

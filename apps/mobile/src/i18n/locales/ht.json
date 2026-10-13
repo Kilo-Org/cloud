@@ -136,7 +136,8 @@
     "working": "Ap travay",
     "yourOwnRepositories": "Pwòp depo ou yo",
     "dismissed": "Rejte",
-    "agent": "Ajan"
+    "agent": "Ajan",
+    "changes": "Chanjman"
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -325,6 +326,7 @@
       "collapseFile": "Kache kontni fichye a",
       "expandFile": "Montre kontni fichye a",
       "diffTooLarge": "Diferans kòd yo twò gwo pou afiche.",
+      "noPreview": "Pa gen apèsi disponib pou fichye sa a",
       "openOnGitHub": "Louvri sou GitHub",
       "openDiffOnGitHub": "Louvri diferans kòd fichye sa a sou GitHub",
       "githubDiff": "Diferans kòd sou GitHub"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "Eseye chaje anviwònman an ankò",
       "defaultEnvironment": "Anviwònman pa defo",
       "environmentSummary": "{{commands}} kòmandman · {{mcp}} MCP · {{skills}} konpetans · {{agents}} ajan",
-      "changes": "Chanjman",
       "leaveChanges": "Kite chanjman yo",
       "commitAndPush": "Anrejistre epi voye",
       "startSession": "Kòmanse sesyon an",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Modèl ({{displayCount}})",
       "modelsCount_other": "Modèl ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Wè chanjman yo",
+      "asOf": "Depi {{time}}",
+      "tooLarge": "Diferans kòd sa a twò gwo pou afiche sou mobil.",
+      "empty": "Poko gen chanjman nan fichye yo nan sesyon sa a."
     },
     "autoApprove": {
       "title": "Apwobasyon otomatik",

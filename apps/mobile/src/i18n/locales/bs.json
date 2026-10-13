@@ -136,7 +136,8 @@
     "working": "U toku",
     "yourOwnRepositories": "Tvoji repozitoriji",
     "dismissed": "Odbačeno",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Izmjene"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi primjene jezika",
@@ -325,6 +326,7 @@
       "collapseFile": "Sažmi prikaz datoteke",
       "expandFile": "Proširi prikaz datoteke",
       "diffTooLarge": "Razlike su prevelike za prikaz.",
+      "noPreview": "Pregled nije dostupan za ovu datoteku",
       "openOnGitHub": "Otvori na GitHubu",
       "openDiffOnGitHub": "Otvori prikaz razlika ove datoteke na GitHubu",
       "githubDiff": "Prikaz razlika na GitHubu"
@@ -2217,7 +2219,6 @@
       "retryLoadingEnvironment": "Pokušaj ponovo učitati okruženje",
       "defaultEnvironment": "Zadano okruženje",
       "environmentSummary": "{{commands}} naredbi · {{mcp}} MCP · {{skills}} vještina · {{agents}} agenata",
-      "changes": "Izmjene",
       "leaveChanges": "Ostavi izmjene",
       "commitAndPush": "Potvrdi i pošalji",
       "startSession": "Započni sesiju",
@@ -2689,6 +2690,12 @@
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeli ({{displayCount}})",
       "modelsCount_few": "Modeli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Prikaži izmjene",
+      "asOf": "Stanje u {{time}}",
+      "tooLarge": "Razlike su prevelike za prikaz na mobilnom uređaju.",
+      "empty": "U ovoj sesiji još nema izmjena datoteka."
     },
     "autoApprove": {
       "title": "Automatsko odobravanje",

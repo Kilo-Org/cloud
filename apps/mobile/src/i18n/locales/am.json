@@ -136,7 +136,8 @@
     "working": "በመሥራት ላይ",
     "yourOwnRepositories": "የራስህ ማከማቻዎች",
     "dismissed": "ተወግዷል",
-    "agent": "ወኪል"
+    "agent": "ወኪል",
+    "changes": "ለውጦች"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -325,6 +326,7 @@
       "collapseFile": "የፋይሉን ዝርዝር ሰብስብ",
       "expandFile": "የፋይሉን ዝርዝር ዘርጋ",
       "diffTooLarge": "ልዩነቱ በጣም ትልቅ ስለሆነ ማሳየት አይቻልም።",
+      "noPreview": "ለዚህ ፋይል ቅድመ እይታ የለም",
       "openOnGitHub": "በGitHub ክፈት",
       "openDiffOnGitHub": "የዚህን ፋይል ልዩነት በGitHub ክፈት",
       "githubDiff": "በGitHub ያለው ልዩነት"
@@ -2189,7 +2191,6 @@
       "retryLoadingEnvironment": "የሥራ አካባቢውን ለመጫን እንደገና ይሞክሩ",
       "defaultEnvironment": "ነባሪ የሥራ አካባቢ",
       "environmentSummary": "{{commands}} ትዕዛዞች · {{mcp}} MCP · {{skills}} ክህሎቶች · {{agents}} ወኪሎች",
-      "changes": "ለውጦች",
       "leaveChanges": "ለውጦችን ይተዉ",
       "commitAndPush": "መዝግበው ይላኩ",
       "startSession": "ክፍለ ጊዜውን ያስጀምሩ",
@@ -2651,6 +2652,12 @@
       "modelAccessibilityLabel": "{{name}}፣ {{provider}}፣ {{steps}}፣ {{cost}}",
       "modelsCount_one": "ሞዴል ({{displayCount}})",
       "modelsCount_other": "ሞዴሎች ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "ለውጦችን ይመልከቱ",
+      "asOf": "ከ{{time}} ጀምሮ",
+      "tooLarge": "ይህ ልዩነት በሞባይል ላይ ለማሳየት በጣም ትልቅ ነው።",
+      "empty": "በዚህ ክፍለ ጊዜ እስካሁን ምንም የፋይል ለውጦች የሉም።"
     },
     "autoApprove": {
       "title": "ራስ-ሰር ማጽደቅ",

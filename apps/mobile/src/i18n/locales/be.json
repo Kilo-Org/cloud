@@ -136,7 +136,8 @@
     "working": "Працуе",
     "yourOwnRepositories": "Твае рэпазіторыі",
     "dismissed": "Адхілена",
-    "agent": "Агент"
+    "agent": "Агент",
+    "changes": "Змены"
   },
   "language": {
     "restarting": "Перазапуск для змены мовы",
@@ -325,6 +326,7 @@
       "collapseFile": "Згарнуць файл",
       "expandFile": "Разгарнуць файл",
       "diffTooLarge": "Змен занадта шмат для паказу.",
+      "noPreview": "Папярэдні прагляд гэтага файла недаступны",
       "openOnGitHub": "Адкрыць на GitHub",
       "openDiffOnGitHub": "Адкрыць змены гэтага файла на GitHub",
       "githubDiff": "Змены на GitHub"
@@ -2245,7 +2247,6 @@
       "retryLoadingEnvironment": "Паўтарыць загрузку асяроддзя",
       "defaultEnvironment": "Прадвызначанае асяроддзе",
       "environmentSummary": "каманд: {{commands}} · MCP: {{mcp}} · навыкаў: {{skills}} · агентаў: {{agents}}",
-      "changes": "Змены",
       "leaveChanges": "Пакінуць змены",
       "commitAndPush": "Закаміціць і адправіць",
       "startSession": "Пачаць сеанс",
@@ -2727,6 +2728,12 @@
       "modelsCount_other": "Мадэлі ({{displayCount}})",
       "modelsCount_few": "Мадэлі ({{displayCount}})",
       "modelsCount_many": "Мадэлі ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Паглядзець змены",
+      "asOf": "Па стане на {{time}}",
+      "tooLarge": "Змен занадта шмат для паказу на мабільнай прыладзе.",
+      "empty": "У гэтым сеансе пакуль няма змен у файлах."
     },
     "autoApprove": {
       "title": "Аўтаматычнае адабрэнне",

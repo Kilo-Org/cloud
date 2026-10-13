@@ -136,7 +136,8 @@
     "working": "En cours",
     "yourOwnRepositories": "Vos propres dépôts",
     "dismissed": "Ignoré",
-    "agent": "Agent"
+    "agent": "Agent",
+    "changes": "Modifications"
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -1591,7 +1592,6 @@
       "retryLoadingEnvironment": "Réessayer de charger l'environnement",
       "defaultEnvironment": "Environnement par défaut",
       "environmentSummary": "{{commands}} commandes · {{mcp}} MCP · {{skills}} compétences · {{agents}} agents",
-      "changes": "Modifications",
       "leaveChanges": "Conserver en l'état",
       "commitAndPush": "Valider et envoyer",
       "startSession": "Démarrer la session",
@@ -2063,6 +2063,12 @@
       "modelsCount_one": "Modèle ({{displayCount}})",
       "modelsCount_other": "Modèles ({{displayCount}})",
       "modelsCount_many": "Modèles ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Voir les modifications",
+      "asOf": "À {{time}}",
+      "tooLarge": "Les différences sont trop volumineuses pour être affichées sur mobile.",
+      "empty": "Aucune modification de fichier dans cette session pour l'instant."
     },
     "autoApprove": {
       "title": "Approbation automatique",
@@ -2672,6 +2678,7 @@
     "fileRows": {
       "collapseFile": "Réduire le fichier",
       "diffTooLarge": "Les différences sont trop volumineuses pour être affichées.",
+      "noPreview": "Aucun aperçu disponible pour ce fichier",
       "expandFile": "Développer le fichier",
       "markViewed": "Marquer {{path}} comme consulté",
       "openDiffOnGitHub": "Ouvrir les différences de ce fichier sur GitHub",

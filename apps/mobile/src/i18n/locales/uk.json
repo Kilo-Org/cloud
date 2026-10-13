@@ -136,7 +136,8 @@
     "working": "У роботі",
     "yourOwnRepositories": "Власні репозиторії",
     "dismissed": "Відхилено",
-    "agent": "Агент"
+    "agent": "Агент",
+    "changes": "Зміни"
   },
   "language": {
     "restarting": "Перезапуск для зміни мови",
@@ -1702,7 +1703,6 @@
       "retryLoadingEnvironment": "Повторити завантаження середовища",
       "defaultEnvironment": "Типове середовище",
       "environmentSummary": "команд: {{commands}} · MCP: {{mcp}} · навичок: {{skills}} · агентів: {{agents}}",
-      "changes": "Зміни",
       "leaveChanges": "Залишити зміни",
       "commitAndPush": "Закомітити та надіслати",
       "startSession": "Розпочати сеанс",
@@ -2184,6 +2184,12 @@
       "modelsCount_other": "Моделі ({{displayCount}})",
       "modelsCount_few": "Моделі ({{displayCount}})",
       "modelsCount_many": "Моделі ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Переглянути зміни",
+      "asOf": "Станом на {{time}}",
+      "tooLarge": "Обсяг змін завеликий для відображення на мобільному пристрої.",
+      "empty": "У цьому сеансі ще немає змін у файлах."
     },
     "autoApprove": {
       "title": "Автосхвалення",
@@ -2700,6 +2706,7 @@
     "fileRows": {
       "collapseFile": "Згорнути файл",
       "diffTooLarge": "Обсяг змін завеликий для відображення.",
+      "noPreview": "Попередній перегляд цього файлу недоступний",
       "expandFile": "Розгорнути файл",
       "markViewed": "Позначити {{path}} як переглянутий",
       "openDiffOnGitHub": "Відкрити зміни цього файлу на GitHub",

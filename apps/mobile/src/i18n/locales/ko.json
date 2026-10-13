@@ -136,7 +136,8 @@
     "working": "작업 중",
     "yourOwnRepositories": "내 저장소",
     "dismissed": "무시됨",
-    "agent": "대리인"
+    "agent": "대리인",
+    "changes": "변경 사항"
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -1678,7 +1679,6 @@
       "retryLoadingEnvironment": "환경 불러오기 다시 시도",
       "defaultEnvironment": "기본 환경",
       "environmentSummary": "명령 {{commands}}개 · MCP {{mcp}}개 · 스킬 {{skills}}개 · 에이전트 {{agents}}개",
-      "changes": "변경 사항",
       "leaveChanges": "변경 사항 유지",
       "commitAndPush": "커밋 및 푸시",
       "startSession": "세션 시작",
@@ -2140,6 +2140,12 @@
       "modelAccessibilityLabel": "{{name}}, 제공업체: {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "모델 ({{displayCount}})",
       "modelsCount_other": "모델 ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "변경 사항 보기",
+      "asOf": "{{time}} 기준",
+      "tooLarge": "변경 내용이 너무 커서 모바일에서 표시할 수 없습니다.",
+      "empty": "이 세션에서 아직 변경된 파일이 없습니다."
     },
     "autoApprove": {
       "title": "자동 승인",
@@ -2644,6 +2650,7 @@
     "fileRows": {
       "collapseFile": "파일 접기",
       "diffTooLarge": "변경 내용이 너무 커서 표시할 수 없습니다.",
+      "noPreview": "이 파일은 미리 보기를 사용할 수 없습니다",
       "expandFile": "파일 펼치기",
       "markViewed": "{{path}} 확인함으로 표시",
       "openDiffOnGitHub": "GitHub에서 이 파일의 변경 내용 열기",

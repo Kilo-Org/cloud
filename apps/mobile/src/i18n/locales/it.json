@@ -136,7 +136,8 @@
     "working": "In corso",
     "yourOwnRepositories": "I tuoi repository",
     "dismissed": "Ignorato",
-    "agent": "Agente"
+    "agent": "Agente",
+    "changes": "Modifiche"
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -1659,7 +1660,6 @@
       "retryLoadingEnvironment": "Riprova a caricare l'ambiente",
       "defaultEnvironment": "Ambiente predefinito",
       "environmentSummary": "{{commands}} comandi · {{mcp}} MCP · {{skills}} competenze · {{agents}} agenti",
-      "changes": "Modifiche",
       "leaveChanges": "Mantieni modifiche",
       "commitAndPush": "Commit e push",
       "startSession": "Avvia sessione",
@@ -2131,6 +2131,12 @@
       "modelsCount_one": "Modello ({{displayCount}})",
       "modelsCount_other": "Modelli ({{displayCount}})",
       "modelsCount_many": "Modelli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Visualizza modifiche",
+      "asOf": "Aggiornato alle {{time}}",
+      "tooLarge": "Questo confronto è troppo esteso per essere visualizzato su dispositivi mobili.",
+      "empty": "Ancora nessuna modifica ai file in questa sessione."
     },
     "autoApprove": {
       "title": "Approvazione automatica",
@@ -2672,6 +2678,7 @@
     "fileRows": {
       "collapseFile": "Comprimi il file",
       "diffTooLarge": "Il confronto è troppo esteso per essere visualizzato.",
+      "noPreview": "Nessuna anteprima disponibile per questo file",
       "expandFile": "Espandi il file",
       "markViewed": "Segna {{path}} come visualizzato",
       "openDiffOnGitHub": "Apri il confronto delle modifiche a questo file su GitHub",

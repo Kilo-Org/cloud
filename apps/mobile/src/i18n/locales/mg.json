@@ -1401,6 +1401,8 @@
       "retryTitle": "Handramana indray ve ny fanamarinana?",
       "retryMessage": "Hamerina ny fanamarinana kaody izany.",
       "retryReview": "Andramo indray ny fanamarinana",
+      "retryNeedsSettings": "Maty ny Mpandinika kaody na mila fiheverana ny fikirany. Amboary ny fikirana, dia andramo indray ity fanamarinana ity.",
+      "fixSettings": "Amboary ny fikirana",
       "couldNotLoad": "Tsy nety nampidirina ny fanamarinana.",
       "couldNotGetLatest": "Tsy nety nalaina ny angona farany.",
       "byline": "{{repo}} #{{number}} nataon'i {{author}}",

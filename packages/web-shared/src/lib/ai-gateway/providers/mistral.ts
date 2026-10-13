@@ -23,7 +23,7 @@ export function applyMistralModelSettings(requestToMutate: GatewayRequest) {
   }
 
   // mistral requires tool call ids to be of length 9
-  normalizeToolCallIds(requestToMutate.body, toolCallId => toolCallId.length !== 9, 9);
+  normalizeToolCallIds(requestToMutate, toolCallId => toolCallId.length !== 9, 9);
 
   // mistral doesn't support strict for our schema
   dropToolStrictProperties(requestToMutate.body);

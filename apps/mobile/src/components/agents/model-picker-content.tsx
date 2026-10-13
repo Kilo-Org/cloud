@@ -172,7 +172,11 @@ export function ModelPickerContent() {
   // differs between the group header and a model row, so `getItemType` lets
   // FlashList recycle the two apart.
   const renderItem = useCallback(
-    ({ item }: { item: ModelPickerRow }) => {
+    ({ item }: { item: ModelPickerRow | undefined }) => {
+      // A stale index past the end of the rows (see `keyExtractor` below).
+      if (!item) {
+        return null;
+      }
       if (item.type === 'header') {
         return (
           <View className="bg-secondary px-4 py-2">
@@ -310,8 +314,15 @@ export function ModelPickerContent() {
         <FlashList<ModelPickerRow>
           style={[listStyle, { backgroundColor: colors.background, marginBottom: bottom }]}
           data={rows}
-          keyExtractor={item => item.key}
-          getItemType={item => item.type}
+          // FlashList stores its props during render. When React discards a
+          // deferred search render, FlashList can keep that render's shorter
+          // rows and then ask for a row past their end, so the row can be
+          // undefined (Sentry KILO-APP-3K0). It indexes `data` without a bounds
+          // check for `renderItem` too, which renders nothing for such a row.
+          // The key and type fallbacks are the ones FlashList uses when these
+          // callbacks are absent.
+          keyExtractor={(item: ModelPickerRow | undefined, index) => item?.key ?? String(index)}
+          getItemType={(item: ModelPickerRow | undefined) => item?.type}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           renderItem={renderItem}

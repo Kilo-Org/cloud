@@ -940,6 +940,8 @@
       "noFindings": "未發現問題。",
       "retryMessage": "這會重新執行程式碼審查。",
       "retryReview": "重新嘗試審查",
+      "retryNeedsSettings": "程式碼審查助手已關閉，或其設定需要處理。請修正設定，然後重新嘗試此審查。",
+      "fixSettings": "修正設定",
       "retryTitle": "要重新嘗試審查嗎？",
       "showMore": "顯示更多",
       "started": "開始時間",

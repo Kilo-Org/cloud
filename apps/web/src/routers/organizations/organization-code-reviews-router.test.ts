@@ -296,20 +296,25 @@ describe('organization review agent router: patchReviewConfig', () => {
     });
   }
 
-  it('returns NOT_FOUND when no stored org config exists', async () => {
+  it('creates a disabled config from the getReviewConfig defaults when none is stored', async () => {
     const { owner, organization } = await createFixtureOrganization();
     const caller = await createCallerForUser(owner.id);
+    const input = { organizationId: organization.id, platform: 'github' as const };
+    const defaults = await caller.organizations.reviewAgent.getReviewConfig(input);
 
-    await expect(
-      caller.organizations.reviewAgent.patchReviewConfig({
-        organizationId: organization.id,
-        platform: 'github',
-        reviewStyle: 'strict',
-      })
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await caller.organizations.reviewAgent.patchReviewConfig({
+      ...input,
+      reviewStyle: 'strict',
+      selectedRepositoryDelta: { add: [303], remove: [] },
+    });
 
+    expect(await caller.organizations.reviewAgent.getReviewConfig(input)).toEqual({
+      ...defaults,
+      reviewStyle: 'strict',
+      selectedRepositoryIds: [303],
+    });
     const stored = await getAgentConfig(organization.id, 'code_review', 'github');
-    expect(stored).toBeNull();
+    expect(stored?.is_enabled).toBe(false);
   });
 
   it('preserves council, councilEnabled, manuallyAddedRepositories, and overrides when the mobile-shaped patch omits them', async () => {

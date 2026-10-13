@@ -59,7 +59,7 @@ type TestBindings = {
   };
   CONNECTION_TICKET_DO: {
     get: ReturnType<typeof vi.fn>;
-    idFromName: ReturnType<typeof vi.fn>;
+    newUniqueId: ReturnType<typeof vi.fn>;
   };
   DIRECT_INGEST_PERCENT: string;
   DIRECT_INGEST_USER_IDS: string;
@@ -82,7 +82,7 @@ function makeTestEnv(overrides: Partial<TestBindings> = {}): TestBindings {
     },
     CONNECTION_TICKET_DO: {
       get: vi.fn(),
-      idFromName: vi.fn(),
+      newUniqueId: vi.fn(),
     },
     DIRECT_INGEST_PERCENT: '0',
     DIRECT_INGEST_USER_IDS: '',
@@ -2822,7 +2822,8 @@ describe('api routes', () => {
     const mint = vi.fn(async () => undefined);
     const ticketStub = { mint };
     const env = makeTestEnv();
-    env.CONNECTION_TICKET_DO.idFromName.mockReturnValue('ticket-do-id');
+    const objectId = 'a'.repeat(64);
+    env.CONNECTION_TICKET_DO.newUniqueId.mockReturnValue({ toString: () => objectId });
     env.CONNECTION_TICKET_DO.get.mockReturnValue(ticketStub);
 
     const now = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
@@ -2837,14 +2838,34 @@ describe('api routes', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ticket: string; expiresAt: number };
     expect(body).toEqual({
-      ticket: expect.any(String),
+      ticket: expect.stringMatching(new RegExp(`^${objectId}\\.[0-9a-f-]{36}$`)),
       expiresAt: 1_700_000_060,
     });
     expect(Number.isInteger(body.expiresAt)).toBe(true);
     expect(mint).toHaveBeenCalledWith({
       userId: 'usr_test',
       expiresAt: 1_700_000_060_000,
+      secret: body.ticket.split('.')[1],
     });
+  });
+
+  it('POST /user/web-ticket retries a retryable Durable Object error', async () => {
+    const reset = Object.assign(new Error('Durable Object reset because its code was updated.'), {
+      retryable: true,
+    });
+    const mint = vi.fn().mockRejectedValueOnce(reset).mockResolvedValueOnce(undefined);
+    const env = makeTestEnv();
+    env.CONNECTION_TICKET_DO.newUniqueId.mockReturnValue({ toString: () => 'b'.repeat(64) });
+    env.CONNECTION_TICKET_DO.get.mockReturnValue({ mint });
+
+    const res = await makeApiApp().fetch(
+      new Request('http://local/user/web-ticket', { method: 'POST' }),
+      env
+    );
+
+    expect(res.status).toBe(200);
+    expect(mint).toHaveBeenCalledTimes(2);
+    expect(env.CONNECTION_TICKET_DO.newUniqueId).toHaveBeenCalledTimes(1);
   });
 
   describe('GET /instances/active', () => {

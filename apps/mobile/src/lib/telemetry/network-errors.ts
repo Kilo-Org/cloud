@@ -1,6 +1,7 @@
 /* oxlint-disable max-lines -- cohesive network-error policy: reading the tRPC error, normalizing the URL, and building the fingerprint and event share one set of total helpers */
 /**
- * Warning-level network-error reporting for the mobile app.
+ * Network-error reporting for the mobile app: one warning-level event per
+ * error-status HTTP response, one breadcrumb per transport failure.
  *
  * Pure and total: no SDK import, no network, no React. The caller installs a
  * transport sink (s2 wires the Sentry adapter); until then every report is a
@@ -11,18 +12,20 @@
  * raised by this module's classifier (`abort-classification.ts`), so the fix
  * is there: the production abort shape is matched in `isExpoCanceledError`.
  *
- * Family 3 (KILO-APP-DJ, `java.net.UnknownHostException`) needs no filter and
- * no code change. It is a mid-flight device-network drop, not an app defect:
- * react-query is gated on connectivity — `query-client-lifecycle.tsx` sets
- * `onlineManager` from `isOnline(...)`, mounted in `app-root-providers.tsx`,
- * and `connectivity-online.ts` never treats unknown as online — so the app
- * does not poll while confirmed offline. The reported failure is a request
- * already in flight when the device lost its network.
+ * Family 3 (KILO-APP-B1, KILO-APP-2PD and ~190 siblings: `fetch failed:`
+ * `UnknownHostException`, `The network connection was lost`, SSL handshake,
+ * connect and socket errors, and `RequestDeadlineError`) is a request that
+ * got no HTTP response: the device lost its network or the server was out of
+ * reach. That is not an app defect, and one issue per procedure buried the
+ * real ones, so a transport failure is a breadcrumb (`category: 'network'`),
+ * never an event. The breadcrumb rides on the next real event and still
+ * explains it. An HTTP response with an error status is still an event.
  */
 
 import { z } from 'zod';
 
-import { captureTelemetry } from '@/lib/telemetry/error-sink';
+import { classifyAuthResponse, isAuthTerminalRoute } from '@/lib/auth/auth-response-class';
+import { addTelemetryBreadcrumb, captureTelemetry } from '@/lib/telemetry/error-sink';
 import { isAbortError, isRequestDeadlineError } from '@/lib/telemetry/abort-classification';
 import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
 
@@ -32,7 +35,9 @@ export { isAbortError };
 
 type TelemetrySource = 'trpc' | 'fetch';
 
-type NetworkOutcome = 'timeout' | 'http_error' | 'failed';
+type NetworkOutcome = 'http_error' | 'failed';
+
+type TransportOutcome = 'timeout' | 'failed';
 
 export type TrpcErrorContext = {
   code?: string;
@@ -49,7 +54,6 @@ export type NetworkErrorContext = {
   statusText?: string;
   durationMs: number;
   error?: unknown;
-  timedOut?: boolean;
 };
 
 export type NetworkErrorFetchOptions = {
@@ -91,6 +95,32 @@ export type TrpcResponseError = z.infer<typeof TrpcResponseErrorSchema>;
 
 const TRPC_PATH = '/api/trpc/';
 const HTTP_URL_PATTERN = /^https?:\/\//iu;
+
+/**
+ * Statuses the app handles as an answer, so a report would name no defect:
+ * - 401: the auth layer refreshes or signs out, and reports a terminal refusal
+ *   itself (`reportAuthTerminalFailure`).
+ * - 402: no credits; the paywall owns it.
+ * - 404: a stale ID for a deleted object; screens show "not found".
+ * - 409: a duplicate of an operation already in progress.
+ * - 429: a rate limit the caller backs off from.
+ */
+const EXPECTED_HTTP_STATUSES: ReadonlySet<number> = new Set([401, 402, 404, 409, 429]);
+
+const FORBIDDEN_STATUS = 403;
+
+/**
+ * True when a status is an expected answer: one of
+ * {@link EXPECTED_HTTP_STATUSES}, or a 403 with no tRPC error code. Production
+ * 403s come from the edge firewall (OFAC-sanctioned regions, IP blocks), whose
+ * body is not a tRPC error. A 403 from a tRPC procedure carries its code
+ * (`FORBIDDEN`) and names app code, so it is still reported.
+ */
+function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
+  return (
+    EXPECTED_HTTP_STATUSES.has(status) || (status === FORBIDDEN_STATUS && trpc.code === undefined)
+  );
+}
 
 /** Strip the query string from a URL. Returns empty string on a non-string. */
 export function stripQueryString(url: string): string {
@@ -172,8 +202,10 @@ export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
  * Read the tRPC error out of a batch response body without consuming the
  * original: the clone is parsed, so the caller still owns `response`. A
  * batched (HTTP 207) body is an array of `{ result } | { error }`; a plain
- * failure body is `{ error }`. Total: a success-only, non-JSON, or otherwise
- * unreadable body yields `undefined` and never throws.
+ * failure body is `{ error }`. A batch yields its first error whose status is
+ * not expected ({@link isExpectedStatus}), else its first error, so an
+ * expected 404 ahead of a 500 cannot hide the 500. Total: a success-only,
+ * non-JSON, or otherwise unreadable body yields `undefined` and never throws.
  */
 export async function readTrpcResponseError(
   response: Response
@@ -181,13 +213,14 @@ export async function readTrpcResponseError(
   try {
     const body: unknown = await response.clone().json();
     if (Array.isArray(body)) {
-      for (const item of body) {
-        const error = errorPropertyOf(item);
-        if (error !== undefined) {
-          return error;
-        }
-      }
-      return undefined;
+      const errors = body
+        .map(item => errorPropertyOf(item))
+        .filter((error): error is TrpcResponseError => error !== undefined);
+      const reportable = errors.find(error => {
+        const trpc = readTrpcErrorContext(error);
+        return trpc.httpStatus === undefined || !isExpectedStatus(trpc.httpStatus, trpc);
+      });
+      return reportable ?? errors[0];
     }
     return errorPropertyOf(body);
   } catch {
@@ -208,9 +241,6 @@ function statusClassFor(status: number | undefined): '4xx' | '5xx' | undefined {
 }
 
 function networkOutcome(context: NetworkErrorContext): NetworkOutcome {
-  if (context.timedOut === true) {
-    return 'timeout';
-  }
   if (context.status !== undefined && (context.status >= 400 || context.status === 207)) {
     return 'http_error';
   }
@@ -314,7 +344,6 @@ export function reportNetworkError(context: NetworkErrorContext): void {
       ...(context.statusText === undefined ? {} : { statusText: context.statusText }),
       ...(procedure === undefined ? {} : { procedure }),
       ...(trpcCode === undefined ? {} : { trpcCode }),
-      ...(context.timedOut === undefined ? {} : { timedOut: context.timedOut }),
     };
 
     // A non-`Error` context (a parsed tRPC body) rides in the payload context
@@ -347,6 +376,74 @@ export function reportNetworkError(context: NetworkErrorContext): void {
   }
 }
 
+/**
+ * True when a failed response is an expected answer ({@link isExpectedStatus};
+ * for a tRPC batch, the inner status), or a terminal refusal on a sign-in
+ * route, which the auth layer reports once.
+ */
+function isExpectedResponse(context: NetworkErrorContext): boolean {
+  const trpc = readTrpcErrorContext(context.error);
+  const status = effectiveHttpStatus(context, trpc);
+  if (status === undefined) {
+    return false;
+  }
+  if (isExpectedStatus(status, trpc)) {
+    return true;
+  }
+  const path = normalizeUrlPath(context.url);
+  return isAuthTerminalRoute(path) && classifyAuthResponse({ path, status }).kind === 'terminal';
+}
+
+/**
+ * Record an expected failed response as a breadcrumb, so the next real event
+ * still shows it. Same message and tags as a report; no query string.
+ */
+function recordExpectedResponse(context: NetworkErrorContext): void {
+  try {
+    const trpc = readTrpcErrorContext(context.error);
+    const path = normalizeUrlPath(context.url);
+    const procedure = trpcProcedureFromUrl(context.url);
+    addTelemetryBreadcrumb({
+      category: 'network',
+      level: 'warning',
+      message: buildSyntheticError(context, path, trpc).message,
+      data: {
+        'error.source': context.source,
+        'network.outcome': networkOutcome(context),
+        durationMs: context.durationMs,
+        ...(context.status === undefined ? {} : { 'http.status': context.status }),
+        ...(procedure === undefined ? {} : { 'trpc.procedure': procedure }),
+        ...(trpc.code === undefined ? {} : { 'trpc.code': trpc.code }),
+      },
+    });
+  } catch {
+    // Telemetry must never throw into app code.
+  }
+}
+
+/**
+ * Record a request that got no HTTP response (no network, DNS, TLS, reset, or
+ * the request deadline) as a breadcrumb. Never an event: see Family 3 in the
+ * header. Never throws; never includes the host, headers, bodies, or query
+ * strings.
+ */
+function recordTransportFailure(
+  context: Pick<NetworkErrorContext, 'source' | 'url' | 'method' | 'durationMs' | 'error'>
+): void {
+  try {
+    const method = context.method ?? 'GET';
+    const path = normalizeUrlPath(context.url);
+    const outcome: TransportOutcome = isRequestDeadlineError(context.error) ? 'timeout' : 'failed';
+    addTelemetryBreadcrumb({
+      category: 'network',
+      level: 'warning',
+      message: `${method} ${path} ${outcome}`,
+      data: { source: context.source, method, path, outcome, durationMs: context.durationMs },
+    });
+  } catch {
+    // Telemetry must never throw into app code.
+  }
+}
 function requestUrlString(input: RequestInfo | URL): string {
   if (input instanceof URL) {
     return input.href;
@@ -380,12 +477,14 @@ function safeShouldReport(url: string, shouldReport: (url: string) => boolean): 
 }
 
 /**
- * Wrap a fetch implementation so every failed (or error-status) http(s)
- * request is reported once at warning level. `isResponseError` chooses the
+ * Wrap a fetch implementation so every error-status http(s) response is
+ * reported once at warning level and every transport failure (a rejection
+ * that is not an abort) leaves one breadcrumb. `isResponseError` chooses the
  * statuses that count as errors (default `>= 400`; tRPC adds 207 so a mixed
- * batch is reported). `readResponseError` may parse the body via a clone to
- * enrich the report. The original rejection is re-thrown and the original
- * Response is returned unchanged; the original body is never read.
+ * batch is reported). An expected answer (`isExpectedResponse`) is a
+ * breadcrumb instead of a report. `readResponseError` may parse the body via a
+ * clone to enrich the report. The original rejection is re-thrown and the
+ * original Response is returned unchanged; the original body is never read.
  */
 export function createNetworkErrorFetch(
   baseFetch: typeof fetch,
@@ -410,7 +509,7 @@ export function createNetworkErrorFetch(
             error = undefined;
           }
         }
-        reportNetworkError({
+        const context: NetworkErrorContext = {
           source,
           url,
           method,
@@ -418,18 +517,22 @@ export function createNetworkErrorFetch(
           statusText: response.statusText,
           durationMs: Date.now() - startedAt,
           ...(error === undefined ? {} : { error }),
-        });
+        };
+        if (isExpectedResponse(context)) {
+          recordExpectedResponse(context);
+        } else {
+          reportNetworkError(context);
+        }
       }
       return response;
     } catch (error) {
       if (safeShouldReport(url, shouldReport) && !isAbortError(error)) {
-        reportNetworkError({
+        recordTransportFailure({
           source,
           url,
           method,
           durationMs: Date.now() - startedAt,
           error,
-          timedOut: isRequestDeadlineError(error),
         });
       }
       throw error;

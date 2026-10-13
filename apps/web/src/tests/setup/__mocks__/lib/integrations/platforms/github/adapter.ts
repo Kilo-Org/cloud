@@ -100,6 +100,34 @@ export class GitHubRateLimitError extends Error {
   }
 }
 
+/**
+ * Mirrors the adapter's rule: 429, `x-ratelimit-remaining: 0`, or a 403 whose
+ * message names a rate limit or abuse. Keep in step with
+ * `isGitHubRateLimitError` in the real adapter.
+ */
+export function isGitHubRateLimitError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const status = 'status' in error ? error.status : undefined;
+  if (status === 429) return true;
+  const response = 'response' in error ? error.response : undefined;
+  const headers =
+    typeof response === 'object' && response !== null && 'headers' in response
+      ? response.headers
+      : undefined;
+  if (
+    typeof headers === 'object' &&
+    headers !== null &&
+    'x-ratelimit-remaining' in headers &&
+    headers['x-ratelimit-remaining'] === '0'
+  ) {
+    return true;
+  }
+  if (status !== 403) return false;
+  const message = 'message' in error ? error.message : undefined;
+  const text = typeof message === 'string' ? message.toLowerCase() : '';
+  return text.includes('rate limit') || text.includes('abuse');
+}
+
 export async function fetchPullRequestByNumber(_params: {
   installationId: number;
   owner: string;

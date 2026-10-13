@@ -1401,6 +1401,8 @@
       "retryTitle": "Ṣé kí a tún gbìyànjú àtúnyẹ̀wò?",
       "retryMessage": "Èyí yóò tún ṣe àtúnyẹ̀wò kóòdù.",
       "retryReview": "Tún gbìyànjú àtúnyẹ̀wò",
+      "retryNeedsSettings": "Olùṣàyẹ̀wò kóòdù ti wà ní pípa tàbí àwọn ètò rẹ̀ nílò àfiyèsí. Ṣàtúnṣe àwọn ètò náà, lẹ́yìn náà tún gbìyànjú àtúnyẹ̀wò yìí.",
+      "fixSettings": "Ṣàtúnṣe àwọn ètò",
       "couldNotLoad": "A kò lè gbé àtúnyẹ̀wò wọlé.",
       "couldNotGetLatest": "A kò lè gba dátà tuntun.",
       "byline": "{{repo}} #{{number}} láti ọwọ́ {{author}}",

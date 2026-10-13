@@ -117,18 +117,19 @@ export async function runLogoutCleanup(): Promise<void> {
       pushLookupFailed = true;
     }
 
+    // Unregister activity tokens (Live Activity / push-to-start) before the
+    // device session revoke: the revoke ends this token's auth, so a later
+    // delete can only answer 401. A failed unregister is tombstoned and retried
+    // at the next authenticated opportunity against the recorded tokens only.
+    const activityResult = await getGlanceableDelivery().unregisterTokens();
+    const needsActivityUnregister = !activityResult.ok;
+
     const results = await Promise.allSettled([
       trpcClient.user.revokeCurrentDeviceSession.mutate(),
       pushToken
         ? trpcClient.user.unregisterPushToken.mutate({ token: pushToken })
         : Promise.resolve(),
     ]);
-
-    // Unregister activity tokens (Live Activity / push-to-start) before the
-    // epoch bump. A failed unregister is tombstoned and retried at the next
-    // authenticated opportunity against the recorded tokens only.
-    const activityResult = await getGlanceableDelivery().unregisterTokens();
-    const needsActivityUnregister = !activityResult.ok;
 
     const unregister = results[1];
 

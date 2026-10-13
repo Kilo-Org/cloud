@@ -1401,6 +1401,8 @@
       "retryTitle": "Sakatta'a irra deebi'anii yaaluu?",
       "retryMessage": "Kun sakatta'a koodii irra deebi'ee raawwata.",
       "retryReview": "Sakatta'a irra deebi'ii yaali",
+      "retryNeedsSettings": "Sakatta'aan koodii dhaameera ykn qindaa'inni isaa xiyyeeffannaa barbaada. Qindaa'ina sirreessi, achiis sakatta'a kana irra deebi'ii yaali.",
+      "fixSettings": "Qindaa'ina sirreessi",
       "couldNotLoad": "Sakatta'a fe'uun hin danda'amne.",
       "couldNotGetLatest": "Odeeffannoo ammaa argachuun hin danda'amne.",
       "byline": "{{repo}} #{{number}} kan {{author}}",

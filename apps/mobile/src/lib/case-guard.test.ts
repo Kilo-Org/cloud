@@ -58,6 +58,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/pr-review/discussion/comment-row.tsx': 'login comparison',
   'components/pr-review/discussion/pr-review-discussion-list.tsx': 'login comparison',
   'components/pr-review/merge/pr-merge-section-parts.tsx': 'merge-method key normalization',
+  'components/pr-review/pr-review-submit-view.ts': 'login comparison',
   'components/agents/attachment-picker.ts': 'file-extension/mime normalization',
   'components/agents/code-block-model.ts': 'language-identifier normalization',
   'components/agents/live-session-filters.ts': 'search folding',

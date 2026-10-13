@@ -1439,6 +1439,8 @@
       "retryTitle": "Zopakovať kontrolu?",
       "retryMessage": "Kontrola kódu sa spustí znova.",
       "retryReview": "Zopakovať kontrolu",
+      "retryNeedsSettings": "Agent na kontrolu kódu je vypnutý alebo jeho nastavenia vyžadujú pozornosť. Opravte nastavenia a potom túto kontrolu zopakujte.",
+      "fixSettings": "Opraviť nastavenia",
       "couldNotLoad": "Kontrolu sa nepodarilo načítať.",
       "couldNotGetLatest": "Najnovšie údaje sa nepodarilo načítať.",
       "byline": "{{repo}} #{{number}} · autor: {{author}}",

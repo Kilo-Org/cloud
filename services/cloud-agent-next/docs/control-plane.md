@@ -379,12 +379,14 @@ These keep their current owners and evidence; the rewrite ports them, it does no
 Scope: `workspace_*` routes on `cloudflare-containers` whose directory is the constant isolated
 path `/workspace/app`. A snapshot holds one repository at one path, so any other route has no key.
 
-- **Key.** When a route is first prepared, the Sandbox DO hashes the owner and the repository URL
-  with HMAC-SHA256 under a Worker secret. Env is not part of the key: setup re-runs on every start.
-  It stores the digest on the route (`repo_key`) and keeps it across attempts. No key is computed, and
-  no snapshot used, when the owner is not enrolled (`CONTAINER_REPO_SNAPSHOT_IDS`), the route
-  has no repository, the provider cannot capture, or the secret is missing. Scope is per user;
-  per org is a change to that one field.
+- **Key.** When a route is first prepared, the Sandbox DO hashes the owner, the repository URL and
+  the setup commands with HMAC-SHA256 under a Worker secret. Env is not part of the key: setup
+  re-runs on every start and rewrites what it derives from the env. The setup commands join the
+  hash so a snapshot is reused only by a route with the same setup; a different setup for one
+  repository gets its own key. It stores the digest on the route (`repo_key`) and keeps it across
+  attempts. No key is computed, and no snapshot used, when the owner is not enrolled
+  (`CONTAINER_REPO_SNAPSHOT_IDS`), the route has no repository, the provider cannot capture, or the
+  secret is missing. Scope is per user; per org is a change to that one field.
 - **Start.** `launch` receives the key of the routes waiting for the allocation: exactly one key,
   else none. `SandboxContainers` appends the image, and starts from the
   repository snapshot in the `REPO_SNAPSHOTS` KV index when it has one for that digest, else from
@@ -403,8 +405,9 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
    the entry. A completed image fallback records `image`, so the next start tries the retained
    snapshot again unless its failure budget is exhausted.
 - **Capture.** `session.prepare` carries `capture: true` when the route has a key and the provider
-  can capture. A route with setup commands has no key: capture runs after setup, so the snapshot
-  would publish the whole container under a key that names only the user and the repository. The
+  can capture. The key names the setup commands as well as the user and the repository, because
+  capture runs after setup: a snapshot built with one setup is never adopted by a route with
+  another. The
   wrapper decides whether to capture (a fresh clone, or an adopted snapshot that is
   due for a refresh) and then sends `workspace.capture` after setup, with origin bare. The Sandbox DO
   calls the provider off its serial queue, bounded at 5 min 5 s, and answers `workspace.captured`
@@ -539,8 +542,8 @@ setup the wrapper writes the stamp (before the snapshot, so a restored container
 allocation's stamp), sets `origin` to the bare URL, clears the reflogs and `FETCH_HEAD`, sends
 `workspace.capture` and waits for `workspace.captured`. It then restores the authenticated URL,
 whatever the outcome, and continues to the Kilo runtime. A snapshot therefore holds no agent edits,
-no Kilo home and no git credential. Process env never reaches the disk. A route with setup commands
-has no key, so it restores and captures nothing: setup output is never published to a snapshot.
+no Kilo home and no git credential. Process env never reaches the disk. Capture runs after setup, so
+the key names the setup commands too: a snapshot is reused only by a route with the same setup.
 
 ### Prompts and turn outcome
 

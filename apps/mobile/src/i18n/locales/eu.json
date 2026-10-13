@@ -1401,6 +1401,8 @@
       "retryTitle": "Berrikuspena berriro egin?",
       "retryMessage": "Kode-berrikuspena berriro exekutatuko da.",
       "retryReview": "Egin berrikuspena berriro",
+      "retryNeedsSettings": "Kode-berrikuslea desaktibatuta dago edo haren ezarpenek arreta behar dute. Konpondu ezarpenak eta egin berrikuspen hau berriro.",
+      "fixSettings": "Konpondu ezarpenak",
       "couldNotLoad": "Ezin izan da berrikuspena kargatu.",
       "couldNotGetLatest": "Ezin izan da azken egoera lortu.",
       "byline": "{{repo}} #{{number}} · Egilea: {{author}}",

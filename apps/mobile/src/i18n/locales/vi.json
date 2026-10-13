@@ -940,6 +940,8 @@
       "noFindings": "Không phát hiện vấn đề nào.",
       "retryMessage": "Thao tác này sẽ chạy lại lượt rà soát mã.",
       "retryReview": "Rà soát lại",
+      "retryNeedsSettings": "Trợ lý rà soát mã đang tắt hoặc cài đặt của trợ lý cần được xử lý. Hãy sửa cài đặt, sau đó rà soát lại.",
+      "fixSettings": "Sửa cài đặt",
       "retryTitle": "Rà soát lại?",
       "showMore": "Xem thêm",
       "started": "Đã bắt đầu",

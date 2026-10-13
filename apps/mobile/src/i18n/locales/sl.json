@@ -1439,6 +1439,8 @@
       "retryTitle": "Ponovim pregled?",
       "retryMessage": "To bo znova zagnalo pregled kode.",
       "retryReview": "Znova zaženi pregled",
+      "retryNeedsSettings": "Pregledovalec kode je izklopljen ali njegove nastavitve zahtevajo pozornost. Popravite nastavitve, nato znova zaženite ta pregled.",
+      "fixSettings": "Popravi nastavitve",
       "couldNotLoad": "Pregleda ni bilo mogoče naložiti.",
       "couldNotGetLatest": "Najnovejših podatkov ni bilo mogoče pridobiti.",
       "byline": "{{repo}} #{{number}} · Avtor: {{author}}",

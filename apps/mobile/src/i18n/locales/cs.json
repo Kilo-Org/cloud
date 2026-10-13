@@ -1439,6 +1439,8 @@
       "retryTitle": "Opakovat kontrolu?",
       "retryMessage": "Kontrola kódu se spustí znovu.",
       "retryReview": "Opakovat kontrolu",
+      "retryNeedsSettings": "Kontrola kódu je vypnutá nebo její nastavení vyžaduje pozornost. Opravte nastavení a potom tuto kontrolu zopakujte.",
+      "fixSettings": "Opravit nastavení",
       "couldNotLoad": "Kontrolu se nepodařilo načíst.",
       "couldNotGetLatest": "Aktuální stav se nepodařilo načíst.",
       "byline": "{{repo}} #{{number}} · autor: {{author}}",

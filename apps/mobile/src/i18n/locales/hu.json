@@ -1401,6 +1401,8 @@
       "retryTitle": "Újraindítod a kódellenőrzést?",
       "retryMessage": "Ez újra lefuttatja a kódellenőrzést.",
       "retryReview": "Kódellenőrzés újrapróbálása",
+      "retryNeedsSettings": "A Kódellenőrző ki van kapcsolva, vagy a beállításai figyelmet igényelnek. Javítsa a beállításokat, majd próbálja újra ezt a kódellenőrzést.",
+      "fixSettings": "Beállítások javítása",
       "couldNotLoad": "Nem sikerült betölteni a kódellenőrzést.",
       "couldNotGetLatest": "Nem sikerült lekérni a legfrissebb adatokat.",
       "byline": "{{repo}} #{{number}}, szerző: {{author}}",

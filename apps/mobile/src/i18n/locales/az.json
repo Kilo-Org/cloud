@@ -1401,6 +1401,8 @@
       "retryTitle": "Kod yoxlaması təkrarlansın?",
       "retryMessage": "Bu, kod yoxlamasını yenidən başladacaq.",
       "retryReview": "Yoxlamanı təkrarla",
+      "retryNeedsSettings": "Kod yoxlayıcısı söndürülüb və ya onun ayarları diqqət tələb edir. Ayarları düzəldin, sonra bu yoxlamanı təkrarlayın.",
+      "fixSettings": "Ayarları düzəlt",
       "couldNotLoad": "Kod yoxlamasını yükləmək mümkün olmadı.",
       "couldNotGetLatest": "Ən son məlumatları almaq mümkün olmadı.",
       "byline": "{{repo}} #{{number}} · Müəllif: {{author}}",

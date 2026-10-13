@@ -590,8 +590,11 @@ function RootLayoutNav({
       shouldStartAnalytics({ hasToken: token != null, consentChecked, needsConsent })
   );
   useAnalyticsConsentGate({
+    authLoading,
     hasToken: token != null,
+    userIdLoading,
     consentChecked,
+    consentCheckFailed: consentCheckError != null,
     needsConsent,
     email,
     accountId: userId,

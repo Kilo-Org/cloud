@@ -1401,6 +1401,8 @@
       "retryTitle": "Cuba semakan semula?",
       "retryMessage": "Ini akan menjalankan semula semakan kod.",
       "retryReview": "Cuba semakan semula",
+      "retryNeedsSettings": "Penyemak kod dimatikan atau tetapannya memerlukan perhatian. Betulkan tetapan, kemudian cuba semakan ini semula.",
+      "fixSettings": "Betulkan tetapan",
       "couldNotLoad": "Tidak dapat memuatkan semakan.",
       "couldNotGetLatest": "Tidak dapat mendapatkan maklumat terkini.",
       "byline": "{{repo}} #{{number}} oleh {{author}}",

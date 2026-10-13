@@ -1401,6 +1401,8 @@
       "retryTitle": "Qayta ko'rib chiqilsinmi?",
       "retryMessage": "Bu kodni ko'rib chiqishni qayta ishga tushiradi.",
       "retryReview": "Qayta ko'rib chiqish",
+      "retryNeedsSettings": "Kod tekshiruvchisi o'chirilgan yoki uning sozlamalari e'tibor talab qiladi. Sozlamalarni tuzating, so'ng ushbu tekshiruvni qayta bajaring.",
+      "fixSettings": "Sozlamalarni tuzatish",
       "couldNotLoad": "Ko'rib chiqish ma'lumotlarini yuklab bo'lmadi.",
       "couldNotGetLatest": "Eng so'nggi ma'lumotlarni olib bo'lmadi.",
       "byline": "{{repo}} #{{number}}, muallif: {{author}}",

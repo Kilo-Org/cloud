@@ -1401,6 +1401,8 @@
       "retryTitle": "A sake gwada bitar?",
       "retryMessage": "Wannan zai sake gudanar da bitar lambar shirin.",
       "retryReview": "Sake gwada bita",
+      "retryNeedsSettings": "Mai bitar lambar shiri a kashe yake ko saitunansa suna bukatar kulawa. Gyara saitunan, sannan ka sake gwada wannan bita.",
+      "fixSettings": "Gyara saituna",
       "couldNotLoad": "An kasa loda bitar.",
       "couldNotGetLatest": "An kasa samun sabbin bayanai.",
       "byline": "{{repo}} #{{number}} daga {{author}}",

@@ -4,10 +4,6 @@ import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/org
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { MISTRAL_LARGE_4_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral.constants';
 import {
-  QWEN37_MAX_MODEL_ID,
-  QWEN37_PLUS_MODEL_ID,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
-import {
   applyCustomPricingToPricing,
   applyCustomPricingToModel,
   calculateCustomCost_mUsd,
@@ -95,7 +91,7 @@ describe('custom model pricing', () => {
     ).toBe(Math.round(800 * 0.68 + 100 * 2.09 + 200 * 0.07));
   });
 
-  test.each([QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID])(
+  test.each(['qwen/qwen3.7-max', 'qwen/qwen3.7-plus'])(
     'does not apply custom pricing to %s',
     modelId => {
       const model = makeModel(modelId);

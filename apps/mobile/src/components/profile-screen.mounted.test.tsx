@@ -135,6 +135,7 @@ type DeleteAccountResult = {
   phase: DeleteAccountPhase;
   isPending: boolean;
   devCode: string | null;
+  canSubmitCode: boolean;
   beginDelete: () => void;
   submitCode: () => void;
   setCode: (code: string) => void;
@@ -157,6 +158,16 @@ function current(holder: { current: DeleteAccountResult | null }): DeleteAccount
     throw new Error('probe did not render');
   }
   return result;
+}
+
+/** Types the code, then submits after the rerender that holds it. */
+function enterCode(holder: { current: DeleteAccountResult | null }, code: string) {
+  act(() => {
+    current(holder).setCode(code);
+  });
+  act(() => {
+    current(holder).submitCode();
+  });
 }
 
 function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
@@ -195,10 +206,7 @@ describe('useDeleteAccount', () => {
     });
     await waitFor(() => current(holder).phase === 'awaiting-code');
 
-    act(() => {
-      current(holder).setCode('123456');
-      current(holder).submitCode();
-    });
+    enterCode(holder, '123456');
     await waitFor(() => current(holder).phase === 'deleted');
 
     expect(executeFn).toHaveBeenCalledTimes(1);
@@ -233,10 +241,7 @@ describe('useDeleteAccount', () => {
     });
     await waitFor(() => current(holder).phase === 'awaiting-code');
 
-    act(() => {
-      current(holder).setCode('123456');
-      current(holder).submitCode();
-    });
+    enterCode(holder, '123456');
     await waitFor(() => toastError.mock.calls.length > 0);
 
     expect(toastError).toHaveBeenCalledWith('Network error');
@@ -259,10 +264,7 @@ describe('useDeleteAccount', () => {
     });
     await waitFor(() => current(holder).phase === 'awaiting-code');
 
-    act(() => {
-      current(holder).setCode('654321');
-      current(holder).submitCode();
-    });
+    enterCode(holder, '654321');
     await waitFor(() => toastError.mock.calls.length > 0);
 
     expect(toastError).toHaveBeenCalledWith('Cancel the subscription before deleting the account.');
@@ -285,16 +287,35 @@ describe('useDeleteAccount', () => {
     });
     await waitFor(() => current(holder).phase === 'awaiting-code');
 
-    act(() => {
-      current(holder).setCode('000000');
-      current(holder).submitCode();
-    });
+    enterCode(holder, '000000');
     await waitFor(() => toastError.mock.calls.length > 0);
 
     expect(toastError).toHaveBeenCalledWith('Invalid confirmation code');
     expect(signOutFn).not.toHaveBeenCalled();
     // Challenge kept: the user can re-enter a correct code.
     expect(current(holder).phase).toBe('awaiting-code');
+  });
+
+  it('empty code: sends nothing until the field holds a code', async () => {
+    challengeFn.mockResolvedValue({ challengeId: 'challenge-1' });
+    executeFn.mockResolvedValue({ status: 'deleted' });
+
+    const holder = await mountProbe();
+
+    act(() => {
+      current(holder).beginDelete();
+    });
+    await waitFor(() => current(holder).phase === 'awaiting-code');
+    expect(current(holder).canSubmitCode).toBe(false);
+
+    enterCode(holder, '');
+    enterCode(holder, '   ');
+    expect(current(holder).canSubmitCode).toBe(false);
+    expect(executeFn).not.toHaveBeenCalled();
+
+    enterCode(holder, ' 123456 ');
+    await waitFor(() => current(holder).phase === 'deleted');
+    expect(executeFn.mock.calls[0]?.[0]).toEqual({ challengeId: 'challenge-1', code: '123456' });
   });
 
   it('pending: isPending is true while the challenge is in flight', async () => {

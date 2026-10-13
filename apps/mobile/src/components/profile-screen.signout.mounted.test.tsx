@@ -79,6 +79,7 @@ vi.mock('@/components/use-delete-account', () => ({
     phase: 'idle',
     isPending: false,
     devCode: null,
+    canSubmitCode: false,
     beginDelete: vi.fn(),
     submitCode: vi.fn(),
     setCode: vi.fn(),

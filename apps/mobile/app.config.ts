@@ -394,6 +394,10 @@ const config: ExpoConfig = {
         organization: 'anaconda-nq',
         useNativeInit: true,
         options: SENTRY_NATIVE_OPTIONS,
+        // Android release builds upload NDK debug symbols and the R8 mapping, so
+        // native tombstones (libhermes, libreactnative, Expo modules) and Java
+        // frames symbolicate. The default sentry.gradle.kts uploads only JS source maps.
+        experimental_android: { enableAndroidGradlePlugin: true },
       },
     ],
     // One native splash configuration and shared AnimatedSplashOverlay lifecycle

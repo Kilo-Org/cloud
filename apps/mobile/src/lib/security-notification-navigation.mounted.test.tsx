@@ -81,16 +81,23 @@ function initializeScope(scope: string) {
     throw new Error('Scope layout did not render a Stack');
   }
   // eslint-disable-next-line react/no-react-children -- Read the actual Stack.Screen declarations for this layout regression.
-  const declaredNames = Children.toArray(stack.children).map(child => {
-    if (!isValidElement<{ name: string }>(child)) {
+  const declared = Children.toArray(stack.children).map(child => {
+    if (!isValidElement<{ name: string; initialParams?: object }>(child)) {
       throw new Error('Expected a Stack.Screen declaration');
     }
-    return child.props.name;
+    return child.props;
   });
+  const declaredNames = declared.map(screen => screen.name);
   // Expo Router puts explicit declarations before the remaining file routes.
   const options = {
-    routeNames: [...declaredNames, 'index', 'findings/index', 'findings/[id]'],
-    routeParamList: {},
+    routeNames: [...declaredNames, 'findings/index', 'findings/[id]'],
+    // React Navigation seeds a route it creates itself, such as the anchor
+    // below an anchored entry, from the screen's `initialParams` only.
+    routeParamList: Object.fromEntries(
+      declared.flatMap(screen =>
+        screen.initialParams ? [[screen.name, screen.initialParams] as const] : []
+      )
+    ),
     routeGetIdList: {},
   };
   const router = createStackRouter({ initialRouteName: stack.initialRouteName });
@@ -116,14 +123,14 @@ describe.each(['personal', 'org-example'])('security notification history (%s)',
   ] as const)('initializes index beneath a $type entry without a duplicate loop', payload => {
     const { initialState, apply } = initializeScope(scope);
     expect(initialState.routeNames).toEqual([
+      'index',
       'dismiss/[id]',
       'filter',
-      'index',
       'findings/index',
       'findings/[id]',
     ]);
     expect(initialState.routes.map(route => route.name)).toEqual(['index']);
-    expect(initialState.routes[0]?.params).toBeUndefined();
+    expect(initialState.routes[0]?.params).toEqual({ scope });
 
     const data = { ...payload, scope, findingId: 'finding-123' } satisfies PushData;
     const path = notificationPathForData(data);
@@ -145,7 +152,7 @@ describe.each(['personal', 'org-example'])('security notification history (%s)',
     } as const;
     const opened = apply(action);
     expect(opened.routes.map(({ name, params }) => ({ name, params }))).toEqual([
-      { name: 'index', params: undefined },
+      { name: 'index', params: { scope } },
       { name: 'findings/[id]', params: { scope, id: 'finding-123', via: 'push' } },
     ]);
     expect(apply(action)).toEqual(opened);

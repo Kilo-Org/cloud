@@ -572,6 +572,14 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     } catch {
       // Cleanup remains best effort before session resource deletion.
     }
-    await sandbox.deleteSession(this.metadata.identity.sessionId);
+    const sessionId = this.metadata.identity.sessionId;
+    try {
+      await sandbox.deleteSession(sessionId);
+    } catch (error) {
+      // A replaced container has no exec session for this id, so the session is already gone.
+      // The container reports this as INTERNAL_ERROR, so match its exact message.
+      if (error instanceof Error && error.message === `Session '${sessionId}' not found`) return;
+      throw error;
+    }
   }
 }

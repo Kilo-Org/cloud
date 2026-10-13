@@ -940,6 +940,8 @@
       "noFindings": "Er zijn geen bevindingen.",
       "retryMessage": "Dit voert de codereview opnieuw uit.",
       "retryReview": "Review opnieuw proberen",
+      "retryNeedsSettings": "De Codebeoordelaar staat uit of de instellingen vragen aandacht. Herstel de instellingen en probeer deze review daarna opnieuw.",
+      "fixSettings": "Instellingen herstellen",
       "retryTitle": "Review opnieuw proberen?",
       "showMore": "Meer tonen",
       "started": "Gestart",

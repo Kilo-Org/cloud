@@ -79,6 +79,21 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {},
 }));
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/unavailable-models') as Record<
+    string,
+    unknown
+  >),
+  getUnavailableModelIds: jest.fn(
+    async () =>
+      new Set([
+        'google/gemma-4-26b-a4b-it:free',
+        'google/gemma-4-31b-it:free',
+        'thinkingmachines/inkling:free',
+      ])
+  ),
+}));
+
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {
     return mockPublicationEnabled;

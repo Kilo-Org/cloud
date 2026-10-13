@@ -87,8 +87,11 @@ const listInputSchema = z
 /**
  * Mint a one-use web ticket from Session Ingest for the given user. The
  * returned `token` is the opaque ticket; `expiresAt` is the Unix-seconds
- * expiry from the worker body. A missing worker URL or a non-2xx mint
- * response fails fast with PRECONDITION_FAILED rather than hanging.
+ * expiry from the worker body.
+ *
+ * Only a missing worker URL is PRECONDITION_FAILED. A worker that cannot be
+ * reached or does not answer inside the budget is SERVICE_UNAVAILABLE; a
+ * non-2xx or malformed mint response is BAD_GATEWAY.
  */
 async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt: number }> {
   if (!SESSION_INGEST_WORKER_URL) {
@@ -107,32 +110,32 @@ async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt
   let response: Response;
   try {
     // Bounded: a worker that never answers rejects inside the budget with
-    // `ServiceFetchTimeoutError`, which the catch below maps to the existing
-    // PRECONDITION_FAILED exactly as any other transport failure.
+    // `ServiceFetchTimeoutError`, which the catch below maps to
+    // SERVICE_UNAVAILABLE exactly as any other transport failure.
     response = await fetchWithinBudget(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
   } catch (error) {
     throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
-      message: 'Session ingest is not configured',
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Session ingest is unavailable',
       cause: error,
     });
   }
 
   if (!response.ok) {
     throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
-      message: 'Session ingest is not configured',
+      code: 'BAD_GATEWAY',
+      message: `Session ingest failed to mint a ticket (status ${response.status})`,
     });
   }
 
-  const raw = await response.json();
+  const raw: unknown = await response.json().catch(() => undefined);
   const parsed = webTicketResponseSchema.safeParse(raw);
   if (!parsed.success) {
     throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
+      code: 'BAD_GATEWAY',
       message: 'Invalid ticket response from session ingest',
       cause: parsed.error,
     });

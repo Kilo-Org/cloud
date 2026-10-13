@@ -109,13 +109,12 @@ export default function AdminGatewayPage() {
               list="preferred_models"
               title="Preferred Models"
               ordered
-              currentLabel="Showing the preferred models currently served by the gateway."
               description={
                 <>
                   Ordered list of preferred model IDs, stored in the <code>preferred_models</code>{' '}
-                  column of <code>ai_gateway_config</code>. The gateway does not read this list yet:
-                  preferred models are still built from the hardcoded list and the Auto Free
-                  configuration.
+                  column of <code>ai_gateway_config</code>. The model catalog sorts these models
+                  first in this order, and every model in the list except <code>kilo-auto/*</code>{' '}
+                  is monitored by the model stats and health checks.
                 </>
               }
             />
@@ -125,13 +124,13 @@ export default function AdminGatewayPage() {
               list="unavailable_models"
               title="Unavailable Models"
               ordered={false}
-              currentLabel="Showing the unavailable models currently hardcoded in the gateway."
               description={
                 <>
                   Model IDs the gateway hides from the catalog and rejects for direct requests,
                   stored in the <code>unavailable_models</code> column of{' '}
-                  <code>ai_gateway_config</code>. The gateway does not read this list yet:
-                  unavailable models are still hardcoded.
+                  <code>ai_gateway_config</code>. <code>kilo-auto</code> can still route to them.{' '}
+                  <code>google/gemma-4-26b-a4b-it:free</code> is always unavailable and is not
+                  listed here.
                 </>
               }
             />

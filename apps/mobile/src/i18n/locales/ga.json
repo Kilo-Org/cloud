@@ -1458,6 +1458,8 @@
       "retryTitle": "An dtriailfear an t-athbhreithniú arís?",
       "retryMessage": "Rithfear an t-athbhreithniú cóid arís.",
       "retryReview": "Bain triail as an athbhreithniú arís",
+      "retryNeedsSettings": "Tá an tAthbhreithneoir cóid múchta nó tá aird de dhíth ar a shocruithe. Ceartaigh na socruithe, ansin bain triail as an athbhreithniú seo arís.",
+      "fixSettings": "Ceartaigh na socruithe",
       "couldNotLoad": "Níorbh fhéidir an t-athbhreithniú a lódáil.",
       "couldNotGetLatest": "Níorbh fhéidir na sonraí is déanaí a fháil.",
       "byline": "{{repo}} #{{number}} le {{author}}",

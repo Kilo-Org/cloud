@@ -123,17 +123,7 @@ function narrowLocked(f: Frame): Block {
 export function narrow(f: Frame): ReactNode[] {
   const { width: W, height: H, copy } = f;
   const phase = phaseOf(copy);
-  const brand = [
-    logo(f, { x: PAD, y: NARROW_HEADER.cy - 8, size: 16 }),
-    label(f, 'brand', {
-      x: PAD + 22,
-      baseline: centredBaseline(12, NARROW_HEADER.cy),
-      width: 40,
-      value: 'Kilo',
-      size: 12,
-      weight: '600',
-    }),
-  ];
+  const brand = [logo(f, { x: PAD, y: NARROW_HEADER.cy - 8, size: 16 })];
   const edges = { top: NARROW_DESIGN.top, bottom: H - PAD };
   if (phase === 'locked') {
     const block = narrowLocked(f);

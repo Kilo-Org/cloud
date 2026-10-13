@@ -1,6 +1,8 @@
 import 'server-only';
 import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
+import { getHTTPStatusCodeFromError } from '@trpc/server/http';
+import { TRPC_ERROR_CODES_BY_KEY, type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
 import {
@@ -519,10 +521,16 @@ export class CloudAgentBillingError extends Error {
   }
 }
 
+function isTRPCErrorCode(code: unknown): code is TRPC_ERROR_CODE_KEY {
+  return typeof code === 'string' && Object.hasOwn(TRPC_ERROR_CODES_BY_KEY, code);
+}
+
 /**
- * Helper to re-throw InsufficientCreditsError as TRPCError with PAYMENT_REQUIRED code.
+ * Re-throws a Cloud Agent error as a TRPCError for the web tRPC response.
+ * Billing errors keep their billing status. A worker 4xx error keeps its tRPC
+ * code and message; tRPC reports any other error as a 500.
  */
-export function rethrowAsPaymentRequired(error: unknown): never {
+export function rethrowCloudAgentError(error: unknown): never {
   if (error instanceof CloudAgentBillingError) {
     throw new TRPCError({
       code:
@@ -540,6 +548,15 @@ export function rethrowAsPaymentRequired(error: unknown): never {
       code: 'PAYMENT_REQUIRED',
       message: error.message,
     });
+  }
+  if (error instanceof TRPCClientError) {
+    const code: unknown = error.data?.code ?? error.shape?.data?.code;
+    if (isTRPCErrorCode(code)) {
+      const workerError = new TRPCError({ code, message: error.message, cause: error });
+      if (getHTTPStatusCodeFromError(workerError) < 500) {
+        throw workerError;
+      }
+    }
   }
   throw error;
 }

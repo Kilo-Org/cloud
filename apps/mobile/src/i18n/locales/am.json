@@ -1401,6 +1401,8 @@
       "retryTitle": "ግምገማው እንደገና ይሞከር?",
       "retryMessage": "ይህ የኮድ ግምገማውን እንደገና ያሂዳል።",
       "retryReview": "ግምገማውን እንደገና ይሞክሩ",
+      "retryNeedsSettings": "የኮድ ገምጋሚ ጠፍቷል ወይም ቅንብሮቹ ትኩረት ይፈልጋሉ። ቅንብሮቹን ያስተካክሉ፣ ከዚያ ይህን ግምገማ እንደገና ይሞክሩ።",
+      "fixSettings": "ቅንብሮችን አስተካክል",
       "couldNotLoad": "ግምገማውን መጫን አልተቻለም።",
       "couldNotGetLatest": "የቅርብ ጊዜ መረጃውን ማግኘት አልተቻለም።",
       "byline": "{{repo}} #{{number}} በ{{author}}",

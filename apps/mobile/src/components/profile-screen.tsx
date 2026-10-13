@@ -142,6 +142,7 @@ export function ProfileScreen() {
     phase: deletePhase,
     isPending: deletePending,
     devCode,
+    canSubmitCode,
     beginDelete,
     submitCode,
     setCode,
@@ -469,7 +470,7 @@ export function ProfileScreen() {
               <Button
                 variant="destructive"
                 loading={deletePhase === 'executing'}
-                disabled={deletePhase === 'executing'}
+                disabled={deletePhase === 'executing' || !canSubmitCode}
                 onPress={submitCode}
               >
                 <Text>{t('profile.confirmDeletion')}</Text>

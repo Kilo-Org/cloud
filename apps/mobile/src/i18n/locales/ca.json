@@ -1420,6 +1420,8 @@
       "retryTitle": "Vols tornar a provar la revisió?",
       "retryMessage": "Això tornarà a executar la revisió de codi.",
       "retryReview": "Torna a provar la revisió",
+      "retryNeedsSettings": "El Revisor de codi està desactivat o la seva configuració requereix atenció. Corregeix la configuració i torna a provar aquesta revisió.",
+      "fixSettings": "Corregeix la configuració",
       "couldNotLoad": "No s'ha pogut carregar la revisió.",
       "couldNotGetLatest": "No s'han pogut obtenir les dades més recents.",
       "byline": "{{repo}} #{{number}} · Autor: {{author}}",

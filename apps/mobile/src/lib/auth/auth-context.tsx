@@ -52,6 +52,7 @@ import {
 } from '@/lib/auth/secure-store-value';
 import { type AuthSignOutCause, reportAuthBranch } from '@/lib/auth/sign-out-telemetry';
 import { chainSave } from '@/lib/hooks/save-chain';
+import { isProtectedDataAvailable, whenProtectedDataAvailable } from '@/lib/protected-data';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearCollapsedConnectCtasPreference } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
 import { clearCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
@@ -218,17 +219,31 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       readonly token: Promise<string | null>;
       readonly refresh: Promise<string | null>;
     }) => {
+      // A push or a background task can launch the app while the device is
+      // locked, and the keychain then refuses every read. That is not an
+      // unreadable session: hold the loading state until unlock, and read
+      // afresh instead of awaiting the preloads the lock refused.
+      let firstAttempt = preload;
+      if (!isProtectedDataAvailable()) {
+        await whenProtectedDataAvailable();
+        firstAttempt = undefined;
+      }
       // Capture the epoch before any asynchronous read: every later check —
       // including the catch below — fences against this moment, so a sign-out
       // or newer sign-in during bootstrap can never be followed by the
       // preloaded token being restored into React state or the token owner.
       const epoch = currentAuthEpoch();
+      let lockedDuringRead = false;
       try {
-        const stored = await readStoredValueWithRetry(AUTH_TOKEN_KEY, undefined, preload?.token);
+        const stored = await readStoredValueWithRetry(
+          AUTH_TOKEN_KEY,
+          undefined,
+          firstAttempt?.token
+        );
         const storedRefresh = await readStoredValueWithRetry(
           REFRESH_TOKEN_KEY,
           undefined,
-          preload?.refresh
+          firstAttempt?.refresh
         );
         // The credential state is now known — a stored session restores below,
         // or genuinely none exists and login is the correct destination. Clear
@@ -313,20 +328,30 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           setCurrentDeepLinkUserId(null);
         }
       } catch {
-        // Every read exhausted its retries. The session is not known to be
-        // gone, so NEVER fall through to the signed-out path and never set a
-        // token here: surface a retryable error and let the person retry or
-        // sign out explicitly.
-        // But never resurrect the surface over a transition that began while
-        // this load was in flight. A sign-out's escape hatch already cleared
-        // it synchronously (and the dedupe makes a second sign-out a no-op,
-        // so a resurrected flag would dead-end the hatch on the login route);
-        // a newer sign-in moved the epoch and owns the tree.
-        if (!isSignedOutReference.current && isCurrentAuthEpoch(epoch)) {
-          setRestoreFailed(true);
+        if (isProtectedDataAvailable()) {
+          // Every read exhausted its retries. The session is not known to be
+          // gone, so NEVER fall through to the signed-out path and never set a
+          // token here: surface a retryable error and let the person retry or
+          // sign out explicitly.
+          // But never resurrect the surface over a transition that began while
+          // this load was in flight. A sign-out's escape hatch already cleared
+          // it synchronously (and the dedupe makes a second sign-out a no-op,
+          // so a resurrected flag would dead-end the hatch on the login route);
+          // a newer sign-in moved the epoch and owns the tree.
+          if (!isSignedOutReference.current && isCurrentAuthEpoch(epoch)) {
+            setRestoreFailed(true);
+          }
+        } else {
+          // The device locked while the reads ran: read again after unlock.
+          lockedDuringRead = true;
         }
       } finally {
-        setIsLoading(false);
+        if (!lockedDuringRead) {
+          setIsLoading(false);
+        }
+      }
+      if (lockedDuringRead) {
+        await load();
       }
     },
     []

@@ -90,9 +90,6 @@ function createFakeProvider(
     releaseStop: () => releaseStop(),
   };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
@@ -615,18 +612,36 @@ describe('repository snapshot launch', () => {
     expect(frame.spec.capture).toBeUndefined();
   });
 
-  it('launches without a key and never asks for a capture when setup commands are present', async () => {
-    const provider = createFakeProvider();
+  it('uses a key and asks the wrapper to capture when setup commands are present', async () => {
+    const provider = createFakeProvider({ startSource: 'repository' });
     const stub = await setup('sbx__repo_launch_setup', provider);
     await stub.prepare(prepareInput({ setupCommands: ['pnpm install'] }));
-
-    expect(await repoKeyOf(stub)).toBeNull();
+    const key = await repoKeyOf(stub);
+    expect(key).not.toBeNull();
 
     const { wrapper } = await connect('sbx__repo_launch_setup', provider);
 
-    expect(provider.launchOptions).toEqual([{}]);
+    expect(provider.launchOptions).toEqual([{ repoKey: key }]);
     const frame = await prepareFrameOf(wrapper);
-    expect(frame.spec.capture).toBeUndefined();
+    expect(frame.spec.capture).toBe(true);
+  });
+
+  it('gives different keys to different setup commands for one repository', async () => {
+    const setupA = 'workspace_aaaa1111-1111-1111-1111-111111111111';
+    const setupB = 'workspace_bbbb2222-2222-2222-2222-222222222222';
+    const providerA = createFakeProvider();
+    const stubA = await setup('sbx__repo_setup_a', providerA);
+    await stubA.prepare(prepareInput({ sessionId: setupA, setupCommands: ['pnpm install'] }));
+
+    const providerB = createFakeProvider();
+    const stubB = await setup('sbx__repo_setup_b', providerB);
+    await stubB.prepare(prepareInput({ sessionId: setupB, setupCommands: ['pnpm build'] }));
+
+    const keyA = await repoKeyOf(stubA, setupA);
+    const keyB = await repoKeyOf(stubB, setupB);
+    expect(keyA).not.toBeNull();
+    expect(keyB).not.toBeNull();
+    expect(keyA).not.toBe(keyB);
   });
 
   it('skips a snapshot whose start never connected and starts from the image', async () => {

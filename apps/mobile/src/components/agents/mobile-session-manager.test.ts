@@ -79,13 +79,13 @@ const sendMessageMutate = vi.fn();
 const cancelQueuedMessageMutate = vi.fn();
 const getSessionQuery = vi.fn();
 const getWithRuntimeStateQuery = vi.fn();
-const getSessionMessagesQuery = vi.fn();
+const getSessionMessagesPageQuery = vi.fn();
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     cliSessionsV2: {
       get: { query: getSessionQuery },
       getWithRuntimeState: { query: getWithRuntimeStateQuery },
-      getSessionMessages: { query: getSessionMessagesQuery },
+      getSessionMessagesPage: { query: getSessionMessagesPageQuery },
     },
     cloudAgentNext: {
       getAttachmentDownloadUrl: { mutate },
@@ -794,7 +794,7 @@ describe('createMobileAgentSessionManager metadata memo', () => {
     mockCreateSessionManager.mockClear();
     getSessionQuery.mockReset();
     getWithRuntimeStateQuery.mockReset();
-    getSessionMessagesQuery.mockReset();
+    getSessionMessagesPageQuery.mockReset();
   });
 
   function setup(): SessionManagerConfig {
@@ -848,7 +848,7 @@ describe('createMobileAgentSessionManager cold open', () => {
     mockCreateSessionManager.mockClear();
     getWithRuntimeStateQuery.mockReset();
     getSessionQuery.mockReset();
-    getSessionMessagesQuery.mockReset();
+    getSessionMessagesPageQuery.mockReset();
   });
 
   it('omits the cached-snapshot reader so a cold open cannot paint stale rows', () => {

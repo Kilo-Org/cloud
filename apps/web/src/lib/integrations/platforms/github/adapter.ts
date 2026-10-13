@@ -1082,7 +1082,12 @@ function getErrorMessage(error: unknown): string {
   return typeof message === 'string' ? message : '';
 }
 
-function isRateLimitError(error: unknown): boolean {
+/**
+ * Is this GitHub failure a rate limit (primary, secondary, or abuse) rather
+ * than a permission refusal? 403 carries both meanings, so callers that map
+ * 403 to a permanent error must ask this first.
+ */
+export function isGitHubRateLimitError(error: unknown): boolean {
   if (!isHttpError(error)) return false;
   // 429 is unambiguously rate limiting.
   if (error.status === 429) return true;
@@ -1204,7 +1209,7 @@ export async function fetchPullRequestByNumber(params: {
       ...(commitShas ? { commitShas } : {}),
     };
   } catch (error) {
-    if (isRateLimitError(error)) {
+    if (isGitHubRateLimitError(error)) {
       throw new GitHubRateLimitError(parseRateLimitResetAt(error));
     }
     if (isHttpError(error) && error.status === 404) {
@@ -1281,7 +1286,7 @@ export async function fetchBatchedReviewDecisions(args: {
     }
     return result;
   } catch (error) {
-    if (isRateLimitError(error)) {
+    if (isGitHubRateLimitError(error)) {
       throw new GitHubRateLimitError(parseRateLimitResetAt(error));
     }
     throw error;

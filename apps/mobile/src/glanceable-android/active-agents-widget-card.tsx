@@ -9,7 +9,6 @@ import {
   baselineAbove,
   boxTop,
   CARD_PAD,
-  centredBaseline,
   type Copy,
   dot,
   dotInk,
@@ -33,23 +32,10 @@ import { fitRows, phaseOf, stack } from './active-agents-widget-stack';
 /** Header ink ends where the 24dp glyphs, their tops on the padding line, end. */
 export const HEADER_BOTTOM = HEADER_GLYPH.cy + HEADER_GLYPH.r;
 
-/**
- * The Kilo mark, as tall as the header glyphs so its top sits on the padding
- * line, and "Kilo" centred on it.
- */
+/** The Kilo mark, as tall as the header glyphs so its top sits on the padding line. */
 export function brand(f: Frame) {
   const size = 2 * HEADER_GLYPH.r;
-  return [
-    logo(f, { x: CARD_PAD, y: HEADER_GLYPH.cy - size / 2, size }),
-    label(f, 'brand', {
-      x: CARD_PAD + size + 6,
-      baseline: centredBaseline(13, HEADER_GLYPH.cy),
-      width: 40,
-      value: 'Kilo',
-      size: 13,
-      weight: '600',
-    }),
-  ];
+  return [logo(f, { x: CARD_PAD, y: HEADER_GLYPH.cy - size / 2, size })];
 }
 
 /** The content edges: under the header, down to the top of the footer line on the padding. */

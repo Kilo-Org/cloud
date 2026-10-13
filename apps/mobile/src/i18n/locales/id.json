@@ -940,6 +940,8 @@
       "noFindings": "Tidak ada temuan.",
       "retryMessage": "Ini akan menjalankan ulang tinjauan kode.",
       "retryReview": "Coba tinjauan lagi",
+      "retryNeedsSettings": "Peninjau kode nonaktif atau pengaturannya perlu diperhatikan. Perbaiki pengaturan, lalu coba tinjauan ini lagi.",
+      "fixSettings": "Perbaiki pengaturan",
       "retryTitle": "Coba tinjauan lagi?",
       "showMore": "Tampilkan lebih banyak",
       "started": "Dimulai",

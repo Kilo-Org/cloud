@@ -912,6 +912,8 @@
       "noFindings": "Aucun signalement.",
       "retryMessage": "Cela relancera la revue de code.",
       "retryReview": "Relancer la revue",
+      "retryNeedsSettings": "L'agent de revue de code est désactivé ou ses paramètres nécessitent votre attention. Corrigez les paramètres, puis relancez cette revue.",
+      "fixSettings": "Corriger les paramètres",
       "retryTitle": "Relancer la revue ?",
       "showMore": "Afficher la suite",
       "started": "Date de début",

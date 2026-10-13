@@ -1,4 +1,10 @@
-import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
+import {
+  env,
+  evictAllDurableObjects,
+  evictDurableObject,
+  reset,
+  runInDurableObject,
+} from 'cloudflare:test';
 import { generateKeyPairSync } from 'node:crypto';
 import { resolveSecret } from '../../src/auth.js';
 import {
@@ -16,11 +22,20 @@ import {
   updateBillingContext,
   type ContainerUsageRpcMethods,
 } from '@kilocode/container-usage';
-import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import type {
+  SandboxControlV2,
+  StoredProviderPin,
+} from '../../src/control-plane/sandbox/sandbox-do.js';
 import {
   allocation as allocationTable,
   routes as routesTable,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
+import { listScopeGrants, writeScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
+import { createControlPlaneCredential } from '../../src/sandbox-control/managed-credential.js';
+import {
+  buildControlNetworkPolicy,
+  type SessionCredentialGrant,
+} from '../../src/sandbox-control/session-credentials.js';
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
@@ -57,6 +72,47 @@ const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
   .SANDBOX_CONTROL;
+
+const GRANT_TARGET = 'https://worker.example.com';
+/** Kilo token that decodes to `runtimeAuthorization`, enabling the runtime proxy. */
+const RUNTIME_AUTHORIZED_KILO_TOKEN =
+  'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
+const GRANT_MEMBER = {
+  sessionId: 'workspace_11111111-1111-1111-1111-111111111111',
+  kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+};
+
+/** A schema-valid contained Vercel grant carrying a bound runtime-proxy handle. */
+function containedGrant(
+  sandboxId: string,
+  options: { scopeId: string; handle: string; preparedAt: number; expiresAt: number }
+): SessionCredentialGrant {
+  const targets = {
+    backendBaseUrl: GRANT_TARGET,
+    providerBaseUrl: GRANT_TARGET,
+    sessionIngestBaseUrl: GRANT_TARGET,
+  };
+  return {
+    version: 1,
+    containmentEnabled: true,
+    scopeId: options.scopeId,
+    sandboxId,
+    directory: `/workspace/${options.scopeId}`,
+    userId: 'owner-1',
+    provider: 'vercel',
+    outboundContainerId: 'outbound-1',
+    members: [{ ...GRANT_MEMBER }],
+    kilo: {
+      alias: createControlPlaneCredential(sandboxId, 'kilo'),
+      token: RUNTIME_AUTHORIZED_KILO_TOKEN,
+      targets,
+      runtimeProxy: { targets, members: [{ ...GRANT_MEMBER, handle: options.handle }] },
+      capabilities: {},
+    },
+    preparedAt: options.preparedAt,
+    expiresAt: options.expiresAt,
+  };
+}
 
 type FakeProviderOptions = {
   failFirstCreate?: boolean;
@@ -96,9 +152,6 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
     stopGates: [],
   };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       provider.createCalls += 1;
@@ -136,6 +189,7 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
       provider.leaseCalls.push(ms);
       provider.leaseRefs.push(ref);
     },
+    async applyContainedCredentials() {},
     async logs() {
       return '';
     },
@@ -402,6 +456,7 @@ async function captureRouteFailures<T>(
 }
 
 afterEach(async () => {
+  vi.unstubAllGlobals();
   await reset();
 });
 
@@ -1599,6 +1654,27 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     }
   );
 
+  it.each([
+    { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
+    { provider: 'vercel', resources: { vcpus: 4, memory: 8192 } },
+    { provider: 'cloudflare-containers', instance: 'standard-3' },
+    { provider: 'cloudflare-containers', instance: 'standard-4' },
+  ] as const)('reads the persisted $provider configuration after eviction', async configuration => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      provider: configuration.provider,
+      configuration,
+    });
+    if (configuration.provider === 'cloudflare-containers') {
+      await awaitStarting(provider, stub);
+    } else {
+      await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'));
+    }
+    expect((await stub.getAllocationState()).configuration).toEqual(configuration);
+    await evictAllDurableObjects();
+    expect((await stub.getAllocationState()).configuration).toEqual(configuration);
+  });
+
   it('rebuilds its provider adapter from the stored pin after eviction', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider, { allocationName: CUSTOM_ALLOCATION_NAME });
@@ -2096,7 +2172,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         },
       };
       const provider = createFakeProvider({ gateStop: existingState === 'stopping' });
-      provider.adapter.updateNetworkPolicy = async ref => {
+      provider.adapter.applyContainedCredentials = async ref => {
         if (ref === provider.refs[0]) throw new Error('Old sandbox is retiring');
       };
       const stub = await startAllocation(provider, {
@@ -2200,7 +2276,6 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         await releaseGate(stub, () => provider.stopGates.shift()?.('terminal'));
       }
       await waitFor(() => expect(provider.createCalls).toBe(2));
-      expect(provider.createInputs[1]?.networkPolicy).toBeDefined();
       const route = await runInDurableObject(stub, async (_instance, state) => {
         const db = drizzle(state.storage, { logger: false });
         return db
@@ -2212,6 +2287,113 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     },
     20_000
   );
+
+  it('reads current stored grants after eviction and adapter construction, excluding expired grants', async () => {
+    // The DO id must be a valid sandbox id (legacy-shared `__` shape); the
+    // allocation name is what the real Vercel REST client validates.
+    const sandboxId = 'sbx__chunk3_grant_reader';
+    const allocationName = 'ses-chunk3-grant-reader';
+    const stub = sandboxNamespace.getByName(sandboxId);
+    const now = Date.now();
+    const active = containedGrant(sandboxId, {
+      scopeId: 'scope-active',
+      handle: 'handle_active',
+      preparedAt: now,
+      expiresAt: now + MINUTE,
+    });
+    const expired = containedGrant(sandboxId, {
+      scopeId: 'scope-expired',
+      handle: 'handle_expired',
+      preparedAt: now - 2 * MINUTE,
+      expiresAt: now - MINUTE,
+    });
+    const next = containedGrant(sandboxId, {
+      scopeId: 'scope-next',
+      handle: 'handle_next',
+      preparedAt: now,
+      expiresAt: now + MINUTE,
+    });
+    const captured: string[] = [];
+    const fetchStub = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      captured.push(typeof init?.body === 'string' ? init.body : '');
+      return new Response('provider error', { status: 500 });
+    });
+    const vercelEnv = {
+      VERCEL_TOKEN: 'vercel-token',
+      VERCEL_TEAM_ID: 'team_1',
+      VERCEL_PROJECT_ID: 'prj_1',
+      VERCEL_SANDBOX_SNAPSHOT_ID: 'snap_1',
+      VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build_1',
+      VERCEL_SANDBOX_RUNTIME: 'node24',
+      VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '600000',
+      VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
+    };
+
+    await runInDurableObject(stub, async instance => {
+      await instance.getAllocationState();
+      Object.assign(instance, { env: { ...instance.env, ...vercelEnv } });
+      vi.stubGlobal('fetch', fetchStub);
+    });
+
+    // With no owner, admission is unavailable: this persists the Vercel pin
+    // without a provider create.
+    await stub.ensureAllocation({
+      provider: 'vercel',
+      configuration: { provider: 'vercel' },
+      allocationName,
+    });
+    await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'));
+    expect(captured).toHaveLength(0);
+
+    await runInDurableObject(stub, async (_instance, state) => {
+      await state.storage.put('control_plane_owner', 'owner-1');
+      const db = drizzle(state.storage, { logger: false });
+      writeScopeGrant(db, active);
+      writeScopeGrant(db, expired);
+    });
+
+    await evictDurableObject(stub);
+
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.getAllocationState();
+      Object.assign(instance, { env: { ...instance.env, ...vercelEnv } });
+      const db = drizzle(state.storage, { logger: false });
+      const realFactory = (
+        instance as unknown as {
+          createProviderAdapter(pin: StoredProviderPin): ProviderAdapter;
+        }
+      ).createProviderAdapter.bind(instance);
+      Object.assign(instance, {
+        createProviderAdapter(pin: StoredProviderPin) {
+          expect(listScopeGrants(db)).toEqual(expect.arrayContaining([active, expired]));
+          const adapter = realFactory(pin);
+          for (const grant of listScopeGrants(db)) {
+            writeScopeGrant(db, {
+              ...grant,
+              preparedAt: now - 2 * MINUTE,
+              expiresAt: now - 1,
+            });
+          }
+          writeScopeGrant(db, next);
+          return adapter;
+        },
+      });
+      captured.length = 0;
+    });
+
+    await stub.ensureAllocation({
+      provider: 'vercel',
+      configuration: { provider: 'vercel' },
+      allocationName,
+    });
+    await waitFor(() => expect(captured.length).toBeGreaterThan(0));
+
+    const body = JSON.parse(captured[0] ?? '{}') as { networkPolicy: unknown };
+    expect(body.networkPolicy).toEqual(buildControlNetworkPolicy([next]));
+    expect(JSON.stringify(body.networkPolicy)).toContain('handle_next');
+    expect(JSON.stringify(body.networkPolicy)).not.toContain('handle_active');
+    expect(JSON.stringify(body.networkPolicy)).not.toContain('handle_expired');
+  }, 20_000);
 
   it('rejects a blocked billing route before sending wrapper preparation', async () => {
     const sandboxId = `ses-${'d'.repeat(47)}c`;
@@ -2248,13 +2430,16 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     });
     await awaitStarting(provider, stub);
     const sent: string[] = [];
-    await runInDurableObject(stub, instance => {
+    await runInDurableObject(stub, async instance => {
       const control = instance as unknown as {
-        vercelBilling: { lifecycle: { isBillingBlocked(): Promise<boolean> } };
+        ensureVercelBillingRuntime(): Promise<
+          { lifecycle: { isBillingBlocked(): Promise<boolean> } } | undefined
+        >;
       };
-      Object.assign(control.vercelBilling.lifecycle, { isBillingBlocked: async () => true });
+      const runtime = await control.ensureVercelBillingRuntime();
+      if (runtime === undefined) throw new Error('missing Vercel billing runtime');
+      Object.assign(runtime.lifecycle, { isBillingBlocked: async () => true });
       Object.assign(instance, { sendSessionPrepare: () => sent.push('prepare') });
-      return Promise.resolve();
     });
     const result = await stub.prepare({
       spec: {

@@ -40,6 +40,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.security.MessageDigest
 import java.util.function.Consumer
 
@@ -60,6 +61,10 @@ private const val GLOBAL_SEARCH_PACKAGE = "com.google.android.googlequicksearchb
 private const val PAGE_SIZE = 100
 private const val TIMEOUT_SECONDS = 30L
 private const val TIMEOUT_MESSAGE = "The system search index did not respond."
+
+// The iOS module rejects a timed-out index call with the same code, so
+// JavaScript can tell an index that did not answer from a call that failed.
+private const val TIMEOUT_CODE = "ERR_SYSTEM_SEARCH_TIMEOUT"
 
 /**
  * One indexed entity, as JavaScript hands it across.
@@ -740,6 +745,8 @@ private fun jetpackDocument(document: IndexedDocument): JetpackDocument {
 private fun platformFailure(code: Int, message: String?): Throwable =
   CodedException(message ?: "The system search index failed with code $code.")
 
+private fun timeoutFailure(): CodedException = CodedException(TIMEOUT_CODE, TIMEOUT_MESSAGE, null)
+
 private fun <T> awaitPlatformResult(start: (Consumer<AppSearchResult<T>>) -> Unit): T {
   val latch = CountDownLatch(1)
   var value: T? = null
@@ -752,7 +759,7 @@ private fun <T> awaitPlatformResult(start: (Consumer<AppSearchResult<T>>) -> Uni
     }
     latch.countDown()
   }
-  if (!latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) throw CodedException(TIMEOUT_MESSAGE)
+  if (!latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) throw timeoutFailure()
   failure?.let { throw it }
   return value ?: throw CodedException("The system search index returned no result.")
 }
@@ -768,7 +775,7 @@ private fun awaitPlatformCompletion(start: (Consumer<AppSearchResult<Void>>) -> 
     }
     latch.countDown()
   }
-  if (!latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) throw CodedException(TIMEOUT_MESSAGE)
+  if (!latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) throw timeoutFailure()
   failure?.let { throw it }
 }
 
@@ -797,7 +804,7 @@ private fun awaitPlatformBatch(start: (BatchResultCallback<String, Void>) -> Uni
       latch.countDown()
     }
   })
-  if (!latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) throw CodedException(TIMEOUT_MESSAGE)
+  if (!latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) throw timeoutFailure()
   failure?.let { throw it }
 }
 
@@ -805,4 +812,6 @@ private fun <T> ListenableFuture<T>.awaitFuture(): T = try {
   get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
 } catch (error: ExecutionException) {
   throw error.cause ?: error
+} catch (error: TimeoutException) {
+  throw timeoutFailure()
 }

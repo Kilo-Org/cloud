@@ -1420,6 +1420,8 @@
       "retryTitle": "Ponoviti pregled?",
       "retryMessage": "Ovo će ponovo pokrenuti pregled koda.",
       "retryReview": "Ponovi pregled",
+      "retryNeedsSettings": "Agent za pregled koda je isključen ili njegove postavke zahtijevaju pažnju. Popravite postavke, a zatim ponovite ovaj pregled.",
+      "fixSettings": "Popravi postavke",
       "couldNotLoad": "Nije moguće učitati pregled.",
       "couldNotGetLatest": "Nije moguće dohvatiti najnovije podatke.",
       "byline": "{{repo}} #{{number}} · Autor: {{author}}",

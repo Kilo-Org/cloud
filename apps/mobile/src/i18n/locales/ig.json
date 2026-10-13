@@ -1401,6 +1401,8 @@
       "retryTitle": "Nwaa nyocha ọzọ?",
       "retryMessage": "Nke a ga-eme nyocha koodu ahụ ọzọ.",
       "retryReview": "Nwaa nyocha ọzọ",
+      "retryNeedsSettings": "Onye nyocha koodu agbanyụọla ma ọ bụ ntọala ya chọrọ nlebara anya. Dozie ntọala ndị ahụ, wee nwaa nyocha a ọzọ.",
+      "fixSettings": "Dozie ntọala",
       "couldNotLoad": "Enweghị ike ibudata nyocha.",
       "couldNotGetLatest": "Enweghị ike ịnweta nke kachasị ọhụrụ.",
       "byline": "{{repo}} #{{number}} nke {{author}}",

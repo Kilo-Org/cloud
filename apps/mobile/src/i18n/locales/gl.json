@@ -1401,6 +1401,8 @@
       "retryTitle": "Tentar de novo a revisión?",
       "retryMessage": "Isto volverá executar a revisión de código.",
       "retryReview": "Tentar de novo a revisión",
+      "retryNeedsSettings": "O Revisor de código está desactivado ou a súa configuración precisa atención. Corrixe a configuración e despois tenta de novo esta revisión.",
+      "fixSettings": "Corrixir a configuración",
       "couldNotLoad": "Non se puido cargar a revisión.",
       "couldNotGetLatest": "Non se puido obter a información máis recente.",
       "byline": "{{repo}} #{{number}} por {{author}}",

@@ -6,10 +6,13 @@ import { useTextHeight } from '@/components/agents/use-text-height';
  * Imperative surface the composer drives without rendering itself. A keystroke
  * pushes its text through `setText`, which re-renders only this leaf; nothing
  * about the 1400-line `ChatComposer` commits on a typed frame whose rendered
- * values did not change.
+ * values did not change. A native content-size report goes through
+ * `setNativeContentHeight` for the same reason: it only sharpens the pitch the
+ * measured cap snaps to, so it must not re-render the composer either.
  */
 export type ChatComposerMeasureHandle = {
   setText: (text: string) => void;
+  setNativeContentHeight: (contentHeight: number) => void;
   reset: () => void;
 };
 
@@ -21,7 +24,6 @@ type ChatComposerMeasureProps = {
   fontSize: number;
   lineHeight: number;
   fontScale?: number;
-  nativeContentHeight?: number | null;
   /**
    * Published only when the measured height or the snapped cap changes. The
    * composer renders both (the input's height, the row's scroll gate), so a
@@ -39,7 +41,8 @@ type ChatComposerMeasureProps = {
  * own render path, so every typed frame re-rendered the whole composer and
  * re-laid-out the mirror. Owning the hook here confines the per-keystroke work
  * to this leaf; the composer learns only the published height/cap, and only
- * when one of them changes (at most once per rendered line).
+ * when one of them changes (at most once per rendered line). The input's own
+ * content-size reports land here too, through the imperative handle.
  */
 export function ChatComposerMeasure({
   handleRef,
@@ -54,6 +57,9 @@ export function ChatComposerMeasure({
     () => ({
       setText: (text: string) => {
         measure.setText(text);
+      },
+      setNativeContentHeight: (contentHeight: number) => {
+        measure.setNativeContentHeight(contentHeight);
       },
       reset: () => {
         measure.reset();

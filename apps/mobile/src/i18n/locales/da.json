@@ -1401,6 +1401,8 @@
       "retryTitle": "Vil du prøve gennemgangen igen?",
       "retryMessage": "Dette kører kodegennemgangen igen.",
       "retryReview": "Prøv gennemgangen igen",
+      "retryNeedsSettings": "Kodegennemgang er slået fra, eller dens indstillinger kræver opmærksomhed. Ret indstillingerne, og prøv derefter denne gennemgang igen.",
+      "fixSettings": "Ret indstillinger",
       "couldNotLoad": "Gennemgangen kunne ikke indlæses.",
       "couldNotGetLatest": "De seneste oplysninger kunne ikke hentes.",
       "byline": "{{repo}} #{{number}} af {{author}}",

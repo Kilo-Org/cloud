@@ -358,7 +358,10 @@ export function CloudAgentWorkspaceTabs({
                             statusUpdatedAt={session.sessionStatusUpdatedAt ?? null}
                           />
                         ) : progress && !isEditing ? (
-                          <StatusSpinner className="h-4 w-4 shrink-0 text-gray-600" title="Busy" />
+                          <StatusSpinner
+                            className="text-muted-foreground h-4 w-4 shrink-0"
+                            title="Busy"
+                          />
                         ) : (
                           <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         )}

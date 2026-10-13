@@ -188,12 +188,8 @@ export const vercelSandboxResourcesSchema = z.union([
 
 export type VercelSandboxResources = z.infer<typeof vercelSandboxResourcesSchema>;
 
-export function getSandboxAllocationProvider(
-  allocation: SandboxAllocation
-): 'cloudflare' | 'vercel' | 'cloudflare-containers' {
-  if (allocation.startsWith('vercel-')) return 'vercel';
-  if (allocation.startsWith('cloudflare-containers-')) return 'cloudflare-containers';
-  return 'cloudflare';
+export function getSandboxAllocationProvider(allocation: SandboxAllocation) {
+  return allocationRequests[allocation].provider.id;
 }
 
 /**

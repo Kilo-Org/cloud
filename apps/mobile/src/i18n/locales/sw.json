@@ -1401,6 +1401,8 @@
       "retryTitle": "Ungependa kujaribu ukaguzi tena?",
       "retryMessage": "Hii itaendesha tena ukaguzi wa msimbo.",
       "retryReview": "Jaribu ukaguzi tena",
+      "retryNeedsSettings": "Mkaguzi wa msimbo amezimwa au mipangilio yake inahitaji kuangaliwa. Rekebisha mipangilio, kisha jaribu ukaguzi huu tena.",
+      "fixSettings": "Rekebisha mipangilio",
       "couldNotLoad": "Imeshindikana kupakia ukaguzi.",
       "couldNotGetLatest": "Imeshindikana kupata taarifa za hivi karibuni.",
       "byline": "{{repo}} #{{number}} na {{author}}",

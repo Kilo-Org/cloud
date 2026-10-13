@@ -14,6 +14,7 @@ import {
   writePickerLaunchContext,
 } from '@/lib/agent-attachments/picker-launch-context';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { waitForActionSheetDismissal } from '@/lib/action-sheet-dismissal';
 import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { registerTempFile } from '@/lib/temp-file-registry';
 
@@ -199,6 +200,9 @@ function showAttachmentSourceSheet(
       }
     };
     const handle = async (source: AttachmentSource) => {
+      // Present the picker only after the sheet's modal is gone; otherwise
+      // iOS dismisses the picker with the modal (KILO-APP-3BF).
+      await waitForActionSheetDismissal();
       // Record the launching composer + account before the camera/library
       // launch so the recovery hook can match a pending result after an
       // Activity recreation. NOT before the Files branch, which uses

@@ -1401,6 +1401,8 @@
       "retryTitle": "Eseye revizyon an ankò?",
       "retryMessage": "Sa ap relanse revizyon kòd la.",
       "retryReview": "Eseye revizyon an ankò",
+      "retryNeedsSettings": "Revizè kòd la etenn oswa paramèt li yo bezwen atansyon. Ranje paramèt yo, epi eseye revizyon sa a ankò.",
+      "fixSettings": "Ranje paramèt yo",
       "couldNotLoad": "Nou pa t ka chaje revizyon an.",
       "couldNotGetLatest": "Nou pa t ka jwenn dènye done yo.",
       "byline": "{{repo}} #{{number}} pa {{author}}",

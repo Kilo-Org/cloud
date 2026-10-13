@@ -16,7 +16,6 @@ import {
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
-import { useTRPC } from '@/lib/trpc';
 import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
   composeSessionProvenanceSubtitle,
@@ -27,6 +26,7 @@ import {
   formatSessionTotalCost,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
+import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { openSessionPreviewStore } from './session-preview-state';
 import {
@@ -124,7 +124,6 @@ export function StoredSessionRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const trpc = useTRPC();
   // The backend names an unnamed session with a raw ISO placeholder
   // ("New session - 2026-09-22T02:05:22.778Z"); it is not a name the user
   // should see. `namedSessionTitle` uses the shared display helper and keeps
@@ -255,7 +254,7 @@ export function StoredSessionRow({
     ? () => {
         void prefetchSessionTranscript(
           queryClient,
-          trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.session_id })
+          sessionTranscriptQueryOptions(session.session_id)
         );
       }
     : undefined;

@@ -940,6 +940,8 @@
       "noFindings": "未发现问题。",
       "retryMessage": "这将重新执行代码审查。",
       "retryReview": "重试审查",
+      "retryNeedsSettings": "代码审查助手已关闭，或其设置需要处理。请修复设置，然后重试此审查。",
+      "fixSettings": "修复设置",
       "retryTitle": "重试审查？",
       "showMore": "显示更多",
       "started": "开始时间",

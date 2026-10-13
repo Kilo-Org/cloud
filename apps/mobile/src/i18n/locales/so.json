@@ -1401,6 +1401,8 @@
       "retryTitle": "Ma mar kale isku dayaysaa dib-u-eegista?",
       "retryMessage": "Tani waxay mar kale socodsiin doontaa dib-u-eegista koodhka.",
       "retryReview": "Mar kale isku day dib-u-eegista",
+      "retryNeedsSettings": "Dib-u-eegaha koodhka waa dansan yahay ama dejintiisu waxay u baahan tahay fiiro. Hagaaji dejinta, kadibna mar kale isku day dib-u-eegistan.",
+      "fixSettings": "Hagaaji dejinta",
       "couldNotLoad": "Dib-u-eegista lama soo dejin karin.",
       "couldNotGetLatest": "Xogta ugu dambaysa lama heli karin.",
       "byline": "{{repo}} #{{number}} oo uu qoray {{author}}",

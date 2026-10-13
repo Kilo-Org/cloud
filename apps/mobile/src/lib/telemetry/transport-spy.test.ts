@@ -376,14 +376,19 @@ type IntegrationLike = { name?: string };
 // it receives the SDK's default integrations and returns the final merged set.
 // Resolve it against a fake default list carrying the HermesProfiling
 // instance the real default list pushes whenever `profilesSampleRate` is a
-// number (0 included) plus one unrelated default to prove the rest survive.
+// number (0 included), the TurboModuleContext instance it pushes whenever
+// `enableNative` is on, plus one unrelated default to prove the rest survive.
 // The mocked deeplink/replay factories return undefined, so the result holds
 // sparse entries; filter them out.
 function resolveIntegrations(initOptions: Record<string, unknown> | undefined): IntegrationLike[] {
   const integrations = initOptions?.integrations as
     | ((defaults: IntegrationLike[]) => (IntegrationLike | undefined)[])
     | undefined;
-  const merged = integrations?.([{ name: 'HermesProfiling' }, { name: 'DeviceContext' }]);
+  const merged = integrations?.([
+    { name: 'HermesProfiling' },
+    { name: 'TurboModuleContext' },
+    { name: 'DeviceContext' },
+  ]);
   return merged?.filter((integration): integration is IntegrationLike => integration != null) ?? [];
 }
 
@@ -463,4 +468,17 @@ describe('Sentry transport spy', () => {
     expect(profilerNames(hoisted.sentryHolder.initOptions)).toEqual(['HermesProfiling#2']);
     expect(hoisted.hermesProfilingIntegration).toHaveBeenCalledTimes(2);
   });
+
+  it.each([true, false])(
+    'drops the TurboModuleContext scope writer (optional consent %s)',
+    async consented => {
+      const { initSentry } = await loadSentryInit();
+
+      initSentry(consented);
+
+      const names = resolveIntegrations(hoisted.sentryHolder.initOptions).map(i => i.name);
+      expect(names).not.toContain('TurboModuleContext');
+      expect(names).toContain('DeviceContext');
+    }
+  );
 });

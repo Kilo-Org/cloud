@@ -1401,6 +1401,8 @@
       "retryTitle": "Reyna yfirferð aftur?",
       "retryMessage": "Þetta keyrir yfirferð kóðans aftur.",
       "retryReview": "Reyna yfirferð aftur",
+      "retryNeedsSettings": "Slökkt er á Kóðarýni eða stillingar hans þarfnast athygli. Lagaðu stillingarnar og reyndu síðan þessa yfirferð aftur.",
+      "fixSettings": "Laga stillingar",
       "couldNotLoad": "Ekki tókst að sækja yfirferðina.",
       "couldNotGetLatest": "Ekki tókst að sækja nýjustu gögnin.",
       "byline": "{{repo}} #{{number}} eftir {{author}}",

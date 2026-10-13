@@ -18,7 +18,7 @@ import {
   convertFromKiloExclusiveModel,
   type KiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
-import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS, type AutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -125,11 +125,13 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
 
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
-  const [endpointsMetadata, dataCollectionRequiredModelIds, preferredModels] = await Promise.all([
-    getOpenRouterModelsMetadataFromDatabase(),
-    getDataCollectionRequiredModelIds(),
-    getPreferredModels(),
-  ]);
+  const [endpointsMetadata, dataCollectionRequiredModelIds, preferredModels, unavailableModelIds] =
+    await Promise.all([
+      getOpenRouterModelsMetadataFromDatabase(),
+      getDataCollectionRequiredModelIds(),
+      getPreferredModels(),
+      getUnavailableModelIds(),
+    ]);
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
   const enhancedModels = await Promise.all(
@@ -140,7 +142,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           !kiloExclusiveModels.some(
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
           ) &&
-          !isUnavailableModel(model.id) &&
+          !unavailableModelIds.has(model.id) &&
           !model.id.endsWith(':batch')
       )
       .map(model => {

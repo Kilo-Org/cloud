@@ -197,7 +197,7 @@ vi.mock('expo-router', () => ({
 vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   useStackSafeReplace: () => ({ replace: vi.fn() }),
 }));
-vi.mock('expo-keep-awake', () => ({
+vi.mock('@/lib/keep-awake', () => ({
   useKeepAwake: vi.fn(),
 }));
 vi.mock('expo-haptics', () => ({

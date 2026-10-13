@@ -940,6 +940,8 @@
       "noFindings": "Es liegen keine Befunde vor.",
       "retryMessage": "Das Code-Review wird erneut ausgeführt.",
       "retryReview": "Review erneut ausführen",
+      "retryNeedsSettings": "Der Code-Prüfer ist ausgeschaltet oder seine Einstellungen erfordern Aufmerksamkeit. Korrigiere die Einstellungen und führe dieses Review dann erneut aus.",
+      "fixSettings": "Einstellungen korrigieren",
       "retryTitle": "Review erneut ausführen?",
       "showMore": "Mehr anzeigen",
       "started": "Gestartet",

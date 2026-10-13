@@ -1420,6 +1420,8 @@
       "retryTitle": "Atkārtot koda pārskatīšanu?",
       "retryMessage": "Koda pārskatīšana tiks veikta vēlreiz.",
       "retryReview": "Atkārtot koda pārskatīšanu",
+      "retryNeedsSettings": "Koda pārskatītājs ir izslēgts, vai tā iestatījumiem nepieciešama uzmanība. Labojiet iestatījumus un pēc tam atkārtojiet šo koda pārskatīšanu.",
+      "fixSettings": "Labot iestatījumus",
       "couldNotLoad": "Neizdevās ielādēt koda pārskatīšanu.",
       "couldNotGetLatest": "Neizdevās iegūt jaunākos datus.",
       "byline": "{{repo}} #{{number}} autors: {{author}}",

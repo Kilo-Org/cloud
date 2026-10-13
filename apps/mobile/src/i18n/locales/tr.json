@@ -940,6 +940,8 @@
       "noFindings": "Bulgu yok.",
       "retryMessage": "Kod incelemesi yeniden çalıştırılacak.",
       "retryReview": "İncelemeyi tekrar dene",
+      "retryNeedsSettings": "Kod inceleyici kapalı veya ayarlarının ilgilenilmesi gerekiyor. Ayarları düzeltin, ardından bu incelemeyi tekrar deneyin.",
+      "fixSettings": "Ayarları düzelt",
       "retryTitle": "İnceleme tekrar denensin mi?",
       "showMore": "Daha fazla göster",
       "started": "Başlangıç zamanı",

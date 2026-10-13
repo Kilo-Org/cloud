@@ -105,7 +105,6 @@ describe('Live Activity Lock Screen card (round 7)', () => {
   it('draws the header, the status row, Approve, and the other counts', () => {
     const { banner } = render(PERMISSION);
     expect(texts(banner)).toEqual([
-      'Kilo',
       'Checked',
       '2',
       'Needs input',
@@ -145,7 +144,7 @@ describe('Live Activity Lock Screen card (round 7)', () => {
 
   it('drops the bottom line for a lone question and prints Next run for scheduled only', () => {
     const question = render({ status: 'happy', needsInput: 1, updatedAt: UPDATED_AT }).banner;
-    expect(texts(question)).toEqual(['Kilo', 'Checked', '1', 'Needs input']);
+    expect(texts(question)).toEqual(['Checked', '1', 'Needs input']);
     const scheduled = render({
       status: 'happy',
       scheduled: 2,

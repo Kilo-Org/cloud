@@ -1439,6 +1439,8 @@
       "retryTitle": "Pakartoti peržiūrą?",
       "retryMessage": "Kodo peržiūra bus atlikta dar kartą.",
       "retryReview": "Pakartoti peržiūrą",
+      "retryNeedsSettings": "Kodo peržiūros agentas išjungtas arba jo nustatymams reikia dėmesio. Pataisykite nustatymus, tada pakartokite šią peržiūrą.",
+      "fixSettings": "Pataisyti nustatymus",
       "couldNotLoad": "Nepavyko įkelti peržiūros.",
       "couldNotGetLatest": "Nepavyko gauti naujausių duomenų.",
       "byline": "{{repo}} #{{number}} · Autorius: {{author}}",

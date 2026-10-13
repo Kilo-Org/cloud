@@ -823,7 +823,7 @@ export async function handleLlmProxyRequest(
 
   if (
     isDisabledKiloExclusiveModel(effectiveModelIdLowerCased) ||
-    (!autoModel && isUnavailableModel(effectiveModelIdLowerCased))
+    (!autoModel && (await isUnavailableModel(effectiveModelIdLowerCased)))
   ) {
     console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);
     return unavailableModelResponse();

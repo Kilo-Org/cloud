@@ -1401,6 +1401,8 @@
       "retryTitle": "Të riprovohet shqyrtimi?",
       "retryMessage": "Kjo do ta kryejë përsëri shqyrtimin e kodit.",
       "retryReview": "Riprovo shqyrtimin",
+      "retryNeedsSettings": "Shqyrtuesi i kodit është i çaktivizuar ose cilësimet e tij kërkojnë vëmendje. Rregulloni cilësimet, pastaj riprovoni këtë shqyrtim.",
+      "fixSettings": "Rregullo cilësimet",
       "couldNotLoad": "Nuk u ngarkua shqyrtimi.",
       "couldNotGetLatest": "Nuk u morën të dhënat më të fundit.",
       "byline": "{{repo}} #{{number}} nga {{author}}",

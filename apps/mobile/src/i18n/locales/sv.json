@@ -1401,6 +1401,8 @@
       "retryTitle": "Gör om granskningen?",
       "retryMessage": "Detta kör kodgranskningen igen.",
       "retryReview": "Gör om granskningen",
+      "retryNeedsSettings": "Kodgranskaren är avstängd eller så behöver dess inställningar åtgärdas. Åtgärda inställningarna och gör sedan om den här granskningen.",
+      "fixSettings": "Åtgärda inställningarna",
       "couldNotLoad": "Kunde inte läsa in granskningen.",
       "couldNotGetLatest": "Kunde inte hämta de senaste uppgifterna.",
       "byline": "{{repo}} #{{number}} av {{author}}",

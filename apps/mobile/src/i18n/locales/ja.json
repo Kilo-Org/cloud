@@ -940,6 +940,8 @@
       "noFindings": "指摘はありません。",
       "retryMessage": "コードレビューをもう一度実行します。",
       "retryReview": "レビューを再試行",
+      "retryNeedsSettings": "コードレビュアーがオフになっているか、設定の確認が必要です。設定を修正してから、このレビューを再試行してください。",
+      "fixSettings": "設定を修正",
       "retryTitle": "レビューを再試行しますか？",
       "showMore": "さらに表示",
       "started": "開始日時",

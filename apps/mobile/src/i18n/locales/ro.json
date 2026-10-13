@@ -1420,6 +1420,8 @@
       "retryTitle": "Reîncerci revizuirea?",
       "retryMessage": "Revizuirea codului va fi efectuată din nou.",
       "retryReview": "Reîncearcă revizuirea",
+      "retryNeedsSettings": "Agentul de revizuire a codului este oprit sau setările sale necesită atenție. Corectează setările, apoi reîncearcă această revizuire.",
+      "fixSettings": "Corectează setările",
       "couldNotLoad": "Nu s-a putut încărca revizuirea.",
       "couldNotGetLatest": "Nu s-au putut obține cele mai recente date.",
       "byline": "{{repo}} #{{number}}, autor: {{author}}",

@@ -1401,6 +1401,8 @@
       "retryTitle": "Kas proovida ülevaatust uuesti?",
       "retryMessage": "See käivitab koodi ülevaatuse uuesti.",
       "retryReview": "Proovi ülevaatust uuesti",
+      "retryNeedsSettings": "Koodiülevaataja on välja lülitatud või selle seaded vajavad tähelepanu. Paranda seaded ja proovi seejärel seda ülevaatust uuesti.",
+      "fixSettings": "Paranda seaded",
       "couldNotLoad": "Ülevaatust ei õnnestunud laadida.",
       "couldNotGetLatest": "Uusimaid andmeid ei õnnestunud laadida.",
       "byline": "{{repo}} #{{number}}, autor {{author}}",

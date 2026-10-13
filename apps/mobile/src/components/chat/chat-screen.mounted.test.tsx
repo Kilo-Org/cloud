@@ -28,6 +28,7 @@ const state = vi.hoisted(() => ({
   retry: vi.fn(),
   send: vi.fn(),
   model: 'm1',
+  effort: null as 'low' | 'medium' | 'high' | null,
   images: false,
 }));
 
@@ -84,6 +85,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
     state: {
       sessionId: 's1',
       model: state.model,
+      effort: state.effort,
       turns: [],
       answering: '',
       status: state.status,
@@ -138,6 +140,9 @@ vi.mock('@/components/agents/message-bubble', () => ({ MessageBubble: 'MessageBu
 vi.mock('@/components/agents/message-details-sheet', () => ({
   MessageDetailsSheet: 'MessageDetailsSheet',
 }));
+vi.mock('@/components/agents/part-detail-sheet-host', () => ({
+  PartDetailSheetHost: 'PartDetailSheetHost',
+}));
 vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: 'SessionMessageList',
 }));
@@ -163,17 +168,20 @@ vi.mock('@/components/chat/mcp-settings-sheet', () => ({
 vi.mock('@/components/chat/web-search-row', () => ({
   useWebSearchSetting: () => ({ enabled: true, setEnabled: () => undefined }),
 }));
+const keyboard = vi.hoisted(() => ({ isVisible: false }));
+vi.mock('react-native-keyboard-controller', () => ({
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
+  useKeyboardState: (selector: (snapshot: { isVisible: boolean }) => boolean) => selector(keyboard),
+}));
 vi.mock('react-native', () => ({
   Alert: { alert: backendUi.alert },
   ActivityIndicator: 'ActivityIndicator',
-  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
-  KeyboardAvoidingView: 'KeyboardAvoidingView',
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 24, left: 0, right: 0 }),
 }));
 
 let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
@@ -189,7 +197,9 @@ beforeEach(() => {
   backendUi.alert.mockClear();
   backendUi.loaded = true;
   state.model = 'm1';
+  state.effort = null;
   state.images = false;
+  keyboard.isVisible = false;
   state.send.mockClear();
 });
 afterEach(() => {
@@ -226,6 +236,17 @@ describe('the chat transcript while it opens', () => {
     expect(count(tree, 'SessionSkeletonMessages')).toBe(0);
   });
 
+  it.each([false, true])(
+    'keeps the composer gap correct when keyboard visibility is %s',
+    async visible => {
+      keyboard.isVisible = visible;
+      const tree = await mount();
+      const composer = tree.root.find(node => (node.type as string) === 'ChatComposer');
+
+      expect(composer.parent?.props.style).toEqual({ paddingBottom: visible ? 0 : 24 });
+    }
+  );
+
   it('hands the sheet the whole chat-tools model', async () => {
     const tree = await mount();
     const sheet = tree.root.findAll(node => (node.type as string) === 'McpSettingsSheet')[0];
@@ -261,7 +282,7 @@ describe('backend context-transfer approval', () => {
       apiKind: 'responses',
       apiKey: '',
       headers: {},
-      models: [{ id: 'shared', name: 'Shared', tools: false, images: false }],
+      models: [{ id: 'shared', name: 'Shared', tools: false, images: false, reasoning: false }],
       allowLocalHttp: false,
     };
     backendUi.profiles = [backend];
@@ -305,7 +326,11 @@ describe('sending before stored backends load', () => {
       onSend('Question');
     });
     expect(backendUi.alert).not.toHaveBeenCalled();
-    expect(state.send).toHaveBeenCalledWith('Question', 'backend:server:1:model', []);
+    expect(state.send).toHaveBeenCalledWith(
+      'Question',
+      { model: 'backend:server:1:model', effort: null },
+      []
+    );
   });
 });
 
@@ -337,7 +362,75 @@ describe('images in a chat', () => {
     act(() => {
       onSend('What is this?', { images: [image] });
     });
-    expect(state.send).toHaveBeenCalledWith('What is this?', 'm1', [image]);
+    expect(state.send).toHaveBeenCalledWith('What is this?', { model: 'm1', effort: null }, [
+      image,
+    ]);
+  });
+});
+
+const composerOf = (tree: ReactTestRenderer) =>
+  tree.root.find(node => (node.type as string) === 'ChatComposer').props as {
+    variant: string;
+    onModelSelect: (model: string, variant: string) => void;
+    onSend: (text: string) => void;
+  };
+
+describe('the thinking effort of a chat', () => {
+  const backend: StoredChatBackend = {
+    id: 'reasoner',
+    revision: 1,
+    name: 'Reasoner',
+    baseUrl: 'https://reasoner.example/v1',
+    apiKind: 'chat_completions',
+    apiKey: '',
+    headers: {},
+    models: [{ id: 'r1', name: 'R1', tools: false, images: false, reasoning: true }],
+    allowLocalHttp: false,
+  };
+  const target = backendTargetId(backend, 'r1');
+  it('sends the effort the person picked', async () => {
+    state.status = 'idle';
+    state.model = target;
+    backendUi.profiles = [backend];
+    const tree = await mount();
+
+    act(() => {
+      composerOf(tree).onModelSelect(target, 'high');
+    });
+    act(() => {
+      composerOf(tree).onSend('Think hard');
+    });
+
+    expect(state.send).toHaveBeenCalledWith('Think hard', { model: target, effort: 'high' }, []);
+  });
+
+  it('shows the effort a reopened chat was opened with', async () => {
+    state.status = 'idle';
+    state.model = target;
+    state.effort = 'medium';
+    backendUi.profiles = [backend];
+    const tree = await mount();
+
+    expect(composerOf(tree).variant).toBe('medium');
+  });
+
+  it('sends no effort to a model that takes none', async () => {
+    state.status = 'idle';
+    state.model = target;
+    state.effort = 'high';
+    backendUi.profiles = [
+      {
+        ...backend,
+        models: [{ id: 'r1', name: 'R1', tools: false, images: false, reasoning: false }],
+      },
+    ];
+    const tree = await mount();
+
+    act(() => {
+      composerOf(tree).onSend('Plain');
+    });
+
+    expect(state.send).toHaveBeenCalledWith('Plain', { model: target, effort: null }, []);
   });
 });
 

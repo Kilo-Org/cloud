@@ -3365,7 +3365,6 @@
       "fieldName": "Ainm taispeána",
       "fieldUrl": "URL an fhreastalaí",
       "fieldUrlInvalid": "Cuir URL bailí freastalaí isteach.",
-      "fieldToken": "Comhartha Bearer (roghnach)",
       "enableServer": "Cumasaigh an freastalaí seo: {{name}}",
       "editServer": "Cuir an freastalaí in eagar",
       "deleteServer": "Scrios an freastalaí",
@@ -3385,6 +3384,18 @@
       "serverToolCount": "{{count}} uirlis",
       "serverUnreachable": "Níorbh fhéidir an freastalaí seo a shroicheadh",
       "serverOff": "Tá an freastalaí seo múchta"
+    },
+    "mcpOAuth": {
+      "authMethod": "Fíordheimhniú",
+      "authNone": "Gan síniú isteach",
+      "authBearer": "Comhartha Bearer",
+      "authOAuth": "Síniú isteach OAuth",
+      "fieldToken": "Comhartha",
+      "oauthHint": "Tar éis duit sábháil, tapáil $t(modelChat.mcpOAuth.signIn) ar an bhfreastalaí chun síniú isteach le do bhrabhsálaí.",
+      "serverNeedsSignIn": "Sínigh isteach chun an freastalaí seo a úsáid",
+      "signIn": "Sínigh isteach",
+      "signInA11y": "Sínigh isteach ar an bhfreastalaí seo: {{name}}",
+      "signInFailed": "Níorbh fhéidir síniú isteach ar {{name}}. Bain triail eile as."
     },
     "backends": {
       "title": "Cúlchórais chomhrá",
@@ -3539,6 +3550,9 @@
       "downloading": "Á híoslódáil…",
       "downloadProgress": "Á híoslódáil… {{percent}}%",
       "downloadFailed": "Níor críochnaíodh an íoslódáil. Seiceáil do nasc agus an spás stórála atá saor, agus bain triail eile as."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tacaíonn an tsamhail seo le leibhéal machnaimh"
     }
   },
   "settingsTools": {

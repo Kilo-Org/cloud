@@ -3242,7 +3242,6 @@
       "fieldName": "Ցուցադրվող անուն",
       "fieldUrl": "Սերվերի URL",
       "fieldUrlInvalid": "Մուտքագրեք սերվերի վավեր URL։",
-      "fieldToken": "Bearer թոքեն (ըստ ցանկության)",
       "enableServer": "Միացնել այս սերվերը: {{name}}",
       "editServer": "Խմբագրել սերվերը",
       "deleteServer": "Ջնջել սերվերը",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} գործիք",
       "serverUnreachable": "Չհաջողվեց հասնել այս սերվերին",
       "serverOff": "Այս սերվերն անջատված է"
+    },
+    "mcpOAuth": {
+      "authMethod": "Նույնականացում",
+      "authNone": "Առանց մուտքի",
+      "authBearer": "Bearer թոքեն",
+      "authOAuth": "OAuth մուտք",
+      "fieldToken": "Թոքեն",
+      "oauthHint": "Պահպանելուց հետո սերվերի վրա հպիր $t(modelChat.mcpOAuth.signIn)՝ դիտարկիչով մուտք գործելու համար։",
+      "serverNeedsSignIn": "Մուտք գործիր՝ այս սերվերն օգտագործելու համար",
+      "signIn": "Մուտք գործել",
+      "signInA11y": "Մուտք գործել այս սերվեր: {{name}}",
+      "signInFailed": "Չհաջողվեց մուտք գործել {{name}}։ Կրկին փորձիր։"
     },
     "backends": {
       "title": "Զրույցի սերվերային ծառայություններ",
@@ -3416,6 +3427,9 @@
       "downloading": "Ներբեռնվում է…",
       "downloadProgress": "Ներբեռնվում է… {{percent}}%",
       "downloadFailed": "Ներբեռնումը չավարտվեց։ Ստուգեք կապը և ազատ հիշողությունը, ապա փորձեք կրկին։"
+    },
+    "reasoningEffort": {
+      "modelFlag": "Այս մոդելն աջակցում է մտածելու խորությունը"
     }
   },
   "settingsTools": {

@@ -3396,7 +3396,6 @@
       "fieldName": "Display name",
       "fieldUrl": "Server URL",
       "fieldUrlInvalid": "Enter a valid server URL.",
-      "fieldToken": "Bearer token (optional)",
       "enableServer": "Enable this server: {{name}}",
       "editServer": "Edit server",
       "deleteServer": "Delete server",
@@ -3416,6 +3415,21 @@
       "serverToolCount": "{{count}} tools",
       "serverUnreachable": "Couldn't reach this server",
       "serverOff": "This server is off"
+    },
+    "reasoningEffort": {
+      "modelFlag": "This model supports thinking effort"
+    },
+    "mcpOAuth": {
+      "authMethod": "Authentication",
+      "authNone": "No sign-in",
+      "authBearer": "Bearer token",
+      "authOAuth": "OAuth sign-in",
+      "fieldToken": "Token",
+      "oauthHint": "After you save, tap $t(modelChat.mcpOAuth.signIn) on the server to sign in with your browser.",
+      "serverNeedsSignIn": "Sign in to use this server",
+      "signIn": "Sign in",
+      "signInA11y": "Sign in to this server: {{name}}",
+      "signInFailed": "Couldn't sign in to {{name}}. Try again."
     }
   },
   "settingsTools": {

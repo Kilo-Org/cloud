@@ -2162,7 +2162,7 @@ describe('processGooglePlayKiloPassNotification', () => {
             returning,
             canceled,
             start,
-            bonusPercent: returning || start === '2026-10-09T00:00:00.000Z' ? 0.05 : 0.5,
+            bonusPercent: returning ? 0.05 : start === '2026-10-09T00:00:00.000Z' ? 0.1 : 0.5,
           }))
         )
       )

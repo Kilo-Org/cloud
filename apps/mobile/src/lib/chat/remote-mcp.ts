@@ -3,13 +3,13 @@ import { type Tool } from '@kilocode/harness-sdk';
 import {
   type RemoteMcpClientDeps,
   RemoteMcpError,
-  type RemoteMcpServer,
   remoteMcpTools,
 } from '@kilocode/harness-sdk/plugins/remote-mcp';
 
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 
+import { credentialDeps, serverValue } from './remote-mcp-credentials';
 import {
   connectingOf,
   type RemoteMcpDiscovery,
@@ -35,7 +35,7 @@ import { type ChatPlace } from './scope';
  * `remoteMcpTools`, and keeps the answer per server so a screen can draw it and
  * a session can be opened with the names.
  *
- * The token is never held here. It is read from the stored server by id each
+ * The token is never held here (see `remote-mcp-credentials.ts`). It is read from the stored server by id each
  * time the accessor is asked, so a rotated one is used rather than the one
  * captured at discovery, and a discovery is cached against the config and the
  * auth epoch — never against a token. A disabled server contributes no tool
@@ -98,56 +98,25 @@ function keyFor(place: ChatPlace): string {
   return `${place.chatScope}\u0000${String(currentAuthEpoch())}\u0000${config}`;
 }
 
-/** The server as the SDK knows it: an id, a name, a URL and how it wants a credential. */
-function serverValue(server: StoredRemoteMcpServer): RemoteMcpServer {
-  return {
-    id: server.id,
-    name: server.name,
-    url: server.url,
-    auth: { type: server.auth.type },
-  };
-}
-
-/**
- * The credential for one call, asked each time so a rotated token is used
- * instead of the one captured at discovery. A server that wants none has no
- * accessor. A bearer server whose stored token is gone is reported as
- * unauthorized rather than as an anonymous request.
- */
-function tokenOf(serverId: string): Effect.Effect<string, RemoteMcpError> {
-  const stored = listRemoteMcpServers().find(entry => entry.id === serverId);
-  const token = stored?.auth.type === 'bearer' ? stored.auth.token : undefined;
-  if (token === undefined) {
-    return Effect.fail(
-      new RemoteMcpError({ serverId, kind: 'unauthorized', cause: 'the stored token is gone' })
-    );
-  }
-  return Effect.succeed(token);
-}
-
-function tokenFor(
-  server: StoredRemoteMcpServer
-): (() => Effect.Effect<string, RemoteMcpError>) | undefined {
-  if (server.auth.type !== 'bearer') {
-    return undefined;
-  }
-  const serverId = server.id;
-  return () => tokenOf(serverId);
-}
-
-/** The deps one discovery runs with, with the token omitted for a server that wants none. */
+/** The deps one discovery runs with. */
 function depsFor(
   server: StoredRemoteMcpServer,
   timeoutMs: number,
   started: number
 ): RemoteMcpClientDeps {
-  const deps: RemoteMcpClientDeps = {
+  return {
     fetch,
     discoverTimeoutMs: timeoutMs,
-    onCallFailure: lostConnection(server.id, started),
+    onCallFailure: lostConnection(server, started),
+    ...credentialDeps(server),
   };
-  const token = tokenFor(server);
-  return token === undefined ? deps : { ...deps, token };
+}
+
+/** What a failed discovery or call leaves: an OAuth server that refused needs a person. */
+function failureOf(server: StoredRemoteMcpServer, error: RemoteMcpError): RemoteMcpDiscovery {
+  return server.auth.type === 'oauth' && error.kind === 'unauthorized'
+    ? { tools: [], failed: true, signIn: true }
+    : { tools: [], failed: true };
 }
 
 /**
@@ -158,13 +127,16 @@ function depsFor(
  * to reach the server again. A sign-out, or a server disabled while the call
  * was out, wins: its failure is not published.
  */
-function lostConnection(serverId: string, started: number): () => void {
-  return () => {
-    if (started !== generation || !stillEnabled(serverId)) {
+function lostConnection(
+  server: StoredRemoteMcpServer,
+  started: number
+): (error: RemoteMcpError) => void {
+  return error => {
+    if (started !== generation || !stillEnabled(server.id)) {
       return;
     }
-    discovered.set(serverId, { tools: [], failed: true });
-    pending.delete(serverId);
+    discovered.set(server.id, failureOf(server, error));
+    pending.delete(server.id);
     publish();
   };
 }
@@ -201,7 +173,10 @@ async function discover(
     publish();
     return;
   }
-  discovered.set(server.id, outcome.ok ? { tools: outcome.tools } : { tools: [], failed: true });
+  discovered.set(
+    server.id,
+    outcome.ok ? { tools: outcome.tools } : failureOf(server, outcome.error)
+  );
   publish();
 }
 

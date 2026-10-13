@@ -3242,7 +3242,6 @@
       "fieldName": "Igama eliboniswayo",
       "fieldUrl": "URL yeseva",
       "fieldUrlInvalid": "Faka i-URL yeseva evumelekile.",
-      "fieldToken": "Ithokheni ye-Bearer (okukhethayo)",
       "enableServer": "Nika amandla le seve: {{name}}",
       "editServer": "Hlela iseva",
       "deleteServer": "Susa iseva",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "amathuluzi angu-{{count}}",
       "serverUnreachable": "Ayikwazanga ukufinyelela le seve",
       "serverOff": "Le seve ivaliwe"
+    },
+    "mcpOAuth": {
+      "authMethod": "Ukuqinisekisa",
+      "authNone": "Akukho ukungena",
+      "authBearer": "Ithokheni ye-Bearer",
+      "authOAuth": "Ukungena nge-OAuth",
+      "fieldToken": "Ithokheni",
+      "oauthHint": "Ngemva kokulondoloza, thepha u-$t(modelChat.mcpOAuth.signIn) kuseve ukuze ungene ngesiphequluli sakho.",
+      "serverNeedsSignIn": "Ngena ukuze usebenzise le seve",
+      "signIn": "Ngena",
+      "signInA11y": "Ngena kule seve: {{name}}",
+      "signInFailed": "Ayikwazanga ukungena ku-{{name}}. Zama futhi."
     },
     "backends": {
       "title": "Izinhlelo ezingemuva zengxoxo",
@@ -3416,6 +3427,9 @@
       "downloading": "Iyadawuniloda…",
       "downloadProgress": "Iyadawuniloda… {{percent}}%",
       "downloadFailed": "Ukudawuniloda akuqedanga. Hlola uxhumano lwakho nendawo yokugcina ekhululekile, bese uzama futhi."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Le modeli isekela umzamo wokucabanga"
     }
   },
   "settingsTools": {

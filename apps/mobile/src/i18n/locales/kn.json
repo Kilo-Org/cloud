@@ -3242,7 +3242,6 @@
       "fieldName": "ಪ್ರದರ್ಶಿತ ಹೆಸರು",
       "fieldUrl": "ಸರ್ವರ್ URL",
       "fieldUrlInvalid": "ಮಾನ್ಯ ಸರ್ವರ್ URL ನಮೂದಿಸಿ.",
-      "fieldToken": "Bearer ಟೋಕನ್ (ಐಚ್ಛಿಕ)",
       "enableServer": "ಈ ಸರ್ವರ್ ಸಕ್ರಿಯಗೊಳಿಸಿ: {{name}}",
       "editServer": "ಸರ್ವರ್ ಸಂಪಾದಿಸಿ",
       "deleteServer": "ಸರ್ವರ್ ಅಳಿಸಿ",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} ಸಾಧನಗಳು",
       "serverUnreachable": "ಈ ಸರ್ವರ್ ತಲುಪಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "serverOff": "ಈ ಸರ್ವರ್ ಆಫ್ ಆಗಿದೆ"
+    },
+    "mcpOAuth": {
+      "authMethod": "ದೃಢೀಕರಣ",
+      "authNone": "ಸೈನ್ ಇನ್ ಇಲ್ಲ",
+      "authBearer": "Bearer ಟೋಕನ್",
+      "authOAuth": "OAuth ಸೈನ್ ಇನ್",
+      "fieldToken": "ಟೋಕನ್",
+      "oauthHint": "ಉಳಿಸಿದ ನಂತರ, ನಿಮ್ಮ ಬ್ರೌಸರ್ ಮೂಲಕ ಸೈನ್ ಇನ್ ಮಾಡಲು ಸರ್ವರ್‌ನಲ್ಲಿ $t(modelChat.mcpOAuth.signIn) ಟ್ಯಾಪ್ ಮಾಡಿ.",
+      "serverNeedsSignIn": "ಈ ಸರ್ವರ್ ಬಳಸಲು ಸೈನ್ ಇನ್ ಮಾಡಿ",
+      "signIn": "ಸೈನ್ ಇನ್",
+      "signInA11y": "ಈ ಸರ್ವರ್‌ಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿ: {{name}}",
+      "signInFailed": "{{name}} ಗೆ ಸೈನ್ ಇನ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
     "backends": {
       "title": "ಚಾಟ್ ಬ್ಯಾಕೆಂಡ್‌ಗಳು",
@@ -3416,6 +3427,9 @@
       "downloading": "ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
       "downloadProgress": "ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ… {{percent}}%",
       "downloadFailed": "ಡೌನ್‌ಲೋಡ್ ಪೂರ್ಣಗೊಳ್ಳಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕ ಮತ್ತು ಖಾಲಿ ಸಂಗ್ರಹಣೆಯನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ಈ ಮಾದರಿ ಯೋಚನೆಯ ಮಟ್ಟವನ್ನು ಬೆಂಬಲಿಸುತ್ತದೆ"
     }
   },
   "settingsTools": {

@@ -3242,7 +3242,6 @@
       "fieldName": "Orúkọ tí a fi hàn",
       "fieldUrl": "URL sáfà",
       "fieldUrlInvalid": "Tẹ URL sáfà tí ó tọ́ sí.",
-      "fieldToken": "Tọ́kẹ̀nì Bearer (àṣàyàn)",
       "enableServer": "Mú sáfà yìí ṣiṣẹ́: {{name}}",
       "editServer": "Ṣàtúnṣe sáfà",
       "deleteServer": "Pa sáfà rẹ́",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "irinṣẹ́ {{count}}",
       "serverUnreachable": "A kò lè dé sáfà yìí",
       "serverOff": "Sáfà yìí ti pa"
+    },
+    "mcpOAuth": {
+      "authMethod": "Ìjẹ́rìísí",
+      "authNone": "Kò sí ìwọlé",
+      "authBearer": "Tọ́kẹ̀nì Bearer",
+      "authOAuth": "Ìwọlé OAuth",
+      "fieldToken": "Tọ́kẹ̀nì",
+      "oauthHint": "Lẹ́yìn tí o bá fipamọ́, tẹ $t(modelChat.mcpOAuth.signIn) lórí sáfà náà láti wọlé pẹ̀lú aṣàwákiri rẹ.",
+      "serverNeedsSignIn": "Wọlé láti lo sáfà yìí",
+      "signIn": "Wọlé",
+      "signInA11y": "Wọlé sí sáfà yìí: {{name}}",
+      "signInFailed": "A kò lè wọlé sí {{name}}. Tún gbìyànjú."
     },
     "backends": {
       "title": "Àwọn ètò ẹ̀yìn ìjíròrò",
@@ -3416,6 +3427,9 @@
       "downloading": "Ó ń gbà sílẹ̀…",
       "downloadProgress": "Ó ń gbà sílẹ̀… {{percent}}%",
       "downloadFailed": "Ìgbàsílẹ̀ náà kò parí. Ṣàyẹ̀wò ìsopọ̀ rẹ àti àyè ìpamọ́ tó ṣófo, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Awoṣe yìí ṣe àtìlẹ́yìn fún ìwọ̀n ìrònú"
     }
   },
   "settingsTools": {

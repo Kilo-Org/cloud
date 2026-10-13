@@ -3283,7 +3283,6 @@
       "fieldName": "Nom que es mostra",
       "fieldUrl": "URL del servidor",
       "fieldUrlInvalid": "Introdueix una URL de servidor vàlida.",
-      "fieldToken": "Testimoni Bearer (opcional)",
       "enableServer": "Activa aquest servidor: {{name}}",
       "editServer": "Edita el servidor",
       "deleteServer": "Elimina el servidor",
@@ -3303,6 +3302,18 @@
       "serverToolCount": "{{count}} eines",
       "serverUnreachable": "No s'ha pogut contactar amb aquest servidor",
       "serverOff": "Aquest servidor està desactivat"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autenticació",
+      "authNone": "Sense inici de sessió",
+      "authBearer": "Testimoni Bearer",
+      "authOAuth": "Inici de sessió OAuth",
+      "fieldToken": "Testimoni",
+      "oauthHint": "Després de desar, toca $t(modelChat.mcpOAuth.signIn) al servidor per iniciar la sessió amb el navegador.",
+      "serverNeedsSignIn": "Inicia la sessió per utilitzar aquest servidor",
+      "signIn": "Inicia la sessió",
+      "signInA11y": "Inicia la sessió en aquest servidor: {{name}}",
+      "signInFailed": "No s'ha pogut iniciar la sessió a {{name}}. Torna-ho a provar."
     },
     "backends": {
       "title": "Servidors de xat",
@@ -3457,6 +3468,9 @@
       "downloading": "S'està baixant…",
       "downloadProgress": "S'està baixant… {{percent}}%",
       "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Aquest model admet l'esforç de raonament"
     }
   },
   "settingsTools": {

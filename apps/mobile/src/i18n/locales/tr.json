@@ -3242,7 +3242,6 @@
       "fieldName": "Görünen ad",
       "fieldUrl": "Sunucu URL'si",
       "fieldUrlInvalid": "Geçerli bir sunucu URL'si girin.",
-      "fieldToken": "Bearer belirteci (isteğe bağlı)",
       "enableServer": "Bu sunucuyu etkinleştir: {{name}}",
       "editServer": "Sunucuyu düzenle",
       "deleteServer": "Sunucuyu sil",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} araç",
       "serverUnreachable": "Bu sunucuya ulaşılamadı",
       "serverOff": "Bu sunucu kapalı"
+    },
+    "mcpOAuth": {
+      "authMethod": "Kimlik doğrulama",
+      "authNone": "Oturum açma yok",
+      "authBearer": "Bearer belirteci",
+      "authOAuth": "OAuth ile oturum açma",
+      "fieldToken": "Belirteç",
+      "oauthHint": "Kaydettikten sonra tarayıcınla oturum açmak için sunucuda $t(modelChat.mcpOAuth.signIn) seçeneğine dokun.",
+      "serverNeedsSignIn": "Bu sunucuyu kullanmak için oturum aç",
+      "signIn": "Oturum aç",
+      "signInA11y": "Bu sunucuda oturum aç: {{name}}",
+      "signInFailed": "{{name}} sunucusunda oturum açılamadı. Tekrar dene."
     },
     "backends": {
       "title": "Sohbet arka uçları",
@@ -3416,6 +3427,9 @@
       "downloading": "İndiriliyor…",
       "downloadProgress": "İndiriliyor… %{{percent}}",
       "downloadFailed": "İndirme tamamlanamadı. Bağlantınızı ve boş depolama alanınızı kontrol edip yeniden deneyin."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Bu model düşünme düzeyini destekler"
     }
   },
   "settingsTools": {

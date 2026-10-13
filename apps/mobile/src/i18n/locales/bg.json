@@ -3242,7 +3242,6 @@
       "fieldName": "Показвано име",
       "fieldUrl": "URL на сървъра",
       "fieldUrlInvalid": "Въведете валиден URL на сървъра.",
-      "fieldToken": "Bearer токен (по избор)",
       "enableServer": "Активиране на този сървър: {{name}}",
       "editServer": "Редактиране на сървъра",
       "deleteServer": "Изтриване на сървъра",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} инструмента",
       "serverUnreachable": "Неуспешно свързване с този сървър",
       "serverOff": "Този сървър е изключен"
+    },
+    "mcpOAuth": {
+      "authMethod": "Удостоверяване",
+      "authNone": "Без вход",
+      "authBearer": "Bearer токен",
+      "authOAuth": "Вход с OAuth",
+      "fieldToken": "Токен",
+      "oauthHint": "След като запазиш, докосни $t(modelChat.mcpOAuth.signIn) при сървъра, за да влезеш чрез браузъра си.",
+      "serverNeedsSignIn": "Влез, за да използваш този сървър",
+      "signIn": "Вход",
+      "signInA11y": "Вход в този сървър: {{name}}",
+      "signInFailed": "Неуспешен вход в {{name}}. Опитай отново."
     },
     "backends": {
       "title": "Сървъри за чат",
@@ -3416,6 +3427,9 @@
       "downloading": "Изтегляне…",
       "downloadProgress": "Изтегляне… {{percent}}%",
       "downloadFailed": "Изтеглянето не завърши. Проверете връзката и свободното място, след което опитайте отново."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Този модел поддържа усилие за разсъждение"
     }
   },
   "settingsTools": {

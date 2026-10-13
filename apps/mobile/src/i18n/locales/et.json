@@ -3242,7 +3242,6 @@
       "fieldName": "Kuvatav nimi",
       "fieldUrl": "Serveri URL",
       "fieldUrlInvalid": "Sisesta kehtiv serveri URL.",
-      "fieldToken": "Beareri tunnus (valikuline)",
       "enableServer": "Luba see server: {{name}}",
       "editServer": "Muuda serverit",
       "deleteServer": "Kustuta server",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} tööriista",
       "serverUnreachable": "Selle serverini ei õnnestunud jõuda",
       "serverOff": "See server on välja lülitatud"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentimine",
+      "authNone": "Sisselogimiseta",
+      "authBearer": "Beareri tunnus",
+      "authOAuth": "OAuth-sisselogimine",
+      "fieldToken": "Tunnus",
+      "oauthHint": "Pärast salvestamist puuduta serveri juures nuppu $t(modelChat.mcpOAuth.signIn), et brauseri kaudu sisse logida.",
+      "serverNeedsSignIn": "Selle serveri kasutamiseks logi sisse",
+      "signIn": "Logi sisse",
+      "signInA11y": "Logi sellesse serverisse sisse: {{name}}",
+      "signInFailed": "Serverisse {{name}} ei õnnestunud sisse logida. Proovi uuesti."
     },
     "backends": {
       "title": "Vestluse taustsüsteemid",
@@ -3416,6 +3427,9 @@
       "downloading": "Allalaadimine…",
       "downloadProgress": "Allalaadimine… {{percent}}%",
       "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti."
+    },
+    "reasoningEffort": {
+      "modelFlag": "See mudel toetab mõtlemise põhjalikkust"
     }
   },
   "settingsTools": {

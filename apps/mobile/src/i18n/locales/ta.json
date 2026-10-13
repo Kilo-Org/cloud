@@ -3242,7 +3242,6 @@
       "fieldName": "காட்டப்படும் பெயர்",
       "fieldUrl": "சேவையக URL",
       "fieldUrlInvalid": "செல்லுபடியாகும் சேவையக URL உள்ளிடவும்.",
-      "fieldToken": "Bearer டோக்கன் (விருப்பம்)",
       "enableServer": "இந்தச் சேவையகத்தை இயக்கு: {{name}}",
       "editServer": "சேவையகத்தைத் திருத்து",
       "deleteServer": "சேவையகத்தை நீக்கு",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} கருவிகள்",
       "serverUnreachable": "இந்தச் சேவையகத்தை அணுக முடியவில்லை",
       "serverOff": "இந்தச் சேவையகம் அணைக்கப்பட்டுள்ளது"
+    },
+    "mcpOAuth": {
+      "authMethod": "அங்கீகாரம்",
+      "authNone": "உள்நுழைவு இல்லை",
+      "authBearer": "Bearer டோக்கன்",
+      "authOAuth": "OAuth உள்நுழைவு",
+      "fieldToken": "டோக்கன்",
+      "oauthHint": "சேமித்த பிறகு, உங்கள் உலாவி மூலம் உள்நுழைய சேவையகத்தில் $t(modelChat.mcpOAuth.signIn) என்பதைத் தட்டவும்.",
+      "serverNeedsSignIn": "இந்தச் சேவையகத்தைப் பயன்படுத்த உள்நுழையவும்",
+      "signIn": "உள்நுழை",
+      "signInA11y": "இந்தச் சேவையகத்தில் உள்நுழையவும்: {{name}}",
+      "signInFailed": "{{name}} இல் உள்நுழைய முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
     },
     "backends": {
       "title": "அரட்டைப் பின்தளங்கள்",
@@ -3416,6 +3427,9 @@
       "downloading": "பதிவிறங்குகிறது…",
       "downloadProgress": "பதிவிறங்குகிறது… {{percent}}%",
       "downloadFailed": "பதிவிறக்கம் முடியவில்லை. உங்கள் இணைப்பையும் காலியிடத்தையும் சரிபார்த்து, மீண்டும் முயலவும்."
+    },
+    "reasoningEffort": {
+      "modelFlag": "இந்த மாதிரி சிந்தனை அளவை ஆதரிக்கிறது"
     }
   },
   "settingsTools": {

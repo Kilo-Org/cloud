@@ -3242,7 +3242,6 @@
       "fieldName": "Non ki parèt",
       "fieldUrl": "URL sèvè a",
       "fieldUrlInvalid": "Antre yon URL sèvè ki valab.",
-      "fieldToken": "Token Bearer (opsyonèl)",
       "enableServer": "Aktive sèvè sa a: {{name}}",
       "editServer": "Modifye sèvè a",
       "deleteServer": "Efase sèvè a",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} zouti",
       "serverUnreachable": "Nou pa t kapab rive jwenn sèvè sa a",
       "serverOff": "Sèvè sa a etenn"
+    },
+    "mcpOAuth": {
+      "authMethod": "Otantifikasyon",
+      "authNone": "San koneksyon",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Koneksyon OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Apre w fin anrejistre, tape $t(modelChat.mcpOAuth.signIn) sou sèvè a pou w konekte ak navigatè w la.",
+      "serverNeedsSignIn": "Konekte pou w sèvi ak sèvè sa a",
+      "signIn": "Konekte",
+      "signInA11y": "Konekte nan sèvè sa a: {{name}}",
+      "signInFailed": "Nou pa t kapab konekte nan {{name}}. Eseye ankò."
     },
     "backends": {
       "title": "Sèvis chat yo",
@@ -3416,6 +3427,9 @@
       "downloading": "Ap telechaje…",
       "downloadProgress": "Ap telechaje… {{percent}}%",
       "downloadFailed": "Telechajman an pa t fini. Verifye koneksyon w ak espas ki lib sou aparèy la, epi eseye ankò."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Modèl sa a sipòte efò refleksyon"
     }
   },
   "settingsTools": {

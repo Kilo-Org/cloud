@@ -3242,7 +3242,6 @@
       "fieldName": "دکھایا جانے والا نام",
       "fieldUrl": "سرور URL",
       "fieldUrlInvalid": "درست سرور URL درج کریں۔",
-      "fieldToken": "Bearer ٹوکن (اختیاری)",
       "enableServer": "اس سرور کو فعال کریں: {{name}}",
       "editServer": "سرور میں ترمیم کریں",
       "deleteServer": "سرور حذف کریں",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} ٹولز",
       "serverUnreachable": "اس سرور تک نہیں پہنچ سکا",
       "serverOff": "یہ سرور بند ہے"
+    },
+    "mcpOAuth": {
+      "authMethod": "تصدیق",
+      "authNone": "سائن ان کے بغیر",
+      "authBearer": "Bearer ٹوکن",
+      "authOAuth": "OAuth سائن ان",
+      "fieldToken": "ٹوکن",
+      "oauthHint": "محفوظ کرنے کے بعد، اپنے براؤزر سے سائن ان کرنے کے لیے سرور پر $t(modelChat.mcpOAuth.signIn) پر ٹیپ کریں۔",
+      "serverNeedsSignIn": "یہ سرور استعمال کرنے کے لیے سائن ان کریں",
+      "signIn": "سائن ان کریں",
+      "signInA11y": "اس سرور میں سائن ان کریں: {{name}}",
+      "signInFailed": "{{name}} میں سائن ان نہیں ہو سکا۔ دوبارہ کوشش کریں۔"
     },
     "backends": {
       "title": "چیٹ بیک اینڈز",
@@ -3416,6 +3427,9 @@
       "downloading": "ڈاؤن لوڈ ہو رہا ہے…",
       "downloadProgress": "ڈاؤن لوڈ ہو رہا ہے… {{percent}}%",
       "downloadFailed": "ڈاؤن لوڈ مکمل نہیں ہوا۔ اپنا کنکشن اور خالی اسٹوریج چیک کریں، پھر دوبارہ کوشش کریں۔"
+    },
+    "reasoningEffort": {
+      "modelFlag": "یہ ماڈل غور کی سطح کو سپورٹ کرتا ہے"
     }
   },
   "settingsTools": {

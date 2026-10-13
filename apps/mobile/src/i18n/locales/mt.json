@@ -3365,7 +3365,6 @@
       "fieldName": "Isem muri",
       "fieldUrl": "URL tas-server",
       "fieldUrlInvalid": "Daħħal URL tas-server validu.",
-      "fieldToken": "Token Bearer (mhux obbligatorju)",
       "enableServer": "Ippermetti dan is-server: {{name}}",
       "editServer": "Editja s-server",
       "deleteServer": "Ħassar is-server",
@@ -3385,6 +3384,18 @@
       "serverToolCount": "{{count}} għodod",
       "serverUnreachable": "Ma setax jintlaħaq dan is-server",
       "serverOff": "Dan is-server huwa mitfi"
+    },
+    "mcpOAuth": {
+      "authMethod": "Awtentikazzjoni",
+      "authNone": "Mingħajr dħul",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Dħul bl-OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Wara li tissejvja, agħfas $t(modelChat.mcpOAuth.signIn) fuq is-server biex tidħol permezz tal-browser tiegħek.",
+      "serverNeedsSignIn": "Idħol biex tuża dan is-server",
+      "signIn": "Idħol",
+      "signInA11y": "Idħol f'dan is-server: {{name}}",
+      "signInFailed": "Ma stajtx tidħol f'{{name}}. Erġa' pprova."
     },
     "backends": {
       "title": "Servizzi taċ-chat",
@@ -3539,6 +3550,9 @@
       "downloading": "Qed jitniżżel…",
       "downloadProgress": "Qed jitniżżel… {{percent}}%",
       "downloadFailed": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni u l-ispazju ħieles, imbagħad erġa' pprova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"
     }
   },
   "settingsTools": {

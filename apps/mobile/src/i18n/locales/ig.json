@@ -3242,7 +3242,6 @@
       "fieldName": "Aha a na-egosi",
       "fieldUrl": "URL sava",
       "fieldUrlInvalid": "Tinye URL sava ziri ezi.",
-      "fieldToken": "Token Bearer (nhọrọ)",
       "enableServer": "Mee ka sava a rụọ ọrụ: {{name}}",
       "editServer": "Dezie sava",
       "deleteServer": "Hichapụ sava",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "ngwá ọrụ {{count}}",
       "serverUnreachable": "Enweghị ike iru sava a",
       "serverOff": "Sava a agbanyụrụ"
+    },
+    "mcpOAuth": {
+      "authMethod": "Nkwenye njirimara",
+      "authNone": "Enweghị ịbanye",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Ịbanye OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Mgbe ị chekwasịrị, pịa $t(modelChat.mcpOAuth.signIn) na sava ahụ iji banye site na ihe nchọgharị gị.",
+      "serverNeedsSignIn": "Banye iji sava a",
+      "signIn": "Banye",
+      "signInA11y": "Banye na sava a: {{name}}",
+      "signInFailed": "Enweghị ike ịbanye na {{name}}. Nwaa ọzọ."
     },
     "backends": {
       "title": "Sava nkata",
@@ -3416,6 +3427,9 @@
       "downloading": "Na-ebudata…",
       "downloadProgress": "Na-ebudata… {{percent}}%",
       "downloadFailed": "Nbudata ahụ emezughị. Lelee njikọ gị na ebe nchekwa tọgbọrọ chakoo, wee nwaa ọzọ."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ihe nlereanya a na-akwado mgbalị iche echiche"
     }
   },
   "settingsTools": {

@@ -3242,7 +3242,6 @@
       "fieldName": "Tên hiển thị",
       "fieldUrl": "URL máy chủ",
       "fieldUrlInvalid": "Nhập URL máy chủ hợp lệ.",
-      "fieldToken": "Mã Bearer (không bắt buộc)",
       "enableServer": "Bật máy chủ này: {{name}}",
       "editServer": "Sửa máy chủ",
       "deleteServer": "Xóa máy chủ",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} công cụ",
       "serverUnreachable": "Không thể kết nối với máy chủ này",
       "serverOff": "Máy chủ này đang tắt"
+    },
+    "mcpOAuth": {
+      "authMethod": "Xác thực",
+      "authNone": "Không đăng nhập",
+      "authBearer": "Mã Bearer",
+      "authOAuth": "Đăng nhập OAuth",
+      "fieldToken": "Mã",
+      "oauthHint": "Sau khi lưu, nhấn $t(modelChat.mcpOAuth.signIn) trên máy chủ để đăng nhập bằng trình duyệt.",
+      "serverNeedsSignIn": "Đăng nhập để dùng máy chủ này",
+      "signIn": "Đăng nhập",
+      "signInA11y": "Đăng nhập vào máy chủ này: {{name}}",
+      "signInFailed": "Không thể đăng nhập vào {{name}}. Hãy thử lại."
     },
     "backends": {
       "title": "Máy chủ trò chuyện",
@@ -3416,6 +3427,9 @@
       "downloading": "Đang tải xuống…",
       "downloadProgress": "Đang tải xuống… {{percent}}%",
       "downloadFailed": "Quá trình tải xuống chưa hoàn tất. Hãy kiểm tra kết nối và dung lượng trống, sau đó thử lại."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"
     }
   },
   "settingsTools": {

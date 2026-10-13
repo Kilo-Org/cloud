@@ -122,7 +122,10 @@ function ScopedChatListScreen() {
     setStarting(true);
     void (async () => {
       try {
-        const sessionId = await newChat(place, model);
+        const sessionId = await newChat(place, {
+          model,
+          effort: null,
+        });
         // Whatever the last attempt failed with is moot once a chat starts.
         toast.dismiss('chat-start-failed');
         router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);

@@ -3242,7 +3242,6 @@
       "fieldName": "Erakusteko izena",
       "fieldUrl": "Zerbitzariaren URLa",
       "fieldUrlInvalid": "Sartu baliozko zerbitzari URLa.",
-      "fieldToken": "Bearer tokena (aukerakoa)",
       "enableServer": "Gaitu zerbitzari hau: {{name}}",
       "editServer": "Editatu zerbitzaria",
       "deleteServer": "Ezabatu zerbitzaria",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} tresna",
       "serverUnreachable": "Ezin izan da zerbitzari honetara iritsi",
       "serverOff": "Zerbitzari hau desgaituta dago"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikazioa",
+      "authNone": "Saio-hasierarik gabe",
+      "authBearer": "Bearer tokena",
+      "authOAuth": "OAuth saio-hasiera",
+      "fieldToken": "Tokena",
+      "oauthHint": "Gorde ondoren, sakatu $t(modelChat.mcpOAuth.signIn) zerbitzarian, nabigatzailearekin saioa hasteko.",
+      "serverNeedsSignIn": "Hasi saioa zerbitzari hau erabiltzeko",
+      "signIn": "Hasi saioa",
+      "signInA11y": "Hasi saioa zerbitzari honetan: {{name}}",
+      "signInFailed": "Ezin izan da saioa hasi hemen: {{name}}. Saiatu berriro."
     },
     "backends": {
       "title": "Txaten atzeko zerbitzuak",
@@ -3416,6 +3427,9 @@
       "downloading": "Deskargatzen…",
       "downloadProgress": "Deskargatzen… %{{percent}}",
       "downloadFailed": "Deskarga ez da amaitu. Egiaztatu konexioa eta biltegiratze-toki librea, eta saiatu berriro."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Modelo honek arrazoiketa-ahalegina onartzen du"
     }
   },
   "settingsTools": {

@@ -3283,7 +3283,6 @@
       "fieldName": "Nombre mostrado",
       "fieldUrl": "URL del servidor",
       "fieldUrlInvalid": "Introduce una URL de servidor válida.",
-      "fieldToken": "Token Bearer (opcional)",
       "enableServer": "Activar este servidor: {{name}}",
       "editServer": "Editar servidor",
       "deleteServer": "Eliminar servidor",
@@ -3303,6 +3302,18 @@
       "serverToolCount": "{{count}} herramientas",
       "serverUnreachable": "No se pudo contactar con este servidor",
       "serverOff": "Este servidor está desactivado"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autenticación",
+      "authNone": "Sin inicio de sesión",
+      "authBearer": "Token Bearer",
+      "authOAuth": "Inicio de sesión con OAuth",
+      "fieldToken": "Token",
+      "oauthHint": "Después de guardar, toca $t(modelChat.mcpOAuth.signIn) en el servidor para iniciar sesión con tu navegador.",
+      "serverNeedsSignIn": "Inicia sesión para usar este servidor",
+      "signIn": "Iniciar sesión",
+      "signInA11y": "Iniciar sesión en este servidor: {{name}}",
+      "signInFailed": "No se pudo iniciar sesión en {{name}}. Inténtalo de nuevo."
     },
     "backends": {
       "title": "Servicios de chat",
@@ -3457,6 +3468,9 @@
       "downloading": "Descargando…",
       "downloadProgress": "Descargando… {{percent}}%",
       "downloadFailed": "La descarga no se completó. Revisa tu conexión y el espacio libre, y vuelve a intentarlo."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Este modelo admite esfuerzo de razonamiento"
     }
   },
   "settingsTools": {

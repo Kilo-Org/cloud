@@ -3242,7 +3242,6 @@
       "fieldName": "ناوی پیشاندراو",
       "fieldUrl": "URL ی سێرڤەر",
       "fieldUrlInvalid": "URLی سێرڤەری دروست بنووسە.",
-      "fieldToken": "تۆکنی Bearer (ئارەزوومەندانە)",
       "enableServer": "چالاککردنی ئەم سێرڤەرە: {{name}}",
       "editServer": "دەستکاریکردنی سێرڤەر",
       "deleteServer": "سڕینەوەی سێرڤەر",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} ئامراز",
       "serverUnreachable": "نەتوانرا بگەیت بەم سێرڤەرە",
       "serverOff": "ئەم سێرڤەرە ناچالاکە"
+    },
+    "mcpOAuth": {
+      "authMethod": "ناسینەوە",
+      "authNone": "بێ چوونەژوورەوە",
+      "authBearer": "تۆکنی Bearer",
+      "authOAuth": "چوونەژوورەوە بە OAuth",
+      "fieldToken": "تۆکن",
+      "oauthHint": "دوای پاشەکەوتکردن، لەسەر سێرڤەرەکە کرتە لە $t(modelChat.mcpOAuth.signIn) بکە بۆ چوونەژوورەوە لە ڕێگەی وێبگەڕەکەتەوە.",
+      "serverNeedsSignIn": "بچۆ ژوورەوە بۆ بەکارهێنانی ئەم سێرڤەرە",
+      "signIn": "چوونەژوورەوە",
+      "signInA11y": "چوونەژوورەوە بۆ ئەم سێرڤەرە: {{name}}",
+      "signInFailed": "نەتوانرا بچیتە ژوورەوەی {{name}}. دووبارە هەوڵ بدەرەوە."
     },
     "backends": {
       "title": "سێرڤەرەکانی گفتوگۆ",
@@ -3416,6 +3427,9 @@
       "downloading": "دادەبەزێت…",
       "downloadProgress": "دادەبەزێت… {{percent}}%",
       "downloadFailed": "داگرتنەکە تەواو نەبوو. پەیوەندییەکەت و شوێنی بەتاڵی بیرگە بپشکنە، پاشان دووبارە هەوڵ بدەرەوە."
+    },
+    "reasoningEffort": {
+      "modelFlag": "ئەم مۆدێلە پشتگیری هەوڵی بیرکردنەوە دەکات"
     }
   },
   "settingsTools": {

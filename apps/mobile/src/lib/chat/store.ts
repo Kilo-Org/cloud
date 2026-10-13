@@ -12,7 +12,10 @@
  * `parts` tables the SDK's SQLite store plugin owns. The join is the point of
  * the file, and it is why the SQL is here in one place and nowhere else.
  */
+import { type Effort } from '@kilocode/harness-sdk';
 import { z } from 'zod';
+
+import { effortOf } from './effort';
 
 /** The tool names the SDK's store writes for a session: a JSON array of names. */
 const toolsSchema = z.array(z.string());
@@ -95,6 +98,15 @@ export function modelOfSession(db: ChatDatabase, sessionId: string): string | nu
     sessionId,
   ]);
   return rows[0]?.model ?? null;
+}
+
+/** The effort a session was opened with, which the SDK's store holds. */
+export function effortOfSession(db: ChatDatabase, sessionId: string): Effort | null {
+  const rows = db.getAllSync<{ effort: string | null }>(
+    'select effort from sessions where id = ?',
+    [sessionId]
+  );
+  return effortOf(rows[0]?.effort);
 }
 
 /**

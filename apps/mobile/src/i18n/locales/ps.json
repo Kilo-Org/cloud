@@ -3242,7 +3242,6 @@
       "fieldName": "ښکارېدونکی نوم",
       "fieldUrl": "د سرور URL",
       "fieldUrlInvalid": "د سرور سم URL ولیکئ.",
-      "fieldToken": "Bearer ټوکن (اختیاري)",
       "enableServer": "دا سرور فعال کړئ: {{name}}",
       "editServer": "سرور سم کړئ",
       "deleteServer": "سرور ړنګ کړئ",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} وسیلې",
       "serverUnreachable": "دې سرور ته رسېدل ممکن نه شول",
       "serverOff": "دا سرور بند دی"
+    },
+    "mcpOAuth": {
+      "authMethod": "تصدیق",
+      "authNone": "بې ننوتلو",
+      "authBearer": "Bearer ټوکن",
+      "authOAuth": "د OAuth له لارې ننوتل",
+      "fieldToken": "ټوکن",
+      "oauthHint": "له خوندي کولو وروسته، په سرور باندې $t(modelChat.mcpOAuth.signIn) ټک کړئ ترڅو د خپل براوزر له لارې ننوځئ.",
+      "serverNeedsSignIn": "د دې سرور کارولو لپاره ننوځئ",
+      "signIn": "ننوتل",
+      "signInA11y": "دې سرور ته ننوځئ: {{name}}",
+      "signInFailed": "{{name}} ته ننوتل ممکن نه شول. بیا هڅه وکړئ."
     },
     "backends": {
       "title": "د چټ شالید خدمتونه",
@@ -3416,6 +3427,9 @@
       "downloading": "ښکته کېږي…",
       "downloadProgress": "ښکته کېږي… {{percent}}%",
       "downloadFailed": "ښکته کول بشپړ نه شول. خپل اتصال او خالي ځای وګورئ، بیا هڅه وکړئ."
+    },
+    "reasoningEffort": {
+      "modelFlag": "دا ماډل د فکر کچه ملاتړ کوي"
     }
   },
   "settingsTools": {

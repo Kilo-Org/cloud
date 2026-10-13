@@ -3242,7 +3242,6 @@
       "fieldName": "Көрсетілетін атау",
       "fieldUrl": "Сервер URL мекенжайы",
       "fieldUrlInvalid": "Жарамды сервер URL мекенжайын енгізіңіз.",
-      "fieldToken": "Bearer токені (қосымша)",
       "enableServer": "Осы серверді қосу: {{name}}",
       "editServer": "Серверді өңдеу",
       "deleteServer": "Серверді жою",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} құрал",
       "serverUnreachable": "Осы серверге қосылу мүмкін болмады",
       "serverOff": "Осы сервер өшірулі"
+    },
+    "mcpOAuth": {
+      "authMethod": "Аутентификация",
+      "authNone": "Кірусіз",
+      "authBearer": "Bearer токені",
+      "authOAuth": "OAuth арқылы кіру",
+      "fieldToken": "Токен",
+      "oauthHint": "Сақтағаннан кейін браузер арқылы кіру үшін сервердегі $t(modelChat.mcpOAuth.signIn) түймесін түртіңіз.",
+      "serverNeedsSignIn": "Бұл серверді пайдалану үшін кіріңіз",
+      "signIn": "Кіру",
+      "signInA11y": "Осы серверге кіру: {{name}}",
+      "signInFailed": "{{name}} серверіне кіру мүмкін болмады. Қайталап көріңіз."
     },
     "backends": {
       "title": "Чаттың серверлік қызметтері",
@@ -3416,6 +3427,9 @@
       "downloading": "Жүктеп алынуда…",
       "downloadProgress": "Жүктеп алынуда… {{percent}}%",
       "downloadFailed": "Жүктеп алу аяқталмады. Интернет байланысын және бос жадты тексеріп, қайталап көріңіз."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Бұл модель ойлау деңгейін қолдайды"
     }
   },
   "settingsTools": {

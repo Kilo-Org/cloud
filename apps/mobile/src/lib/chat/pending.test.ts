@@ -31,14 +31,29 @@ beforeEach(() => {
 
 describe('titledByAsked', () => {
   it('names a chat whose only question failed with that question', async () => {
-    await rememberAsked('failed', { text: 'what is a monad', model: 'kilo/one', images: [] });
+    await rememberAsked('failed', {
+      text: 'what is a monad',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+    });
 
     expect(await titledByAsked([row('failed', '')])).toEqual([row('failed', 'what is a monad')]);
   });
 
   it('keeps the name or the first stored question over the one that waits', async () => {
-    await rememberAsked('renamed', { text: 'later question', model: 'kilo/one', images: [] });
-    await rememberAsked('answered', { text: 'later question', model: 'kilo/one', images: [] });
+    await rememberAsked('renamed', {
+      text: 'later question',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+    });
+    await rememberAsked('answered', {
+      text: 'later question',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+    });
 
     expect(
       await titledByAsked([row('renamed', 'Greetings'), row('answered', 'first question')])

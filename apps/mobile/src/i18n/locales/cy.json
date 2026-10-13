@@ -3406,7 +3406,6 @@
       "fieldName": "Enw dangos",
       "fieldUrl": "URL gweinydd",
       "fieldUrlInvalid": "Rhowch URL gweinydd dilys.",
-      "fieldToken": "Tocyn Bearer (dewisol)",
       "enableServer": "Galluogi'r gweinydd hwn: {{name}}",
       "editServer": "Golygu gweinydd",
       "deleteServer": "Dileu gweinydd",
@@ -3426,6 +3425,18 @@
       "serverToolCount": "{{count}} offeryn",
       "serverUnreachable": "Ni ellid cyrraedd y gweinydd hwn",
       "serverOff": "Mae'r gweinydd hwn i ffwrdd"
+    },
+    "mcpOAuth": {
+      "authMethod": "Dilysu",
+      "authNone": "Dim mewngofnodi",
+      "authBearer": "Tocyn Bearer",
+      "authOAuth": "Mewngofnodi OAuth",
+      "fieldToken": "Tocyn",
+      "oauthHint": "Ar ôl i chi gadw, tapiwch $t(modelChat.mcpOAuth.signIn) ar y gweinydd i fewngofnodi gyda'ch porwr.",
+      "serverNeedsSignIn": "Mewngofnodwch i ddefnyddio'r gweinydd hwn",
+      "signIn": "Mewngofnodi",
+      "signInA11y": "Mewngofnodi i'r gweinydd hwn: {{name}}",
+      "signInFailed": "Ni ellid mewngofnodi i {{name}}. Rhowch gynnig arall arni."
     },
     "backends": {
       "title": "Ôl-bennau sgwrs",
@@ -3580,6 +3591,9 @@
       "downloading": "Wrthi'n llwytho i lawr…",
       "downloadProgress": "Wrthi'n llwytho i lawr… {{percent}}%",
       "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"
     }
   },
   "settingsTools": {

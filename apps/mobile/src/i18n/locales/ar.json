@@ -3406,7 +3406,6 @@
       "fieldName": "الاسم المعروض",
       "fieldUrl": "عنوان URL للخادم",
       "fieldUrlInvalid": "أدخل عنوان URL صالحًا للخادم.",
-      "fieldToken": "رمز Bearer (اختياري)",
       "enableServer": "تفعيل هذا الخادم: {{name}}",
       "editServer": "تعديل الخادم",
       "deleteServer": "حذف الخادم",
@@ -3426,6 +3425,18 @@
       "serverToolCount": "{{count}} أدوات",
       "serverUnreachable": "تعذّر الوصول إلى هذا الخادم",
       "serverOff": "هذا الخادم متوقف"
+    },
+    "mcpOAuth": {
+      "authMethod": "المصادقة",
+      "authNone": "بدون تسجيل دخول",
+      "authBearer": "رمز Bearer",
+      "authOAuth": "تسجيل الدخول عبر OAuth",
+      "fieldToken": "الرمز",
+      "oauthHint": "بعد الحفظ، اضغط على $t(modelChat.mcpOAuth.signIn) في الخادم لتسجيل الدخول عبر المتصفح.",
+      "serverNeedsSignIn": "سجّل الدخول لاستخدام هذا الخادم",
+      "signIn": "تسجيل الدخول",
+      "signInA11y": "تسجيل الدخول إلى هذا الخادم: {{name}}",
+      "signInFailed": "تعذّر تسجيل الدخول إلى {{name}}. حاول مرة أخرى."
     },
     "backends": {
       "title": "خوادم الدردشة",
@@ -3580,6 +3591,9 @@
       "downloading": "جارٍ التنزيل…",
       "downloadProgress": "جارٍ التنزيل… {{percent}}%",
       "downloadFailed": "لم يكتمل التنزيل. تحقّق من اتصالك ومن توفر مساحة تخزين كافية، ثم حاول مرة أخرى."
+    },
+    "reasoningEffort": {
+      "modelFlag": "يدعم هذا النموذج جهد التفكير"
     }
   },
   "settingsTools": {

@@ -123,6 +123,7 @@ app's minSdk does not change.
 
 - **Manage backends** shows its status and why it is unavailable: Apple Intelligence off, device not eligible, model not ready, or iOS older than 26.
 - Apple's model receives the chat's tools through Foundation Models tool calling. When the model calls a tool, the generation waits, JavaScript runs the tool through the harness, and the next request resumes the same generation with the results. A tool whose arguments schema Foundation Models cannot express (a union, a reference, a map with free keys) is left out and logged; an optional argument of that kind is left out of its tool.
+- Apple's answer budget is at most half its context window. On iOS 26.4 and later, the native module also subtracts Apple's token count of the complete input (instructions, tools, history, and latest prompt) and reserves one eighth of the window for tool outputs and framing. Earlier iOS releases use a conservative UTF-8-byte input estimate. Requests with no answer space fail before generation. Very large tool outputs can still exhaust the reserve.
 - Gemini Nano is text-only: the ML Kit GenAI Prompt API has no function calling, so it never receives tool definitions.
 - An unavailable or busy model fails the send with fixed copy. It never falls back to Kilo or another backend.
 - Switching between Kilo, a custom backend, and an on-device model shows the context-transfer warning.

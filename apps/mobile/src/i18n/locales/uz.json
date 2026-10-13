@@ -3242,7 +3242,6 @@
       "fieldName": "Koʻrsatiladigan nom",
       "fieldUrl": "Server URL manzili",
       "fieldUrlInvalid": "Toʻgʻri server URL manzilini kiriting.",
-      "fieldToken": "Bearer tokeni (ixtiyoriy)",
       "enableServer": "Bu serverni yoqish: {{name}}",
       "editServer": "Serverni tahrirlash",
       "deleteServer": "Serverni oʻchirish",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "{{count}} vosita",
       "serverUnreachable": "Bu serverga yetib boʻlmadi",
       "serverOff": "Bu server oʻchirilgan"
+    },
+    "mcpOAuth": {
+      "authMethod": "Autentifikatsiya",
+      "authNone": "Kirishsiz",
+      "authBearer": "Bearer tokeni",
+      "authOAuth": "OAuth orqali kirish",
+      "fieldToken": "Token",
+      "oauthHint": "Saqlagandan soʻng brauzer orqali kirish uchun serverda $t(modelChat.mcpOAuth.signIn) tugmasini bosing.",
+      "serverNeedsSignIn": "Bu serverdan foydalanish uchun kiring",
+      "signIn": "Kirish",
+      "signInA11y": "Bu serverga kirish: {{name}}",
+      "signInFailed": "{{name}} serveriga kirib boʻlmadi. Qayta urinib koʻring."
     },
     "backends": {
       "title": "Suhbat serverlari",
@@ -3416,6 +3427,9 @@
       "downloading": "Yuklab olinmoqda…",
       "downloadProgress": "Yuklab olinmoqda… {{percent}}%",
       "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"
     }
   },
   "settingsTools": {

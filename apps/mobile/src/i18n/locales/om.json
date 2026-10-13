@@ -3242,7 +3242,6 @@
       "fieldName": "Maqaa mul'atu",
       "fieldUrl": "URL seerverii",
       "fieldUrlInvalid": "URL seerverii sirrii galchi.",
-      "fieldToken": "Token Bearer (filannoo)",
       "enableServer": "Seerverii kana dandeessisi: {{name}}",
       "editServer": "Seerverii sirreessi",
       "deleteServer": "Seerverii balleessi",
@@ -3262,6 +3261,18 @@
       "serverToolCount": "meeshaalee {{count}}",
       "serverUnreachable": "Seerverii kana bira ga'uun hin danda'amne",
       "serverOff": "Seerveriin kun dhaameera"
+    },
+    "mcpOAuth": {
+      "authMethod": "Mirkaneessa",
+      "authNone": "Seenuu malee",
+      "authBearer": "Token Bearer",
+      "authOAuth": "OAuth'n seenuu",
+      "fieldToken": "Token",
+      "oauthHint": "Erga olkaa'attee booda, brawuzarii keetiin seenuuf seerverii irratti $t(modelChat.mcpOAuth.signIn) tuqi.",
+      "serverNeedsSignIn": "Seerverii kana fayyadamuuf seeni",
+      "signIn": "Seeni",
+      "signInA11y": "Seerverii kanatti seeni: {{name}}",
+      "signInFailed": "{{name}} tti seenuun hin danda'amne. Irra deebi'ii yaali."
     },
     "backends": {
       "title": "Sirnoota duubaa chaat",
@@ -3416,6 +3427,9 @@
       "downloading": "Buufamaa jira…",
       "downloadProgress": "Buufamaa jira… {{percent}}%",
       "downloadFailed": "Buufachuun hin xumuramne. Walqunnamtii keessanii fi kuusaa duwwaa mirkaneessii irra deebi'ii yaali."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Moodeelli kun sadarkaa xiinxalaa ni deeggara"
     }
   },
   "settingsTools": {

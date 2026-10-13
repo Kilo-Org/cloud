@@ -503,6 +503,10 @@ function partsOf({ text, images }: Question): string | readonly PartDraft[] {
  * the model the session runs on, and writes it down so a reopened chat has it.
  * `last` is the call that just ended: what it put in front of the model is how
  * full the window is now.
+ *
+ * The count is kept in memory first and the write cannot fail the answer: the
+ * column holds the whole tally, so the next write that lands carries this call
+ * too.
  */
 async function countCall(
   sessionId: string,
@@ -514,10 +518,14 @@ async function countCall(
   chat.counted = total;
   const { model, record } = snapshotOf(sessionId);
   const usage = countUsage(record.usage, model, spent);
-  recordUsage(await open(), sessionId, usage);
   change(sessionId, {
     record: { ...record, usage, prompted: last.inputTokens + last.cacheReadTokens },
   });
+  try {
+    recordUsage(await open(), sessionId, usage);
+  } catch {
+    // The tally stays in memory and the next answer's write includes it.
+  }
 }
 
 /** Reads one answer to the end, however it ends. */

@@ -63,6 +63,8 @@ const CALL: ModelUsage = {
 const totals = new Map<string, ModelUsage>();
 /** The usage column of the chats table, by session. */
 const recorded = vi.hoisted(() => new Map<string, unknown>());
+/** Makes the next usage write throw, the way a closed database does. */
+const recordFailure = vi.hoisted(() => ({ next: false }));
 /** Every session whose scope was closed, so a leaked one can be told from one released. */
 const released: string[] = [];
 
@@ -289,6 +291,10 @@ vi.mock('./store', () => ({
     effort: null,
   }),
   recordUsage: (_database: unknown, sessionId: string, usage: unknown) => {
+    if (recordFailure.next) {
+      recordFailure.next = false;
+      throw new Error('database closed');
+    }
     recorded.set(sessionId, usage);
   },
 }));
@@ -348,6 +354,7 @@ beforeEach(async () => {
   openedWith = undefined;
   storedTools = null;
   recorded.clear();
+  recordFailure.next = false;
   settingsSwitch.enabled = true;
   mcp.tools.length = 0;
   mcp.enabled.clear();
@@ -1272,5 +1279,16 @@ describe('what a chat has used', () => {
       inputTokens: 20,
       cost: 0.02,
     });
+  });
+
+  it('keeps the answer and the count when writing the count fails', async () => {
+    recordFailure.next = true;
+    await answer('one', 'kilo/one');
+
+    expect(snapshotOf(opened)).toMatchObject({ status: 'idle', failed: null, failureKey: null });
+    expect(snapshotOf(opened).record.usage).toEqual({ 'kilo/one': CALL });
+
+    await answer('two', 'kilo/one');
+    expect(recorded.get('s1')).toMatchObject({ 'kilo/one': { inputTokens: 20 } });
   });
 });

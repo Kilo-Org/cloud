@@ -34,7 +34,10 @@ export function hasLeftPendingWorktreeChatOrigin(
   pending: PendingWorktreeChat | null,
   location: CloudChatLocation
 ): boolean {
-  if (!pending?.owned || location.key === pending.originLocationKey) return false;
+  if (!pending?.owned) return false;
+  if (pending.resolvedKiloSessionId === null && location.key === pending.originLocationKey) {
+    return false;
+  }
   return (
     pending.resolvedKiloSessionId === null || location.sessionId !== pending.resolvedKiloSessionId
   );

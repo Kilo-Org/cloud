@@ -2949,24 +2949,24 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     //     authoritative user message lands (see the onEvent handler).
     const optimisticStorage = store.get(sessionStorageAtom);
     const optimisticSessionId = store.get(rootSessionIdAtom) ?? kiloSessionId;
-    if (sessionAtSend && optimisticStorage && optimisticSessionId) {
-      insertOptimisticUserMessage({
-        storage: optimisticStorage,
-        sessionId: optimisticSessionId,
-        messageId,
-        messageText,
-        ...(input.attachments ? { attachments: input.attachments } : {}),
-        ...(input.attachmentParts ? { attachmentParts: input.attachmentParts } : {}),
-      });
-      if (sessionType === 'remote') {
-        remoteOptimisticIds.add(messageId);
-      }
-      markSending(messageId, true);
-      // Signal the composer exactly once, after the row is in the transcript.
-      input.onOptimisticSend?.();
-    }
-
     try {
+      if (sessionAtSend && optimisticStorage && optimisticSessionId) {
+        insertOptimisticUserMessage({
+          storage: optimisticStorage,
+          sessionId: optimisticSessionId,
+          messageId,
+          messageText,
+          ...(input.attachments ? { attachments: input.attachments } : {}),
+          ...(input.attachmentParts ? { attachmentParts: input.attachmentParts } : {}),
+        });
+        if (sessionType === 'remote') {
+          remoteOptimisticIds.add(messageId);
+        }
+        markSending(messageId, true);
+        // Signal the composer exactly once, after the row is in the transcript.
+        input.onOptimisticSend?.();
+      }
+
       if (!sessionAtSend) throw new Error('No active session');
       if (input.attachments && sessionType !== 'cloud-agent') {
         // The cloud-only `attachments` field is exclusive to cloud-agent

@@ -2711,6 +2711,27 @@ describe('createSessionManager', () => {
       );
     });
 
+    it('clears the sending mark and optimistic row when the composer callback throws', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        onOptimisticSend: () => {
+          throw new Error('composer callback failed');
+        },
+      });
+
+      expect(accepted).toBe(false);
+      expect(atomValue<ReadonlySet<string>>(config.store, mgr.atoms.sendingMessageIds).size).toBe(
+        0
+      );
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Hello');
+      expect(mockSession.send).not.toHaveBeenCalled();
+    });
+
     it('queued event does not duplicate or overwrite the optimistic row', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

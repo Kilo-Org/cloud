@@ -367,6 +367,14 @@ export function ChatInput({
             if (currentKey === conversationAtSend) {
               removeIds.forEach(attachmentUpload.removeAttachment);
             } else {
+              revokeComposerSnapshotPreviews([
+                {
+                  text: '',
+                  attachments: submittedAttachments.filter(attachment =>
+                    removeIds.includes(attachment.id)
+                  ),
+                },
+              ]);
               const existing = composerSnapshotsRef.current.get(conversationAtSend);
               storeComposerSnapshot(conversationAtSend, {
                 text: existing?.text ?? '',

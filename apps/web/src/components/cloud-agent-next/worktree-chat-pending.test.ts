@@ -128,6 +128,14 @@ describe('hasLeftPendingWorktreeChatOrigin', () => {
     expect(hasLeftPendingWorktreeChatOrigin(resolved, at('/cloud/chat', 'ses-b'))).toBe(true);
   });
 
+  it('releases ownership when returning to the origin after creation resolves', () => {
+    const resolved = pending({ resolvedKiloSessionId: 'ses-new' });
+    const left = hasLeftPendingWorktreeChatOrigin(resolved, at('/cloud/chat', 'ses-a'));
+    expect(left).toBe(true);
+    const released = left ? releasePendingOwnership(resolved) : resolved;
+    expect(shouldShowPendingWorktreeView(released, 'wt-1')).toBe(false);
+  });
+
   it('does nothing once ownership is gone', () => {
     expect(hasLeftPendingWorktreeChatOrigin(null, at('/cloud', null))).toBe(false);
     expect(hasLeftPendingWorktreeChatOrigin(pending({ owned: false }), at('/cloud', null))).toBe(

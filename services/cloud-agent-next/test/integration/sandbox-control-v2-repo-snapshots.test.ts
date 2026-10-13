@@ -840,7 +840,7 @@ describe('repository snapshot preparation fallback', () => {
     }
     fresh.wrapper.send({ type: 'session.ready', sessionId: SESSION });
     for (const messageId of ['m1', 'm2']) {
-      expect(await fresh.wrapper.nextSkipping(['worktree.capture'])).toMatchObject({
+      expect(await fresh.wrapper.nextSkipping(['worktree.snapshot'])).toMatchObject({
         type: 'session.prompt',
         sessionId: SESSION,
         payload: { messageId },
@@ -1213,32 +1213,76 @@ describe('repository snapshot preparation fallback', () => {
     expect(provider.launchEnvs).toHaveLength(1);
   });
 
-  it('fails preparation if snapshot cleanup exhausts without a confirmed stop', async () => {
-    const sandboxId = 'sbx__repo_prepare_unconfirmed_stop';
-    const provider = createFakeProvider({ startSource: 'repository', stopResult: 'retryable' });
-    const stub = await setup(sandboxId, provider);
-    await runInDurableObject(stub, instance => {
-      Object.assign(instance, {
-        sandboxTimers: () => ({ ...CONTROL_PLANE_TIMERS.sandbox, providerStopLadderMs: [] }),
+  it.each(['current', 'superseded', 'stale and current'] as const)(
+    'fails preparation if snapshot cleanup exhausts with %s failure records',
+    async failures => {
+      const sandboxId = 'sbx__repo_prepare_unconfirmed_stop';
+      const provider = createFakeProvider({
+        startSource: 'repository',
+        stopResult: 'retryable',
+        holdStop: true,
       });
-    });
-    await stub.prepare(prepareInput());
-    const { wrapper } = await connect(sandboxId, provider);
-    await prepareFrameOf(wrapper);
-    wrapper.send({
-      type: 'session.failed',
-      sessionId: SESSION,
-      reason: 'workspace_setup_failed',
-      step: 'setup',
-      subtype: 'setup_command_failed',
-    });
-    await waitFor(async () =>
-      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
-    );
-    expect((await stub.getAllocationState()).unconfirmedProviderRef).toBe(provider.launchRefs[0]);
-    expect(provider.stopRefs).toHaveLength(1);
-    expect(provider.launchEnvs).toHaveLength(1);
-  });
+      const peer = new FakeSessionPeer();
+      const stub = await setup(sandboxId, provider, ENROLLED, peer);
+      await runInDurableObject(stub, instance => {
+        Object.assign(instance, {
+          sandboxTimers: () => ({ ...CONTROL_PLANE_TIMERS.sandbox, providerStopLadderMs: [] }),
+        });
+      });
+      let view = await stub.prepare(prepareInput());
+      const { wrapper, allocationId } = await connect(sandboxId, provider);
+      await prepareFrameOf(wrapper);
+      if (failures === 'stale and current') {
+        await putLaunchRecord(stub, {
+          allocationId,
+          startSource: 'repository',
+          confirmed: true,
+          preparationFailures: [
+            {
+              sessionId: SESSION,
+              attemptId: 'superseded-attempt',
+              subtype: 'setup_command_timeout',
+            },
+          ],
+        });
+      }
+      wrapper.send({
+        type: 'session.failed',
+        sessionId: SESSION,
+        reason: 'workspace_setup_failed',
+        step: 'setup',
+        subtype: 'setup_command_failed',
+      });
+      await waitFor(() => expect(provider.stopRefs).toHaveLength(1));
+      if (failures === 'superseded') {
+        await stub.release({ sessionId: SESSION });
+        const previousAttemptId = view.attemptId;
+        view = await stub.prepare(prepareInput());
+        expect(view.attemptId).not.toBe(previousAttemptId);
+      }
+      await releaseHeld(stub, () => provider.releaseStop());
+      await waitFor(() =>
+        expect(
+          peer
+            .routeUpdatesFor(SESSION)
+            .some(update => update.state === 'failed' && update.attemptId === view.attemptId)
+        ).toBe(true)
+      );
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'failed',
+        attemptId: view.attemptId,
+        reason: 'workspace_setup_failed',
+        ...(failures === 'superseded' ? {} : { subtype: 'setup_command_failed' }),
+      });
+      expect((await stub.status({ sessionId: SESSION })).view).toMatchObject({
+        state: 'failed',
+        attemptId: view.attemptId,
+      });
+      expect((await stub.getAllocationState()).unconfirmedProviderRef).toBe(provider.launchRefs[0]);
+      expect(provider.stopRefs).toHaveLength(1);
+      expect(provider.launchEnvs).toHaveLength(1);
+    }
+  );
 });
 
 describe('repository capture request', () => {

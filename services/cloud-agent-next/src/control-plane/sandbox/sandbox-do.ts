@@ -2352,8 +2352,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
           ctx,
           route.sessionId,
           'workspace_setup_failed',
-          launch.preparationFailures.find(failure => failure.sessionId === route.sessionId)
-            ?.subtype,
+          launch.preparationFailures.find(
+            failure =>
+              failure.sessionId === route.sessionId && failure.attemptId === route.attemptId
+          )?.subtype,
           true
         );
       }

@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { createRequire } from 'node:module';
 import type { CloudChatPage as CloudChatPageComponent } from './CloudChatPage';
 import type { ChatHeader } from './ChatHeader';
+import type { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
 import type { SessionStatusIndicator as SessionStatusIndicatorType } from '@kilocode/cloud-agent-sdk';
 
 Object.assign(globalThis, { React });
@@ -11,6 +12,7 @@ let mockSessionId: string | null = 'ses_b';
 let mockAtParam: string | null = null;
 let mockWorktreeId: string | null = null;
 let mockChatInput: Record<string, unknown> | null = null;
+let mockWorkspaceTabs: ComponentProps<typeof CloudAgentWorkspaceTabs> | null = null;
 let mockAtomValues: Record<string, unknown>;
 const mockSetAtom = jest.fn();
 const mockRequestOlderMessages = jest.fn();
@@ -91,7 +93,10 @@ jest.mock('./CloudSidebarLayout', () => ({
   }),
 }));
 jest.mock('./CloudAgentWorkspaceTabs', () => ({
-  CloudAgentWorkspaceTabs: () => null,
+  CloudAgentWorkspaceTabs: (props: ComponentProps<typeof CloudAgentWorkspaceTabs>) => {
+    mockWorkspaceTabs = props;
+    return null;
+  },
 }));
 jest.mock('./CloudAgentTerminalDock', () => ({ CloudAgentTerminalPane: () => null }));
 jest.mock('@/hooks/useCloudAgentProfiles', () => ({
@@ -226,6 +231,7 @@ describe('CloudChatPage route-aware transcript phase', () => {
     mockAtParam = null;
     mockWorktreeId = null;
     mockChatInput = null;
+    mockWorkspaceTabs = null;
     mockResizeObserve.mockClear();
     mockResizeDisconnect.mockClear();
     mockPlanResumeAttempt.mockClear();
@@ -251,6 +257,7 @@ describe('CloudChatPage route-aware transcript phase', () => {
 
   afterEach(() => {
     act(() => root.unmount());
+    jest.useRealTimers();
     dom.cleanup();
   });
 
@@ -295,6 +302,8 @@ describe('CloudChatPage route-aware transcript phase', () => {
   });
 
   it('shows cached rows before metadata without allowing submission or resuming an anchor', () => {
+    jest.useFakeTimers();
+    mockWorktreeId = 'worktree_b';
     mockAtParam = 'msg_1';
     mockAtomValues.staticMessages = [anchorMessage('msg_1')];
     mockAtomValues.isRefreshingCachedTranscript = true;
@@ -305,9 +314,20 @@ describe('CloudChatPage route-aware transcript phase', () => {
 
     expect(skeleton()).toBeNull();
     expect(dom.container.querySelector('[data-conversation]')).not.toBeNull();
-    expect(dom.container.querySelector('[aria-label="Refreshing session…"]')).not.toBeNull();
+    expect(mockWorkspaceTabs?.currentChatLoadingLabel).toBeNull();
+    act(() => jest.advanceTimersByTime(999));
+    expect(mockWorkspaceTabs?.currentChatLoadingLabel).toBeNull();
+    act(() => jest.advanceTimersByTime(1));
+    expect(mockWorkspaceTabs?.currentChatLoadingLabel).toBe('Refreshing session…');
     expect(mockChatInput?.disabled).toBe(true);
     expect(mockPlanResumeAttempt).not.toHaveBeenCalled();
+
+    mockAtomValues.fetchedSessionData = { kiloSessionId: 'ses_b', organizationId: null };
+    mockAtomValues.isRefreshingCachedTranscript = false;
+    render();
+
+    expect(mockWorkspaceTabs?.currentChatLoadingLabel).toBeNull();
+    expect(mockPlanResumeAttempt).toHaveBeenCalledTimes(1);
   });
 
   it('shows the existing error alert and drops prior rows once the started open fails', () => {

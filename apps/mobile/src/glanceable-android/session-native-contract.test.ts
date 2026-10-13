@@ -72,6 +72,7 @@ describe('SessionNotificationCard', () => {
     for (const field of [
       'organizationId',
       'subText',
+      'expandedText',
       'compactText',
       'approveLabel',
       'approvalKey',
@@ -157,6 +158,17 @@ describe('the quiet moment of a Working card', () => {
     expect(body(NOTIFICATIONS, 'private fun quietIntent(')).toContain(
       '.setAction(ActiveAgentsActionReceiver.ACTION_QUIET)'
     );
+  });
+
+  it('draws the expanded-only line in the big-text style alone, never in the header', () => {
+    const build = body(NOTIFICATIONS, 'private fun builder(');
+    const fallback = build.slice(
+      build.indexOf('} else {', build.indexOf('promotionCapable(context)'))
+    );
+    expect(fallback).toContain('card.expandedText?.let');
+    expect(fallback).toContain('Notification.BigTextStyle().bigText(');
+    expect(build.match(/expandedText/g)).toHaveLength(1);
+    expect(build).toContain('.setSubText(card.subText)');
   });
 
   it('hides the relative system time on every card that does not count up', () => {

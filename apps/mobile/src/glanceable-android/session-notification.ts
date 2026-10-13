@@ -21,6 +21,11 @@ export type SessionNotificationCard = {
   text: string;
   subText: string | null;
   /**
+   * One line that only the expanded notification shows, under the text: the
+   * cost so far. The collapsed header never carries it.
+   */
+  expandedText: string | null;
+  /**
    * The status chip of a promoted Live Update: the wait or wake time that fits
    * one short line, else null.
    */

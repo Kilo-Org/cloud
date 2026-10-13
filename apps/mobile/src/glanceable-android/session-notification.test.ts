@@ -31,6 +31,7 @@ const CARD: SessionNotificationCard = {
   title: 'Migrate the billing webhooks',
   text: 'Working',
   subText: null,
+  expandedText: null,
   compactText: null,
   openLabel: 'Open',
   openUrl: 'kiloapp:///cloud/sessions/session-1',

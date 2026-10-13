@@ -283,7 +283,8 @@ observable behavior is the same.
 5. The system MAY draw extra detail the platform can show, as the Content
    rules define it: the current step, plan progress, the permission command,
    the diff size, and the cost so far. The cost MUST appear only in the
-   expanded part of the notification.
+   expanded part of the notification, never in its collapsed header. A
+   promoted Live Update has no expanded text area, so it leaves the cost out.
 6. The notification MUST use the platform's progress style for the plan bar.
    The card has one platform timer, so a quiet `running` card MUST name the
    quiet warning in its text and MUST count that timer from the last activity,
@@ -375,3 +376,4 @@ observable behavior is the same.
   the last activity; the device switches it at the end of the quiet window.
 - Android cards other than Working show the absolute time in the text and hide
   the relative header time.
+- The Android cost moved out of the collapsed header into the expanded text.

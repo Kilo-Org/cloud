@@ -130,7 +130,34 @@ describe('buildSessionNotificationCard', () => {
     );
 
     expect(plan.subText).toBe(`۳ ${i18n.t('glanceable.planOf')} ۷`);
-    expect(cost.subText).toMatch(/[۰-۹]/u);
-    expect(cost.subText).not.toMatch(/[0-9]/u);
+    expect(cost.expandedText).toMatch(/[۰-۹]/u);
+    expect(cost.expandedText).not.toMatch(/[0-9]/u);
+  });
+
+  it('puts the cost in the expanded-only line and keeps the collapsed header free of it', () => {
+    const card = buildSessionNotificationCard(
+      content({
+        statusKind: 'idle',
+        plan: { done: 3, total: 7, current: null },
+        costMicrodollars: 840_000,
+      }),
+      null,
+      NOW
+    );
+
+    expect(card.expandedText).toBe('$0.84');
+    expect(card.subText).toBe(`3 ${i18n.t('glanceable.planOf')} 7`);
+    expect([card.subText, card.text, card.compactText].join(' ')).not.toContain('0.84');
+  });
+
+  it('keeps the cost off the header when the session has no plan', () => {
+    const card = buildSessionNotificationCard(
+      content({ statusKind: 'idle', costMicrodollars: 840_000 }),
+      null,
+      NOW
+    );
+
+    expect(card.subText).toBeNull();
+    expect(card.expandedText).toBe('$0.84');
   });
 });

@@ -93,21 +93,29 @@ function chipText(content: SessionLiveActivityContentState): string | null {
   return at.length > 0 ? at : null;
 }
 
-/** The expanded (and promoted) extra line, in the app language's digits. */
-function extraText(content: SessionLiveActivityContentState): string | null {
+/** The plan count ("3 of 7") in the app language's digits, or null. */
+function planText(content: SessionLiveActivityContentState): string | null {
   const plan = content.plan;
-  if (plan !== null && plan !== undefined && plan.total > 0) {
-    return [
-      formatGlanceableCount(plan.done),
-      translate('glanceable.planOf'),
-      formatGlanceableCount(plan.total),
-    ].join(' ');
+  if (plan === null || plan === undefined || plan.total <= 0) {
+    return null;
   }
+  return [
+    formatGlanceableCount(plan.done),
+    translate('glanceable.planOf'),
+    formatGlanceableCount(plan.total),
+  ].join(' ');
+}
+
+/**
+ * The cost so far in the app language's digits, or null. It goes only to the
+ * expanded part of the notification (spec "Android: the notification" rule 5).
+ */
+function costText(content: SessionLiveActivityContentState): string | null {
   const cost = content.costMicrodollars;
-  if (cost !== null && cost !== undefined && cost > 0) {
-    return formatCurrency(cost / 1_000_000, i18n.language, 2);
+  if (cost === null || cost === undefined || cost <= 0) {
+    return null;
   }
-  return null;
+  return formatCurrency(cost / 1_000_000, i18n.language, 2);
 }
 
 type QuietFields = Pick<
@@ -167,7 +175,8 @@ export function buildSessionNotificationCard(
     sessionId: content.sessionId,
     organizationId,
     title: title.length > 0 ? title : translate('common.agent'),
-    subText: extraText(content),
+    subText: planText(content),
+    expandedText: costText(content),
     compactText: chipText(content),
     openLabel: translate('glanceable.openSession'),
     openUrl: launcherSessionUrl(content.sessionId),

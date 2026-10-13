@@ -232,6 +232,14 @@ internal object SessionNotifications {
       }
       builder.setStyle(Notification.ProgressStyle())
       card.compactText?.let { builder.setShortCriticalText(it) }
+    } else {
+      // The expanded-only line (the cost so far): the big-text style draws it
+      // only when the user expands the card, so the collapsed card never shows
+      // it. The promoted style has no text area for it, so a promoted card
+      // leaves it out.
+      card.expandedText?.let { expanded ->
+        builder.setStyle(Notification.BigTextStyle().bigText("${card.text}\n$expanded"))
+      }
     }
     return builder
   }
@@ -305,6 +313,7 @@ class SessionNotificationCard : Record {
   @Field var title: String = ""
   @Field var text: String = ""
   @Field var subText: String? = null
+  @Field var expandedText: String? = null
   @Field var compactText: String? = null
   @Field var openLabel: String = ""
   @Field var openUrl: String = ""
@@ -324,6 +333,7 @@ class SessionNotificationCard : Record {
     put("title", title)
     put("text", text)
     put("subText", subText ?: "")
+    put("expandedText", expandedText ?: "")
     put("compactText", compactText ?: "")
     put("openLabel", openLabel)
     put("openUrl", openUrl)
@@ -342,6 +352,7 @@ class SessionNotificationCard : Record {
   fun fillFromJson(json: JSONObject) {
     organizationId = optionalString(json, "organizationId")
     subText = optionalString(json, "subText")
+    expandedText = optionalString(json, "expandedText")
     compactText = optionalString(json, "compactText")
     approveLabel = optionalString(json, "approveLabel")
     approvalKey = optionalString(json, "approvalKey")

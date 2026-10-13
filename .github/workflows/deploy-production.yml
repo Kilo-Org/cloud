@@ -149,9 +149,21 @@ jobs:
     secrets:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
+  promote-ai-gateway:
     needs: [stage-ai-gateway, check-production-db-startup, run-migrations]
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage-ai-gateway.outputs.deployment_url }}
+      # The gateway has no dedicated Axiom dataset. Its logs reach Axiom through
+      # the Axiom Vercel integration's drain, which feeds the shared `vercel`
+      # dataset, so annotate promotes there.
+      axiom_annotation_dataset: vercel
+      axiom_expected_project: kilocode-ai-gateway
+    secrets:
+      AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   deploy-workers:
     needs:

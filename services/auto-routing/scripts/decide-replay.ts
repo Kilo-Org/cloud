@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import {
   detectRequiredInputModalities,
@@ -116,6 +117,7 @@ async function main(): Promise<void> {
       url: { type: 'string', default: 'http://localhost:8810' },
       sessions: { type: 'string', default: '36' },
       concurrency: { type: 'string', default: '3' },
+      'turn-gap-ms': { type: 'string', default: '1000' },
       out: { type: 'string', default: 'replay.json' },
       'user-id': { type: 'string' },
       help: { type: 'boolean', short: 'h' },
@@ -123,8 +125,8 @@ async function main(): Promise<void> {
   });
   if (values.help) {
     console.log(
-      'Usage: pnpm --filter auto-routing replay --user-id <dev-user-id> [--url http://localhost:8810] [--sessions 36] [--concurrency 3] [--out replay.json]\n' +
-        'Set INTERNAL_API_SECRET in the environment. Each session sends cold, warm_new_turn, and exact_repeat requests in order. Requests time out after 30 seconds. Percentiles use nearest rank over all attempts, including errors.'
+      'Usage: pnpm --filter auto-routing replay --user-id <dev-user-id> [--url http://localhost:8810] [--sessions 36] [--concurrency 3] [--turn-gap-ms 1000] [--out replay.json]\n' +
+        'Set INTERNAL_API_SECRET in the environment. Each session sends cold, warm_new_turn, and exact_repeat requests in order, waiting between turns outside the timed region to allow background cache writes to finish. Requests time out after 30 seconds. Percentiles use nearest rank over all attempts, including errors.'
     );
     return;
   }
@@ -134,6 +136,10 @@ async function main(): Promise<void> {
   if (!userId) throw new Error('--user-id is required; pass a seeded local user ID');
   const sessions = positiveInteger(values.sessions, '--sessions');
   const concurrency = positiveInteger(values.concurrency, '--concurrency');
+  const turnGapMs = Number(values['turn-gap-ms']);
+  if (!Number.isSafeInteger(turnGapMs) || turnGapMs < 0 || turnGapMs > 2_147_483_647) {
+    throw new Error('--turn-gap-ms must be an integer between 0 and 2147483647');
+  }
   const url = new URL(values.url);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
     throw new Error('--url must be an HTTP(S) worker URL without credentials');
@@ -177,12 +183,14 @@ async function main(): Promise<void> {
     const identity = { userId, sessionId: randomUUID(), machineId: randomUUID() };
     const body = chatBody(firstCase);
     await measure('cold', JSON.stringify(decidePayload(body, identity)));
+    await delay(turnGapMs);
     body.messages.push(
       { role: 'assistant', content: 'The requested work is complete. What should I work on next?' },
       { role: 'user', content: nextCase.input.userPromptPrefix }
     );
     const warmPayload = JSON.stringify(decidePayload(body, identity));
     await measure('warm_new_turn', warmPayload);
+    await delay(turnGapMs);
     await measure('exact_repeat', warmPayload);
   }
 
@@ -203,6 +211,7 @@ async function main(): Promise<void> {
     target,
     startedAt,
     sessions,
+    turnGapMs,
     scenarios: {
       cold: scenarioMetrics('cold'),
       warm_new_turn: scenarioMetrics('warm_new_turn'),

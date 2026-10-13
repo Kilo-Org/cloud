@@ -43,6 +43,7 @@ export const ReplayMetricsSchema = z.object({
   target: z.string().min(1),
   startedAt: z.iso.datetime({ offset: true }),
   sessions: z.number().int().nonnegative(),
+  turnGapMs: z.number().nonnegative().optional(),
   scenarios: replayScenariosSchema,
 });
 export type ReplayMetrics = z.infer<typeof ReplayMetricsSchema>;

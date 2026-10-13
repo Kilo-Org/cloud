@@ -42,6 +42,7 @@ export function KiloPassTierCard(props: {
     tier,
     isFirstTimeSubscriberEver: showFirstMonthPromo,
     subscriptionStartedAtIso,
+    usesNewMonthlyBonusSchedule: true,
   });
   const handleSelect = () => {
     if (pending) return;
@@ -107,6 +108,7 @@ export function KiloPassTierCard(props: {
                 tier={tier}
                 showFirstMonthPromo={showFirstMonthPromo}
                 subscriptionStartedAtIso={subscriptionStartedAtIso}
+                usesNewMonthlyBonusSchedule={true}
               />
             </div>
 

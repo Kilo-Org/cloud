@@ -69,6 +69,7 @@ export type KiloPassActiveSubscriptionCardLogicSubscription = Pick<
   | 'tier'
   | 'currentStreakMonths'
   | 'isFirstTimeSubscriberEver'
+  | 'usesNewMonthlyBonusSchedule'
   | 'startedAt'
   | 'refillAt'
   | 'nextBillingAt'
@@ -185,6 +186,7 @@ function computeRefillRowModel(params: {
               streakMonths: Math.max(1, params.subscription.currentStreakMonths + 1),
               isFirstTimeSubscriberEver: params.subscription.isFirstTimeSubscriberEver,
               subscriptionStartedAtIso: params.subscription.startedAt,
+              usesNewMonthlyBonusSchedule: params.subscription.usesNewMonthlyBonusSchedule,
             })
           : null;
   if (typeof bonusUsd !== 'number' || bonusUsd <= 0) return null;

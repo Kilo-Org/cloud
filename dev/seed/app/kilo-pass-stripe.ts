@@ -233,6 +233,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     stripe_subscription_id: subscription.id,
     tier: KiloPassTier.Tier49,
     cadence: KiloPassCadence.Monthly,
+    uses_new_monthly_bonus_schedule: true,
     status: 'active',
     cancel_at_period_end: false,
     started_at: new Date().toISOString(),

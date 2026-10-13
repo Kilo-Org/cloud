@@ -873,6 +873,7 @@ export async function completeStoreKiloPassPurchase(params: {
         started_at: purchase.subscriptionStartedAtIso ?? purchase.purchasedAtIso,
         ended_at: null,
         current_streak_months: 1,
+        uses_new_monthly_bonus_schedule: true,
         next_yearly_issue_at: nextYearlyIssueAt,
       })
       .onConflictDoUpdate({

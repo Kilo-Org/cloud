@@ -159,17 +159,15 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
     Bonus-decision paths MUST clamp streak to at least `1` before applying the ramp.
 14. Yearly cadence MUST use a flat monthly bonus of 50% of the monthly price and MUST NOT use the monthly ramp or
     welcome-promo branch.
-15. For eligible first-time monthly subscribers started strictly before `2026-10-09T00:00:00Z`, streak month 1 MUST use
-    the 50% welcome bonus, month 2 MUST use the normal 10% ramp, and month 3 MUST use the normal 15% ramp.
-    This includes subscriptions started before May 7, 2026; no two-month welcome-promo grandfathering remains.
-16. For eligible first-time monthly subscribers started at or after `2026-10-09T00:00:00Z` but strictly before
-    `2026-10-14T00:00:00Z`, streak month 1 MUST use the normal 5% ramp, month 2 MUST use the 50% welcome bonus,
-    and month 3 MUST use the normal 15% ramp.
-    Eligible first-time monthly subscribers started at or after `2026-10-14T00:00:00Z` MUST receive 10% in
-    streak month 1, the 50% welcome bonus in month 2, and the normal 15% ramp in month 3.
-    The subscription start timestamp MUST determine the schedule, with no persisted schedule flag.
-    Missing or invalid subscription starts MUST conservatively use the legacy month-1 schedule.
-    Non-first-time subscribers MUST always use the normal monthly ramp, regardless of subscription start.
+15. Existing subscriptions with `uses_new_monthly_bonus_schedule = false` MUST retain their timestamp-based welcome schedule.
+    Eligible first-time monthly starts strictly before `2026-10-09T00:00:00Z` receive 50%, 10%, then 15%.
+    Starts at or after that historical cutoff receive 5%, 50%, then 15%.
+    Missing or invalid starts MUST retain the legacy month-1 welcome schedule.
+16. New subscription rows MUST set `uses_new_monthly_bonus_schedule = true` only at creation.
+    The database default MUST remain false to preserve every existing subscription without a backfill.
+    Renewals, updates, and conflicting inserts MUST NOT replace the persisted marker.
+    Eligible first-time monthly subscriptions with the marker receive 10%, 50%, then 15%, independent of start timestamp.
+    Non-first-time subscribers MUST always use the normal monthly ramp, regardless of marker or start timestamp.
 17. From streak month 3 onward, and in any month where neither the welcome promo nor the eligible first-month
     10% override applies, monthly cadence MUST use the monthly ramp value.
     The first-month 10% override MUST use the same first-time and payment eligibility as the welcome promo.
@@ -442,13 +440,11 @@ promo or Kilo Pass referral conversion.
 
 ### 2026-10-13 -- Prospective first-month bonus increase
 
-- Eligible first-time monthly subscriptions starting at or after October 14, 2026 at midnight UTC receive
-  10%, 50%, then 15%, followed by the normal ramp to 40%.
-- Preserved earlier subscription schedules and missing/invalid start behavior; returning and payment-disqualified
-  subscribers retain the normal 5%, 10%, 15% ramp.
-- Kept yearly bonuses, payment eligibility, and usage unlock unchanged.
-- Confirmed canonical bonus-decision smoke results for the new schedule, both historical schedules, returning
-  subscribers, and payment-disqualified subscribers before updating this spec.
+- New subscription rows select the increased first-month bonus with a persisted creation-time marker.
+- Existing rows retain their original welcome schedules through the false database default and no backfill.
+- Removed the proposed activation date; renewals and updates preserve the marker.
+- Kept returning-subscriber bonuses, yearly bonuses, payment eligibility, and usage unlock unchanged.
+- Confirmed marker-driven schedules for historical and future starts before updating this spec.
 
 ### 2026-10-08 -- Timestamp-based monthly welcome bonus cutoff
 

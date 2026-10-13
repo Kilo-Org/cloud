@@ -157,26 +157,39 @@ describe('usage-triggered-bonus (unit)', () => {
     });
 
     test.each([
-      [1, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, true, 0.05],
-      [2, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, true, 0.5],
-      [2, KiloPassWelcomePromoEligibilityReason.MissingFingerprint, true, 0.5],
-      [2, KiloPassWelcomePromoEligibilityReason.NoSupportedFingerprint, true, 0.5],
-      [2, KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed, true, 0.1],
-      [2, KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement, true, 0.1],
-      [2, KiloPassWelcomePromoEligibilityReason.SettlementUnresolved, true, 0.1],
-      [2, null, true, 0.1],
-      [2, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, false, 0.1],
+      [true, 1, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, true, 0.1],
+      [false, 1, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, true, 0.05],
+      [true, 2, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, true, 0.5],
+      [false, 2, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, true, 0.5],
+      [true, 2, KiloPassWelcomePromoEligibilityReason.MissingFingerprint, true, 0.5],
+      [true, 2, KiloPassWelcomePromoEligibilityReason.NoSupportedFingerprint, true, 0.5],
+      [true, 1, KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed, true, 0.05],
+      [true, 1, KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement, true, 0.05],
+      [true, 1, KiloPassWelcomePromoEligibilityReason.SettlementUnresolved, true, 0.05],
+      [true, 2, KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed, true, 0.1],
+      [true, 2, KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement, true, 0.1],
+      [true, 2, KiloPassWelcomePromoEligibilityReason.SettlementUnresolved, true, 0.1],
+      [true, 2, null, true, 0.1],
+      [true, 1, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, false, 0.05],
+      [true, 2, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, false, 0.1],
     ] as const)(
-      'new subscription month %s with reason %s and first-time status %s receives %s',
-      (currentStreakMonths, welcomePromoEligibilityReason, isFirstTimeSubscriberEver, expected) => {
+      'marker %s month %s reason %s first-time status %s receives %s',
+      (
+        usesNewMonthlyBonusSchedule,
+        currentStreakMonths,
+        welcomePromoEligibilityReason,
+        isFirstTimeSubscriberEver,
+        expected
+      ) => {
         const decision = computeUsageTriggeredMonthlyBonusDecision({
           tier: KiloPassTier.Tier19,
-          startedAtIso: '2026-10-09T00:00:00.000Z',
+          startedAtIso: '2100-01-01T00:00:00.000Z',
           currentStreakMonths,
           isFirstTimeSubscriberEver,
+          usesNewMonthlyBonusSchedule,
           welcomePromoPolicy: 'settled-payment-required',
           welcomePromoEligibilityReason,
-          issueMonth: currentStreakMonths === 1 ? '2026-10-01' : '2026-11-01',
+          issueMonth: currentStreakMonths === 1 ? '2100-01-01' : '2100-02-01',
         });
 
         expect(decision.bonusPercentApplied).toBeCloseTo(expected);

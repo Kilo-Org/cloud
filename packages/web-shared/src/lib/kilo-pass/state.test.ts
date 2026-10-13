@@ -97,6 +97,7 @@ describe('getKiloPassStateForUser', () => {
         status: 'active',
         cancelAtPeriodEnd: false,
         currentStreakMonths: 6,
+        usesNewMonthlyBonusSchedule: false,
         nextYearlyIssueAt: null,
         stripeSubscriptionId: expect.stringMatching(/^test-stripe-sub-active-new-/),
       })
@@ -166,6 +167,36 @@ describe('getKiloPassStateForUser', () => {
     expect(state).toBeNull();
   });
 
+  test.each([
+    KiloPassPaymentProvider.Stripe,
+    KiloPassPaymentProvider.AppStore,
+    KiloPassPaymentProvider.GooglePlay,
+  ])(
+    'returns the persisted schedule marker for %s independently of start date',
+    async paymentProvider => {
+      for (const usesNewMonthlyBonusSchedule of [false, true]) {
+        const user = await insertTestUser();
+        const providerSubscriptionId = `sub-${crypto.randomUUID()}`;
+        await db.insert(kilo_pass_subscriptions).values({
+          kilo_user_id: user.id,
+          payment_provider: paymentProvider,
+          provider_subscription_id: providerSubscriptionId,
+          stripe_subscription_id:
+            paymentProvider === KiloPassPaymentProvider.Stripe ? providerSubscriptionId : null,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+          started_at: '2100-01-01T00:00:00.000Z',
+          uses_new_monthly_bonus_schedule: usesNewMonthlyBonusSchedule,
+        });
+
+        const state = await getKiloPassStateForUser(db, user.id);
+        expect(state?.usesNewMonthlyBonusSchedule).toBe(usesNewMonthlyBonusSchedule);
+        expect(state?.startedAt).toBe('2100-01-01T00:00:00.000Z');
+      }
+    }
+  );
+
   test('keeps stripeSubscriptionId null for App Store subscriptions', async () => {
     const user = await insertTestUser();
     const providerSubscriptionId = `test-app-store-original-${crypto.randomUUID()}`;
@@ -182,6 +213,7 @@ describe('getKiloPassStateForUser', () => {
       started_at: '2025-06-01T00:00:00.000Z',
       ended_at: null,
       current_streak_months: 1,
+      uses_new_monthly_bonus_schedule: true,
       next_yearly_issue_at: null,
     });
 
@@ -192,6 +224,7 @@ describe('getKiloPassStateForUser', () => {
         paymentProvider: KiloPassPaymentProvider.AppStore,
         providerSubscriptionId,
         stripeSubscriptionId: null,
+        usesNewMonthlyBonusSchedule: true,
       })
     );
   });

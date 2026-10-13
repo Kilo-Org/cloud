@@ -117,6 +117,7 @@ export async function handleKiloPassSubscriptionEvent(params: {
           started_at: dayjs.unix(currentSubscription.start_date).utc().toISOString(),
           ended_at: endedAt,
           current_streak_months: 0,
+          uses_new_monthly_bonus_schedule: true,
         })
         .onConflictDoUpdate({
           target: kilo_pass_subscriptions.stripe_subscription_id,

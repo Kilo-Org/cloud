@@ -20,6 +20,7 @@ export function getMonthlyBonusPreview(params: {
   tier: KiloPassTier;
   isFirstTimeSubscriberEver: boolean;
   subscriptionStartedAtIso: string;
+  usesNewMonthlyBonusSchedule: boolean;
 }) {
   const firstMonthPercent = computeMonthlyCadenceBonusPercent({ ...params, streakMonths: 1 });
   const secondMonthPercent = computeMonthlyCadenceBonusPercent({ ...params, streakMonths: 2 });

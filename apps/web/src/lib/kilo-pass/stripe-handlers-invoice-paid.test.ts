@@ -2529,6 +2529,7 @@ describe('handleKiloPassInvoicePaid', () => {
     expect(subRow?.cadence).toBe(KiloPassCadence.Monthly);
     expect(subRow?.status).toBe('active');
     expect(subRow?.current_streak_months).toBe(1);
+    expect(subRow?.uses_new_monthly_bonus_schedule).toBe(true);
 
     const issuance = await db.query.kilo_pass_issuances.findFirst({
       where: and(
@@ -2882,9 +2883,17 @@ describe('handleKiloPassInvoicePaid', () => {
     expect(kinds.map(k => k.kind).sort()).toEqual([KiloPassIssuanceItemKind.Base]);
   });
 
-  test.each(['2026-10-08T23:59:59.999Z', '2026-10-09T00:00:00.000Z'])(
-    'monthly: renewal and replay preserve subscription start %s and count consecutive months',
-    async startedAt => {
+  test.each(
+    ['2026-10-08T23:59:59.999Z', '2026-10-09T00:00:00.000Z', '2100-01-01T00:00:00.000Z'].flatMap(
+      startedAt =>
+        [false, true].map(usesNewMonthlyBonusSchedule => ({
+          startedAt,
+          usesNewMonthlyBonusSchedule,
+        }))
+    )
+  )(
+    'monthly: renewal and replay preserve start $startedAt and schedule $usesNewMonthlyBonusSchedule and count consecutive months',
+    async ({ startedAt, usesNewMonthlyBonusSchedule }) => {
       const { handleKiloPassInvoicePaid } =
         await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
@@ -2922,6 +2931,7 @@ describe('handleKiloPassInvoicePaid', () => {
           started_at: startedAt,
           ended_at: null,
           current_streak_months: 1,
+          uses_new_monthly_bonus_schedule: usesNewMonthlyBonusSchedule,
         })
         .returning({ subscriptionId: kilo_pass_subscriptions.id });
 
@@ -2966,6 +2976,7 @@ describe('handleKiloPassInvoicePaid', () => {
         where: eq(kilo_pass_subscriptions.id, subscriptionId),
       });
       expect(updatedSub?.current_streak_months).toBe(2);
+      expect(updatedSub?.uses_new_monthly_bonus_schedule).toBe(usesNewMonthlyBonusSchedule);
       expect(updatedSub?.started_at ? new Date(updatedSub.started_at).toISOString() : null).toBe(
         new Date(startedAt).toISOString()
       );

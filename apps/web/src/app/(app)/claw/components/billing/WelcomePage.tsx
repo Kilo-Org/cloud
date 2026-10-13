@@ -114,6 +114,7 @@ function TierCard({
     tier: KILO_PASS_TIERS[tier],
     isFirstTimeSubscriberEver: showFirstMonthPromo,
     subscriptionStartedAtIso,
+    usesNewMonthlyBonusSchedule: true,
   });
 
   return (
@@ -317,6 +318,7 @@ function CreditsHowItWorks({
     tier: KiloPassTier.Tier19,
     isFirstTimeSubscriberEver: showFirstMonthPromo,
     subscriptionStartedAtIso,
+    usesNewMonthlyBonusSchedule: true,
   });
   return (
     <div className="border-border/50 mb-3.5 overflow-hidden rounded-lg border">

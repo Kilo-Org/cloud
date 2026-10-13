@@ -28,6 +28,7 @@ export type KiloPassSubscriptionState = {
   status: Stripe.Subscription.Status;
   cancelAtPeriodEnd: boolean;
   currentStreakMonths: number;
+  usesNewMonthlyBonusSchedule: boolean;
   nextYearlyIssueAt: string | null;
   startedAt: string | null;
   resumesAt: string | null;
@@ -43,6 +44,7 @@ type KiloPassSubscriptionRowForState = {
   status: Stripe.Subscription.Status;
   cancelAtPeriodEnd: boolean;
   currentStreakMonths: number;
+  usesNewMonthlyBonusSchedule: boolean;
   nextYearlyIssueAt: string | null;
   startedAt: string | null;
   createdAt: string;
@@ -136,6 +138,7 @@ export async function getKiloPassStateForUser(
       status: kilo_pass_subscriptions.status,
       cancelAtPeriodEnd: kilo_pass_subscriptions.cancel_at_period_end,
       currentStreakMonths: kilo_pass_subscriptions.current_streak_months,
+      usesNewMonthlyBonusSchedule: kilo_pass_subscriptions.uses_new_monthly_bonus_schedule,
       nextYearlyIssueAt: kilo_pass_subscriptions.next_yearly_issue_at,
       startedAt: kilo_pass_subscriptions.started_at,
       createdAt: kilo_pass_subscriptions.created_at,
@@ -174,6 +177,7 @@ export async function getKiloPassStateForUser(
         status: 'canceled',
         cancelAtPeriodEnd: false,
         currentStreakMonths: selected.currentStreakMonths,
+        usesNewMonthlyBonusSchedule: selected.usesNewMonthlyBonusSchedule,
         nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),
         startedAt: normalizeTimestampToIso(selected.startedAt),
         resumesAt: null,
@@ -201,6 +205,7 @@ export async function getKiloPassStateForUser(
     status: isPaused ? 'paused' : selected.status,
     cancelAtPeriodEnd: selected.cancelAtPeriodEnd,
     currentStreakMonths: selected.currentStreakMonths,
+    usesNewMonthlyBonusSchedule: selected.usesNewMonthlyBonusSchedule,
     nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),
     startedAt: normalizeTimestampToIso(selected.startedAt),
     resumesAt,

@@ -32,6 +32,7 @@ export function KiloPassBonusRampDialog(props: {
   streakMonths?: number;
   showSlider?: boolean;
   subscriptionStartedAtIso?: string | null;
+  usesNewMonthlyBonusSchedule: boolean;
 }) {
   const {
     tier,
@@ -39,6 +40,7 @@ export function KiloPassBonusRampDialog(props: {
     streakMonths,
     showSlider = true,
     subscriptionStartedAtIso,
+    usesNewMonthlyBonusSchedule,
   } = props;
   const [open, setOpen] = useState(false);
 
@@ -47,7 +49,10 @@ export function KiloPassBonusRampDialog(props: {
   const [sliderMonth, setSliderMonth] = useState(resolvedMonth);
   const effectiveMonth = showSlider ? sliderMonth : resolvedMonth;
   const config = KILO_PASS_TIER_CONFIG[tier];
-  const promoMonth = getMonthlyWelcomePromoMonth(subscriptionStartedAtIso);
+  const promoMonth = getMonthlyWelcomePromoMonth(
+    subscriptionStartedAtIso,
+    usesNewMonthlyBonusSchedule
+  );
   const showPromoCallout = showSlider && showFirstMonthPromo && resolvedMonth <= promoMonth;
   const promoMonthLabel = promoMonth === 1 ? 'first paid month' : 'second paid month';
   const firstMonthPercent = computeMonthlyCadenceBonusPercent({
@@ -55,6 +60,7 @@ export function KiloPassBonusRampDialog(props: {
     streakMonths: 1,
     isFirstTimeSubscriberEver: showFirstMonthPromo,
     subscriptionStartedAtIso,
+    usesNewMonthlyBonusSchedule,
   });
 
   const sliderPercent = computeMonthlyCadenceBonusPercent({
@@ -62,6 +68,7 @@ export function KiloPassBonusRampDialog(props: {
     streakMonths: effectiveMonth,
     isFirstTimeSubscriberEver: showFirstMonthPromo,
     subscriptionStartedAtIso,
+    usesNewMonthlyBonusSchedule,
   });
 
   const totalBonusUsd = useMemo(
@@ -73,6 +80,7 @@ export function KiloPassBonusRampDialog(props: {
               streakMonths: index + 1,
               isFirstTimeSubscriberEver: showFirstMonthPromo,
               subscriptionStartedAtIso,
+              usesNewMonthlyBonusSchedule,
             })
           ).reduce((total, percent) => total + config.monthlyPriceUsd * percent, 0)
         : 0,
@@ -82,6 +90,7 @@ export function KiloPassBonusRampDialog(props: {
       showFirstMonthPromo,
       showSlider,
       subscriptionStartedAtIso,
+      usesNewMonthlyBonusSchedule,
       tier,
     ]
   );

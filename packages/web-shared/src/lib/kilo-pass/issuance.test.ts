@@ -195,6 +195,14 @@ test('base issuance is idempotent: calling twice only creates one credit_transac
       )
     );
   expect(transactions).toHaveLength(1);
+  const baseCredit = await db.query.credit_transactions.findFirst({
+    where: eq(credit_transactions.id, transactions[0].id),
+  });
+  expect(baseCredit!.expiration_baseline_microdollars_used).toBe(0);
+  expect(new Date(baseCredit!.expiry_date!).getTime()).toBeCloseTo(
+    dayjs(baseCredit!.created_at).utc().add(1, 'year').valueOf(),
+    -4
+  );
 
   const issuanceItems = await db
     .select({ id: kilo_pass_issuance_items.id })

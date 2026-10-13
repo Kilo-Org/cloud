@@ -1,4 +1,5 @@
 import { createCallerForUser } from '@/routers/test-utils';
+import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
@@ -187,6 +188,26 @@ describe('organization funds router', () => {
   });
 
   describe('distribute', () => {
+    it('does not turn a new paid top-up into non-expiring transferred credits', async () => {
+      await processTopupForOrganization(ownerUser.id, parentOrg.id, 1000, {
+        type: 'stripe',
+        stripe_payment_id: crypto.randomUUID(),
+      });
+      const caller = await createCallerForUser(ownerUser.id);
+      const balances = await caller.organizations.funds.childBalances({
+        organizationId: parentOrg.id,
+      });
+      expect(balances.hasExpiringCredits).toBe(true);
+      await expect(
+        caller.organizations.funds.distribute({
+          organizationId: parentOrg.id,
+          allocations: [{ childOrganizationId: childA.id, amountMicrodollars: 1_000_000 }],
+        })
+      ).rejects.toThrow(
+        'Funds cannot be distributed while this organization has expiring credits.'
+      );
+      expect(balanceOf(await getOrg(childA.id))).toBe(0);
+    });
     it('moves funds from parent to children and records ledger transactions', async () => {
       const caller = await createCallerForUser(ownerUser.id);
 

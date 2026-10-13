@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { paidCreditExpiration } from '@kilocode/web-shared/lib/paid-credit-expiration';
 import type Stripe from 'stripe';
 import {
   credit_transactions,
@@ -186,6 +187,19 @@ describe('Kilo Pass organization agreement service', () => {
       .from(credit_transactions)
       .where(inArray(credit_transactions.organization_id, [parent.id, child.id]));
     expect(credits).toHaveLength(2);
+    for (const credit of credits) {
+      expect(credit.expiration_baseline_microdollars_used).toBe(
+        credit.original_baseline_microdollars_used
+      );
+      expect(new Date(credit.expiry_date!).getTime()).toBeCloseTo(
+        paidCreditExpiration(new Date(credit.created_at)).getTime(),
+        -4
+      );
+      const organization = await db.query.organizations.findFirst({
+        where: eq(organizations.id, credit.organization_id!),
+      });
+      expect(organization!.next_credit_expiration_at).toBe(credit.expiry_date);
+    }
   });
 
   it('returns the latest immutable issuance separately from the next allocation plan', async () => {
@@ -1259,6 +1273,19 @@ describe('Kilo Pass organization agreement service', () => {
     ).resolves.toEqual({ created: false });
     const supplements = await db.select().from(kilo_pass_org_supplements);
     expect(supplements).toHaveLength(1);
+    const supplementCredit = await db.query.credit_transactions.findFirst({
+      where: eq(
+        credit_transactions.credit_category,
+        `kpo:supplement:base:${input.providerInvoiceLineId}`
+      ),
+    });
+    expect(supplementCredit!.expiration_baseline_microdollars_used).toBe(
+      supplementCredit!.original_baseline_microdollars_used
+    );
+    expect(new Date(supplementCredit!.expiry_date!).getTime()).toBeCloseTo(
+      paidCreditExpiration(new Date(supplementCredit!.created_at)).getTime(),
+      -4
+    );
     await expect(
       organizationKiloPassService.getDetail({ organizationId: parent.id })
     ).resolves.toMatchObject({

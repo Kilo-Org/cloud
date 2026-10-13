@@ -1,4 +1,5 @@
 import 'server-only';
+import { paidCreditExpiration } from '@kilocode/web-shared/lib/paid-credit-expiration';
 
 import {
   credit_transactions,
@@ -706,6 +707,7 @@ async function issue(
       microdollars: base,
       identity: grantKey,
       description: 'Kilo Pass organization base issuance',
+      expiresAt: paidCreditExpiration(),
     });
     const bonusId =
       row.term.bonus_mode === KiloPassOrgBonusMode.Upfront
@@ -1216,6 +1218,7 @@ export async function createParentSupplement(input: {
       microdollars: baseAmount,
       identity: `kpo:supplement:base:${input.providerInvoiceLineId}`,
       description: 'Kilo Pass organization supplement',
+      expiresAt: paidCreditExpiration(),
     });
     const bonusId =
       agreement.term.bonus_mode === KiloPassOrgBonusMode.Upfront

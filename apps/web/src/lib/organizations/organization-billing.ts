@@ -1,4 +1,5 @@
 import type { Organization, User } from '@kilocode/db/schema';
+import { paidCreditExpiration } from '@kilocode/web-shared/lib/paid-credit-expiration';
 import { organizations, credit_transactions, transactional_email_log } from '@kilocode/db/schema';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -378,8 +379,15 @@ export async function processTopupForOrganization(
 
   const creditDescription = `Organization top-up via ${config.type}`;
   const creditAmountInMicrodollars = toMicrodollars(amountInCents / 100);
+  const expiryDate = creditAmountInMicrodollars > 0 ? paidCreditExpiration().toISOString() : null;
 
   const didInsertCreditTransaction = await db.transaction(async (tx: DrizzleTransaction) => {
+    const [currentOrganization] = await tx
+      .select({ microdollarsUsed: organizations.microdollars_used })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .for('no key update');
+    if (!currentOrganization) throw new Error('Organization not found: ' + organizationId);
     logExceptInTest(
       `processing topup for ${organization.id} - ${amountInCents} in transaction with payment id ${config.stripe_payment_id}`
     );
@@ -393,7 +401,11 @@ export async function processTopupForOrganization(
         amount_microdollars: creditAmountInMicrodollars,
         description: creditDescription,
         stripe_payment_id: config.stripe_payment_id,
-        original_baseline_microdollars_used: organization.microdollars_used,
+        original_baseline_microdollars_used: currentOrganization.microdollarsUsed,
+        expiration_baseline_microdollars_used: expiryDate
+          ? currentOrganization.microdollarsUsed
+          : null,
+        expiry_date: expiryDate,
       })
       .onConflictDoNothing();
 
@@ -409,6 +421,9 @@ export async function processTopupForOrganization(
       .set({
         total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${Math.round(creditAmountInMicrodollars)}`,
         microdollars_balance: sql`${organizations.microdollars_balance} + ${Math.round(creditAmountInMicrodollars)}`,
+        ...(expiryDate && {
+          next_credit_expiration_at: sql`LEAST(${organizations.next_credit_expiration_at}, ${expiryDate}::timestamptz)`,
+        }),
       })
       .where(eq(organizations.id, organization.id));
 

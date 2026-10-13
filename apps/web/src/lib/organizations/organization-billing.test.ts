@@ -1,4 +1,6 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
+import { paidCreditExpiration } from '@kilocode/web-shared/lib/paid-credit-expiration';
+import { processOrganizationExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import {
   getOrCreateStripeCustomerIdForOrganization,
   getTopUpConfirmationRecipientsForOrganization,
@@ -519,6 +521,102 @@ describe('getTopUpConfirmationRecipientsForOrganization', () => {
 describe('processTopupForOrganization', () => {
   let testUser: User;
   let testOrganization: Organization;
+
+  test('keeps legacy grants unchanged and preserves earlier scheduled expiry', async () => {
+    const earlier = new Date(Date.now() + 86400_000).toISOString();
+    await db
+      .update(organizations)
+      .set({ next_credit_expiration_at: earlier })
+      .where(eq(organizations.id, testOrganization.id));
+    const config = { type: 'stripe' as const, stripe_payment_id: crypto.randomUUID() };
+    const [legacy] = await db
+      .insert(credit_transactions)
+      .values({
+        kilo_user_id: testUser.id,
+        organization_id: testOrganization.id,
+        is_free: false,
+        amount_microdollars: 10_000_000,
+        stripe_payment_id: config.stripe_payment_id,
+      })
+      .returning();
+    await processTopupForOrganization(
+      SYSTEM_AUTO_TOP_UP_USER_ID,
+      testOrganization.id,
+      1000,
+      config
+    );
+    expect(
+      await db.query.credit_transactions.findFirst({ where: eq(credit_transactions.id, legacy.id) })
+    ).toEqual(legacy);
+    await processTopupForOrganization(SYSTEM_AUTO_TOP_UP_USER_ID, testOrganization.id, 1000, {
+      ...config,
+      stripe_payment_id: crypto.randomUUID(),
+    });
+    const updated = await db.query.organizations.findFirst({
+      where: eq(organizations.id, testOrganization.id),
+    });
+    expect(new Date(updated!.next_credit_expiration_at!).toISOString()).toBe(earlier);
+  });
+
+  test.each([false, true])(
+    'expires unused paid organization credits (auto=%s)',
+    async isAutoTopUp => {
+      await db
+        .update(organizations)
+        .set({
+          total_microdollars_acquired: 20_000_000,
+          microdollars_used: 3_000_000,
+          microdollars_balance: 17_000_000,
+        })
+        .where(eq(organizations.id, testOrganization.id));
+      const config = { type: 'stripe' as const, stripe_payment_id: crypto.randomUUID() };
+      const before = paidCreditExpiration();
+      await processTopupForOrganization(
+        SYSTEM_AUTO_TOP_UP_USER_ID,
+        testOrganization.id,
+        1000,
+        config,
+        { isAutoTopUp }
+      );
+      const credit = await db.query.credit_transactions.findFirst({
+        where: eq(credit_transactions.stripe_payment_id, config.stripe_payment_id),
+      });
+      expect(credit).toMatchObject({
+        original_baseline_microdollars_used: 3_000_000,
+        expiration_baseline_microdollars_used: 3_000_000,
+      });
+      expect(new Date(credit!.expiry_date!).getTime()).toBeGreaterThanOrEqual(before.getTime());
+      expect(new Date(credit!.expiry_date!).getTime()).toBeLessThanOrEqual(
+        paidCreditExpiration().getTime()
+      );
+      await processTopupForOrganization(
+        SYSTEM_AUTO_TOP_UP_USER_ID,
+        testOrganization.id,
+        1000,
+        config
+      );
+      expect(
+        await db.query.credit_transactions.findFirst({
+          where: eq(credit_transactions.id, credit!.id),
+        })
+      ).toEqual(credit);
+      await db
+        .update(organizations)
+        .set({ microdollars_used: 7_000_000, microdollars_balance: 23_000_000 })
+        .where(eq(organizations.id, testOrganization.id));
+      const updated = await db.query.organizations.findFirst({
+        where: eq(organizations.id, testOrganization.id),
+      });
+      expect(updated!.next_credit_expiration_at).toBe(credit!.expiry_date);
+      await processOrganizationExpirations(updated!, new Date(credit!.expiry_date!));
+      const expired = await db.query.organizations.findFirst({
+        where: eq(organizations.id, testOrganization.id),
+      });
+      expect(expired!.total_microdollars_acquired).toBe(24_000_000);
+      expect(expired!.microdollars_balance).toBe(17_000_000);
+      expect(expired!.next_credit_expiration_at).toBeNull();
+    }
+  );
 
   beforeEach(async () => {
     captureExceptionMock.mockClear();

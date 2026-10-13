@@ -128,6 +128,7 @@ function creditRowsForPayment(paymentId: string) {
       description: credit_transactions.description,
       isFree: credit_transactions.is_free,
       creditCategory: credit_transactions.credit_category,
+      expiryDate: credit_transactions.expiry_date,
     })
     .from(credit_transactions)
     .where(eq(credit_transactions.stripe_payment_id, paymentId));
@@ -166,6 +167,7 @@ describe('completeStoreCreditPurchase', () => {
         description: 'Credit purchase via App Store',
         isFree: false,
         creditCategory: null,
+        expiryDate: expect.any(String),
       }),
     ]);
     expect(await balanceOf(user.id)).toBe(toMicrodollars(10));
@@ -199,7 +201,12 @@ describe('completeStoreCreditPurchase', () => {
       await creditRowsForPayment(
         storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, providerTransactionId)
       )
-    ).toEqual([expect.objectContaining({ description: 'Credit purchase via Google Play' })]);
+    ).toEqual([
+      expect.objectContaining({
+        description: 'Credit purchase via Google Play',
+        expiryDate: expect.any(String),
+      }),
+    ]);
   });
 
   it('reports a replay as already processed without a second grant', async () => {

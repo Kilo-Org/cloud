@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { egressAllowlistSchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
@@ -384,6 +385,7 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
  * initial turn fields.
  */
 const PrepareSessionSharedFields = {
+  egressAllowlist: egressAllowlistSchema.optional(),
   // Repository source (mutually exclusive - must provide exactly one)
   githubRepo: z
     .string()

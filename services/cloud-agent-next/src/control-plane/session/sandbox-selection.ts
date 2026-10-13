@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { egressAllowlistSchema } from '@kilocode/worker-utils/egress-allowlist';
 import { agentSandboxProviderSchema } from '../../types.js';
 import { sandboxProviderConfigurationSchema } from '../../sandbox-control/provider.js';
 import { sandboxBillingInputEnvelopeSchema } from '../../container-usage-context.js';
@@ -24,8 +25,15 @@ export const controlPlaneSandboxSelectionSchema = z
     containment: credentialContainmentSchema.optional(),
     /** The stored kind of a placed (`sbx-`) key; absent for a legacy prefixed key. */
     sandboxKind: sandboxKindSchema.optional(),
+    egressAllowlist: egressAllowlistSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    selection =>
+      selection.egressAllowlist === undefined ||
+      (selection.provider === 'cloudflare-containers' && selection.sandboxKind !== 'shared'),
+    'Egress allowlists require an isolated Cloudflare containers sandbox'
+  );
 
 export type ControlPlaneSandboxSelection = z.infer<typeof controlPlaneSandboxSelectionSchema>;
 

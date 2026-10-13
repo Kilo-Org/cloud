@@ -25,6 +25,26 @@ afterEach(() => {
 });
 
 describe('CloudAgentNextFetchClient prepareSession', () => {
+  it.each([[], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+    'posts an API-only egress policy unchanged: %j',
+    async ({ egressAllowlist }) => {
+      const fetchMock = mockFetch(200, {
+        result: { data: { cloudAgentSessionId: 'workspace_test', kiloSessionId: 'ses_test' } },
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const input: CloudAgentPrepareSessionInput = {
+        prompt: 'hello',
+        mode: 'code',
+        model: 'test-model',
+        egressAllowlist,
+      };
+      await createCloudAgentNextFetchClient(BASE_URL).prepareSession({}, input);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE_URL}/trpc/prepareSession`,
+        expect.objectContaining({ body: JSON.stringify(input) })
+      );
+    }
+  );
   it('posts the complete managed Bitbucket code-review context', async () => {
     const fetchMock = mockFetch(200, {
       result: {

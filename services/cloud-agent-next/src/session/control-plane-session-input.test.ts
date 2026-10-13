@@ -3,6 +3,7 @@ import type { Env } from '../types.js';
 import { vercelBillingIdentity } from '../container-usage-context.js';
 import {
   buildControlPlaneCreateInput,
+  buildControlPlaneRegisterInput,
   buildControlPlanePromptPayload,
 } from './control-plane-session-input.js';
 import { buildControlPlaneSessionRegistration } from '../control-plane/session/registration.js';
@@ -42,6 +43,49 @@ describe('buildControlPlanePromptPayload', () => {
 });
 
 describe('buildControlPlaneCreateInput', () => {
+  it.each(
+    [undefined, [], ['Z.Example.COM.', 'example.com']].map(egressAllowlist => ({ egressAllowlist }))
+  )(
+    'persists and selects the same policy for start and registration: %j',
+    async ({ egressAllowlist }) => {
+      const command = {
+        identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
+        auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+        message: {
+          initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          turn: { type: 'prompt' as const, prompt: 'hi' },
+        },
+        agent: { mode: 'code', model: FULL_MODEL },
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef' as const,
+          sandboxProvider: 'cloudflare-containers' as const,
+          egressAllowlist,
+        },
+      };
+      const created = await buildControlPlaneCreateInput({
+        command,
+        env: {} as Env,
+        attachments: [],
+        agent: command.agent,
+      });
+      const registered = await buildControlPlaneRegisterInput({ command, env: {} as Env });
+      const expected =
+        egressAllowlist === undefined
+          ? undefined
+          : egressAllowlist.length === 0
+            ? []
+            : ['example.com', 'z.example.com'];
+      for (const input of [created, registered]) {
+        expect(input.metadata.workspace?.egressAllowlist).toEqual(expected);
+        expect(input.sandboxSelection.egressAllowlist).toEqual(expected);
+        expect(
+          buildControlPlaneSessionRegistration(input.metadata, input.sandboxSelection)
+            .sandboxSelection?.egressAllowlist
+        ).toEqual(expected);
+      }
+    }
+  );
+
   it.each([
     [undefined, { vcpus: 2, memory: 4096 }, 'SandboxVercelSmall'],
     ['vercel-large', { vcpus: 4, memory: 8192 }, 'SandboxVercelLarge'],

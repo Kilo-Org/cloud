@@ -123,6 +123,7 @@ import {
   withSavedSandboxAllocation,
 } from './sandbox-allocation-resolution.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
+import { egressAllowlistSchema } from '@kilocode/worker-utils/egress-allowlist';
 
 export type SessionRegistrationInput = SessionCreateRequest;
 
@@ -161,6 +162,12 @@ function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
   options?: { billingOrigin?: string }
 ): void {
+  if (
+    input.runtime?.egressAllowlist !== undefined &&
+    !egressAllowlistSchema.safeParse(input.runtime.egressAllowlist).success
+  ) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid egress allowlist' });
+  }
   if (input.runtime && 'devcontainer' in input.runtime && input.runtime.devcontainer === true) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: DEVCONTAINER_RETIRED_MESSAGE });
   }
@@ -176,6 +183,27 @@ function assertSupportedSandboxAllocation(
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Sandbox allocations cannot be combined with specialized sandbox routing',
+    });
+  }
+}
+
+function assertEgressAllowlistAllocation(
+  input: SessionRegistrationInput,
+  allocation: Pick<
+    SessionRegistrationResult,
+    'cloudAgentSessionId' | 'sandboxProvider' | 'sandboxRoute' | 'sandboxKind'
+  >
+): void {
+  if (input.runtime?.egressAllowlist === undefined) return;
+  if (
+    !allocation.cloudAgentSessionId.startsWith('workspace_') ||
+    allocation.sandboxProvider !== 'cloudflare-containers' ||
+    allocation.sandboxRoute !== undefined ||
+    allocation.sandboxKind === 'shared'
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Egress allowlists require an isolated control-plane Cloudflare containers sandbox',
     });
   }
 }
@@ -806,6 +834,12 @@ async function allocateNewSession(
     rethrowAllocationFailure(ledger, 'sandbox', error);
   }
 
+  try {
+    assertEgressAllowlistAllocation(input, { cloudAgentSessionId, sandboxProvider, sandboxRoute });
+  } catch (error) {
+    rethrowAllocationFailure(ledger, 'sandbox', error);
+  }
+
   if (ledger) {
     // Record the non-secret sandbox allocation before the ownership row is
     // created so a same-key retry can reconcile the same allocation instead of
@@ -1071,6 +1105,12 @@ function rebuildRecordedSessionAllocation(
     initialTurn = { ...accepted, messageId: initialMessageId };
   }
 
+  assertEgressAllowlistAllocation(input, {
+    cloudAgentSessionId,
+    sandboxProvider: recordedProvider.data,
+    sandboxRoute: route,
+    sandboxKind,
+  });
   const sessionService = new SessionService();
   const cloneFromKiloSessionId = input.clone?.cloneFromKiloSessionId;
 
@@ -1163,6 +1203,9 @@ function buildSessionRegistrationCommand(
     workspace: {
       sandboxId: allocation.sandboxId,
       sandboxProvider: allocation.sandboxProvider,
+      ...(input.runtime?.egressAllowlist === undefined
+        ? {}
+        : { egressAllowlist: input.runtime.egressAllowlist }),
       ...(allocation.sandboxAllocation ? { sandboxAllocation: allocation.sandboxAllocation } : {}),
       shallow: input.options?.shallow,
       ...(allocation.worktreeId
@@ -1751,6 +1794,9 @@ export async function sessionCreateIntentFingerprint(
             ...(input.runtime.sandboxAllocation
               ? { sandboxAllocation: input.runtime.sandboxAllocation }
               : {}),
+            ...(input.runtime.egressAllowlist === undefined
+              ? {}
+              : { egressAllowlist: egressAllowlistSchema.parse(input.runtime.egressAllowlist) }),
           }
         : undefined,
       options: input.options
@@ -1795,7 +1841,8 @@ async function assertCreateIntentUnchanged(
   if (
     !recorded.success ||
     !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement) ||
-    (selectable !== undefined && (typeof stored !== 'string' || stored.length === 0))
+    ((selectable !== undefined || input.runtime?.egressAllowlist !== undefined) &&
+      (typeof stored !== 'string' || stored.length === 0))
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
   }
@@ -2286,10 +2333,12 @@ async function resumeFirstWorktreeCreate(
  */
 async function readSessionMetadata(
   ctx: SessionRegistrationContext,
-  sessionId: string
+  sessionId: string,
+  input: SessionRegistrationInput
 ): Promise<SessionMetadata | null> {
+  let metadata: SessionMetadata | null;
   try {
-    return await withDORetry(
+    metadata = await withDORetry<SessionStub, SessionMetadata | null>(
       () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
       s => s.getMetadata(),
       'getMetadata'
@@ -2297,6 +2346,18 @@ async function readSessionMetadata(
   } catch {
     throw creationInProgressError();
   }
+  if (
+    metadata !== null &&
+    JSON.stringify(metadata.workspace?.egressAllowlist) !==
+      JSON.stringify(
+        input.runtime?.egressAllowlist === undefined
+          ? undefined
+          : egressAllowlistSchema.parse(input.runtime.egressAllowlist)
+      )
+  ) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+  }
+  return metadata;
 }
 
 /**
@@ -2391,14 +2452,14 @@ async function reconcileLedgerCreate(
     });
 
   // (c) Ownership present → read the DO state.
-  if (!(await readSessionMetadata(ctx, ids.cloudAgentSessionId))) {
+  if (!(await readSessionMetadata(ctx, ids.cloudAgentSessionId, input))) {
     if (worktreeAllocation) {
       return resumeFirstWorktreeCreate(input, ctx, options, db, row, worktreeAllocation, true);
     }
     // A single null metadata read is NOT proof of no registration (a transient
     // read or a pending deletion intent can hide committed metadata), so read
     // once more before treating the ownership row as stale.
-    if (await readSessionMetadata(ctx, ids.cloudAgentSessionId)) {
+    if (await readSessionMetadata(ctx, ids.cloudAgentSessionId, input)) {
       return confirm();
     }
 

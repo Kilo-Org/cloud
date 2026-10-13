@@ -172,7 +172,13 @@ export function buildControlPlaneSandboxSelection(
     ...buildSandboxBillingInput(metadata, sandboxId, enforcementRequested),
     enforcementRequested,
   };
-  const pinned = { billing, ...(sandboxKind ? { sandboxKind } : {}) };
+  const pinned = {
+    billing,
+    ...(sandboxKind ? { sandboxKind } : {}),
+    ...(metadata.workspace?.egressAllowlist === undefined
+      ? {}
+      : { egressAllowlist: metadata.workspace.egressAllowlist }),
+  };
   switch (provider) {
     case 'vercel': {
       const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');

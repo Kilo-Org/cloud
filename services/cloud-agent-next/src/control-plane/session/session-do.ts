@@ -158,6 +158,7 @@ import {
 import {
   controlPlaneSandboxSelectionSchema,
   type ControlPlanePrepareInputWithSelection,
+  type ControlPlaneSandboxSelection,
 } from './sandbox-selection.js';
 import type { ControlRuntimeCredentialProxyFence } from '../sandbox/sandbox-do.js';
 import { diagnosticCause, logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
@@ -651,7 +652,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const { metadata, message, sandboxSelection, runtimeAuthorizationSeal } = parsed.data;
 
     if (this.metadata !== null && this.registration !== null) {
-      if (!this.matchesExistingRegistration(metadata, message.messageId)) {
+      if (!this.matchesExistingRegistration(metadata, message.messageId, sandboxSelection)) {
         return createFailure(
           'BAD_REQUEST',
           'Registration does not match the existing session intent'
@@ -726,7 +727,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // seal) must not touch the seal again. Match the stored intent and replay
     // success before unsealing; a different intent is rejected.
     if (this.metadata !== null && this.registration !== null) {
-      if (!this.matchesExistingRegistration(metadata, undefined)) {
+      if (!this.matchesExistingRegistration(metadata, undefined, sandboxSelection)) {
         return createFailure(
           'BAD_REQUEST',
           'Registration does not match the existing session intent'
@@ -887,7 +888,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   private matchesExistingRegistration(
     metadata: SessionMetadata,
-    messageId: string | undefined
+    messageId: string | undefined,
+    sandboxSelection: ControlPlaneSandboxSelection
   ): boolean {
     const existing = this.metadata;
     if (existing === null || this.registration === null) return false;
@@ -896,6 +898,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.identity.orgId ?? null) === (metadata.identity.orgId ?? null) &&
       sameRepository(existing.repository, metadata.repository) &&
       this.registration.sandboxId === metadata.workspace?.sandboxId &&
+      JSON.stringify(existing.workspace?.egressAllowlist) ===
+        JSON.stringify(metadata.workspace?.egressAllowlist) &&
+      JSON.stringify(this.registration.sandboxSelection?.egressAllowlist) ===
+        JSON.stringify(sandboxSelection.egressAllowlist) &&
       (existing.initialMessage?.id ?? null) === (messageId ?? null) &&
       (existing.clone?.cloneUpToMessageId ?? null) === (metadata.clone?.cloneUpToMessageId ?? null)
     );

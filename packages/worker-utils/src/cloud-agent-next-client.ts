@@ -66,6 +66,7 @@ export type CloudAgentPrepareSessionInput = {
   createdOnPlatform?: string;
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
   sandboxAllocation?: 'isolated-standard';
+  egressAllowlist?: string[];
   runtimeSkills?: Array<{
     name: string;
     rawMarkdown: string;

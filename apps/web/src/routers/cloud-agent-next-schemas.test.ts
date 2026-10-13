@@ -734,6 +734,31 @@ describe('prepare session sandbox selection', () => {
     model: 'kilo/test-model',
   };
   const organizationInput = { ...baseInput, organizationId: MESSAGE_UUID };
+  it.each([[], ['Z.Example.COM.', 'example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+    'preserves canonical API-only policy %j',
+    ({ egressAllowlist }) => {
+      const expected = egressAllowlist.length === 0 ? [] : ['example.com', 'z.example.com'];
+      expect(
+        personalPrepareSessionNextSchema.parse({ ...baseInput, egressAllowlist }).egressAllowlist
+      ).toEqual(expected);
+      expect(
+        organizationPrepareSessionNextSchema.parse({ ...organizationInput, egressAllowlist })
+          .egressAllowlist
+      ).toEqual(expected);
+    }
+  );
+
+  it('rejects non-domain API policies', () => {
+    for (const egressAllowlist of [['*'], ['127.1'], ['https://example.com'], null]) {
+      expect(
+        personalPrepareSessionNextSchema.safeParse({ ...baseInput, egressAllowlist }).success
+      ).toBe(false);
+      expect(
+        organizationPrepareSessionNextSchema.safeParse({ ...organizationInput, egressAllowlist })
+          .success
+      ).toBe(false);
+    }
+  });
   const allocations = SELECTABLE_SANDBOX_ALLOCATIONS;
   const requests: SelectableSandboxAllocationRequest[] = [
     ...allocations.map(allocation => getSandboxAllocationRequest(allocation)),

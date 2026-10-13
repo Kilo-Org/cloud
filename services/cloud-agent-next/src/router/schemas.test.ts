@@ -52,6 +52,39 @@ const baseStartInput = {
 };
 
 describe('grouped unified session input contracts', () => {
+  it.each(
+    [[], ['Z.Example.COM.', 'example.com', 'EXAMPLE.COM']].map(egressAllowlist => ({
+      egressAllowlist,
+    }))
+  )('normalizes grouped and legacy egress allowlists: %j', ({ egressAllowlist }) => {
+    const expected = egressAllowlist.length === 0 ? [] : ['example.com', 'z.example.com'];
+    expect(
+      StartSessionInput.parse({ ...baseStartInput, runtime: { egressAllowlist } }).runtime
+    ).toEqual({ egressAllowlist: expected });
+    expect(
+      PrepareSessionInput.parse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        egressAllowlist,
+      }).egressAllowlist
+    ).toEqual(expected);
+  });
+
+  it('rejects invalid egress policies at both public boundaries', () => {
+    for (const egressAllowlist of [null, ['*'], ['127.1'], ['https://example.com']]) {
+      expect(
+        StartSessionInput.safeParse({ ...baseStartInput, runtime: { egressAllowlist } }).success
+      ).toBe(false);
+      expect(
+        PrepareSessionInput.safeParse({
+          ...basePromptInput,
+          githubRepo: 'acme/repo',
+          egressAllowlist,
+        }).success
+      ).toBe(false);
+    }
+  });
+
   it('rejects retired devcontainer requests at the legacy API boundary', () => {
     const input = {
       ...basePromptInput,

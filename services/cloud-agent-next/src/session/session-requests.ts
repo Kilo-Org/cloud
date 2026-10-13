@@ -48,6 +48,7 @@ export type SessionRepositoryRequest =
 
 export type SessionRuntimeIntent = {
   sandboxAllocation?: SandboxAllocation;
+  egressAllowlist?: string[];
 };
 
 export type SessionCreateRequest = {

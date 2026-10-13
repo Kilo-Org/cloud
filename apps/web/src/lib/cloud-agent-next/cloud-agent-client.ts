@@ -180,6 +180,7 @@ type PrepareSessionSharedFields = {
   /** Deprecated: true is rejected because devcontainer support is retired. */
   devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocationInput;
+  egressAllowlist?: string[];
 };
 
 /** Non-clone prepare input: required `prompt` and the current optional initial fields. */

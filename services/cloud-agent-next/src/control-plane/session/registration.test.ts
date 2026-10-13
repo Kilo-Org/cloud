@@ -50,6 +50,46 @@ function metadata(overrides: Record<string, unknown> = {}) {
 
 const selection = { provider: 'cloudflare' as const };
 
+describe('egress policy registration', () => {
+  it.each([[], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+    'preserves a matching policy %j',
+    ({ egressAllowlist }) => {
+      const input = metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressAllowlist,
+        },
+      });
+      expect(
+        buildControlPlaneSessionRegistration(input, {
+          provider: 'cloudflare-containers',
+          egressAllowlist,
+        }).sandboxSelection?.egressAllowlist
+      ).toEqual(egressAllowlist);
+    }
+  );
+
+  it.each([undefined, [], ['other.example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+    'rejects a mismatched policy %j',
+    ({ egressAllowlist }) => {
+      const input = metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressAllowlist: ['example.com'],
+        },
+      });
+      expect(() =>
+        buildControlPlaneSessionRegistration(input, {
+          provider: 'cloudflare-containers',
+          egressAllowlist,
+        })
+      ).toThrow('Sandbox selection egress allowlist does not match session metadata');
+    }
+  );
+});
+
 describe('migrated origin permissions', () => {
   it.each(['standard', 'lite', undefined] as const)(
     'defers GitHub publisher identity %s to credential resolution',

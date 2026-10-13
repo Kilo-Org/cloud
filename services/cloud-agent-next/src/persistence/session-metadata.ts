@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { egressAllowlistSchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
@@ -296,6 +297,7 @@ const MetadataWorkspaceSchema = z
     sandboxKind: sandboxKindSchema.optional(),
     sandboxProvider: SandboxProviderSchema.optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
+    egressAllowlist: egressAllowlistSchema.optional(),
     providerRuntime: ProviderRuntimeSchema.optional(),
     worktreeId: cloudAgentWorktreeIdSchema.optional(),
     workspacePath: z.string().optional(),
@@ -364,6 +366,14 @@ const MetadataWorkspaceSchema = z
       });
     }
   })
+  .refine(
+    workspace =>
+      workspace.egressAllowlist === undefined ||
+      (workspace.sandboxProvider === 'cloudflare-containers' &&
+        isIsolatedProviderWorkspace(workspace) &&
+        workspace.sandboxRoute === undefined),
+    'Egress allowlists require an isolated Cloudflare containers sandbox'
+  )
   .refine(
     workspace => workspace.sandboxProvider !== 'vercel' || isIsolatedProviderWorkspace(workspace),
     'Vercel sandbox metadata requires an isolated sandbox'

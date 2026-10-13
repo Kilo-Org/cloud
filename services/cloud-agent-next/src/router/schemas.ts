@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { egressAllowlistSchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   getKiloSandboxAllocation,
   sandboxAllocationInputSchema,
@@ -598,6 +599,7 @@ const PrepareSessionSharedFields = {
   sandboxAllocation: ManagedSandboxAllocationInput.optional().describe(
     'Select a provider account and instance type instead of default routing'
   ),
+  egressAllowlist: egressAllowlistSchema.optional(),
 };
 
 const PrepareSessionNonCloneVariant = z.object({
@@ -926,7 +928,10 @@ export const StartSessionInput = z
     repository: RepositoryInputSchema,
     profile: ProfileInputSchema,
     runtime: z
-      .object({ sandboxAllocation: ManagedSandboxAllocationInput.optional() })
+      .object({
+        sandboxAllocation: ManagedSandboxAllocationInput.optional(),
+        egressAllowlist: egressAllowlistSchema.optional(),
+      })
       .strict()
       .optional(),
     options: z

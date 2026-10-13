@@ -4,10 +4,12 @@ import {
   cloneSession,
   continueSession,
   type ModelEvent,
+  type ModelUsage,
   openSession,
   type PartDraft,
   type SessionHandle,
   ToolMissingError,
+  zeroUsage,
 } from '@kilocode/harness-sdk';
 import { type SQLiteDatabase } from 'expo-sqlite';
 
@@ -15,6 +17,7 @@ import { KILO_MCP_URL } from '@/lib/config';
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 import { change, forgetState, moveState, NOTHING, type Question, snapshotOf } from './state';
 import { chatLayers, type ChatOrg, organizationIdOf } from './layers';
+import { countUsage, usageSince } from './chat-usage';
 import {
   ensureKiloMcp,
   mcpEnabledFor,
@@ -31,6 +34,8 @@ import {
   forgetSession,
   modelOfSession,
   moveChat,
+  recordOfChat,
+  recordUsage,
   rememberChat,
   toolsOfSession,
   touchChat,
@@ -83,6 +88,12 @@ type Chat = {
    * answer that is still coming.
    */
   pendingTools: boolean | undefined;
+  /**
+   * The session's own total when the chat's usage last took from it. The SDK
+   * counts from zero each time a session opens, so a new session starts here
+   * at zero too.
+   */
+  counted: ModelUsage;
   readonly chatScope: string;
   readonly org: ChatOrg;
 };
@@ -195,7 +206,8 @@ export async function startChat(
       tools: toolsSupported ? chatToolNamesStarting(organizationIdOf(place.org), mcpEnabled) : [],
     })
   );
-  rememberChat(await open(), { sessionId: handle.id, scope: place.chatScope, at: Date.now() });
+  const database = await open();
+  rememberChat(database, { sessionId: handle.id, scope: place.chatScope, at: Date.now() });
   if (!mcpEnabled) {
     /* The chat was opened without the tools, so its setting says so: a chat
        that never had them is still a chat a person can turn them on for. */
@@ -207,9 +219,15 @@ export async function startChat(
     answering: undefined,
     waiting: [],
     pendingTools: undefined,
+    counted: zeroUsage,
     ...place,
   });
-  change(handle.id, { ...NOTHING, model, status: 'idle' });
+  change(handle.id, {
+    ...NOTHING,
+    model,
+    status: 'idle',
+    record: recordOfChat(database, handle.id),
+  });
   return handle.id;
 }
 
@@ -319,7 +337,8 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
     const current = await onto(place, sessionId, {
       tools: await chatToolNames(organizationIdOf(place.org), sessionId),
     });
-    const model = modelOfSession(await open(), current) ?? '';
+    const database = await open();
+    const model = modelOfSession(database, current) ?? '';
     const asked = await askedIn(current);
     change(current, {
       model,
@@ -329,6 +348,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       status: 'idle',
       failed: null,
       failureKey: null,
+      record: recordOfChat(database, current),
     });
     return;
   }
@@ -336,13 +356,15 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   try {
     const turns = await runtime.runPromise(handle.history);
     const asked = await askedIn(sessionId);
-    const model = modelOfSession(await open(), sessionId) ?? '';
+    const database = await open();
+    const model = modelOfSession(database, sessionId) ?? '';
     chats.set(sessionId, {
       handle,
       scope,
       answering: undefined,
       waiting: [],
       pendingTools: undefined,
+      counted: zeroUsage,
       ...place,
     });
     change(sessionId, {
@@ -353,6 +375,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       asked: asked?.text ?? null,
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
+      record: recordOfChat(database, sessionId),
     });
   } catch (error) {
     /* Reading the history or the pending question failed after the session
@@ -409,7 +432,8 @@ export async function say(sessionId: string, question: Question, model: string):
       throw new Error('the chat is not open');
     }
     const runtime = await runtimeFor(chat);
-    touchChat(await open(), current, Date.now());
+    const at = Date.now();
+    touchChat(await open(), current, at);
     change(current, {
       status: 'working',
       answering: '',
@@ -418,6 +442,7 @@ export async function say(sessionId: string, question: Question, model: string):
       askedModel: model,
       failed: null,
       failureKey: null,
+      record: { ...snapshotOf(current).record, updatedAt: at },
     });
     chat.answering = runtime.runFork(reading(current, { text, images }, runtime));
   } catch (error) {
@@ -473,6 +498,28 @@ function partsOf({ text, images }: Question): string | readonly PartDraft[] {
   ];
 }
 
+/**
+ * Adds what the session used since it was last read to the chat's usage, under
+ * the model the session runs on, and writes it down so a reopened chat has it.
+ * `last` is the call that just ended: what it put in front of the model is how
+ * full the window is now.
+ */
+async function countCall(
+  sessionId: string,
+  chat: Chat,
+  total: ModelUsage,
+  last: ModelUsage
+): Promise<void> {
+  const spent = usageSince(total, chat.counted);
+  chat.counted = total;
+  const { model, record } = snapshotOf(sessionId);
+  const usage = countUsage(record.usage, model, spent);
+  recordUsage(await open(), sessionId, usage);
+  change(sessionId, {
+    record: { ...record, usage, prompted: last.inputTokens + last.cacheReadTokens },
+  });
+}
+
 /** Reads one answer to the end, however it ends. */
 function reading(sessionId: string, question: Question, runtime: ChatRuntime): Effect.Effect<void> {
   const chat = chats.get(sessionId);
@@ -480,14 +527,21 @@ function reading(sessionId: string, question: Question, runtime: ChatRuntime): E
     return Effect.void;
   }
   let said = '';
-  return Stream.runForEach(chat.handle.ask(partsOf(question)), (event: ModelEvent) =>
-    Effect.sync(() => {
+  return Stream.runForEach(chat.handle.ask(partsOf(question)), (event: ModelEvent) => {
+    if (event.kind === 'done') {
+      return Effect.flatMap(chat.handle.usage, total =>
+        Effect.promise(async () => {
+          await countCall(sessionId, chat, total, event.usage);
+        })
+      );
+    }
+    return Effect.sync(() => {
       if (event.kind === 'delta') {
         said += event.text;
         change(sessionId, { answering: said });
       }
-    })
-  ).pipe(
+    });
+  }).pipe(
     Effect.matchCauseEffect({
       onFailure: (cause: Cause.Cause<unknown>) =>
         Effect.promise(async () => {
@@ -659,8 +713,16 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
   chats.set(
     handle.id,
     chat === undefined
-      ? { handle, scope, answering: undefined, waiting: [], pendingTools: undefined, ...place }
-      : { ...chat, handle, scope, answering: undefined }
+      ? {
+          handle,
+          scope,
+          answering: undefined,
+          waiting: [],
+          pendingTools: undefined,
+          counted: zeroUsage,
+          ...place,
+        }
+      : { ...chat, handle, scope, answering: undefined, counted: zeroUsage }
   );
   change(handle.id, { ...held, sessionId: handle.id, model, turns });
   /* The chat it moved off is left pointing at the one it became, rather than

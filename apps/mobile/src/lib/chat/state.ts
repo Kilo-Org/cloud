@@ -2,6 +2,8 @@ import { type Turn } from '@kilocode/harness-sdk';
 
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
 
+import { type ChatRecord, NO_RECORD } from './store';
+
 /**
  * What a chat looks like to whoever is drawing it.
  *
@@ -46,6 +48,11 @@ export type ChatState = {
   readonly failed: string | null;
   /** A fixed localization key safe to display, never a provider's raw error. */
   readonly failureKey: string | null;
+  /**
+   * What the chat used, how full the last call was, and when it started and
+   * last moved. Changed when a call ends, not on every word of an answer.
+   */
+  readonly record: ChatRecord;
 };
 
 /**
@@ -115,6 +122,7 @@ export const NOTHING = {
   waiting: [] as readonly Question[],
   failed: null,
   failureKey: null,
+  record: NO_RECORD,
 } satisfies Omit<ChatState, 'sessionId' | 'model' | 'status'>;
 
 function publish(sessionId: string): void {

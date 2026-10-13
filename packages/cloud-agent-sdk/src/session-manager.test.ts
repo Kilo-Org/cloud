@@ -819,13 +819,13 @@ describe('createSessionManager', () => {
         );
       });
 
-      it('removes cached-only messages and parts without deleting live arrivals', async () => {
+      it('retains cached messages and parts omitted from the live page alongside live arrivals', async () => {
         const live = deferred<SessionSnapshotPageOutcome | null>();
         const cached = {
-          ...cachedPage('ses-1', ['msg-retained', 'msg-removed']),
+          ...cachedPage('ses-1', ['msg-retained', 'msg-omitted']),
           messages: [
-            makePageMessage('msg-retained', 'ses-1', 'removed cached part'),
-            makePageMessage('msg-removed', 'ses-1', 'removed cached message'),
+            makePageMessage('msg-retained', 'ses-1', 'omitted cached part'),
+            makePageMessage('msg-omitted', 'ses-1', 'omitted cached message'),
           ],
         };
         const config = createMockConfig({
@@ -845,21 +845,25 @@ describe('createSessionManager', () => {
         await new Promise<void>(resolve => setImmediate(resolve));
 
         expect(config.store.get(mgr.atoms.messagesList).map(message => message.info.id)).toEqual(
-          expect.arrayContaining(['msg-retained', 'msg-live-event'])
+          expect.arrayContaining(['msg-retained', 'msg-omitted', 'msg-live-event'])
         );
-        expect(storage.getMessageInfo('msg-removed')).toBeUndefined();
-        expect(storage.getParts('msg-retained').map(part => part.id)).toEqual(['fresh-part-id']);
+        expect(storage.getParts('msg-omitted')).toEqual(cached.messages[1].parts);
+        expect(storage.getParts('msg-retained')).toEqual(
+          expect.arrayContaining([...cached.messages[0].parts, ...fresh.parts])
+        );
         expect(config.store.get(mgr.atoms.isRefreshingCachedTranscript)).toBe(false);
         mgr.destroy();
       });
 
-      it('reconciles cached rows preserved by a metadata retry', async () => {
+      it('retains cached rows and reader scroll intent through a metadata retry and an empty live page', async () => {
+        const metadata = deferred<FetchedSessionData>();
         const config = createMockConfig({
           fetchSession: jest
             .fn()
             .mockRejectedValueOnce(new Error('offline'))
+            .mockReturnValueOnce(metadata.promise)
             .mockResolvedValue(defaultFetchedSession),
-          readCachedSnapshotPage: async () => cachedPage('ses-1', ['msg-removed']),
+          readCachedSnapshotPage: async id => cachedPage(id, ['msg-retained']),
           fetchSnapshotPage: createPageFetchMock(async () =>
             makePage({ kiloSessionId: 'ses-1', messages: [] })
           ),
@@ -868,12 +872,25 @@ describe('createSessionManager', () => {
         await mgr.switchSession(kiloId('ses-1'));
         await new Promise<void>(resolve => setImmediate(resolve));
         expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(1);
+        const rows = config.store.get(mgr.atoms.messagesList);
+        const readerIntent = { shouldAutoScroll: false };
+        config.store.set(mgr.atoms.chatUI, readerIntent);
 
-        await mgr.switchSession(kiloId('ses-1'));
+        const retry = mgr.switchSession(kiloId('ses-1'));
+        expect(config.store.get(mgr.atoms.messagesList)).toBe(rows);
+        expect(config.store.get(mgr.atoms.chatUI)).toBe(readerIntent);
+        metadata.resolve(defaultFetchedSession);
+        await retry;
         await new Promise<void>(resolve => setImmediate(resolve));
 
-        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(0);
+        expect(config.store.get(mgr.atoms.messagesList).map(message => message.info.id)).toEqual([
+          'msg-retained',
+        ]);
+        expect(config.store.get(mgr.atoms.chatUI)).toBe(readerIntent);
         expect(config.store.get(mgr.atoms.isRefreshingCachedTranscript)).toBe(false);
+
+        await mgr.switchSession(kiloId('ses-2'));
+        expect(config.store.get(mgr.atoms.chatUI)).toEqual({ shouldAutoScroll: true });
         mgr.destroy();
       });
 

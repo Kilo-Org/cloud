@@ -327,8 +327,8 @@ export default function CloudChatPage({
     hasMessages: transcriptMessageCount > 0,
     terminalOpenFailure,
   });
-  const transcriptReady =
-    transcriptReadyForEffects(transcriptPhase) && !isRefreshingCachedTranscript;
+  const transcriptVisible = transcriptReadyForEffects(transcriptPhase);
+  const transcriptReady = transcriptVisible && !isRefreshingCachedTranscript;
 
   const { pendingFirstChat, setPendingFirstChat } = usePendingFirstChat();
   const pendingWorktreeResolvedKiloSessionId = pendingWorktreeChat?.resolvedKiloSessionId ?? null;
@@ -625,6 +625,7 @@ export default function CloudChatPage({
   // shouldAutoScroll, making it impossible for the user to scroll away during streaming.
   const isAutoScrollingRef = useRef(false);
   const autoScrollRunRef = useRef(0);
+  const transcriptPositionedRef = useRef(false);
   const lastScrollTopRef = useRef(0);
   // Mirrors `chatUI.shouldAutoScroll` so a scroll already scheduled (rAF or
   // timeout) re-checks the latest intent when it runs, not the value captured
@@ -708,7 +709,7 @@ export default function CloudChatPage({
 
   useEffect(() => cancelScheduledAutoScroll, [cancelScheduledAutoScroll]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     // An in-progress resume has already paused auto-scroll and owns the
     // position; do not let an atom write (e.g. a session reset) re-enable it.
     const resumeState = resumeStateRef.current;
@@ -716,12 +717,53 @@ export default function CloudChatPage({
     shouldAutoScrollRef.current = chatUI.shouldAutoScroll;
   }, [chatUI.shouldAutoScroll]);
 
-  useEffect(() => {
-    if (!chatTabActive || transcriptPhase === 'opening') cancelScheduledAutoScroll();
-  }, [cancelScheduledAutoScroll, chatTabActive, transcriptPhase]);
+  useLayoutEffect(() => {
+    cancelScheduledAutoScroll();
+    autoScrollRunRef.current += 1;
+    isAutoScrollingRef.current = false;
+    transcriptPositionedRef.current = false;
+    resumeStateRef.current =
+      sessionIdFromParams && anchorMessageIdFromParams
+        ? {
+            key: `${sessionIdFromParams}\u0000${anchorMessageIdFromParams}`,
+            attempts: 0,
+            done: false,
+          }
+        : null;
+    shouldAutoScrollRef.current = !resumeStateRef.current;
+    setChatUI({ shouldAutoScroll: shouldAutoScrollRef.current });
+    lastScrollTopRef.current = 0;
+    wasNearBottomRef.current = true;
+    olderArrivalInitializedRef.current = false;
+    olderArrivalCountRef.current = 0;
+    olderArrivalNewestKeyRef.current = null;
+    setOlderArrivalAnnouncement('');
+    setShowScrollButton(false);
+  }, [anchorMessageIdFromParams, cancelScheduledAutoScroll, sessionIdFromParams, setChatUI]);
+
+  useLayoutEffect(() => {
+    if (!chatTabActive || !transcriptVisible) {
+      cancelScheduledAutoScroll();
+      transcriptPositionedRef.current = false;
+    }
+  }, [cancelScheduledAutoScroll, chatTabActive, transcriptVisible]);
+
+  useLayoutEffect(() => {
+    if (!transcriptVisible || !chatTabActive || transcriptMessageCount === 0) return;
+    if (transcriptPositionedRef.current) return;
+    transcriptPositionedRef.current = true;
+    scrollToBottomNow();
+  }, [
+    anchorMessageIdFromParams,
+    chatTabActive,
+    scrollToBottomNow,
+    sessionIdFromParams,
+    transcriptMessageCount,
+    transcriptVisible,
+  ]);
 
   useEffect(() => {
-    if (!transcriptReady || !chatTabActive || !chatUI.shouldAutoScroll) return;
+    if (!transcriptVisible || !chatTabActive || !chatUI.shouldAutoScroll) return;
     scheduleScrollToBottom();
   }, [
     staticMessages,
@@ -729,11 +771,11 @@ export default function CloudChatPage({
     chatTabActive,
     chatUI.shouldAutoScroll,
     scheduleScrollToBottom,
-    transcriptReady,
+    transcriptVisible,
   ]);
 
   useEffect(() => {
-    if (!transcriptReady || !chatTabActive || !chatUI.shouldAutoScroll) return;
+    if (!transcriptVisible || !chatTabActive || !chatUI.shouldAutoScroll) return;
     if (typeof ResizeObserver === 'undefined') return;
 
     const content = messagesContentRef.current;
@@ -744,31 +786,7 @@ export default function CloudChatPage({
     });
     observer.observe(content);
     return () => observer.disconnect();
-  }, [chatTabActive, chatUI.shouldAutoScroll, scheduleScrollToBottom, transcriptReady]);
-
-  useEffect(() => {
-    if (!sessionIdFromParams) return;
-
-    // A `?at=` link's resume owns the opening position. Leave auto-scroll paused
-    // for it instead of snapping to the bottom, which would override the anchor.
-    const resuming = Boolean(anchorMessageIdFromParams);
-    if (!resuming) {
-      shouldAutoScrollRef.current = true;
-      setChatUI({ shouldAutoScroll: true });
-    }
-    lastScrollTopRef.current = 0;
-    wasNearBottomRef.current = true;
-    olderArrivalInitializedRef.current = false;
-    olderArrivalCountRef.current = 0;
-    olderArrivalNewestKeyRef.current = null;
-    setOlderArrivalAnnouncement('');
-    setShowScrollButton(false);
-  }, [anchorMessageIdFromParams, sessionIdFromParams, setChatUI]);
-
-  useEffect(() => {
-    if (!transcriptReady || anchorMessageIdFromParams) return;
-    scheduleScrollToBottom();
-  }, [anchorMessageIdFromParams, scheduleScrollToBottom, transcriptReady]);
+  }, [chatTabActive, chatUI.shouldAutoScroll, scheduleScrollToBottom, transcriptVisible]);
 
   const newestTranscriptMessageId =
     dynamicMessages.at(-1)?.info.id ?? staticMessages.at(-1)?.info.id ?? null;
@@ -794,6 +812,10 @@ export default function CloudChatPage({
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
+    if (!transcriptVisible) {
+      lastScrollTopRef.current = el.scrollTop;
+      return;
+    }
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     setShowScrollButton(distanceFromBottom > 20);
 
@@ -812,9 +834,10 @@ export default function CloudChatPage({
     const scrolledUp = el.scrollTop < lastScrollTopRef.current;
     lastScrollTopRef.current = el.scrollTop;
 
-    if (scrolledUp) {
+    if (scrolledUp || distanceFromBottom >= OLDER_MESSAGES_NEAR_BOTTOM_PX) {
       shouldAutoScrollRef.current = false;
       setChatUI({ shouldAutoScroll: false });
+      cancelScheduledAutoScroll();
     } else if (distanceFromBottom < OLDER_MESSAGES_NEAR_BOTTOM_PX) {
       shouldAutoScrollRef.current = true;
       setChatUI({ shouldAutoScroll: true });
@@ -827,7 +850,7 @@ export default function CloudChatPage({
       manager.trimRetainedHistory();
     }
     wasNearBottomRef.current = isNearBottom;
-  }, [manager, setChatUI, tryLoadOlderFromScroll]);
+  }, [cancelScheduledAutoScroll, manager, setChatUI, transcriptVisible, tryLoadOlderFromScroll]);
 
   const scrollToBottom = useCallback(() => {
     shouldAutoScrollRef.current = true;
@@ -1535,7 +1558,7 @@ export default function CloudChatPage({
   // at `scrollTop = 0`, so leaving the paused resume behind would strand the
   // reader on the oldest loaded message with follow off.
   useLayoutEffect(() => {
-    if (!transcriptReady) return;
+    if (!transcriptVisible) return;
     if (!chatTabActive || !sessionIdFromParams || !anchorMessageIdFromParams) return;
     if (isLoading) return;
 
@@ -1568,6 +1591,7 @@ export default function CloudChatPage({
     );
     const container = scrollContainerRef.current;
     const element = anchor && container ? findAnchorElement(container, anchor.selectorIds) : null;
+    if (!element && !transcriptReady) return;
 
     const step = planResumeAttempt({
       anchorRendered: element !== null && container !== null,
@@ -1629,6 +1653,7 @@ export default function CloudChatPage({
     setChatUI,
     staticMessages,
     transcriptReady,
+    transcriptVisible,
   ]);
   // A running preparation row already shows live progress inline, so the
   // trailing progress row would repeat the same message beneath it.

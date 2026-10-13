@@ -1386,6 +1386,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(sessionStorageAtom, null);
       storedMessageMemo.clear();
       store.set(rootSessionIdAtom, null);
+      store.set(chatUIAtom, { shouldAutoScroll: true });
     }
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
@@ -1432,7 +1433,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(fetchedSessionDataAtom, null);
     store.set(childSessionHydrationStatesAtom, new Map());
     store.set(childSessionErrorsAtom, new Map());
-    store.set(chatUIAtom, { shouldAutoScroll: true });
     store.set(availableCommandsAtom, []);
     store.set(availableCommandsCatalogStatusAtom, null);
     store.set(worktreeChangesRefreshAtom, null);
@@ -2344,14 +2344,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(sessionStorageAtom, jotaiStorage);
     const initialPageGeneration = loadOlderGeneration;
     let acceptCachedPage = true;
-    let cachedSnapshotPage: SessionSnapshotPage | null = preserveTranscript
-      ? {
-          info: { id: kiloSessionId },
-          messages: store.get(messagesListAtom),
-          nextCursor: null,
-          omittedItemCount: 0,
-        }
-      : null;
     // False while this open's cached-transcript read is still in flight. A
     // retryable metadata failure must not decide the screen until the read
     // settles, or a warm offline open would flash the terminal error over
@@ -2368,7 +2360,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           if (!acceptCachedPage || expectedGeneration !== switchGeneration) return;
           if (cachedPage && cachedPage.messages.length > 0) {
             if (applyPage({ ...cachedPage, kind: 'success' }, initialPageGeneration, true)) {
-              cachedSnapshotPage = cachedPage;
               store.set(isLoadingAtom, false);
               // Rows are on screen but they are the cached page: the live
               // transcript is still being fetched, so the open is refreshing,
@@ -2488,25 +2479,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // and omitted-item count.
     const recordInitialPage = (page: SessionSnapshotPage): void => {
       if (applyPage({ ...page, kind: 'success' }, initialPageGeneration, true)) {
-        if (cachedSnapshotPage) {
-          const storage = store.get(sessionStorageAtom);
-          const liveMessages = new Map(page.messages.map(message => [message.info.id, message]));
-          for (const cached of cachedSnapshotPage.messages) {
-            const live = liveMessages.get(cached.info.id);
-            if (!live) {
-              storage?.deleteMessage(cached.info.id);
-              continue;
-            }
-            const livePartIds = new Set(live.parts.map(part => part.id));
-            for (const part of cached.parts) {
-              if (!livePartIds.has(part.id)) storage?.deletePart(cached.info.id, part.id);
-            }
-          }
-          cachedSnapshotPage = null;
-        }
-        // The live bounded page landed: what is on screen is no longer the
-        // cached page, so the refresh indicator is done. Guarded by the
-        // applied flag so a superseded page cannot clear a newer open's state.
+        // A bounded page can lag the stream; omissions are not deletion evidence.
+        // Only an applied page can finish the current open's refresh.
         store.set(isRefreshingCachedTranscriptAtom, false);
       }
     };

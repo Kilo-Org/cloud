@@ -205,12 +205,8 @@ type McpSettingsSheetProps = {
   webSearch: WebSearchSetting;
 };
 
-export function McpSettingsSheet({
-  visible,
-  onClose,
-  settings,
-  webSearch,
-}: Readonly<McpSettingsSheetProps>) {
+export function McpSettingsSheet(props: Readonly<McpSettingsSheetProps>) {
+  const { visible, onClose, settings, webSearch } = props;
   const { confirm, dialog } = useConfirmDialog();
   const { t } = useTranslation();
   const [form, setForm] = useState<McpServerFormTarget | null>(null);
@@ -220,6 +216,11 @@ export function McpSettingsSheet({
   const formGeneration = useRef(0);
   const { view, settingsTools, discoverServers } = settings;
   const kilo = kiloServerRow(view);
+  const handleSettingsToolsChange = settings.setSettingsToolsEnabled;
+  const handleKiloEnabledChange = settings.setEnabled;
+  const handleKiloRetry = settings.retry;
+  const handleServerToggle = settings.setServerEnabled;
+  const handleServerRetry = settings.retryServer;
 
   // A restart keeps no discovered tool, so the sheet asks the servers as it
   // opens rather than showing a server with no tools and nothing running.
@@ -310,9 +311,7 @@ export function McpSettingsSheet({
             subtitle={t(settingsTools.subtitleKey)}
             value={settings.settingsToolsEnabled}
             disabled={false}
-            onValueChange={next => {
-              settings.setSettingsToolsEnabled(next);
-            }}
+            onValueChange={handleSettingsToolsChange}
           />
           {/* One line's height in every state, so on -> off never moves what
               follows it. */}
@@ -333,9 +332,7 @@ export function McpSettingsSheet({
             value={kilo.enabled}
             disabled={!kilo.toggleable}
             busy={kilo.busy}
-            onValueChange={next => {
-              settings.setEnabled(next);
-            }}
+            onValueChange={handleKiloEnabledChange}
           />
           <View className="min-h-6 justify-center px-1">
             <Text className="text-sm font-medium text-foreground">
@@ -358,9 +355,7 @@ export function McpSettingsSheet({
                  (BaseViewManager, RN 0.86). */
               key={settings.retrying ? 'retrying' : 'idle'}
               variant="secondary"
-              onPress={() => {
-                settings.retry();
-              }}
+              onPress={handleKiloRetry}
               loading={settings.retrying}
               accessibilityLabel={t('common.retry')}
             >
@@ -374,14 +369,10 @@ export function McpSettingsSheet({
           loaded={settings.loaded}
           servers={settings.servers}
           retryingIds={settings.retryingServerIds}
-          onToggle={(id, next) => {
-            settings.setServerEnabled(id, next);
-          }}
+          onToggle={handleServerToggle}
           onEdit={openEdit}
           onDelete={confirmDelete}
-          onRetry={id => {
-            settings.retryServer(id);
-          }}
+          onRetry={handleServerRetry}
           onAdd={openAdd}
         />
       </ScrollView>

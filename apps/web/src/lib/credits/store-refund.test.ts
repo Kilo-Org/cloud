@@ -4,6 +4,8 @@ import { eq } from 'drizzle-orm';
 
 import { credit_transactions, kilo_pass_store_events, kilocode_users } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { processTopUp } from '@kilocode/web-shared/lib/credits';
+import { processLocalExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -88,6 +90,39 @@ function creditRowsForCategory(creditCategory: string) {
 }
 
 describe('reverseStoreCreditPurchase', () => {
+  it('does not deduct a fully refunded unused pack again at expiration', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const providerTransactionId = `tx-${crypto.randomUUID()}`;
+    await processTopUp(
+      user,
+      1000,
+      {
+        type: 'stripe',
+        stripe_payment_id: storeCreditPaymentId(
+          KiloPassPaymentProvider.AppStore,
+          providerTransactionId
+        ),
+      },
+      { skipPostTopUpFreeStuff: true }
+    );
+    await db.transaction(tx =>
+      reverseStoreCreditPurchase(tx, {
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerTransactionId,
+        refundedMilliunits: STORE_FULL_MILLIUNITS,
+      })
+    );
+    expect(await userBalance(user.id)).toBe(0);
+    const refundedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    await processLocalExpirations(
+      refundedUser!,
+      new Date(refundedUser!.next_credit_expiration_at!)
+    );
+    expect(await userBalance(user.id)).toBe(0);
+  });
+
   it('reverses a granted credit pack once with the exact negative amount and balance decrement', async () => {
     const user = await insertTestUser();
     const providerTransactionId = `tx-${crypto.randomUUID()}`;

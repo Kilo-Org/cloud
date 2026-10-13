@@ -1,8 +1,14 @@
 import type { SecurityFindingAnalysisInput } from '@kilocode/db/schema-types';
+import {
+  LOWEST_SECURITY_SEVERITY_RANK,
+  getSecuritySeverityRank,
+  getSecuritySeverityThresholdRank,
+  type SecuritySeverityRank,
+} from './security-severity.js';
 
 export type SecurityRemediationOrigin = 'auto_policy' | 'bulk_existing' | 'manual';
 export type SecurityRemediationMinSeverity = 'critical' | 'high' | 'medium' | 'all';
-export type SecurityRemediationSeverityRank = 0 | 1 | 2 | 3;
+export type SecurityRemediationSeverityRank = SecuritySeverityRank;
 
 export type SecurityRemediationConfig = {
   repository_selection_mode?: 'all' | 'selected';
@@ -130,38 +136,19 @@ export type SecurityRemediationEligibilityDecision = {
   severityRank: SecurityRemediationSeverityRank;
 };
 
-const LOWEST_SEVERITY_RANK = 3;
-const ALL_SEVERITIES_MAX_RANK = LOWEST_SEVERITY_RANK;
-
-const SEVERITY_RANKS = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: LOWEST_SEVERITY_RANK,
-} as const satisfies Record<string, SecurityRemediationSeverityRank>;
-
-const MIN_SEVERITY_MAX_RANKS = {
-  critical: SEVERITY_RANKS.critical,
-  high: SEVERITY_RANKS.high,
-  medium: SEVERITY_RANKS.medium,
-  all: ALL_SEVERITIES_MAX_RANK,
-} as const satisfies Record<SecurityRemediationMinSeverity, SecurityRemediationSeverityRank>;
-
-function isKnownSeverity(severity: string): severity is keyof typeof SEVERITY_RANKS {
-  return severity in SEVERITY_RANKS;
-}
-
 export function getSecurityRemediationSeverityRank(
   severity: string | null
 ): SecurityRemediationSeverityRank {
-  return severity && isKnownSeverity(severity) ? SEVERITY_RANKS[severity] : LOWEST_SEVERITY_RANK;
+  return getSecuritySeverityRank(severity) ?? LOWEST_SECURITY_SEVERITY_RANK;
 }
 
 export function severityMeetsSecurityRemediationThreshold(
   severity: string | null,
   minSeverity: SecurityRemediationMinSeverity
 ): boolean {
-  return getSecurityRemediationSeverityRank(severity) <= MIN_SEVERITY_MAX_RANKS[minSeverity];
+  return (
+    getSecurityRemediationSeverityRank(severity) <= getSecuritySeverityThresholdRank(minSeverity)
+  );
 }
 
 function normalizeTimestamp(value: string | null | undefined): string | null {

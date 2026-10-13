@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChatComposer, type ChatComposerSendOptions } from '@/components/agents/chat-composer';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
@@ -33,6 +34,8 @@ import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 
 import { BetaPill } from './beta-pill';
+import { ChatDetailsSheet } from './chat-details-sheet';
+import { chatContextInfo, chatCost, chatModelUsages } from './chat-details-state';
 import { ChatFailureRow } from './chat-failure-row';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
@@ -82,6 +85,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   // and the remote servers — is read here. The header draws its dot from the
   // Kilo view, so the control and the sheet cannot disagree.
   const [mcpOpen, setMcpOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const backends = useChatBackends();
   const localModels = useLocalModels();
   const mcp = useMcpSettings(place, state.sessionId);
@@ -162,6 +166,12 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const messages = asMessages(state);
   const actions = useChatMessageActions(state, messages, retry);
   const { actionsFor } = actions;
+  // The details describe the chat as it stands, so they read the model it is
+  // on rather than the one the next message goes to.
+  const detailsModel = state.model === '' ? model : state.model;
+  const contextInfo = chatContextInfo(detailsModel, state.record.prompted, availableOptions);
+  const cost = chatCost(chatModelUsages(state.record.usage, availableOptions).map(one => one.cost));
+  const costMicrodollars = cost.kind === 'known' ? Math.round(cost.usd * 1_000_000) : null;
 
   const renderItem: ListRenderItem<StoredMessage> = useCallback(
     ({ item }) => <MessageBubble message={item} {...actionsFor(item)} />,
@@ -302,7 +312,15 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           </View>
         }
         headerRight={
-          <View className="flex-row">
+          <View className="flex-row items-center">
+            <SessionContextMetrics
+              info={contextInfo}
+              totalCostMicrodollars={costMicrodollars}
+              hasMessages={messages.length > 0}
+              onPress={() => {
+                setDetailsOpen(true);
+              }}
+            />
             <BackendSettingsControl />
             <Pressable
               onPress={() => {
@@ -330,6 +348,17 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         settings={mcp}
       />
       <MessageDetailsSheet {...actions.details} modelOptions={modelOptions.options} />
+      <ChatDetailsSheet
+        visible={detailsOpen}
+        onClose={() => {
+          setDetailsOpen(false);
+        }}
+        model={detailsModel}
+        record={state.record}
+        modelOptions={availableOptions}
+        backends={backends}
+        mcp={mcp}
+      />
     </View>
   );
 }

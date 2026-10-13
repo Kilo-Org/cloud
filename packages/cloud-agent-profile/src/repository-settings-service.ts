@@ -43,8 +43,10 @@ export async function removeRepositorySettings(
   repoFullName: string,
   platform: RepositoryPlatform
 ): Promise<void> {
+  // Same row order as setRepositorySettings (allocation, then binding), so two
+  // concurrent writes for one repository cannot lock the rows in opposite order.
   await withProfileTransaction(db, async tx => {
-    await removeRepoBinding(tx, owner, repoFullName, platform);
     await clearRepoSandboxAllocation(tx, owner, repoFullName, platform);
+    await removeRepoBinding(tx, owner, repoFullName, platform);
   });
 }

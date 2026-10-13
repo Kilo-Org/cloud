@@ -25,7 +25,7 @@ export function DefaultSandboxSection({ organizationId, settings }: DefaultSandb
   const setContextAllocation = useSetContextAllocationMutation(organizationId);
   const canChoose = settings.capabilities.enabled;
   const value = setContextAllocation.isPending
-    ? setContextAllocation.variables.allocation
+    ? (setContextAllocation.variables?.allocation ?? null)
     : toSelectableAllocation(settings.contextAllocation);
 
   return (

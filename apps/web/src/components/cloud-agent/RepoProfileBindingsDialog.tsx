@@ -85,7 +85,9 @@ export function RepoProfileBindingsDialog({
     organizationId,
     enabled: open,
   });
-  const canManage = permissions?.canManage ?? !organizationId;
+  // Locked only once the server says so. While the query loads or if it fails,
+  // the controls stay enabled and the server still rejects a non-manager.
+  const canManage = permissions?.canManage !== false;
 
   // Fetch profiles
   const { data: personalProfiles } = useProfiles({

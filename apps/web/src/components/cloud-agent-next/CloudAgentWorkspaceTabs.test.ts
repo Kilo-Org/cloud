@@ -497,6 +497,38 @@ describe('CloudAgentWorkspaceTabs', () => {
     expect(html).not.toContain('New terminal');
   });
 
+  it('offers preview as a toolbar button instead of a caret menu item', () => {
+    const html = renderWorkspaceTabs(
+      { canCreateTerminal: true, canOpenPreview: true, onOpenPreview: () => undefined },
+      true
+    );
+
+    expect(findButtonMarkup(html, 'aria-label="Open preview"')).toContain('lucide-globe');
+    expect(html).not.toContain('Open preview…');
+  });
+
+  it('does not expose preview creation without the preview capability', () => {
+    const html = renderWorkspaceTabs({ canCreateTerminal: true }, true);
+
+    expect(html).not.toContain('Open preview');
+  });
+
+  it('opens preview from the toolbar action with or without a worktree', () => {
+    let opened = 0;
+    const html = renderWorkspaceTabs({
+      chatSessions: [],
+      currentSessionId: null,
+      worktreeId: null,
+      canCreateTerminal: true,
+      canOpenPreview: true,
+      onOpenPreview: () => opened++,
+    });
+
+    expect(findButtonMarkup(html, 'aria-label="New terminal"')).toContain('lucide-terminal');
+    getButtonProps('Open preview').onClick?.({} as React.MouseEvent<HTMLButtonElement>);
+    expect(opened).toBe(1);
+  });
+
   it('offers eligible terminal creation and history in the caret without chat creation', () => {
     const html = renderWorkspaceTabs(
       { onCreateChat: undefined, canCreateTerminal: true, isCreatingChat: true },

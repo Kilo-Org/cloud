@@ -155,9 +155,10 @@ function fixture() {
   const statuses = vi.fn<WrapperKiloClient['getSessionStatuses']>(async () => ({}));
   const createPty = vi.fn<WrapperKiloClient['createPty']>();
   const clients: WrapperKiloClient[] = [];
-  vi.mocked(createWrapperKiloClient).mockImplementation((_client, serverUrl) => {
+  vi.mocked(createWrapperKiloClient).mockImplementation((_client, server) => {
     const partial: Partial<WrapperKiloClient> = {
-      serverUrl,
+      serverUrl: server.url,
+      server,
       getSessionStatuses: statuses,
       createPty,
     };

@@ -55,6 +55,10 @@ import {
   baseResizeTerminalNextOutputSchema,
   baseCloseTerminalNextSchema,
   baseCloseTerminalNextOutputSchema,
+  baseCreatePreviewNextSchema,
+  baseCreatePreviewNextOutputSchema,
+  basePreviewOptionsNextOutputSchema,
+  basePreviewOptionsNextSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
@@ -69,7 +73,8 @@ import {
 import { linkPendingUploads, releasePendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
+import { signPreviewTicket, signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
+import { buildPreviewOpenUrl, buildPreviewUrlTemplate } from '@/lib/cloud-agent/preview-open-url';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
@@ -431,6 +436,37 @@ export const cloudAgentNextRouter = createTRPCRouter({
       } catch (error) {
         rethrowAsTerminalError(error);
       }
+    }),
+
+  createPreview: baseProcedure
+    .input(baseCreatePreviewNextSchema)
+    .output(baseCreatePreviewNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+
+      const { ticket, expiresAt } = signPreviewTicket({
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        port: input.port,
+      });
+      return { url: buildPreviewOpenUrl(ticket, input.path), expiresAt };
+    }),
+
+  /**
+   * Whether the Worker shows preview for this session, and the preview URL with
+   * a `{port}` placeholder. The Worker owns both preview switches.
+   */
+  getPreviewOptions: baseProcedure
+    .input(basePreviewOptionsNextSchema)
+    .output(basePreviewOptionsNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const options = await createCloudAgentNextClient(authToken).getPreviewOptions({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        organizationId: input.organizationId,
+      });
+      if (!options.enabled) return { enabled: false };
+      return { enabled: true, urlTemplate: buildPreviewUrlTemplate(options.hostTemplate) };
     }),
 
   refreshTerminalTicket: baseProcedure

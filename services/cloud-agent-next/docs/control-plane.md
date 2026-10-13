@@ -32,9 +32,9 @@ wrapper. Product rules stay in `.specs/cloud-agent-session.md`. The legacy `agen
 
 | Component | Owns | Does not own |
 |---|---|---|
-| Worker | Authentication, organization and worktree access, billing eligibility on send, tRPC, `/stream` and terminal WebSocket upgrade | Message, route or sandbox state |
-| Session DO, one per session | Message queue and message states, route view, event log and client stream, question/permission projection, per-message reports and batch callback, current runtime authorization and delegated Kilo token renewal | Sandbox lifecycle, preparation steps, Kilo health, turn outcome |
-| Sandbox DO, one per `sandboxId` | Allocation lifecycle through the provider adapter, wrapper socket, per-session routes, forwarding in both directions, activity, idle stop and provider lease, billing admission and attribution, wrapper and session credentials | Message states, Kilo health, turn outcome, workspace steps, physical billing intervals (container lifecycle owns them) |
+| Worker | Authentication, organization and worktree access, billing eligibility on send, tRPC, `/stream` and terminal WebSocket upgrade, preview on/off (`PREVIEW_HOST_SUFFIX`) and UI gate (`PREVIEW_ENABLED_IDS`), `/preview/open` hop, preview hostname dispatch, entry-ticket validation, session-token cookie, entry 303, per-request access checks, and preview request/response header sanitisation (`src/shared/preview-headers.ts`) | Message, route or sandbox state |
+| Session DO, one per session | Message queue and message states, route view, event log and client stream, question/permission projection, per-message reports and batch callback, current runtime authorization and delegated Kilo token renewal, preview eligibility and sandbox lookup | Sandbox lifecycle, preparation steps, Kilo health, turn outcome |
+| Sandbox DO, one per `sandboxId` | Allocation lifecycle through the provider adapter, wrapper socket, per-session routes, forwarding in both directions, activity, idle stop and provider lease, billing admission and attribution, wrapper and session credentials, preview target coordinates | Message states, Kilo health, turn outcome, workspace steps, physical billing intervals (container lifecycle owns them) |
 | Supervisor, inside the container | Restart a crashed wrapper, bounded | Anything else |
 | Wrapper, one per sandbox | Connection to the Sandbox DO, route preparation (clone, checkout, setup commands, Kilo runtime, Kilo session), Kilo supervision and restart, prompt submission, event streaming, turn outcome, finalization (auto-commit, condense), activity heartbeat, terminals, worktree changes | Sandbox lifecycle, message states |
 | Kilo | Agent execution, provider retries, native history published to session-ingest | Infrastructure |
@@ -801,7 +801,9 @@ them through one development-only override.
 Session DO → Sandbox DO (RPC, returns at once): `prepare(route spec)` → route view,
 `deliver(sessionId, messages)` → `sent` | `not_ready`, `abort(sessionId)`, `answer(sessionId,
 reply)`, terminal create/resize/close/connect requests, worktree-change requests,
-`release(sessionId)`, `status(sessionId)` (passive read).
+`release(sessionId)`, `status(sessionId)` (passive read). Preview resolves off the operation queue:
+the Session DO `resolvePreviewTarget()` does a passive read of the Sandbox DO `previewTarget` and
+returns provider coordinates; it enqueues nothing (see Preview).
 
 Sandbox DO → Session DO (RPC notifications): `onRoute(update)` where the update is a route view
 (`preparing(step)`, `ready`, `reconnecting`, `failed(reason)`) or `lost(reason)`, `onEvents(events)`,
@@ -837,8 +839,138 @@ Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `hear
 `workspace.captured`, `session.credentials`, `session.prompt`, `session.abort`, `session.answer`, `session.release`, `session.events`,
 `session.outcome`, `events_dropped`, terminal control requests, worktree-change requests,
 worktree-deletion requests (`worktree.prepareDeletion`, `worktree.delete`; both answer with
-`worktree.result`). Terminal
-bytes use the existing wrapper-to-Session-DO terminal socket.
+`worktree.result`). Terminal bytes use the existing wrapper-to-Session-DO terminal socket.
+
+### Preview
+
+Preview reaches a dev server in a live interactive (`workspace_*`) sandbox through a dedicated
+per-port hostname. It handles ordinary HTTP and WebSocket upgrades.
+
+- **Hostname dispatch.** Before any route match, the Worker tests the request hostname against its
+  `PREVIEW_HOST_SUFFIX`: a hostname of exactly `<label>.<suffix>` is a preview request, and every
+  other hostname falls through to the normal routes. The label is `p<port>-<workspace-uuid-hex>`
+  (port 1024-65535; at most 63 characters). The Worker derives the session and port from the label
+  alone and never selects a session from a path prefix, query or header.
+- **Availability.** `PREVIEW_HOST_SUFFIX` turns preview on. `PREVIEW_ENABLED_IDS` (user or org
+  IDs, `*` for all) limits who sees the preview UI; it is a UI gate only, and entry and proxying do
+  not check it. The web app reads both through the Worker's
+  `getPreviewOptions({ cloudAgentSessionId, organizationId? })` query, which answers the session's
+  preview hostname with a `{port}` placeholder (`p{port}-<hex>.<suffix>`) or `enabled: false`. The
+  `organizationId` is the web route's org and is not verified. The web app
+  has no preview configuration and no copy of the label format; it adds the browser-facing Worker
+  scheme and port, as the open hop does. One gate (preview enabled, the viewer can open a terminal,
+  a `workspace_*` session) controls both the preview button and preview links in the chat: an
+  assistant link to a loopback address with a port in range (`localhost`, `127.0.0.1`, `0.0.0.0`,
+  `[::1]`, `[::]`) shows the real preview URL with its path, and a click mints a ticket for that
+  port and path. A copied preview URL opened without the cookie gets the 401 below.
+- **Entry exchange.** The web app mints a 60-second HS256 entry ticket (audience
+  `cloud-agent-preview`, purpose `preview`, claims `userId`, `cloudAgentSessionId`, optional
+  `organizationId`, `port`) and opens `<worker>/preview/open?ticket=<jwt>[&path=<path>]` on the
+  Worker host. That hop verifies the ticket, derives the label from its claims, and answers **303**
+  to `<label>.<suffix>/.kilo-preview/enter?ticket=<jwt>[&path=<path>]` on the same scheme and port;
+  it does not run the access check. A `GET`/`HEAD` on the enter path with
+  a valid ticket runs the access check once, sets a host-bound 1-hour session token (audience
+  `cloud-agent-preview-session`, type `preview_session`) as a cookie, and answers **303** to the
+  requested path with the ticket removed. The path is client input, so the enter step owns its
+  check (`src/preview/return-path.ts`): only a same-host path that starts with one `/`, has no
+  backslash or control character, is at most 2048 characters and is not under `/.kilo-preview` is
+  kept; any other value lands on `/`. Cookie names are scheme-owned: `__Host-kilo_preview` over https,
+  `kilo_preview` over http (local dev); both are HttpOnly, `SameSite=Lax`, `Path=/`, no `Domain`,
+  `Secure` only over https. The entry ticket never reaches the document URL. Any method other than
+  `GET`/`HEAD` answers 405.
+- **Per-request access check.** Every proxied request (asset, form POST, WebSocket upgrade) validates
+  the session token (signature, audience, type, exp, derived label) and re-runs
+  `requireCurrentSessionAccess`. There is no in-isolate cache, so revocation takes effect on the next
+  request, subject to any Hyperdrive query caching of the access query. A database outage fails the
+  request instead of hiding revocation. Both tokens share one claims check; the label derived from
+  the claims must equal the request label, which also proves the port and the `workspace_` session.
+- **Off-queue transport and the physical boundary.** The Worker resolves coordinates with an
+  off-queue path: Session DO `resolvePreviewTarget()` (eligibility and `sandboxId` only) → Sandbox DO
+  `previewTarget` (the only owner of route and allocation state for preview; one storage pass, no
+  enqueue, no wrapper traffic). The Worker then calls `fetch()` on the physical Durable Object
+  that owns the port; the request carries the reserved `x-kilo-preview-*` markers so the physical DO
+  selects the preview port path rather than the control path. The markers are a dispatch selector,
+  not authentication: the trust boundary is the private DO binding plus ingress stripping, and the
+  DO never falls through to the SDK `fetch()` (which can start a container) for a marked request.
+  The path exists because a WebSocket `Response` cannot cross an RPC boundary back to the Worker,
+  while a `fetch()` response can. The Worker strips client-supplied `x-kilo-preview-*` headers once,
+  at the top of its default `fetch`, so no route can forward one into a sandbox DO.
+- **No start, no wake.** Preview never starts, resumes or wakes an allocation. A request for a
+  session whose sandbox is stopped or asleep fails without creating a generation; the user starts
+  the session again.
+- **Activity.** Preview does not update SandboxControl's activity anchor or request an explicit
+  activity lease. SandboxControl's existing idle deadline still stops the allocation, even with
+  preview/HMR traffic. Normal active-agent heartbeats still renew leases.
+- **Reserved ports.** The physical DO refuses the provider's own control port with 403 before it
+  opens the container port: 3000 for `cloudflare`; `cloudflare-containers` reserves none (`vercel`
+  23456 is listed but unreachable while Vercel is unsupported). The physical DO owns this check
+  because it is the one check a leaked marker cannot bypass. Only 1024-65535 are eligible. The table
+  (`src/shared/reserved-ports.ts`) also feeds the Cloud Agent rules file, which tells the agent not
+  to start servers on the reserved port, to use the port that its server prints, and to report the
+  exact `http://localhost:<port>` URL. Legacy writers and the V2 wrapper (through
+  `CONTROL_SANDBOX_PROVIDER` in its launch env) write the same `~/.kilocode/rules/cloud-agent.md`.
+- **Origin and WebSocket.** A WebSocket upgrade, and any non-GET/HEAD request, is admitted only when
+  `Origin` equals the preview origin; a foreign, `null` or missing `Origin` is 403 before the
+  resolver or fetch. Ordinary GET/HEAD requests do not use `Origin` for admission. Upstream requests
+  always carry `Host: localhost:<port>`. Every upstream request also forces `Origin:
+  http://localhost:<port>`, not only when the browser sent the preview origin; this is a recorded
+  deviation from the original plan (which rewrote only a matching origin) and is safer, because a
+  sibling preview's origin is never forwarded to the app.
+
+**Status map.** Every body is fixed text; the ticket and upstream error text are never returned.
+Request and response bodies stream; there is no body-size cap.
+
+| Condition | Status | Body |
+|---|---|---|
+| `/preview/open` or enter method other than `GET`/`HEAD`; proxied `TRACE`/`CONNECT` | 405 | `Method not allowed` |
+| `/preview/open` while `PREVIEW_HOST_SUFFIX` is unset | 404 | `Preview is not configured` |
+| Invalid or missing entry ticket on `/preview/open` or the enter path (signature, audience, purpose, claims, `exp`), or a label derived from it that does not name the host | 401 | `Preview ticket is missing or invalid` |
+| Missing, invalid, expired or wrong-audience/type session token, or a derived label that does not name the host | 401 | `Preview session is missing or expired. Open the preview again from the chat.` |
+| Proxied `/.kilo-preview/*` path | 404 | `Not found` |
+| WebSocket upgrade or non-`GET`/`HEAD` with a foreign, `null` or missing `Origin` | 403 | `Cross-origin preview request rejected` |
+| Access denied | 403 | `Session access denied` |
+| Reserved port (`cloudflare` 3000), refused by the physical DO | 403 | `That port is reserved` |
+| Access database unavailable | 503 | `Session access is temporarily unavailable` |
+| Ineligible platform | 409 | `Preview is only available for interactive Cloud Agent sessions` |
+| Unsupported provider | 409 | `Preview is not available for this sandbox provider` |
+| Route preparing, or no session metadata yet | 503 + `Retry-After: 1` | `The sandbox is not ready` |
+| Resolver RPC failure or physical DO `fetch()` throw | 503 + `Retry-After: 1` | `Preview is temporarily unavailable` |
+| Sandbox route failed or absent for this session, allocation stopped/stopping, no current `providerRef`, or the physical DO not running | 503 | `The sandbox is not running` |
+| Request headers over the cap (40 forwarded, name > 128, value > 8192; bounds header work before the access query and DO calls) | 431 | `Preview request headers are too large` |
+| Connection refused on the container port | 502 | `Nothing is listening on that port` |
+| No upstream response headers within 15 s | 504 | `The server on that port did not respond in time` |
+
+- **Accepted residuals.** The SDK physical DO name is the stable pinned sandbox id, so a
+  resolve-to-fetch race can reach a replacement container of the same owner scope / same session
+  sandbox (SandboxContainers is fenced by `allocationRef` + state; SandboxControl rejects other
+  owners, and the per-request access check still applies). Kilo's `serve` listener binds loopback
+  on 4096 or a random port, so a preview can reach it; the wrapper starts every `kilo serve` with
+  its own random `KILO_SERVER_PASSWORD` and sends Basic auth on each of its own connections, so a
+  preview request to that port gets 401 from Kilo. The physical boundary is still the
+  sandbox/workspace (owner scope for shared sandboxes), not the individual chat. A
+  stolen entry ticket replayed within its 60-second window yields an hour-long session; late replay
+  is bounded, single-use replay is not. Service workers are not blocked, so an app on a stable
+  `(session, port)` origin can register one. Established WebSockets are not re-authorised after
+  upgrade: revocation applies to new requests and upgrades only. Cookie jars are not guaranteed
+  independent: the preview zone must be a separate registrable site from every trusted app origin,
+  but apps can still set parent-domain cookies, and `*.localhost` is not a faithful site-isolation
+  model. The entry ticket is carried in the `/preview/open` and enter URLs, so platform
+  observability or Logpush may capture it; the 60-second TTL bounds replay.
+  The `@cloudflare/containers` `Container` constructor calls `renewActivityTimeout()` when an evicted
+  DO wakes, so a preview request that wakes an evicted DO can extend the SDK sleep timer; our code
+  paths never call it.
+- **Enablement checklist.** Put the preview zone on a separate registrable site from every trusted
+  app origin; add DNS `*.<zone>`; add the Worker route `*.<zone>/*`; issue a certificate covering
+  the wildcard label; set the Worker `PREVIEW_HOST_SUFFIX` to `<zone>`; redeploy the Worker. The web
+  app needs no change: it shows the preview button once the Worker reports preview as enabled. The
+  `kilo serve` password is in the wrapper, so ship a sandbox image with it before you enable
+  preview; an older image leaves `kilo serve` open to a preview of its port.
+- **Second hosted provider (follow-up).** A provider-native inbound port is the eventual second
+  path, but it needs ports declared at sandbox creation: `createSandbox` in
+  `src/agent-sandbox/vercel/vercel-sandbox-rest-client.ts` sends none, and the creation response
+  carries `routes[{ url, subdomain, port }]`. Routing would follow those routes. The published URLs
+  are public, so a Worker proxy behind this auth would be required to keep the access check.
+  Until that exists the resolver returns 409 `unsupported_provider` without a provider call.
 
 ### Public mapping
 
@@ -978,6 +1110,14 @@ counts.
     use the existing stop ladder and retain unconfirmed physical evidence. Late results after hello
     cannot fail a healthy sibling or clean up its allocation. After restoration, a new message in
     the same session succeeds without changing the earlier terminal message or duplicating effects.
+23. **Preview over the preview host (local fixture).** With Worker `PREVIEW_HOST_SUFFIX=localhost`,
+    fetch the Worker with `Host: <label>.localhost` and a web-minted entry URL: the 303 sets an
+    HttpOnly `kilo_preview` cookie and its `Location: /` carries no ticket; a follow-up GET loads the
+    fixture; a form POST with the preview `Origin` echoes the body and never sees `kilo_preview`; a
+    foreign or `null` `Origin` POST is 403; a WebSocket echo round-trips; `GET /health` on the worker
+    host still returns health JSON; a reserved port (3000) is 403 well under 5 s and never reaches
+    the fixture; a closed port is 502 well under 5 s; a chunked or over-2 MiB body returns intact. A
+    local run does not prove hosted DNS/TLS/providers, the native Containers path, or no-wake.
 
 Fault scenarios use existing harness faults (container kill, pause, socket recycle through the
 wrapper's SIGUSR1 handler) plus harness additions for Kilo and wrapper process kill. Timer overrides keep long scenarios short. A local run does not prove

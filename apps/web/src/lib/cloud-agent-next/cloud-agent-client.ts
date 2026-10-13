@@ -28,7 +28,10 @@ import {
   type WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
-import { baseGetMessageResultNextOutputSchema } from '@/routers/cloud-agent-next-schemas';
+import {
+  baseGetMessageResultNextOutputSchema,
+  workerPreviewOptionsSchema,
+} from '@/routers/cloud-agent-next-schemas';
 import {
   SandboxStatusSnapshotSchema,
   type SandboxStatusSnapshot,
@@ -662,6 +665,9 @@ type CloudAgentNextTRPCClient = {
   getSandboxSelectionOptions: {
     query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
   };
+  getPreviewOptions: {
+    query: (input: { cloudAgentSessionId: string; organizationId?: string }) => Promise<unknown>;
+  };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
   };
@@ -983,6 +989,13 @@ export class CloudAgentNextClient {
     return sandboxSelectionCapabilitiesSchema.parse(
       await this.client.getSandboxSelectionOptions.query(input)
     );
+  }
+
+  async getPreviewOptions(input: {
+    cloudAgentSessionId: string;
+    organizationId?: string;
+  }): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
+    return workerPreviewOptionsSchema.parse(await this.client.getPreviewOptions.query(input));
   }
 
   /**

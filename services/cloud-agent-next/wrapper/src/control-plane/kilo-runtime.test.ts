@@ -17,6 +17,7 @@ import {
   createKiloRuntimes,
   KiloWorktreeMcpMismatchError,
   parseKiloPidfile,
+  prepareKiloFilesystem,
   type KiloFeedCallbacks,
   type KiloProcess,
   type KiloProcessSpawner,
@@ -91,6 +92,7 @@ function createSpawner(): {
     const process: KiloProcess = {
       pid,
       url: `http://127.0.0.1:${pid}`,
+      authorization: 'Basic test',
       exited: deferred.promise,
       stop: async () => {
         record.stopped += 1;
@@ -172,7 +174,8 @@ function createRuntime(options: {
   directory?: string;
   env?: Record<string, string>;
   isIdle?: () => boolean | Promise<boolean>;
-  prepareFilesystem?: (env: Record<string, string>, directory: string) => Promise<void>;
+  prepareFilesystem?: KiloRuntimeOptions['prepareFilesystem'];
+  sandboxProvider?: KiloRuntimeOptions['sandboxProvider'];
   spawnKilo?: KiloProcessSpawner;
   timers?: ControlPlaneTimers;
   onRestart?: (info: { directory: string; reason: string }) => void;
@@ -204,7 +207,9 @@ function createRuntime(options: {
           isIdle: async () => options.isIdle!(),
         }
       : {}),
-    ...(options.prepareFilesystem ? { prepareFilesystem: options.prepareFilesystem } : {}),
+    // The real preparation writes under HOME; `prepareKiloFilesystem` has its own tests.
+    prepareFilesystem: options.prepareFilesystem ?? (async () => {}),
+    ...(options.sandboxProvider ? { sandboxProvider: options.sandboxProvider } : {}),
     ...(options.sampleMemory ? { sampleMemory: options.sampleMemory } : {}),
     onMemoryHold: info => options.memoryHolds?.push(info.held),
     onRestart: info => {
@@ -229,6 +234,70 @@ function createRuntime(options: {
     runtime,
   };
 }
+
+describe('prepareKiloFilesystem', () => {
+  it('writes auth.json and the Cloud Agent rules with the reserved port of the provider', async () => {
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-prepare-'));
+    try {
+      const home = path.join(root, 'home');
+      const directory = path.join(root, 'worktree');
+      await prepareKiloFilesystem(
+        {
+          HOME: home,
+          XDG_DATA_HOME: path.join(home, '.local', 'share'),
+          KILO_AUTH_CONTENT: '{"kilo":{}}',
+        },
+        directory,
+        'cloudflare'
+      );
+      const rules = await fsp.readFile(
+        path.join(home, '.kilocode', 'rules', 'cloud-agent.md'),
+        'utf8'
+      );
+      expect(rules).toContain('# Cloud Agent Environment');
+      expect(rules).toContain('Port 3000 is used by the sandbox itself.');
+      expect(rules).toContain('no more than 3 minutes 30 seconds');
+      expect(
+        await fsp.readFile(path.join(home, '.local', 'share', 'kilo', 'auth.json'), 'utf8')
+      ).toBe('{"kilo":{}}');
+      expect((await fsp.stat(directory)).isDirectory()).toBe(true);
+    } finally {
+      await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves the reserved-port rule out when the provider is unknown', async () => {
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-prepare-'));
+    try {
+      await prepareKiloFilesystem({ HOME: root }, path.join(root, 'worktree'));
+      const rules = await fsp.readFile(
+        path.join(root, '.kilocode', 'rules', 'cloud-agent.md'),
+        'utf8'
+      );
+      expect(rules).not.toContain('used by the sandbox itself');
+      expect(rules).toContain('read its output to find the port that it uses');
+    } finally {
+      await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('receives the runtime provider before Kilo starts', async () => {
+    const providers: Array<string | undefined> = [];
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      sandboxProvider: 'vercel',
+      prepareFilesystem: async (_env, _directory, sandboxProvider) => {
+        providers.push(sandboxProvider);
+      },
+    });
+    await runtime.ensure();
+    expect(providers).toEqual(['vercel']);
+    await runtime.shutdown();
+  });
+});
 
 describe('Kilo startup lifecycle', () => {
   it('keeps credentials installed while the first feed is opening pending behind the idle gate', async () => {
@@ -1272,6 +1341,7 @@ describe('createKiloRuntime', () => {
       return {
         pid,
         url: `http://127.0.0.1:${pid}`,
+        authorization: 'Basic test',
         exited: deferred.promise,
         stop: async () => {
           record.stopped += 1;
@@ -1311,6 +1381,7 @@ describe('createKiloRuntime', () => {
       return {
         pid,
         url: `http://127.0.0.1:${pid}`,
+        authorization: 'Basic test',
         exited: deferred.promise,
         stop: async () => {
           record.stopped += 1;
@@ -1366,6 +1437,7 @@ describe('createKiloRuntime', () => {
           XDG_RUNTIME_DIR: runtimeDir,
           KILO_AUTH_CONTENT: '{"token":"x"}',
         },
+        prepareFilesystem: prepareKiloFilesystem,
       });
 
       await runtime.ensure();

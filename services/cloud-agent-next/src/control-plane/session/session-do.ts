@@ -128,6 +128,8 @@ import {
   type ControlPlaneWorktreeChanges,
 } from './worktree-changes.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
+import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
+import type { PreviewTargetResult, ResolvedPreviewTarget } from '../sandbox/preview-target.js';
 import { readWorktreeChildSessions } from './worktree-child-sessions.js';
 import {
   buildControlPlaneMessageReport,
@@ -330,6 +332,8 @@ export type ControlPlaneSandboxPeer = {
   worktreeCapture(input: ControlPlaneWorktreeCaptureInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one terminal request to the wrapper. */
   terminal(input: ControlPlaneTerminalInput): Promise<ControlPlaneControlResult>;
+  /** Resolves the preview provider coordinates for this sandbox (off the op queue). */
+  previewTarget(sessionId: string): Promise<PreviewTargetResult>;
   /** B10: the wrapper identity bound to the connected allocation. */
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
@@ -468,6 +472,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private readonly worktreeChanges: ControlPlaneWorktreeChanges;
   /** Terminal records and the browser/wrapper bridge (plan B10). */
   private readonly terminals: ControlPlaneTerminals;
+  /** Preview eligibility and target resolution through the Sandbox DO. */
+  private readonly preview: ControlPlanePreview;
   /** Generation of the in-flight preparation, for the worktree-change hooks. */
   private worktreePreparationGeneration: number | undefined;
   /**
@@ -534,6 +540,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       isRouteReady: () => this.route.state === 'ready',
       request: (sandboxId, input) => this.terminalRequest(sandboxId, input),
     });
+    this.preview = createControlPlanePreview({
+      getMetadata: () => this.metadata,
+      resolveTarget: sandboxId => this.previewTargetFor(sandboxId),
+    });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
 
@@ -549,6 +559,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       };
     }
     return peer.terminal(input);
+  }
+
+  private async previewTargetFor(sandboxId: string): Promise<PreviewTargetResult> {
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) {
+      return { status: 'not_running' };
+    }
+    return withDORetry(
+      () => this.sandboxPeerFor(sandboxId) ?? peer,
+      stub => stub.previewTarget(this.sessionId),
+      'previewTarget'
+    );
   }
 
   private async currentWrapperId(): Promise<string | undefined> {
@@ -1689,6 +1711,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async terminalClose(input: { ptyId: string }): Promise<OperationResult<{ success: boolean }>> {
     await this.initialized;
     return this.terminals.close(input);
+  }
+
+  // --- preview ----------------------------------------------------------------
+
+  /**
+   * Worker-facing preview resolver (spec §10). Runs on the RPC path, not the
+   * operation queue, so a preview never waits behind queued messages. It owns
+   * only eligibility and routing; the provider coordinates come from the
+   * Sandbox DO's off-queue `previewTarget` read.
+   */
+  async resolvePreviewTarget(): Promise<ResolvedPreviewTarget> {
+    await this.initialized;
+    return this.preview.resolve();
   }
 
   // --- stream -----------------------------------------------------------------

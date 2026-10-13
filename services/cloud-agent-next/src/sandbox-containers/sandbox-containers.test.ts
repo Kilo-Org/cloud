@@ -28,6 +28,10 @@ import {
   type ContainerInstanceSize,
   type ContainersObservation,
 } from './SandboxContainers.js';
+import {
+  PREVIEW_MARKER_ALLOCATION_HEADER,
+  PREVIEW_MARKER_PORT_HEADER,
+} from '../shared/preview-headers.js';
 import type { Env } from '../types.js';
 
 // The fake proves coordinator ordering only. It does not prove that exec behaves as assumed, and it
@@ -203,6 +207,13 @@ class FakeContainer {
 
   async setInactivityTimeout(ms: number | bigint): Promise<void> {
     this.leaseCalls.push(Number(ms));
+  }
+
+  tcpPortCalls = 0;
+
+  getTcpPort(_port: number): { fetch: (url: string, request: Request) => Promise<Response> } {
+    this.tcpPortCalls += 1;
+    return { fetch: async () => new Response('preview', { status: 200 }) };
   }
 
   async monitor(): Promise<void> {
@@ -2696,5 +2707,86 @@ describe('containment trust ownership', () => {
   it('keeps the container entrypoint to PID 1 only', () => {
     expect(dockerfileSource).not.toContain('update-ca-certificates');
     expect(dockerfileSource).toContain('exec sleep infinity');
+  });
+});
+
+describe('SandboxContainers preview fetch boundary', () => {
+  const runningRecord = (): StoredRecord => ({
+    ...idleRecord,
+    state: 'running',
+    allocationRef: REF_A,
+  });
+
+  function markedRequest(headers: Record<string, string>): Request {
+    return new Request('http://localhost:5173/page', { headers });
+  }
+
+  it('answers 404 for an unmarked request without touching the container', async () => {
+    const { instance, container } = setup({ record: runningRecord(), running: true });
+    const response = await instance.fetch(new Request('http://localhost:5173/page'));
+    expect(response.status).toBe(404);
+    expect(container.tcpPortCalls).toBe(0);
+  });
+
+  it('refuses a missing allocation header with a fixed 503 before getTcpPort', async () => {
+    const { instance, container } = setup({ record: runningRecord(), running: true });
+    const response = await instance.fetch(markedRequest({ [PREVIEW_MARKER_PORT_HEADER]: '5173' }));
+    expect(response.status).toBe(503);
+    expect(await response.text()).toBe('The sandbox is not running');
+    expect(container.tcpPortCalls).toBe(0);
+  });
+
+  it('refuses a replacement allocation ref with 503 before getTcpPort', async () => {
+    const { instance, container } = setup({ record: runningRecord(), running: true });
+    const response = await instance.fetch(
+      markedRequest({
+        [PREVIEW_MARKER_PORT_HEADER]: '5173',
+        [PREVIEW_MARKER_ALLOCATION_HEADER]: REF_B,
+      })
+    );
+    expect(response.status).toBe(503);
+    expect(container.tcpPortCalls).toBe(0);
+  });
+
+  it('refuses a stopping record with 503 before getTcpPort', async () => {
+    const { instance, container } = setup({
+      record: { ...runningRecord(), state: 'stopping' },
+      running: true,
+    });
+    const response = await instance.fetch(
+      markedRequest({
+        [PREVIEW_MARKER_PORT_HEADER]: '5173',
+        [PREVIEW_MARKER_ALLOCATION_HEADER]: REF_A,
+      })
+    );
+    expect(response.status).toBe(503);
+    expect(container.tcpPortCalls).toBe(0);
+  });
+
+  it('refuses with 503 when ctx.container is absent', async () => {
+    const { instance } = setup({ record: runningRecord(), attachContainer: false });
+    const response = await instance.fetch(
+      markedRequest({
+        [PREVIEW_MARKER_PORT_HEADER]: '5173',
+        [PREVIEW_MARKER_ALLOCATION_HEADER]: REF_A,
+      })
+    );
+    expect(response.status).toBe(503);
+  });
+
+  it('serves a running allocation and never calls the DO lease or container activity timer', async () => {
+    const { instance, container } = setup({ record: runningRecord(), running: true });
+    const lease = vi.spyOn(instance, 'ensureLeaseAtLeast');
+    const leaseCallsBeforeFetch = container.leaseCalls.length;
+    const response = await instance.fetch(
+      markedRequest({
+        [PREVIEW_MARKER_PORT_HEADER]: '5173',
+        [PREVIEW_MARKER_ALLOCATION_HEADER]: REF_A,
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(container.tcpPortCalls).toBe(1);
+    expect(container.leaseCalls).toHaveLength(leaseCallsBeforeFetch);
+    expect(lease).not.toHaveBeenCalled();
   });
 });

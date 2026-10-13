@@ -137,6 +137,8 @@
     "yourOwnRepositories": "O‘zingizga tegishli repozitoriylar",
     "dismissed": "E’tiborsiz qoldirilgan",
     "agent": "Agent",
+    "durationMinuteShort": "daq",
+    "durationHourShort": "soat",
     "changes": "O'zgarishlar"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw faoliyati",
       "balance": "Balans haqida ogohlantirishlar",
       "security": "Aniqlangan xavfsizlik muammolari",
-      "spend": "Xarajat bildirishnomalari"
+      "spend": "Xarajat bildirishnomalari",
+      "followedSessions": "Kuzatilayotgan seanslar"
     },
     "category": {
       "chatMessagesSubtitle": "suhbatlaringizdagi javoblar",
@@ -2088,6 +2091,8 @@
       "title": "Sessiya",
       "copyErrorDetails": "Xato tafsilotlarini nusxalash",
       "backToSessions": "Sessiyalarga qaytish",
+      "follow": "Qulflangan ekranda kuzatish",
+      "unfollow": "Qulflangan ekranda kuzatishni to'xtatish",
       "couldNotLoad": "Sessiyani yuklab bo'lmadi.",
       "failedToLoadDetails": "Sessiya tafsilotlarini yuklab bo'lmadi.",
       "failedToStopExecution": "Bajarishni to'xtatib bo'lmadi.",
@@ -3170,6 +3175,8 @@
     "channelName": "Faol agentlar",
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing.",
     "openSession": "Ochish",
+    "finished": "Yakunlandi",
+    "followFailed": "Bu agentni qulflangan ekranda ko'rsatib bo'lmadi.",
     "approveFailed": "Tasdiqlab bo'lmadi. Qayta urinish uchun $t(common.approve) ga teging.",
     "checked": "Tekshirilgan",
     "lastKnown": "So‘nggi ma’lum holat",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Sizni kutmoqda",
     "nextScheduled": "Keyingi rejalashtirilganlar",
     "answerNeeded": "Javob kutilmoqda",
-    "waitingToRetry": "Qayta urinish kutilmoqda"
+    "waitingToRetry": "Qayta urinish kutilmoqda",
+    "step": {
+      "editing": "Tahrirlanmoqda",
+      "reading": "O'qilmoqda",
+      "running": "Ishga tushirish",
+      "searching": "Veb qidiruv",
+      "thinking": "O'ylab ko'rmoqda"
+    },
+    "planOf": "/",
+    "filesChanged": "fayl o'zgardi",
+    "finishedIn": "Tugatish vaqti",
+    "noActivityFor": "Faoliyat yo'q",
+    "prOpened": "Pull request ochildi",
+    "permissionWants": "Ishga tushirmoqchi",
+    "failure": {
+      "provider": "To'xtatildi: provayder xatosi",
+      "tool": "To'xtatildi: vosita xatosi",
+      "cancelled": "To'xtatildi: bekor qilindi",
+      "other": "TO'XTATILGAN"
+    }
   },
   "transcriptionModel": {
     "title": "Matnga aylantirish modeli",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Suhbat tarixini yuklab bo'lmadi.",
       "new": "Yangi chat",
-      "openHint": "Chatni ochadi. Oʻchirish uchun bosib turing.",
       "deleteTitle": "Bu chat oʻchirilsinmi?"
+    },
+    "rename": {
+      "title": "Chat nomini o‘zgartirish",
+      "accessibility": "Chat nomini o‘zgartirish: {{title}}",
+      "openHint": "Chatni ochadi. Nomini o‘zgartirish yoki o‘chirish uchun bosib turing."
     },
     "beta": "Beta",
     "details": {

@@ -1,10 +1,17 @@
+import { GLANCEABLE_SNAPSHOT_EXPIRY_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
-  GLANCEABLE_SNAPSHOT_EXPIRY_MS,
-  isEligibleGlanceableWork,
-} from '@kilocode/app-shared/glanceable-agents-snapshot';
+  type SessionLiveActivityContentState,
+  sessionLiveActivityContentStateSchema,
+} from '@kilocode/notifications';
 import { z } from 'zod';
 
-import { deliverGlanceableSnapshot, type GlanceableDeliveryDeps } from './glanceable-delivery';
+import {
+  aggregateCardWork,
+  deliverGlanceableSnapshot,
+  type GlanceableDeliveryDeps,
+  hasSessionCardIo,
+} from './glanceable-delivery';
+import { deliverSessionCards, type SessionCardMemory } from './session-card-delivery';
 
 /**
  * At most one aggregate device wake per account scope per window. A change
@@ -249,6 +256,33 @@ export async function refreshGlanceableSnapshot(
   });
 
   const snapshot = await deps.buildSnapshot(scope.userId, scope.organizationId);
+  const isCurrent = async () =>
+    refreshStateSchema.parse(await storage.get(key)).revision === request.revision;
+  const cardMemory = sessionCardMemory(storage, scope);
+  if (snapshot === 'access_denied') {
+    // The user lost the scope: end its session cards at once (spec "Ending"
+    // rule 2). Nothing else in the scope may be delivered.
+    if (hasSessionCardIo(deps)) {
+      await deliverSessionCards(
+        {
+          ...scope,
+          sources: 'end_all',
+          updatedAt: request.updatedAt,
+          timestampSeconds: request.apnsTimestampSeconds,
+          nowSeconds: Math.floor(nowMs() / 1000),
+        },
+        {
+          listIosSessionActivityTokens: deps.listIosSessionActivityTokens,
+          sendIosSessionLiveActivity: deps.sendIosSessionLiveActivity,
+          listAndroidSessionTokens: deps.listAndroidSessionTokens,
+          sendAndroidSessionLiveUpdate: deps.sendAndroidSessionLiveUpdate,
+          sessionCardMemory: cardMemory,
+          isCurrent,
+        }
+      );
+    }
+    return;
+  }
   // Only the authoritative happy/empty result can change an eligible interval.
   if (snapshot === null || (snapshot.status !== 'happy' && snapshot.status !== 'empty')) {
     // A trailing refresh owes the deferred change its final counts. Production
@@ -274,8 +308,7 @@ export async function refreshGlanceableSnapshot(
   const committed = await storage.transaction(async tx => {
     const current = refreshStateSchema.parse(await tx.get(key));
     if (current.revision !== request.revision) return null;
-    return {
-      ...snapshot,
+    const aligned = {
       revision: request.revision,
       updatedAt: request.updatedAt,
       expiresAt: new Date(
@@ -283,6 +316,14 @@ export async function refreshGlanceableSnapshot(
           Date.parse(snapshot.expiresAt) -
           Date.parse(snapshot.updatedAt)
       ).toISOString(),
+    };
+    return {
+      ...snapshot,
+      ...aligned,
+      // The aggregate card counts share the revision and times of the snapshot.
+      ...(snapshot.liveActivitySnapshot === undefined
+        ? {}
+        : { liveActivitySnapshot: { ...snapshot.liveActivitySnapshot, ...aligned } }),
     };
   });
   if (committed === null) {
@@ -323,16 +364,14 @@ export async function refreshGlanceableSnapshot(
     needsApproval: committed.needsApproval ?? 0,
   });
 
-  const eligible = isEligibleGlanceableWork(committed);
+  const { eligible } = aggregateCardWork(committed);
   try {
     await deliverGlanceableSnapshot(scope, {
       ...deps,
       buildSnapshot: async () => committed,
       apnsTimestampSeconds: request.apnsTimestampSeconds,
-      isCurrent: async () => {
-        const current = refreshStateSchema.parse(await storage.get(key));
-        return current.revision === request.revision;
-      },
+      isCurrent,
+      sessionCardMemory: cardMemory,
       listIosActivityTokens: async (userId, organizationId) => {
         const tokens = await deps.listIosActivityTokens(userId, organizationId);
         const current = refreshStateSchema.parse(await storage.get(key));
@@ -604,4 +643,36 @@ async function dropFencedStarts<T extends { token: string; kind: string; superse
   }
   const scopeHeld = [...held].some(([, until]) => until > now);
   return scopeHeld ? tokens.filter(({ kind }) => kind !== 'ios_push_to_start') : [...tokens];
+}
+
+/**
+ * The content each session card token last accepted, kept per scope in the
+ * user DO. It lets a refresh skip a push that does not change the card (spec
+ * "Updates" rule 2) and keep a timer when a row carries no status time.
+ */
+function sessionCardMemory(
+  storage: DurableObjectStorage,
+  scope: { userId: string; organizationId: string | null }
+): SessionCardMemory {
+  const prefix = `glanceable-session-card:${JSON.stringify([scope.userId, scope.organizationId])}:`;
+  const keyOf = (token: string) => `${prefix}${JSON.stringify(token)}`;
+  return {
+    list: async () => {
+      const stored = await storage.list<unknown>({ prefix });
+      const memory = new Map<string, SessionLiveActivityContentState>();
+      for (const [storedKey, value] of stored) {
+        const parsed = sessionLiveActivityContentStateSchema.safeParse(value);
+        const token: unknown = JSON.parse(storedKey.slice(prefix.length));
+        // A record that no longer parses only costs one extra push.
+        if (parsed.success && typeof token === 'string') memory.set(token, parsed.data);
+      }
+      return memory;
+    },
+    put: async (token, content) => {
+      await storage.put(keyOf(token), content);
+    },
+    delete: async tokens => {
+      await storage.delete(tokens.map(keyOf));
+    },
+  };
 }

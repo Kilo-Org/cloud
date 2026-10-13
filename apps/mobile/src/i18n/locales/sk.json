@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Tvoje vlastné repozitáre",
     "dismissed": "Ignorované",
     "agent": "agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Zmeny"
   },
   "language": {
@@ -865,7 +867,8 @@
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornenia na zostatok",
       "security": "Bezpečnostné zistenia",
-      "spend": "Upozornenia na výdavky"
+      "spend": "Upozornenia na výdavky",
+      "followedSessions": "Sledované relácie"
     },
     "category": {
       "chatMessagesSubtitle": "odpovede v tvojich konverzáciách",
@@ -2144,6 +2147,8 @@
       "title": "Relácia",
       "copyErrorDetails": "Kopírovať podrobnosti chyby",
       "backToSessions": "Späť na relácie",
+      "follow": "Sledovať na uzamknutej obrazovke",
+      "unfollow": "Prestať sledovať na uzamknutej obrazovke",
       "couldNotLoad": "Reláciu sa nepodarilo načítať.",
       "failedToLoadDetails": "Podrobnosti relácie sa nepodarilo načítať.",
       "failedToStopExecution": "Vykonávanie sa nepodarilo zastaviť.",
@@ -3252,6 +3257,8 @@
     "channelName": "Aktívne agenty",
     "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke.",
     "openSession": "Otvoriť",
+    "finished": "Dokončené",
+    "followFailed": "Tohto agenta sa nepodarilo zobraziť na uzamknutej obrazovke.",
     "approveFailed": "Schválenie sa nepodarilo. Klepnutím na $t(common.approve) to skús znova.",
     "checked": "Overené",
     "lastKnown": "Posledný známy stav",
@@ -3260,7 +3267,26 @@
     "waitingForYou": "Čaká na vás",
     "nextScheduled": "Ďalšie naplánované",
     "answerNeeded": "Čaká na odpoveď",
-    "waitingToRetry": "Čaká na opakovanie"
+    "waitingToRetry": "Čaká na opakovanie",
+    "step": {
+      "editing": "Úprava",
+      "reading": "Čítanie",
+      "running": "Spustenie",
+      "searching": "Webové vyhľadávanie",
+      "thinking": "Premýšľanie"
+    },
+    "planOf": "z",
+    "filesChanged": "zmenených súborov",
+    "finishedIn": "Dokončené za",
+    "noActivityFor": "Žiadna aktivita už",
+    "prOpened": "Pull request otvorený",
+    "permissionWants": "Chce spustiť",
+    "failure": {
+      "provider": "Zastavené: chyba poskytovateľa",
+      "tool": "Zastavené: chyba nástroja",
+      "cancelled": "Zastavené: zrušené",
+      "other": "ZASTAVENÉ"
+    }
   },
   "transcriptionModel": {
     "title": "Model prepisu",
@@ -3296,8 +3322,12 @@
     "list": {
       "loadFailed": "Históriu chatu sa nepodarilo načítať.",
       "new": "Nový chat",
-      "openHint": "Otvorí chat. Dlhým stlačením odstránite.",
       "deleteTitle": "Odstrániť tento chat?"
+    },
+    "rename": {
+      "title": "Premenovať chat",
+      "accessibility": "Premenovať chat: {{title}}",
+      "openHint": "Otvorí chat. Dlhým stlačením ho premenujete alebo odstránite."
     },
     "beta": "Beta",
     "details": {

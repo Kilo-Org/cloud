@@ -137,6 +137,8 @@
     "yourOwnRepositories": "ឃ្លាំងកូដផ្ទាល់ខ្លួនរបស់អ្នក",
     "dismissed": "បានសម្គាល់ថាមិនអើពើ",
     "agent": "ភ្នាក់ងារ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "ការផ្លាស់ប្តូរ"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "សកម្មភាព KiloClaw",
       "balance": "ការជូនដំណឹងអំពីសមតុល្យ",
       "security": "បញ្ហាសុវត្ថិភាពដែលរកឃើញ",
-      "spend": "ការជូនដំណឹងអំពីការចំណាយ"
+      "spend": "ការជូនដំណឹងអំពីការចំណាយ",
+      "followedSessions": "វគ្គដែលបានតាមដាន"
     },
     "category": {
       "chatMessagesSubtitle": "ការឆ្លើយតបនៅក្នុងការសន្ទនារបស់អ្នក",
@@ -2088,6 +2091,8 @@
       "title": "វគ្គ",
       "copyErrorDetails": "ចម្លងព័ត៌មានលម្អិតនៃកំហុស",
       "backToSessions": "ត្រឡប់ទៅបញ្ជីវគ្គ",
+      "follow": "តាមដាននៅលើអេក្រង់ចាក់សោ",
+      "unfollow": "ឈប់តាមដាននៅលើអេក្រង់ចាក់សោ",
       "couldNotLoad": "មិនអាចផ្ទុកវគ្គបានទេ។",
       "failedToLoadDetails": "មិនអាចផ្ទុកព័ត៌មានលម្អិតនៃវគ្គបានទេ។",
       "failedToStopExecution": "មិនអាចបញ្ឈប់ការដំណើរការបានទេ។",
@@ -3170,6 +3175,8 @@
     "channelName": "ភ្នាក់ងារសកម្ម",
     "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។",
     "openSession": "បើក",
+    "finished": "បានបញ្ចប់",
+    "followFailed": "មិនអាចបង្ហាញភ្នាក់ងារនេះនៅលើអេក្រង់ចាក់សោបានទេ។",
     "approveFailed": "មិនអាចយល់ព្រមបានទេ។ ប៉ះ $t(common.approve) ដើម្បីព្យាយាមម្តងទៀត។",
     "checked": "បានពិនិត្យ",
     "lastKnown": "ស្ថានភាពដែលដឹងចុងក្រោយ",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "កំពុងរង់ចាំអ្នក",
     "nextScheduled": "កាលវិភាគបន្ទាប់",
     "answerNeeded": "ត្រូវការការឆ្លើយតប",
-    "waitingToRetry": "រង់ចាំព្យាយាមម្ដងទៀត"
+    "waitingToRetry": "រង់ចាំព្យាយាមម្ដងទៀត",
+    "step": {
+      "editing": "ការកែសម្រួល",
+      "reading": "ការអាន",
+      "running": "ដំណើរការ",
+      "searching": "ស្វែងរកតាមវេប",
+      "thinking": "ការពិចារណា"
+    },
+    "planOf": "/",
+    "filesChanged": "ឯកសារបានផ្លាស់ប្តូរ",
+    "finishedIn": "បានបញ្ចប់ក្នុង",
+    "noActivityFor": "គ្មានសកម្មភាពរយៈពេល",
+    "prOpened": "បានបើក pull request",
+    "permissionWants": "ចង់ដំណើរការ",
+    "failure": {
+      "provider": "បានឈប់: កំហុសអ្នកផ្តល់សេវា",
+      "tool": "បានឈប់: កំហុសឧបករណ៍",
+      "cancelled": "បានឈប់: បានបោះបង់",
+      "other": "បានឈប់"
+    }
   },
   "transcriptionModel": {
     "title": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទ",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "មិនអាចផ្ទុកប្រវត្តិជជែកបានទេ។",
       "new": "ការជជែកថ្មី",
-      "openHint": "បើកការជជែក។ ចុចឱ្យយូរដើម្បីលុប។",
       "deleteTitle": "លុបការជជែកនេះ?"
+    },
+    "rename": {
+      "title": "ប្តូរឈ្មោះការជជែក",
+      "accessibility": "ប្តូរឈ្មោះការជជែក: {{title}}",
+      "openHint": "បើកការជជែក។ ចុចឱ្យយូរដើម្បីប្តូរឈ្មោះ ឬលុប។"
     },
     "beta": "បេតា",
     "details": {

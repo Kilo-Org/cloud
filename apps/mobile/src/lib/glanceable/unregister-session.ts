@@ -1,5 +1,6 @@
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { isUnauthorizedTrpcError } from '@/lib/auth/trpc-unauthorized';
+import { trpcClient } from '@/lib/trpc';
 
 /**
  * Session gate for activity-token deletes. The server deletes a row only for
@@ -25,7 +26,7 @@ export async function readUnregisterAuthToken(): Promise<string | null> {
 }
 
 /** Blocks further deletes with `token` when the server refused its session. */
-export function noteUnregisterFailure(token: string, error: unknown): void {
+function noteUnregisterFailure(token: string, error: unknown): void {
   if (isUnauthorizedTrpcError(error)) {
     refusedToken = token;
   }
@@ -33,4 +34,44 @@ export function noteUnregisterFailure(token: string, error: unknown): void {
 
 export function _resetUnregisterSessionForTests(): void {
   refusedToken = null;
+}
+
+/** Every token in the given record sets, once, in first-seen order. */
+export function unionTokens(records: readonly Set<string>[]): string[] {
+  const merged = new Set<string>();
+  for (const record of records) {
+    for (const token of record) {
+      merged.add(token);
+    }
+  }
+  return [...merged];
+}
+
+/**
+ * Delete each token for the authenticated owner and drop every deleted token
+ * from the given record sets. Returns the tokens whose delete failed, so the
+ * caller keeps them for a later cleanup.
+ */
+// eslint-disable-next-line max-params -- the token, the session gate, and the record sets a delete reconciles
+export async function deleteActivityTokens(
+  tokens: readonly string[],
+  authToken: string,
+  records: readonly Set<string>[],
+  sessionId?: string
+): Promise<string[]> {
+  const results = await Promise.all(
+    tokens.map(async token => {
+      try {
+        await trpcClient.user.unregisterActivityToken.mutate({ token, sessionId });
+        for (const record of records) {
+          record.delete(token);
+        }
+        return true;
+      } catch (error) {
+        noteUnregisterFailure(authToken, error);
+        return false;
+      }
+    })
+  );
+  return tokens.filter((_token, index) => !results[index]);
 }

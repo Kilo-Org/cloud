@@ -72,6 +72,7 @@ import {
 } from '@/components/agents/session-goal-collapse';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { SessionFollowButton } from '@/components/agents/session-follow-button';
 import {
   canAutoApprovePermissions,
   canAutoApproveReply,
@@ -1843,6 +1844,7 @@ export function SessionDetailContent({
   const handleRenameClose = rename.closeModal;
   const headerRight = (
     <View className="min-w-0 shrink flex-row items-center gap-2">
+      <SessionFollowButton sessionId={sessionId} />
       <SessionContextMetrics
         info={contextInfo}
         totalCostMicrodollars={totalMicrodollars}

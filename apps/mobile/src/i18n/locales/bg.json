@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Личните ти хранилища",
     "dismissed": "Отхвърлено",
     "agent": "агент",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Промени"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "Активност на KiloClaw",
       "balance": "Известия за салдото",
       "security": "Проблеми със сигурността",
-      "spend": "Известия за разходи"
+      "spend": "Известия за разходи",
+      "followedSessions": "Следвани сесии"
     },
     "category": {
       "chatMessagesSubtitle": "отговори в разговорите ти",
@@ -2088,6 +2091,8 @@
       "title": "Сесия",
       "copyErrorDetails": "Копирай подробностите за грешката",
       "backToSessions": "Обратно към сесиите",
+      "follow": "Следи на заключения екран",
+      "unfollow": "Спри следенето на заключения екран",
       "couldNotLoad": "Не успяхме да заредим сесията.",
       "failedToLoadDetails": "Не успяхме да заредим подробностите за сесията.",
       "failedToStopExecution": "Не успяхме да спрем изпълнението.",
@@ -3170,6 +3175,8 @@
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран.",
     "openSession": "Отвори",
+    "finished": "Завършено",
+    "followFailed": "Агентът не може да се покаже на заключения екран.",
     "approveFailed": "Не успяхме да одобрим. Докосни $t(common.approve), за да опиташ отново.",
     "checked": "Проверено",
     "lastKnown": "Последно известно",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Очаква ви",
     "nextScheduled": "Следващи планирани",
     "answerNeeded": "Нужен е отговор",
-    "waitingToRetry": "Изчаква повторен опит"
+    "waitingToRetry": "Изчаква повторен опит",
+    "step": {
+      "editing": "Редактиране",
+      "reading": "Четене",
+      "running": "Изпълнение",
+      "searching": "Търсене в мрежата",
+      "thinking": "Обмисляне"
+    },
+    "planOf": "от",
+    "filesChanged": "променени файла",
+    "finishedIn": "Завършено за",
+    "noActivityFor": "Няма активност за",
+    "prOpened": "Отворена заявка за сливане",
+    "permissionWants": "Иска да изпълни",
+    "failure": {
+      "provider": "Спряно: грешка при доставчика",
+      "tool": "Спряно: грешка в инструмента",
+      "cancelled": "Спряно: отменено",
+      "other": "СПРЯНА"
+    }
   },
   "transcriptionModel": {
     "title": "Модел за транскрипция",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Не можа да се зареди историята на чата.",
       "new": "Нов чат",
-      "openHint": "Отваря чата. Задръжте, за да изтриете.",
       "deleteTitle": "Изтриване на този чат?"
+    },
+    "rename": {
+      "title": "Преименувай чата",
+      "accessibility": "Преименувай чата: {{title}}",
+      "openHint": "Отваря чата. Задръжте, за да преименувате или изтриете."
     },
     "beta": "Бета",
     "details": {

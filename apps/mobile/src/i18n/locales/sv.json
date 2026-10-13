@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Dina egna kodarkiv",
     "dismissed": "Avskriven",
     "agent": "Ombud",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Ändringar"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarningar",
       "security": "Säkerhetsanmärkningar",
-      "spend": "Utgiftsvarningar"
+      "spend": "Utgiftsvarningar",
+      "followedSessions": "Följda sessioner"
     },
     "category": {
       "chatMessagesSubtitle": "svar i dina konversationer",
@@ -2088,6 +2091,8 @@
       "title": "Sessionen",
       "copyErrorDetails": "Kopiera felinformation",
       "backToSessions": "Tillbaka till sessionerna",
+      "follow": "Följ på låsskärmen",
+      "unfollow": "Sluta följa på låsskärmen",
       "couldNotLoad": "Det gick inte att läsa in sessionen.",
       "failedToLoadDetails": "Det gick inte att läsa in sessionsinformationen.",
       "failedToStopExecution": "Det gick inte att stoppa körningen.",
@@ -3170,6 +3175,8 @@
     "channelName": "Aktiva agenter",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen.",
     "openSession": "Öppna",
+    "finished": "Slutförd",
+    "followFailed": "Det gick inte att visa agenten på låsskärmen.",
     "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen.",
     "checked": "Kontrollerad",
     "lastKnown": "Senast kända",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Väntar på dig",
     "nextScheduled": "Nästa schemalagda",
     "answerNeeded": "Väntar på svar",
-    "waitingToRetry": "Väntar på nytt försök"
+    "waitingToRetry": "Väntar på nytt försök",
+    "step": {
+      "editing": "Redigerar",
+      "reading": "Läser",
+      "running": "Kör",
+      "searching": "Webbsökning",
+      "thinking": "Tänker igenom"
+    },
+    "planOf": "av",
+    "filesChanged": "filer ändrade",
+    "finishedIn": "Klart på",
+    "noActivityFor": "Ingen aktivitet i",
+    "prOpened": "Pull request öppnad",
+    "permissionWants": "Vill köra",
+    "failure": {
+      "provider": "Stoppad: leverantörsfel",
+      "tool": "Stoppad: verktygsfel",
+      "cancelled": "Stoppad: avbruten",
+      "other": "STOPPAD"
+    }
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Det gick inte att läsa in chatthistoriken.",
       "new": "Ny chatt",
-      "openHint": "Öppnar chatten. Tryck länge för att ta bort.",
       "deleteTitle": "Ta bort den här chatten?"
+    },
+    "rename": {
+      "title": "Byt namn på chatten",
+      "accessibility": "Byt namn på chatten: {{title}}",
+      "openHint": "Öppnar chatten. Tryck länge för att byta namn eller ta bort."
     },
     "beta": "Beta",
     "details": {

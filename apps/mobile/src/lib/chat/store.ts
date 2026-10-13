@@ -35,7 +35,7 @@ export type ChatSummary = {
   readonly sessionId: string;
   /** The model the conversation is on now, which a switch changes. */
   readonly model: string;
-  /** The first thing the user said, or empty for a chat with nothing in it. */
+  /** The name the person gave it, else the first thing they said, else empty. */
   readonly title: string;
   readonly updatedAt: number;
 };
@@ -50,9 +50,10 @@ type SummaryRow = {
 /**
  * The list, newest first.
  *
- * The title is the first thing the user said, read as a subquery rather than by
- * loading every turn of every conversation to draw one screen. Both subqueries
- * are answered by the store's own `(session_id, id)` indexes.
+ * The title is the name the person gave the chat, else the first thing they
+ * said, read as a subquery rather than by loading every turn of every
+ * conversation to draw one screen. Both subqueries are answered by the store's
+ * own `(session_id, id)` indexes.
  *
  * A chat whose session the SDK never wrote — a create that failed half way —
  * is left out by the join rather than drawn as a row that opens onto nothing.
@@ -62,13 +63,13 @@ const LIST = `
     chats.session_id,
     sessions.model,
     chats.updated_at,
-    (
+    coalesce(chats.title, (
       select parts.body from parts
       join turns on parts.turn_id = turns.id
       where turns.session_id = chats.session_id
         and turns.role = 'user' and parts.kind = 'text'
       order by parts.id limit 1
-    ) as title
+    )) as title
   from chats
   join sessions on sessions.id = chats.session_id
   where chats.scope = ?
@@ -224,6 +225,17 @@ export function moveChat(
     move.at,
     move.from,
   ]);
+}
+
+/** The longest name a chat takes, the same limit a session title has. */
+export const CHAT_TITLE_MAX_LENGTH = 200;
+
+/**
+ * Names a chat. The name lives on the row, so a model switch, which moves the
+ * row onto another session, keeps it.
+ */
+export function renameChat(db: ChatDatabase, sessionId: string, title: string): void {
+  db.runSync('update chats set title = ? where session_id = ?', [title, sessionId]);
 }
 
 /**

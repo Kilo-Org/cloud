@@ -137,6 +137,8 @@
     "yourOwnRepositories": "আপনার নিজের রিপোজিটরি",
     "dismissed": "খারিজ",
     "agent": "এজেন্ট",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "পরিবর্তন"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw-এর কার্যকলাপ",
       "balance": "ব্যালেন্সের সতর্কতা",
       "security": "শনাক্ত নিরাপত্তা সমস্যা",
-      "spend": "খরচের সতর্কতা"
+      "spend": "খরচের সতর্কতা",
+      "followedSessions": "অনুসরণ করা সেশন"
     },
     "category": {
       "chatMessagesSubtitle": "আপনার কথোপকথনে উত্তর",
@@ -2088,6 +2091,8 @@
       "title": "সেশন",
       "copyErrorDetails": "ত্রুটির বিস্তারিত কপি করুন",
       "backToSessions": "সেশনের তালিকায় ফিরুন",
+      "follow": "লক স্ক্রিনে অনুসরণ করুন",
+      "unfollow": "লক স্ক্রিনে অনুসরণ বন্ধ করুন",
       "couldNotLoad": "সেশন লোড করা যায়নি।",
       "failedToLoadDetails": "সেশনের বিস্তারিত লোড করা যায়নি।",
       "failedToStopExecution": "কাজটি থামানো যায়নি।",
@@ -3170,6 +3175,8 @@
     "channelName": "সক্রিয় এজেন্ট",
     "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।",
     "openSession": "খুলুন",
+    "finished": "শেষ হয়েছে",
+    "followFailed": "এই এজেন্টকে লক স্ক্রিনে দেখানো যায়নি।",
     "approveFailed": "অনুমোদন করা যায়নি। আবার চেষ্টা করতে $t(common.approve) স্পর্শ করুন।",
     "checked": "যাচাই করা হয়েছে",
     "lastKnown": "সর্বশেষ জানা",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "আপনার অপেক্ষায়",
     "nextScheduled": "পরবর্তী নির্ধারিত",
     "answerNeeded": "উত্তর প্রয়োজন",
-    "waitingToRetry": "আবার চেষ্টার অপেক্ষায়"
+    "waitingToRetry": "আবার চেষ্টার অপেক্ষায়",
+    "step": {
+      "editing": "সম্পাদনা",
+      "reading": "পড়া",
+      "running": "চালান",
+      "searching": "ওয়েব অনুসন্ধান",
+      "thinking": "ভেবে দেখা"
+    },
+    "planOf": "এর",
+    "filesChanged": "ফাইল পরিবর্তিত",
+    "finishedIn": "শেষ হয়েছে",
+    "noActivityFor": "কোনও কার্যকলাপ নেই",
+    "prOpened": "পুল অনুরোধ খোলা হয়েছে",
+    "permissionWants": "চালাতে চায়",
+    "failure": {
+      "provider": "থেমে গেছে: প্রদানকারীর ত্রুটি",
+      "tool": "থেমে গেছে: সরঞ্জামের ত্রুটি",
+      "cancelled": "থেমে গেছে: বাতিল",
+      "other": "বন্ধ"
+    }
   },
   "transcriptionModel": {
     "title": "কথা থেকে লেখার মডেল",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "চ্যাট ইতিহাস লোড করা যায়নি।",
       "new": "নতুন চ্যাট",
-      "openHint": "চ্যাট খোলে। মুছে ফেলতে চেপে ধরুন।",
       "deleteTitle": "এই চ্যাট মুছবেন?"
+    },
+    "rename": {
+      "title": "চ্যাটের নাম বদলান",
+      "accessibility": "চ্যাটের নাম বদলান: {{title}}",
+      "openHint": "চ্যাট খোলে। নাম বদলাতে বা মুছে ফেলতে চেপে ধরুন।"
     },
     "beta": "বিটা",
     "details": {

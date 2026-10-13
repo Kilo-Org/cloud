@@ -137,6 +137,8 @@
     "yourOwnRepositories": "შენი რეპოზიტორიები",
     "dismissed": "უგულებელყოფილია",
     "agent": "აგენტი",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "ცვლილებები"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw-ის აქტივობა",
       "balance": "ბალანსის შესახებ გაფრთხილებები",
       "security": "უსაფრთხოების პრობლემები",
-      "spend": "ხარჯვის შეტყობინებები"
+      "spend": "ხარჯვის შეტყობინებები",
+      "followedSessions": "მოყოლილი სესიები"
     },
     "category": {
       "chatMessagesSubtitle": "პასუხები თქვენს საუბრებში",
@@ -2088,6 +2091,8 @@
       "title": "სესია",
       "copyErrorDetails": "შეცდომის დეტალების კოპირება",
       "backToSessions": "სესიებში დაბრუნება",
+      "follow": "ჩაკეტილ ეკრანზე თვალის მიდევნება",
+      "unfollow": "ჩაკეტილ ეკრანზე თვალის მიდევნების შეწყვეტა",
       "couldNotLoad": "სესიის ჩატვირთვა ვერ მოხერხდა.",
       "failedToLoadDetails": "სესიის დეტალების ჩატვირთვა ვერ მოხერხდა.",
       "failedToStopExecution": "შესრულების შეჩერება ვერ მოხერხდა.",
@@ -3170,6 +3175,8 @@
     "channelName": "აქტიური აგენტები",
     "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები.",
     "openSession": "გახსენი",
+    "finished": "დასრულდა",
+    "followFailed": "ამ აგენტის ჩაკეტილ ეკრანზე ჩვენება ვერ მოხერხდა.",
     "approveFailed": "დამტკიცება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ $t(common.approve)-ს.",
     "checked": "შემოწმდა",
     "lastKnown": "ბოლო ცნობილი",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "გელოდებათ",
     "nextScheduled": "შემდეგი დაგეგმილი",
     "answerNeeded": "პასუხს ელის",
-    "waitingToRetry": "ხელახალ ცდას ელის"
+    "waitingToRetry": "ხელახალ ცდას ელის",
+    "step": {
+      "editing": "რედაქტირება",
+      "reading": "კითხვა",
+      "running": "გაშვება",
+      "searching": "ვებ ძიება",
+      "thinking": "დაფიქრება"
+    },
+    "planOf": "/",
+    "filesChanged": "შეცვლილი ფაილები",
+    "finishedIn": "დასრულდა",
+    "noActivityFor": "აქტივობა არ არის",
+    "prOpened": "Pull request გაიხსნა",
+    "permissionWants": "სურს გაშვება",
+    "failure": {
+      "provider": "შეჩერდა: პროვაიდერის შეცდომა",
+      "tool": "შეჩერდა: ხელსაწყოს შეცდომა",
+      "cancelled": "შეჩერდა: გაუქმდა",
+      "other": "შეჩერებულია"
+    }
   },
   "transcriptionModel": {
     "title": "ტრანსკრიფციის მოდელი",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "ჩატის ისტორიის ჩატვირთვა ვერ მოხერხდა.",
       "new": "ახალი ჩატი",
-      "openHint": "ხსნის ჩატს. წასაშლელად დიდხანს დააჭირეთ.",
       "deleteTitle": "წაიშალოს ეს ჩატი?"
+    },
+    "rename": {
+      "title": "ჩატის სახელის შეცვლა",
+      "accessibility": "ჩატის სახელის შეცვლა: {{title}}",
+      "openHint": "ხსნის ჩატს. სახელის შესაცვლელად ან წასაშლელად დიდხანს დააჭირეთ."
     },
     "beta": "ბეტა",
     "details": {

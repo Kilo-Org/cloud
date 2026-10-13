@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Dy ystorfeydd dy hun",
     "dismissed": "Wedi'i ddiystyru",
     "agent": "Asiant",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Newidiadau"
   },
   "language": {
@@ -897,7 +899,8 @@
       "kiloclaw": "Gweithgaredd KiloClaw",
       "balance": "Rhybuddion balans",
       "security": "Canfyddiadau diogelwch",
-      "spend": "Rhybuddion gwariant"
+      "spend": "Rhybuddion gwariant",
+      "followedSessions": "Sesiynau a ddilynir"
     },
     "category": {
       "chatMessagesSubtitle": "atebion yn eich sgyrsiau",
@@ -2200,6 +2203,8 @@
       "title": "Sesiwn",
       "copyErrorDetails": "Copïo manylion gwall",
       "backToSessions": "Yn ôl i sesiynau",
+      "follow": "Dilyn ar y sgrin glo",
+      "unfollow": "Peidio â dilyn ar y sgrin glo",
       "couldNotLoad": "Methu llwytho'r sesiwn.",
       "failedToLoadDetails": "Methu llwytho manylion y sesiwn.",
       "failedToStopExecution": "Methu atal y gweithrediad.",
@@ -3334,6 +3339,8 @@
     "channelName": "Asiantau gweithredol",
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo.",
     "openSession": "Agor",
+    "finished": "Wedi gorffen",
+    "followFailed": "Methu dangos yr asiant hwn ar y sgrin glo.",
     "approveFailed": "Methu cymeradwyo. Tapiwch $t(common.approve) i geisio eto.",
     "checked": "Gwiriwyd",
     "lastKnown": "Hysbys diwethaf",
@@ -3342,7 +3349,26 @@
     "waitingForYou": "Yn aros amdanoch",
     "nextScheduled": "Nesaf ar yr amserlen",
     "answerNeeded": "Angen ateb",
-    "waitingToRetry": "Yn aros i ailgeisio"
+    "waitingToRetry": "Yn aros i ailgeisio",
+    "step": {
+      "editing": "Golygu",
+      "reading": "Darllen",
+      "running": "Rhedeg",
+      "searching": "Chwilio'r we",
+      "thinking": "Meddwl drwyddo"
+    },
+    "planOf": "o",
+    "filesChanged": "ffeiliau wedi newid",
+    "finishedIn": "Gorffen mewn",
+    "noActivityFor": "Dim gweithgaredd am",
+    "prOpened": "Cais tynnu wedi agor",
+    "permissionWants": "Eisiau rhedeg",
+    "failure": {
+      "provider": "Wedi stopio: gwall darparwr",
+      "tool": "Wedi stopio: gwall offeryn",
+      "cancelled": "Wedi stopio: wedi canslo",
+      "other": "WEDI STOPIO"
+    }
   },
   "transcriptionModel": {
     "title": "Model trawsgrifio",
@@ -3378,8 +3404,12 @@
     "list": {
       "loadFailed": "Ni ellid llwytho hanes y sgwrs.",
       "new": "Sgwrs newydd",
-      "openHint": "Yn agor y sgwrs. Pwyswch yn hir i ddileu.",
       "deleteTitle": "Dileu'r sgwrs hon?"
+    },
+    "rename": {
+      "title": "Ailenwi sgwrs",
+      "accessibility": "Ailenwi sgwrs: {{title}}",
+      "openHint": "Yn agor y sgwrs. Pwyswch yn hir i ailenwi neu ddileu."
     },
     "beta": "Beta",
     "details": {

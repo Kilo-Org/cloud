@@ -137,6 +137,8 @@
     "yourOwnRepositories": "ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਰਿਪੋਜ਼ਿਟਰੀਆਂ",
     "dismissed": "ਖਾਰਜ",
     "agent": "ਏਜੰਟ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "ਤਬਦੀਲੀਆਂ"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw ਦੀ ਗਤੀਵਿਧੀ",
       "balance": "ਬਚੀ ਰਕਮ ਬਾਰੇ ਚੇਤਾਵਨੀਆਂ",
       "security": "ਸੁਰੱਖਿਆ ਜਾਂਚ ਦੇ ਨਤੀਜੇ",
-      "spend": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ"
+      "spend": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ",
+      "followedSessions": "ਫਾਲੋ ਕੀਤੇ ਸੈਸ਼ਨ"
     },
     "category": {
       "chatMessagesSubtitle": "ਤੁਹਾਡੀਆਂ ਗੱਲਬਾਤਾਂ ਵਿੱਚ ਜਵਾਬ",
@@ -2088,6 +2091,8 @@
       "title": "ਸੈਸ਼ਨ",
       "copyErrorDetails": "ਗਲਤੀ ਦੇ ਵੇਰਵੇ ਕਾਪੀ ਕਰੋ",
       "backToSessions": "ਸੈਸ਼ਨਾਂ 'ਤੇ ਵਾਪਸ ਜਾਓ",
+      "follow": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਫਾਲੋ ਕਰੋ",
+      "unfollow": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਫਾਲੋ ਕਰਨਾ ਬੰਦ ਕਰੋ",
       "couldNotLoad": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "failedToLoadDetails": "ਸੈਸ਼ਨ ਦੇ ਵੇਰਵੇ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ।",
       "failedToStopExecution": "ਚੱਲ ਰਿਹਾ ਕੰਮ ਰੋਕਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
@@ -3170,6 +3175,8 @@
     "channelName": "ਸਰਗਰਮ ਏਜੰਟ",
     "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।",
     "openSession": "ਖੋਲ੍ਹੋ",
+    "finished": "ਪੂਰਾ ਹੋਇਆ",
+    "followFailed": "ਇਸ ਏਜੰਟ ਨੂੰ ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਨਹੀਂ ਦਿਖਾਇਆ ਜਾ ਸਕਿਆ।",
     "approveFailed": "ਮਨਜ਼ੂਰ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ $t(common.approve) 'ਤੇ ਟੈਪ ਕਰੋ।",
     "checked": "ਜਾਂਚ ਕੀਤੀ",
     "lastKnown": "ਆਖਰੀ ਜਾਣੀ ਸਥਿਤੀ",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "ਤੁਹਾਡੀ ਉਡੀਕ",
     "nextScheduled": "ਅਗਲਾ ਨਿਰਧਾਰਿਤ",
     "answerNeeded": "ਜਵਾਬ ਚਾਹੀਦਾ ਹੈ",
-    "waitingToRetry": "ਮੁੜ ਕੋਸ਼ਿਸ਼ ਦੀ ਉਡੀਕ"
+    "waitingToRetry": "ਮੁੜ ਕੋਸ਼ਿਸ਼ ਦੀ ਉਡੀਕ",
+    "step": {
+      "editing": "ਸੰਪਾਦਨ ਕਰ ਰਿਹਾ",
+      "reading": "ਪੜ੍ਹ ਰਿਹਾ",
+      "running": "ਚਲਾ ਰਿਹਾ",
+      "searching": "ਵੈੱਬ ਖੋਜ",
+      "thinking": "ਸੋਚ ਰਿਹਾ"
+    },
+    "planOf": "ਵਿੱਚੋਂ",
+    "filesChanged": "ਫਾਈਲਾਂ ਬਦਲੀਆਂ",
+    "finishedIn": "ਵਿੱਚ ਪੂਰਾ ਹੋਇਆ",
+    "noActivityFor": "ਕੋਈ ਸਰਗਰਮੀ ਨਹੀਂ",
+    "prOpened": "ਪੁੱਲ ਰਿਕੁਐਸਟ ਖੋਲ੍ਹੀ ਗਈ",
+    "permissionWants": "ਚਲਾਉਣਾ ਚਾਹੁੰਦਾ ਹੈ",
+    "failure": {
+      "provider": "ਰੁਕਿਆ: ਪ੍ਰਦਾਤਾ ਗਲਤੀ",
+      "tool": "ਰੁਕਿਆ: ਸਾਧਨ ਗਲਤੀ",
+      "cancelled": "ਰੁਕਿਆ: ਰੱਦ ਕੀਤਾ",
+      "other": "ਰੁਕਿਆ"
+    }
   },
   "transcriptionModel": {
     "title": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਦਾ ਮਾਡਲ",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "ਚੈਟ ਇਤਿਹਾਸ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "new": "ਨਵੀਂ ਚੈਟ",
-      "openHint": "ਚੈਟ ਖੋਲ੍ਹਦਾ ਹੈ। ਮਿਟਾਉਣ ਲਈ ਲੰਮਾ ਦਬਾਓ।",
       "deleteTitle": "ਇਹ ਚੈਟ ਮਿਟਾਉਣੀ ਹੈ?"
+    },
+    "rename": {
+      "title": "ਚੈਟ ਦਾ ਨਾਮ ਬਦਲੋ",
+      "accessibility": "ਚੈਟ ਦਾ ਨਾਮ ਬਦਲੋ: {{title}}",
+      "openHint": "ਚੈਟ ਖੋਲ੍ਹਦਾ ਹੈ। ਨਾਮ ਬਦਲਣ ਜਾਂ ਮਿਟਾਉਣ ਲਈ ਲੰਮਾ ਦਬਾਓ।"
     },
     "beta": "ਬੀਟਾ",
     "details": {

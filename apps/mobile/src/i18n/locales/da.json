@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Dine egne kodelagre",
     "dismissed": "Afvist",
     "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Ændringer"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Advarsler om saldo",
       "security": "Sikkerhedsfund",
-      "spend": "Forbrugsadvarsler"
+      "spend": "Forbrugsadvarsler",
+      "followedSessions": "Fulgte sessioner"
     },
     "category": {
       "chatMessagesSubtitle": "svar i dine samtaler",
@@ -2088,6 +2091,8 @@
       "title": "Sessionen",
       "copyErrorDetails": "Kopiér fejloplysninger",
       "backToSessions": "Tilbage til sessioner",
+      "follow": "Følg på låseskærmen",
+      "unfollow": "Stop med at følge på låseskærmen",
       "couldNotLoad": "Kunne ikke indlæse sessionen.",
       "failedToLoadDetails": "Kunne ikke indlæse oplysninger om sessionen.",
       "failedToStopExecution": "Kunne ikke stoppe kørslen.",
@@ -3170,6 +3175,8 @@
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen.",
     "openSession": "Åbn",
+    "finished": "Afsluttet",
+    "followFailed": "Kunne ikke vise denne agent på låseskærmen.",
     "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen.",
     "checked": "Kontrolleret",
     "lastKnown": "Sidst kendt",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Afventer dig",
     "nextScheduled": "Næste planlagte",
     "answerNeeded": "Afventer svar",
-    "waitingToRetry": "Afventer nyt forsøg"
+    "waitingToRetry": "Afventer nyt forsøg",
+    "step": {
+      "editing": "Redigerer",
+      "reading": "Læser",
+      "running": "Kører",
+      "searching": "Websøgning",
+      "thinking": "Tænker igennem"
+    },
+    "planOf": "af",
+    "filesChanged": "filer ændret",
+    "finishedIn": "Færdig på",
+    "noActivityFor": "Ingen aktivitet i",
+    "prOpened": "Pull request åbnet",
+    "permissionWants": "Vil køre",
+    "failure": {
+      "provider": "Stoppet: udbyderfejl",
+      "tool": "Stoppet: værktøjsfejl",
+      "cancelled": "Stoppet: annulleret",
+      "other": "STOPPET"
+    }
   },
   "transcriptionModel": {
     "title": "Transskriptionsmodel",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Kunne ikke indlæse chathistorik.",
       "new": "Ny chat",
-      "openHint": "Åbner chatten. Tryk og hold for at slette.",
       "deleteTitle": "Slet denne chat?"
+    },
+    "rename": {
+      "title": "Omdøb chat",
+      "accessibility": "Omdøb chat: {{title}}",
+      "openHint": "Åbner chatten. Tryk og hold for at omdøbe eller slette."
     },
     "beta": "Beta",
     "details": {

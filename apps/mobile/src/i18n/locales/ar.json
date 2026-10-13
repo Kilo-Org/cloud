@@ -137,6 +137,8 @@
     "yourOwnRepositories": "مستودعاتك الخاصة",
     "dismissed": "مستبعدة",
     "agent": "عامل",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "التغييرات"
   },
   "language": {
@@ -321,7 +323,8 @@
       "kiloclaw": "نشاط KiloClaw",
       "balance": "تنبيهات الرصيد",
       "security": "ملاحظات الأمان",
-      "spend": "تنبيهات الإنفاق"
+      "spend": "تنبيهات الإنفاق",
+      "followedSessions": "الجلسات المتابَعة"
     },
     "category": {
       "chatMessagesSubtitle": "الردود في محادثاتك",
@@ -1624,6 +1627,8 @@
       "title": "الجلسة",
       "copyErrorDetails": "نسخ تفاصيل الخطأ",
       "backToSessions": "العودة إلى الجلسات",
+      "follow": "المتابعة على شاشة القفل",
+      "unfollow": "إيقاف المتابعة على شاشة القفل",
       "couldNotLoad": "تعذّر تحميل الجلسة.",
       "failedToLoadDetails": "تعذّر تحميل تفاصيل الجلسة.",
       "failedToStopExecution": "تعذّر إيقاف التنفيذ.",
@@ -3334,6 +3339,8 @@
     "channelName": "الوكلاء النشطون",
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل.",
     "openSession": "افتح",
+    "finished": "انتهى",
+    "followFailed": "تعذّر عرض هذا الوكيل على شاشة القفل.",
     "approveFailed": "تعذّر الموافقة. اضغط على $t(common.approve) للمحاولة مرة أخرى.",
     "checked": "آخر تحقق",
     "lastKnown": "آخر حالة معروفة",
@@ -3342,7 +3349,26 @@
     "waitingForYou": "بانتظارك",
     "nextScheduled": "المواعيد المجدولة القادمة",
     "answerNeeded": "بانتظار إجابتك",
-    "waitingToRetry": "بانتظار إعادة المحاولة"
+    "waitingToRetry": "بانتظار إعادة المحاولة",
+    "step": {
+      "editing": "التحرير",
+      "reading": "القراءة",
+      "running": "التشغيل",
+      "searching": "بحث في الويب",
+      "thinking": "التفكير بعمق"
+    },
+    "planOf": "من",
+    "filesChanged": "ملفات متغيّرة",
+    "finishedIn": "اكتمل في",
+    "noActivityFor": "لا نشاط لمدة",
+    "prOpened": "تم فتح طلب سحب",
+    "permissionWants": "يريد التشغيل",
+    "failure": {
+      "provider": "توقف: خطأ في المزوِّد",
+      "tool": "توقف: خطأ في الأداة",
+      "cancelled": "توقف: أُلغي",
+      "other": "متوقف"
+    }
   },
   "transcriptionModel": {
     "title": "نموذج التفريغ الصوتي",
@@ -3378,8 +3404,12 @@
     "list": {
       "loadFailed": "تعذّر تحميل سجل المحادثة.",
       "new": "محادثة جديدة",
-      "openHint": "يفتح المحادثة. اضغط مطولاً للحذف.",
       "deleteTitle": "حذف هذه المحادثة؟"
+    },
+    "rename": {
+      "title": "إعادة تسمية الدردشة",
+      "accessibility": "إعادة تسمية الدردشة: {{title}}",
+      "openHint": "يفتح المحادثة. اضغط مطولاً لإعادة التسمية أو الحذف."
     },
     "beta": "بيتا",
     "details": {

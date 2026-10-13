@@ -137,6 +137,8 @@
     "yourOwnRepositories": "तपाईंका आफ्नै रिपोजिटरीहरू",
     "dismissed": "खारेज गरियो",
     "agent": "एजेन्ट",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "परिवर्तनहरू"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw का गतिविधिहरू",
       "balance": "मौज्दातसम्बन्धी चेतावनीहरू",
       "security": "भेटिएका सुरक्षा समस्या",
-      "spend": "खर्चका चेतावनीहरू"
+      "spend": "खर्चका चेतावनीहरू",
+      "followedSessions": "फलो गरिएका सत्रहरू"
     },
     "category": {
       "chatMessagesSubtitle": "तपाईंका कुराकानीमा आएका उत्तरहरू",
@@ -2088,6 +2091,8 @@
       "title": "सत्र",
       "copyErrorDetails": "त्रुटिको विवरण प्रतिलिपि गर्नुहोस्",
       "backToSessions": "सत्रहरूमा फर्कनुहोस्",
+      "follow": "लक स्क्रिनमा फलो गर्नुहोस्",
+      "unfollow": "लक स्क्रिनमा फलो गर्न रोक्नुहोस्",
       "couldNotLoad": "सत्र लोड गर्न सकिएन।",
       "failedToLoadDetails": "सत्रको विवरण लोड गर्न सकिएन।",
       "failedToStopExecution": "चलिरहेको काम रोक्न सकिएन।",
@@ -3170,6 +3175,8 @@
     "channelName": "सक्रिय एजेन्टहरू",
     "activityKitDisabledBody": "लक स्क्रिनमा सक्रिय एजेन्टहरू हेर्न सेटिङ्समा प्रत्यक्ष गतिविधिहरू चालू गर्नुहोस्।",
     "openSession": "खोल्नुहोस्",
+    "finished": "समाप्त भयो",
+    "followFailed": "यो एजेन्टलाई लक स्क्रिनमा देखाउन सकिएन।",
     "approveFailed": "स्वीकृति गर्न सकिएन। फेरि प्रयास गर्न $t(common.approve) मा ट्याप गर्नुहोस्।",
     "checked": "जाँच गरिएको",
     "lastKnown": "पछिल्लो ज्ञात",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "तपाईंको प्रतीक्षामा",
     "nextScheduled": "अब तय भएका",
     "answerNeeded": "जवाफ चाहिन्छ",
-    "waitingToRetry": "फेरि प्रयासको प्रतीक्षामा"
+    "waitingToRetry": "फेरि प्रयासको प्रतीक्षामा",
+    "step": {
+      "editing": "सम्पादन गर्दै",
+      "reading": "पढ्दै",
+      "running": "चलाउँदै",
+      "searching": "वेब खोज",
+      "thinking": "राम्ररी सोच्दै"
+    },
+    "planOf": "मध्ये",
+    "filesChanged": "फाइलहरू परिवर्तन भए",
+    "finishedIn": "समाप्त भयो",
+    "noActivityFor": "का लागि कुनै गतिविधि छैन",
+    "prOpened": "पुल रिक्वेस्ट खोलियो",
+    "permissionWants": "चलाउन चाहन्छ",
+    "failure": {
+      "provider": "रोकियो: प्रदायक त्रुटि",
+      "tool": "रोकियो: उपकरण त्रुटि",
+      "cancelled": "रोकियो: रद्द गरियो",
+      "other": "रोकियो"
+    }
   },
   "transcriptionModel": {
     "title": "बोलीलाई पाठमा रूपान्तरण गर्ने मोडेल",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "कुराकानी इतिहास लोड गर्न सकिएन।",
       "new": "नयाँ च्याट",
-      "openHint": "च्याट खोल्छ। मेट्न लामो थिच्नुहोस्।",
       "deleteTitle": "यो च्याट मेट्ने?"
+    },
+    "rename": {
+      "title": "च्याटको नाम बदल्नुहोस्",
+      "accessibility": "च्याटको नाम बदल्नुहोस्: {{title}}",
+      "openHint": "च्याट खोल्छ। नाम बदल्न वा मेट्न लामो थिच्नुहोस्।"
     },
     "beta": "बिटा",
     "details": {

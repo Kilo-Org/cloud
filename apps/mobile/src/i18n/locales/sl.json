@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Tvoji repozitoriji",
     "dismissed": "Zavrženo",
     "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Spremembe"
   },
   "language": {
@@ -865,7 +867,8 @@
       "kiloclaw": "Dejavnost v KiloClaw",
       "balance": "Opozorila o stanju dobroimetja",
       "security": "Varnostne ugotovitve",
-      "spend": "Opozorila o porabi"
+      "spend": "Opozorila o porabi",
+      "followedSessions": "Sledene seje"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori v tvojih pogovorih",
@@ -2144,6 +2147,8 @@
       "title": "Seja",
       "copyErrorDetails": "Kopiraj podrobnosti napake",
       "backToSessions": "Nazaj na seje",
+      "follow": "Spremljaj na zaklenjenem zaslonu",
+      "unfollow": "Prenehaj spremljati na zaklenjenem zaslonu",
       "couldNotLoad": "Seje ni bilo mogoče naložiti.",
       "failedToLoadDetails": "Podrobnosti seje ni bilo mogoče naložiti.",
       "failedToStopExecution": "Izvajanja ni bilo mogoče ustaviti.",
@@ -3252,6 +3257,8 @@
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu.",
     "openSession": "Odpri",
+    "finished": "Zaključeno",
+    "followFailed": "Tega agenta ni bilo mogoče prikazati na zaklenjenem zaslonu.",
     "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus.",
     "checked": "Preverjeno",
     "lastKnown": "Nazadnje znano",
@@ -3260,7 +3267,26 @@
     "waitingForYou": "Čaka na vas",
     "nextScheduled": "Naslednje načrtovano",
     "answerNeeded": "Potreben odgovor",
-    "waitingToRetry": "Čaka na ponovni poskus"
+    "waitingToRetry": "Čaka na ponovni poskus",
+    "step": {
+      "editing": "Urejanje",
+      "reading": "Branje",
+      "running": "Zagon",
+      "searching": "Spletno iskanje",
+      "thinking": "Premišljevanje"
+    },
+    "planOf": "od",
+    "filesChanged": "spremenjenih datotek",
+    "finishedIn": "Dokončano v",
+    "noActivityFor": "Ni dejavnosti že",
+    "prOpened": "Pull request odprt",
+    "permissionWants": "Želi zagnati",
+    "failure": {
+      "provider": "Ustavljeno: napaka ponudnika",
+      "tool": "Ustavljeno: napaka orodja",
+      "cancelled": "Ustavljeno: preklicano",
+      "other": "USTAVLJENO"
+    }
   },
   "transcriptionModel": {
     "title": "Model za prepisovanje",
@@ -3296,8 +3322,12 @@
     "list": {
       "loadFailed": "Zgodovine klepeta ni bilo mogoče naložiti.",
       "new": "Nov klepet",
-      "openHint": "Odpre klepet. Pridržite za brisanje.",
       "deleteTitle": "Izbrišem ta klepet?"
+    },
+    "rename": {
+      "title": "Preimenuj klepet",
+      "accessibility": "Preimenuj klepet: {{title}}",
+      "openHint": "Odpre klepet. Pridržite za preimenovanje ali brisanje."
     },
     "beta": "Beta",
     "details": {

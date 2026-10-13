@@ -137,6 +137,8 @@
     "yourOwnRepositories": "你自己的仓库",
     "dismissed": "已忽略",
     "agent": "代理人",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "更改"
   },
   "language": {
@@ -321,7 +323,8 @@
       "kiloclaw": "KiloClaw 活动",
       "balance": "余额提醒",
       "security": "安全问题",
-      "spend": "支出提醒"
+      "spend": "支出提醒",
+      "followedSessions": "已关注的会话"
     },
     "category": {
       "chatMessagesSubtitle": "对话中的回复",
@@ -1576,6 +1579,8 @@
       "title": "会话",
       "copyErrorDetails": "复制错误详情",
       "backToSessions": "返回会话列表",
+      "follow": "在锁定屏幕上关注",
+      "unfollow": "停止在锁定屏幕上关注",
       "couldNotLoad": "无法加载会话。",
       "failedToLoadDetails": "无法加载会话详情。",
       "failedToStopExecution": "停止执行失败。",
@@ -3170,6 +3175,8 @@
     "channelName": "运行中的智能体",
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。",
     "openSession": "打开",
+    "finished": "已结束",
+    "followFailed": "无法在锁定屏幕上显示此智能体。",
     "approveFailed": "无法批准。点按$t(common.approve)重试。",
     "checked": "上次确认",
     "lastKnown": "上次已知状态",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "等待你处理",
     "nextScheduled": "后续计划",
     "answerNeeded": "等待回答",
-    "waitingToRetry": "等待重试"
+    "waitingToRetry": "等待重试",
+    "step": {
+      "editing": "编辑中",
+      "reading": "读取中",
+      "running": "运行",
+      "searching": "网页搜索",
+      "thinking": "正在思考"
+    },
+    "planOf": "/",
+    "filesChanged": "个文件已更改",
+    "finishedIn": "耗时",
+    "noActivityFor": "无活动",
+    "prOpened": "拉取请求已打开",
+    "permissionWants": "想要运行",
+    "failure": {
+      "provider": "已停止：提供商错误",
+      "tool": "已停止：工具错误",
+      "cancelled": "已停止：已取消",
+      "other": "已停止"
+    }
   },
   "transcriptionModel": {
     "title": "转写模型",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "无法加载聊天历史。",
       "new": "新对话",
-      "openHint": "打开对话。长按可删除。",
       "deleteTitle": "删除这个对话？"
+    },
+    "rename": {
+      "title": "重命名聊天",
+      "accessibility": "重命名聊天：{{title}}",
+      "openHint": "打开对话。长按可重命名或删除。"
     },
     "beta": "测试版",
     "details": {

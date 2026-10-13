@@ -17,7 +17,7 @@ import {
 import { formatFileSize } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-import { modelCapabilityKey } from './model-tools-hint';
+import { modelCapabilityKey } from './model-capability';
 
 const FAILURE_KEYS = {
   space: 'modelChat.gguf.errors.space',

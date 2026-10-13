@@ -137,6 +137,8 @@
     "yourOwnRepositories": "ଆପଣଙ୍କ ନିଜ ରିପୋଜିଟୋରୀ",
     "dismissed": "ଖାରଜ ହୋଇଛି",
     "agent": "ଏଜେଣ୍ଟ।",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "ପରିବର୍ତ୍ତନ"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw କାର୍ଯ୍ୟକଳାପ",
       "balance": "ଅବଶିଷ୍ଟ ରାଶି ସମ୍ବନ୍ଧୀୟ ସତର୍କ ସୂଚନା",
       "security": "ଚିହ୍ନଟ ସୁରକ୍ଷା ସମସ୍ୟା",
-      "spend": "ଖର୍ଚ୍ଚ ସତର୍କତା"
+      "spend": "ଖର୍ଚ୍ଚ ସତର୍କତା",
+      "followedSessions": "ଅନୁସରଣ କରାଯାଇଥିବା ସେସନ"
     },
     "category": {
       "chatMessagesSubtitle": "ଆପଣଙ୍କ ବାର୍ତ୍ତାଳାପର ଉତ୍ତର",
@@ -2088,6 +2091,8 @@
       "title": "ସେସନ୍",
       "copyErrorDetails": "ତ୍ରୁଟି ବିବରଣୀ କପି କରନ୍ତୁ",
       "backToSessions": "ସେସନ୍ ତାଲିକାକୁ ଫେରନ୍ତୁ",
+      "follow": "ଲକ୍ ସ୍କ୍ରିନରେ ଅନୁସରଣ କରନ୍ତୁ",
+      "unfollow": "ଲକ୍ ସ୍କ୍ରିନରେ ଅନୁସରଣ ବନ୍ଦ କରନ୍ତୁ",
       "couldNotLoad": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "failedToLoadDetails": "ସେସନ୍ ବିବରଣୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "failedToStopExecution": "ଚାଲୁଥିବା କାମ ବନ୍ଦ ହୋଇପାରିଲା ନାହିଁ।",
@@ -3170,6 +3175,8 @@
     "channelName": "ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ",
     "activityKitDisabledBody": "ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ ଦେଖିବାକୁ ସେଟିଂସ୍‌ରେ ଲାଇଭ୍ କାର୍ଯ୍ୟକଳାପ ଚାଲୁ କରନ୍ତୁ।",
     "openSession": "ଖୋଲନ୍ତୁ",
+    "finished": "ସମାପ୍ତ",
+    "followFailed": "ଲକ୍ ସ୍କ୍ରିନରେ ଏହି ଏଜେଣ୍ଟକୁ ଦେଖାଇ ହେଲା ନାହିଁ।",
     "approveFailed": "ଅନୁମୋଦନ କରିହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ $t(common.approve) ଟାପ୍ କରନ୍ତୁ।",
     "checked": "ଯାଞ୍ଚ ହୋଇଛି",
     "lastKnown": "ଶେଷ ଜଣା ସ୍ଥିତି",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "ଆପଣଙ୍କ ଅପେକ୍ଷାରେ",
     "nextScheduled": "ପରବର୍ତ୍ତୀ ନିର୍ଧାରିତ",
     "answerNeeded": "ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ",
-    "waitingToRetry": "ପୁନଃଚେଷ୍ଟା ଅପେକ୍ଷାରେ"
+    "waitingToRetry": "ପୁନଃଚେଷ୍ଟା ଅପେକ୍ଷାରେ",
+    "step": {
+      "editing": "ସମ୍ପାଦନ କରୁଛି",
+      "reading": "ପଢ଼ୁଛି",
+      "running": "ଚାଲୁଛି",
+      "searching": "ୱେବ ସନ୍ଧାନ",
+      "thinking": "ଚିନ୍ତା କରୁଛି"
+    },
+    "planOf": "ମଧ୍ୟରୁ",
+    "filesChanged": "ଫାଇଲ ବଦଳିଛି",
+    "finishedIn": "ସମାପ୍ତ",
+    "noActivityFor": "କୌଣସି କାର୍ଯ୍ୟକଳାପ ନାହିଁ",
+    "prOpened": "ପୁଲ ରିକ୍ୱେଷ୍ଟ ଖୋଲାଗଲା",
+    "permissionWants": "ଚଲାଇବାକୁ ଚାହେଁ",
+    "failure": {
+      "provider": "ବନ୍ଦ: ପ୍ରୋଭାଇଡର ତ୍ରୁଟି",
+      "tool": "ବନ୍ଦ: ଟୁଲ ତ୍ରୁଟି",
+      "cancelled": "ବନ୍ଦ: ବାତିଲ",
+      "other": "ବନ୍ଦ"
+    }
   },
   "transcriptionModel": {
     "title": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର ମଡେଲ୍",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "ଚାଟ୍ ଇତିହାସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "new": "ନୂଆ ଚାଟ୍",
-      "openHint": "ଚାଟ୍ ଖୋଲେ। ବିଲୋପ କରିବାକୁ ଦବାଇ ଧରନ୍ତୁ।",
       "deleteTitle": "ଏହି ଚାଟ୍ ବିଲୋପ କରିବେ?"
+    },
+    "rename": {
+      "title": "ଚାଟ୍‌ର ନାମ ବଦଳାନ୍ତୁ",
+      "accessibility": "{{title}} ଚାଟ୍‌ର ନାମ ବଦଳାନ୍ତୁ",
+      "openHint": "ଚାଟ୍ ଖୋଲେ। ନାମ ବଦଳାଇବାକୁ କିମ୍ବା ବିଲୋପ କରିବାକୁ ଦବାଇ ଧରନ୍ତୁ।"
     },
     "beta": "ବିଟା",
     "details": {

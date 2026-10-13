@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Kuusaalee koodii mataa keetii",
     "dismissed": "Dhiifame",
     "agent": "Bakka bu'aa",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Jijjiiramoota"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "Sochii KiloClaw",
       "balance": "Akeekkachiisa haftee maallaqaa",
       "security": "Argannoowwan nageenyaa",
-      "spend": "Akeekkachiisa baasii"
+      "spend": "Akeekkachiisa baasii",
+      "followedSessions": "Seeshiniiwwan hordofaman"
     },
     "category": {
       "chatMessagesSubtitle": "deebiiwwan mariiwwan kee keessatti",
@@ -2088,6 +2091,8 @@
       "title": "Turtii",
       "copyErrorDetails": "Ibsa dogoggoraa kopii godhi",
       "backToSessions": "Gara turtiiwwaniitti deebi'i",
+      "follow": "Iskiriinii qulfii irratti hordofi",
+      "unfollow": "Iskiriinii qulfii irratti hordofuu dhaabi",
       "couldNotLoad": "Turtii fe'uu hin danda'amne.",
       "failedToLoadDetails": "Ibsa turtii fe'uu hin danda'amne.",
       "failedToStopExecution": "Raawwii dhaabuu hin danda'amne.",
@@ -3170,6 +3175,8 @@
     "channelName": "Eejentoota hojii irra jiran",
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi.",
     "openSession": "Bani",
+    "finished": "Xumurameera",
+    "followFailed": "Ergamaa kana iskiriinii qulfii irratti agarsiisuun hin danda'amne.",
     "approveFailed": "Raggaasisuun hin danda'amne. Deebi'anii yaaluuf $t(common.approve) tuqi.",
     "checked": "Mirkanaa'e",
     "lastKnown": "Kan dhumarratti beekame",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Si eeggachaa jira",
     "nextScheduled": "Kan itti aansee karoorfame",
     "answerNeeded": "Deebii barbaada",
-    "waitingToRetry": "Irra deebi'uuf eeggachaa jira"
+    "waitingToRetry": "Irra deebi'uuf eeggachaa jira",
+    "step": {
+      "editing": "Gulaaluu",
+      "reading": "Dubbisuu",
+      "running": "Fiiguu",
+      "searching": "Barbaacha weeb",
+      "thinking": "Xiinxaluu"
+    },
+    "planOf": "keessaa",
+    "filesChanged": "faayiloonni jijjiiraman",
+    "finishedIn": "Xumurame",
+    "noActivityFor": "Sochii hin jiru",
+    "prOpened": "Pull request baname",
+    "permissionWants": "Fiiguu barbaada",
+    "failure": {
+      "provider": "Dhaabbate: dogoggora dhiyeessaa",
+      "tool": "Dhaabbate: dogoggora meeshaa",
+      "cancelled": "Dhaabbate: haqame",
+      "other": "DHAABAME"
+    }
   },
   "transcriptionModel": {
     "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Seenaa chaat fudhachuu hin dandeenye.",
       "new": "Marii haaraa",
-      "openHint": "Marii ni bana. Haquuf cuqaasii dheeraa godhi.",
       "deleteTitle": "Marii kana haquuf?"
+    },
+    "rename": {
+      "title": "Maqaa marii jijjiiri",
+      "accessibility": "Maqaa marii jijjiiri: {{title}}",
+      "openHint": "Marii ni bana. Maqaa jijjiiruuf ykn haquuf cuqaasii dheeraa godhi."
     },
     "beta": "Beetaa",
     "details": {

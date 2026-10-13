@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Өзіңіздің репозиторийлеріңіз",
     "dismissed": "Еленбейді",
     "agent": "Агент",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Өзгерістер"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw белсенділігі",
       "balance": "Баланс туралы ескертулер",
       "security": "Анықталған қауіпсіздік мәселелері",
-      "spend": "Шығыс ескертулері"
+      "spend": "Шығыс ескертулері",
+      "followedSessions": "Бақыланатын сессиялар"
     },
     "category": {
       "chatMessagesSubtitle": "сөйлесулеріңіздегі жауаптар",
@@ -2088,6 +2091,8 @@
       "title": "Сессия",
       "copyErrorDetails": "Қате туралы мәліметтерді көшіру",
       "backToSessions": "Сессияларға оралу",
+      "follow": "Құлыптау экранында бақылау",
+      "unfollow": "Құлыптау экранында бақылауды тоқтату",
       "couldNotLoad": "Сессияны жүктеу мүмкін болмады.",
       "failedToLoadDetails": "Сессия мәліметтерін жүктеу мүмкін болмады.",
       "failedToStopExecution": "Орындалуды тоқтату мүмкін болмады.",
@@ -3170,6 +3175,8 @@
     "channelName": "Белсенді агенттер",
     "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз.",
     "openSession": "Ашыңыз",
+    "finished": "Аяқталды",
+    "followFailed": "Бұл агентті құлыптау экранында көрсету мүмкін болмады.",
     "approveFailed": "Мақұлдау мүмкін болмады. Қайталап көру үшін $t(common.approve) түртіңіз.",
     "checked": "Тексерілді",
     "lastKnown": "Соңғы белгілі күй",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Сізді күтуде",
     "nextScheduled": "Келесі жоспарланғандар",
     "answerNeeded": "Жауап қажет",
-    "waitingToRetry": "Қайта әрекет күтілуде"
+    "waitingToRetry": "Қайта әрекет күтілуде",
+    "step": {
+      "editing": "Өңдеу",
+      "reading": "Оқу",
+      "running": "Іске қосу",
+      "searching": "Веб іздеу",
+      "thinking": "Ойлану"
+    },
+    "planOf": "/",
+    "filesChanged": "файл өзгертілді",
+    "finishedIn": "Аяқталды",
+    "noActivityFor": "Белсенділік жоқ",
+    "prOpened": "Pull request ашылды",
+    "permissionWants": "Іске қосуды қалайды",
+    "failure": {
+      "provider": "Тоқтатылды: провайдер қатесі",
+      "tool": "Тоқтатылды: құрал қатесі",
+      "cancelled": "Тоқтатылды: бас тартылды",
+      "other": "ТОҚТАТЫЛДЫ"
+    }
   },
   "transcriptionModel": {
     "title": "Дауысты мәтінге айналдыру моделі",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Чат тарихын жүктеу мүмкін болмады.",
       "new": "Жаңа чат",
-      "openHint": "Чатты ашады. Жою үшін басып тұрыңыз.",
       "deleteTitle": "Осы чат жойылсын ба?"
+    },
+    "rename": {
+      "title": "Чат атын өзгерту",
+      "accessibility": "Чат атын өзгерту: {{title}}",
+      "openHint": "Чатты ашады. Атын өзгерту немесе жою үшін басып тұрыңыз."
     },
     "beta": "Бета",
     "details": {

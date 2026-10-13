@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Mga sarili mong repositoryo",
     "dismissed": "Binalewala",
     "agent": "Ahente",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Mga pagbabago"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "Aktibidad ng KiloClaw",
       "balance": "Mga babala sa balanse",
       "security": "Mga natukoy na isyu sa seguridad",
-      "spend": "Mga babala sa gastos"
+      "spend": "Mga babala sa gastos",
+      "followedSessions": "Mga sinusubaybayang sesyon"
     },
     "category": {
       "chatMessagesSubtitle": "mga tugon sa iyong mga pag-uusap",
@@ -2088,6 +2091,8 @@
       "title": "Sesyon",
       "copyErrorDetails": "Kopyahin ang mga detalye ng error",
       "backToSessions": "Bumalik sa mga sesyon",
+      "follow": "Subaybayan sa naka-lock na screen",
+      "unfollow": "Ihinto ang pagsubaybay sa naka-lock na screen",
       "couldNotLoad": "Hindi ma-load ang sesyon.",
       "failedToLoadDetails": "Hindi ma-load ang mga detalye ng sesyon.",
       "failedToStopExecution": "Hindi maihinto ang pagpapatakbo.",
@@ -3170,6 +3175,8 @@
     "channelName": "Mga aktibong agent",
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
     "openSession": "Buksan",
+    "finished": "Natapos",
+    "followFailed": "Hindi maipakita ang ahenteng ito sa naka-lock na screen.",
     "approveFailed": "Hindi maaprubahan. I-tap ang $t(common.approve) para subukang muli.",
     "checked": "Nakumpirma",
     "lastKnown": "Huling nalaman",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Hinihintay ka",
     "nextScheduled": "Susunod na naka-iskedyul",
     "answerNeeded": "Kailangan ng sagot",
-    "waitingToRetry": "Naghihintay ng muling pagsubok"
+    "waitingToRetry": "Naghihintay ng muling pagsubok",
+    "step": {
+      "editing": "Nag-e-edit",
+      "reading": "Nagbabasa",
+      "running": "Tumatakbo",
+      "searching": "Paghahanap sa web",
+      "thinking": "Pinag-iisipan"
+    },
+    "planOf": "ng",
+    "filesChanged": "mga file na binago",
+    "finishedIn": "Natapos sa",
+    "noActivityFor": "Walang aktibidad sa loob ng",
+    "prOpened": "Nabuksan ang pull request",
+    "permissionWants": "Gustong patakbuhin",
+    "failure": {
+      "provider": "Huminto: error ng provider",
+      "tool": "Huminto: error ng tool",
+      "cancelled": "Huminto: kinansela",
+      "other": "NAKAHINTO"
+    }
   },
   "transcriptionModel": {
     "title": "Modelo para sa pagsasalin ng boses sa teksto",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Hindi ma-load ang kasaysayan ng chat.",
       "new": "Bagong chat",
-      "openHint": "Binubuksan ang chat. Pindutin nang matagal para burahin.",
       "deleteTitle": "Burahin ang chat na ito?"
+    },
+    "rename": {
+      "title": "Palitan ang pangalan ng chat",
+      "accessibility": "Palitan ang pangalan ng chat: {{title}}",
+      "openHint": "Binubuksan ang chat. Pindutin nang matagal para palitan ang pangalan o burahin."
     },
     "beta": "Beta",
     "details": {

@@ -74,6 +74,7 @@ export { default as Globe } from 'lucide-react-native/icons/globe';
 export { default as HelpCircle } from 'lucide-react-native/icons/circle-question-mark';
 export { default as History } from 'lucide-react-native/icons/rotate-ccw-clock';
 export { default as House } from 'lucide-react-native/icons/house';
+export { default as ImageIcon } from 'lucide-react-native/icons/image';
 export { default as ImageOff } from 'lucide-react-native/icons/image-off';
 export { default as Inbox } from 'lucide-react-native/icons/inbox';
 export { default as Info } from 'lucide-react-native/icons/info';

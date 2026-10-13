@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Öz repozitoriyaların",
     "dismissed": "Rədd edilib",
     "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Dəyişikliklər"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw fəaliyyəti",
       "balance": "Balans bildirişləri",
       "security": "Təhlükəsizlik problemləri",
-      "spend": "Xərc bildirişləri"
+      "spend": "Xərc bildirişləri",
+      "followedSessions": "İzlənilən sessiyalar"
     },
     "category": {
       "chatMessagesSubtitle": "söhbətlərindəki cavablar",
@@ -2088,6 +2091,8 @@
       "title": "Sessiya",
       "copyErrorDetails": "Xətanın təfərrüatlarını kopyala",
       "backToSessions": "Sessiyalara qayıt",
+      "follow": "Kilid ekranında izlə",
+      "unfollow": "Kilid ekranında izləməni dayandır",
       "couldNotLoad": "Sessiyanı yükləmək mümkün olmadı.",
       "failedToLoadDetails": "Sessiyanın təfərrüatlarını yükləmək mümkün olmadı.",
       "failedToStopExecution": "İcranı dayandırmaq mümkün olmadı.",
@@ -3170,6 +3175,8 @@
     "channelName": "Aktiv agentlər",
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir.",
     "openSession": "Aç",
+    "finished": "Bitdi",
+    "followFailed": "Bu agenti kilid ekranında göstərmək mümkün olmadı.",
     "approveFailed": "Təsdiqləmək mümkün olmadı. Yenidən cəhd etmək üçün $t(common.approve) üzərinə toxun.",
     "checked": "Yoxlanılıb",
     "lastKnown": "Son məlum vəziyyət",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Sizi gözləyir",
     "nextScheduled": "Növbəti planlaşdırılanlar",
     "answerNeeded": "Cavab gözləyir",
-    "waitingToRetry": "Təkrar cəhd gözlənilir"
+    "waitingToRetry": "Təkrar cəhd gözlənilir",
+    "step": {
+      "editing": "Redaktə",
+      "reading": "Oxu",
+      "running": "İşləyir",
+      "searching": "Veb axtarış",
+      "thinking": "Dərindən düşünür"
+    },
+    "planOf": "dən",
+    "filesChanged": "fayl dəyişdi",
+    "finishedIn": "Tamamlandı",
+    "noActivityFor": "Fəaliyyət yoxdur",
+    "prOpened": "Çəkmə sorğusu açıldı",
+    "permissionWants": "İşlətmək istəyir",
+    "failure": {
+      "provider": "Dayandı: provayder xətası",
+      "tool": "Dayandı: alət xətası",
+      "cancelled": "Dayandı: ləğv edildi",
+      "other": "DAYANDIRILIB"
+    }
   },
   "transcriptionModel": {
     "title": "Səsin mətnə çevrilməsi modeli",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Söhbət tarixçəsi yüklənə bilmədi.",
       "new": "Yeni söhbət",
-      "openHint": "Söhbəti açır. Silmək üçün basıb saxlayın.",
       "deleteTitle": "Bu söhbət silinsin?"
+    },
+    "rename": {
+      "title": "Söhbətin adını dəyiş",
+      "accessibility": "Söhbətin adını dəyiş: {{title}}",
+      "openHint": "Söhbəti açır. Adını dəyişmək və ya silmək üçün basıb saxlayın."
     },
     "beta": "Beta",
     "details": {

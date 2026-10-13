@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Ir-repożitorji tiegħek stess",
     "dismissed": "Imwarrba",
     "agent": "Aġent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Bidliet"
   },
   "language": {
@@ -881,7 +883,8 @@
       "kiloclaw": "Attività ta' KiloClaw",
       "balance": "Twissijiet tal-bilanċ",
       "security": "Sejbiet tas-sigurtà",
-      "spend": "Twissijiet tal-infiq"
+      "spend": "Twissijiet tal-infiq",
+      "followedSessions": "Sessjonijiet segwiti"
     },
     "category": {
       "chatMessagesSubtitle": "tweġibiet fil-konversazzjonijiet tiegħek",
@@ -2172,6 +2175,8 @@
       "title": "Sessjoni",
       "copyErrorDetails": "Ikkopja d-dettalji tal-iżball",
       "backToSessions": "Lura għas-sessjonijiet",
+      "follow": "Segwi fuq l-iskrin tal-qfil",
+      "unfollow": "Ieqaf segwi fuq l-iskrin tal-qfil",
       "couldNotLoad": "Ma setgħetx titgħabba s-sessjoni.",
       "failedToLoadDetails": "Ma setgħux jitgħabbew id-dettalji tas-sessjoni.",
       "failedToStopExecution": "Ma setgħetx titwaqqaf l-eżekuzzjoni.",
@@ -3293,6 +3298,8 @@
     "channelName": "Aġenti attivi",
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar.",
     "openSession": "Iftaħ",
+    "finished": "Spiċċa",
+    "followFailed": "Ma stajniex nuru dan l-aġent fuq l-iskrin tal-qfil.",
     "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova.",
     "checked": "Iċċekkjat",
     "lastKnown": "L-aħħar magħruf",
@@ -3301,7 +3308,26 @@
     "waitingForYou": "Jistenna lilek",
     "nextScheduled": "Ipprogrammati li jmiss",
     "answerNeeded": "Tweġiba meħtieġa",
-    "waitingToRetry": "Jistenna biex jerġa’ jipprova"
+    "waitingToRetry": "Jistenna biex jerġa’ jipprova",
+    "step": {
+      "editing": "Editjar",
+      "reading": "Qari",
+      "running": "Ħaddem",
+      "searching": "Fittxija fuq il-web",
+      "thinking": "Qed jaħseb"
+    },
+    "planOf": "minn",
+    "filesChanged": "fajls mibdula",
+    "finishedIn": "Lest fi",
+    "noActivityFor": "L-ebda attività għal",
+    "prOpened": "Pull request miftuħa",
+    "permissionWants": "Jixtieq iħaddem",
+    "failure": {
+      "provider": "Waqaf: żball tal-fornitur",
+      "tool": "Waqaf: żball tal-għodda",
+      "cancelled": "Waqaf: ikkanċellat",
+      "other": "WAQFET"
+    }
   },
   "transcriptionModel": {
     "title": "Mudell ta' traskrizzjoni",
@@ -3337,8 +3363,12 @@
     "list": {
       "loadFailed": "Ma setgħux jitgħabbew l-istorja taċ-chat.",
       "new": "Chat ġdid",
-      "openHint": "Jiftaħ iċ-chat. Agħfas fit-tul biex tħassar.",
       "deleteTitle": "Tħassar dan iċ-chat?"
+    },
+    "rename": {
+      "title": "Ibdel l-isem taċ-chat",
+      "accessibility": "Ibdel l-isem taċ-chat: {{title}}",
+      "openHint": "Jiftaħ iċ-chat. Agħfas fit-tul biex tibdel l-isem jew tħassar."
     },
     "beta": "Beta",
     "details": {

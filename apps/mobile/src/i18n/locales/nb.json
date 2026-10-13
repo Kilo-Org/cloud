@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Dine egne kodelagre",
     "dismissed": "Avvist",
     "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Endringer"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarsler",
       "security": "Sikkerhetsfunn",
-      "spend": "Forbruksvarsler"
+      "spend": "Forbruksvarsler",
+      "followedSessions": "Fulgte økter"
     },
     "category": {
       "chatMessagesSubtitle": "svar i samtalene dine",
@@ -2088,6 +2091,8 @@
       "title": "Økt",
       "copyErrorDetails": "Kopier feildetaljer",
       "backToSessions": "Tilbake til økter",
+      "follow": "Følg på låseskjermen",
+      "unfollow": "Slutt å følge på låseskjermen",
       "couldNotLoad": "Kunne ikke laste inn økten.",
       "failedToLoadDetails": "Kunne ikke laste inn øktdetaljene.",
       "failedToStopExecution": "Kunne ikke stoppe kjøringen.",
@@ -3170,6 +3175,8 @@
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen.",
     "openSession": "Åpne",
+    "finished": "Fullført",
+    "followFailed": "Kunne ikke vise denne agenten på låseskjermen.",
     "approveFailed": "Kunne ikke godkjenne. Trykk på $t(common.approve) for å prøve igjen.",
     "checked": "Sjekket",
     "lastKnown": "Sist kjent",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Venter på deg",
     "nextScheduled": "Neste planlagte",
     "answerNeeded": "Venter på svar",
-    "waitingToRetry": "Venter på nytt forsøk"
+    "waitingToRetry": "Venter på nytt forsøk",
+    "step": {
+      "editing": "Redigerer",
+      "reading": "Leser",
+      "running": "Kjører",
+      "searching": "Nettsøk",
+      "thinking": "Tenker gjennom"
+    },
+    "planOf": "av",
+    "filesChanged": "filer endret",
+    "finishedIn": "Fullført på",
+    "noActivityFor": "Ingen aktivitet i",
+    "prOpened": "Pull request åpnet",
+    "permissionWants": "Vil kjøre",
+    "failure": {
+      "provider": "Stoppet: leverandørfeil",
+      "tool": "Stoppet: verktøyfeil",
+      "cancelled": "Stoppet: avbrutt",
+      "other": "STOPPET"
+    }
   },
   "transcriptionModel": {
     "title": "Transkripsjonsmodell",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Kunne ikke laste inn chathistorikken.",
       "new": "Ny chat",
-      "openHint": "Åpner chatten. Trykk og hold for å slette.",
       "deleteTitle": "Slette denne chatten?"
+    },
+    "rename": {
+      "title": "Gi chatten nytt navn",
+      "accessibility": "Gi chatten nytt navn: {{title}}",
+      "openHint": "Åpner chatten. Trykk og hold for å gi nytt navn eller slette."
     },
     "beta": "Beta",
     "details": {

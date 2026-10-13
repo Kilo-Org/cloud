@@ -1,5 +1,5 @@
 {
-  "id": "59cfce63-c6fb-4d03-a7fb-ce81b2508ad2",
+  "id": "3ead8d31-3b34-45b4-a18a-40a6200c93c4",
   "prevId": "75cae9ab-b8e6-406b-bf82-fff96bf1fd23",
   "version": "7",
   "dialect": "postgresql",
@@ -1276,12 +1276,6 @@
         },
         "unavailable_models": {
           "name": "unavailable_models",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "custom_pricing": {
-          "name": "custom_pricing",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -4717,6 +4711,12 @@
         "total_cost_microdollars": {
           "name": "total_cost_microdollars",
           "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "live_summary": {
+          "name": "live_summary",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -39387,6 +39387,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -39409,21 +39415,6 @@
         }
       },
       "indexes": {
-        "UQ_user_activity_tokens_token": {
-          "name": "UQ_user_activity_tokens_token",
-          "columns": [
-            {
-              "expression": "token",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "UQ_user_activity_tokens_live_ios_activity": {
           "name": "UQ_user_activity_tokens_live_ios_activity",
           "columns": [
@@ -39466,6 +39457,28 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "IDX_user_activity_tokens_live_session": {
+          "name": "IDX_user_activity_tokens_live_session",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"user_activity_tokens\".\"kind\" IN ('ios_session_activity', 'android_session_ongoing') AND \"user_activity_tokens\".\"superseded_at\" IS NULL",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -39484,7 +39497,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "UQ_user_activity_tokens_token_session": {
+          "name": "UQ_user_activity_tokens_token_session",
+          "nullsNotDistinct": true,
+          "columns": [
+            "token",
+            "session_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

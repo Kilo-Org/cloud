@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Os teus propios repositorios",
     "dismissed": "Descartado",
     "agent": "Axente",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Cambios"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "Actividade de KiloClaw",
       "balance": "Alertas de saldo",
       "security": "Problemas de seguridade",
-      "spend": "Alertas de gasto"
+      "spend": "Alertas de gasto",
+      "followedSessions": "Sesións seguidas"
     },
     "category": {
       "chatMessagesSubtitle": "respostas nas túas conversas",
@@ -2088,6 +2091,8 @@
       "title": "Sesión",
       "copyErrorDetails": "Copiar detalles do erro",
       "backToSessions": "Volver ás sesións",
+      "follow": "Seguir na pantalla de bloqueo",
+      "unfollow": "Deixar de seguir na pantalla de bloqueo",
       "couldNotLoad": "Non se puido cargar a sesión.",
       "failedToLoadDetails": "Non se puideron cargar os detalles da sesión.",
       "failedToStopExecution": "Non se puido deter a execución.",
@@ -3170,6 +3175,8 @@
     "channelName": "Axentes activos",
     "activityKitDisabledBody": "Activa as actividades en directo nos axustes para ver os axentes activos na pantalla de bloqueo.",
     "openSession": "Abrir",
+    "finished": "Rematado",
+    "followFailed": "Non se puido mostrar este axente na pantalla de bloqueo.",
     "approveFailed": "Non se puido aprobar. Toca $t(common.approve) para tentalo de novo.",
     "checked": "Comprobado",
     "lastKnown": "Último estado coñecido",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Agardando por ti",
     "nextScheduled": "Próximas tarefas programadas",
     "answerNeeded": "Agardando resposta",
-    "waitingToRetry": "Agardando para reintentar"
+    "waitingToRetry": "Agardando para reintentar",
+    "step": {
+      "editing": "Edición",
+      "reading": "Lectura",
+      "running": "Execución",
+      "searching": "Busca web",
+      "thinking": "Pensando"
+    },
+    "planOf": "de",
+    "filesChanged": "ficheiros modificados",
+    "finishedIn": "Rematado en",
+    "noActivityFor": "Sen actividade durante",
+    "prOpened": "Solicitude de extracción aberta",
+    "permissionWants": "Quere executar",
+    "failure": {
+      "provider": "Detido: erro do provedor",
+      "tool": "Detido: erro da ferramenta",
+      "cancelled": "Detido: cancelado",
+      "other": "PARADO"
+    }
   },
   "transcriptionModel": {
     "title": "Modelo de transcrición",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Non se puido cargar o historial do chat.",
       "new": "Chat novo",
-      "openHint": "Abre o chat. Mantén premido para eliminar.",
       "deleteTitle": "Eliminar este chat?"
+    },
+    "rename": {
+      "title": "Renomear o chat",
+      "accessibility": "Renomear o chat: {{title}}",
+      "openHint": "Abre o chat. Mantén premido para renomear ou eliminar."
     },
     "beta": "Beta",
     "details": {

@@ -106,6 +106,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
     stop: vi.fn(),
     retry: state.retry,
   }),
+  useChatList: () => ({ chats: [], rename: vi.fn() }),
 }));
 vi.mock('@/lib/chat/turns', () => ({
   asMessages: () => state.messages,
@@ -179,17 +180,20 @@ vi.mock('@/components/agents/session-context-metrics', () => ({
 vi.mock('@/components/chat/web-search-row', () => ({
   useWebSearchSetting: () => ({ enabled: true, setEnabled: () => undefined }),
 }));
+const keyboard = vi.hoisted(() => ({ isVisible: false }));
+vi.mock('react-native-keyboard-controller', () => ({
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
+  useKeyboardState: (selector: (snapshot: { isVisible: boolean }) => boolean) => selector(keyboard),
+}));
 vi.mock('react-native', () => ({
   Alert: { alert: backendUi.alert },
   ActivityIndicator: 'ActivityIndicator',
-  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
-  KeyboardAvoidingView: 'KeyboardAvoidingView',
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 24, left: 0, right: 0 }),
 }));
 
 let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
@@ -207,6 +211,7 @@ beforeEach(() => {
   state.model = 'm1';
   state.effort = null;
   state.images = false;
+  keyboard.isVisible = false;
   state.send.mockClear();
 });
 afterEach(() => {
@@ -242,6 +247,17 @@ describe('the chat transcript while it opens', () => {
     expect(count(tree, 'EmptyState')).toBe(1);
     expect(count(tree, 'SessionSkeletonMessages')).toBe(0);
   });
+
+  it.each([false, true])(
+    'keeps the composer gap correct when keyboard visibility is %s',
+    async visible => {
+      keyboard.isVisible = visible;
+      const tree = await mount();
+      const composer = tree.root.find(node => (node.type as string) === 'ChatComposer');
+
+      expect(composer.parent?.props.style).toEqual({ paddingBottom: visible ? 0 : 24 });
+    }
+  );
 
   it('hands the sheet the whole chat-tools model', async () => {
     const tree = await mount();

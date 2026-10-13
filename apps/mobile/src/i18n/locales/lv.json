@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Tavi repozitoriji",
     "dismissed": "Noraidīts",
     "agent": "Aģents",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Izmaiņas"
   },
   "language": {
@@ -849,7 +851,8 @@
       "kiloclaw": "KiloClaw darbība",
       "balance": "Brīdinājumi par atlikumu",
       "security": "Drošības konstatējumi",
-      "spend": "Izdevumu brīdinājumi"
+      "spend": "Izdevumu brīdinājumi",
+      "followedSessions": "Sekotās sesijas"
     },
     "category": {
       "chatMessagesSubtitle": "atbildes tavās sarunās",
@@ -2116,6 +2119,8 @@
       "title": "Sesija",
       "copyErrorDetails": "Kopēt informāciju par kļūdu",
       "backToSessions": "Atpakaļ uz sesijām",
+      "follow": "Sekot bloķēšanas ekrānā",
+      "unfollow": "Pārtraukt sekošanu bloķēšanas ekrānā",
       "couldNotLoad": "Neizdevās ielādēt sesiju.",
       "failedToLoadDetails": "Neizdevās ielādēt sesijas informāciju.",
       "failedToStopExecution": "Neizdevās apturēt izpildi.",
@@ -3211,6 +3216,8 @@
     "channelName": "Aktīvie aģenti",
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus.",
     "openSession": "Atvērt",
+    "finished": "Pabeigts",
+    "followFailed": "Neizdevās parādīt šo aģentu bloķēšanas ekrānā.",
     "approveFailed": "Neizdevās apstiprināt. Pieskaries $t(common.approve), lai mēģinātu vēlreiz.",
     "checked": "Pārbaudīts",
     "lastKnown": "Pēdējais zināmais",
@@ -3219,7 +3226,26 @@
     "waitingForYou": "Gaida jūs",
     "nextScheduled": "Nākamie ieplānotie",
     "answerNeeded": "Nepieciešama atbilde",
-    "waitingToRetry": "Gaida atkārtotu mēģinājumu"
+    "waitingToRetry": "Gaida atkārtotu mēģinājumu",
+    "step": {
+      "editing": "Rediģēšana",
+      "reading": "Lasīšana",
+      "running": "Palaišana",
+      "searching": "Tīmekļa meklēšana",
+      "thinking": "Domāšana"
+    },
+    "planOf": "no",
+    "filesChanged": "mainīti faili",
+    "finishedIn": "Pabeigts pēc",
+    "noActivityFor": "Nav aktivitātes",
+    "prOpened": "Atvērts pull pieprasījums",
+    "permissionWants": "Vēlas palaist",
+    "failure": {
+      "provider": "Apturēts: pakalpojuma sniedzēja kļūda",
+      "tool": "Apturēts: rīka kļūda",
+      "cancelled": "Apturēts: atcelts",
+      "other": "APTURĒTS"
+    }
   },
   "transcriptionModel": {
     "title": "Transkripcijas modelis",
@@ -3255,8 +3281,12 @@
     "list": {
       "loadFailed": "Neizdevās ielādēt tērzēšanas vēsturi.",
       "new": "Jauna tērzēšana",
-      "openHint": "Atver tērzēšanu. Turiet nospiestu, lai dzēstu.",
       "deleteTitle": "Vai dzēst šo tērzēšanu?"
+    },
+    "rename": {
+      "title": "Pārdēvēt tērzēšanu",
+      "accessibility": "Pārdēvēt tērzēšanu: {{title}}",
+      "openHint": "Atver tērzēšanu. Turiet nospiestu, lai pārdēvētu vai dzēstu."
     },
     "beta": "Beta",
     "details": {

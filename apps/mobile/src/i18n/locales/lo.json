@@ -137,6 +137,8 @@
     "yourOwnRepositories": "ຄັງໂຄ້ດຂອງທ່ານເອງ",
     "dismissed": "ລະເວັ້ນແລ້ວ",
     "agent": "ຕົວແທນ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "ການປ່ຽນແປງ"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "ກິດຈະກຳ KiloClaw",
       "balance": "ການແຈ້ງເຕືອນຍອດເງິນ",
       "security": "ບັນຫາດ້ານຄວາມປອດໄພທີ່ກວດພົບ",
-      "spend": "ການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ"
+      "spend": "ການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ",
+      "followedSessions": "ເຊສຊັນທີ່ຕິດຕາມ"
     },
     "category": {
       "chatMessagesSubtitle": "ຄຳຕອບໃນການສົນທະນາຂອງທ່ານ",
@@ -2088,6 +2091,8 @@
       "title": "ເຊດຊັນ",
       "copyErrorDetails": "ຄັດລອກລາຍລະອຽດຂໍ້ຜິດພາດ",
       "backToSessions": "ກັບໄປລາຍການເຊດຊັນ",
+      "follow": "ຕິດຕາມໃນໜ້າຈໍລັອກ",
+      "unfollow": "ຢຸດຕິດຕາມໃນໜ້າຈໍລັອກ",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດເຊດຊັນໄດ້.",
       "failedToLoadDetails": "ບໍ່ສາມາດໂຫຼດລາຍລະອຽດເຊດຊັນໄດ້.",
       "failedToStopExecution": "ບໍ່ສາມາດຢຸດການເຮັດວຽກໄດ້.",
@@ -3170,6 +3175,8 @@
     "channelName": "ເອເຈນທີ່ກຳລັງເຮັດວຽກ",
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ.",
     "openSession": "ເປີດ",
+    "finished": "ສຳເລັດແລ້ວ",
+    "followFailed": "ບໍ່ສາມາດສະແດງຕົວແທນນີ້ໃນໜ້າຈໍລັອກໄດ້.",
     "approveFailed": "ບໍ່ສາມາດອະນຸມັດໄດ້. ແຕະ $t(common.approve) ເພື່ອລອງອີກຄັ້ງ.",
     "checked": "ກວດສອບແລ້ວ",
     "lastKnown": "ສະຖານະຫຼ້າສຸດທີ່ຮູ້",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "ລໍທ່ານ",
     "nextScheduled": "ກຳນົດເວລາຖັດໄປ",
     "answerNeeded": "ລໍຄຳຕອບ",
-    "waitingToRetry": "ລໍລອງໃໝ່"
+    "waitingToRetry": "ລໍລອງໃໝ່",
+    "step": {
+      "editing": "ກຳລັງແກ້ໄຂ",
+      "reading": "ກຳລັງອ່ານ",
+      "running": "ຮັນ",
+      "searching": "ຄົ້ນຫາເວັບ",
+      "thinking": "ກຳລັງຄິດ"
+    },
+    "planOf": "ຈາກ",
+    "filesChanged": "ໄຟລ໌ທີ່ປ່ຽນແປງ",
+    "finishedIn": "ສຳເລັດໃນ",
+    "noActivityFor": "ບໍ່ມີການເຄື່ອນໄຫວ",
+    "prOpened": "ເປີດ pull request",
+    "permissionWants": "ຕ້ອງການຮັນ",
+    "failure": {
+      "provider": "ຢຸດ: ຂໍ້ຜິດພາດຜູ້ໃຫ້ບໍລິການ",
+      "tool": "ຢຸດ: ຂໍ້ຜິດພາດເຄື່ອງມື",
+      "cancelled": "ຢຸດ: ຍົກເລິກ",
+      "other": "ຢຸດແລ້ວ"
+    }
   },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "ບໍ່ສາມາດໂຫຼດປະຫວັດການສົນທະນາໄດ້.",
       "new": "ແຊັດໃໝ່",
-      "openHint": "ເປີດແຊັດ. ກົດຄ້າງເພື່ອລຶບ.",
       "deleteTitle": "ລຶບແຊັດນີ້ບໍ?"
+    },
+    "rename": {
+      "title": "ປ່ຽນຊື່ແຊັດ",
+      "accessibility": "ປ່ຽນຊື່ແຊັດ: {{title}}",
+      "openHint": "ເປີດແຊັດ. ກົດຄ້າງເພື່ອປ່ຽນຊື່ ຫຼື ລຶບ."
     },
     "beta": "ເບຕ້າ",
     "details": {

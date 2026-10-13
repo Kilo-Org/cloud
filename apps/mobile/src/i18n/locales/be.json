@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Твае рэпазіторыі",
     "dismissed": "Адхілена",
     "agent": "Агент",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Змены"
   },
   "language": {
@@ -865,7 +867,8 @@
       "kiloclaw": "Актыўнасць KiloClaw",
       "balance": "Апавяшчэнні аб балансе",
       "security": "Выяўленыя праблемы бяспекі",
-      "spend": "Апавяшчэнні аб выдатаках"
+      "spend": "Апавяшчэнні аб выдатаках",
+      "followedSessions": "Адсочваемыя сеансы"
     },
     "category": {
       "chatMessagesSubtitle": "адказы ў вашых размовах",
@@ -2144,6 +2147,8 @@
       "title": "Сеанс",
       "copyErrorDetails": "Капіяваць падрабязнасці памылкі",
       "backToSessions": "Назад да сеансаў",
+      "follow": "Сачыць на экране блакіроўкі",
+      "unfollow": "Перастаць сачыць на экране блакіроўкі",
       "couldNotLoad": "Не ўдалося загрузіць сеанс.",
       "failedToLoadDetails": "Не ўдалося загрузіць падрабязнасці сеанса.",
       "failedToStopExecution": "Не ўдалося спыніць выкананне.",
@@ -3252,6 +3257,8 @@
     "channelName": "Актыўныя агенты",
     "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі.",
     "openSession": "Адкрыць",
+    "finished": "Скончыў",
+    "followFailed": "Не ўдалося паказаць гэтага агента на экране блакіроўкі.",
     "approveFailed": "Не ўдалося ўхваліць. Націсніце $t(common.approve), каб паспрабаваць яшчэ раз.",
     "checked": "Праверана",
     "lastKnown": "Апошні вядомы стан",
@@ -3260,7 +3267,26 @@
     "waitingForYou": "Чакае вас",
     "nextScheduled": "Наступныя запланаваныя",
     "answerNeeded": "Патрэбны адказ",
-    "waitingToRetry": "Чакае паўторнай спробы"
+    "waitingToRetry": "Чакае паўторнай спробы",
+    "step": {
+      "editing": "Рэдагаванне",
+      "reading": "Чытанне",
+      "running": "Запуск",
+      "searching": "Вэб-пошук",
+      "thinking": "Абдумванне"
+    },
+    "planOf": "з",
+    "filesChanged": "файлаў зменена",
+    "finishedIn": "Завершана за",
+    "noActivityFor": "Няма актыўнасці за",
+    "prOpened": "Запыт на зліццё адкрыты",
+    "permissionWants": "Хоча запусціць",
+    "failure": {
+      "provider": "Спынена: памылка правайдэра",
+      "tool": "Спынена: памылка інструмента",
+      "cancelled": "Спынена: скасавана",
+      "other": "СПЫНЕНЫ"
+    }
   },
   "transcriptionModel": {
     "title": "Мадэль распазнавання маўлення",
@@ -3296,8 +3322,12 @@
     "list": {
       "loadFailed": "Не атрымалася загрузіць гісторыю чата.",
       "new": "Новы чат",
-      "openHint": "Адкрывае чат. Утрымлівайце, каб выдаліць.",
       "deleteTitle": "Выдаліць гэты чат?"
+    },
+    "rename": {
+      "title": "Перайменаваць чат",
+      "accessibility": "Перайменаваць чат: {{title}}",
+      "openHint": "Адкрывае чат. Утрымлівайце, каб перайменаваць або выдаліць."
     },
     "beta": "Бэта",
     "details": {

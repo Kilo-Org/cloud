@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Depot e tua",
     "dismissed": "E hedhur poshtë",
     "agent": "Agjenti",
+    "durationMinuteShort": "min",
+    "durationHourShort": "orë",
     "changes": "Ndryshimet"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "Aktiviteti i KiloClaw",
       "balance": "Njoftimet për gjendjen e llogarisë",
       "security": "Gjetjet e sigurisë",
-      "spend": "Njoftime për shpenzimet"
+      "spend": "Njoftime për shpenzimet",
+      "followedSessions": "Sesione të ndjekura"
     },
     "category": {
       "chatMessagesSubtitle": "përgjigje në bisedat e tua",
@@ -2088,6 +2091,8 @@
       "title": "Seanca",
       "copyErrorDetails": "Kopjo detajet e gabimit",
       "backToSessions": "Kthehu te seancat",
+      "follow": "Ndiq në ekranin e kyçjes",
+      "unfollow": "Ndalo ndjekjen në ekranin e kyçjes",
       "couldNotLoad": "Nuk u ngarkua seanca.",
       "failedToLoadDetails": "Nuk u ngarkuan detajet e seancës.",
       "failedToStopExecution": "Nuk u ndal ekzekutimi.",
@@ -3170,6 +3175,8 @@
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
     "openSession": "Hap",
+    "finished": "Përfundoi",
+    "followFailed": "Ky agjent nuk mund të shfaqej në ekranin e kyçjes.",
     "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri.",
     "checked": "Kontrolluar",
     "lastKnown": "Gjendja e fundit e njohur",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Pret ty",
     "nextScheduled": "Të planifikuara në vijim",
     "answerNeeded": "Pret përgjigje",
-    "waitingToRetry": "Në pritje për të riprovuar"
+    "waitingToRetry": "Në pritje për të riprovuar",
+    "step": {
+      "editing": "Duke redaktuar",
+      "reading": "Duke lexuar",
+      "running": "Ekzekutim",
+      "searching": "Kërkim në web",
+      "thinking": "Duke e menduar"
+    },
+    "planOf": "nga",
+    "filesChanged": "skedarë të ndryshuar",
+    "finishedIn": "Përfundoi në",
+    "noActivityFor": "Pa aktivitet për",
+    "prOpened": "U hap kërkesa për tërheqje",
+    "permissionWants": "Dëshiron të ekzekutojë",
+    "failure": {
+      "provider": "U ndal: gabim ofruesi",
+      "tool": "U ndal: gabim mjeti",
+      "cancelled": "U ndal: anuluar",
+      "other": "U NDAL"
+    }
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Nuk u arrit të ngarkohej historia e bisedës.",
       "new": "Bisedë e re",
-      "openHint": "Hap bisedën. Shtypni gjatë për ta fshirë.",
       "deleteTitle": "Ta fshini këtë bisedë?"
+    },
+    "rename": {
+      "title": "Riemërto bisedën",
+      "accessibility": "Riemërto bisedën: {{title}}",
+      "openHint": "Hap bisedën. Shtypni gjatë për ta riemërtuar ose fshirë."
     },
     "beta": "Beta",
     "details": {

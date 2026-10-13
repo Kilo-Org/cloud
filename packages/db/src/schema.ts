@@ -25,6 +25,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { isNotNull, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
+import type { SessionLiveSummary } from '@kilocode/session-ingest-contracts';
 import {
   KiloPassTier,
   KiloPassCadence,
@@ -6429,6 +6430,10 @@ export const cli_sessions_v2 = pgTable(
     status_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
     last_activity_at: timestamp({ withTimezone: true, mode: 'string' }),
     total_cost_microdollars: bigint({ mode: 'number' }),
+    // The small derived summary the session card shows. Derived by
+    // session-ingest from tool, todo, diff and error items; only this summary
+    // is stored, never the raw text. Null means "no summary".
+    live_summary: jsonb().$type<SessionLiveSummary>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -10259,12 +10264,23 @@ export const user_activity_tokens = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     token: text().notNull(),
     kind: text()
-      .$type<'ios_push_to_start' | 'ios_activity' | 'ios_widget' | 'android_ongoing'>()
+      .$type<
+        | 'ios_push_to_start'
+        | 'ios_activity'
+        | 'ios_session_activity'
+        | 'ios_widget'
+        | 'android_ongoing'
+        | 'android_session_ongoing'
+      >()
       .notNull(),
     platform: text().$type<'ios' | 'android'>().notNull(),
     // Null means the personal surface. Server-only lookup key; never sent in a
     // glanceable payload.
     organization_id: text(),
+    // The followed session of an `ios_session_activity` card or an
+    // `android_session_ongoing` notification; null for every other kind.
+    // Server-only lookup key; never sent in an aggregate payload.
+    session_id: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -10275,7 +10291,13 @@ export const user_activity_tokens = pgTable(
     superseded_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [
-    uniqueIndex('UQ_user_activity_tokens_token').on(table.token),
+    // One row per (token, session). An Android device follows each session
+    // with its one Expo push token, so that token appears once per followed
+    // session and once for its `android_ongoing` row (session null). Nulls do
+    // not differ here, so every other kind keeps one row per token.
+    unique('UQ_user_activity_tokens_token_session')
+      .on(table.token, table.session_id)
+      .nullsNotDistinct(),
     // One live ios_activity card per (user_id, organization_id) scope. `coalesce`
     // folds the personal scope (null organization) into a single key, because
     // Postgres treats NULLs as distinct in a unique index.
@@ -10284,6 +10306,14 @@ export const user_activity_tokens = pgTable(
       .concurrently()
       .where(sql`${table.kind} = 'ios_activity' AND ${table.superseded_at} IS NULL`),
     index('IDX_user_activity_tokens_user_org').on(table.user_id, table.organization_id),
+    // Live followed sessions of one user, read by the aggregate exclusion and
+    // the session card delivery.
+    index('IDX_user_activity_tokens_live_session')
+      .on(table.user_id, table.session_id)
+      .concurrently()
+      .where(
+        sql`${table.kind} IN ('ios_session_activity', 'android_session_ongoing') AND ${table.superseded_at} IS NULL`
+      ),
   ]
 );
 

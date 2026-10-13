@@ -6,7 +6,11 @@ import {
   waitOnExecutionContext,
 } from 'cloudflare:test';
 import { getWorkerDb } from '@kilocode/db/client';
-import type { DispatchPushInput } from '@kilocode/notifications';
+import {
+  aggregateLiveActivityRelevance,
+  type DispatchPushInput,
+  sessionLiveActivityRelevance,
+} from '@kilocode/notifications';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import { NotificationChannelDO, NotificationsService } from '../index';
 import { sendPushNotifications, type ExpoPushMessage } from './expo-push';
@@ -86,14 +90,17 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
   type Scope = { userId: string; organizationId: string | null };
   type ApnsPayload = {
     token: string;
+    priority: string | null;
     aps: {
       event: string;
       timestamp: number;
       'dismissal-date'?: number;
       'stale-date'?: number;
+      'relevance-score'?: number;
       'content-state': GlanceableApnsContentState;
     };
   };
+  type ActivityKind = IosActivityToken['kind'] | 'ios_session_activity';
 
   function setupService(
     options: {
@@ -103,7 +110,15 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       beforeIosTokens?: () => Promise<void>;
       iosTokenKind?: IosActivityToken['kind'];
       iosTokens?: Array<
-        IosActivityToken & Partial<Scope> & { updated_at?: string; superseded_at?: string | null }
+        Omit<IosActivityToken, 'kind'> &
+          Partial<Scope> & {
+            kind: ActivityKind;
+            sessionId?: string;
+            /** Older than the ActivityKit lifetime, as the database clock reports it. */
+            expired?: boolean;
+            updated_at?: string;
+            superseded_at?: string | null;
+          }
       >;
       privateKey?: () => Promise<string>;
       beforeApnsDelivery?: (token: string) => Promise<void>;
@@ -120,7 +135,9 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       string,
       Partial<Scope> & {
         id: string;
-        kind: IosActivityToken['kind'];
+        kind: ActivityKind;
+        sessionId?: string;
+        expired?: boolean;
         updated_at: string;
         superseded_at?: string | null;
       }
@@ -200,6 +217,25 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         // These suites seed no widget tokens; keep the widget-hint read out of the Live Activity read.
         return { rows: [] };
       }
+      if (sql.includes('from "user_activity_tokens"') && params.includes('ios_session_activity')) {
+        return {
+          rows: [...activityRows]
+            .filter(
+              ([, row]) =>
+                row.kind === 'ios_session_activity' &&
+                matches('user_id', row.userId ?? 'usr_1') &&
+                matches('organization_id', row.organizationId ?? null)
+            )
+            .map(([token, row]) => [
+              token,
+              row.sessionId ?? null,
+              row.kind,
+              row.id,
+              row.updated_at,
+              row.expired ?? false,
+            ]),
+        };
+      }
       if (sql.includes('from "user_activity_tokens"')) {
         if (params.includes('android_ongoing')) return { rows: [['subscription']] };
         await options.beforeIosTokens?.();
@@ -209,6 +245,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           rows: [...activityRows]
             .filter(
               ([, row]) =>
+                row.kind !== 'ios_session_activity' &&
                 matches('user_id', row.userId ?? 'usr_1') &&
                 matches('organization_id', row.organizationId ?? null)
             )
@@ -239,7 +276,11 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       const apnsPrefix = 'https://api.push.apple.com/3/device/';
       if (url.startsWith(apnsPrefix)) {
         const token = url.slice(apnsPrefix.length);
-        const request = { ...(JSON.parse(init.body) as ApnsPayload), token };
+        const request = {
+          ...(JSON.parse(init.body) as Omit<ApnsPayload, 'token' | 'priority'>),
+          token,
+          priority: new Headers(init.headers).get('apns-priority'),
+        };
         const status = options.apnsStatus?.(token) ?? 200;
         await options.beforeApnsDelivery?.(token);
         apns.push(request);
@@ -719,6 +760,176 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       needsInputSince: '2026-08-27T10:00:31.000Z',
     });
     expect([...activityRows.keys()]).toEqual(['scope-token', 'activity-token']);
+  });
+
+  it('pushes a followed session card beside the aggregate card and ends it when finished', async () => {
+    const pem = await generateTestPrivateKeyPem();
+    const key = 'a'.repeat(64);
+    let cardRow: Record<string, unknown> = {
+      title: 'Deploy the API',
+      status: 'permission',
+      statusUpdatedAt: '2026-08-27T09:59:00.000Z',
+      scheduledAt: null,
+      approvalKey: key,
+    };
+    const { createService, apns, activityRows, messages } = setupService({
+      privateKey: async () => pem,
+      iosTokens: [
+        { token: 'aggregate-token', kind: 'ios_activity' },
+        { token: 'card-token', kind: 'ios_session_activity', sessionId: 'ses_followed' },
+      ],
+      response: () => {
+        const full = freshSnapshot({ running: 1, needsInput: 1, needsApproval: 1 });
+        return Response.json({
+          ...full,
+          // The followed session leaves the aggregate card counts.
+          liveActivitySnapshot: { ...full, needsInput: 0, needsApproval: 0, needsInputSince: null },
+          sessionCards: [{ sessionId: 'ses_followed', row: cardRow }],
+        });
+      },
+    });
+    const cardPushes = () => apns.filter(({ token }) => token === 'card-token');
+
+    await createService().refreshGlanceableSessions(personalRefresh);
+    const aggregate = apns.find(({ token }) => token === 'aggregate-token');
+    expect(aggregate?.aps['relevance-score']).toBe(
+      aggregateLiveActivityRelevance(0, snapshot.newestResultAt)
+    );
+    expect(JSON.parse(aggregate?.aps['content-state'].props ?? '{}')).toMatchObject({
+      running: 1,
+      needsInput: 0,
+    });
+    expect(cardPushes()).toHaveLength(1);
+    expect(cardPushes()[0]).toMatchObject({
+      priority: '10',
+      aps: {
+        event: 'update',
+        'relevance-score': sessionLiveActivityRelevance('needsInput', '2026-08-27T09:59:00.000Z'),
+        'content-state': { name: 'SessionLiveActivity' },
+      },
+    });
+    expect(cardPushes()[0].aps['stale-date']).toBe(Date.now() / 1000 + 1800);
+    // The richer session facts are optional and travel with the content; this
+    // asserts the core card fields the delivery always carries.
+    expect(JSON.parse(cardPushes()[0].aps['content-state'].props)).toMatchObject({
+      sessionId: 'ses_followed',
+      title: 'Deploy the API',
+      statusKind: 'needsInput',
+      statusSince: '2026-08-27T09:59:00.000Z',
+      scheduledAt: null,
+      awaitingPermission: true,
+      approvalKey: key,
+      updatedAt: expect.any(String),
+    });
+    // Session card facts never ride a data-only wake.
+    for (const message of messages) {
+      const data = JSON.stringify(message.data);
+      expect(data).not.toContain('Deploy the API');
+      expect(data).not.toContain('ses_followed');
+      expect(data).not.toContain('liveActivitySnapshot');
+    }
+
+    // Content that does not change what the card shows is not pushed again.
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
+    await createService().refreshGlanceableSessions(personalRefresh);
+    expect(cardPushes()).toHaveLength(1);
+
+    // Back to work: an update outside the iOS budget.
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:20.000Z'));
+    cardRow = { ...cardRow, status: 'busy', statusUpdatedAt: '2026-08-27T10:00:19.000Z' };
+    await createService().refreshGlanceableSessions(personalRefresh);
+    expect(cardPushes()).toHaveLength(2);
+    expect(cardPushes()[1]).toMatchObject({
+      priority: '5',
+      aps: {
+        event: 'update',
+        'relevance-score': sessionLiveActivityRelevance('running', '2026-08-27T10:00:19.000Z'),
+      },
+    });
+    expect(JSON.parse(cardPushes()[1].aps['content-state'].props)).toMatchObject({
+      statusKind: 'running',
+      awaitingPermission: false,
+      approvalKey: null,
+    });
+
+    // Finished: end with the Finished content, kept on the Lock Screen 15 min.
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:30.000Z'));
+    cardRow = { ...cardRow, status: 'idle', statusUpdatedAt: '2026-08-27T10:00:29.000Z' };
+    await createService().refreshGlanceableSessions(personalRefresh);
+    expect(cardPushes()).toHaveLength(3);
+    expect(cardPushes()[2]).toMatchObject({
+      priority: '10',
+      aps: {
+        event: 'end',
+        'relevance-score': sessionLiveActivityRelevance('idle', '2026-08-27T10:00:29.000Z'),
+        'dismissal-date': Date.parse('2026-08-27T10:15:30.000Z') / 1000,
+      },
+    });
+    expect(JSON.parse(cardPushes()[2].aps['content-state'].props)).toMatchObject({
+      statusKind: 'idle',
+      statusSince: '2026-08-27T10:00:29.000Z',
+    });
+    // The accepted end retires the token, so the session counts as unfollowed.
+    expect(activityRows.has('card-token')).toBe(false);
+    expect(activityRows.has('aggregate-token')).toBe(true);
+  });
+
+  it('drops a session card token older than the ActivityKit lifetime without a push', async () => {
+    const pem = await generateTestPrivateKeyPem();
+    const row = {
+      title: 'Old work',
+      status: 'busy',
+      statusUpdatedAt: '2026-08-27T09:00:00.000Z',
+      scheduledAt: null,
+      approvalKey: null,
+    };
+    const { createService, apns, activityRows } = setupService({
+      privateKey: async () => pem,
+      iosTokens: [
+        { token: 'old-card', kind: 'ios_session_activity', sessionId: 'ses_old', expired: true },
+        { token: 'new-card', kind: 'ios_session_activity', sessionId: 'ses_new' },
+      ],
+      response: () =>
+        Response.json({
+          ...freshSnapshot(),
+          sessionCards: [
+            { sessionId: 'ses_old', row },
+            { sessionId: 'ses_new', row },
+          ],
+        }),
+    });
+
+    await createService().refreshGlanceableSessions(personalRefresh);
+
+    expect(apns.map(({ token }) => token)).toEqual(['new-card']);
+    expect(activityRows.has('old-card')).toBe(false);
+    expect(activityRows.has('new-card')).toBe(true);
+  });
+
+  it('ends every session card in a scope the user lost', async () => {
+    const pem = await generateTestPrivateKeyPem();
+    const { createService, apns, activityRows } = setupService({
+      privateKey: async () => pem,
+      deniedOrganizationId: 'org-1',
+      iosTokens: [
+        {
+          token: 'org-card',
+          kind: 'ios_session_activity',
+          sessionId: 'org-a',
+          organizationId: 'org-1',
+        },
+      ],
+    });
+
+    await createService().refreshGlanceableSessions({ userId: 'usr_1', cliSessionIds: ['org-a'] });
+
+    expect(apns).toHaveLength(1);
+    expect(apns[0]).toMatchObject({
+      token: 'org-card',
+      priority: '10',
+      aps: { event: 'end', 'dismissal-date': Date.now() / 1000 },
+    });
+    expect(activityRows.has('org-card')).toBe(false);
   });
 
   it('raises one card per push-to-start token, however many refreshes find no activity', async () => {
@@ -2134,6 +2345,139 @@ describe('deliverGlanceableSnapshot', () => {
     expect(deps.hasAndroidOngoingToken).not.toHaveBeenCalled();
     expect(calls.iosSends).toHaveLength(0);
     expect(calls.expoSends).toHaveLength(0);
+  });
+
+  describe('with followed sessions', () => {
+    const activityRow = {
+      token: 'activity-token',
+      kind: 'ios_activity' as const,
+      id: 'row-0',
+      updated_at: snapshot.updatedAt,
+    };
+    const followedCard = {
+      sessionId: 'ses_followed',
+      row: {
+        title: 'Followed title',
+        status: 'busy',
+        statusUpdatedAt: '2026-08-27T09:00:00.000Z',
+        scheduledAt: null,
+        approvalKey: null,
+      },
+    };
+
+    it('pushes the unfollowed counts with the aggregate relevance and keeps card facts out of wakes', async () => {
+      const sendIosLiveActivity = vi.fn<GlanceableDeliveryDeps['sendIosLiveActivity']>(
+        async () => undefined
+      );
+      const { deps, calls } = fakeDeps({
+        buildSnapshot: vi.fn(async () => ({
+          ...snapshot,
+          liveActivitySnapshot: { ...snapshot, running: 1, needsInput: 0, needsApproval: 0 },
+          sessionCards: [followedCard],
+        })),
+        listIosActivityTokens: vi.fn(async () => [activityRow]),
+        listIosExpoTokens: vi.fn(async () => [{ token: 'ExponentPushToken[ios]', locale: null }]),
+        sendIosLiveActivity,
+      });
+
+      await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
+
+      const [tokens, contentState] = sendIosLiveActivity.mock.calls[0];
+      expect(tokens).toEqual([{ token: 'activity-token', event: 'update' }]);
+      expect(JSON.parse(contentState.props)).toMatchObject({ running: 1, needsInput: 0 });
+      expect(sendIosLiveActivity.mock.calls[0][8]).toBe(
+        aggregateLiveActivityRelevance(0, snapshot.newestResultAt)
+      );
+      // The Home widget wake still counts every session.
+      expect(calls.expoSends[0][0].data).toMatchObject({ running: 2, needsInput: 1 });
+      const wake = JSON.stringify(calls.expoSends);
+      expect(wake).not.toContain('Followed title');
+      expect(wake).not.toContain('ses_followed');
+      expect(wake).not.toContain('liveActivitySnapshot');
+    });
+
+    it('uses the needs-input relevance when unfollowed work waits', async () => {
+      const sendIosLiveActivity = vi.fn<GlanceableDeliveryDeps['sendIosLiveActivity']>(
+        async () => undefined
+      );
+      const { deps } = fakeDeps({
+        listIosActivityTokens: vi.fn(async () => [activityRow]),
+        sendIosLiveActivity,
+      });
+      await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
+      expect(sendIosLiveActivity.mock.calls[0][8]).toBe(
+        aggregateLiveActivityRelevance(1, snapshot.newestResultAt)
+      );
+    });
+
+    it('ends the aggregate card when only idle work is left unfollowed', async () => {
+      const { deps, calls } = fakeDeps({
+        buildSnapshot: vi.fn(async () => ({
+          ...snapshot,
+          liveActivitySnapshot: {
+            ...snapshot,
+            running: 0,
+            needsInput: 0,
+            needsApproval: 0,
+            idle: 1,
+            needsInputSince: null,
+          },
+          sessionCards: [followedCard],
+        })),
+        listIosActivityTokens: vi.fn(async () => [activityRow]),
+      });
+
+      await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
+
+      expect(calls.iosSends[0][0]).toEqual([{ token: 'activity-token', event: 'end' }]);
+    });
+
+    it.each([
+      ['finished', { ...followedCard, row: { ...followedCard.row, status: 'idle' } }],
+      ['gone', { sessionId: 'ses_followed', row: null }],
+    ])(
+      'keeps idle unfollowed work on the aggregate card when the followed session is %s',
+      async (_, card) => {
+        const { deps, calls } = fakeDeps({
+          buildSnapshot: vi.fn(async () => ({
+            ...snapshot,
+            liveActivitySnapshot: {
+              ...snapshot,
+              running: 0,
+              needsInput: 0,
+              needsApproval: 0,
+              idle: 1,
+              needsInputSince: null,
+            },
+            sessionCards: [card],
+          })),
+          listIosActivityTokens: vi.fn(async () => [activityRow]),
+        });
+
+        await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
+
+        expect(calls.iosSends[0][0]).toEqual([{ token: 'activity-token', event: 'update' }]);
+      }
+    );
+
+    it('pushes the followed session card through the session card IO', async () => {
+      const sendIosSessionLiveActivity = vi.fn(async () => true);
+      const { deps } = fakeDeps({
+        buildSnapshot: vi.fn(async () => ({ ...snapshot, sessionCards: [followedCard] })),
+        listIosSessionActivityTokens: vi.fn(async () => [
+          { token: 'card-token', sessionId: 'ses_followed' },
+        ]),
+        sendIosSessionLiveActivity,
+      });
+
+      await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
+
+      expect(sendIosSessionLiveActivity).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ token: 'card-token', event: 'update', priority: 5 }),
+        Math.floor(Date.parse(snapshot.updatedAt) / 1000),
+        undefined
+      );
+    });
   });
 
   it('sends update only to the activity tokens when both kinds are registered', async () => {

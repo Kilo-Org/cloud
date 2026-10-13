@@ -37612,7 +37612,9 @@
           "enum": [
             "ios_push_to_start",
             "ios_activity",
-            "android_ongoing"
+            "ios_session_activity",
+            "android_ongoing",
+            "android_session_ongoing"
           ]
         },
         "platform": {
@@ -37632,6 +37634,10 @@
               "type": "null"
             }
           ]
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -37647,9 +37653,10 @@
       "token",
       "kind",
       "platform",
-      "organizationid"
+      "organizationid",
+      "sessionid"
     ],
-    "searchBlob": "user.registerActivityToken Register an iOS Live Activity or Android ongoing notification token for the user. user registeractivitytoken token kind platform organizationid token kind platform organizationId"
+    "searchBlob": "user.registerActivityToken Register an iOS Live Activity or Android ongoing notification token for the user. user registeractivitytoken token kind platform organizationid sessionid token kind platform organizationId sessionId"
   },
   "user.registerPushToken": {
     "path": "user.registerPushToken",
@@ -38022,6 +38029,10 @@
         "token": {
           "type": "string",
           "minLength": 1
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -38031,9 +38042,10 @@
     "tags": [
       "user",
       "unregisteractivitytoken",
-      "token"
+      "token",
+      "sessionid"
     ],
-    "searchBlob": "user.unregisterActivityToken Remove an activity token used for Live Activities or ongoing notifications. user unregisteractivitytoken token token"
+    "searchBlob": "user.unregisterActivityToken Remove an activity token used for Live Activities or ongoing notifications. user unregisteractivitytoken token sessionid token sessionId"
   },
   "user.unregisterPushToken": {
     "path": "user.unregisterPushToken",

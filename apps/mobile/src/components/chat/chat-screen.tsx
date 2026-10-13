@@ -1,8 +1,8 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, Pressable, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -22,7 +22,7 @@ import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useSessionModelOptions } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { useChat, useChatPlace } from '@/lib/chat/use-chat';
+import { useChat, useChatList, useChatPlace } from '@/lib/chat/use-chat';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
@@ -34,13 +34,12 @@ import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
 
-import { BetaPill } from './beta-pill';
+import { ChatTitle } from './chat-title';
 import { ChatDetailsSheet } from './chat-details-sheet';
 import { useChatDetails } from './chat-details-state';
 import { ChatFailureRow } from './chat-failure-row';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
-import { ModelToolsHint } from './model-tools-hint';
 import { useChatMessageActions } from './use-chat-message-actions';
 import { useWebSearchSetting } from './web-search-row';
 
@@ -81,7 +80,11 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const { organizationId } = useOrganization();
   const place = useChatPlace();
   const { state, send, stop, retry } = useChat(place, opened);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const { chats, rename } = useChatList(place);
+  // A chat is listed once its session is written. Until then it has no row to name.
+  const summary = chats.find(chat => chat.sessionId === state.sessionId);
+  const title = summary === undefined || summary.title === '' ? t('common.chat') : summary.title;
+  const keyboardVisible = useKeyboardState(keyboard => keyboard.isVisible);
   // The sheet's whole model — the Kilo control, the settings-tools group switch
   // and the remote servers — is read here. The header draws its dot from the
   // Kilo view, so the control and the sheet cannot disagree.
@@ -160,19 +163,6 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       ]
     );
   };
-
-  useEffect(() => {
-    const shown = Keyboard.addListener('keyboardDidShow', () => {
-      setKeyboardVisible(true);
-    });
-    const hidden = Keyboard.addListener('keyboardDidHide', () => {
-      setKeyboardVisible(false);
-    });
-    return () => {
-      shown.remove();
-      hidden.remove();
-    };
-  }, []);
 
   const messages = asMessages(state);
   const actions = useChatMessageActions(state, messages, retry);
@@ -289,8 +279,8 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         ) : null}
 
         <View style={composerPadding}>
-          <ModelToolsHint model={model} backends={backends} localModels={localModels} />
           <ChatComposer
+            toolbarClassName="pb-1"
             controlRef={actions.composerControlRef}
             onSend={handleSend}
             onSendCommand={noSessionCommand}
@@ -318,14 +308,16 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('common.chat')}
+        title={title}
         titleContent={
-          <View className="flex-row items-center gap-2">
-            <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
-              {t('common.chat')}
-            </Text>
-            <BetaPill />
-          </View>
+          <ChatTitle
+            title={title}
+            initialValue={summary?.title ?? ''}
+            canRename={summary !== undefined}
+            onRename={async name => {
+              await rename(state.sessionId, name);
+            }}
+          />
         }
         headerRight={
           <View className="flex-row items-center">

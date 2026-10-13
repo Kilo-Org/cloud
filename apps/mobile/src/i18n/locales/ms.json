@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Repositori anda sendiri",
     "dismissed": "Diketepikan",
     "agent": "ejen",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Perubahan"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "Aktiviti KiloClaw",
       "balance": "Amaran baki",
       "security": "Dapatan keselamatan",
-      "spend": "Amaran perbelanjaan"
+      "spend": "Amaran perbelanjaan",
+      "followedSessions": "Sesi diikuti"
     },
     "category": {
       "chatMessagesSubtitle": "balasan dalam perbualan anda",
@@ -2088,6 +2091,8 @@
       "title": "Sesi",
       "copyErrorDetails": "Salin butiran ralat",
       "backToSessions": "Kembali ke sesi",
+      "follow": "Ikuti pada Skrin Kunci",
+      "unfollow": "Berhenti mengikuti pada Skrin Kunci",
       "couldNotLoad": "Tidak dapat memuatkan sesi.",
       "failedToLoadDetails": "Gagal memuatkan butiran sesi.",
       "failedToStopExecution": "Gagal menghentikan pelaksanaan.",
@@ -3170,6 +3175,8 @@
     "channelName": "Ejen aktif",
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci.",
     "openSession": "Buka",
+    "finished": "Selesai",
+    "followFailed": "Tidak dapat memaparkan ejen ini pada Skrin Kunci.",
     "approveFailed": "Tidak dapat meluluskan. Ketik $t(common.approve) untuk mencuba semula.",
     "checked": "Disemak",
     "lastKnown": "Terakhir diketahui",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Menunggu anda",
     "nextScheduled": "Jadual seterusnya",
     "answerNeeded": "Perlu jawapan",
-    "waitingToRetry": "Menunggu cubaan semula"
+    "waitingToRetry": "Menunggu cubaan semula",
+    "step": {
+      "editing": "Menyunting",
+      "reading": "Membaca",
+      "running": "Jalankan",
+      "searching": "Carian web",
+      "thinking": "Sedang berfikir"
+    },
+    "planOf": "daripada",
+    "filesChanged": "fail diubah",
+    "finishedIn": "Selesai dalam",
+    "noActivityFor": "Tiada aktiviti selama",
+    "prOpened": "Permintaan tarik dibuka",
+    "permissionWants": "Ingin menjalankan",
+    "failure": {
+      "provider": "Berhenti: ralat pembekal",
+      "tool": "Berhenti: ralat alat",
+      "cancelled": "Berhenti: dibatalkan",
+      "other": "DIHENTIKAN"
+    }
   },
   "transcriptionModel": {
     "title": "Model transkripsi",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Tidak dapat memuatkan sejarah sembang.",
       "new": "Sembang baharu",
-      "openHint": "Membuka sembang. Tekan lama untuk memadam.",
       "deleteTitle": "Padam sembang ini?"
+    },
+    "rename": {
+      "title": "Namakan semula sembang",
+      "accessibility": "Namakan semula sembang: {{title}}",
+      "openHint": "Membuka sembang. Tekan lama untuk menamakan semula atau memadam."
     },
     "beta": "Beta",
     "details": {

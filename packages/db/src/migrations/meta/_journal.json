@@ -1933,6 +1933,13 @@
       "when": 1791802756295,
       "tag": "0275_skinny_ironclad",
       "breakpoints": true
+    },
+    {
+      "idx": 276,
+      "version": "7",
+      "when": 1791882735449,
+      "tag": "0276_thin_whirlwind",
+      "breakpoints": true
     }
   ]
 }

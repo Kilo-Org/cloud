@@ -143,8 +143,8 @@ app.get('/internal/session/:sessionId/export', requireValidInternalSecret, async
   const parsed = sessionIdSchema.safeParse(c.req.param('sessionId'));
   if (!parsed.success) return c.json({ success: false, error: 'Invalid sessionId' }, 400);
 
-  const stream = await getSessionExport(c.env, parsed.data, kiloUserId);
-  if (stream === null) return c.json({ success: false, error: 'Session not found' }, 404);
+  const result = await getSessionExport(c.env, parsed.data, kiloUserId);
+  if (result.status !== 'ok') return c.json({ success: false, error: 'Session not found' }, 404);
 
-  return c.body(stream, 200, { 'content-type': 'application/json; charset=utf-8' });
+  return c.body(result.stream, 200, { 'content-type': 'application/json; charset=utf-8' });
 });

@@ -41,11 +41,13 @@ describe('callback queue retry configuration', () => {
     const config = readWranglerConfig();
 
     expect(config.vars?.VERCEL_SANDBOX_ORG_IDS).toBe('');
+    expect(config.vars?.CLOUDFLARE_CONTAINERS_ORG_IDS).toBe('*');
     expect(config.vars?.CODE_REVIEW_CONTROL_PLANE_IDS).toBe('*');
     expect(config.vars?.SANDBOX_SELECTION_IDS).toBe(
       '9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55'
     );
     expect(config.env?.dev?.vars?.VERCEL_SANDBOX_ORG_IDS).toBe('');
+    expect(config.env?.dev?.vars?.CLOUDFLARE_CONTAINERS_ORG_IDS).toBe('*');
     expect(config.env?.dev?.vars?.CODE_REVIEW_CONTROL_PLANE_IDS).toBe('*');
     expect(config.env?.dev?.vars?.SANDBOX_SELECTION_IDS).toBe('*');
   });

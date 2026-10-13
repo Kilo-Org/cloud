@@ -498,6 +498,7 @@ function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalRe
     // sees it. That check has therefore never fired; the structured reason makes
     // the existing intent actually work.
     terminalReason === 'assistant_rate_limited_byok' ||
+    terminalReason === 'assistant_invalid_request_byok' ||
     isCodeReviewActionRequiredReason(terminalReason)
   );
 }

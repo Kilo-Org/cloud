@@ -605,6 +605,8 @@ export type Env = {
   GITHUB_APP_BOT_USER_ID?: string;
   /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** 'true' disables the per-account concurrent-container cap. Set only on the disposable e2e Worker. */
+  CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
   /** Comma-separated user or org IDs whose Code Reviewer sessions run on the call-home control plane. `*` includes personal. */
   CODE_REVIEW_CONTROL_PLANE_IDS?: string;
   RUNTIME_ISOLATION_ENABLED?: string;

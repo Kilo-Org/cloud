@@ -140,6 +140,7 @@ export type PreparingStep =
   | 'workspace_backup'
   | 'sandbox_provision'
   | 'sandbox_boot'
+  | 'snapshot_fallback'
   | 'kilo_server'
   | 'kilo_session'
   | 'restore_incomplete'

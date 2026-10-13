@@ -674,17 +674,19 @@ describe('createSessionForCloudAgent clone path', () => {
       kind: 'empty' as 'empty' | 'in_progress' | 'complete',
       sourceSessionId: null as string | null,
       destinationSessionId: null as string | null,
+      upToMessageId: null as string | null,
       nextCursor: null as { ingestedAt: number | null; id: number } | null,
       rollingDigest: '',
       copiedItemCount: 0,
       stagedRows: [] as CloneItem[],
     };
 
-    const inspectCloneStage = vi.fn(() => {
+    const inspectCloneStage = vi.fn((params?: { upToMessageId?: string }) => {
       if (state.kind === 'empty') return { status: 'empty' };
       const sameIdentity =
         state.sourceSessionId === sourceSessionId &&
-        state.destinationSessionId === destinationSessionId;
+        state.destinationSessionId === destinationSessionId &&
+        state.upToMessageId === (params?.upToMessageId ?? null);
       if (!sameIdentity) {
         return {
           status: 'mismatch',
@@ -714,6 +716,7 @@ describe('createSessionForCloudAgent clone path', () => {
       (params: {
         sourceSessionId: string;
         destinationSessionId: string;
+        upToMessageId?: string;
         rows: CloneItem[];
         nextCursor: { ingestedAt: number | null; id: number } | null;
         rollingDigest: string;
@@ -739,7 +742,8 @@ describe('createSessionForCloudAgent clone path', () => {
         if (
           state.kind === 'in_progress' &&
           (state.sourceSessionId !== params.sourceSessionId ||
-            state.destinationSessionId !== params.destinationSessionId)
+            state.destinationSessionId !== params.destinationSessionId ||
+            state.upToMessageId !== (params.upToMessageId ?? null))
         ) {
           return {
             status: 'mismatch',
@@ -750,6 +754,7 @@ describe('createSessionForCloudAgent clone path', () => {
         state.kind = 'in_progress';
         state.sourceSessionId = params.sourceSessionId;
         state.destinationSessionId = params.destinationSessionId;
+        state.upToMessageId = params.upToMessageId ?? null;
         state.nextCursor = params.nextCursor;
         state.rollingDigest = params.rollingDigest;
         state.copiedItemCount = params.copiedItemCount;
@@ -815,6 +820,7 @@ describe('createSessionForCloudAgent clone path', () => {
       state.kind = 'empty';
       state.sourceSessionId = null;
       state.destinationSessionId = null;
+      state.upToMessageId = null;
       state.nextCursor = null;
       state.rollingDigest = '';
       state.copiedItemCount = 0;
@@ -1531,6 +1537,256 @@ describe('createSessionForCloudAgent clone path', () => {
       expect.anything()
     );
   });
+
+  describe('with cloneUpToMessageId', () => {
+    const cutMessage = (id: string, ingestedAt: number, role = 'user'): CloneItem => ({
+      itemId: `message/${id}`,
+      itemType: 'message',
+      itemData: JSON.stringify({
+        id,
+        sessionID: sourceSessionId,
+        role,
+        time: { created: ingestedAt },
+        agent: 'build',
+        model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+      }),
+      itemDataR2Key: null,
+      ingestedAt,
+    });
+
+    const cutPart = (messageId: string, partId: string, ingestedAt: number): CloneItem => ({
+      itemId: `${messageId}/${partId}`,
+      itemType: 'part',
+      itemData: JSON.stringify({
+        id: partId,
+        sessionID: sourceSessionId,
+        messageID: messageId,
+        type: 'text',
+        text: `text of ${partId}`,
+      }),
+      itemDataR2Key: null,
+      ingestedAt,
+    });
+
+    const sessionDiffItem = (ingestedAt: number): CloneItem => ({
+      itemId: 'session_diff',
+      itemType: 'session_diff',
+      itemData: JSON.stringify([{ file: 'src/a.ts', additions: 1, deletions: 0 }]),
+      itemDataR2Key: null,
+      ingestedAt,
+    });
+
+    // Ingest order is not message order: a late part of msg_02 lands after msg_03.
+    const interleavedSource = (): CloneItem[] => [
+      sourceSessionItem(),
+      cutMessage('msg_01', 2),
+      cutPart('msg_01', 'prt_01', 3),
+      cutMessage('msg_02', 4, 'assistant'),
+      cutMessage('msg_03', 5),
+      cutPart('msg_02', 'prt_02', 6),
+      cutPart('msg_03', 'prt_03', 7),
+      sessionDiffItem(8),
+    ];
+
+    function makeCutRpc(items: CloneItem[], pageSize: number) {
+      const sourceStub = {
+        ...makePagedSourceStub(items, pageSize),
+        hasMessageItem: vi.fn(async (messageId: string) =>
+          items.some(item => item.itemType === 'message' && item.itemId === `message/${messageId}`)
+        ),
+      };
+      const dest = makeDestinationStub();
+      const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+      const { db, values } = makeCloneDb({
+        sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+        created: createdRow,
+      });
+      const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+      return { rpc, sourceStub, dest, r2, values };
+    }
+
+    it('copies messages up to the inclusive cut with their parts and drops the session diff', async () => {
+      const { rpc, sourceStub, dest, r2 } = makeCutRpc(interleavedSource(), 100);
+
+      await expect(
+        rpc.createSessionForCloudAgent(cloneParams({ cloneUpToMessageId: 'msg_02' }))
+      ).resolves.toEqual({
+        status: 'ready',
+        clone: { sessionId: destinationSessionId, copiedItemCount: 5 },
+      });
+
+      expect(dest.state.stagedRows.map(row => row.itemId)).toEqual([
+        'session',
+        'message/msg_01',
+        'msg_01/prt_01',
+        'message/msg_02',
+        'msg_02/prt_02',
+      ]);
+      expect(dest.state.kind).toBe('complete');
+      expect(dest.state.upToMessageId).toBe('msg_02');
+      expect(dest.stub.inspectCloneStage).toHaveBeenCalledWith({
+        sourceSessionId,
+        destinationSessionId,
+        upToMessageId: 'msg_02',
+      });
+      expect(dest.stub.finalizeCloneStage).toHaveBeenCalledWith(
+        expect.objectContaining({ upToMessageId: 'msg_02', finalItemCount: 5 })
+      );
+      expect(sourceStub.hasMessageItem).toHaveBeenCalledWith('msg_02');
+      expect(r2.get).not.toHaveBeenCalled();
+    });
+
+    it('keeps the full clone, including the session diff, when no cut is given', async () => {
+      const { rpc, sourceStub, dest } = makeCutRpc(interleavedSource(), 100);
+
+      await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+        status: 'ready',
+        clone: { sessionId: destinationSessionId, copiedItemCount: 8 },
+      });
+
+      expect(dest.state.stagedRows.map(row => row.itemId)).toEqual(
+        interleavedSource().map(item => item.itemId)
+      );
+      expect(dest.state.upToMessageId).toBeNull();
+      expect(dest.stub.inspectCloneStage.mock.calls[0]?.[0]).toStrictEqual({
+        sourceSessionId,
+        destinationSessionId,
+      });
+      expect(sourceStub.hasMessageItem).not.toHaveBeenCalled();
+    });
+
+    it('rejects clone_cut_not_found before touching the destination when the cut message is absent', async () => {
+      // A part may reference the ID, but only a message row satisfies the cut.
+      const { rpc, sourceStub, dest, values } = makeCutRpc(
+        [...interleavedSource(), cutPart('msg_99', 'prt_99', 9)],
+        100
+      );
+
+      await expect(
+        rpc.createSessionForCloudAgent(cloneParams({ cloneUpToMessageId: 'msg_99' }))
+      ).resolves.toEqual({ status: 'rejected', code: 'clone_cut_not_found' });
+
+      expect(dest.stub.inspectCloneStage).not.toHaveBeenCalled();
+      expect(dest.stub.stageCloneBatch).not.toHaveBeenCalled();
+      expect(dest.stub.resetCloneStage).not.toHaveBeenCalled();
+      expect(sourceStub.exportCloneBatch).not.toHaveBeenCalled();
+      expect(values).not.toHaveBeenCalled();
+    });
+
+    it('resets an unpublished stage built for another cut and restarts from scratch', async () => {
+      const { rpc, dest } = makeCutRpc(interleavedSource(), 100);
+      Object.assign(dest.state, {
+        kind: 'in_progress',
+        sourceSessionId,
+        destinationSessionId,
+        upToMessageId: 'msg_01',
+        nextCursor: { ingestedAt: 3, id: 3 },
+        rollingDigest: 'digest-for-msg_01',
+        copiedItemCount: 3,
+        stagedRows: interleavedSource().slice(0, 3),
+      });
+
+      await expect(
+        rpc.createSessionForCloudAgent(cloneParams({ cloneUpToMessageId: 'msg_02' }))
+      ).resolves.toEqual({
+        status: 'ready',
+        clone: { sessionId: destinationSessionId, copiedItemCount: 5 },
+      });
+
+      expect(dest.stub.resetCloneStage).toHaveBeenCalledTimes(1);
+      expect(dest.state.upToMessageId).toBe('msg_02');
+      expect(dest.state.stagedRows.map(row => row.itemId)).toEqual([
+        'session',
+        'message/msg_01',
+        'msg_01/prt_01',
+        'message/msg_02',
+        'msg_02/prt_02',
+      ]);
+    });
+
+    it('rejects destination_conflict for a published stage built for another cut', async () => {
+      const { rpc, dest } = makeCutRpc(interleavedSource(), 100);
+      Object.assign(dest.state, {
+        kind: 'complete',
+        sourceSessionId,
+        destinationSessionId,
+        upToMessageId: 'msg_01',
+      });
+
+      await expect(
+        rpc.createSessionForCloudAgent(cloneParams({ cloneUpToMessageId: 'msg_02' }))
+      ).resolves.toEqual({ status: 'rejected', code: 'destination_conflict' });
+
+      expect(dest.stub.resetCloneStage).not.toHaveBeenCalled();
+      expect(dest.stub.stageCloneBatch).not.toHaveBeenCalled();
+    });
+
+    it('resumes a cut clone across requests with a digest over the kept rows only', async () => {
+      // A dropped row first, then 20 messages; one row per page so the first
+      // request stops after 16 batches with 15 kept rows staged.
+      const items = [
+        cutPart('msg_19', 'prt_19', 0),
+        ...Array.from({ length: 20 }, (_, index) =>
+          cutMessage(`msg_${String(index).padStart(2, '0')}`, index + 1)
+        ),
+      ];
+      const { rpc, dest } = makeCutRpc(items, 1);
+      const params = cloneParams({ cloneUpToMessageId: 'msg_14' });
+
+      await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+        status: 'in_progress',
+      });
+      expect(dest.state.copiedItemCount).toBe(15);
+
+      await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+        status: 'ready',
+        clone: { sessionId: destinationSessionId, copiedItemCount: 15 },
+      });
+      expect(dest.state.kind).toBe('complete');
+      expect(dest.stub.resetCloneStage).not.toHaveBeenCalled();
+    });
+
+    it('resumes after a byte-budget overflow at the right source row when the cut skips rows', async () => {
+      const hugeBody = JSON.stringify({
+        id: 'msg_02',
+        sessionID: sourceSessionId,
+        role: 'assistant',
+        time: { created: 4 },
+        agent: 'build',
+        model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+        text: 'x'.repeat(5 * 1024 * 1024),
+      });
+      const items: CloneItem[] = [
+        sourceSessionItem(),
+        cutPart('msg_09', 'prt_09', 1),
+        sessionDiffItem(2),
+        cutMessage('msg_01', 3),
+        { ...cutMessage('msg_02', 4, 'assistant'), itemData: '{}', itemDataR2Key: 'items/huge' },
+        cutMessage('msg_09', 5),
+        cutPart('msg_02', 'prt_02', 6),
+      ];
+      const { rpc, sourceStub, dest, r2 } = makeCutRpc(items, 100);
+      r2.get.mockImplementation((async (key: string) =>
+        key === 'items/huge' ? { text: async () => hugeBody } : null) as never);
+
+      await expect(
+        rpc.createSessionForCloudAgent(cloneParams({ cloneUpToMessageId: 'msg_02' }))
+      ).resolves.toEqual({
+        status: 'ready',
+        clone: { sessionId: destinationSessionId, copiedItemCount: 4 },
+      });
+
+      // The overflow at the huge row re-exports the 4 source rows before it,
+      // including the two skipped rows, so no kept row is staged twice.
+      expect(sourceStub.exportCloneBatch).toHaveBeenCalledWith(null, 4);
+      expect(dest.state.stagedRows.map(row => row.itemId)).toEqual([
+        'session',
+        'message/msg_01',
+        'message/msg_02',
+        'msg_02/prt_02',
+      ]);
+    });
+  });
 });
 
 describe('deleteSessionForCloudAgent clone rollback', () => {
@@ -1600,6 +1856,32 @@ describe('deleteSessionForCloudAgent clone rollback', () => {
       sourceSessionId,
       destinationSessionId,
     });
+    expect(resetCloneStage).toHaveBeenCalled();
+    expect(deleteFn).toHaveBeenCalled();
+  });
+
+  it('rolls back a clone stage built with a message cut for the same source', async () => {
+    // The cut is part of the stage identity, so a cut-less inspect reports
+    // mismatch with the same stored source and destination.
+    const inspectCloneStage = vi.fn(() => ({
+      status: 'mismatch',
+      storedSourceSessionId: sourceSessionId,
+      storedDestinationSessionId: destinationSessionId,
+      storedStage: 'complete',
+    }));
+    const resetCloneStage = vi.fn(async () => {});
+    const { db, deleteFn } = makeDeleteDb({
+      session_id: destinationSessionId,
+      kilo_user_id: kiloUserId,
+    });
+    const rpc = makeDeleteRpc({ db, destStub: { inspectCloneStage, resetCloneStage } });
+
+    await rpc.deleteSessionForCloudAgent({
+      sessionId: destinationSessionId,
+      kiloUserId,
+      cloneSourceSessionId: sourceSessionId,
+    });
+
     expect(resetCloneStage).toHaveBeenCalled();
     expect(deleteFn).toHaveBeenCalled();
   });

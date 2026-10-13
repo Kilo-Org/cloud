@@ -29,7 +29,6 @@ import {
   handleInstallationUnsuspend,
   handleInstallationTargetRenamed,
   handleInstallationRepositories,
-  handlePushEvent,
   handlePullRequest,
   handleIssue,
   handlePRReviewComment,
@@ -605,12 +604,6 @@ export async function handleGitHubWebhook(
         return NextResponse.json({ error: 'Invalid push event payload' }, { status: 400 });
       }
 
-      if (!parseResult.data.deleted) {
-        after(async () => {
-          if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
-          await handlePushEvent(parseResult.data, integration);
-        });
-      }
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
     }
 

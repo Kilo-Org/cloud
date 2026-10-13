@@ -4253,6 +4253,17 @@ describe('UserConnectionDO', () => {
       expect(result).toEqual([]);
     });
 
+    it('keeps a cleared session out of the list while its CLI still reports it', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')]);
+
+      await doInstance.clearSession('s1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')]);
+
+      expect(doInstance.getActiveSessions().map(session => session.id)).toEqual(['s2']);
+    });
+
     it('excludes child sessions reported with parentSessionId in heartbeat', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
@@ -4741,7 +4752,7 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
-    it('projects metadata and both capabilities from a live hibernated attachment', async () => {
+    it('projects metadata and every capability from a live hibernated attachment', async () => {
       const { doInstance, mockCtx } = setup();
       const instance: Instance = {
         name: 'laptop-cap',
@@ -4751,7 +4762,7 @@ describe('UserConnectionDO', () => {
         startedAt: '2026-08-28T12:34:56.789Z',
         gitBranch: '',
       };
-      const capabilities = { attachments: true, sessionClone: true };
+      const capabilities = { attachments: true, sessionClone: true, sessionCloneAtMessage: true };
       const cliWs = createMockWs(['cli'], {
         role: 'cli',
         connectionId: 'cli-cap',

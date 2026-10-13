@@ -192,11 +192,14 @@ export type PrepareSessionNonCloneInput = PrepareSessionSharedFields & {
   /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey?: string;
   cloneFromKiloSessionId?: undefined;
+  cloneUpToMessageId?: undefined;
 };
 
 /** Clone-only prepare input: copies the source session and forbids a synthetic initial turn. */
 export type PrepareSessionCloneInput = PrepareSessionSharedFields & {
   cloneFromKiloSessionId: string;
+  /** Inclusive cut: copy source messages up to and including this ID. */
+  cloneUpToMessageId?: string;
   autoInitiate: true;
   operationKey: string;
 };
@@ -207,6 +210,9 @@ export type PrepareSessionInput = PrepareSessionNonCloneInput | PrepareSessionCl
 export type GetSandboxSelectionOptionsInput = {
   kilocodeOrganizationId?: string;
   devcontainer?: boolean;
+  repositoryType?: 'github' | 'gitlab' | 'bitbucket' | 'git';
+  /** With `repositoryType`, resolves saved repository overrides into `effectiveDestination`. */
+  repositoryFullName?: string;
 };
 
 /** Output from prepareSession procedure */

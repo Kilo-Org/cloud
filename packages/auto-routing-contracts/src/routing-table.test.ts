@@ -16,26 +16,69 @@ const candidate = (model: string, accuracy: number, avgCostUsd: number) => ({
   meetsThreshold: false,
 });
 
+const rankInput = (
+  model: string,
+  accuracy: number,
+  avgCostUsd: number,
+  p50LatencyMs: number | null = 10_000
+) => ({ model, accuracy, avgCostUsd, p50LatencyMs });
+
+const order = (ranked: { model: string }[]) => ranked.map(c => c.model);
+
 describe('rankCandidates', () => {
-  it('puts the lowest cost-per-accuracy above-threshold candidate first', () => {
+  it('puts the best-value competing candidate first and the rest by accuracy', () => {
     const ranked = rankCandidates(
       [
-        candidate('lower-raw-cost', 0.7, 0.007),
-        candidate('better-value', 0.9, 0.008),
-        candidate('weak', 0.5, 0.001),
+        rankInput('lower-raw-cost', 0.7, 0.007),
+        rankInput('better-value', 0.9, 0.008),
+        rankInput('weak', 0.5, 0.001),
       ],
       0.7
     );
-    expect(ranked.map(c => c.model)).toEqual(['better-value', 'lower-raw-cost', 'weak']);
+    expect(order(ranked)).toEqual(['better-value', 'lower-raw-cost', 'weak']);
     expect(ranked[0].meetsThreshold).toBe(true);
     expect(ranked[2].meetsThreshold).toBe(false);
+    expect(ranked[0]).not.toHaveProperty('p50LatencyMs');
   });
-  it('falls back to highest accuracy when nothing meets the threshold', () => {
-    const ranked = rankCandidates([candidate('a', 0.5, 1), candidate('b', 0.6, 5)], 0.9);
-    expect(ranked[0].model).toBe('b');
+  it('prefers a faster candidate over a slightly cheaper slow one', () => {
+    const ranked = rankCandidates(
+      [rankInput('cheap-slow', 1, 0.0013, 28_000), rankInput('fast', 1, 0.0017, 11_000)],
+      0.95
+    );
+    expect(order(ranked)).toEqual(['fast', 'cheap-slow']);
   });
-  it('breaks cost ties by accuracy', () => {
-    const ranked = rankCandidates([candidate('a', 0.8, 1), candidate('b', 0.9, 1)], 0.7);
+  it('lets a candidate inside the noise band compete without marking it as meeting the threshold', () => {
+    const ranked = rankCandidates(
+      [rankInput('meets', 1, 0.006), rankInput('in-band', 0.9, 0.001)],
+      0.95
+    );
+    expect(order(ranked)).toEqual(['in-band', 'meets']);
+    expect(ranked[0].meetsThreshold).toBe(false);
+    expect(ranked[1].meetsThreshold).toBe(true);
+  });
+  it('keeps a candidate below the noise band behind every competing candidate', () => {
+    const ranked = rankCandidates(
+      [rankInput('meets', 1, 0.01), rankInput('below-band', 0.89, 0.0001)],
+      0.95
+    );
+    expect(order(ranked)).toEqual(['meets', 'below-band']);
+  });
+  it('needs a large value gain before a lower-accuracy candidate wins', () => {
+    const ranked = rankCandidates(
+      [rankInput('accurate', 1, 0.002), rankInput('in-band-4x-cheaper', 0.9, 0.0005)],
+      0.95
+    );
+    expect(order(ranked)).toEqual(['accurate', 'in-band-4x-cheaper']);
+  });
+  it('ranks a competing candidate without latency data after those with it', () => {
+    const ranked = rankCandidates(
+      [rankInput('no-latency', 1, 0.0001, null), rankInput('measured', 1, 0.01)],
+      0.95
+    );
+    expect(order(ranked)).toEqual(['measured', 'no-latency']);
+  });
+  it('falls back to highest accuracy when nothing competes', () => {
+    const ranked = rankCandidates([rankInput('a', 0.5, 1), rankInput('b', 0.6, 5)], 0.9);
     expect(ranked[0].model).toBe('b');
   });
 });

@@ -135,19 +135,51 @@ export type CustomRoutingTable = z.infer<typeof CustomRoutingTableSchema>;
 
 export const ROUTING_TABLE_KV_KEY = 'routing_table_v1';
 
-// "Best bang for buck": candidates meeting the accuracy threshold come first,
-// lowest cost per unit of accuracy first; below-threshold candidates follow
-// ordered by accuracy so a degenerate table still routes sensibly.
+// Accuracy comes from about 10 golden cases per route, so a candidate up to
+// this far below `minAccuracy` is inside benchmark noise. Such a candidate
+// competes on value with the candidates that meet the threshold.
+const ACCURACY_NOISE_BAND = 0.05;
+// Value = avgCostUsd * p50LatencyMs^LATENCY_WEIGHT / accuracy^ACCURACY_WEIGHT;
+// lower is better. The accuracy weight makes a 0.9 candidate rank first only
+// when its cost-latency product is about 4.9x better than a 1.0 candidate's.
+const LATENCY_WEIGHT = 1.5;
+const ACCURACY_WEIGHT = 15;
+// Part of every registry table version: a policy change must republish tables
+// built from unchanged measurements.
+export const RANKING_POLICY_VERSION = 'value-latency-v1';
+
+type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
+  meetsThreshold?: boolean;
+  // Benchmark p50 latency for this route. Null ranks last among competitors.
+  p50LatencyMs: number | null;
+};
+
+function rankValue(c: { avgCostUsd: number; accuracy: number; p50LatencyMs: number | null }) {
+  if (c.p50LatencyMs === null) return Number.POSITIVE_INFINITY;
+  return (c.avgCostUsd * c.p50LatencyMs ** LATENCY_WEIGHT) / c.accuracy ** ACCURACY_WEIGHT;
+}
+
+// Candidates within ACCURACY_NOISE_BAND of the threshold come first, best
+// value first; the rest follow ordered by accuracy so a degenerate table still
+// routes sensibly. `meetsThreshold` stays the strict `accuracy >= minAccuracy`
+// flag that sticky routing reads.
 export function rankCandidates(
-  candidates: ReadonlyArray<Omit<RankedCandidate, 'meetsThreshold'> & { meetsThreshold?: boolean }>,
+  candidates: ReadonlyArray<RankInput>,
   minAccuracy: number
 ): RankedCandidate[] {
-  const flagged = candidates.map(c => ({ ...c, meetsThreshold: c.accuracy >= minAccuracy }));
-  return flagged.toSorted((a, b) => {
-    if (a.meetsThreshold !== b.meetsThreshold) return a.meetsThreshold ? -1 : 1;
-    if (a.meetsThreshold) {
-      return a.avgCostUsd / a.accuracy - b.avgCostUsd / b.accuracy || b.accuracy - a.accuracy;
-    }
-    return b.accuracy - a.accuracy || a.avgCostUsd - b.avgCostUsd;
-  });
+  const floor = minAccuracy - ACCURACY_NOISE_BAND;
+  return candidates
+    .map(({ p50LatencyMs, ...c }) => ({
+      candidate: { ...c, meetsThreshold: c.accuracy >= minAccuracy },
+      competes: c.accuracy > 0 && c.accuracy >= floor,
+      value: rankValue({ ...c, p50LatencyMs }),
+    }))
+    .toSorted((a, b) => {
+      if (a.competes !== b.competes) return a.competes ? -1 : 1;
+      if (a.competes && a.value !== b.value) return a.value < b.value ? -1 : 1;
+      const x = a.candidate;
+      const y = b.candidate;
+      return y.accuracy - x.accuracy || x.avgCostUsd - y.avgCostUsd;
+    })
+    .map(s => s.candidate);
 }

@@ -212,6 +212,27 @@ describe('native on-device model client with tools', () => {
     expect(bridge.generate).toHaveBeenCalledOnce();
   });
 
+  it('does not start again when a token generation fails after the tool calls ran', async () => {
+    const { bridge, emit } = toolBridge((native, send) => {
+      send({ id: native.id, kind: 'toolCalls', calls: [call] });
+    });
+    const client = nativeModelClient(bridge);
+    await said(client);
+    bridge.resume.mockImplementation(async resumed => {
+      await Promise.resolve();
+      emit({ id: resumed, kind: 'error', reason: 'token_generation_failed' });
+    });
+    const result = await collect(
+      bridge,
+      client.stream(answered([{ callId: call.id, body: '12:00' }]))
+    );
+    expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+      'modelChat.localModels.failed'
+    );
+    expect(bridge.resume).toHaveBeenCalledOnce();
+    expect(bridge.generate).toHaveBeenCalledOnce();
+  });
+
   it('keeps a provider without the tool loop text-only', async () => {
     const { bridge } = toolBridge(answerWith({}));
     await said(nativeModelClient({ ...bridge, resume: undefined }));

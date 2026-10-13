@@ -233,7 +233,7 @@ describe('native on-device model client with tools', () => {
     expect(bridge.generate).toHaveBeenCalledOnce();
   });
 
-  it('does not start again when a token generation fails after the model asked for a tool', async () => {
+  it('ends the round on the tool calls, so a later failure of that attempt starts nothing', async () => {
     const failsTokenGeneration = Object.assign(new Error('token_generation_failed'), {
       code: 'token_generation_failed',
     });

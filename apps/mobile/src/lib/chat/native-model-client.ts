@@ -190,7 +190,11 @@ function answer(
       void emit.fail(failure(problemOf(reason), output !== ''));
     };
     const failOrRetry = (reason: string | undefined) => {
-      if (reason === TRANSIENT_REASON && output === '' && retries > 0) {
+      if (
+        (reason === TRANSIENT_REASON || reason === 'empty_response') &&
+        output === '' &&
+        retries > 0
+      ) {
         retries -= 1;
         state = 'retrying';
       } else {
@@ -198,6 +202,10 @@ function answer(
       }
     };
     const finish = async (done: Extract<NativeModelEvent, { kind: 'done' }>) => {
+      if (output.trim() === '') {
+        fail('empty_response');
+        return;
+      }
       state = 'finishing';
       const counts = done.usageSource === 'unavailable' ? undefined : done;
       const usage: ModelUsage = {

@@ -39,11 +39,12 @@ const instruction =
 /** How the summary is introduced, so the model reads it as the record, not as a question. */
 const heading = 'Summary of the conversation so far:';
 
-/** The tokens one call put in front of the model, cached or not. */
+/** The completed exchange occupies both its input and its generated answer. */
 const promptedOf = (usage: {
   readonly inputTokens: number;
   readonly cacheReadTokens: number;
-}): number => usage.inputTokens + usage.cacheReadTokens;
+  readonly outputTokens: number;
+}): number => usage.inputTokens + usage.cacheReadTokens + usage.outputTokens;
 
 /**
  * The share of the window a session may fill before it compacts. It leaves room
@@ -54,10 +55,9 @@ const defaultCompactAt = 0.8;
 /**
  * Whether the last call filled enough of the window to compact now.
  *
- * The number comes from the provider's own count of the last request, so no
- * tokeniser is needed and no estimate can drift. A catalog that does not name a
- * window never compacts: guessing one would either truncate a conversation that
- * fit, or fail to save one that did not.
+ * The provider's token counts include the completed answer, which occupies
+ * context before the next question. A catalog that names no window never
+ * compacts: guessing one could truncate a conversation that fit.
  */
 const windowOf = (wiring: Wiring): Effect.Effect<Option.Option<number>> =>
   wiring.catalog.facts(wiring.model).pipe(

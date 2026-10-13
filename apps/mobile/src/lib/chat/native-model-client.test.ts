@@ -150,28 +150,49 @@ describe('native on-device model client', () => {
     );
   });
 
+  it.each(['end', 'unknown', 'refusal'])(
+    'reports an empty %s completion instead of saving an empty answer',
+    async stop => {
+      const { bridge } = fakeBridge((native, emit) => {
+        emit({ id: native.id, kind: 'done', stop, usageSource: 'unavailable' });
+      });
+      expect(await failureKey(bridge)).toBe('modelChat.localModels.failed');
+    }
+  );
+
+  it('reports a whitespace-only completion instead of saving an empty answer', async () => {
+    const { bridge } = fakeBridge((native, emit) => {
+      emit({ id: native.id, kind: 'delta', text: ' \n ' });
+      emit({ id: native.id, kind: 'done', stop: 'end', usageSource: 'unavailable' });
+    });
+    expect(await failureKey(bridge)).toBe('modelChat.localModels.failed');
+  });
+
   describe('when Foundation Models fails a token generation', () => {
     const failsTokenGeneration = Object.assign(new Error('token_generation_failed'), {
       code: 'token_generation_failed',
     });
 
-    it('starts once more on a new request when no text arrived, and answers', async () => {
-      let attempt = 0;
-      const { bridge } = fakeBridge((native, emit) => {
-        attempt += 1;
-        if (attempt === 1) {
-          emit({ id: native.id, kind: 'error', reason: 'token_generation_failed' });
-          throw failsTokenGeneration;
-        }
-        answerWith({})(native, emit);
-      });
-      const answered = await events(bridge);
-      expect(answered[0]).toEqual({ kind: 'delta', text: 'abcdefg' });
-      expect(answered.at(-1)).toMatchObject({ kind: 'done', stop: 'end' });
-      const [first, second] = bridge.generate.mock.calls.map(([native]) => native.id);
-      expect(bridge.generate).toHaveBeenCalledTimes(2);
-      expect(second).not.toBe(first);
-    });
+    it.each(['token_generation_failed', 'empty_response'])(
+      'starts once more after %s before any text, and answers',
+      async reason => {
+        let attempt = 0;
+        const { bridge } = fakeBridge((native, emit) => {
+          attempt += 1;
+          if (attempt === 1) {
+            emit({ id: native.id, kind: 'error', reason });
+            throw Object.assign(new Error(reason), { code: reason });
+          }
+          answerWith({})(native, emit);
+        });
+        const answered = await events(bridge);
+        expect(answered[0]).toEqual({ kind: 'delta', text: 'abcdefg' });
+        expect(answered.at(-1)).toMatchObject({ kind: 'done', stop: 'end' });
+        const [first, second] = bridge.generate.mock.calls.map(([native]) => native.id);
+        expect(bridge.generate).toHaveBeenCalledTimes(2);
+        expect(second).not.toBe(first);
+      }
+    );
 
     it('does not start again after text arrived', async () => {
       const { bridge } = fakeBridge((native, emit) => {

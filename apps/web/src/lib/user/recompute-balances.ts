@@ -138,6 +138,7 @@ async function fetchUserBalanceData(userId: string) {
       is_free: credit_transactions.is_free,
       original_transaction_id: credit_transactions.original_transaction_id,
       refund_for_transaction_id: credit_transactions.refund_for_transaction_id,
+      debt_repaid_microdollars: credit_transactions.debt_repaid_microdollars,
     })
     .from(credit_transactions)
     .where(

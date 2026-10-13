@@ -522,11 +522,12 @@ async function reverseGooglePlayRefundCredits(
     // full charge to the customer and reverses its own commission, so clawing
     // back the store price would leave a customer who spent nothing at minus the
     // store margin.
-    const reversalAmountMicrodollars = -(await creditRefundAdjustment(
+    const adjustment = await creditRefundAdjustment(
       tx,
       item.creditTransactionId,
       -item.amountMicrodollars
-    ));
+    );
+    const reversalAmountMicrodollars = -adjustment.amountMicrodollars;
 
     if (item.amountMicrodollars <= 0) {
       continue;
@@ -539,7 +540,7 @@ async function reverseGooglePlayRefundCredits(
       isFree: item.isFree,
       description: getGooglePlayRefundReversalDescription(item.kind),
       creditCategory: `kilo-pass-store-refund:${KiloPassPaymentProvider.GooglePlay}:${providerTransactionId}:${item.kind}:${item.itemId}`,
-      originalBaselineMicrodollarsUsed: user.microdollarsUsed,
+      originalBaselineMicrodollarsUsed: adjustment.microdollarsUsed,
     });
     if (reversal.creditTransactionId) {
       creditTransactionIds.push(reversal.creditTransactionId);

@@ -1,6 +1,6 @@
 import { NotificationTypeV2 } from '@apple/app-store-server-library';
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 import { credit_transactions, kilo_pass_store_events, kilocode_users } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -92,6 +92,207 @@ function creditRowsForCategory(creditCategory: string) {
 }
 
 describe('reverseStoreCreditPurchase', () => {
+  it.each([true, false])(
+    'treats repaid debt as consumed during refund and expired reversal (refund first=%s)',
+    async refundFirst => {
+      const user = await insertTestUser({
+        total_microdollars_acquired: 0,
+        microdollars_used: toMicrodollars(5),
+      });
+      const providerTransactionId = crypto.randomUUID();
+      const params = {
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerTransactionId,
+        refundedMilliunits: STORE_FULL_MILLIUNITS,
+      };
+      await processTopUp(
+        user,
+        1000,
+        {
+          type: 'stripe',
+          stripe_payment_id: storeCreditPaymentId(params.paymentProvider, providerTransactionId),
+        },
+        { skipPostTopUpFreeStuff: true }
+      );
+      if (refundFirst) await db.transaction(tx => reverseStoreCreditPurchase(tx, params));
+      const current = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      const expiry = new Date(current!.next_credit_expiration_at!);
+      await processLocalExpirations(current!, expiry);
+      advanceToExpiry(expiry);
+      if (!refundFirst) await db.transaction(tx => reverseStoreCreditPurchase(tx, params));
+      expect(await userBalance(user.id)).toBe(0);
+      await db.transaction(tx => restoreStoreCreditPurchase(tx, params));
+      expect(await userBalance(user.id)).toBe(toMicrodollars(5));
+    }
+  );
+
+  it.each([
+    { priorFirst: true, refund: 10 },
+    { priorFirst: false, refund: 10 },
+    { priorFirst: true, refund: 8 },
+    { priorFirst: false, refund: 8 },
+  ])(
+    'keeps repaid refund debt separate from overlapping grants ($priorFirst / $refund)',
+    async ({ priorFirst, refund }) => {
+      const debt = toMicrodollars(refund - 5);
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const providerTransactionId = crypto.randomUUID();
+      const paymentId = storeCreditPaymentId(
+        KiloPassPaymentProvider.AppStore,
+        providerTransactionId
+      );
+      await processTopUp(
+        user,
+        1000,
+        { type: 'stripe', stripe_payment_id: paymentId },
+        { skipPostTopUpFreeStuff: true }
+      );
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: toMicrodollars(5) })
+        .where(eq(kilocode_users.id, user.id));
+      await db.transaction(tx =>
+        reverseStoreCreditPurchase(tx, {
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerTransactionId,
+          refundedMilliunits: refund * 10_000,
+        })
+      );
+      for (let index = 0; index < 2; index++)
+        await processTopUp(
+          user,
+          1000,
+          { type: 'stripe', stripe_payment_id: crypto.randomUUID() },
+          { skipPostTopUpFreeStuff: true }
+        );
+      await db
+        .update(credit_transactions)
+        .set({
+          expiry_date: priorFirst
+            ? new Date(Date.now() + 86400_000).toISOString()
+            : '2098-01-01T00:00:00Z',
+        })
+        .where(eq(credit_transactions.stripe_payment_id, paymentId));
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: toMicrodollars(8) })
+        .where(eq(kilocode_users.id, user.id));
+      let current = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      const rows = await db.query.credit_transactions.findMany({
+        where: eq(credit_transactions.kilo_user_id, user.id),
+      });
+      expect(
+        rows.filter(row => row.debt_repaid_microdollars).map(row => row.debt_repaid_microdollars)
+      ).toEqual([debt]);
+      expect(
+        getCreditBlocks(rows, new Date(), current!, user.id).creditBlocks.reduce(
+          (sum, block) => sum + block.balance_mUsd,
+          0
+        )
+      ).toBe(toMicrodollars(17) - debt);
+      if (!priorFirst) {
+        await processLocalExpirations(
+          current!,
+          new Date(new Date(current!.next_credit_expiration_at!).getTime() + 86400_000)
+        );
+        current = await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.id, user.id),
+        });
+      }
+      await processLocalExpirations(current!, new Date('2099-01-01T00:00:00Z'));
+      const expired = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(expired!.total_microdollars_acquired - expired!.microdollars_used).toBe(0);
+      advanceToExpiry(new Date('2099-01-01T00:00:00Z'));
+      await db.transaction(tx =>
+        restoreStoreCreditPurchase(tx, {
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerTransactionId,
+        })
+      );
+      expect((await userBalance(user.id)) - toMicrodollars(8)).toBe(debt);
+    }
+  );
+
+  it.each([false, true])(
+    'captures consumption committed between lookup and account lock (restoration=%s)',
+    async restoration => {
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const providerTransactionId = crypto.randomUUID();
+      const params = {
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerTransactionId,
+        refundedMilliunits: STORE_FULL_MILLIUNITS,
+      };
+      await processTopUp(
+        user,
+        1000,
+        {
+          type: 'stripe',
+          stripe_payment_id: storeCreditPaymentId(params.paymentProvider, providerTransactionId),
+        },
+        { skipPostTopUpFreeStuff: true }
+      );
+      await processTopUp(
+        user,
+        1000,
+        { type: 'stripe', stripe_payment_id: crypto.randomUUID() },
+        { skipPostTopUpFreeStuff: true }
+      );
+      if (restoration) await db.transaction(tx => reverseStoreCreditPurchase(tx, params));
+      const started = Promise.withResolvers<number>();
+      let refundWork:
+        | Promise<
+            | Awaited<ReturnType<typeof reverseStoreCreditPurchase>>
+            | Awaited<ReturnType<typeof restoreStoreCreditPurchase>>
+          >
+        | undefined;
+      await db.transaction(async usageTx => {
+        await usageTx
+          .update(kilocode_users)
+          .set({ microdollars_used: toMicrodollars(5) })
+          .where(eq(kilocode_users.id, user.id));
+        refundWork = db.transaction(async refundTx => {
+          const pid = await refundTx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+          started.resolve(pid.rows[0].pid);
+          return restoration
+            ? restoreStoreCreditPurchase(refundTx, params)
+            : reverseStoreCreditPurchase(refundTx, params);
+        });
+        const pid = await started.promise;
+        for (let attempt = 0; attempt < 100; attempt++) {
+          const waiting = await usageTx.execute<{ blocked: boolean }>(
+            sql`SELECT cardinality(pg_blocking_pids(${pid})) > 0 AS blocked`
+          );
+          if (waiting.rows[0].blocked) return;
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        throw new Error('Refund did not reach the account lock');
+      });
+      const result = await refundWork;
+      if (!result) throw new Error('Refund did not start');
+      const refund = await db.query.credit_transactions.findFirst({
+        where: eq(credit_transactions.id, result.creditTransactionId!),
+      });
+      expect(refund!.original_baseline_microdollars_used).toBe(toMicrodollars(5));
+      const current = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      await processLocalExpirations(current!, new Date('2099-01-01T00:00:00Z'));
+      const expired = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(expired!.total_microdollars_acquired - expired!.microdollars_used).toBe(
+        restoration ? 0 : -toMicrodollars(5)
+      );
+    }
+  );
+
   afterEach(() => {
     jest.useRealTimers();
   });

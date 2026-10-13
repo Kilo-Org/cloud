@@ -383,7 +383,10 @@ export async function processTopupForOrganization(
 
   const didInsertCreditTransaction = await db.transaction(async (tx: DrizzleTransaction) => {
     const [currentOrganization] = await tx
-      .select({ microdollarsUsed: organizations.microdollars_used })
+      .select({
+        microdollarsUsed: organizations.microdollars_used,
+        acquired: organizations.total_microdollars_acquired,
+      })
       .from(organizations)
       .where(eq(organizations.id, organizationId))
       .for('no key update');
@@ -406,6 +409,12 @@ export async function processTopupForOrganization(
           ? currentOrganization.microdollarsUsed
           : null,
         expiry_date: expiryDate,
+        debt_repaid_microdollars: expiryDate
+          ? Math.min(
+              creditAmountInMicrodollars,
+              Math.max(0, currentOrganization.microdollarsUsed - currentOrganization.acquired)
+            )
+          : null,
       })
       .onConflictDoNothing();
 

@@ -17,6 +17,33 @@ jest.mock('@kilocode/web-shared/lib/email', () => ({
 }));
 
 describe('processTopUp', () => {
+  test.each([[[300]], [[1000]], [[300, 1000]], [[1000, 1000]]])(
+    'does not expire debt repayment twice for purchases %j',
+    async purchases => {
+      const user = await insertTestUser({
+        total_microdollars_acquired: 0,
+        microdollars_used: 5_000_000,
+      });
+      for (const amount of purchases)
+        await processTopUp(
+          user,
+          amount,
+          { type: 'stripe', stripe_payment_id: crypto.randomUUID() },
+          { skipPostTopUpFreeStuff: true }
+        );
+      const current = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      await processLocalExpirations(current!, new Date('2099-01-01T00:00:00Z'));
+      const expired = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(expired!.total_microdollars_acquired - expired!.microdollars_used).toBe(
+        Math.min(0, purchases.reduce((sum, cents) => sum + cents * 10_000, 0) - 5_000_000)
+      );
+    }
+  );
+
   test.each([false, true])('expires only unused new paid credits (auto=%s)', async isAutoTopUp => {
     const user = await insertTestUser({
       total_microdollars_acquired: 20_000_000,

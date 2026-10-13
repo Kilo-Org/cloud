@@ -779,11 +779,12 @@ async function reverseAppStoreRefundCredits(
     // Reverse what Kilo granted, never the App Store price. Apple returns the full
     // charge to the customer and reverses its own commission, so clawing back the
     // store price would leave a customer who spent nothing at minus the store margin.
-    const reversalAmountMicrodollars = -(await creditRefundAdjustment(
+    const adjustment = await creditRefundAdjustment(
       tx,
       item.creditTransactionId,
       -item.amountMicrodollars
-    ));
+    );
+    const reversalAmountMicrodollars = -adjustment.amountMicrodollars;
 
     if (item.amountMicrodollars <= 0) {
       continue;
@@ -809,7 +810,7 @@ async function reverseAppStoreRefundCredits(
       isFree: item.isFree,
       description: getRefundReversalDescription(item.kind),
       creditCategory: `${APP_STORE_REFUND_CLAWBACK_CATEGORY_PREFIX}${itemKey}${cycle === 0 ? '' : `:r${cycle}`}`,
-      originalBaselineMicrodollarsUsed: user.microdollarsUsed,
+      originalBaselineMicrodollarsUsed: adjustment.microdollarsUsed,
     });
     if (reversal.creditTransactionId) {
       creditTransactionIds.push(reversal.creditTransactionId);
@@ -932,13 +933,17 @@ async function restoreAppStoreRefundCredits(
     if (clawback.amountMicrodollars > 0 || ledger.restoredCycleKeys.has(clawback.cycleKey)) {
       continue;
     }
-    const amountMicrodollars = clawback.originalTransactionId
+    const adjustment = clawback.originalTransactionId
       ? await creditRefundAdjustment(
           tx,
           clawback.originalTransactionId,
           -clawback.amountMicrodollars
         )
-      : -clawback.amountMicrodollars;
+      : {
+          amountMicrodollars: -clawback.amountMicrodollars,
+          microdollarsUsed: user.microdollarsUsed,
+        };
+    const amountMicrodollars = adjustment.amountMicrodollars;
 
     const itemKind = getRefundCycleItemKind(clawback.cycleKey);
     // Cycle key `<tx>:base:<baseCreditTransactionId>[:r<n>]`.
@@ -958,7 +963,7 @@ async function restoreAppStoreRefundCredits(
       isFree: clawback.isFree,
       description: getRefundRestorationDescription(itemKind),
       creditCategory: `${APP_STORE_REFUND_RESTORATION_CATEGORY_PREFIX}${clawback.cycleKey}`,
-      originalBaselineMicrodollarsUsed: user.microdollarsUsed,
+      originalBaselineMicrodollarsUsed: adjustment.microdollarsUsed,
     });
     if (restoration.creditTransactionId) {
       restoredCreditTransactionIds.push(restoration.creditTransactionId);

@@ -1,0 +1,1 @@
+ALTER TABLE "credit_transactions" ADD COLUMN "debt_repaid_microdollars" bigint;

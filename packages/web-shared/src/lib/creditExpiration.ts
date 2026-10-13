@@ -19,7 +19,7 @@ export type ExpiringTransaction = Pick<
   | 'expiry_date'
   | 'description'
   | 'is_free'
-> & { refunded_consumption_microdollars?: number };
+> & { refunded_consumption_microdollars?: number; debt_repaid_microdollars?: number | null };
 
 export type CreditTransactionForBlocks = ExpiringTransaction &
   Pick<CreditTransaction, 'credit_category' | 'original_transaction_id' | 'created_at'> &
@@ -87,10 +87,15 @@ export function computeExpiration(
       (t.refunded_consumption_microdollars ?? 0) -
         (baseline - (t.expiration_baseline_microdollars_used ?? 0))
     );
-    const transactionEnd = baseline + Math.max(t.amount_microdollars, refundedConsumption);
+    const transactionEnd =
+      baseline +
+      Math.max(t.amount_microdollars - (t.debt_repaid_microdollars ?? 0), refundedConsumption);
     const usageEnd = Math.min(transactionEnd, entity.microdollars_used);
     const usage = Math.max(0, usageEnd - baseline);
-    const expiredAmount = Math.max(0, t.amount_microdollars - usage);
+    const expiredAmount = Math.max(
+      0,
+      t.amount_microdollars - (t.debt_repaid_microdollars ?? 0) - usage
+    );
     newTransactions.push({
       kilo_user_id,
       amount_microdollars: expiredAmount === 0 ? 0 : -expiredAmount,
@@ -105,6 +110,19 @@ export function computeExpiration(
       const otherT = sortedByExpiry[laterIndex];
       const otherBaseline =
         newBaselines.get(otherT.id) ?? otherT.expiration_baseline_microdollars_used ?? 0;
+      const otherRefundedConsumption = Math.max(
+        0,
+        (otherT.refunded_consumption_microdollars ?? 0) -
+          (otherBaseline - (otherT.expiration_baseline_microdollars_used ?? 0))
+      );
+      // A consumed refund reserve is historical debt, not movable remaining credit.
+      if (
+        otherRefundedConsumption > 0 &&
+        otherRefundedConsumption >=
+          otherT.amount_microdollars - (otherT.debt_repaid_microdollars ?? 0) &&
+        otherBaseline + otherRefundedConsumption <= baseline
+      )
+        continue;
       const consumedOverlap = Math.min(usage, usageEnd - otherBaseline);
       if (consumedOverlap <= 0) continue;
       newBaselines.set(otherT.id, otherBaseline + consumedOverlap);
@@ -136,7 +154,7 @@ export function applyCreditRefundAdjustments<T extends ExpiringTransaction>(
         consumed = Math.max(
           consumed,
           Math.min(
-            amount,
+            Math.max(0, amount - (transaction.debt_repaid_microdollars ?? 0)),
             Math.max(
               0,
               (refund.original_baseline_microdollars_used ?? 0) -
@@ -165,6 +183,7 @@ export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx =
     .select({
       id: creditTransactionsTable.id,
       amount_microdollars: creditTransactionsTable.amount_microdollars,
+      debt_repaid_microdollars: creditTransactionsTable.debt_repaid_microdollars,
       expiration_baseline_microdollars_used:
         creditTransactionsTable.expiration_baseline_microdollars_used,
       expiry_date: creditTransactionsTable.expiry_date,
@@ -329,6 +348,7 @@ export async function fetchExpiringTransactionsForOrganization(
     .select({
       id: creditTransactionsTable.id,
       amount_microdollars: creditTransactionsTable.amount_microdollars,
+      debt_repaid_microdollars: creditTransactionsTable.debt_repaid_microdollars,
       expiration_baseline_microdollars_used:
         creditTransactionsTable.expiration_baseline_microdollars_used,
       expiry_date: creditTransactionsTable.expiry_date,
@@ -435,6 +455,7 @@ async function fetchExpiringTransactionsForOrganizations(
     .select({
       id: creditTransactionsTable.id,
       amount_microdollars: creditTransactionsTable.amount_microdollars,
+      debt_repaid_microdollars: creditTransactionsTable.debt_repaid_microdollars,
       expiration_baseline_microdollars_used:
         creditTransactionsTable.expiration_baseline_microdollars_used,
       expiry_date: creditTransactionsTable.expiry_date,

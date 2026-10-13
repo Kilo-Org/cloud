@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { paidCreditExpiration } from '@kilocode/web-shared/lib/paid-credit-expiration';
+import { processOrganizationExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import type Stripe from 'stripe';
 import {
   credit_transactions,
@@ -61,7 +62,7 @@ describe('Kilo Pass organization agreement service', () => {
     await db.delete(organizations).where(inArray(organizations.id, ids));
   });
 
-  it('seeds concrete immutable standard terms and activates exactly once with parent remainder', async () => {
+  it.each([0, 5_000_000])('activates exactly once with debt %s', async debt => {
     expect(standardOrgPassTerms).toHaveLength(6);
     expect(
       standardOrgPassTerms
@@ -126,6 +127,10 @@ describe('Kilo Pass organization agreement service', () => {
     const parent = await createOrganization(`kpo-parent-${crypto.randomUUID()}`, owner.id);
     const child = await createOrganization(`kpo-child-${crypto.randomUUID()}`, childOwner.id);
     organizationIds.push(parent.id, child.id);
+    await db
+      .update(organizations)
+      .set({ microdollars_used: debt, microdollars_balance: -debt })
+      .where(eq(organizations.id, parent.id));
     await db
       .update(organizations)
       .set({ parent_organization_id: parent.id })
@@ -199,6 +204,12 @@ describe('Kilo Pass organization agreement service', () => {
         where: eq(organizations.id, credit.organization_id!),
       });
       expect(organization!.next_credit_expiration_at).toBe(credit.expiry_date);
+      expect(credit.debt_repaid_microdollars).toBe(credit.organization_id === parent.id ? debt : 0);
+      await processOrganizationExpirations(organization!, new Date('2099-01-01T00:00:00Z'));
+      const expired = await db.query.organizations.findFirst({
+        where: eq(organizations.id, credit.organization_id!),
+      });
+      expect(expired!.microdollars_balance).toBe(0);
     }
   });
 

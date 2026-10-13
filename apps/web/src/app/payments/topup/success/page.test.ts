@@ -12,6 +12,7 @@ function makeTransaction(overrides: Partial<CreditTransaction> = {}): CreditTran
     description: 'Top-up via stripe',
     original_transaction_id: null,
     refund_for_transaction_id: null,
+    debt_repaid_microdollars: null,
     stripe_payment_id: 'ch_test',
     coinbase_credit_block_id: null,
     credit_category: null,

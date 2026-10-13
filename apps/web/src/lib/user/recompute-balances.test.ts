@@ -239,6 +239,7 @@ describe('recomputeUserBalances', () => {
           is_free: true,
           original_transaction_id: null,
           refund_for_transaction_id: null,
+          debt_repaid_microdollars: null,
         },
       ],
     });
@@ -272,6 +273,7 @@ describe('recomputeUserBalances', () => {
           is_free: true,
           original_transaction_id: null,
           refund_for_transaction_id: null,
+          debt_repaid_microdollars: null,
         },
       ],
     });
@@ -305,6 +307,7 @@ describe('recomputeUserBalances', () => {
           is_free: false,
           original_transaction_id: null,
           refund_for_transaction_id: null,
+          debt_repaid_microdollars: null,
         },
       ],
     });
@@ -360,6 +363,7 @@ describe('recomputeUserBalances', () => {
           is_free: true,
           original_transaction_id: null,
           refund_for_transaction_id: null,
+          debt_repaid_microdollars: null,
         },
         {
           id: 'grant-b',
@@ -372,6 +376,7 @@ describe('recomputeUserBalances', () => {
           is_free: true,
           original_transaction_id: null,
           refund_for_transaction_id: null,
+          debt_repaid_microdollars: null,
         },
         {
           id: 'exp-a',
@@ -384,6 +389,7 @@ describe('recomputeUserBalances', () => {
           is_free: true,
           original_transaction_id: 'grant-a',
           refund_for_transaction_id: null,
+          debt_repaid_microdollars: null,
         },
         {
           id: 'exp-b',
@@ -396,6 +402,7 @@ describe('recomputeUserBalances', () => {
           is_free: true,
           original_transaction_id: 'grant-b',
           refund_for_transaction_id: null,
+          debt_repaid_microdollars: null,
         },
         {
           id: 'grant-c',
@@ -408,6 +415,7 @@ describe('recomputeUserBalances', () => {
           is_free: true,
           original_transaction_id: null,
           refund_for_transaction_id: null,
+          debt_repaid_microdollars: null,
         },
         {
           id: 'grant-d',
@@ -420,6 +428,7 @@ describe('recomputeUserBalances', () => {
           is_free: true,
           original_transaction_id: null,
           refund_for_transaction_id: null,
+          debt_repaid_microdollars: null,
         },
       ],
     });
@@ -564,6 +573,7 @@ describe('recomputeUserBalances', () => {
           is_free: false,
           original_transaction_id: null,
           refund_for_transaction_id: null,
+          debt_repaid_microdollars: null,
         },
       ],
     });

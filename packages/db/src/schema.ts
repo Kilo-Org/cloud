@@ -360,6 +360,7 @@ export const credit_transactions = pgTable(
     description: text(),
     original_transaction_id: uuid(), // Links expiration records to their original credit transaction
     refund_for_transaction_id: uuid(),
+    debt_repaid_microdollars: bigint({ mode: 'number' }), // Consumed at issuance, outside future usage ranges.
     stripe_payment_id: text(),
     coinbase_credit_block_id: text(),
     credit_category: text(),

@@ -98,7 +98,10 @@ export async function processTopUp(
 
   const insertCreditTransactionAndUpdateBalance = async (tx: DrizzleTransaction) => {
     const [currentUser] = await tx
-      .select({ microdollarsUsed: kilocode_users.microdollars_used })
+      .select({
+        microdollarsUsed: kilocode_users.microdollars_used,
+        acquired: kilocode_users.total_microdollars_acquired,
+      })
       .from(kilocode_users)
       .where(eq(kilocode_users.id, user.id))
       .for('no key update');
@@ -108,6 +111,12 @@ export async function processTopUp(
       .insert(credit_transactions)
       .values({
         ...creditTransactionOptions,
+        debt_repaid_microdollars: expiryDate
+          ? Math.min(
+              creditAmountInMicrodollars,
+              Math.max(0, currentUser.microdollarsUsed - currentUser.acquired)
+            )
+          : null,
         original_baseline_microdollars_used: currentUser.microdollarsUsed,
         expiration_baseline_microdollars_used: expiryDate ? currentUser.microdollarsUsed : null,
         expiry_date: expiryDate,

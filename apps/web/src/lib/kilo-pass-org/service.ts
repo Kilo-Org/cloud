@@ -508,7 +508,10 @@ async function grant(
 ) {
   if (input.microdollars === 0) return null;
   const [organization] = await tx
-    .select({ microdollarsUsed: organizations.microdollars_used })
+    .select({
+      microdollarsUsed: organizations.microdollars_used,
+      acquired: organizations.total_microdollars_acquired,
+    })
     .from(organizations)
     .where(eq(organizations.id, input.organizationId))
     .for('update');
@@ -525,6 +528,12 @@ async function grant(
       credit_category: input.identity,
       check_category_uniqueness: true,
       expiry_date: expiresAt ?? null,
+      debt_repaid_microdollars: expiresAt
+        ? Math.min(
+            Math.max(0, input.microdollars),
+            Math.max(0, organization.microdollarsUsed - organization.acquired)
+          )
+        : null,
       expiration_baseline_microdollars_used: expiresAt ? organization.microdollarsUsed : null,
       original_baseline_microdollars_used: organization.microdollarsUsed,
     })

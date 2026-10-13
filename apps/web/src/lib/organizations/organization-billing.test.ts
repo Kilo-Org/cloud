@@ -522,6 +522,35 @@ describe('processTopupForOrganization', () => {
   let testUser: User;
   let testOrganization: Organization;
 
+  test('debt repayment cannot expire or overlap subsequent consumption', async () => {
+    await db
+      .update(organizations)
+      .set({
+        total_microdollars_acquired: 0,
+        microdollars_used: 5_000_000,
+        microdollars_balance: -5_000_000,
+      })
+      .where(eq(organizations.id, testOrganization.id));
+    for (let index = 0; index < 2; index++)
+      await processTopupForOrganization(SYSTEM_AUTO_TOP_UP_USER_ID, testOrganization.id, 1000, {
+        type: 'stripe',
+        stripe_payment_id: crypto.randomUUID(),
+      });
+    await db
+      .update(organizations)
+      .set({ microdollars_used: 8_000_000, microdollars_balance: 12_000_000 })
+      .where(eq(organizations.id, testOrganization.id));
+    const current = await db.query.organizations.findFirst({
+      where: eq(organizations.id, testOrganization.id),
+    });
+    await processOrganizationExpirations(current!, new Date('2099-01-01T00:00:00Z'));
+    const expired = await db.query.organizations.findFirst({
+      where: eq(organizations.id, testOrganization.id),
+    });
+    expect(expired!.microdollars_balance).toBe(0);
+    expect(expired!.total_microdollars_acquired - expired!.microdollars_used).toBe(0);
+  });
+
   test('keeps legacy grants unchanged and preserves earlier scheduled expiry', async () => {
     const earlier = new Date(Date.now() + 86400_000).toISOString();
     await db

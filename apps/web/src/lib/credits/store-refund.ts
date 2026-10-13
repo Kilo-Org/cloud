@@ -253,7 +253,6 @@ type StoreCreditRefundCycle = {
   amountMicrodollars: number;
   isFree: boolean;
   kiloUserId: string;
-  microdollarsUsed: number;
 };
 
 /**
@@ -290,10 +289,8 @@ async function findStoreCreditRefundCycles(
       creditCategory: credit_transactions.credit_category,
       isFree: credit_transactions.is_free,
       kiloUserId: credit_transactions.kilo_user_id,
-      microdollarsUsed: kilocode_users.microdollars_used,
     })
     .from(credit_transactions)
-    .innerJoin(kilocode_users, eq(credit_transactions.kilo_user_id, kilocode_users.id))
     .where(
       and(
         // A purchase has one owner and its clawback and restoration rows are
@@ -313,7 +310,6 @@ async function findStoreCreditRefundCycles(
       amountMicrodollars: row.amountMicrodollars,
       isFree: row.isFree,
       kiloUserId: row.kiloUserId,
-      microdollarsUsed: row.microdollarsUsed,
     };
     const isClawback =
       row.creditCategory === clawbackPrefix ||
@@ -443,11 +439,12 @@ export async function reverseStoreCreditPurchase(
     ...params,
     cycle: clawbacks.length + 1,
   });
-  const reversalMicrodollars = -(await creditRefundAdjustment(
+  const adjustment = await creditRefundAdjustment(
     tx,
     granted.creditTransactionId,
     -requestedReversalMicrodollars
-  ));
+  );
+  const reversalMicrodollars = -adjustment.amountMicrodollars;
   const insertResult = await tx
     .insert(credit_transactions)
     .values({
@@ -460,7 +457,7 @@ export async function reverseStoreCreditPurchase(
       description: creditPackReversalDescription(params.paymentProvider),
       credit_category: creditCategory,
       check_category_uniqueness: true,
-      original_baseline_microdollars_used: granted.microdollarsUsed,
+      original_baseline_microdollars_used: adjustment.microdollarsUsed,
     })
     .onConflictDoNothing();
 
@@ -544,11 +541,12 @@ export async function restoreStoreCreditPurchase(
     };
   }
 
-  const amountMicrodollars = await creditRefundAdjustment(
+  const adjustment = await creditRefundAdjustment(
     tx,
     granted.creditTransactionId,
     -clawback.amountMicrodollars
   );
+  const amountMicrodollars = adjustment.amountMicrodollars;
   const creditTransactionId = crypto.randomUUID();
   const creditCategory = storeCreditRefundReversalCategory({
     ...params,
@@ -566,7 +564,7 @@ export async function restoreStoreCreditPurchase(
       description: creditPackRestorationDescription(params.paymentProvider),
       credit_category: creditCategory,
       check_category_uniqueness: true,
-      original_baseline_microdollars_used: clawback.microdollarsUsed,
+      original_baseline_microdollars_used: adjustment.microdollarsUsed,
     })
     .onConflictDoNothing();
 

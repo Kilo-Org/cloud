@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useCallback } from 'react';
-import { Scissors, Image, FileText, AlertCircle, Clock, LoaderCircle } from 'lucide-react';
+import React, { useCallback, useState } from 'react';
+import { Scissors, Image, FileText, AlertCircle, Clock, LoaderCircle, RotateCcw } from 'lucide-react';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { MessageDeliveryState } from '@kilocode/cloud-agent-sdk';
@@ -379,10 +379,13 @@ export function MessageBubble({
   isSending,
   getChildMessages,
   onOpenChildSession,
+  onRetryMessage,
+  onCopyToComposer,
 }: MessageBubbleProps) {
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
   const timestamp = displayTimestamp ?? message.info.time.created;
   const deliveryBadge = getDeliveryBadge(deliveryState, { sending: isSending });
+  const failure = selectMessageFailure({ deliveryState, info: message.info });
 
   const getTextForCopy = useCallback(
     () =>

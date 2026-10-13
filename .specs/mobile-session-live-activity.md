@@ -134,15 +134,16 @@ its turn, or when the user loses access to the session.
    last-known time when the content is out of date), the status row (the
    state label, the state time, and the controls), and one merged detail
    row. Every row is one line, and no row wraps.
-2. The merged detail row carries, in order of importance, the state's own
-   line (the current step, the quiet warning, "Wants to run" with the
-   command, or the stop reason) and then the compact facts: the plan
-   count, the diff size, and the file count. The cost joins them only on a
-   finished or failed card.
-3. When a state's own line needs the whole row, it keeps the row and the
-   compact facts move to the expanded view. A `failed` card is that case:
-   the stop reason takes the row alone, because a truncated reason names
-   nothing.
+2. The merged detail row carries the state's own line: the current step,
+   the quiet warning, the command a permission wait runs, or the stop
+   reason. The compact facts — the plan count, the diff size, and the file
+   count — follow it on the same row while the row has room. The cost
+   joins them only on a finished or failed card.
+3. When the state's own line needs the whole row, it keeps the row and the
+   compact facts move to the expanded view. Two states are that case: a
+   `failed` card, whose stop reason names nothing when it is cut, and a
+   permission wait, whose command must read in full beside the Approve
+   control.
 4. The expanded view MUST show the full set: the rows above, the plan bar
    and the current step's name, and the cost.
 5. The status label and every number MUST NOT truncate in either view.

@@ -286,6 +286,31 @@ function byokErrorMessage(
   return byokErrorMessages[status];
 }
 
+const byokUpstreamErrorSchema = z.object({
+  error: z.object({ message: z.string() }).optional().catch(undefined),
+  message: z.string().optional().catch(undefined),
+});
+
+async function genericByokErrorResponse(response: Response) {
+  const body: unknown = await response
+    .clone()
+    .json()
+    .catch(() => null);
+  const parsed = byokUpstreamErrorSchema.safeParse(body);
+  const providerMessage = parsed.success ? (parsed.data.error?.message ?? parsed.data.message) : '';
+  const message = providerMessage
+    ?.replace(/\p{Cc}/gu, ' ')
+    .trim()
+    .slice(0, 300);
+  const error = message
+    ? `[BYOK] ${message}`
+    : '[BYOK] Your provider rejected the request. Check your provider account and settings.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: response.status }
+  );
+}
+
 function vertexByokModelNotFoundResponse(
   response: Response,
   userByokProviderIds: UserByokProviderId[] | null
@@ -390,6 +415,10 @@ export async function makeErrorReadable({
 
   const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
   if (overflowResponse) return overflowResponse;
+
+  if (userByokProviderIds !== null && response.status < 500) {
+    return genericByokErrorResponse(response);
+  }
 
   if (shouldRedactErrorResponse(providerId, requestedModel)) {
     return await redactedErrorResponse(response);

@@ -1073,5 +1073,6 @@ export async function handleLlmProxyRequest(
     kind: requestBodyParsed.kind,
     logging: requestLogging,
     responseTransforms: effectiveProviderContext.provider.responseTransforms,
+    userByok: usageContext.user_byok,
   });
 }

@@ -157,7 +157,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
   ])('returns structured JSON for %s', async (errorName, errorType, messageFragment) => {
     const result = await rewrite({
       response: failingResponse('application/json', errorName),
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture: null,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -176,7 +176,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     async reasoningEffort => {
       const result = await rewrite({
         response: failingResponse('application/json', 'TimeoutError'),
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort,
@@ -193,7 +193,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
   test('includes the vercel request id only in the JSON read error message', async () => {
     const result = await rewrite({
       response: failingResponse('application/json', 'ResponseAborted'),
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture: null,
       vercelRequestId: 'iad1::iad1::request-id',
       reasoningEffort: null,
@@ -212,7 +212,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
   test('includes the vercel request id only in the stream error message', async () => {
     const result = await rewrite({
       response: failingResponse('text/event-stream', 'ResponseAborted'),
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture: null,
       vercelRequestId: 'iad1::iad1::request-id',
       reasoningEffort: null,
@@ -231,7 +231,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
   test('omits the request id suffix when no vercel request id is available', async () => {
     const result = await rewrite({
       response: failingResponse('text/event-stream', 'ResponseAborted'),
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture: null,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -250,7 +250,7 @@ describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
     async contentType => {
       const result = await rewrite({
         response: failingResponse(contentType, new UpstreamTimeoutError(600_000, 5_000)),
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: 'iad1::iad1::request-id',
         reasoningEffort: null,
@@ -332,6 +332,7 @@ describe.each(timeoutEffortRequests)('$name timeout effort guidance', ({ request
         request,
       },
       responseTransforms: null,
+      userByok: false,
     });
     const expectedMessage =
       (errorName === 'TimeoutError'
@@ -375,7 +376,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -405,7 +406,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -425,7 +426,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -451,7 +452,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -487,7 +488,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -515,7 +516,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -551,7 +552,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       try {
         const result = await rewriteModelResponse_ChatCompletions({
           response: upstream,
-          removeCost: true,
+          usageCost: { type: 'remove' },
           capture: null,
           vercelRequestId: null,
           reasoningEffort: null,
@@ -583,7 +584,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -606,7 +607,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -632,7 +633,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -682,7 +683,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -713,7 +714,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -745,7 +746,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -767,7 +768,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture,
         vercelRequestId: 'iad1::terminal-request',
         reasoningEffort: null,
@@ -798,7 +799,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -829,7 +830,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -848,7 +849,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -871,7 +872,7 @@ describe('rewriteModelResponse_Messages', () => {
         errorName,
         'data: {"type":"message_start","message":{"id":"gen-message","usage":{"input_tokens":1,"output_tokens":0}}}\n\n'
       ),
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture: null,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -914,7 +915,7 @@ describe('rewriteModelResponse_Messages', () => {
 
     const result = await rewriteModelResponse_Messages({
       response: upstream,
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture: null,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -936,7 +937,7 @@ describe('rewriteModelResponse_Messages', () => {
 
     const result = await rewriteModelResponse_Messages({
       response: upstream,
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture: null,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -955,7 +956,7 @@ describe('rewriteModelResponse_Messages', () => {
 
     const result = await rewriteModelResponse_Messages({
       response: upstream,
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture: null,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -990,7 +991,7 @@ describe('rewriteModelResponse_Messages', () => {
 
     const result = await rewriteModelResponse_Messages({
       response: upstream,
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture: null,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -1009,7 +1010,7 @@ describe('rewriteModelResponse_Messages', () => {
 
     const result = await rewriteModelResponse_Messages({
       response: upstream,
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -1041,7 +1042,7 @@ describe('rewriteModelResponse_Messages', () => {
 
     const result = await rewriteModelResponse_Messages({
       response: upstream,
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -1067,7 +1068,7 @@ describe('rewriteModelResponse_Responses', () => {
         errorName,
         'data: {"type":"response.created","sequence_number":4,"response":{"id":"gen-response"}}\n\n'
       ),
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture: null,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -1110,7 +1111,7 @@ describe('rewriteModelResponse_Responses', () => {
 
     const result = await rewriteModelResponse_Responses({
       response: upstream,
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture: null,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -1132,7 +1133,7 @@ describe('rewriteModelResponse_Responses', () => {
 
     const result = await rewriteModelResponse_Responses({
       response: upstream,
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture: null,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -1169,7 +1170,7 @@ describe('rewriteModelResponse_Responses', () => {
 
       const result = await rewriteModelResponse_Responses({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -1228,7 +1229,7 @@ describe.each([
 
       const result = await rewrite({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture,
         vercelRequestId: 'iad1::error-request',
         reasoningEffort: null,
@@ -1335,6 +1336,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       logging: makeLogging({ organization_id: KILO_ORGANIZATION_ID }),
       responseTransforms: null,
+      userByok: false,
     });
 
     expect(result).not.toBeNull();
@@ -1362,6 +1364,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       logging: makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
       responseTransforms: null,
+      userByok: false,
     });
 
     expect(await result.json()).toMatchObject({
@@ -1384,6 +1387,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       logging: makeLogging(),
       responseTransforms: null,
+      userByok: false,
     });
 
     expect(result).not.toBeNull();
@@ -1393,24 +1397,161 @@ describe('rewriteModelResponse', () => {
     });
   });
 
-  test('strips cost for models with custom pricing', async () => {
+  test('reports the custom-priced cost instead of the upstream cost', async () => {
     const result = await rewriteModelResponse({
       response: jsonResponse({
         model: GEMINI_FLASH_CURRENT_MODEL_ID,
-        usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
+        usage: {
+          cost: 0.5,
+          cost_details: { upstream_inference_cost: 0.4 },
+          is_byok: false,
+          prompt_tokens: 1_000,
+          prompt_tokens_details: { cached_tokens: 200 },
+          completion_tokens: 100,
+          total_tokens: 1_100,
+        },
       }),
       model: GEMINI_FLASH_CURRENT_MODEL_ID,
       providerId: 'openrouter',
       kind: 'chat_completions',
       logging: makeLogging(),
       responseTransforms: null,
+      userByok: false,
     });
 
-    // The upstream-reported cost does not reflect the custom pricing, so it
-    // must be removed just like for free models.
+    expect(await result.json()).toEqual({
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      usage: {
+        prompt_tokens: 1_000,
+        prompt_tokens_details: { cached_tokens: 200 },
+        completion_tokens: 100,
+        total_tokens: 1_100,
+        cost: Math.round(800 * 0.75 + 200 * 0.075 + 100 * 3.75) / 1_000_000,
+      },
+    });
+  });
+
+  test('reports the custom-priced cost for providers that do not report a cost', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
+        model: GEMINI_FLASH_CURRENT_MODEL_ID,
+        usage: { prompt_tokens: 1_000, completion_tokens: 100, total_tokens: 1_100 },
+      }),
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      providerId: 'inception',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+      userByok: false,
+    });
+
+    expect((await result.json()).usage.cost).toBe(
+      Math.round(1_000 * 0.75 + 100 * 3.75) / 1_000_000
+    );
+  });
+
+  test('strips cost for custom-priced BYOK requests, which are not billed', async () => {
+    const result = await rewriteModelResponse({
+      response: jsonResponse({
+        model: GEMINI_FLASH_CURRENT_MODEL_ID,
+        usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: true },
+      }),
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+      userByok: true,
+    });
+
     expect(await result.json()).toEqual({
       model: GEMINI_FLASH_CURRENT_MODEL_ID,
       usage: {},
+    });
+  });
+
+  test('reports the custom-priced cost in the streamed Chat Completions usage chunk', async () => {
+    const result = await rewriteModelResponse({
+      response: sseResponse(
+        'data: {"id":"gen-1","choices":[{"delta":{"content":"hi"}}]}\n\n' +
+          'data: {"id":"gen-1","choices":[],"usage":{"cost":0.5,"cost_details":{"upstream_inference_cost":0.4},"is_byok":false,"prompt_tokens":1000,"prompt_tokens_details":{"cached_tokens":0,"cache_write_tokens":300},"completion_tokens":10,"total_tokens":1010}}\n\n' +
+          'data: [DONE]\n\n'
+      ),
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      providerId: 'openrouter',
+      kind: 'chat_completions',
+      logging: makeLogging(),
+      responseTransforms: null,
+      userByok: false,
+    });
+
+    const [, usageChunk] = dataObjects(await readOutputStream(result)) as Array<{
+      usage?: Record<string, unknown>;
+    }>;
+    expect(usageChunk.usage).toEqual({
+      prompt_tokens: 1_000,
+      prompt_tokens_details: { cached_tokens: 0, cache_write_tokens: 300 },
+      completion_tokens: 10,
+      total_tokens: 1_010,
+      cost: Math.round(700 * 0.75 + 300 * 0.0416666666667 + 10 * 3.75) / 1_000_000,
+    });
+  });
+
+  test('reports the custom-priced cost in the completed Responses event', async () => {
+    const result = await rewriteModelResponse({
+      response: sseResponse(
+        'event: response.completed\n' +
+          'data: {"type":"response.completed","response":{"id":"resp_1","usage":{"cost":0.5,"is_byok":false,"input_tokens":1000,"input_tokens_details":{"cached_tokens":400},"output_tokens":20,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":1020}}}\n\n'
+      ),
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      providerId: 'openrouter',
+      kind: 'responses',
+      logging: makeLogging(),
+      responseTransforms: null,
+      userByok: false,
+    });
+
+    const [event] = dataObjects(await readOutputStream(result)) as Array<{
+      response: { usage: Record<string, unknown> };
+    }>;
+    expect(event.response.usage.is_byok).toBeUndefined();
+    expect(event.response.usage.cost).toBe(
+      Math.round(600 * 0.75 + 400 * 0.075 + 20 * 3.75) / 1_000_000
+    );
+  });
+
+  test('reports the custom-priced cost only in the final Messages usage', async () => {
+    const result = await rewriteModelResponse({
+      response: sseResponse(
+        'event: message_start\n' +
+          'data: {"type":"message_start","message":{"id":"msg_1","usage":{"input_tokens":800,"cache_read_input_tokens":200,"output_tokens":1,"cost":0.1,"is_byok":false}}}\n\n' +
+          'event: message_delta\n' +
+          'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":800,"cache_read_input_tokens":200,"output_tokens":100,"cost":0.5,"is_byok":false}}\n\n' +
+          'event: message_stop\n' +
+          'data: {"type":"message_stop"}\n\n'
+      ),
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      providerId: 'openrouter',
+      kind: 'messages',
+      logging: makeLogging(),
+      responseTransforms: null,
+      userByok: false,
+    });
+
+    const [start, delta] = dataObjects(await readOutputStream(result)) as [
+      { message: { usage: Record<string, unknown> } },
+      { usage: Record<string, unknown> },
+    ];
+    expect(start.message.usage).toEqual({
+      input_tokens: 800,
+      cache_read_input_tokens: 200,
+      output_tokens: 1,
+    });
+    expect(delta.usage).toEqual({
+      input_tokens: 800,
+      cache_read_input_tokens: 200,
+      output_tokens: 100,
+      cost: Math.round(800 * 0.75 + 200 * 0.075 + 100 * 3.75) / 1_000_000,
     });
   });
 
@@ -1423,6 +1564,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       logging: makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' }),
       responseTransforms: null,
+      userByok: false,
     });
 
     expect(result).not.toBeNull();
@@ -1437,6 +1579,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       logging: makeLogging(),
       responseTransforms: null,
+      userByok: false,
     });
 
     expect(mockedAfter).not.toHaveBeenCalled();
@@ -1455,6 +1598,7 @@ describe('rewriteModelResponse', () => {
           user: { id: 'test-user', google_user_email: email } as RequestLoggingParams['user'],
         }),
         responseTransforms: null,
+        userByok: false,
       });
 
       expect(mockedAfter).not.toHaveBeenCalled();
@@ -1470,6 +1614,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       logging: makeLogging(),
       responseTransforms: null,
+      userByok: false,
     });
 
     expect(mockedAfter).not.toHaveBeenCalled();
@@ -1485,6 +1630,7 @@ describe('rewriteModelResponse', () => {
       kind: 'chat_completions',
       logging: makeLogging(),
       responseTransforms: null,
+      userByok: false,
     });
 
     expect(mockedAfter).toHaveBeenCalledTimes(1);
@@ -1629,7 +1775,7 @@ describe('request log capture', () => {
 
     const result = await rewrite({
       response: jsonResponse(body),
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -1648,7 +1794,7 @@ describe('request log capture', () => {
 
     const result = await rewrite({
       response: sseResponse(sseBody),
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -1667,7 +1813,7 @@ describe('request log capture', () => {
 
       const result = await rewrite({
         response: new Response(null, { headers: { 'content-type': 'text/event-stream' } }),
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -1687,7 +1833,7 @@ describe('request log capture', () => {
 
       const result = await rewrite({
         response: failingResponse('text/event-stream', 'ResponseAborted', receivedChunks),
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -1707,7 +1853,7 @@ describe('request log capture', () => {
 
       const result = await rewrite({
         response: failingResponse('text/event-stream', 'ResponseAborted'),
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -1727,7 +1873,7 @@ describe('request log capture', () => {
 
       const result = await rewrite({
         response: failingResponse('application/json', 'TimeoutError'),
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -1747,7 +1893,7 @@ describe('request log capture', () => {
 
     const result = await rewriteModelResponse_ChatCompletions({
       response: upstream,
-      removeCost: true,
+      usageCost: { type: 'remove' },
       capture,
       vercelRequestId: null,
       reasoningEffort: null,
@@ -1769,7 +1915,7 @@ describe('request log capture', () => {
 
       const result = await rewrite({
         response: upstream,
-        removeCost: true,
+        usageCost: { type: 'remove' },
         capture,
         vercelRequestId: null,
         reasoningEffort: null,

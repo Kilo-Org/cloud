@@ -19,6 +19,7 @@ import {
   extractVercelUpstreamId,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
+import { messagesUsageTokenCounts } from '@kilocode/web-shared/lib/ai-gateway/usage-token-counts';
 import type Anthropic from '@anthropic-ai/sdk';
 
 type MaybeHasVercelProviderMetadata = {
@@ -65,10 +66,8 @@ export function processMessagesApiUsage(
   providerMetadata: VercelProviderMetaData | null | undefined,
   coreProps: NotYetCostedUsageStats
 ): JustTheCostsUsageStats {
-  const cacheHitTokens = usage?.cache_read_input_tokens ?? 0;
-  const cacheWriteTokens = usage?.cache_creation_input_tokens ?? 0;
-  const inputTokens = (usage?.input_tokens ?? 0) + cacheHitTokens + cacheWriteTokens;
-  const outputTokens = usage?.output_tokens ?? 0;
+  const { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens } =
+    messagesUsageTokenCounts(usage);
 
   // OpenRouter path: cost fields are present directly in usage
   if (usage?.cost != null || usage?.is_byok != null) {

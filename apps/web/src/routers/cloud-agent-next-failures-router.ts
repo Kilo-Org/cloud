@@ -1,6 +1,6 @@
 import 'server-only';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { and, eq, sql } from 'drizzle-orm';

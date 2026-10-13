@@ -1,6 +1,6 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   cloud_agent_session_runs,
   cloud_agent_sessions,
@@ -135,6 +135,7 @@ describe('cloudAgentNextFailuresRouter', () => {
     await db.insert(organization_memberships).values({
       kilo_user_id: owner.id,
       organization_id: organization.id,
+      role: 'owner',
     });
   });
 

@@ -2180,6 +2180,11 @@
       "collapse": "Plega l'objectiu",
       "expand": "Desplega l'objectiu"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Objectius, {{completed}} de {{total}} completats",
+      "rowAccessibility": "Objectius, {{completed}} de {{total}} completats. Objectiu actual: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Utilitzats recentment",
       "couldNotLoadGithubRepositories": "No s'han pogut carregar els repositoris de GitHub.",
@@ -2235,6 +2240,10 @@
       "importingSession": "Important la sessió…",
       "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Tria Cloud Agent o un altre CLI.",
       "importFailed": "No s'ha pogut importar aquesta sessió.",
+      "cliCannotFork": "Actualitza el CLI de Kilo per bifurcar des d'un missatge.",
+      "forkCutNotSynced": "Aquest missatge encara no s'ha desat. Torna-ho a provar d'aquí a un moment.",
+      "forkFilesFromBaseBranch": "Els fitxers parteixen de la branca base.",
+      "forkFilesUnchangedOnComputer": "Els fitxers d'aquest ordinador no es modifiquen.",
       "pickProfile": "Tria un perfil",
       "noProfile": "Sense perfil",
       "manageProfiles": "Gestionar perfils",
@@ -2354,6 +2363,7 @@
       "copyMessage": "Copia el missatge",
       "copyText": "Copia el text",
       "selectText": "Selecciona el text",
+      "forkFromHere": "Bifurca des d'aquí",
       "reportAiResponse": "Denuncia la resposta de la IA",
       "reportAiResponseConfirm": "Vols denunciar aquesta resposta perquè es revisi?",
       "report": "Denuncia",
@@ -3230,6 +3240,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Aquest model necessita connexió a internet. Connecta't i torna-ho a provar, o canvia a un model d'aquest dispositiu.",
     "empty": {
       "title": "Comença un xat",
       "description": "Envia un missatge per parlar amb un model."
@@ -3253,6 +3264,11 @@
       "localNote": "Els models al dispositiu s'executen en aquest dispositiu. No tenen cost ni memòria cau de peticions, i els seus recomptes de tòkens poden ser estimacions.",
       "countedSinceNote": "Aquest xat va començar abans que es registrés l'ús. Els totals només mostren les respostes posteriors.",
       "remoteServersOn": "Servidors MCP remots activats"
+    },
+    "webSearch": {
+      "title": "Cerca al web",
+      "description": "Permet que aquest xat busqui informació actual a través del teu compte de Kilo. Les cerques fan servir la teva quota mensual de cerques.",
+      "allowanceExhausted": "Has esgotat les cerques web gratuïtes d'aquest mes. Afegeix crèdits per tornar a cercar."
     },
     "mcp": {
       "title": "Eines de Kilo",
@@ -3379,8 +3395,48 @@
         "notGguf": "L'enllaç ha d'apuntar a un fitxer .gguf.",
         "space": "No hi ha prou espai d'emmagatzematge lliure per a aquest model. Allibera espai i torna-ho a provar.",
         "network": "La descàrrega no s'ha acabat. Comprova la connexió i torna-ho a provar.",
-        "invalidFile": "El fitxer descarregat no és un model que aquesta aplicació pugui executar, així que s'ha eliminat."
+        "invalidFile": "El fitxer descarregat no és un model que aquesta aplicació pugui executar, així que s'ha eliminat.",
+        "checksum": "El fitxer descarregat no coincideix amb la suma de verificació publicada, així que s'ha eliminat. Torna a provar la descàrrega."
       }
+    },
+    "catalog": {
+      "browse": "Explora models",
+      "title": "Catàleg de models",
+      "search": "Cerca models de Hugging Face",
+      "tabs": "Filtre de models",
+      "fitsTab": "Compatibles amb aquest dispositiu",
+      "fromHuggingFace": "De Hugging Face",
+      "loading": "S'estan carregant els models",
+      "noResults": "No s'ha trobat cap model",
+      "noFits": "Cap model no cap en aquest dispositiu",
+      "noFitsDescription": "Els models més grans són a la pestanya $t(common.all).",
+      "fit": {
+        "fits": "Hi cap",
+        "tight": "Just",
+        "tooLarge": "Massa gran",
+        "noStorage": "No hi ha prou espai"
+      },
+      "parameters": "Paràmetres: {{value}}",
+      "downloads": "Baixades: {{value}}",
+      "likes": "M'agrada: {{value}}",
+      "context": "Finestra de context: {{value}}",
+      "license": "Llicència: {{license}}",
+      "licenseUnknown": "No s'indica la llicència",
+      "tools": "Crida d'eines",
+      "vision": "Entrada d'imatges",
+      "hintsHelp": "Indicacions de Hugging Face. L'aplicació comprova el model després de descarregar-lo.",
+      "gated": "Aquest model requereix un compte de Hugging Face, així que l'aplicació no el pot descarregar.",
+      "quantizations": "Quantitzacions",
+      "quantizationsHelp": "Els fitxers més petits fan servir menys memòria i espai. Els més grans solen donar millors respostes.",
+      "quantDetail": "Descàrrega de {{size}} · uns {{memory}} de memòria",
+      "downloadQuant": "Descarrega {{quant}}",
+      "loadingModel": "S'estan carregant els detalls del model",
+      "couldNotLoadModel": "No s'ha pogut carregar aquest model",
+      "noFiles": "No hi ha fitxers que aquesta aplicació pugui executar",
+      "noFilesDescription": "Aquesta aplicació executa models que consten d'un sol fitxer GGUF.",
+      "tooLargeTitle": "És possible que aquest model no funcioni",
+      "tooLargeMessage": "Probablement {{name}} necessita més memòria de la que té aquest dispositiu. L'aplicació es pot tancar mentre el model respon. Vols descarregar-lo igualment?",
+      "downloadAnyway": "Descarrega igualment"
     },
     "localModels": {
       "title": "Models al dispositiu",

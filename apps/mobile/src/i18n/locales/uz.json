@@ -2152,6 +2152,11 @@
       "collapse": "Maqsadni yig'ish",
       "expand": "Maqsadni yoyish"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Vazifalar, {{total}} tadan {{completed}} tasi bajarildi",
+      "rowAccessibility": "Vazifalar, {{total}} tadan {{completed}} tasi bajarildi. Joriy vazifa: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Yaqinda ishlatilgan",
       "couldNotLoadGithubRepositories": "GitHub repozitoriyalarini yuklab bo'lmadi.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Sessiya import qilinmoqda",
       "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent xizmatini yoki boshqa CLI dasturini tanlang.",
       "importFailed": "Bu sessiyani import qilib bo'lmadi.",
+      "cliCannotFork": "Xabardan tarmoqlash uchun Kilo CLI dasturini yangilang.",
+      "forkCutNotSynced": "Bu xabar hali saqlanmagan. Birozdan so'ng qayta urinib ko'ring.",
+      "forkFilesFromBaseBranch": "Fayllar asosiy branchdan boshlanadi.",
+      "forkFilesUnchangedOnComputer": "Bu kompyuterdagi fayllar o'zgartirilmaydi.",
       "pickProfile": "Profilni tanlang",
       "noProfile": "Profil yo'q",
       "manageProfiles": "Profillarni boshqarish",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Xabarni nusxalash",
       "copyText": "Matnni nusxalash",
       "selectText": "Matnni tanlash",
+      "forkFromHere": "Shu yerdan tarmoqlash",
       "reportAiResponse": "AI javobi haqida shikoyat qilish",
       "reportAiResponseConfirm": "Bu javob tekshirish uchun yuborilsinmi?",
       "report": "Shikoyat qilish",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Qo'llanma"
   },
   "modelChat": {
+    "offlineFailure": "Bu model internet aloqasini talab qiladi. Ulaning va qaytadan urinib ko'ring yoki ushbu qurilmadagi modelga o'ting.",
     "empty": {
       "title": "Suhbatni boshlang",
       "description": "Model bilan gaplashish uchun xabar yuboring."
@@ -3212,6 +3223,11 @@
       "localNote": "Qurilmadagi modellar shu qurilmada ishlaydi. Ularda xarajat ham, so'rov keshi ham yo'q, token soni esa taxminiy bo'lishi mumkin.",
       "countedSinceNote": "Bu suhbat foydalanish qayd etila boshlanishidan oldin boshlangan. Jami qiymatlar faqat undan keyingi javoblarni ko'rsatadi.",
       "remoteServersOn": "Yoqilgan masofaviy MCP serverlari"
+    },
+    "webSearch": {
+      "title": "Internetdan qidirish",
+      "description": "Bu chatga Kilo hisobingiz orqali dolzarb ma’lumot qidirishga ruxsat bering. Qidiruvlar oylik qidiruv limitingizdan foydalanadi.",
+      "allowanceExhausted": "Bu oy uchun bepul veb qidiruvlaringiz tugadi. Qayta qidirish uchun kredit qo‘shing."
     },
     "mcp": {
       "title": "Kilo vositalari",
@@ -3338,8 +3354,48 @@
         "notGguf": "Havola .gguf faylga ishora qilishi kerak.",
         "space": "Bu model uchun yetarli bo‘sh joy yo‘q. Joy bo‘shatib, qayta urinib ko‘ring.",
         "network": "Yuklab olish tugallanmadi. Ulanishni tekshirib, qayta urinib ko‘ring.",
-        "invalidFile": "Yuklab olingan fayl bu ilova ishga tushira oladigan model emas, shuning uchun u o‘chirildi."
+        "invalidFile": "Yuklab olingan fayl bu ilova ishga tushira oladigan model emas, shuning uchun u o‘chirildi.",
+        "checksum": "Yuklab olingan fayl e’lon qilingan nazorat summasiga mos kelmaydi, shuning uchun u o‘chirildi. Qayta yuklab olib ko‘ring."
       }
+    },
+    "catalog": {
+      "browse": "Modellarni ko‘rish",
+      "title": "Modellar katalogi",
+      "search": "Hugging Face modellarini qidirish",
+      "tabs": "Model filtri",
+      "fitsTab": "Bu qurilmaga mos",
+      "fromHuggingFace": "Hugging Face’dan",
+      "loading": "Modellar yuklanmoqda",
+      "noResults": "Hech qanday model topilmadi",
+      "noFits": "Bu qurilmaga mos model yo‘q",
+      "noFitsDescription": "Kattaroq modellar “$t(common.all)” bo‘limida.",
+      "fit": {
+        "fits": "Mos",
+        "tight": "Zo‘rg‘a sig‘adi",
+        "tooLarge": "Juda katta",
+        "noStorage": "Xotira yetarli emas"
+      },
+      "parameters": "Parametrlar: {{value}}",
+      "downloads": "Yuklab olishlar: {{value}}",
+      "likes": "Yoqtirishlar: {{value}}",
+      "context": "Kontekst oynasi: {{value}}",
+      "license": "Litsenziya: {{license}}",
+      "licenseUnknown": "Litsenziya ko‘rsatilmagan",
+      "tools": "Vositalarni chaqirish",
+      "vision": "Rasm kiritish",
+      "hintsHelp": "Hugging Face’dan olingan maslahatlar. Ilova modelni yuklab olingandan keyin tekshiradi.",
+      "gated": "Bu model uchun Hugging Face hisobi kerak, shuning uchun ilova uni yuklab ololmaydi.",
+      "quantizations": "Kvantlashlar",
+      "quantizationsHelp": "Kichikroq fayllar kamroq operativ va doimiy xotira egallaydi. Kattaroq fayllar odatda yaxshiroq javob beradi.",
+      "quantDetail": "Yuklab olish: {{size}} · taxminan {{memory}} operativ xotira",
+      "downloadQuant": "{{quant}} yuklab olish",
+      "loadingModel": "Model tafsilotlari yuklanmoqda",
+      "couldNotLoadModel": "Bu modelni yuklab bo‘lmadi",
+      "noFiles": "Bu ilova ishga tushira oladigan fayllar yo‘q",
+      "noFilesDescription": "Bu ilova bitta GGUF faylidan iborat modellarni ishga tushiradi.",
+      "tooLargeTitle": "Bu model ishlamasligi mumkin",
+      "tooLargeMessage": "{{name}} uchun bu qurilmadagidan ko‘proq operativ xotira kerak bo‘lishi mumkin. Model javob berayotganda ilova yopilib qolishi mumkin. Baribir yuklab olinsinmi?",
+      "downloadAnyway": "Baribir yuklab olish"
     },
     "localModels": {
       "title": "Qurilmadagi modellar",

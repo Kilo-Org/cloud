@@ -67,6 +67,12 @@ export type UseCloudAgentAttachmentUploadReturn = {
   addFiles: (files: FileList | File[]) => void;
   removeAttachment: (attachmentId: string) => void;
   clearAttachments: () => void;
+  /**
+   * Swap the visible attachments for another conversation's snapshot. In-flight
+   * uploads for the outgoing list are aborted, but their pending-ledger rows are
+   * NOT released: the snapshot that owns them must decide that on settlement.
+   */
+  replaceAttachments: (attachments: CloudAgentAttachmentFile[]) => void;
   hasUploadingAttachments: boolean;
   getAttachmentsData: () => CloudAgentAttachments | undefined;
   finalizeAttachments: () => Promise<CloudAgentAttachments | undefined>;
@@ -234,6 +240,23 @@ export function useCloudAgentAttachmentUpload(
     };
   }, []);
 
+  /**
+   * Fire-and-forget release of abandoned files' pending-ledger rows. Never
+   * blocks removal: a failed release just leaves the row for the 24-hour
+   * reaper.
+   */
+  const releasePendingUploadKeys = useCallback(
+    (objectKeys: string[]) => {
+      if (objectKeys.length === 0) return;
+      void (
+        organizationId
+          ? orgReleaseMutateAsync({ objectKeys, organizationId })
+          : personalReleaseMutateAsync({ objectKeys })
+      ).catch(() => {});
+    },
+    [organizationId, orgReleaseMutateAsync, personalReleaseMutateAsync]
+  );
+
   const uploadAttachment = useCallback(
     async (attachment: CloudAgentAttachmentFile) => {
       if (uploadingIdsRef.current.has(attachment.id)) return;
@@ -259,7 +282,13 @@ export function useCloudAgentAttachmentUpload(
           contentType: attachment.contentType,
           contentLength: attachment.file.size,
         });
-        if (!canContinue()) return;
+        if (!canContinue()) {
+          // Remove, clear, unmount or a conversation switch cancelled this file
+          // while the presign was in flight, so no row holds the admitted key.
+          // Release it now instead of leaving it for the 24-hour reaper.
+          releasePendingUploadKeys([result.key]);
+          return;
+        }
 
         // Store the admitted object key as soon as the presign succeeds, so a
         // later remove/clear still releases the pending-ledger row even when
@@ -307,7 +336,7 @@ export function useCloudAgentAttachmentUpload(
         cancelledAttachmentIdsRef.current.delete(attachment.id);
       }
     },
-    [getPresignedUrl, messageUuid]
+    [getPresignedUrl, messageUuid, releasePendingUploadKeys]
   );
 
   useEffect(() => {
@@ -401,23 +430,6 @@ export function useCloudAgentAttachmentUpload(
     });
   }, []);
 
-  /**
-   * Fire-and-forget release of abandoned files' pending-ledger rows. Never
-   * blocks removal: a failed release just leaves the row for the 24-hour
-   * reaper.
-   */
-  const releasePendingUploadKeys = useCallback(
-    (objectKeys: string[]) => {
-      if (objectKeys.length === 0) return;
-      void (
-        organizationId
-          ? orgReleaseMutateAsync({ objectKeys, organizationId })
-          : personalReleaseMutateAsync({ objectKeys })
-      ).catch(() => {});
-    },
-    [organizationId, orgReleaseMutateAsync, personalReleaseMutateAsync]
-  );
-
   const removeAttachment = useCallback(
     (attachmentId: string) => {
       const attachment = attachmentsRef.current.find(item => item.id === attachmentId);
@@ -458,6 +470,20 @@ export function useCloudAgentAttachmentUpload(
     });
     setAttachments([]);
   }, [releasePendingUploadKeys]);
+
+  const replaceAttachments = useCallback((next: CloudAgentAttachmentFile[]) => {
+    attachmentsRef.current.forEach(attachment => {
+      if (shouldCancelCloudAgentAttachmentUpload(attachment.status)) {
+        cancelledAttachmentIdsRef.current.add(attachment.id);
+      }
+      const xhr = activeUploadsRef.current.get(attachment.id);
+      if (xhr) {
+        xhr.abort();
+        activeUploadsRef.current.delete(attachment.id);
+      }
+    });
+    setAttachments(next);
+  }, []);
 
   const getAttachmentsData = useCallback(
     () => buildCloudAgentAttachments(messageUuid, attachmentsRef.current),
@@ -508,6 +534,7 @@ export function useCloudAgentAttachmentUpload(
     addFiles,
     removeAttachment,
     clearAttachments,
+    replaceAttachments,
     hasUploadingAttachments: attachments.some(attachment =>
       ['processing', 'pending', 'uploading'].includes(attachment.status)
     ),

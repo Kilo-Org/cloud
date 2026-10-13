@@ -2152,6 +2152,11 @@
       "collapse": "Kutista tavoite",
       "expand": "Laajenna tavoite"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tehtävät, {{completed}}/{{total}} valmiina",
+      "rowAccessibility": "Tehtävät, {{completed}}/{{total}} valmiina. Nykyinen tehtävä: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Äskettäin käytetyt",
       "couldNotLoadGithubRepositories": "GitHub-repositorioiden lataus epäonnistui.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Tuodaan istuntoa",
       "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
       "importFailed": "Tätä istuntoa ei voitu tuoda.",
+      "cliCannotFork": "Päivitä Kilo CLI, jotta voit haaroittaa viestistä.",
+      "forkCutNotSynced": "Tätä viestiä ei ole vielä tallennettu. Yritä hetken kuluttua uudelleen.",
+      "forkFilesFromBaseBranch": "Tiedostot otetaan perushaarasta.",
+      "forkFilesUnchangedOnComputer": "Tämän tietokoneen tiedostoja ei muuteta.",
       "pickProfile": "Valitse profiili",
       "noProfile": "Ei profiilia",
       "manageProfiles": "Hallitse profiileja",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Kopioi viesti",
       "copyText": "Kopioi teksti",
       "selectText": "Valitse teksti",
+      "forkFromHere": "Haaroita tästä",
       "reportAiResponse": "Ilmoita AI-vastauksesta",
       "reportAiResponseConfirm": "Lähetetäänkö tämä vastaus tarkistettavaksi?",
       "report": "Ilmoita",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Käyttöopas"
   },
   "modelChat": {
+    "offlineFailure": "Tämä malli tarvitsee internetyhteyden. Muodosta yhteys ja yritä uudelleen tai vaihda tämän laitteen malliin.",
     "empty": {
       "title": "Aloita keskustelu",
       "description": "Lähetä viesti keskustellaksesi mallin kanssa."
@@ -3212,6 +3223,11 @@
       "localNote": "Laitteessa toimivat mallit ajetaan tässä laitteessa. Niillä ei ole kustannuksia eikä kehotevälimuistia, ja niiden tokenimäärät voivat olla arvioita.",
       "countedSinceNote": "Tämä keskustelu alkoi ennen käytön tallentamista. Summat näyttävät vain sen jälkeiset vastaukset.",
       "remoteServersOn": "Käytössä olevat etä-MCP-palvelimet"
+    },
+    "webSearch": {
+      "title": "Hae verkosta",
+      "description": "Anna tämän keskustelun hakea ajantasaista tietoa Kilo-tilisi kautta. Haut kuluttavat kuukausittaista hakukiintiötäsi.",
+      "allowanceExhausted": "Tämän kuun ilmaiset verkkohakusi on käytetty. Lisää krediittejä hakeaksesi uudelleen."
     },
     "mcp": {
       "title": "Kilon työkalut",
@@ -3338,8 +3354,48 @@
         "notGguf": "Linkin täytyy osoittaa .gguf-tiedostoon.",
         "space": "Laitteessa ei ole tarpeeksi vapaata tallennustilaa tälle mallille. Vapauta tilaa ja yritä uudelleen.",
         "network": "Lataus ei valmistunut. Tarkista yhteytesi ja yritä uudelleen.",
-        "invalidFile": "Ladattu tiedosto ei ole malli, jota tämä sovellus voi ajaa, joten se poistettiin."
+        "invalidFile": "Ladattu tiedosto ei ole malli, jota tämä sovellus voi ajaa, joten se poistettiin.",
+        "checksum": "Ladattu tiedosto ei vastaa julkaistua tarkistussummaansa, joten se poistettiin. Yritä latausta uudelleen."
       }
+    },
+    "catalog": {
+      "browse": "Selaa malleja",
+      "title": "Mallikatalogi",
+      "search": "Hae Hugging Face -malleja",
+      "tabs": "Mallisuodatin",
+      "fitsTab": "Sopii tälle laitteelle",
+      "fromHuggingFace": "Lähde: Hugging Face",
+      "loading": "Ladataan malleja",
+      "noResults": "Malleja ei löytynyt",
+      "noFits": "Mikään malli ei sovi tälle laitteelle",
+      "noFitsDescription": "Suuremmat mallit ovat välilehdellä $t(common.all).",
+      "fit": {
+        "fits": "Sopii",
+        "tight": "Mahtuu niukasti",
+        "tooLarge": "Liian suuri",
+        "noStorage": "Tallennustila ei riitä"
+      },
+      "parameters": "Parametrit: {{value}}",
+      "downloads": "Lataukset: {{value}}",
+      "likes": "Tykkäykset: {{value}}",
+      "context": "Kontekstiikkuna: {{value}}",
+      "license": "Lisenssi: {{license}}",
+      "licenseUnknown": "Lisenssiä ei ole ilmoitettu",
+      "tools": "Työkalukutsut",
+      "vision": "Kuvasyöte",
+      "hintsHelp": "Vihjeet ovat peräisin Hugging Facesta. Sovellus tarkistaa mallin latauksen jälkeen.",
+      "gated": "Tämä malli vaatii Hugging Face -tilin, joten sovellus ei voi ladata sitä.",
+      "quantizations": "Kvantisoinnit",
+      "quantizationsHelp": "Pienemmät tiedostot vievät vähemmän muistia ja tallennustilaa. Suuremmat tiedostot antavat yleensä parempia vastauksia.",
+      "quantDetail": "Lataus {{size}} · noin {{memory}} muistia",
+      "downloadQuant": "Lataa {{quant}}",
+      "loadingModel": "Ladataan mallin tietoja",
+      "couldNotLoadModel": "Tämän mallin lataaminen epäonnistui",
+      "noFiles": "Ei tiedostoja, joita tämä sovellus voi ajaa",
+      "noFilesDescription": "Tämä sovellus ajaa malleja, jotka ovat yksi GGUF-tiedosto.",
+      "tooLargeTitle": "Tämä malli ei ehkä toimi",
+      "tooLargeMessage": "{{name}} tarvitsee todennäköisesti enemmän muistia kuin tässä laitteessa on. Sovellus voi sulkeutua, kun malli vastaa. Ladataanko silti?",
+      "downloadAnyway": "Lataa silti"
     },
     "localModels": {
       "title": "Laitteessa toimivat mallit",

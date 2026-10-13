@@ -3,6 +3,7 @@ import createMDX from '@next/mdx';
 import { statSync } from 'fs';
 import { resolve } from 'path';
 import NextBundleAnalyzer from '@next/bundle-analyzer';
+import { buildAiGatewayRewrites } from './ai-gateway-rewrites.mjs';
 
 const withBundleAnalyzer = NextBundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
@@ -66,29 +67,23 @@ const nextConfig = {
   // errors are still surfaced without the indicator.
   devIndicators: false,
 
+  // Matches the gateway routes' 800s maxDuration. Next's default of 30s cuts off
+  // AI gateway requests proxied to a local apps/ai-gateway. Vercel ignores this
+  // and applies its own proxied-request timeout to external rewrites.
+  experimental: {
+    proxyTimeout: 800_000,
+  },
+
   async rewrites() {
-    // Global API rewrites - proxy to global-api.kilo.ai when not on global backend
-    // Uses beforeFiles to ensure the rewrite happens BEFORE filesystem routes are checked
+    // beforeFiles rewrites run BEFORE filesystem routes are checked, so they
+    // take precedence over this app's own copies of the proxied routes.
     // See: https://nextjs.org/docs/app/api-reference/config/next-config-js/rewrites
+    const aiGatewayRewrites = buildAiGatewayRewrites(process.env);
+
+    // Global API rewrites - proxy to global-api.kilo.ai when not on global backend
     const globalApiRewrites =
       process.env.VERCEL_ENV === 'production' && process.env.GLOBAL_KILO_BACKEND !== 'true'
         ? [
-            {
-              source: '/api/fim/completions',
-              destination: 'https://global-api.kilo.ai/api/fim/completions',
-            },
-            {
-              source: '/api/edit/completions',
-              destination: 'https://global-api.kilo.ai/api/edit/completions',
-            },
-            {
-              source: '/api/gateway/:path*',
-              destination: 'https://global-api.kilo.ai/api/gateway/:path*',
-            },
-            {
-              source: '/api/openrouter/:path*',
-              destination: 'https://global-api.kilo.ai/api/openrouter/:path*',
-            },
             {
               source: '/api/exa/:path*',
               destination: 'https://global-api.kilo.ai/api/exa/:path*',
@@ -101,7 +96,7 @@ const nextConfig = {
         : [];
 
     return {
-      beforeFiles: globalApiRewrites,
+      beforeFiles: [...aiGatewayRewrites, ...globalApiRewrites],
       afterFiles: [
         // /config.json is handled by src/app/config.json/route.ts which merges
         // Kilo-specific schema additions on top of the upstream opencode schema.

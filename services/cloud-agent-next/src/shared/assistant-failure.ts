@@ -20,13 +20,20 @@ const ASSISTANT_FAILURE_MESSAGES = {
   structured_output: 'The model response did not match the required format',
   unknown: 'Assistant request failed',
 } as const satisfies Record<CloudAgentAssistantFailureReason, string>;
+const BYOK_INVALID_REQUEST_MESSAGE =
+  'Your provider rejected the request. Check your provider account and settings.';
 const ASSISTANT_INTERRUPT_MESSAGE = 'The message was interrupted by the user';
 const ASSISTANT_FAILURE_REASONS = Object.keys(
   ASSISTANT_FAILURE_MESSAGES
 ) as CloudAgentAssistantFailureReason[];
 
-export function assistantFailureMessage(reason: CloudAgentAssistantFailureReason): string {
-  return ASSISTANT_FAILURE_MESSAGES[reason];
+export function assistantFailureMessage(
+  reason: CloudAgentAssistantFailureReason,
+  providerOwnership?: CloudAgentProviderOwnership
+): string {
+  return reason === 'invalid_request' && providerOwnership === 'byok'
+    ? BYOK_INVALID_REQUEST_MESSAGE
+    : ASSISTANT_FAILURE_MESSAGES[reason];
 }
 
 /**
@@ -87,7 +94,11 @@ export function classifyAssistantFailure(
   defaultProviderOwnership: CloudAgentProviderOwnership = 'unknown'
 ): AssistantFailureClassification {
   const message = assistantFailureText(source).toLocaleLowerCase();
-  const providerOwnership = /\[byok\]/i.test(message) ? 'byok' : defaultProviderOwnership;
+  const gatewayErrorType = readGatewayErrorType(source);
+  const providerOwnership =
+    /\[byok\]/i.test(message) || gatewayErrorType === 'byok_error'
+      ? 'byok'
+      : defaultProviderOwnership;
   const messageReason = classifyAssistantFailureText(message);
   const specificMessageReason =
     messageReason !== 'unknown' &&
@@ -98,17 +109,18 @@ export function classifyAssistantFailure(
   // pattern (an `upstream_disconnect` body says "gateway timeout"). The
   // structured `error_type` is the origin tag and is read before that text.
   const reason =
-    classifyGatewayOrigin(source) ??
+    classifyGatewayOrigin(gatewayErrorType) ??
     (specificMessageReason
       ? messageReason
       : (classifySdkErrorName(source) ??
+        (gatewayErrorType === 'byok_error' ? classifySdkStatus(source) : undefined) ??
         (messageReason !== 'unknown' ? messageReason : classifySdkStatus(source)) ??
         'unknown'));
   const terminalCode = assistantTerminalCode(reason);
 
   return {
     reason,
-    safeMessage: assistantFailureMessage(reason),
+    safeMessage: assistantFailureMessage(reason, providerOwnership),
     providerOwnership,
     ...(terminalCode === undefined ? {} : { terminalCode }),
   };
@@ -264,8 +276,10 @@ function classifySdkStatus(source: unknown): CloudAgentAssistantFailureReason | 
  */
 const GATEWAY_ERROR_BODY_MAX_LENGTH = 4096;
 
-function classifyGatewayOrigin(source: unknown): CloudAgentAssistantFailureReason | undefined {
-  switch (readGatewayErrorType(source)) {
+function classifyGatewayOrigin(
+  errorType: string | undefined
+): CloudAgentAssistantFailureReason | undefined {
+  switch (errorType) {
     case 'upstream_disconnect':
       return 'provider_disconnect';
     case 'temporarily_unavailable':
@@ -300,6 +314,9 @@ function readGatewayErrorType(source: unknown): string | undefined {
 
 function classifyAssistantFailureText(message: string): CloudAgentAssistantFailureReason {
   const canonicalMessage = message.replace(/^\[byok\] /, '');
+  if (canonicalMessage === BYOK_INVALID_REQUEST_MESSAGE.toLocaleLowerCase()) {
+    return 'invalid_request';
+  }
   const canonicalReason = ASSISTANT_FAILURE_REASONS.find(
     reason => ASSISTANT_FAILURE_MESSAGES[reason].toLocaleLowerCase() === canonicalMessage
   );

@@ -86,7 +86,7 @@ const mcpModel = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/chat/use-chat', () => ({
-  chatPlaceOf: () => ({ chatScope: 'u1:personal', org: { kind: 'personal' } }),
+  useChatPlace: () => ({ chatScope: 'u1:personal', org: { kind: 'personal' } }),
   useChat: () => ({
     state: {
       sessionId: 's1',
@@ -170,6 +170,9 @@ vi.mock('@/components/chat/mcp-settings-sheet', () => ({
 vi.mock('@/components/chat/chat-details-sheet', () => ({ ChatDetailsSheet: 'ChatDetailsSheet' }));
 vi.mock('@/components/agents/session-context-metrics', () => ({
   SessionContextMetrics: 'SessionContextMetrics',
+}));
+vi.mock('@/components/chat/web-search-row', () => ({
+  useWebSearchSetting: () => ({ enabled: true, setEnabled: () => undefined }),
 }));
 vi.mock('react-native', () => ({
   Alert: { alert: backendUi.alert },

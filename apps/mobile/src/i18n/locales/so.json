@@ -2152,6 +2152,11 @@
       "collapse": "Isku laab hadafka",
       "expand": "Ballaarso hadafka"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Hawlo, {{completed}} ka mid ah {{total}} ayaa dhammaaday",
+      "rowAccessibility": "Hawlo, {{completed}} ka mid ah {{total}} ayaa dhammaaday. Hawsha hadda: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Dhawaan la isticmaalay",
       "couldNotLoadGithubRepositories": "Kaydadka GitHub lama soo shubi karin.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Kalfadhiga waa la soo gelinayaa",
       "cliCannotContinue": "CLI-kan ma sii wadi karo kalfadhi. Dooro Cloud Agent ama CLI kale.",
       "importFailed": "Kalfadhigan lama soo gelin karin.",
+      "cliCannotFork": "Cusboonaysii Kilo CLI si aad uga laameyso farriin.",
+      "forkCutNotSynced": "Farriintan weli lama kaydin. Mar kale isku day wax yar kadib.",
+      "forkFilesFromBaseBranch": "Faylashu waxay ka bilaabmaan laanta saldhigga.",
+      "forkFilesUnchangedOnComputer": "Faylasha kombiyuutarkan lama beddelo.",
       "pickProfile": "Dooro profile",
       "noProfile": "Profile malaha",
       "manageProfiles": "Maamul profiles",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Nuqul ka samee farriinta",
       "copyText": "Nuqul ka samee qoraalka",
       "selectText": "Dooro qoraalka",
+      "forkFromHere": "Ka laan halkan",
       "reportAiResponse": "Ka warbixi jawaabta AI",
       "reportAiResponseConfirm": "Ma gudbinaysaa warbixin ku saabsan jawaabtan si dib loogu eego?",
       "report": "Ka warbixi",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Barasho"
   },
   "modelChat": {
+    "offlineFailure": "Model-kan wuxuu u baahan yahay xiriir internet. Ku xirmo oo isku day mar kale, ama u beddel model ku jira qalabkan.",
     "empty": {
       "title": "Bilow wada sheekaysi",
       "description": "Dir fariin si aad ula hadasho model."
@@ -3212,6 +3223,11 @@
       "localNote": "Moodeelada aaladda gudaheeda waxay ku shaqeeyaan aaladdan. Kharash ma laha, kayd ku meelgaar ah oo codsiyada ma laha, tirada tokenno ee ay isticmaalaanna waxay noqon kartaa qiyaas.",
       "countedSinceNote": "Wada sheekaysigan wuxuu bilaabmay ka hor intaan isticmaalka la diiwaangelin. Wadarta waxay muujinaysaa oo keliya jawaabaha intaas ka dambeeyay.",
       "remoteServersOn": "Serverada MCP ee fog ee shidan"
+    },
+    "webSearch": {
+      "title": "Ka raadi shabakadda",
+      "description": "U oggolow sheekadan inay ku raadiso macluumaad cusub akoonkaaga Kilo. Raadintu waxay isticmaashaa xaddiga raadinta ee bishii.",
+      "allowanceExhausted": "Raadintaada shabakadda ee bilaashka ah ee bishan way dhammaatay. Ku dar kiridit si aad mar kale u raadiso."
     },
     "mcp": {
       "title": "Qalabka Kilo",
@@ -3338,8 +3354,48 @@
         "notGguf": "Xiriirku waa inuu tilmaamaa fayl .gguf ah.",
         "space": "Ma jiro kayd bannaan oo ku filan moodeelkan. Meel bannaan samee oo mar kale isku day.",
         "network": "Soo dejintu ma dhammaanin. Hubi xiriirkaaga oo mar kale isku day.",
-        "invalidFile": "Faylka la soo dejiyay ma aha moodeel uu abkani ku shaqeyn karo, sidaas darteed waa la tirtiray."
+        "invalidFile": "Faylka la soo dejiyay ma aha moodeel uu abkani ku shaqeyn karo, sidaas darteed waa la tirtiray.",
+        "checksum": "Faylka la soo dejiyay kuma eka checksum-kiisa la daabacay, sidaas darteed waa la tirtiray. Mar kale isku day soo dejinta."
       }
+    },
+    "catalog": {
+      "browse": "Baadh moodeelada",
+      "title": "Liiska moodeelada",
+      "search": "Raadi moodeelada Hugging Face",
+      "tabs": "Shaandheynta moodeelada",
+      "fitsTab": "Ku habboon qalabkan",
+      "fromHuggingFace": "Laga keenay Hugging Face",
+      "loading": "Moodeelada waa la soo rarayaa",
+      "noResults": "Wax moodeel ah lama helin",
+      "noFits": "Ma jiro moodeel ku habboon qalabkan",
+      "noFitsDescription": "Moodeelada waaweyn waxay ku jiraan tabka $t(common.all).",
+      "fit": {
+        "fits": "Ku habboon",
+        "tight": "Si cidhiidhi ah u habboon",
+        "tooLarge": "Aad u weyn",
+        "noStorage": "Kayd kuma filna"
+      },
+      "parameters": "Halbeegyada: {{value}}",
+      "downloads": "Soo dejinta: {{value}}",
+      "likes": "Jeclaysiga: {{value}}",
+      "context": "Daaqadda macnaha: {{value}}",
+      "license": "Ruqsad: {{license}}",
+      "licenseUnknown": "Ruqsadda lama sheegin",
+      "tools": "Isticmaalka qalabka",
+      "vision": "Gelinta sawirka",
+      "hintsHelp": "Tilmaamo ka yimid Hugging Face. Abka ayaa hubiya moodeelka marka la soo dejiyo kadib.",
+      "gated": "Moodeelkani wuxuu u baahan yahay akoon Hugging Face, sidaa darteed abku ma soo dejin karo.",
+      "quantizations": "Noocyada qiyaasta",
+      "quantizationsHelp": "Faylasha yaryar waxay isticmaalaan xusuus iyo kayd yar. Faylasha waaweyn badanaa waxay bixiyaan jawaabo ka wanaagsan.",
+      "quantDetail": "{{size}} soo dejin · qiyaastii {{memory}} oo xusuus ah",
+      "downloadQuant": "Soo deji {{quant}}",
+      "loadingModel": "Faahfaahinta moodeelka waa la soo rarayaa",
+      "couldNotLoadModel": "Moodeelkan lama soo rari karin",
+      "noFiles": "Ma jiraan faylal uu abkani socodsiin karo",
+      "noFilesDescription": "Abkani wuxuu socodsiiyaa moodeelada ah hal fayl oo GGUF ah.",
+      "tooLargeTitle": "Moodeelkani waxaa laga yaabaa inuusan shaqeyn",
+      "tooLargeMessage": "{{name}} waxay u badan tahay inuu u baahan yahay xusuus ka badan inta qalabkani leeyahay. Abku wuu xirmi karaa inta moodeelku jawaabayo. Ma soo dejinaysaa si kastaba?",
+      "downloadAnyway": "Soo deji si kastaba"
     },
     "localModels": {
       "title": "Moodeelada aaladda gudaheeda",

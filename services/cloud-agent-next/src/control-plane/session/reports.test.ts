@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionMessage } from './messages.js';
 import { projectSettledMessageFailure } from './reports.js';
+import { classifyAssistantFailure } from '../../shared/assistant-failure.js';
 
 function message(
   overrides: Partial<SessionMessage> & Pick<SessionMessage, 'state'>
@@ -21,6 +22,28 @@ function message(
 }
 
 describe('projectSettledMessageFailure', () => {
+  it.each([400, 402, 403])(
+    'preserves classified BYOK APIError %s facts in the callback projection',
+    statusCode => {
+      const classified = classifyAssistantFailure({
+        name: 'APIError',
+        data: { statusCode, responseBody: '{"error_type":"byok_error","message":"poison-body"}' },
+      });
+      const failure = projectSettledMessageFailure(
+        message({ state: 'failed', acceptedAt: 1, reason: classified.safeMessage }),
+        { assistantReason: classified.reason, providerOwnership: classified.providerOwnership }
+      );
+
+      expect(failure).toMatchObject({
+        stage: 'agent_activity',
+        code: classified.terminalCode ?? 'assistant_error',
+        assistantReason: classified.reason,
+        providerOwnership: 'byok',
+      });
+      expect(JSON.stringify(failure)).not.toContain('poison');
+    }
+  );
+
   it('projects a workspace clone timeout subtype onto the callback failure', () => {
     const failure = projectSettledMessageFailure(
       message({ state: 'failed', reason: 'workspace_setup_failed' }),

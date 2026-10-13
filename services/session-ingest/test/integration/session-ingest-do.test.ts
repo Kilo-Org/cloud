@@ -219,6 +219,48 @@ describe('SessionIngestDO integration', () => {
       expect(snapshot.messages[0].info.id).toBe('msg_1');
       expect(snapshot.messages[1].info.id).toBe('msg_2');
     });
+
+    it('exports only the transcript up to an inclusive message cut and drops the session diff', async () => {
+      const sessionId = 'ses_roundtrip_cut_0000000005';
+      const stub = getStub(kiloUserId, sessionId);
+
+      // Ingest order is not message order: a late part of msg_2 lands after msg_3.
+      await stub.ingest(
+        [
+          { type: 'session', data: { title: 'Cut Session' } },
+          { type: 'message', data: { id: 'msg_1', role: 'user', content: 'first' } },
+          { type: 'part', data: { id: 'part_1', messageID: 'msg_1', type: 'text' } },
+          { type: 'message', data: { id: 'msg_2', role: 'assistant', content: 'second' } },
+          { type: 'message', data: { id: 'msg_3', role: 'user', content: 'third' } },
+          { type: 'part', data: { id: 'part_2', messageID: 'msg_2', type: 'text' } },
+          { type: 'part', data: { id: 'part_3', messageID: 'msg_3', type: 'text' } },
+          { type: 'session_diff', data: [{ file: 'a.ts', additions: 1, deletions: 0 }] },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(await stub.hasMessageItem('msg_2')).toBe(true);
+      expect(await stub.hasMessageItem('msg_9')).toBe(false);
+
+      const cut = JSON.parse(await stub.getAllStream('msg_2').then(s => new Response(s).text()));
+      expect(cut.info).toEqual({ title: 'Cut Session' });
+      expect(
+        cut.messages.map((m: { info: { id: string }; parts: Array<{ id: string }> }) => [
+          m.info.id,
+          m.parts.map(p => p.id),
+        ])
+      ).toEqual([
+        ['msg_1', ['part_1']],
+        ['msg_2', ['part_2']],
+      ]);
+      expect(cut.sessionDiff).toEqual([]);
+
+      const full = JSON.parse(await stub.getAllStream().then(s => new Response(s).text()));
+      expect(full.messages).toHaveLength(3);
+      expect(full.sessionDiff).toEqual([{ file: 'a.ts', additions: 1, deletions: 0 }]);
+    });
   });
 
   describe('SDK session snapshot reads', () => {

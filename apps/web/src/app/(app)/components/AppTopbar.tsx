@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/breadcrumb';
 
 export function AppTopbar() {
-  const { title, icon, extras, hideTopbar } = usePageTitle();
+  const { title, icon, extras, actions, hideTopbar } = usePageTitle();
 
   if (hideTopbar) return null;
 
@@ -33,6 +33,8 @@ export function AppTopbar() {
           {extras && <div className="shrink-0">{extras}</div>}
         </div>
       )}
+
+      {actions && <div className="ml-auto flex shrink-0 items-center gap-1 pr-3">{actions}</div>}
     </header>
   );
 }

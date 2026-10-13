@@ -2152,6 +2152,11 @@
       "collapse": "Itago ang layunin",
       "expand": "Ipakita ang layunin"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Layunin, {{completed}} sa {{total}} ang natapos",
+      "rowAccessibility": "Layunin, {{completed}} sa {{total}} ang natapos. Kasalukuyang layunin: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Mga ginamit kamakailan",
       "couldNotLoadGithubRepositories": "Hindi ma-load ang mga imbakan ng code sa GitHub.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Ini-import ang sesyon",
       "cliCannotContinue": "Hindi kayang magpatuloy ng sesyon ang CLI na ito. Pumili ng Cloud Agent o ibang CLI.",
       "importFailed": "Hindi ma-import ang sesyong ito.",
+      "cliCannotFork": "I-update ang Kilo CLI para makapag-fork mula sa isang mensahe.",
+      "forkCutNotSynced": "Hindi pa naka-save ang mensaheng ito. Subukang muli maya-maya.",
+      "forkFilesFromBaseBranch": "Magsisimula ang mga file mula sa base branch.",
+      "forkFilesUnchangedOnComputer": "Hindi mababago ang mga file sa computer na ito.",
       "pickProfile": "Pumili ng profile",
       "noProfile": "Walang profile",
       "manageProfiles": "Pamahalaan ang mga profile",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Kopyahin ang mensahe",
       "copyText": "Kopyahin ang teksto",
       "selectText": "Piliin ang teksto",
+      "forkFromHere": "I-fork mula rito",
       "reportAiResponse": "Iulat ang tugon ng AI",
       "reportAiResponseConfirm": "Iulat ang tugong ito para masuri?",
       "report": "Iulat",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Tutorial"
   },
   "modelChat": {
+    "offlineFailure": "Kailangan ng modelong ito ng koneksyon sa internet. Kumonekta at subukang muli, o lumipat sa isang modelo sa device na ito.",
     "empty": {
       "title": "Magsimula ng chat",
       "description": "Magpadala ng mensahe para makipag-usap sa isang modelo."
@@ -3212,6 +3223,11 @@
       "localNote": "Tumatakbo sa device na ito ang mga modelong nasa device. Wala silang gastos at walang prompt cache, at maaaring tantiya lang ang bilang ng kanilang mga token.",
       "countedSinceNote": "Nagsimula ang chat na ito bago pa naitala ang paggamit. Ang mga sagot lang pagkatapos noon ang ipinapakita ng mga kabuuan.",
       "remoteServersOn": "Mga naka-on na remote MCP server"
+    },
+    "webSearch": {
+      "title": "Maghanap sa web",
+      "description": "Hayaan ang chat na ito na maghanap ng kasalukuyang impormasyon gamit ang iyong Kilo account. Ginagamit ng mga paghahanap ang iyong buwanang allowance sa paghahanap.",
+      "allowanceExhausted": "Naubos na ang iyong libreng web search para sa buwang ito. Magdagdag ng credits para makapaghanap ulit."
     },
     "mcp": {
       "title": "Mga tool ng Kilo",
@@ -3338,8 +3354,48 @@
         "notGguf": "Dapat nakaturo ang link sa isang .gguf file.",
         "space": "Walang sapat na libreng storage para sa modelong ito. Magbakante ng espasyo at subukan muli.",
         "network": "Hindi natapos ang pag-download. Suriin ang iyong koneksyon at subukan muli.",
-        "invalidFile": "Ang na-download na file ay hindi modelong kayang patakbuhin ng app na ito, kaya inalis ito."
+        "invalidFile": "Ang na-download na file ay hindi modelong kayang patakbuhin ng app na ito, kaya inalis ito.",
+        "checksum": "Ang na-download na file ay hindi tumutugma sa nakalathalang checksum nito, kaya inalis ito. Subukang i-download itong muli."
       }
+    },
+    "catalog": {
+      "browse": "Mag-browse ng mga modelo",
+      "title": "Katalogo ng modelo",
+      "search": "Maghanap ng mga modelo sa Hugging Face",
+      "tabs": "Filter ng modelo",
+      "fitsTab": "Kasya sa device na ito",
+      "fromHuggingFace": "Mula sa Hugging Face",
+      "loading": "Nilo-load ang mga modelo",
+      "noResults": "Walang nakitang modelo",
+      "noFits": "Walang modelong kasya sa device na ito",
+      "noFitsDescription": "Nasa tab na $t(common.all) ang mas malalaking modelo.",
+      "fit": {
+        "fits": "Kasya",
+        "tight": "Halos kasya",
+        "tooLarge": "Masyadong malaki",
+        "noStorage": "Kulang ang storage"
+      },
+      "parameters": "Mga parameter: {{value}}",
+      "downloads": "Mga download: {{value}}",
+      "likes": "Mga like: {{value}}",
+      "context": "Context window: {{value}}",
+      "license": "Lisensya: {{license}}",
+      "licenseUnknown": "Hindi nakasaad ang lisensya",
+      "tools": "Pagtawag ng tool",
+      "vision": "Input na larawan",
+      "hintsHelp": "Mga pahiwatig mula sa Hugging Face. Sinusuri ng app ang modelo pagkatapos itong ma-download.",
+      "gated": "Nangangailangan ang modelong ito ng Hugging Face account, kaya hindi ito ma-download ng app.",
+      "quantizations": "Mga quantization",
+      "quantizationsHelp": "Mas kaunting memory at storage ang ginagamit ng mas maliliit na file. Kadalasang mas mahusay ang sagot ng mas malalaking file.",
+      "quantDetail": "{{size}} na download · mga {{memory}} ng memory",
+      "downloadQuant": "I-download ang {{quant}}",
+      "loadingModel": "Nilo-load ang mga detalye ng modelo",
+      "couldNotLoadModel": "Hindi ma-load ang modelong ito",
+      "noFiles": "Walang file na kayang patakbuhin ng app na ito",
+      "noFilesDescription": "Nagpapatakbo ang app na ito ng mga modelong iisang GGUF file.",
+      "tooLargeTitle": "Maaaring hindi tumakbo ang modelong ito",
+      "tooLargeMessage": "Malamang na mas maraming memory ang kailangan ng {{name}} kaysa sa mayroon ang device na ito. Maaaring magsara ang app habang sumasagot ang modelo. I-download pa rin?",
+      "downloadAnyway": "I-download pa rin"
     },
     "localModels": {
       "title": "Mga modelong nasa device",

@@ -81,7 +81,7 @@ describe('buildE2eWorkerConfig', () => {
       memory_mib: 12288,
       disk_mb: 20000,
     });
-    expect(config.containers[0].max_instances).toBe(20);
+    expect(config.containers[0].max_instances).toBe(40);
     expect(config.containers[0].ssh.enabled).toBe(true);
   });
 

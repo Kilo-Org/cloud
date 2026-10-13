@@ -175,6 +175,8 @@ export type PersistenceEnv = {
   R2_ATTACHMENTS_BUCKET?: string;
   /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** 'true' disables the per-account concurrent-container cap. Set only on the disposable e2e Worker. */
+  CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
   VERCEL_TOKEN?: string;
   VERCEL_TEAM_ID?: string;
   VERCEL_PROJECT_ID?: string;

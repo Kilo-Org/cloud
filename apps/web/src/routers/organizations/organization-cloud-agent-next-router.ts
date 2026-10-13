@@ -283,7 +283,13 @@ const ListBitbucketRepositoriesInput = z.object({
  */
 export const organizationCloudAgentNextRouter = createTRPCRouter({
   getSandboxSelectionOptions: organizationMemberProcedure
-    .input(z.object({ devcontainer: z.boolean().optional() }))
+    .input(
+      z.object({
+        devcontainer: z.boolean().optional(),
+        repositoryType: z.enum(['github', 'gitlab', 'bitbucket', 'git']).optional(),
+        repositoryFullName: z.string().min(1).max(500).optional(),
+      })
+    )
     .output(sandboxSelectionCapabilitiesSchema)
     .query(async ({ ctx, input }) => {
       const authToken = await createCloudAgentControlToken(
@@ -293,6 +299,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       );
       return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({
         kilocodeOrganizationId: input.organizationId,
+        ...(input.repositoryType ? { repositoryType: input.repositoryType } : {}),
+        ...(input.repositoryFullName ? { repositoryFullName: input.repositoryFullName } : {}),
       });
     }),
 

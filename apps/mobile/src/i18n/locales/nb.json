@@ -2152,6 +2152,11 @@
       "collapse": "Skjul målet",
       "expand": "Vis målet"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Oppgaver, {{completed}} av {{total}} fullført",
+      "rowAccessibility": "Oppgaver, {{completed}} av {{total}} fullført. Gjeldende oppgave: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Nylig brukt",
       "couldNotLoadGithubRepositories": "Kunne ikke laste inn kodelagre fra GitHub.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Importerer økten",
       "cliCannotContinue": "Denne CLI-en kan ikke fortsette en økt. Velg Cloud Agent eller en annen CLI.",
       "importFailed": "Kunne ikke importere denne økten.",
+      "cliCannotFork": "Oppdater Kilo CLI for å forgrene fra en melding.",
+      "forkCutNotSynced": "Denne meldingen er ikke lagret ennå. Prøv igjen om et øyeblikk.",
+      "forkFilesFromBaseBranch": "Filene starter fra basegrenen.",
+      "forkFilesUnchangedOnComputer": "Filene på denne datamaskinen blir ikke endret.",
       "pickProfile": "Velg en profil",
       "noProfile": "Ingen profil",
       "manageProfiles": "Administrer profiler",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Kopier melding",
       "copyText": "Kopier tekst",
       "selectText": "Marker tekst",
+      "forkFromHere": "Forgren herfra",
       "reportAiResponse": "Rapporter AI-svar",
       "reportAiResponseConfirm": "Vil du rapportere dette svaret for vurdering?",
       "report": "Rapporter",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Opplæring"
   },
   "modelChat": {
+    "offlineFailure": "Denne modellen trenger internettilkobling. Koble til og prøv igjen, eller bytt til en modell på denne enheten.",
     "empty": {
       "title": "Start en chat",
       "description": "Send en melding for å snakke med en modell."
@@ -3212,6 +3223,11 @@
       "localNote": "Modeller på enheten kjører på denne enheten. De har ingen kostnad og ingen ledetekstbuffer, og tokenantallet kan være anslag.",
       "countedSinceNote": "Denne chatten startet før bruk ble registrert. Summene viser bare svarene etter det.",
       "remoteServersOn": "Eksterne MCP-servere på"
+    },
+    "webSearch": {
+      "title": "Søk på nettet",
+      "description": "La denne chatten slå opp oppdatert informasjon via Kilo-kontoen din. Søk bruker den månedlige søkekvoten din.",
+      "allowanceExhausted": "De gratis nettsøkene dine for denne måneden er brukt opp. Legg til kreditter for å søke igjen."
     },
     "mcp": {
       "title": "Kilo-verktøy",
@@ -3338,8 +3354,48 @@
         "notGguf": "Lenken må peke til en .gguf-fil.",
         "space": "Det er ikke nok ledig lagringsplass til denne modellen. Frigjør plass, og prøv igjen.",
         "network": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen, og prøv igjen.",
-        "invalidFile": "Den nedlastede filen er ikke en modell denne appen kan kjøre, så den ble fjernet."
+        "invalidFile": "Den nedlastede filen er ikke en modell denne appen kan kjøre, så den ble fjernet.",
+        "checksum": "Den nedlastede filen samsvarer ikke med den publiserte kontrollsummen, så den ble fjernet. Prøv nedlastingen på nytt."
       }
+    },
+    "catalog": {
+      "browse": "Utforsk modeller",
+      "title": "Modellkatalog",
+      "search": "Søk i Hugging Face-modeller",
+      "tabs": "Modellfilter",
+      "fitsTab": "Passer denne enheten",
+      "fromHuggingFace": "Fra Hugging Face",
+      "loading": "Laster inn modeller",
+      "noResults": "Fant ingen modeller",
+      "noFits": "Ingen modeller passer denne enheten",
+      "noFitsDescription": "Større modeller finner du i fanen $t(common.all).",
+      "fit": {
+        "fits": "Passer",
+        "tight": "Så vidt",
+        "tooLarge": "For stor",
+        "noStorage": "Ikke nok lagringsplass"
+      },
+      "parameters": "Parametere: {{value}}",
+      "downloads": "Nedlastinger: {{value}}",
+      "likes": "Likerklikk: {{value}}",
+      "context": "Kontekstvindu: {{value}}",
+      "license": "Lisens: {{license}}",
+      "licenseUnknown": "Lisensen er ikke oppgitt",
+      "tools": "Verktøykall",
+      "vision": "Bildeinndata",
+      "hintsHelp": "Hint fra Hugging Face. Appen sjekker modellen etter at den er lastet ned.",
+      "gated": "Denne modellen krever en Hugging Face-konto, så appen kan ikke laste den ned.",
+      "quantizations": "Kvantiseringer",
+      "quantizationsHelp": "Mindre filer bruker mindre minne og lagringsplass. Større filer gir vanligvis bedre svar.",
+      "quantDetail": "{{size}} nedlasting · omtrent {{memory}} minne",
+      "downloadQuant": "Last ned {{quant}}",
+      "loadingModel": "Laster inn modelldetaljer",
+      "couldNotLoadModel": "Kunne ikke laste inn denne modellen",
+      "noFiles": "Ingen filer denne appen kan kjøre",
+      "noFilesDescription": "Denne appen kjører modeller som består av én GGUF-fil.",
+      "tooLargeTitle": "Denne modellen kjører kanskje ikke",
+      "tooLargeMessage": "{{name}} trenger sannsynligvis mer minne enn denne enheten har. Appen kan lukkes mens modellen svarer. Vil du laste den ned likevel?",
+      "downloadAnyway": "Last ned likevel"
     },
     "localModels": {
       "title": "Modeller på enheten",

@@ -66,6 +66,18 @@ describe('assertContainerCapacity', () => {
     });
   });
 
+  it('admits any start when the account concurrency cap is disabled', async () => {
+    const countLive = vi.fn(async () => PERSONAL_CONTAINER_LIMIT);
+    await expect(
+      assertContainerCapacity(
+        { ...env, CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true' },
+        request(),
+        { countLive }
+      )
+    ).resolves.toBeUndefined();
+    expect(countLive).not.toHaveBeenCalled();
+  });
+
   it('applies the organization limit to organization subjects', async () => {
     const org = request({ subject: { type: 'org', id: 'org_1' } });
     await expect(

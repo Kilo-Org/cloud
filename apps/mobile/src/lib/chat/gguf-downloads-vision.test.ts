@@ -120,6 +120,17 @@ describe('downloading a vision model', () => {
     expect(h.files.size).toBe(0);
   });
 
+  it('refuses a projector whose bytes do not match its published SHA-256, and keeps nothing', async () => {
+    const h = harness({ checksums: { [ggufProjectorPartialName('eyes')]: 'f'.repeat(64) } });
+    h.store.start(VISION_CATALOG);
+    await finish(taskAt(h.tasks, 0), 1000);
+    await finish(taskAt(h.tasks, 1), 200);
+    expect(h.store.snapshot().failure).toEqual({ fileId: 'eyes', problem: 'checksum' });
+    expect(h.inspected).toEqual([]);
+    expect(h.files.size).toBe(0);
+    expect(h.store.model('eyes')).toBeUndefined();
+  });
+
   it('refuses a projector llama.cpp does not read images with, and keeps nothing', async () => {
     const h = harness({
       inspection: async () => ({ contextWindow: 4096, tools: false, vision: false }),

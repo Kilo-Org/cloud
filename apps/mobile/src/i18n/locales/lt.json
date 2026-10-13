@@ -2208,6 +2208,11 @@
       "collapse": "Sutraukti tikslą",
       "expand": "Išskleisti tikslą"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Užduotys, atlikta {{completed}} iš {{total}}",
+      "rowAccessibility": "Užduotys, atlikta {{completed}} iš {{total}}. Dabartinė užduotis: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Neseniai naudota",
       "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų.",
@@ -2263,6 +2268,10 @@
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šioje CLI sesijos tęsti negalima. Pasirinkite „Cloud Agent“ arba kitą CLI.",
       "importFailed": "Nepavyko importuoti šios sesijos.",
+      "cliCannotFork": "Atnaujinkite Kilo CLI, kad galėtumėte atšakoti nuo žinutės.",
+      "forkCutNotSynced": "Ši žinutė dar neišsaugota. Netrukus bandykite dar kartą.",
+      "forkFilesFromBaseBranch": "Failai pradedami nuo bazinės šakos.",
+      "forkFilesUnchangedOnComputer": "Failai šiame kompiuteryje nekeičiami.",
       "pickProfile": "Pasirinkite profilį",
       "noProfile": "Nėra profilio",
       "manageProfiles": "Tvarkyti profilius",
@@ -2386,6 +2395,7 @@
       "copyMessage": "Kopijuoti žinutę",
       "copyText": "Kopijuoti tekstą",
       "selectText": "Pažymėti tekstą",
+      "forkFromHere": "Atšakoti nuo čia",
       "reportAiResponse": "Pranešti apie AI atsakymą",
       "reportAiResponseConfirm": "Pranešti apie šį atsakymą, kad jis būtų patikrintas?",
       "report": "Pranešti",
@@ -3271,6 +3281,7 @@
     "tutorialLabel": "Pamoka"
   },
   "modelChat": {
+    "offlineFailure": "Šiam modeliui reikalingas interneto ryšys. Prisijunkite ir bandykite dar kartą arba perjunkite į šio įrenginio modelį.",
     "empty": {
       "title": "Pradėti pokalbį",
       "description": "Siųskite žinutę, kad pakalbėtumėte su modeliu."
@@ -3294,6 +3305,11 @@
       "localNote": "Įrenginio modeliai veikia šiame įrenginyje. Jie neturi kainos ir užklausų talpyklos, o jų žetonų skaičius gali būti apytikslis.",
       "countedSinceNote": "Šis pokalbis prasidėjo prieš pradedant registruoti naudojimą. Sumos rodo tik vėlesnius atsakymus.",
       "remoteServersOn": "Įjungti nuotoliniai MCP serveriai"
+    },
+    "webSearch": {
+      "title": "Ieškoti žiniatinklyje",
+      "description": "Leiskite šiam pokalbiui ieškoti naujausios informacijos per jūsų Kilo paskyrą. Paieškos naudoja jūsų mėnesinį paieškų limitą.",
+      "allowanceExhausted": "Jūsų nemokamos šio mėnesio žiniatinklio paieškos išnaudotos. Pridėkite kreditų, kad vėl galėtumėte ieškoti."
     },
     "mcp": {
       "title": "Kilo įrankiai",
@@ -3420,8 +3436,48 @@
         "notGguf": "Nuoroda turi nurodyti į .gguf failą.",
         "space": "Šiam modeliui nepakanka laisvos vietos. Atlaisvinkite vietos ir bandykite dar kartą.",
         "network": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir bandykite dar kartą.",
-        "invalidFile": "Atsisiųstas failas nėra modelis, kurį ši programa gali paleisti, todėl jis buvo pašalintas."
+        "invalidFile": "Atsisiųstas failas nėra modelis, kurį ši programa gali paleisti, todėl jis buvo pašalintas.",
+        "checksum": "Atsisiųstas failas neatitinka paskelbtos kontrolinės sumos, todėl jis buvo pašalintas. Pabandykite atsisiųsti dar kartą."
       }
+    },
+    "catalog": {
+      "browse": "Naršyti modelius",
+      "title": "Modelių katalogas",
+      "search": "Ieškoti Hugging Face modelių",
+      "tabs": "Modelių filtras",
+      "fitsTab": "Tinka šiam įrenginiui",
+      "fromHuggingFace": "Iš Hugging Face",
+      "loading": "Įkeliami modeliai",
+      "noResults": "Modelių nerasta",
+      "noFits": "Šiam įrenginiui netinka nė vienas modelis",
+      "noFitsDescription": "Didesni modeliai yra skirtuke „$t(common.all)“.",
+      "fit": {
+        "fits": "Tinka",
+        "tight": "Vos tinka",
+        "tooLarge": "Per didelis",
+        "noStorage": "Nepakanka vietos"
+      },
+      "parameters": "Parametrai: {{value}}",
+      "downloads": "Atsisiuntimai: {{value}}",
+      "likes": "Patinka: {{value}}",
+      "context": "Konteksto langas: {{value}}",
+      "license": "Licencija: {{license}}",
+      "licenseUnknown": "Licencija nenurodyta",
+      "tools": "Įrankių iškvietimas",
+      "vision": "Vaizdų įvestis",
+      "hintsHelp": "Užuominos iš Hugging Face. Programa patikrina modelį, kai jis atsisiunčiamas.",
+      "gated": "Šiam modeliui reikia Hugging Face paskyros, todėl programa negali jo atsisiųsti.",
+      "quantizations": "Kvantavimai",
+      "quantizationsHelp": "Mažesni failai naudoja mažiau atminties ir saugyklos vietos. Didesni failai paprastai pateikia geresnius atsakymus.",
+      "quantDetail": "Atsisiuntimas: {{size}} · apie {{memory}} atminties",
+      "downloadQuant": "Atsisiųsti {{quant}}",
+      "loadingModel": "Įkeliama modelio informacija",
+      "couldNotLoadModel": "Nepavyko įkelti šio modelio",
+      "noFiles": "Nėra failų, kuriuos ši programa galėtų paleisti",
+      "noFilesDescription": "Ši programa paleidžia modelius, sudarytus iš vieno GGUF failo.",
+      "tooLargeTitle": "Šis modelis gali neveikti",
+      "tooLargeMessage": "Modeliui {{name}} greičiausiai reikia daugiau atminties, nei turi šis įrenginys. Programa gali užsidaryti, kol modelis atsakinėja. Vis tiek atsisiųsti?",
+      "downloadAnyway": "Vis tiek atsisiųsti"
     },
     "localModels": {
       "title": "Įrenginio modeliai",

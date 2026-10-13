@@ -3937,7 +3937,7 @@ describe('SessionService session-ingest compatibility', () => {
       'cloud-agent',
       undefined,
       undefined,
-      'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+      { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' }
     );
 
     expect(result).toEqual(readyResult);
@@ -3953,6 +3953,35 @@ describe('SessionService session-ingest compatibility', () => {
       gitUrl: undefined,
       cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
+  });
+
+  it('forwards the clone cut to session-ingest', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+
+    await service.createCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      'user_test',
+      env,
+      undefined,
+      undefined,
+      'cloud-agent',
+      undefined,
+      undefined,
+      {
+        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+        cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      }
+    );
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+        cloneUpToMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      })
+    );
   });
 
   it('returns undefined when the old worker sends no clone acknowledgement', async () => {

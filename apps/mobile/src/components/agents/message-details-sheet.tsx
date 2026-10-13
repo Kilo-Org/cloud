@@ -41,6 +41,11 @@ type MessageDetailsSheetProps = {
   onCancelQueued?: (message: StoredMessage) => void | Promise<void>;
   cancelQueuedFeedback?: { message: string; attempt: number } | null;
   cancelQueuedGuidance?: string | null;
+  /**
+   * Opens Continue with a cut at this message. Omitted when the message offers
+   * no fork (streaming, queued, failed, or the first user message).
+   */
+  onForkFromHere?: () => void;
 };
 
 export function MessageDetailsSheet({
@@ -54,6 +59,7 @@ export function MessageDetailsSheet({
   onCancelQueued,
   cancelQueuedFeedback,
   cancelQueuedGuidance,
+  onForkFromHere,
 }: Readonly<MessageDetailsSheetProps>) {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -211,6 +217,20 @@ export function MessageDetailsSheet({
                     </Text>
                   ) : null}
                 </View>
+              ) : null}
+
+              {visible && onForkFromHere ? (
+                <Pressable
+                  onPress={onForkFromHere}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('agentChat.messageDetails.forkFromHere')}
+                  className="mb-6 rounded-md border border-border px-4 py-3 active:opacity-70"
+                  testID="message-details-fork"
+                >
+                  <Text className="text-center text-base font-medium text-foreground">
+                    {t('agentChat.messageDetails.forkFromHere')}
+                  </Text>
+                </Pressable>
               ) : null}
 
               {visible && message && onCancelQueued && (canCancelQueued || isCancelingQueued) ? (

@@ -38,6 +38,8 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
         // Old form is absent sessionClone; treat missing as incapable until
         // every shipped CLI advertises it.
         sessionClone: z.boolean().optional(),
+        // Absent means the CLI cannot clone up to a message (fork from here).
+        sessionCloneAtMessage: z.boolean().optional(),
       })
       .optional(),
     // Optional identity of the spawning CLI process. Absent on legacy CLIs

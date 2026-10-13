@@ -32,7 +32,11 @@ const REPORT_QUEUE = 'cloud-agent-next-report-queue';
 const SHARED_SANDBOX_OVERRIDES_KV_ID_E2E = '4d5f651fb14b4de682204eaa9fa60a7d';
 
 const E2E_CONTAINER_CLASSES = new Set(['Sandbox']);
-const E2E_MAX_INSTANCES = 20;
+// The suite cold-boots a container per scenario and they linger until the
+// 15-minute idle stop, so a whole run keeps far more than 20 alive at once. The
+// old value of 20 pinned the class at the limit and left later cold boots
+// stuck in `preparing`; match the production `Sandbox` class instead.
+const E2E_MAX_INSTANCES = 40;
 
 const E2E_CALLBACK_CLASS = 'E2eCallbackSink';
 const E2E_CALLBACK_BINDING = 'E2E_CALLBACK_SINK';
@@ -158,6 +162,9 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'false',
     CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: '',
     CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: '',
+    // The suite runs every scenario through one funded test account, so its own
+    // churn would trip the per-account concurrent-container cap.
+    CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',
     CREDENTIAL_CONTAINMENT_ENABLED: 'false',
   };
 

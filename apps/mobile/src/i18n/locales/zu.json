@@ -2152,6 +2152,11 @@
       "collapse": "Goqa umgomo",
       "expand": "Nweba umgomo"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Imigomo, {{completed}} kwezi {{total}} kuqediwe",
+      "rowAccessibility": "Imigomo, {{completed}} kwezi {{total}} kuqediwe. Umgomo wamanje: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Okusetshenziswe muva nje",
       "couldNotLoadGithubRepositories": "Asikwazanga ukulayisha izinqolobane zekhodi ze-GitHub.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Iseshini iyangeniswa",
       "cliCannotContinue": "Le CLI ayikwazi ukuqhubeka neseshini. Khetha i-Cloud Agent noma enye i-CLI.",
       "importFailed": "Asikwazanga ukungenisa le seshini.",
+      "cliCannotFork": "Buyekeza i-Kilo CLI ukuze uhlukanise kusukela kumlayezo.",
+      "forkCutNotSynced": "Lo mlayezo awukalondolozwa. Zama futhi emzuzwini.",
+      "forkFilesFromBaseBranch": "Amafayela aqala egatsheni eliyisisekelo.",
+      "forkFilesUnchangedOnComputer": "Amafayela akule khompyutha awashintshwa.",
       "pickProfile": "Khetha iphrofayela",
       "noProfile": "Ayikho iphrofayela",
       "manageProfiles": "Phatha amaphrofayili",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Kopisha umlayezo",
       "copyText": "Kopisha umbhalo",
       "selectText": "Khetha umbhalo",
+      "forkFromHere": "Hlukanisa kusukela lapha",
       "reportAiResponse": "Bika impendulo ye-AI",
       "reportAiResponseConfirm": "Uyafuna ukubika le mpendulo ukuze ihlolwe?",
       "report": "Bika",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Uqeqesho"
   },
   "modelChat": {
+    "offlineFailure": "Le modeli idinga ukuxhumeka ku-inthanethi. Xhuma bese uzama futhi, noma ushintshele kumodeli ekule divayisi.",
     "empty": {
       "title": "Qala ingxoxo",
       "description": "Thumela umlayezo ukuze uxoxe nomodeli."
@@ -3212,6 +3223,11 @@
       "localNote": "Amamodeli asedivayisini asebenza kule divayisi. Awanazo izindleko futhi awanayo inqolobane yesikhashana yemiyalo, futhi izibalo zawo zamathokheni zingaba ngezilinganiselwe.",
       "countedSinceNote": "Le ngxoxo yaqala ngaphambi kokuthi ukusetshenziswa kuqoshwe. Izingqikithi zibonisa kuphela izimpendulo zangemuva kwalokho.",
       "remoteServersOn": "Amaseva e-MCP akude avuliwe"
+    },
+    "webSearch": {
+      "title": "Sesha kuwebhu",
+      "description": "Vumela le ngxoxo ibheke ulwazi lwamanje ngokusebenzisa i-akhawunti yakho ye-Kilo. Ukusesha kusebenzisa isabelo sakho sokusesha senyanga.",
+      "allowanceExhausted": "Ukusesha kwakho kwamahhala kuwebhu kwale nyanga kuphelile. Engeza amakhredithi ukuze uphinde useshe."
     },
     "mcp": {
       "title": "Amathuluzi e-Kilo",
@@ -3338,8 +3354,48 @@
         "notGguf": "Isixhumanisi kufanele sikhombe efayeleni le-.gguf.",
         "space": "Asikho isikhala esanele saleli modeli. Khulula isikhala bese uzama futhi.",
         "network": "Ukulanda akuphelanga. Hlola ukuxhumana kwakho bese uzama futhi.",
-        "invalidFile": "Ifayela elilandiwe akusiyo imodeli le app engayisebenzisa, ngakho isusiwe."
+        "invalidFile": "Ifayela elilandiwe akusiyo imodeli le app engayisebenzisa, ngakho isusiwe.",
+        "checksum": "Ifayela elilandiwe alihambisani ne-checksum yalo eshicilelwe, ngakho isusiwe. Zama ukulanda futhi."
       }
+    },
+    "catalog": {
+      "browse": "Phequlula amamodeli",
+      "title": "Ikhathalogi yamamodeli",
+      "search": "Sesha amamodeli e-Hugging Face",
+      "tabs": "Isihlungi samamodeli",
+      "fitsTab": "Afanele le divayisi",
+      "fromHuggingFace": "Kusuka ku-Hugging Face",
+      "loading": "Ilayisha amamodeli",
+      "noResults": "Awekho amamodeli atholakele",
+      "noFits": "Awekho amamodeli afanele le divayisi",
+      "noFitsDescription": "Amamodeli amakhulu asethebhini ethi $t(common.all).",
+      "fit": {
+        "fits": "Iyafanela",
+        "tight": "Ilingana kancane",
+        "tooLarge": "Inkulu kakhulu",
+        "noStorage": "Indawo yokugcina ayanele"
+      },
+      "parameters": "Amapharamitha: {{value}}",
+      "downloads": "Okulandiwe: {{value}}",
+      "likes": "Abathandayo: {{value}}",
+      "context": "Iwindi lomongo: {{value}}",
+      "license": "Ilayisensi: {{license}}",
+      "licenseUnknown": "Ilayisensi ayishiwongo",
+      "tools": "Ukusebenzisa amathuluzi",
+      "vision": "Okokufaka kwesithombe",
+      "hintsHelp": "Amacebiso avela ku-Hugging Face. Uhlelo lokusebenza luhlola imodeli ngemva kokuba ilandiwe.",
+      "gated": "Le modeli idinga i-akhawunti ye-Hugging Face, ngakho uhlelo lokusebenza alukwazi ukuyilanda.",
+      "quantizations": "Ama-quantization",
+      "quantizationsHelp": "Amafayela amancane asebenzisa inkumbulo nendawo yokugcina encane. Amafayela amakhulu ngokuvamile anikeza izimpendulo ezingcono.",
+      "quantDetail": "Ukulanda okungu-{{size}} · cishe u-{{memory}} wenkumbulo",
+      "downloadQuant": "Landa i-{{quant}}",
+      "loadingModel": "Ilayisha imininingwane yemodeli",
+      "couldNotLoadModel": "Ayikwazanga ukulayisha le modeli",
+      "noFiles": "Awekho amafayela angasetshenziswa yilolu hlelo lokusebenza",
+      "noFilesDescription": "Lolu hlelo lokusebenza lusebenzisa amamodeli angafayela elilodwa le-GGUF.",
+      "tooLargeTitle": "Le modeli ingase ingasebenzi",
+      "tooLargeMessage": "{{name}} kungenzeka idinga inkumbulo eyengeziwe kunaleyo le divayisi enayo. Uhlelo lokusebenza lungavaleka ngesikhathi imodeli iphendula. Uyayilanda noma kunjalo?",
+      "downloadAnyway": "Landa noma kunjalo"
     },
     "localModels": {
       "title": "Amamodeli asedivayisini",

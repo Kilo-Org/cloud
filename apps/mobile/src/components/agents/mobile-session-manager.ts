@@ -7,6 +7,7 @@ import {
   type KiloSessionId,
   type ResolvedSession,
   type SessionManager,
+  type SessionSnapshotPageOutcome,
   type UserWebConnection,
 } from '@kilocode/cloud-agent-sdk';
 import { normalizeTransportPayload } from '@/components/agents/mobile-session-transport-payload';
@@ -165,6 +166,34 @@ export async function fetchSessionWithNotFoundRetry(
   }
 }
 
+/**
+ * The first page of a session just cloned onto a remote CLI, re-read while it
+ * is empty. The CLI answers `create_session` once the clone is in its own
+ * database; the transcript reaches session ingest only after the share
+ * bootstrap and the debounced full sync that follow. A read in between finds
+ * the session row with no history, and the transport reads the first page only
+ * once, so that empty page would stay on screen until the session is reopened.
+ * A clone always has messages, so an empty page here is never the final state.
+ */
+async function fetchClonedSessionFirstPage(
+  kiloSessionId: KiloSessionId
+): Promise<SessionSnapshotPageOutcome> {
+  let page = await fetchMobileSessionSnapshotPage(kiloSessionId, {});
+  for (
+    let attempt = 0;
+    attempt < SPAWNED_NOT_FOUND_MAX_ATTEMPTS &&
+    page.kind === 'success' &&
+    page.messages.length === 0;
+    attempt += 1
+  ) {
+    // eslint-disable-next-line no-await-in-loop -- flat 1s delay between re-reads
+    await defaultFetchSessionSleep(FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS);
+    // eslint-disable-next-line no-await-in-loop -- each re-read waits for the previous one
+    page = await fetchMobileSessionSnapshotPage(kiloSessionId, {});
+  }
+  return page;
+}
+
 type CreateMobileAgentSessionManagerOptions = {
   store: JotaiStore;
   userWebConnection: UserWebConnection;
@@ -176,6 +205,8 @@ type CreateMobileAgentSessionManagerOptions = {
    * shared anonymous scope.
    */
   userId?: string;
+  /** A session just cloned onto a remote CLI: its first page waits for the synced transcript. */
+  clonedSessionId?: KiloSessionId;
 };
 
 const skipBatchOptions = { context: { skipBatch: true } };
@@ -185,7 +216,10 @@ export function createMobileAgentSessionManager({
   userWebConnection,
   organizationId: initialOrganizationId,
   userId,
+  clonedSessionId,
 }: Readonly<CreateMobileAgentSessionManagerOptions>): SessionManager {
+  // Cleared by the first successful read, so reconnect replays never wait.
+  let awaitingClonedHistory = clonedSessionId ?? null;
   // The route resolves the session's organization from its metadata read, but
   // that read can be paused (offline) or stalled when the route mounts the
   // session on its persisted transcript, so the scope handed in may still be
@@ -312,6 +346,13 @@ export function createMobileAgentSessionManager({
       };
     },
     fetchSnapshotPage: async (id: KiloSessionId, options: { cursor?: string }) => {
+      if (!options.cursor && id === awaitingClonedHistory) {
+        const firstPage = await fetchClonedSessionFirstPage(id);
+        if (firstPage.kind === 'success') {
+          awaitingClonedHistory = null;
+        }
+        return firstPage;
+      }
       const outcome = await fetchMobileSessionSnapshotPage(id, options);
       return outcome;
     },

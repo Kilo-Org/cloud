@@ -2152,6 +2152,11 @@
       "collapse": "Məqsədi yığ",
       "expand": "Məqsədi göstər"
     },
+    "tasks": {
+      "progress": "{{completed}}/{{total}}",
+      "progressAccessibility": "Tapşırıqlar, {{total}} tapşırıqdan {{completed}} tamamlandı",
+      "rowAccessibility": "Tapşırıqlar, {{total}} tapşırıqdan {{completed}} tamamlandı. Cari tapşırıq: {{task}}"
+    },
     "newSession": {
       "recentlyUsed": "Son istifadə edilənlər",
       "couldNotLoadGithubRepositories": "GitHub repozitoriyalarını yükləmək mümkün olmadı.",
@@ -2207,6 +2212,10 @@
       "importingSession": "Sessiya idxal olunur",
       "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seç.",
       "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı.",
+      "cliCannotFork": "Mesajdan ayırmaq üçün Kilo CLI-ı yenilə.",
+      "forkCutNotSynced": "Bu mesaj hələ saxlanmayıb. Bir azdan yenidən cəhd et.",
+      "forkFilesFromBaseBranch": "Fayllar əsas branch-dən başlayır.",
+      "forkFilesUnchangedOnComputer": "Bu kompüterdəki fayllar dəyişdirilmir.",
       "pickProfile": "Profil seçin",
       "noProfile": "Profil yoxdur",
       "manageProfiles": "Profilləri idarə edin",
@@ -2322,6 +2331,7 @@
       "copyMessage": "Mesajı kopyala",
       "copyText": "Mətni kopyala",
       "selectText": "Mətni seç",
+      "forkFromHere": "Buradan ayır",
       "reportAiResponse": "AI cavabından şikayət et",
       "reportAiResponseConfirm": "Yoxlanılması üçün bu cavabdan şikayət göndərilsin?",
       "report": "Şikayət et",
@@ -3189,6 +3199,7 @@
     "tutorialLabel": "Təlimat"
   },
   "modelChat": {
+    "offlineFailure": "Bu model internet bağlantısı tələb edir. Qoşulun və yenidən cəhd edin və ya bu cihazdakı modelə keçin.",
     "empty": {
       "title": "Söhbətə başlayın",
       "description": "Bir modellə danışmaq üçün mesaj göndərin."
@@ -3212,6 +3223,11 @@
       "localNote": "Cihazdakı modellər bu cihazda işləyir. Onların xərci və sorğu keşi yoxdur, token sayları isə təxmini ola bilər.",
       "countedSinceNote": "Bu söhbət istifadə qeydə alınmazdan əvvəl başlayıb. Cəmlər yalnız ondan sonrakı cavabları göstərir.",
       "remoteServersOn": "Aktiv uzaq MCP serverləri"
+    },
+    "webSearch": {
+      "title": "Vebdə axtar",
+      "description": "Bu söhbətə Kilo hesabınız vasitəsilə aktual məlumat axtarmağa icazə verin. Axtarışlar aylıq axtarış limitinizdən istifadə edir.",
+      "allowanceExhausted": "Bu ay üçün pulsuz veb axtarışlarınız bitdi. Yenidən axtarmaq üçün kredit əlavə edin."
     },
     "mcp": {
       "title": "Kilo alətləri",
@@ -3338,8 +3354,48 @@
         "notGguf": "Link .gguf faylına yönəlməlidir.",
         "space": "Bu model üçün kifayət qədər boş yaddaş yoxdur. Yer boşaldın və yenidən cəhd edin.",
         "network": "Yükləmə tamamlanmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
-        "invalidFile": "Yüklənmiş fayl bu tətbiqin işlədə biləcəyi model deyil, ona görə silindi."
+        "invalidFile": "Yüklənmiş fayl bu tətbiqin işlədə biləcəyi model deyil, ona görə silindi.",
+        "checksum": "Yüklənmiş fayl dərc olunmuş yoxlama cəmi ilə uyğun gəlmir, ona görə silindi. Yükləməni yenidən cəhd edin."
       }
+    },
+    "catalog": {
+      "browse": "Modellərə bax",
+      "title": "Model kataloqu",
+      "search": "Hugging Face modellərində axtar",
+      "tabs": "Model filtri",
+      "fitsTab": "Bu cihaza uyğun",
+      "fromHuggingFace": "Hugging Face-dən",
+      "loading": "Modellər yüklənir",
+      "noResults": "Model tapılmadı",
+      "noFits": "Bu cihaza uyğun model yoxdur",
+      "noFitsDescription": "Daha böyük modellər $t(common.all) bölməsindədir.",
+      "fit": {
+        "fits": "Uyğundur",
+        "tight": "Çətinliklə sığır",
+        "tooLarge": "Çox böyükdür",
+        "noStorage": "Yaddaş kifayət etmir"
+      },
+      "parameters": "Parametrlər: {{value}}",
+      "downloads": "Yükləmələr: {{value}}",
+      "likes": "Bəyənmələr: {{value}}",
+      "context": "Kontekst pəncərəsi: {{value}}",
+      "license": "Lisenziya: {{license}}",
+      "licenseUnknown": "Lisenziya göstərilməyib",
+      "tools": "Alət çağırışı",
+      "vision": "Şəkil girişi",
+      "hintsHelp": "Hugging Face-dən göstərişlər. Tətbiq modeli yükləndikdən sonra yoxlayır.",
+      "gated": "Bu model Hugging Face hesabı tələb edir, ona görə də tətbiq onu yükləyə bilmir.",
+      "quantizations": "Kvantlaşdırmalar",
+      "quantizationsHelp": "Kiçik fayllar daha az yaddaş və yer tutur. Böyük fayllar adətən daha yaxşı cavablar verir.",
+      "quantDetail": "{{size}} yükləmə · təxminən {{memory}} yaddaş",
+      "downloadQuant": "{{quant}} yüklə",
+      "loadingModel": "Model məlumatları yüklənir",
+      "couldNotLoadModel": "Bu modeli yükləmək mümkün olmadı",
+      "noFiles": "Bu tətbiqin işlədə biləcəyi fayl yoxdur",
+      "noFilesDescription": "Bu tətbiq tək GGUF faylından ibarət modelləri işlədir.",
+      "tooLargeTitle": "Bu model işləməyə bilər",
+      "tooLargeMessage": "{{name}} çox güman ki, bu cihazda olandan daha çox yaddaş tələb edir. Model cavab verərkən tətbiq bağlana bilər. Yenə də yüklənsin?",
+      "downloadAnyway": "Yenə də yüklə"
     },
     "localModels": {
       "title": "Cihazdakı modellər",

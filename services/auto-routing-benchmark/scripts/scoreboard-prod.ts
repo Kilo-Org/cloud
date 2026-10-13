@@ -97,7 +97,9 @@ function axiomQuery(window: Window): AxiomQuery {
       throw new CollectionError('inconsistent tabular columns');
     }
     return Array.from({ length }, (_, row) =>
-      Object.fromEntries(table.fields.map((field, column) => [field.name, table.columns[column][row]]))
+      Object.fromEntries(
+        table.fields.map((field, column) => [field.name, table.columns[column][row]])
+      )
     );
   };
 }
@@ -141,8 +143,8 @@ async function workerMetrics(query: AxiomQuery): Promise<Partial<ProdMetrics>> {
     }
   }
   const requestCount = count(requests);
-  const availablePhases = timings.filter((entry): entry is readonly [typeof phases[number], Dist] =>
-    entry[1] !== null
+  const availablePhases = timings.filter(
+    (entry): entry is readonly [(typeof phases)[number], Dist] => entry[1] !== null
   );
   return {
     workerDecideMs: distribution(workerDuration),
@@ -172,7 +174,11 @@ function postgresEnv(): NodeJS.ProcessEnv {
   } catch {
     throw new CollectionError('invalid READ_REPLICA_URL');
   }
-  if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname || !url.pathname.slice(1)) {
+  if (
+    !['postgres:', 'postgresql:'].includes(url.protocol) ||
+    !url.hostname ||
+    !url.pathname.slice(1)
+  ) {
     throw new CollectionError('invalid READ_REPLICA_URL');
   }
   try {
@@ -225,9 +231,13 @@ ROLLBACK;`;
     });
     let stdout = '';
     child.stdout.setEncoding('utf8');
-    child.stdout.on('data', (chunk: string) => { stdout += chunk; });
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
     child.stderr.resume();
-    child.on('error', () => reject(new CollectionError('could not start psql; ensure it is installed')));
+    child.on('error', () =>
+      reject(new CollectionError('could not start psql; ensure it is installed'))
+    );
     child.on('close', code => {
       if (code === 0) resolve(stdout);
       else reject(new CollectionError('psql failed; check READ_REPLICA_URL and replica access'));
@@ -239,8 +249,11 @@ ROLLBACK;`;
   if (lines.length !== 2 || lines[0] !== 'n,p50,p90,p99,mean_usd,p50_usd,cache_share') {
     throw new CollectionError('invalid psql aggregate output');
   }
-  const values = lines[1].split(',').map(value => value === '' ? null : Number(value));
-  const [n, p50, p90, p99, mean, median, cacheShare] = z.array(nullableNumber).length(7).parse(values);
+  const values = lines[1].split(',').map(value => (value === '' ? null : Number(value)));
+  const [n, p50, p90, p99, mean, median, cacheShare] = z
+    .array(nullableNumber)
+    .length(7)
+    .parse(values);
   const latency = distributionSchema.parse({ n, p50, p90, p99 });
   return {
     modelTtftMs: latency.n ? latency : null,
@@ -266,7 +279,8 @@ async function main(): Promise<void> {
   }
   const end = new Date();
   const start = new Date(end.getTime() - hours * 3_600_000);
-  if (!Number.isFinite(start.getTime())) throw new CollectionError('--since is outside the date range');
+  if (!Number.isFinite(start.getTime()))
+    throw new CollectionError('--since is outside the date range');
   const window = { start: start.toISOString(), end: end.toISOString() };
   const metrics: ProdMetrics = {
     kind: 'prod',
@@ -283,13 +297,25 @@ async function main(): Promise<void> {
     prodCacheReadShare: null,
   };
   const jobs: Promise<void>[] = [
-    postgresMetrics(window).then(result => { Object.assign(metrics, result); }).catch(error => warn('Postgres', error)),
+    postgresMetrics(window)
+      .then(result => {
+        Object.assign(metrics, result);
+      })
+      .catch(error => warn('Postgres', error)),
   ];
   try {
     const query = axiomQuery(window);
     jobs.push(
-      workerMetrics(query).then(result => { Object.assign(metrics, result); }).catch(error => warn('Axiom worker', error)),
-      gatewayMetrics(query).then(result => { Object.assign(metrics, result); }).catch(error => warn('Axiom gateway', error))
+      workerMetrics(query)
+        .then(result => {
+          Object.assign(metrics, result);
+        })
+        .catch(error => warn('Axiom worker', error)),
+      gatewayMetrics(query)
+        .then(result => {
+          Object.assign(metrics, result);
+        })
+        .catch(error => warn('Axiom gateway', error))
     );
   } catch (error) {
     warn('Axiom', error);
@@ -299,6 +325,8 @@ async function main(): Promise<void> {
 }
 
 main().catch(error => {
-  console.error(error instanceof CollectionError ? error.message : 'Could not write production scoreboard.');
+  console.error(
+    error instanceof CollectionError ? error.message : 'Could not write production scoreboard.'
+  );
   process.exitCode = 1;
 });

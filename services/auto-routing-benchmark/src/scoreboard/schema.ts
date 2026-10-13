@@ -16,7 +16,10 @@ export type Dist = z.infer<typeof DistSchema>;
 
 export const ProdMetricsSchema = z.object({
   kind: z.literal('prod'),
-  window: z.object({ start: z.iso.datetime({ offset: true }), end: z.iso.datetime({ offset: true }) }),
+  window: z.object({
+    start: z.iso.datetime({ offset: true }),
+    end: z.iso.datetime({ offset: true }),
+  }),
   gatewayDecideMs: DistSchema.nullable(),
   workerDecideMs: DistSchema.nullable(),
   workerPhasesMs: z.record(z.string(), DistSchema).nullable(),

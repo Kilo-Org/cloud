@@ -18,7 +18,8 @@ export function buildScoreboard({
   now,
 }: BuildScoreboardInput): Scoreboard {
   const routeKeys = Object.keys(table.routes);
-  const routeMix = prod?.routeMix ?? Object.fromEntries(routeKeys.map(key => [key, 1 / routeKeys.length]));
+  const routeMix =
+    prod?.routeMix ?? Object.fromEntries(routeKeys.map(key => [key, 1 / routeKeys.length]));
   const weighted = (metric: 'accuracy' | 'avgCostUsd' | 'p50LatencyMs'): number | null => {
     let total = 0;
     let weight = 0;
@@ -43,7 +44,10 @@ export function buildScoreboard({
       },
       workerPhasesMs: prod?.workerPhasesMs ?? null,
       cacheHitRate: prod?.cacheHitRate ?? null,
-      modelTtftMs: { prod: prod?.modelTtftMs ?? null, benchmarkP50Weighted: weighted('p50LatencyMs') },
+      modelTtftMs: {
+        prod: prod?.modelTtftMs ?? null,
+        benchmarkP50Weighted: weighted('p50LatencyMs'),
+      },
     },
     cost: {
       prodPerRequestUsd: prod?.prodPerRequestUsd ?? { mean: null, p50: null },

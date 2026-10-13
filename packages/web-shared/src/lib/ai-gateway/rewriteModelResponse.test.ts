@@ -1309,6 +1309,7 @@ describe('fallback-only custom pricing', () => {
   test.each([
     ['no upstream cost', {}],
     ['a zero upstream cost', { cost: 0, is_byok: false }],
+    ['an upstream cost that rounds to zero microdollars', { cost: 0.0000004, is_byok: false }],
   ])('reports the custom-priced cost for %s', async (_name, upstreamCost) => {
     const result = await rewriteModelResponse_ChatCompletions({
       response: jsonResponse({

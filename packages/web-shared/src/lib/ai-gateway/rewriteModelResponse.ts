@@ -5,6 +5,7 @@ import {
   type CustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { calculateCustomPricingCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import {
   chatCompletionsUsageTokenCounts,
   messagesUsageTokenCounts,
@@ -446,10 +447,10 @@ type UpstreamUsageCost = {
   is_byok?: boolean | null;
 };
 
-/** Mirrors `computeOpenRouterCostFields`, which billing compares against zero. */
+/** Mirrors `computeOpenRouterCostFields`, whose microdollar cost billing compares against zero. */
 function upstreamReportsCost(usage: UpstreamUsageCost): boolean {
   const upstreamCost = usage.is_byok ? usage.cost_details?.upstream_inference_cost : usage.cost;
-  return (upstreamCost ?? 0) > 0;
+  return toMicrodollars(upstreamCost ?? 0) > 0;
 }
 
 function rewriteUsageCost(

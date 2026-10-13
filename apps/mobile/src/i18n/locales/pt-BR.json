@@ -3241,6 +3241,19 @@
       "deleteTitle": "Excluir esta conversa?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detalhes do chat",
+      "backend": "Servidor",
+      "effortDefault": "Padrão do modelo",
+      "noCost": "Sem custo",
+      "costUnknown": "Desconhecido",
+      "costEstimatedNote": "As respostas que não informaram preço foram estimadas com base nos preços de tabela.",
+      "costUnknownNote": "Nenhum preço é conhecido para este modelo.",
+      "costPartialNote": "Este total não inclui modelos sem preço conhecido.",
+      "localNote": "Os modelos no dispositivo rodam neste dispositivo. Eles não têm custo nem cache de prompt, e as contagens de tokens podem ser estimativas.",
+      "countedSinceNote": "Este chat começou antes de o uso ser registrado. Os totais mostram apenas as respostas depois disso.",
+      "remoteServersOn": "Servidores MCP remotos ativados"
+    },
     "mcp": {
       "title": "Ferramentas do Kilo",
       "use": "Usar as ferramentas do Kilo",

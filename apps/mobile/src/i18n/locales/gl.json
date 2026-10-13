@@ -3200,6 +3200,19 @@
       "deleteTitle": "Eliminar este chat?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detalles do chat",
+      "backend": "Servizo",
+      "effortDefault": "Predeterminado do modelo",
+      "noCost": "Sen custo",
+      "costUnknown": "Descoñecido",
+      "costEstimatedNote": "O custo das respostas que non informaron dun prezo estímase a partir dos prezos de tarifa.",
+      "costUnknownNote": "Non se coñece ningún prezo para este modelo.",
+      "costPartialNote": "Este total non inclúe os modelos sen prezo coñecido.",
+      "localNote": "Os modelos no dispositivo execútanse neste dispositivo. Non teñen custo nin caché de instrucións, e o seu reconto de unidades de texto pode ser estimado.",
+      "countedSinceNote": "Este chat comezou antes de que se rexistrase o uso. Os totais só mostran as respostas posteriores.",
+      "remoteServersOn": "Servidores MCP remotos activados"
+    },
     "mcp": {
       "title": "Ferramentas de Kilo",
       "use": "Usar as ferramentas de Kilo",

@@ -3200,6 +3200,19 @@
       "deleteTitle": "Deze chat verwijderen?"
     },
     "beta": "Bèta",
+    "details": {
+      "title": "Chatdetails",
+      "backend": "Chatserver",
+      "effortDefault": "Standaard van het model",
+      "noCost": "Geen kosten",
+      "costUnknown": "Onbekend",
+      "costEstimatedNote": "Antwoorden zonder opgegeven prijs zijn geschat op basis van lijstprijzen.",
+      "costUnknownNote": "Voor dit model is geen prijs bekend.",
+      "costPartialNote": "Dit totaal bevat geen modellen zonder bekende prijs.",
+      "localNote": "Modellen op het apparaat draaien op dit apparaat. Ze hebben geen kosten en geen promptcache, en hun aantal tokens kan een schatting zijn.",
+      "countedSinceNote": "Deze chat begon voordat het gebruik werd bijgehouden. De totalen tonen alleen de antwoorden daarna.",
+      "remoteServersOn": "Externe MCP-servers aan"
+    },
     "mcp": {
       "title": "Kilo-tools",
       "use": "Kilo-tools gebruiken",

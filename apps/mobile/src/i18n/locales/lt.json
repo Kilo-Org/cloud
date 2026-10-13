@@ -3282,6 +3282,19 @@
       "deleteTitle": "Ištrinti šį pokalbį?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Pokalbio informacija",
+      "backend": "Serveris",
+      "effortDefault": "Modelio numatytasis",
+      "noCost": "Nemokama",
+      "costUnknown": "Nežinoma",
+      "costEstimatedNote": "Atsakymų, kurie nenurodė kainos, kaina apskaičiuota pagal kainoraščio kainas.",
+      "costUnknownNote": "Šio modelio kaina nežinoma.",
+      "costPartialNote": "Į šią sumą neįtraukti modeliai, kurių kaina nežinoma.",
+      "localNote": "Įrenginio modeliai veikia šiame įrenginyje. Jie neturi kainos ir užklausų talpyklos, o jų žetonų skaičius gali būti apytikslis.",
+      "countedSinceNote": "Šis pokalbis prasidėjo prieš pradedant registruoti naudojimą. Sumos rodo tik vėlesnius atsakymus.",
+      "remoteServersOn": "Įjungti nuotoliniai MCP serveriai"
+    },
     "mcp": {
       "title": "Kilo įrankiai",
       "use": "Naudoti Kilo įrankius",

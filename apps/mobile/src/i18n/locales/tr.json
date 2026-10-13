@@ -3200,6 +3200,19 @@
       "deleteTitle": "Bu sohbet silinsin mi?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Sohbet ayrıntıları",
+      "backend": "Arka uç",
+      "effortDefault": "Model varsayılanı",
+      "noCost": "Maliyet yok",
+      "costUnknown": "Bilinmiyor",
+      "costEstimatedNote": "Fiyat bildirmeyen yanıtlar liste fiyatlarına göre tahmin edilmiştir.",
+      "costUnknownNote": "Bu model için bilinen bir fiyat yok.",
+      "costPartialNote": "Bu toplam, fiyatı bilinmeyen modelleri içermez.",
+      "localNote": "Cihazdaki modeller bu cihazda çalışır. Maliyetleri ve istem önbellekleri yoktur; belirteç sayıları tahmini olabilir.",
+      "countedSinceNote": "Bu sohbet, kullanım kaydedilmeye başlanmadan önce başladı. Toplamlar yalnızca bundan sonraki yanıtları gösterir.",
+      "remoteServersOn": "Açık uzak MCP sunucuları"
+    },
     "mcp": {
       "title": "Kilo araçları",
       "use": "Kilo araçlarını kullan",

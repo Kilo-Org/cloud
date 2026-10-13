@@ -3200,6 +3200,19 @@
       "deleteTitle": "Skrap hierdie klets?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Kletsbesonderhede",
+      "backend": "Agtergrondstelsel",
+      "effortDefault": "Modelverstek",
+      "noCost": "Geen koste",
+      "costUnknown": "Onbekend",
+      "costEstimatedNote": "Antwoorde wat nie 'n prys aangegee het nie, word volgens lyspryse geskat.",
+      "costUnknownNote": "Geen prys is vir hierdie model bekend nie.",
+      "costPartialNote": "Hierdie totaal sluit nie modelle in waarvoor geen prys bekend is nie.",
+      "localNote": "Modelle op die toestel loop op hierdie toestel. Hulle het geen koste en geen promptkas nie, en hul tekentellings kan skattings wees.",
+      "countedSinceNote": "Hierdie klets het begin voordat gebruik aangeteken is. Die totale wys slegs die antwoorde daarna.",
+      "remoteServersOn": "Afgeleë MCP-bedieners aan"
+    },
     "mcp": {
       "title": "Kilo-nutsmiddels",
       "use": "Gebruik Kilo-nutsmiddels",

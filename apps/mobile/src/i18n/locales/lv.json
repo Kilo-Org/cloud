@@ -3241,6 +3241,19 @@
       "deleteTitle": "Vai dzēst šo tērzēšanu?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Tērzēšanas informācija",
+      "backend": "Aizmugursistēma",
+      "effortDefault": "Modeļa noklusējums",
+      "noCost": "Bez maksas",
+      "costUnknown": "Nav zināms",
+      "costEstimatedNote": "Atbildes, kurām cena netika norādīta, ir aprēķinātas pēc cenrāža cenām.",
+      "costUnknownNote": "Šim modelim cena nav zināma.",
+      "costPartialNote": "Šajā kopsummā nav iekļauti modeļi, kuriem cena nav zināma.",
+      "localNote": "Ierīces modeļi darbojas šajā ierīcē. Tiem nav izmaksu un uzvedņu kešatmiņas, un to tokenu skaits var būt aptuvens.",
+      "countedSinceNote": "Šī tērzēšana sākās, pirms tika reģistrēts lietojums. Kopsummās ir tikai atbildes pēc tam.",
+      "remoteServersOn": "Ieslēgti attālinātie MCP serveri"
+    },
     "mcp": {
       "title": "Kilo rīki",
       "use": "Izmantot Kilo rīkus",

@@ -3364,6 +3364,19 @@
       "deleteTitle": "Dileu'r sgwrs hon?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Manylion sgwrs",
+      "backend": "Ôl-ben",
+      "effortDefault": "Rhagosodiad y model",
+      "noCost": "Dim cost",
+      "costUnknown": "Anhysbys",
+      "costEstimatedNote": "Mae cost atebion na wnaeth nodi pris wedi'i amcangyfrif o'r prisiau rhestr.",
+      "costUnknownNote": "Does dim pris yn hysbys ar gyfer y model hwn.",
+      "costPartialNote": "Nid yw'r cyfanswm hwn yn cynnwys modelau heb bris hysbys.",
+      "localNote": "Mae modelau ar y ddyfais yn rhedeg ar y ddyfais hon. Does dim cost na storfa anogwyr iddyn nhw, a gall eu cyfrif tocynnau fod yn amcangyfrifon.",
+      "countedSinceNote": "Dechreuodd y sgwrs hon cyn i'r defnydd gael ei gofnodi. Mae'r cyfansymiau'n dangos yr atebion ar ôl hynny yn unig.",
+      "remoteServersOn": "Gweinyddwyr MCP anghysbell ymlaen"
+    },
     "mcp": {
       "title": "Offer Kilo",
       "use": "Defnyddio offer Kilo",

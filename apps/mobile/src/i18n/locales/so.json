@@ -3200,6 +3200,19 @@
       "deleteTitle": "Ma tirtiraa wada sheekaysigan?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Faahfaahinta wada sheekaysiga",
+      "backend": "Adeegga gadaale",
+      "effortDefault": "Caadiga moodeelka",
+      "noCost": "Kharash ma leh",
+      "costUnknown": "Lama yaqaan",
+      "costEstimatedNote": "Jawaabaha aan sheegin qiimo waxaa lagu qiyaasay qiimaha liiska.",
+      "costUnknownNote": "Moodeelkan qiimo looma yaqaan.",
+      "costPartialNote": "Wadartan kuma jiraan moodeelada aan qiimo la yaqaan lahayn.",
+      "localNote": "Moodeelada aaladda gudaheeda waxay ku shaqeeyaan aaladdan. Kharash ma laha, kayd ku meelgaar ah oo codsiyada ma laha, tirada tokenno ee ay isticmaalaanna waxay noqon kartaa qiyaas.",
+      "countedSinceNote": "Wada sheekaysigan wuxuu bilaabmay ka hor intaan isticmaalka la diiwaangelin. Wadarta waxay muujinaysaa oo keliya jawaabaha intaas ka dambeeyay.",
+      "remoteServersOn": "Serverada MCP ee fog ee shidan"
+    },
     "mcp": {
       "title": "Qalabka Kilo",
       "use": "Isticmaal qalabka Kilo",

@@ -3200,6 +3200,19 @@
       "deleteTitle": "Bu söhbət silinsin?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Söhbətin təfərrüatları",
+      "backend": "Arxa xidmət",
+      "effortDefault": "Modelin standart dəyəri",
+      "noCost": "Xərc yoxdur",
+      "costUnknown": "Məlum deyil",
+      "costEstimatedNote": "Qiymət bildirməyən cavabların xərci siyahı qiymətlərinə əsasən təxmin edilib.",
+      "costUnknownNote": "Bu model üçün məlum qiymət yoxdur.",
+      "costPartialNote": "Bu cəmə qiyməti məlum olmayan modellər daxil deyil.",
+      "localNote": "Cihazdakı modellər bu cihazda işləyir. Onların xərci və sorğu keşi yoxdur, token sayları isə təxmini ola bilər.",
+      "countedSinceNote": "Bu söhbət istifadə qeydə alınmazdan əvvəl başlayıb. Cəmlər yalnız ondan sonrakı cavabları göstərir.",
+      "remoteServersOn": "Aktiv uzaq MCP serverləri"
+    },
     "mcp": {
       "title": "Kilo alətləri",
       "use": "Kilo alətlərindən istifadə et",

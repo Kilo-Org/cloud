@@ -3200,6 +3200,19 @@
       "deleteTitle": "このチャットを削除しますか？"
     },
     "beta": "ベータ",
+    "details": {
+      "title": "チャットの詳細",
+      "backend": "バックエンド",
+      "effortDefault": "モデルのデフォルト",
+      "noCost": "コストなし",
+      "costUnknown": "不明",
+      "costEstimatedNote": "価格が報告されなかった回答は、定価から推定しています。",
+      "costUnknownNote": "このモデルの価格は不明です。",
+      "costPartialNote": "この合計には、価格が不明なモデルは含まれていません。",
+      "localNote": "オンデバイスモデルはこのデバイス上で動作します。コストもプロンプトキャッシュもなく、トークン数は推定値の場合があります。",
+      "countedSinceNote": "このチャットは使用状況の記録が始まる前に開始されました。合計にはそれ以降の回答のみが含まれます。",
+      "remoteServersOn": "オンのリモートMCPサーバー"
+    },
     "mcp": {
       "title": "Kiloツール",
       "use": "Kiloツールを使う",

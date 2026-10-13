@@ -3200,6 +3200,19 @@
       "deleteTitle": "Ta fshini këtë bisedë?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Detajet e bisedës",
+      "backend": "Shërbimi mbështetës",
+      "effortDefault": "Parazgjedhja e modelit",
+      "noCost": "Pa kosto",
+      "costUnknown": "E panjohur",
+      "costEstimatedNote": "Përgjigjet që nuk raportuan çmim janë vlerësuar sipas çmimeve të listës.",
+      "costUnknownNote": "Nuk dihet asnjë çmim për këtë model.",
+      "costPartialNote": "Ky total nuk përfshin modelet pa çmim të njohur.",
+      "localNote": "Modelet në pajisje funksionojnë në këtë pajisje. Nuk kanë kosto as memorie të përkohshme për kërkesat, dhe numri i tokenëve të tyre mund të jetë i përafërt.",
+      "countedSinceNote": "Kjo bisedë filloi para se të regjistrohej përdorimi. Totalet tregojnë vetëm përgjigjet pas asaj kohe.",
+      "remoteServersOn": "Serverë MCP në distancë të aktivizuar"
+    },
     "mcp": {
       "title": "Mjetet Kilo",
       "use": "Përdor mjetet Kilo",

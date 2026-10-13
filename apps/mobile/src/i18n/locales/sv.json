@@ -3200,6 +3200,19 @@
       "deleteTitle": "Ta bort den här chatten?"
     },
     "beta": "Beta",
+    "details": {
+      "title": "Chattinformation",
+      "backend": "Backend",
+      "effortDefault": "Modellens standard",
+      "noCost": "Ingen kostnad",
+      "costUnknown": "Okänd",
+      "costEstimatedNote": "Svar som inte rapporterade något pris har uppskattats utifrån listpriser.",
+      "costUnknownNote": "Inget pris är känt för den här modellen.",
+      "costPartialNote": "Totalen omfattar inte modeller som saknar känt pris.",
+      "localNote": "Modeller på enheten körs på den här enheten. De har ingen kostnad och ingen promptcache, och deras antal token kan vara uppskattningar.",
+      "countedSinceNote": "Den här chatten startade innan användningen registrerades. Totalerna visar bara svaren efter det.",
+      "remoteServersOn": "Aktiverade MCP-fjärrservrar"
+    },
     "mcp": {
       "title": "Kilo-verktyg",
       "use": "Använd Kilo-verktyg",

@@ -3200,6 +3200,19 @@
       "deleteTitle": "删除这个对话？"
     },
     "beta": "测试版",
+    "details": {
+      "title": "聊天详情",
+      "backend": "后端",
+      "effortDefault": "模型默认",
+      "noCost": "无费用",
+      "costUnknown": "未知",
+      "costEstimatedNote": "未报告价格的回答按标价估算。",
+      "costUnknownNote": "此模型没有已知价格。",
+      "costPartialNote": "此总计不包括没有已知价格的模型。",
+      "localNote": "本机模型在此设备上运行。它们没有费用，也没有提示缓存，其词元数可能是估算值。",
+      "countedSinceNote": "此聊天开始于记录用量之前。总计仅包含之后的回答。",
+      "remoteServersOn": "已开启的远程 MCP 服务器"
+    },
     "mcp": {
       "title": "Kilo 工具",
       "use": "使用 Kilo 工具",

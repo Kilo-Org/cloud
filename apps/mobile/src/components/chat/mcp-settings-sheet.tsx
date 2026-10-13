@@ -16,7 +16,7 @@ import {
   retryKiloMcp,
   setMcpEnabled as setChatMcpEnabled,
 } from '@/lib/chat/registry';
-import { type RemoteMcpServerDraft, type StoredRemoteMcpServer } from '@/lib/chat/remote-mcp-store';
+import { type RemoteMcpServerDraft } from '@/lib/chat/remote-mcp-store';
 import { type ChatPlace } from '@/lib/chat/scope';
 import {
   isSettingsToolsEnabled,
@@ -27,12 +27,10 @@ import { useRemoteMcpServers } from '@/lib/chat/use-remote-mcp-servers';
 
 import {
   kiloServerRow,
+  type McpSettings,
   mcpSettingsView,
-  type McpSettingsView,
-  type RemoteMcpServerRow,
   remoteServerRows,
   settingsToolsView,
-  type SettingsToolsView,
 } from './mcp-settings-state';
 import { McpServerFormSheet, type McpServerFormTarget } from './mcp-server-form-sheet';
 import { McpServersSection } from './mcp-servers-section';
@@ -51,41 +49,6 @@ import { WebSearchRow, type WebSearchSetting } from './web-search-row';
  * than copying them, so a switch an agent flips — or a server another screen
  * adds — redraws this sheet without it being reopened.
  */
-
-/** The Kilo MCP control as a screen reads it. */
-export type McpSettings = {
-  /** The Kilo row's view, and the tone the header dot draws. */
-  readonly view: McpSettingsView;
-  readonly setEnabled: (next: boolean) => void;
-  readonly retry: () => void;
-  /** A Retry is in flight, so the button shows it is working. */
-  readonly retrying: boolean;
-  /** The one group switch for the settings-changing tools. */
-  readonly settingsTools: SettingsToolsView;
-  readonly settingsToolsEnabled: boolean;
-  readonly setSettingsToolsEnabled: (next: boolean) => void;
-  /** One row per stored remote server, in the stored order. */
-  readonly servers: readonly RemoteMcpServerRow[];
-  /** Whether the stored list has been read, so an empty list means none. */
-  readonly loaded: boolean;
-  /** The stored servers behind those rows, so an edit can prefill the form. */
-  readonly storedServers: readonly StoredRemoteMcpServer[];
-  readonly setServerEnabled: (id: string, next: boolean) => void;
-  /** The servers whose Retry is in flight, so only those buttons show it. */
-  readonly retryingServerIds: readonly string[];
-  /** Asks one server with no tools on hand again, with the longer deadline a Retry gets. */
-  readonly retryServer: (id: string) => void;
-  /** Asks every enabled server with no tools on hand, as the sheet opens. */
-  readonly discoverServers: () => void;
-  /** Adds a server, discovers it, and answers whether the write landed. */
-  readonly addServer: (draft: RemoteMcpServerDraft) => Promise<boolean>;
-  /** Replaces one server, discovers it, and answers whether the write landed. */
-  readonly updateServer: (id: string, draft: RemoteMcpServerDraft) => Promise<boolean>;
-  /** Removes one server and answers whether the write landed. */
-  readonly deleteServer: (id: string) => Promise<boolean>;
-  /** A server write is in flight, so the form's Save shows it is working. */
-  readonly saving: boolean;
-};
 
 /**
  * Subscribes to the connection and the stores, and reads the chat's setting.

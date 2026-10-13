@@ -12,7 +12,10 @@ describe('catalog candidate pricing', () => {
     const catalog = BenchmarkModelCatalogSchema.parse({
       data: [
         { id: 'synthetic/virtual', pricing: { prompt: '-1', completion: '-1' } },
-        { id: 'synthetic/normal', pricing: { prompt: '0.002', completion: '0.003', input_cache_read: '-1' } },
+        {
+          id: 'synthetic/normal',
+          pricing: { prompt: '0.002', completion: '0.003', input_cache_read: '-1' },
+        },
         { id: 'synthetic/malformed', pricing: 'unavailable' },
       ],
     });

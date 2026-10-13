@@ -222,12 +222,27 @@ function answer(
       await emit.single({ kind: 'done', usage, stop: 'tools' });
       await emit.end();
     };
+    const stopNative = async (stopped: string) => {
+      try {
+        await bridge.cancel(stopped);
+      } catch {
+        // The native request already ended; there is nothing left to stop.
+      }
+    };
     // The harness ends a turn with a round that offers no tools, so that the
     // model answers from the results it has. A resumed Foundation Models
     // generation keeps the tools its session opened with, and a call it makes
     // now would end the turn with no answer. The call gets a result that says
-    // so, and the same generation continues to its answer.
+    // so, and the same generation continues to its answer. A model that calls
+    // again after that would loop until the window is full, so it fails.
+    let refused = false;
     const refuse = async (calls: readonly NativeToolCall[]) => {
+      if (refused) {
+        fail('tools_refused');
+        await stopNative(id);
+        return;
+      }
+      refused = true;
       try {
         await bridge.resume?.(
           id,
@@ -255,13 +270,6 @@ function answer(
         void finish(event);
       }
     });
-    const stopNative = async (stopped: string) => {
-      try {
-        await bridge.cancel(stopped);
-      } catch {
-        // The native request already ended; there is nothing left to stop.
-      }
-    };
     const run = async () => {
       try {
         if (resumption !== undefined) {

@@ -91,6 +91,10 @@ const UNAVAILABLE_REASONS = new Set([
 /** A native promise rejection carries its stable reason as an Expo error code. */
 const codedRejection = z.object({ code: z.string() });
 
+/** What the model reads for a call it makes in a round that offers no tools. */
+const TOOLS_CLOSED =
+  'No tool can run for the rest of this answer. Answer now with the results you already have.';
+
 let sequence = 0;
 
 function problemOf(reason: string | undefined): LocalModelProblem {
@@ -149,6 +153,7 @@ function answer(
 ): Stream.Stream<ModelEvent, ModelError> {
   return Stream.async<ModelEvent, ModelError>(emit => {
     const tools = availability.tools === true && bridge.resume !== undefined;
+    const offersTools = tools && request.tools !== undefined && request.tools.length > 0;
     sequence += 1;
     const native = nativeRequest(request, {
       id: `quick-chat-${sequence}`,
@@ -217,6 +222,39 @@ function answer(
       await emit.single({ kind: 'done', usage, stop: 'tools' });
       await emit.end();
     };
+    const stopNative = async (stopped: string) => {
+      try {
+        await bridge.cancel(stopped);
+      } catch {
+        // The native request already ended; there is nothing left to stop.
+      }
+    };
+    // The harness ends a turn with a round that offers no tools, so that the
+    // model answers from the results it has. A resumed Foundation Models
+    // generation keeps the tools its session opened with, and a call it makes
+    // now would end the turn with no answer. The call gets a result that says
+    // so, and the same generation continues to its answer. A model that calls
+    // again after that would loop until the window is full, so it fails.
+    let refused = false;
+    const refuse = async (calls: readonly NativeToolCall[]) => {
+      if (refused) {
+        fail('tools_refused');
+        await stopNative(id);
+        return;
+      }
+      refused = true;
+      try {
+        await bridge.resume?.(
+          id,
+          calls.map(call => ({ callId: call.id, body: TOOLS_CLOSED }))
+        );
+      } catch (error) {
+        if (state === 'running') {
+          const coded = codedRejection.safeParse(error);
+          fail(coded.success ? coded.data.code : undefined);
+        }
+      }
+    };
     const subscription = bridge.addListener('onModelEvent', event => {
       if (event.id !== id || state !== 'running') {
         return;
@@ -225,20 +263,13 @@ function answer(
         output += event.text;
         void emit.single({ kind: 'delta', text: event.text });
       } else if (event.kind === 'toolCalls') {
-        void pause(event.calls);
+        void (offersTools ? pause(event.calls) : refuse(event.calls));
       } else if (event.kind === 'error') {
         fail(event.reason);
       } else {
         void finish(event);
       }
     });
-    const stopNative = async (stopped: string) => {
-      try {
-        await bridge.cancel(stopped);
-      } catch {
-        // The native request already ended; there is nothing left to stop.
-      }
-    };
     const run = async () => {
       try {
         if (resumption !== undefined) {

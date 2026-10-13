@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 
 import {
+  _androidSessionGenerationCountForTests,
   _resetAndroidSessionTokensForTests,
   _setDevicePushTokenReaderForTests,
   androidSessionActivityTokens,
@@ -244,6 +245,104 @@ describe('a release and a re-follow commute: the later call wins', () => {
 
     expect(mocks.unregister).not.toHaveBeenCalled();
     expect(mocks.register).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('the per-session generation map', () => {
+  const follow = (sessionId: string) => ({ ...FOLLOW, sessionId });
+
+  it('does not grow after follow and unfollow cycles', async () => {
+    // One cycle per session, run together: each follows, then unfollows.
+    await Promise.all(
+      ['session-1', 'session-2', 'session-3'].map(async sessionId => {
+        await registerAndroidSessionToken(follow(sessionId));
+        await releaseAndroidSessionToken(sessionId);
+      })
+    );
+    // A follow that stays followed, and an unfollow of a session never followed.
+    await registerAndroidSessionToken(follow('session-4'));
+    await releaseAndroidSessionToken('session-5');
+
+    expect(_androidSessionGenerationCountForTests()).toBe(0);
+  });
+
+  it('keeps the entry while a pending follow or a release delete still needs it', async () => {
+    mocks.register.mockRejectedValueOnce(new Error('offline'));
+    await registerAndroidSessionToken(FOLLOW);
+    expect(_androidSessionGenerationCountForTests()).toBe(1);
+
+    await retryAndroidSessionTokens();
+    expect(_androidSessionGenerationCountForTests()).toBe(0);
+
+    const { promise, resolve } = Promise.withResolvers<undefined>();
+    _setDevicePushTokenReaderForTests(async () => {
+      await promise;
+      return mocks.deviceToken;
+    });
+    const release = releaseAndroidSessionToken('session-9');
+    expect(_androidSessionGenerationCountForTests()).toBe(1);
+    resolve(undefined);
+    await release;
+    expect(_androidSessionGenerationCountForTests()).toBe(0);
+  });
+
+  it('is not pruned under a release whose delete still waits in the FIFO', async () => {
+    // The release is the later call, so its delete must run. The registration
+    // that was on the wire finishes first and prunes what it can; pruning the
+    // release's generation then would make its delete look superseded.
+    const { promise: upsert, resolve: answer } = Promise.withResolvers<undefined>();
+    mocks.register.mockReturnValueOnce(upsert);
+    const first = registerAndroidSessionToken(FOLLOW);
+    await vi.waitFor(() => {
+      expect(mocks.register).toHaveBeenCalledTimes(1);
+    });
+    // The release's own token read waits, so the registration settles (and
+    // prunes) before the release queues its delete.
+    const { promise: tokenRead, resolve: openTokenRead } = Promise.withResolvers<undefined>();
+    _setDevicePushTokenReaderForTests(async () => {
+      await tokenRead;
+      return mocks.deviceToken;
+    });
+    const release = releaseAndroidSessionToken('session-1');
+    answer(undefined);
+    await first;
+    openTokenRead(undefined);
+    await release;
+
+    expect(mocks.unregister).toHaveBeenCalledExactlyOnceWith({
+      token: 'ExponentPushToken[device]',
+      sessionId: 'session-1',
+    });
+    expect(_androidSessionGenerationCountForTests()).toBe(0);
+  });
+
+  it('still lets the later call win after the entry was pruned', async () => {
+    // One full cycle prunes the entry.
+    await registerAndroidSessionToken(FOLLOW);
+    await releaseAndroidSessionToken('session-1');
+    expect(_androidSessionGenerationCountForTests()).toBe(0);
+    mocks.register.mockClear();
+    mocks.unregister.mockClear();
+
+    // Then the race again: a release whose token read lets a re-follow's
+    // upsert overtake its delete must not delete the re-follow's row.
+    const { promise, resolve } = Promise.withResolvers<undefined>();
+    let first = true;
+    _setDevicePushTokenReaderForTests(async () => {
+      if (first) {
+        first = false;
+        await promise;
+      }
+      return mocks.deviceToken;
+    });
+    const release = releaseAndroidSessionToken('session-1');
+    await registerAndroidSessionToken(FOLLOW);
+    resolve(undefined);
+    await release;
+
+    expect(mocks.register).toHaveBeenCalledTimes(1);
+    expect(mocks.unregister).not.toHaveBeenCalled();
+    expect(_androidSessionGenerationCountForTests()).toBe(0);
   });
 });
 

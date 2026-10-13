@@ -54,13 +54,38 @@ const pending = new Map<string, PendingRegistration>();
 /** Sessions with a registration attempt running now, so a retry cannot double it. */
 const inFlight = new Set<string>();
 
-/** Bumped by every register and release of a session: the latest call's number. */
+/**
+ * The number of the latest register or release call of each session. Numbers
+ * come from one process-wide clock and never repeat, so an entry can be pruned
+ * and recreated without an old queued delete ever matching a newer call.
+ */
 const generations = new Map<string, number>();
+let generationClock = 0;
+
+/** Release calls of each session whose delete has not settled yet. */
+const releasesInFlight = new Map<string, number>();
 
 function nextGeneration(sessionId: string): number {
-  const generation = (generations.get(sessionId) ?? 0) + 1;
-  generations.set(sessionId, generation);
-  return generation;
+  generationClock += 1;
+  generations.set(sessionId, generationClock);
+  return generationClock;
+}
+
+/**
+ * Forget a session's generation once no call can still read it: nothing is
+ * pending, no registration attempt runs, and no release's delete waits. Only a
+ * queued delete compares generations (an upsert checks its own pending entry),
+ * so the map then holds nothing any operation needs, and it stays bounded by
+ * the sessions with work in progress.
+ */
+function pruneGeneration(sessionId: string): void {
+  if (
+    !pending.has(sessionId) &&
+    !inFlight.has(sessionId) &&
+    (releasesInFlight.get(sessionId) ?? 0) === 0
+  ) {
+    generations.delete(sessionId);
+  }
 }
 
 let registeredScope: { userId: string; organizationId: string | null } | null = null;
@@ -169,6 +194,8 @@ async function runRegistration(sessionId: string): Promise<void> {
     // The follow stays pending; the next foreground or publish retries it.
   } finally {
     inFlight.delete(sessionId);
+    // Every exit, the early ones included; a follow made meanwhile keeps it.
+    pruneGeneration(sessionId);
   }
   // A re-follow made while this attempt ran replaced the entry, and the guard
   // above skipped it: run it now instead of waiting for the next retry.
@@ -199,6 +226,11 @@ export async function retryAndroidSessionTokens(): Promise<void> {
       await runRegistration(sessionId);
     })
   );
+}
+
+/** Test-only: how many sessions still hold a generation entry. */
+export function _androidSessionGenerationCountForTests(): number {
+  return generations.size;
 }
 
 /** True while a follow of this session waits for its registration. */
@@ -237,12 +269,23 @@ async function deleteSessionRow(
  */
 export async function releaseAndroidSessionToken(sessionId: string): Promise<void> {
   const generation = nextGeneration(sessionId);
+  releasesInFlight.set(sessionId, (releasesInFlight.get(sessionId) ?? 0) + 1);
   pending.delete(sessionId);
   const known = tokensBySession.get(sessionId);
   tokensBySession.delete(sessionId);
-  const token = known ?? (await getDevicePushToken());
-  if (token !== null && token.length > 0) {
-    await deleteSessionRow(sessionId, token, generation);
+  try {
+    const token = known ?? (await getDevicePushToken());
+    if (token !== null && token.length > 0) {
+      await deleteSessionRow(sessionId, token, generation);
+    }
+  } finally {
+    const remaining = (releasesInFlight.get(sessionId) ?? 1) - 1;
+    if (remaining > 0) {
+      releasesInFlight.set(sessionId, remaining);
+    } else {
+      releasesInFlight.delete(sessionId);
+    }
+    pruneGeneration(sessionId);
   }
 }
 
@@ -261,5 +304,6 @@ export function _resetAndroidSessionTokensForTests(): void {
   pending.clear();
   inFlight.clear();
   generations.clear();
+  releasesInFlight.clear();
   androidSessionActivityTokens.clear();
 }

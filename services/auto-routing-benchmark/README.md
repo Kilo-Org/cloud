@@ -76,6 +76,8 @@ the current classifier winner from remote D1 through Wrangler. File inputs are
 validated; table candidates may include optional nullable `p50LatencyMs`. Live
 latency comes from each exact model/variant's ready, current-engine/repetition
 registry profile and its measuring-run summary for that route, or is null if absent.
+The live input also retains the published token profile, switch horizon, candidate
+pricing, and request-cost estimates; stored JSON fields are decoded and validated.
 Production and replay inputs are optional. Without production input, benchmark
 weights are uniform over table routes; otherwise they use the observed route mix.
 Missing routes and null benchmark metrics are excluded and the remaining weights normalized.

@@ -15,6 +15,8 @@ import { BenchmarkModelCatalogSchema, catalogCandidatePrices } from '../src/plat
 import { buildScoreboard } from '../src/scoreboard/build';
 import { compareScoreboards } from '../src/scoreboard/compare';
 import {
+  LiveScoreboardCandidateRowSchema,
+  LiveScoreboardTableRowSchema,
   ProdMetricsSchema,
   ReplayMetricsSchema,
   ScoreboardRoutingTableSchema,
@@ -23,29 +25,6 @@ import {
 
 const execFileAsync = promisify(execFile);
 const packageDirectory = fileURLToPath(new URL('..', import.meta.url));
-const tableRowSchema = z.object({
-  run_id: z.string(),
-  published_at: z.string(),
-  generated_at: z.string(),
-  min_accuracy: z.number(),
-  switch_cost_factor: z.number(),
-  best_accuracy_switch_threshold: z.number(),
-  source: z.string(),
-});
-const candidateRowSchema = z.object({
-  run_id: z.string(),
-  route_key: z.string(),
-  rank: z.number().int(),
-  model: z.string(),
-  accuracy: z.number(),
-  avg_cost_usd: z.number(),
-  meets_threshold: z
-    .union([z.boolean(), z.literal(0), z.literal(1)])
-    .transform(value => Boolean(value)),
-  reasoning_effort: z.string().nullable(),
-  variant: z.string(),
-  p50LatencyMs: z.number().nonnegative().nullable(),
-});
 const classifierRunSchema = z.object({
   id: z.string(),
   min_accuracy: z.number(),
@@ -96,7 +75,10 @@ function sqlString(value: string): string {
 
 async function loadLiveTable() {
   const [tableRows, classifierRuns] = await Promise.all([
-    queryD1('SELECT * FROM routing_tables ORDER BY published_at DESC LIMIT 1', tableRowSchema),
+    queryD1(
+      'SELECT * FROM routing_tables ORDER BY published_at DESC LIMIT 1',
+      LiveScoreboardTableRowSchema
+    ),
     queryD1(
       `SELECT id, min_accuracy, classifier_max_p95_latency_ms FROM benchmark_runs
       WHERE kind = 'classifier' AND status = 'completed'
@@ -118,7 +100,7 @@ async function loadLiveTable() {
       LEFT JOIN model_summaries s
         ON s.run_id = p.run_id AND s.model = p.model AND s.variant = p.variant AND s.route_key = c.route_key
       WHERE c.run_id = ${sqlString(tableRow.run_id)} ORDER BY c.route_key, c.rank`,
-      candidateRowSchema
+      LiveScoreboardCandidateRowSchema
     ),
     classifierRun
       ? queryD1(

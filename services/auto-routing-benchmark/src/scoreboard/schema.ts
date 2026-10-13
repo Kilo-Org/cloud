@@ -1,5 +1,10 @@
 import * as z from 'zod';
-import { RankedCandidateSchema, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
+import {
+  CandidatePricingSchema,
+  ProductionTokenProfileSchema,
+  RankedCandidateSchema,
+  RoutingTableSchema,
+} from '@kilocode/auto-routing-contracts';
 
 const nullableMetric = z.number().nonnegative().nullable();
 const nullableRate = z.number().min(0).max(1).nullable();
@@ -104,3 +109,45 @@ export const ScoreboardRoutingTableSchema = RoutingTableSchema.extend({
     }),
 });
 export type ScoreboardRoutingTable = z.infer<typeof ScoreboardRoutingTableSchema>;
+
+const storedJsonSchema = z.string().transform((value): unknown => JSON.parse(value));
+
+export const LiveScoreboardTableRowSchema = z.object({
+  run_id: z.string(),
+  published_at: z.string(),
+  generated_at: z.string(),
+  min_accuracy: z.number(),
+  switch_cost_factor: z.number(),
+  best_accuracy_switch_threshold: z.number(),
+  production_token_profile: storedJsonSchema
+    .pipe(ProductionTokenProfileSchema)
+    .nullish()
+    .transform(value => value ?? null),
+  switch_horizon_turns: z
+    .number()
+    .int()
+    .positive()
+    .nullish()
+    .transform(value => value ?? null),
+  source: z.string(),
+});
+
+export const LiveScoreboardCandidateRowSchema = z.object({
+  run_id: z.string(),
+  route_key: z.string(),
+  rank: z.number().int(),
+  model: z.string(),
+  accuracy: z.number(),
+  avg_cost_usd: z.number(),
+  meets_threshold: z
+    .union([z.boolean(), z.literal(0), z.literal(1)])
+    .transform(value => Boolean(value)),
+  reasoning_effort: z.string().nullable(),
+  variant: z.string(),
+  pricing: storedJsonSchema
+    .pipe(CandidatePricingSchema)
+    .nullish()
+    .transform(value => value ?? null),
+  estimated_request_cost_usd: nullableMetric.optional().transform(value => value ?? null),
+  p50LatencyMs: nullableMetric,
+});

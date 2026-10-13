@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { rowsToRoutingTable } from '../db';
 import { buildScoreboard } from './build';
 import { compareScoreboards } from './compare';
 import { estimateClassifiedMetrics } from './production';
 import {
+  LiveScoreboardCandidateRowSchema,
+  LiveScoreboardTableRowSchema,
   ReplayMetricsSchema,
   ScoreboardRoutingTableSchema,
   ScoreboardSchema,
@@ -132,6 +135,49 @@ describe('buildScoreboard', () => {
         costProfile: { uncachedInputTokens: 10, cachedInputTokens: 100 },
       }).cost.estimatedRequestUsdWeighted
     ).toBeNull();
+  });
+
+  it('uses persisted live-table pricing and token profile without override flags', () => {
+    const profile = { uncachedInputTokens: 10, cachedInputTokens: 100 };
+    const pricing = {
+      promptUsdPerToken: 0.01,
+      completionUsdPerToken: 0.02,
+      cacheReadUsdPerToken: 0.001,
+    };
+    const tableRow = LiveScoreboardTableRowSchema.parse({
+      run_id: 'fixture/live',
+      published_at: now.toISOString(),
+      generated_at: now.toISOString(),
+      min_accuracy: 0.5,
+      switch_cost_factor: 2,
+      best_accuracy_switch_threshold: 0.05,
+      production_token_profile: JSON.stringify(profile),
+      switch_horizon_turns: 3,
+      source: 'benchmark',
+    });
+    const candidateRow = LiveScoreboardCandidateRowSchema.parse({
+      run_id: tableRow.run_id,
+      route_key: 'implementation/code_generation',
+      rank: 0,
+      model: 'fixture/priced',
+      accuracy: 0.8,
+      avg_cost_usd: 0.02,
+      meets_threshold: 1,
+      reasoning_effort: null,
+      variant: '',
+      pricing: JSON.stringify(pricing),
+      estimated_request_cost_usd: 0.22,
+      p50LatencyMs: 100,
+    });
+    const parsed = ScoreboardRoutingTableSchema.parse(rowsToRoutingTable(tableRow, [candidateRow]));
+    expect(parsed.productionTokenProfile).toEqual(profile);
+    expect(parsed.switchHorizonTurns).toBe(3);
+    expect(parsed.routes['implementation/code_generation'][0]).toMatchObject({
+      pricing,
+      estimatedRequestCostUsd: 0.22,
+      meetsThreshold: true,
+    });
+    expect(build(parsed).cost.estimatedRequestUsdWeighted).toBeCloseTo(0.22);
   });
 
   it('weights prompt-aware estimates without changing the published first picks', () => {

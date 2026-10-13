@@ -22,12 +22,10 @@ type StoredConversationState = {
   classification: StoredEntry | null;
   sticky: StoredValue | null;
   pendingCostUsd: StoredValue | null;
-  generation: number;
 };
 
 const STICKY_DECISION_KEY = 'sticky';
 const PENDING_COST_KEY = 'pending-cost';
-const GENERATION_KEY = 'generation';
 const PendingCostSchema = z.number().finite().nonnegative();
 
 const classificationHotCache = new Map<string, { value: ClassifierOutput; storedAt: number }>();
@@ -54,36 +52,22 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
       classificationKey,
       STICKY_DECISION_KEY,
       PENDING_COST_KEY,
-      GENERATION_KEY,
     ]);
     const now = Date.now();
-    const previousGeneration = PendingCostSchema.safeParse(entries.get(GENERATION_KEY)?.value);
-    const generation = (previousGeneration.success ? previousGeneration.data : 0) + 1;
-    entries.delete(GENERATION_KEY);
-    const keysToDelete: string[] = [];
     for (const [key, entry] of entries) {
       if (
         now - entry.storedAt >
         (key === PENDING_COST_KEY ? PENDING_COST_RETENTION_MS : ENTRY_TTL_MS)
       ) {
         entries.delete(key);
-        keysToDelete.push(key);
       }
     }
     const pendingCost = entries.get(PENDING_COST_KEY);
-    if (consumePendingCost && pendingCost) keysToDelete.push(PENDING_COST_KEY);
-    await Promise.all([
-      this.ctx.storage.put(GENERATION_KEY, {
-        value: generation,
-        storedAt: now,
-      } satisfies StoredEntry),
-      ...(keysToDelete.length > 0 ? [this.ctx.storage.delete(keysToDelete)] : []),
-    ]);
+    if (consumePendingCost && pendingCost) await this.ctx.storage.delete(PENDING_COST_KEY);
     return {
       classification: entries.get(classificationKey) ?? null,
       sticky: entries.get(STICKY_DECISION_KEY)?.value ?? null,
       pendingCostUsd: pendingCost?.value ?? null,
-      generation,
     };
   }
 
@@ -125,7 +109,6 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
     const expiredKeys: string[] = [];
     let liveEntries = 0;
     for (const [key, entry] of entries) {
-      if (key === GENERATION_KEY) continue;
       if (
         now - entry.storedAt >
         (key === PENDING_COST_KEY ? PENDING_COST_RETENTION_MS : ENTRY_TTL_MS)
@@ -172,7 +155,6 @@ export type ConversationState = {
   classification: ClassifierOutput | null;
   sticky: StickyDecision | null;
   pendingCostUsd: number;
-  generation: number;
 };
 
 export async function readConversationState(
@@ -207,10 +189,9 @@ export async function readConversationState(
       classification,
       sticky: sticky.success ? sticky.data : null,
       pendingCostUsd: pendingCost.success ? pendingCost.data : 0,
-      generation: state.generation,
     };
   } catch {
-    return { classification: null, sticky: null, pendingCostUsd: 0, generation: 0 };
+    return { classification: null, sticky: null, pendingCostUsd: 0 };
   }
 }
 

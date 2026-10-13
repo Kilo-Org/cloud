@@ -177,7 +177,7 @@ export async function testStoredSubstackCredential(): Promise<
 
 export async function replaceSubstackCredential(params: {
   material: string;
-  totpSecret?: string | null;
+  totpSecret?: string;
   actorKiloUserId: string;
 }): Promise<void> {
   const parsed = parseSubstackCredential(params.material);
@@ -190,7 +190,7 @@ export async function replaceSubstackCredential(params: {
   }
 
   let totpSecret = parsed.credential.totpSecret;
-  if (params.totpSecret !== undefined && params.totpSecret !== null) {
+  if (params.totpSecret !== undefined) {
     const trimmed = params.totpSecret.trim();
     if (trimmed) {
       const normalized = normalizeTotpSecret(trimmed);
@@ -395,7 +395,11 @@ async function classifySubstackProfileResponse(
 function reauthFailureResult(failure: SubstackReauthFailure): SubstackCredentialTestResult {
   switch (failure.kind) {
     case 'fetch_failed':
-      return { status: 'error', errorCode: failure.errorCode };
+      return {
+        status: 'error',
+        errorCode:
+          failure.errorCode === 'redirect' ? 'substack_redirect_blocked' : failure.errorCode,
+      };
     case 'http':
       if (failure.status === 401) return { status: 'expired' };
       if (failure.status === 403) return { status: 'error', errorCode: 'substack_forbidden' };

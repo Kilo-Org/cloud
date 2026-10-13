@@ -1,7 +1,7 @@
 import {
   USER_DELETION_SUBSTACK_TIMEOUT_MS,
   USER_DELETION_SUBSTACK_USER_AGENT,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { generateTotpCode, normalizeTotpSecret } from '@/lib/user/deletion-queue/substack-totp';
 
 const REAUTH_START_PATH = '/api/v1/reauthenticate/start';
@@ -210,7 +210,8 @@ function parseSetCookie(
   const value = pair.slice(separator + 1).trim();
   if (!name) return null;
 
-  let remove = value === '';
+  let hasExpiryDirective = false;
+  let remove = false;
   for (const segment of segments.slice(1)) {
     const trimmed = segment.trim();
     const attributeSeparator = trimmed.indexOf('=');
@@ -223,12 +224,19 @@ function parseSetCookie(
       attributeSeparator === -1 ? '' : trimmed.slice(attributeSeparator + 1).trim();
     if (attributeName === 'max-age') {
       const seconds = Number.parseInt(attributeValue, 10);
-      if (Number.isFinite(seconds) && seconds <= 0) remove = true;
+      if (Number.isFinite(seconds)) {
+        hasExpiryDirective = true;
+        if (seconds <= 0) remove = true;
+      }
     } else if (attributeName === 'expires') {
       const expires = Date.parse(attributeValue);
-      if (!Number.isNaN(expires) && expires <= now) remove = true;
+      if (!Number.isNaN(expires)) {
+        hasExpiryDirective = true;
+        if (expires <= now) remove = true;
+      }
     }
   }
+  if (!hasExpiryDirective && value === '') remove = true;
   return { name, value, remove };
 }
 

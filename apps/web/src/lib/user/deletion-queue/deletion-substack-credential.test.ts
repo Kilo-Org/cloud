@@ -255,6 +255,19 @@ describe('testSubstackCredentialMaterial', () => {
       result: { status: 'error', errorCode: 'substack_reauth_method_unsupported' },
     });
   });
+
+  it('maps a blocked reauth redirect to substack_redirect_blocked', async () => {
+    jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(Response.json({ handle: 'jane', name: 'Jane Doe' }))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch: redirect'));
+
+    await expect(
+      testSubstackCredentialMaterial('connect.sid=abc123', RFC_SECRET)
+    ).resolves.toMatchObject({
+      result: { status: 'error', errorCode: 'substack_redirect_blocked' },
+    });
+  });
 });
 
 describe('Substack credential storage', () => {

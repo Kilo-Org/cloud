@@ -39,6 +39,11 @@ describe('cookie jar', () => {
     expect(applyResponseCookies('a=1', response)).toBe('a=9');
   });
 
+  it('honors a positive Max-Age over an empty cookie value', () => {
+    const response = responseWithCookies('a=; Max-Age=3600');
+    expect(applyResponseCookies('a=1; connect.sid=x', response)).toBe('a=; connect.sid=x');
+  });
+
   it('returns the original string when nothing changes', () => {
     const response = responseWithCookies('a=1');
     expect(applyResponseCookies('a=1; connect.sid=x', response)).toBe('a=1; connect.sid=x');

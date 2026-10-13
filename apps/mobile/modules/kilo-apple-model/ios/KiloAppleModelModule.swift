@@ -584,6 +584,15 @@ private actor AppleModelEngine {
   private static func safeReason(_ error: Error) -> String {
     if error is CancellationError { return "cancelled" }
     if let error = error as? AppleModelFailure { return error.reason }
+    // Foundation Models reports a failed token generation as a bare NSError
+    // (code -1, which no GenerationError case has), so no enum cast below
+    // matches it. It is transient, so JavaScript can try again.
+    let failure = error as NSError
+    if failure.domain == "FoundationModels.LanguageModelSession.GenerationError",
+       let underlying = failure.userInfo[NSMultipleUnderlyingErrorsKey] as? [NSError],
+       underlying.contains(where: { $0.domain == "com.apple.tokengeneration" && $0.code == 10 }) {
+      return "token_generation_failed"
+    }
     #if KILO_FOUNDATION_MODELS_USAGE
     if #available(iOS 27.0, *) {
       if let error = error as? LanguageModelError {
@@ -618,14 +627,6 @@ private actor AppleModelEngine {
       case .concurrentRequests: return "busy"
       default: return "generation_failed"
       }
-    }
-    // Foundation Models reports a failed token generation as a bare NSError, not
-    // as a GenerationError case. It is transient, so JavaScript can try again.
-    let failure = error as NSError
-    if failure.domain == "FoundationModels.LanguageModelSession.GenerationError",
-       let underlying = failure.userInfo[NSMultipleUnderlyingErrorsKey] as? [NSError],
-       underlying.contains(where: { $0.domain == "com.apple.tokengeneration" && $0.code == 10 }) {
-      return "token_generation_failed"
     }
     // Never expose a provider exception's debugDescription, prompt, or output.
     return "generation_failed"

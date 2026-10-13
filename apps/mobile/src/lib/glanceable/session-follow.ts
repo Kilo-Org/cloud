@@ -158,7 +158,10 @@ export const applyFixtureSessionContent = async (
   if (card === undefined) {
     return false;
   }
-  void settleFixtureCardWork(
+  // Awaited so a fixture's "applied" line only prints once the card holds the
+  // content, on both platforms. The helper swallows a write to a card iOS has
+  // already removed.
+  await settleFixtureCardWork(
     card.update(
       content,
       GLANCEABLE_STALE_MS / 1000,

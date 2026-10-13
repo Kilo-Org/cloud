@@ -417,6 +417,12 @@ A call is tried again on a transport failure and on 408, 409, 425, 429, 500,
 body is read, so a second try never repeats text the caller has already seen.
 The older `/api/openrouter` prefix also works; the package does not use it.
 
+A `chat_completions` reply on this gateway reports what the call cost, in US
+dollars, as `usage.cost`. The wire reads it into `ModelUsage.cost`, and
+`session.usage` adds it up. The gateway removes it for a free model and for a
+model with a custom price, so an absent cost is not a zero. The `messages` and
+`responses` wires do not read a cost.
+
 ### The gateway wants the session id in a header
 
 Every call carries `x-kilo-session`, which is the session's own id. The gateway

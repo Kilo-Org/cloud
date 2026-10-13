@@ -4,10 +4,16 @@ import { stopFrom, type Wire, type WirePart } from './wire.js';
 import { readCached, type TokenCount } from './usage.js';
 import { toBody } from './completions-body.js';
 
+/**
+ * `cost` is the Kilo gateway's and OpenRouter's own field: what the call cost in
+ * US dollars. It is read apart from the check, so a provider that sends it in
+ * another form loses the cost and keeps its token counts.
+ */
 interface Counts {
   prompt_tokens: TokenCount;
   completion_tokens: TokenCount;
   prompt_tokens_details?: { cached_tokens?: TokenCount | null } | null;
+  cost?: unknown;
 }
 
 const stopReasons: Readonly<Record<string, StopReason>> = {
@@ -65,12 +71,17 @@ const isReasoning = createIs<ReasoningEvent>();
 const isUsage = createIs<UsageEvent>();
 const isStop = createIs<StopEvent>();
 
-const readUsage = (usage: Counts): Partial<ModelUsage> =>
-  readCached(
+const costOf = (cost: unknown): { readonly cost?: number } =>
+  typeof cost === 'number' && Number.isFinite(cost) && cost >= 0 ? { cost } : {};
+
+const readUsage = (usage: Counts): Partial<ModelUsage> => ({
+  ...readCached(
     usage.prompt_tokens,
     usage.completion_tokens,
     usage.prompt_tokens_details?.cached_tokens ?? 0
-  );
+  ),
+  ...costOf(usage.cost),
+});
 
 /**
  * The empty-choices frame is filtered here rather than in the type. A tuple

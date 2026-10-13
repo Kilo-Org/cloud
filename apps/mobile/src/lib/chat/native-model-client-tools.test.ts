@@ -233,6 +233,22 @@ describe('native on-device model client with tools', () => {
     expect(bridge.generate).toHaveBeenCalledOnce();
   });
 
+  it('does not start again when a token generation fails after the model asked for a tool', async () => {
+    const failsTokenGeneration = Object.assign(new Error('token_generation_failed'), {
+      code: 'token_generation_failed',
+    });
+    const { bridge } = toolBridge((native, send) => {
+      send({ id: native.id, kind: 'toolCalls', calls: [call] });
+      send({ id: native.id, kind: 'error', reason: 'token_generation_failed' });
+      throw failsTokenGeneration;
+    });
+    expect(await said(nativeModelClient(bridge))).toEqual([
+      { kind: 'toolCall', call },
+      expect.objectContaining({ kind: 'done', stop: 'tools' }),
+    ]);
+    expect(bridge.generate).toHaveBeenCalledOnce();
+  });
+
   it('keeps a provider without the tool loop text-only', async () => {
     const { bridge } = toolBridge(answerWith({}));
     await said(nativeModelClient({ ...bridge, resume: undefined }));

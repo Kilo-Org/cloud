@@ -66,6 +66,7 @@ export function CloudAgentWorkspaceTabs({
   activeTabRef,
   chatSessions,
   currentChatProgress,
+  currentChatLoadingLabel,
   currentSessionId,
   worktreeId,
   openChatSessionIds,
@@ -96,6 +97,7 @@ export function CloudAgentWorkspaceTabs({
   onCloseFile: (path: string) => void;
   chatSessions: StoredSession[];
   currentChatProgress?: { sessionId: string; message: string } | null;
+  currentChatLoadingLabel?: string | null;
   currentSessionId: string | null;
   worktreeId?: string | null;
   openChatSessionIds?: readonly string[];
@@ -163,6 +165,16 @@ export function CloudAgentWorkspaceTabs({
   const suppressedSelectionProps = selectionSuppressed
     ? { 'aria-selected': false, 'data-state': 'inactive' }
     : {};
+
+  const loadingIndicator = currentChatLoadingLabel ? (
+    <span role="status" aria-label={currentChatLoadingLabel}>
+      <LoaderCircle
+        className="text-muted-foreground h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
+        aria-hidden="true"
+      />
+      <span className="sr-only">{currentChatLoadingLabel}</span>
+    </span>
+  ) : null;
 
   type DisplayChatTab = { pending: true } | { pending: false; session: StoredSession };
   const displayChatTabs: DisplayChatTab[] =
@@ -413,7 +425,9 @@ export function CloudAgentWorkspaceTabs({
                   >
                     <TooltipTrigger>
                       <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                        {activityKind ? (
+                        {selected && !isEditing && loadingIndicator ? (
+                          loadingIndicator
+                        ) : activityKind ? (
                           <SessionStatusIndicator
                             status={session.sessionStatus ?? null}
                             statusUpdatedAt={session.sessionStatusUpdatedAt ?? null}
@@ -515,7 +529,13 @@ export function CloudAgentWorkspaceTabs({
               value={CHAT_TAB_ID}
               className={tabTriggerClassName}
             >
-              <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                {activeTabId === CHAT_TAB_ID && !selectionSuppressed && loadingIndicator ? (
+                  loadingIndicator
+                ) : (
+                  <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                )}
+              </span>
               <span className="min-w-0 truncate">Chat</span>
             </TabsTrigger>
           </div>

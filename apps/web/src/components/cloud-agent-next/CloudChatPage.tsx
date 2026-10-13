@@ -1477,15 +1477,21 @@ export default function CloudChatPage({
   );
 
   // -- Delayed loading indicator (avoid flash for fast switches) ------------
+  const isTranscriptLoading =
+    transcriptPhase === 'opening' || isRefreshingCachedTranscript || isLoading;
   const [showLoadingIndicator, setShowLoadingIndicator] = useState(false);
   useEffect(() => {
-    if (!isLoading) {
-      setShowLoadingIndicator(false);
-      return;
-    }
+    setShowLoadingIndicator(false);
+    if (!isTranscriptLoading) return;
     const timer = setTimeout(() => setShowLoadingIndicator(true), 1000);
     return () => clearTimeout(timer);
-  }, [isLoading]);
+  }, [isTranscriptLoading, sessionIdFromParams]);
+  const currentChatLoadingLabel =
+    isTranscriptLoading && showLoadingIndicator
+      ? isRefreshingCachedTranscript
+        ? 'Refreshing session…'
+        : 'Loading session…'
+      : null;
 
   // -- Derived state --------------------------------------------------------
   const showChatInterface =
@@ -1769,18 +1775,6 @@ export default function CloudChatPage({
                 onValueChange={handleWorkspaceValueChange}
                 className="flex min-h-0 flex-1 flex-col"
               >
-                {(transcriptPhase === 'opening' ||
-                  isRefreshingCachedTranscript ||
-                  showLoadingIndicator) && (
-                  <div
-                    role="status"
-                    aria-label={
-                      isRefreshingCachedTranscript ? 'Refreshing session…' : 'Loading session…'
-                    }
-                    className="bg-primary h-0.5 w-full animate-pulse motion-reduce:animate-none"
-                  />
-                )}
-
                 <div className="flex shrink-0 flex-wrap items-center gap-x-2 border-b px-3 py-2 sm:flex-nowrap">
                   <MobileSidebarToggle variant="inline" label="Worktrees" />
                   <div className="order-last min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-auto">
@@ -1792,6 +1786,7 @@ export default function CloudChatPage({
                         onCloseFile={handleCloseFileTab}
                         chatSessions={worktreeChats}
                         currentChatProgress={currentChatProgress}
+                        currentChatLoadingLabel={currentChatLoadingLabel}
                         openChatSessionIds={openWorktreeChats.map(chat => chat.sessionId)}
                         closedChatSessionIds={closedWorktreeChats.map(chat => chat.sessionId)}
                         currentSessionId={sessionIdFromParams}
@@ -1901,7 +1896,7 @@ export default function CloudChatPage({
                             ref={scrollContainerRef}
                             hidden={!chatTabActive}
                             inert={showPendingWorktreeView || showPendingFirstChatView || undefined}
-                            className={`absolute inset-0 overflow-x-hidden overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2 transition-opacity duration-150 ${showLoadingIndicator && transcriptPhase === 'live' ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+                            className="absolute inset-0 overflow-x-hidden overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2"
                             onScroll={handleScroll}
                           >
                             <div ref={messagesContentRef}>

@@ -295,6 +295,42 @@ describe('CloudAgentWorkspaceTabs', () => {
     expect(attentionTab).toContain('flex h-4 w-4 shrink-0 items-center justify-center"><span');
   });
 
+  it.each(['Loading session…', 'Refreshing session…'])(
+    'shows %s in the selected chat icon slot without changing the tab title',
+    label => {
+      const first = makeSession('ses_first', 'First chat');
+      const second = makeSession('ses_second', 'Second chat');
+      const html = renderWorkspaceTabs({
+        chatSessions: [first, second],
+        currentSessionId: first.sessionId,
+        currentChatLoadingLabel: label,
+      });
+      const firstTab = findButtonMarkup(html, first.prompt);
+      expect(firstTab).toContain(`role="status" aria-label="${label}"`);
+      expect(firstTab).toContain('flex h-4 w-4 shrink-0 items-center justify-center');
+      expect(firstTab).toContain('motion-reduce:animate-none');
+      expect(findButtonMarkup(html, second.prompt)).not.toContain(label);
+    }
+  );
+
+  it('does not show chat loading when another workspace tab is selected', () => {
+    const html = renderWorkspaceTabs({
+      activeTabId: terminalTabId('terminal_first'),
+      currentChatLoadingLabel: 'Loading session…',
+    });
+    expect(html).not.toContain('Loading session…');
+  });
+
+  it('shows loading in the standalone Chat tab icon slot', () => {
+    const html = renderWorkspaceTabs({
+      worktreeId: null,
+      currentChatLoadingLabel: 'Loading session…',
+    });
+    const tab = findButtonMarkup(html, '>Chat</span>');
+    expect(tab).toContain('role="status" aria-label="Loading session…"');
+    expect(tab).toContain('flex h-4 w-4 shrink-0 items-center justify-center');
+  });
+
   it('overlays current-chat progress without changing a chat tab title anchor or status slot', () => {
     const first = makeSession('ses_first', 'Short title');
     const second = makeSession('ses_second', 'Neighboring chat title');

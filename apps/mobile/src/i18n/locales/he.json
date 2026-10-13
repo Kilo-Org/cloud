@@ -137,6 +137,8 @@
     "yourOwnRepositories": "המאגרים שלך",
     "dismissed": "סומן להתעלמות",
     "agent": "סוֹכֵן",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "שינויים"
   },
   "language": {
@@ -321,7 +323,8 @@
       "kiloclaw": "פעילות KiloClaw",
       "balance": "התראות על היתרה",
       "security": "ממצאי אבטחה",
-      "spend": "התראות הוצאות"
+      "spend": "התראות הוצאות",
+      "followedSessions": "הפעלות במעקב"
     },
     "category": {
       "chatMessagesSubtitle": "תשובות בשיחות שלך",
@@ -1588,6 +1591,8 @@
       "title": "סשן",
       "copyErrorDetails": "העתקת פרטי השגיאה",
       "backToSessions": "חזרה לסשנים",
+      "follow": "מעקב במסך הנעילה",
+      "unfollow": "הפסקת מעקב במסך הנעילה",
       "couldNotLoad": "לא ניתן היה לטעון את הסשן.",
       "failedToLoadDetails": "לא ניתן היה לטעון את פרטי הסשן.",
       "failedToStopExecution": "לא ניתן היה לעצור את ההרצה.",
@@ -3211,6 +3216,8 @@
     "channelName": "סוכנים פעילים",
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה.",
     "openSession": "פתח",
+    "finished": "הסתיים",
+    "followFailed": "לא ניתן להציג את הסוכן הזה במסך הנעילה.",
     "approveFailed": "לא ניתן היה לאשר. הקש על $t(common.approve) כדי לנסות שוב.",
     "checked": "נבדק",
     "lastKnown": "מצב אחרון ידוע",
@@ -3219,7 +3226,26 @@
     "waitingForYou": "ממתין לך",
     "nextScheduled": "התזמונים הבאים",
     "answerNeeded": "נדרשת תשובה",
-    "waitingToRetry": "ממתין לניסיון חוזר"
+    "waitingToRetry": "ממתין לניסיון חוזר",
+    "step": {
+      "editing": "עריכה",
+      "reading": "קריאה",
+      "running": "הרצה",
+      "searching": "חיפוש באינטרנט",
+      "thinking": "חשיבה מעמיקה"
+    },
+    "planOf": "מתוך",
+    "filesChanged": "קבצים שונו",
+    "finishedIn": "הסתיים תוך",
+    "noActivityFor": "אין פעילות במשך",
+    "prOpened": "בקשת משיכה נפתחה",
+    "permissionWants": "רוצה להריץ",
+    "failure": {
+      "provider": "נעצר: שגיאת ספק",
+      "tool": "נעצר: שגיאת כלי",
+      "cancelled": "נעצר: בוטל",
+      "other": "עצור"
+    }
   },
   "transcriptionModel": {
     "title": "מודל תמלול",
@@ -3255,8 +3281,12 @@
     "list": {
       "loadFailed": "לא ניתן היה לטעון את היסטוריית השיחה.",
       "new": "צ'אט חדש",
-      "openHint": "פותח את הצ'אט. לחיצה ארוכה למחיקה.",
       "deleteTitle": "למחוק את הצ'אט הזה?"
+    },
+    "rename": {
+      "title": "שינוי שם הצ׳אט",
+      "accessibility": "שינוי שם הצ׳אט: {{title}}",
+      "openHint": "פותח את הצ'אט. לחיצה ארוכה לשינוי שם או למחיקה."
     },
     "beta": "בטא",
     "details": {

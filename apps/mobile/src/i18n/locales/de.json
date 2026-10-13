@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Deine eigenen Code-Repositories",
     "dismissed": "Verworfen",
     "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Änderungen"
   },
   "language": {
@@ -321,7 +323,8 @@
       "kiloclaw": "KiloClaw-Aktivitäten",
       "balance": "Guthaben-Warnungen",
       "security": "Sicherheitsbefunde",
-      "spend": "Ausgaben-Warnungen"
+      "spend": "Ausgaben-Warnungen",
+      "followedSessions": "Gefolgte Sitzungen"
     },
     "category": {
       "chatMessagesSubtitle": "antworten in deinen Unterhaltungen",
@@ -1576,6 +1579,8 @@
       "title": "Sitzung",
       "copyErrorDetails": "Fehlerdetails kopieren",
       "backToSessions": "Zurück zu den Sitzungen",
+      "follow": "Auf dem Sperrbildschirm verfolgen",
+      "unfollow": "Nicht mehr auf dem Sperrbildschirm verfolgen",
       "couldNotLoad": "Die Sitzung konnte nicht geladen werden.",
       "failedToLoadDetails": "Die Sitzungsdetails konnten nicht geladen werden.",
       "failedToStopExecution": "Die Ausführung konnte nicht gestoppt werden.",
@@ -3170,6 +3175,8 @@
     "channelName": "Aktive Agenten",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen.",
     "openSession": "Öffnen",
+    "finished": "Abgeschlossen",
+    "followFailed": "Dieser Agent konnte nicht auf dem Sperrbildschirm angezeigt werden.",
     "approveFailed": "Genehmigen fehlgeschlagen. Tippe auf $t(common.approve), um es erneut zu versuchen.",
     "checked": "Geprüft",
     "lastKnown": "Zuletzt bekannt",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Wartet auf dich",
     "nextScheduled": "Als Nächstes geplant",
     "answerNeeded": "Antwort erforderlich",
-    "waitingToRetry": "Wartet auf erneuten Versuch"
+    "waitingToRetry": "Wartet auf erneuten Versuch",
+    "step": {
+      "editing": "Bearbeiten",
+      "reading": "Lesen",
+      "running": "Ausführen",
+      "searching": "Websuche",
+      "thinking": "Durchdenken"
+    },
+    "planOf": "von",
+    "filesChanged": "Dateien geändert",
+    "finishedIn": "Fertig in",
+    "noActivityFor": "Keine Aktivität seit",
+    "prOpened": "Pull Request geöffnet",
+    "permissionWants": "Möchte ausführen",
+    "failure": {
+      "provider": "Gestoppt: Anbieterfehler",
+      "tool": "Gestoppt: Werkzeugfehler",
+      "cancelled": "Gestoppt: abgebrochen",
+      "other": "GESTOPPT"
+    }
   },
   "transcriptionModel": {
     "title": "Transkriptionsmodell",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Chatverlauf konnte nicht geladen werden.",
       "new": "Neuer Chat",
-      "openHint": "Öffnet den Chat. Zum Löschen lange drücken.",
       "deleteTitle": "Diesen Chat löschen?"
+    },
+    "rename": {
+      "title": "Chat umbenennen",
+      "accessibility": "Chat umbenennen: {{title}}",
+      "openHint": "Öffnet den Chat. Zum Umbenennen oder Löschen lange drücken."
     },
     "beta": "Beta",
     "details": {

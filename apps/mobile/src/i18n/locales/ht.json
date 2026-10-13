@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Pwòp depo ou yo",
     "dismissed": "Rejte",
     "agent": "Ajan",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Chanjman"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "Aktivite KiloClaw",
       "balance": "Alèt balans",
       "security": "Pwoblèm sekirite detekte",
-      "spend": "Alèt depans"
+      "spend": "Alèt depans",
+      "followedSessions": "Sesyon swiv"
     },
     "category": {
       "chatMessagesSubtitle": "repons nan konvèsasyon ou yo",
@@ -2088,6 +2091,8 @@
       "title": "Sesyon",
       "copyErrorDetails": "Kopye detay erè a",
       "backToSessions": "Tounen nan sesyon yo",
+      "follow": "Swiv sou ekran fèmen an",
+      "unfollow": "Sispann swiv sou ekran fèmen an",
       "couldNotLoad": "Nou pa t ka chaje sesyon an.",
       "failedToLoadDetails": "Nou pa t ka chaje detay sesyon an.",
       "failedToStopExecution": "Nou pa t ka sispann egzekisyon an.",
@@ -3170,6 +3175,8 @@
     "channelName": "Ajan aktif",
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an.",
     "openSession": "Louvri",
+    "finished": "Fini",
+    "followFailed": "Nou pa t ka montre ajan sa a sou ekran fèmen an.",
     "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò.",
     "checked": "Verifye",
     "lastKnown": "Dènye eta koni",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Ap tann ou",
     "nextScheduled": "Pwochen ki pwograme",
     "answerNeeded": "Bezwen repons",
-    "waitingToRetry": "Ap tann pou reeseye"
+    "waitingToRetry": "Ap tann pou reeseye",
+    "step": {
+      "editing": "Modifikasyon",
+      "reading": "Lekti",
+      "running": "Ekzekisyon",
+      "searching": "Rechèch wèb",
+      "thinking": "Ap reflechi"
+    },
+    "planOf": "sou",
+    "filesChanged": "fichye chanje",
+    "finishedIn": "Fini nan",
+    "noActivityFor": "Pa gen aktivite pou",
+    "prOpened": "Demann rale ouvè",
+    "permissionWants": "Vle ekzekite",
+    "failure": {
+      "provider": "Sispann: erè founisè",
+      "tool": "Sispann: erè zouti",
+      "cancelled": "Sispann: anile",
+      "other": "SISPANN"
+    }
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Pa t ka chaje istwa chat la.",
       "new": "Nouvo chat",
-      "openHint": "Louvri chat la. Peze lontan pou efase.",
       "deleteTitle": "Efase chat sa a?"
+    },
+    "rename": {
+      "title": "Chanje non chat la",
+      "accessibility": "Chanje non chat la: {{title}}",
+      "openHint": "Louvri chat la. Peze lontan pou chanje non an oswa pou efase."
     },
     "beta": "Beta",
     "details": {

@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Tus propios repositorios",
     "dismissed": "Descartado",
     "agent": "Agente",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Cambios"
   },
   "language": {
@@ -294,7 +296,8 @@
       "kiloclaw": "Actividad de KiloClaw",
       "balance": "Alertas de saldo",
       "security": "Hallazgos de seguridad",
-      "spend": "Alertas de gasto"
+      "spend": "Alertas de gasto",
+      "followedSessions": "Sesiones seguidas"
     },
     "category": {
       "chatMessagesSubtitle": "respuestas en tus conversaciones",
@@ -1588,6 +1591,8 @@
       "title": "Sesión",
       "copyErrorDetails": "Copiar detalles del error",
       "backToSessions": "Volver a las sesiones",
+      "follow": "Seguir en la pantalla de bloqueo",
+      "unfollow": "Dejar de seguir en la pantalla de bloqueo",
       "couldNotLoad": "No se pudo cargar la sesión.",
       "failedToLoadDetails": "No se pudieron cargar los detalles de la sesión.",
       "failedToStopExecution": "No se pudo detener la ejecución.",
@@ -3211,6 +3216,8 @@
     "channelName": "Agentes activos",
     "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo.",
     "openSession": "Abrir",
+    "finished": "Terminado",
+    "followFailed": "No se ha podido mostrar este agente en la pantalla de bloqueo.",
     "approveFailed": "No se pudo aprobar. Toca $t(common.approve) para intentarlo de nuevo.",
     "checked": "Comprobado",
     "lastKnown": "Último estado conocido",
@@ -3219,7 +3226,26 @@
     "waitingForYou": "En espera de tu respuesta",
     "nextScheduled": "Próximas programadas",
     "answerNeeded": "En espera de respuesta",
-    "waitingToRetry": "En espera de reintento"
+    "waitingToRetry": "En espera de reintento",
+    "step": {
+      "editing": "Editando",
+      "reading": "Leyendo",
+      "running": "Ejecutar",
+      "searching": "Búsqueda web",
+      "thinking": "Pensando a fondo"
+    },
+    "planOf": "de",
+    "filesChanged": "archivos modificados",
+    "finishedIn": "Terminado en",
+    "noActivityFor": "Sin actividad durante",
+    "prOpened": "Pull request abierto",
+    "permissionWants": "Quiere ejecutar",
+    "failure": {
+      "provider": "Detenido: error del proveedor",
+      "tool": "Detenido: error de herramienta",
+      "cancelled": "Detenido: cancelado",
+      "other": "DETENIDO"
+    }
   },
   "transcriptionModel": {
     "title": "Modelo de transcripción",
@@ -3255,8 +3281,12 @@
     "list": {
       "loadFailed": "No se pudo cargar el historial del chat.",
       "new": "Chat nuevo",
-      "openHint": "Abre el chat. Mantén pulsado para eliminar.",
       "deleteTitle": "¿Eliminar este chat?"
+    },
+    "rename": {
+      "title": "Cambiar nombre del chat",
+      "accessibility": "Cambiar nombre del chat: {{title}}",
+      "openHint": "Abre el chat. Mantén pulsado para cambiar el nombre o eliminar."
     },
     "beta": "Beta",
     "details": {

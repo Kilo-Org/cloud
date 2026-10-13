@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Izinqolobane zakho zekhodi",
     "dismissed": "Kuchithiwe",
     "agent": "Umenzeli",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Izinguquko"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "Umsebenzi we-KiloClaw",
       "balance": "Izexwayiso zebhalansi",
       "security": "Okutholakele kwezokuphepha",
-      "spend": "Izexwayiso zokusebenzisa imali"
+      "spend": "Izexwayiso zokusebenzisa imali",
+      "followedSessions": "Amaseshini alandiwe"
     },
     "category": {
       "chatMessagesSubtitle": "izimpendulo ezingxoxweni zakho",
@@ -2088,6 +2091,8 @@
       "title": "Iseshini",
       "copyErrorDetails": "Kopisha imininingwane yephutha",
       "backToSessions": "Buyela eziseshini",
+      "follow": "Landela esikrinini sokukhiya",
+      "unfollow": "Yeka ukulandela esikrinini sokukhiya",
       "couldNotLoad": "Asikwazanga ukulayisha iseshini.",
       "failedToLoadDetails": "Asikwazanga ukulayisha imininingwane yeseshini.",
       "failedToStopExecution": "Asikwazanga ukumisa ukusebenza.",
@@ -3170,6 +3175,8 @@
     "channelName": "Ama-ejenti asebenzayo",
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe.",
     "openSession": "Vula",
+    "finished": "Kuqediwe",
+    "followFailed": "Akukwazekanga ukubonisa lo menzeli esikrinini sokukhiya.",
     "approveFailed": "Asikwazanga ukugunyaza. Thepha $t(common.approve) ukuze uzame futhi.",
     "checked": "Kuhloliwe",
     "lastKnown": "Okwagcina kwaziwa",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Kulinde wena",
     "nextScheduled": "Okulandelayo okuhleliwe",
     "answerNeeded": "Kudinga impendulo",
-    "waitingToRetry": "Kulinde ukuzama futhi"
+    "waitingToRetry": "Kulinde ukuzama futhi",
+    "step": {
+      "editing": "Kuhlelwa",
+      "reading": "Kufundwa",
+      "running": "Gijima",
+      "searching": "Usesho lwewebhu",
+      "thinking": "Kucatshangelwa"
+    },
+    "planOf": "/",
+    "filesChanged": "amafayela ashintshiwe",
+    "finishedIn": "Kuqedwe ngo",
+    "noActivityFor": "Akukho msebenzi ku",
+    "prOpened": "Isicelo sokudonsa sivuliwe",
+    "permissionWants": "Ifuna ukugijima",
+    "failure": {
+      "provider": "Kumisiwe: iphutha lomhlinzeki",
+      "tool": "Kumisiwe: iphutha lethuluzi",
+      "cancelled": "Kumisiwe: kukhanseliwe",
+      "other": "IMISIWE"
+    }
   },
   "transcriptionModel": {
     "title": "Imodeli yokuguqula inkulumo",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Asikwazanga ukulayisha umlando wengxoxo.",
       "new": "Ingxoxo entsha",
-      "openHint": "Ivula ingxoxo. Cindezela isikhathi eside ukuze usule.",
       "deleteTitle": "Susa le ngxoxo?"
+    },
+    "rename": {
+      "title": "Qamba kabusha ingxoxo",
+      "accessibility": "Qamba kabusha ingxoxo: {{title}}",
+      "openHint": "Ivula ingxoxo. Cindezela isikhathi eside ukuze uqambe kabusha noma usule."
     },
     "beta": "Beta",
     "details": {

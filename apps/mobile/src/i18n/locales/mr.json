@@ -137,6 +137,8 @@
     "yourOwnRepositories": "तुमच्या स्वतःच्या रिपॉझिटरी",
     "dismissed": "दुर्लक्षित",
     "agent": "एजंट",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "बदल"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw मधील घडामोडी",
       "balance": "शिल्लक रकमेच्या सूचना",
       "security": "सुरक्षा निष्कर्ष",
-      "spend": "खर्चाच्या सूचना"
+      "spend": "खर्चाच्या सूचना",
+      "followedSessions": "फॉलो केलेली सत्रे"
     },
     "category": {
       "chatMessagesSubtitle": "तुमच्या संभाषणांमधील उत्तरे",
@@ -2088,6 +2091,8 @@
       "title": "सत्र",
       "copyErrorDetails": "त्रुटीचे तपशील कॉपी करा",
       "backToSessions": "सत्रांवर परत जा",
+      "follow": "लॉक स्क्रीनवर फॉलो करा",
+      "unfollow": "लॉक स्क्रीनवर फॉलो करणे थांबवा",
       "couldNotLoad": "सत्र लोड करता आले नाही.",
       "failedToLoadDetails": "सत्राचे तपशील लोड करता आले नाहीत.",
       "failedToStopExecution": "चालू काम थांबवता आले नाही.",
@@ -3170,6 +3175,8 @@
     "channelName": "सक्रिय एजंट्स",
     "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये लाइव्ह अॅक्टिव्हिटी चालू करा.",
     "openSession": "उघडा",
+    "finished": "पूर्ण झाले",
+    "followFailed": "हा एजंट लॉक स्क्रीनवर दाखवता आला नाही.",
     "approveFailed": "मंजूर करता आले नाही. पुन्हा प्रयत्न करण्यासाठी $t(common.approve) वर टॅप करा.",
     "checked": "तपासले",
     "lastKnown": "शेवटची ज्ञात स्थिती",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "तुमची प्रतीक्षा",
     "nextScheduled": "पुढील नियोजित",
     "answerNeeded": "उत्तर आवश्यक",
-    "waitingToRetry": "पुन्हा प्रयत्नाची प्रतीक्षा"
+    "waitingToRetry": "पुन्हा प्रयत्नाची प्रतीक्षा",
+    "step": {
+      "editing": "संपादन",
+      "reading": "वाचन",
+      "running": "चालवा",
+      "searching": "वेब शोध",
+      "thinking": "विचार करत आहे"
+    },
+    "planOf": "पैकी",
+    "filesChanged": "फाइल्स बदलल्या",
+    "finishedIn": "पूर्ण झाले",
+    "noActivityFor": "हालचाल नाही",
+    "prOpened": "पुल रिक्वेस्ट उघडली",
+    "permissionWants": "चालवायचे आहे",
+    "failure": {
+      "provider": "थांबले: प्रदाता त्रुटी",
+      "tool": "थांबले: साधन त्रुटी",
+      "cancelled": "थांबले: रद्द केले",
+      "other": "थांबले"
+    }
   },
   "transcriptionModel": {
     "title": "लिप्यंतरण मॉडेल",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "चॅट इतिहास लोड करता आला नाही.",
       "new": "नवीन चॅट",
-      "openHint": "चॅट उघडते. हटवण्यासाठी दाबून धरा.",
       "deleteTitle": "ही चॅट हटवायची?"
+    },
+    "rename": {
+      "title": "चॅटचे नाव बदला",
+      "accessibility": "{{title}} या चॅटचे नाव बदला",
+      "openHint": "चॅट उघडते. नाव बदलण्यासाठी किंवा हटवण्यासाठी दाबून धरा."
     },
     "beta": "बीटा",
     "details": {

@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Saját adattáraid",
     "dismissed": "Elvetve",
     "agent": "Ügynök",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Változtatások"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw-tevékenység",
       "balance": "Egyenlegértesítések",
       "security": "Biztonsági találatok",
-      "spend": "Költésfigyelmeztetések"
+      "spend": "Költésfigyelmeztetések",
+      "followedSessions": "Követett munkamenetek"
     },
     "category": {
       "chatMessagesSubtitle": "válaszok a beszélgetéseidben",
@@ -2088,6 +2091,8 @@
       "title": "Munkamenet",
       "copyErrorDetails": "Hibarészletek másolása",
       "backToSessions": "Vissza a munkamenetekhez",
+      "follow": "Követés a zárolási képernyőn",
+      "unfollow": "Követés leállítása a zárolási képernyőn",
       "couldNotLoad": "Nem sikerült betölteni a munkamenetet.",
       "failedToLoadDetails": "Nem sikerült betölteni a munkamenet részleteit.",
       "failedToStopExecution": "Nem sikerült leállítani a végrehajtást.",
@@ -3170,6 +3175,8 @@
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn.",
     "openSession": "Megnyitás",
+    "finished": "Befejezve",
+    "followFailed": "Nem sikerült megjeleníteni ezt az ügynököt a zárolási képernyőn.",
     "approveFailed": "Nem sikerült jóváhagyni. Az újrapróbáláshoz koppints a $t(common.approve) elemre.",
     "checked": "Ellenőrizve",
     "lastKnown": "Utolsó ismert",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Rád vár",
     "nextScheduled": "Következő ütemezések",
     "answerNeeded": "Válaszra vár",
-    "waitingToRetry": "Újrapróbálkozásra vár"
+    "waitingToRetry": "Újrapróbálkozásra vár",
+    "step": {
+      "editing": "Szerkesztés",
+      "reading": "Olvasás",
+      "running": "Futtatás",
+      "searching": "Webes keresés",
+      "thinking": "Végiggondolás"
+    },
+    "planOf": "/",
+    "filesChanged": "módosított fájl",
+    "finishedIn": "Befejezve",
+    "noActivityFor": "Nincs aktivitás",
+    "prOpened": "Pull request megnyitva",
+    "permissionWants": "Futtatni szeretne",
+    "failure": {
+      "provider": "Leállt: szolgáltatói hiba",
+      "tool": "Leállt: eszközhiba",
+      "cancelled": "Leállt: megszakítva",
+      "other": "LEÁLLÍTVA"
+    }
   },
   "transcriptionModel": {
     "title": "Átírási modell",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Nem sikerült betölteni a csevegés előzményeit.",
       "new": "Új csevegés",
-      "openHint": "Megnyitja a csevegést. Hosszan nyomja meg a törléshez.",
       "deleteTitle": "Törli ezt a csevegést?"
+    },
+    "rename": {
+      "title": "Csevegés átnevezése",
+      "accessibility": "Csevegés átnevezése: {{title}}",
+      "openHint": "Megnyitja a csevegést. Hosszan nyomja meg az átnevezéshez vagy a törléshez."
     },
     "beta": "Béta",
     "details": {

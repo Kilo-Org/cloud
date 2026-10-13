@@ -137,6 +137,8 @@
     "yourOwnRepositories": "आपकी अपनी रिपॉज़िटरी",
     "dismissed": "खारिज",
     "agent": "प्रतिनिधि",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "बदलाव"
   },
   "language": {
@@ -321,7 +323,8 @@
       "kiloclaw": "KiloClaw की गतिविधि",
       "balance": "बैलेंस की चेतावनियाँ",
       "security": "सुरक्षा संबंधी समस्याएँ",
-      "spend": "खर्च की चेतावनियाँ"
+      "spend": "खर्च की चेतावनियाँ",
+      "followedSessions": "फ़ॉलो किए गए सत्र"
     },
     "category": {
       "chatMessagesSubtitle": "आपकी बातचीत में उत्तर",
@@ -1576,6 +1579,8 @@
       "title": "सत्र",
       "copyErrorDetails": "त्रुटि का विवरण कॉपी करें",
       "backToSessions": "सत्रों पर वापस जाएँ",
+      "follow": "लॉक स्क्रीन पर फ़ॉलो करें",
+      "unfollow": "लॉक स्क्रीन पर फ़ॉलो करना बंद करें",
       "couldNotLoad": "सत्र लोड नहीं हो सका।",
       "failedToLoadDetails": "सत्र का विवरण लोड नहीं हो सका।",
       "emptyDescription": "शुरू करने के लिए नीचे एक संदेश भेजें।",
@@ -3170,6 +3175,8 @@
     "channelName": "सक्रिय एजेंट",
     "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।",
     "openSession": "खोलें",
+    "finished": "पूरा हुआ",
+    "followFailed": "इस एजेंट को लॉक स्क्रीन पर नहीं दिखाया जा सका।",
     "approveFailed": "स्वीकार नहीं किया जा सका। फिर से कोशिश करने के लिए $t(common.approve) पर टैप करें।",
     "checked": "जाँच की गई",
     "lastKnown": "अंतिम ज्ञात",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "आपका इंतज़ार",
     "nextScheduled": "अगले निर्धारित",
     "answerNeeded": "जवाब चाहिए",
-    "waitingToRetry": "फिर कोशिश का इंतज़ार"
+    "waitingToRetry": "फिर कोशिश का इंतज़ार",
+    "step": {
+      "editing": "संपादन",
+      "reading": "पढ़ना",
+      "running": "चलाएँ",
+      "searching": "वेब खोज",
+      "thinking": "गहराई से सोच"
+    },
+    "planOf": "में से",
+    "filesChanged": "फ़ाइलें बदलीं",
+    "finishedIn": "में पूरा हुआ",
+    "noActivityFor": "कोई गतिविधि नहीं",
+    "prOpened": "पुल रिक्वेस्ट खुली",
+    "permissionWants": "चलाना चाहता है",
+    "failure": {
+      "provider": "रुका: प्रदाता त्रुटि",
+      "tool": "रुका: टूल त्रुटि",
+      "cancelled": "रुका: रद्द किया गया",
+      "other": "रुका हुआ"
+    }
   },
   "transcriptionModel": {
     "title": "आवाज़ को टेक्स्ट में बदलने का मॉडल",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "चैट इतिहास लोड नहीं किया जा सका।",
       "new": "नई चैट",
-      "openHint": "चैट खोलता है। मिटाने के लिए देर तक दबाएँ।",
       "deleteTitle": "यह चैट मिटाएँ?"
+    },
+    "rename": {
+      "title": "चैट का नाम बदलें",
+      "accessibility": "चैट का नाम बदलें: {{title}}",
+      "openHint": "चैट खोलता है। नाम बदलने या मिटाने के लिए देर तक दबाएँ।"
     },
     "beta": "बीटा",
     "details": {

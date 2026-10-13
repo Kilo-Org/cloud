@@ -137,6 +137,8 @@
     "yourOwnRepositories": "آپ کی اپنی ریپوزٹریز",
     "dismissed": "نظر انداز کردہ",
     "agent": "ایجنٹ",
+    "durationMinuteShort": "منٹ",
+    "durationHourShort": "گھنٹہ",
     "changes": "تبدیلیاں"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw کی سرگرمی",
       "balance": "بیلنس کی تنبیہات",
       "security": "شناخت شدہ سیکیورٹی مسائل",
-      "spend": "اخراجات کی تنبیہات"
+      "spend": "اخراجات کی تنبیہات",
+      "followedSessions": "فالو کیے گئے سیشنز"
     },
     "category": {
       "chatMessagesSubtitle": "آپ کی گفتگو میں جوابات",
@@ -2088,6 +2091,8 @@
       "title": "سیشن",
       "copyErrorDetails": "خرابی کی تفصیلات کاپی کریں",
       "backToSessions": "سیشنز پر واپس جائیں",
+      "follow": "لاک اسکرین پر فالو کریں",
+      "unfollow": "لاک اسکرین پر فالو کرنا بند کریں",
       "couldNotLoad": "سیشن لوڈ نہیں ہو سکا۔",
       "failedToLoadDetails": "سیشن کی تفصیلات لوڈ نہیں ہو سکیں۔",
       "failedToStopExecution": "کام کو روکا نہیں جا سکا۔",
@@ -3170,6 +3175,8 @@
     "channelName": "فعال ایجنٹس",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
     "openSession": "کھولیں",
+    "finished": "مکمل",
+    "followFailed": "اس ایجنٹ کو لاک اسکرین پر نہیں دکھایا جا سکا۔",
     "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔",
     "checked": "آخری تصدیق",
     "lastKnown": "آخری معلوم حالت",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "آپ کا انتظار",
     "nextScheduled": "آئندہ شیڈول",
     "answerNeeded": "جواب درکار",
-    "waitingToRetry": "دوبارہ کوشش کا انتظار"
+    "waitingToRetry": "دوبارہ کوشش کا انتظار",
+    "step": {
+      "editing": "ترمیم",
+      "reading": "پڑھ رہا ہے",
+      "running": "چلائیں",
+      "searching": "ویب تلاش",
+      "thinking": "غور کر رہا ہے"
+    },
+    "planOf": "میں سے",
+    "filesChanged": "فائلیں تبدیل ہوئیں",
+    "finishedIn": "مکمل ہونے میں",
+    "noActivityFor": "کوئی سرگرمی نہیں",
+    "prOpened": "پل ریکویسٹ کھول دی گئی",
+    "permissionWants": "چلانا چاہتا ہے",
+    "failure": {
+      "provider": "رک گیا: فراہم کنندہ کی خرابی",
+      "tool": "رک گیا: ٹول کی خرابی",
+      "cancelled": "رک گیا: منسوخ کیا گیا",
+      "other": "رکا ہوا"
+    }
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "چیٹ کی سرگزشت لوڈ نہیں ہو سکی۔",
       "new": "نئی چیٹ",
-      "openHint": "چیٹ کھولتا ہے۔ حذف کرنے کے لیے دبائے رکھیں۔",
       "deleteTitle": "یہ چیٹ حذف کریں؟"
+    },
+    "rename": {
+      "title": "چیٹ کا نام تبدیل کریں",
+      "accessibility": "چیٹ کا نام تبدیل کریں: {{title}}",
+      "openHint": "چیٹ کھولتا ہے۔ نام تبدیل کرنے یا حذف کرنے کے لیے دبائے رکھیں۔"
     },
     "beta": "بیٹا",
     "details": {

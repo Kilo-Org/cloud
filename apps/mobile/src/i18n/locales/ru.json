@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Личные репозитории",
     "dismissed": "Отклонено",
     "agent": "Агент",
+    "durationMinuteShort": "мин",
+    "durationHourShort": "ч",
     "changes": "Изменения"
   },
   "language": {
@@ -321,7 +323,8 @@
       "kiloclaw": "Активность KiloClaw",
       "balance": "Оповещения о балансе",
       "security": "Замечания по безопасности",
-      "spend": "Оповещения о расходах"
+      "spend": "Оповещения о расходах",
+      "followedSessions": "Отслеживаемые сеансы"
     },
     "category": {
       "chatMessagesSubtitle": "ответы в вашей переписке",
@@ -1600,6 +1603,8 @@
       "title": "Сеанс",
       "copyErrorDetails": "Копировать сведения об ошибке",
       "backToSessions": "К сеансам",
+      "follow": "Следить на экране блокировки",
+      "unfollow": "Не следить на экране блокировки",
       "couldNotLoad": "Не удалось загрузить сеанс.",
       "failedToLoadDetails": "Не удалось загрузить сведения о сеансе.",
       "failedToStopExecution": "Не удалось остановить выполнение.",
@@ -3252,6 +3257,8 @@
     "channelName": "Активные агенты",
     "activityKitDisabledBody": "Включите «Эфир активности» в настройках, чтобы видеть активных агентов на экране блокировки.",
     "openSession": "Открыть",
+    "finished": "Завершено",
+    "followFailed": "Не удалось показать этого агента на экране блокировки.",
     "approveFailed": "Не удалось одобрить. Нажмите $t(common.approve), чтобы повторить.",
     "checked": "Проверено",
     "lastKnown": "Последний известный статус",
@@ -3260,7 +3267,26 @@
     "waitingForYou": "Ожидание ваших действий",
     "nextScheduled": "Далее по расписанию",
     "answerNeeded": "Требуется ответ",
-    "waitingToRetry": "Ожидание повтора"
+    "waitingToRetry": "Ожидание повтора",
+    "step": {
+      "editing": "Редактирование",
+      "reading": "Чтение",
+      "running": "Запуск",
+      "searching": "Веб-поиск",
+      "thinking": "Обдумывание"
+    },
+    "planOf": "из",
+    "filesChanged": "файлов изменено",
+    "finishedIn": "Завершено за",
+    "noActivityFor": "Нет активности уже",
+    "prOpened": "Pull request открыт",
+    "permissionWants": "Хочет запустить",
+    "failure": {
+      "provider": "Остановлено: ошибка провайдера",
+      "tool": "Остановлено: ошибка инструмента",
+      "cancelled": "Остановлено: отменено",
+      "other": "ОСТАНОВЛЕН"
+    }
   },
   "transcriptionModel": {
     "title": "Модель распознавания речи",
@@ -3296,8 +3322,12 @@
     "list": {
       "loadFailed": "Не удалось загрузить историю чата.",
       "new": "Новый чат",
-      "openHint": "Открывает чат. Удерживайте, чтобы удалить.",
       "deleteTitle": "Удалить этот чат?"
+    },
+    "rename": {
+      "title": "Переименовать чат",
+      "accessibility": "Переименовать чат: {{title}}",
+      "openHint": "Открывает чат. Удерживайте, чтобы переименовать или удалить."
     },
     "beta": "Бета",
     "details": {

@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Þín eigin kóðasöfn",
     "dismissed": "Vísað frá",
     "agent": "Umboðsmaður",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Breytingar"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "Virkni í KiloClaw",
       "balance": "Inneignarviðvaranir",
       "security": "Öryggisniðurstöður",
-      "spend": "Útgjaldaviðvaranir"
+      "spend": "Útgjaldaviðvaranir",
+      "followedSessions": "Fylgdar lotur"
     },
     "category": {
       "chatMessagesSubtitle": "svör í samtölunum þínum",
@@ -2088,6 +2091,8 @@
       "title": "Lota",
       "copyErrorDetails": "Afrita villuupplýsingar",
       "backToSessions": "Til baka í lotur",
+      "follow": "Fylgjast með á lásskjánum",
+      "unfollow": "Hætta að fylgjast með á lásskjánum",
       "couldNotLoad": "Ekki tókst að hlaða lotunni.",
       "failedToLoadDetails": "Ekki tókst að hlaða upplýsingum um lotuna.",
       "failedToStopExecution": "Ekki tókst að stöðva keyrsluna.",
@@ -3170,6 +3175,8 @@
     "channelName": "Virkir fulltrúar",
     "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum.",
     "openSession": "Opna",
+    "finished": "Búið",
+    "followFailed": "Ekki tókst að sýna þennan fulltrúa á lásskjánum.",
     "approveFailed": "Ekki tókst að samþykkja. Ýttu á $t(common.approve) til að reyna aftur.",
     "checked": "Staðfest",
     "lastKnown": "Síðast þekkta staða",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Bíður eftir þér",
     "nextScheduled": "Næst á dagskrá",
     "answerNeeded": "Bíður eftir svari",
-    "waitingToRetry": "Bíður eftir endurtilraun"
+    "waitingToRetry": "Bíður eftir endurtilraun",
+    "step": {
+      "editing": "Breyting",
+      "reading": "Lestur",
+      "running": "Keyrsla",
+      "searching": "Vefleit",
+      "thinking": "Ígrundun"
+    },
+    "planOf": "af",
+    "filesChanged": "skrár breyttar",
+    "finishedIn": "Lokið á",
+    "noActivityFor": "Engin virkni í",
+    "prOpened": "Pull request opnað",
+    "permissionWants": "Vill keyra",
+    "failure": {
+      "provider": "Stöðvað: villa veitanda",
+      "tool": "Stöðvað: verkfæravilla",
+      "cancelled": "Stöðvað: hætt við",
+      "other": "STÖÐVAÐ"
+    }
   },
   "transcriptionModel": {
     "title": "Umritunarlíkan",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Ekki tókst að hlaða samtalsferilinn.",
       "new": "Nýtt spjall",
-      "openHint": "Opnar spjallið. Haltu inni til að eyða.",
       "deleteTitle": "Eyða þessu spjalli?"
+    },
+    "rename": {
+      "title": "Endurnefna spjall",
+      "accessibility": "Endurnefna spjall: {{title}}",
+      "openHint": "Opnar spjallið. Haltu inni til að endurnefna eða eyða."
     },
     "beta": "Beta",
     "details": {

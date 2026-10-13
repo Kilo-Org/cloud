@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Kendi depoların",
     "dismissed": "Yok sayıldı",
     "agent": "Ajan",
+    "durationMinuteShort": "dk",
+    "durationHourShort": "sa",
     "changes": "Değişiklikler"
   },
   "language": {
@@ -321,7 +323,8 @@
       "kiloclaw": "KiloClaw etkinliği",
       "balance": "Bakiye uyarıları",
       "security": "Güvenlik bulguları",
-      "spend": "Harcama uyarıları"
+      "spend": "Harcama uyarıları",
+      "followedSessions": "Takip edilen oturumlar"
     },
     "category": {
       "chatMessagesSubtitle": "konuşmalarındaki yanıtlar",
@@ -1576,6 +1579,8 @@
       "title": "Oturum",
       "copyErrorDetails": "Hata ayrıntılarını kopyala",
       "backToSessions": "Oturumlara geri dön",
+      "follow": "Kilit ekranında takip et",
+      "unfollow": "Kilit ekranında takibi bırak",
       "couldNotLoad": "Oturum yüklenemedi.",
       "failedToLoadDetails": "Oturum ayrıntıları yüklenemedi.",
       "failedToStopExecution": "Çalışan işlem durdurulamadı.",
@@ -3170,6 +3175,8 @@
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
     "openSession": "Aç",
+    "finished": "Tamamlandı",
+    "followFailed": "Bu ajan kilit ekranında gösterilemedi.",
     "approveFailed": "Onaylanamadı. Tekrar denemek için $t(common.approve) öğesine dokun.",
     "checked": "Kontrol edildi",
     "lastKnown": "Son bilinen",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Sizi bekliyor",
     "nextScheduled": "Sıradaki zamanlananlar",
     "answerNeeded": "Yanıt bekliyor",
-    "waitingToRetry": "Yeniden deneme bekleniyor"
+    "waitingToRetry": "Yeniden deneme bekleniyor",
+    "step": {
+      "editing": "Düzenleniyor",
+      "reading": "Okunuyor",
+      "running": "Çalıştır",
+      "searching": "Web araması",
+      "thinking": "İyice düşünüyor"
+    },
+    "planOf": "/",
+    "filesChanged": "dosya değişti",
+    "finishedIn": "Tamamlanma süresi",
+    "noActivityFor": "Etkinlik yok",
+    "prOpened": "Pull request açıldı",
+    "permissionWants": "Çalıştırmak istiyor",
+    "failure": {
+      "provider": "Durduruldu: sağlayıcı hatası",
+      "tool": "Durduruldu: araç hatası",
+      "cancelled": "Durduruldu: iptal edildi",
+      "other": "DURDURULDU"
+    }
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Sohbet geçmişi yüklenemedi.",
       "new": "Yeni sohbet",
-      "openHint": "Sohbeti açar. Silmek için uzun basın.",
       "deleteTitle": "Bu sohbet silinsin mi?"
+    },
+    "rename": {
+      "title": "Sohbeti yeniden adlandır",
+      "accessibility": "Sohbeti yeniden adlandır: {{title}}",
+      "openHint": "Sohbeti açar. Yeniden adlandırmak veya silmek için uzun basın."
     },
     "beta": "Beta",
     "details": {

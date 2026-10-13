@@ -27,7 +27,7 @@ type RenderWithProvidersOptions = {
   wrapper?: ComponentType<{ children: ReactNode }>;
 };
 
-type RenderWithProvidersResult = {
+export type RenderWithProvidersResult = {
   renderer: TestRenderer.ReactTestRenderer;
   queryClient: QueryClient;
   /** Unmount the tree and clear the query cache. */

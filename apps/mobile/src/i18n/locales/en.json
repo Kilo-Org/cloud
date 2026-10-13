@@ -137,6 +137,8 @@
     "working": "Working",
     "yourOwnRepositories": "Your own repositories",
     "dismissed": "Dismissed",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Changes"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw activity",
       "balance": "Balance alerts",
       "security": "Security findings",
-      "spend": "Spend alerts"
+      "spend": "Spend alerts",
+      "followedSessions": "Followed sessions"
     },
     "category": {
       "chatMessagesSubtitle": "replies in your conversations",
@@ -2088,6 +2091,8 @@
       "title": "Session",
       "copyErrorDetails": "Copy error details",
       "backToSessions": "Back to sessions",
+      "follow": "Follow on Lock Screen",
+      "unfollow": "Stop following on Lock Screen",
       "couldNotLoad": "Could not load session",
       "failedToLoadDetails": "Failed to load session details",
       "failedToStopExecution": "Failed to stop execution",
@@ -3170,6 +3175,8 @@
     "channelName": "Active agents",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
     "openSession": "Open",
+    "finished": "Finished",
+    "followFailed": "Couldn't show this agent on the Lock Screen.",
     "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again.",
     "checked": "Checked",
     "lastKnown": "Last known",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Waiting for you",
     "nextScheduled": "Next scheduled",
     "answerNeeded": "Answer needed",
-    "waitingToRetry": "Waiting to retry"
+    "waitingToRetry": "Waiting to retry",
+    "step": {
+      "editing": "Editing",
+      "reading": "Reading",
+      "running": "Run",
+      "searching": "Web search",
+      "thinking": "Thinking it through"
+    },
+    "planOf": "of",
+    "filesChanged": "files changed",
+    "finishedIn": "Finished in",
+    "noActivityFor": "No activity for",
+    "prOpened": "Pull request opened",
+    "permissionWants": "Wants to run",
+    "failure": {
+      "provider": "Stopped: provider error",
+      "tool": "Stopped: tool error",
+      "cancelled": "Stopped: cancelled",
+      "other": "Stopped"
+    }
   },
   "transcriptionModel": {
     "title": "Transcription model",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Could not load chat history.",
       "new": "New chat",
-      "openHint": "Opens the chat. Long press to delete.",
       "deleteTitle": "Delete this chat?"
+    },
+    "rename": {
+      "title": "Rename chat",
+      "accessibility": "Rename chat: {{title}}",
+      "openHint": "Opens the chat. Long press to rename or delete."
     },
     "beta": "Beta",
     "details": {

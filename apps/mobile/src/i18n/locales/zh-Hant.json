@@ -137,6 +137,8 @@
     "yourOwnRepositories": "你自己的存放庫",
     "dismissed": "已忽略",
     "agent": "代理人",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "變更"
   },
   "language": {
@@ -321,7 +323,8 @@
       "kiloclaw": "KiloClaw 活動",
       "balance": "餘額提醒",
       "security": "資安問題",
-      "spend": "支出提醒"
+      "spend": "支出提醒",
+      "followedSessions": "已關注的會話"
     },
     "category": {
       "chatMessagesSubtitle": "對話中的回覆",
@@ -1576,6 +1579,8 @@
       "title": "工作階段",
       "copyErrorDetails": "複製錯誤詳細資料",
       "backToSessions": "返回工作階段清單",
+      "follow": "在鎖定畫面上追蹤",
+      "unfollow": "停止在鎖定畫面上追蹤",
       "couldNotLoad": "無法載入工作階段。",
       "failedToLoadDetails": "無法載入工作階段詳細資料。",
       "failedToStopExecution": "無法停止執行。",
@@ -3170,6 +3175,8 @@
     "channelName": "執行中的代理程式",
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。",
     "openSession": "開啟",
+    "finished": "已完成",
+    "followFailed": "無法在鎖定畫面上顯示此代理程式。",
     "approveFailed": "無法核准。點一下$t(common.approve)再試一次。",
     "checked": "上次確認",
     "lastKnown": "最後已知",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "等待你回應",
     "nextScheduled": "下次排程",
     "answerNeeded": "等待回答",
-    "waitingToRetry": "等待重試"
+    "waitingToRetry": "等待重試",
+    "step": {
+      "editing": "編輯中",
+      "reading": "讀取中",
+      "running": "執行",
+      "searching": "網頁搜尋",
+      "thinking": "正在思考"
+    },
+    "planOf": "/",
+    "filesChanged": "個檔案已變更",
+    "finishedIn": "耗時",
+    "noActivityFor": "無活動",
+    "prOpened": "拉取請求已開啟",
+    "permissionWants": "想要執行",
+    "failure": {
+      "provider": "已停止：供應商錯誤",
+      "tool": "已停止：工具錯誤",
+      "cancelled": "已停止：已取消",
+      "other": "已停止"
+    }
   },
   "transcriptionModel": {
     "title": "轉錄模型",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "無法載入聊天記錄。",
       "new": "新對話",
-      "openHint": "開啟對話。長按可刪除。",
       "deleteTitle": "刪除這個對話？"
+    },
+    "rename": {
+      "title": "重新命名聊天",
+      "accessibility": "重新命名聊天：{{title}}",
+      "openHint": "開啟對話。長按可重新命名或刪除。"
     },
     "beta": "測試版",
     "details": {

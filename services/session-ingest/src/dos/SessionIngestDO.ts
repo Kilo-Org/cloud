@@ -1,5 +1,9 @@
 import { DurableObject } from 'cloudflare:workers';
-import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  sessionIdSchema,
+  sessionLiveSummarySchema,
+  type SessionLiveSummary,
+} from '@kilocode/session-ingest-contracts';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
@@ -41,6 +45,16 @@ import {
   type TerminationReason,
 } from './session-metrics';
 import migrations from '../../drizzle/migrations';
+import { refreshGlanceableSessions } from '../remote-session-notifications';
+import {
+  applySessionLiveSummaryStatus,
+  decideLiveSummaryPersist,
+  EMPTY_SESSION_LIVE_SUMMARY_STATE,
+  foldSessionLiveSummary,
+  sessionLiveSummaryChanged,
+  type SessionLiveBatchItem,
+  type SessionLiveSummaryState,
+} from './session-live-summary';
 import {
   readKiloSdkMessages,
   readKiloSdkSessionSnapshot,
@@ -55,7 +69,8 @@ type LiveThrottleMetaKey =
   | 'lastActivityPersistedAtMs'
   | 'lastActivityPersistedValueMs'
   | 'lastCostPersistedAtMs'
-  | 'lastCostPersistedMicrodollars';
+  | 'lastCostPersistedMicrodollars'
+  | 'lastLiveSummaryPersistedAtMs';
 
 type IngestMetaKey =
   | ExtractableMetaKey
@@ -66,6 +81,8 @@ type IngestMetaKey =
   | 'metricsEmitted'
   | 'deleted'
   | 'sessionReadyNotified'
+  | 'liveSummaryState'
+  | 'lastLiveSummaryPersisted'
   | LiveThrottleMetaKey;
 
 type ExtractableMetaKey =
@@ -110,6 +127,42 @@ function hasIngestMeta(db: DrizzleSqliteDODatabase, key: IngestMetaKey): boolean
     db.select({ value: ingestMeta.value }).from(ingestMeta).where(eq(ingestMeta.key, key)).get() !==
     undefined
   );
+}
+
+function readIngestMetaValue(db: DrizzleSqliteDODatabase, key: IngestMetaKey): string | null {
+  const row = db
+    .select({ value: ingestMeta.value })
+    .from(ingestMeta)
+    .where(eq(ingestMeta.key, key))
+    .get();
+  return row?.value ?? null;
+}
+
+function writeIngestMetaValue(
+  db: DrizzleSqliteDODatabase,
+  key: IngestMetaKey,
+  value: string
+): void {
+  db.insert(ingestMeta)
+    .values({ key, value })
+    .onConflictDoUpdate({ target: ingestMeta.key, set: { value } })
+    .run();
+}
+
+/** The running summary the previous batches left, or the empty value. */
+function readLiveSummaryState(db: DrizzleSqliteDODatabase): SessionLiveSummaryState {
+  const raw = readIngestMetaValue(db, 'liveSummaryState');
+  if (raw === null) return EMPTY_SESSION_LIVE_SUMMARY_STATE;
+  const parsed = sessionLiveSummarySchema.safeParse(JSON.parse(raw));
+  return parsed.success ? parsed.data : EMPTY_SESSION_LIVE_SUMMARY_STATE;
+}
+
+/** The value the last successful persist wrote, or null when none did. */
+function readLiveSummaryPersisted(db: DrizzleSqliteDODatabase): SessionLiveSummary | null {
+  const raw = readIngestMetaValue(db, 'lastLiveSummaryPersisted');
+  if (raw === null) return null;
+  const parsed = sessionLiveSummarySchema.safeParse(JSON.parse(raw));
+  return parsed.success ? parsed.data : null;
 }
 
 function readIngestMetaNumber(
@@ -164,19 +217,29 @@ function writeCloneMeta(db: DrizzleSqliteDODatabase, key: CloneMetaKey, value: s
 }
 
 /**
- * Monotonic live-column write for cost and/or last_activity_at.
- * Per-column CASE guards so concurrent waitUntil tasks commute.
+ * Monotonic live-column write for cost, last_activity_at, and the session
+ * card summary. Per-column CASE guards so concurrent waitUntil tasks commute.
  * Used by live ingest persists and the close-path emitSessionMetrics write.
+ *
+ * The summary has no order of its own, so it carries the activity time of
+ * the batch that produced it (`atIso`) and is written only when that time is
+ * not older than the stored activity. A slower in-flight write of an older
+ * batch then leaves the newer summary in place, as the activity guard does.
  */
 export async function persistLiveSessionColumns(
   connectionString: string,
   kiloUserId: string,
   sessionId: string,
-  columns: { costMicrodollars?: number; lastActivityAtIso?: string }
+  columns: {
+    costMicrodollars?: number;
+    lastActivityAtIso?: string;
+    liveSummary?: { summary: SessionLiveSummary; atIso: string };
+  }
 ): Promise<void> {
   const set: {
     total_cost_microdollars?: ReturnType<typeof sql>;
     last_activity_at?: ReturnType<typeof sql>;
+    live_summary?: ReturnType<typeof sql>;
   } = {};
 
   if (columns.costMicrodollars !== undefined) {
@@ -196,6 +259,18 @@ export async function persistLiveSessionColumns(
         OR ${cli_sessions_v2.last_activity_at} < ${activity}
       THEN ${activity}
       ELSE ${cli_sessions_v2.last_activity_at}
+    END`;
+  }
+
+  if (columns.liveSummary !== undefined) {
+    // Postgres reads every SET expression against the old row, so this guard
+    // compares with the stored activity, not the value set beside it.
+    const { summary, atIso } = columns.liveSummary;
+    set.live_summary = sql`CASE
+      WHEN ${cli_sessions_v2.last_activity_at} IS NULL
+        OR ${cli_sessions_v2.last_activity_at} <= ${atIso}
+      THEN ${JSON.stringify(summary)}::jsonb
+      ELSE ${cli_sessions_v2.live_summary}
     END`;
   }
 
@@ -459,6 +534,12 @@ export class SessionIngestDO extends DurableObject<Env> {
     // re-emit on replay without re-reading item_data from SQLite.
     const pendingAgentNotifications = new Map<string, string>();
 
+    // The items this batch actually stored. The session card summary folds
+    // only these: a stale item is an older version of a row the DO already
+    // holds a newer one of, and folding it would move the summary back (an
+    // old running state of a tool that already finished would revive its step).
+    const storedItems: IngestBatch[number][] = [];
+
     for (const item of payload) {
       const { item_id, item_type } = getItemIdentity(item);
 
@@ -514,6 +595,7 @@ export class SessionIngestDO extends DurableObject<Env> {
           },
         })
         .run();
+      storedItems.push(item);
 
       if (item.type === 'message' || item.type === 'part') {
         wroteActivityItem = true;
@@ -645,6 +727,43 @@ export class SessionIngestDO extends DurableObject<Env> {
     const statusChangeForLive = changes.find(change => change.name === 'status');
     const idleTransition =
       statusChangeForLive !== undefined && isCompletedStatus(statusChangeForLive.value);
+    const statusValue = statusChangeForLive?.value ?? readIngestMetaValue(this.db, 'status');
+    const nowMsLive = Date.now();
+
+    // Session card summary: fold this batch into the running value and apply
+    // the status transition. Only the derived summary leaves the DO.
+    const priorLiveSummary = readLiveSummaryState(this.db);
+    const foldedLiveSummary = foldSessionLiveSummary(
+      priorLiveSummary,
+      storedItems as unknown as SessionLiveBatchItem[],
+      statusValue
+    );
+    const currentLiveSummaryState =
+      statusChangeForLive === undefined
+        ? foldedLiveSummary
+        : applySessionLiveSummaryStatus(foldedLiveSummary, statusChangeForLive.value);
+    const currentLiveSummaryChanged = sessionLiveSummaryChanged(
+      priorLiveSummary,
+      currentLiveSummaryState
+    );
+    if (currentLiveSummaryChanged) {
+      writeIngestMetaValue(this.db, 'liveSummaryState', JSON.stringify(currentLiveSummaryState));
+    }
+    const lastPersistedLiveSummary = readLiveSummaryPersisted(this.db);
+    const currentLiveSummary = currentLiveSummaryState;
+    const liveSummaryVisibleChanged = sessionLiveSummaryChanged(
+      lastPersistedLiveSummary ?? EMPTY_SESSION_LIVE_SUMMARY_STATE,
+      currentLiveSummary
+    );
+    const liveSummaryFailureChanged =
+      (lastPersistedLiveSummary?.failure?.kind ?? null) !==
+      (currentLiveSummary.failure?.kind ?? null);
+    const liveSummaryDecision = decideLiveSummaryPersist({
+      nowMs: nowMsLive,
+      statusTransition: statusChangeForLive !== undefined,
+      failureChanged: liveSummaryFailureChanged,
+      lastPersistedAtMs: readIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs'),
+    });
 
     // Only scan all inline messages when the cost-persist window is open (KB-3).
     // Window needs no cost value: idle forces (D17), else assistant upsert + 30s throttle.
@@ -682,21 +801,48 @@ export class SessionIngestDO extends DurableObject<Env> {
     });
 
     if (decision.persistActivity || decision.persistCost) {
-      const columns: { costMicrodollars?: number; lastActivityAtIso?: string } = {};
+      const columns: {
+        costMicrodollars?: number;
+        lastActivityAtIso?: string;
+        liveSummary?: { summary: SessionLiveSummary; atIso: string };
+      } = {};
       if (decision.persistCost && currentCostMicrodollars !== null) {
         columns.costMicrodollars = currentCostMicrodollars;
       }
       if (decision.persistActivity) {
         columns.lastActivityAtIso = new Date(lastActivityValueMs).toISOString();
       }
+      // The live summary rides the activity write: a summary change with no
+      // activity (a metadata-only or lifecycle-only batch) must not open a
+      // persist of its own, and the next activity carries the newer summary.
+      if (decision.persistActivity && liveSummaryDecision) {
+        columns.liveSummary = {
+          summary: currentLiveSummary,
+          atIso: new Date(lastActivityValueMs).toISOString(),
+        };
+      }
       const costToPersist = columns.costMicrodollars;
       const activityValueMs = decision.persistActivity ? lastActivityValueMs : undefined;
+      const summaryToPersist = columns.liveSummary;
       const connectionString = this.env.HYPERDRIVE.connectionString;
       this.ctx.waitUntil(
         (async () => {
           try {
             await persistLiveSessionColumns(connectionString, kiloUserId, sessionId, columns);
             if (this.isDeleted()) return;
+            if (summaryToPersist !== undefined) {
+              const prevSummaryAt = readIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs');
+              if (prevSummaryAt === null || nowMsLive > prevSummaryAt) {
+                writeIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs', nowMsLive);
+                if (liveSummaryVisibleChanged) {
+                  writeIngestMetaValue(
+                    this.db,
+                    'lastLiveSummaryPersisted',
+                    JSON.stringify(summaryToPersist.summary)
+                  );
+                }
+              }
+            }
             // Max-merge post-await so out-of-order concurrent ingests cannot regress throttle meta.
             if (activityValueMs !== undefined) {
               const prevAt = readIngestMetaNumber(this.db, 'lastActivityPersistedAtMs');
@@ -723,6 +869,25 @@ export class SessionIngestDO extends DurableObject<Env> {
               const prevCost = readIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars');
               if (prevCost === null || costToPersist > prevCost) {
                 writeIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars', costToPersist);
+              }
+            }
+            // The card reads the persisted row, so refresh only after the write
+            // landed and only when a card follows this session: the follow gate
+            // saves the whole snapshot build for a session nobody watches.
+            if (summaryToPersist !== undefined && liveSummaryVisibleChanged) {
+              try {
+                await refreshGlanceableSessions(this.env, {
+                  userId: kiloUserId,
+                  cliSessionIds: [sessionId],
+                  cardFollowSessionIds: [sessionId],
+                });
+              } catch (refreshError) {
+                console.error('SessionIngestDO failed to refresh the session card', {
+                  kiloUserId,
+                  sessionId,
+                  error:
+                    refreshError instanceof Error ? refreshError.message : String(refreshError),
+                });
               }
             }
           } catch (error) {

@@ -130,9 +130,6 @@ const endRound = (
     Effect.tap(answer => collect(wiring, exchange, answer)),
     Effect.tap(() => Ref.set(exchange.stop, ended.stop)),
     Effect.tap(() => Ref.update(exchange.rounds, held => held + 1)),
-    /* What this call put in front of the model, which is what decides whether
-       the next question compacts first. It is the provider's own count, so no
-       tokeniser is needed and no estimate can drift. */
     Effect.tap(() => Ref.set(wiring.prompted, promptedOf(ended.usage))),
     Effect.tap(() => Ref.update(wiring.totals, held => add(held, ended.usage)))
   );

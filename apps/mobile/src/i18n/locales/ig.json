@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Ebe nchekwa koodu nke gị",
     "dismissed": "Elegharala anya",
     "agent": "Onye nnọchi anya",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Mgbanwe"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "Ihe omume KiloClaw",
       "balance": "Ọkwa gbasara ego fọdụrụ",
       "security": "Ihe achọpụtara gbasara nchebe",
-      "spend": "Ọkwa gbasara mmefu"
+      "spend": "Ọkwa gbasara mmefu",
+      "followedSessions": "Seshọn ndị e soro"
     },
     "category": {
       "chatMessagesSubtitle": "azịza na mkparịta ụka gị",
@@ -2088,6 +2091,8 @@
       "title": "Nnọkọ",
       "copyErrorDetails": "Detuo nkọwa njehie",
       "backToSessions": "Laghachi na nnọkọ",
+      "follow": "Soro n'ihuenyo mkpọchi",
+      "unfollow": "Kwụsị iso n'ihuenyo mkpọchi",
       "couldNotLoad": "Enweghị ike ibudata nnọkọ ahụ.",
       "failedToLoadDetails": "Enweghị ike ibudata nkọwa nnọkọ ahụ.",
       "failedToStopExecution": "Enweghị ike ịkwụsị ọrụ ahụ.",
@@ -3170,6 +3175,8 @@
     "channelName": "Ndị nnọchi anya na-arụ ọrụ",
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi.",
     "openSession": "Meghe",
+    "finished": "Emechaala",
+    "followFailed": "Enweghị ike igosi onye nnọchi anya a n'ihuenyo mkpọchi.",
     "approveFailed": "Enweghị ike ịkwado. Pịa $t(common.approve) ka ị nwaa ọzọ.",
     "checked": "Enyochara",
     "lastKnown": "Nke ikpeazụ a maara",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Na-eche gị",
     "nextScheduled": "Ihe ahaziri na-esote",
     "answerNeeded": "Chọrọ azịza",
-    "waitingToRetry": "Na-eche ịnwale ọzọ"
+    "waitingToRetry": "Na-eche ịnwale ọzọ",
+    "step": {
+      "editing": "Na-edezi",
+      "reading": "Na-agụ",
+      "running": "Na-agba",
+      "searching": "Nchọgharị weebụ",
+      "thinking": "Na-eche echiche"
+    },
+    "planOf": "nke",
+    "filesChanged": "faịlụ gbanwere",
+    "finishedIn": "Emechara n'ime",
+    "noActivityFor": "Enweghị ọrụ ruo",
+    "prOpened": "E meghere Pull request",
+    "permissionWants": "Ọ chọrọ ịgba",
+    "failure": {
+      "provider": "Kwụsịrị: njehie onye na-eweta",
+      "tool": "Kwụsịrị: njehie ngwaọrụ",
+      "cancelled": "Kwụsịrị: kagburu",
+      "other": "KWỤSỊRỊ"
+    }
   },
   "transcriptionModel": {
     "title": "Ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Enweghị ike ibutu akụkọ nkata.",
       "new": "Nkata ọhụrụ",
-      "openHint": "Na-emeghe nkata ahụ. Pịgide iji hichapụ.",
       "deleteTitle": "Hichapụ nkata a?"
+    },
+    "rename": {
+      "title": "Gbanwee aha nkata",
+      "accessibility": "Gbanwee aha nkata: {{title}}",
+      "openHint": "Na-emeghe nkata ahụ. Pịgide iji gbanwee aha ma ọ bụ hichapụ."
     },
     "beta": "Beta",
     "details": {

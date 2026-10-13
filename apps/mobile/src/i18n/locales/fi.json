@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Omat koodivarastosi",
     "dismissed": "Sivuutettu",
     "agent": "Agentti",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Muutokset"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw-tapahtumat",
       "balance": "Saldoilmoitukset",
       "security": "Tietoturvahavainnot",
-      "spend": "Kulutusvaroitukset"
+      "spend": "Kulutusvaroitukset",
+      "followedSessions": "Seuratut istunnot"
     },
     "category": {
       "chatMessagesSubtitle": "vastaukset keskusteluissasi",
@@ -2088,6 +2091,8 @@
       "title": "Istunto",
       "copyErrorDetails": "Kopioi virheen tiedot",
       "backToSessions": "Takaisin istuntoihin",
+      "follow": "Seuraa lukitusnäytöllä",
+      "unfollow": "Lopeta seuraaminen lukitusnäytöllä",
       "couldNotLoad": "Istuntoa ei voitu ladata.",
       "failedToLoadDetails": "Istunnon tietojen lataus epäonnistui.",
       "failedToStopExecution": "Suorituksen pysäyttäminen epäonnistui.",
@@ -3170,6 +3175,8 @@
     "channelName": "Aktiiviset agentit",
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
     "openSession": "Avaa",
+    "finished": "Valmis",
+    "followFailed": "Tätä agenttia ei voitu näyttää lukitusnäytöllä.",
     "approveFailed": "Hyväksyminen ei onnistunut. Yritä uudelleen napauttamalla $t(common.approve).",
     "checked": "Tarkistettu",
     "lastKnown": "Viimeisin tiedossa oleva",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Odottaa sinua",
     "nextScheduled": "Seuraavaksi ajastetut",
     "answerNeeded": "Odottaa vastausta",
-    "waitingToRetry": "Odottaa uutta yritystä"
+    "waitingToRetry": "Odottaa uutta yritystä",
+    "step": {
+      "editing": "Muokkaus",
+      "reading": "Lukeminen",
+      "running": "Suoritus",
+      "searching": "Verkkohaku",
+      "thinking": "Pohdinta"
+    },
+    "planOf": "viidestä",
+    "filesChanged": "tiedostoa muutettu",
+    "finishedIn": "Valmis",
+    "noActivityFor": "Ei toimintaa",
+    "prOpened": "Pull request avattu",
+    "permissionWants": "Haluaa suorittaa",
+    "failure": {
+      "provider": "Pysäytetty: tarjoajan virhe",
+      "tool": "Pysäytetty: työkalun virhe",
+      "cancelled": "Pysäytetty: peruutettu",
+      "other": "PYSÄYTETTY"
+    }
   },
   "transcriptionModel": {
     "title": "Puheentunnistusmalli",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Keskusteluhistoriaa ei voitu ladata.",
       "new": "Uusi keskustelu",
-      "openHint": "Avaa keskustelun. Poista painamalla pitkään.",
       "deleteTitle": "Poistetaanko tämä keskustelu?"
+    },
+    "rename": {
+      "title": "Nimeä keskustelu uudelleen",
+      "accessibility": "Nimeä keskustelu uudelleen: {{title}}",
+      "openHint": "Avaa keskustelun. Nimeä uudelleen tai poista painamalla pitkään."
     },
     "beta": "Beta",
     "details": {

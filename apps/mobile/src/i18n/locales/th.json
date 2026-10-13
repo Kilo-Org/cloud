@@ -137,6 +137,8 @@
     "yourOwnRepositories": "คลังโค้ดของคุณเอง",
     "dismissed": "ละเว้นแล้ว",
     "agent": "ตัวแทน",
+    "durationMinuteShort": "น.",
+    "durationHourShort": "ชม.",
     "changes": "การเปลี่ยนแปลง"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "กิจกรรม KiloClaw",
       "balance": "การแจ้งเตือนยอดเงิน",
       "security": "ข้อค้นพบด้านความปลอดภัย",
-      "spend": "การแจ้งเตือนการใช้จ่าย"
+      "spend": "การแจ้งเตือนการใช้จ่าย",
+      "followedSessions": "เซสชันที่ติดตาม"
     },
     "category": {
       "chatMessagesSubtitle": "การตอบกลับในการสนทนาของคุณ",
@@ -2088,6 +2091,8 @@
       "title": "เซสชัน",
       "copyErrorDetails": "คัดลอกรายละเอียดข้อผิดพลาด",
       "backToSessions": "กลับไปที่เซสชัน",
+      "follow": "ติดตามบนหน้าจอล็อก",
+      "unfollow": "หยุดติดตามบนหน้าจอล็อก",
       "couldNotLoad": "ไม่สามารถโหลดเซสชันได้",
       "failedToLoadDetails": "ไม่สามารถโหลดรายละเอียดเซสชันได้",
       "failedToStopExecution": "ไม่สามารถหยุดการทำงานได้",
@@ -3170,6 +3175,8 @@
     "channelName": "เอเจนต์ที่กำลังทำงาน",
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก",
     "openSession": "เปิด",
+    "finished": "เสร็จแล้ว",
+    "followFailed": "ไม่สามารถแสดงเอเจนต์นี้บนหน้าจอล็อกได้",
     "approveFailed": "อนุมัติไม่สำเร็จ แตะ $t(common.approve) เพื่อลองอีกครั้ง",
     "checked": "ตรวจสอบล่าสุด",
     "lastKnown": "สถานะล่าสุดที่ทราบ",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "รอคุณ",
     "nextScheduled": "กำหนดการถัดไป",
     "answerNeeded": "รอคำตอบ",
-    "waitingToRetry": "รอลองใหม่"
+    "waitingToRetry": "รอลองใหม่",
+    "step": {
+      "editing": "กำลังแก้ไข",
+      "reading": "กำลังอ่าน",
+      "running": "รัน",
+      "searching": "ค้นหาเว็บ",
+      "thinking": "กำลังคิดทบทวน"
+    },
+    "planOf": "จาก",
+    "filesChanged": "ไฟล์ที่เปลี่ยนแปลง",
+    "finishedIn": "เสร็จใน",
+    "noActivityFor": "ไม่มีกิจกรรมเป็นเวลา",
+    "prOpened": "เปิดพูลรีเควสต์แล้ว",
+    "permissionWants": "ต้องการรัน",
+    "failure": {
+      "provider": "หยุด: ผู้ให้บริการเกิดข้อผิดพลาด",
+      "tool": "หยุด: เครื่องมือเกิดข้อผิดพลาด",
+      "cancelled": "หยุด: ถูกยกเลิก",
+      "other": "หยุดแล้ว"
+    }
   },
   "transcriptionModel": {
     "title": "โมเดลถอดเสียง",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "ไม่สามารถโหลดประวัติแชทได้",
       "new": "แชทใหม่",
-      "openHint": "เปิดแชท กดค้างเพื่อลบ",
       "deleteTitle": "ลบแชทนี้ไหม"
+    },
+    "rename": {
+      "title": "เปลี่ยนชื่อแชท",
+      "accessibility": "เปลี่ยนชื่อแชท: {{title}}",
+      "openHint": "เปิดแชท กดค้างเพื่อเปลี่ยนชื่อหรือลบ"
     },
     "beta": "เบต้า",
     "details": {

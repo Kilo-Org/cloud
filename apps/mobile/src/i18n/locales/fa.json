@@ -137,6 +137,8 @@
     "yourOwnRepositories": "مخازن خودتان",
     "dismissed": "نادیده‌گرفته‌شده",
     "agent": "عامل",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "تغییرات"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "فعالیت KiloClaw",
       "balance": "هشدارهای موجودی",
       "security": "یافته‌های امنیتی",
-      "spend": "هشدارهای هزینه"
+      "spend": "هشدارهای هزینه",
+      "followedSessions": "نشست‌های دنبال‌شده"
     },
     "category": {
       "chatMessagesSubtitle": "پاسخ‌های گفت‌وگوهای شما",
@@ -2088,6 +2091,8 @@
       "title": "نشست",
       "copyErrorDetails": "کپی جزئیات خطا",
       "backToSessions": "بازگشت به نشست‌ها",
+      "follow": "دنبال کردن در صفحهٔ قفل",
+      "unfollow": "توقف دنبال کردن در صفحهٔ قفل",
       "couldNotLoad": "بارگذاری نشست ممکن نشد.",
       "failedToLoadDetails": "بارگذاری جزئیات نشست ممکن نشد.",
       "failedToStopExecution": "توقف اجرا ممکن نشد.",
@@ -3170,6 +3175,8 @@
     "channelName": "عامل‌های فعال",
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید.",
     "openSession": "باز کن",
+    "finished": "پایان یافت",
+    "followFailed": "نمایش این عامل در صفحهٔ قفل ممکن نشد.",
     "approveFailed": "تأیید ممکن نشد. برای تلاش دوباره روی $t(common.approve) ضربه بزنید.",
     "checked": "آخرین بررسی",
     "lastKnown": "آخرین وضعیت شناخته‌شده",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "در انتظار شما",
     "nextScheduled": "زمانبندی‌های بعدی",
     "answerNeeded": "نیازمند پاسخ",
-    "waitingToRetry": "در انتظار تلاش مجدد"
+    "waitingToRetry": "در انتظار تلاش مجدد",
+    "step": {
+      "editing": "ویرایش",
+      "reading": "خواندن",
+      "running": "اجرا",
+      "searching": "جستجوی وب",
+      "thinking": "در حال تفکر"
+    },
+    "planOf": "از",
+    "filesChanged": "فایل‌های تغییریافته",
+    "finishedIn": "تمام‌شده در",
+    "noActivityFor": "بدون فعالیت برای",
+    "prOpened": "پول ریکوئست باز شد",
+    "permissionWants": "می‌خواهد اجرا کند",
+    "failure": {
+      "provider": "متوقف شد: خطای ارائه‌دهنده",
+      "tool": "متوقف شد: خطای ابزار",
+      "cancelled": "متوقف شد: لغو شد",
+      "other": "متوقف"
+    }
   },
   "transcriptionModel": {
     "title": "مدل تبدیل گفتار به متن",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "تاریخچه گفتگو بارگذاری نشد.",
       "new": "گفتگوی جدید",
-      "openHint": "گفتگو را باز می‌کند. برای حذف، لمس کنید و نگه دارید.",
       "deleteTitle": "این گفتگو حذف شود؟"
+    },
+    "rename": {
+      "title": "تغییر نام گفتگو",
+      "accessibility": "تغییر نام گفتگو: {{title}}",
+      "openHint": "گفتگو را باز می‌کند. برای تغییر نام یا حذف، لمس کنید و نگه دارید."
     },
     "beta": "بتا",
     "details": {

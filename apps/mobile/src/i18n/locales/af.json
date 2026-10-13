@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Jou eie bewaarplekke",
     "dismissed": "Verwerp",
     "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Wysigings"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw-aktiwiteit",
       "balance": "Saldowaarskuwings",
       "security": "Sekuriteitsbevindings",
-      "spend": "Bestedingswaarskuwings"
+      "spend": "Bestedingswaarskuwings",
+      "followedSessions": "Gevolgde sessies"
     },
     "category": {
       "chatMessagesSubtitle": "antwoorde in jou gesprekke",
@@ -2088,6 +2091,8 @@
       "title": "Sessie",
       "copyErrorDetails": "Kopieer foutbesonderhede",
       "backToSessions": "Terug na sessies",
+      "follow": "Volg op die sluitskerm",
+      "unfollow": "Hou op volg op die sluitskerm",
       "couldNotLoad": "Die sessie kon nie gelaai word nie.",
       "failedToLoadDetails": "Die sessiebesonderhede kon nie gelaai word nie.",
       "failedToStopExecution": "Die uitvoering kon nie gestop word nie.",
@@ -3170,6 +3175,8 @@
     "channelName": "Aktiewe agente",
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
     "openSession": "Oop",
+    "finished": "Voltooi",
+    "followFailed": "Kon nie hierdie agent op die sluitskerm wys nie.",
     "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer.",
     "checked": "Gekontroleer",
     "lastKnown": "Laas bekend",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Wag vir jou",
     "nextScheduled": "Volgende geskeduleerde",
     "answerNeeded": "Antwoord nodig",
-    "waitingToRetry": "Wag om weer te probeer"
+    "waitingToRetry": "Wag om weer te probeer",
+    "step": {
+      "editing": "Wysig",
+      "reading": "Lees",
+      "running": "Hardloop",
+      "searching": "Websoektog",
+      "thinking": "Dink dit deur"
+    },
+    "planOf": "van",
+    "filesChanged": "lêers verander",
+    "finishedIn": "Klaar in",
+    "noActivityFor": "Geen aktiwiteit vir",
+    "prOpened": "Trekversoek oopgemaak",
+    "permissionWants": "Wil uitvoer",
+    "failure": {
+      "provider": "Gestop: verskafferfout",
+      "tool": "Gestop: gereedskapfout",
+      "cancelled": "Gestop: gekanselleer",
+      "other": "GESTAAK"
+    }
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Kon nie kletsgeskiedenis laai nie.",
       "new": "Nuwe klets",
-      "openHint": "Maak die klets oop. Hou lank in om te skrap.",
       "deleteTitle": "Skrap hierdie klets?"
+    },
+    "rename": {
+      "title": "Hernoem klets",
+      "accessibility": "Hernoem klets: {{title}}",
+      "openHint": "Maak die klets oop. Hou lank in om te hernoem of te skrap."
     },
     "beta": "Beta",
     "details": {

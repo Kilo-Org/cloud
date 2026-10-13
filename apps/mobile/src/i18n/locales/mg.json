@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Ny tahirin-kaodinao manokana",
     "dismissed": "Nesorina",
     "agent": "mpandraharaha",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Fiovana"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "Hetsika ao amin'ny KiloClaw",
       "balance": "Fampitandremana momba ny vola sisa",
       "security": "Olana hita amin'ny fiarovana",
-      "spend": "Fampitandremana momba ny fandaniana"
+      "spend": "Fampitandremana momba ny fandaniana",
+      "followedSessions": "Sessions arahina"
     },
     "category": {
       "chatMessagesSubtitle": "valiny amin'ny resakao",
@@ -2088,6 +2091,8 @@
       "title": "Fotoam-piasana",
       "copyErrorDetails": "Adikao ny antsipirian'ny hadisoana",
       "backToSessions": "Miverena amin'ny fotoam-piasana",
+      "follow": "Araho eo amin'ny efijery mihidy",
+      "unfollow": "Aza arahina intsony eo amin'ny efijery mihidy",
       "couldNotLoad": "Tsy voaray ny fotoam-piasana.",
       "failedToLoadDetails": "Tsy voaray ny antsipirian'ny fotoam-piasana.",
       "failedToStopExecution": "Tsy nahomby ny fampijanonana ny fampandehanana.",
@@ -3170,6 +3175,8 @@
     "channelName": "Mpanatanteraka mandeha",
     "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy.",
     "openSession": "Sokafy",
+    "finished": "Vita",
+    "followFailed": "Tsy afaka naseho teo amin'ny efijery mihidy ity mpandraharaha ity.",
     "approveFailed": "Tsy nahomby ny fanekena. Tsindrio $t(common.approve) hanandramana indray.",
     "checked": "Voamarina",
     "lastKnown": "Fantatra farany",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Miandry anao",
     "nextScheduled": "Voalahatra manaraka",
     "answerNeeded": "Mila valiny",
-    "waitingToRetry": "Miandry hanandrana indray"
+    "waitingToRetry": "Miandry hanandrana indray",
+    "step": {
+      "editing": "Fanovana",
+      "reading": "Famakiana",
+      "running": "Fandehanana",
+      "searching": "Fikarohana an-tserasera",
+      "thinking": "Misaina"
+    },
+    "planOf": "amin'ny",
+    "filesChanged": "rakipeo niova",
+    "finishedIn": "Vita tao anatin'ny",
+    "noActivityFor": "Tsy misy hetsika",
+    "prOpened": "Nisokatra pull request",
+    "permissionWants": "Te hampandeha",
+    "failure": {
+      "provider": "Nijanona: hadisoana mpamatsy",
+      "tool": "Nijanona: hadisoana fitaovana",
+      "cancelled": "Nijanona: nofoanana",
+      "other": "NIJANONA"
+    }
   },
   "transcriptionModel": {
     "title": "Modely fanovana feo ho soratra",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Tsy afaka nampidirina ny tantaran'ny resaka.",
       "new": "Resaka vaovao",
-      "openHint": "Manokatra ny resaka. Tsindrio ela mba hamafana.",
       "deleteTitle": "Hamafa ity resaka ity?"
+    },
+    "rename": {
+      "title": "Ovay ny anaran'ny resaka",
+      "accessibility": "Ovay ny anaran'ny resaka: {{title}}",
+      "openHint": "Manokatra ny resaka. Tsindrio ela mba hanovana ny anarana na hamafana."
     },
     "beta": "Beta",
     "details": {

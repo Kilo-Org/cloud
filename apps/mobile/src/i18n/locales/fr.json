@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Vos propres dépôts",
     "dismissed": "Ignoré",
     "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Modifications"
   },
   "language": {
@@ -263,7 +265,8 @@
       "kiloclaw": "Activité KiloClaw",
       "balance": "Alertes sur le solde",
       "security": "Problèmes de sécurité",
-      "spend": "Alertes de dépenses"
+      "spend": "Alertes de dépenses",
+      "followedSessions": "Sessions suivies"
     },
     "category": {
       "chatMessagesSubtitle": "réponses dans vos conversations",
@@ -1489,6 +1492,8 @@
       "title": "Session de travail",
       "copyErrorDetails": "Copier les détails de l'erreur",
       "backToSessions": "Retour aux sessions",
+      "follow": "Suivre sur l’écran verrouillé",
+      "unfollow": "Ne plus suivre sur l’écran verrouillé",
       "couldNotLoad": "Impossible de charger la session.",
       "failedToLoadDetails": "Impossible de charger les détails de la session.",
       "failedToStopExecution": "Impossible d'arrêter l'exécution.",
@@ -3211,6 +3216,8 @@
     "channelName": "Agents actifs",
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé.",
     "openSession": "Ouvrir",
+    "finished": "Terminé",
+    "followFailed": "Impossible d’afficher cet agent sur l’écran verrouillé.",
     "approveFailed": "Impossible d'approuver. Touchez $t(common.approve) pour réessayer.",
     "checked": "Vérifié",
     "lastKnown": "Dernier état connu",
@@ -3219,7 +3226,26 @@
     "waitingForYou": "En attente de votre intervention",
     "nextScheduled": "Prochaines exécutions",
     "answerNeeded": "Réponse requise",
-    "waitingToRetry": "Nouvelle tentative en attente"
+    "waitingToRetry": "Nouvelle tentative en attente",
+    "step": {
+      "editing": "Modification",
+      "reading": "Lecture",
+      "running": "Exécution",
+      "searching": "Recherche web",
+      "thinking": "Réflexion"
+    },
+    "planOf": "sur",
+    "filesChanged": "fichiers modifiés",
+    "finishedIn": "Terminé en",
+    "noActivityFor": "Aucune activité depuis",
+    "prOpened": "Pull request ouverte",
+    "permissionWants": "Veut exécuter",
+    "failure": {
+      "provider": "Arrêté : erreur du fournisseur",
+      "tool": "Arrêté : erreur d'outil",
+      "cancelled": "Arrêté : annulé",
+      "other": "ARRÊTÉ"
+    }
   },
   "transcriptionModel": {
     "title": "Modèle de transcription",
@@ -3255,8 +3281,12 @@
     "list": {
       "loadFailed": "Impossible de charger l'historique de la conversation.",
       "new": "Nouvelle discussion",
-      "openHint": "Ouvre la discussion. Appui long pour supprimer.",
       "deleteTitle": "Supprimer cette discussion ?"
+    },
+    "rename": {
+      "title": "Renommer la discussion",
+      "accessibility": "Renommer la discussion : {{title}}",
+      "openHint": "Ouvre la discussion. Appui long pour renommer ou supprimer."
     },
     "beta": "Bêta",
     "details": {

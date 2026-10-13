@@ -12,40 +12,41 @@ import {
 } from '@/lib/auth/logout-reconciliation';
 import { trpcClient } from '@/lib/trpc';
 
+import {
+  collectActivityToken,
+  detachActivity,
+  emptyActivityObservation,
+  observeActivity,
+} from './delivery-activity-observation';
+import { type Registration } from './delivery-registration-types';
+
+import {
+  _resetSessionActivityTokensForTests,
+  collectSessionScopeTokens,
+  sessionActivityTokens,
+  unregisterSessionActivityToken,
+} from './session-activity-tokens';
+import {
+  _resetAndroidSessionTokensForTests,
+  androidSessionActivityTokens,
+} from './session-activity-tokens-android';
 import { enqueueTokenMutation, resetTokenMutationQueue } from './token-mutation-queue';
 import {
   _resetUnregisterSessionForTests,
-  noteUnregisterFailure,
+  deleteActivityTokens,
   readUnregisterAuthToken,
+  unionTokens,
 } from './unregister-session';
-
 import { canRegisterActivityTokenKind } from './live-activity-switch';
-import {
-  type GlanceableActivity,
-  type GlanceableDelivery,
-  type GlanceableSinkContext,
-  setGlanceableDelivery,
-} from './sink-registry';
-
-/** Scope delivery survives idle work; only the activity registration ends with its surface. */
-type Registration = GlanceableSinkContext & {
-  kind: 'ios_push_to_start' | 'ios_activity' | 'android_ongoing';
-  epoch: number;
-  authEpoch: number;
-  token: string | null;
-  registeredToken: string | null;
-  tokens: Set<string>;
-};
+import { type GlanceableDelivery, setGlanceableDelivery } from './sink-registry';
 
 let pushToStartToken: string | null = null;
 let scopeRegistration: Registration | null = null;
-let activityRegistration: Registration | null = null;
-let observedActivity: GlanceableActivity | null = null;
 let startSubscription: ReturnType<typeof addPushToStartTokenListener> | null = null;
-let activitySubscription: ReturnType<GlanceableActivity['addPushTokenListener']> | null = null;
 // Keep every attempted token until its delete succeeds, including tokens rotated away by native.
 const scopeTokens = new Set<string>();
 const activityTokens = new Set<string>();
+const observation = emptyActivityObservation(activityTokens);
 let registerEpoch = 0;
 
 // Pure suites must not load the native notification graph.
@@ -65,7 +66,7 @@ function isCurrent(target: Registration): boolean {
   return (
     target.epoch === registerEpoch &&
     isCurrentAuthEpoch(target.authEpoch) &&
-    (target === scopeRegistration || target === activityRegistration)
+    (target === scopeRegistration || target === observation.registration)
   );
 }
 
@@ -127,13 +128,6 @@ function observePushToStart(target: Registration | null): void {
   });
 }
 
-function detachActivity(): void {
-  activityRegistration = null;
-  observedActivity = null;
-  activitySubscription?.remove();
-  activitySubscription = null;
-}
-
 function getScope(organizationId: string | null, userId: string | null): Registration {
   if (
     scopeRegistration === null ||
@@ -142,7 +136,7 @@ function getScope(organizationId: string | null, userId: string | null): Registr
     !isCurrent(scopeRegistration)
   ) {
     registerEpoch += 1;
-    detachActivity();
+    detachActivity(observation);
     scopeRegistration = {
       organizationId,
       userId,
@@ -174,51 +168,6 @@ async function registerAndroidToken(target: Registration): Promise<void> {
   }
 }
 
-async function observeActivity(target: Registration, instance: GlanceableActivity): Promise<void> {
-  try {
-    if (observedActivity === instance && activityRegistration !== null) {
-      if (activityRegistration.token !== null) {
-        await registerToken(activityRegistration, activityRegistration.token);
-      }
-      return;
-    }
-    if (activityRegistration !== null) {
-      delivery.cleanupTokens('activity');
-    }
-    const registration: Registration = {
-      ...target,
-      kind: 'ios_activity',
-      token: null,
-      registeredToken: null,
-      tokens: activityTokens,
-    };
-    activityRegistration = registration;
-    observedActivity = instance;
-    activitySubscription = instance.addPushTokenListener(({ pushToken }) => {
-      void registerToken(registration, pushToken);
-    });
-    const token = await instance.getPushToken();
-    // A token event is newer than the initial asynchronous read.
-    if (token !== null && registration.token === null) {
-      await registerToken(registration, token);
-    }
-  } catch {
-    // Unsupported or transient native reads must not discard the scope subscription.
-  }
-}
-
-async function collectActivityToken(
-  instance: GlanceableActivity | null,
-  activityToken?: Promise<string | null>
-): Promise<string | null> {
-  try {
-    return (await (activityToken ?? instance?.getPushToken())) ?? null;
-  } catch {
-    // Recorded tokens still need deletion when a native read fails.
-    return null;
-  }
-}
-
 const delivery: GlanceableDelivery = {
   registerScopeTokens(organizationId, userId) {
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
@@ -241,7 +190,15 @@ const delivery: GlanceableDelivery = {
     try {
       const current = instance ?? ActiveAgentsLiveActivity.getInstances().at(-1);
       if (current) {
-        void observeActivity(scopeRegistration, current);
+        void observeActivity({
+          observation,
+          target: scopeRegistration,
+          instance: current,
+          onSuperseded: () => {
+            delivery.cleanupTokens('activity');
+          },
+          registerToken,
+        });
       }
     } catch {
       // getInstances can throw on unsupported surfaces; the sink owns retry.
@@ -253,8 +210,12 @@ const delivery: GlanceableDelivery = {
   },
 
   async unregisterTokens(lifetime, activityToken) {
+    if (lifetime === 'session') {
+      // A session card end retires its own token only; the aggregate card keeps its registration.
+      return unregisterSessionActivityToken(activityToken);
+    }
     const includeScope = lifetime !== 'activity';
-    let instance = observedActivity;
+    let instance = observation.instance;
     if (Platform.OS === 'ios' && instance === null && activityToken === undefined) {
       try {
         instance = ActiveAgentsLiveActivity.getInstances().at(-1) ?? null;
@@ -262,6 +223,8 @@ const delivery: GlanceableDelivery = {
         // Recorded tokens remain available when native discovery fails.
       }
     }
+    // Read every session card's token before its end drops it.
+    const sessionScope = includeScope ? collectSessionScopeTokens() : null;
     if (includeScope) {
       registerEpoch += 1;
       scopeRegistration = null;
@@ -272,36 +235,28 @@ const delivery: GlanceableDelivery = {
         observePushToStart(null);
       }
     }
-    detachActivity();
+    detachActivity(observation);
     const nativeToken = collectActivityToken(instance, activityToken);
     const result = await enqueueTokenMutation(async () => {
       const capturedToken = await nativeToken;
       if (capturedToken) {
         activityTokens.add(capturedToken);
       }
+      await sessionScope;
       // Read the sets inside the FIFO so an already-running upsert is included.
-      const tokens = [
-        ...new Set(includeScope ? [...scopeTokens, ...activityTokens] : activityTokens),
+      const records = [
+        scopeTokens,
+        activityTokens,
+        sessionActivityTokens,
+        androidSessionActivityTokens,
       ];
+      const tokens = unionTokens(includeScope ? records : [activityTokens]);
       // Without a session the delete can only answer 401: keep the tokens for an authorized cleanup.
       const authToken = tokens.length > 0 ? await readUnregisterAuthToken() : null;
       if (authToken === null) {
         return { ok: tokens.length === 0, tokens };
       }
-      const results = await Promise.all(
-        tokens.map(async token => {
-          try {
-            await trpcClient.user.unregisterActivityToken.mutate({ token });
-            scopeTokens.delete(token);
-            activityTokens.delete(token);
-            return true;
-          } catch (error) {
-            noteUnregisterFailure(authToken, error);
-            return false;
-          }
-        })
-      );
-      const failed = tokens.filter((_token, index) => !results[index]);
+      const failed = await deleteActivityTokens(tokens, authToken, records);
       // Keep Android's existing successful-cleanup result contract.
       return {
         ok: failed.length === 0,
@@ -324,11 +279,13 @@ export function _setGetDevicePushTokenForTests(fn: (() => Promise<string | null>
 
 export function _resetDeliveryRegistrationForTests(): void {
   registerEpoch += 1;
-  detachActivity();
+  detachActivity(observation);
   scopeRegistration = null;
   scopeTokens.clear();
   activityTokens.clear();
   pushToStartToken = null;
+  _resetSessionActivityTokensForTests();
+  _resetAndroidSessionTokensForTests();
   resetTokenMutationQueue();
   _resetUnregisterSessionForTests();
   if (Platform.OS === 'ios') {

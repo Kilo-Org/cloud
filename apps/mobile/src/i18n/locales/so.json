@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Kaydadkaaga shakhsiga ah",
     "dismissed": "La iska dhaafay",
     "agent": "Wakiil",
+    "durationMinuteShort": "daq",
+    "durationHourShort": "saac",
     "changes": "Isbeddellada"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "Hawlaha KiloClaw",
       "balance": "Digniinaha haraaga",
       "security": "Natiijooyinka amniga",
-      "spend": "Digniinaha kharashka"
+      "spend": "Digniinaha kharashka",
+      "followedSessions": "Fadhiyada la raacay"
     },
     "category": {
       "chatMessagesSubtitle": "jawaabaha wadahadalladaada",
@@ -2088,6 +2091,8 @@
       "title": "Kalfadhi",
       "copyErrorDetails": "Nuqul ka samee faahfaahinta ciladda",
       "backToSessions": "Ku noqo kalfadhiyada",
+      "follow": "Kala soco shaashadda qufulka",
+      "unfollow": "Jooji la socoshada shaashadda qufulka",
       "couldNotLoad": "Kalfadhiga lama soo shubi karin.",
       "failedToLoadDetails": "Faahfaahinta kalfadhiga lama soo shubi karin.",
       "failedToStopExecution": "Fulinta lama joojin karin.",
@@ -3170,6 +3175,8 @@
     "channelName": "Wakiillada firfircoon",
     "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka.",
     "openSession": "Fur",
+    "finished": "Dhammaaday",
+    "followFailed": "Wakiilkan lagama muujin karin shaashadda qufulka.",
     "approveFailed": "Lama oggolaan karin. Taabo $t(common.approve) si aad mar kale isku daydo.",
     "checked": "La hubiyay",
     "lastKnown": "Ugu dambayn la ogaa",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Adiga ku sugaya",
     "nextScheduled": "Qorshaha xiga",
     "answerNeeded": "Jawaab loo baahan yahay",
-    "waitingToRetry": "Dib-u-tijaabin sugaya"
+    "waitingToRetry": "Dib-u-tijaabin sugaya",
+    "step": {
+      "editing": "Tafatirid",
+      "reading": "Akhris",
+      "running": "Socodsii",
+      "searching": "Raadinta webka",
+      "thinking": "Ka fikrid"
+    },
+    "planOf": "ka mid ah",
+    "filesChanged": "faylal la beddelay",
+    "finishedIn": "Ku dhammaaday",
+    "noActivityFor": "Dhaqdhaqaaq ma jiro",
+    "prOpened": "Pull request la furay",
+    "permissionWants": "Wuxuu rabaa inuu socodsiiyo",
+    "failure": {
+      "provider": "La joojiyay: khalad bixiye",
+      "tool": "La joojiyay: khalad qalab",
+      "cancelled": "La joojiyay: la baajiyay",
+      "other": "JOOGSATAY"
+    }
   },
   "transcriptionModel": {
     "title": "Moodeelka qoraal u beddelidda",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Taariikhda wada sheekaysiga lama soo gelin karin.",
       "new": "Wada sheekaysi cusub",
-      "openHint": "Wada sheekaysiga ayuu furayaa. Si aad u tirtirto si dheer u taabo.",
       "deleteTitle": "Ma tirtiraa wada sheekaysigan?"
+    },
+    "rename": {
+      "title": "Beddel magaca sheekaysiga",
+      "accessibility": "Beddel magaca sheekaysiga: {{title}}",
+      "openHint": "Wada sheekaysiga ayuu furayaa. Si aad magaca u beddesho ama u tirtirto si dheer u taabo."
     },
     "beta": "Beta",
     "details": {

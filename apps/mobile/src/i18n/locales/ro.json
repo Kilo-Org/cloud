@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Depozitele tale de cod",
     "dismissed": "Ignorată",
     "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Modificări"
   },
   "language": {
@@ -849,7 +851,8 @@
       "kiloclaw": "Activitate KiloClaw",
       "balance": "Alerte privind soldul",
       "security": "Probleme de securitate detectate",
-      "spend": "Alerte de cheltuieli"
+      "spend": "Alerte de cheltuieli",
+      "followedSessions": "Sesiuni urmărite"
     },
     "category": {
       "chatMessagesSubtitle": "răspunsuri în conversațiile tale",
@@ -2116,6 +2119,8 @@
       "title": "Sesiune",
       "copyErrorDetails": "Copiază detaliile erorii",
       "backToSessions": "Înapoi la sesiuni",
+      "follow": "Urmărește pe ecranul de blocare",
+      "unfollow": "Nu mai urmări pe ecranul de blocare",
       "couldNotLoad": "Nu s-a putut încărca sesiunea.",
       "failedToLoadDetails": "Nu s-au putut încărca detaliile sesiunii.",
       "failedToStopExecution": "Nu s-a putut opri execuția.",
@@ -3211,6 +3216,8 @@
     "channelName": "Agenți activi",
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare.",
     "openSession": "Deschide",
+    "finished": "Terminat",
+    "followFailed": "Agentul nu a putut fi afișat pe ecranul de blocare.",
     "approveFailed": "Aprobarea nu a reușit. Atinge $t(common.approve) pentru a încerca din nou.",
     "checked": "Verificat",
     "lastKnown": "Ultima stare cunoscută",
@@ -3219,7 +3226,26 @@
     "waitingForYou": "Te așteaptă",
     "nextScheduled": "Următoarele programate",
     "answerNeeded": "Așteaptă un răspuns",
-    "waitingToRetry": "Așteaptă reîncercarea"
+    "waitingToRetry": "Așteaptă reîncercarea",
+    "step": {
+      "editing": "Editare",
+      "reading": "Citire",
+      "running": "Rulare",
+      "searching": "Căutare web",
+      "thinking": "Analizează"
+    },
+    "planOf": "din",
+    "filesChanged": "fișiere modificate",
+    "finishedIn": "Finalizat în",
+    "noActivityFor": "Fără activitate de",
+    "prOpened": "Pull request deschis",
+    "permissionWants": "Vrea să ruleze",
+    "failure": {
+      "provider": "Oprit: eroare furnizor",
+      "tool": "Oprit: eroare instrument",
+      "cancelled": "Oprit: anulat",
+      "other": "OPRIT"
+    }
   },
   "transcriptionModel": {
     "title": "Model de transcriere",
@@ -3255,8 +3281,12 @@
     "list": {
       "loadFailed": "Nu s-a putut încărca istoricul de chat.",
       "new": "Chat nou",
-      "openHint": "Deschide chatul. Apasă lung pentru a șterge.",
       "deleteTitle": "Ștergi acest chat?"
+    },
+    "rename": {
+      "title": "Redenumește chatul",
+      "accessibility": "Redenumește chatul: {{title}}",
+      "openHint": "Deschide chatul. Apasă lung pentru a redenumi sau a șterge."
     },
     "beta": "Beta",
     "details": {

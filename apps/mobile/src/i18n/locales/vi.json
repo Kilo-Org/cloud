@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Kho mã nguồn của riêng bạn",
     "dismissed": "Đã bỏ qua",
     "agent": "Đại lý",
+    "durationMinuteShort": "phút",
+    "durationHourShort": "giờ",
     "changes": "Thay đổi"
   },
   "language": {
@@ -321,7 +323,8 @@
       "kiloclaw": "Hoạt động KiloClaw",
       "balance": "Cảnh báo số dư",
       "security": "Vấn đề bảo mật",
-      "spend": "Cảnh báo chi tiêu"
+      "spend": "Cảnh báo chi tiêu",
+      "followedSessions": "Phiên đã theo dõi"
     },
     "category": {
       "chatMessagesSubtitle": "câu trả lời trong các cuộc trò chuyện của bạn",
@@ -1576,6 +1579,8 @@
       "title": "Phiên",
       "copyErrorDetails": "Sao chép chi tiết lỗi",
       "backToSessions": "Quay lại danh sách phiên",
+      "follow": "Theo dõi trên màn hình khóa",
+      "unfollow": "Dừng theo dõi trên màn hình khóa",
       "couldNotLoad": "Không thể tải phiên.",
       "failedToLoadDetails": "Không thể tải thông tin phiên.",
       "failedToStopExecution": "Không thể dừng tác vụ đang chạy.",
@@ -3170,6 +3175,8 @@
     "channelName": "Tác nhân đang hoạt động",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
     "openSession": "Mở",
+    "finished": "Đã hoàn tất",
+    "followFailed": "Không thể hiển thị tác nhân này trên màn hình khóa.",
     "approveFailed": "Không thể phê duyệt. Nhấn $t(common.approve) để thử lại.",
     "checked": "Đã kiểm tra",
     "lastKnown": "Ghi nhận gần nhất",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Đang chờ bạn",
     "nextScheduled": "Lịch tiếp theo",
     "answerNeeded": "Cần trả lời",
-    "waitingToRetry": "Đang chờ thử lại"
+    "waitingToRetry": "Đang chờ thử lại",
+    "step": {
+      "editing": "Đang chỉnh sửa",
+      "reading": "Đang đọc",
+      "running": "Chạy",
+      "searching": "Tìm kiếm web",
+      "thinking": "Đang suy nghĩ kỹ"
+    },
+    "planOf": "trong",
+    "filesChanged": "tệp đã thay đổi",
+    "finishedIn": "Hoàn thành trong",
+    "noActivityFor": "Không có hoạt động trong",
+    "prOpened": "Đã mở pull request",
+    "permissionWants": "Muốn chạy",
+    "failure": {
+      "provider": "Đã dừng: lỗi nhà cung cấp",
+      "tool": "Đã dừng: lỗi công cụ",
+      "cancelled": "Đã dừng: đã hủy",
+      "other": "ĐÃ DỪNG"
+    }
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Không thể tải lịch sử trò chuyện.",
       "new": "Cuộc trò chuyện mới",
-      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để xóa.",
       "deleteTitle": "Xóa cuộc trò chuyện này?"
+    },
+    "rename": {
+      "title": "Đổi tên cuộc trò chuyện",
+      "accessibility": "Đổi tên cuộc trò chuyện: {{title}}",
+      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để đổi tên hoặc xóa."
     },
     "beta": "Beta",
     "details": {

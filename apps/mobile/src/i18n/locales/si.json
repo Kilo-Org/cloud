@@ -137,6 +137,8 @@
     "yourOwnRepositories": "ඔබේම කේත ගබඩා",
     "dismissed": "ඉවතලා ඇත",
     "agent": "නියෝජිතයා",
+    "durationMinuteShort": "මිනි",
+    "durationHourShort": "පැය",
     "changes": "වෙනස්කම්"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw ක්‍රියාකාරකම්",
       "balance": "ශේෂය පිළිබඳ ඇඟවීම්",
       "security": "හඳුනාගත් ආරක්ෂක ගැටලු",
-      "spend": "වියදම් දැනුම්දීම්"
+      "spend": "වියදම් දැනුම්දීම්",
+      "followedSessions": "අනුගමනය කරන සැසි"
     },
     "category": {
       "chatMessagesSubtitle": "ඔබේ සංවාදවල පිළිතුරු",
@@ -2088,6 +2091,8 @@
       "title": "සැසිය",
       "copyErrorDetails": "දෝෂ විස්තර පිටපත් කරන්න",
       "backToSessions": "සැසි වෙත ආපසු යන්න",
+      "follow": "අගුළු තිරයේ අනුගමනය කරන්න",
+      "unfollow": "අගුළු තිරයේ අනුගමනය කිරීම නවත්වන්න",
       "couldNotLoad": "සැසිය පූරණය කළ නොහැකි විය.",
       "failedToLoadDetails": "සැසියේ විස්තර පූරණය කළ නොහැකි විය.",
       "failedToStopExecution": "ක්‍රියාත්මක කිරීම නතර කළ නොහැකි විය.",
@@ -3170,6 +3175,8 @@
     "channelName": "සක්‍රීය නියෝජිතයන්",
     "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න.",
     "openSession": "විවෘත කරන්න",
+    "finished": "නිම විය",
+    "followFailed": "මෙම නියෝජිතයා අගුළු තිරයේ පෙන්වීමට නොහැකි විය.",
     "approveFailed": "අනුමත කිරීමට නොහැකි විය. නැවත උත්සාහ කිරීමට $t(common.approve) තට්ටු කරන්න.",
     "checked": "තහවුරු කළේ",
     "lastKnown": "අවසන් වරට දන්නා තත්ත්වය",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "ඔබේ ප්‍රතිචාරය එනතුරු",
     "nextScheduled": "ඊළඟ නියමිත කාර්යයන්",
     "answerNeeded": "පිළිතුරක් අවශ්‍යයි",
-    "waitingToRetry": "නැවත උත්සාහ කිරීමට රැඳී සිටී"
+    "waitingToRetry": "නැවත උත්සාහ කිරීමට රැඳී සිටී",
+    "step": {
+      "editing": "සංස්කරණය",
+      "reading": "කියවීම",
+      "running": "ක්‍රියාත්මක කිරීම",
+      "searching": "වෙබ් සෙවීම",
+      "thinking": "සිතා බැලීම"
+    },
+    "planOf": "න්",
+    "filesChanged": "ගොනු වෙනස් විය",
+    "finishedIn": "අවසන් විය",
+    "noActivityFor": "ක්‍රියාකාරකම් නැත",
+    "prOpened": "Pull request විවෘත කරන ලදී",
+    "permissionWants": "ක්‍රියාත්මක කිරීමට අවශ්‍යයි",
+    "failure": {
+      "provider": "නතර විය: සපයන්නාගේ දෝෂය",
+      "tool": "නතර විය: මෙවලම් දෝෂය",
+      "cancelled": "නතර විය: අවලංගු කරන ලදී",
+      "other": "නතර කර ඇත"
+    }
   },
   "transcriptionModel": {
     "title": "හඬ පෙළට හරවන ආකෘතිය",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "සංවාද ඉතිහාසය පූරණය කළ නොහැකි විය.",
       "new": "නව කතාබහ",
-      "openHint": "කතාබහ විවෘත කරයි. මකා දැමීමට දිගු ලෙස ඔබන්න.",
       "deleteTitle": "මෙම කතාබහ මකන්නද?"
+    },
+    "rename": {
+      "title": "කතාබහේ නම වෙනස් කරන්න",
+      "accessibility": "{{title}} කතාබහේ නම වෙනස් කරන්න",
+      "openHint": "කතාබහ විවෘත කරයි. නම වෙනස් කිරීමට හෝ මකා දැමීමට දිගු ලෙස ඔබන්න."
     },
     "beta": "බීටා",
     "details": {

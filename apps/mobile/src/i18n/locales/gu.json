@@ -137,6 +137,8 @@
     "yourOwnRepositories": "તમારી પોતાની રિપોઝિટરીઓ",
     "dismissed": "ખારિજ કરેલું",
     "agent": "એજન્ટ",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "ફેરફારો"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClawની પ્રવૃત્તિ",
       "balance": "બેલેન્સ અંગેની ચેતવણીઓ",
       "security": "સુરક્ષા તપાસનાં તારણો",
-      "spend": "ખર્ચની ચેતવણીઓ"
+      "spend": "ખર્ચની ચેતવણીઓ",
+      "followedSessions": "ફોલો કરેલ સેશન્સ"
     },
     "category": {
       "chatMessagesSubtitle": "તમારી વાતચીતમાં જવાબો",
@@ -2088,6 +2091,8 @@
       "title": "સત્ર",
       "copyErrorDetails": "ભૂલની વિગતોની નકલ કરો",
       "backToSessions": "સત્રો પર પાછા જાઓ",
+      "follow": "લૉક સ્ક્રીન પર ફૉલો કરો",
+      "unfollow": "લૉક સ્ક્રીન પર ફૉલો કરવાનું બંધ કરો",
       "couldNotLoad": "સત્ર લોડ કરી શકાયું નહીં.",
       "failedToLoadDetails": "સત્રની વિગતો લોડ કરી શકાઈ નહીં.",
       "failedToStopExecution": "ચાલી રહેલું કાર્ય રોકી શકાયું નહીં.",
@@ -3170,6 +3175,8 @@
     "channelName": "સક્રિય એજન્ટો",
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો.",
     "openSession": "ખોલો",
+    "finished": "સમાપ્ત",
+    "followFailed": "આ એજન્ટને લૉક સ્ક્રીન પર બતાવી શકાયો નથી.",
     "approveFailed": "મંજૂર કરી શકાયું નહીં. ફરી પ્રયાસ કરવા $t(common.approve) પર ટૅપ કરો.",
     "checked": "ચકાસ્યું",
     "lastKnown": "છેલ્લે જાણીતું",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "તમારી રાહમાં",
     "nextScheduled": "આગામી નિર્ધારિત",
     "answerNeeded": "જવાબ જરૂરી",
-    "waitingToRetry": "ફરી પ્રયાસની રાહમાં"
+    "waitingToRetry": "ફરી પ્રયાસની રાહમાં",
+    "step": {
+      "editing": "સંપાદન",
+      "reading": "વાંચન",
+      "running": "ચલાવો",
+      "searching": "વેબ શોધ",
+      "thinking": "વિચારી રહ્યું છે"
+    },
+    "planOf": "માંથી",
+    "filesChanged": "ફાઇલો બદલાઈ",
+    "finishedIn": "માં પૂર્ણ",
+    "noActivityFor": "કોઈ પ્રવૃત્તિ નથી",
+    "prOpened": "પુલ રિક્વેસ્ટ ખૂલી",
+    "permissionWants": "ચલાવવા માંગે છે",
+    "failure": {
+      "provider": "બંધ થયું: પ્રદાતા ભૂલ",
+      "tool": "બંધ થયું: સાધન ભૂલ",
+      "cancelled": "બંધ થયું: રદ કર્યું",
+      "other": "રોકાયેલું"
+    }
   },
   "transcriptionModel": {
     "title": "અવાજને લખાણમાં ફેરવવાનું મોડેલ",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "વાતચીત ઇતિહાસ લોડ કરી શકાયો નહીં.",
       "new": "નવી ચેટ",
-      "openHint": "ચેટ ખોલે છે. કાઢી નાખવા માટે લાંબું દબાવો.",
       "deleteTitle": "આ ચેટ કાઢી નાખવી?"
+    },
+    "rename": {
+      "title": "ચેટનું નામ બદલો",
+      "accessibility": "ચેટનું નામ બદલો: {{title}}",
+      "openHint": "ચેટ ખોલે છે. નામ બદલવા કે કાઢી નાખવા માટે લાંબું દબાવો."
     },
     "beta": "બીટા",
     "details": {

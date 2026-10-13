@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Tavo saugyklos",
     "dismissed": "Atmesta",
     "agent": "Agentas",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Pakeitimai"
   },
   "language": {
@@ -865,7 +867,8 @@
       "kiloclaw": "KiloClaw veikla",
       "balance": "Įspėjimai apie likutį",
       "security": "Saugos problemos",
-      "spend": "Išlaidų įspėjimai"
+      "spend": "Išlaidų įspėjimai",
+      "followedSessions": "Sekamos sesijos"
     },
     "category": {
       "chatMessagesSubtitle": "atsakymai jūsų pokalbiuose",
@@ -2144,6 +2147,8 @@
       "title": "Sesija",
       "copyErrorDetails": "Kopijuoti klaidos informaciją",
       "backToSessions": "Grįžti į sesijas",
+      "follow": "Sekti užrakinimo ekrane",
+      "unfollow": "Nebesekti užrakinimo ekrane",
       "couldNotLoad": "Nepavyko įkelti sesijos.",
       "failedToLoadDetails": "Nepavyko įkelti sesijos informacijos.",
       "failedToStopExecution": "Nepavyko sustabdyti vykdymo.",
@@ -3252,6 +3257,8 @@
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
     "openSession": "Atidaryti",
+    "finished": "Baigta",
+    "followFailed": "Nepavyko parodyti šio agento užrakinimo ekrane.",
     "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą.",
     "checked": "Patikrinta",
     "lastKnown": "Paskutinė žinoma",
@@ -3260,7 +3267,26 @@
     "waitingForYou": "Laukia jūsų",
     "nextScheduled": "Artimiausi suplanuoti",
     "answerNeeded": "Laukia atsakymo",
-    "waitingToRetry": "Laukiama pakartojimo"
+    "waitingToRetry": "Laukiama pakartojimo",
+    "step": {
+      "editing": "Redagavimas",
+      "reading": "Skaitymas",
+      "running": "Vykdoma",
+      "searching": "Paieška žiniatinklyje",
+      "thinking": "Mąstoma"
+    },
+    "planOf": "iš",
+    "filesChanged": "pakeisti failai",
+    "finishedIn": "Baigta per",
+    "noActivityFor": "Nėra veiklos",
+    "prOpened": "Atidaryta pull užklausa",
+    "permissionWants": "Nori vykdyti",
+    "failure": {
+      "provider": "Sustabdyta: teikėjo klaida",
+      "tool": "Sustabdyta: įrankio klaida",
+      "cancelled": "Sustabdyta: atšaukta",
+      "other": "SUSTABDYTA"
+    }
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",
@@ -3296,8 +3322,12 @@
     "list": {
       "loadFailed": "Nepavyko įkelti pokalbio istorijos.",
       "new": "Naujas pokalbis",
-      "openHint": "Atidaro pokalbį. Palaikykite, kad ištrintumėte.",
       "deleteTitle": "Ištrinti šį pokalbį?"
+    },
+    "rename": {
+      "title": "Pervadinti pokalbį",
+      "accessibility": "Pervadinti pokalbį: {{title}}",
+      "openHint": "Atidaro pokalbį. Palaikykite, kad pervadintumėte arba ištrintumėte."
     },
     "beta": "Beta",
     "details": {

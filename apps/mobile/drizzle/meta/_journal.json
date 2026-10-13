@@ -22,6 +22,13 @@
       "when": 1791853110512,
       "tag": "0002_majestic_old_lace",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791914277576,
+      "tag": "0003_quick_chat_titles",
+      "breakpoints": true
     }
   ]
 }

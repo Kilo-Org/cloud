@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Do stóir féin",
     "dismissed": "Curtha as an áireamh",
     "agent": "Gníomhaire",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Athruithe"
   },
   "language": {
@@ -881,7 +883,8 @@
       "kiloclaw": "Gníomhaíocht KiloClaw",
       "balance": "Foláirimh iarmhéid",
       "security": "Torthaí slándála",
-      "spend": "Foláirimh chaiteachais"
+      "spend": "Foláirimh chaiteachais",
+      "followedSessions": "Seisiúin leanta"
     },
     "category": {
       "chatMessagesSubtitle": "freagraí i do chomhráite",
@@ -2172,6 +2175,8 @@
       "title": "Seisiún",
       "copyErrorDetails": "Cóipeáil sonraí na hearráide",
       "backToSessions": "Ar ais chuig na seisiúin",
+      "follow": "Lean ar an scáileán glasála",
+      "unfollow": "Stop ag leanúint ar an scáileán glasála",
       "couldNotLoad": "Níorbh fhéidir an seisiún a lódáil.",
       "failedToLoadDetails": "Níorbh fhéidir sonraí an tseisiúin a lódáil.",
       "failedToStopExecution": "Níorbh fhéidir an forghníomhú a stopadh.",
@@ -3293,6 +3298,8 @@
     "channelName": "Gníomhairí gníomhacha",
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála.",
     "openSession": "Oscail",
+    "finished": "Críochnaithe",
+    "followFailed": "Níorbh fhéidir an gníomhaire seo a thaispeáint ar an scáileán glasála.",
     "approveFailed": "Níorbh fhéidir ceadú. Tapáil $t(common.approve) chun triail eile a bhaint as.",
     "checked": "Seiceáilte",
     "lastKnown": "Stádas deireanach ar eolas",
@@ -3301,7 +3308,26 @@
     "waitingForYou": "Ag fanacht leat",
     "nextScheduled": "Sceidealaithe amach romhainn",
     "answerNeeded": "Freagra de dhíth",
-    "waitingToRetry": "Ag fanacht le hatriail"
+    "waitingToRetry": "Ag fanacht le hatriail",
+    "step": {
+      "editing": "Eagarthóireacht",
+      "reading": "Léamh",
+      "running": "Rith",
+      "searching": "Cuardach gréasáin",
+      "thinking": "Ag smaoineamh"
+    },
+    "planOf": "as",
+    "filesChanged": "comhaid athraithe",
+    "finishedIn": "Críochnaithe i",
+    "noActivityFor": "Níl aon ghníomhaíocht le",
+    "prOpened": "Iarratas tarraingthe oscailte",
+    "permissionWants": "Teastaíonn uaidh rith",
+    "failure": {
+      "provider": "Stoptha: earráid soláthraí",
+      "tool": "Stoptha: earráid uirlise",
+      "cancelled": "Stoptha: cealaithe",
+      "other": "STADTA"
+    }
   },
   "transcriptionModel": {
     "title": "Samhail tras-scríobh",
@@ -3337,8 +3363,12 @@
     "list": {
       "loadFailed": "Níorbh fhéidir stair an chomhrá a lódáil.",
       "new": "Comhrá nua",
-      "openHint": "Osclaíonn sé an comhrá. Brúigh go fada chun scriosadh.",
       "deleteTitle": "An comhrá seo a scriosadh?"
+    },
+    "rename": {
+      "title": "Athainmnigh an comhrá",
+      "accessibility": "Athainmnigh an comhrá: {{title}}",
+      "openHint": "Osclaíonn sé an comhrá. Brúigh go fada chun athainmniú nó scriosadh."
     },
     "beta": "Béite",
     "details": {

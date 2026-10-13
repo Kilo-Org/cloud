@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Tvoji repozitoriji",
     "dismissed": "Odbačeno",
     "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Izmjene"
   },
   "language": {
@@ -849,7 +851,8 @@
       "kiloclaw": "Aktivnost u KiloClawu",
       "balance": "Upozorenja o stanju",
       "security": "Sigurnosni nalazi",
-      "spend": "Upozorenja o potrošnji"
+      "spend": "Upozorenja o potrošnji",
+      "followedSessions": "Praćene sesije"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",
@@ -2116,6 +2119,8 @@
       "title": "Sesija",
       "copyErrorDetails": "Kopiraj detalje greške",
       "backToSessions": "Nazad na sesije",
+      "follow": "Prati na zaključanom ekranu",
+      "unfollow": "Prestani pratiti na zaključanom ekranu",
       "couldNotLoad": "Nije moguće učitati sesiju.",
       "failedToLoadDetails": "Nije moguće učitati detalje sesije.",
       "failedToStopExecution": "Nije moguće zaustaviti izvršavanje.",
@@ -3211,6 +3216,8 @@
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama da vidiš aktivne agente na zaključanom ekranu.",
     "openSession": "Otvori",
+    "finished": "Završeno",
+    "followFailed": "Nije moguće prikazati ovog agenta na zaključanom ekranu.",
     "approveFailed": "Odobravanje nije uspjelo. Dodirni $t(common.approve) da pokušaš ponovo.",
     "checked": "Provjereno",
     "lastKnown": "Posljednje poznato",
@@ -3219,7 +3226,26 @@
     "waitingForYou": "Čeka vas",
     "nextScheduled": "Sljedeće zakazano",
     "answerNeeded": "Potreban odgovor",
-    "waitingToRetry": "Čeka ponovni pokušaj"
+    "waitingToRetry": "Čeka ponovni pokušaj",
+    "step": {
+      "editing": "Uređivanje",
+      "reading": "Čitanje",
+      "running": "Pokretanje",
+      "searching": "Web pretraga",
+      "thinking": "Razmišljanje"
+    },
+    "planOf": "od",
+    "filesChanged": "datoteka promijenjeno",
+    "finishedIn": "Završeno za",
+    "noActivityFor": "Nema aktivnosti za",
+    "prOpened": "Zahtjev za povlačenje otvoren",
+    "permissionWants": "Želi pokrenuti",
+    "failure": {
+      "provider": "Zaustavljeno: greška provajdera",
+      "tool": "Zaustavljeno: greška alata",
+      "cancelled": "Zaustavljeno: otkazano",
+      "other": "ZAUSTAVLJENO"
+    }
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",
@@ -3255,8 +3281,12 @@
     "list": {
       "loadFailed": "Nije moguće učitati istoriju razgovora.",
       "new": "Novi razgovor",
-      "openHint": "Otvara razgovor. Dugo pritisnite za brisanje.",
       "deleteTitle": "Izbrisati ovaj razgovor?"
+    },
+    "rename": {
+      "title": "Preimenuj razgovor",
+      "accessibility": "Preimenuj razgovor: {{title}}",
+      "openHint": "Otvara razgovor. Dugo pritisnite za preimenovanje ili brisanje."
     },
     "beta": "Beta",
     "details": {

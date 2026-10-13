@@ -51,7 +51,11 @@ function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
     };
   };
   return {
-    paragraph: { color: textColor, fontSize: 16, lineHeight: 24, marginTop: 2, marginBottom: 2 },
+    // No top margin: the library puts a leading margin on the first block as a
+    // spacer line, and its measure reads any second line as wrapped text and
+    // takes the full width, so a short user bubble filled its maximum width.
+    // The bottom margin alone keeps the gap between paragraphs.
+    paragraph: { color: textColor, fontSize: 16, lineHeight: 24, marginTop: 0, marginBottom: 4 },
     h1: heading('h1'),
     h2: heading('h2'),
     h3: heading('h3'),

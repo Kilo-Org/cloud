@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Zure biltegiak",
     "dismissed": "Baztertuta",
     "agent": "Agentea",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Aldaketak"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "KiloClaw-en jarduera",
       "balance": "Saldoari buruzko alertak",
       "security": "Antzemandako segurtasun-arazoak",
-      "spend": "Gastu-alertak"
+      "spend": "Gastu-alertak",
+      "followedSessions": "Jarraitutako saioak"
     },
     "category": {
       "chatMessagesSubtitle": "zure elkarrizketetako erantzunak",
@@ -2088,6 +2091,8 @@
       "title": "Saioa",
       "copyErrorDetails": "Kopiatu errorearen xehetasunak",
       "backToSessions": "Itzuli saioetara",
+      "follow": "Jarraitu blokeo-pantailan",
+      "unfollow": "Utzi blokeo-pantailan jarraitzeari",
       "couldNotLoad": "Ezin izan da saioa kargatu.",
       "failedToLoadDetails": "Ezin izan dira saioaren xehetasunak kargatu.",
       "failedToStopExecution": "Ezin izan da exekuzioa gelditu.",
@@ -3170,6 +3175,8 @@
     "channelName": "Agente aktiboak",
     "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko.",
     "openSession": "Ireki",
+    "finished": "Amaituta",
+    "followFailed": "Ezin izan da agente hau blokeo-pantailan erakutsi.",
     "approveFailed": "Ezin izan da onartu. Sakatu $t(common.approve) berriro saiatzeko.",
     "checked": "Egiaztatuta",
     "lastKnown": "Azken egoera ezaguna",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Zure zain",
     "nextScheduled": "Hurrengo programatuak",
     "answerNeeded": "Zure erantzunaren zain",
-    "waitingToRetry": "Berriro saiatzeko zain"
+    "waitingToRetry": "Berriro saiatzeko zain",
+    "step": {
+      "editing": "Editatzen",
+      "reading": "Irakurtzen",
+      "running": "Exekutatzen",
+      "searching": "Web bilaketa",
+      "thinking": "Hausnartzen"
+    },
+    "planOf": "etik",
+    "filesChanged": "fitxategiak aldatuta",
+    "finishedIn": "Amaituta",
+    "noActivityFor": "Jarduerarik gabe",
+    "prOpened": "Pull request irekita",
+    "permissionWants": "Exekutatu nahi du",
+    "failure": {
+      "provider": "Geldituta: hornitzailearen errorea",
+      "tool": "Geldituta: tresnaren errorea",
+      "cancelled": "Geldituta: bertan behera utzita",
+      "other": "GELDITUTA"
+    }
   },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Ezin izan da txat-historia kargatu.",
       "new": "Txat berria",
-      "openHint": "Txata irekitzen du. Ezabatzeko, sakatu luze.",
       "deleteTitle": "Txat hau ezabatu?"
+    },
+    "rename": {
+      "title": "Berrizendatu txata",
+      "accessibility": "Berrizendatu txata: {{title}}",
+      "openHint": "Txata irekitzen du. Berrizendatzeko edo ezabatzeko, sakatu luze."
     },
     "beta": "Beta",
     "details": {

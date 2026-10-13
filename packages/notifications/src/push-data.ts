@@ -2,6 +2,14 @@ import { z } from 'zod';
 import { homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
 
 import { instanceLifecycleEventSchema, scheduledActionEventSchema } from './notification-events';
+import {
+  SESSION_LIVE_COMMAND_LIMIT,
+  sessionLiveChangesSchema,
+  sessionLiveFailureSchema,
+  sessionLiveOutcomeSchema,
+  sessionLivePlanSchema,
+  sessionLiveStepSchema,
+} from './session-live-content';
 
 const nonEmptyStringSchema = z.string().min(1);
 
@@ -11,6 +19,50 @@ const nonEmptyStringSchema = z.string().min(1);
 // at the enforcement read site.
 export const cloudAgentSessionCategorySchema = z.enum(['attention', 'status']);
 export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategorySchema>;
+
+/**
+ * The raw content-state one followed session's Live Activity renders
+ * (`.specs/mobile-session-live-activity.md`). Unlike the aggregate card, it
+ * carries the session title: the user started the card with Follow. The
+ * session id routes taps and approval and is never drawn. It must never carry
+ * an organization name, repository, generated text, or a raw account id.
+ */
+export const sessionLiveActivityContentStateSchema = z.object({
+  sessionId: nonEmptyStringSchema,
+  /** Trimmed and capped display title; null for an untitled session. */
+  title: z.string().max(120).nullable(),
+  statusKind: z.enum(['needsInput', 'running', 'idle', 'scheduled', 'failed']),
+  /** ISO 8601; when the current status kind began. */
+  statusSince: z.string(),
+  /** ISO 8601 wake time for a scheduled session, else null. */
+  scheduledAt: z.string().nullable(),
+  /** True only when Approve can answer the waiting permission request. */
+  awaitingPermission: z.boolean(),
+  /** SHA-256 hex of `JSON.stringify([sessionId, permissionId])`, else null. */
+  approvalKey: z.string().nullable(),
+  /** ISO 8601; when the server confirmed this content. */
+  updatedAt: z.string(),
+  /** The step the agent is on; null when the session is not working. */
+  currentStep: sessionLiveStepSchema.nullable().optional(),
+  /** Plan progress while the agent works from a todo list. */
+  plan: sessionLivePlanSchema.nullable().optional(),
+  /** The command Approve answers, trimmed to one line; null without one. */
+  permissionCommand: z.string().max(SESSION_LIVE_COMMAND_LIMIT).nullable().optional(),
+  /** The diff this session produced so far. */
+  changes: sessionLiveChangesSchema.nullable().optional(),
+  /** ISO 8601; the last activity the server saw. */
+  lastActivityAt: z.string().nullable().optional(),
+  /** The cost so far, in microdollars. */
+  costMicrodollars: z.number().int().nonnegative().nullable().optional(),
+  /** How a finished session ended. */
+  outcome: sessionLiveOutcomeSchema.nullable().optional(),
+  /** Why a finished turn failed; null while nothing failed. */
+  failure: sessionLiveFailureSchema.nullable().optional(),
+  /** ISO 8601; when the session started. */
+  startedAt: z.string().nullable().optional(),
+});
+
+export type SessionLiveActivityContentState = z.infer<typeof sessionLiveActivityContentStateSchema>;
 
 /**
  * Schema for the `data` blob attached to Expo push notifications.
@@ -140,6 +192,24 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     newestResultAt: z.string().nullable().default(null),
     homeWidgetDetails: homeWidgetDetailsSchema.optional(),
   }),
+  // One followed session's Android ongoing notification
+  // (`.specs/mobile-session-live-activity.md` "Android"). A high-priority
+  // data-only message to the device that follows the session; the app
+  // renders, updates, or cancels the notification from `content`. Only a
+  // device that registered an `android_session_ongoing` row receives it, and
+  // `schemaVersion` gates a later shape: a client that does not know the
+  // version ignores the message.
+  z.object({
+    type: z.literal('session_live_update'),
+    schemaVersion: z.literal(1),
+    event: z.enum(['update', 'end']),
+    content: sessionLiveActivityContentStateSchema,
+    /**
+     * Only on an end: how long a finished notification stays in the shade.
+     * 0 removes it at once (the session is gone or out of scope).
+     */
+    dismissAfterMs: z.number().int().min(0).optional(),
+  }),
 ]);
 
 export type PushData = z.infer<typeof pushDataSchema>;
@@ -164,3 +234,15 @@ export type GlanceableLiveActivityContentState = Pick<
   | 'scheduled'
   | 'scheduledAt'
 >;
+
+/**
+ * Relevance per spec "Presentation order": iOS shows the highest score in the
+ * Dynamic Island and orders the Lock Screen by it. Both producers use this.
+ */
+export const LIVE_ACTIVITY_RELEVANCE = {
+  sessionNeedsInput: 100,
+  aggregateNeedsInput: 80,
+  sessionActive: 60,
+  aggregate: 40,
+  sessionIdle: 20,
+} as const;

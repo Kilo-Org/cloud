@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Ma'ajiyoyinka",
     "dismissed": "An yi watsi da shi",
     "agent": "Wakili",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Canje-canje"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "Ayyukan KiloClaw",
       "balance": "Faɗakarwar ragowar kuɗi",
       "security": "Sakamakon binciken tsaro",
-      "spend": "Faɗakarwar kashe kuɗi"
+      "spend": "Faɗakarwar kashe kuɗi",
+      "followedSessions": "Zaman da ake bibiya"
     },
     "category": {
       "chatMessagesSubtitle": "amsoshi a cikin tattaunawarka",
@@ -2088,6 +2091,8 @@
       "title": "Zama",
       "copyErrorDetails": "Kwafi cikakkun bayanan kuskure",
       "backToSessions": "Koma zuwa zamanni",
+      "follow": "Bi a allon kulle",
+      "unfollow": "Daina bi a allon kulle",
       "couldNotLoad": "An kasa loda zaman.",
       "failedToLoadDetails": "An kasa loda cikakkun bayanan zaman.",
       "failedToStopExecution": "An kasa dakatar da aikin.",
@@ -3170,6 +3175,8 @@
     "channelName": "Wakilai da ke aiki",
     "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle.",
     "openSession": "Buɗe",
+    "finished": "An kammala",
+    "followFailed": "Ba a iya nuna wannan wakili a allon kulle ba.",
     "approveFailed": "An kasa amincewa. Danna $t(common.approve) don sake gwadawa.",
     "checked": "An duba",
     "lastKnown": "Na ƙarshe da aka sani",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Ana jiran ku",
     "nextScheduled": "Na gaba da aka tsara",
     "answerNeeded": "Ana buƙatar amsa",
-    "waitingToRetry": "Ana jiran sake gwadawa"
+    "waitingToRetry": "Ana jiran sake gwadawa",
+    "step": {
+      "editing": "Ana gyarawa",
+      "reading": "Ana karatu",
+      "running": "Gudu",
+      "searching": "Binciken yanar gizo",
+      "thinking": "Ana tunani"
+    },
+    "planOf": "cikin",
+    "filesChanged": "fayiloli sun canza",
+    "finishedIn": "An gama cikin",
+    "noActivityFor": "Babu aiki na",
+    "prOpened": "An buɗe buƙatar ja",
+    "permissionWants": "Yana son gudu",
+    "failure": {
+      "provider": "An tsaya: kuskuren mai bayarwa",
+      "tool": "An tsaya: kuskuren kayan aiki",
+      "cancelled": "An tsaya: an soke",
+      "other": "YA TSAYA"
+    }
   },
   "transcriptionModel": {
     "title": "Samfurin mayar da magana zuwa rubutu",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Ba a iya loda tarihin tattaunawa.",
       "new": "Sabuwar tattaunawa",
-      "openHint": "Yana buɗe tattaunawar. Danna sosai don sharewa.",
       "deleteTitle": "A share wannan tattaunawar?"
+    },
+    "rename": {
+      "title": "Sauya sunan tattaunawa",
+      "accessibility": "Sauya sunan tattaunawa: {{title}}",
+      "openHint": "Yana buɗe tattaunawar. Danna sosai don sauya suna ko sharewa."
     },
     "beta": "Beta",
     "details": {

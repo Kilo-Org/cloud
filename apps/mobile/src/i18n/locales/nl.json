@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Je eigen coderepository's",
     "dismissed": "Genegeerd",
     "agent": "Tussenpersoon",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Wijzigingen"
   },
   "language": {
@@ -294,7 +296,8 @@
       "kiloclaw": "KiloClaw-activiteit",
       "balance": "Saldowaarschuwingen",
       "security": "Beveiligingsbevindingen",
-      "spend": "Bestedingswaarschuwingen"
+      "spend": "Bestedingswaarschuwingen",
+      "followedSessions": "Gevolgde sessies"
     },
     "category": {
       "chatMessagesSubtitle": "antwoorden in je gesprekken",
@@ -1576,6 +1579,8 @@
       "title": "Sessie",
       "copyErrorDetails": "Foutdetails kopiëren",
       "backToSessions": "Terug naar sessies",
+      "follow": "Volgen op toegangsscherm",
+      "unfollow": "Niet meer volgen op toegangsscherm",
       "couldNotLoad": "De sessie kon niet worden geladen.",
       "failedToLoadDetails": "De sessiedetails konden niet worden geladen.",
       "failedToStopExecution": "De uitvoering kon niet worden gestopt.",
@@ -3170,6 +3175,8 @@
     "channelName": "Actieve agents",
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
     "openSession": "Openen",
+    "finished": "Voltooid",
+    "followFailed": "Kan deze agent niet op het toegangsscherm tonen.",
     "approveFailed": "Goedkeuren is niet gelukt. Tik op $t(common.approve) om het opnieuw te proberen.",
     "checked": "Gecontroleerd",
     "lastKnown": "Laatst bekend",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Wacht op jou",
     "nextScheduled": "Hierna gepland",
     "answerNeeded": "Antwoord nodig",
-    "waitingToRetry": "Wacht op nieuwe poging"
+    "waitingToRetry": "Wacht op nieuwe poging",
+    "step": {
+      "editing": "Bewerken",
+      "reading": "Lezen",
+      "running": "Uitvoeren",
+      "searching": "Webzoekopdracht",
+      "thinking": "Nadenken"
+    },
+    "planOf": "van",
+    "filesChanged": "bestanden gewijzigd",
+    "finishedIn": "Voltooid in",
+    "noActivityFor": "Geen activiteit gedurende",
+    "prOpened": "Pull request geopend",
+    "permissionWants": "Wil uitvoeren",
+    "failure": {
+      "provider": "Gestopt: providerfout",
+      "tool": "Gestopt: toolfout",
+      "cancelled": "Gestopt: geannuleerd",
+      "other": "GESTOPT"
+    }
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Kon de chatgeschiedenis niet laden.",
       "new": "Nieuwe chat",
-      "openHint": "Opent de chat. Lang indrukken om te verwijderen.",
       "deleteTitle": "Deze chat verwijderen?"
+    },
+    "rename": {
+      "title": "Chat hernoemen",
+      "accessibility": "Chat hernoemen: {{title}}",
+      "openHint": "Opent de chat. Lang indrukken om te hernoemen of te verwijderen."
     },
     "beta": "Bèta",
     "details": {

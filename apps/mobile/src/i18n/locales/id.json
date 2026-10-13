@@ -137,6 +137,8 @@
     "yourOwnRepositories": "Repositori milikmu",
     "dismissed": "Diabaikan",
     "agent": "Agen",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "Perubahan"
   },
   "language": {
@@ -321,7 +323,8 @@
       "kiloclaw": "Aktivitas KiloClaw",
       "balance": "Peringatan saldo",
       "security": "Temuan keamanan",
-      "spend": "Peringatan pengeluaran"
+      "spend": "Peringatan pengeluaran",
+      "followedSessions": "Sesi yang diikuti"
     },
     "category": {
       "chatMessagesSubtitle": "balasan dalam percakapanmu",
@@ -1576,6 +1579,8 @@
       "title": "Sesi",
       "copyErrorDetails": "Salin detail kesalahan",
       "backToSessions": "Kembali ke sesi",
+      "follow": "Ikuti di layar kunci",
+      "unfollow": "Berhenti mengikuti di layar kunci",
       "couldNotLoad": "Tidak dapat memuat sesi.",
       "failedToLoadDetails": "Gagal memuat detail sesi.",
       "failedToStopExecution": "Gagal menghentikan eksekusi.",
@@ -3170,6 +3175,8 @@
     "channelName": "Agen aktif",
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci.",
     "openSession": "Buka",
+    "finished": "Selesai",
+    "followFailed": "Tidak dapat menampilkan agen ini di layar kunci.",
     "approveFailed": "Tidak dapat menyetujui. Ketuk $t(common.approve) untuk mencoba lagi.",
     "checked": "Diperiksa",
     "lastKnown": "Terakhir diketahui",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "Menunggu Anda",
     "nextScheduled": "Jadwal berikutnya",
     "answerNeeded": "Perlu jawaban",
-    "waitingToRetry": "Menunggu percobaan ulang"
+    "waitingToRetry": "Menunggu percobaan ulang",
+    "step": {
+      "editing": "Mengedit",
+      "reading": "Membaca",
+      "running": "Menjalankan",
+      "searching": "Penelusuran web",
+      "thinking": "Berpikir"
+    },
+    "planOf": "dari",
+    "filesChanged": "file diubah",
+    "finishedIn": "Selesai dalam",
+    "noActivityFor": "Tidak ada aktivitas selama",
+    "prOpened": "Pull request dibuka",
+    "permissionWants": "Ingin menjalankan",
+    "failure": {
+      "provider": "Berhenti: kesalahan penyedia",
+      "tool": "Berhenti: kesalahan alat",
+      "cancelled": "Berhenti: dibatalkan",
+      "other": "BERHENTI"
+    }
   },
   "transcriptionModel": {
     "title": "Model transkripsi",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "Tidak dapat memuat riwayat obrolan.",
       "new": "Obrolan baru",
-      "openHint": "Membuka obrolan. Tekan lama untuk menghapus.",
       "deleteTitle": "Hapus obrolan ini?"
+    },
+    "rename": {
+      "title": "Ganti nama obrolan",
+      "accessibility": "Ganti nama obrolan: {{title}}",
+      "openHint": "Membuka obrolan. Tekan lama untuk mengganti nama atau menghapus."
     },
     "beta": "Beta",
     "details": {

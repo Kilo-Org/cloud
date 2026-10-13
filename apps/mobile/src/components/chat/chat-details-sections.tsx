@@ -12,7 +12,7 @@ import { formatNumber } from '@/lib/format';
 
 import { type ChatModelUsage, type ModelCost } from './chat-details-state';
 import { type McpSettings } from './mcp-settings-sheet';
-import { modelCapabilityKey } from './model-tools-hint';
+import { modelCapabilityKey } from './model-capability';
 
 /** Who answers a target, as the sheet names it. A deleted backend has no name left. */
 export function backendLabel(

@@ -137,6 +137,8 @@
     "yourOwnRepositories": "کۆگاکانی خۆت",
     "dismissed": "پشتگوێخراو",
     "agent": "بریکار",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
     "changes": "گۆڕانکارییەکان"
   },
   "language": {
@@ -833,7 +835,8 @@
       "kiloclaw": "چالاکییەکانی KiloClaw",
       "balance": "ئاگادارکردنەوەکانی باڵانس",
       "security": "دۆزینەوەکانی ئاسایش",
-      "spend": "ئاگادارکردنەوەکانی خەرجی"
+      "spend": "ئاگادارکردنەوەکانی خەرجی",
+      "followedSessions": "دانیشتنە شوێنکەوتووەکان"
     },
     "category": {
       "chatMessagesSubtitle": "وەڵامەکان لە گفتوگۆکانتدا",
@@ -2088,6 +2091,8 @@
       "title": "سێشن",
       "copyErrorDetails": "کۆپیکردنی وردەکارییەکانی هەڵە",
       "backToSessions": "گەڕانەوە بۆ سێشنەکان",
+      "follow": "بەدواداچوون لە شاشەی قوفڵ",
+      "unfollow": "ڕاگرتنی بەدواداچوون لە شاشەی قوفڵ",
       "couldNotLoad": "نەتوانرا سێشنەکە بار بکرێت.",
       "failedToLoadDetails": "نەتوانرا وردەکارییەکانی سێشنەکە بار بکرێن.",
       "failedToStopExecution": "نەتوانرا جێبەجێکردن بوەستێنرێت.",
@@ -3170,6 +3175,8 @@
     "channelName": "ئەجێنتە چالاکەکان",
     "activityKitDisabledBody": "بۆ بینینی ئەجێنتە چالاکەکان لە شاشەی قوفڵدا، چالاکییە ڕاستەوخۆکان لە ڕێکخستنەکاندا چالاک بکە.",
     "openSession": "بیکەرەوە",
+    "finished": "تەواوبوو",
+    "followFailed": "نەتوانرا ئەم ئەجێنتە لە شاشەی قوفڵدا نیشان بدرێت.",
     "approveFailed": "نەتوانرا پەسند بکرێت. بۆ دووبارە هەوڵدانەوە، لە $t(common.approve) بدە.",
     "checked": "پشکنراو",
     "lastKnown": "دوایین دۆخی زانراو",
@@ -3178,7 +3185,26 @@
     "waitingForYou": "چاوەڕێی تۆ",
     "nextScheduled": "خشتەکراوەکانی داهاتوو",
     "answerNeeded": "چاوەڕێی وەڵام",
-    "waitingToRetry": "چاوەڕێی هەوڵدانەوە"
+    "waitingToRetry": "چاوەڕێی هەوڵدانەوە",
+    "step": {
+      "editing": "دەستکاریکردن",
+      "reading": "خوێندنەوە",
+      "running": "جێبەجێکردن",
+      "searching": "گەڕان لە وێب",
+      "thinking": "بیرکردنەوە لەسەری"
+    },
+    "planOf": "لە",
+    "filesChanged": "فایل گۆڕدرا",
+    "finishedIn": "تەواو بوو لە",
+    "noActivityFor": "چالاکی نییە بۆ",
+    "prOpened": "داواکاری هێنان کرایەوە",
+    "permissionWants": "دەیەوێت جێبەجێی بکات",
+    "failure": {
+      "provider": "وەستا: هەڵەی دابینکەر",
+      "tool": "وەستا: هەڵەی ئامراز",
+      "cancelled": "وەستا: هەڵوەشێنرا",
+      "other": "وەستاو"
+    }
   },
   "transcriptionModel": {
     "title": "مۆدێلی گۆڕینی دەنگ بۆ دەق",
@@ -3214,8 +3240,12 @@
     "list": {
       "loadFailed": "نەتوانرا مێژووی گفتوگۆ بار بکرێت.",
       "new": "چاتی نوێ",
-      "openHint": "چاتەکە دەکاتەوە. بۆ سڕینەوە دەست بگرە.",
       "deleteTitle": "ئەم چاتە بسڕدرێتەوە؟"
+    },
+    "rename": {
+      "title": "گۆڕینی ناوی چات",
+      "accessibility": "گۆڕینی ناوی چات: {{title}}",
+      "openHint": "چاتەکە دەکاتەوە. بۆ گۆڕینی ناو یان سڕینەوە دەست بگرە."
     },
     "beta": "بێتا",
     "details": {

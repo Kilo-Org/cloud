@@ -1461,6 +1461,43 @@ describe('SandboxControlV2 routes and forwarding', () => {
     }
   );
 
+  it('restores idle and lease timers when invalid configuration inserts a route without credentials', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(60_000);
+
+    wrapper.heartbeat(true);
+    await waitFor(() => expect(provider.leaseCalls).toEqual([120_000]));
+    expect(
+      await stub.prepare({
+        ...prepareInput(SESSION_NEXT, 'cloud-agent-web'),
+        sandboxSelection: { provider: 'cloudflare-containers', egressMode: 'allowlist' },
+      })
+    ).toMatchObject({ state: 'failed', reason: 'invalid_configuration' });
+    expect(await readRouteRow(stub, SESSION_NEXT)).toMatchObject({
+      state: 'failed',
+      credential_source: null,
+    });
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(TIMERS.idleMs);
+    await waitFor(() => expect(provider.leaseCalls).toEqual([120_000, TIMERS.providerLeaseMs]));
+
+    const idleHeartbeatAt = Date.now();
+    wrapper.heartbeat(false);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(idleHeartbeatAt)
+    );
+    await setAllocationField(stub, { last_activity_at: Date.now() - 61_000 });
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+    wrapper.close();
+  });
+
   it('preserves the web idle window in a mixed sandbox until the web route is released', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);

@@ -1836,6 +1836,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         attemptId,
         'invalid_configuration'
       );
+      this.cachedSandboxTimers = undefined;
       return routeView(route, state.kind === 'connected');
     }
     // H1: apply the Worker-selected provider pin before the first attempt. The

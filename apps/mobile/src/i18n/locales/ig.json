@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Melite ngwa GitHub"
       },
       "githubIpAllowList": {
-        "description": "A gbanyụrụ onye nyocha koodu n'ihi na nzukọ GitHub a na-eji ndepụta adreesị IP a nabatara nke na-egbochi Kilo. Kpọtụrụ hi@kilocode.ai maka enyemaka, wee gbanye onye nyocha koodu ọzọ."
+        "description": "A gbanyụrụ onye nyocha koodu n'ihi na nzukọ GitHub a na-eji ndepụta adreesị IP a nabatara nke na-egbochi Kilo. Kpọtụrụ hi@kilo.ai maka enyemaka, wee gbanye onye nyocha koodu ọzọ."
       },
       "gitlabProjectAccessRequired": {
         "description": "A gbanyụrụ onye nyocha koodu n'ihi na Kilo enweghị ike imepụta akara ikike ịnweta ọrụ a na GitLab. Nye ikike onye nlekọta ma ọ bụ gbanye akara ikike ịnweta ọrụ, wee gbanye onye nyocha koodu ọzọ.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Melite ntọala onye nyocha koodu"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "A gbanyụrụ onye nyocha koodu mgbe oge e nyere maka ime nnomi ebe nchekwa gwụchara ugboro atọ taa. Kpọtụrụ hi@kilocode.ai maka enyemaka, wee gbanye onye nyocha koodu ọzọ."
+        "description": "A gbanyụrụ onye nyocha koodu mgbe oge e nyere maka ime nnomi ebe nchekwa gwụchara ugboro atọ taa. Kpọtụrụ hi@kilo.ai maka enyemaka, wee gbanye onye nyocha koodu ọzọ."
       },
       "title": "Onye nyocha koodu chọrọ nlebara anya.",
       "recoveryLabel": "Kpọtụrụ ndị nkwado"

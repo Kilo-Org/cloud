@@ -18,7 +18,12 @@ import type {
 import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import { cn } from '@/lib/utils';
 import { useManager } from './CloudAgentProvider';
-import { formatAttemptDuration, phaseStatus, phaseStatusLabel } from './preparation-phases';
+import {
+  commandsForPhase,
+  formatAttemptDuration,
+  phaseStatus,
+  phaseStatusLabel,
+} from './preparation-phases';
 import {
   phaseDisplayText,
   preparationSummaryLine,
@@ -93,13 +98,16 @@ function PreparationTimeline({ attempt }: { attempt: PreparationAttempt }) {
   return (
     <>
       <ol className="flex flex-col">
-        {phaseSteps.map(step => (
-          <PhaseRow key={step.id} step={step} status={phaseStatus(step, commands)}>
-            {step.key === 'setup_commands' && commands.length > 0 && (
-              <CommandList commands={commands} attemptError={attempt.safeError} />
-            )}
-          </PhaseRow>
-        ))}
+        {phaseSteps.map(step => {
+          const phaseCommands = commandsForPhase(step, attempt.steps);
+          return (
+            <PhaseRow key={step.id} step={step} status={phaseStatus(step, phaseCommands)}>
+              {phaseCommands.length > 0 && (
+                <CommandList commands={phaseCommands} attemptError={attempt.safeError} />
+              )}
+            </PhaseRow>
+          );
+        })}
       </ol>
 
       {!commandsUnderPhase && commands.length > 0 && (

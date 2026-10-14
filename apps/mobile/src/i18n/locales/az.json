@@ -1552,7 +1552,7 @@
         "recoveryLabel": "GitHub tətbiqini yenilə"
       },
       "githubIpAllowList": {
-        "description": "Bu GitHub təşkilatının icazə verilən IP ünvanları siyahısı Kilo-nun girişini blokladığı üçün kod yoxlayıcısı deaktiv edildi. Kömək üçün hi@kilocode.ai ünvanına yaz, sonra kod yoxlayıcısını yenidən aktivləşdir."
+        "description": "Bu GitHub təşkilatının icazə verilən IP ünvanları siyahısı Kilo-nun girişini blokladığı üçün kod yoxlayıcısı deaktiv edildi. Kömək üçün hi@kilo.ai ünvanına yaz, sonra kod yoxlayıcısını yenidən aktivləşdir."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo bu layihə üçün GitLab layihə giriş tokeni yarada bilmədiyi üçün kod yoxlayıcısı deaktiv edildi. Layihə idarəçisi icazəsi ver və ya layihə giriş tokenlərini aktivləşdir, sonra kod yoxlayıcısını yenidən aktivləşdir.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Kod yoxlayıcısının parametrlərini yenilə"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Bu gün repozitoriyanın klonlanması üç dəfə vaxt həddini aşdığı üçün kod yoxlayıcısı deaktiv edildi. Kömək üçün hi@kilocode.ai ünvanına yaz, sonra kod yoxlayıcısını yenidən aktivləşdir."
+        "description": "Bu gün repozitoriyanın klonlanması üç dəfə vaxt həddini aşdığı üçün kod yoxlayıcısı deaktiv edildi. Kömək üçün hi@kilo.ai ünvanına yaz, sonra kod yoxlayıcısını yenidən aktivləşdir."
       },
       "title": "Kod yoxlayıcısında müdaxilə tələb olunur.",
       "recoveryLabel": "Dəstək xidməti ilə əlaqə saxla"

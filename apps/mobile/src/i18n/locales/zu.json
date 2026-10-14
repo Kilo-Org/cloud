@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Buyekeza uhlelo lokusebenza lwe-GitHub"
       },
       "githubIpAllowList": {
-        "description": "Umhloli wekhodi uvaliwe ngoba le nhlangano ye-GitHub isebenzisa uhlu lwamakheli e-IP avunyelwe oluvimba i-Kilo. Xhumana no-hi@kilocode.ai ukuze uthole usizo bese uvula umhloli wekhodi futhi."
+        "description": "Umhloli wekhodi uvaliwe ngoba le nhlangano ye-GitHub isebenzisa uhlu lwamakheli e-IP avunyelwe oluvimba i-Kilo. Xhumana no-hi@kilo.ai ukuze uthole usizo bese uvula umhloli wekhodi futhi."
       },
       "gitlabProjectAccessRequired": {
         "description": "Umhloli wekhodi uvaliwe ngoba i-Kilo ayikwazi ukudala ithokheni yokufinyelela kule phrojekthi ye-GitLab. Nikeza izimvume zomgcini wephrojekthi noma uvule amathokheni okufinyelela kuphrojekthi bese uvula umhloli wekhodi futhi.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Buyekeza izilungiselelo zomhloli wekhodi"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Umhloli wekhodi uvaliwe ngemva kokuba ukukopisha inqolobane yekhodi kuphelelwe yisikhathi kathathu namuhla. Xhumana no-hi@kilocode.ai ukuze uthole usizo bese uvula umhloli wekhodi futhi."
+        "description": "Umhloli wekhodi uvaliwe ngemva kokuba ukukopisha inqolobane yekhodi kuphelelwe yisikhathi kathathu namuhla. Xhumana no-hi@kilo.ai ukuze uthole usizo bese uvula umhloli wekhodi futhi."
       },
       "title": "Umhloli wekhodi udinga ukunakwa.",
       "recoveryLabel": "Xhumana nethimba losizo"

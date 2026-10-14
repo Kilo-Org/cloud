@@ -211,7 +211,7 @@ export function getOutboundContainerId(
   return getSandboxNamespace(env, sandboxId, options).idFromName(sandboxId).toString();
 }
 
-async function hashToSandboxId(input: string, prefix: string): Promise<SandboxId> {
+export async function hashToSandboxId(input: string, prefix: string): Promise<SandboxId> {
   const encoder = new TextEncoder();
   const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(input));
   const hashHex = Array.from(new Uint8Array(hashBuffer))
@@ -297,7 +297,7 @@ export function selectSandboxProvider(input: {
   });
 }
 
-function selectDefaultSandboxProvider(input: {
+export function selectDefaultSandboxProvider(input: {
   env: SandboxSelectionEnv;
   orgId?: string;
   userId: string;
@@ -498,10 +498,7 @@ export async function generateSandboxRoutingTarget(
     }
   }
 
-  const sandboxOrgSegment = orgId ?? `user:${userId}`;
-  const originalFormat = botId
-    ? `${sandboxOrgSegment}__${userId}__bot:${botId}`
-    : `${sandboxOrgSegment}__${userId}`;
+  const originalFormat = sharedSandboxOwnerKey(orgId, userId, botId);
   const prefix: SharedSandboxPrefix = botId ? (orgId ? 'bot' : 'ubt') : orgId ? 'org' : 'usr';
   const sharedVersion =
     sessionPlaneFromId(sessionId) === 'control'
@@ -513,6 +510,18 @@ export async function generateSandboxRoutingTarget(
     kind: 'shared',
     routeKey,
   };
+}
+
+/** The owner identity a shared sandbox is keyed on: org (or personal user), user and bot. */
+export function sharedSandboxOwnerKey(
+  orgId: string | undefined,
+  userId: string,
+  botId: string | undefined
+): string {
+  const sandboxOrgSegment = orgId ?? `user:${userId}`;
+  return botId
+    ? `${sandboxOrgSegment}__${userId}__bot:${botId}`
+    : `${sandboxOrgSegment}__${userId}`;
 }
 
 export async function generateSandboxId(

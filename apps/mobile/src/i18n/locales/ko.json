@@ -1040,7 +1040,7 @@
         "recoveryLabel": "GitHub 앱 업데이트"
       },
       "githubIpAllowList": {
-        "description": "이 GitHub 조직의 IP 허용 목록이 Kilo를 차단하여 코드 리뷰어가 비활성화되었습니다. hi@kilocode.ai에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
+        "description": "이 GitHub 조직의 IP 허용 목록이 Kilo를 차단하여 코드 리뷰어가 비활성화되었습니다. hi@kilo.ai에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo가 이 프로젝트의 GitLab 프로젝트 액세스 토큰을 생성할 수 없어 코드 리뷰어가 비활성화되었습니다. 유지보수 담당자 권한을 부여하거나 프로젝트 액세스 토큰을 활성화한 후 코드 리뷰어를 다시 활성화하세요.",
@@ -1055,7 +1055,7 @@
         "recoveryLabel": "코드 리뷰어 설정 업데이트"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "오늘 저장소 복제 중 시간 초과가 세 번 발생하여 코드 리뷰어가 비활성화되었습니다. hi@kilocode.ai에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
+        "description": "오늘 저장소 복제 중 시간 초과가 세 번 발생하여 코드 리뷰어가 비활성화되었습니다. hi@kilo.ai에 도움을 요청한 후 코드 리뷰어를 다시 활성화하세요."
       },
       "title": "코드 리뷰어에 조치가 필요합니다.",
       "recoveryLabel": "지원팀에 문의"

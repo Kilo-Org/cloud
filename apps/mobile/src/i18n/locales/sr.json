@@ -1571,7 +1571,7 @@
         "recoveryLabel": "Ažuriraj GitHub aplikaciju"
       },
       "githubIpAllowList": {
-        "description": "Agent za pregled koda je isključen jer ova GitHub organizacija blokira Kilo listom dozvoljenih IP adresa. Zatraži pomoć na hi@kilocode.ai, pa ponovo uključi agenta za pregled koda."
+        "description": "Agent za pregled koda je isključen jer ova GitHub organizacija blokira Kilo listom dozvoljenih IP adresa. Zatraži pomoć na hi@kilo.ai, pa ponovo uključi agenta za pregled koda."
       },
       "gitlabProjectAccessRequired": {
         "description": "Agent za pregled koda je isključen jer Kilo ne može da kreira token za pristup ovom projektu na GitLab-u. Dodeli pristup za održavanje projekta ili omogući tokene za pristup projektu, pa ponovo uključi agenta za pregled koda.",
@@ -1586,7 +1586,7 @@
         "recoveryLabel": "Ažuriraj podešavanja agenta za pregled koda"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Agent za pregled koda je isključen jer je danas tri puta istekao rok za kloniranje repozitorijuma. Zatraži pomoć na hi@kilocode.ai, pa ponovo uključi agenta za pregled koda."
+        "description": "Agent za pregled koda je isključen jer je danas tri puta istekao rok za kloniranje repozitorijuma. Zatraži pomoć na hi@kilo.ai, pa ponovo uključi agenta za pregled koda."
       },
       "title": "Agent za pregled koda zahteva tvoju pažnju.",
       "recoveryLabel": "Kontaktiraj podršku"

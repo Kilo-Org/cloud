@@ -87,8 +87,8 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
     case 'codeReviewDisabled':
       return {
         reason:
-          'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
-        recovery_url: 'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts',
+          'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilo.ai for help, then enable Code Reviewer again.',
+        recovery_url: 'mailto:hi@kilo.ai?subject=Repository%20clone%20timeouts',
         recovery_label: 'Contact support',
       };
     case 'ossInviteNewUser':
@@ -250,7 +250,7 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
         manage_url: `${NEXTAUTH_URL}/organizations/${orgId}/subscriptions/kilo-pass`,
       };
     case 'kiloPassDuplicateCardCanceled':
-      return { support_url: 'mailto:hi@kilocode.ai' };
+      return { support_url: 'mailto:hi@kilo.ai' };
     case 'userDataExportReady':
       return {
         data_exports_url: `${NEXTAUTH_URL}/data-exports`,

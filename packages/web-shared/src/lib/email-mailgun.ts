@@ -100,7 +100,7 @@ export async function sendViaMailgun(params: OutboundEmailParams): Promise<boole
   });
   await client.messages.create(MAILGUN_DOMAIN, {
     from: 'Kilo Code <hi@app.kilocode.ai>',
-    'h:Reply-To': replyTo ?? 'hi@kilocode.ai',
+    'h:Reply-To': replyTo ?? 'hi@kilo.ai',
     to,
     subject,
     html: params.html,

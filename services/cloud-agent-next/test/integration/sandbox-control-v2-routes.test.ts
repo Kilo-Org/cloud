@@ -1398,6 +1398,69 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(provider.stopCalls).toEqual([provider.refs[0]]);
   });
 
+  it('restores the provider lease when the last unattended route is released', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    wrapper.heartbeat(true);
+    await waitFor(() => expect(provider.leaseCalls).toEqual([120_000]));
+    await stub.release({ sessionId: SESSION });
+    await waitFor(() => expect(provider.leaseCalls).toEqual([120_000, TIMERS.providerLeaseMs]));
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(TIMERS.idleMs);
+
+    const idleHeartbeatAt = Date.now();
+    wrapper.heartbeat(false);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(idleHeartbeatAt)
+    );
+    await setAllocationField(stub, { last_activity_at: Date.now() - 121_000 });
+    await runAlarm(stub);
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.leaseCalls).toEqual([120_000, TIMERS.providerLeaseMs]);
+    expect(provider.stopCalls).toEqual([]);
+    wrapper.close();
+  });
+
+  it.each(['cloud-agent-web', undefined])(
+    'extends the provider lease when origin %s joins an unattended sandbox',
+    async origin => {
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider);
+      await stub.prepare(prepareInput(SESSION, 'code-review'));
+      const { wrapper } = await connectAndHello(provider);
+      await wrapper.next();
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+      wrapper.heartbeat(true);
+      await waitFor(() => expect(provider.leaseCalls).toEqual([120_000]));
+      await stub.prepare(prepareInput(SESSION_NEXT, origin));
+      await waitFor(() => expect(provider.leaseCalls).toEqual([120_000, TIMERS.providerLeaseMs]));
+      await wrapper.next();
+      wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+      await waitFor(async () =>
+        expect((await readRouteRow(stub, SESSION_NEXT))?.state).toBe('ready')
+      );
+
+      const idleHeartbeatAt = Date.now();
+      wrapper.heartbeat(false);
+      await waitFor(async () =>
+        expect((await readState(stub)).lastFrameAt).toBeGreaterThanOrEqual(idleHeartbeatAt)
+      );
+      await setAllocationField(stub, { last_activity_at: Date.now() - 121_000 });
+      await runAlarm(stub);
+      expect((await readState(stub)).kind).toBe('connected');
+      expect(provider.leaseCalls).toEqual([120_000, TIMERS.providerLeaseMs]);
+      expect(provider.stopCalls).toEqual([]);
+      wrapper.close();
+    }
+  );
+
   it('preserves the web idle window in a mixed sandbox until the web route is released', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);

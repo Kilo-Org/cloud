@@ -4223,7 +4223,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
-    const run = this.operations.tail.then(task, task);
+    const apply = async (): Promise<T> => {
+      const providerLeaseMs = this.sandboxTimers().providerLeaseMs;
+      try {
+        return await task();
+      } finally {
+        if (this.sandboxTimers().providerLeaseMs > providerLeaseMs) {
+          this.ctx.waitUntil(this.runLease());
+        }
+      }
+    };
+    const run = this.operations.tail.then(apply, apply);
     this.operations.tail = run.then(
       () => undefined,
       () => undefined

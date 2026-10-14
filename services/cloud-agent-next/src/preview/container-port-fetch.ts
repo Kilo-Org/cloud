@@ -1,6 +1,7 @@
 import { stripPreviewMarkerHeaders } from '../shared/preview-headers.js';
 import { isValidPreviewPort } from './host.js';
 import { previewUpstreamHost, previewUpstreamUrl } from './upstream.js';
+import { bridgeSockets } from './websocket-bridge.js';
 
 // Time to response headers. A dev server can compile a page on its first request.
 export const PREVIEW_UPSTREAM_TIMEOUT_MS = 60_000;
@@ -67,60 +68,16 @@ function buildUpstreamRequest(
   return new Request(url, init);
 }
 
-function normalizeCloseCode(code: number): number {
-  return code === 1005 || code === 1006 ? 1000 : code;
-}
-
-async function messageData(event: MessageEvent): Promise<string | ArrayBuffer> {
-  const raw: unknown = event.data;
-  return raw instanceof Blob ? raw.arrayBuffer() : (raw as string | ArrayBuffer);
-}
-
 function bridgeWebSocket(response: Response): Response {
   const containerSocket = response.webSocket;
   if (containerSocket === null || containerSocket === undefined) {
     return new Response(null, { status: response.status, headers: response.headers });
   }
   const pair = new WebSocketPair();
-  const client = pair[0];
-  const server = pair[1];
-  containerSocket.accept();
-  server.accept();
-
-  server.addEventListener('message', event => {
-    void (async () => {
-      try {
-        containerSocket.send(await messageData(event));
-      } catch {
-        server.close(1011, 'Failed to forward message to container');
-      }
-    })();
-  });
-  containerSocket.addEventListener('message', event => {
-    void (async () => {
-      try {
-        server.send(await messageData(event));
-      } catch {
-        containerSocket.close(1011, 'Failed to forward message to client');
-      }
-    })();
-  });
-  server.addEventListener('close', event => {
-    containerSocket.close(normalizeCloseCode(event.code), event.reason);
-  });
-  containerSocket.addEventListener('close', event => {
-    server.close(normalizeCloseCode(event.code), event.reason);
-  });
-  server.addEventListener('error', () => {
-    containerSocket.close(1011, 'Client WebSocket error');
-  });
-  containerSocket.addEventListener('error', () => {
-    server.close(1011, 'Container WebSocket error');
-  });
-
+  bridgeSockets(pair[1], containerSocket);
   return new Response(null, {
     status: response.status,
-    webSocket: client,
+    webSocket: pair[0],
     headers: response.headers,
   });
 }

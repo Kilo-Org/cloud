@@ -785,6 +785,24 @@ describe('Lock Screen accessories', () => {
     }
   });
 
+  it('centers rectangular content vertically while keeping its leading inset', () => {
+    for (const props of [
+      propsFor([], { status: 'empty' }),
+      propsFor([], { status: 'signed_out' }),
+      propsFor([BUSY]),
+      propsFor([PERMISSION, BUSY, scheduled('Usage report', null)]),
+    ]) {
+      const tree = render(props, 'accessoryRectangular');
+      expect(tree.props.alignment).toBe('leading');
+      expect(modifier(tree, 'padding')).toEqual({ leading: 6, trailing: 6 });
+      expect(modifier(tree, 'frame')).toEqual({
+        maxWidth: 10_000,
+        maxHeight: 10_000,
+        alignment: 'leading',
+      });
+    }
+  });
+
   it('prints the primary count and the others in the rectangular', () => {
     const tree = render(
       propsFor([PERMISSION, BUSY, scheduled('Usage report', null)]),

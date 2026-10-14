@@ -26,7 +26,10 @@ jobs:
 
   check-production-db-startup:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: this workflow only triggers on pushes to main, so the guard is
+    # defense-in-depth rather than a fork block. It is applied to every job
+    # so the workflow cannot run outside the canonical repo under any path.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
@@ -59,7 +62,8 @@ jobs:
 
   run-migrations:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
@@ -92,7 +96,8 @@ jobs:
 
   stage-app:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -103,7 +108,8 @@ jobs:
 
   stage-global-app:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -125,6 +131,7 @@ jobs:
 
   promote-app:
     needs: [stage-app, check-production-db-startup, run-migrations]
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
@@ -135,6 +142,7 @@ jobs:
 
   promote-global-app:
     needs: [stage-global-app, check-production-db-startup, run-migrations]
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
@@ -143,6 +151,8 @@ jobs:
 
   promote-ai-gateway:
     needs: [stage-ai-gateway, check-production-db-startup, run-migrations]
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-ai-gateway.outputs.deployment_url }}
@@ -170,6 +180,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-production-db-startup.result == 'success' &&
@@ -205,7 +216,8 @@ jobs:
 
   detect-gastown-wasteland-changes:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -280,6 +292,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-production-db-startup.result == 'success' &&
@@ -361,6 +374,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-production-db-startup.result == 'success' &&

@@ -15,6 +15,10 @@ permissions:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
+    # Guard: a fork with Actions enabled can trigger this workflow_dispatch,
+    # and CodeQL would run against the fork's own code with the fork's
+    # security-events scope. Only the canonical repo needs this analysis.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     strategy:

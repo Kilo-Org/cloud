@@ -15,7 +15,7 @@ Keep PR history clean. Treat rebases, non-fast-forward push rejections, and bran
 - Prefer `git push --force-with-lease` over `git push --force`; still ask first.
 - If hooks/checks fail, diagnose and fix or ask; do not bypass silently.
 - Run `pnpm format` before committing. For verification, prefer targeted checks; avoid full `pnpm typecheck` by default because it is slow.
-- For migration conflicts: never hand-write or hand-edit generated migration SQL, snapshots, or journal entries. Delete branch-local generated migration artifacts, rerun `pnpm drizzle generate`, then re-append intentional backfill SQL after generated DDL using `-->  statement-breakpoint` separators.
+- For migration conflicts: never hand-write or hand-edit generated migration SQL, snapshots, or journal entries. Always accept and preserve the incoming migration files and Drizzle snapshot/journal metadata, then re-apply the PR's schema changes on top by rerunning `pnpm drizzle generate`. Re-append intentional backfill SQL after generated DDL using `-->  statement-breakpoint` separators.
 
 ## Start every rebase/branch-cleanup task
 
@@ -90,27 +90,38 @@ Exit code `0` means file trees match.
 
 ## Migration conflict procedure
 
-When rebase conflicts touch `packages/db/src/migrations/`:
+When an incoming Drizzle migration on the new base conflicts with the PR's migration during a rebase (conflicts under `packages/db/src/migrations/`, including `meta/*_snapshot.json` and `meta/_journal.json`), the policy is: **accept the incoming migration in full, then re-apply the PR's schema changes on top.** The final migration history must be linear: incoming migration first, then the PR's migration regenerated after it. Never resolve the conflict by keeping the PR's conflicting generated files as-is, and never hand-merge snapshot or journal JSON.
 
-1. Identify branch-local generated migration artifacts. During an interrupted rebase, prefer the pre-rebase backup branch if `HEAD` no longer contains all branch commits:
+Note on direction: during an interrupted rebase, `git checkout --ours` refers to the branch being rebased **onto** (`origin/main`, i.e. the incoming migration), and `--theirs` refers to the commit being replayed (the PR).
+
+1. Accept and preserve the incoming migration files and Drizzle metadata: the incoming migration SQL plus its `meta/<NNNN>_snapshot.json` and the incoming `meta/_journal.json` entries. For example:
+
+   ```bash
+   git checkout --ours -- packages/db/src/migrations
+   git add packages/db/src/migrations
+   git rebase --continue
+   ```
+
+2. If `--ours` resolution does not apply cleanly (e.g. the conflict is inside a replayed commit that adds the PR's migration), identify and drop the PR's conflicting generated migration artifacts instead. Prefer the pre-rebase backup branch if `HEAD` no longer contains all branch commits:
 
    ```bash
    git diff --name-only --diff-filter=A origin/main...$backup -- packages/db/src/migrations
    git diff --name-only --diff-filter=A origin/main...HEAD -- packages/db/src/migrations
    ```
 
-2. Do not manually resolve generated migration SQL, snapshots, or journal JSON.
-3. Remove branch-local generated migration SQL, snapshot, and journal entries involved in the conflict.
-4. If generated snapshot or journal conflicts block `git rebase --continue`, stage the current/base migration metadata as a temporary conflict resolution, then continue the rebase.
-5. After the rebase reaches the target branch tip, rerun generation from the rebased schema:
+   Remove those files, restore the incoming snapshot/journal state, stage the result, and continue the rebase.
+
+3. After the rebase reaches the target branch tip, re-apply the PR's schema changes on top of the incoming migration by regenerating from the rebased `packages/db/src/schema.ts`:
 
    ```bash
    pnpm drizzle generate
    ```
 
-6. Re-append any intentional backfill SQL after generated DDL with `-->  statement-breakpoint` separators.
-7. If regenerated migration files belong in an earlier logical commit, use the post-rebase cleanup guidance above.
-8. Prefer a single regenerated migration per feature branch when it has not shipped.
+   This runs `drizzle-kit generate` inside `@kilocode/db` (root script: `pnpm --filter @kilocode/db exec drizzle-kit`) and creates a new migration numbered after the incoming one. If the PR's `schema.ts` changes were already replayed by the rebase, this is the only step needed to recreate the migration. Use `pnpm drizzle:verify-bootstrap` to validate migration bootstrap behavior when the migration set changed.
+
+4. Re-append any intentional backfill SQL after generated DDL with `-->  statement-breakpoint` separators.
+5. If regenerated migration files belong in an earlier logical commit, use the post-rebase cleanup guidance above.
+6. Prefer a single regenerated migration per feature branch when it has not shipped.
 
 ## Non-fast-forward push rejection
 

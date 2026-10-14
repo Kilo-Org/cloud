@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Kemas kini apl GitHub"
       },
       "githubIpAllowList": {
-        "description": "Penyemak Kod dinyahdayakan kerana senarai alamat IP yang dibenarkan oleh organisasi GitHub ini menyekat Kilo. Hubungi hi@kilocode.ai untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
+        "description": "Penyemak Kod dinyahdayakan kerana senarai alamat IP yang dibenarkan oleh organisasi GitHub ini menyekat Kilo. Hubungi hi@kilo.ai untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
       },
       "gitlabProjectAccessRequired": {
         "description": "Penyemak Kod dinyahdayakan kerana Kilo tidak dapat mencipta token akses projek GitLab untuk projek ini. Berikan akses penyelenggara atau dayakan token akses projek, kemudian dayakan Penyemak Kod semula.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Kemas kini tetapan Penyemak Kod"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Penyemak Kod dinyahdayakan selepas tiga percubaan mengklon repositori melebihi had masa hari ini. Hubungi hi@kilocode.ai untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
+        "description": "Penyemak Kod dinyahdayakan selepas tiga percubaan mengklon repositori melebihi had masa hari ini. Hubungi hi@kilo.ai untuk mendapatkan bantuan, kemudian dayakan Penyemak Kod semula."
       },
       "title": "Penyemak kod memerlukan perhatian anda.",
       "recoveryLabel": "Hubungi sokongan"

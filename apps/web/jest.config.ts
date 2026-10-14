@@ -36,7 +36,7 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^server-only$': '<rootDir>/src/tests/setup/__mocks__/server-only.js',
   },
-  roots: ['<rootDir>', '<rootDir>/../../packages/web-shared'],
+  roots: ['<rootDir>', '<rootDir>/../../packages/web-shared', '<rootDir>/../ai-gateway'],
   testMatch: ['**/src/**/*.test.ts', '<rootDir>/../../packages/db/src/**/*.test.ts'],
   testPathIgnorePatterns: [
     '<rootDir>/../../.kilocode/',

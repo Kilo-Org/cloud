@@ -1571,7 +1571,7 @@
         "recoveryLabel": "Atjaunināt GitHub lietotni"
       },
       "githubIpAllowList": {
-        "description": "Koda pārskatītājs tika atspējots, jo šī GitHub organizācija izmanto atļauto IP adrešu sarakstu, kas bloķē Kilo. Raksti uz hi@kilocode.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
+        "description": "Koda pārskatītājs tika atspējots, jo šī GitHub organizācija izmanto atļauto IP adrešu sarakstu, kas bloķē Kilo. Raksti uz hi@kilo.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
       },
       "gitlabProjectAccessRequired": {
         "description": "Koda pārskatītājs tika atspējots, jo Kilo nevar izveidot GitLab projekta piekļuves pilnvaru šim projektam. Piešķir uzturētāja piekļuves tiesības vai iespējo projekta piekļuves pilnvaras un vēlreiz iespējo koda pārskatītāju.",
@@ -1586,7 +1586,7 @@
         "recoveryLabel": "Atjaunināt koda pārskatītāja iestatījumus"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Koda pārskatītājs tika atspējots, jo šodien trīs reizes tika pārsniegts repozitorija klonēšanai atvēlētais laiks. Raksti uz hi@kilocode.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
+        "description": "Koda pārskatītājs tika atspējots, jo šodien trīs reizes tika pārsniegts repozitorija klonēšanai atvēlētais laiks. Raksti uz hi@kilo.ai, lai saņemtu palīdzību, un vēlreiz iespējo koda pārskatītāju."
       },
       "title": "Lai koda pārskatītājs turpinātu darbu, nepieciešama tava rīcība.",
       "recoveryLabel": "Sazināties ar atbalsta dienestu"

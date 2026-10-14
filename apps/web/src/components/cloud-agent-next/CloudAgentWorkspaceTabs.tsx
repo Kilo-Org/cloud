@@ -177,17 +177,15 @@ export function CloudAgentWorkspaceTabs({
   ) : null;
 
   type DisplayChatTab = { pending: true } | { pending: false; session: StoredSession };
-  const displayChatTabs: DisplayChatTab[] =
-    pendingChat && pendingChat.placement === 'replace'
-      ? visibleChatSessions.flatMap<DisplayChatTab>(session =>
-          session.sessionId === pendingChat.sourceKiloSessionId
-            ? [{ pending: true }]
-            : [{ pending: false, session }]
-        )
-      : [
-          ...visibleChatSessions.map<DisplayChatTab>(session => ({ pending: false, session })),
-          ...(pendingChat ? [{ pending: true } as const] : []),
-        ];
+  const pendingChatSessionId =
+    pendingChat?.resolvedKiloSessionId ??
+    (pendingChat?.placement === 'replace' ? pendingChat.sourceKiloSessionId : null);
+  const displayChatTabs = visibleChatSessions.map<DisplayChatTab>(session =>
+    session.sessionId === pendingChatSessionId ? { pending: true } : { pending: false, session }
+  );
+  if (pendingChat && !displayChatTabs.some(tab => tab.pending)) {
+    displayChatTabs.push({ pending: true });
+  }
 
   useEffect(() => {
     if (!editingSessionId) return;

@@ -28,6 +28,14 @@ export type VercelProviderAttempt = {
   providerRequestId?: string;
   /** The upstream provider's own response id; usually equal to `providerRequestId`. */
   providerResponseId?: string;
+  /**
+   * Gateway-clock milliseconds when this provider attempt started. Recent
+   * responses report epoch time, older ones a monotonic clock, so only the
+   * difference to `endTime` is meaningful.
+   */
+  startTime?: number;
+  /** Gateway-clock milliseconds when this provider attempt finished; see `startTime`. */
+  endTime?: number;
 };
 
 export type VercelModelAttempt = {

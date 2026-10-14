@@ -29,6 +29,7 @@ import {
   type ContainersObservation,
 } from './SandboxContainers.js';
 import type { Env } from '../types.js';
+import type { ContainersOutboundProps } from './containers-outbound.js';
 
 // The fake proves coordinator ordering only. It does not prove that exec behaves as assumed, and it
 // fails any attempt to snapshot the container so a stop that snapshots cannot pass silently.
@@ -47,6 +48,7 @@ type StoredRecord = {
   billingConfigured?: true;
   wrapperAttempt?: string;
   repositoryStartFailures?: { snapshotId: string; attempts: number };
+  egressPolicy?: { allocationRef: string; allowlist: string[] };
 };
 
 const idleRecord: StoredRecord = {
@@ -327,11 +329,12 @@ function captureLogs() {
   };
 }
 
-function attachOutbound(instance: SandboxContainers): void {
-  const outbound = vi.fn((options: { props: { containerId: string } }) => options.props);
+function attachOutbound(instance: SandboxContainers) {
+  const outbound = vi.fn((options: { props: ContainersOutboundProps }) => options.props);
   (
     instance as unknown as { ctx: { exports: { ContainersOutbound: typeof outbound } } }
   ).ctx.exports = { ContainersOutbound: outbound };
+  return outbound;
 }
 
 const NATIVE_GATE_ENV = { CONTROL_PLANE_NATIVE_LOGS: '1' };
@@ -365,6 +368,268 @@ function sleepPreExec(record?: StoredRecord) {
   state.container.running = true;
   return state;
 }
+
+describe('SandboxContainers egress enforcement', () => {
+  it.each([{ egressAllowlist: [] }, { egressAllowlist: ['Example.COM.', 'example.com'] }])(
+    'restricts a native image start independently of credential containment: %j',
+    async ({ egressAllowlist }) => {
+      const { instance, container, readRecord } = setup();
+      const outbound = attachOutbound(instance);
+      await instance.launchWrapper({
+        allocationRef: REF_A,
+        env: { EGRESS_ALLOWLIST: '*' },
+        instance: 'lite',
+        egressAllowlist,
+      });
+
+      const expectedPolicy = egressAllowlist.length === 0 ? [] : ['example.com'];
+      expect(container.calls).toEqual(['https-intercept', 'http-intercept', 'start', 'exec:cat']);
+      expect(container.startCalls[0]).toMatchObject({
+        enableInternet: false,
+        env: {
+          SANDBOX_INTERCEPT_HTTPS: '1',
+          NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt',
+        },
+      });
+      expect(outbound).toHaveBeenCalledWith({
+        props: { containerId: 'do-id', egressAllowlist: expectedPolicy },
+      });
+      expect(readRecord().egressPolicy).toEqual({
+        allocationRef: REF_A,
+        allowlist: expectedPolicy,
+      });
+    }
+  );
+
+  it('retains unrestricted starts when no policy or containment is supplied', async () => {
+    const { instance, container } = setup();
+    await launch(instance, REF_A);
+    expect(container.calls).toEqual(['start', 'exec:cat']);
+    expect(container.startCalls[0]?.enableInternet).toBe(true);
+  });
+
+  it.each(['interceptOutboundHttps', 'interceptAllOutboundHttp'] as const)(
+    'never starts a restricted container when %s fails',
+    async method => {
+      const { instance, container } = setup();
+      attachOutbound(instance);
+      vi.spyOn(container, method).mockRejectedValue(new Error('interceptor unavailable'));
+      await expect(
+        instance.launchWrapper({
+          allocationRef: REF_A,
+          env: {},
+          instance: 'lite',
+          egressAllowlist: [],
+        })
+      ).rejects.toThrow('interceptor unavailable');
+      expect(container.startCalls).toHaveLength(0);
+    }
+  );
+
+  it('reinstalls trusted props on same-allocation retries after Durable Object reconstruction', async () => {
+    const initial = setup();
+    attachOutbound(initial.instance);
+    await initial.instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'lite',
+      egressAllowlist: ['example.com'],
+    });
+    const restored = setup({ record: initial.readRecord(), running: true });
+    const outbound = attachOutbound(restored.instance);
+    await restored.instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'lite',
+      egressAllowlist: ['EXAMPLE.COM.'],
+    });
+    expect(restored.container.calls).toEqual(['https-intercept', 'http-intercept']);
+    expect(outbound).toHaveBeenCalledWith({
+      props: { containerId: 'do-id', egressAllowlist: ['example.com'] },
+    });
+    expect(restored.readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
+  });
+
+  it.each(
+    [undefined, [], ['other.test'], ['example.com', 'other.test']].map(egressAllowlist => ({
+      egressAllowlist,
+    }))
+  )(
+    'rejects policy changes on a restricted running allocation: %j',
+    async ({ egressAllowlist }) => {
+      const { instance, container, readRecord } = setup({
+        record: {
+          ...idleRecord,
+          allocationRef: REF_A,
+          state: 'running',
+          egressPolicy: { allocationRef: REF_A, allowlist: ['example.com'] },
+        },
+        running: true,
+      });
+      await expect(
+        instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: 'lite', egressAllowlist })
+      ).rejects.toThrow('egress policy cannot change');
+      expect(container.calls).toEqual([]);
+      expect(readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
+    }
+  );
+
+  it('rejects attempts to retrofit runtime network isolation onto an unrestricted allocation', async () => {
+    const { instance, container } = setup({
+      record: { ...idleRecord, allocationRef: REF_A, state: 'running' },
+      running: true,
+    });
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        env: {},
+        instance: 'lite',
+        egressAllowlist: [],
+      })
+    ).rejects.toThrow('egress policy cannot change');
+    expect(container.calls).toEqual([]);
+  });
+
+  it('rejects restricted fresh launches when an unowned physical container is already running', async () => {
+    const { instance, container } = setup({ running: true });
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        env: {},
+        instance: 'lite',
+        egressAllowlist: [],
+      })
+    ).rejects.toThrow('unowned running container');
+    expect(container.calls).toEqual([]);
+  });
+
+  it.each(
+    [null, '*', ['*.example.com'], ['127.0.0.1']].map(egressAllowlist => ({ egressAllowlist }))
+  )('fails closed before start for invalid policy %j', async ({ egressAllowlist }) => {
+    const { instance, container } = setup();
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        env: {},
+        instance: 'lite',
+        egressAllowlist,
+      } as never)
+    ).rejects.toThrow();
+    expect(container.calls).toEqual([]);
+  });
+
+  it('fails closed for invalid persisted policy instead of re-registering unrestricted props', async () => {
+    const { instance, container } = setup({
+      record: {
+        ...idleRecord,
+        allocationRef: REF_A,
+        state: 'running',
+        egressPolicy: { allocationRef: REF_A, allowlist: ['*'] },
+      },
+      running: true,
+    });
+    await expect(launch(instance, REF_A)).rejects.toThrow();
+    expect(container.calls).toEqual([]);
+  });
+
+  it('retains policy after an ambiguous native start and rejects removal before adoption', async () => {
+    const { instance, container, readRecord } = setup();
+    attachOutbound(instance);
+    container.startBehavior = 'effect-then-reject';
+    const input = {
+      allocationRef: REF_A,
+      env: {},
+      instance: 'lite' as const,
+      egressAllowlist: ['example.com'],
+    };
+    await expect(instance.launchWrapper(input)).rejects.toThrow('start failed');
+    expect(readRecord()).toMatchObject({
+      egressPolicy: { allocationRef: REF_A, allowlist: ['example.com'] },
+      wrapperAttempt: 'exec_pending',
+    });
+    await expect(launch(instance, REF_A)).rejects.toThrow('egress policy cannot change');
+    await expect(instance.launchWrapper(input)).resolves.toMatchObject({ started: true });
+    expect(container.startCalls).toHaveLength(1);
+    expect(container.startCalls[0]?.enableInternet).toBe(false);
+  });
+
+  it('retains enforcement on stopped pre-exec resume', async () => {
+    const { instance, container } = setup({
+      record: {
+        ...idleRecord,
+        allocationRef: REF_A,
+        state: 'launching',
+        wrapperAttempt: 'not_started',
+        egressPolicy: { allocationRef: REF_A, allowlist: [] },
+      },
+    });
+    attachOutbound(instance);
+    await instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'lite',
+      egressAllowlist: [],
+    });
+    expect(container.calls).toEqual(['https-intercept', 'http-intercept', 'start', 'exec:cat']);
+    expect(container.startCalls[0]?.enableInternet).toBe(false);
+  });
+
+  it('retains trust and props on a running pre-exec resume', async () => {
+    const { instance, container } = sleepPreExec({
+      ...idleRecord,
+      allocationRef: REF_A,
+      state: 'launching',
+      wrapperAttempt: 'not_started',
+      egressPolicy: { allocationRef: REF_A, allowlist: ['example.com'] },
+    });
+    const outbound = attachOutbound(instance);
+    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+    await instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'lite',
+      egressAllowlist: ['example.com'],
+    });
+    expect(container.startCalls).toHaveLength(0);
+    expect(container.execCalls.at(-1)?.options?.env).toMatchObject({
+      SANDBOX_INTERCEPT_HTTPS: '1',
+    });
+    expect(outbound).toHaveBeenCalledWith({
+      props: { containerId: 'do-id', egressAllowlist: ['example.com'] },
+    });
+  });
+
+  it('allows policy replacement only after destroying the previous allocation', async () => {
+    const { instance, container, readRecord } = setup();
+    attachOutbound(instance);
+    await instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'lite',
+      egressAllowlist: [],
+    });
+    await launch(instance, REF_B);
+    expect(container.destroyCalls).toBe(1);
+    expect(container.startCalls.map(options => options.enableInternet)).toEqual([false, true]);
+    expect(readRecord().egressPolicy).toBeUndefined();
+  });
+
+  it('rejects policy removal after stop when retrying the same allocation reference', async () => {
+    const { instance, container, readRecord } = setup();
+    attachOutbound(instance);
+    const input = { allocationRef: REF_A, env: {}, instance: 'lite' as const, egressAllowlist: [] };
+    await instance.launchWrapper(input);
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    expect(readRecord()).toMatchObject({
+      state: 'idle',
+      allocationRef: null,
+      egressPolicy: { allocationRef: REF_A, allowlist: [] },
+    });
+    await expect(launch(instance, REF_A)).rejects.toThrow('egress policy cannot change');
+    await expect(instance.launchWrapper(input)).resolves.toMatchObject({ started: true });
+    expect(container.startCalls.map(options => options.enableInternet)).toEqual([false, false]);
+  });
+});
 
 describe('SandboxContainers launch', () => {
   it('fresh idle+missing starts natively with the supervisor entrypoint, gate and CA, and never execs the supervisor', async () => {
@@ -2060,6 +2325,36 @@ async function launchWithImageFallback(instance: SandboxContainers, ref: string)
 }
 
 describe('SandboxContainers repository snapshots', () => {
+  it('restricts repository restore and subsequent image fallback with the same policy', async () => {
+    vi.useFakeTimers();
+    const key = await indexKeyFor();
+    const { kv } = fakeKv({ [key]: { snapshotId: 'snap-repo' } });
+    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: kv } });
+    const outbound = attachOutbound(instance);
+    container.identityAfterStart = 'ambiguous';
+    const policy = { egressAllowlist: ['example.com'] };
+    const pending = launchFromRepo(instance, REF_A, policy);
+    await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
+    await vi.advanceTimersByTimeAsync(300_000);
+    const first = await pending;
+    expect(first.snapshotFailed).toBe(true);
+    expect(readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    container.identityAfterStart = 'supervisor';
+    await launchFromRepo(instance, REF_A, { ...policy, skipRepository: true });
+
+    expect(container.startCalls.map(options => options.enableInternet)).toEqual([false, false]);
+    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-repo' } });
+    expect(container.startCalls[1]).toMatchObject({ image: IMAGE });
+    expect(
+      container.startCalls.every(options => options.env?.SANDBOX_INTERCEPT_HTTPS === '1')
+    ).toBe(true);
+    expect(outbound.mock.calls.map(call => call[0].props.egressAllowlist)).toEqual([
+      ['example.com'],
+      ['example.com'],
+    ]);
+  });
+
   it('starts from the repository snapshot stored for the repo key and the current image', async () => {
     const key = await indexKeyFor();
     const { kv } = fakeKv({ [key]: { snapshotId: 'snap-repo', commit: 'abc123' } });

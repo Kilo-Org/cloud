@@ -196,6 +196,18 @@ export function buildControlPlaneSessionRegistration(
     throw new Error('Sandbox selection provider does not match session metadata');
   }
   if (
+    (sandboxSelection.egressMode ?? 'unrestricted') !==
+    (metadata.workspace?.egressMode ?? 'unrestricted')
+  ) {
+    throw new Error('Sandbox selection egress mode does not match session metadata');
+  }
+  if (
+    JSON.stringify(sandboxSelection.egressAllowlist ?? []) !==
+    JSON.stringify(metadata.workspace?.egressAllowlist ?? [])
+  ) {
+    throw new Error('Sandbox selection egress allowlist does not match session metadata');
+  }
+  if (
     sandboxSelection.configuration !== undefined &&
     sandboxSelection.configuration.provider !== sandboxSelection.provider
   ) {

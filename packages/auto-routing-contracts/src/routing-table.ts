@@ -95,6 +95,8 @@ export const RankedCandidateSchema = z
     meetsThreshold: z.boolean(),
     pricing: CandidatePricingSchema.nullable().optional(),
     estimatedRequestCostUsd: z.number().nonnegative().nullable().optional(),
+    p50TtftMs: z.number().nonnegative().nullable().optional(),
+    p50LatencyMs: z.number().nonnegative().nullable().optional(),
     // Canonical catalog variant key the model was benchmarked with.
     // Optional so tables published before this field existed stay valid.
     variant: z.string().trim().min(1).nullable().optional(),
@@ -113,6 +115,24 @@ export const RankedCandidateSchema = z
   });
 export type RankedCandidate = z.infer<typeof RankedCandidateSchema>;
 
+export const ReasoningComplexitySchema = z.enum(['low', 'medium', 'high']);
+export type ReasoningComplexity = z.infer<typeof ReasoningComplexitySchema>;
+export const ComplexityLabelsSchema = z.record(z.string().min(1), ReasoningComplexitySchema);
+export type ComplexityLabels = z.infer<typeof ComplexityLabelsSchema>;
+
+export const EffortByComplexitySchema = z
+  .record(
+    z.string(),
+    z.record(
+      z.string().trim().min(1),
+      z.partialRecord(ReasoningComplexitySchema, z.string().trim().min(1).nullable())
+    )
+  )
+  .superRefine((routes, ctx) => {
+    refineTaxonomyRouteKeys(routes, ctx);
+  });
+export type EffortByComplexity = z.infer<typeof EffortByComplexitySchema>;
+
 const routingTableFields = {
   // Benchmark run id.
   version: z.string().min(1),
@@ -125,6 +145,7 @@ const routingTableFields = {
   // fresh pick improves accuracy by more than this absolute delta.
   bestAccuracySwitchThreshold: z.number().min(0).max(1).default(0.05),
   productionTokenProfile: ProductionTokenProfileSchema.nullable().optional(),
+  effortByComplexity: EffortByComplexitySchema.optional(),
   switchHorizonTurns: z.number().int().positive().nullable().optional(),
   lowConfidenceThreshold: z.number().min(0).max(1).nullable().optional(),
   source: z.enum(['benchmark']),
@@ -171,10 +192,11 @@ export const ROUTING_TABLE_KV_KEY = 'routing_table_v1';
 const ACCURACY_NOISE_BAND = 0.05;
 // Value uses the Wilson lower bound when the measured case count is known.
 const LATENCY_WEIGHT = 1.5;
+export const LATENCY_TOTAL_WEIGHT = 0.25;
 const ACCURACY_WEIGHT = 15;
 // Part of every registry table version: a policy change must republish tables
 // built from unchanged measurements.
-export const RANKING_POLICY_VERSION = 'value-latency-prodcost-wilson-v3';
+export const RANKING_POLICY_VERSION = 'value-ttft-prodcost-wilson-v4';
 
 type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
   meetsThreshold?: boolean;
@@ -191,15 +213,20 @@ export function wilsonLowerBound(accuracy: number, n: number, z = 1.0): number {
   return Math.max(0, (center - margin) / denominator);
 }
 
-function rankValue(c: {
+export function rankValue(c: {
   avgCostUsd: number;
   accuracy: number;
   cases?: number | null;
   p50LatencyMs: number | null;
+  p50TtftMs?: number | null;
 }) {
   const accuracy = c.cases == null ? c.accuracy : wilsonLowerBound(c.accuracy, c.cases);
   if (c.p50LatencyMs === null || accuracy <= 0) return Number.POSITIVE_INFINITY;
-  return (c.avgCostUsd * c.p50LatencyMs ** LATENCY_WEIGHT) / accuracy ** ACCURACY_WEIGHT;
+  const effectiveLatency =
+    c.p50TtftMs == null
+      ? c.p50LatencyMs
+      : c.p50TtftMs + LATENCY_TOTAL_WEIGHT * c.p50LatencyMs;
+  return (c.avgCostUsd * effectiveLatency ** LATENCY_WEIGHT) / accuracy ** ACCURACY_WEIGHT;
 }
 
 // Candidates within ACCURACY_NOISE_BAND of the threshold come first, best
@@ -216,13 +243,14 @@ export function rankCandidates(
     .map(({ p50LatencyMs, ...c }) => {
       const estimatedRequestCostUsd = estimateRequestCostUsd(c, options?.profile ?? null);
       return {
-        candidate: { ...c, estimatedRequestCostUsd, meetsThreshold: c.accuracy >= minAccuracy },
+        candidate: { ...c, p50LatencyMs, estimatedRequestCostUsd, meetsThreshold: c.accuracy >= minAccuracy },
         competes: c.accuracy > 0 && c.accuracy >= floor,
         value: rankValue({
           avgCostUsd: estimatedRequestCostUsd,
           accuracy: c.accuracy,
           cases: c.cases,
           p50LatencyMs,
+          p50TtftMs: c.p50TtftMs,
         }),
       };
     })

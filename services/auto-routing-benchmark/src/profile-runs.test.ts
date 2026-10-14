@@ -40,6 +40,7 @@ vi.mock('./db', async importOriginal => {
     getRunWithModels: vi.fn(),
     listReadyCurrentProfilesForEntries: vi.fn(),
     getSummariesForRuns: vi.fn(),
+    getRoutingCaseResultsForEntries: vi.fn(),
     countCurrentProfilesByStatus: vi.fn(),
     getLatestRoutingTable: vi.fn(),
     syncPlatformRegistryRows: vi.fn(),
@@ -60,6 +61,7 @@ import {
   getRunWithModels,
   getSummaries,
   getSummariesForRuns,
+  getRoutingCaseResultsForEntries,
   insertRun,
   listLaneFailures,
   listPendingCurrentProfiles,
@@ -179,6 +181,7 @@ beforeEach(() => {
   vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);
   vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);
+  vi.mocked(getRoutingCaseResultsForEntries).mockResolvedValue([]);
   vi.mocked(syncPlatformRegistryRows).mockResolvedValue(undefined);
   vi.mocked(recordLaneFailure).mockResolvedValue(undefined);
   vi.mocked(failOrphanedRunningProfiles).mockResolvedValue(0);
@@ -600,6 +603,14 @@ describe('decider run completion', () => {
       expect(saveRoutingTable).toHaveBeenCalledOnce();
       const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
       expect(table.source).toBe('benchmark');
+      expect(getRoutingCaseResultsForEntries).toHaveBeenCalledWith(env.BENCH_DB, [
+        { entry: { model: 'platform/a', variant: null }, runId },
+        { entry: { model: 'platform/b', variant: 'high' }, runId },
+      ]);
+      expect(table.effortByComplexity?.['implementation/code_generation']).toEqual({
+        'platform/a': { low: null, medium: null, high: null },
+        'platform/b': { low: 'high', medium: 'high', high: 'high' },
+      });
       // Version identifies the contributing registry rows, not a single run.
       expect(table.version).toMatch(/^registry-/);
       expect(Object.keys(table.routes)).toHaveLength(TAXONOMY_ROUTE_KEYS.length);

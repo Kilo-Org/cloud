@@ -1,3 +1,4 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import * as z from 'zod';
 import { DECIDER_CASES, FRONTIER_CASES } from '../datasets/decider-cases';
 import type { OfflineSweep } from './schema';
@@ -93,6 +94,84 @@ export async function readSweepCompletion(
   }
 }
 
+export async function requestDirectSweepCompletion(input: {
+  model: string;
+  fragment: Record<string, unknown>;
+  systemPrompt: string;
+  userPrompt: string;
+  apiKey: string;
+  attributionHeaders: Record<string, string>;
+  budgetAvailable: () => boolean;
+  fetchImpl?: typeof fetch;
+}): Promise<{
+  output: string | null;
+  costUsd: number | null;
+  ttftMs: number | null;
+  latencyMs: number;
+  error: string | null;
+}> {
+  const body = JSON.stringify({
+    ...input.fragment,
+    model: input.model,
+    messages: [
+      { role: 'system', content: input.systemPrompt },
+      { role: 'user', content: input.userPrompt },
+    ],
+    stream: true,
+    usage: { include: true },
+  });
+  const started = performance.now();
+  let error: string | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (!input.budgetAvailable()) {
+      error = 'Sweep budget exhausted before request';
+      break;
+    }
+    let retry = false;
+    try {
+      const response = await (input.fetchImpl ?? fetch)(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            ...input.attributionHeaders,
+            Authorization: `Bearer ${input.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body,
+          signal: AbortSignal.timeout(170_000),
+        }
+      );
+      if (!response.ok) {
+        await response.body?.cancel();
+        error = `OpenRouter returned HTTP ${response.status}`;
+        retry = response.status === 429 || response.status >= 500;
+      } else {
+        const result = await readSweepCompletion(response, started);
+        return {
+          ...result,
+          latencyMs: performance.now() - started,
+          error: result.output.length === 0
+            ? 'OpenRouter response is missing answer content'
+            : result.costUsd === null ? 'usage_missing' : null,
+        };
+      }
+    } catch {
+      error = 'OpenRouter transport or body read failed';
+      retry = true;
+    }
+    if (!retry || attempt === 2) break;
+    await delay(1_000 * 2 ** attempt);
+  }
+  return {
+    output: null,
+    costUsd: null,
+    ttftMs: null,
+    latencyMs: performance.now() - started,
+    error,
+  };
+}
+
 const timedEventSchema = z.object({
   type: z.string(),
   timestamp: z.number().optional(),
@@ -131,6 +210,16 @@ function median(values: number[]): number | null {
   return values.length % 2 === 0 ? (values[middle - 1] + values[middle]) / 2 : values[middle];
 }
 
+export function isGradedSweepResult(result: SweepResult): result is SweepResult & { score: number } {
+  return (
+    result.score !== null &&
+    (result.error === null ||
+      result.error === 'usage_missing' ||
+      result.error === 'OpenRouter response is missing answer content' ||
+      result.error === 'Container response is missing answer content')
+  );
+}
+
 export function summarizeSweep(pairs: OfflineSweep['pairs']): OfflineSweep['summaries'] {
   return pairs.flatMap(pair => {
     const groups = new Map<string, SweepResult[]>();
@@ -141,14 +230,7 @@ export function summarizeSweep(pairs: OfflineSweep['pairs']): OfflineSweep['summ
       else groups.set(key, [result]);
     }
     return [...groups.values()].map(results => {
-      const graded = results.filter(
-        (result): result is SweepResult & { score: number } =>
-          result.score !== null &&
-          (result.error === null ||
-            result.error === 'usage_missing' ||
-            result.error === 'OpenRouter response is missing answer content' ||
-            result.error === 'Container response is missing answer content')
-      );
+      const graded = results.filter(isGradedSweepResult);
       const costs = graded.flatMap(result => (result.costUsd === null ? [] : [result.costUsd]));
       const latencies = graded.map(result => result.latencyMs);
       const ttfts = graded.flatMap(result => (result.ttftMs == null ? [] : [result.ttftMs]));

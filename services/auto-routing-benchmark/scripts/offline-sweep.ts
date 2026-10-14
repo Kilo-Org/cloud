@@ -13,7 +13,7 @@ import { OPENROUTER_APP_TITLE, OPENROUTER_HTTP_REFERER } from '../src/openrouter
 import { OfflineSweepSchema, type OfflineSweep } from '../src/scoreboard/schema';
 import {
   containerTtftMs,
-  readSweepCompletion,
+  requestDirectSweepCompletion,
   selectSweepCases,
   summarizeSweep,
 } from '../src/scoreboard/sweep';
@@ -219,6 +219,7 @@ async function main() {
       const { pairIndex, benchCase, rep } = job;
       const pair = sweep.pairs[pairIndex];
       let ttftMs: number | null = null;
+      let directLatencyMs: number | null = null;
       let modelCostUsd: number | null = null;
       let graderCostUsd = 0;
       let score: number | null = null;
@@ -236,84 +237,77 @@ async function main() {
             timeoutMs: 180_000,
             variant: pair.variant,
           })
-        : JSON.stringify({
-            ...fragments[pairIndex],
-            model: pair.model,
-            messages: [
-              { role: 'system', content: prompts.systemPrompt },
-              { role: 'user', content: prompts.userPrompt },
-            ],
-            stream: true,
-            usage: { include: true },
-          });
+        : null;
       const started = performance.now();
       const startedWall = Date.now();
-      for (let attempt = 0; attempt < 3; attempt++) {
+      if (!agentic) {
+        const result = await requestDirectSweepCompletion({
+          model: pair.model,
+          fragment: fragments[pairIndex],
+          systemPrompt: prompts.systemPrompt,
+          userPrompt: prompts.userPrompt,
+          apiKey,
+          attributionHeaders,
+          budgetAvailable,
+        });
+        modelCostUsd = result.costUsd;
+        ttftMs = result.ttftMs;
+        directLatencyMs = result.latencyMs;
+        output = result.output;
+        error = result.error;
+        if (modelCostUsd !== null) sweep.costUsd += modelCostUsd;
+        if (output === '') {
+          score = 0;
+          output = null;
+        }
+      }
+      for (let attempt = 0; agentic && attempt < 3; attempt++) {
         if (!budgetAvailable()) {
           error = 'Sweep budget exhausted before request';
           break;
         }
         let retry = false;
         try {
-          const endpoint =
-            agentic && containerUrl
-              ? new URL('/run', containerUrl).toString()
-              : 'https://openrouter.ai/api/v1/chat/completions';
-          const response = await fetch(endpoint, {
+          if (!containerUrl) throw new Error('Agentic cases require a container URL');
+          const response = await fetch(new URL('/run', containerUrl), {
             method: 'POST',
-            headers: agentic
-              ? { 'Content-Type': 'application/json' }
-              : {
-                  ...attributionHeaders,
-                  Authorization: `Bearer ${apiKey}`,
-                  'Content-Type': 'application/json',
-                },
+            headers: { 'Content-Type': 'application/json' },
             body,
-            signal: AbortSignal.timeout(agentic ? 195_000 * agenticConcurrency : 170_000),
+            signal: AbortSignal.timeout(195_000 * agenticConcurrency),
           });
           if (!response.ok) {
             await response.body?.cancel();
-            error = `${agentic ? 'Container' : 'OpenRouter'} returned HTTP ${response.status}`;
+            error = `Container returned HTTP ${response.status}`;
             retry = response.status === 429 || response.status >= 500;
           } else {
-            if (agentic) {
-              const result = containerResponseSchema.parse(await response.json());
-              const parsed = parseKiloRunEvents(result.stdoutLines);
-              modelCostUsd = parsed.costUsd;
-              ttftMs = containerTtftMs(result.stdoutLines, startedWall);
-              if (modelCostUsd !== null) sweep.costUsd += modelCostUsd;
-              if (result.timedOut || result.exitCode !== 0) {
-                error = result.timedOut
-                  ? 'Container CLI timed out'
-                  : `Container CLI exited ${result.exitCode}`;
-                break;
-              }
-              output = parsed.text;
-            } else {
-              const result = await readSweepCompletion(response, started);
-              modelCostUsd = result.costUsd;
-              ttftMs = result.ttftMs;
-              output = result.output;
-              if (modelCostUsd !== null) sweep.costUsd += modelCostUsd;
+            const result = containerResponseSchema.parse(await response.json());
+            const parsed = parseKiloRunEvents(result.stdoutLines);
+            modelCostUsd = parsed.costUsd;
+            ttftMs = containerTtftMs(result.stdoutLines, startedWall);
+            if (modelCostUsd !== null) sweep.costUsd += modelCostUsd;
+            if (result.timedOut || result.exitCode !== 0) {
+              error = result.timedOut
+                ? 'Container CLI timed out'
+                : `Container CLI exited ${result.exitCode}`;
+              break;
             }
+            output = parsed.text;
             error = modelCostUsd === null ? 'usage_missing' : null;
             if (output.length === 0) {
               score = 0;
-              error = agentic
-                ? 'Container response is missing answer content'
-                : 'OpenRouter response is missing answer content';
+              error = 'Container response is missing answer content';
               output = null;
             }
             break;
           }
         } catch {
-          error = `${agentic ? 'Container' : 'OpenRouter'} transport or body read failed`;
+          error = 'Container transport or body read failed';
           retry = true;
         }
         if (!retry || attempt === 2) break;
         await delay(1_000 * 2 ** attempt);
       }
-      const latencyMs = performance.now() - started;
+      const latencyMs = directLatencyMs ?? performance.now() - started;
       if (output !== null) {
         const grade = await gradeDeciderOutput(benchCase.check, {
           userPrompt: prompts.userPrompt,

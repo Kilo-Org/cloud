@@ -38,6 +38,7 @@ import {
   variantFromStorage,
   variantToStorage,
 } from './reasoning-effort';
+import type { OfflineSweep } from './scoreboard/schema';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
@@ -358,6 +359,63 @@ export async function countCaseResultsByLane(
 
 export async function getCaseResults(db: D1Database, runId: string): Promise<CaseResultRow[]> {
   return drizzle(db).select().from(caseResults).where(eq(caseResults.run_id, runId));
+}
+
+export async function getRoutingCaseResultsForEntries(
+  db: D1Database,
+  entries: readonly { entry: PoolEntry; runId: string }[]
+): Promise<OfflineSweep['pairs']> {
+  const pairs = new Map<string, OfflineSweep['pairs'][number]>();
+  const orm = drizzle(db);
+  for (let offset = 0; offset < entries.length; offset += 30) {
+    const chunk = entries.slice(offset, offset + 30);
+    const rows = await orm
+      .select({
+        model: caseResults.model,
+        variant: caseResults.variant,
+        caseId: caseResults.case_id,
+        routeKey: caseResults.route_key,
+        rep: caseResults.rep,
+        score: caseResults.score,
+        costUsd: caseResults.cost_usd,
+        latencyMs: caseResults.latency_ms,
+        error: caseResults.error,
+      })
+      .from(caseResults)
+      .where(
+        or(
+          ...chunk.map(({ entry, runId }) =>
+            and(
+              eq(caseResults.run_id, runId),
+              eq(caseResults.model, entry.model),
+              eq(caseResults.variant, variantToStorage(entry.variant))
+            )
+          )
+        )
+      );
+    for (const row of rows) {
+      if (row.routeKey === null) continue;
+      const variant = variantFromStorage(row.variant);
+      const key = poolEntryKey({ model: row.model, variant });
+      let pair = pairs.get(key);
+      if (!pair) {
+        pair = { model: row.model, variant, results: [] };
+        pairs.set(key, pair);
+      }
+      pair.results.push({
+        caseId: row.caseId,
+        routeKey: row.routeKey,
+        rep: row.rep,
+        score: row.score,
+        costUsd: row.costUsd,
+        latencyMs: row.latencyMs,
+        error: row.error,
+        graderCostUsd: 0,
+        split: 'train',
+      });
+    }
+  }
+  return [...pairs.values()];
 }
 
 export async function getExistingCaseResultIds(
@@ -1369,6 +1427,7 @@ export function routingTableToRows(
     production_token_profile: table.productionTokenProfile ?? null,
     switch_horizon_turns: table.switchHorizonTurns ?? null,
     low_confidence_threshold: table.lowConfidenceThreshold ?? null,
+    effort_by_complexity: table.effortByComplexity ?? null,
     source: table.source,
   };
 
@@ -1447,6 +1506,9 @@ export function rowsToRoutingTable(
     ...(tableRow.low_confidence_threshold != null
       ? { lowConfidenceThreshold: tableRow.low_confidence_threshold }
       : {}),
+    ...(tableRow.effort_by_complexity != null
+      ? { effortByComplexity: tableRow.effort_by_complexity }
+      : {}),
     source: tableRow.source as RoutingTable['source'],
     routes: routeMap,
   };
@@ -1476,6 +1538,7 @@ export async function saveRoutingTable(
           production_token_profile: tableRow.production_token_profile,
           switch_horizon_turns: tableRow.switch_horizon_turns,
           low_confidence_threshold: tableRow.low_confidence_threshold,
+          effort_by_complexity: tableRow.effort_by_complexity,
           source: tableRow.source,
         },
       }),

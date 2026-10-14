@@ -84,6 +84,7 @@ vi.mock('./db', async importOriginal => {
     syncPlatformRegistryRows: vi.fn(),
     listReadyCurrentProfilesForEntries: vi.fn(),
     getSummariesForRuns: vi.fn(),
+    getRoutingCaseResultsForEntries: vi.fn().mockResolvedValue([]),
     countCurrentProfilesByStatus: vi.fn(),
     listCurrentPlatformProfileStatuses: vi.fn(),
     requeueFailedCurrentProfiles: vi.fn(),

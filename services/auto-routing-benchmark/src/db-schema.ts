@@ -13,6 +13,7 @@ import type {
   BenchmarkKind,
   CandidatePricing,
   ProductionTokenProfile,
+  EffortByComplexity,
   BenchmarkProfileStatus,
   BenchmarkRunPurpose,
   BenchmarkRunStatus,
@@ -216,6 +217,7 @@ export const routingTables = sqliteTable('routing_tables', {
   }).$type<ProductionTokenProfile>(),
   switch_horizon_turns: integer('switch_horizon_turns'),
   low_confidence_threshold: real('low_confidence_threshold'),
+  effort_by_complexity: text('effort_by_complexity', { mode: 'json' }).$type<EffortByComplexity>(),
   source: text('source').notNull(),
 });
 

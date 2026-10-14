@@ -233,6 +233,7 @@ export const BenchmarkModelSummarySchema = z.object({
   avgCostUsd: z.number().nullable(),
   avgLatencyMs: z.number(),
   p50LatencyMs: z.number().nullable(),
+  p50TtftMs: z.number().nonnegative().nullable().optional(),
   p95LatencyMs: z.number().nullable(),
   cases: z.number().int(),
   errors: z.number().int(),

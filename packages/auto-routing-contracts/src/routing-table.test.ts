@@ -42,6 +42,29 @@ describe('wilsonLowerBound', () => {
 });
 
 describe('rankCandidates', () => {
+  it('uses first-token latency to break an equal-cost and total-latency tie', () => {
+    const ranked = rankCandidates(
+      [
+        { ...rankInput('slow-first-token', 1, 0.01, 1000), p50TtftMs: 400 },
+        { ...rankInput('fast-first-token', 1, 0.01, 1000), p50TtftMs: 100 },
+      ],
+      0.95
+    );
+    expect(order(ranked)).toEqual(['fast-first-token', 'slow-first-token']);
+    expect(ranked[0].p50TtftMs).toBe(100);
+  });
+
+  it('keeps total-latency ordering when first-token latency is unknown', () => {
+    const candidates = [
+      rankInput('slow-total', 1, 0.01, 2000),
+      rankInput('fast-total', 1, 0.01, 1000),
+    ];
+    expect(order(rankCandidates(candidates, 0.95))).toEqual(['fast-total', 'slow-total']);
+    expect(order(rankCandidates(candidates.map(c => ({ ...c, p50TtftMs: null })), 0.95))).toEqual(
+      ['fast-total', 'slow-total']
+    );
+  });
+
   it('prefers more measured cases when raw accuracy, latency and cost match', () => {
     const ranked = rankCandidates(
       [
@@ -157,7 +180,7 @@ describe('rankCandidates', () => {
     expect(order(ranked)).toEqual(['better-value', 'lower-raw-cost', 'weak']);
     expect(ranked[0].meetsThreshold).toBe(true);
     expect(ranked[2].meetsThreshold).toBe(false);
-    expect(ranked[0]).not.toHaveProperty('p50LatencyMs');
+    expect(ranked[0].p50LatencyMs).toBe(10_000);
   });
   it('prefers a faster candidate over a slightly cheaper slow one', () => {
     const ranked = rankCandidates(
@@ -203,6 +226,37 @@ describe('rankCandidates', () => {
 });
 
 describe('RoutingTableSchema', () => {
+  it('preserves sparse complexity mappings and rejects unknown buckets and routes', () => {
+    const table = {
+      version: 'complexity-fixture',
+      generatedAt: new Date(0).toISOString(),
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      source: 'benchmark',
+      routes: { 'implementation/code_generation': [candidate('m', 1, 1)] },
+    };
+    const effortByComplexity = {
+      'implementation/code_generation': { m: { low: null, high: 'high' } },
+    };
+    expect(RoutingTableSchema.parse({ ...table, effortByComplexity }).effortByComplexity).toEqual(
+      effortByComplexity
+    );
+    expect(CustomRoutingTableSchema.parse({ ...table, effortByComplexity }).effortByComplexity).toEqual(
+      effortByComplexity
+    );
+    expect(
+      RoutingTableSchema.safeParse({
+        ...table,
+        effortByComplexity: { 'implementation/code_generation': { m: { impossible: 'high' } } },
+      }).success
+    ).toBe(false);
+    expect(
+      RoutingTableSchema.safeParse({
+        ...table,
+        effortByComplexity: { unknown: { m: { high: 'high' } } },
+      }).success
+    ).toBe(false);
+  });
   it('requires at least one candidate per taxonomy route', () => {
     expect(
       RoutingTableSchema.safeParse({

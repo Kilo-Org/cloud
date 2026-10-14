@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import {
   CandidatePricingSchema,
+  EffortByComplexitySchema,
   ProductionTokenProfileSchema,
   RankedCandidateSchema,
   RoutingTableSchema,
@@ -183,6 +184,10 @@ export const LiveScoreboardTableRowSchema = z.object({
     .nullish()
     .transform(value => value ?? null),
   low_confidence_threshold: nullableRate.optional().transform(value => value ?? null),
+  effort_by_complexity: storedJsonSchema
+    .pipe(EffortByComplexitySchema)
+    .nullish()
+    .transform(value => value ?? null),
   source: z.string(),
 });
 

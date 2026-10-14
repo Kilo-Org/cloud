@@ -31,6 +31,7 @@ vi.mock('./db', async importOriginal => {
     getLatestRoutingTable: vi.fn(),
     countCurrentProfilesByStatus: vi.fn(),
     getSummariesForRuns: vi.fn(),
+    getRoutingCaseResultsForEntries: vi.fn().mockResolvedValue([]),
     listReadyCurrentProfilesForEntries: vi.fn(),
     markRunCompleted: vi.fn(),
     replaceModelSummaries: vi.fn(),

@@ -7790,6 +7790,29 @@
         {
           "type": "object",
           "properties": {
+            "egressMode": {
+              "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
+              "type": "string",
+              "enum": [
+                "unrestricted",
+                "allowlist"
+              ]
+            },
+            "egressAllowlist": {
+              "description": "Additional exact DNS hostnames; requires explicit allowlist mode.",
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 254,
+                "pattern": "^[A-Za-z0-9.-]+$"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
             "sandboxAllocation": {
               "anyOf": [
                 {
@@ -7924,9 +7947,11 @@
     "tags": [
       "cloudagentnext",
       "preparesession",
+      "egressmode",
+      "egressallowlist",
       "sandboxallocation"
     ],
-    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession sandboxallocation sandboxAllocation"
+    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist sandboxallocation egressMode egressAllowlist sandboxAllocation"
   },
   "cloudAgentNext.refreshTerminalTicket": {
     "path": "cloudAgentNext.refreshTerminalTicket",
@@ -20606,6 +20631,29 @@
             {
               "type": "object",
               "properties": {
+                "egressMode": {
+                  "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
+                  "type": "string",
+                  "enum": [
+                    "unrestricted",
+                    "allowlist"
+                  ]
+                },
+                "egressAllowlist": {
+                  "description": "Additional exact DNS hostnames; requires explicit allowlist mode.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "pattern": "^[A-Za-z0-9.-]+$"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
                 "organizationId": {
                   "type": "string",
                   "format": "uuid",
@@ -20752,9 +20800,11 @@
       "cloudagentnext",
       "preparesession",
       "organizationid",
+      "egressmode",
+      "egressallowlist",
       "sandboxallocation"
     ],
-    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid sandboxallocation organizationId sandboxAllocation"
+    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist sandboxallocation organizationId egressMode egressAllowlist sandboxAllocation"
   },
   "organizations.cloudAgentNext.refreshTerminalTicket": {
     "path": "organizations.cloudAgentNext.refreshTerminalTicket",

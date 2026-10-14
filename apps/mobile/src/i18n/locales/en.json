@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Update GitHub App"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact hi@kilocode.ai for help, then enable Code Reviewer again."
+        "description": "Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact hi@kilo.ai for help, then enable Code Reviewer again."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer was disabled because Kilo cannot create a GitLab Project Access Token for this project. Grant Maintainer access or enable Project Access Tokens, then enable Code Reviewer again.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Update Code Reviewer settings"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again."
+        "description": "Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilo.ai for help, then enable Code Reviewer again."
       },
       "title": "Code Reviewer needs attention",
       "recoveryLabel": "Contact support"

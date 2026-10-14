@@ -1,12 +1,20 @@
 import { z } from 'zod';
 import type { Sandbox } from '@cloudflare/sandbox';
 import {
+  getSandboxAllocationProvider,
+  type SandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import {
   classifySandboxId,
   getSandboxNamespace,
+  hashToSandboxId,
   isPlacedSandboxKey,
+  selectDefaultSandboxProvider,
+  sharedSandboxOwnerKey,
   type SandboxIdClass,
+  type SandboxSelectionEnv,
 } from './sandbox-id.js';
-import type { Env } from './types.js';
+import type { AgentSandboxProvider, Env, SandboxId } from './types.js';
 
 /**
  * What a control-plane sandbox with a neutral `sbx-` key is. The key carries no
@@ -14,7 +22,7 @@ import type { Env } from './types.js';
  * reads it from there. Legacy prefixed keys store no kind and keep routing by
  * prefix.
  */
-export const sandboxKindSchema = z.enum(['isolated', 'code-review', 'shared']);
+export const sandboxKindSchema = z.enum(['isolated', 'isolated-standard', 'code-review', 'shared']);
 
 export type SandboxKind = z.infer<typeof sandboxKindSchema>;
 
@@ -33,6 +41,7 @@ type SandboxNamespaceEnv = Pick<
  */
 const KIND_SANDBOX_ID_CLASS: Record<SandboxKind, SandboxIdClass> = {
   isolated: 'isolated-small',
+  'isolated-standard': 'isolated-standard',
   'code-review': 'code-review',
   shared: 'shared',
 };
@@ -40,9 +49,70 @@ const KIND_SANDBOX_ID_CLASS: Record<SandboxKind, SandboxIdClass> = {
 /** The contained pool per kind; the same mapping the legacy prefixes encode. */
 const CONTAINED_NAMESPACE = {
   isolated: 'SandboxSmallContainment',
+  'isolated-standard': 'SandboxContainment',
   'code-review': 'SandboxCodeReviewContainment',
   shared: 'SandboxContainment',
 } as const satisfies Record<SandboxKind, keyof SandboxNamespaceEnv>;
+
+export type ControlPlaneSandboxDecision = {
+  sandboxId: SandboxId;
+  provider: AgentSandboxProvider;
+  sandboxKind: SandboxKind;
+};
+
+/** The one sandbox decision for a new control-plane session: kind, provider and neutral key. */
+export async function selectControlPlaneSandbox(input: {
+  env: SandboxSelectionEnv;
+  sessionId: string;
+  userId: string;
+  orgId?: string;
+  botId?: string;
+  codeReview: boolean;
+  sandboxAllocation?: SandboxAllocation;
+}): Promise<ControlPlaneSandboxDecision> {
+  const sandboxKind = controlPlaneSandboxKind(input);
+  const provider =
+    input.sandboxAllocation === undefined
+      ? selectDefaultSandboxProvider({
+          env: input.env,
+          orgId: input.orgId,
+          userId: input.userId,
+          plane: 'control',
+          isolated: sandboxKind === 'isolated',
+        })
+      : getSandboxAllocationProvider(input.sandboxAllocation);
+  return { sandboxId: await placedSandboxKey(sandboxKind, input), provider, sandboxKind };
+}
+
+/** Sessions are isolated by default; only an explicit shared allocation shares a sandbox. */
+function controlPlaneSandboxKind(input: {
+  codeReview: boolean;
+  sandboxAllocation?: SandboxAllocation;
+}): SandboxKind {
+  const allocation = input.sandboxAllocation;
+  if (allocation !== undefined) {
+    if (input.codeReview) {
+      throw new Error('Sandbox allocations cannot be combined with specialized sandbox routing');
+    }
+    if (allocation === 'isolated-standard') {
+      return 'isolated-standard';
+    }
+    return allocation === 'cloudflare-shared' ? 'shared' : 'isolated';
+  }
+  return input.codeReview ? 'code-review' : 'isolated';
+}
+
+function placedSandboxKey(
+  sandboxKind: SandboxKind,
+  input: { sessionId: string; userId: string; orgId?: string; botId?: string }
+): Promise<SandboxId> {
+  return sandboxKind === 'shared'
+    ? hashToSandboxId(
+        `control-shared-v2:${sharedSandboxOwnerKey(input.orgId, input.userId, input.botId)}`,
+        'sbx'
+      )
+    : hashToSandboxId(`control-isolated-v1:${input.sessionId}`, 'sbx');
+}
 
 /** A placed key requires a stored kind; a legacy key has none. */
 export function sandboxKindMatchesKey(

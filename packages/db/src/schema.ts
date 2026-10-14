@@ -5430,6 +5430,8 @@ export const ModelStatsBenchmarksSchema = z
         terminalBenchHard: z.number().optional(),
         lcr: z.number().optional(),
         ifBench: z.number().optional(),
+        resolvedAaSlug: z.string().optional(),
+        reasoningEffort: z.string().nullable().optional(),
         lastUpdated: z.string().optional(),
       })
       .optional(),

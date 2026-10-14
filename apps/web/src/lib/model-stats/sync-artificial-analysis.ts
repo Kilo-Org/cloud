@@ -40,6 +40,7 @@ export async function syncArtificialAnalysisBenchmarks() {
   const aaModelBySlug = new Map(
     aaModels.filter(model => model.slug).map(model => [model.slug, model])
   );
+  const aaFamilies = groupByReasoningFamily(aaModels);
 
   const modelsToUpdate: Array<{
     id: string;
@@ -59,7 +60,7 @@ export async function syncArtificialAnalysisBenchmarks() {
       continue;
     }
 
-    const aaModel = aaModelBySlug.get(dbModel.aaSlug);
+    const aaModel = resolveAaModel(dbModel.aaSlug, aaModelBySlug, aaFamilies);
 
     if (aaModel) {
       const benchmarkData = extractBenchmarkData(aaModel);
@@ -146,11 +147,83 @@ async function fetchArtificialAnalysisModels(): Promise<ArtificialAnalysisModel[
 }
 
 /**
+ * Artificial Analysis benchmarks reasoning models once per reasoning effort and
+ * publishes each run as its own model, e.g. `gpt-5-2` alongside `gpt-5-2-xhigh`
+ * and `gpt-5-2-low`, or `claude-4-5-sonnet` alongside
+ * `claude-4-5-sonnet-thinking`. A configured aaSlug naming the family therefore
+ * matches whichever variant happens to own the bare slug, which is frequently a
+ * lower or non-reasoning configuration.
+ *
+ * An aaSlug that already carries an effort suffix pins that exact variant. Any
+ * other aaSlug resolves to the highest-effort variant in its family.
+ */
+const REASONING_EFFORT_RANK: Record<string, number> = {
+  'non-reasoning': 0,
+  minimal: 1,
+  low: 2,
+  medium: 3,
+  // The unsuffixed slug: AA's default configuration for the model.
+  '': 4,
+  high: 5,
+  reasoning: 5,
+  thinking: 5,
+  xhigh: 6,
+  max: 7,
+};
+
+const EFFORT_SUFFIX_PATTERN = new RegExp(
+  `^(.+?)-(${Object.keys(REASONING_EFFORT_RANK)
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length)
+    .join('|')})$`
+);
+
+function parseReasoningVariant(slug: string): { family: string; effort: string } {
+  const match = EFFORT_SUFFIX_PATTERN.exec(slug);
+  return match ? { family: match[1], effort: match[2] } : { family: slug, effort: '' };
+}
+
+export function groupByReasoningFamily(aaModels: ArtificialAnalysisModel[]) {
+  const families = new Map<string, ArtificialAnalysisModel[]>();
+  for (const model of aaModels) {
+    if (!model.slug) continue;
+    const { family } = parseReasoningVariant(model.slug);
+    const members = families.get(family) ?? [];
+    members.push(model);
+    families.set(family, members);
+  }
+  return families;
+}
+
+export function resolveAaModel(
+  aaSlug: string,
+  aaModelBySlug: Map<string, ArtificialAnalysisModel>,
+  aaFamilies: Map<string, ArtificialAnalysisModel[]>
+): ArtificialAnalysisModel | undefined {
+  const exact = aaModelBySlug.get(aaSlug);
+  if (exact && parseReasoningVariant(aaSlug).effort !== '') return exact;
+
+  const variants = (aaFamilies.get(aaSlug) ?? []).filter(
+    model => model.evaluations?.artificial_analysis_coding_index != null
+  );
+  if (variants.length === 0) return exact;
+
+  return variants.reduce((best, candidate) =>
+    effortRank(candidate.slug) > effortRank(best.slug) ? candidate : best
+  );
+}
+
+function effortRank(slug: string) {
+  return REASONING_EFFORT_RANK[parseReasoningVariant(slug).effort] ?? -1;
+}
+
+/**
  * Extract benchmark data from AA model
  */
 function extractBenchmarkData(aaModel: ArtificialAnalysisModel) {
   const lastUpdated = new Date().toISOString();
   const evals = aaModel.evaluations || {};
+  const { effort } = parseReasoningVariant(aaModel.slug);
 
   return {
     codingIndex: evals.artificial_analysis_coding_index ?? null,
@@ -163,6 +236,8 @@ function extractBenchmarkData(aaModel: ArtificialAnalysisModel) {
       lcr: evals.lcr,
       ifBench: evals.ifbench,
       timeToFirstTokenSeconds: aaModel.median_time_to_first_token_seconds,
+      resolvedAaSlug: aaModel.slug,
+      reasoningEffort: effort || null,
       lastUpdated,
     },
   };
@@ -218,4 +293,4 @@ const ArtificialAnalysisResponseSchema = z.object({
   data: z.array(ArtificialAnalysisModelSchema).optional(),
 });
 
-type ArtificialAnalysisModel = z.infer<typeof ArtificialAnalysisModelSchema>;
+export type ArtificialAnalysisModel = z.infer<typeof ArtificialAnalysisModelSchema>;

@@ -1,6 +1,7 @@
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
   GitHubRepositoryAuthorizationFailureReason,
   GitHubRepositoryAuthorizationResult,
@@ -660,6 +661,7 @@ export type ValidatedSessionAccess = AccessibleCloudAgentSession & {
 
 /** tRPC context passed to all procedures */
 export type TRPCContext = {
+  cloudAgentAuthority?: CloudAgentAuthority;
   env: Env;
   userId: string;
   request: Request;

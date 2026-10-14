@@ -244,7 +244,11 @@ type Harness = {
   authorCalls: Array<{ name: string; email: string } | undefined>;
   ensureCalls: () => number;
   ensureInputs: EnsureInput[];
-  installCalls: Array<{ key: string; env: Record<string, string> }>;
+  installCalls: Array<{
+    key: string;
+    env: Record<string, string>;
+    cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
+  }>;
   releaseCalls: string[];
   removeCalls: string[];
   ensureSessionCalls: () => number;
@@ -299,7 +303,7 @@ function createHarness(
   const gitCalls: string[][] = [];
   const authorCalls: Array<{ name: string; email: string } | undefined> = [];
   const ensureInputs: EnsureInput[] = [];
-  const installCalls: Array<{ key: string; env: Record<string, string> }> = [];
+  const installCalls: Harness['installCalls'] = [];
   const releaseCalls: string[] = [];
   const removeCalls: string[] = [];
   let clone: ExecResult | (() => Promise<ExecResult>) = result(0);
@@ -350,8 +354,8 @@ function createHarness(
         },
       } as unknown as WrapperKiloClient;
     },
-    installCredentials: async (key, env) => {
-      installCalls.push({ key, env });
+    installCredentials: async (key, env, cloudAgentMcp) => {
+      installCalls.push({ key, env, cloudAgentMcp });
       await options.beforeInstall?.();
     },
     isUnavailable: key => unavailableKeys.has(key),
@@ -1472,6 +1476,80 @@ describe('createPreparationManager', () => {
     const env = harness.installCalls[0]?.env;
     expect(env?.KILOCODE_TOKEN).toBe('proxy-handle-1');
     expect(env?.KILOCODE_BACKEND_BASE_URL).toBe('https://facade.test');
+  });
+
+  it('installs scoped MCP authority only in the parent per-session config, separately from model credentials', async () => {
+    const harness = createHarness();
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const cloudAgentMcp = {
+      url: 'https://mcp.kiloapps.io/mcp' as const,
+      token: 'scoped-parent-mcp-token',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    await harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'model-runtime-alias' },
+      cloudAgentMcp,
+    });
+    const env = harness.ensureInputs[0]?.env;
+    const config = JSON.parse(env?.KILO_CONFIG_CONTENT ?? '{}');
+    expect(config.mcp['kilo-cloud-agent']).toEqual({
+      type: 'remote',
+      url: cloudAgentMcp.url,
+      oauth: false,
+      headers: { Authorization: `Bearer ${cloudAgentMcp.token}` },
+    });
+    expect(env?.KILOCODE_TOKEN).toBe('model-runtime-alias');
+    expect(config.provider.kilo.options.apiKey).toBe('model-runtime-alias');
+    expect(env?.KILO_AUTH_CONTENT).not.toContain(cloudAgentMcp.token);
+    expect(JSON.stringify(spec)).not.toContain(cloudAgentMcp.token);
+    expect(JSON.stringify(harness.frames)).not.toContain(cloudAgentMcp.token);
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'renewed-model-alias' },
+    });
+    const renewed = JSON.parse(harness.installCalls[0]?.env.KILO_CONFIG_CONTENT ?? '{}');
+    expect(renewed.mcp['kilo-cloud-agent']).toEqual(config.mcp['kilo-cloud-agent']);
+    expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe('renewed-model-alias');
+    const recoveredGrant = {
+      ...cloudAgentMcp,
+      token: 'recovered-mcp-token',
+      expiresAt: cloudAgentMcp.expiresAt + 24 * 3600,
+    };
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'renewed-model-alias' },
+      cloudAgentMcp: recoveredGrant,
+    });
+    expect(harness.installCalls[1]?.cloudAgentMcp).toEqual(recoveredGrant);
+    expect(
+      JSON.parse(harness.installCalls[1]?.env.KILO_CONFIG_CONTENT ?? '{}').mcp['kilo-cloud-agent']
+        .headers.Authorization
+    ).toBe(`Bearer ${recoveredGrant.token}`);
+    const preparedGrant = { ...recoveredGrant, token: 'reprepared-mcp-token' };
+    await harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'renewed-model-alias' },
+      cloudAgentMcp: preparedGrant,
+    });
+    expect(harness.installCalls[2]?.cloudAgentMcp).toEqual(preparedGrant);
+    expect(JSON.stringify(harness.frames)).not.toContain(recoveredGrant.token);
+    const child = routeSpec({
+      sessionId: 'workspace_child',
+      kiloSessionId: 'ses_22222222222222222222222222',
+      runtimeIsolation: 'per-session',
+    });
+    await harness.manager.prepare(child);
+    const childConfig = JSON.parse(harness.ensureInputs[1]?.env.KILO_CONFIG_CONTENT ?? '{}');
+    expect(childConfig.mcp?.['kilo-cloud-agent']).toBeUndefined();
+    expect(harness.ensureInputs[1]?.env.KILO_CONFIG_CONTENT).not.toContain(cloudAgentMcp.token);
+  });
+
+  it('does not inject a Cloud Agent MCP entry for opt-out sessions', async () => {
+    const harness = createHarness();
+    await harness.manager.prepare(routeSpec({ runtimeIsolation: 'per-session' }));
+    const config = JSON.parse(harness.ensureInputs[0]?.env.KILO_CONFIG_CONTENT ?? '{}');
+    expect(config.mcp?.['kilo-cloud-agent']).toBeUndefined();
   });
 
   it('surfaces setup-command output on the wire', async () => {

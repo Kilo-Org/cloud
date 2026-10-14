@@ -40,7 +40,7 @@ import {
   buildWorktreeKiloEnvironment,
   type WorktreeKiloAuth,
 } from '../control/worktree-runtime.js';
-import { createOutputRedactor, createSecretRedactor } from '../redact-output.js';
+import { createOutputRedactor, createSecretRedactor, redactSecrets } from '../redact-output.js';
 import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
 import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
@@ -124,7 +124,11 @@ export type PrepareRuntimePort = {
     env: Record<string, string>;
     workload?: ControlWorkload;
   }): Promise<WrapperKiloClient>;
-  installCredentials(key: string, env: Record<string, string>): Promise<void>;
+  installCredentials(
+    key: string,
+    env: Record<string, string>,
+    cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp']
+  ): Promise<void>;
   /** True when the runtime is gone or has spent its restart budget. */
   isUnavailable(key: string): boolean;
   remove(key: string): void;
@@ -176,6 +180,7 @@ export type PrepareDeps = {
 };
 
 type PreparedRoute = {
+  cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
   key: string;
   spec: ControlPlaneRouteSpec;
   directory: string;
@@ -707,7 +712,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     } catch (error) {
       log(
         `control-plane capture failed session=${spec.sessionId} error=${
-          error instanceof Error ? error.message : 'unknown'
+          error instanceof Error ? createSecretRedactor(env)(error.message) : 'unknown'
         }`
       );
     } finally {
@@ -976,7 +981,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           spec.env ?? {},
           inheritedEnv,
           spec.mcp,
-          spec
+          { ...spec, cloudAgentMcp: credentials?.cloudAgentMcp }
         ),
         spec
       );
@@ -987,6 +992,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           {
             ...env,
             ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}),
+            ...(credentials?.cloudAgentMcp
+              ? { CLOUD_AGENT_MCP_TOKEN: credentials.cloudAgentMcp.token }
+              : {}),
           },
         ],
         spec.secretEnvKeys ?? []
@@ -1082,7 +1090,15 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         if (spec.runtimeIsolation === 'per-session') deps.runtimes.release(key);
         return;
       }
-      prepared.set(sessionId, { key, spec, directory, home, kilo: kiloAuth, env });
+      prepared.set(sessionId, {
+        key,
+        spec,
+        directory,
+        home,
+        kilo: kiloAuth,
+        env,
+        cloudAgentMcp: credentials?.cloudAgentMcp,
+      });
       emitSessionReadyNative(sessionId);
       deps.emit({ type: 'session.ready', sessionId, ...(workspace ? { workspace } : {}) });
       log(`control-plane prepare ready session=${sessionId} directory=${directory}`);
@@ -1092,9 +1108,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         return;
       }
       log(
-        `control-plane prepare failed session=${sessionId} step=${currentStep} error=${
-          error instanceof Error ? error.message : String(error)
-        }${
+        `control-plane prepare failed session=${sessionId} step=${currentStep} error=${redactSecrets(
+          error instanceof Error ? error.message : String(error),
+          credentials?.cloudAgentMcp ? [credentials.cloudAgentMcp.token] : []
+        )}${
           error instanceof WrapperBootstrapError && error.gitFailure ? ` ${error.gitFailure}` : ''
         }`
       );
@@ -1107,6 +1124,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   ): Promise<void> {
     const route = prepared.get(credentials.sessionId);
     if (!route) return;
+    route.cloudAgentMcp = credentials.cloudAgentMcp ?? route.cloudAgentMcp;
     const nextEnv = withRuntimeProfileEnvironment(
       buildWorktreeKiloEnvironment(
         route.directory,
@@ -1119,12 +1137,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         route.spec.env ?? {},
         inheritedEnv,
         route.spec.mcp,
-        route.spec
+        { ...route.spec, cloudAgentMcp: route.cloudAgentMcp }
       ),
       route.spec
     );
     route.env = nextEnv;
-    await deps.runtimes.installCredentials(route.key, nextEnv);
+    await deps.runtimes.installCredentials(route.key, nextEnv, route.cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
       const url = authenticatedGitUrl(
         route.spec.git.url,

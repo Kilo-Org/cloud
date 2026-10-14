@@ -62,6 +62,7 @@ function startInputToSessionCreateRequest(
   }
 
   return {
+    allowSubagentSessions: input.allowSubagentSessions ?? false,
     initialTurn: {
       type: 'prompt',
       id: input.message.id,

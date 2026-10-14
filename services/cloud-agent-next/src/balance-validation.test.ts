@@ -1,5 +1,9 @@
 import jwt from 'jsonwebtoken';
 import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
+import {
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+  verifyRuntimeProxyAttestation,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   validateBalanceOnly,
@@ -49,6 +53,54 @@ describe('balance-validation', () => {
   });
 
   describe('validateBalanceOnly', () => {
+    it('attests trusted parent model credentials for balance checks without widening their audience or organization', async () => {
+      const token = jwt.sign(
+        {
+          version: 3,
+          kiloUserId: 'user_123',
+          apiTokenPepper: 'current-pepper',
+          aud: ['kilo-api', 'kilo-gateway', 'session-ingest'],
+          tokenPurpose: 'delegated-workload',
+          credentialExchange: false,
+          runtimeAuthorization: {
+            id: '12345678-1234-4234-8234-123456789abc',
+            resourceKind: 'cloud-agent-next',
+            resourceId: 'workspace_parent',
+          },
+        },
+        'test-secret',
+        { expiresIn: 3600 }
+      );
+      fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
+        const headers = new Headers(init.headers);
+        expect(headers.get('Authorization')).toBe(`Bearer ${token}`);
+        const result = await verifyRuntimeProxyAttestation({
+          secret: 'test-secret',
+          audience: 'kilo-api',
+          userId: 'user_123',
+          bearer: token,
+          value: headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+          authorizationId: '12345678-1234-4234-8234-123456789abc',
+          resourceId: 'workspace_parent',
+        });
+        expect(result).toBe(true);
+        return Response.json({ balance: 10, isDepleted: false });
+      });
+      await expect(validateBalanceOnly(token, undefined, mockEnv)).resolves.toEqual({
+        success: true,
+      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://app.kilo.ai/api/profile/balance',
+        expect.anything()
+      );
+      fetchMock.mockClear();
+      await expect(validateBalanceOnly(token, 'wrong-org', mockEnv)).resolves.toMatchObject({
+        success: false,
+        status: 500,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it('fails closed if bearer classification throws', async () => {
       const decode = vi.spyOn(jwt, 'decode').mockImplementationOnce(() => {
         throw new Error('Malformed token');

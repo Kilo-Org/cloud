@@ -660,6 +660,148 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle ?? '')).not.toBeNull();
   });
 
+  it('delivers a private scoped MCP grant separately from model aliases and never in launch env or persisted route specs', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createProvider();
+    const sandbox = await installSandbox(sandboxId, provider);
+    const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+    const mcpGrant = {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'private-scoped-mcp-fixture',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    const sessionStub = sessions.getByName(sessionDoName(USER_ID, sessionId));
+    await runInDurableObject(sandbox, instance => {
+      const peerFor = instance.sessionPeerFor.bind(instance);
+      instance.sessionPeerFor = (ownerId, id) => {
+        const peer = peerFor(ownerId, id);
+        if (!peer) return null;
+        return {
+          onRoute: update => peer.onRoute(update),
+          onEvents: notification => peer.onEvents(notification),
+          onOutcome: outcome => peer.onOutcome(outcome),
+          issueRuntimeCredentialProxyGrant: fence => peer.issueRuntimeCredentialProxyGrant(fence),
+          issueCloudAgentMcpGrant: async () => mcpGrant,
+        };
+      };
+    });
+    await createVercelSession({
+      sessionId,
+      kiloId: kiloSessionId(),
+      sandboxId,
+      kiloToken: token,
+      seal,
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+    await wrapper.hello({ wrapperId: 'wr_scoped', allocationId });
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.credentials.cloudAgentMcp).toEqual(mcpGrant);
+    expect(frame.credentials.proxy?.handle).toEqual(expect.any(String));
+    expect(frame.credentials.kilo.token).not.toBe(mcpGrant.token);
+    expect(JSON.stringify(frame.spec)).not.toContain(mcpGrant.token);
+    expect(JSON.stringify(provider.launchEnvs)).not.toContain(mcpGrant.token);
+    await runInDurableObject(sandbox, instance => {
+      const db = drizzle(instance.ctx.storage);
+      expect(JSON.stringify(db.select().from(routesTable).all())).not.toContain(mcpGrant.token);
+    });
+    expect(JSON.stringify(await sessionStub.getMetadata())).not.toContain(mcpGrant.token);
+    wrapper.close();
+    await waitFor(async () =>
+      expect((await sandbox.getAllocationState()).kind).toBe('disconnected')
+    );
+    mcpGrant.token = 'recovered-scoped-mcp-fixture';
+    mcpGrant.expiresAt += 24 * 3600;
+    const reconnected = await FakeWrapper.connect({ sandboxId, credential });
+    await reconnected.hello({ wrapperId: 'wr_scoped', allocationId });
+    const recovered = await reconnected.next();
+    if (recovered?.type !== 'session.prepare')
+      throw new Error('expected reconnected session.prepare');
+    expect(recovered.credentials.cloudAgentMcp).toEqual(mcpGrant);
+    expect(JSON.stringify(recovered.spec)).not.toContain(mcpGrant.token);
+  });
+
+  it.each(['rejection', 'timeout'] as const)(
+    'prepares without optional MCP credentials after issuance %s and retries on reconnect',
+    async failure => {
+      const sessionId = newSessionId();
+      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      const provider = createProvider();
+      const sandbox = await installSandbox(sandboxId, provider);
+      const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+      const mcpGrant = {
+        url: 'https://mcp.kiloapps.io/mcp',
+        token: 'recovered-optional-prepare-mcp-grant',
+        expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+      };
+      let failIssuance = true;
+      const issueMcpGrant = vi.fn(async () => {
+        if (!failIssuance) return mcpGrant;
+        if (failure === 'rejection') throw new Error(`MCP failure containing ${mcpGrant.token}`);
+        return new Promise<typeof mcpGrant>(() => {});
+      });
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      await runInDurableObject(sandbox, instance => {
+        const peerFor = instance.sessionPeerFor.bind(instance);
+        instance.sessionPeerFor = (ownerId, id) => {
+          const peer = peerFor(ownerId, id);
+          if (!peer) return null;
+          return {
+            onRoute: update => peer.onRoute(update),
+            onEvents: notification => peer.onEvents(notification),
+            onOutcome: outcome => peer.onOutcome(outcome),
+            issueRuntimeCredentialProxyGrant: fence => peer.issueRuntimeCredentialProxyGrant(fence),
+            issueCloudAgentMcpGrant: issueMcpGrant,
+          };
+        };
+        Object.assign(instance, { grantIssueTimeoutMs: () => 100 });
+      });
+      const session = await createVercelSession({
+        sessionId,
+        kiloId: kiloSessionId(),
+        sandboxId,
+        kiloToken: token,
+        seal,
+      });
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      const { credential, allocationId } = launchIdentity(provider);
+      const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+      await wrapper.hello({ wrapperId: 'wr_optional_mcp', allocationId });
+      const frame = await wrapper.next();
+      if (frame?.type !== 'session.prepare' || frame.credentials === undefined)
+        throw new Error('expected session.prepare credentials');
+      expect(frame.credentials.cloudAgentMcp).toBeUndefined();
+      expect(frame.credentials.kilo.token).toEqual(expect.any(String));
+      expect(
+        await session.resolveRuntimeCredentialProxyGrant(frame.credentials.proxy?.handle ?? '')
+      ).not.toBeNull();
+      expect(await sandbox.status({ sessionId })).toMatchObject({ view: { state: 'preparing' } });
+      expect(issueMcpGrant).toHaveBeenCalledTimes(1);
+      expect(fields).toHaveBeenCalledWith({ sandboxId, sessionId });
+      expect(warn).toHaveBeenCalledWith(
+        'Optional Cloud Agent MCP grant unavailable; continuing without it'
+      );
+      expect(JSON.stringify([fields.mock.calls, warn.mock.calls])).not.toContain(mcpGrant.token);
+
+      wrapper.close();
+      await waitFor(async () =>
+        expect((await sandbox.getAllocationState()).kind).toBe('disconnected')
+      );
+      failIssuance = false;
+      const reconnected = await FakeWrapper.connect({ sandboxId, credential });
+      await reconnected.hello({ wrapperId: 'wr_optional_mcp', allocationId });
+      const recovered = await reconnected.next();
+      if (recovered?.type !== 'session.prepare' || recovered.credentials === undefined)
+        throw new Error('expected recovered session.prepare credentials');
+      expect(recovered.credentials.cloudAgentMcp).toEqual(mcpGrant);
+      expect(issueMcpGrant).toHaveBeenCalledTimes(2);
+    }
+  );
+
   it.each(['before request', 'during token resolution'] as const)(
     'authorizes the model facade while disconnected %s and completes after same-wrapper reconnect',
     async disconnectAt => {

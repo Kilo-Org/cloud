@@ -286,6 +286,9 @@ function materializationStage(error: unknown): PrepareFrameMaterializationStage 
  * binding exists; tests inject a fake peer instead.
  */
 export type ControlPlaneSessionPeer = {
+  issueCloudAgentMcpGrant?(): Promise<
+    { url: string; token: string; expiresAt: number } | undefined
+  >;
   onRoute(update: ControlPlaneRouteUpdate): Promise<void>;
   onEvents(notification: ControlPlaneEventsNotification): Promise<void>;
   onOutcome(outcome: ControlPlaneOutcome): Promise<void>;
@@ -2107,12 +2110,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
     } catch {
       return 'failed';
     }
+    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(route.sessionId);
     if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';
     const next: RouteRecord = { ...route, grant: issued.grant, spec: issued.spec };
     this.publishRouteGrant(next);
-    const payload: ControlPlaneSessionCredentialsPayload = {
+    const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
       ...sessionCredentialsPayloadFromGrant(issued.grant, route.sessionId),
-    };
+      ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
+    });
     this.trySendFrame(socket, { type: 'session.credentials', ...payload });
     return 'issued';
   }
@@ -2665,6 +2670,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
       // Select the socket and re-check the fence from the same allocation read, so
       // a restart between the (bind and) send cannot deliver a stale handle.
+      const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(sessionId);
       const state = await this.readAllocation();
       const socket = this.boundWrapperSocket(state);
       if (socket === null) return;
@@ -2687,7 +2693,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.trySendFrame(socket, {
         type: 'session.prepare',
         spec,
-        credentials: this.prepareCredentials(route.grant, sessionId),
+        credentials: controlPlaneSessionCredentialsPayloadSchema.parse({
+          ...this.prepareCredentials(route.grant, sessionId),
+          ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
+        }),
       });
     } catch {
       // A throw here (read/parse/bind) must still fail the fenced attempt; the
@@ -2697,6 +2706,26 @@ export class SandboxControlV2 extends DurableObject<Env> {
       } catch {
         // Best effort only.
       }
+    }
+  }
+
+  private async tryIssueCloudAgentMcpGrant(
+    sessionId: string
+  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
+    try {
+      const ownerId = await this.requireOwner();
+      const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, sessionId);
+      if (peer?.issueCloudAgentMcpGrant === undefined) return undefined;
+      return await withTimeout(
+        peer.issueCloudAgentMcpGrant(),
+        this.grantIssueTimeoutMs(),
+        'Cloud Agent MCP grant issuance timed out'
+      );
+    } catch {
+      logger
+        .withFields({ sandboxId: this.sandboxId, sessionId })
+        .warn('Optional Cloud Agent MCP grant unavailable; continuing without it');
+      return undefined;
     }
   }
 

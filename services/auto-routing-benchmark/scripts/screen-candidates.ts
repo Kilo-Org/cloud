@@ -217,6 +217,25 @@ export function screenRouteComparison(input: {
   };
 }
 
+export function screenRecommendation(
+  variants: readonly {
+    routes: readonly { routeKey: string; beatsCurrentPick: boolean }[];
+  }[]
+) {
+  const beatsCurrentPickRoutes = new Set<string>();
+  let recommend = false;
+  for (const variant of variants) {
+    const variantRoutes = new Set<string>();
+    for (const route of variant.routes) {
+      if (!route.beatsCurrentPick) continue;
+      variantRoutes.add(route.routeKey);
+      beatsCurrentPickRoutes.add(route.routeKey);
+    }
+    if (variantRoutes.size >= 2) recommend = true;
+  }
+  return { beatsCurrentPickRoutes: [...beatsCurrentPickRoutes].sort(), recommend };
+}
+
 async function main() {
   const { values } = parseArgs({
     options: {
@@ -379,13 +398,7 @@ async function main() {
             results: pair.results,
           };
         });
-      const beatsCurrentPickRoutes = [
-        ...new Set(
-          variants.flatMap(variant =>
-            variant.routes.filter(route => route.beatsCurrentPick).map(route => route.routeKey)
-          )
-        ),
-      ].sort();
+      const recommendation = screenRecommendation(variants);
       return {
         model: model.id,
         pricing,
@@ -394,8 +407,7 @@ async function main() {
           pricing,
           profile
         ),
-        beatsCurrentPickRoutes,
-        recommend: beatsCurrentPickRoutes.length >= 2,
+        ...recommendation,
         variants,
       };
     }),

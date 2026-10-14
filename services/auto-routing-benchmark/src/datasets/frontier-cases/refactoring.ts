@@ -710,7 +710,7 @@ Determine which proposals preserve every contractual observation across the ENTI
                   ['é', 1],
                   ['𝌆', 2],
                 ],
-                points: [['é'], ['e', '́'], ['�', '�']],
+                points: [['é'], ['e', '́'], ['\ud834', '\udf06']],
                 units: [1, 2, 2],
               },
             },

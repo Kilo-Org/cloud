@@ -311,9 +311,11 @@ export function computeDecision(
       candidate
     );
   };
-  const freshPair = { model: freshPick.model, variant: candidateVariant(freshPick) };
+  const picked = applyComplexityEffort(freshPick);
+  const freshPair = { model: picked.model, variant: candidateVariant(picked) };
 
   const incumbentCandidate = findIncumbentCandidate(candidates, incumbent);
+  const incumbentPick = incumbentCandidate ? applyComplexityEffort(incumbentCandidate) : undefined;
   // Sticky eligibility, shared by the keep decision and the switchReason
   // telemetry below so the two can never disagree. best_accuracy keeps the
   // strict bar (that mode exists to buy accuracy); cost_per_accuracy keeps
@@ -327,23 +329,24 @@ export function computeDecision(
       table.switchHorizonTurns != null &&
       options.contextTokens != null &&
       candidate.estimatedRequestCostUsd != null &&
-      freshPick.estimatedRequestCostUsd != null &&
+      picked.estimatedRequestCostUsd != null &&
       candidate.pricing != null &&
-      freshPick.pricing != null
+      picked.pricing != null
     ) {
       const expectedSavings =
-        (candidate.estimatedRequestCostUsd - freshPick.estimatedRequestCostUsd) *
+        (candidate.estimatedRequestCostUsd - picked.estimatedRequestCostUsd) *
         table.switchHorizonTurns;
       const cacheLossCost =
         options.contextTokens *
-        (freshPick.pricing.promptUsdPerToken -
+        (picked.pricing.promptUsdPerToken -
           (candidate.pricing.cacheReadUsdPerToken ?? candidate.pricing.promptUsdPerToken));
       return expectedSavings > cacheLossCost;
     }
-    return freshPick.avgCostUsd * table.switchCostFactor < candidate.avgCostUsd;
+    return picked.avgCostUsd * table.switchCostFactor < candidate.avgCostUsd;
   };
   const stickyIncumbent =
     incumbentCandidate &&
+    incumbentPick &&
     incumbentStickyEligible(incumbentCandidate) &&
     ((incumbentCandidate.model === freshPick.model &&
       ((options.preserveIncumbentVariant &&
@@ -351,34 +354,32 @@ export function computeDecision(
           { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
           freshPair
         )) ||
-        applyComplexityEffort(incumbentCandidate) !== incumbentCandidate ||
-        applyComplexityEffort(freshPick) !== freshPick)) ||
+        incumbentPick !== incumbentCandidate ||
+        picked !== freshPick)) ||
       (!sameExactPair(
         { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
         freshPair
       ) &&
-        ((mode === 'cost_per_accuracy' && !costSwitchWorthwhile(incumbentCandidate)) ||
+        ((mode === 'cost_per_accuracy' && !costSwitchWorthwhile(incumbentPick)) ||
           (mode === 'best_accuracy' &&
             !(
-              freshPick.accuracy - incumbentCandidate.accuracy >
+              picked.accuracy - incumbentPick.accuracy >
               table.bestAccuracySwitchThreshold
             )))));
 
-  if (stickyIncumbent && incumbentCandidate) {
-    const picked = applyComplexityEffort(incumbentCandidate);
+  if (stickyIncumbent && incumbentCandidate && incumbentPick) {
     return {
       model: incumbentCandidate.model,
       taskType: classification.taskType,
       subtaskType: classification.subtaskType,
       source: table.source,
       tableVersion: table.version,
-      ...decisionFieldsFromCandidate(picked),
+      ...decisionFieldsFromCandidate(incumbentPick),
       sticky: true,
       switchReason: null,
     };
   }
 
-  const picked = applyComplexityEffort(freshPick);
   const switched =
     incumbent !== null &&
     (picked !== freshPick || incumbent.variant === null
@@ -386,7 +387,7 @@ export function computeDecision(
       : !sameExactPair(incumbent, freshPair));
 
   return {
-    model: freshPick.model,
+    model: picked.model,
     taskType: classification.taskType,
     subtaskType: classification.subtaskType,
     source: table.source,

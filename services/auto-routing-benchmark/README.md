@@ -95,6 +95,11 @@ Expand a route to inspect every ranked model/effort pair.
 - `meetsThreshold` stays strict (`accuracy >= minAccuracy`) for sticky routing.
 - The ranking policy version is part of every registry table version, so a policy change republishes.
 
+Production CLI benchmarks currently record total latency only, so published D1
+tables use the total-latency fallback. Offline sweep and candidate-screen
+summaries carry measured TTFT and use the TTFT-aware formula; missing TTFT is
+never fabricated.
+
 The optional `effortByComplexity` table mapping selects a variant after the model
 has been picked, using the production classifier's `low`, `medium`, or `high`
 reasoning-complexity bucket. It never changes models or restores a candidate
@@ -115,9 +120,10 @@ Regenerate the labels with the production classifier and gateway normalization:
 OPENROUTER_API_KEY=... pnpm --filter auto-routing-benchmark exec tsx scripts/label-case-complexity.ts
 ```
 
-If a classifier call fails, the script saves completed labels and identifies the
-failed case. Use `--resume` to continue that checkpoint; commit the generated file
-only after the script completes successfully.
+If a classifier call fails, the script atomically saves completed labels to
+`<output>.checkpoint` and identifies the failed case without changing the
+published dataset. Use `--resume` to read that checkpoint. Only a successful
+complete run atomically replaces the output and removes the checkpoint.
 
 ## Grading
 

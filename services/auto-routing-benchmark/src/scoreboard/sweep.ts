@@ -51,7 +51,7 @@ export async function readSweepCompletion(
       return;
     }
     const chunk = streamChunkSchema.parse(JSON.parse(payload));
-    if (chunk.error !== undefined) throw new Error('OpenRouter stream returned an error');
+    if (chunk.error != null) throw new Error('OpenRouter stream returned an error');
     for (const choice of chunk.choices ?? []) {
       const delta = choice.delta;
       if (!delta) continue;
@@ -74,22 +74,24 @@ export async function readSweepCompletion(
     else if (normalized.startsWith('data:')) data.push(normalized.slice(5).replace(/^ /, ''));
   };
   try {
-    while (true) {
+    while (!done) {
       const chunk: ReadableStreamReadResult<Uint8Array> = await reader.read();
       buffer += chunk.done ? decoder.decode() : decoder.decode(chunk.value, { stream: true });
       let newline: number;
-      while ((newline = buffer.indexOf('\n')) >= 0) {
+      while (!done && (newline = buffer.indexOf('\n')) >= 0) {
         consumeLine(buffer.slice(0, newline));
         buffer = buffer.slice(newline + 1);
       }
       if (chunk.done) break;
     }
-    if (buffer) consumeLine(buffer);
-    consumeEvent();
+    if (!done) {
+      if (buffer) consumeLine(buffer);
+      consumeEvent();
+    }
     if (!done) throw new Error('OpenRouter stream ended before [DONE]');
     return { output, costUsd, ttftMs };
   } finally {
-    if (!done) await reader.cancel().catch(() => {});
+    await reader.cancel().catch(() => {});
     reader.releaseLock();
   }
 }

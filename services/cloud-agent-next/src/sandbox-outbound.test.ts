@@ -664,6 +664,26 @@ describe('handleManagedScmOutbound', () => {
     expect(forward).toHaveBeenCalledWith(request);
   });
 
+  it('preserves native interceptor manual redirects through generic credential-free forwarding', async () => {
+    const forward = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { Location: 'https://disallowed.test/' },
+      })
+    );
+    vi.stubGlobal('fetch', forward);
+    const request = new Request('https://example.com/resource', { redirect: 'manual' });
+
+    const response = await handleOutbound(request, createEnv());
+
+    expect(forward).toHaveBeenCalledTimes(1);
+    expect(forward).toHaveBeenCalledWith(request);
+    const forwarded = forward.mock.calls[0]?.[0] as Request | undefined;
+    expect(forwarded?.redirect).toBe('manual');
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe('https://disallowed.test/');
+  });
+
   it.each([
     ['GitHub API bearer', { Authorization: 'Bearer kgh3opaque' }],
     ['GitLab Git Basic', { Authorization: basicCredential('kgl42opaque', 'Basic', 'oauth2') }],

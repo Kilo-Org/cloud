@@ -1040,7 +1040,7 @@
         "recoveryLabel": "GitHub Appを更新"
       },
       "githubIpAllowList": {
-        "description": "このGitHub組織のIP許可リストがKiloをブロックしているため、コードレビュアーを無効にしました。hi@kilocode.aiにサポートを依頼してから、コードレビュアーを再度有効にしてください。"
+        "description": "このGitHub組織のIP許可リストがKiloをブロックしているため、コードレビュアーを無効にしました。hi@kilo.aiにサポートを依頼してから、コードレビュアーを再度有効にしてください。"
       },
       "gitlabProjectAccessRequired": {
         "description": "KiloがこのプロジェクトのGitLabプロジェクトアクセストークンを作成できないため、コードレビュアーを無効にしました。メンテナー権限を付与するか、プロジェクトアクセストークンを有効にしてから、コードレビュアーを再度有効にしてください。",
@@ -1055,7 +1055,7 @@
         "recoveryLabel": "コードレビュアーの設定を更新"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "今日、リポジトリのクローンが3回タイムアウトしたため、コードレビュアーを無効にしました。hi@kilocode.aiにサポートを依頼してから、コードレビュアーを再度有効にしてください。"
+        "description": "今日、リポジトリのクローンが3回タイムアウトしたため、コードレビュアーを無効にしました。hi@kilo.aiにサポートを依頼してから、コードレビュアーを再度有効にしてください。"
       },
       "title": "コードレビュアーで対応が必要です。",
       "recoveryLabel": "サポートに連絡"

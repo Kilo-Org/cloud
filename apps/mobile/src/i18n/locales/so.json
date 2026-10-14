@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Cusboonaysii abka GitHub"
       },
       "githubIpAllowList": {
-        "description": "Dib-u-eegaha koodhka waa la damiyay sababtoo ah ururkan GitHub wuxuu isticmaalaa liiska cinwaannada IP ee la oggol yahay oo xannibaya Kilo. La xiriir hi@kilocode.ai si aad caawimaad u hesho, ka dibna mar kale shid Dib-u-eegaha koodhka."
+        "description": "Dib-u-eegaha koodhka waa la damiyay sababtoo ah ururkan GitHub wuxuu isticmaalaa liiska cinwaannada IP ee la oggol yahay oo xannibaya Kilo. La xiriir hi@kilo.ai si aad caawimaad u hesho, ka dibna mar kale shid Dib-u-eegaha koodhka."
       },
       "gitlabProjectAccessRequired": {
         "description": "Dib-u-eegaha koodhka waa la damiyay sababtoo ah Kilo ma abuuri karo summadda gelitaanka mashruucan ee GitLab. Sii oggolaanshaha daryeelaha mashruuca ama shid summadaha gelitaanka mashruuca, ka dibna mar kale shid Dib-u-eegaha koodhka.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Cusboonaysii dejinta Dib-u-eegaha koodhka"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Dib-u-eegaha koodhka waa la damiyay ka dib markii nuqul ka samaynta kaydku saddex jeer maanta dhaaftay waqtigii loo qoondeeyay. La xiriir hi@kilocode.ai si aad caawimaad u hesho, ka dibna mar kale shid Dib-u-eegaha koodhka."
+        "description": "Dib-u-eegaha koodhka waa la damiyay ka dib markii nuqul ka samaynta kaydku saddex jeer maanta dhaaftay waqtigii loo qoondeeyay. La xiriir hi@kilo.ai si aad caawimaad u hesho, ka dibna mar kale shid Dib-u-eegaha koodhka."
       },
       "title": "Dib-u-eegaha koodhka wuxuu u baahan yahay in wax laga qabto.",
       "recoveryLabel": "La xiriir taageerada"

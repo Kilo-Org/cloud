@@ -180,6 +180,7 @@ function fixture() {
     } as never);
     return {
       url: `http://127.0.0.1:${10000 + clients.length}`,
+      authorization: 'Basic test',
       stopped: stopped.promise,
       close: () => {
         close();
@@ -654,7 +655,12 @@ describe('direct worktree credential refresh', () => {
     const stopped = Promise.withResolvers<void>();
     f.startServer.mockImplementationOnce(async options => {
       options.onProcessScope?.({ stop: async () => true, verify: async () => true } as never);
-      return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+      return {
+        url: 'http://127.0.0.1:10000',
+        authorization: 'Basic test',
+        close: f.close,
+        stopped: stopped.promise,
+      };
     });
     const runtime = await f.attach();
     const attachment = f.registry.attach(
@@ -679,7 +685,12 @@ describe('direct worktree credential refresh', () => {
       if (failure === 'process-stop-timeout') {
         f.startServer.mockImplementationOnce(async options => {
           options.onProcessScope?.({ stop: async () => false, verify: async () => false } as never);
-          return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+          return {
+            url: 'http://127.0.0.1:10000',
+            authorization: 'Basic test',
+            close: f.close,
+            stopped: stopped.promise,
+          };
         });
       }
       const runtime = await f.attach();
@@ -726,6 +737,7 @@ describe('direct worktree credential refresh', () => {
       options.onProcessScope?.({ stop: async () => stopResult.promise } as never);
       return {
         url: 'http://127.0.0.1:10000',
+        authorization: 'Basic test',
         close: f.close,
         stopped: new Promise<void>(() => {}),
       };
@@ -758,7 +770,12 @@ describe('direct worktree credential refresh', () => {
     const stopped = Promise.withResolvers<void>();
     f.startServer.mockImplementationOnce(async options => {
       options.onProcessScope?.({ stop: async () => true, verify: async () => true } as never);
-      return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+      return {
+        url: 'http://127.0.0.1:10000',
+        authorization: 'Basic test',
+        close: f.close,
+        stopped: stopped.promise,
+      };
     });
     const runtime = await f.attach();
     stopped.resolve();

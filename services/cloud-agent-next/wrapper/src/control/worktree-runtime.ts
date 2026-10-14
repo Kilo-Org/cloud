@@ -215,7 +215,7 @@ type ServerOptions = {
 
 type WorktreeKiloServerHandle = Omit<KiloServerHandle, 'close'> & {
   /** Basic credential the server requires; see `kilo-server-auth.ts`. */
-  authorization?: string;
+  authorization: string;
   close(deadlineAt?: number): void;
   stopped?: Promise<void>;
   exited?: Promise<void>;

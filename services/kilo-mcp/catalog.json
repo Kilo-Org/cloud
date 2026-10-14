@@ -6830,15 +6830,6 @@
                 },
                 "cloneFromKiloSessionId": {},
                 "cloneUpToMessageId": {},
-                "egressAllowlist": {
-                  "maxItems": 100,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "maxLength": 254,
-                    "pattern": "^[A-Za-z0-9.-]+$"
-                  }
-                },
                 "githubRepo": {
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -7328,15 +7319,6 @@
                   "format": "uuid",
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 },
-                "egressAllowlist": {
-                  "maxItems": 100,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "maxLength": 254,
-                    "pattern": "^[A-Za-z0-9.-]+$"
-                  }
-                },
                 "githubRepo": {
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -7808,6 +7790,29 @@
         {
           "type": "object",
           "properties": {
+            "egressMode": {
+              "description": "Defaults to allow-all when omitted. deny-by-default allows the Kilo/Git baseline plus optional egressAllowlist domains.",
+              "type": "string",
+              "enum": [
+                "allow-all",
+                "deny-by-default"
+              ]
+            },
+            "egressAllowlist": {
+              "description": "Additional exact DNS hostnames; requires explicit deny-by-default mode.",
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 254,
+                "pattern": "^[A-Za-z0-9.-]+$"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
             "sandboxAllocation": {
               "anyOf": [
                 {
@@ -7942,9 +7947,11 @@
     "tags": [
       "cloudagentnext",
       "preparesession",
+      "egressmode",
+      "egressallowlist",
       "sandboxallocation"
     ],
-    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession sandboxallocation sandboxAllocation"
+    "searchBlob": "cloudAgentNext.prepareSession Set up a new cloud agent session before it starts, including the repository, model, and any attached files or images. cloudagentnext preparesession egressmode egressallowlist sandboxallocation egressMode egressAllowlist sandboxAllocation"
   },
   "cloudAgentNext.refreshTerminalTicket": {
     "path": "cloudAgentNext.refreshTerminalTicket",
@@ -19664,15 +19671,6 @@
                     },
                     "cloneFromKiloSessionId": {},
                     "cloneUpToMessageId": {},
-                    "egressAllowlist": {
-                      "maxItems": 100,
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "maxLength": 254,
-                        "pattern": "^[A-Za-z0-9.-]+$"
-                      }
-                    },
                     "githubRepo": {
                       "type": "string",
                       "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -20162,15 +20160,6 @@
                       "format": "uuid",
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
-                    "egressAllowlist": {
-                      "maxItems": 100,
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "maxLength": 254,
-                        "pattern": "^[A-Za-z0-9.-]+$"
-                      }
-                    },
                     "githubRepo": {
                       "type": "string",
                       "pattern": "^[a-zA-Z0-9_.-]+\\/[a-zA-Z0-9_.-]+$"
@@ -20642,6 +20631,29 @@
             {
               "type": "object",
               "properties": {
+                "egressMode": {
+                  "description": "Defaults to allow-all when omitted. deny-by-default allows the Kilo/Git baseline plus optional egressAllowlist domains.",
+                  "type": "string",
+                  "enum": [
+                    "allow-all",
+                    "deny-by-default"
+                  ]
+                },
+                "egressAllowlist": {
+                  "description": "Additional exact DNS hostnames; requires explicit deny-by-default mode.",
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "pattern": "^[A-Za-z0-9.-]+$"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
                 "organizationId": {
                   "type": "string",
                   "format": "uuid",
@@ -20788,9 +20800,11 @@
       "cloudagentnext",
       "preparesession",
       "organizationid",
+      "egressmode",
+      "egressallowlist",
       "sandboxallocation"
     ],
-    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid sandboxallocation organizationId sandboxAllocation"
+    "searchBlob": "organizations.cloudAgentNext.prepareSession Prepare a new cloud agent coding session for an organization before it starts. Use to set up a session from a repository. organizations cloudagentnext preparesession organizationid egressmode egressallowlist sandboxallocation organizationId egressMode egressAllowlist sandboxAllocation"
   },
   "organizations.cloudAgentNext.refreshTerminalTicket": {
     "path": "organizations.cloudAgentNext.refreshTerminalTicket",

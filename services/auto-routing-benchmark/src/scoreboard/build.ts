@@ -66,11 +66,16 @@ export function buildScoreboard({
   }
   const routes = rebuildFromSweep
     ? Object.fromEntries(
-        Object.entries(trainingRoutes).map(([route, summaries]) => {
-          const latencies = new Map(
-            summaries.map(summary => [candidateKey(summary), summary.p50LatencyMs])
+        Object.entries(trainingRoutes).flatMap(([route, summaries]) => {
+          const measured = summaries.filter(
+            (summary): summary is OfflineSweepSummary & { accuracy: number; avgCostUsd: number } =>
+              summary.cases > 0 && summary.accuracy !== null && summary.avgCostUsd !== null
           );
-          const candidates = summaries.map(
+          if (measured.length === 0) return [];
+          const latencies = new Map(
+            measured.map(summary => [candidateKey(summary), summary.p50LatencyMs])
+          );
+          const candidates = measured.map(
             ({ model, variant, accuracy, cases, avgCostUsd, p50LatencyMs }) => ({
               model,
               variant,
@@ -82,11 +87,13 @@ export function buildScoreboard({
             })
           );
           return [
-            route,
-            rankCandidates(candidates, table.minAccuracy, { profile }).map(candidate => ({
-              ...candidate,
-              p50LatencyMs: latencies.get(candidateKey(candidate)) ?? null,
-            })),
+            [
+              route,
+              rankCandidates(candidates, table.minAccuracy, { profile }).map(candidate => ({
+                ...candidate,
+                p50LatencyMs: latencies.get(candidateKey(candidate)) ?? null,
+              })),
+            ],
           ];
         })
       )
@@ -147,21 +154,27 @@ export function buildScoreboard({
     summaries.set(candidateKey(summary), summary);
   }
   const heldOutPicks = Object.entries(routeMix).flatMap(([route, share]) => {
-    const pick = (rebuildFromSweep ? routes : table.routes)[route]?.[0];
+    const pick = routes[route]?.[0];
     const summary = pick && heldOutByRoute.get(route)?.get(candidateKey(pick));
-    return summary && pick && share > 0 ? [{ pick, summary, share }] : [];
+    return summary && summary.cases > 0 && summary.accuracy !== null && pick && share > 0
+      ? [{ pick, summary, share }]
+      : [];
   });
   const heldOutWeighted = (metric: 'accuracy' | 'avgCostUsd' | 'p50LatencyMs'): number | null => {
     let total = 0;
     let weight = 0;
     for (const { pick, summary, share } of heldOutPicks) {
-      const value =
-        metric === 'avgCostUsd'
-          ? estimateRequestCostUsd(
-              { avgCostUsd: summary.avgCostUsd, pricing: pick.pricing },
-              profile
-            )
-          : summary[metric];
+      let value: number | null;
+      if (metric === 'avgCostUsd') {
+        if (summary.avgCostUsd === null) continue;
+        value = estimateRequestCostUsd(
+          { avgCostUsd: summary.avgCostUsd, pricing: pick.pricing },
+          profile
+        );
+      } else {
+        value = summary[metric];
+      }
+      if (value === null) continue;
       total += value * share;
       weight += share;
     }

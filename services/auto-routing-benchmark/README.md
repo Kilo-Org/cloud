@@ -125,6 +125,13 @@ request cost, and wall-clock latency. Missing picks are excluded; `quality.heldO
 reports coverage. `--max-usd` includes model and grader spend (in-flight requests can
 overshoot). Atomic checkpoints every 200 cases retain each pair's raw `results`;
 `--resume sweep.json` skips completed pair/case/repetitions and retains accumulated spend.
+Infrastructure/grader failures are excluded from graded `cases` and counted in summary
+`errors`; empty answers score zero. Missing usage still permits grading but makes
+`costUsd` null and excludes that row only from the cost mean. Summaries with no known
+cost cannot be used for cost-based training ranking. Recompute old summaries without
+an API key or network calls using
+`sweep:offline --summarize-only --resume sweep.json --out corrected.json`;
+old missing-usage rows without saved answers remain excluded.
 
 ```bash
 pnpm --filter auto-routing-benchmark sweep:offline --pairs pairs.json --catalog live --max-usd 20 --out sweep.json

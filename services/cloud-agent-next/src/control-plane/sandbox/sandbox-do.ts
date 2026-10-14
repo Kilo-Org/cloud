@@ -951,8 +951,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
   /**
    * Off-queue read the Session DO uses to resolve one preview's provider
    * coordinates. It never enqueues, so a preview never waits behind the control
-   * operation queue. The allocation and route are local storage reads with no
-   * other await between them, so they form one coherent snapshot.
+   * operation queue. The allocation and route are two separate reads, not one
+   * snapshot. A target that changes before the upstream fetch is fenced
+   * downstream: SandboxContainers checks `allocationRef` and state, and the
+   * remaining race is an accepted residual (control-plane.md, Preview).
    */
   async previewTarget(sessionId: string): Promise<PreviewTargetResult> {
     await this.initialized;

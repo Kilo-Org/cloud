@@ -45,14 +45,7 @@ emit('tick', 2);
 console.log(JSON.stringify(log));`,
     check: {
       kind: 'json_equal',
-      value: [
-        "a1",
-        "a11",
-        "c11",
-        "b1",
-        "a2",
-        "c2"
-      ],
+      value: ['a1', 'a11', 'c11', 'b1', 'a2', 'c2'],
     },
   },
   {
@@ -93,7 +86,7 @@ Promise.all([task, chain]).then(() => {
 });`,
     check: {
       kind: 'exact',
-      value: "w0,sync,w1,p1,q1,w2,inner,q2,p2",
+      value: 'w0,sync,w1,p1,q1,w2,inner,q2,p2',
     },
   },
   {
@@ -132,19 +125,13 @@ console.log(JSON.stringify(result));`,
     check: {
       kind: 'json_equal',
       value: {
-        "mapped": "[null,4,null,null,11]",
-        "copiedHasZero": true,
-        "slicedHasZero": false,
-        "keys": [
-          "1",
-          "4"
-        ],
-        "visits": [
-          "1:3",
-          "4:7"
-        ],
-        "sum": 10,
-        "reductions": 2
+        mapped: '[null,4,null,null,11]',
+        copiedHasZero: true,
+        slicedHasZero: false,
+        keys: ['1', '4'],
+        visits: ['1:3', '4:7'],
+        sum: 10,
+        reductions: 2,
       },
     },
   },
@@ -187,17 +174,10 @@ console.log(JSON.stringify(result));`,
     check: {
       kind: 'json_equal',
       value: {
-        "values": [
-          10,
-          20,
-          30,
-          40
-        ],
-        "reads": 4,
-        "spreadKeys": [
-          "value"
-        ],
-        "preservedHidden": 99
+        values: [10, 20, 30, 40],
+        reads: 4,
+        spreadKeys: ['value'],
+        preservedHidden: 99,
       },
     },
   },
@@ -237,15 +217,10 @@ console.log(JSON.stringify(result));`,
     check: {
       kind: 'json_equal',
       value: {
-        "size": 4,
-        "freshObject": false,
-        "nan": "N2",
-        "snapshot": [
-          "second:B",
-          "nan:N2",
-          "zero:zero",
-          "first:A2"
-        ]
+        size: 4,
+        freshObject: false,
+        nan: 'N2',
+        snapshot: ['second:B', 'nan:N2', 'zero:zero', 'first:A2'],
       },
     },
   },
@@ -284,27 +259,22 @@ console.log(JSON.stringify({one, two, three, four, events}));`,
     check: {
       kind: 'json_equal',
       value: {
-        "one": {
-          "value": 1,
-          "done": false
+        one: {
+          value: 1,
+          done: false,
         },
-        "two": {
-          "value": 9,
-          "done": false
+        two: {
+          value: 9,
+          done: false,
         },
-        "three": {
-          "value": 8,
-          "done": true
+        three: {
+          value: 8,
+          done: true,
         },
-        "four": {
-          "done": true
+        four: {
+          done: true,
         },
-        "events": [
-          "start",
-          "finally",
-          "cleanup",
-          "outer:4"
-        ]
+        events: ['start', 'finally', 'cleanup', 'outer:4'],
       },
     },
   },
@@ -347,20 +317,15 @@ console.log(JSON.stringify(result));`,
     check: {
       kind: 'json_equal',
       value: {
-        "values": [
-          8,
-          5,
-          2,
-          2
-        ],
-        "first": {
-          "misses": 11,
-          "size": 4
+        values: [8, 5, 2, 2],
+        first: {
+          misses: 11,
+          size: 4,
         },
-        "second": {
-          "misses": 4,
-          "size": 4
-        }
+        second: {
+          misses: 4,
+          size: 4,
+        },
       },
     },
   },
@@ -405,14 +370,10 @@ run();`,
     check: {
       kind: 'json_equal',
       value: {
-        "before": true,
-        "after": false,
-        "calls": 3,
-        "values": [
-          "old",
-          "new",
-          "third"
-        ]
+        before: true,
+        after: false,
+        calls: 3,
+        values: ['old', 'new', 'third'],
       },
     },
   },
@@ -453,36 +414,36 @@ console.log(JSON.stringify(result));`,
     check: {
       kind: 'json_equal',
       value: {
-        "out": [
+        out: [
           {
-            "at": 0,
-            "word": "ab",
-            "next": 2
+            at: 0,
+            word: 'ab',
+            next: 2,
           },
           {
-            "at": 2,
-            "word": null,
-            "next": 0
+            at: 2,
+            word: null,
+            next: 0,
           },
           {
-            "at": 3,
-            "word": "cd",
-            "next": 5
+            at: 3,
+            word: 'cd',
+            next: 5,
           },
           {
-            "at": 5,
-            "word": null,
-            "next": 0
+            at: 5,
+            word: null,
+            next: 0,
           },
           {
-            "at": 6,
-            "word": "ef",
-            "next": 8
-          }
+            at: 6,
+            word: 'ef',
+            next: 8,
+          },
         ],
-        "globalWord": "cd",
-        "globalIndex": 3,
-        "globalNext": 5
+        globalWord: 'cd',
+        globalIndex: 3,
+        globalNext: 5,
       },
     },
   },
@@ -521,38 +482,29 @@ console.log(JSON.stringify(result));`,
     check: {
       kind: 'json_equal',
       value: {
-        "defaults": {
-          "tags": [
-            "base",
-            "shared"
-          ],
-          "limits": {
-            "soft": 3,
-            "hard": 9
-          }
+        defaults: {
+          tags: ['base', 'shared'],
+          limits: {
+            soft: 3,
+            hard: 9,
+          },
         },
-        "first": {
-          "tags": [
-            "base",
-            "shared"
-          ],
-          "limits": {
-            "soft": 5,
-            "hard": 12
-          }
+        first: {
+          tags: ['base', 'shared'],
+          limits: {
+            soft: 5,
+            hard: 12,
+          },
         },
-        "second": {
-          "tags": [
-            "custom",
-            "private"
-          ],
-          "limits": {
-            "soft": 3,
-            "hard": 9
-          }
+        second: {
+          tags: ['custom', 'private'],
+          limits: {
+            soft: 3,
+            hard: 9,
+          },
         },
-        "thirdHasHard": true,
-        "thirdHard": "missing"
+        thirdHasHard: true,
+        thirdHard: 'missing',
       },
     },
   },
@@ -586,23 +538,12 @@ console.log(JSON.stringify(result));`,
     check: {
       kind: 'json_equal',
       value: {
-        "exact": [
-          "9007199254740992",
-          "9007199254740993",
-          "9007199254740994"
-        ],
-        "distinctNumbers": 2,
-        "cacheValues": [
-          1,
-          2
-        ],
-        "differences": [
-          "0",
-          "-1",
-          "0"
-        ],
-        "equalFirstTwo": true,
-        "subtraction": 2
+        exact: ['9007199254740992', '9007199254740993', '9007199254740994'],
+        distinctNumbers: 2,
+        cacheValues: [1, 2],
+        differences: ['0', '-1', '0'],
+        equalFirstTwo: true,
+        subtraction: 2,
       },
     },
   },
@@ -643,11 +584,11 @@ console.log(JSON.stringify({
     check: {
       kind: 'json_equal',
       value: {
-        "a": "none",
-        "b": "none",
-        "c": 24,
-        "calls": 22,
-        "error": "TypeError"
+        a: 'none',
+        b: 'none',
+        c: 24,
+        calls: 22,
+        error: 'TypeError',
       },
     },
   },
@@ -686,20 +627,8 @@ console.log(JSON.stringify({results, events}));`,
     check: {
       kind: 'json_equal',
       value: {
-        "results": [
-          "ok",
-          "override",
-          "error:cleanup"
-        ],
-        "events": [
-          "try:0",
-          "finally:0",
-          "try:1",
-          "catch:failure",
-          "finally:1",
-          "try:2",
-          "finally:2"
-        ]
+        results: ['ok', 'override', 'error:cleanup'],
+        events: ['try:0', 'finally:0', 'try:1', 'catch:failure', 'finally:1', 'try:2', 'finally:2'],
       },
     },
   },
@@ -740,35 +669,11 @@ console.log(JSON.stringify(result));`,
     check: {
       kind: 'json_equal',
       value: {
-        "original": [
-          "a",
-          "b",
-          "c",
-          "d",
-          "e",
-          "f"
-        ],
-        "order": [
-          "b",
-          "f",
-          "d",
-          "c",
-          "e",
-          "a"
-        ],
-        "aliasOrder": [
-          "b",
-          "f",
-          "d",
-          "c",
-          "e",
-          "a"
-        ],
-        "sameArray": true,
-        "top": [
-          "b",
-          "c"
-        ]
+        original: ['a', 'b', 'c', 'd', 'e', 'f'],
+        order: ['b', 'f', 'd', 'c', 'e', 'a'],
+        aliasOrder: ['b', 'f', 'd', 'c', 'e', 'a'],
+        sameArray: true,
+        top: ['b', 'c'],
       },
     },
   },
@@ -806,23 +711,8 @@ console.log(JSON.stringify({first, second}));`,
     check: {
       kind: 'json_equal',
       value: {
-        "first": [
-          "v8",
-          "v8",
-          "v8",
-          "l0",
-          "l1",
-          "l2",
-          "c0",
-          "c1",
-          "c2",
-          "r4",
-          "r4"
-        ],
-        "second": [
-          "r5",
-          "r5"
-        ]
+        first: ['v8', 'v8', 'v8', 'l0', 'l1', 'l2', 'c0', 'c1', 'c2', 'r4', 'r4'],
+        second: ['r5', 'r5'],
       },
     },
   },
@@ -863,24 +753,11 @@ console.log(JSON.stringify(result));`,
     check: {
       kind: 'json_equal',
       value: {
-        "own": [
-          "2",
-          "10",
-          "01",
-          "a",
-          "z"
-        ],
-        "traversed": [
-          "2",
-          "10",
-          "01",
-          "a",
-          "z",
-          "inherited"
-        ],
-        "copiedSecret": "s",
-        "copiedHidden": false,
-        "copiedInherited": false
+        own: ['2', '10', '01', 'a', 'z'],
+        traversed: ['2', '10', '01', 'a', 'z', 'inherited'],
+        copiedSecret: 's',
+        copiedHidden: false,
+        copiedInherited: false,
       },
     },
   },
@@ -921,21 +798,10 @@ console.log(JSON.stringify(result));`,
     check: {
       kind: 'json_equal',
       value: {
-        "streamed": [
-          "A",
-          "",
-          "€B",
-          "😀",
-          ""
-        ],
-        "joined": "A€B😀",
-        "isolated": [
-          ["0041", "FFFD"],
-          ["FFFD"],
-          ["FFFD", "0042", "FFFD"],
-          ["FFFD", "FFFD"]
-        ],
-        "rejected": true
+        streamed: ['A', '', '€B', '😀', ''],
+        joined: 'A€B😀',
+        isolated: [['0041', 'FFFD'], ['FFFD'], ['FFFD', '0042', 'FFFD'], ['FFFD', 'FFFD']],
+        rejected: true,
       },
     },
   },
@@ -975,23 +841,9 @@ console.log(JSON.stringify({order, cycles, visited: [...visited]}));`,
     check: {
       kind: 'json_equal',
       value: {
-        "order": [
-          "shared",
-          "store",
-          "api",
-          "ui",
-          "app"
-        ],
-        "cycles": [
-          "api"
-        ],
-        "visited": [
-          "app",
-          "api",
-          "store",
-          "shared",
-          "ui"
-        ]
+        order: ['shared', 'store', 'api', 'ui', 'app'],
+        cycles: ['api'],
+        visited: ['app', 'api', 'store', 'shared', 'ui'],
       },
     },
   },
@@ -1024,8 +876,10 @@ const second = get('full');
 console.log(JSON.stringify({loads, same: first === second, key: second.key}));`,
     check: {
       kind: 'judged',
-      rubric: "The answer states loads=3, first===second is true, and second.key is changed. It explains that cache.get returns undefined for both absent and cached-undefined entries, so empty is loaded twice, while full is loaded once. It explains shared object identity and mutation, not a copy. It identifies Map.has as the missing-versus-present discriminator, without claiming it fixes aliasing.",
-      reference: "loads is 3. The two empty lookups reload because cache.get cannot distinguish cached undefined from a miss; Map.has would distinguish them. full is loaded once. Both full lookups return the same object, so first===second is true and second.key is changed after mutation.",
+      rubric:
+        'The answer states loads=3, first===second is true, and second.key is changed. It explains that cache.get returns undefined for both absent and cached-undefined entries, so empty is loaded twice, while full is loaded once. It explains shared object identity and mutation, not a copy. It identifies Map.has as the missing-versus-present discriminator, without claiming it fixes aliasing.',
+      reference:
+        'loads is 3. The two empty lookups reload because cache.get cannot distinguish cached undefined from a miss; Map.has would distinguish them. full is loaded once. Both full lookups return the same object, so first===second is true and second.key is changed after mutation.',
     },
   },
   {
@@ -1059,8 +913,10 @@ async function run() {
 run();`,
     check: {
       kind: 'judged',
-      rubric: "The answer identifies tail.then as the predecessor connection and tail=result as the scheduling-state update. It states only a runs, both promises reject, and both rejection messages are a, explaining that the next fulfillment-only handler is skipped on rejection. It distinguishes the original promise stored in tail from a new promise returned by a caller's catch; attaching that catch does not replace the internal tail. It explains the supplied implementation without prescribing changes.",
-      reference: "enqueue connects each job to tail through tail.then, then stores its result as the next tail and returns that same result to the caller. Only a runs; both results reject with message a because b's fulfillment handler is attached to a rejected predecessor. A caller's catch creates another promise but does not replace the promise stored in tail or the predecessor already captured by b.",
+      rubric:
+        "The answer identifies tail.then as the predecessor connection and tail=result as the scheduling-state update. It states only a runs, both promises reject, and both rejection messages are a, explaining that the next fulfillment-only handler is skipped on rejection. It distinguishes the original promise stored in tail from a new promise returned by a caller's catch; attaching that catch does not replace the internal tail. It explains the supplied implementation without prescribing changes.",
+      reference:
+        "enqueue connects each job to tail through tail.then, then stores its result as the next tail and returns that same result to the caller. Only a runs; both results reject with message a because b's fulfillment handler is attached to a rejected predecessor. A caller's catch creates another promise but does not replace the promise stored in tail or the predecessor already captured by b.",
     },
   },
   {
@@ -1085,11 +941,8 @@ The erratum overrides its matrix; otherwise the matching official versioned sour
     check: {
       kind: 'json_equal',
       value: {
-        "release": "2.4.1",
-        "sources": [
-          "S2",
-          "S3"
-        ]
+        release: '2.4.1',
+        sources: ['S2', 'S3'],
       },
     },
   },
@@ -1115,7 +968,7 @@ f: POST /charge had connection refused before any request bytes were sent; serve
 List the retry-eligible observation ids in alphabetic order, comma-separated with no spaces.`,
     check: {
       kind: 'exact',
-      value: "a,b,e,f",
+      value: 'a,b,e,f',
     },
   },
   {
@@ -1144,18 +997,10 @@ What does the matching authoritative ledger say about this deployment? Return JS
     check: {
       kind: 'json_equal',
       value: {
-        "accepted": [
-          "a",
-          "b",
-          "d",
-          "e"
-        ],
-        "rejected": [
-          "c",
-          "f"
-        ],
-        "minute": 0,
-        "hour": 5
+        accepted: ['a', 'b', 'd', 'e'],
+        rejected: ['c', 'f'],
+        minute: 0,
+        hour: 5,
       },
     },
   },
@@ -1185,17 +1030,9 @@ Which versions do the current published profiles accept after the erratum? Retur
     check: {
       kind: 'json_equal',
       value: {
-        "caret034": [
-          "0.3.4",
-          "0.3.5"
-        ],
-        "caret004": [
-          "0.0.4"
-        ],
-        "preview": [
-          "0.3.5-beta.1",
-          "0.3.5"
-        ]
+        caret034: ['0.3.4', '0.3.5'],
+        caret004: ['0.0.4'],
+        preview: ['0.3.5-beta.1', '0.3.5'],
       },
     },
   },
@@ -1220,9 +1057,9 @@ The deployment uses strict mode and is investigating response r7. What does the 
     check: {
       kind: 'json_equal',
       value: {
-        "currentAge": 69,
-        "fresh": false,
-        "secondsBeyondLimit": 9
+        currentAge: 69,
+        fresh: false,
+        secondsBeyondLimit: 9,
       },
     },
   },
@@ -1253,9 +1090,9 @@ Which prefix strings are documented for this deployment's enabled mode? Return J
     check: {
       kind: 'json_equal',
       value: {
-        "a": "Aé😀B",
-        "b": "Aé😀",
-        "c": "€😀"
+        a: 'Aé😀B',
+        b: 'Aé😀',
+        c: '€😀',
       },
     },
   },
@@ -1280,14 +1117,9 @@ What does the archived manifest say about the export started by the investigatio
     check: {
       kind: 'json_equal',
       value: {
-        "snapshot": "s1",
-        "ids": [
-          "z",
-          "b",
-          "k",
-          "a"
-        ],
-        "pages": 3
+        snapshot: 's1',
+        ids: ['z', 'b', 'k', 'a'],
+        pages: 3,
       },
     },
   },
@@ -1310,14 +1142,9 @@ Return JSON keys v1Delivered,v2Delivered,networkReceived; arrays contain chunk n
     check: {
       kind: 'json_equal',
       value: {
-        "v1Delivered": [
-          1,
-          2
-        ],
-        "v2Delivered": [
-          1
-        ],
-        "networkReceived": 2
+        v1Delivered: [1, 2],
+        v2Delivered: [1],
+        networkReceived: 2,
       },
     },
   },
@@ -1342,16 +1169,14 @@ What configuration does the published registry document for a client 2.1 deploym
     check: {
       kind: 'json_equal',
       value: {
-        "limits": {
-          "read": 5,
-          "burst": 3
+        limits: {
+          read: 5,
+          burst: 3,
         },
-        "tags": [
-          "c"
-        ],
-        "extra": {
-          "keep": 0
-        }
+        tags: ['c'],
+        extra: {
+          keep: 0,
+        },
       },
     },
   },
@@ -1373,7 +1198,7 @@ All version 3 releases are unsafe; upgrade to 4.
 Choose the newest available, non-prerelease, unaffected release satisfying BOTH application and runtime constraints. Reply only with the version.`,
     check: {
       kind: 'exact',
-      value: "3.2.4",
+      value: '3.2.4',
     },
   },
   {
@@ -1397,14 +1222,8 @@ Return JSON keys old,new; each value is a list of accepted output ids in alphabe
     check: {
       kind: 'json_equal',
       value: {
-        "old": [
-          "a",
-          "b",
-          "d"
-        ],
-        "new": [
-          "d"
-        ]
+        old: ['a', 'b', 'd'],
+        new: ['d'],
       },
     },
   },
@@ -1431,11 +1250,9 @@ The deployment uses a fixed offset without daylight saving. What run, cutoff and
     check: {
       kind: 'json_equal',
       value: {
-        "runUtc": "2025-03-02T19:00:00Z",
-        "cutoffUtc": "2025-02-28T19:00:00Z",
-        "deleted": [
-          "a"
-        ]
+        runUtc: '2025-03-02T19:00:00Z',
+        cutoffUtc: '2025-02-28T19:00:00Z',
+        deleted: ['a'],
       },
     },
   },
@@ -1466,14 +1283,14 @@ Which charge facts does the applicable finalized journal document? Return JSON k
     check: {
       kind: 'json_equal',
       value: {
-        "units": {
-          "a": 1,
-          "b": 2,
-          "c": 0,
-          "d": 3
+        units: {
+          a: 1,
+          b: 2,
+          c: 0,
+          d: 3,
         },
-        "preDiscount": 6,
-        "billed": 5
+        preDiscount: 6,
+        billed: 5,
       },
     },
   },
@@ -1499,10 +1316,10 @@ Return JSON keys a,b,c,d with each resolved scalar target.`,
     check: {
       kind: 'json_equal',
       value: {
-        "a": "dev",
-        "b": "prod",
-        "c": "local",
-        "d": "stage"
+        a: 'dev',
+        b: 'prod',
+        c: 'local',
+        d: 'stage',
       },
     },
   },
@@ -1531,9 +1348,9 @@ What settings do the current official documents, including their amendments and 
     check: {
       kind: 'json_equal',
       value: {
-        "a": "off",
-        "b": "small",
-        "c": "blue"
+        a: 'off',
+        b: 'small',
+        c: 'blue',
       },
     },
   },
@@ -1557,14 +1374,8 @@ Which observations establish restart survival, and which establish that their pa
     check: {
       kind: 'json_equal',
       value: {
-        "survives": [
-          "c",
-          "d"
-        ],
-        "tokenApplied": [
-          "b",
-          "d"
-        ]
+        survives: ['c', 'd'],
+        tokenApplied: ['b', 'd'],
       },
     },
   },
@@ -1586,8 +1397,10 @@ We raised the limit to 32 MiB on our internal preview cluster; public availabili
 A customer runs public version 2.1 in edge mode and wants to send 12 MiB. Explain whether the provided evidence supports this, reconcile the apparent contradictions, and name what evidence would be needed before relying on 32 MiB.`,
     check: {
       kind: 'judged',
-      rubric: "The answer rejects 12 MiB for public 2.1 edge mode because E3 imposes 8 MiB; explains E1 is scoped to 1.x, E2 is amended for edge by E3, and E4 covers only an internal preview. It does not claim 32 MiB is publicly available or invent dates. It asks for an authoritative public release/limit document explicitly covering 2.1 edge mode before relying on 32 MiB.",
-      reference: "No: E3 limits edge mode to 8 MiB, so 12 MiB exceeds it. E1 covers 1.x, while E2 allows 16 MiB only outside the edge exception in E3. E4 concerns an internal preview, not this public deployment. A public version- and mode-specific release note or limit specification is required to support a 32 MiB assumption.",
+      rubric:
+        'The answer rejects 12 MiB for public 2.1 edge mode because E3 imposes 8 MiB; explains E1 is scoped to 1.x, E2 is amended for edge by E3, and E4 covers only an internal preview. It does not claim 32 MiB is publicly available or invent dates. It asks for an authoritative public release/limit document explicitly covering 2.1 edge mode before relying on 32 MiB.',
+      reference:
+        'No: E3 limits edge mode to 8 MiB, so 12 MiB exceeds it. E1 covers 1.x, while E2 allows 16 MiB only outside the edge exception in E3. E4 concerns an internal preview, not this public deployment. A public version- and mode-specific release note or limit specification is required to support a 32 MiB assumption.',
     },
   },
   {
@@ -1606,8 +1419,10 @@ Do not mix 1.x and 2.x clients in one process. Server accepts both formats indep
 The investigation concerns the guarantees of these published APIs, not an upgrade plan. Which credential and process-compatibility restrictions does the bulletin state? What do the 1.x and 2.x acknowledgements establish, what writes does durable flush cover, and which missing 1.x guarantee prevents the documents from proving a lossless queued-write shutdown? Explain those documented boundaries without designing a migration or inventing APIs.`,
     check: {
       kind: 'judged',
-      rubric: "The answer identifies credential B as required before 2.x connection and the prohibition on mixing clients in one process. It states 1.x send establishes only local enqueue and stop discards its queue; the provided 1.x APIs do not establish a durable drain. It states 2.x send proves accepted, not durable, and durable flush covers only writes already enqueued when flush starts. It distinguishes these factual guarantees and missing documentation without presenting an invented 1.x drain API or a migration design.",
-      reference: "G3 requires credential B before 2.x connection and prohibits mixing 1.x and 2.x in one process; B remains compatible with 1.x. G1 send proves only local enqueue, while stop discards queued writes, so no documented 1.x durable-drain guarantee exists. G2 send proves server acceptance, not durability. Its durable flush covers the writes already enqueued at the instant it starts, not later submissions.",
+      rubric:
+        'The answer identifies credential B as required before 2.x connection and the prohibition on mixing clients in one process. It states 1.x send establishes only local enqueue and stop discards its queue; the provided 1.x APIs do not establish a durable drain. It states 2.x send proves accepted, not durable, and durable flush covers only writes already enqueued when flush starts. It distinguishes these factual guarantees and missing documentation without presenting an invented 1.x drain API or a migration design.',
+      reference:
+        'G3 requires credential B before 2.x connection and prohibits mixing 1.x and 2.x in one process; B remains compatible with 1.x. G1 send proves only local enqueue, while stop discards queued writes, so no documented 1.x durable-drain guarantee exists. G2 send proves server acceptance, not durability. Its durable flush covers the writes already enqueued at the instant it starts, not later submissions.',
     },
   },
   {
@@ -1628,8 +1443,10 @@ The payment service, independently of the queue, honors a stable payment idempot
 What do these documents say the producer token guarantees, and why does H3 not contradict that guarantee? Identify which documented layer owns repeated-payment suppression and which scope and timing boundaries apply. Report source-supported behavior; do not redesign the handler.`,
     check: {
       kind: 'judged',
-      rubric: "The answer attributes H3's second execution to lost-ACK redelivery of the same message. It states H2 deduplicates enqueues only for five minutes in queue-plus-producer scope, not handler execution. It identifies H4's payment-service idempotency key as the documented repeated-payment suppression layer and notes queue tokens are not automatically payment keys. It states ACK-before-payment carries the documented crash-loss risk, without treating a queue token as an exactly-once payment guarantee.",
-      reference: "H1 permits redelivery when the ACK is lost, so the same message can run twice without a duplicate enqueue. H2's token covers only enqueues for five minutes within a queue and producer id. H4 assigns repeated-payment suppression to the payment service's stable idempotency key, which is independent of the queue token. ACK before payment has the documented crash-loss risk.",
+      rubric:
+        "The answer attributes H3's second execution to lost-ACK redelivery of the same message. It states H2 deduplicates enqueues only for five minutes in queue-plus-producer scope, not handler execution. It identifies H4's payment-service idempotency key as the documented repeated-payment suppression layer and notes queue tokens are not automatically payment keys. It states ACK-before-payment carries the documented crash-loss risk, without treating a queue token as an exactly-once payment guarantee.",
+      reference:
+        "H1 permits redelivery when the ACK is lost, so the same message can run twice without a duplicate enqueue. H2's token covers only enqueues for five minutes within a queue and producer id. H4 assigns repeated-payment suppression to the payment service's stable idempotency key, which is independent of the queue token. ACK before payment has the documented crash-loss risk.",
     },
   },
   {
@@ -1648,8 +1465,10 @@ v3 changes pooling and enables caching by default. No claim about answer correct
 A proposal claims v3 is 37.5% faster and more correct, citing J1-J3. Investigate what evidence those sources actually provide. Distinguish their observed latency and status facts from version-level causal or correctness claims, identify the source-to-source comparability gaps, and say whether any supplied source establishes a controlled comparison. Do not compute a speedup, design an experiment or recommend a rollout.`,
     check: {
       kind: 'judged',
-      rubric: "The answer reports A's 40 ms and B's 25 ms observed p50 but does not attribute the difference causally to version. It identifies different hosts, concurrency, cache state, sample sizes and correctness criteria as comparability gaps. It states all HTTP 200 responses in B do not prove exact-answer correctness or justify comparing its status rate to A's 96 exact passes. It identifies J3 as a pooling/cache change note without a correctness claim and concludes no supplied source establishes a controlled version comparison. It does not prescribe an experiment or rollout.",
-      reference: "J1 reports 40 ms p50 and 96 exact passes; J2 reports 25 ms p50 and all HTTP statuses 200, not exact-answer checks. Host, concurrency, cache state, sample size and correctness criteria differ, so these reports do not isolate a causal version effect or comparable correctness rate. J3 documents pooling and default caching changes but makes no correctness claim. No supplied source establishes a controlled comparison.",
+      rubric:
+        "The answer reports A's 40 ms and B's 25 ms observed p50 but does not attribute the difference causally to version. It identifies different hosts, concurrency, cache state, sample sizes and correctness criteria as comparability gaps. It states all HTTP 200 responses in B do not prove exact-answer correctness or justify comparing its status rate to A's 96 exact passes. It identifies J3 as a pooling/cache change note without a correctness claim and concludes no supplied source establishes a controlled version comparison. It does not prescribe an experiment or rollout.",
+      reference:
+        'J1 reports 40 ms p50 and 96 exact passes; J2 reports 25 ms p50 and all HTTP statuses 200, not exact-answer checks. Host, concurrency, cache state, sample size and correctness criteria differ, so these reports do not isolate a causal version effect or comparable correctness rate. J3 documents pooling and default caching changes but makes no correctness claim. No supplied source establishes a controlled comparison.',
     },
   },
   {
@@ -1673,14 +1492,14 @@ Return the affected paths as a JSON array sorted lexicographically.`,
     check: {
       kind: 'json_equal',
       value: [
-        "src/api.ts",
-        "src/app.ts",
-        "src/cache.ts",
-        "src/hash.ts",
-        "src/schema.ts",
-        "src/ui.ts",
-        "src/unused.ts",
-        "src/view.ts"
+        'src/api.ts',
+        'src/app.ts',
+        'src/cache.ts',
+        'src/hash.ts',
+        'src/schema.ts',
+        'src/ui.ts',
+        'src/unused.ts',
+        'src/view.ts',
       ],
     },
   },
@@ -1704,11 +1523,11 @@ Return JSON keys a,b,c,d,e. Values are manifest-relative target paths; use the s
     check: {
       kind: 'json_equal',
       value: {
-        "a": "./dist/node.mjs",
-        "b": "./dist/browser.mjs",
-        "c": "./dist/index.d.ts",
-        "d": "BLOCKED",
-        "e": "./dist/debug.mjs"
+        a: './dist/node.mjs',
+        b: './dist/browser.mjs',
+        c: './dist/index.d.ts',
+        d: 'BLOCKED',
+        e: './dist/debug.mjs',
       },
     },
   },
@@ -1731,8 +1550,8 @@ From the site project resolve @core/a and @util/b. Return JSON keys core,util wi
     check: {
       kind: 'json_equal',
       value: {
-        "core": "apps/site/src/core/a.ts",
-        "util": "UNRESOLVED"
+        core: 'apps/site/src/core/a.ts',
+        util: 'UNRESOLVED',
       },
     },
   },
@@ -1761,11 +1580,7 @@ Rules: * consumes exactly one path segment; ** consumes zero or more complete se
 Return the workspace member paths as a JSON array sorted lexicographically.`,
     check: {
       kind: 'json_equal',
-      value: [
-        "packages/api",
-        "services/jobs/worker",
-        "services/router"
-      ],
+      value: ['packages/api', 'services/jobs/worker', 'services/router'],
     },
   },
   {
@@ -1791,19 +1606,10 @@ Return JSON keys run,client,schema,nested with owner arrays in declaration order
     check: {
       kind: 'json_equal',
       value: {
-        "run": [
-          "@routing"
-        ],
-        "client": [
-          "@generator"
-        ],
-        "schema": [
-          "@schema",
-          "@routing"
-        ],
-        "nested": [
-          "@platform"
-        ]
+        run: ['@routing'],
+        client: ['@generator'],
+        schema: ['@schema', '@routing'],
+        nested: ['@platform'],
       },
     },
   },
@@ -1834,10 +1640,10 @@ Return selected paths as a JSON array sorted lexicographically.`,
     check: {
       kind: 'json_equal',
       value: [
-        "src/.cache/hidden.test.ts",
-        "src/a.test.ts",
-        "tests/deep/next.spec.ts",
-        "tests/root.spec.ts"
+        'src/.cache/hidden.test.ts',
+        'src/a.test.ts',
+        'tests/deep/next.spec.ts',
+        'tests/root.spec.ts',
       ],
     },
   },
@@ -1860,13 +1666,7 @@ Startup discovery follows static runtime imports and runtime re-exports only. It
 For entry src/main.ts return the startup module set as a JSON array sorted lexicographically.`,
     check: {
       kind: 'json_equal',
-      value: [
-        "src/api.ts",
-        "src/main.ts",
-        "src/metrics.ts",
-        "src/shared.ts",
-        "src/store.ts"
-      ],
+      value: ['src/api.ts', 'src/main.ts', 'src/metrics.ts', 'src/shared.ts', 'src/store.ts'],
     },
   },
   {
@@ -1892,11 +1692,7 @@ A test is impacted iff its transitive dependency set contains the changed file. 
 Return impacted test paths as a JSON array sorted lexicographically.`,
     check: {
       kind: 'json_equal',
-      value: [
-        "a.test.ts",
-        "b.test.ts",
-        "d.test.ts"
-      ],
+      value: ['a.test.ts', 'b.test.ts', 'd.test.ts'],
     },
   },
   {
@@ -1925,7 +1721,7 @@ No overrides exist. For this exercise the importer version chooses the installed
 What codec version is installed for packages/api? Reply only with the semantic version.`,
     check: {
       kind: 'exact',
-      value: "3.3.1",
+      value: '3.3.1',
     },
   },
   {
@@ -1946,9 +1742,9 @@ Return JSON keys valid,firstMissingBeforeApplied,wouldRun. firstMissingBeforeApp
     check: {
       kind: 'json_equal',
       value: {
-        "valid": false,
-        "firstMissingBeforeApplied": "003_add_email.sql",
-        "wouldRun": []
+        valid: false,
+        firstMissingBeforeApplied: '003_add_email.sql',
+        wouldRun: [],
       },
     },
   },
@@ -1980,11 +1776,11 @@ Return JSON keys a,b,c,d,e with root-relative resolved paths.`,
     check: {
       kind: 'json_equal',
       value: {
-        "a": "src/lib.ts",
-        "b": "src/lib/parser.ts",
-        "c": "src/config/index.ts",
-        "d": "src/lib/parser.tsx",
-        "e": "src/config.json"
+        a: 'src/lib.ts',
+        b: 'src/lib/parser.ts',
+        c: 'src/config/index.ts',
+        d: 'src/lib/parser.tsx',
+        e: 'src/config.json',
       },
     },
   },
@@ -2004,10 +1800,7 @@ Walker rules: follow directory symlinks; mark each real directory path visited B
 Return the emitted paths as a JSON array in traversal order.`,
     check: {
       kind: 'json_equal',
-      value: [
-        "a/x.ts",
-        "b/y.ts"
-      ],
+      value: ['a/x.ts', 'b/y.ts'],
     },
   },
   {
@@ -2029,7 +1822,7 @@ The question is specifically the handwritten implementation reached by importing
 Reply only with the repository-relative implementation path.`,
     check: {
       kind: 'exact',
-      value: "src/security/token.ts",
+      value: 'src/security/token.ts',
     },
   },
   {
@@ -2049,12 +1842,12 @@ Return final JSON with keys targets,limits,trace; within limits use read,write.`
     check: {
       kind: 'json_equal',
       value: {
-        "targets": [],
-        "limits": {
-          "read": 7,
-          "write": 0
+        targets: [],
+        limits: {
+          read: 7,
+          write: 0,
         },
-        "trace": false
+        trace: false,
       },
     },
   },
@@ -2074,7 +1867,7 @@ Rules: named export forwards only the named binding; export type forwards no run
 List the runtime export names visible through src/index.ts, sorted alphabetically and comma-separated with no spaces.`,
     check: {
       kind: 'exact',
-      value: "decode,normalize",
+      value: 'decode,normalize',
     },
   },
   {
@@ -2093,9 +1886,9 @@ Return JSON keys newLineOf8,newLineOf16,totalLines.`,
     check: {
       kind: 'json_equal',
       value: {
-        "newLineOf8": 10,
-        "newLineOf16": 16,
-        "totalLines": 20
+        newLineOf8: 10,
+        newLineOf16: 16,
+        totalLines: 20,
       },
     },
   },
@@ -2116,8 +1909,10 @@ Paths in plugins.json resolve relative to src, so this configured module is src/
 A cleanup proposal says makeReport is test-only and can be deleted because no production literal import names it. Explain the repository-supported conclusion, trace the production route, and identify why the original search was insufficient.`,
     check: {
       kind: 'judged',
-      rubric: "The answer rejects the test-only/deletion conclusion and traces main -> loader -> config module report.ts -> export alias make -> makeReport. It explains literal searches miss configured dynamic import and alias references. It distinguishes the evidenced configured reachability from proof that every deployment invokes it, and does not invent deployment configuration or claim all dynamic exports are used.",
-      reference: "makeReport has a configured production route: main imports loader, loader reads plugins.json, that config selects report.ts and export make, and make aliases makeReport. A literal search for makeReport misses the dynamic import and alias. This evidence contradicts test-only reachability, though actual deployment invocation would require runtime/config evidence.",
+      rubric:
+        'The answer rejects the test-only/deletion conclusion and traces main -> loader -> config module report.ts -> export alias make -> makeReport. It explains literal searches miss configured dynamic import and alias references. It distinguishes the evidenced configured reachability from proof that every deployment invokes it, and does not invent deployment configuration or claim all dynamic exports are used.',
+      reference:
+        'makeReport has a configured production route: main imports loader, loader reads plugins.json, that config selects report.ts and export make, and make aliases makeReport. A literal search for makeReport misses the dynamic import and alias. This evidence contradicts test-only reachability, though actual deployment invocation would require runtime/config evidence.',
     },
   },
   {
@@ -2136,8 +1931,10 @@ The source and distribution declarations are from the same checkout; the build h
 Trace the repository's source-to-artifact-to-consumer path. Which declaration is authoritative for generation, which file is selected by the demo's package-name import, and which documented script owns that artifact? Explain whether manually changing the generated declaration changes the generator's source of truth. Do not diagnose a failure or prescribe a repair.`,
     check: {
       kind: 'judged',
-      rubric: "The answer traces src/math.ts through tools/build.mjs to dist/math.js, then package exports to apps/demo. It identifies src/math.ts as the generator's source of truth, dist/math.js as the consumed package export, and the build script running node tools/build.mjs as the artifact producer. It explains that manual distribution edits do not change source authority and are overwritten by subsequent generation. It does not invent a source-path resolver override or prescribe a bug fix.",
-      reference: "src/math.ts is the generation source. The documented build script invokes node tools/build.mjs to produce dist/math.js. package.json exports that distribution file, so apps/demo's package-name import consumes its declaration rather than the source declaration. A manual distribution edit changes the current artifact only, not the generation source, and a later build overwrites it.",
+      rubric:
+        "The answer traces src/math.ts through tools/build.mjs to dist/math.js, then package exports to apps/demo. It identifies src/math.ts as the generator's source of truth, dist/math.js as the consumed package export, and the build script running node tools/build.mjs as the artifact producer. It explains that manual distribution edits do not change source authority and are overwritten by subsequent generation. It does not invent a source-path resolver override or prescribe a bug fix.",
+      reference:
+        "src/math.ts is the generation source. The documented build script invokes node tools/build.mjs to produce dist/math.js. package.json exports that distribution file, so apps/demo's package-name import consumes its declaration rather than the source declaration. A manual distribution edit changes the current artifact only, not the generation source, and a later build overwrites it.",
     },
   },
   {
@@ -2157,8 +1954,10 @@ The investigation is a map of task inputs and cache provenance. No output artifa
 Which files are semantic inputs to schema generation, which are represented in schema:generate's recorded cache key, and how does api:build represent its dependency? Trace whether a spec-only edit is visible to either recorded key, distinguishing execution ordering from input tracking. Describe the existing repository mechanism only; do not propose cache changes or diagnose a failed build.`,
     check: {
       kind: 'judged',
-      rubric: "The answer identifies spec.json and tools/generate.mjs as semantic generation inputs but only tools/generate.mjs as hashed by schema:generate. It identifies api:build's source hash plus dependency task key rather than a direct generated-file hash. It traces that a spec-only edit changes neither recorded key because spec.json is absent from the first key and the dependency key remains unchanged. It distinguishes dependsOn ordering from cache-input representation without proposing changes.",
-      reference: "schema generation consumes both spec.json and tools/generate.mjs, but its recorded key hashes only the generator script. api:build hashes its own src files and schema:generate's task key, not generated/types.ts directly. A spec-only edit is absent from the schema key and therefore from the unchanged dependency key used by api. dependsOn expresses execution ordering, not an additional file-input hash.",
+      rubric:
+        "The answer identifies spec.json and tools/generate.mjs as semantic generation inputs but only tools/generate.mjs as hashed by schema:generate. It identifies api:build's source hash plus dependency task key rather than a direct generated-file hash. It traces that a spec-only edit changes neither recorded key because spec.json is absent from the first key and the dependency key remains unchanged. It distinguishes dependsOn ordering from cache-input representation without proposing changes.",
+      reference:
+        "schema generation consumes both spec.json and tools/generate.mjs, but its recorded key hashes only the generator script. api:build hashes its own src files and schema:generate's task key, not generated/types.ts directly. A spec-only edit is absent from the schema key and therefore from the unchanged dependency key used by api. dependsOn expresses execution ordering, not an additional file-input hash.",
     },
   },
   {
@@ -2179,8 +1978,10 @@ A reviewer says there is no cycle because toast does not import screen, so no ar
 Explain the exact module-versus-package distinction, the violating edge, and one minimal boundary-preserving replacement that keeps failure reporting visible.`,
     check: {
       kind: 'judged',
-      rubric: "The answer notes the shown module graph is acyclic but the package graph has ui -> domain -> storage -> ui. It identifies storage/sql.ts -> ui/toast.ts as the forbidden dependency under the stated rule. It proposes storage returning/throwing a structured failure that domain/UI handle, or injecting a neutral reporting callback/port without a storage import of UI, preserving visible failure reporting. It does not propose deleting reporting or deny the package cycle.",
-      reference: "The module chain ends at toast, so those specific modules form no cycle. Collapsing by package gives ui -> domain -> storage -> ui, and storage/sql.ts importing ui/toast.ts violates the declared boundary. Remove that import and return/throw a structured failure for upper layers to present, or accept a neutral reporting port supplied from above; keep the UI notification without making storage depend on UI.",
+      rubric:
+        'The answer notes the shown module graph is acyclic but the package graph has ui -> domain -> storage -> ui. It identifies storage/sql.ts -> ui/toast.ts as the forbidden dependency under the stated rule. It proposes storage returning/throwing a structured failure that domain/UI handle, or injecting a neutral reporting callback/port without a storage import of UI, preserving visible failure reporting. It does not propose deleting reporting or deny the package cycle.',
+      reference:
+        'The module chain ends at toast, so those specific modules form no cycle. Collapsing by package gives ui -> domain -> storage -> ui, and storage/sql.ts importing ui/toast.ts violates the declared boundary. Remove that import and return/throw a structured failure for upper layers to present, or accept a neutral reporting port supplied from above; keep the UI notification without making storage depend on UI.',
     },
   },
 ];

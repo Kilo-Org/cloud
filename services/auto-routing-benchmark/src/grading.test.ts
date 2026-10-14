@@ -156,9 +156,9 @@ describe('gradeDeciderOutput', () => {
     expect(result).toEqual({ score: 0.73, costUsd: 0.002, graderError: null });
   });
 
-  it('fails only the case when the judge is unavailable', async () => {
+  it('reports unavailable judging as retryable without a final score', async () => {
     expect(await gradeDeciderOutput(check, { userPrompt: '', output: '', judge: null })).toEqual({
-      score: 0,
+      score: null,
       costUsd: 0,
       graderError: 'Decider judge is unavailable',
     });
@@ -172,7 +172,7 @@ describe('gradeDeciderOutput', () => {
         throw new Error('Provider failed');
       },
     });
-    expect(result).toEqual({ score: 0, costUsd: 0, graderError: 'Provider failed' });
+    expect(result).toEqual({ score: null, costUsd: 0, graderError: 'Decider judge failed' });
   });
 
   it.each([-0.1, 1.1, NaN, Infinity])('rejects invalid probability %s', async probability => {
@@ -181,8 +181,8 @@ describe('gradeDeciderOutput', () => {
       output: '',
       judge: async () => ({ probability, costUsd: 0 }),
     });
-    expect(result.score).toBe(0);
-    expect(result.graderError).toContain('invalid probability or cost');
+    expect(result.score).toBeNull();
+    expect(result.graderError).toBe('Decider judge failed');
   });
 
   it.each([

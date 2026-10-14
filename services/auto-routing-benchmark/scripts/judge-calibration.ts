@@ -5,11 +5,15 @@ import { createDeciderJudge } from '../src/decider-judge';
 import { runDeciderCheck } from '../src/grading';
 
 const LabeledRowSchema = z.object({
-  userPrompt: z.string(), output: z.string(), rubric: z.string(),
-  reference: z.string().optional(), label: z.boolean(),
+  userPrompt: z.string(),
+  output: z.string(),
+  rubric: z.string(),
+  reference: z.string().optional(),
+  label: z.boolean(),
 });
 const MechanicalRowSchema = z.object({
-  userPrompt: z.string(), output: z.string(),
+  userPrompt: z.string(),
+  output: z.string(),
   check: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('exact'), value: z.string() }),
     z.object({ kind: z.literal('contains_all'), values: z.array(z.string()) }),
@@ -19,9 +23,12 @@ const MechanicalRowSchema = z.object({
 });
 
 async function main() {
-  const { values } = parseArgs({ options: {
-    in: { type: 'string' }, 'from-mechanical': { type: 'string' },
-  } });
+  const { values } = parseArgs({
+    options: {
+      in: { type: 'string' },
+      'from-mechanical': { type: 'string' },
+    },
+  });
   const input = values.in;
   const mechanical = values['from-mechanical'];
   if ((!input && !mechanical) || (input && mechanical)) {
@@ -32,29 +39,35 @@ async function main() {
   let rows: z.infer<typeof LabeledRowSchema>[];
   if (mechanical) {
     const source: unknown = JSON.parse(await readFile(mechanical, 'utf8'));
-    rows = z.array(MechanicalRowSchema).parse(source).map(({ userPrompt, output, check }) => {
-      let rubric: string;
-      switch (check.kind) {
-        case 'exact':
-          rubric = `The final answer equals ${JSON.stringify(check.value)} after removing markdown fences, trimming whitespace and ignoring case. Accept a matching last non-empty line even if preceded by prose.`;
-          break;
-        case 'json_equal':
-          rubric = `The final answer equals ${JSON.stringify(check.value)} as JSON, preserving array and object key order. Ignore surrounding prose and markdown fences.`;
-          break;
-        case 'contains_all':
-          rubric = `The final answer contains every string in ${JSON.stringify(check.values)}, ignoring case and markdown fences.`;
-          break;
-        case 'regex':
-          rubric = `The final answer matches the JavaScript regular expression ${JSON.stringify(check.pattern)} with flags ${JSON.stringify(check.flags ?? '')}.`;
-          break;
-      }
-      return { userPrompt, output, rubric, label: runDeciderCheck(check, output) };
-    });
+    rows = z
+      .array(MechanicalRowSchema)
+      .parse(source)
+      .map(({ userPrompt, output, check }) => {
+        let rubric: string;
+        switch (check.kind) {
+          case 'exact':
+            rubric = `The final answer equals ${JSON.stringify(check.value)} after removing markdown fences, trimming whitespace and ignoring case. Accept a matching last non-empty line even if preceded by prose.`;
+            break;
+          case 'json_equal':
+            rubric = `The final answer equals ${JSON.stringify(check.value)} as JSON, preserving array and object key order. Ignore surrounding prose and markdown fences.`;
+            break;
+          case 'contains_all':
+            rubric = `The final answer contains every string in ${JSON.stringify(check.values)}, ignoring case and markdown fences.`;
+            break;
+          case 'regex':
+            rubric = `The final answer matches the JavaScript regular expression ${JSON.stringify(check.pattern)} with flags ${JSON.stringify(check.flags ?? '')}.`;
+            break;
+        }
+        return { userPrompt, output, rubric, label: runDeciderCheck(check, output) };
+      });
   } else if (input) {
-    rows = (await readFile(input, 'utf8')).split('\n').filter(line => line.trim()).map(line => {
-      const row: unknown = JSON.parse(line);
-      return LabeledRowSchema.parse(row);
-    });
+    rows = (await readFile(input, 'utf8'))
+      .split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        const row: unknown = JSON.parse(line);
+        return LabeledRowSchema.parse(row);
+      });
   } else {
     throw new Error('Calibration input is required');
   }
@@ -66,7 +79,7 @@ async function main() {
   for (const row of rows) {
     const { probability } = await judge(row);
     const label = Number(row.label);
-    correct += Number((probability >= 0.5) === row.label);
+    correct += Number(probability >= 0.5 === row.label);
     squaredError += (probability - label) ** 2;
     const bin = bins[Math.min(4, Math.floor(probability * 5))];
     if (!bin) throw new Error('Invalid reliability bin');
@@ -80,11 +93,15 @@ async function main() {
   console.log('bin\tn\tmean probability\tpositive fraction');
   bins.forEach((bin, index) => {
     const range = `[${(index / 5).toFixed(1)},${((index + 1) / 5).toFixed(1)}${index === 4 ? ']' : ')'}`;
-    console.log(`${range}\t${bin.n}\t${bin.n ? (bin.probability / bin.n).toFixed(6) : '-'}\t${bin.n ? (bin.positives / bin.n).toFixed(6) : '-'}`);
+    console.log(
+      `${range}\t${bin.n}\t${bin.n ? (bin.probability / bin.n).toFixed(6) : '-'}\t${bin.n ? (bin.positives / bin.n).toFixed(6) : '-'}`
+    );
   });
 }
 
 main().catch(() => {
-  console.error('Judge calibration failed. Check input schema, arguments, API key availability and System One connectivity.');
+  console.error(
+    'Judge calibration failed. Check input schema, arguments, API key availability and System One connectivity.'
+  );
   process.exitCode = 1;
 });

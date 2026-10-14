@@ -187,6 +187,23 @@ export const caseResults = sqliteTable(
   ]
 );
 
+export const pendingDeciderOutputs = sqliteTable(
+  'pending_decider_outputs',
+  {
+    run_id: text('run_id')
+      .notNull()
+      .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    case_id: text('case_id').notNull(),
+    rep: integer('rep').notNull(),
+    payload: text('payload').notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.run_id, table.model, table.variant, table.case_id, table.rep] }),
+  ]
+);
+
 export const routingTables = sqliteTable('routing_tables', {
   run_id: text('run_id').primaryKey(),
   published_at: text('published_at').notNull(),

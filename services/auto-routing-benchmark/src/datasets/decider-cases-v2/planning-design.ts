@@ -332,7 +332,10 @@ export const PLANNING_DESIGN_V2_CASES: readonly DeciderCase[] = [
     systemPrompt: SYS_SYS,
     userPrompt:
       'Plan the architecture boundary for extracting Report into an independently deployable component. Choose the smallest module bundle closed over all required imports; do not add unrelated dependents. Proposed dependencies: Report imports Query and Schema; Query imports Cache and Schema; Cache imports Clock; Schema imports Validation; Clock and Validation import nothing. Admin imports Report but Report does not import Admin. No imports may be rewritten in this phase, so every direct or transitive dependency must move with Report. Return only the planned bundle as a JSON array of module names sorted alphabetically, including Report itself.',
-    check: { kind: 'json_equal', value: ['Cache', 'Clock', 'Query', 'Report', 'Schema', 'Validation'] },
+    check: {
+      kind: 'json_equal',
+      value: ['Cache', 'Clock', 'Query', 'Report', 'Schema', 'Validation'],
+    },
   },
   {
     id: 'plan-arch-v2-transitive-change-blast-radius',

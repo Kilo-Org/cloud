@@ -24,7 +24,18 @@ Run the feature on this fixture. Return only the final balance as a JSON number.
     subtaskType: 'feature_development',
     systemPrompt: CODE_SYS,
     userPrompt: `Implement interval normalization. Intervals are half-open [start,end). Discard empty intervals, sort by start then end, and merge transitively overlapping intervals, but DO NOT merge intervals that merely touch. Output intervals in increasing start order. Run it on [[8,10],[1,3],[3,5],[2,4],[10,11],[7,9],[-4,-1],[-2,0],[0,1],[12,12],[15,19],[17,21],[21,22],[14,16],[1,2]]. Return only the JSON array of normalized intervals.`,
-    check: { kind: 'json_equal', value: [[-4, 0], [0, 1], [1, 5], [7, 10], [10, 11], [14, 21], [21, 22]] },
+    check: {
+      kind: 'json_equal',
+      value: [
+        [-4, 0],
+        [0, 1],
+        [1, 5],
+        [7, 10],
+        [10, 11],
+        [14, 21],
+        [21, 22],
+      ],
+    },
   },
   {
     id: 'impl-feat-v2-versioned-tombstones',
@@ -34,7 +45,13 @@ Run the feature on this fixture. Return only the final balance as a JSON number.
     userPrompt: `Implement a versioned key/value reducer. A row replaces the stored row for its key when its version is greater OR equal; equal versions therefore use the last row in input order. x:null is a tombstone that participates in version comparisons and must not appear in the output. Zero is a live value. Input rows use [key,version,x]:
 [["a",2,7],["b",1,8],["a",1,9],["b",3,null],["a",2,11],["c",0,0]]
 Return only a JSON array of [key,x] for live keys, sorted lexicographically by key.`,
-    check: { kind: 'json_equal', value: [['a', 11], ['c', 0]] },
+    check: {
+      kind: 'json_equal',
+      value: [
+        ['a', 11],
+        ['c', 0],
+      ],
+    },
   },
   {
     id: 'impl-feat-v2-expiry-boundary',
@@ -90,7 +107,13 @@ Decode the JSON string first, then parse its contents. Return only the JSON arra
     subtaskType: 'feature_development',
     systemPrompt: CODE_SYS,
     userPrompt: `Implement event-time sessionization. Sort all timestamps numerically before processing. Consecutive sorted events belong to the same session when their gap is at most five; the threshold is measured from the immediately preceding event, not session start. Count every event. Input: [12,0,5,16,9,30,35,34]. Return only a JSON array of [firstTimestamp,lastTimestamp,eventCount], ordered by session start.`,
-    check: { kind: 'json_equal', value: [[0, 16, 5], [30, 35, 3]] },
+    check: {
+      kind: 'json_equal',
+      value: [
+        [0, 16, 5],
+        [30, 35, 3],
+      ],
+    },
   },
   {
     id: 'impl-feat-v2-detached-ring-snapshots',
@@ -130,7 +153,13 @@ a=1&a=2&x=a+b&x=a%2Bb&empty=&flag&bad=%252F
 Return only the JSON array of [key,valuesArray], with keys sorted lexicographically.`,
     check: {
       kind: 'json_equal',
-      value: [['a', ['1', '2']], ['bad', ['%2F']], ['empty', ['']], ['flag', ['']], ['x', ['a b', 'a+b']]],
+      value: [
+        ['a', ['1', '2']],
+        ['bad', ['%2F']],
+        ['empty', ['']],
+        ['flag', ['']],
+        ['x', ['a b', 'a+b']],
+      ],
     },
   },
   {
@@ -153,7 +182,16 @@ Return only the resulting JSON object. Use top-level keys a,b,c in that order, k
     userPrompt: `Implement per-key deduplication with a four-unit window. Accept a key's first event. Later accept it only when time minus the time of its LAST ACCEPTED event is at least four. Rejected events do not advance that timestamp. Process these [time,key] pairs in their given order:
 [[0,"a"],[2,"a"],[3,"b"],[4,"a"],[5,"a"],[7,"b"],[8,"a"],[9,"b"]]
 Return only the JSON array of accepted pairs.`,
-    check: { kind: 'json_equal', value: [[0, 'a'], [3, 'b'], [4, 'a'], [7, 'b'], [8, 'a']] },
+    check: {
+      kind: 'json_equal',
+      value: [
+        [0, 'a'],
+        [3, 'b'],
+        [4, 'a'],
+        [7, 'b'],
+        [8, 'a'],
+      ],
+    },
   },
   {
     id: 'impl-feat-v2-shortest-path-ties',
@@ -199,7 +237,12 @@ Find a path from a to e with minimum total cost. Break equal-cost ties by lexico
 Return only the JSON array of rows, including the header, with each row an array of strings.`,
     check: {
       kind: 'json_equal',
-      value: [['name', 'note'], ['Ada', 'a,b'], ['Bob', 'He said "ok"'], ['Eve', 'two\nlines']],
+      value: [
+        ['name', 'note'],
+        ['Ada', 'a,b'],
+        ['Bob', 'He said "ok"'],
+        ['Eve', 'two\nlines'],
+      ],
     },
   },
   {
@@ -216,7 +259,10 @@ Return only the JSON array of rows, including the header, with each row an array
     subtaskType: 'code_generation',
     systemPrompt: CODE_SYS,
     userPrompt: `Generate unsigned LEB128 byte fixtures for [0,127,128,255,16384,624485]. Emit least-significant seven-bit groups first, set bit 7 on every byte except the last, and encode zero as one zero byte. Return only a JSON array of arrays of decimal byte values, in input order.`,
-    check: { kind: 'json_equal', value: [[0], [127], [128, 1], [255, 1], [128, 128, 1], [229, 142, 38]] },
+    check: {
+      kind: 'json_equal',
+      value: [[0], [127], [128, 1], [255, 1], [128, 128, 1], [229, 142, 38]],
+    },
   },
   {
     id: 'impl-gen-v2-delta-zigzag',
@@ -234,7 +280,16 @@ Return only the JSON array of rows, including the header, with each row an array
     userPrompt: `Generate every balanced-parenthesis string with exactly four pairs and maximum nesting depth at most two. No prefix may have more closing than opening parentheses. Return only the JSON array of distinct strings in lexicographic order, with '(' ordered before ')'.`,
     check: {
       kind: 'json_equal',
-      value: ['(()()())', '(()())()', '(())(())', '(())()()', '()(()())', '()(())()', '()()(())', '()()()()'],
+      value: [
+        '(()()())',
+        '(()())()',
+        '(())(())',
+        '(())()()',
+        '()(()())',
+        '()(())()',
+        '()()(())',
+        '()()()()',
+      ],
     },
   },
   {
@@ -269,7 +324,18 @@ Return only the JSON array of rows, including the header, with each row an array
     userPrompt: `Generate every six-character binary string with exactly three ones, with no substring "111", and with its first and last characters DIFFERENT. Preserve leading zeroes. Return only the JSON array in lexicographic order.`,
     check: {
       kind: 'json_equal',
-      value: ['001011', '001101', '010011', '010101', '011001', '100110', '101010', '101100', '110010', '110100'],
+      value: [
+        '001011',
+        '001101',
+        '010011',
+        '010101',
+        '011001',
+        '100110',
+        '101010',
+        '101100',
+        '110010',
+        '110100',
+      ],
     },
   },
   {
@@ -280,7 +346,10 @@ Return only the JSON array of rows, including the header, with each row an array
     userPrompt: String.raw`Generate literal-regex source fixtures for the strings represented by this JSON array:
 ["a.b","x+y","[z]","a\\b","^$","(a|b)?"]
 For each string prefix EACH regex metacharacter in the set . * + ? ^ $ { } ( ) | [ ] and backslash with one backslash. Do not add anchors or regex delimiters. Return only the JSON array of regex SOURCE strings in input order, correctly JSON-escaped.`,
-    check: { kind: 'json_equal', value: ['a\\.b', 'x\\+y', '\\[z\\]', 'a\\\\b', '\\^\\$', '\\(a\\|b\\)\\?'] },
+    check: {
+      kind: 'json_equal',
+      value: ['a\\.b', 'x\\+y', '\\[z\\]', 'a\\\\b', '\\^\\$', '\\(a\\|b\\)\\?'],
+    },
   },
   {
     id: 'impl-gen-v2-rectangular-spiral',
@@ -298,7 +367,14 @@ For each string prefix EACH regex metacharacter in the set . * + ? ^ $ { } ( ) |
     userPrompt: `Generate canonical binary prefix codes for symbol lengths [["A",2],["B",3],["C",3],["D",3],["E",4],["F",4]]. Sort by length then symbol. The first code is zero padded to its length. For each subsequent symbol increment the previous code numerically, then left-shift by the increase in length, and zero-pad to its new length. Return only the JSON array of [symbol,bitString] in canonical assignment order.`,
     check: {
       kind: 'json_equal',
-      value: [['A', '00'], ['B', '010'], ['C', '011'], ['D', '100'], ['E', '1010'], ['F', '1011']],
+      value: [
+        ['A', '00'],
+        ['B', '010'],
+        ['C', '011'],
+        ['D', '100'],
+        ['E', '1010'],
+        ['F', '1011'],
+      ],
     },
   },
   {
@@ -339,7 +415,16 @@ For each string prefix EACH regex metacharacter in the set . * + ? ^ $ { } ( ) |
     subtaskType: 'code_generation',
     systemPrompt: CODE_SYS,
     userPrompt: `Generate a sweep-line fixture for half-open intervals [[0,4],[2,6],[4,7],[6,8]]. Partition at EVERY distinct endpoint, including endpoints where the count does not change. For each elementary segment between consecutive endpoints emit [start,end,numberOfActiveIntervals]. Return only the JSON array sorted by start.`,
-    check: { kind: 'json_equal', value: [[0, 2, 1], [2, 4, 2], [4, 6, 2], [6, 7, 2], [7, 8, 1]] },
+    check: {
+      kind: 'json_equal',
+      value: [
+        [0, 2, 1],
+        [2, 4, 2],
+        [4, 6, 2],
+        [6, 7, 2],
+        [7, 8, 1],
+      ],
+    },
   },
   {
     id: 'impl-gen-v2-midnight-anchored-schedule',
@@ -355,7 +440,17 @@ For each string prefix EACH regex metacharacter in the set . * + ? ^ $ { } ( ) |
     subtaskType: 'code_generation',
     systemPrompt: CODE_SYS,
     userPrompt: `Generate signed 16-bit two's-complement big-endian byte fixtures for [-32768,-257,-1,0,255,32767]. Return only the JSON array of [highByte,lowByte] arrays using unsigned decimal byte values in input order.`,
-    check: { kind: 'json_equal', value: [[128, 0], [254, 255], [255, 255], [0, 0], [0, 255], [127, 255]] },
+    check: {
+      kind: 'json_equal',
+      value: [
+        [128, 0],
+        [254, 255],
+        [255, 255],
+        [0, 0],
+        [0, 255],
+        [127, 255],
+      ],
+    },
   },
   {
     id: 'impl-gen-v2-json-pointer-patch-fixture',
@@ -518,7 +613,8 @@ const mutants = [
     taskType: 'implementation',
     subtaskType: 'test_creation',
     systemPrompt: CODE_SYS,
-    userPrompt: mutationTestPrompt(`const inputs = [[0,2,2,4], [0,4,1,2], [0,2,1,3], [0,0,0,1], [1,3,0,2]];
+    userPrompt:
+      mutationTestPrompt(`const inputs = [[0,2,2,4], [0,4,1,2], [0,2,1,3], [0,0,0,1], [1,3,0,2]];
 const reference = ([a,b,c,d]) => Math.max(a,c) < Math.min(b,d);
 const mutants = [
   ([a,b,c,d]) => Math.max(a,c) <= Math.min(b,d),
@@ -532,7 +628,8 @@ const mutants = [
     taskType: 'implementation',
     subtaskType: 'test_creation',
     systemPrompt: CODE_SYS,
-    userPrompt: mutationTestPrompt(String.raw`const inputs = ["a", "é", "🙂", "e\u0301", "👩\u200d💻"];
+    userPrompt:
+      mutationTestPrompt(String.raw`const inputs = ["a", "é", "🙂", "e\u0301", "👩\u200d💻"];
 const reference = s => [...s].length;
 const mutants = [
   s => s.length,
@@ -620,7 +717,13 @@ async function run() {
 }
 const result = await run();
 assert.deepEqual(result, EXPECTED);`,
-    check: { kind: 'json_equal', value: { trace: ['start', 'sync', 'resume', 'queued', 'then:4', 'finally', 'end:5'], value: 5 } },
+    check: {
+      kind: 'json_equal',
+      value: {
+        trace: ['start', 'sync', 'resume', 'queued', 'then:4', 'finally', 'end:5'],
+        value: 5,
+      },
+    },
   },
   {
     id: 'impl-test-v2-sparse-map-mutation-assertion',
@@ -641,7 +744,18 @@ const mapped = xs.map((n,i,a) => {
 });
 const actual = JSON.parse(JSON.stringify({seen,mapped,source:xs}));
 assert.deepEqual(actual, EXPECTED);`,
-    check: { kind: 'json_equal', value: { seen: [[0, 1], [1, 2], [3, 4]], mapped: [10, 20, null, 40], source: [1, 2, null, 4, 5] } },
+    check: {
+      kind: 'json_equal',
+      value: {
+        seen: [
+          [0, 1],
+          [1, 2],
+          [3, 4],
+        ],
+        mapped: [10, 20, null, 40],
+        source: [1, 2, null, 4, 5],
+      },
+    },
   },
   {
     id: 'impl-test-v2-json-hook-order-assertion',
@@ -669,7 +783,13 @@ const text = JSON.stringify(obj, (key,value) => {
     typeof value === "number" ? value * 10 : value;
 });
 assert.deepEqual({calls,text}, EXPECTED);`,
-    check: { kind: 'json_equal', value: { calls: ['key:', 'key:a', 'get:b', 'key:b', 'toJSON:c', 'key:c', 'key:x', 'key:y'], text: '{"a":10,"b":20,"c":{"y":40}}' } },
+    check: {
+      kind: 'json_equal',
+      value: {
+        calls: ['key:', 'key:a', 'get:b', 'key:b', 'toJSON:c', 'key:c', 'key:x', 'key:y'],
+        text: '{"a":10,"b":20,"c":{"y":40}}',
+      },
+    },
   },
   {
     id: 'impl-test-v2-sticky-regex-assertion',
@@ -691,7 +811,16 @@ for (const [text,pos] of [
   steps.push([m ? m[0] : null, re.lastIndex]);
 }
 assert.deepEqual(steps, EXPECTED);`,
-    check: { kind: 'json_equal', value: [['aa', 2], [null, 0], ['a', 4], [null, 0], ['aa', 2]] },
+    check: {
+      kind: 'json_equal',
+      value: [
+        ['aa', 2],
+        [null, 0],
+        ['a', 4],
+        [null, 0],
+        ['aa', 2],
+      ],
+    },
   },
   {
     id: 'impl-test-v2-property-enumeration-assertion',
@@ -720,7 +849,15 @@ const actual = {
   hasInherited: Object.hasOwn(obj,"inherited")
 };
 assert.deepEqual(actual, EXPECTED);`,
-    check: { kind: 'json_equal', value: { own: ['2', '10', 'b', 'a'], all: ['2', '10', 'b', 'a', 'inherited'], hasHidden: true, hasInherited: false } },
+    check: {
+      kind: 'json_equal',
+      value: {
+        own: ['2', '10', 'b', 'a'],
+        all: ['2', '10', 'b', 'a', 'inherited'],
+        hasHidden: true,
+        hasInherited: false,
+      },
+    },
   },
   {
     id: 'impl-test-v2-stable-secondary-sort-assertion',
@@ -743,7 +880,10 @@ const selected = rows
   .map(x => x.id);
 const actual = {order:rows.map(x => x.id), selected};
 assert.deepEqual(actual, EXPECTED);`,
-    check: { kind: 'json_equal', value: { order: ['s', 'q', 'p', 'r', 't'], selected: ['s', 'p'] } },
+    check: {
+      kind: 'json_equal',
+      value: { order: ['s', 'q', 'p', 'r', 't'], selected: ['s', 'p'] },
+    },
   },
   {
     id: 'impl-test-v2-rejected-single-flight-assertion',
@@ -780,7 +920,16 @@ const actual = {
   calls
 };
 assert.deepEqual(actual, EXPECTED);`,
-    check: { kind: 'json_equal', value: { sameFirst: true, statuses: ['rejected', 'rejected'], sameSecond: true, second: ['x:2', 'x:2'], calls: 2 } },
+    check: {
+      kind: 'json_equal',
+      value: {
+        sameFirst: true,
+        statuses: ['rejected', 'rejected'],
+        sameSecond: true,
+        second: ['x:2', 'x:2'],
+        calls: 2,
+      },
+    },
   },
   {
     id: 'impl-test-v2-generator-return-finally-assertion',
@@ -817,6 +966,18 @@ const values = [
 ];
 const actual = JSON.parse(JSON.stringify({values,trace}));
 assert.deepEqual(actual, EXPECTED);`,
-    check: { kind: 'json_equal', value: { values: [{ value: 'start', done: false }, { value: 'a', done: false }, { value: 'cleanup', done: false }, { value: 'end', done: false }, { done: true }], trace: ['inner-finally', 'outer-finally'] } },
+    check: {
+      kind: 'json_equal',
+      value: {
+        values: [
+          { value: 'start', done: false },
+          { value: 'a', done: false },
+          { value: 'cleanup', done: false },
+          { value: 'end', done: false },
+          { done: true },
+        ],
+        trace: ['inner-finally', 'outer-finally'],
+      },
+    },
   },
 ];

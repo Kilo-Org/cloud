@@ -14,6 +14,7 @@ let mockSessionId: string | null = 'ses_b';
 let mockAtParam: string | null = null;
 let mockWorktreeId: string | null = null;
 let mockChatInput: Record<string, unknown> | null = null;
+let mockChatHeader: ComponentProps<typeof ChatHeader> | null = null;
 let mockWorkspaceTabs: ComponentProps<typeof CloudAgentWorkspaceTabs> | null = null;
 let mockAtomValues: Record<string, unknown>;
 const mockSetAtom = jest.fn();
@@ -138,7 +139,10 @@ jest.mock('./older-messages-scroll', () => ({
 }));
 jest.mock('./MobileSidebarToggle', () => ({ MobileSidebarToggle: () => null }));
 jest.mock('./ChatHeader', () => ({
-  ChatHeader: (_props: ComponentProps<typeof ChatHeader>) => null,
+  ChatHeader: (props: ComponentProps<typeof ChatHeader>) => {
+    mockChatHeader = props;
+    return null;
+  },
 }));
 jest.mock('./WorktreeChanges', () => ({ WorktreeChangesView: () => null }));
 jest.mock('./WorktreeFilePane', () => ({ WorktreeFilePane: () => null }));
@@ -299,6 +303,7 @@ describe('CloudChatPage route-aware transcript phase', () => {
     mockAtParam = null;
     mockWorktreeId = null;
     mockChatInput = null;
+    mockChatHeader = null;
     mockWorkspaceTabs = null;
     mockResizeObserve.mockClear();
     mockResizeDisconnect.mockClear();
@@ -370,19 +375,57 @@ describe('CloudChatPage route-aware transcript phase', () => {
     expect(mockChatInput?.placeholder).toBe('Loading session…');
   });
 
-  it('shows the assigned branch below the composer while the sandbox is preparing', () => {
+  it.each([null, { type: 'preparing' }, { type: 'error', message: 'Preparation failed' }])(
+    'shows the assigned branch only in the footer before preparation completes (%j)',
+    cloudStatus => {
+      mockAtomValues.fetchedSessionData = {
+        kiloSessionId: 'ses_b',
+        organizationId: null,
+        gitBranch: 'kilo/assigned-before-preparation',
+        gitUrl: 'https://github.com/Kilo-Org/cloud.git',
+        isPreparingAsync: true,
+      };
+      mockAtomValues.cloudStatus = cloudStatus;
+      mockAtomValues.isLoading = false;
+
+      render();
+
+      const footer = dom.container.querySelector('[data-composer]')?.nextElementSibling;
+      expect(footer?.textContent).toBe('kilo/assigned-before-preparation');
+      expect(mockChatHeader).toMatchObject({
+        branch: undefined,
+        gitUrl: 'https://github.com/Kilo-Org/cloud.git',
+      });
+    }
+  );
+
+  it.each([
+    { isPreparingAsync: true, cloudStatus: { type: 'ready' } },
+    { isPreparingAsync: false, cloudStatus: null },
+    {
+      isPreparingAsync: true,
+      cloudStatus: { type: 'finalizing' },
+      preparationAttempts: [{ status: 'completed', steps: [] }],
+    },
+    {
+      isPreparingAsync: true,
+      cloudStatus: null,
+      preparationAttempts: [{ status: 'completed', steps: [] }],
+    },
+  ])('passes the branch to the header after preparation completes (%j)', state => {
     mockAtomValues.fetchedSessionData = {
       kiloSessionId: 'ses_b',
       organizationId: null,
-      gitBranch: 'kilo/assigned-before-preparation',
+      gitBranch: 'kilo/prepared-branch',
+      isPreparingAsync: state.isPreparingAsync,
     };
-    mockAtomValues.cloudStatus = { type: 'preparing' };
+    mockAtomValues.cloudStatus = state.cloudStatus;
+    mockAtomValues.preparationAttempts = state.preparationAttempts ?? [];
     mockAtomValues.isLoading = false;
 
     render();
 
-    expect(dom.container.textContent).toContain('kilo/assigned-before-preparation');
-    expect(dom.container.textContent).not.toContain('Assigning branch');
+    expect(mockChatHeader?.branch).toBe('kilo/prepared-branch');
   });
 
   it('does not render a placeholder when branch metadata is missing', () => {
@@ -396,7 +439,9 @@ describe('CloudChatPage route-aware transcript phase', () => {
 
     render();
 
-    expect(dom.container.textContent).not.toContain('Assigning branch');
+    const composer = dom.container.querySelector('[data-composer]');
+    expect(composer).not.toBeNull();
+    expect(composer?.nextElementSibling).toBeNull();
   });
 
   it('shows cached rows before metadata without allowing submission or resuming an anchor', () => {

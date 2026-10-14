@@ -1701,7 +1701,11 @@ export default function CloudChatPage({
       branch={
         workspaceControlSession
           ? (workspaceControlSession.branch ?? undefined)
-          : (sessionBranch ?? undefined)
+          : fetchedSessionData?.isPreparingAsync &&
+              cloudStatus?.type !== 'ready' &&
+              !preparationAttempts.some(attempt => attempt.status === 'completed')
+            ? undefined
+            : (sessionBranch ?? undefined)
       }
       gitUrl={workspaceControlSession ? undefined : fetchedSessionData?.gitUrl}
       model={workspaceControlSession?.model ?? sessionConfig?.model}

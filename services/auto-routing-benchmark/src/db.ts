@@ -1,4 +1,5 @@
 import type {
+  AutoRouter,
   BenchmarkKind,
   BenchmarkModelSummary,
   BenchmarkProfileStatus,
@@ -11,9 +12,9 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { PoolEntry } from '@kilocode/auto-routing-contracts';
-import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
+import { BENCHMARK_CONTAINER_BUDGET, BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, count, desc, eq, gt, inArray, lt, ne, notInArray, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, lt, ne, notInArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import * as z from 'zod';
 import {
@@ -42,8 +43,12 @@ import {
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
 export type RunModelRow = typeof runModels.$inferSelect;
-export type ConfigDeciderModelRow = typeof configDeciderModels.$inferSelect;
-export type ConfigAutoDeciderModelRow = typeof configAutoDeciderModels.$inferSelect;
+export type ConfigDeciderModelRow = Omit<typeof configDeciderModels.$inferSelect, 'router'> & {
+  router?: AutoRouter;
+};
+export type ConfigAutoDeciderModelRow = Omit<typeof configAutoDeciderModels.$inferSelect, 'router'> & {
+  router?: AutoRouter;
+};
 type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 
 // D1 rejects statements with too many bound variables. A model summary insert
@@ -113,6 +118,7 @@ export function mapSummaryRowWithRun(row: ModelSummaryRow): BenchmarkModelSummar
 export function mapRunRow(row: RunRow, summaries: BenchmarkModelSummary[]): BenchmarkRun {
   return {
     id: row.id,
+    router: row.router ?? 'efficient',
     kind: row.kind,
     purpose: row.purpose === 'user' ? 'user' : 'platform',
     status: row.status,
@@ -123,7 +129,7 @@ export function mapRunRow(row: RunRow, summaries: BenchmarkModelSummary[]): Benc
   };
 }
 
-export async function getConfigRows(db: D1Database): Promise<{
+export async function getConfigRows(db: D1Database, router: AutoRouter = 'efficient'): Promise<{
   config: typeof benchmarkConfig.$inferSelect | null;
   classifierModels: string[];
   deciderModels: ConfigDeciderModelRow[];
@@ -133,11 +139,11 @@ export async function getConfigRows(db: D1Database): Promise<{
   const orm = drizzle(db);
   const [configRows, classifierRows, deciderRows, autoDeciderRows, exclusionRows] =
     await Promise.all([
-      orm.select().from(benchmarkConfig).where(eq(benchmarkConfig.id, 1)).limit(1),
-      orm.select().from(configClassifierModels),
-      orm.select().from(configDeciderModels),
-      orm.select().from(configAutoDeciderModels),
-      orm.select().from(configAutoDeciderExclusions),
+      orm.select().from(benchmarkConfig).where(eq(benchmarkConfig.router, router)).limit(1),
+      orm.select().from(configClassifierModels).where(eq(configClassifierModels.router, router)),
+      orm.select().from(configDeciderModels).where(eq(configDeciderModels.router, router)),
+      orm.select().from(configAutoDeciderModels).where(eq(configAutoDeciderModels.router, router)),
+      orm.select().from(configAutoDeciderExclusions).where(eq(configAutoDeciderExclusions.router, router)),
     ]);
   return {
     config: configRows[0] ?? null,
@@ -152,6 +158,8 @@ export async function replaceConfig(
   db: D1Database,
   config: {
     min_accuracy: number;
+    accuracy_noise_band?: number;
+    frontier_min_accuracy_delta?: number;
     switch_cost_factor: number;
     best_accuracy_switch_threshold: number;
     production_token_profile?: ProductionTokenProfile | null;
@@ -171,43 +179,45 @@ export async function replaceConfig(
   },
   classifierModels: string[],
   deciderModels: ConfigDeciderModelRow[],
-  excludedAutoDeciderModels: string[] = []
+  excludedAutoDeciderModels: string[] = [],
+  router: AutoRouter = 'efficient'
 ): Promise<void> {
   const orm = drizzle(db);
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
     orm
       .insert(benchmarkConfig)
-      .values({ id: 1, ...config })
+      .values({ id: router === 'efficient' ? 1 : 2, ...config, router })
       .onConflictDoUpdate({
-        target: benchmarkConfig.id,
+        target: benchmarkConfig.router,
         set: config,
       }),
-    orm.delete(configClassifierModels),
-    orm.delete(configDeciderModels),
-    orm.delete(configAutoDeciderExclusions),
+    orm.delete(configClassifierModels).where(eq(configClassifierModels.router, router)),
+    orm.delete(configDeciderModels).where(eq(configDeciderModels.router, router)),
+    orm.delete(configAutoDeciderExclusions).where(eq(configAutoDeciderExclusions.router, router)),
   ];
   for (const batch of batchRows(classifierModels)) {
-    stmts.push(orm.insert(configClassifierModels).values(batch.map(m => ({ model: m }))));
+    stmts.push(orm.insert(configClassifierModels).values(batch.map(m => ({ model: m, router }))));
   }
   for (const batch of batchRows(deciderModels)) {
-    stmts.push(orm.insert(configDeciderModels).values(batch));
+    stmts.push(orm.insert(configDeciderModels).values(batch.map(row => ({ ...row, router }))));
   }
   for (const batch of batchRows(excludedAutoDeciderModels)) {
-    stmts.push(orm.insert(configAutoDeciderExclusions).values(batch.map(model => ({ model }))));
+    stmts.push(orm.insert(configAutoDeciderExclusions).values(batch.map(model => ({ model, router }))));
   }
   await orm.batch(stmts);
 }
 
 export async function replaceAutoDeciderModels(
   db: D1Database,
-  autoDeciderModels: ConfigAutoDeciderModelRow[]
+  autoDeciderModels: ConfigAutoDeciderModelRow[],
+  router: AutoRouter = 'efficient'
 ): Promise<void> {
   const orm = drizzle(db);
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
-    orm.delete(configAutoDeciderModels),
+    orm.delete(configAutoDeciderModels).where(eq(configAutoDeciderModels.router, router)),
   ];
   for (const batch of batchRows(autoDeciderModels)) {
-    stmts.push(orm.insert(configAutoDeciderModels).values(batch));
+    stmts.push(orm.insert(configAutoDeciderModels).values(batch.map(row => ({ ...row, router }))));
   }
   await orm.batch(stmts);
 }
@@ -219,6 +229,9 @@ export async function insertRun(
   db: D1Database,
   run: {
     id: string;
+    router?: AutoRouter;
+    accuracy_noise_band?: number;
+    frontier_min_accuracy_delta?: number;
     kind: BenchmarkKind;
     startedAt: string;
     min_accuracy: number;
@@ -238,13 +251,24 @@ export async function insertRun(
   const orm = drizzle(db);
   const insertRunStmt = orm.insert(benchmarkRuns).values({
     id: run.id,
+    router: run.router ?? 'efficient',
+    accuracy_noise_band: run.accuracy_noise_band ?? 0.05,
+    frontier_min_accuracy_delta: run.frontier_min_accuracy_delta ?? 0,
     kind: run.kind,
     status: 'running',
     started_at: run.startedAt,
     min_accuracy: run.min_accuracy,
     switch_cost_factor: run.switch_cost_factor,
     best_accuracy_switch_threshold: run.best_accuracy_switch_threshold,
-    max_concurrency: run.max_concurrency,
+    // A NOT NULL rejection rolls back the whole D1 batch, including model snapshots.
+    max_concurrency: run.kind === 'decider'
+      ? sql`CASE WHEN (
+          SELECT COALESCE(SUM(${benchmarkRuns.max_concurrency}), 0)
+          FROM ${benchmarkRuns}
+          WHERE ${benchmarkRuns.kind} = 'decider' AND ${benchmarkRuns.status} = 'running'
+        ) + ${run.max_concurrency} <= ${BENCHMARK_CONTAINER_BUDGET}
+        THEN ${run.max_concurrency} ELSE NULL END`
+      : run.max_concurrency,
     benchmark_user_id: run.benchmark_user_id,
     benchmark_org_id: run.benchmark_org_id,
     repetitions: run.repetitions,
@@ -514,7 +538,7 @@ export async function listRuns(
   // Classifier, platform-decider and profile-decider runs interleave in one
   // table and profile runs are by far the most frequent, so the admin list
   // filters server-side instead of slicing a mixed page client-side.
-  filter: { kind?: BenchmarkKind; purpose?: BenchmarkRunPurpose } = {}
+  filter: { router?: AutoRouter; kind?: BenchmarkKind; purpose?: BenchmarkRunPurpose } = {}
 ): Promise<BenchmarkRun[]> {
   const orm = drizzle(db);
   const runRows = await orm
@@ -522,6 +546,7 @@ export async function listRuns(
     .from(benchmarkRuns)
     .where(
       and(
+        eq(benchmarkRuns.router, filter.router ?? 'efficient'),
         filter.kind ? eq(benchmarkRuns.kind, filter.kind) : undefined,
         filter.purpose ? eq(benchmarkRuns.purpose, filter.purpose) : undefined
       )
@@ -588,13 +613,15 @@ export async function markStaleRunsFailed(db: D1Database, olderThanIso: string):
 export async function getRunningRun(
   db: D1Database,
   kind: BenchmarkKind,
-  purpose: BenchmarkRunPurpose
+  purpose: BenchmarkRunPurpose,
+  router: AutoRouter = 'efficient'
 ): Promise<RunRow | undefined> {
   return drizzle(db)
     .select()
     .from(benchmarkRuns)
     .where(
       and(
+        eq(benchmarkRuns.router, router),
         eq(benchmarkRuns.kind, kind),
         eq(benchmarkRuns.purpose, purpose),
         eq(benchmarkRuns.status, 'running')
@@ -614,13 +641,15 @@ export async function existsNewerCompletedRun(
   db: D1Database,
   kind: BenchmarkKind,
   startedAt: string,
-  runId: string
+  runId: string,
+  router: AutoRouter = 'efficient'
 ): Promise<boolean> {
   const newer = await drizzle(db)
     .select({ id: benchmarkRuns.id })
     .from(benchmarkRuns)
     .where(
       and(
+        eq(benchmarkRuns.router, kind === 'classifier' ? 'efficient' : router),
         eq(benchmarkRuns.kind, kind),
         eq(benchmarkRuns.purpose, 'platform'),
         eq(benchmarkRuns.status, 'completed'),
@@ -654,7 +683,7 @@ export async function markProfilesRunningForRun(
   db: D1Database,
   runId: string,
   entries: readonly PoolEntry[],
-  current: { engineIdentity: string; repetitions: number },
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
   nowIso: string = new Date().toISOString()
 ): Promise<PoolEntry[]> {
   if (entries.length === 0) return [];
@@ -677,6 +706,7 @@ export async function markProfilesRunningForRun(
         and(
           eq(benchmarkProfiles.model, entry.model),
           eq(benchmarkProfiles.variant, variantToStorage(entry.variant)),
+          eq(benchmarkProfiles.router, current.router ?? 'efficient'),
           eq(benchmarkProfiles.engine_identity, current.engineIdentity),
           eq(benchmarkProfiles.repetitions, current.repetitions),
           or(
@@ -889,7 +919,7 @@ export async function listLaneFailures(
  */
 export async function listPendingCurrentProfiles(
   db: D1Database,
-  current: { engineIdentity: string; repetitions: number },
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
   queue: BenchmarkRunPurpose
 ): Promise<Array<{ model: string; variant: string; requested_at: string }>> {
   return drizzle(db)
@@ -902,6 +932,7 @@ export async function listPendingCurrentProfiles(
     .where(
       and(
         eq(benchmarkProfiles.status, 'pending'),
+        eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
         queue === 'platform'
@@ -919,7 +950,7 @@ export async function listPendingCurrentProfiles(
 /** Registry row counts per status for one queue's current-engine rows. */
 export async function countCurrentProfilesByStatus(
   db: D1Database,
-  current: { engineIdentity: string; repetitions: number },
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
   queue: BenchmarkRunPurpose
 ): Promise<Array<{ status: BenchmarkProfileStatus; count: number }>> {
   const rows = await drizzle(db)
@@ -927,6 +958,7 @@ export async function countCurrentProfilesByStatus(
     .from(benchmarkProfiles)
     .where(
       and(
+        eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
         queue === 'platform'
@@ -941,7 +973,7 @@ export async function countCurrentProfilesByStatus(
 /** Exact platform-pair coverage for the currently measured engine and repetitions. */
 export async function listCurrentPlatformProfileStatuses(
   db: D1Database,
-  current: { engineIdentity: string; repetitions: number }
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number }
 ): Promise<Array<{ model: string; variant: string | null; status: BenchmarkProfileStatus }>> {
   const rows = await drizzle(db)
     .select({
@@ -952,6 +984,7 @@ export async function listCurrentPlatformProfileStatuses(
     .from(benchmarkProfiles)
     .where(
       and(
+        eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
         eq(benchmarkProfiles.platform_requested, true)
@@ -968,7 +1001,7 @@ export async function listCurrentPlatformProfileStatuses(
  */
 export async function requeueFailedCurrentProfiles(
   db: D1Database,
-  current: { engineIdentity: string; repetitions: number },
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
   queue: BenchmarkRunPurpose | 'both',
   nowIso: string = new Date().toISOString()
 ): Promise<number> {
@@ -994,6 +1027,7 @@ export async function requeueFailedCurrentProfiles(
     .where(
       and(
         eq(benchmarkProfiles.status, 'failed'),
+        eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
         queueFilter
@@ -1011,7 +1045,7 @@ export async function requeueFailedCurrentProfiles(
  */
 export async function syncPlatformRegistryRows(
   db: D1Database,
-  current: { engineIdentity: string; repetitions: number },
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
   desired: readonly { model: string; variant: string | null }[],
   nowIso: string = new Date().toISOString()
 ): Promise<void> {
@@ -1039,7 +1073,7 @@ export async function syncPlatformRegistryRows(
 export function claimPlatformRequestedStatement(
   orm: ReturnType<typeof drizzle>,
   entry: { model: string; variant: string | null },
-  current: { engineIdentity: string; repetitions: number },
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
   nowIso: string
 ) {
   return (
@@ -1047,6 +1081,7 @@ export function claimPlatformRequestedStatement(
       .insert(benchmarkProfiles)
       .values({
         model: entry.model,
+        router: current.router ?? 'efficient',
         variant: variantToStorage(entry.variant),
         engine_identity: current.engineIdentity,
         repetitions: current.repetitions,
@@ -1064,6 +1099,7 @@ export function claimPlatformRequestedStatement(
       // someone requeues it.
       .onConflictDoUpdate({
         target: [
+          benchmarkProfiles.router,
           benchmarkProfiles.model,
           benchmarkProfiles.variant,
           benchmarkProfiles.engine_identity,
@@ -1088,13 +1124,14 @@ export function claimPlatformRequestedStatement(
  */
 export function clearPlatformRequestedStatement(
   orm: ReturnType<typeof drizzle>,
-  current: { engineIdentity: string; repetitions: number }
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number }
 ) {
   return orm
     .update(benchmarkProfiles)
     .set({ platform_requested: false })
     .where(
       and(
+        eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
         eq(benchmarkProfiles.platform_requested, true)
@@ -1107,7 +1144,7 @@ export function clearPlatformRequestedStatement(
  */
 export async function listReadyCurrentProfilesForEntries(
   db: D1Database,
-  current: { engineIdentity: string; repetitions: number },
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
   entries: readonly PoolEntry[]
 ): Promise<Array<{ model: string; variant: string; run_id: string | null }>> {
   if (entries.length === 0) return [];
@@ -1129,6 +1166,7 @@ export async function listReadyCurrentProfilesForEntries(
           and(
             inArray(benchmarkProfiles.model, models.slice(i, i + PROFILE_ENTRY_FILTER_BATCH_SIZE)),
             eq(benchmarkProfiles.status, 'ready'),
+            eq(benchmarkProfiles.router, current.router ?? 'efficient'),
             eq(benchmarkProfiles.engine_identity, current.engineIdentity),
             eq(benchmarkProfiles.repetitions, current.repetitions)
           )
@@ -1289,7 +1327,8 @@ export function exactPairKey(model: string, variant: string | null | undefined):
 // included that pair (mixing routes across runs would pair incomparable numbers).
 export async function getLatestSummariesByModel(
   db: D1Database,
-  kind: BenchmarkKind
+  kind: BenchmarkKind,
+  router: AutoRouter = 'efficient'
 ): Promise<Map<string, PriorModelResult>> {
   const results = await drizzle(db)
     .select({
@@ -1321,7 +1360,7 @@ export async function getLatestSummariesByModel(
         eq(runModels.variant, modelSummaries.variant)
       )
     )
-    .where(and(eq(benchmarkRuns.kind, kind), eq(benchmarkRuns.status, 'completed')))
+    .where(and(eq(benchmarkRuns.router, router), eq(benchmarkRuns.kind, kind), eq(benchmarkRuns.status, 'completed')))
     .orderBy(desc(benchmarkRuns.started_at));
 
   const latestRunByPair = new Map<string, string>();
@@ -1357,10 +1396,12 @@ type RoutingTableCandidateRow = typeof routingTableCandidates.$inferSelect;
 
 export function routingTableToRows(
   table: RoutingTable,
-  publishedAt: string
+  publishedAt: string,
+  router: AutoRouter = 'efficient'
 ): { tableRow: RoutingTableRow; candidateRows: RoutingTableCandidateRow[] } {
   const tableRow: RoutingTableRow = {
     run_id: table.version,
+    router,
     published_at: publishedAt,
     generated_at: table.generatedAt,
     min_accuracy: table.minAccuracy,
@@ -1455,10 +1496,11 @@ export function rowsToRoutingTable(
 export async function saveRoutingTable(
   db: D1Database,
   table: RoutingTable,
-  publishedAt: string
+  publishedAt: string,
+  router: AutoRouter = 'efficient'
 ): Promise<void> {
   const orm = drizzle(db);
-  const { tableRow, candidateRows } = routingTableToRows(table, publishedAt);
+  const { tableRow, candidateRows } = routingTableToRows(table, publishedAt, router);
 
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
     orm.delete(routingTableCandidates).where(eq(routingTableCandidates.run_id, table.version)),
@@ -1493,12 +1535,14 @@ export async function saveRoutingTable(
 }
 
 export async function getLatestRoutingTable(
-  db: D1Database
+  db: D1Database,
+  router: AutoRouter = 'efficient'
 ): Promise<{ table: RoutingTable; publishedAt: string } | null> {
   const orm = drizzle(db);
   const tableRow = await orm
     .select()
     .from(routingTables)
+    .where(eq(routingTables.router, router))
     .orderBy(desc(routingTables.published_at))
     .limit(1)
     .get();

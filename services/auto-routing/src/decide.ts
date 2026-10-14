@@ -1,6 +1,7 @@
 import {
   ClassifierOutputSchema,
   MirrorPayloadSchema,
+  DEFAULT_AUTO_ROUTER,
   poolEntryKey,
   taxonomyRouteKey,
   type AutoRoutingDecision,
@@ -41,7 +42,11 @@ import { fetchCustomRoutingTable } from './benchmark-origin';
 import { getRoutingTable } from './routing-table';
 import { getEffectiveAutoRoutingSettings } from './routing-mode';
 import type { HonoEnv } from './hono-env';
-import { codingPlanDefaultDecision, getCodingPlanPreference } from './coding-plan-preference';
+import {
+  codingPlanDefaultDecision,
+  getCodingPlanPreference,
+  type CodingPlanPreference,
+} from './coding-plan-preference';
 import { getModelCapabilities } from './model-capabilities';
 import type { ModelCapabilitiesMap } from './model-capabilities';
 import { recordClassifierUsage, type ClassifierCallKind } from './classifier-usage';
@@ -322,6 +327,7 @@ function recordDecision(
       hashLoose: ctx.hashes.loose,
       reqSeq: ctx.reqSeq,
       colo: ctx.colo,
+      router: ctx.payload.router ?? DEFAULT_AUTO_ROUTER,
       classifierDurationMs: Math.round(durationMs),
       classifierCostCredits: summary.cost,
       messageCount: ctx.payload.input.messageCount,
@@ -376,6 +382,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   }
 
   const payload = parsed.data;
+  const router = payload.router ?? DEFAULT_AUTO_ROUTER;
   const startedAt = performance.now();
   const timings: DecisionTimings = {
     codingPlanMs: 0,
@@ -389,7 +396,10 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   };
   const deniedModelIds = new Set(payload.routingPolicy?.deniedModelIds ?? []);
   const codingPlanStartedAt = performance.now();
-  const codingPlanPreference = await getCodingPlanPreference(c.env, payload.userId);
+  const codingPlanPreference: CodingPlanPreference =
+    router === 'efficient'
+      ? await getCodingPlanPreference(c.env, payload.userId)
+      : { active: false };
   timings.codingPlanMs = performance.now() - codingPlanStartedAt;
   const codingPlanActive =
     codingPlanPreference.active && !deniedModelIds.has(codingPlanPreference.modelId);
@@ -423,7 +433,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       organizationId: payload.organizationId,
     });
     timings.settingsMs = performance.now() - settingsStartedAt;
-    const configuredPool = effectiveSettings.pool;
+    const configuredPool = router === 'efficient' ? effectiveSettings.pool : null;
     let capabilities: ModelCapabilitiesMap = new Map();
     if (hasConstraints || configuredPool !== null) {
       const capabilitiesStartedAt = performance.now();
@@ -447,7 +457,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     const routingTable = codingPlanEligible
       ? null
       : await (configuredPool === null
-          ? getRoutingTable(c.env)
+          ? getRoutingTable(c.env, router)
           : loadCustomRoutingTable(c.env, configuredPool));
     if (!codingPlanEligible) timings.tableMs = performance.now() - tableStartedAt;
     return {
@@ -529,7 +539,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       c.env,
       ctx.conversationKey,
       hashes.exact,
-      classifierModel
+      classifierModel,
+      router
     );
     timings.cacheReadMs = performance.now() - cacheReadStartedAt;
     if (cached) {
@@ -629,7 +640,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
               ctx.conversationKey,
               ctx.hashes.exact,
               classifier.classifierModel,
-              classifier.classification
+              classifier.classification,
+              router
             ),
             decision
               ? putStickyDecision(
@@ -638,7 +650,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
                   decision.model,
                   decisionVariant(decision),
                   taxonomyRouteKey(classifier.classification),
-                  generation
+                  generation,
+                  router
                 )
               : Promise.resolve(),
           ]);
@@ -681,7 +694,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
           decision.model,
           decisionVariant(decision),
           taxonomyRouteKey(cached),
-          generation
+          generation,
+          router
         )
       );
     }
@@ -708,7 +722,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         ctx.conversationKey,
         ctx.hashes.exact,
         classifier.classifierModel,
-        classifier.classification
+        classifier.classification,
+        router
       )
     );
     const decision = computeDecision(
@@ -727,7 +742,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
           decision.model,
           decisionVariant(decision),
           taxonomyRouteKey(classifier.classification),
-          generation
+          generation,
+          router
         )
       );
     }

@@ -1,8 +1,10 @@
 import type {
+  AutoRouter,
   BenchmarkConfig,
   BenchmarkPlatformModel,
   ProductionTokenProfile,
 } from '@kilocode/auto-routing-contracts';
+import { BENCHMARK_CONTAINER_BUDGET } from '@kilocode/auto-routing-contracts';
 import {
   getConfigRows,
   replaceConfig,
@@ -24,6 +26,9 @@ export function toDeciderModelRows(models: BenchmarkPlatformModel[]): ConfigDeci
 // one, and runs cannot start until a config exists.
 export function mapConfigRows(
   configRow: {
+    router?: AutoRouter;
+    accuracy_noise_band?: number;
+    frontier_min_accuracy_delta?: number;
     min_accuracy: number;
     switch_cost_factor: number;
     best_accuracy_switch_threshold: number;
@@ -65,6 +70,9 @@ export function mapConfigRows(
   }
 
   return {
+    router: configRow.router ?? 'efficient',
+    accuracyNoiseBand: configRow.accuracy_noise_band ?? 0.05,
+    frontierMinAccuracyDelta: configRow.frontier_min_accuracy_delta ?? 0,
     classifierModels,
     deciderModels,
     manualDeciderModels,
@@ -90,9 +98,32 @@ export function mapConfigRows(
   };
 }
 
-export async function getBenchmarkConfig(db: D1Database): Promise<BenchmarkConfig | null> {
+export class BenchmarkConcurrencyBudgetError extends Error {
+  constructor() {
+    super(`Efficient platform + owner and frontier platform concurrency must total at most ${BENCHMARK_CONTAINER_BUDGET}`);
+    this.name = 'BenchmarkConcurrencyBudgetError';
+  }
+}
+
+export async function validateBenchmarkConcurrencyBudget(
+  db: D1Database,
+  config: BenchmarkConfig
+): Promise<void> {
+  const otherRouter = config.router === 'frontier' ? 'efficient' : 'frontier';
+  const other = await getBenchmarkConfig(db, otherRouter);
+  const efficient = config.router === 'efficient' ? config : other;
+  const frontier = config.router === 'frontier' ? config : other;
+  const total = (efficient ? efficient.maxConcurrency + efficient.userMaxConcurrency : 0) +
+    (frontier?.maxConcurrency ?? 0);
+  if (total > BENCHMARK_CONTAINER_BUDGET) throw new BenchmarkConcurrencyBudgetError();
+}
+
+export async function getBenchmarkConfig(
+  db: D1Database,
+  router: AutoRouter = 'efficient'
+): Promise<BenchmarkConfig | null> {
   const { config, classifierModels, deciderModels, autoDeciderModels, excludedAutoDeciderModels } =
-    await getConfigRows(db);
+    await getConfigRows(db, router);
   return mapConfigRows(
     config,
     classifierModels,
@@ -107,6 +138,7 @@ export async function saveBenchmarkConfig(
   config: BenchmarkConfig,
   updatedBy: string | null
 ): Promise<BenchmarkConfig> {
+  await validateBenchmarkConcurrencyBudget(db, config);
   const updatedAt = new Date().toISOString();
   const stamped: BenchmarkConfig = { ...config, updatedAt, updatedBy };
 
@@ -117,6 +149,8 @@ export async function saveBenchmarkConfig(
     db,
     {
       min_accuracy: config.minAccuracy,
+      accuracy_noise_band: config.accuracyNoiseBand,
+      frontier_min_accuracy_delta: config.frontierMinAccuracyDelta,
       switch_cost_factor: config.switchCostFactor,
       best_accuracy_switch_threshold: config.bestAccuracySwitchThreshold,
       production_token_profile: config.productionTokenProfile,
@@ -136,7 +170,8 @@ export async function saveBenchmarkConfig(
     },
     config.classifierModels,
     deciderModelRows,
-    config.excludedAutoDeciderModels ?? []
+    config.excludedAutoDeciderModels ?? [],
+    config.router
   );
 
   return stamped;

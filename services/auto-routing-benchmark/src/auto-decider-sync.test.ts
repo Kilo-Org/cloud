@@ -53,13 +53,16 @@ const env = {
 
 const config = {
   id: 1 as const,
+  router: 'efficient' as const,
+  accuracy_noise_band: 0.05,
+  frontier_min_accuracy_delta: 0,
   min_accuracy: 0.7,
   switch_cost_factor: 3,
   best_accuracy_switch_threshold: 0.05,
   production_token_profile: null,
   switch_horizon_turns: null,
   low_confidence_threshold: null,
-  max_concurrency: 100,
+  max_concurrency: 40,
   benchmark_user_id: 'user-123',
   benchmark_org_id: null,
   classifier_repetitions: 1,
@@ -67,7 +70,7 @@ const config = {
   classifier_max_p95_latency_ms: 1000,
   auto_decider_min_cost_usd: 12,
   auto_decider_max_cost_usd: 24,
-  user_max_concurrency: 100,
+  user_max_concurrency: 40,
   updated_at: '2026-06-01T00:00:00.000Z',
   updated_by: null,
 };
@@ -158,7 +161,7 @@ describe('syncAutoDeciderModels', () => {
     expect(replaceAutoDeciderModels).toHaveBeenCalledWith(env.BENCH_DB, [
       expect.objectContaining({ model: 'auto/existing', reasoning_effort: null }),
       expect.objectContaining({ model: 'auto/new', reasoning_effort: null }),
-    ]);
+    ], 'efficient');
     // Newly configured models enter the registry queue; nothing is measured
     // straight from the config list.
     expect(syncPlatformRegistryRows).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), [
@@ -178,6 +181,9 @@ describe('syncAutoDeciderModels', () => {
     vi.mocked(getRunningRun).mockResolvedValue({
       id: 'decider-active',
       kind: 'decider',
+      router: 'efficient',
+      accuracy_noise_band: 0.05,
+      frontier_min_accuracy_delta: 0,
       status: 'running',
       started_at: '2026-06-01T00:00:00.000Z',
       completed_at: null,
@@ -290,5 +296,28 @@ describe('syncAutoDeciderModels', () => {
     // The platform slot is taken, so only the user queue starts a run.
     expect(result.startedRuns.map(run => run.purpose)).toEqual(['user']);
     expect(vi.mocked(insertRun).mock.calls.map(call => call[1].purpose)).toEqual(['user']);
+  });
+
+  it('syncs frontier candidates and drains platform entries without owner work', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      config: { ...config, router: 'frontier' },
+      classifierModels: ['classifier/model'],
+      deciderModels: [],
+      autoDeciderModels: [],
+      excludedAutoDeciderModels: [],
+    });
+    await syncAutoDeciderModels(env, { fetchImpl, router: 'frontier' });
+    expect(getConfigRows).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
+    expect(replaceAutoDeciderModels).toHaveBeenCalledWith(
+      env.BENCH_DB, expect.any(Array), 'frontier'
+    );
+    expect(syncPlatformRegistryRows).toHaveBeenCalledWith(
+      env.BENCH_DB, expect.objectContaining({ router: 'frontier' }), expect.any(Array)
+    );
+    expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB, expect.objectContaining({ router: 'frontier' }), 'platform'
+    );
+    expect(vi.mocked(listPendingCurrentProfiles).mock.calls.every(call => call[2] === 'platform'))
+      .toBe(true);
   });
 });

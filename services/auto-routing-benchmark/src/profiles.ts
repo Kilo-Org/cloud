@@ -1,4 +1,5 @@
 import type {
+  AutoRouter,
   BenchmarkConfig,
   BenchmarkProfileEntryStatus,
   BenchmarkProfileQuotaError,
@@ -29,6 +30,7 @@ export type ProfileOwnerType = 'user' | 'org';
 export type ProfileRow = typeof benchmarkProfiles.$inferSelect;
 
 export type CurrentProfileContext = {
+  router?: AutoRouter;
   engineIdentity: string;
   repetitions: number;
 };
@@ -41,11 +43,12 @@ export type CurrentProfileContext = {
  * ready.
  */
 export function isCurrentBenchmarkProfile(
-  row: Pick<ProfileRow, 'model' | 'variant' | 'engine_identity' | 'repetitions'>,
+  row: Pick<ProfileRow, 'model' | 'variant' | 'engine_identity' | 'repetitions'> & { router?: AutoRouter },
   current: CurrentProfileContext,
   entry: PoolEntry
 ): boolean {
   return (
+    (row.router ?? 'efficient') === (current.router ?? 'efficient') &&
     row.model === entry.model &&
     row.variant === variantToStorage(entry.variant) &&
     row.engine_identity === current.engineIdentity &&
@@ -54,10 +57,11 @@ export function isCurrentBenchmarkProfile(
 }
 
 export function currentProfileContextFromConfig(
-  config: Pick<BenchmarkConfig, 'deciderRepetitions'>
+  config: Pick<BenchmarkConfig, 'deciderRepetitions'> & Partial<Pick<BenchmarkConfig, 'router'>>
 ): CurrentProfileContext {
   return {
-    engineIdentity: computeEngineIdentity('decider'),
+    router: config.router ?? 'efficient',
+    engineIdentity: computeEngineIdentity('decider', config.router ?? 'efficient'),
     repetitions: config.deciderRepetitions,
   };
 }
@@ -176,7 +180,7 @@ async function loadRowsForEntries(
   const rows = await orm
     .select()
     .from(benchmarkProfiles)
-    .where(inArray(benchmarkProfiles.model, models));
+    .where(and(eq(benchmarkProfiles.router, 'efficient'), inArray(benchmarkProfiles.model, models)));
   const wanted = new Set(entries.map(poolEntryKey));
   return rows.filter(row => wanted.has(entryKeyFromRow(row)));
 }
@@ -218,6 +222,7 @@ export function buildPendingUpsertValues(
   nowIso: string
 ): typeof benchmarkProfiles.$inferInsert {
   return {
+    router: current.router ?? 'efficient',
     model: entry.model,
     variant: variantToStorage(entry.variant),
     engine_identity: current.engineIdentity,
@@ -258,6 +263,7 @@ export function claimUserRequestedStatement(
     .set({ user_requested: true, updated_at: nowIso })
     .where(
       and(
+        eq(benchmarkProfiles.router, 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
         eq(benchmarkProfiles.user_requested, false),
@@ -274,6 +280,7 @@ export function claimUserRequestedStatement(
 }
 
 const PROFILE_PK_TARGET = [
+  benchmarkProfiles.router,
   benchmarkProfiles.model,
   benchmarkProfiles.variant,
   benchmarkProfiles.engine_identity,
@@ -368,6 +375,7 @@ export function chargedEventInsertStatement(
       WHERE NOT EXISTS (
         SELECT 1 FROM ${benchmarkProfiles}
         WHERE ${benchmarkProfiles.model} = ${values.model}
+          AND ${benchmarkProfiles.router} = 'efficient'
           AND ${benchmarkProfiles.variant} = ${values.variant}
           AND ${benchmarkProfiles.engine_identity} = ${values.engine_identity}
           AND ${benchmarkProfiles.repetitions} = ${values.repetitions}
@@ -408,9 +416,12 @@ export type RegisterProfilesInput = {
  */
 export async function registerProfiles(
   db: D1Database,
-  config: Pick<BenchmarkConfig, 'deciderRepetitions'>,
+  config: Pick<BenchmarkConfig, 'deciderRepetitions'> & Partial<Pick<BenchmarkConfig, 'router'>>,
   input: RegisterProfilesInput
 ): Promise<BenchmarkProfileStatusesResponse> {
+  if (config.router === 'frontier') {
+    throw new ProfileValidationError('Custom model pools are only supported by the efficient router');
+  }
   assertUniqueEntries(input.entries);
   const current = currentProfileContextFromConfig(config);
   const now = input.now ?? new Date();
@@ -549,9 +560,12 @@ export type LookupProfileStatusesInput = {
  */
 export async function lookupProfileStatuses(
   db: D1Database,
-  config: Pick<BenchmarkConfig, 'deciderRepetitions'>,
+  config: Pick<BenchmarkConfig, 'deciderRepetitions'> & Partial<Pick<BenchmarkConfig, 'router'>>,
   input: LookupProfileStatusesInput
 ): Promise<BenchmarkProfileStatusesResponse> {
+  if (config.router === 'frontier') {
+    throw new ProfileValidationError('Custom model pools are only supported by the efficient router');
+  }
   assertUniqueEntries(input.entries);
   const current = currentProfileContextFromConfig(config);
   const nowIso = (input.now ?? new Date()).toISOString();

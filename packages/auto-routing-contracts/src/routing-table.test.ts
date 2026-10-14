@@ -42,6 +42,17 @@ describe('wilsonLowerBound', () => {
 });
 
 describe('rankCandidates', () => {
+  it('uses the configured noise band without changing the value formula or strict threshold', () => {
+    const candidates = [
+      rankInput('threshold', 0.95, 1),
+      rankInput('cheap-near-threshold', 0.91, 0.000001),
+    ];
+    expect(order(rankCandidates(candidates, 0.95))).toEqual(['cheap-near-threshold', 'threshold']);
+    const strict = rankCandidates(candidates, 0.95, { accuracyNoiseBand: 0 });
+    expect(order(strict)).toEqual(['threshold', 'cheap-near-threshold']);
+    expect(strict.map(c => c.meetsThreshold)).toEqual([true, false]);
+  });
+
   it('prefers more measured cases when raw accuracy, latency and cost match', () => {
     const ranked = rankCandidates(
       [

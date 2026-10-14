@@ -10,6 +10,7 @@ import {
 } from 'drizzle-orm/sqlite-core';
 import { BENCHMARK_CONTAINER_BUDGET } from '@kilocode/auto-routing-contracts';
 import type {
+  AutoRouter,
   BenchmarkKind,
   CandidatePricing,
   ProductionTokenProfile,
@@ -23,7 +24,10 @@ import type {
 
 export const benchmarkConfig = sqliteTable('benchmark_config', {
   id: integer('id').primaryKey(),
+  router: text('router').$type<AutoRouter>().notNull().default('efficient').unique(),
   min_accuracy: real('min_accuracy').notNull(),
+  accuracy_noise_band: real('accuracy_noise_band').notNull().default(0.05),
+  frontier_min_accuracy_delta: real('frontier_min_accuracy_delta').notNull().default(0),
   switch_cost_factor: real('switch_cost_factor').notNull(),
   best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
   production_token_profile: text('production_token_profile', {
@@ -49,32 +53,52 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   updated_by: text('updated_by'),
 });
 
-export const configClassifierModels = sqliteTable('config_classifier_models', {
-  model: text('model').primaryKey(),
-});
+export const configClassifierModels = sqliteTable(
+  'config_classifier_models',
+  {
+    router: text('router').$type<AutoRouter>().notNull().default('efficient'),
+    model: text('model').notNull(),
+  },
+  table => [primaryKey({ columns: [table.router, table.model] })]
+);
 
-export const configDeciderModels = sqliteTable('config_decider_models', {
-  model: text('model').primaryKey(),
-  // Retained for rolling deploys; model-level config ignores and clears these columns.
-  variant: text('variant'),
-  reasoning_effort: text('reasoning_effort'),
-});
+export const configDeciderModels = sqliteTable(
+  'config_decider_models',
+  {
+    router: text('router').$type<AutoRouter>().notNull().default('efficient'),
+    model: text('model').notNull(),
+    variant: text('variant'),
+    reasoning_effort: text('reasoning_effort'),
+  },
+  table => [primaryKey({ columns: [table.router, table.model] })]
+);
 
-export const configAutoDeciderModels = sqliteTable('config_auto_decider_models', {
-  model: text('model').primaryKey(),
-  reasoning_effort: text('reasoning_effort'),
-  avg_attempt_cost_usd: real('avg_attempt_cost_usd').notNull(),
-  synced_at: text('synced_at').notNull(),
-});
+export const configAutoDeciderModels = sqliteTable(
+  'config_auto_decider_models',
+  {
+    router: text('router').$type<AutoRouter>().notNull().default('efficient'),
+    model: text('model').notNull(),
+    reasoning_effort: text('reasoning_effort'),
+    avg_attempt_cost_usd: real('avg_attempt_cost_usd').notNull(),
+    synced_at: text('synced_at').notNull(),
+  },
+  table => [primaryKey({ columns: [table.router, table.model] })]
+);
 
-export const configAutoDeciderExclusions = sqliteTable('config_auto_decider_exclusions', {
-  model: text('model').primaryKey(),
-});
+export const configAutoDeciderExclusions = sqliteTable(
+  'config_auto_decider_exclusions',
+  {
+    router: text('router').$type<AutoRouter>().notNull().default('efficient'),
+    model: text('model').notNull(),
+  },
+  table => [primaryKey({ columns: [table.router, table.model] })]
+);
 
 export const benchmarkRuns = sqliteTable(
   'benchmark_runs',
   {
     id: text('id').primaryKey(),
+    router: text('router').$type<AutoRouter>().notNull().default('efficient'),
     kind: text('kind').$type<BenchmarkKind>().notNull(),
     status: text('status').$type<BenchmarkRunStatus>().notNull(),
     started_at: text('started_at').notNull(),
@@ -82,6 +106,8 @@ export const benchmarkRuns = sqliteTable(
     error: text('error'),
     // Config snapshot taken at startRun time so mid-run edits can't skew results.
     min_accuracy: real('min_accuracy').notNull(),
+    accuracy_noise_band: real('accuracy_noise_band').notNull().default(0.05),
+    frontier_min_accuracy_delta: real('frontier_min_accuracy_delta').notNull().default(0),
     switch_cost_factor: real('switch_cost_factor').notNull(),
     best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
     max_concurrency: integer('max_concurrency').notNull(),
@@ -100,12 +126,8 @@ export const benchmarkRuns = sqliteTable(
     purpose: text('purpose').$type<BenchmarkRunPurpose>().notNull().default('platform'),
   },
   table => [
-    // At most one running run per (kind, purpose) — the atomic backstop for the
-    // server-side admission rule (concurrent POSTs / multiple tabs that slip
-    // past the pre-check still can't both claim). The platform and user queues
-    // hold independent slots, so a user drain never blocks a platform run.
-    uniqueIndex('UQ_benchmark_runs_one_running_per_kind_purpose')
-      .on(table.kind, table.purpose)
+    uniqueIndex('UQ_benchmark_runs_one_running_per_router_kind_purpose')
+      .on(table.router, table.kind, table.purpose)
       .where(sql`${table.status} = 'running'`),
   ]
 );
@@ -206,6 +228,7 @@ export const pendingDeciderOutputs = sqliteTable(
 
 export const routingTables = sqliteTable('routing_tables', {
   run_id: text('run_id').primaryKey(),
+  router: text('router').$type<AutoRouter>().notNull().default('efficient'),
   published_at: text('published_at').notNull(),
   generated_at: text('generated_at').notNull(),
   min_accuracy: real('min_accuracy').notNull(),
@@ -252,6 +275,7 @@ export const benchmarkProfiles = sqliteTable(
   'benchmark_profiles',
   {
     model: text('model').notNull(),
+    router: text('router').$type<AutoRouter>().notNull().default('efficient'),
     // Canonical variant key at the D1 boundary. '' means null/default variant.
     variant: text('variant').notNull().default(''),
     engine_identity: text('engine_identity').notNull(),
@@ -274,7 +298,7 @@ export const benchmarkProfiles = sqliteTable(
   },
   table => [
     primaryKey({
-      columns: [table.model, table.variant, table.engine_identity, table.repetitions],
+      columns: [table.router, table.model, table.variant, table.engine_identity, table.repetitions],
     }),
   ]
 );

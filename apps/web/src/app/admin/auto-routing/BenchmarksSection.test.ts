@@ -26,6 +26,26 @@ const baseConfig: BenchmarkConfig = {
 };
 
 describe('platform model selection', () => {
+  it('defaults to efficient and preserves router-specific accuracy settings', () => {
+    expect(formStateToConfig(configToFormState(null), null)).toMatchObject({
+      router: 'efficient',
+      accuracyNoiseBand: 0.05,
+      frontierMinAccuracyDelta: 0,
+    });
+    const config: BenchmarkConfig = {
+      ...baseConfig,
+      router: 'frontier',
+      accuracyNoiseBand: 0.02,
+      frontierMinAccuracyDelta: 0.1,
+    };
+    expect(formStateToConfig(configToFormState(config), config)).toMatchObject({
+      router: 'frontier',
+      accuracyNoiseBand: 0.02,
+      frontierMinAccuracyDelta: 0.1,
+      minAccuracy: config.minAccuracy,
+    });
+  });
+
   it('preserves the configured confidence threshold when saving unrelated form changes', () => {
     const config = { ...baseConfig, lowConfidenceThreshold: 0.8 };
     const state = configToFormState(config);

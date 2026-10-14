@@ -2,6 +2,8 @@ import {
   AUTO_DECIDER_DEFAULT_MAX_COST_USD,
   AUTO_DECIDER_DEFAULT_MIN_COST_USD,
   AutoBenchmarkDeciderCandidatesResponseSchema,
+  DEFAULT_AUTO_ROUTER,
+  type AutoRouter,
   type BenchmarkPlatformModel,
 } from '@kilocode/auto-routing-contracts';
 import { mapConfigRows } from './config';
@@ -15,6 +17,7 @@ import {
 } from './run';
 
 type SyncOptions = {
+  router?: AutoRouter;
   fetchImpl?: typeof fetch;
   now?: Date;
 };
@@ -73,11 +76,12 @@ export async function syncAutoDeciderModels(
   options: SyncOptions = {}
 ): Promise<AutoDeciderSyncResult> {
   const fetchImpl = options.fetchImpl ?? fetch;
+  const router = options.router ?? DEFAULT_AUTO_ROUTER;
   const syncedAt = (options.now ?? new Date()).toISOString();
 
   await sweepStaleRuns(env);
 
-  const beforeRows = await getConfigRows(env.BENCH_DB);
+  const beforeRows = await getConfigRows(env.BENCH_DB, router);
   const beforeConfig = mapConfigRows(
     beforeRows.config,
     beforeRows.classifierModels,
@@ -98,7 +102,7 @@ export async function syncAutoDeciderModels(
     synced_at: syncedAt,
   }));
 
-  await replaceAutoDeciderModels(env.BENCH_DB, nextAutoRows);
+  await replaceAutoDeciderModels(env.BENCH_DB, nextAutoRows, router);
 
   const afterConfig = mapConfigRows(
     beforeRows.config,
@@ -109,19 +113,15 @@ export async function syncAutoDeciderModels(
   );
   const diff = diffModels(beforeConfig?.deciderModels ?? [], afterConfig?.deciderModels ?? []);
 
-  // Reconcile the platform queue with the (possibly changed) decider list, then
-  // drain both queues. Models that already have a ready registry row — measured
-  // for an owner pool or by an earlier run — are reused, never re-benchmarked.
-  const { desiredEntries } = await syncPlatformRegistry(env, fetchImpl);
-  const startedRuns = await drainQueues(env, 'both');
+  const { desiredEntries } = await syncPlatformRegistry(env, fetchImpl, router);
+  const startedRuns = await drainQueues(env, router === 'frontier' ? 'platform' : 'both', undefined, router);
 
-  // Republish from the registry: a removed model must leave the live table even
-  // when no new measurement was needed.
-  const published = await publishPlatformRoutingTable(env, fetchImpl).catch(error => {
+  const published = await publishPlatformRoutingTable(env, fetchImpl, router).catch(error => {
     console.warn(
       JSON.stringify({
         event: 'routing_table_publish_skipped',
         afterAutoDeciderSync: true,
+        router,
         error: error instanceof Error ? error.message : String(error),
       })
     );

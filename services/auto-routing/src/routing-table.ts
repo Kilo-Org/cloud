@@ -1,8 +1,10 @@
 import { formatError, ttlCached } from '@kilocode/worker-utils';
 import {
-  ROUTING_TABLE_KV_KEY,
+  DEFAULT_AUTO_ROUTER,
+  routingTableKvKey,
   RoutingTableSchema,
   type RoutingTable,
+  type AutoRouter,
 } from '@kilocode/auto-routing-contracts';
 import { kvReadThrough } from './kv-read-through';
 import { fetchRoutingTableFromOrigin } from './benchmark-origin';
@@ -14,12 +16,13 @@ type RoutingTableEnv = Pick<
   'AUTO_ROUTING_CONFIG' | 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'
 >;
 
-const routingTableCache = ttlCached(ROUTING_TABLE_CACHE_TTL_MS, async (env: RoutingTableEnv) => {
+function createRoutingTableCache(router: AutoRouter) {
+  return ttlCached(ROUTING_TABLE_CACHE_TTL_MS, async (env: RoutingTableEnv) => {
   const table = await kvReadThrough({
     kv: env.AUTO_ROUTING_CONFIG,
-    key: ROUTING_TABLE_KV_KEY,
+    key: routingTableKvKey(router),
     ttlSeconds: 3600,
-    fetchOrigin: () => fetchRoutingTableFromOrigin(env),
+    fetchOrigin: () => fetchRoutingTableFromOrigin(env, router),
     parse: raw => {
       try {
         const parsed = RoutingTableSchema.safeParse(JSON.parse(raw));
@@ -42,17 +45,24 @@ const routingTableCache = ttlCached(ROUTING_TABLE_CACHE_TTL_MS, async (env: Rout
     },
   });
   return table;
-});
-
-export function clearRoutingTableCache(): void {
-  routingTableCache.clear();
+  });
 }
 
-// Null when no benchmark-published table exists (or it cannot be read):
-// /decide then makes no decision and the gateway falls back to its static
-// balanced defaults.
-export function getRoutingTable(env: RoutingTableEnv): Promise<RoutingTable | null> {
-  return routingTableCache.get(env).catch((error: unknown) => {
+const routingTableCaches = {
+  efficient: createRoutingTableCache('efficient'),
+  frontier: createRoutingTableCache('frontier'),
+};
+
+export function clearRoutingTableCache(): void {
+  for (const cache of Object.values(routingTableCaches)) cache.clear();
+}
+
+export function getRoutingTable(
+  env: RoutingTableEnv,
+  router: AutoRouter = DEFAULT_AUTO_ROUTER
+): Promise<RoutingTable | null> {
+  const cache = routingTableCaches[router];
+  return cache.get(env).catch((error: unknown) => {
     console.warn(
       JSON.stringify({ event: 'auto_routing_table_read_failed', ...formatError(error) })
     );

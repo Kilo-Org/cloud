@@ -41,7 +41,7 @@ export async function assembleCustomRoutingTable(
     Partial<
       Pick<
         BenchmarkConfig,
-        'productionTokenProfile' | 'switchHorizonTurns' | 'lowConfidenceThreshold'
+        'router' | 'accuracyNoiseBand' | 'productionTokenProfile' | 'switchHorizonTurns' | 'lowConfidenceThreshold'
       >
     >,
   entries: readonly PoolEntry[],
@@ -51,6 +51,9 @@ export async function assembleCustomRoutingTable(
     fetchImpl?: typeof fetch;
   } = {}
 ): Promise<CustomRoutingTableResponse> {
+  if (config.router === 'frontier') {
+    throw new ProfileValidationError('Custom model pools are only supported by the efficient router');
+  }
   assertUniqueEntries(entries);
   const current = currentProfileContextFromConfig(config);
   const readyRows = await listReadyCurrentProfilesForEntries(db, current, entries);
@@ -83,6 +86,7 @@ export async function assembleCustomRoutingTable(
   const table: CustomRoutingTable | null = buildCustomRoutingTable({
     generatedAt,
     minAccuracy: config.minAccuracy,
+    accuracyNoiseBand: config.accuracyNoiseBand,
     switchCostFactor: config.switchCostFactor,
     bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
     productionTokenProfile: config.productionTokenProfile ?? null,

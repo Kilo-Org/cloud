@@ -49,6 +49,24 @@ function summariesForEveryRoute(
 }
 
 describe('production-cost table version', () => {
+  it('isolates router, dataset identity and ranking configuration in the version hash', () => {
+    const contributors = [{ runId: 'run', model: 'model', variant: 'high' }];
+    const knobs = { minAccuracy: 0.9, switchCostFactor: 3, bestAccuracySwitchThreshold: 0.05 };
+    const efficient = computeRegistryRoutingTableVersion(contributors, knobs);
+    expect(computeRegistryRoutingTableVersion(contributors, {
+      ...knobs, router: 'efficient', accuracyNoiseBand: 0.05, frontierMinAccuracyDelta: 0,
+    })).toBe(efficient);
+    for (const changed of [
+      { router: 'frontier' as const },
+      { engineIdentity: 'frontier:v1:dataset' },
+      { accuracyNoiseBand: 0.01 },
+      { frontierMinAccuracyDelta: 0.1 },
+    ]) {
+      expect(computeRegistryRoutingTableVersion(contributors, { ...knobs, ...changed }))
+        .not.toBe(efficient);
+    }
+  });
+
   it('republishes when the profile, horizon or model prices change', () => {
     const contributors = [{ runId: 'synthetic-run', model: 'synthetic/model', variant: null }];
     const knobs = { minAccuracy: 0.9, switchCostFactor: 3, bestAccuracySwitchThreshold: 0.05 };

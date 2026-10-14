@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { ReasoningEffortSchema } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
+import { DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 
 /** Maximum Pool entries in an owner-configured Efficient model pool. */
 export const MAX_POOL_ENTRIES = 10;
@@ -166,6 +167,11 @@ export const CustomRoutingTableSchema = z.object({
 export type CustomRoutingTable = z.infer<typeof CustomRoutingTableSchema>;
 
 export const ROUTING_TABLE_KV_KEY = 'routing_table_v1';
+export const FRONTIER_ROUTING_TABLE_KV_KEY = 'routing_table_frontier_v1';
+
+export function routingTableKvKey(router: AutoRouter = DEFAULT_AUTO_ROUTER): string {
+  return router === 'frontier' ? FRONTIER_ROUTING_TABLE_KV_KEY : ROUTING_TABLE_KV_KEY;
+}
 
 // Candidates within this raw-accuracy margin of minAccuracy compete on value.
 const ACCURACY_NOISE_BAND = 0.05;
@@ -209,9 +215,9 @@ function rankValue(c: {
 export function rankCandidates(
   candidates: ReadonlyArray<RankInput>,
   minAccuracy: number,
-  options?: { profile?: ProductionTokenProfile | null }
+  options?: { profile?: ProductionTokenProfile | null; accuracyNoiseBand?: number }
 ): RankedCandidate[] {
-  const floor = minAccuracy - ACCURACY_NOISE_BAND;
+  const floor = minAccuracy - (options?.accuracyNoiseBand ?? ACCURACY_NOISE_BAND);
   return candidates
     .map(({ p50LatencyMs, ...c }) => {
       const estimatedRequestCostUsd = estimateRequestCostUsd(c, options?.profile ?? null);

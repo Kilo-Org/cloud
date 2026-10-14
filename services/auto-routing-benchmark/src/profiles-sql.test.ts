@@ -16,6 +16,7 @@ import {
 
 const SCHEMA_SQL = `
   CREATE TABLE benchmark_profiles (
+    router TEXT NOT NULL DEFAULT 'efficient',
     model TEXT NOT NULL,
     variant TEXT NOT NULL DEFAULT '',
     engine_identity TEXT NOT NULL,
@@ -28,7 +29,7 @@ const SCHEMA_SQL = `
     completed_at TEXT,
     platform_requested INTEGER NOT NULL DEFAULT 0,
     user_requested INTEGER NOT NULL DEFAULT 1,
-    PRIMARY KEY (model, variant, engine_identity, repetitions)
+    PRIMARY KEY (router, model, variant, engine_identity, repetitions)
   );
   CREATE TABLE profile_request_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

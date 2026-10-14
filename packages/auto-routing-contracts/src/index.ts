@@ -3,6 +3,7 @@ import { BenchmarkProfileEntryStatusSchema } from './benchmark';
 import { NormalizedClassifierInputSchema } from './input';
 import { ReasoningEffortSchema } from './reasoning';
 import { EfficientModelPoolSchema, PoolEntrySchema, poolEntryKey } from './routing-table';
+import { AutoRouterSchema } from './router';
 import {
   ClassifierSubtaskTypeSchema,
   ClassifierTaskTypeSchema,
@@ -15,6 +16,8 @@ export {
   type JsonValue,
   type NormalizedClassifierInput,
 } from './input';
+
+export { AUTO_ROUTERS, AutoRouterSchema, DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 
 export const AutoRoutingModeSchema = z.enum(['cost_per_accuracy', 'best_accuracy']);
 export type AutoRoutingMode = z.infer<typeof AutoRoutingModeSchema>;
@@ -43,6 +46,7 @@ export function isVirtualAutoModelId(model: string): boolean {
 // leaves it, and skips the mirror entirely when normalization fails.
 export const MirrorPayloadSchema = z.object({
   input: NormalizedClassifierInputSchema,
+  router: AutoRouterSchema.optional(),
   routingPolicy: z
     .object({
       deniedModelIds: z.array(z.string().trim().min(1)),

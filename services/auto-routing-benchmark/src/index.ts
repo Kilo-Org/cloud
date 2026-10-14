@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { AUTO_ROUTERS } from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
@@ -33,28 +34,44 @@ app.onError(createErrorHandler());
 export default {
   fetch: app.fetch,
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
-    // Each queue holds its own slot and container budget, so the frequent tick
-    // starts pending registry work without waiting for the platform cadence.
-    if (controller.cron !== PLATFORM_SYNC_CRON) {
-      const result = await sweepStaleRunsAndDrain(env);
-      console.log(
-        JSON.stringify({
-          event: 'benchmark_queue_drain_tick_completed',
-          cron: controller.cron,
-          staleRunIds: result.staleRunIds,
-          drained: result.drained,
-        })
-      );
-      return;
+    const errors: unknown[] = [];
+    for (const router of AUTO_ROUTERS) {
+      try {
+        if (controller.cron !== PLATFORM_SYNC_CRON) {
+          const result = await sweepStaleRunsAndDrain(env, router);
+          console.log(
+            JSON.stringify({
+              event: 'benchmark_queue_drain_tick_completed',
+              cron: controller.cron,
+              router,
+              staleRunIds: result.staleRunIds,
+              drained: result.drained,
+            })
+          );
+        } else {
+          const result = await syncAutoDeciderModels(env, { router });
+          console.log(
+            JSON.stringify({
+              event: 'auto_decider_model_sync_completed',
+              cron: controller.cron,
+              router,
+              ...result,
+            })
+          );
+        }
+      } catch (error) {
+        errors.push(error);
+        console.error(
+          JSON.stringify({
+            event: 'benchmark_scheduled_router_failed',
+            cron: controller.cron,
+            router,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        );
+      }
     }
-    const result = await syncAutoDeciderModels(env);
-    console.log(
-      JSON.stringify({
-        event: 'auto_decider_model_sync_completed',
-        cron: controller.cron,
-        ...result,
-      })
-    );
+    if (errors.length > 0) throw new AggregateError(errors, 'Benchmark scheduled routers failed');
   },
   async queue(batch: MessageBatch<BenchmarkJobMessage>, env: Env): Promise<void> {
     // Dead-lettered messages: record the lane death and try to finalize the

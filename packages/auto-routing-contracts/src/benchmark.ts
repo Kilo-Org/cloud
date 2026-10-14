@@ -9,6 +9,7 @@ import {
 } from './routing-table';
 import { ReasoningEffortSchema } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
+import { AutoRouterSchema, DEFAULT_AUTO_ROUTER } from './router';
 
 export { ReasoningEffortSchema } from './reasoning';
 export type { ReasoningEffort } from './reasoning';
@@ -97,6 +98,7 @@ function addDuplicateModelIssues(ids: string[], path: string, ctx: z.RefinementC
 
 export const BenchmarkConfigSchema = z
   .object({
+    router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
     classifierModels: z.array(z.string().trim().min(1)).min(1),
     deciderModels: z.array(BenchmarkPlatformModelSchema).min(1),
     // Manual additions are operator-pinned decider candidates. When omitted by
@@ -109,6 +111,8 @@ export const BenchmarkConfigSchema = z
     excludedAutoDeciderModels: z.array(z.string().trim().min(1)).optional(),
     // Accuracy threshold for "gets the job done" (per taxonomy route).
     minAccuracy: z.number().min(0).max(1),
+    accuracyNoiseBand: z.number().min(0).max(1).default(0.05),
+    frontierMinAccuracyDelta: z.number().min(0).max(1).default(0),
     // Platform parallelism budget. Platform decider runs use it as a live
     // container budget; classifier runs use it for parallel OpenRouter calls.
     maxConcurrency: z.number().int().min(1).max(BENCHMARK_CONTAINER_BUDGET),
@@ -185,7 +189,7 @@ export const BenchmarkConfigSchema = z
     }
     // Platform-queue and user-queue runs can hold containers at the same time,
     // so the two budgets share one hard platform cap.
-    if (config.maxConcurrency + config.userMaxConcurrency > BENCHMARK_CONTAINER_BUDGET) {
+    if (config.router === 'efficient' && config.maxConcurrency + config.userMaxConcurrency > BENCHMARK_CONTAINER_BUDGET) {
       ctx.addIssue({
         code: 'custom',
         path: ['userMaxConcurrency'],
@@ -246,6 +250,7 @@ export type BenchmarkModelSummary = z.infer<typeof BenchmarkModelSummarySchema>;
 
 export const BenchmarkRunSchema = z.object({
   id: z.string(),
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
   kind: BenchmarkKindSchema,
   // Defaulted so run payloads persisted before the field existed still parse.
   purpose: BenchmarkRunPurposeSchema.default('platform'),
@@ -264,6 +269,7 @@ export const BenchmarkConfigResponseSchema = z.object({
   config: BenchmarkConfigSchema.nullable(),
 });
 export const StartBenchmarkRunRequestSchema = z.object({
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
   kind: BenchmarkKindSchema,
   // Re-run every configured model even when prior results exist. Classifier
   // only — decider dedup is the registry's job.
@@ -273,6 +279,7 @@ export const StartBenchmarkRunRequestSchema = z.object({
 });
 export const StartedBenchmarkRunSchema = z.object({
   runId: z.string(),
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
   purpose: BenchmarkRunPurposeSchema,
   entryCount: z.number().int(),
 });
@@ -311,6 +318,7 @@ export type BenchmarkRegistryQueue = z.infer<typeof BenchmarkRegistryQueueSchema
  */
 export const BenchmarkRegistryResponseSchema = z.object({
   engineIdentity: z.string(),
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
   repetitions: z.number().int(),
   platform: BenchmarkRegistryQueueSchema,
   user: BenchmarkRegistryQueueSchema,
@@ -327,6 +335,7 @@ export const BenchmarkRegistryResponseSchema = z.object({
 export type BenchmarkRegistryResponse = z.infer<typeof BenchmarkRegistryResponseSchema>;
 
 export const RequeueBenchmarkRegistryRequestSchema = z.object({
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
   scope: BenchmarkQueueSelectorSchema,
 });
 export const RequeueBenchmarkRegistryResponseSchema = z.object({
@@ -378,6 +387,7 @@ export type BenchmarkProfileEntryStatus = z.infer<typeof BenchmarkProfileEntrySt
 
 export const RegisterBenchmarkProfilesRequestSchema = z
   .object({
+    router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
     ownerType: BenchmarkProfileOwnerTypeSchema,
     ownerId: z.string().trim().min(1),
     entries: EfficientModelPoolSchema,
@@ -400,14 +410,15 @@ export const RegisterBenchmarkProfilesRequestSchema = z
       }
     });
   });
-export type RegisterBenchmarkProfilesRequest = z.infer<
+export type RegisterBenchmarkProfilesRequest = z.input<
   typeof RegisterBenchmarkProfilesRequestSchema
 >;
 
 export const BenchmarkProfileStatusesRequestSchema = z.object({
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
   entries: EfficientModelPoolSchema,
 });
-export type BenchmarkProfileStatusesRequest = z.infer<typeof BenchmarkProfileStatusesRequestSchema>;
+export type BenchmarkProfileStatusesRequest = z.input<typeof BenchmarkProfileStatusesRequestSchema>;
 
 export const BenchmarkProfileStatusesResponseSchema = z.object({
   statuses: z.array(BenchmarkProfileEntryStatusSchema),
@@ -425,9 +436,10 @@ export const BenchmarkProfileQuotaErrorSchema = z.object({
 export type BenchmarkProfileQuotaError = z.infer<typeof BenchmarkProfileQuotaErrorSchema>;
 
 export const CustomRoutingTableRequestSchema = z.object({
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
   entries: EfficientModelPoolSchema,
 });
-export type CustomRoutingTableRequest = z.infer<typeof CustomRoutingTableRequestSchema>;
+export type CustomRoutingTableRequest = z.input<typeof CustomRoutingTableRequestSchema>;
 
 export const CustomRoutingTableResponseSchema = z.object({
   table: CustomRoutingTableSchema.nullable(),

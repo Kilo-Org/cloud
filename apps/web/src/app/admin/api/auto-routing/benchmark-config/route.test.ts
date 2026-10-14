@@ -47,7 +47,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
   };
 });
 
-import { PUT } from './route';
+import { GET, PUT } from './route';
 
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockGetBenchmarkConfig = jest.mocked(getBenchmarkConfig);
@@ -100,6 +100,39 @@ describe('PUT /admin/api/auto-routing/benchmark-config', () => {
       body: { config: validConfig },
     });
     mockGetBenchmarkConfig.mockResolvedValue({ status: 200, body: { config: null } });
+  });
+
+  it('defaults config reads to efficient', async () => {
+    await GET();
+    expect(mockGetBenchmarkConfig).toHaveBeenCalledWith('efficient');
+  });
+
+  it('forwards frontier config reads', async () => {
+    await GET(new NextRequest('http://localhost:3000/admin/api/auto-routing/benchmark-config?router=frontier'));
+    expect(mockGetBenchmarkConfig).toHaveBeenCalledWith('frontier');
+  });
+
+  it('rejects an unknown router before proxying', async () => {
+    const response = await GET(new NextRequest('http://localhost:3000/admin/api/auto-routing/benchmark-config?router=unknown'));
+    expect(response.status).toBe(400);
+    expect(mockGetBenchmarkConfig).not.toHaveBeenCalled();
+  });
+
+  it('forwards frontier config updates and accuracy settings', async () => {
+    await PUT(putRequest({
+      ...validConfig,
+      router: 'frontier',
+      accuracyNoiseBand: 0.02,
+      frontierMinAccuracyDelta: 0,
+    }));
+    expect(mockUpdateBenchmarkConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        router: 'frontier',
+        accuracyNoiseBand: 0.02,
+        frontierMinAccuracyDelta: 0,
+      }),
+      'admin@kilocode.ai'
+    );
   });
 
   it('rejects with 400 listing decider models not servable on all gateway chat APIs', async () => {

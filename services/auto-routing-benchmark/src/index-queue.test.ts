@@ -7,16 +7,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as RunModule from './run';
 
+vi.mock('./auto-decider-sync', () => ({ syncAutoDeciderModels: vi.fn() }));
+
+import { syncAutoDeciderModels } from './auto-decider-sync';
 vi.mock('./run', async importOriginal => {
   const actual = await importOriginal<typeof RunModule>();
   return {
     ...actual,
     processDeadLetter: vi.fn(),
     processJob: vi.fn(),
+    sweepStaleRunsAndDrain: vi.fn(),
   };
 });
 
-import { processDeadLetter, processJob, type BenchmarkJobMessage } from './run';
+import { processDeadLetter, processJob, sweepStaleRunsAndDrain, type BenchmarkJobMessage } from './run';
 import worker from './index';
 
 const env = {} as unknown as Env;
@@ -75,5 +79,33 @@ describe('queue handler — jobs branch', () => {
 
     await expect(worker.queue(retry.batch, env)).rejects.toThrow('container capacity');
     expect(retry.messages[0].ack).not.toHaveBeenCalled();
+  });
+});
+
+describe('scheduled router queues', () => {
+  it('drains both routers on frequent ticks', async () => {
+    vi.mocked(sweepStaleRunsAndDrain).mockResolvedValue({ staleRunIds: [], drained: [] });
+    await worker.scheduled({ cron: '*/5 * * * *' } as ScheduledController, env);
+    expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'efficient');
+    expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'frontier');
+  });
+
+  it('syncs both routers at the platform cadence', async () => {
+    vi.mocked(syncAutoDeciderModels).mockResolvedValue({
+      addedModels: [], removedModels: [], platformEntries: 0, startedRuns: [], publishedVersion: null,
+    });
+    await worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env);
+    expect(syncAutoDeciderModels).toHaveBeenCalledWith(env, { router: 'efficient' });
+    expect(syncAutoDeciderModels).toHaveBeenCalledWith(env, { router: 'frontier' });
+    expect(sweepStaleRunsAndDrain).not.toHaveBeenCalled();
+  });
+
+  it('still drains frontier when the efficient drain fails and reports the failure', async () => {
+    vi.mocked(sweepStaleRunsAndDrain)
+      .mockRejectedValueOnce(new Error('efficient queue failed'))
+      .mockResolvedValueOnce({ staleRunIds: [], drained: [] });
+    await expect(worker.scheduled({ cron: '*/5 * * * *' } as ScheduledController, env))
+      .rejects.toThrow('Benchmark scheduled routers failed');
+    expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'frontier');
   });
 });

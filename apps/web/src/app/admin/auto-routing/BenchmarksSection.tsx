@@ -4,6 +4,10 @@ import {
   AUTO_DECIDER_DEFAULT_MAX_COST_USD,
   AUTO_DECIDER_DEFAULT_MIN_COST_USD,
   BENCHMARK_CONTAINER_BUDGET,
+  AUTO_ROUTERS,
+  AutoRouterSchema,
+  DEFAULT_AUTO_ROUTER,
+  type AutoRouter,
   BenchmarkConfigResponseSchema,
   BenchmarkRegistryResponseSchema,
   BenchmarkRoutingTableResponseSchema,
@@ -122,8 +126,8 @@ export function effortCoverageForModel(
 // Fetch helpers
 // ---------------------------------------------------------------------------
 
-async function fetchBenchmarkConfig() {
-  const response = await fetch('/admin/api/auto-routing/benchmark-config');
+async function fetchBenchmarkConfig(router: AutoRouter) {
+  const response = await fetch(`/admin/api/auto-routing/benchmark-config?router=${router}`);
   return parseAdminResponse(response, BenchmarkConfigResponseSchema);
 }
 
@@ -159,8 +163,10 @@ export function runTypeLabel(run: Pick<BenchmarkRun, 'kind' | 'purpose'>): strin
   return run.purpose === 'user' ? 'User queue' : 'Platform queue';
 }
 
-async function fetchBenchmarkRuns(filter: RunFilter) {
-  const response = await fetch(`/admin/api/auto-routing/benchmark-runs${runFilterQuery(filter)}`);
+async function fetchBenchmarkRuns(filter: RunFilter, router: AutoRouter) {
+  const query = new URLSearchParams(runFilterQuery(filter).replace(/^\?/, ''));
+  query.set('router', router);
+  const response = await fetch(`/admin/api/auto-routing/benchmark-runs?${query}`);
   return parseAdminResponse(response, BenchmarkRunsResponseSchema);
 }
 
@@ -168,35 +174,37 @@ async function startBenchmarkRun({
   kind,
   force,
   queue,
+  router,
 }: {
   kind: BenchmarkKind;
   force: boolean;
   queue: BenchmarkQueueSelector;
+  router: AutoRouter;
 }) {
   const response = await fetch('/admin/api/auto-routing/benchmark-runs', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ kind, force, queue }),
+    body: JSON.stringify({ kind, force, queue, router }),
   });
   return parseAdminResponse(response, StartBenchmarkRunResponseSchema);
 }
 
-async function fetchBenchmarkRegistry() {
-  const response = await fetch('/admin/api/auto-routing/benchmark-registry');
+async function fetchBenchmarkRegistry(router: AutoRouter) {
+  const response = await fetch(`/admin/api/auto-routing/benchmark-registry?router=${router}`);
   return parseAdminResponse(response, BenchmarkRegistryResponseSchema);
 }
 
-async function requeueBenchmarkRegistry(scope: BenchmarkQueueSelector) {
+async function requeueBenchmarkRegistry(scope: BenchmarkQueueSelector, router: AutoRouter) {
   const response = await fetch('/admin/api/auto-routing/benchmark-registry', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ scope }),
+    body: JSON.stringify({ scope, router }),
   });
   return parseAdminResponse(response, RequeueBenchmarkRegistryResponseSchema);
 }
 
-async function fetchBenchmarkRoutingTable() {
-  const response = await fetch('/admin/api/auto-routing/benchmark-routing-table');
+async function fetchBenchmarkRoutingTable(router: AutoRouter) {
+  const response = await fetch(`/admin/api/auto-routing/benchmark-routing-table?router=${router}`);
   return parseAdminResponse<BenchmarkRoutingTableResponse>(
     response,
     BenchmarkRoutingTableResponseSchema
@@ -217,6 +225,8 @@ export function configToFormState(config: BenchmarkConfig | null): {
   autoDeciderModels: AutoDeciderModelRow[];
   excludedAutoDeciderModels: string;
   minAccuracy: number;
+  accuracyNoiseBand: number;
+  frontierMinAccuracyDelta: number;
   switchCostFactor: number;
   bestAccuracySwitchThreshold: number;
   maxConcurrency: number;
@@ -238,6 +248,8 @@ export function configToFormState(config: BenchmarkConfig | null): {
       autoDeciderModels: [],
       excludedAutoDeciderModels: '',
       minAccuracy: 0.7,
+      accuracyNoiseBand: 0.05,
+      frontierMinAccuracyDelta: 0,
       switchCostFactor: 3,
       bestAccuracySwitchThreshold: 0.05,
       maxConcurrency: BENCHMARK_CONTAINER_BUDGET / 2,
@@ -257,6 +269,8 @@ export function configToFormState(config: BenchmarkConfig | null): {
     autoDeciderModels: config.autoDeciderModels ?? [],
     excludedAutoDeciderModels: (config.excludedAutoDeciderModels ?? []).join('\n'),
     minAccuracy: config.minAccuracy,
+    accuracyNoiseBand: config.accuracyNoiseBand,
+    frontierMinAccuracyDelta: config.frontierMinAccuracyDelta,
     switchCostFactor: config.switchCostFactor,
     bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
     maxConcurrency: config.maxConcurrency,
@@ -321,12 +335,15 @@ export function formStateToConfig(
   const rawLatency = state.classifierMaxP95LatencyMs.trim();
   const classifierMaxP95LatencyMs = rawLatency.length > 0 ? parseInt(rawLatency, 10) || null : null;
   return {
+    router: base?.router ?? DEFAULT_AUTO_ROUTER,
     classifierModels,
     deciderModels,
     manualDeciderModels,
     autoDeciderModels: state.autoDeciderModels,
     excludedAutoDeciderModels,
     minAccuracy: state.minAccuracy,
+    accuracyNoiseBand: state.accuracyNoiseBand,
+    frontierMinAccuracyDelta: state.frontierMinAccuracyDelta,
     switchCostFactor: state.switchCostFactor,
     bestAccuracySwitchThreshold: state.bestAccuracySwitchThreshold,
     productionTokenProfile: base?.productionTokenProfile ?? null,
@@ -351,6 +368,7 @@ export function formStateToConfig(
 // ---------------------------------------------------------------------------
 
 function BenchmarkConfigEditor({
+  router,
   config,
   onSaved,
   modelOptions,
@@ -362,6 +380,7 @@ function BenchmarkConfigEditor({
   registryEntries,
 }: {
   config: BenchmarkConfig | null;
+  router: AutoRouter;
   onSaved: (next: { config: BenchmarkConfig | null }) => void;
   modelOptions: ModelOption[];
   modelsLoading: boolean;
@@ -402,7 +421,7 @@ function BenchmarkConfigEditor({
   }, [config]);
 
   const saveMutation = useMutation({
-    mutationFn: saveBenchmarkConfig,
+    mutationFn: (next: BenchmarkConfig) => saveBenchmarkConfig({ ...next, router }),
     onSuccess: data => {
       // The save is now the source of truth: clear dirty and re-sync so the
       // next background refetch is free to update the form again.
@@ -711,6 +730,45 @@ function BenchmarkConfigEditor({
             />
           </div>
           <div className="flex flex-col gap-1.5">
+            <Label htmlFor="benchmark-accuracy-noise-band" className="text-sm font-medium">
+              Accuracy noise band (0–1)
+            </Label>
+            <Input
+              id="benchmark-accuracy-noise-band"
+              type="number"
+              min={0}
+              max={1}
+              step={0.01}
+              value={form.accuracyNoiseBand}
+              onChange={e =>
+                updateForm(prev => ({ ...prev, accuracyNoiseBand: parseFloat(e.target.value) || 0 }))
+              }
+              className="h-8 w-40 tabular-nums"
+            />
+          </div>
+          {router === 'frontier' ? (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="benchmark-frontier-min-accuracy-delta" className="text-sm font-medium">
+                Frontier minimum accuracy delta (0–1)
+              </Label>
+              <Input
+                id="benchmark-frontier-min-accuracy-delta"
+                type="number"
+                min={0}
+                max={1}
+                step={0.01}
+                value={form.frontierMinAccuracyDelta}
+                onChange={e =>
+                  updateForm(prev => ({
+                    ...prev,
+                    frontierMinAccuracyDelta: parseFloat(e.target.value) || 0,
+                  }))
+                }
+                className="h-8 w-40 tabular-nums"
+              />
+            </div>
+          ) : null}
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-switch-cost-factor" className="text-sm font-medium">
               Switch cost factor (1–100)
             </Label>
@@ -771,6 +829,7 @@ function BenchmarkConfigEditor({
               OpenRouter calls.
             </p>
           </div>
+          {router === 'efficient' ? (
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-user-max-concurrency" className="text-sm font-medium">
               User max concurrency (1–{BENCHMARK_CONTAINER_BUDGET})
@@ -802,6 +861,7 @@ function BenchmarkConfigEditor({
               {form.maxConcurrency + form.userMaxConcurrency}).
             </p>
           </div>
+          ) : null}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-auto-decider-min-cost" className="text-sm font-medium">
               Auto min run cost
@@ -1265,7 +1325,9 @@ const REGISTRY_STATUSES = ['pending', 'running', 'ready', 'failed'] as const;
 
 function RegistrySummary({
   data,
+  router,
 }: {
+  router: AutoRouter;
   data: {
     engineIdentity: string;
     repetitions: number;
@@ -1275,7 +1337,7 @@ function RegistrySummary({
 }) {
   const queues: { label: string; queue: BenchmarkRegistryQueue }[] = [
     { label: 'Platform queue', queue: data.platform },
-    { label: 'User queue', queue: data.user },
+    ...(router === 'efficient' ? [{ label: 'User queue', queue: data.user }] : []),
   ];
   return (
     <div className="flex flex-col gap-2">
@@ -1308,8 +1370,8 @@ function RegistrySummary({
       <p className="text-muted-foreground text-xs">
         Engine <span className="font-mono">{data.engineIdentity}</span>, {data.repetitions}{' '}
         {data.repetitions === 1 ? 'repetition' : 'repetitions'}. Counts exclude entries measured
-        under an older engine identity. An entry wanted by both queues is counted in both — it is
-        one measurement, shared.
+        under an older engine identity.
+        {router === 'efficient' ? ' Entries wanted by both queues share one measurement.' : null}
       </p>
     </div>
   );
@@ -1320,6 +1382,30 @@ function RegistrySummary({
 // ---------------------------------------------------------------------------
 
 export function BenchmarksSection() {
+  const [router, setRouter] = useState<AutoRouter>(DEFAULT_AUTO_ROUTER);
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="benchmark-router">Router</Label>
+        <Select value={router} onValueChange={value => setRouter(AutoRouterSchema.parse(value))}>
+          <SelectTrigger id="benchmark-router" className="h-9 w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {AUTO_ROUTERS.map(value => (
+              <SelectItem key={value} value={value}>
+                {value === 'efficient' ? 'Efficient' : 'Frontier'}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <RouterBenchmarksSection key={router} router={router} />
+    </div>
+  );
+}
+
+function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
   const queryClient = useQueryClient();
   const [forceRerun, setForceRerun] = useState(false);
   const [runFilter, setRunFilter] = useState<RunFilter>('all');
@@ -1341,23 +1427,23 @@ export function BenchmarksSection() {
     systemOneModelsQuery.error instanceof Error ? systemOneModelsQuery.error.message : undefined;
 
   const configQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-config'],
-    queryFn: fetchBenchmarkConfig,
+    queryKey: ['auto-routing', 'benchmark-config', router],
+    queryFn: () => fetchBenchmarkConfig(router),
   });
 
   const runsQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-runs', runFilter],
-    queryFn: () => fetchBenchmarkRuns(runFilter),
+    queryKey: ['auto-routing', 'benchmark-runs', router, runFilter],
+    queryFn: () => fetchBenchmarkRuns(runFilter, router),
   });
 
   const registryQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-registry'],
-    queryFn: fetchBenchmarkRegistry,
+    queryKey: ['auto-routing', 'benchmark-registry', router],
+    queryFn: () => fetchBenchmarkRegistry(router),
   });
 
   const routingTableQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-routing-table'],
-    queryFn: fetchBenchmarkRoutingTable,
+    queryKey: ['auto-routing', 'benchmark-routing-table', router],
+    queryFn: () => fetchBenchmarkRoutingTable(router),
   });
 
   // Run activity drives polling and cache invalidation, so it must not depend
@@ -1365,8 +1451,8 @@ export function BenchmarksSection() {
   // reads the classifier list is still a completion. On the 'all' filter this
   // shares its key with runsQuery, so it costs no extra request.
   const allRunsQuery = useQuery({
-    queryKey: ['auto-routing', 'benchmark-runs', 'all'],
-    queryFn: () => fetchBenchmarkRuns('all'),
+    queryKey: ['auto-routing', 'benchmark-runs', router, 'all'],
+    queryFn: () => fetchBenchmarkRuns('all', router),
   });
 
   // Poll runs every 30s while any run is 'running'
@@ -1391,16 +1477,17 @@ export function BenchmarksSection() {
   useEffect(() => {
     if (prevHasRunningRun.current && !hasRunningRun) {
       void queryClient.invalidateQueries({
-        queryKey: ['auto-routing', 'benchmark-routing-table'],
+        queryKey: ['auto-routing', 'benchmark-routing-table', router],
       });
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-config'] });
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry'] });
+      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-config', router] });
+      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry', router] });
     }
     prevHasRunningRun.current = hasRunningRun;
-  }, [hasRunningRun, queryClient]);
+  }, [hasRunningRun, queryClient, router]);
 
   const startRunMutation = useMutation({
-    mutationFn: startBenchmarkRun,
+    mutationFn: (input: { kind: BenchmarkKind; force: boolean; queue: BenchmarkQueueSelector }) =>
+      startBenchmarkRun({ ...input, router }),
     onSuccess: (data, variables) => {
       if (variables.kind === 'classifier') {
         toast.success(
@@ -1421,8 +1508,8 @@ export function BenchmarksSection() {
       for (const message of data.drainErrors) {
         toast.error(`A queue could not start: ${message}`);
       }
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-runs'] });
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry'] });
+      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-runs', router] });
+      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry', router] });
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : 'Failed to start benchmark run');
@@ -1430,14 +1517,14 @@ export function BenchmarksSection() {
   });
 
   const requeueMutation = useMutation({
-    mutationFn: requeueBenchmarkRegistry,
+    mutationFn: (scope: BenchmarkQueueSelector) => requeueBenchmarkRegistry(scope, router),
     onSuccess: data => {
       toast.success(
         data.requeued === 0
           ? 'No failed entries to requeue'
           : `${data.requeued} failed ${data.requeued === 1 ? 'entry' : 'entries'} requeued`
       );
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry'] });
+      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry', router] });
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : 'Failed to requeue entries');
@@ -1446,9 +1533,9 @@ export function BenchmarksSection() {
 
   const handleConfigSaved = useCallback(
     (next: { config: BenchmarkConfig | null }) => {
-      queryClient.setQueryData(['auto-routing', 'benchmark-config'], next);
+      queryClient.setQueryData(['auto-routing', 'benchmark-config', router], next);
     },
-    [queryClient]
+    [queryClient, router]
   );
 
   return (
@@ -1475,6 +1562,7 @@ export function BenchmarksSection() {
         </div>
       ) : configQuery.data ? (
         <BenchmarkConfigEditor
+          router={router}
           config={configQuery.data.config}
           onSaved={handleConfigSaved}
           modelOptions={modelOptions}
@@ -1494,11 +1582,8 @@ export function BenchmarksSection() {
         </CardHeader>
         <CardContent className="flex flex-col gap-3 p-4 pt-0">
           <p className="text-muted-foreground text-xs">
-            Every decider measurement lives in one global registry, keyed by model, reasoning effort
-            and engine identity. The platform routing table and each owner pool's table are
-            assembled from it, so a model wanted by both is benchmarked once. A model with no
-            current entry is queued; the two queues run independently, each with its own container
-            budget.
+            Measurements and published tables are isolated for the selected router. Classifier
+            measurements are shared. Custom owner pools use the efficient router only.
           </p>
           {registryQuery.isLoading ? (
             <Skeleton className="h-20 w-full" />
@@ -1509,7 +1594,7 @@ export function BenchmarksSection() {
                 : 'Failed to load registry'}
             </div>
           ) : registryQuery.data ? (
-            <RegistrySummary data={registryQuery.data} />
+            <RegistrySummary data={registryQuery.data} router={router} />
           ) : null}
           <div className="flex flex-wrap gap-2">
             <Button
@@ -1523,6 +1608,8 @@ export function BenchmarksSection() {
               <Play className="size-4" />
               Run platform queue
             </Button>
+            {router === 'efficient' ? (
+              <>
             <Button
               type="button"
               variant="outline"
@@ -1545,11 +1632,13 @@ export function BenchmarksSection() {
               <Play className="size-4" />
               Run both queues
             </Button>
+              </>
+            ) : null}
             <Button
               type="button"
               variant="outline"
               disabled={requeueMutation.isPending}
-              onClick={() => requeueMutation.mutate('both')}
+              onClick={() => requeueMutation.mutate(router === 'efficient' ? 'both' : 'platform')}
             >
               <RotateCcw className="size-4" />
               Requeue failed
@@ -1615,7 +1704,10 @@ export function BenchmarksSection() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(['all', 'classifier', 'platform', 'user'] as const).map(value => (
+              {(router === 'efficient'
+                ? (['all', 'classifier', 'platform', 'user'] as const)
+                : (['all', 'classifier', 'platform'] as const)
+              ).map(value => (
                 <SelectItem key={value} value={value}>
                   {RUN_FILTER_LABELS[value]}
                 </SelectItem>

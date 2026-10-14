@@ -120,6 +120,7 @@ vi.mock('drizzle-orm/d1', () => {
 
   function profileValuesFromRow(row: Record<string, unknown>): ProfileRow {
     return {
+      router: row.router === 'frontier' ? 'frontier' : 'efficient',
       model: String(row.model),
       variant: typeof row.variant === 'string' ? row.variant : '',
       engine_identity: String(row.engine_identity),
@@ -386,6 +387,7 @@ function profileRow(
   partial: Partial<ProfileRow> & Pick<ProfileRow, 'model' | 'status'>
 ): ProfileRow {
   return {
+    router: 'efficient',
     variant: '',
     engine_identity: ENGINE,
     repetitions: REPS,

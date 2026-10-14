@@ -4,6 +4,8 @@ import {
   listBenchmarkRuns,
   startBenchmarkRun,
   getBenchmarkRoutingTable,
+  getBenchmarkRegistry,
+  requeueBenchmarkRegistry,
 } from './auto-routing-benchmark-admin-client';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -16,6 +18,9 @@ global.fetch = mockFetch;
 
 const configResponse = {
   config: {
+    router: 'efficient' as const,
+    accuracyNoiseBand: 0.05,
+    frontierMinAccuracyDelta: 0,
     classifierModels: ['anthropic/claude-haiku-4'],
     deciderModels: [{ id: 'anthropic/claude-sonnet-4' }],
     minAccuracy: 0.8,
@@ -42,6 +47,7 @@ const runsResponse = {
   runs: [
     {
       id: 'run-1',
+      router: 'efficient',
       kind: 'classifier',
       purpose: 'platform',
       status: 'completed',
@@ -80,7 +86,7 @@ describe('auto routing benchmark admin client', () => {
 
     await updateBenchmarkConfig(configResponse.config, 'admin@kilocode.ai');
 
-    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/config', {
+    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/config?router=efficient', {
       method: 'PUT',
       headers: {
         authorization: 'Bearer test-internal-secret',
@@ -103,7 +109,7 @@ describe('auto routing benchmark admin client', () => {
       body: runsResponse,
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs', {
+    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs?router=efficient', {
       method: 'GET',
       headers: {
         authorization: 'Bearer test-internal-secret',
@@ -142,13 +148,13 @@ describe('auto routing benchmark admin client', () => {
       },
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs', {
+    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs?router=efficient', {
       method: 'POST',
       headers: {
         authorization: 'Bearer test-internal-secret',
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ kind: 'classifier', force: false, queue: 'platform' }),
+      body: JSON.stringify({ kind: 'classifier', force: false, queue: 'platform', router: 'efficient' }),
     });
   });
 
@@ -170,13 +176,13 @@ describe('auto routing benchmark admin client', () => {
 
     const result = await startBenchmarkRun('decider', false, 'both');
 
-    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs', {
+    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs?router=efficient', {
       method: 'POST',
       headers: {
         authorization: 'Bearer test-internal-secret',
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ kind: 'decider', force: false, queue: 'both' }),
+      body: JSON.stringify({ kind: 'decider', force: false, queue: 'both', router: 'efficient' }),
     });
     expect(result.body).toMatchObject({
       startedRuns: [
@@ -199,7 +205,7 @@ describe('auto routing benchmark admin client', () => {
     });
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://benchmark-worker.example.com/admin/routing-table',
+      'https://benchmark-worker.example.com/admin/routing-table?router=efficient',
       {
         method: 'GET',
         headers: {
@@ -207,5 +213,27 @@ describe('auto routing benchmark admin client', () => {
         },
       }
     );
+  });
+
+  it('passes frontier on every selectable endpoint', async () => {
+    mockFetch.mockResolvedValue({
+      status: 404, ok: false, json: () => Promise.resolve({ error: 'not configured' }),
+    });
+    await getBenchmarkConfig('frontier');
+    await updateBenchmarkConfig({ ...configResponse.config, router: 'frontier' }, 'admin@kilocode.ai');
+    await listBenchmarkRuns({ router: 'frontier' });
+    await startBenchmarkRun('decider', false, 'platform', 'frontier');
+    await getBenchmarkRegistry('frontier');
+    await requeueBenchmarkRegistry('platform', 'frontier');
+    await getBenchmarkRoutingTable('frontier');
+    expect(mockFetch.mock.calls.map(([url]) => url)).toEqual([
+      'https://benchmark-worker.example.com/admin/config?router=frontier',
+      'https://benchmark-worker.example.com/admin/config?router=frontier',
+      'https://benchmark-worker.example.com/admin/runs?router=frontier',
+      'https://benchmark-worker.example.com/admin/runs?router=frontier',
+      'https://benchmark-worker.example.com/admin/registry?router=frontier',
+      'https://benchmark-worker.example.com/admin/registry/requeue?router=frontier',
+      'https://benchmark-worker.example.com/admin/routing-table?router=frontier',
+    ]);
   });
 });

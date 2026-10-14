@@ -122,6 +122,48 @@ describe('getRoutingTable', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it('defaults to efficient and caches frontier tables independently', async () => {
+    const frontierTable = { ...SAMPLE_TABLE, version: 'frontier-run-1' };
+    const get = vi.fn(async (key: string) =>
+      JSON.stringify(key === 'routing_table_frontier_v1' ? frontierTable : SAMPLE_TABLE)
+    );
+    const env = makeEnv(null);
+    env.AUTO_ROUTING_CONFIG.get = get as typeof env.AUTO_ROUTING_CONFIG.get;
+    expect((await getRoutingTable(env))?.version).toBe(SAMPLE_TABLE.version);
+    expect((await getRoutingTable(env, 'frontier'))?.version).toBe(frontierTable.version);
+    expect((await getRoutingTable(env, 'efficient'))?.version).toBe(SAMPLE_TABLE.version);
+    expect(get.mock.calls.map(([key]) => key)).toEqual([
+      'routing_table_v1', 'routing_table_frontier_v1',
+    ]);
+  });
+
+  it('fetches a missing frontier table from its own origin and KV key', async () => {
+    const env = makeEnv(null);
+    const frontierTable = { ...SAMPLE_TABLE, version: 'frontier-run-1' };
+    const fetch = vi.fn(async () => Response.json({ table: frontierTable, publishedAt: null }));
+    const put = vi.fn(async () => {});
+    env.BENCHMARK_SERVICE.fetch = fetch;
+    env.AUTO_ROUTING_CONFIG.put = put;
+    expect((await getRoutingTable(env, 'frontier'))?.version).toBe(frontierTable.version);
+    expect(fetch).toHaveBeenCalledWith(
+      'https://auto-routing-benchmark/admin/routing-table?router=frontier',
+      expect.objectContaining({ headers: { authorization: 'Bearer test-secret' } })
+    );
+    expect(put).toHaveBeenCalledWith(
+      'routing_table_frontier_v1', JSON.stringify(frontierTable), expect.anything()
+    );
+  });
+
+  it('does not substitute the efficient table when the frontier table is missing', async () => {
+    const env = makeEnv(null);
+    const get = vi.fn(async (key: string) =>
+      key === 'routing_table_v1' ? JSON.stringify(SAMPLE_TABLE) : null
+    );
+    env.AUTO_ROUTING_CONFIG.get = get as typeof env.AUTO_ROUTING_CONFIG.get;
+    expect(await getRoutingTable(env, 'frontier')).toBeNull();
+    expect((await getRoutingTable(env))?.version).toBe(SAMPLE_TABLE.version);
+  });
+
   it('fetches from origin on KV miss, writes to KV with expirationTtl, and returns the table', async () => {
     const puts: Array<{ key: string; value: string; options: unknown }> = [];
     const env = makeEnv(null, {

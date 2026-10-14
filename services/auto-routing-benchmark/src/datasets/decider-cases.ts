@@ -6,14 +6,18 @@ import { IMPLEMENTATION_V2_CASES } from './decider-cases-v2/implementation';
 import { INVESTIGATION_V2_CASES } from './decider-cases-v2/investigation';
 import { PLANNING_DESIGN_V2_CASES } from './decider-cases-v2/planning-design';
 import { REFACTORING_V2_CASES } from './decider-cases-v2/refactoring';
+import { FRONTIER_V1_CASES } from './frontier-cases';
+import { FRONTIER_LONG_CONTEXT_CASES, LONG_CONTEXT_CASES } from './long-context/cases';
 
 export type DeciderCase = {
-  id: string; // stable slug, e.g. 'impl-gen-squares-array' (<taskType>-<subtype>-<topic>)
+  id: string;
   taskType: ClassifierTaskType;
   subtaskType: ClassifierSubtaskType;
   systemPrompt: string;
   userPrompt: string;
   check: DeciderCheck;
+  tier?: 'efficient' | 'frontier';
+  longContext?: { generator: string; seed: number; targetTokens: number };
 };
 
 const CODE_SYS =
@@ -1690,4 +1694,10 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
   ...PLANNING_DESIGN_V2_CASES,
   ...REFACTORING_V2_CASES,
   ...AGENTIC_EXECUTION_V2_CASES,
+  ...LONG_CONTEXT_CASES,
+];
+
+export const FRONTIER_CASES: readonly DeciderCase[] = [
+  ...FRONTIER_V1_CASES,
+  ...FRONTIER_LONG_CONTEXT_CASES,
 ];

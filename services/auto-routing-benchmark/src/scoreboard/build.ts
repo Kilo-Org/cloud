@@ -184,7 +184,9 @@ export function buildScoreboard({
       ? [{ pick, summary, share }]
       : [];
   });
-  const heldOutWeighted = (metric: 'accuracy' | 'avgCostUsd' | 'p50LatencyMs'): number | null => {
+  const heldOutWeighted = (
+    metric: 'accuracy' | 'avgCostUsd' | 'p50LatencyMs' | 'p50TtftMs'
+  ): number | null => {
     let total = 0;
     let weight = 0;
     for (const { pick, summary, share } of heldOutPicks) {
@@ -196,7 +198,7 @@ export function buildScoreboard({
           profile
         );
       } else {
-        value = summary[metric];
+        value = summary[metric] ?? null;
       }
       if (value === null) continue;
       total += value * share;
@@ -238,6 +240,7 @@ export function buildScoreboard({
             accuracyWeighted: heldOutWeighted('accuracy'),
             estimatedRequestUsdWeighted: heldOutWeighted('avgCostUsd'),
             p50LatencyMsWeighted: heldOutWeighted('p50LatencyMs'),
+            p50TtftMsWeighted: heldOutWeighted('p50TtftMs'),
             routes: heldOutPicks.length,
           }
         : null,

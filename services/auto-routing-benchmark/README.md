@@ -117,14 +117,30 @@ also supplies the cost estimate. If neither flag is supplied, the estimate uses 
 table's `productionTokenProfile`, or just the benchmark cost when that is absent.
 
 For held-out measurement without deploying, set `OPENROUTER_API_KEY` and save pairs
-as `[{"model":"provider/model","variant":null}]`. The sweep excludes `agentic_execution`,
-grades rubric cases with the decider judge, and hashes case ids into stable train/held-out
-splits. `--rebuild-from-sweep` ranks train data only with Wilson counts, pricing, and the
-cost profile; both builds evaluate exact first picks on held-out accuracy, estimated
-request cost, and wall-clock latency. Missing picks are excluded; `quality.heldOut.routes`
-reports coverage. `--max-usd` includes model and grader spend (in-flight requests can
-overshoot). Atomic checkpoints every 200 cases retain each pair's raw `results`;
-`--resume sweep.json` skips completed pair/case/repetitions and retains accumulated spend.
+as `[{"model":"provider/model","variant":null}]`. `--suite efficient` (default) selects
+`DECIDER_CASES`; `--suite frontier` selects only `FRONTIER_CASES`, including its own
+harder long-context cases. Long-context prompts are materialized deterministically
+from each case's generator, seed, and target size. Efficient long-context cases target
+32k, 96k, and 160k tokens; frontier cases target 160k. These are deterministic size
+estimates using combined system/user characters divided by four, not model-specific
+tokenizer counts. The long-context set covers all 12 implementation, debugging,
+refactoring, and investigation routes with 36 efficient and 24 frontier `json_equal`
+checks. Agentic cases run through the real Kilo CLI container; all other cases use
+OpenRouter directly with streaming enabled.
+The sweep grades rubric cases with the decider judge and hashes case ids into stable
+train/held-out splits. `--rebuild-from-sweep` ranks train data only with Wilson counts,
+pricing, and the cost profile; both builds evaluate exact first picks on held-out
+accuracy, estimated request cost, wall-clock latency, and TTFT
+(`quality.heldOut.p50TtftMsWeighted`, compared on the latency axis).
+Direct TTFT is time to the first nonempty content or reasoning delta; final streaming
+usage supplies cost. Container TTFT uses the first text event timestamp (or text
+`time.start`) relative to request start, and is null when timestamps are unavailable.
+Legacy sweeps without TTFT remain readable and do not substitute total latency.
+Missing picks are excluded; `quality.heldOut.routes` reports coverage.
+`--max-usd` includes model and grader spend (in-flight requests can overshoot).
+Atomic checkpoints every 200 cases retain each pair's raw `results`;
+`--resume sweep.json` requires the same suite and pairs, skips completed
+pair/case/repetitions, and retains accumulated spend.
 Infrastructure/grader failures are excluded from graded `cases` and counted in summary
 `errors`; empty answers score zero. Missing usage still permits grading but makes
 `costUsd` null and excludes that row only from the cost mean. Graded training candidates
@@ -136,11 +152,34 @@ an API key or network calls using
 old missing-usage rows without saved answers remain excluded.
 
 ```bash
-pnpm --filter auto-routing-benchmark sweep:offline --pairs pairs.json --catalog live --max-usd 20 --out sweep.json
+pnpm --filter auto-routing-benchmark sweep:offline --suite efficient --pairs pairs.json --catalog live --container-url http://localhost:3000 --cli-api-url "$KILO_CLI_API_URL" --concurrency-agentic 1 --max-usd 20 --out sweep.json
 pnpm --filter auto-routing-benchmark scoreboard build --label baseline --table live --pricing live --cost-profile p.json --sweep sweep.json --out baseline.json
 pnpm --filter auto-routing-benchmark scoreboard build --label candidate --table live --pricing live --cost-profile p.json --sweep sweep.json --rebuild-from-sweep --out candidate.json
 pnpm --filter auto-routing-benchmark scoreboard compare baseline.json candidate.json --relative-only
 ```
+
+On the work VM, build and start the existing bench image (from the repository root):
+
+```bash
+docker build -t kilo-bench-local services/auto-routing-benchmark/container
+docker run --rm -d --name kilo-bench-local -p 127.0.0.1:3000:3000 --add-host=host.docker.internal:host-gateway kilo-bench-local
+```
+
+Export `KILO_TOKEN` in the sweep process environment (never pass it as a command-line
+argument), plus `KILO_CLI_API_URL` or `--cli-api-url`. The CLI API URL must be a running,
+container-reachable Kilo gateway base URL with the CLI's model-discovery and chat
+endpoints, and the token must authenticate there and have model access/credit.
+For a gateway on the VM host, use `http://host.docker.internal:<gateway-port>` rather
+than `localhost`, and bind the gateway to an address reachable from Docker.
+The runner posts `/run` with the same model, prompt, variant, token, API URL,
+optional `KILO_ORG_ID`, and timeout fields as the benchmark worker.
+The container maps that API URL to the CLI's `KILO_API_URL`; it cannot use an
+OpenRouter key alone in place of a Kilo gateway/token. No gateway or credentials
+are provisioned by the sweep. Keep the container port loopback-only because `/run`
+accepts credentials. Stop it after the sweep with `docker stop kilo-bench-local`.
+`--concurrency` controls direct requests independently of `--concurrency-agentic`.
+The existing container serializes CLI runs for sqlite safety: the default agentic
+concurrency is 1; higher values queue requests, not parallel CLI executions.
 
 `--pricing live` hydrates candidates by model id from
 `https://app.kilo.ai/api/openrouter/models`. Prompt, completion, and optional

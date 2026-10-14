@@ -72,11 +72,13 @@ export const OfflineSweepSummarySchema = z.object({
   errors: z.number().int().nonnegative().optional(),
   avgCostUsd: z.number().nonnegative().nullable(),
   p50LatencyMs: z.number().nonnegative().nullable(),
+  p50TtftMs: nullableMetric.optional(),
 });
 export type OfflineSweepSummary = z.infer<typeof OfflineSweepSummarySchema>;
 
 export const OfflineSweepSchema = z.object({
   startedAt: z.iso.datetime({ offset: true }),
+  suite: z.enum(['efficient', 'frontier']).optional(),
   truncated: z.boolean(),
   costUsd: z.number().nonnegative(),
   graderCostUsd: z.number().nonnegative(),
@@ -94,6 +96,7 @@ export const OfflineSweepSchema = z.object({
           costUsd: z.number().nonnegative().nullable().default(null),
           graderCostUsd: z.number().nonnegative(),
           latencyMs: z.number().nonnegative(),
+          ttftMs: nullableMetric.optional(),
           error: z.string().nullable(),
           output: z.string().nullable().optional(),
         })
@@ -134,6 +137,7 @@ export const ScoreboardSchema = z.object({
         accuracyWeighted: nullableRate,
         estimatedRequestUsdWeighted: nullableMetric,
         p50LatencyMsWeighted: nullableMetric,
+        p50TtftMsWeighted: nullableMetric.optional(),
         routes: z.number().int().nonnegative(),
       })
       .nullable(),

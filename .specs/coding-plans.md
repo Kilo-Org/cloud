@@ -184,3 +184,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 - Added Provider Management Credential and Upstream Usage ID definitions for provider control-plane quota lookups.
 - Allowed scoped control-plane authorization for BytePlus while preserving owner, live-subscription, assignment, and server-only data-boundary requirements.
 - Clarified that the BytePlus upload identifier is the assigned provider username used to resolve a seat.
+
+### 2026-10-14 -- Ordinary Kilo Auto routing for Coding Plan users
+
+- Updated §6.4 so Kilo Auto no longer prefers the Coding Plan default model.
+- Coding Plan users are routed through ordinary Kilo Auto routing.

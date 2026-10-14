@@ -6,6 +6,7 @@ import { createKiloClient } from '@kilocode/sdk/v2/client';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import { createKiloEventFeed } from './kilo-event-feed.js';
 import { createKiloRuntime } from './kilo-runtime.js';
+import { kiloClientConfig } from '../kilo-server-auth.js';
 
 const binary = process.env.KILO_781_BINARY;
 const suite = binary ? describe : describe.skip;
@@ -102,7 +103,7 @@ suite('pinned Kilo default health supervision', () => {
     });
     try {
       const wrapper = await runtime.ensure();
-      const client = createKiloClient({ baseUrl: wrapper.serverUrl, directory: root });
+      const client = createKiloClient(kiloClientConfig(wrapper.server, root));
       const before = await client.global.health({ signal: AbortSignal.timeout(5000) });
       expect(before.data?.healthy).toBe(true);
       expect(before.data?.version).toBe('7.8.1');

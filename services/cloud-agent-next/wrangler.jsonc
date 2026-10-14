@@ -67,6 +67,7 @@
     "SANDBOX_SELECTION_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55",
     "CONTAINER_REPO_SNAPSHOT_IDS": "2bbc9955-5dc2-428c-a353-be59d89a8130",
     "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
+    "PREVIEW_ENABLED_IDS": "2bbc9955-5dc2-428c-a353-be59d89a8130",
     "VERCEL_SANDBOX_ORG_IDS": "",
     "VERCEL_PROJECT_ID": "",
     "VERCEL_TEAM_ID": "",
@@ -443,6 +444,9 @@
   "env": {
     "dev": {
       "name": "cloud-agent-next-dev",
+      // Do not inherit the top-level custom-domain route. `wrangler dev` takes its
+      // origin host from the first route, which would hide the preview Host.
+      "routes": [],
       "triggers": {
         "crons": ["17 2 * * *", "*/5 * * * *"],
       },
@@ -485,6 +489,7 @@
         "RUNTIME_ISOLATION_ENABLED": "true",
         "SANDBOX_SELECTION_IDS": "*",
         "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
+        "PREVIEW_ENABLED_IDS": "*",
         "VERCEL_SANDBOX_ORG_IDS": "",
         "VERCEL_PROJECT_ID": "",
         "VERCEL_TEAM_ID": "",

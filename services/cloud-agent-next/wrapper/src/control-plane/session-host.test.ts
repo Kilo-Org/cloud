@@ -74,6 +74,7 @@ async function hostFixture() {
         return {
           pid: id,
           url: server.url.toString(),
+          authorization: 'Basic test',
           exited: new Promise<void>(() => undefined),
           stop: async () => {
             stopped.push(id);

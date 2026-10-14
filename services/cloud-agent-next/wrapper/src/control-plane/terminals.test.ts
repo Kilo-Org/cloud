@@ -10,6 +10,7 @@ const session = {
   directory: '/workspace/terminal',
 };
 const ptyId = 'pty_1';
+const KILO_AUTHORIZATION = 'Basic a2lsbzp0ZXN0';
 
 async function waitFor(assertion: () => boolean): Promise<void> {
   const deadline = Date.now() + 2_000;
@@ -23,6 +24,7 @@ async function waitFor(assertion: () => boolean): Promise<void> {
 function fakeClient(serverUrl: string): WrapperKiloClient {
   return {
     serverUrl,
+    server: { url: serverUrl, authorization: KILO_AUTHORIZATION },
     createPty: async (input: { cwd: string }): Promise<WrapperPty> => ({
       id: ptyId,
       title: 'Terminal',
@@ -94,12 +96,15 @@ function fakeRuntimes(runtime: KiloRuntime | undefined): KiloRuntimes {
 let server: Bun.Server<{ path: string }>;
 let serverUrl: string;
 const sockets: { reverse?: Bun.ServerWebSocket<{ path: string }> } = {};
+/** The `Authorization` header of each PTY upgrade that reached the fake Kilo. */
+const ptyAuthorizations: Array<string | null> = [];
 
 beforeAll(() => {
   server = Bun.serve<{ path: string }>({
     port: 0,
     fetch(request, instance) {
       const path = new URL(request.url).pathname;
+      if (path.startsWith('/pty/')) ptyAuthorizations.push(request.headers.get('Authorization'));
       if (instance.upgrade(request, { data: { path } })) return undefined;
       return new Response('upgrade failed', { status: 400 });
     },
@@ -222,6 +227,7 @@ describe('control-plane terminal adapter (B10)', () => {
 
   it('routes create, resize, close and connect to their own runtime operation', async () => {
     sockets.reverse = undefined;
+    ptyAuthorizations.length = 0;
     const terminals = attachedTerminals(fakeClient(serverUrl));
 
     const created = await terminals.handle({
@@ -269,6 +275,8 @@ describe('control-plane terminal adapter (B10)', () => {
       ok: true,
       result: { connected: true },
     });
+    // The local PTY socket authenticates to Kilo, which requires a password.
+    expect(ptyAuthorizations).toEqual([KILO_AUTHORIZATION]);
 
     const closed = await terminals.handle({
       type: 'terminal.close',

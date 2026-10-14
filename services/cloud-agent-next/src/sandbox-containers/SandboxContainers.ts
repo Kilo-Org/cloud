@@ -21,6 +21,12 @@ import {
   logControlDiagnostic,
   type ControlDiagnosticFields,
 } from '../sandbox-control/diagnostics.js';
+import { fetchPreviewPort, previewNotRunningResponse } from '../preview/container-port-fetch.js';
+import { isReservedPreviewPort } from '../shared/reserved-ports.js';
+import {
+  PREVIEW_MARKER_ALLOCATION_HEADER,
+  PREVIEW_MARKER_PORT_HEADER,
+} from '../shared/preview-headers.js';
 import {
   ContainersBilling,
   ContainersBillingScheduler,
@@ -640,6 +646,24 @@ export class SandboxContainers extends DurableObject<Env> {
 
   async isContainerRunning(): Promise<boolean> {
     return this.ctx.container?.running === true;
+  }
+
+  /**
+   * Preview port fetches arrive as a marked request; every other request is a
+   * 404. The record is re-read after the last await and immediately before
+   * admission, so a stale resolve cannot reach a replacement container.
+   */
+  async fetch(request: Request): Promise<Response> {
+    const marker = request.headers.get(PREVIEW_MARKER_PORT_HEADER);
+    if (marker === null) return new Response('Not found', { status: 404 });
+    const allocationRef = request.headers.get(PREVIEW_MARKER_ALLOCATION_HEADER);
+    if (allocationRef === null) return previewNotRunningResponse();
+    const container = this.ctx.container;
+    if (!container) return previewNotRunningResponse();
+    if (!(await this.isRunningAllocation(allocationRef))) return previewNotRunningResponse();
+    return fetchPreviewPort(container, Number.parseInt(marker, 10), request, port =>
+      isReservedPreviewPort('cloudflare-containers', port)
+    );
   }
 
   async forceDestroyForControlPlane(): Promise<void> {

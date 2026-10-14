@@ -3531,3 +3531,24 @@ describe('SandboxControlV2 prepare frame secrets', () => {
     expect(await wrapper.next(250)).toBeNull();
   });
 });
+
+describe('SandboxControlV2 previewTarget', () => {
+  it('answers an unrouted session as not_running and never enqueues', async () => {
+    const stub = sandboxNamespace.getByName(`${SANDBOX_ID}__preview`);
+    const observed = await runInDurableObject(stub, async instance => {
+      const target = instance as unknown as {
+        enqueue: (task: () => Promise<unknown>) => Promise<unknown>;
+      };
+      let enqueueCalls = 0;
+      const original = target.enqueue.bind(instance);
+      target.enqueue = task => {
+        enqueueCalls += 1;
+        return original(task);
+      };
+      const result = await instance.previewTarget('workspace_preview_unrouted');
+      return { result, enqueueCalls };
+    });
+    expect(observed.result).toEqual({ status: 'not_running' });
+    expect(observed.enqueueCalls).toBe(0);
+  });
+});

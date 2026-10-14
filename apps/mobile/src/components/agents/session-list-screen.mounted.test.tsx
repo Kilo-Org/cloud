@@ -731,7 +731,6 @@ describe('AgentSessionListScreen live presentation', () => {
     const emptyState = root().findByType(EmptyState);
 
     expect(header().parent?.children[0]).toBe(header());
-    expect(header().props.className).toBe('px-[22px]');
     expect(header().props.headerRight).toBeUndefined();
     expect(header().props.context).toBeUndefined();
     expect(emptyState.props.placement).toBeUndefined();

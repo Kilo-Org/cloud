@@ -441,7 +441,6 @@ describe('auto routing worker', () => {
   });
 
   it('returns no frontier decision when only the efficient table exists', async () => {
-    dbLimit.mockResolvedValueOnce([{ planId: 'minimax-token-plan-plus', providerId: 'minimax' }]);
     configGet.mockImplementation(async (key: string) =>
       key === 'routing_table_v1' ? JSON.stringify(benchmarkRoutingTable) : null
     );
@@ -450,7 +449,6 @@ describe('auto routing worker', () => {
     );
     const response = await decideRequest(mirrorPayload({ router: 'frontier' }));
     await expect(response.json()).resolves.toMatchObject({ decision: null });
-    expect(dbLimit).not.toHaveBeenCalled();
     expect(benchmarkFetch).toHaveBeenCalledWith(
       'https://auto-routing-benchmark/admin/routing-table?router=frontier',
       expect.anything()

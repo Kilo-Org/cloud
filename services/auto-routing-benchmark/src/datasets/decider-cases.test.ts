@@ -18,8 +18,8 @@ describe('DECIDER_CASES', () => {
     expect(TAXONOMY_PAIRS.length).toBe(18);
   });
 
-  it('has exactly 540 cases with unique ids', () => {
-    expect(DECIDER_CASES.length).toBe(540);
+  it('has exactly 576 cases with unique ids', () => {
+    expect(DECIDER_CASES.length).toBe(576);
     const ids = new Set(DECIDER_CASES.map(c => c.id));
     expect(ids.size).toBe(DECIDER_CASES.length);
   });

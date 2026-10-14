@@ -81,14 +81,20 @@ async function main() {
   const reps = z.coerce.number().int().positive().parse(values.reps);
   const concurrency = z.coerce.number().int().positive().parse(values.concurrency);
   const suite = z.enum(['efficient', 'frontier']).parse(values.suite);
-  const agenticConcurrency = z.coerce.number().int().positive().parse(values['concurrency-agentic']);
+  const agenticConcurrency = z.coerce
+    .number()
+    .int()
+    .positive()
+    .parse(values['concurrency-agentic']);
   const cases = selectSweepCases(suite);
   const containerUrl = values['container-url'] ? new URL(values['container-url']) : null;
   const cliApiUrl = values['cli-api-url'] ?? process.env.KILO_CLI_API_URL;
   const kiloToken = process.env.KILO_TOKEN;
   if (cases.some(benchCase => benchCase.taskType === 'agentic_execution')) {
     if (!containerUrl || !cliApiUrl || !kiloToken) {
-      throw new Error('Agentic cases require --container-url, --cli-api-url (or KILO_CLI_API_URL), and KILO_TOKEN');
+      throw new Error(
+        'Agentic cases require --container-url, --cli-api-url (or KILO_CLI_API_URL), and KILO_TOKEN'
+      );
     }
     z.url().parse(cliApiUrl);
   }
@@ -246,9 +252,10 @@ async function main() {
         }
         let retry = false;
         try {
-          const endpoint = agentic && containerUrl
-            ? new URL('/run', containerUrl).toString()
-            : 'https://openrouter.ai/api/v1/chat/completions';
+          const endpoint =
+            agentic && containerUrl
+              ? new URL('/run', containerUrl).toString()
+              : 'https://openrouter.ai/api/v1/chat/completions';
           const response = await fetch(endpoint, {
             method: 'POST',
             headers: agentic
@@ -273,7 +280,9 @@ async function main() {
               ttftMs = containerTtftMs(result.stdoutLines, startedWall);
               if (modelCostUsd !== null) sweep.costUsd += modelCostUsd;
               if (result.timedOut || result.exitCode !== 0) {
-                error = result.timedOut ? 'Container CLI timed out' : `Container CLI exited ${result.exitCode}`;
+                error = result.timedOut
+                  ? 'Container CLI timed out'
+                  : `Container CLI exited ${result.exitCode}`;
                 break;
               }
               output = parsed.text;
@@ -340,7 +349,9 @@ async function main() {
   const agenticJobs = jobs.filter(job => job.benchCase.taskType === 'agentic_execution').reverse();
   const results = await Promise.allSettled([
     ...Array.from({ length: Math.min(concurrency, directJobs.length) }, () => worker(directJobs)),
-    ...Array.from({ length: Math.min(agenticConcurrency, agenticJobs.length) }, () => worker(agenticJobs)),
+    ...Array.from({ length: Math.min(agenticConcurrency, agenticJobs.length) }, () =>
+      worker(agenticJobs)
+    ),
   ]);
   await checkpoint();
   for (const result of results) {

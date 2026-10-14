@@ -375,12 +375,18 @@ describe('buildScoreboard', () => {
       routes: 2,
     });
     expect(ScoreboardSchema.parse(result)).toEqual(result);
-    const missingTtft = build(table,
+    const missingTtft = build(
+      table,
       prod({ 'implementation/code_generation': 0.75, 'debugging/bug_fixing': 0.25 }),
       null,
-      { sweep: { ...sweep, summaries: summaries.map(summary =>
-        summary.model === 'fixture/third' ? { ...summary, p50TtftMs: null } : summary
-      ) } }
+      {
+        sweep: {
+          ...sweep,
+          summaries: summaries.map(summary =>
+            summary.model === 'fixture/third' ? { ...summary, p50TtftMs: null } : summary
+          ),
+        },
+      }
     );
     expect(missingTtft.quality.heldOut?.p50TtftMsWeighted).toBe(200);
   });

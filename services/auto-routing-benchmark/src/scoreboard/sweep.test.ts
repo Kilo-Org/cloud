@@ -154,26 +154,33 @@ describe('summarizeSweep', () => {
   });
 
   it('takes TTFT medians only from graded rows with measured first tokens', () => {
-    const summaries = summarizeSweep([{
-      ...pair,
-      results: [
-        result,
-        { ...result, ttftMs: 75 },
-        { ...result, ttftMs: null },
-        { ...result, ttftMs: 10000, score: null, error: 'grader_failed' },
-      ],
-    }]);
+    const summaries = summarizeSweep([
+      {
+        ...pair,
+        results: [
+          result,
+          { ...result, ttftMs: 75 },
+          { ...result, ttftMs: null },
+          { ...result, ttftMs: 10000, score: null, error: 'grader_failed' },
+        ],
+      },
+    ]);
     expect(summaries[0]).toMatchObject({ cases: 3, errors: 1, p50TtftMs: 50 });
-    expect(summarizeSweep([{ ...pair, results: [{ ...result, ttftMs: undefined }] }])[0].p50TtftMs)
-      .toBeNull();
+    expect(
+      summarizeSweep([{ ...pair, results: [{ ...result, ttftMs: undefined }] }])[0].p50TtftMs
+    ).toBeNull();
   });
 });
 
 describe('selectSweepCases', () => {
   it('defaults to efficient without frontier cases', () => {
     expect(selectSweepCases()).toBe(DECIDER_CASES);
-    expect(selectSweepCases('efficient').every(benchCase => benchCase.tier !== 'frontier')).toBe(true);
-    expect(selectSweepCases().some(benchCase => benchCase.taskType === 'agentic_execution')).toBe(true);
+    expect(selectSweepCases('efficient').every(benchCase => benchCase.tier !== 'frontier')).toBe(
+      true
+    );
+    expect(selectSweepCases().some(benchCase => benchCase.taskType === 'agentic_execution')).toBe(
+      true
+    );
   });
 
   it('selects only the frontier suite, including its long-context cases', () => {
@@ -190,9 +197,10 @@ describe('readSweepCompletion', () => {
   it.each(['content', 'reasoning', 'reasoning_content', 'reasoning_details'])(
     'measures first %s delta from a fragmented SSE fixture and retains final usage',
     async field => {
-      const firstDelta = field === 'reasoning_details'
-        ? { reasoning_details: [{ type: 'reasoning.encrypted', data: 'opaque-reasoning' }] }
-        : { [field]: field === 'content' ? 'A' : 'Thinking' };
+      const firstDelta =
+        field === 'reasoning_details'
+          ? { reasoning_details: [{ type: 'reasoning.encrypted', data: 'opaque-reasoning' }] }
+          : { [field]: field === 'content' ? 'A' : 'Thinking' };
       const fixture = [
         ': OPENROUTER PROCESSING',
         '',
@@ -240,29 +248,43 @@ describe('readSweepCompletion', () => {
   });
 
   it('rejects incomplete and failed streams instead of grading partial answers', async () => {
-    await expect(readSweepCompletion(new Response(
-      'data: {"choices":[{"delta":{"content":"partial"}}]}\n\n'
-    ), 0)).rejects.toThrow('before [DONE]');
-    await expect(readSweepCompletion(new Response(
-      'data: {"error":{"message":"provider failure"}}\n\ndata: [DONE]\n\n'
-    ), 0)).rejects.toThrow('stream returned an error');
+    await expect(
+      readSweepCompletion(
+        new Response('data: {"choices":[{"delta":{"content":"partial"}}]}\n\n'),
+        0
+      )
+    ).rejects.toThrow('before [DONE]');
+    await expect(
+      readSweepCompletion(
+        new Response('data: {"error":{"message":"provider failure"}}\n\ndata: [DONE]\n\n'),
+        0
+      )
+    ).rejects.toThrow('stream returned an error');
   });
 });
 
 describe('containerTtftMs', () => {
   it('uses the first text event timestamp relative to request start', () => {
-    expect(containerTtftMs([
-      'not json',
-      '{"type":"step_start","timestamp":1010}',
-      '{"type":"text","timestamp":1040,"part":{"text":"answer","time":{"end":1090}}}',
-      '{"type":"text","timestamp":1090,"part":{"text":"more"}}',
-    ], 1000)).toBe(40);
+    expect(
+      containerTtftMs(
+        [
+          'not json',
+          '{"type":"step_start","timestamp":1010}',
+          '{"type":"text","timestamp":1040,"part":{"text":"answer","time":{"end":1090}}}',
+          '{"type":"text","timestamp":1090,"part":{"text":"more"}}',
+        ],
+        1000
+      )
+    ).toBe(40);
   });
 
   it('accepts text start timestamps and leaves untimed events unavailable', () => {
-    expect(containerTtftMs([
-      '{"type":"text","part":{"text":"answer","time":{"start":1060,"end":1100}}}',
-    ], 1000)).toBe(60);
+    expect(
+      containerTtftMs(
+        ['{"type":"text","part":{"text":"answer","time":{"start":1060,"end":1100}}}'],
+        1000
+      )
+    ).toBe(60);
     expect(containerTtftMs(['{"type":"text","part":{"text":"answer"}}'], 1000)).toBeNull();
     expect(containerTtftMs(['{"type":"text","timestamp":900,"text":"answer"}'], 1000)).toBeNull();
   });

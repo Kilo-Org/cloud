@@ -19,9 +19,12 @@ export function repoScenario(seed: number, frontier = false): LongContextScenari
     const adjustment = 3 + random(19);
     actual = actual * multiplier + (index === faultyHop ? -adjustment : adjustment);
     corrected = corrected * multiplier + adjustment;
-    const dependency = index === 0 ? '' : `import { stage${index - 1} } from './stage-${index - 1}';\n`;
+    const dependency =
+      index === 0 ? '' : `import { stage${index - 1} } from './stage-${index - 1}';\n`;
     const argument = index === 0 ? 'input' : `stage${index - 1}(input)`;
-    stages.push(`FILE ${root}/stage-${index}.ts\n${dependency}export function stage${index}(input: number): number {\n  return ${argument} * ${multiplier} ${index === faultyHop ? '-' : '+'} ${adjustment};\n}\nEND FILE`);
+    stages.push(
+      `FILE ${root}/stage-${index}.ts\n${dependency}export function stage${index}(input: number): number {\n  return ${argument} * ${multiplier} ${index === faultyHop ? '-' : '+'} ${adjustment};\n}\nEND FILE`
+    );
   }
 
   const sections = [
@@ -36,11 +39,12 @@ export function repoScenario(seed: number, frontier = false): LongContextScenari
 
   return {
     sections,
-    question: 'Trace the invocation in src/cli.ts through the selected pipeline and settlement. Compare its current output with the ledger-transform contract. Return only a JSON object with keys "entrypoint", "actual", "corrected", "faultyFile" in that order. entrypoint is the invocation file; actual is its current numeric result; corrected is its numeric result after repairing the one contract-violating stage; faultyFile is the full path of that stage.',
+    question:
+      'Trace the invocation in src/cli.ts through the selected pipeline and settlement. Compare its current output with the ledger-transform contract. Return only a JSON object with keys "entrypoint", "actual", "corrected", "faultyFile" in that order. entrypoint is the invocation file; actual is its current numeric result; corrected is its numeric result after repairing the one contract-violating stage; faultyFile is the full path of that stage.',
     answer: {
       entrypoint: 'src/cli.ts',
-      actual: actual % modulus - offset,
-      corrected: corrected % modulus - offset,
+      actual: (actual % modulus) - offset,
+      corrected: (corrected % modulus) - offset,
       faultyFile: `${root}/stage-${faultyHop}.ts`,
     },
   };

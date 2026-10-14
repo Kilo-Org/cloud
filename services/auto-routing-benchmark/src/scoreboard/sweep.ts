@@ -9,16 +9,20 @@ export function selectSweepCases(suite: 'efficient' | 'frontier' = 'efficient') 
 }
 
 const streamChunkSchema = z.object({
-  choices: z.array(
-    z.object({
-      delta: z.object({
-        content: z.string().nullish(),
-        reasoning: z.string().nullish(),
-        reasoning_content: z.string().nullish(),
-        reasoning_details: z.array(z.unknown()).nullish(),
-      }).optional(),
-    })
-  ).optional(),
+  choices: z
+    .array(
+      z.object({
+        delta: z
+          .object({
+            content: z.string().nullish(),
+            reasoning: z.string().nullish(),
+            reasoning_content: z.string().nullish(),
+            reasoning_details: z.array(z.unknown()).nullish(),
+          })
+          .optional(),
+      })
+    )
+    .optional(),
   usage: z.object({ cost: z.number().nonnegative().nullish() }).nullish(),
   error: z.unknown().optional(),
 });
@@ -52,7 +56,9 @@ export async function readSweepCompletion(
       if (!delta) continue;
       if (
         ttftMs === null &&
-        (delta.content || delta.reasoning || delta.reasoning_content ||
+        (delta.content ||
+          delta.reasoning ||
+          delta.reasoning_content ||
           (delta.reasoning_details?.length ?? 0) > 0)
       ) {
         ttftMs = Math.max(0, now() - startedAt);
@@ -68,7 +74,7 @@ export async function readSweepCompletion(
   };
   try {
     while (true) {
-      const chunk = await reader.read();
+      const chunk: ReadableStreamReadResult<Uint8Array> = await reader.read();
       buffer += chunk.done ? decoder.decode() : decoder.decode(chunk.value, { stream: true });
       let newline: number;
       while ((newline = buffer.indexOf('\n')) >= 0) {
@@ -92,10 +98,12 @@ const timedEventSchema = z.object({
   timestamp: z.number().optional(),
   text: z.string().optional(),
   time: z.object({ start: z.number().optional() }).optional(),
-  part: z.object({
-    text: z.string().optional(),
-    time: z.object({ start: z.number().optional() }).optional(),
-  }).optional(),
+  part: z
+    .object({
+      text: z.string().optional(),
+      time: z.object({ start: z.number().optional() }).optional(),
+    })
+    .optional(),
 });
 
 export function containerTtftMs(lines: string[], startedAt: number): number | null {
@@ -143,7 +151,7 @@ export function summarizeSweep(pairs: OfflineSweep['pairs']): OfflineSweep['summ
       );
       const costs = graded.flatMap(result => (result.costUsd === null ? [] : [result.costUsd]));
       const latencies = graded.map(result => result.latencyMs);
-      const ttfts = graded.flatMap(result => result.ttftMs == null ? [] : [result.ttftMs]);
+      const ttfts = graded.flatMap(result => (result.ttftMs == null ? [] : [result.ttftMs]));
       return {
         model: pair.model,
         variant: pair.variant,

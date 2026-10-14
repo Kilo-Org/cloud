@@ -2364,13 +2364,17 @@ describe('auto routing worker', () => {
         expect(writeDataPoint).toHaveBeenCalledTimes(1);
         expect(writeDataPoint.mock.calls[0]?.[0]?.doubles[1]).toBe(classifierResult.cost);
         classifyNormalizedInput.mockRejectedValue(new Error('unbilled failure'));
-        await expect((await decideRequest(mirrorPayload({ input }))).json()).resolves.toMatchObject({
-          cost: 0,
-        });
+        await expect((await decideRequest(mirrorPayload({ input }))).json()).resolves.toMatchObject(
+          {
+            cost: 0,
+          }
+        );
         await drainBackgroundTasks();
-        await expect((await decideRequest(mirrorPayload({ input }))).json()).resolves.toMatchObject({
-          cost: 0,
-        });
+        await expect((await decideRequest(mirrorPayload({ input }))).json()).resolves.toMatchObject(
+          {
+            cost: 0,
+          }
+        );
         await expectClassifierUsage(
           input as NormalizedClassifierInput,
           'speculative',

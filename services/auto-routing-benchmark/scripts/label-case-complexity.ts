@@ -63,7 +63,7 @@ export async function labelCaseComplexity(
 
 async function main() {
   const defaultOutput = fileURLToPath(
-    new URL('../src/datasets/case-complexity.json', import.meta.url)
+    new URL('../src/datasets/case-complexity.json', import.meta.url).href
   );
   const { values } = parseArgs({
     options: {

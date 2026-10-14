@@ -248,15 +248,17 @@ describe('readSweepCompletion', () => {
   });
 
   it('accepts explicit null error fields in answer and usage chunks', async () => {
-    const response = new Response([
-      'data: {"error":null,"choices":[{"delta":{"content":"answer"}}]}',
-      '',
-      'data: {"error":null,"choices":[],"usage":{"cost":0.012}}',
-      '',
-      'data: [DONE]',
-      '',
-      '',
-    ].join('\n'));
+    const response = new Response(
+      [
+        'data: {"error":null,"choices":[{"delta":{"content":"answer"}}]}',
+        '',
+        'data: {"error":null,"choices":[],"usage":{"cost":0.012}}',
+        '',
+        'data: [DONE]',
+        '',
+        '',
+      ].join('\n')
+    );
     expect(await readSweepCompletion(response, 100, () => 175)).toEqual({
       output: 'answer',
       costUsd: 0.012,
@@ -270,11 +272,14 @@ describe('readSweepCompletion', () => {
       const cancel = vi.fn();
       const stream = new ReadableStream<Uint8Array>({
         start(controller) {
-          controller.enqueue(new TextEncoder().encode(
-            'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
-            'data: {"choices":[],"usage":{"cost":0.012}}\n\n' +
-            'data: [DONE]\n\n' + trailingData
-          ));
+          controller.enqueue(
+            new TextEncoder().encode(
+              'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
+                'data: {"choices":[],"usage":{"cost":0.012}}\n\n' +
+                'data: [DONE]\n\n' +
+                trailingData
+            )
+          );
         },
         cancel,
       });

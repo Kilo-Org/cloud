@@ -8,7 +8,7 @@
   "finish_reason": "end_turn",
   "latency": null,
   "moderation_latency": null,
-  "generation_time": null,
+  "generation_time": 3508.150326999952,
   "streamed": false,
   "cancelled": null,
   "status_code": 200,

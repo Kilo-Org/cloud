@@ -85,6 +85,7 @@ import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishR
 import {
   computeOpenRouterCostFields,
   drainSseStream,
+  extractVercelGenerationTime,
   extractVercelIsByok,
   extractVercelUpstreamId,
   isResponseInterruptedError,
@@ -1216,7 +1217,7 @@ export async function parseMicrodollarUsageFromStream(
     upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
     latency: null,
     moderation_latency: null,
-    generation_time: null,
+    generation_time: extractVercelGenerationTime(vercelProviderMetadata),
     streamed: true,
     cancelled: null,
     status_code: effectiveStatusCode,
@@ -1259,7 +1260,7 @@ export function parseMicrodollarUsageFromString(
     finish_reason,
     latency: null,
     moderation_latency: null,
-    generation_time: null,
+    generation_time: extractVercelGenerationTime(vercelProviderMetadata),
     streamed: false,
     cancelled: null,
     status_code: statusCode,
@@ -1344,6 +1345,7 @@ export async function processTokenData(
 
     genStats.model = usageStats.model; // openrouter bug?
     genStats.upstream_id ??= usageStats.upstream_id; // keep the id the response already reported
+    genStats.generation_time ??= usageStats.generation_time;
     genStats.hasError = usageStats.hasError; // retain by choice
     genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;

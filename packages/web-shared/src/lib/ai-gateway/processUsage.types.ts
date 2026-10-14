@@ -28,6 +28,10 @@ export type VercelProviderAttempt = {
   providerRequestId?: string;
   /** The upstream provider's own response id; usually equal to `providerRequestId`. */
   providerResponseId?: string;
+  /** Epoch milliseconds when the gateway started this provider attempt. */
+  startTime?: number;
+  /** Epoch milliseconds when this provider attempt finished. */
+  endTime?: number;
 };
 
 export type VercelModelAttempt = {

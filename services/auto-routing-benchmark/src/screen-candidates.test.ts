@@ -6,6 +6,8 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import {
   ScreeningCatalogSchema,
+  ScreenResumeSchema,
+  restoreScreenMeasurements,
   recordScreenModelCost,
   sampleScreenCases,
   screenCandidateJobs,
@@ -15,6 +17,7 @@ import {
   screenVariants,
   selectScreenCandidates,
   type ScreenModelSpend,
+  type ScreenMeasurement,
 } from '../scripts/screen-candidates';
 import type { OfflineSweep } from './scoreboard/schema';
 import { requestDirectSweepCompletion, selectSweepCases } from './scoreboard/sweep';
@@ -135,6 +138,69 @@ describe('candidate screening', () => {
         .toEqual(cases.map(benchCase => benchCase.id));
     }
     expect([...screenCandidateJobs([], cases)]).toEqual([]);
+  });
+
+  it('restores existing report results by exact pair and skips only completed requests', () => {
+    const cases = selectSweepCases().slice(0, 1);
+    const benchCase = cases[0];
+    const savedResult = { ...result, caseId: benchCase.id,
+      routeKey: `${benchCase.taskType}/${benchCase.subtaskType}` };
+    const previous = ScreenResumeSchema.parse({
+      startedAt: '2026-10-14T00:00:00.000Z', suite: 'efficient', tableVersion: 'fixture-table',
+      productionTokenProfile: null, casesPerRoute: 4,
+      costUsd: 0.12, graderCostUsd: 0.01, estimatedCostUsd: 0.02,
+      sampledCases: [{ id: benchCase.id, routeKey: savedResult.routeKey }],
+      models: [{ model: 'fixture/new', costUnknown: false, estimatedCostUsd: 0.02, variants: [
+        { variant: null, results: [savedResult] }, { variant: 'high', results: [] },
+      ] }],
+    });
+    const measurements: ScreenMeasurement[] = [
+      { model: 'fixture/new', variant: null, results: [] },
+      { model: 'fixture/new', variant: 'high', results: [] },
+    ];
+    const identity = { suite: 'efficient' as const, casesPerRoute: 4,
+      tableVersion: 'fixture-table', profile: null };
+    restoreScreenMeasurements(previous, measurements, cases, identity);
+    expect(measurements[0].results).toEqual([savedResult]);
+    expect(previous).toMatchObject({ costUsd: 0.12, graderCostUsd: 0.01, estimatedCostUsd: 0.02 });
+    const pending = [...screenCandidateJobs(measurements, cases)].filter(job =>
+      !measurements[job.pairIndex].results.some(row => row.caseId === job.benchCase.id));
+    expect(pending.map(job => job.pairIndex)).toEqual([1]);
+    expect(() => restoreScreenMeasurements(previous, measurements, cases,
+      { ...identity, suite: 'frontier' })).toThrow('same suite');
+    expect(() => restoreScreenMeasurements(previous, measurements, cases,
+      { ...identity, tableVersion: 'other-table' })).toThrow('same suite');
+    expect(() => restoreScreenMeasurements(previous, measurements, cases,
+      { ...identity, profile: { uncachedInputTokens: 10, cachedInputTokens: 0 } })).toThrow('same suite');
+    const duplicate = ScreenResumeSchema.parse(previous);
+    duplicate.models[0].variants[0].results.push(savedResult);
+    expect(() => restoreScreenMeasurements(duplicate, measurements, cases, identity))
+      .toThrow('duplicate case results');
+    const changedPairs: ScreenMeasurement[] = [{ model: 'fixture/other', variant: null, results: [] }];
+    expect(() => restoreScreenMeasurements(previous, changedPairs, cases, identity))
+      .toThrow('same candidate models');
+  });
+
+  it('waits for a reservation before sending and settles the attempt after reading its usage', async () => {
+    const admitted = Promise.withResolvers<boolean>();
+    const settled = vi.fn();
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(
+      'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
+      'data: {"usage":{"cost":0.001}}\n\n' +
+      'data: [DONE]\n\n'
+    ));
+    const request = requestDirectSweepCompletion({
+      model: 'fixture/new', fragment: {}, systemPrompt: 'system', userPrompt: 'user',
+      apiKey: 'fixture-key', attributionHeaders: {}, budgetAvailable: () => true, fetchImpl,
+      beforeRequest: () => admitted.promise,
+      onAttemptComplete: settled,
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    admitted.resolve(true);
+    await request;
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(settled).toHaveBeenCalledTimes(1);
+    expect(settled.mock.calls[0][0]).toMatchObject({ costUsd: 0.001, output: 'answer' });
   });
 
   it('screens default plus highest reasoning effort, preserving the full request fragment', () => {

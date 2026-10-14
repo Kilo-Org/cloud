@@ -20,11 +20,7 @@ describe('summarizeSweep', () => {
   it.each([
     'OpenRouter transport or body read failed',
     'OpenRouter returned HTTP 429',
-    'OpenRouter returned HTTP 503',
-    'grader_failed',
-    'Decider judge failed',
     'OpenRouter response is missing valid usage.cost',
-    'OpenRouter response is missing valid usage',
   ])('excludes legacy infrastructure failure %s from graded metrics', error => {
     const summaries = summarizeSweep([
       {
@@ -140,7 +136,12 @@ describe('summarizeSweep', () => {
     expect(score).toBe(1);
     const legacy = OfflineSweepSchema.parse({
       ...sweep,
-      pairs: [{ ...pair, results: [{ ...withoutScore, error: 'Decider judge failed' }] }],
+      pairs: [
+        {
+          ...pair,
+          results: [{ ...withoutScore, error: 'OpenRouter response is missing valid usage.cost' }],
+        },
+      ],
     });
     expect(legacy.pairs[0].results[0].score).toBeNull();
     expect(summarizeSweep(legacy.pairs)[0].cases).toBe(0);

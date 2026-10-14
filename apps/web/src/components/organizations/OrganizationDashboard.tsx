@@ -212,11 +212,8 @@ export function OrganizationDashboard({
               <CardContent className="space-y-4">
                 <p className="text-muted-foreground text-sm">
                   Need help? Have a feature request? Want to chat? Contact us at{' '}
-                  <a
-                    href="mailto:teams@kilocode.ai"
-                    className="text-primary font-medium hover:underline"
-                  >
-                    teams@kilocode.ai
+                  <a href="mailto:hi@kilo.ai" className="text-primary font-medium hover:underline">
+                    hi@kilo.ai
                   </a>
                 </p>
                 <div className="border-muted-foreground/20 space-y-3 border-t pt-4">

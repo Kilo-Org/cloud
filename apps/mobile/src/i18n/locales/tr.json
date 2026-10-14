@@ -1040,7 +1040,7 @@
         "recoveryLabel": "GitHub uygulamasını güncelle"
       },
       "githubIpAllowList": {
-        "description": "Bu GitHub kuruluşunun IP izin listesi Kilo'yu engellediği için Kod inceleyici devre dışı bırakıldı. Yardım için hi@kilocode.ai adresine yaz, ardından Kod inceleyiciyi tekrar etkinleştir."
+        "description": "Bu GitHub kuruluşunun IP izin listesi Kilo'yu engellediği için Kod inceleyici devre dışı bırakıldı. Yardım için hi@kilo.ai adresine yaz, ardından Kod inceleyiciyi tekrar etkinleştir."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo bu proje için GitLab proje erişim belirteci oluşturamadığından Kod inceleyici devre dışı bırakıldı. Proje sorumlusu yetkisi ver veya proje erişim belirteçlerini etkinleştir, ardından Kod inceleyiciyi tekrar etkinleştir.",
@@ -1055,7 +1055,7 @@
         "recoveryLabel": "Kod inceleyici ayarlarını güncelle"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Depo klonlama işlemi bugün üç kez zaman aşımına uğradığı için Kod inceleyici devre dışı bırakıldı. Yardım için hi@kilocode.ai adresine yaz, ardından Kod inceleyiciyi tekrar etkinleştir."
+        "description": "Depo klonlama işlemi bugün üç kez zaman aşımına uğradığı için Kod inceleyici devre dışı bırakıldı. Yardım için hi@kilo.ai adresine yaz, ardından Kod inceleyiciyi tekrar etkinleştir."
       },
       "title": "Kod inceleyici için işlem yapman gerekiyor.",
       "recoveryLabel": "Destekle iletişime geç"

@@ -15,7 +15,7 @@ import {
 /**
  * Frankfurt-local sink for AI-gateway usage writes.
  *
- * Callers are SFO instances of `kilocode-global-app`, which are a transatlantic
+ * Callers are SFO instances of `kilocode-ai-gateway`, which are a transatlantic
  * round trip away from the PostgreSQL primary. Executing the write here collapses
  * the row-lock hold on `kilocode_users` / `organizations` /
  * `organization_user_usage` from hundreds of milliseconds to single-digit

@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Sasisha programu ya GitHub"
       },
       "githubIpAllowList": {
-        "description": "Mkaguzi wa msimbo alizimwa kwa sababu shirika hili la GitHub linatumia orodha ya anwani za IP zinazoruhusiwa ambayo inazuia Kilo. Wasiliana na hi@kilocode.ai kwa msaada, kisha uwashe mkaguzi wa msimbo tena."
+        "description": "Mkaguzi wa msimbo alizimwa kwa sababu shirika hili la GitHub linatumia orodha ya anwani za IP zinazoruhusiwa ambayo inazuia Kilo. Wasiliana na hi@kilo.ai kwa msaada, kisha uwashe mkaguzi wa msimbo tena."
       },
       "gitlabProjectAccessRequired": {
         "description": "Mkaguzi wa msimbo alizimwa kwa sababu Kilo haiwezi kuunda tokeni ya kufikia mradi huu wa GitLab. Toa ruhusa za mtunzaji wa mradi au uwashe tokeni za kufikia mradi, kisha uwashe mkaguzi wa msimbo tena.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Sasisha mipangilio ya mkaguzi wa msimbo"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Mkaguzi wa msimbo alizimwa baada ya kunakili hazina kuzidi muda uliowekwa mara tatu leo. Wasiliana na hi@kilocode.ai kwa msaada, kisha uwashe mkaguzi wa msimbo tena."
+        "description": "Mkaguzi wa msimbo alizimwa baada ya kunakili hazina kuzidi muda uliowekwa mara tatu leo. Wasiliana na hi@kilo.ai kwa msaada, kisha uwashe mkaguzi wa msimbo tena."
       },
       "title": "Mkaguzi wa msimbo anahitaji uangalizi wako.",
       "recoveryLabel": "Wasiliana na timu ya usaidizi"

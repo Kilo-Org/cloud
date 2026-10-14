@@ -1552,7 +1552,7 @@
         "recoveryLabel": "GitHub ilovasini yangilash"
       },
       "githubIpAllowList": {
-        "description": "Bu GitHub tashkilotining ruxsat etilgan IP manzillari ro'yxati Kiloni bloklagani uchun Kodni ko'rib chiquvchi o'chirildi. Yordam uchun hi@kilocode.ai manziliga yozing, so'ng Kodni ko'rib chiquvchini qayta yoqing."
+        "description": "Bu GitHub tashkilotining ruxsat etilgan IP manzillari ro'yxati Kiloni bloklagani uchun Kodni ko'rib chiquvchi o'chirildi. Yordam uchun hi@kilo.ai manziliga yozing, so'ng Kodni ko'rib chiquvchini qayta yoqing."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo bu loyiha uchun GitLab loyihasiga kirish tokenini yarata olmagani sababli Kodni ko'rib chiquvchi o'chirildi. Loyihani boshqarish huquqini bering yoki loyihaga kirish tokenlarini yoqing, so'ng Kodni ko'rib chiquvchini qayta yoqing.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Kodni ko'rib chiquvchi sozlamalarini yangilash"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Bugun repozitoriyani klonlash uch marta belgilangan vaqtda tugamagani uchun Kodni ko'rib chiquvchi o'chirildi. Yordam uchun hi@kilocode.ai manziliga yozing, so'ng Kodni ko'rib chiquvchini qayta yoqing."
+        "description": "Bugun repozitoriyani klonlash uch marta belgilangan vaqtda tugamagani uchun Kodni ko'rib chiquvchi o'chirildi. Yordam uchun hi@kilo.ai manziliga yozing, so'ng Kodni ko'rib chiquvchini qayta yoqing."
       },
       "title": "Kod tekshiruvchisida e’tibor talab qiladigan muammo bor.",
       "recoveryLabel": "Yordam xizmatiga murojaat qilish"

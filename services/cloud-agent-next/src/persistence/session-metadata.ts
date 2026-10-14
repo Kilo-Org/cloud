@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
@@ -272,7 +273,8 @@ function sandboxIdentityMatchesAllocation(
   if (workspace.sandboxKind !== undefined) {
     return shared
       ? workspace.sandboxKind === 'shared'
-      : allocation !== 'isolated-standard' && workspace.sandboxKind === 'isolated';
+      : workspace.sandboxKind ===
+          (allocation === 'isolated-standard' ? 'isolated-standard' : 'isolated');
   }
   return shared
     ? isGeneratedSharedSandboxId(sandboxId) && workspace.sandboxRoute !== undefined
@@ -289,8 +291,8 @@ function isIsolatedProviderWorkspace(workspace: {
     : workspace.sandboxId?.startsWith('ses-') === true;
 }
 
-const MetadataWorkspaceSchema = z
-  .object({
+const MetadataWorkspaceSchema = egressPolicySchema
+  .safeExtend({
     sandboxId: SandboxIdSchema.optional(),
     sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
     sandboxKind: sandboxKindSchema.optional(),
@@ -364,6 +366,14 @@ const MetadataWorkspaceSchema = z
       });
     }
   })
+  .refine(
+    workspace =>
+      workspace.egressMode !== 'allowlist' ||
+      (workspace.sandboxProvider === 'cloudflare-containers' &&
+        isIsolatedProviderWorkspace(workspace) &&
+        workspace.sandboxRoute === undefined),
+    'allowlist egress requires an isolated Cloudflare containers sandbox'
+  )
   .refine(
     workspace => workspace.sandboxProvider !== 'vercel' || isIsolatedProviderWorkspace(workspace),
     'Vercel sandbox metadata requires an isolated sandbox'

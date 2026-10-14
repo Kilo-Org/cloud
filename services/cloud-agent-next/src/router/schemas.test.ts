@@ -52,6 +52,94 @@ const baseStartInput = {
 };
 
 describe('grouped unified session input contracts', () => {
+  it.each(
+    [[], ['Z.Example.COM.', 'example.com', 'EXAMPLE.COM']].map(egressAllowlist => ({
+      egressAllowlist,
+    }))
+  )('normalizes grouped and legacy egress allowlists: %j', ({ egressAllowlist }) => {
+    const expected = egressAllowlist.length === 0 ? [] : ['example.com', 'z.example.com'];
+    expect(
+      StartSessionInput.parse({
+        ...baseStartInput,
+        runtime: { egressMode: 'allowlist', egressAllowlist },
+      }).runtime
+    ).toEqual({ egressMode: 'allowlist', egressAllowlist: expected });
+    expect(
+      PrepareSessionInput.parse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        egressMode: 'allowlist',
+        egressAllowlist,
+      }).egressAllowlist
+    ).toEqual(expected);
+  });
+
+  it.each([{}, { egressMode: 'unrestricted' }, { egressMode: 'allowlist' }])(
+    'preserves omitted lists and explicit modes at both boundaries: %j',
+    policy => {
+      expect(StartSessionInput.parse({ ...baseStartInput, runtime: policy }).runtime).toEqual(
+        policy
+      );
+      const parsed = PrepareSessionInput.parse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        ...policy,
+      });
+      expect(parsed.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+      expect(parsed.egressAllowlist).toBeUndefined();
+      expect(StartSessionInput.parse(baseStartInput).runtime).toBeUndefined();
+    }
+  );
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
+    { egressMode: 'deny-all' },
+    { egressMode: null },
+  ])('rejects ambiguous or unsupported egress policies: %j', policy => {
+    const grouped = StartSessionInput.safeParse({ ...baseStartInput, runtime: policy });
+    const legacy = PrepareSessionInput.safeParse({
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      ...policy,
+    });
+    expect(grouped.success).toBe(false);
+    expect(legacy.success).toBe(false);
+    if ('egressAllowlist' in policy) {
+      if (!grouped.success) {
+        expect(grouped.error.issues).toContainEqual(
+          expect.objectContaining({ path: ['runtime', 'egressAllowlist'] })
+        );
+      }
+      if (!legacy.success) {
+        expect(legacy.error.issues).toContainEqual(
+          expect.objectContaining({ path: ['egressAllowlist'] })
+        );
+      }
+    }
+  });
+
+  it('rejects invalid egress policies at both public boundaries', () => {
+    for (const egressAllowlist of [null, ['*'], ['127.1'], ['https://example.com']]) {
+      expect(
+        StartSessionInput.safeParse({
+          ...baseStartInput,
+          runtime: { egressMode: 'allowlist', egressAllowlist },
+        }).success
+      ).toBe(false);
+      expect(
+        PrepareSessionInput.safeParse({
+          ...basePromptInput,
+          githubRepo: 'acme/repo',
+          egressMode: 'allowlist',
+          egressAllowlist,
+        }).success
+      ).toBe(false);
+    }
+  });
+
   it('rejects retired devcontainer requests at the legacy API boundary', () => {
     const input = {
       ...basePromptInput,
@@ -546,6 +634,21 @@ describe('prepareSession clone-only variant', () => {
     autoInitiate: true,
     operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
   };
+
+  it('enforces explicit egress mode on clone-only inputs', () => {
+    const input = { ...baseCloneInput, cloneFromKiloSessionId: validKiloSessionId };
+    const parsed = PrepareSessionInput.parse({ ...input, egressMode: 'allowlist' });
+    expect(parsed.egressMode).toBe('allowlist');
+    expect(parsed.egressAllowlist).toBeUndefined();
+    expect(PrepareSessionInput.safeParse({ ...input, egressAllowlist: [] }).success).toBe(false);
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        egressMode: 'unrestricted',
+        egressAllowlist: [],
+      }).success
+    ).toBe(false);
+  });
 
   it('accepts a clone-only prepare without a prompt', () => {
     expect(

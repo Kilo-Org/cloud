@@ -1540,6 +1540,7 @@ describe('MeteredSandbox container capacity', () => {
         subject: billingInput.subject,
         instanceId: billingInput.sandboxId,
         checkpoint: 'sandbox-start',
+        billingOrigin: billingInput.metadata.origin,
       });
       expect(sandbox.startCalls).toBe(1);
     }

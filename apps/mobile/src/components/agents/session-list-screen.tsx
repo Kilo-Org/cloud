@@ -492,7 +492,7 @@ export function AgentSessionListScreen({
           reserveEyebrow
           size="large"
           showBackButton={false}
-          className="px-[22px] pb-1"
+          className="px-[22px]"
           // An accepted empty live list carries the history route in its body
           // (`LiveSessionListEmptyState`'s `historyAction`), so the controls row
           // is withheld there: the empty state renders exactly one history

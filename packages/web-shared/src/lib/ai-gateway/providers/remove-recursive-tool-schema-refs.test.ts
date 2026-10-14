@@ -93,6 +93,30 @@ describe('removeRecursiveJsonSchemaRefs', () => {
     expect(schema).toEqual(expected);
   });
 
+  it('removes recursive refs from properties and definitions named like data keywords', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        default: { $ref: '#' },
+        enum: { $ref: '#/$defs/const' },
+      },
+      patternProperties: { examples: { $ref: '#' } },
+      $defs: { const: { type: 'array', items: { $ref: '#/$defs/const' } } },
+    };
+
+    removeRecursiveJsonSchemaRefs(schema);
+
+    expect(schema).toEqual({
+      type: 'object',
+      properties: {
+        default: { type: 'object' },
+        enum: { $ref: '#/$defs/const' },
+      },
+      patternProperties: { examples: { type: 'object' } },
+      $defs: { const: { type: 'array', items: { type: 'array' } } },
+    });
+  });
+
   it('ignores remote and unresolvable refs', () => {
     const schema = {
       type: 'object',

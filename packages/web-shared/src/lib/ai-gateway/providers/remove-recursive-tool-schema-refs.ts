@@ -3,6 +3,16 @@ import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/provide
 // Keywords whose values are instance data rather than subschemas.
 const DATA_KEYWORDS = new Set(['const', 'default', 'enum', 'examples']);
 
+// Keywords whose values map arbitrary names, such as property names, to subschemas.
+const SUBSCHEMA_MAP_KEYWORDS = new Set([
+  '$defs',
+  'definitions',
+  'dependencies',
+  'dependentSchemas',
+  'patternProperties',
+  'properties',
+]);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -52,7 +62,7 @@ export function removeRecursiveJsonSchemaRefs(schema: unknown): void {
   const expanding = new Set<object>();
   const expanded = new Set<object>();
 
-  const visit = (node: unknown) => {
+  const visit = (node: unknown, isSubschemaMap = false) => {
     if (Array.isArray(node)) {
       for (const item of node) visit(item);
       return;
@@ -62,7 +72,7 @@ export function removeRecursiveJsonSchemaRefs(schema: unknown): void {
     }
     expanding.add(node);
 
-    if (typeof node.$ref === 'string') {
+    if (!isSubschemaMap && typeof node.$ref === 'string') {
       const target = resolveLocalRef(root, node.$ref);
       if (isRecord(target) && expanding.has(target)) {
         delete node.$ref;
@@ -75,7 +85,13 @@ export function removeRecursiveJsonSchemaRefs(schema: unknown): void {
     }
 
     for (const [key, value] of Object.entries(node)) {
-      if (!DATA_KEYWORDS.has(key)) visit(value);
+      if (isSubschemaMap) {
+        visit(value);
+      } else if (SUBSCHEMA_MAP_KEYWORDS.has(key)) {
+        visit(value, true);
+      } else if (!DATA_KEYWORDS.has(key)) {
+        visit(value);
+      }
     }
 
     expanding.delete(node);

@@ -454,17 +454,25 @@ export const cloudAgentNextRouter = createTRPCRouter({
 
   /**
    * Whether the Worker shows preview for this session, and the preview URL with
-   * a `{port}` placeholder. The Worker owns both preview switches.
+   * a `{port}` placeholder. The Worker owns both preview switches. This is only
+   * a UI gate, so a Worker failure hides preview instead of failing the query.
    */
   getPreviewOptions: baseProcedure
     .input(basePreviewOptionsNextSchema)
     .output(basePreviewOptionsNextOutputSchema)
     .query(async ({ ctx, input }) => {
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
-      const options = await createCloudAgentNextClient(authToken).getPreviewOptions({
-        cloudAgentSessionId: input.cloudAgentSessionId,
-        organizationId: input.organizationId,
-      });
+      const options = await createCloudAgentNextClient(authToken)
+        .getPreviewOptions({
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          organizationId: input.organizationId,
+        })
+        .catch((error: unknown) => {
+          console.warn('[cloud-agent-next.getPreviewOptions] Worker call failed:', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return { enabled: false } as const;
+        });
       if (!options.enabled) return { enabled: false };
       return { enabled: true, urlTemplate: buildPreviewUrlTemplate(options.hostTemplate) };
     }),

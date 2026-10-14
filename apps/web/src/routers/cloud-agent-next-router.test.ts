@@ -1703,6 +1703,18 @@ describe('cloudAgentNextRouter.getPreviewOptions', () => {
     });
   });
 
+  it('returns disabled when the Worker call fails', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockGetPreviewOptions.mockRejectedValueOnce(new Error('No procedure found on path'));
+    const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
+
+    await expect(caller.getPreviewOptions({ cloudAgentSessionId })).resolves.toEqual({
+      enabled: false,
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
   it('passes the route organization to the Worker gate', async () => {
     const organizationId = '11111111-1111-4111-8111-111111111111';
     mockGetPreviewOptions.mockResolvedValueOnce({ enabled: false });

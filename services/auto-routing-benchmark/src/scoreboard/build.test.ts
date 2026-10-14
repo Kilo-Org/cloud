@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { rowsToRoutingTable } from '../db';
 import { buildScoreboard } from './build';
+import { summarizeSweep } from './sweep';
 import { compareScoreboards } from './compare';
 import { estimateClassifiedMetrics } from './production';
 import {
@@ -76,7 +77,7 @@ function build(
   replay: ReplayMetrics | null = null,
   options: Pick<
     Parameters<typeof buildScoreboard>[0],
-    'costProfile' | 'rerankProfile' | 'sweep' | 'rebuildFromSweep' | 'pricing'
+    'costProfile' | 'rerankProfile' | 'sweep' | 'rebuildFromSweep' | 'pricing' | 'complexityLabels'
   > = {}
 ) {
   return buildScoreboard({
@@ -91,6 +92,71 @@ function build(
 }
 
 describe('buildScoreboard', () => {
+  it('learns efforts from train buckets and evaluates mapped per-case held-out results', () => {
+    const route = 'implementation/code_generation';
+    const labels = Object.fromEntries([
+      ...Array.from({ length: 6 }, (_, i) => [`low-${i}`, 'low'] as const),
+      ...Array.from({ length: 6 }, (_, i) => [`high-${i}`, 'high'] as const),
+      ['held-low', 'low'] as const,
+      ['held-high', 'high'] as const,
+    ]);
+    const pairs: OfflineSweep['pairs'] = ['low', 'high'].map(variant => ({
+      model: 'fixture/shared',
+      variant,
+      results: [
+        ...['low', 'high'].flatMap(bucket =>
+          Array.from({ length: 6 }, (_, i) => ({
+            caseId: `${bucket}-${i}`,
+            rep: 0,
+            routeKey: route,
+            split: 'train' as const,
+            score: 1,
+            costUsd: variant === 'low' ? (bucket === 'low' ? 0.01 : 2) : (bucket === 'low' ? 4 : 0.1),
+            graderCostUsd: 0,
+            latencyMs: 100,
+            error: null,
+          }))
+        ),
+        ...['low', 'high'].map(bucket => ({
+          caseId: `held-${bucket}`,
+          rep: 0,
+          routeKey: route,
+          split: 'heldOut' as const,
+          score: variant === bucket ? 1 : 0,
+          costUsd: variant === bucket ? (bucket === 'low' ? 0.02 : 0.03) : 1,
+          graderCostUsd: 0,
+          latencyMs: variant === bucket ? (bucket === 'low' ? 20 : 40) : 1000,
+          ttftMs: variant === bucket ? (bucket === 'low' ? 5 : 7) : 500,
+          error: null,
+        })),
+      ],
+    }));
+    const sweep: OfflineSweep = {
+      startedAt: now.toISOString(),
+      truncated: false,
+      costUsd: 0,
+      graderCostUsd: 0,
+      pairs,
+      summaries: summarizeSweep(pairs),
+    };
+    const result = build(table, prod({ [route]: 1 }), null, {
+      sweep,
+      rebuildFromSweep: true,
+      complexityLabels: labels,
+    });
+    expect(result.quality.heldOut).toEqual({
+      accuracyWeighted: 1,
+      estimatedRequestUsdWeighted: 0.025,
+      p50LatencyMsWeighted: 30,
+      p50TtftMsWeighted: 6,
+      routes: 1,
+    });
+    const withoutMapping = build(table, prod({ [route]: 1 }), null, {
+      sweep,
+      rebuildFromSweep: true,
+    });
+    expect(withoutMapping.quality.heldOut?.accuracyWeighted).toBe(0.5);
+  });
   it('weights first candidates over shared routes and excludes routes missing from the mix', () => {
     const result = build(
       table,

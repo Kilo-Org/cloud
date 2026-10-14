@@ -9,6 +9,7 @@ import {
   AUTO_ROUTERS,
   type AutoRouter,
   resolveBenchmarkIdentity,
+  ComplexityLabelsSchema,
   type BenchmarkDeciderModel,
   type BenchmarkKind,
   type BenchmarkModelSummary,
@@ -19,6 +20,7 @@ import * as z from 'zod';
 import { BenchmarkConcurrencyBudgetError, getBenchmarkConfig, validateBenchmarkConcurrencyBudget } from './config';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
+import caseComplexity from './datasets/case-complexity.json';
 import type { RunModelRow, RunRow } from './db';
 import {
   countCaseResultsByLane,
@@ -35,6 +37,7 @@ import {
   getLatestRoutingTable,
   getSummaries,
   getSummariesForRuns,
+  getRoutingCaseResultsForEntries,
   insertRun,
   listLaneFailures,
   listPendingCurrentProfiles,
@@ -418,8 +421,9 @@ export async function publishPlatformRoutingTable(
     return null;
   }
 
-  const summaries = await getSummariesForRuns(env.BENCH_DB, [
-    ...new Set(readyEntries.map(r => r.runId)),
+  const [summaries, perCaseResults] = await Promise.all([
+    getSummariesForRuns(env.BENCH_DB, [...new Set(readyEntries.map(r => r.runId))]),
+    getRoutingCaseResultsForEntries(env.BENCH_DB, readyEntries),
   ]);
   const generatedAt = new Date().toISOString();
   const deciderModels: BenchmarkDeciderModel[] = readyEntries.map(({ entry }) => ({
@@ -429,23 +433,7 @@ export async function publishPlatformRoutingTable(
   }));
   const minAccuracy = Math.min(1, config.minAccuracy + (router === 'frontier' ? config.frontierMinAccuracyDelta : 0));
   const table = buildRoutingTable({
-    // Namespace the canonical artifact so identical legacy measurements republish.
-    version: `${computeRegistryRoutingTableVersion(
-      readyEntries.map(r => ({ runId: r.runId, model: r.entry.model, variant: r.entry.variant })),
-      {
-        router,
-        engineIdentity: current.engineIdentity,
-        accuracyNoiseBand: config.accuracyNoiseBand,
-        frontierMinAccuracyDelta: config.frontierMinAccuracyDelta,
-        minAccuracy,
-        switchCostFactor: config.switchCostFactor,
-        bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
-        productionTokenProfile: config.productionTokenProfile,
-        switchHorizonTurns: config.switchHorizonTurns,
-        lowConfidenceThreshold: config.lowConfidenceThreshold,
-        prices,
-      }
-    )}-variants`,
+    version: generatedAt,
     generatedAt,
     minAccuracy,
     accuracyNoiseBand: config.accuracyNoiseBand,
@@ -457,7 +445,27 @@ export async function publishPlatformRoutingTable(
     prices,
     deciderModels,
     summaries: filterSummariesByProvenance(readyEntries, summaries),
+    perCaseResults,
+    complexityLabels: ComplexityLabelsSchema.parse(caseComplexity),
   });
+  table.version = `${computeRegistryRoutingTableVersion(
+    readyEntries.map(r => ({ runId: r.runId, model: r.entry.model, variant: r.entry.variant })),
+    {
+      router,
+      engineIdentity: current.engineIdentity,
+      accuracyNoiseBand: config.accuracyNoiseBand,
+      frontierMinAccuracyDelta: config.frontierMinAccuracyDelta,
+      minAccuracy,
+      switchCostFactor: config.switchCostFactor,
+      bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
+      productionTokenProfile: config.productionTokenProfile,
+      switchHorizonTurns: config.switchHorizonTurns,
+      lowConfidenceThreshold: config.lowConfidenceThreshold,
+      prices,
+      summaries: filterSummariesByProvenance(readyEntries, summaries),
+      effortByComplexity: table.effortByComplexity,
+    }
+  )}-variants`;
 
   // The version hashes the contributing registry rows and the config knobs, so
   // an identical version means an identical table. Skip the write and the flush.

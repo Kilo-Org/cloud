@@ -85,13 +85,37 @@ Expand a route to inspect every ranked model/effort pair.
 - A candidate competes within the router's `accuracyNoiseBand` of its effective `minAccuracy` (default noise band 0.05).
 - Frontier's effective threshold is `min(1, minAccuracy + frontierMinAccuracyDelta)`; the delta defaults to 0.
 - Both routers use the same best-value formula, selecting models and efforts from their own measured pools.
-- Competing candidates are ordered by `estimatedRequestCostUsd × p50LatencyMs^1.5 / wilson^15`, lowest first.
+- Competing candidates are ordered by `estimatedRequestCostUsd × effectiveLatency^1.5 / wilson^15`, lowest first. With known TTFT, `effectiveLatency = p50TtftMs + LATENCY_TOTAL_WEIGHT × p50LatencyMs`, where the exported `LATENCY_TOTAL_WEIGHT` is 0.25; without TTFT, total `p50LatencyMs` alone preserves legacy ordering.
 - `estimatedRequestCostUsd` adds the configured `productionTokenProfile` prompt cost at catalog prices to `avgCostUsd`. Without a profile or pricing, it equals `avgCostUsd`.
 - `wilson` is the Wilson lower bound (z = 1) of accuracy over the candidate's measured `cases`. A well-measured candidate beats a thinly measured one at equal accuracy. Without `cases`, raw accuracy is used.
 - The other candidates follow by accuracy, then cost.
 - When `lowConfidenceThreshold` is set and the classifier's route confidence is below it, the worker picks the most accurate eligible candidate of the route instead of the first-ranked one.
 - `meetsThreshold` stays strict (`accuracy >= minAccuracy`) for sticky routing.
 - The ranking policy version is part of every registry table version, so a policy change republishes.
+
+The optional `effortByComplexity` table mapping selects a variant after the model
+has been picked, using the production classifier's `low`, `medium`, or `high`
+reasoning-complexity bucket. It never changes models or restores a candidate
+excluded by the decision filters. Same-model effort changes retain the prompt
+cache and do not trigger cost-switch logic; sticky-immediate turns retain the
+incumbent variant until a classification is available.
+
+Platform and custom-table builds read `case_results` for each ready pair's exact
+provenance run and join the committed `src/datasets/case-complexity.json` labels.
+Missing labels are ignored. Each route/model/bucket ranks its measured variants
+with the same value policy, falling back to the route-level variant when fewer
+than six distinct graded cases are available. Mappings are persisted with the
+table and included in its version identity.
+
+Regenerate the labels with the production classifier and gateway normalization:
+
+```bash
+OPENROUTER_API_KEY=... pnpm --filter auto-routing-benchmark exec tsx scripts/label-case-complexity.ts
+```
+
+If a classifier call fails, the script saves completed labels and identifies the
+failed case. Use `--resume` to continue that checkpoint; commit the generated file
+only after the script completes successfully.
 
 ## Grading
 
@@ -163,6 +187,12 @@ train/held-out splits. `--rebuild-from-sweep` ranks train data only with Wilson 
 pricing, and the cost profile; both builds evaluate exact first picks on held-out
 accuracy, estimated request cost, wall-clock latency, and TTFT
 (`quality.heldOut.p50TtftMsWeighted`, compared on the latency axis).
+Supply `--complexity-labels src/datasets/case-complexity.json` with
+`--rebuild-from-sweep` to learn complexity-specific effort choices from training
+cases only. Held-out accuracy, cost, latency, and TTFT then aggregate the raw
+per-case results of the mapped variant for each bucket, not the route-level
+variant's overall summary. Without labels, the existing route-level evaluation
+is unchanged.
 Direct TTFT is time to the first nonempty content or reasoning delta; final streaming
 usage supplies cost. Container TTFT uses the first text event timestamp (or text
 `time.start`) relative to request start, and is null when timestamps are unavailable.
@@ -230,6 +260,53 @@ route mix, table, and pricing snapshot for base and head; use saved table and pr
 files if the live inputs may change between builds. `benchmarkPerTaskUsdWeighted`
 remains the benchmark-only cost and can move differently from this production-input
 estimate.
+
+## Candidate screening
+
+Screen inexpensive catalog models before an admin adds them to the platform pool:
+
+```bash
+pnpm --filter auto-routing-benchmark screen:candidates --catalog live --pairs current-pairs.json --suite efficient --max-prompt-usd-per-mtok 3 --cases-per-route 4 --max-usd 5 --table table.json --cost-profile profile.json --out screen.json
+pnpm --filter auto-routing-benchmark screen:candidates --catalog file --catalog-file catalog.json --pairs current-pairs.json --suite frontier --max-prompt-usd-per-mtok 3 --cases-per-route 4 --max-usd 5 --table frontier-table.json --out screen.json
+```
+
+These caps are example screening settings, not production measurements.
+`--catalog` also accepts a saved catalog path directly. `--pairs` is an array
+of `{model, variant}` entries; every model already represented in it is excluded,
+regardless of effort. Eligible models must support text output and tools, have
+fixed nonnegative prompt and completion prices, and have a prompt price strictly
+below the USD-per-million-token cap. Virtual auto-routing entries are excluded.
+Each model runs once without variant overrides (the provider default), and once
+with its highest catalog-supported reasoning effort, when available. Full catalog
+variant fragments are retained, including controls beyond reasoning.
+
+The screen hashes case IDs with SHA-256 and takes the first N hashes per direct
+route from the selected suite. Every candidate sees the same cases; selection is
+stable when dataset order changes. Agentic routes require CLI execution and are
+explicitly listed in `excludedRoutes`, never simulated by direct completions.
+Direct requests, streaming TTFT, retries, long-context materialization, and grading
+reuse the offline sweep path. Set `OPENROUTER_API_KEY`; no container is required.
+
+The report contains model-wide and per-variant accuracy, Wilson lower bounds,
+benchmark and estimated production request cost, p50 TTFT and total latency, raw
+results, and route comparisons against the supplied table's current first pick.
+`--cost-profile` takes the same token-profile JSON as the scoreboard, or defaults
+to the table's profile. Candidate and incumbent prices use the catalog snapshot;
+an incumbent absent from it can use its saved table pricing. A route beats its
+current pick only with complete graded, priced samples and a strictly better
+finite value under the shared ranking policy and accuracy eligibility rule.
+Missing incumbent latency or required pricing prevents a recommendation.
+`recommend` is true when either screened variant beats the current pick on at
+least two distinct routes. It is an admin-review suggestion, not a pool change.
+The command never writes configuration, registry rows, or routing tables.
+
+`--max-usd` includes both model and grader spend. Requests run sequentially and
+budget is checked before each request and judge call, but one request can exceed
+the remaining budget because its actual cost is only known after completion.
+Missing usage, a failed judge call, or an indeterminate transport/body failure
+stops further spending and sets `spendIncomplete`; incomplete routes cannot
+recommend a model. Atomic
+checkpoints after each case retain partial results if the screen is interrupted.
 
 ## Admin endpoints
 

@@ -2,10 +2,18 @@ import { describe, expect, it } from 'vitest';
 import type {
   BenchmarkDeciderModel,
   BenchmarkModelSummary,
+  ComplexityLabels,
+  RoutingTable,
   TaxonomyRouteKey,
 } from '@kilocode/auto-routing-contracts';
 import { RoutingTableSchema, TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
-import { buildRoutingTable, computeRegistryRoutingTableVersion } from './routing-table-builder';
+import {
+  buildEffortByComplexity,
+  buildRoutingTable,
+  computeRegistryRoutingTableVersion,
+  MIN_COMPLEXITY_CASES,
+} from './routing-table-builder';
+import type { OfflineSweep } from './scoreboard/schema';
 
 const DECIDER_MODELS: BenchmarkDeciderModel[] = [
   { id: 'model/cheap', variant: null, reasoningEffort: null },
@@ -48,6 +56,158 @@ function summariesForEveryRoute(
   );
 }
 
+describe('buildEffortByComplexity', () => {
+  const route = 'implementation/code_generation';
+  const routes: RoutingTable['routes'] = {
+    [route]: ['low', 'high'].map(variant => ({
+      model: 'model/shared',
+      variant,
+      accuracy: 1,
+      avgCostUsd: 0.1,
+      meetsThreshold: true,
+    })),
+  };
+  const labels: ComplexityLabels = Object.fromEntries(
+    ['low', 'high'].flatMap(bucket =>
+      Array.from({ length: MIN_COMPLEXITY_CASES }, (_, i) => [`${bucket}-${i}`, bucket])
+    )
+  ) as ComplexityLabels;
+  function pairs(highCases = MIN_COMPLEXITY_CASES): OfflineSweep['pairs'] {
+    return ['low', 'high'].map(variant => ({
+      model: 'model/shared',
+      variant,
+      results: ['low', 'high'].flatMap(bucket =>
+        Array.from(
+          { length: bucket === 'high' ? highCases : MIN_COMPLEXITY_CASES },
+          (_, i) => ({
+            caseId: `${bucket}-${i}`,
+            rep: 0,
+            routeKey: route,
+            split: 'train' as const,
+            score: 1,
+            costUsd: variant === bucket ? 0.01 : 1,
+            graderCostUsd: 0,
+            latencyMs: 100,
+            error: null,
+          })
+        )
+      ),
+    }));
+  }
+
+  it('ranks variants independently for each measured complexity bucket', () => {
+    expect(buildEffortByComplexity(routes, pairs(), labels, 0.9)).toEqual({
+      [route]: { 'model/shared': { low: 'low', medium: 'low', high: 'high' } },
+    });
+  });
+
+  it('uses the route-level variant for sparse and absent buckets', () => {
+    const mapping = buildEffortByComplexity(routes, pairs(MIN_COMPLEXITY_CASES - 1), labels, 0.9);
+    expect(mapping[route]?.['model/shared']).toEqual({ low: 'low', medium: 'low', high: 'low' });
+  });
+
+  it('ignores unlabeled and infrastructure-error cases when deciding bucket coverage', () => {
+    expect(buildEffortByComplexity(routes, pairs(), {}, 0.9)[route]?.['model/shared']?.high).toBe('low');
+    const failed = pairs().map(pair => ({
+      ...pair,
+      results: pair.results.map(result =>
+        result.caseId.startsWith('high-')
+          ? { ...result, error: 'OpenRouter returned HTTP 503' }
+          : result
+      ),
+    }));
+    expect(buildEffortByComplexity(routes, failed, labels, 0.9)[route]?.['model/shared']?.high).toBe(
+      'low'
+    );
+  });
+
+  it('does not count repetitions as independent cases or train on held-out scores', () => {
+    const repeated = pairs(1).map(pair => ({
+      ...pair,
+      results: pair.results.flatMap(result =>
+        Array.from({ length: MIN_COMPLEXITY_CASES }, (_, rep) => ({ ...result, rep }))
+      ),
+    }));
+    expect(buildEffortByComplexity(routes, repeated, labels, 0.9)[route]?.['model/shared']?.high).toBe(
+      'low'
+    );
+    const heldOut = pairs().map(pair => ({
+      ...pair,
+      results: pair.results.map(result => ({ ...result, split: 'heldOut' as const })),
+    }));
+    expect(buildEffortByComplexity(routes, heldOut, labels, 0.9)[route]?.['model/shared']?.high).toBe(
+      'low'
+    );
+  });
+
+  it('does not choose pairs missing from the published model candidates', () => {
+    const measured = [
+      ...pairs(),
+      { ...pairs()[0], variant: 'unpublished', results: pairs()[0].results.map(r => ({ ...r, costUsd: 0 })) },
+    ];
+    expect(buildEffortByComplexity(routes, measured, labels, 0.9)[route]?.['model/shared']?.high).toBe(
+      'high'
+    );
+  });
+
+  it('preserves null as the selected variant instead of falling back to a named effort', () => {
+    const nullRoutes: RoutingTable['routes'] = {
+      [route]: [
+        { model: 'model/shared', variant: 'high', accuracy: 1, avgCostUsd: 1, meetsThreshold: true },
+        { model: 'model/shared', variant: null, accuracy: 1, avgCostUsd: 0.01, meetsThreshold: true },
+      ],
+    };
+    const measured = pairs().map(pair => ({ ...pair, variant: pair.variant === 'low' ? null : 'high' }));
+    expect(buildEffortByComplexity(nullRoutes, measured, labels, 0.9)[route]?.['model/shared']?.low).toBeNull();
+  });
+
+  it('includes complexity choices in registry table identity', () => {
+    const contributors = [{ runId: 'fixture', model: 'model/shared', variant: 'low' }];
+    const knobs = { minAccuracy: 0.9, switchCostFactor: 3, bestAccuracySwitchThreshold: 0.05 };
+    const base = computeRegistryRoutingTableVersion(contributors, knobs);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        effortByComplexity: buildEffortByComplexity(routes, pairs(), labels, 0.9),
+      })
+    ).not.toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        effortByComplexity: { [route]: { 'model/shared': { low: null } } },
+      })
+    ).not.toBe(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        effortByComplexity: { [route]: { 'model/shared': {} } },
+      })
+    );
+  });
+
+  it('attaches learned efforts when building the full routing table', () => {
+    const built = buildRoutingTable({
+      version: 'fixture-complexity',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.9,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      deciderModels: [
+        { id: 'model/shared', variant: 'low', reasoningEffort: null },
+        { id: 'model/shared', variant: 'high', reasoningEffort: null },
+      ],
+      summaries: TAXONOMY_ROUTE_KEYS.flatMap(routeKey =>
+        ['low', 'high'].map(variant => ({
+          ...summary('model/shared', routeKey, 1, variant === 'low' ? 0.1 : 1),
+          variant,
+        }))
+      ),
+      perCaseResults: pairs(),
+      complexityLabels: labels,
+    });
+    expect(built.effortByComplexity?.[route]?.['model/shared']?.high).toBe('high');
+  });
+});
+
 describe('production-cost table version', () => {
   it('isolates router, dataset identity and ranking configuration in the version hash', () => {
     const contributors = [{ runId: 'run', model: 'model', variant: 'high' }];
@@ -67,6 +227,24 @@ describe('production-cost table version', () => {
     }
   });
 
+  it('includes first-token measurements in the version independent of summary order', () => {
+    const contributors = [{ runId: 'synthetic-run', model: 'model/cheap', variant: null }];
+    const knobs = { minAccuracy: 0.9, switchCostFactor: 3, bestAccuracySwitchThreshold: 0.05 };
+    const summaries = [
+      { ...summary('model/cheap', TAXONOMY_ROUTE_KEYS[0], 1), p50TtftMs: 100 },
+      { ...summary('model/cheap', TAXONOMY_ROUTE_KEYS[1], 1), p50TtftMs: null },
+    ];
+    const base = computeRegistryRoutingTableVersion(contributors, { ...knobs, summaries });
+    expect(
+      computeRegistryRoutingTableVersion(contributors, { ...knobs, summaries: [...summaries].reverse() })
+    ).toBe(base);
+    expect(
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        summaries: summaries.map(s => ({ ...s, p50TtftMs: 200 })),
+      })
+    ).not.toBe(base);
+  });
   it('republishes when the profile, horizon or model prices change', () => {
     const contributors = [{ runId: 'synthetic-run', model: 'synthetic/model', variant: null }];
     const knobs = { minAccuracy: 0.9, switchCostFactor: 3, bestAccuracySwitchThreshold: 0.05 };

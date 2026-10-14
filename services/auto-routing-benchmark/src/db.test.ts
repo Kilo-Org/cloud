@@ -1,8 +1,10 @@
+import { DatabaseSync } from 'node:sqlite';
 import { describe, it, expect } from 'vitest';
 import { RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { RankedCandidate, RoutingTable } from '@kilocode/auto-routing-contracts';
 import {
   exactPairKey,
+  getRoutingCaseResultsForEntries,
   mapRunRow,
   mapSummaryRow,
   routingTableToRows,
@@ -11,6 +13,80 @@ import {
 import type { BenchmarkModelSummary } from '@kilocode/auto-routing-contracts';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 
+describe('routing case results provenance read', () => {
+  it('reads only the ready exact pairs from their own measuring runs', async () => {
+    const sqlite = new DatabaseSync(':memory:');
+    sqlite.exec(`
+      CREATE TABLE case_results (
+        run_id TEXT, model TEXT, variant TEXT, case_id TEXT, route_key TEXT,
+        rep INTEGER, score REAL, cost_usd REAL, latency_ms INTEGER, error TEXT
+      );
+      INSERT INTO case_results VALUES
+        ('run-a', 'shared/model', 'low', 'correct-low', 'implementation/code_generation', 0, 1, 0.01, 100, NULL),
+        ('run-b', 'shared/model', 'high', 'correct-high', 'implementation/code_generation', 0, 1, 0.02, 200, NULL),
+        ('run-b', 'shared/model', 'low', 'wrong-run', 'implementation/code_generation', 0, 0, 5, 500, NULL),
+        ('run-a', 'shared/model', 'high', 'wrong-pair', 'implementation/code_generation', 0, 0, 5, 500, NULL),
+        ('run-a', 'other/model', 'low', 'wrong-model', 'implementation/code_generation', 0, 0, 5, 500, NULL),
+        ('run-null', 'null/model', '', 'null-variant', 'debugging/bug_fixing', 0, 1, 0.03, 300, NULL),
+        ('run-null', 'null/model', '', 'no-route', NULL, 0, 1, 0.03, 300, NULL);
+    `);
+    const binding = {
+      prepare(sqlText: string) {
+        const statement = sqlite.prepare(sqlText);
+        return {
+          bind(...params: unknown[]) {
+            return {
+              async raw() {
+                return statement.all(...(params as never[])).map(row => Object.values(row));
+              },
+            };
+          },
+        };
+      },
+    } as D1Database;
+    try {
+      const results = await getRoutingCaseResultsForEntries(binding, [
+        { entry: { model: 'shared/model', variant: 'low' }, runId: 'run-a' },
+        { entry: { model: 'shared/model', variant: 'high' }, runId: 'run-b' },
+        { entry: { model: 'null/model', variant: null }, runId: 'run-null' },
+      ]);
+      expect(results.flatMap(pair => pair.results.map(result => result.caseId)).sort()).toEqual([
+        'correct-high',
+        'correct-low',
+        'null-variant',
+      ]);
+      expect(results.find(pair => pair.model === 'null/model')?.variant).toBeNull();
+      expect(results.flatMap(pair => pair.results).every(result => result.split === 'train')).toBe(true);
+      expect(await getRoutingCaseResultsForEntries(binding, [])).toEqual([]);
+    } finally {
+      sqlite.close();
+    }
+  });
+});
+
+describe('complexity mapping persistence', () => {
+  it('round-trips learned variants through routing table D1 rows', () => {
+    const table: RoutingTable = {
+      version: 'fixture-efforts',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
+      source: 'benchmark',
+      routes: {
+        'implementation/code_generation': [
+          { model: 'm', variant: 'high', accuracy: 1, avgCostUsd: 1, meetsThreshold: true },
+        ],
+      },
+      effortByComplexity: { 'implementation/code_generation': { m: { low: null, high: 'high' } } },
+    };
+    const rows = routingTableToRows(table, table.generatedAt);
+    expect(rows.tableRow.effort_by_complexity).toEqual(table.effortByComplexity);
+    expect(rowsToRoutingTable(rows.tableRow, rows.candidateRows).effortByComplexity).toEqual(
+      table.effortByComplexity
+    );
+  });
+});
 describe('variant storage helpers', () => {
   it('round-trips null and empty as the D1 null/default convention', () => {
     expect(variantToStorage(null)).toBe('');
@@ -306,6 +382,7 @@ describe('rowsToRoutingTable', () => {
       production_token_profile: null,
       switch_horizon_turns: null,
       low_confidence_threshold: null,
+      effort_by_complexity: null,
       source: 'benchmark',
     };
     const candidateRows = [
@@ -342,6 +419,7 @@ describe('rowsToRoutingTable', () => {
       production_token_profile: null,
       switch_horizon_turns: null,
       low_confidence_threshold: null,
+      effort_by_complexity: null,
       source: 'benchmark',
     };
     const candidateRows = [

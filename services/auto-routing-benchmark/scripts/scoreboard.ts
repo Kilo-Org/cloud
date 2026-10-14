@@ -150,6 +150,7 @@ async function main() {
         sweep: { type: 'string' },
         'rebuild-from-sweep': { type: 'boolean', default: false },
         'complexity-labels': { type: 'string' },
+        'accuracy-noise-band': { type: 'string' },
       },
       allowPositionals: true,
     });
@@ -200,6 +201,9 @@ async function main() {
         rebuildFromSweep: values['rebuild-from-sweep'],
         complexityLabels,
         pricing,
+        accuracyNoiseBand: values['accuracy-noise-band'] === undefined
+          ? undefined
+          : z.coerce.number().min(0).max(1).parse(values['accuracy-noise-band']),
         now: new Date(),
       })
     );

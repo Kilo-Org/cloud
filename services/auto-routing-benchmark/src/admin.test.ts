@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  BenchmarkRegistryResponseSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   type BenchmarkConfig,
@@ -639,6 +640,32 @@ describe('POST /admin/runs', () => {
 });
 
 describe('GET /admin/registry', () => {
+  it.each([
+    { query: '', router: 'efficient' as const },
+    { query: '?router=efficient', router: 'efficient' as const },
+    { query: '?router=frontier', router: 'frontier' as const },
+  ])('emits $router for registry request "$query"', async ({ query, router }) => {
+    vi.mocked(getConfigRows).mockResolvedValue({
+      ...TEST_CONFIG_ROWS,
+      config: { ...TEST_CONFIG_ROWS.config, router },
+    });
+
+    const response = await authedGet(`/admin/registry${query}`);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual({
+      router,
+      engineIdentity: expect.any(String),
+      repetitions: TEST_CONFIG.deciderRepetitions,
+      platform: { pending: 0, running: 0, ready: 0, failed: 0 },
+      user: { pending: 0, running: 0, ready: 0, failed: 0 },
+      platformEntries: [],
+    });
+    expect(BenchmarkRegistryResponseSchema.parse(body).router).toBe(router);
+    expect(getConfigRows).toHaveBeenCalledWith(env.BENCH_DB, router);
+  });
+
   it('exposes exact current platform-pair coverage separately from aggregate queue counts', async () => {
     vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
     const platformEntries = [
@@ -650,6 +677,7 @@ describe('GET /admin/registry', () => {
     const response = await authedGet('/admin/registry');
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
+      router: 'efficient',
       repetitions: TEST_CONFIG.deciderRepetitions,
       platformEntries,
     });

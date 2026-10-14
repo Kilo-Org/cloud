@@ -438,6 +438,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     if (hasConstraints || configuredPool !== null) {
       const capabilitiesStartedAt = performance.now();
       capabilities = await getModelCapabilities(c.env, {
+        router,
         codingPlanModelId: codingPlanActive ? codingPlanPreference.modelId : null,
         waitUntil: promise => c.executionCtx.waitUntil(promise),
         ...(configuredPool !== null

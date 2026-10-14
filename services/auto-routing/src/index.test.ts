@@ -408,10 +408,24 @@ describe('auto routing worker', () => {
     configGet.mockImplementation(async (key: string) =>
       key === 'routing_table_frontier_v1' ? JSON.stringify(frontierTable) : null
     );
-    const response = await decideRequest(mirrorPayload({ router: 'frontier' }));
+    dbWhereCaps.mockResolvedValue([
+      {
+        openrouterId: 'anthropic/claude-opus-4.6',
+        inputModalities: ['image', 'file'],
+        contextLength: 200_000,
+        isActive: true,
+      },
+    ]);
+    const response = await decideRequest(mirrorPayload({
+      router: 'frontier',
+      constraints: { requiredInputModalities: ['image', 'file'] },
+    }));
     await expect(response.json()).resolves.toMatchObject({
       decision: { model: 'anthropic/claude-opus-4.6', tableVersion: 'frontier-table' },
     });
+    expect(getModelCapabilitiesMock).toHaveBeenCalledWith(
+      env, expect.objectContaining({ router: 'frontier' })
+    );
     expect(cacheIdFromName).toHaveBeenCalledWith('frontier:user:user-1:task:task-123');
     expect(cacheReadConversationState).toHaveBeenCalledWith(expect.stringMatching(/^frontier:/));
     expect(configGet).not.toHaveBeenCalledWith('routing_table_v1');

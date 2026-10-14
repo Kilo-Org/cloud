@@ -8,6 +8,7 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import { RoutingTableSchema, TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
 import {
+  buildCustomRoutingTable,
   buildEffortByComplexity,
   buildRoutingTable,
   computeRegistryRoutingTableVersion,
@@ -97,6 +98,63 @@ describe('buildEffortByComplexity', () => {
       [route]: { 'model/shared': { low: 'low', medium: 'low', high: 'high' } },
     });
   });
+
+  it.each([
+    { accuracyNoiseBand: undefined, expectedVariant: 'low' },
+    { accuracyNoiseBand: 0.05, expectedVariant: 'low' },
+    { accuracyNoiseBand: 0.01, expectedVariant: 'high' },
+  ])(
+    'uses noise band $accuracyNoiseBand consistently for route and complexity rankings',
+    ({ accuracyNoiseBand, expectedVariant }) => {
+      const measured = pairs().map(pair => ({
+        ...pair,
+        results: pair.results.map(result => ({
+          ...result,
+          score: pair.variant === 'low' ? 0.97 : 1,
+          costUsd: pair.variant === 'low' ? 0.01 : 1,
+        })),
+      }));
+      const summaries = TAXONOMY_ROUTE_KEYS.flatMap(routeKey =>
+        ['low', 'high'].map(variant => ({
+          ...summary('model/shared', routeKey, variant === 'low' ? 0.97 : 1,
+            variant === 'low' ? 0.01 : 1),
+          variant,
+        }))
+      );
+      const params = {
+        generatedAt: '2026-01-01T00:00:00.000Z',
+        minAccuracy: 0.9,
+        accuracyNoiseBand,
+        switchCostFactor: 3,
+        bestAccuracySwitchThreshold: 0.05,
+        summaries,
+        perCaseResults: measured,
+        complexityLabels: labels,
+      };
+      const platform = buildRoutingTable({
+        ...params,
+        version: 'noise-band',
+        deciderModels: ['low', 'high'].map(variant => ({
+          id: 'model/shared', variant, reasoningEffort: null,
+        })),
+      });
+      const custom = buildCustomRoutingTable({
+        ...params,
+        readyEntries: ['low', 'high'].map(variant => ({
+          entry: { model: 'model/shared', variant }, runId: 'noise-band',
+        })),
+        summaries: summaries.map(value => ({ ...value, runId: 'noise-band' })),
+      });
+      for (const table of [platform, custom]) {
+        expect(table?.routes[route]?.[0]?.variant).toBe(expectedVariant);
+        expect(table?.effortByComplexity?.[route]?.['model/shared']?.low).toBe(expectedVariant);
+        expect(table?.effortByComplexity?.[route]?.['model/shared']?.high).toBe(expectedVariant);
+      }
+      expect(
+        buildEffortByComplexity(routes, measured, labels, 0.9, null, accuracyNoiseBand)[route]
+      ).toEqual(platform.effortByComplexity?.[route]);
+    }
+  );
 
   it('uses the route-level variant for sparse and absent buckets', () => {
     const mapping = buildEffortByComplexity(routes, pairs(MIN_COMPLEXITY_CASES - 1), labels, 0.9);

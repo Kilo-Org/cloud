@@ -30,6 +30,7 @@ type BuildScoreboardInput = {
   rebuildFromSweep?: boolean;
   complexityLabels?: ComplexityLabels | null;
   pricing?: Record<string, CandidatePricing | null> | null;
+  accuracyNoiseBand?: number;
 };
 
 export function buildScoreboard({
@@ -45,6 +46,7 @@ export function buildScoreboard({
   rebuildFromSweep = false,
   complexityLabels = null,
   pricing = null,
+  accuracyNoiseBand,
 }: BuildScoreboardInput): Scoreboard {
   const profile = costProfile ?? rerankProfile ?? table.productionTokenProfile ?? null;
   if (rebuildFromSweep && !sweep) throw new Error('Rebuilding requires an offline sweep');
@@ -119,10 +121,12 @@ export function buildScoreboard({
           return [
             [
               route,
-              rankCandidates(candidates, table.minAccuracy, { profile }).map(candidate => ({
-                ...candidate,
-                p50LatencyMs: latencies.get(candidateKey(candidate)) ?? null,
-              })),
+              rankCandidates(candidates, table.minAccuracy, { profile, accuracyNoiseBand }).map(
+                candidate => ({
+                  ...candidate,
+                  p50LatencyMs: latencies.get(candidateKey(candidate)) ?? null,
+                })
+              ),
             ],
           ];
         })
@@ -139,7 +143,7 @@ export function buildScoreboard({
                 p50LatencyMs: candidate.p50LatencyMs ?? null,
               })),
               table.minAccuracy,
-              { profile: rerankProfile }
+              { profile: rerankProfile, accuracyNoiseBand }
             ).map(candidate => ({
               ...candidate,
               p50LatencyMs: latencies[candidateKey(candidate)],
@@ -150,7 +154,14 @@ export function buildScoreboard({
       : table.routes;
   const effortByComplexity =
     rebuildFromSweep && sweep && complexityLabels
-      ? buildEffortByComplexity(routes, sweep.pairs, complexityLabels, table.minAccuracy, profile)
+      ? buildEffortByComplexity(
+          routes,
+          sweep.pairs,
+          complexityLabels,
+          table.minAccuracy,
+          profile,
+          accuracyNoiseBand
+        )
       : table.effortByComplexity;
   const routeKeys = Object.keys(table.routes);
   const routeMix =

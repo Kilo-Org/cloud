@@ -216,6 +216,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       return queue;
     };
     return c.json({
+      router,
       engineIdentity: current.engineIdentity,
       repetitions: current.repetitions,
       platform: toQueue(platform),

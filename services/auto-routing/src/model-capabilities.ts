@@ -3,6 +3,7 @@ import { getWorkerDb, modelStats } from '@kilocode/db';
 import { inArray } from 'drizzle-orm';
 import { kvReadThrough, type KvReadThroughMetadata } from './kv-read-through';
 import { getRoutingTable } from './routing-table';
+import { DEFAULT_AUTO_ROUTER, type AutoRouter } from '@kilocode/auto-routing-contracts';
 
 // Capability snapshot for a single model. `inputModalities` is the synonym-
 // folded set (e.g. an `image_url` row is mapped to `image` so callers do not
@@ -167,9 +168,12 @@ async function queryModelCapabilities(
   return out;
 }
 
-const cache = ttlCached<ModelCapabilitiesEnv, ModelCapabilitiesCacheValue>(
+const cache = ttlCached<
+  { env: ModelCapabilitiesEnv; router: AutoRouter },
+  ModelCapabilitiesCacheValue
+>(
   MODEL_CAPABILITIES_IN_MEMORY_TTL_MS,
-  async env => loadAll(env)
+  async ({ env, router }) => loadAll(env, router)
 );
 
 // Tombstones are deliberately NOT merged: callers must see a tombstoned id
@@ -196,17 +200,15 @@ export function clearModelCapabilitiesCache(): void {
 // One-shot load that reads the full cached union of capability rows from
 // KV, fills any missing entries from the DB, and returns the whole union
 // (as a plain object so it is JSON-serialisable for the in-memory cache).
-async function loadAll(env: ModelCapabilitiesEnv): Promise<ModelCapabilitiesCacheValue> {
+async function loadAll(
+  env: ModelCapabilitiesEnv,
+  router: AutoRouter
+): Promise<ModelCapabilitiesCacheValue> {
   const fromKv = await kvReadThrough<ModelCapabilitiesCacheValue>({
     kv: env.AUTO_ROUTING_CONFIG,
     key: MODEL_CAPABILITIES_KV_KEY,
     ttlSeconds: MODEL_CAPABILITIES_KV_TTL_SECONDS,
-    fetchOrigin: () => {
-      // Cache-miss path: ask the DB for every id we have ever needed.
-      // `loadAll` does not know the current id set, so it falls back to
-      // scanning the routing table for the canonical id set.
-      return queryAllIds(env);
-    },
+    fetchOrigin: () => queryAllIds(env, router),
     parse: (raw: string) => {
       try {
         const parsed: unknown = JSON.parse(raw);
@@ -293,8 +295,11 @@ async function writeBack(
   }
 }
 
-async function queryAllIds(env: ModelCapabilitiesEnv): Promise<ModelCapabilitiesCacheValue | null> {
-  const routingTable = await getRoutingTable(env);
+async function queryAllIds(
+  env: ModelCapabilitiesEnv,
+  router: AutoRouter
+): Promise<ModelCapabilitiesCacheValue | null> {
+  const routingTable = await getRoutingTable(env, router);
   if (!routingTable) {
     return null;
   }
@@ -331,11 +336,13 @@ function withTombstones(
 export async function getModelCapabilities(
   env: ModelCapabilitiesEnv,
   options: {
+    router?: AutoRouter;
     codingPlanModelId?: string | null;
     additionalModelIds?: ReadonlyArray<string>;
     waitUntil?: (promise: Promise<unknown>) => void;
   } = {}
 ): Promise<ModelCapabilitiesMap> {
+  const router = options.router ?? DEFAULT_AUTO_ROUTER;
   const load = async (): Promise<Map<string, ModelCapabilities>> => {
     // We derive the id set inside the module so the caller (decide.ts) does
     // not have to wait on the routing-table fetch before kicking off the
@@ -343,7 +350,7 @@ export async function getModelCapabilities(
     // 500ms sub-budget covers the routing-table read as well as the cache/DB
     // lookups. `routing-table.ts`'s `ttlCached` dedups the concurrent in-flight
     // call with whichever other component also asked for the table.
-    const routingTable = await getRoutingTable(env);
+    const routingTable = await getRoutingTable(env, router);
     const ids = new Set<string>();
     if (routingTable) {
       for (const route of Object.values(routingTable.routes)) {
@@ -366,7 +373,7 @@ export async function getModelCapabilities(
     }
 
     const result = new Map<string, ModelCapabilities>();
-    const all = await cache.get(env);
+    const all = await cache.get({ env, router });
     mergeInto(result, all);
     if (
       options.codingPlanModelId === BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID &&

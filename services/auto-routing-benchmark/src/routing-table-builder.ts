@@ -29,7 +29,8 @@ export function buildEffortByComplexity(
   perCaseResults: OfflineSweep['pairs'],
   labels: ComplexityLabels,
   minAccuracy: number,
-  profile: ProductionTokenProfile | null = null
+  profile: ProductionTokenProfile | null = null,
+  accuracyNoiseBand?: number
 ): EffortByComplexity {
   const mapping: EffortByComplexity = {};
   for (const bucket of ReasoningComplexitySchema.options) {
@@ -72,7 +73,7 @@ export function buildEffortByComplexity(
         const ranked = rankCandidates(
           measured.map(summary => ({ ...summary, pricing: candidate.pricing })),
           minAccuracy,
-          { profile }
+          { profile, accuracyNoiseBand }
         );
         (routeMapping[candidate.model] ??= {})[bucket] = ranked[0]
           ? (ranked[0].variant ?? null)
@@ -176,7 +177,8 @@ export function buildRoutingTable(params: {
             params.perCaseResults,
             params.complexityLabels,
             minAccuracy,
-            params.productionTokenProfile ?? null
+            params.productionTokenProfile ?? null,
+            params.accuracyNoiseBand
           ),
         }
       : {}),
@@ -384,7 +386,8 @@ export function buildCustomRoutingTable(params: {
           params.perCaseResults,
           params.complexityLabels,
           minAccuracy,
-          params.productionTokenProfile ?? null
+          params.productionTokenProfile ?? null,
+          params.accuracyNoiseBand
         )
       : undefined;
 

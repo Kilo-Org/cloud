@@ -102,6 +102,63 @@ beforeEach(() => {
 });
 
 describe('getModelCapabilities', () => {
+  it.each([undefined, 'efficient', 'frontier'] as const)(
+    'loads capabilities from the selected router table on a cold cache (%s)',
+    async requestedRouter => {
+      const router = requestedRouter ?? 'efficient';
+      const model = `${router}/image-model`;
+      const table: RoutingTable = {
+        ...SAMPLE_ROUTING_TABLE,
+        routes: {
+          'implementation/code_generation': [
+            { model, accuracy: 1, avgCostUsd: 0.01, meetsThreshold: true },
+          ],
+        },
+      };
+      mockGetRoutingTable.mockImplementation(async (_env, selectedRouter) =>
+        selectedRouter === router ? table : null
+      );
+      dbWhere.mockResolvedValue([
+        { openrouterId: model, inputModalities: ['image', 'file'], contextLength: 32768 },
+      ]);
+      const env = makeEnv(null);
+      const result = await getModelCapabilities(env, { router: requestedRouter });
+      expect(result.get(model)?.inputModalities).toEqual(new Set(['image', 'file']));
+      expect(mockGetRoutingTable).toHaveBeenCalledTimes(2);
+      expect(mockGetRoutingTable.mock.calls.every(([calledEnv, selectedRouter]) =>
+        calledEnv === env && selectedRouter === router
+      )).toBe(true);
+      expect(dbWhere).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('fills frontier-only capabilities when the shared union was warmed by efficient', async () => {
+    const frontierTable: RoutingTable = {
+      ...SAMPLE_ROUTING_TABLE,
+      routes: {
+        'implementation/code_generation': [
+          { model: 'frontier/image-model', accuracy: 1, avgCostUsd: 0.01, meetsThreshold: true },
+        ],
+      },
+    };
+    mockGetRoutingTable.mockImplementation(async (_env, router) =>
+      router === 'frontier' ? frontierTable : SAMPLE_ROUTING_TABLE
+    );
+    dbWhere.mockResolvedValueOnce([
+      { openrouterId: 'a/chat', inputModalities: ['image'], contextLength: 8192 },
+      { openrouterId: 'b/chat', inputModalities: ['text'], contextLength: 16384 },
+    ]).mockResolvedValueOnce([
+      { openrouterId: 'frontier/image-model', inputModalities: ['image', 'file'], contextLength: 32768 },
+    ]);
+    const env = makeEnv(null);
+    await getModelCapabilities(env);
+    const result = await getModelCapabilities(env, { router: 'frontier' });
+    expect(result.get('frontier/image-model')?.inputModalities.has('image')).toBe(true);
+    expect(result.get('frontier/image-model')?.inputModalities.has('file')).toBe(true);
+    expect(mockGetRoutingTable).toHaveBeenLastCalledWith(env, 'frontier');
+    expect(dbWhere).toHaveBeenCalledTimes(2);
+  });
+
   it('folds image_url to image in the capability set', async () => {
     dbWhere.mockImplementation(() =>
       Promise.resolve([

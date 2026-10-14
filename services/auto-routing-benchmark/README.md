@@ -41,6 +41,8 @@ classifier runs use the efficient configuration even when requested from the fro
 Classifier inference billing is owned by the routing worker. Usage IDs and durable delivery
 objects include the router, so an otherwise identical call on another router cannot be
 deduplicated as a retry of the first call.
+Capability lookups derive candidate IDs from the selected router's table; the capability
+cache remains a shared model-ID union because modalities and context limits belong to models.
 
 Frontier initially has no saved configuration or published table. No default model pool or
 efficient table is fabricated for it. Before enabling frontier serving, administrators must
@@ -218,6 +220,10 @@ pnpm --filter auto-routing-benchmark scoreboard build --label baseline --table l
 pnpm --filter auto-routing-benchmark scoreboard build --label candidate --table live --pricing live --cost-profile p.json --sweep sweep.json --rebuild-from-sweep --out candidate.json
 pnpm --filter auto-routing-benchmark scoreboard compare baseline.json candidate.json --relative-only
 ```
+
+Use `--accuracy-noise-band <0..1>` when rebuilding or reranking a scoreboard with a
+nondefault ranking band. It applies to both route ranking and learned complexity
+variants; omitting it preserves the default `0.05` band.
 
 On the work VM, build and start the existing bench image (from the repository root):
 

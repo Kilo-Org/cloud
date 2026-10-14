@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Uppdatera GitHub-appen"
       },
       "githubIpAllowList": {
-        "description": "Kodgranskaren inaktiverades eftersom GitHub-organisationens lista över tillåtna IP-adresser blockerar Kilo. Kontakta hi@kilocode.ai för att få hjälp och aktivera sedan kodgranskaren igen."
+        "description": "Kodgranskaren inaktiverades eftersom GitHub-organisationens lista över tillåtna IP-adresser blockerar Kilo. Kontakta hi@kilo.ai för att få hjälp och aktivera sedan kodgranskaren igen."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kodgranskaren inaktiverades eftersom Kilo inte kan skapa en åtkomsttoken för det här projektet i GitLab. Ge behörighet som projektansvarig eller aktivera åtkomsttoken för projekt och aktivera sedan kodgranskaren igen.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Uppdatera kodgranskarens inställningar"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Kodgranskaren inaktiverades efter att kloningen av kodarkivet överskred tidsgränsen tre gånger i dag. Kontakta hi@kilocode.ai för att få hjälp och aktivera sedan kodgranskaren igen."
+        "description": "Kodgranskaren inaktiverades efter att kloningen av kodarkivet överskred tidsgränsen tre gånger i dag. Kontakta hi@kilo.ai för att få hjälp och aktivera sedan kodgranskaren igen."
       },
       "title": "Kodgranskaren kräver en åtgärd.",
       "recoveryLabel": "Kontakta supporten"

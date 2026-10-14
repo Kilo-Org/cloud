@@ -1307,6 +1307,65 @@ describe('normalize', () => {
       });
     });
 
+    it('carries the owning phase of a v2 setup command through', () => {
+      const result = normalize(
+        createRaw('preparing', {
+          step: 'setup_commands',
+          message: 'Installing dependencies',
+          version: 2,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'msg-1',
+          revision: 3,
+          timestamp: 1000,
+          action: 'step_started',
+          stepId: 'command:install',
+          parentStepId: 'phase:setup_commands:2',
+          kind: 'setup_command',
+          label: 'Install dependencies',
+        })
+      );
+      expect(result).toMatchObject({
+        type: 'preparing',
+        action: 'step_started',
+        stepId: 'command:install',
+        parentStepId: 'phase:setup_commands:2',
+      });
+    });
+
+    it.each([{ startedRevision: 2, parentStepId: 'phase:setup_commands:2' }, {}])(
+      'preserves optional preparation snapshot metadata %j',
+      metadata => {
+        const stepSnapshot = {
+          id: 'command:install',
+          key: 'setup_commands',
+          kind: 'setup_command',
+          label: 'Install dependencies',
+          status: 'completed',
+          startedAt: 1000,
+          completedAt: 2000,
+          revision: 5,
+          ...metadata,
+        };
+        const result = normalize(
+          createRaw('preparing', {
+            step: 'setup_commands',
+            message: 'Preparation snapshot',
+            version: 2,
+            attemptId: 'attempt-1',
+            triggerMessageId: 'msg-1',
+            revision: 5,
+            timestamp: 2000,
+            action: 'step_snapshot',
+            stepId: stepSnapshot.id,
+            stepSnapshot,
+          })
+        );
+        expect(result).toMatchObject({ type: 'preparing', action: 'step_snapshot', stepSnapshot });
+        if (result?.type !== 'preparing') throw new Error('Expected preparing event');
+        expect(result.stepSnapshot).toEqual(stepSnapshot);
+      }
+    );
+
     it('returns null when step is missing', () => {
       expect(normalize(createRaw('preparing', { message: 'Cloning repository...' }))).toBeNull();
     });

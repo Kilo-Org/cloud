@@ -1040,7 +1040,7 @@
         "recoveryLabel": "Cập nhật ứng dụng GitHub"
       },
       "githubIpAllowList": {
-        "description": "Trình rà soát mã đã bị tắt vì danh sách địa chỉ IP được phép của tổ chức GitHub này chặn Kilo. Hãy liên hệ hi@kilocode.ai để được hỗ trợ rồi bật lại Trình rà soát mã."
+        "description": "Trình rà soát mã đã bị tắt vì danh sách địa chỉ IP được phép của tổ chức GitHub này chặn Kilo. Hãy liên hệ hi@kilo.ai để được hỗ trợ rồi bật lại Trình rà soát mã."
       },
       "gitlabProjectAccessRequired": {
         "description": "Trình rà soát mã đã bị tắt vì Kilo không thể tạo mã truy cập dự án trên GitLab cho dự án này. Hãy cấp quyền người bảo trì hoặc cho phép tạo mã truy cập dự án rồi bật lại Trình rà soát mã.",
@@ -1055,7 +1055,7 @@
         "recoveryLabel": "Cập nhật cài đặt Trình rà soát mã"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Trình rà soát mã đã bị tắt sau ba lần sao chép kho lưu trữ quá thời gian chờ trong hôm nay. Hãy liên hệ hi@kilocode.ai để được hỗ trợ rồi bật lại Trình rà soát mã."
+        "description": "Trình rà soát mã đã bị tắt sau ba lần sao chép kho lưu trữ quá thời gian chờ trong hôm nay. Hãy liên hệ hi@kilo.ai để được hỗ trợ rồi bật lại Trình rà soát mã."
       },
       "title": "Trợ lý rà soát mã cần bạn xử lý sự cố.",
       "recoveryLabel": "Liên hệ hỗ trợ"

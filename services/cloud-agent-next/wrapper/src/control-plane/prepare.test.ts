@@ -29,6 +29,7 @@ const NOW = 1_800_000_000_000;
 import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
 import type { restoreWorktreeRecovery } from './worktree-recovery.js';
 import { restoreSession } from '../restore-session.js';
+import { createWorkspaceCapture } from './workspace-capture.js';
 
 describe('replacement workspace local recovery', () => {
   const recovery = {
@@ -285,6 +286,11 @@ function createHarness(
     beforeInstall?: () => Promise<void>;
     recoverWorktree?: typeof restoreWorktreeRecovery;
     beforeCapture?: () => Promise<void>;
+    captureRequest?: (
+      sessionId: string,
+      commit: string | undefined,
+      timeoutMs: number
+    ) => Promise<boolean>;
   } = {}
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -373,6 +379,8 @@ function createHarness(
             request: async (sessionId: string, commit: string | undefined, timeoutMs: number) => {
               await options.beforeCapture?.();
               captureRequests.push({ sessionId, commit, timeoutMs });
+              if (options.captureRequest)
+                return options.captureRequest(sessionId, commit, timeoutMs);
               if (captureResult === 'throw') throw new Error('capture channel failed');
               return captureResult;
             },
@@ -2111,6 +2119,28 @@ describe('capturing a repository snapshot', () => {
 
     expect(harness.captureRequests).toEqual([]);
     expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
+  });
+
+  it('continues through Kilo startup when the capture acknowledgement times out', async () => {
+    const capture = createWorkspaceCapture({ send: () => undefined });
+    const harness = createHarness(timers({ captureMs: 20 }), {
+      capture: true,
+      captureRequest: (sessionId, commit, timeoutMs) =>
+        capture.request(sessionId, commit, timeoutMs),
+    });
+    const spec = captureSpec();
+    harness.setSessionExists(false);
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.captureRequests).toHaveLength(1);
+    expect(harness.logs).toContain(`control-plane capture not saved session=${spec.sessionId}`);
+    const setUrls = harness.gitCalls.filter(args => args[0] === 'remote' && args[1] === 'set-url');
+    expect(setUrls.at(-1)?.[3]).toContain('git-1');
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.ensureSessionCalls()).toBe(1);
+    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
+    expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(false);
   });
 
   it('fails the route when the credential cannot be restored after a capture', async () => {

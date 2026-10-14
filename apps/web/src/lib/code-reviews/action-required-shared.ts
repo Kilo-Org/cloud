@@ -90,11 +90,11 @@ export function getCodeReviewActionRequiredRecoveryHref(
   }
 
   if (reason === 'github_ip_allow_list') {
-    return 'mailto:hi@kilocode.ai?subject=GitHub%20IP%20allow%20list%20for%20Code%20Reviewer';
+    return 'mailto:hi@kilo.ai?subject=GitHub%20IP%20allow%20list%20for%20Code%20Reviewer';
   }
 
   if (reason === 'repeated_repository_clone_timeout') {
-    return 'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer';
+    return 'mailto:hi@kilo.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer';
   }
 
   if (reason === 'gitlab_project_access_required') {

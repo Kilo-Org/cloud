@@ -93,9 +93,11 @@ function renderWorkspaceTabs(
       ? props.chatSessions.find(chat => chat.sessionId === props.currentSessionId)?.worktreeId
       : props.worktreeId;
   const value =
-    props.activeTabId === CHAT_TAB_ID && worktreeId && props.currentSessionId
-      ? `chat:${props.currentSessionId}`
-      : props.activeTabId;
+    props.pendingChat?.owned && props.pendingChat.worktreeId === worktreeId
+      ? props.pendingChat.tabId
+      : props.activeTabId === CHAT_TAB_ID && worktreeId && props.currentSessionId
+        ? `chat:${props.currentSessionId}`
+        : props.activeTabId;
   return renderToStaticMarkup(
     createElement(
       Tabs,
@@ -955,6 +957,67 @@ describe('pending new-chat tab', () => {
   function tabByText(container: HTMLElement, text: string): HTMLButtonElement | undefined {
     return tabButtons(container).find(button => button.textContent?.includes(text));
   }
+
+  it.each(['append', 'replace'] as const)(
+    'keeps one new-chat tab throughout the %s creation handoff',
+    placement => {
+      const source = makeSession('ses_first', 'First worktree chat');
+      const sibling = makeSession('ses_second', 'Second worktree chat');
+      const created = makeSession('ses_created', 'New session - 2026-10-14');
+      const pendingChat = {
+        tabId: 'pending-new-chat:op-1',
+        worktreeId: 'worktree_shared',
+        sourceKiloSessionId: source.sessionId,
+        placement,
+        owned: true,
+        resolvedKiloSessionId: null,
+        originLocationKey: 'origin',
+      };
+      const openChatSessionIds =
+        placement === 'replace'
+          ? [created.sessionId, sibling.sessionId]
+          : [source.sessionId, sibling.sessionId, created.sessionId];
+
+      for (const stage of [
+        { chatSessions: [source, sibling], pendingChat },
+        {
+          chatSessions: [source, sibling],
+          openChatSessionIds,
+          pendingChat: { ...pendingChat, resolvedKiloSessionId: created.sessionId },
+        },
+        {
+          chatSessions: [source, sibling, created],
+          openChatSessionIds,
+          pendingChat: { ...pendingChat, resolvedKiloSessionId: created.sessionId },
+          currentSessionId: created.sessionId,
+        },
+      ]) {
+        const html = renderWorkspaceTabs({ ...stage, worktreeId: 'worktree_shared' });
+        const tabs = html.match(/<button\b[^>]*role="tab"[^>]*>[\s\S]*?<\/button>/g) ?? [];
+        expect(tabs).toHaveLength(placement === 'replace' ? 2 : 3);
+        expect(tabs.filter(tab => tab.includes('aria-selected="true"'))).toHaveLength(1);
+        const pendingTab = findButtonMarkup(html, '>New chat<');
+        expect(pendingTab).toContain('aria-busy="true"');
+        expect(pendingTab).toContain('aria-selected="true"');
+        expect(html).not.toContain(created.prompt);
+        expect(html).toContain(sibling.prompt);
+        if (placement === 'replace') expect(html).not.toContain(source.prompt);
+        else expect(html).toContain(source.prompt);
+      }
+
+      const html = renderWorkspaceTabs({
+        chatSessions: [source, sibling, created],
+        openChatSessionIds,
+        currentSessionId: created.sessionId,
+        pendingChat: null,
+      });
+      const tabs = html.match(/<button\b[^>]*role="tab"[^>]*>[\s\S]*?<\/button>/g) ?? [];
+      expect(tabs).toHaveLength(placement === 'replace' ? 2 : 3);
+      expect(findButtonMarkup(html, created.prompt)).toContain('aria-selected="true"');
+      expect(html).not.toContain('aria-busy="true"');
+      expect(html).not.toContain('>New chat<');
+    }
+  );
 
   it('keeps the source tab selectable next to the pending tab in append mode', () => {
     const dom = installTabsTestDom();

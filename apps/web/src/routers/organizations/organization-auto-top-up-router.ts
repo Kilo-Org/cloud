@@ -84,20 +84,17 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
       const { organizationId, currentEnabled, amountCents } = input;
 
       if (currentEnabled) {
-        // Disabling auto-top-up
         await db
           .update(organizations)
           .set({ auto_top_up_enabled: false })
           .where(eq(organizations.id, organizationId));
         return { enabled: false } as const;
       } else {
-        // Enabling auto-top-up
         const config = await db.query.auto_top_up_configs.findFirst({
           where: eq(auto_top_up_configs.owned_by_organization_id, organizationId),
         });
 
         if (config?.stripe_payment_method_id) {
-          // Has existing payment method - enable directly
           await db
             .update(organizations)
             .set({ auto_top_up_enabled: true })
@@ -112,7 +109,6 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
             .where(eq(auto_top_up_configs.owned_by_organization_id, organizationId));
           return { enabled: true } as const;
         } else {
-          // No payment method - redirect to Stripe checkout
           const stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
           const selectedAmount = amountCents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
 

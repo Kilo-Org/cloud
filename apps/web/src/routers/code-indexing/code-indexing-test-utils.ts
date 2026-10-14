@@ -44,7 +44,6 @@ export function generateFakeEmbedding(text: string): number[] {
   return embedding.map((val: number) => val / magnitude);
 }
 
-// Setup mocks for AI SDK and OpenAI
 export function setupEmbeddingMocks() {
   // Mock AI SDK
   jest.mock('ai', () => ({

@@ -139,7 +139,6 @@ describe('cli-sessions-router', () => {
     it('should include git_url in list response when set', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Create a session with git_url
       const sessionWithGitUrl = await caller.cliSessions.createV2({
         title: 'Session with Git URL',
         git_url: 'https://github.com/test/repo',
@@ -154,7 +153,6 @@ describe('cli-sessions-router', () => {
       expect(sessionInList).toBeDefined();
       expect(sessionInList!.git_url).toBe('https://github.com/test/repo');
 
-      // Clean up
       await db.delete(cliSessions).where(eq(cliSessions.session_id, sessionWithGitUrl.session_id));
     });
 
@@ -164,7 +162,6 @@ describe('cli-sessions-router', () => {
       // The sessions created in beforeAll don't have git_url set
       const result = await caller.cliSessions.list({});
 
-      // All sessions from beforeAll should have null git_url
       const sessionsWithoutGitUrl = result.cliSessions.filter(s =>
         s.title.startsWith('Test Session')
       );
@@ -636,13 +633,11 @@ describe('cli-sessions-router', () => {
     it('should create a session with parent_session_id when parent has no organization', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Create parent session without organization
       const parentSession = await caller.cliSessions.createV2({
         title: 'Parent Session',
         created_on_platform: 'vscode',
       });
 
-      // Create child session with parent_session_id
       const result = await caller.cliSessions.createV2({
         title: 'Child Session',
         created_on_platform: 'vscode',
@@ -664,14 +659,12 @@ describe('cli-sessions-router', () => {
 
       const caller = await createCallerForUser(regularUser.id);
 
-      // Create parent session with organization
       const parentSession = await caller.cliSessions.createV2({
         title: 'Parent Session with Org',
         created_on_platform: 'vscode',
         organization_id: testOrganization.id,
       });
 
-      // Create child session with parent_session_id
       const result = await caller.cliSessions.createV2({
         title: 'Child Session',
         created_on_platform: 'vscode',
@@ -693,7 +686,6 @@ describe('cli-sessions-router', () => {
     });
 
     it('should throw NOT_FOUND when creating session with parent_session_id where parent belongs to another user', async () => {
-      // First, create the parent session directly in the database with organization
       const [parentSession] = await db
         .insert(cliSessions)
         .values({
@@ -704,7 +696,6 @@ describe('cli-sessions-router', () => {
         })
         .returning();
 
-      // Add regularUser as a member of the organization
       await db.insert(organization_memberships).values({
         organization_id: testOrganization.id,
         kilo_user_id: regularUser.id,
@@ -750,13 +741,11 @@ describe('cli-sessions-router', () => {
     it('should throw NOT_FOUND when creating session with parent_session_id belonging to another user', async () => {
       const regularUserCaller = await createCallerForUser(regularUser.id);
 
-      // Create parent session as regularUser
       const parentSession = await regularUserCaller.cliSessions.createV2({
         title: 'Parent Session',
         created_on_platform: 'vscode',
       });
 
-      // Try to create child session as otherUser
       const otherUserCaller = await createCallerForUser(otherUser.id);
 
       await expect(

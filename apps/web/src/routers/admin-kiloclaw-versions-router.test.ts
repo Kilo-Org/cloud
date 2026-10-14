@@ -247,7 +247,6 @@ describe('admin.kiloclawVersions.updateVersionStatus', () => {
   });
 
   afterAll(async () => {
-    // Reset status for other tests
     await db
       .update(kiloclaw_image_catalog)
       .set({ status: 'available' })
@@ -488,7 +487,6 @@ describe('admin.kiloclawVersions pin operations', () => {
       expect(updated.image_tag).toBe(catalogEntry2.image_tag);
       expect(updated.reason).toBe('Updated pin');
 
-      // Verify only one pin exists
       const pins = await caller.admin.kiloclawVersions.listPins({});
       expect(pins.pagination.totalCount).toBe(1);
     });

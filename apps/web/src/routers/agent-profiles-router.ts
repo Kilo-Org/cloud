@@ -28,7 +28,6 @@ function isForeignKeyViolation(error: unknown): boolean {
   );
 }
 
-// Input schemas
 const ProfileIdSchema = z.object({
   profileId: z.uuid(),
 });
@@ -48,10 +47,8 @@ const CommandsSchema = z.object({
   commands: z.array(z.string().max(500)).max(20),
 });
 
-// Owner type schema
 const ProfileOwnerTypeSchema = z.enum(['organization', 'user']);
 
-// Output schemas
 const ProfileSummarySchema = z.object({
   id: z.uuid(),
   name: z.string(),
@@ -469,8 +466,6 @@ export const agentProfilesRouter = createTRPCRouter({
       return repoBindingService.listBindings(db, owner);
     }),
 
-  // ============ MCP SERVERS ============
-
   /**
    * Create an MCP server on a profile from a CLI-native input (local or remote).
    * Each env/header value is encrypted at-rest with the agent env vars public key
@@ -567,8 +562,6 @@ export const agentProfilesRouter = createTRPCRouter({
       );
       return { success: true };
     }),
-
-  // ============ SKILLS ============
 
   /**
    * Create a custom skill by pasting SKILL.md directly (optionally with
@@ -678,8 +671,6 @@ export const agentProfilesRouter = createTRPCRouter({
       );
       return { success: true };
     }),
-
-  // ============ AGENTS ============
 
   /**
    * Create an agent on a profile. The agent config is injected into

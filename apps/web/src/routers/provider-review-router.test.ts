@@ -22,7 +22,6 @@ import { providerLedgerResourceKey, providerReviewRouter } from './provider-revi
 const ORG_ID = '2b1d4c8e-9f3a-4e5d-8c7b-6a5948372615';
 const USER_ID = 'user-1';
 
-// ----- mocked seams -----------------------------------------------------------
 // Every jest.mock factory below delegates LAZILY (arrow closures) so the
 // hoisted mock registration never touches the const bindings during the
 // import phase.
@@ -141,8 +140,6 @@ jest.mock('@/lib/provider-review/bitbucket-write', () => ({
   mergePullRequest: (...a: unknown[]) => bitbucketWrite.mergePullRequest(...a),
 }));
 
-// ----- fixtures ---------------------------------------------------------------
-
 const gitlabBase = {
   platform: 'gitlab' as const,
   projectPath: 'group/sub/repo',
@@ -231,8 +228,6 @@ beforeEach(() => {
   bitbucketWrite.addComment.mockResolvedValue({ done: true, replayed: false });
 });
 
-// ----- inputs are provider-discriminated, strict, and carry no identity -------
-
 describe('providerReviewRouter inputs', () => {
   it('rejects host, token, instanceUrl, and userId fields on the GitLab arm', async () => {
     for (const smuggled of [
@@ -277,8 +272,6 @@ describe('providerReviewRouter inputs', () => {
     );
   });
 });
-
-// ----- identity is server-derived ----------------------------------------------
 
 describe('providerReviewRouter identity derivation', () => {
   it('runs ensureOrganizationAccess before any provider call when an organizationId is present', async () => {
@@ -369,8 +362,6 @@ describe('providerReviewRouter identity derivation', () => {
     );
   });
 });
-
-// ----- the shared operation ledger ------------------------------------------------
 
 describe('providerReviewRouter ledger', () => {
   it('admits provider writes into the shared pr domain with a provider-tagged resource key', async () => {

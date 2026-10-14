@@ -539,7 +539,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       const config = await getAgentConfig(input.organizationId, 'code_review', platform);
 
       if (!config) {
-        // Return default configuration
         return {
           isEnabled: false,
           reviewStyle: 'balanced' as const,
@@ -700,7 +699,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           createdBy: ctx.user.id,
         });
 
-        // For GitLab: sync webhooks if auto-configure is enabled
         let webhookSyncResult = null;
         if (
           platform === PLATFORM.GITLAB &&
@@ -721,7 +719,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
             if (webhookSecret) {
               try {
-                // Get a valid access token (handles refresh if expired)
                 const accessToken = await getValidGitLabToken(integration, {
                   userId: ctx.user.id,
                   organizationId: input.organizationId,
@@ -742,7 +739,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
                   instanceUrl
                 );
 
-                // Update integration metadata with new webhook configuration
                 const existingMetadata = (integration.metadata as Record<string, unknown>) || {};
                 await updateIntegrationMetadata(integration.id, {
                   ...existingMetadata,
@@ -761,7 +757,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
                   webhookSyncResult
                 );
               } catch (webhookError) {
-                // Log but don't fail the config save
                 logExceptInTest('[saveReviewConfig] Webhook sync failed for organization', {
                   error:
                     webhookError instanceof Error ? webhookError.message : String(webhookError),
@@ -783,7 +778,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           }
         }
 
-        // Audit log
         await createAuditLog({
           organization_id: input.organizationId,
           action: 'organization.settings.change',

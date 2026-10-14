@@ -81,12 +81,10 @@ function isSessionNotFoundError(err: unknown): boolean {
   if (err instanceof TRPCClientError) {
     const data = err.data as { code?: string; httpStatus?: number } | undefined;
     const shape = err.shape as { data?: { code?: string; httpStatus?: number } } | undefined;
-    // Check TRPC error code
     const code = data?.code ?? shape?.data?.code;
     if (code === 'NOT_FOUND') {
       return true;
     }
-    // Also check HTTP status 404
     const httpStatus = data?.httpStatus ?? shape?.data?.httpStatus;
     if (httpStatus === 404) {
       return true;
@@ -1705,7 +1703,6 @@ export const cliSessionsV2Router = createTRPCRouter({
     .input(GetSessionInputSchema)
     .output(
       z.object({
-        // DB fields
         session_id: z.string(),
         title: z.string().nullable(),
         cloud_agent_session_id: z.string().nullable(),

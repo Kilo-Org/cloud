@@ -186,7 +186,6 @@ describe('active-sessions-router.list', () => {
           organizationId: null,
         },
       ]);
-      // Assert the explicit camelCase keys exist (not snake_case).
       const row = result.sessions[0]!;
       expect(Object.keys(row)).toEqual(
         expect.arrayContaining(['createdOnPlatform', 'createdAt', 'updatedAt'])

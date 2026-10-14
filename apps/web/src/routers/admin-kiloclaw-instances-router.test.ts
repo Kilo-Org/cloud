@@ -228,13 +228,11 @@ describe('admin.kiloclawInstances.listKiloCliRuns', () => {
     try {
       const caller = await createCallerForUser(adminUser.id);
 
-      // Without instanceId — returns both
       const allResult = await caller.admin.kiloclawInstances.listKiloCliRuns({
         userId: cliRunUser.id,
       });
       expect(allResult.runs).toHaveLength(2);
 
-      // With first instanceId — returns only the first run
       const firstResult = await caller.admin.kiloclawInstances.listKiloCliRuns({
         userId: cliRunUser.id,
         instanceId: cliRunInstanceId,
@@ -242,7 +240,6 @@ describe('admin.kiloclawInstances.listKiloCliRuns', () => {
       expect(firstResult.runs).toHaveLength(1);
       expect(firstResult.runs[0]).toMatchObject({ id: cliRunId });
 
-      // With second instanceId — returns only the second run
       const secondResult = await caller.admin.kiloclawInstances.listKiloCliRuns({
         userId: cliRunUser.id,
         instanceId: secondInstanceId,
@@ -997,7 +994,6 @@ describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
 
 describe('admin.kiloclawInstances.listKiloCliRuns', () => {
   it('scopes results to the given instanceId', async () => {
-    // Create a second instance for the same user with its own CLI run
     const [otherInstance] = await db
       .insert(kiloclaw_instances)
       .values({
@@ -1024,7 +1020,6 @@ describe('admin.kiloclawInstances.listKiloCliRuns', () => {
     try {
       const caller = await createCallerForUser(adminUser.id);
 
-      // Without instanceId — returns runs from both instances
       const allRuns = await caller.admin.kiloclawInstances.listKiloCliRuns({
         userId: cliRunUser.id,
       });
@@ -1032,14 +1027,12 @@ describe('admin.kiloclawInstances.listKiloCliRuns', () => {
       expect(allIds).toContain(cliRunId);
       expect(allIds).toContain(otherRun.id);
 
-      // Scoped to the original instance — only its run
       const scopedOriginal = await caller.admin.kiloclawInstances.listKiloCliRuns({
         userId: cliRunUser.id,
         instanceId: cliRunInstanceId,
       });
       expect(scopedOriginal.runs.map(r => r.id)).toEqual([cliRunId]);
 
-      // Scoped to the other instance — only its run
       const scopedOther = await caller.admin.kiloclawInstances.listKiloCliRuns({
         userId: cliRunUser.id,
         instanceId: otherInstance.id,
@@ -2050,7 +2043,6 @@ describe('admin.kiloclawInstances scheduled actions', () => {
     });
 
     it('rejects scheduling on a destroyed instance', async () => {
-      // Mark the test instance destroyed.
       await db
         .update(kiloclaw_instances)
         .set({ destroyed_at: new Date().toISOString() })
@@ -2124,7 +2116,6 @@ describe('admin.kiloclawInstances scheduled actions', () => {
     });
 
     it('multi-instance happy path creates one parent + one stage + N targets', async () => {
-      // Build a second instance owned by a different user.
       const secondUser = await insertTestUser();
       const [secondInstance] = await db
         .insert(kiloclaw_instances)
@@ -2160,7 +2151,6 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       expect(targets).toHaveLength(2);
       const targetInstanceIds = new Set(targets.map(t => t.instance_id));
       expect(targetInstanceIds).toEqual(new Set([testInstanceId, secondInstance.id]));
-      // Each target is stamped with the right user_id.
       const userIdByInstance = new Map(targets.map(t => [t.instance_id, t.user_id]));
       expect(userIdByInstance.get(testInstanceId)).toBe(regularUser.id);
       expect(userIdByInstance.get(secondInstance.id)).toBe(secondUser.id);

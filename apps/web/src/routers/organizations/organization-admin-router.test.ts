@@ -525,14 +525,12 @@ describe('organization admin router', () => {
     it('should keep earlier next_credit_expiration_at when granting later expiry', async () => {
       const caller = await createCallerForUser(adminUser.id);
 
-      // First grant with earlier expiry
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 5,
         expiry_date: '2024-02-01T00:00:00.000Z',
       });
 
-      // Second grant with later expiry
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 5,
@@ -571,7 +569,6 @@ describe('organization admin router', () => {
     });
 
     it('should set original_baseline_microdollars_used from org microdollars_used', async () => {
-      // Set up org with some usage
       await db
         .update(organizations)
         .set({ microdollars_used: 2_000_000, total_microdollars_acquired: 5_000_000 })
@@ -800,19 +797,16 @@ describe('organization admin router', () => {
     it('does not double-count a nullified grant after re-granting with a new expiry', async () => {
       const caller = await createCallerForUser(adminUser.id);
 
-      // 1. Grant $100 expiring in the future.
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 100,
         expiry_date: '2030-01-01T00:00:00.000Z',
       });
 
-      // 2. Remove (nullify) all credits.
       await caller.organizations.admin.nullifyCredits({
         organizationId: testOrganization.id,
       });
 
-      // 3. Re-add $40 with a different expiration date.
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 40,

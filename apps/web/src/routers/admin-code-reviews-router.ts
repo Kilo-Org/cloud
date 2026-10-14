@@ -393,7 +393,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get overview KPIs
   getOverviewStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
     const statusTable =
@@ -496,11 +495,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       inProgressCount,
       billingErrorCount,
       billingRate: terminalCount > 0 ? (billingErrorCount / terminalCount) * 100 : 0,
-      // Success rate = completed / terminal states
       successRate: terminalCount > 0 ? (completedCount / terminalCount) * 100 : 0,
-      // Failure rate = (failed + interrupted) / terminal states
       failureRate: terminalCount > 0 ? ((failedCount + interruptedCount) / terminalCount) * 100 : 0,
-      // Cancelled rate = cancelled / terminal states (the remainder to reach 100%)
       cancelledRate: terminalCount > 0 ? (cancelledCount / terminalCount) * 100 : 0,
       avgDurationSeconds: Number(stats.avg_duration_seconds) || 0,
       waitStartedCount,
@@ -513,7 +509,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get daily time series data
   getDailyStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
     const dayExpr = accountingDayExpr(input);
@@ -575,7 +570,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     }));
   }),
 
-  // Get cancellation reasons analysis
   getCancellationAnalysis: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const createdAt = accountingCreatedAt(input);
     const statusTable =
@@ -663,7 +657,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       ...buildBaseConditions(input),
     ] as SQL[];
 
-    // Categorized error summary
     const categorizedQuery = db
       .select({
         category: errorCategory,
@@ -848,7 +841,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     const waitSeconds =
       input.retryAccountingMode === 'all_attempts' ? attemptWaitSecondsExpr : waitSecondsExpr;
 
-    // Personal vs Org breakdown
     const ownershipBreakdownQuery = db
       .select({
         ownership_type: ownershipTypeExpr,
@@ -1113,7 +1105,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     }));
   }),
 
-  // Get CSV export data
   getExportData: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
 
@@ -1207,7 +1198,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       .limit(10000);
   }),
 
-  // Search users for filter dropdown
   searchUsers: adminProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {
@@ -1230,7 +1220,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       return result;
     }),
 
-  // Search organizations for filter dropdown
   searchOrganizations: adminProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {

@@ -31,12 +31,10 @@ export const sendMessageBaseSchema = z.object({
   forceNewSession: z.boolean().optional(),
 });
 
-// Common extension for organizationId
 export const organizationIdSchema = z.object({
   organizationId: z.uuid(),
 });
 
-// Image upload URL request schema
 export const getImageUploadUrlSchema = z.object({
   messageUuid: z.uuid(),
   imageId: z.uuid(),
@@ -44,7 +42,6 @@ export const getImageUploadUrlSchema = z.object({
   contentLength: z.number().int().positive().max(APP_BUILDER_IMAGE_MAX_SIZE_BYTES),
 });
 
-// Schema for fetching historical messages for a legacy v1 session
 export const legacySessionMessagesBaseSchema = z.object({
   projectId: z.uuid(),
   cloudAgentSessionId: z.string().min(1),

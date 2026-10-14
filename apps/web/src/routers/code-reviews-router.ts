@@ -250,7 +250,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
       const config = await getAgentConfigForOwner(owner, 'code_review', platform);
 
       if (!config) {
-        // Return default configuration
         return {
           isEnabled: false,
           reviewStyle: 'balanced' as const,
@@ -319,7 +318,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
         const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
         const platform = input.platform ?? 'github';
 
-        // Get previous config to determine which repos were previously selected
         const previousConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
         const previousRepoIds =
           (previousConfig?.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids ||
@@ -337,7 +335,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
           thinking_effort: override.thinkingEffort ?? null,
         }));
 
-        // Save the agent config
         await upsertAgentConfigForOwner({
           owner,
           agentType: 'code_review',
@@ -362,7 +359,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
           createdBy: ctx.user.id,
         });
 
-        // For GitLab: sync webhooks if auto-configure is enabled
         let webhookSyncResult = null;
         if (
           platform === PLATFORM.GITLAB &&
@@ -380,7 +376,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
 
             if (webhookSecret) {
               try {
-                // Get a valid access token (handles refresh if expired)
                 const accessToken = await getValidGitLabToken(integration, {
                   userId: ctx.user.id,
                 });
@@ -400,7 +395,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
                   instanceUrl
                 );
 
-                // Update integration metadata with new webhook configuration
                 await updateIntegrationMetadataForOwner(
                   owner,
                   PLATFORM.GITLAB,
@@ -419,7 +413,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
 
                 logExceptInTest('[saveReviewConfig] Webhook sync completed', webhookSyncResult);
               } catch (webhookError) {
-                // Log but don't fail the config save
                 logExceptInTest('[saveReviewConfig] Webhook sync failed', {
                   error:
                     webhookError instanceof Error ? webhookError.message : String(webhookError),

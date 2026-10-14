@@ -55,7 +55,6 @@ function extractRepoNameFromUrl(githubUrl: string): string | null {
     if (pathParts.length < 2) {
       return null;
     }
-    // Get repo name (second part of path), remove .git extension if present
     const repoName = pathParts[1].replace(/\.git$/, '');
     return repoName || null;
   } catch {
@@ -92,7 +91,6 @@ async function processOssRow(
   const normalizedEmail = email.toLowerCase();
 
   try {
-    // Extract org name from GitHub repository URL
     const orgName = extractRepoNameFromUrl(githubUrl);
     if (!orgName) {
       return {
@@ -103,7 +101,6 @@ async function processOssRow(
       };
     }
 
-    // Check if an OSS organization with this repo name already exists
     const [existingOssOrg] = await db
       .select({ id: organizations.id, name: organizations.name })
       .from(organizations)
@@ -125,20 +122,17 @@ async function processOssRow(
       };
     }
 
-    // Check if user with this email already exists in Kilo
     const [existingUser] = await db
       .select({ id: kilocode_users.id })
       .from(kilocode_users)
       .where(eq(kilocode_users.google_user_email, normalizedEmail))
       .limit(1);
 
-    // Calculate values
     const now = new Date();
     const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
     const creditsMicrodollars = creditsDollars > 0 ? creditsDollars * 1_000_000 : null;
 
     const result = await db.transaction(async (tx: DrizzleTransaction) => {
-      // 1. Create organization
       const [organization] = await tx
         .insert(organizations)
         .values({
@@ -163,7 +157,6 @@ async function processOssRow(
       }
 
       if (existingUser) {
-        // User EXISTS: Directly add them to the organization as Owner
         await tx.insert(organization_memberships).values({
           organization_id: organization.id,
           kilo_user_id: existingUser.id,
@@ -180,7 +173,6 @@ async function processOssRow(
           monthlyCreditsUsd: creditsDollars,
         });
       } else {
-        // User does NOT exist: Create invitation for them to accept after signing up
         const inviteToken = randomUUID();
         const inviteExpiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year expiry for OSS invites
 
@@ -193,7 +185,6 @@ async function processOssRow(
           expires_at: inviteExpiry.toISOString(),
         });
 
-        // Send invitation email
         const acceptInviteUrl = getAcceptInviteUrl(inviteToken);
         await sendOssInviteNewUserEmail({
           to: normalizedEmail,
@@ -205,7 +196,6 @@ async function processOssRow(
         });
       }
 
-      // 3. If credits > 0, grant credits using the standard function
       if (creditsDollars > 0) {
         const creditResult = await grantEntityCreditForCategory(
           { user: adminUser, organization: organization },
@@ -262,7 +252,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
    *    (used for existing users directly added to org)
    */
   listOssSponsorships: adminProcedure.query(async () => {
-    // Get all organizations with OSS sponsorship tier set in settings
     const ossOrgs = await db
       .select({
         id: organizations.id,
@@ -280,7 +269,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
         )
       );
 
-    // For each org, find the owner email (from invitation or direct membership)
     const results = await Promise.all(
       ossOrgs.map(async org => {
         let email: string | null = null;
@@ -304,7 +292,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
 
         if (ownerInvitation) {
           email = ownerInvitation.email;
-          // Check if user with this email exists
           const [user] = await db
             .select({ id: kilocode_users.id })
             .from(kilocode_users)
@@ -334,7 +321,6 @@ export const ossSponsorshipRouter = createTRPCRouter({
             kiloUserId = ownerMembership.kilo_user_id;
             hasKiloAccount = true;
 
-            // Look up the user's email
             const [user] = await db
               .select({ google_user_email: kilocode_users.google_user_email })
               .from(kilocode_users)
@@ -347,11 +333,9 @@ export const ossSponsorshipRouter = createTRPCRouter({
 
         const monthlyCredits = org.settings.oss_monthly_credit_amount_microdollars;
 
-        // Check GitHub integration status
         const githubIntegration = await getPrimaryGitHubIntegrationForOrganization(org.id);
         const hasGitHubIntegration = githubIntegration !== null;
 
-        // Check Code Reviews configuration status
         const codeReviewConfig = await getAgentConfig(org.id, 'code_review', 'github');
         const hasCodeReviewsEnabled = codeReviewConfig?.is_enabled === true;
 

@@ -158,12 +158,9 @@ export const autoTriageRouter = createTRPCRouter({
         });
       }
 
-      // Authorization check based on owner type
       if (ticket.owned_by_organization_id) {
-        // Organization ticket: verify user is org member
         await ensureOrganizationAccess(ctx, ticket.owned_by_organization_id);
       } else if (ticket.owned_by_user_id) {
-        // Personal ticket: verify user owns it
         if (ticket.owned_by_user_id !== ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -171,7 +168,6 @@ export const autoTriageRouter = createTRPCRouter({
           });
         }
       } else {
-        // Should not happen, but handle edge case
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Invalid ticket ownership data',
@@ -204,12 +200,9 @@ export const autoTriageRouter = createTRPCRouter({
           });
         }
 
-        // Authorization check based on owner type
         if (ticket.owned_by_organization_id) {
-          // Organization ticket: verify user is org member
           await ensureOrganizationAccess(ctx, ticket.owned_by_organization_id);
         } else if (ticket.owned_by_user_id) {
-          // Personal ticket: verify user owns it
           if (ticket.owned_by_user_id !== ctx.user.id) {
             throw new TRPCError({
               code: 'FORBIDDEN',
@@ -217,14 +210,12 @@ export const autoTriageRouter = createTRPCRouter({
             });
           }
         } else {
-          // Should not happen, but handle edge case
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Invalid ticket ownership data',
           });
         }
 
-        // Only allow retriggering failed tickets
         if (ticket.status !== 'failed') {
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -232,7 +223,6 @@ export const autoTriageRouter = createTRPCRouter({
           });
         }
 
-        // Reset the ticket for retry
         await resetTriageTicketForRetry(input.ticketId);
 
         return successResult({ message: 'Triage ticket retriggered successfully' });
@@ -294,7 +284,6 @@ export const autoTriageRouter = createTRPCRouter({
           await requireActiveSubscriptionOrTrial(fullInput.organizationId);
         }
 
-        // Build config object with defaults for optional fields
         const config = {
           enabled_for_issues: fullInput.enabled_for_issues,
           repository_selection_mode: fullInput.repository_selection_mode,

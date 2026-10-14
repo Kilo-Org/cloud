@@ -54,9 +54,6 @@ type KiloclawInternalClientMockShape = {
 };
 
 jest.setTimeout(15_000);
-
-// ── Mocks ──────────────────────────────────────────────────────────────────
-
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   const { errors } = require('stripe').default ?? require('stripe');
@@ -173,9 +170,6 @@ jest.mock('@kilocode/web-shared/lib/posthog', () => ({
     alias: jest.fn(),
   }),
 }));
-
-// ── Dynamic imports (after mocks) ──────────────────────────────────────────
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let createCallerForUser: (userId: string) => Promise<any>;
 
@@ -218,9 +212,6 @@ beforeAll(async () => {
   const mod = await import('@/routers/test-utils');
   createCallerForUser = mod.createCallerForUser;
 });
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 let user: User;
 
 beforeEach(async () => {
@@ -300,7 +291,6 @@ beforeEach(async () => {
     (priceId: string) => priceId === 'price_standard_intro'
   );
 
-  // Reset stripe mocks
   stripeMock.checkout.sessions.create.mockReset();
   stripeMock.checkout.sessions.list.mockReset();
   stripeMock.checkout.sessions.list.mockResolvedValue({ data: [], has_more: false });
@@ -334,7 +324,6 @@ beforeEach(async () => {
   kiloclawInternalClientMock.__startAsyncMock.mockResolvedValue(undefined);
   posthogCaptureMock.mockReset();
 
-  // Default mock returns for live-fetch calls
   stripeMock.subscriptions.retrieve.mockResolvedValue({
     schedule: null,
     items: { data: [{ price: { id: 'price_standard' } }] },
@@ -583,9 +572,6 @@ async function createCanceledTrialAndPaidSubscriptions(params?: {
     paidSubscription,
   };
 }
-
-// ── Tests ──────────────────────────────────────────────────────────────────
-
 describe('getBillingStatus', () => {
   it('returns trialEligible true when user has no instance rows and no subscription', async () => {
     const caller = await createCallerForUser(user.id);
@@ -4235,7 +4221,6 @@ describe('handleKiloClawSubscriptionCreated', () => {
       subscription: staleSubscription,
     });
 
-    // Row should be unchanged
     const [row] = await db
       .select()
       .from(kiloclaw_subscriptions)
@@ -4248,7 +4233,6 @@ describe('handleKiloClawSubscriptionCreated', () => {
 
   it('calls ensureAutoIntroSchedule for intro-price subscription', async () => {
     const instance = await createWebhookAnchor();
-    // Set up stripe.subscriptions.retrieve to return intro price
     stripeMock.subscriptions.retrieve.mockResolvedValue({
       schedule: null,
       items: { data: [{ price: { id: 'price_standard_intro' } }] },
@@ -4290,7 +4274,6 @@ describe('handleKiloClawSubscriptionCreated', () => {
 
     expect(row.stripe_subscription_id).toBe('sub_intro');
     expect(row.plan).toBe('standard');
-    // ensureAutoIntroSchedule should have been invoked
     expect(stripeMock.subscriptionSchedules.create).toHaveBeenCalled();
     expect(row.stripe_schedule_id).toBe('sub_sched_auto');
     expect(row.scheduled_plan).toBe('standard');
@@ -4338,7 +4321,6 @@ describe('handleKiloClawSubscriptionCreated', () => {
       subscription,
     });
 
-    // Should have rewritten the schedule with 2 phases
     expect(stripeMock.subscriptionSchedules.update).toHaveBeenCalledWith(
       'sched_half',
       expect.objectContaining({
@@ -4465,7 +4447,6 @@ describe('handleKiloClawSubscriptionCreated', () => {
       subscription,
     });
 
-    // Should NOT create a schedule
     expect(stripeMock.subscriptionSchedules.create).not.toHaveBeenCalled();
   });
 
@@ -6382,9 +6363,6 @@ describe('createSubscriptionCheckout — concurrent checkout guard', () => {
     expect(stripeMock.checkout.sessions.create).toHaveBeenCalled();
   });
 });
-
-// ── org-subscription coexistence ──────────────────────────────────────────
-
 describe('personal billing mutations do not affect org subscriptions', () => {
   async function createPersonalAndOrgSubscriptions(overrides?: {
     personalCancelAtPeriodEnd?: boolean;
@@ -6567,9 +6545,6 @@ describe('personal billing mutations do not affect org subscriptions', () => {
     expect(unchangedOrg?.scheduled_plan).toBeNull();
   });
 });
-
-// ── switchPlan ─────────────────────────────────────────────────────────────
-
 describe('switchPlan', () => {
   const now = Math.floor(Date.now() / 1000);
 
@@ -6831,9 +6806,6 @@ describe('switchPlan', () => {
     expect(row.stripe_schedule_id).toBe('sub_sched_concurrent');
   });
 });
-
-// ── cancelPlanSwitch ───────────────────────────────────────────────────────
-
 describe('cancelPlanSwitch', () => {
   it('releases the schedule and clears DB fields on happy path', async () => {
     await insertPersonalSubscriptionFixture({
@@ -6982,9 +6954,6 @@ describe('cancelPlanSwitch', () => {
     expect(row.stripe_schedule_id).toBe('sub_sched_fail');
   });
 });
-
-// ── Stripe-Funded Credit Settlement ─────────────────────────────────────────
-
 describe('applyStripeFundedKiloClawPeriod', () => {
   async function giveUserCredits(userId: string, microdollars: number) {
     await db
@@ -7210,9 +7179,6 @@ describe('applyStripeFundedKiloClawPeriod', () => {
     expect(subscription.auto_resume_retry_after).toEqual(expect.any(String));
   });
 });
-
-// ── Credit Enrollment ──────────────────────────────────────────────────────
-
 describe('enrollWithCredits', () => {
   async function giveUserCredits(userId: string, microdollars: number) {
     await db
@@ -8214,9 +8180,6 @@ describe('enrollWithCredits', () => {
     );
   });
 });
-
-// ── Billing Status with Credits ────────────────────────────────────────────
-
 describe('getBillingStatus with credits', () => {
   async function createKiloPassSubscription(params: {
     userId: string;
@@ -8768,9 +8731,6 @@ describe('getBillingStatus with credits', () => {
     expect(result.creditEnrollmentPreview.commit.effectiveBalanceMicrodollars).toBe(9_500_000);
   });
 });
-
-// ── Pure Credit Cancel/Reactivate/SwitchPlan/CancelPlanSwitch ──────────────
-
 describe('pure credit cancel/reactivate', () => {
   async function createPureCreditSubscription(
     userId: string,

@@ -341,7 +341,6 @@ describe('active-sessions-router', () => {
           },
         ],
       });
-      // Verify it actually called the worker with the right path.
       const calledUrl = fetchSpy.mock.calls[0][0] as unknown as string;
       expect(calledUrl).toBe('https://test-ingest.example.com/api/instances/active');
     });

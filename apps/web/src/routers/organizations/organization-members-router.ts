@@ -210,7 +210,6 @@ export const organizationsMembersRouter = createTRPCRouter({
       const { user } = ctx;
       const { organizationId, memberId, role, dailyUsageLimitUsd } = input;
 
-      // Prevent users from changing their own role.
       if (role !== undefined && user.id === memberId) {
         throw new TRPCError({
           code: 'FORBIDDEN',
@@ -218,7 +217,6 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
-      // Limit-only update.
       if (role === undefined) {
         if (dailyUsageLimitUsd !== undefined) {
           const targetMember = await readOrgMemberRole(organizationId, memberId);
@@ -433,7 +431,6 @@ export const organizationsMembersRouter = createTRPCRouter({
       const { user } = ctx;
       const { organizationId, memberId } = input;
 
-      // Prevent users from removing themselves (unless they are kilo admin users)
       if (user.id === memberId && !user.is_admin) {
         throw new TRPCError({
           code: 'FORBIDDEN',
@@ -449,7 +446,6 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
-      // Prevent removal of bot users
       if (targetMember.isBot) {
         throw new TRPCError({
           code: 'FORBIDDEN',
@@ -507,7 +503,6 @@ export const organizationsMembersRouter = createTRPCRouter({
         assertOwnerAuthority(actorRole, { nextRole: role });
       }
 
-      // Get organization details
       const organization = await getOrganizationById(organizationId);
       if (!organization) {
         throw new TRPCError({
@@ -594,7 +589,6 @@ export const organizationsMembersRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, inviteId } = input;
 
-      // Find the invitation
       const [invitation] = await db
         .select()
         .from(organization_invitations)
@@ -662,7 +656,6 @@ export const organizationsMembersRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, inviteId } = input;
 
-      // Find the invitation
       const [invitation] = await db
         .select()
         .from(organization_invitations)

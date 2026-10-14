@@ -131,7 +131,6 @@ describe('user router - updateProfile', () => {
   });
 
   afterEach(async () => {
-    // Reset profile URLs between tests
     await db
       .update(kilocode_users)
       .set({ linkedin_url: null, github_url: null })
@@ -185,7 +184,6 @@ describe('user router - updateProfile', () => {
   });
 
   it('clears a URL by passing null', async () => {
-    // First set a value
     await db
       .update(kilocode_users)
       .set({ linkedin_url: 'https://linkedin.com/in/testuser' })
@@ -978,7 +976,6 @@ describe('user router - notification preferences', () => {
       .where(eq(user_notification_preferences.user_id, firstUser.id));
     expect(row?.balance_alerts_enabled).toBe(false);
     expect(row?.security_findings_enabled).toBe(false);
-    // Unrelated columns remain at default.
     expect(row?.chat_messages_enabled).toBe(true);
     expect(row?.agent_push_enabled).toBe(true);
   });
@@ -1027,7 +1024,6 @@ describe('user router - notification preferences', () => {
       security_findings_enabled: false,
     });
 
-    // Flip exactly one category ON.
     const result = await caller.user.setNotificationPreferences({ balanceAlerts: true });
     expect(result.balanceAlerts).toBe(true);
     expect(result.spendAlerts).toBe(false);
@@ -1061,7 +1057,6 @@ describe('user router - notification capabilities', () => {
   });
 
   afterEach(async () => {
-    // Remove every gate fixture so each test starts from the no-gates baseline.
     await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, capUser.id));
     await db
       .delete(organization_memberships)

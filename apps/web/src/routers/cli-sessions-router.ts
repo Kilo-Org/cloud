@@ -764,8 +764,6 @@ export const cliSessionsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verifyWebhookTriggerAccess(ctx, input.trigger_id, input.organization_id);
 
-      // For org triggers, verify the session belongs to the same org.
-      // For personal triggers, verify the session belongs to the requesting user.
       const ownerCondition = input.organization_id
         ? eq(cliSessions.organization_id, input.organization_id)
         : eq(cliSessions.kilo_user_id, ctx.user.id);

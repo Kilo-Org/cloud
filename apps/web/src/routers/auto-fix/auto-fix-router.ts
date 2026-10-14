@@ -153,12 +153,9 @@ export const autoFixRouter = createTRPCRouter({
         });
       }
 
-      // Authorization check based on owner type
       if (ticket.owned_by_organization_id) {
-        // Organization ticket: verify user is org member
         await ensureOrganizationAccess(ctx, ticket.owned_by_organization_id);
       } else if (ticket.owned_by_user_id) {
-        // Personal ticket: verify user owns it
         if (ticket.owned_by_user_id !== ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -166,7 +163,6 @@ export const autoFixRouter = createTRPCRouter({
           });
         }
       } else {
-        // Should not happen, but handle edge case
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Invalid ticket ownership data',
@@ -197,12 +193,9 @@ export const autoFixRouter = createTRPCRouter({
         });
       }
 
-      // Authorization check based on owner type
       if (ticket.owned_by_organization_id) {
-        // Organization ticket: verify user is org member
         await ensureOrganizationAccess(ctx, ticket.owned_by_organization_id);
       } else if (ticket.owned_by_user_id) {
-        // Personal ticket: verify user owns it
         if (ticket.owned_by_user_id !== ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -210,14 +203,12 @@ export const autoFixRouter = createTRPCRouter({
           });
         }
       } else {
-        // Should not happen, but handle edge case
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Invalid ticket ownership data',
         });
       }
 
-      // Only allow retriggering failed, pending, or cancelled tickets
       if (
         ticket.status !== 'failed' &&
         ticket.status !== 'pending' &&
@@ -229,7 +220,6 @@ export const autoFixRouter = createTRPCRouter({
         });
       }
 
-      // Determine owner for dispatch
       const owner: Owner = ticket.owned_by_organization_id
         ? {
             type: 'org',
@@ -242,10 +232,7 @@ export const autoFixRouter = createTRPCRouter({
             userId: ctx.user.id,
           };
 
-      // Reset the ticket for retry
       await resetFixTicketForRetry(input.ticketId);
-
-      // Trigger dispatch to process pending tickets
       await tryDispatchPendingFixes(owner);
 
       return successResult({ message: 'Fix ticket retriggered successfully' });
@@ -273,12 +260,9 @@ export const autoFixRouter = createTRPCRouter({
         });
       }
 
-      // Authorization check based on owner type
       if (ticket.owned_by_organization_id) {
-        // Organization ticket: verify user is org member
         await ensureOrganizationAccess(ctx, ticket.owned_by_organization_id);
       } else if (ticket.owned_by_user_id) {
-        // Personal ticket: verify user owns it
         if (ticket.owned_by_user_id !== ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -286,14 +270,12 @@ export const autoFixRouter = createTRPCRouter({
           });
         }
       } else {
-        // Should not happen, but handle edge case
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Invalid ticket ownership data',
         });
       }
 
-      // Only allow cancelling running or pending tickets
       if (ticket.status !== 'running' && ticket.status !== 'pending') {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -301,7 +283,6 @@ export const autoFixRouter = createTRPCRouter({
         });
       }
 
-      // Cancel the ticket
       await cancelFixTicket(input.ticketId);
 
       return successResult({ message: 'Fix ticket cancelled successfully' });
@@ -367,7 +348,6 @@ export const autoFixRouter = createTRPCRouter({
           userId: ctx.user.id,
         };
 
-        // Build config object with defaults for optional fields
         const config: AutoFixAgentConfig = {
           enabled_for_issues: fullInput.enabled_for_issues,
           enabled_for_review_comments: fullInput.enabled_for_review_comments ?? false,
@@ -430,8 +410,6 @@ export const autoFixRouter = createTRPCRouter({
         const existingConfig = await getAgentConfigForOwner(owner, 'auto_fix', 'github');
 
         if (!existingConfig) {
-          // Create default config if it doesn't exist
-          // Set enabled_for_issues to match the toggle state
           const config = {
             ...DEFAULT_AUTO_FIX_CONFIG,
             enabled_for_issues: fullInput.isEnabled,
@@ -445,7 +423,6 @@ export const autoFixRouter = createTRPCRouter({
             createdBy: ctx.user.id,
           });
         } else {
-          // Update existing config and sync enabled_for_issues with toggle state
           const updatedConfig = {
             ...(existingConfig.config as AutoFixAgentConfig),
             enabled_for_issues: fullInput.isEnabled,

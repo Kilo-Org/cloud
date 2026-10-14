@@ -170,7 +170,6 @@ async function assertOrganizationOwnsSession(params: {
   }
 }
 
-// Extend base schemas with organizationId for organization context
 const CreateWorktreeChatInput = baseCreateWorktreeChatNextSchema.extend({
   organizationId: z.uuid(),
 });

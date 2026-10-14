@@ -471,7 +471,6 @@ const PrepareSessionCloneVariant = z.object({
   ...PrepareSessionSharedFields,
 });
 
-// Schema for preparing a session
 export const basePrepareSessionNextSchema = z
   .union([PrepareSessionNonCloneVariant, PrepareSessionCloneVariant])
   .refine(
@@ -520,7 +519,6 @@ export const organizationPrepareSessionNextSchema = basePrepareSessionNextSchema
     path: ['sandboxAllocation'],
   });
 
-// Output schema for prepareSession
 export const basePrepareSessionNextOutputSchema = z.object({
   kiloSessionId: kiloSessionIdSchema,
   cloudAgentSessionId: z.string(),
@@ -544,7 +542,6 @@ export const baseCreateWorktreeChatNextOutputSchema = z
   })
   .strict();
 
-// Schema for initiating from a prepared session
 export const baseInitiateFromPreparedSessionNextSchema = z
   .object({
     cloudAgentSessionId: z.string(),
@@ -558,7 +555,6 @@ const controlPlaneSessionIdNextSchema = z
     'Worktree review requires a control-plane session'
   );
 
-// Schema for sending a message (V2 - uses cloudAgentSessionId)
 export const baseSendMessageNextSchema = z
   .object({
     cloudAgentSessionId: z.string(),
@@ -606,18 +602,15 @@ export const baseGetMessageResultNextOutputSchema = z.object({
   acceptedAt: z.number().optional(),
 });
 
-// Schema for interrupting a session
 export const baseInterruptSessionNextSchema = z.object({
   sessionId: z.string(),
 });
 
-// Schema for canceling one queued (not yet accepted) message by id.
 export const baseCancelQueuedMessageNextSchema = z.object({
   sessionId: z.string(),
   messageId: messageIdNextSchema,
 });
 
-// Schema for getting session state
 export const baseGetSessionNextSchema = z.object({
   cloudAgentSessionId: z.string(),
 });
@@ -721,7 +714,6 @@ export const baseCloseTerminalNextOutputSchema = z.object({
   success: z.boolean(),
 });
 
-// Execution status schema for getSession response
 export const executionStatusNextSchema = z
   .object({
     id: z.string(),
@@ -736,7 +728,6 @@ export const executionStatusNextSchema = z
 
 // Output schema for getSession (sanitized, no secrets)
 export const baseGetSessionNextOutputSchema = z.object({
-  // Session identifiers
   sessionId: z.string(),
   kiloSessionId: kiloSessionIdSchema.optional(),
   userId: z.string(),
@@ -753,7 +744,6 @@ export const baseGetSessionNextOutputSchema = z.object({
   gitUrl: z.string().optional(),
   platform: z.enum(['github', 'gitlab', 'bitbucket']).optional(),
 
-  // Execution params
   prompt: z.string().optional(),
   mode: z.string().optional(),
   model: z.string().optional(),
@@ -778,7 +768,6 @@ export const baseGetSessionNextOutputSchema = z.object({
   // Execution status (grouped for cleaner API)
   execution: executionStatusNextSchema,
 
-  // Lifecycle timestamps
   preparedAt: z.number().optional(),
   initiatedAt: z.number().optional(),
 

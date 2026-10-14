@@ -1146,7 +1146,6 @@ describe('cli-sessions-v2-router', () => {
           watermarkEventId: 42,
         });
         expect(mockGetSession).toHaveBeenCalledWith(cloudAgentSessionId);
-        // Verify both the watermark and the page were fetched.
         expect(fetchSessionMessagesPage).toHaveBeenCalled();
       });
 
@@ -1192,7 +1191,6 @@ describe('cli-sessions-v2-router', () => {
       });
 
       it('skips the watermark read when the session has no cloud_agent_session_id', async () => {
-        // Remove the CA session ID and test that no watermark fetch happens.
         await db
           .update(cli_sessions_v2)
           .set({ cloud_agent_session_id: null })
@@ -1610,7 +1608,6 @@ describe('cli-sessions-v2-router', () => {
     });
 
     it('should throw NOT_FOUND when session belongs to a different org (org trigger)', async () => {
-      // Create a session belonging to testOrganization
       const orgSessionId = 'ses_test_share_v2_org_session_1234';
       await db.insert(cli_sessions_v2).values({
         session_id: orgSessionId,
@@ -1619,7 +1616,6 @@ describe('cli-sessions-v2-router', () => {
         organization_id: testOrganization.id,
       });
 
-      // Create a second org and an org trigger for it
       const [otherOrg] = await db
         .insert(organizations)
         .values({

@@ -112,22 +112,29 @@ test('AI_GATEWAY_URL overrides the gateway origin', () => {
   assert.equal(rewrites.length, AI_GATEWAY_PATH_REWRITES.length);
   assert.ok(rewrites.every(({ destination }) => destination.startsWith('http://localhost:3010/')));
   assert.deepEqual(rewrites[0], {
-    source: '/api/gateway/typesafe/v1/systemone',
-    destination: 'http://localhost:3010/api/v1/systemone',
+    source: '/api/gateway/v1/:path*',
+    destination: 'http://localhost:3010/api/v1/:path*',
   });
 });
 
-test('collapses versioned and unversioned gateway paths onto /api/v1', () => {
-  assert.equal(rewritePath('/api/gateway/v1/models'), '/api/v1/models');
-  assert.equal(rewritePath('/api/gateway/models'), '/api/v1/models');
-  assert.equal(rewritePath('/api/openrouter/v1/chat/completions'), '/api/v1/chat/completions');
-  assert.equal(rewritePath('/api/openrouter/chat/completions'), '/api/v1/chat/completions');
-  assert.equal(rewritePath('/api/gateway/typesafe/v1/systemone'), '/api/v1/systemone');
-  assert.equal(rewritePath('/api/fim/completions'), '/api/v1/fim/completions');
-  assert.equal(
-    rewritePath('/api/organizations/org-id/models/validate'),
-    '/api/v1/organizations/org-id/models/validate'
-  );
+test('keeps the legacy apps/web gateway paths working', () => {
+  const legacyPaths = {
+    '/api/gateway/typesafe/v1/systemone': '/api/v1/systemone',
+    '/api/gateway/chat/completions': '/api/v1/chat/completions',
+    '/api/gateway/models': '/api/v1/models',
+    '/api/gateway/audio/transcriptions': '/api/v1/audio/transcriptions',
+    '/api/gateway/fim/completions': '/api/v1/fim/completions',
+    '/api/openrouter/v1/chat/completions': '/api/v1/chat/completions',
+    '/api/openrouter/chat/completions': '/api/v1/chat/completions',
+    '/api/openrouter/models/validate': '/api/v1/models/validate',
+    '/api/fim/completions': '/api/v1/fim/completions',
+    '/api/edit/completions': '/api/v1/edit/completions',
+    '/api/organizations/org-id/models': '/api/v1/organizations/org-id/models',
+    '/api/organizations/org-id/models/validate': '/api/v1/organizations/org-id/models/validate',
+  };
+  for (const [webPath, gatewayPath] of Object.entries(legacyPaths)) {
+    assert.equal(rewritePath(webPath), gatewayPath, webPath);
+  }
 });
 
 test('every rewrite lands on an ai-gateway route', () => {
@@ -141,7 +148,18 @@ test('every rewrite lands on an ai-gateway route', () => {
   }
 });
 
-test('every ai-gateway route is reachable through the web app gateway paths', () => {
+test('/api/gateway is a drop-in base URL for every ai-gateway /api route', () => {
+  const gatewayRoutes = listRouteDirs(AI_GATEWAY_APP_DIR).filter(dir => dir.startsWith('api/'));
+  assert.ok(gatewayRoutes.includes('api/v1/fim/completions'));
+
+  for (const routeDir of gatewayRoutes) {
+    const gatewayPath = samplePathFor(routeDir);
+    const webPath = `/api/gateway${gatewayPath.slice('/api'.length)}`;
+    assert.equal(rewritePath(webPath), gatewayPath, `${webPath} does not reach ${routeDir}`);
+  }
+});
+
+test('every ai-gateway /api/v1 route is reachable through the legacy prefixes', () => {
   const gatewayRoutes = listRouteDirs(AI_GATEWAY_APP_DIR).filter(dir => dir.startsWith('api/v1/'));
   assert.ok(gatewayRoutes.length > 0);
 
@@ -151,7 +169,11 @@ test('every ai-gateway route is reachable through the web app gateway paths', ()
     const webPaths =
       routeDir === 'api/v1/systemone'
         ? ['/api/gateway/typesafe/v1/systemone']
-        : [`/api/gateway${routePath}`, `/api/openrouter/v1${routePath}`];
+        : [
+            `/api/gateway${routePath}`,
+            `/api/openrouter${routePath}`,
+            `/api/openrouter/v1${routePath}`,
+          ];
     for (const webPath of webPaths) {
       assert.equal(rewritePath(webPath), gatewayPath, `${webPath} does not reach ${routeDir}`);
     }

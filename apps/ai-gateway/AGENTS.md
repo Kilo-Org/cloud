@@ -9,7 +9,10 @@ it rewrites its legacy gateway paths here (`apps/web/ai-gateway-rewrites.mjs`) i
 every environment: the matching gateway on Vercel's production and staging targets,
 `AI_GATEWAY_URL` when set, and otherwise the local app on its `dev:start` port.
 `apps/web/ai-gateway-rewrites.test.mjs` checks that every route here is reachable
-through those paths and that no `apps/web` route is shadowed by a rewrite.
+through those paths and that no `apps/web` route is shadowed by a rewrite. It
+also checks that `apps/web`'s `/api/gateway/<path>` reaches this app's
+`/api/<path>`, so `ai-gateway.kilo.ai/api` can replace `api.kilo.ai/api/gateway`
+as a base URL for `/v1` paths. The remaining rewrites are legacy compatibility only.
 
 - Every route lives under `/api/v1`. There are no `/api/gateway` or `/api/openrouter`
   aliases. Each `apps/web` route maps to the path without that prefix, and the

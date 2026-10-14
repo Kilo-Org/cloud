@@ -2227,7 +2227,7 @@ describe('auto routing worker', () => {
               },
             });
             expect(cachePutEntry).toHaveBeenCalledWith(
-              expect.stringMatching(/^typesafe\/jev-1\.13:/),
+              expect.stringMatching(/^efficient:typesafe\/jev-1\.13:/),
               mockClassification
             );
             expect(cachePutStickyDecision).toHaveBeenCalledTimes(1);

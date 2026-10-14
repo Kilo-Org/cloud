@@ -131,7 +131,10 @@ import {
   type ControlPlaneWorktreeCaptureInput,
   type ControlPlaneWrapperFrame,
 } from '../../shared/control-plane-protocol.js';
-import { resolveControlPlaneTimers } from '../../shared/control-plane-timers.js';
+import {
+  CONTROL_PLANE_TIMERS,
+  resolveControlPlaneTimers,
+} from '../../shared/control-plane-timers.js';
 import {
   controlPlaneSandboxSelectionSchema,
   type ControlPlanePrepareInputWithSelection,
@@ -3637,11 +3640,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const route = await readRoute(this.db, frame.sessionId);
       repoKeyPrefix = route?.repoKey?.slice(0, 16) ?? undefined;
       const provider = this.provider;
+      const timers = CONTROL_PLANE_TIMERS.wrapper;
+      const captureBudgetMs =
+        Math.max(REPOSITORY_CAPTURE_CALL_MS, timers.captureMs) +
+        timers.kiloRuntimeStartMs +
+        timers.kiloSessionMs;
       if (route === null) reason = 'no_route';
       else if (route.state !== 'preparing') reason = 'route_not_preparing';
       else if (route.repoKey === null) reason = 'no_repo_key';
       else if (provider.captureRepository === undefined) reason = 'provider_no_capture';
       else if (state.providerRef === null) reason = 'no_provider_ref';
+      else if (route.attemptDeadlineAt - Date.now() <= captureBudgetMs)
+        reason = 'insufficient_preparation_budget';
       else {
         reason = 'capture_declined';
         ok = await withTimeout(

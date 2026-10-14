@@ -1436,6 +1436,46 @@ describe('repository capture request', () => {
     expect(provider.captures).toEqual([]);
   });
 
+  it.each([4 * 60_000, 9 * 60_000])(
+    'skips capture with %s ms left and keeps the original preparation deadline',
+    async remainingMs => {
+      const provider = createFakeProvider();
+      provider.captureResult = 'hang';
+      const { stub, wrapper } = await preparing(
+        provider,
+        `sbx__repo_capture_budget_${remainingMs}`
+      );
+      const deadlineAt = Date.now() + remainingMs;
+      await runInDurableObject(stub, async (_instance, state) => {
+        const db = drizzle(state.storage, { logger: false });
+        await db
+          .update(routesTable)
+          .set({ attempt_deadline_at: deadlineAt })
+          .where(eq(routesTable.session_id, SESSION));
+      });
+
+      wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
+
+      expect(await wrapper.next()).toEqual({
+        type: 'workspace.captured',
+        sessionId: SESSION,
+        ok: false,
+      });
+      expect(provider.captures).toEqual([]);
+      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('preparing');
+      await runInDurableObject(stub, async (_instance, state) => {
+        const db = drizzle(state.storage, { logger: false });
+        const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, SESSION));
+        expect(rows[0]?.attempt_deadline_at).toBe(deadlineAt);
+      });
+
+      wrapper.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
+      );
+    }
+  );
+
   it('answers ok:false for an unknown session and a route that is no longer preparing', async () => {
     const provider = createFakeProvider();
     const { wrapper } = await preparing(provider, 'sbx__repo_capture_state');

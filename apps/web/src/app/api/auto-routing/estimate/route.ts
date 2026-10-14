@@ -3,11 +3,21 @@ import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { estimateAutoRoutingProfiles } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { NextResponse, type NextRequest } from 'next/server';
 import { validatePoolEntries } from '@/lib/auto-routing-pool-validation';
-import { resolveOwner } from '@/lib/auto-routing-owner';
+import { resolveOwner, trpcErrorResponse } from '@/lib/auto-routing-owner';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const owner = await resolveOwner(request, ORGANIZATION_BILLING_ROLES);
   if ('response' in owner) return owner.response;
+  if (owner.ownerType === 'org') {
+    try {
+      await requireActiveSubscriptionOrTrial(owner.ownerId);
+    } catch (error) {
+      const response = trpcErrorResponse(error);
+      if (response) return response;
+      throw error;
+    }
+  }
   let body: unknown;
   try {
     body = await request.json();

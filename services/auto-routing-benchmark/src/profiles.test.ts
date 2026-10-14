@@ -4,7 +4,11 @@ import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import { drizzle } from 'drizzle-orm/d1';
 import { benchmarkProfiles, profileRequestEvents } from './db-schema';
 import { DECIDER_CASES } from './datasets/decider-cases';
-import { recoverPendingProfileAdmissions, type ProfileCreditBridge } from './profile-billing';
+import {
+  recoverPendingProfileAdmissions,
+  ProfileReservationMismatchError,
+  type ProfileCreditBridge,
+} from './profile-billing';
 import {
   boundFailureReason,
   classifyProfileAdmission,
@@ -41,7 +45,8 @@ const SCHEMA_SQL = `
   CREATE TABLE profile_benchmark_admissions (
     admission_id TEXT PRIMARY KEY, owner_type TEXT NOT NULL, owner_id TEXT NOT NULL,
     engine_identity TEXT NOT NULL, repetitions INTEGER NOT NULL, state TEXT NOT NULL,
-    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+    recovery_attempts INTEGER NOT NULL DEFAULT 0, recovery_next_at TEXT
   );
   CREATE TABLE profile_benchmark_claims (
     admission_id TEXT NOT NULL REFERENCES profile_benchmark_admissions(admission_id),
@@ -467,6 +472,61 @@ describe('exact-pair benchmark profiles', () => {
     expect(
       sqlite.prepare('SELECT state, charged_cost_usd FROM profile_benchmark_claims').get()
     ).toEqual({ state: 'released', charged_cost_usd: 0 });
+  });
+
+  it('closes allocating claims after echoed holds were released on a reservation mismatch', async () => {
+    reserve.mockRejectedValueOnce(new ProfileReservationMismatchError());
+    await expect(registration([{ model: 'vendor/model', variant: null }]))
+      .rejects.toThrow('mismatched reservation');
+    expect(sqlite.prepare('SELECT state FROM profile_benchmark_admissions').get())
+      .toEqual({ state: 'admitted' });
+    expect(sqlite.prepare('SELECT state FROM profile_benchmark_claims').get())
+      .toEqual({ state: 'released' });
+    await recoverPendingProfileAdmissions(fixture.db, billing, NOW);
+    expect(reserve).toHaveBeenCalledTimes(1);
+    await registration([{ model: 'vendor/model', variant: null }]);
+    expect(reserve).toHaveBeenCalledTimes(2);
+  });
+
+  it('backs off poisoned admissions so newer allocations and hold releases are recovered', async () => {
+    const insertAdmission = sqlite.prepare(`INSERT INTO profile_benchmark_admissions
+      (admission_id, owner_type, owner_id, engine_identity, repetitions, state, created_at, updated_at)
+      VALUES (?, 'user', 'owner-a', 'current-engine', 1, ?, ?, ?)`);
+    const insertClaim = sqlite.prepare(`INSERT INTO profile_benchmark_claims
+      (admission_id, model, variant, engine_identity, repetitions, estimated_cost_usd, quota_charged, state, created_at, updated_at)
+      VALUES (?, ?, '', 'current-engine', 1, 0.01, 0, ?, ?, ?)`);
+    const old = new Date(NOW.getTime() - 60_000).toISOString();
+    for (let index = 0; index < 100; index++) {
+      const id = `poison-${index}`;
+      insertAdmission.run(id, 'allocating', old, old);
+      insertClaim.run(id, `vendor/${id}`, 'allocating', old, old);
+    }
+    insertAdmission.run('new-admission', 'allocating', NOW.toISOString(), NOW.toISOString());
+    insertClaim.run('new-admission', 'vendor/new', 'allocating', NOW.toISOString(), NOW.toISOString());
+    insertAdmission.run('new-release', 'admitted', NOW.toISOString(), NOW.toISOString());
+    insertClaim.run('new-release', 'vendor/release', 'release_pending', NOW.toISOString(), NOW.toISOString());
+    reserve.mockImplementation(async request => {
+      if (request.admissionId.startsWith('poison-')) throw new Error('poisoned admission');
+      return { kind: 'held' };
+    });
+    await expect(recoverPendingProfileAdmissions(fixture.db, billing, NOW))
+      .rejects.toThrow('poisoned admission');
+    expect(reserve).toHaveBeenCalledTimes(100);
+    await recoverPendingProfileAdmissions(fixture.db, billing, NOW);
+    expect(reserve).toHaveBeenCalledTimes(101);
+    expect(settle).toHaveBeenCalledWith(expect.objectContaining({ admissionId: 'new-release', actualCostUsd: 0 }));
+    expect(sqlite.prepare(`SELECT state FROM profile_benchmark_claims WHERE admission_id = 'new-admission'`).get())
+      .toEqual({ state: 'admitted' });
+    expect(sqlite.prepare(`SELECT state FROM profile_benchmark_claims WHERE admission_id = 'new-release'`).get())
+      .toEqual({ state: 'released' });
+    const retryAt = new Date(NOW.getTime() + 15 * 60_000);
+    await expect(recoverPendingProfileAdmissions(fixture.db, billing, retryAt))
+      .rejects.toThrow('poisoned admission');
+    expect(sqlite.prepare(`SELECT recovery_attempts, recovery_next_at FROM profile_benchmark_admissions
+      WHERE admission_id = 'poison-0'`).get()).toEqual({
+        recovery_attempts: 2,
+        recovery_next_at: new Date(retryAt.getTime() + 30 * 60_000).toISOString(),
+      });
   });
 
   it('retains the previous unpaid terminal claim when admitting a failed retry with a new hold', async () => {

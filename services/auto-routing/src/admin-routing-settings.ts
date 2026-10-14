@@ -15,6 +15,7 @@ import type { Handler } from 'hono';
 import {
   BenchmarkProfileQuotaError,
   BenchmarkInsufficientCreditsError,
+  BenchmarkEstimateRequestError,
   estimateBenchmarkProfiles,
   fetchBenchmarkProfileStatuses,
   registerBenchmarkProfiles,
@@ -141,6 +142,9 @@ export const estimateRoutingProfilesHandler: Handler<HonoEnv> = async c => {
   } catch (error) {
     if (error instanceof BenchmarkInsufficientCreditsError) {
       return c.json({ error: error.message }, 402);
+    }
+    if (error instanceof BenchmarkEstimateRequestError) {
+      return c.json({ error: error.message }, error.status);
     }
     return c.json({ error: 'Failed to estimate benchmark profiles' }, 502);
   }

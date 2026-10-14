@@ -42,15 +42,22 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
   }
 
   async getPool(): Promise<EfficientModelPool | null> {
-    return this.ctx.storage.transaction(async txn => {
-      const raw = await txn.get(POOL_STORAGE_KEY);
-      const parsed = PersistedEfficientModelPoolSchema.safeParse(raw);
-      if (!parsed.success) return null;
-      if (JSON.stringify(raw) !== JSON.stringify(parsed.data)) {
-        await txn.put(POOL_STORAGE_KEY, parsed.data);
-      }
-      return parsed.data;
-    });
+    let poolToNormalize: EfficientModelPool | null = null;
+    try {
+      return await this.ctx.storage.transaction(async txn => {
+        const raw = await txn.get(POOL_STORAGE_KEY);
+        const parsed = PersistedEfficientModelPoolSchema.safeParse(raw);
+        if (!parsed.success) return null;
+        if (JSON.stringify(raw) !== JSON.stringify(parsed.data)) {
+          poolToNormalize = parsed.data;
+          await txn.put(POOL_STORAGE_KEY, parsed.data);
+        }
+        return parsed.data;
+      });
+    } catch (error) {
+      if (poolToNormalize !== null) return poolToNormalize;
+      throw error;
+    }
   }
 
   async setPool(pool: EfficientModelPool | null): Promise<void> {

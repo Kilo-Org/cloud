@@ -3,6 +3,7 @@ import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { estimateMicrodollars } from '@kilocode/auto-routing-contracts';
 import {
   auto_routing_benchmark_holds,
   credit_transactions,
@@ -93,14 +94,6 @@ export class BenchmarkBillingError extends Error {
 
 function pairKey(pair: { model: string; variant: string | null }) {
   return JSON.stringify([pair.model, pair.variant]);
-}
-
-function estimateMicrodollars(costUsd: number) {
-  const microdollars = costUsd * 1_000_000;
-  const nearest = Math.round(microdollars);
-  return Math.abs(microdollars - nearest) <= Number.EPSILON * Math.abs(microdollars)
-    ? nearest
-    : Math.ceil(microdollars);
 }
 
 function holdWhere(input: OwnerInput) {

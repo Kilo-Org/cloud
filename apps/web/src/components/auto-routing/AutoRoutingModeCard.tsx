@@ -3,6 +3,7 @@
 import {
   AutoRoutingModeSchema,
   EstimateBenchmarkProfilesResponseSchema,
+  getReasoningVariantKeys,
   isVirtualAutoModelId,
   MAX_POOL_ENTRIES,
   poolEntryKey,
@@ -250,10 +251,16 @@ export function resolveEditableChrome(params: {
   };
 }
 
-/** True when any saved (non-unavailable) entry is still pending/running. */
+export function supportedBenchmarkEffortCount(
+  variants: Parameters<typeof getReasoningVariantKeys>[0]
+): number {
+  return Math.max(1, getReasoningVariantKeys(variants).length);
+}
+
 export function hasBenchmarkingEntries(
   configuredPool: PoolEntryWithAvailability[] | null,
-  poolStatuses: BenchmarkProfileEntryStatus[]
+  poolStatuses: BenchmarkProfileEntryStatus[],
+  supportedEffortCounts: Readonly<Record<string, number>> = {}
 ): boolean {
   if (!configuredPool || configuredPool.length === 0) return false;
   return configuredPool.some(entry => {
@@ -262,6 +269,7 @@ export function hasBenchmarkingEntries(
       entry,
       unavailable: entry.unavailable,
       poolStatuses,
+      supportedEffortCount: supportedEffortCounts[entry.model],
     });
     return display.kind === 'benchmarking';
   });
@@ -273,11 +281,12 @@ export function hasBenchmarkingEntries(
  * Never poll when the worker does not support pools (legacy fallback).
  */
 export function settingsRefetchInterval(
-  data: AutoRoutingSettingsApiResponse | undefined
+  data: AutoRoutingSettingsApiResponse | undefined,
+  supportedEffortCounts: Readonly<Record<string, number>> = {}
 ): number | false {
   if (!data) return false;
   if (data.poolSupported === false) return false;
-  return hasBenchmarkingEntries(data.configuredPool, data.poolStatuses)
+  return hasBenchmarkingEntries(data.configuredPool, data.poolStatuses, supportedEffortCounts)
     ? SETTINGS_POLL_INTERVAL_MS
     : false;
 }
@@ -311,7 +320,7 @@ export function buildRetryBody(params: {
   mode: ModeSelection;
   savedPool: PoolEntry[];
   retryEntry: PoolEntry;
-}): { mode: AutoRoutingMode | null; pool: PoolEntry[]; retryEntries: PoolEntry[] } {
+}): { mode: AutoRoutingMode | null; pool: PoolEntry[]; retryEntries: [PoolEntry] } {
   return {
     mode: params.mode === 'inherit' ? null : params.mode,
     pool: params.savedPool,
@@ -643,16 +652,27 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
   const addErrorId = `${idPrefix}-add-error`;
   const loadErrorId = `${idPrefix}-load-error`;
   const saveErrorId = `${idPrefix}-save-error`;
+  const retryErrorId = `${idPrefix}-retry-error`;
   const addModelSectionRef = useRef<HTMLDivElement>(null);
+
+  const modelsQuery = useModelSelectorList(organizationId);
+  const supportedEffortCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        (modelsQuery.data?.data ?? []).map(model => [
+          model.id,
+          supportedBenchmarkEffortCount(model.opencode?.variants),
+        ])
+      ),
+    [modelsQuery.data]
+  );
 
   const query = useQuery({
     queryKey,
     queryFn: () => fetchSettings(organizationId),
-    refetchInterval: query => settingsRefetchInterval(query.state.data),
+    refetchInterval: query => settingsRefetchInterval(query.state.data, supportedEffortCounts),
     refetchOnWindowFocus: true,
   });
-
-  const modelsQuery = useModelSelectorList(organizationId);
 
   // Local draft overrides. `undefined` means "follow the latest server snapshot".
   // Polls/refetches update statuses via query.data without touching these.
@@ -662,6 +682,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
   const [addError, setAddError] = useState<string | null>(null);
   const [showAddFlow, setShowAddFlow] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<{ entry: PoolEntry; message: string } | null>(null);
   const [retryingKey, setRetryingKey] = useState<string | null>(null);
   // After a successful save, drop overrides once the query reflects the new snapshot.
   const clearOverridesAfterSaveRef = useRef(false);
@@ -702,7 +723,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
       return EstimateBenchmarkProfilesResponseSchema.parse(body);
     },
   });
-  const quoteReady = !draftPool?.length || (estimateQuery.isSuccess && !estimateQuery.isFetching);
+  const quoteReady = !draftPool?.length || estimateQuery.isSuccess;
 
   useEffect(() => {
     if (!clearOverridesAfterSaveRef.current) return;
@@ -778,9 +799,10 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
     mutationFn: (payload: {
       mode: AutoRoutingMode | null;
       pool: PoolEntry[];
-      retryEntries: PoolEntry[];
+      retryEntries: [PoolEntry];
     }) => putSettings(organizationId, payload),
     onSuccess: data => {
+      setRetryError(null);
       applyRetryMutationSuccess({
         queryClient,
         queryKey,
@@ -789,10 +811,10 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
         toastSuccess: message => toast.success(message),
       });
     },
-    onError: error => {
+    onError: (error, payload) => {
       setRetryingKey(null);
       const message = error instanceof Error ? error.message : 'Failed to retry benchmark';
-      setSaveError(message);
+      setRetryError({ entry: payload.retryEntries[0], message });
       toast.error(message);
     },
   });
@@ -883,6 +905,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
 
   const handleRetryBenchmark = (entry: PoolEntry) => {
     if (!savedPool) return;
+    setRetryError(null);
     setRetryingKey(poolEntryKey(entry));
     retryMutation.mutate(
       buildRetryBody({
@@ -1059,7 +1082,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
                   savedPool?.some(saved => poolEntryKey(saved) === poolEntryKey(entry)) ?? false;
                 const model = modelsQuery.data?.data.find(model => model.id === entry.model);
                 const supportedEfforts = model
-                  ? Math.max(1, Object.keys(model.opencode?.variants ?? {}).length)
+                  ? supportedBenchmarkEffortCount(model.opencode?.variants)
                   : poolStatuses.filter(status => status.entry.model === entry.model).length;
                 const display = mapPoolEntryDisplayStatus({
                   entry,
@@ -1257,6 +1280,26 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
               </>
             ) : null}
           </div>
+        ) : null}
+
+        {retryError ? (
+          <Alert variant="destructive" id={retryErrorId}>
+            <AlertTitle>Could not retry benchmark</AlertTitle>
+            <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span>{retryError.message}</span>
+              {!readonly ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={controlsDisabled || retryMutation.isPending}
+                  onClick={() => handleRetryBenchmark(retryError.entry)}
+                >
+                  Retry benchmark
+                </Button>
+              ) : null}
+            </AlertDescription>
+          </Alert>
         ) : null}
 
         {saveError ? (

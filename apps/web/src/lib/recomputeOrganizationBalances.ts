@@ -104,7 +104,7 @@ export async function recomputeOrganizationBalances(args: {
     .select({
       cost: sql<number>`${auto_routing_benchmark_holds.charged_microdollars}`.mapWith(Number),
       created_at: sql<string>`${auto_routing_benchmark_holds.settled_at}`.mapWith(
-        auto_routing_benchmark_holds.settled_at
+        String
       ),
     })
     .from(auto_routing_benchmark_holds)

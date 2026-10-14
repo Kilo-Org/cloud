@@ -13,6 +13,14 @@ import { TaxonomyRouteKeySchema } from './taxonomy';
 export { ReasoningEffortSchema } from './reasoning';
 export type { ReasoningEffort } from './reasoning';
 
+export function estimateMicrodollars(costUsd: number): number {
+  const microdollars = costUsd * 1_000_000;
+  const nearest = Math.round(microdollars);
+  return Math.abs(microdollars - nearest) <= Number.EPSILON * Math.abs(microdollars)
+    ? nearest
+    : Math.ceil(microdollars);
+}
+
 // Matches AutoRoutingModeOwnerTypeSchema in index.ts. Declared here (not
 // imported) to avoid a circular package-root dependency.
 const BenchmarkProfileOwnerTypeSchema = z.enum(['user', 'org']);

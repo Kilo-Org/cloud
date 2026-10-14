@@ -1369,6 +1369,23 @@ describe('auto routing worker', () => {
       );
     });
 
+    it.each([
+      { status: 400, error: 'Model custom/chat has no pricing available' },
+      { status: 409, error: 'Benchmark profile measurement is already running' },
+    ])('POST preserves estimate rejection $status and its message', async ({ status, error }) => {
+      const store = ownerSettingsStore();
+      benchmarkFetch.mockResolvedValue(Response.json({ error }, { status }));
+      const response = await request('/admin/profiles/estimate', {
+        method: 'POST',
+        headers: { authorization: 'Bearer classifier-token', 'content-type': 'application/json' },
+        body: JSON.stringify({ ownerType: 'user', ownerId: 'user-1', entries: pool }),
+      });
+
+      expect(response.status).toBe(status);
+      await expect(response.json()).resolves.toEqual({ error });
+      expect(store.setSettings).not.toHaveBeenCalled();
+    });
+
     it('PUT preserves insufficient credits and does not save the pool', async () => {
       const store = ownerSettingsStore();
       benchmarkFetch.mockResolvedValue({

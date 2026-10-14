@@ -275,6 +275,38 @@ describe('AutoRoutingModeConfigDO', () => {
     await expect(modeDO.getPool()).resolves.toEqual(SAMPLE_POOL);
     expect(storage.entries.get('pool')).toEqual(SAMPLE_POOL);
   });
+
+  it('returns the normalized pool and configured mode when normalization cannot be stored', async () => {
+    const { modeDO, storage } = createModeDO();
+    const legacyPool = [
+      { model: 'a/chat', variant: 'thinking' },
+      { model: 'a/chat', variant: 'max' },
+      { model: 'b/chat', variant: null },
+    ];
+    storage.entries.set('mode', 'best_accuracy');
+    storage.entries.set('pool', legacyPool);
+
+    const put = vi.fn(async () => {
+      throw new Error('put failed');
+    });
+    const originalTransaction = storage.transaction.bind(storage);
+    vi.spyOn(storage, 'transaction').mockImplementation(async callback =>
+      originalTransaction(async txn => {
+        txn.put = put;
+        return callback(txn);
+      })
+    );
+
+    await expect(modeDO.getPool()).resolves.toEqual(SAMPLE_POOL);
+    await expect(modeDO.getSettings()).resolves.toEqual({
+      mode: 'best_accuracy',
+      pool: SAMPLE_POOL,
+    });
+    expect(put).toHaveBeenCalledTimes(2);
+    expect(put).toHaveBeenCalledWith('pool', SAMPLE_POOL);
+    expect(storage.entries.get('mode')).toBe('best_accuracy');
+    expect(storage.entries.get('pool')).toEqual(legacyPool);
+  });
 });
 
 describe('auto routing mode config', () => {

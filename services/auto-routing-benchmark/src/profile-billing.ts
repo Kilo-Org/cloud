@@ -1,6 +1,6 @@
 import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
-import { benchmarkPairKey } from '@kilocode/auto-routing-contracts';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { benchmarkPairKey, estimateMicrodollars } from '@kilocode/auto-routing-contracts';
+import { and, asc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { drizzle } from 'drizzle-orm/d1';
 import { z } from 'zod';
@@ -69,6 +69,13 @@ export class ProfileCreditBridgeError extends Error {
   }
 }
 
+export class ProfileReservationMismatchError extends Error {
+  constructor() {
+    super('Benchmark credit bridge returned a mismatched reservation; echoed holds were released.');
+    this.name = 'ProfileReservationMismatchError';
+  }
+}
+
 export function createProfileCreditBridge(input: {
   webUrl: string;
   internalApiSecret: string;
@@ -83,6 +90,20 @@ export function createProfileCreditBridge(input: {
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(30_000),
     });
+  }
+  async function settle(request: ProfileCreditSettleRequest): Promise<void> {
+    const response = await post('settle', request);
+    if (!response.ok) throw new ProfileCreditBridgeError(response.status);
+    const settled = CreditSettlementSchema.parse(await response.json());
+    if (
+      settled.admissionId !== request.admissionId ||
+      settled.model !== request.model ||
+      settled.variant !== request.variant ||
+      settled.runId !== request.runId ||
+      settled.chargedCostUsd !== Math.round(request.actualCostUsd * 1_000_000) / 1_000_000
+    ) {
+      throw new Error('Benchmark credit bridge returned a mismatched settlement.');
+    }
   }
   return {
     async reserve(request) {
@@ -106,28 +127,30 @@ export function createProfileCreditBridge(input: {
           const expected = requested.get(benchmarkPairKey(item));
           return (
             !expected ||
-            Math.ceil(expected.estimatedCostUsd * 1_000_000) / 1_000_000 !== item.estimatedCostUsd
+            estimateMicrodollars(expected.estimatedCostUsd) !== Math.round(item.estimatedCostUsd * 1_000_000)
           );
         })
       ) {
-        throw new Error('Benchmark credit bridge returned a mismatched reservation.');
+        const released = new Set<string>();
+        for (const item of held.items) {
+          const key = benchmarkPairKey(item);
+          if (item.status !== 'held' || released.has(key)) continue;
+          await settle({
+            admissionId: held.admissionId,
+            ownerType: request.ownerType,
+            ownerId: request.ownerId,
+            model: item.model,
+            variant: item.variant,
+            runId: null,
+            actualCostUsd: 0,
+          });
+          released.add(key);
+        }
+        throw new ProfileReservationMismatchError();
       }
       return { kind: 'held' };
     },
-    async settle(request) {
-      const response = await post('settle', request);
-      if (!response.ok) throw new ProfileCreditBridgeError(response.status);
-      const settled = CreditSettlementSchema.parse(await response.json());
-      if (
-        settled.admissionId !== request.admissionId ||
-        settled.model !== request.model ||
-        settled.variant !== request.variant ||
-        settled.runId !== request.runId ||
-        settled.chargedCostUsd !== Math.round(request.actualCostUsd * 1_000_000) / 1_000_000
-      ) {
-        throw new Error('Benchmark credit bridge returned a mismatched settlement.');
-      }
-    },
+    settle,
   };
 }
 
@@ -308,16 +331,31 @@ export async function recoverProfileAdmission(
       );
     return { kind: 'held' };
   }
-  const reservation = await billing.reserve({
-    admissionId,
-    ownerType: admission.owner_type,
-    ownerId: admission.owner_id,
-    items: claims.map(claim => ({
-      model: claim.model,
-      variant: variantFromStorage(claim.variant),
-      estimatedCostUsd: claim.estimated_cost_usd,
-    })),
-  });
+  let reservation: ProfileCreditReserveResult;
+  try {
+    reservation = await billing.reserve({
+      admissionId,
+      ownerType: admission.owner_type,
+      ownerId: admission.owner_id,
+      items: claims.map(claim => ({
+        model: claim.model,
+        variant: variantFromStorage(claim.variant),
+        estimatedCostUsd: claim.estimated_cost_usd,
+      })),
+    });
+  } catch (error) {
+    if (error instanceof ProfileReservationMismatchError) {
+      await orm.batch([
+        orm.update(profileBenchmarkClaims)
+          .set({ state: 'released', charged_cost_usd: 0, settled_at: nowIso, updated_at: nowIso })
+          .where(and(eq(profileBenchmarkClaims.admission_id, admissionId), eq(profileBenchmarkClaims.state, 'allocating'))),
+        orm.update(profileBenchmarkAdmissions)
+          .set({ state: 'admitted', updated_at: nowIso })
+          .where(and(eq(profileBenchmarkAdmissions.admission_id, admissionId), eq(profileBenchmarkAdmissions.state, 'allocating'))),
+      ]);
+    }
+    throw error;
+  }
   if (reservation.kind === 'insufficient') {
     await orm.batch([
       orm
@@ -419,15 +457,28 @@ export async function recoverPendingProfileAdmissions(
   const admissions = await orm
     .select()
     .from(profileBenchmarkAdmissions)
-    .where(sql`${profileBenchmarkAdmissions.state} = 'allocating' OR EXISTS (
-      SELECT 1 FROM ${profileBenchmarkClaims}
-      WHERE ${profileBenchmarkClaims.admission_id} = ${profileBenchmarkAdmissions.admission_id}
-        AND ${profileBenchmarkClaims.state} = 'release_pending'
-    )`)
-    .orderBy(asc(profileBenchmarkAdmissions.created_at))
+    .where(and(
+      or(isNull(profileBenchmarkAdmissions.recovery_next_at), lte(profileBenchmarkAdmissions.recovery_next_at, now.toISOString())),
+      sql`(${profileBenchmarkAdmissions.state} = 'allocating' OR EXISTS (
+        SELECT 1 FROM ${profileBenchmarkClaims}
+        WHERE ${profileBenchmarkClaims.admission_id} = ${profileBenchmarkAdmissions.admission_id}
+          AND ${profileBenchmarkClaims.state} = 'release_pending'
+      ))`
+    ))
+    .orderBy(asc(profileBenchmarkAdmissions.recovery_next_at), asc(profileBenchmarkAdmissions.created_at))
     .limit(100);
   let firstError: unknown;
   for (const admission of admissions) {
+    const nextAttempt = admission.recovery_attempts + 1;
+    const delayMs = Math.min(24 * 60 * 60 * 1000, 15 * 60 * 1000 * 2 ** Math.min(nextAttempt - 1, 7));
+    const claimed = await orm.update(profileBenchmarkAdmissions).set({
+      recovery_attempts: sql`${profileBenchmarkAdmissions.recovery_attempts} + 1`,
+      recovery_next_at: new Date(now.getTime() + delayMs).toISOString(),
+    }).where(and(
+      eq(profileBenchmarkAdmissions.admission_id, admission.admission_id),
+      or(isNull(profileBenchmarkAdmissions.recovery_next_at), lte(profileBenchmarkAdmissions.recovery_next_at, now.toISOString()))
+    ));
+    if ((claimed.meta.changes ?? 0) === 0) continue;
     try {
       await recoverProfileAdmission(db, billing, admission.admission_id, now);
     } catch (error) {

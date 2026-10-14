@@ -48,6 +48,7 @@ import {
   settingsQueryKey,
   settingsRefetchInterval,
   SETTINGS_POLL_INTERVAL_MS,
+  supportedBenchmarkEffortCount,
   shouldShowClearPoolControl,
   toEligibleModelOptions,
   tryAddPoolEntry,
@@ -409,6 +410,35 @@ describe('settingsRefetchInterval / hasBenchmarkingEntries', () => {
         })
       )
     ).toBe(SETTINGS_POLL_INTERVAL_MS);
+  });
+
+  it('counts only reasoning presets, with one default effort for nonreasoning models', () => {
+    expect(supportedBenchmarkEffortCount({
+      high: { reasoning: { effort: 'high' } },
+      disabled: { reasoning: { enabled: false } },
+      creative: {},
+    })).toBe(2);
+    expect(supportedBenchmarkEffortCount({ creative: {}, concise: {} })).toBe(1);
+  });
+
+  it('keeps polling when a supported reasoning effort has no status yet', () => {
+    const pool = [{ ...entryReady, unavailable: false }];
+    const readyStatuses: BenchmarkProfileEntryStatus[] = [
+      { entry: { ...entryReady, variant: 'high' }, status: 'ready' },
+    ];
+    const counts = { [entryReady.model]: 2 };
+    expect(hasBenchmarkingEntries(pool, readyStatuses, counts)).toBe(true);
+    expect(settingsRefetchInterval(
+      settings({ configuredPool: pool, poolStatuses: readyStatuses }),
+      counts
+    )).toBe(SETTINGS_POLL_INTERVAL_MS);
+    expect(settingsRefetchInterval(
+      settings({ configuredPool: pool, poolStatuses: [
+        ...readyStatuses,
+        { entry: { ...entryReady, variant: 'low' }, status: 'ready' },
+      ] }),
+      counts
+    )).toBe(false);
   });
 
   it('stops polling once every entry is terminal (ready/failed) or unavailable', () => {
@@ -989,6 +1019,11 @@ describe('owner benchmark quote', () => {
       expect(mounted.container.textContent).toContain('Estimated owner cost: $0.250000');
       expect(mounted.container.textContent).toContain('Charged: Not charged');
       expect(mounted.container.textContent).toContain('quote is advisory');
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(30_000);
+      });
+      expect(mounted.container.textContent).toContain('Estimating benchmark cost…');
+      expect(findSaveButton(mounted.container).disabled).toBe(false);
     } finally {
       mounted.cleanup();
       global.fetch = originalFetch;

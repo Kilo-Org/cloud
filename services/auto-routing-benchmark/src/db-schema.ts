@@ -260,6 +260,8 @@ export const profileBenchmarkAdmissions = sqliteTable(
       .notNull(),
     created_at: text('created_at').notNull(),
     updated_at: text('updated_at').notNull(),
+    recovery_attempts: integer('recovery_attempts').notNull().default(0),
+    recovery_next_at: text('recovery_next_at'),
   },
   table => [index('IDX_profile_benchmark_admissions_state').on(table.state, table.created_at)]
 );

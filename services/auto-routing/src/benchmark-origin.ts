@@ -35,6 +35,16 @@ export class BenchmarkProfileQuotaError extends Error {
 
 export class BenchmarkInsufficientCreditsError extends Error {}
 
+export class BenchmarkEstimateRequestError extends Error {
+  readonly status: 400 | 409;
+
+  constructor(message: string, status: 400 | 409) {
+    super(message);
+    this.name = 'BenchmarkEstimateRequestError';
+    this.status = status;
+  }
+}
+
 async function rejectInsufficientCredits(res: Response): Promise<void> {
   if (res.status !== 402) return;
   const raw: unknown = await res.json().catch(() => null);
@@ -190,6 +200,13 @@ export async function estimateBenchmarkProfiles(
     body: JSON.stringify(body),
   });
   await rejectInsufficientCredits(res);
+  if (res.status === 400 || res.status === 409) {
+    const raw: unknown = await res.json().catch(() => null);
+    const parsed = z.object({ error: z.string() }).safeParse(raw);
+    if (parsed.success) {
+      throw new BenchmarkEstimateRequestError(parsed.data.error, res.status);
+    }
+  }
   if (!res.ok) {
     throw new Error(`benchmark estimate responded ${res.status}`);
   }

@@ -147,6 +147,11 @@ held remainder; failed pairs release their entire hold,
 including partial failed-lane measurements. Actual cost exceeding the estimate
 is charged in full. D1 admission and settlement records retain retryable work;
 scheduled recovery reconciles interrupted credit calls and terminal runs.
+Recovery persists an attempt count and exponential retry deadline (15 minutes
+through 24 hours) before each attempt, so poisoned older admissions cannot
+starve newer admissions or pending releases. Reservation verification shares
+the web ledger's microdollar rounding; mismatched successful responses release
+the echoed holds and close the allocation instead of leaving credits reserved.
 
 Admission returns before the caller's Durable Object settings write. If that
 write fails, the previous pool remains, but authorized measurements still run.

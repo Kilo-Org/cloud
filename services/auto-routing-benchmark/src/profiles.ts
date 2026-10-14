@@ -10,6 +10,7 @@ import {
   BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH,
   MAX_POOL_ENTRIES,
   benchmarkPairKey,
+  estimateMicrodollars,
 } from '@kilocode/auto-routing-contracts';
 import { and, asc, eq, gte, inArray, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
@@ -282,7 +283,7 @@ async function planProfiles(
         throw new ProfileValidationError(
           `Benchmark estimate is not finite for ${item.pair.model}.`
         );
-      item.estimatedCostUsd = Math.ceil(total * 1_000_000) / 1_000_000;
+      item.estimatedCostUsd = estimateMicrodollars(total) / 1_000_000;
     }
   }
   return plan;

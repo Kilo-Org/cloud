@@ -5,6 +5,11 @@ import type { OfflineSweep } from './schema';
 
 type SweepResult = OfflineSweep['pairs'][number]['results'][number];
 
+export type SweepTokenUsage = {
+  promptTokens: number | null;
+  completionTokens: number | null;
+};
+
 export function selectSweepCases(suite: 'efficient' | 'frontier' = 'efficient') {
   return suite === 'frontier' ? FRONTIER_CASES : DECIDER_CASES;
 }
@@ -24,7 +29,11 @@ const streamChunkSchema = z.object({
       })
     )
     .optional(),
-  usage: z.object({ cost: z.number().nonnegative().nullish() }).nullish(),
+  usage: z.object({
+    cost: z.number().nonnegative().nullish(),
+    prompt_tokens: z.number().int().nonnegative().nullish(),
+    completion_tokens: z.number().int().nonnegative().nullish(),
+  }).nullish(),
   error: z.unknown().optional(),
 });
 
@@ -32,7 +41,12 @@ export async function readSweepCompletion(
   response: Response,
   startedAt: number,
   now: () => number = () => performance.now()
-): Promise<{ output: string; costUsd: number | null; ttftMs: number | null }> {
+): Promise<{
+  output: string;
+  costUsd: number | null;
+  ttftMs: number | null;
+  tokenUsage?: SweepTokenUsage;
+}> {
   if (!response.body) throw new Error('OpenRouter response has no stream');
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -41,6 +55,7 @@ export async function readSweepCompletion(
   let output = '';
   let costUsd: number | null = null;
   let ttftMs: number | null = null;
+  let tokenUsage: SweepTokenUsage | undefined;
   let done = false;
   const consumeEvent = () => {
     if (data.length === 0) return;
@@ -67,6 +82,12 @@ export async function readSweepCompletion(
       output += delta.content ?? '';
     }
     if (chunk.usage?.cost != null) costUsd = chunk.usage.cost;
+    if (chunk.usage?.prompt_tokens != null || chunk.usage?.completion_tokens != null) {
+      tokenUsage = {
+        promptTokens: chunk.usage.prompt_tokens ?? tokenUsage?.promptTokens ?? null,
+        completionTokens: chunk.usage.completion_tokens ?? tokenUsage?.completionTokens ?? null,
+      };
+    }
   };
   const consumeLine = (line: string) => {
     const normalized = line.endsWith('\r') ? line.slice(0, -1) : line;
@@ -89,7 +110,7 @@ export async function readSweepCompletion(
       consumeEvent();
     }
     if (!done) throw new Error('OpenRouter stream ended before [DONE]');
-    return { output, costUsd, ttftMs };
+    return { output, costUsd, ttftMs, ...(tokenUsage ? { tokenUsage } : {}) };
   } finally {
     await reader.cancel().catch(() => {});
     reader.releaseLock();
@@ -111,6 +132,7 @@ export async function requestDirectSweepCompletion(input: {
   ttftMs: number | null;
   latencyMs: number;
   error: string | null;
+  tokenUsage?: SweepTokenUsage;
 }> {
   const body = JSON.stringify({
     ...input.fragment,

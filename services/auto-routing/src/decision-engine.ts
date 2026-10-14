@@ -27,11 +27,6 @@ export type DecisionIncumbent = {
   variant: string | null;
 };
 
-// Single source of the constraint policy shared by benchmark routing
-// (`applyCapabilityFilters`) and the coding-plan short-circuit in `decide.ts`.
-// Keeping these in one place stops the two paths from silently diverging when
-// the policy changes.
-
 // A required+enforced modality the model does not (or might not) support fails
 // closed: unknown capability data is treated as unsupported.
 export function satisfiesRequiredModalities(
@@ -58,18 +53,6 @@ export function contextProvablyTooSmall(
     !!caps &&
     typeof caps.contextLength === 'number' &&
     caps.contextLength < estimate
-  );
-}
-
-// Combined fitness used by the coding-plan short-circuit, which needs a single
-// yes/no. Benchmark routing calls the two predicates separately because a
-// modality miss drops the candidate while a too-small context only demotes it.
-export function modelSatisfiesConstraints(
-  caps: ModelCapabilities | undefined,
-  constraints: RoutingConstraints
-): boolean {
-  return (
-    satisfiesRequiredModalities(caps, constraints) && !contextProvablyTooSmall(caps, constraints)
   );
 }
 

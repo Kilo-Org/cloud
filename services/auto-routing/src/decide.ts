@@ -592,7 +592,12 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     }
   })();
   // Keep an in-flight paid call alive if the gateway disconnects before its response.
-  c.executionCtx.waitUntil(preparedClassification.then(() => undefined));
+  c.executionCtx.waitUntil(
+    preparedClassification.then(
+      () => undefined,
+      () => undefined
+    )
+  );
 
   const [routing, prepared] = await Promise.all([routingPrerequisites, preparedClassification]);
   if (!('ctx' in prepared)) {

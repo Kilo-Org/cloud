@@ -14,7 +14,6 @@ import {
   getRunningRun,
   listRuns,
   replaceConfig,
-  replaceAutoDeciderModels,
   insertRun,
 } from './db';
 
@@ -94,7 +93,7 @@ describe('router contracts and database isolation', () => {
       const { db, queries } = capturingDatabase();
       const rows = await getConfigRows(db, router);
       expect(rows.config).toBeNull();
-      expect(queries).toHaveLength(5);
+      expect(queries).toHaveLength(3);
       for (const query of queries) {
         expect(query.sql).toContain('"router" = ?');
         expect(query.params).toContain(router);
@@ -104,7 +103,7 @@ describe('router contracts and database isolation', () => {
   );
 
   it.each(['efficient', 'frontier'] as const)(
-    'isolates config and auto-model replacement for %s',
+    'isolates configured model replacement for %s',
     async router => {
       const { db, queries } = capturingDatabase();
       await replaceConfig(
@@ -122,23 +121,15 @@ describe('router contracts and database isolation', () => {
           classifier_repetitions: 1,
           decider_repetitions: 1,
           classifier_max_p95_latency_ms: 1000,
-          auto_decider_min_cost_usd: 15,
-          auto_decider_max_cost_usd: 25,
           updated_at: 'now',
           updated_by: null,
         },
         ['classifier'],
         [{ model: 'model', variant: null, reasoning_effort: null }],
-        ['excluded'],
-        router
-      );
-      await replaceAutoDeciderModels(
-        db,
-        [{ model: 'auto', reasoning_effort: null, avg_attempt_cost_usd: 20, synced_at: 'now' }],
         router
       );
       const deletes = queries.filter(query => query.sql.startsWith('delete'));
-      expect(deletes).toHaveLength(4);
+      expect(deletes).toHaveLength(2);
       for (const query of deletes) {
         expect(query.sql).toContain('"router" = ?');
         expect(query.params).toEqual([router]);

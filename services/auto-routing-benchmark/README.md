@@ -460,8 +460,8 @@ first flips it to `running`, so it is still measured exactly once.
 **Scheduled handlers:**
 
 - `*/15 * * * *` — sweep stale runs, then drain both queues.
-- `0 5 * * *` — sweep, refresh auto-decider candidates, reconcile the platform
-  queue with the resulting decider list, drain both queues, republish the
+- `0 5 * * *` — sweep, reconcile the platform queue with each router's
+  admin-configured decider list, drain both queues, republish the
   platform table (so a *removed* model leaves the live table even when nothing
   new needed measuring).
 

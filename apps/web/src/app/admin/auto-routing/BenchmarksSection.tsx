@@ -1,8 +1,6 @@
 'use client';
 
 import {
-  AUTO_DECIDER_DEFAULT_MAX_COST_USD,
-  AUTO_DECIDER_DEFAULT_MIN_COST_USD,
   BENCHMARK_CONTAINER_BUDGET,
   AUTO_ROUTERS,
   AutoRouterSchema,
@@ -17,7 +15,6 @@ import {
   getReasoningVariantKeys,
   RequeueBenchmarkRegistryResponseSchema,
   StartBenchmarkRunResponseSchema,
-  type AutoBenchmarkDeciderModel,
   type BenchmarkConfig,
   type BenchmarkPlatformModel,
   type BenchmarkKind,
@@ -217,13 +214,9 @@ async function fetchBenchmarkRoutingTable(router: AutoRouter) {
 
 type DeciderModelRow = BenchmarkPlatformModel;
 
-type AutoDeciderModelRow = AutoBenchmarkDeciderModel;
-
 export function configToFormState(config: BenchmarkConfig | null): {
   classifierModels: string[];
   deciderModels: DeciderModelRow[];
-  autoDeciderModels: AutoDeciderModelRow[];
-  excludedAutoDeciderModels: string;
   minAccuracy: number;
   accuracyNoiseBand: number;
   frontierMinAccuracyDelta: number;
@@ -236,8 +229,6 @@ export function configToFormState(config: BenchmarkConfig | null): {
   classifierRepetitions: number;
   deciderRepetitions: number;
   classifierMaxP95LatencyMs: string;
-  autoDeciderMinCostUsd: number;
-  autoDeciderMaxCostUsd: number;
 } {
   if (config === null) {
     // No config saved yet: identity fields are overrides, so blank means the
@@ -245,8 +236,6 @@ export function configToFormState(config: BenchmarkConfig | null): {
     return {
       classifierModels: [],
       deciderModels: [],
-      autoDeciderModels: [],
-      excludedAutoDeciderModels: '',
       minAccuracy: 0.7,
       accuracyNoiseBand: 0.05,
       frontierMinAccuracyDelta: 0,
@@ -259,15 +248,11 @@ export function configToFormState(config: BenchmarkConfig | null): {
       classifierRepetitions: 1,
       deciderRepetitions: 1,
       classifierMaxP95LatencyMs: '1000',
-      autoDeciderMinCostUsd: AUTO_DECIDER_DEFAULT_MIN_COST_USD,
-      autoDeciderMaxCostUsd: AUTO_DECIDER_DEFAULT_MAX_COST_USD,
     };
   }
   return {
     classifierModels: config.classifierModels,
-    deciderModels: (config.manualDeciderModels ?? config.deciderModels).map(({ id }) => ({ id })),
-    autoDeciderModels: config.autoDeciderModels ?? [],
-    excludedAutoDeciderModels: (config.excludedAutoDeciderModels ?? []).join('\n'),
+    deciderModels: config.deciderModels.map(({ id }) => ({ id })),
     minAccuracy: config.minAccuracy,
     accuracyNoiseBand: config.accuracyNoiseBand,
     frontierMinAccuracyDelta: config.frontierMinAccuracyDelta,
@@ -281,39 +266,7 @@ export function configToFormState(config: BenchmarkConfig | null): {
     deciderRepetitions: config.deciderRepetitions,
     classifierMaxP95LatencyMs:
       config.classifierMaxP95LatencyMs !== null ? String(config.classifierMaxP95LatencyMs) : '',
-    autoDeciderMinCostUsd: config.autoDeciderMinCostUsd,
-    autoDeciderMaxCostUsd: config.autoDeciderMaxCostUsd,
   };
-}
-
-function parseModelLines(value: string): string[] {
-  return value
-    .split('\n')
-    .map(s => s.trim())
-    .filter(s => s.length > 0);
-}
-
-export function effectiveDeciderModels({
-  manualDeciderModels,
-  autoDeciderModels,
-  excludedAutoDeciderModels,
-}: {
-  manualDeciderModels: DeciderModelRow[];
-  autoDeciderModels: AutoDeciderModelRow[];
-  excludedAutoDeciderModels: string[];
-}): BenchmarkPlatformModel[] {
-  const manual = manualDeciderModels
-    .filter(row => row.id.trim().length > 0)
-    .map(row => ({ id: row.id.trim() }));
-  const manualIds = new Set(manual.map(model => model.id));
-  const excludedAuto = new Set(excludedAutoDeciderModels);
-  return [
-    ...manual,
-    ...autoDeciderModels
-      .filter(model => !excludedAuto.has(model.id))
-      .filter(model => !manualIds.has(model.id))
-      .map(({ id }) => ({ id })),
-  ];
 }
 
 export function formStateToConfig(
@@ -321,15 +274,9 @@ export function formStateToConfig(
   base: BenchmarkConfig | null
 ): BenchmarkConfig {
   const classifierModels = state.classifierModels.map(id => id.trim()).filter(id => id.length > 0);
-  const excludedAutoDeciderModels = parseModelLines(state.excludedAutoDeciderModels);
-  const manualDeciderModels = state.deciderModels
+  const deciderModels = state.deciderModels
     .filter(row => row.id.trim().length > 0)
     .map(row => ({ id: row.id.trim() }));
-  const deciderModels = effectiveDeciderModels({
-    manualDeciderModels,
-    autoDeciderModels: state.autoDeciderModels,
-    excludedAutoDeciderModels,
-  });
   const benchmarkUserId = state.benchmarkUserId.trim();
   const benchmarkOrgId = state.benchmarkOrgId.trim();
   const rawLatency = state.classifierMaxP95LatencyMs.trim();
@@ -338,9 +285,6 @@ export function formStateToConfig(
     router: base?.router ?? DEFAULT_AUTO_ROUTER,
     classifierModels,
     deciderModels,
-    manualDeciderModels,
-    autoDeciderModels: state.autoDeciderModels,
-    excludedAutoDeciderModels,
     minAccuracy: state.minAccuracy,
     accuracyNoiseBand: state.accuracyNoiseBand,
     frontierMinAccuracyDelta: state.frontierMinAccuracyDelta,
@@ -356,8 +300,6 @@ export function formStateToConfig(
     classifierRepetitions: state.classifierRepetitions,
     deciderRepetitions: state.deciderRepetitions,
     classifierMaxP95LatencyMs,
-    autoDeciderMinCostUsd: state.autoDeciderMinCostUsd,
-    autoDeciderMaxCostUsd: state.autoDeciderMaxCostUsd,
     updatedAt: base?.updatedAt ?? null,
     updatedBy: base?.updatedBy ?? null,
   };
@@ -491,24 +433,6 @@ function BenchmarkConfigEditor({
     [updateForm]
   );
 
-  const handleToggleAutoDeciderModel = useCallback(
-    (modelId: string, included: boolean) => {
-      updateForm(prev => {
-        const excluded = new Set(parseModelLines(prev.excludedAutoDeciderModels));
-        if (included) {
-          excluded.delete(modelId);
-        } else {
-          excluded.add(modelId);
-        }
-        return {
-          ...prev,
-          excludedAutoDeciderModels: [...excluded].sort().join('\n'),
-        };
-      });
-    },
-    [updateForm]
-  );
-
   const handleSave = useCallback(() => {
     saveMutation.mutate(formStateToConfig(form, config));
   }, [form, config, saveMutation]);
@@ -579,9 +503,8 @@ function BenchmarkConfigEditor({
           </Button>
         </div>
 
-        {/* Manual decider models table */}
         <div className="flex flex-col gap-1.5">
-          <Label className="text-sm font-medium">Manual decider models</Label>
+          <Label className="text-sm font-medium">Decider models</Label>
           <p className="text-muted-foreground text-xs">
             Each selected model benchmarks every supported reasoning effort. Queue status is shown
             in the registry below.
@@ -652,62 +575,6 @@ function BenchmarkConfigEditor({
             <Plus className="size-3.5" />
             Add model
           </Button>
-        </div>
-
-        {/* Auto decider models */}
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-3">
-            <Label className="text-sm font-medium">Auto decider models</Label>
-            <Badge variant="secondary">{form.autoDeciderModels.length} synced</Badge>
-          </div>
-          {form.autoDeciderModels.length > 0 ? (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Model ID</TableHead>
-                    <TableHead className="w-32">Avg run</TableHead>
-                    <TableHead>Effort coverage</TableHead>
-                    <TableHead className="w-24">Included</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {form.autoDeciderModels.map(model => {
-                    const excluded = parseModelLines(form.excludedAutoDeciderModels).includes(
-                      model.id
-                    );
-                    return (
-                      <TableRow key={model.id}>
-                        <TableCell className="font-mono text-xs">{model.id}</TableCell>
-                        <TableCell className="tabular-nums">
-                          {formatUsd(model.avgAttemptCostUsd)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-xs">
-                          {effortCoverageForModel(
-                            modelOptions.find(option => option.id === model.id),
-                            registryEntries
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Checkbox
-                            checked={!excluded}
-                            onCheckedChange={checked =>
-                              handleToggleAutoDeciderModel(model.id, checked === true)
-                            }
-                            aria-label={`${excluded ? 'Include' : 'Exclude'} ${model.id}`}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-muted-foreground rounded-md border px-3 py-2 text-sm">
-              No auto decider models synced yet.
-            </div>
-          )}
         </div>
 
         {/* Numeric inputs */}
@@ -868,44 +735,6 @@ function BenchmarkConfigEditor({
               </p>
             </div>
           ) : null}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-auto-decider-min-cost" className="text-sm font-medium">
-              Auto min run cost
-            </Label>
-            <Input
-              id="benchmark-auto-decider-min-cost"
-              type="number"
-              min={0}
-              step={1}
-              value={form.autoDeciderMinCostUsd}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  autoDeciderMinCostUsd: parseFloat(e.target.value) || 0,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-auto-decider-max-cost" className="text-sm font-medium">
-              Auto max run cost
-            </Label>
-            <Input
-              id="benchmark-auto-decider-max-cost"
-              type="number"
-              min={0}
-              step={1}
-              value={form.autoDeciderMaxCostUsd}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  autoDeciderMaxCostUsd: parseFloat(e.target.value) || 0,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
-          </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-classifier-repetitions" className="text-sm font-medium">
               Classifier repetitions (1–5)

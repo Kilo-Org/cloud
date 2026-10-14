@@ -36,8 +36,6 @@ const configResponse = {
     classifierRepetitions: 1,
     deciderRepetitions: 1,
     classifierMaxP95LatencyMs: 1000,
-    autoDeciderMinCostUsd: 15,
-    autoDeciderMaxCostUsd: 25,
     updatedAt: null,
     updatedBy: null,
   },

@@ -25,8 +25,6 @@ import {
   benchmarkProfiles,
   benchmarkRuns,
   caseResults,
-  configAutoDeciderExclusions,
-  configAutoDeciderModels,
   configClassifierModels,
   configDeciderModels,
   modelSummaries,
@@ -48,12 +46,6 @@ export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
 export type RunModelRow = typeof runModels.$inferSelect;
 export type ConfigDeciderModelRow = Omit<typeof configDeciderModels.$inferSelect, 'router'> & {
-  router?: AutoRouter;
-};
-export type ConfigAutoDeciderModelRow = Omit<
-  typeof configAutoDeciderModels.$inferSelect,
-  'router'
-> & {
   router?: AutoRouter;
 };
 type ModelSummaryRow = typeof modelSummaries.$inferSelect;
@@ -143,27 +135,17 @@ export async function getConfigRows(
   config: typeof benchmarkConfig.$inferSelect | null;
   classifierModels: string[];
   deciderModels: ConfigDeciderModelRow[];
-  autoDeciderModels: ConfigAutoDeciderModelRow[];
-  excludedAutoDeciderModels: string[];
 }> {
   const orm = drizzle(db);
-  const [configRows, classifierRows, deciderRows, autoDeciderRows, exclusionRows] =
-    await Promise.all([
-      orm.select().from(benchmarkConfig).where(eq(benchmarkConfig.router, router)).limit(1),
-      orm.select().from(configClassifierModels).where(eq(configClassifierModels.router, router)),
-      orm.select().from(configDeciderModels).where(eq(configDeciderModels.router, router)),
-      orm.select().from(configAutoDeciderModels).where(eq(configAutoDeciderModels.router, router)),
-      orm
-        .select()
-        .from(configAutoDeciderExclusions)
-        .where(eq(configAutoDeciderExclusions.router, router)),
-    ]);
+  const [configRows, classifierRows, deciderRows] = await Promise.all([
+    orm.select().from(benchmarkConfig).where(eq(benchmarkConfig.router, router)).limit(1),
+    orm.select().from(configClassifierModels).where(eq(configClassifierModels.router, router)),
+    orm.select().from(configDeciderModels).where(eq(configDeciderModels.router, router)),
+  ]);
   return {
     config: configRows[0] ?? null,
     classifierModels: classifierRows.map(r => r.model),
     deciderModels: deciderRows,
-    autoDeciderModels: autoDeciderRows,
-    excludedAutoDeciderModels: exclusionRows.map(r => r.model),
   };
 }
 
@@ -185,14 +167,11 @@ export async function replaceConfig(
     classifier_repetitions: number;
     decider_repetitions: number;
     classifier_max_p95_latency_ms: number | null;
-    auto_decider_min_cost_usd: number;
-    auto_decider_max_cost_usd: number;
     updated_at: string;
     updated_by: string | null;
   },
   classifierModels: string[],
   deciderModels: ConfigDeciderModelRow[],
-  excludedAutoDeciderModels: string[] = [],
   router: AutoRouter = 'efficient'
 ): Promise<void> {
   const orm = drizzle(db);
@@ -206,7 +185,6 @@ export async function replaceConfig(
       }),
     orm.delete(configClassifierModels).where(eq(configClassifierModels.router, router)),
     orm.delete(configDeciderModels).where(eq(configDeciderModels.router, router)),
-    orm.delete(configAutoDeciderExclusions).where(eq(configAutoDeciderExclusions.router, router)),
   ];
   for (const batch of batchRows(classifierModels)) {
     stmts.push(orm.insert(configClassifierModels).values(batch.map(m => ({ model: m, router }))));
@@ -214,28 +192,9 @@ export async function replaceConfig(
   for (const batch of batchRows(deciderModels)) {
     stmts.push(orm.insert(configDeciderModels).values(batch.map(row => ({ ...row, router }))));
   }
-  for (const batch of batchRows(excludedAutoDeciderModels)) {
-    stmts.push(
-      orm.insert(configAutoDeciderExclusions).values(batch.map(model => ({ model, router })))
-    );
-  }
   await orm.batch(stmts);
 }
 
-export async function replaceAutoDeciderModels(
-  db: D1Database,
-  autoDeciderModels: ConfigAutoDeciderModelRow[],
-  router: AutoRouter = 'efficient'
-): Promise<void> {
-  const orm = drizzle(db);
-  const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
-    orm.delete(configAutoDeciderModels).where(eq(configAutoDeciderModels.router, router)),
-  ];
-  for (const batch of batchRows(autoDeciderModels)) {
-    stmts.push(orm.insert(configAutoDeciderModels).values(batch.map(row => ({ ...row, router }))));
-  }
-  await orm.batch(stmts);
-}
 
 /** Which registry queue a run drains: the platform decider list, or owner pools. */
 export type { BenchmarkRunPurpose };

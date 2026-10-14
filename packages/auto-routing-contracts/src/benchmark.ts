@@ -68,15 +68,8 @@ export const BenchmarkPlatformModelSchema = z.object({
 });
 export type BenchmarkPlatformModel = z.infer<typeof BenchmarkPlatformModelSchema>;
 
-export const AUTO_DECIDER_DEFAULT_MIN_COST_USD = 15;
-export const AUTO_DECIDER_DEFAULT_MAX_COST_USD = 25;
 export const DEFAULT_BENCHMARK_USER_ID = 'ce12ef3d-ae95-4d77-b4f0-23735f0a0591';
 export const DEFAULT_BENCHMARK_ORG_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
-
-export const AutoBenchmarkDeciderModelSchema = BenchmarkPlatformModelSchema.extend({
-  avgAttemptCostUsd: z.number().nonnegative(),
-});
-export type AutoBenchmarkDeciderModel = z.infer<typeof AutoBenchmarkDeciderModelSchema>;
 
 // Flags each list entry whose (trimmed) id already appeared earlier in the
 // array. Model ids are the D1 primary keys for config_classifier_models /
@@ -101,14 +94,6 @@ export const BenchmarkConfigSchema = z
     router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
     classifierModels: z.array(z.string().trim().min(1)).min(1),
     deciderModels: z.array(BenchmarkPlatformModelSchema).min(1),
-    // Manual additions are operator-pinned decider candidates. When omitted by
-    // older clients, the worker treats deciderModels as the manual list.
-    manualDeciderModels: z.array(BenchmarkPlatformModelSchema).optional(),
-    // Auto additions are refreshed from Kilo Bench cost data by the benchmark
-    // worker's scheduled sync. The effective deciderModels list is manual +
-    // non-excluded auto models.
-    autoDeciderModels: z.array(AutoBenchmarkDeciderModelSchema).optional(),
-    excludedAutoDeciderModels: z.array(z.string().trim().min(1)).optional(),
     // Accuracy threshold for "gets the job done" (per taxonomy route).
     minAccuracy: z.number().min(0).max(1),
     accuracyNoiseBand: z.number().min(0).max(1).default(0.05),
@@ -151,10 +136,6 @@ export const BenchmarkConfigSchema = z
     // Maximum acceptable p95 latency for the classifier winner; null means no
     // constraint (cost-only selection).
     classifierMaxP95LatencyMs: z.number().int().positive().nullable().default(1000),
-    // Auto decider model selection includes terminal-bench models whose
-    // floored average run cost falls within this inclusive range.
-    autoDeciderMinCostUsd: z.number().nonnegative().default(AUTO_DECIDER_DEFAULT_MIN_COST_USD),
-    autoDeciderMaxCostUsd: z.number().nonnegative().default(AUTO_DECIDER_DEFAULT_MAX_COST_USD),
     updatedAt: z.string().nullable(),
     updatedBy: z.string().nullable(),
   })
@@ -165,28 +146,6 @@ export const BenchmarkConfigSchema = z
       'deciderModels',
       ctx
     );
-    addDuplicateModelIssues(
-      (config.manualDeciderModels ?? []).map(m => m.id),
-      'manualDeciderModels',
-      ctx
-    );
-    addDuplicateModelIssues(
-      (config.autoDeciderModels ?? []).map(m => m.id),
-      'autoDeciderModels',
-      ctx
-    );
-    addDuplicateModelIssues(
-      config.excludedAutoDeciderModels ?? [],
-      'excludedAutoDeciderModels',
-      ctx
-    );
-    if (config.autoDeciderMinCostUsd > config.autoDeciderMaxCostUsd) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['autoDeciderMaxCostUsd'],
-        message: 'Auto decider max cost must be greater than or equal to min cost',
-      });
-    }
     // Platform-queue and user-queue runs can hold containers at the same time,
     // so the two budgets share one hard platform cap.
     if (
@@ -210,21 +169,6 @@ export function resolveBenchmarkIdentity(
     benchmarkOrgId: config.benchmarkOrgId ?? DEFAULT_BENCHMARK_ORG_ID,
   };
 }
-
-export const AutoBenchmarkDeciderCandidatesResponseSchema = z.object({
-  candidates: z.array(
-    z.object({
-      id: z.string().trim().min(1),
-      avgAttemptCostUsd: z.number().nonnegative(),
-    })
-  ),
-  minCostUsd: z.number().nonnegative().optional(),
-  maxCostUsd: z.number().nonnegative().optional(),
-  generatedAt: z.string().optional(),
-});
-export type AutoBenchmarkDeciderCandidatesResponse = z.infer<
-  typeof AutoBenchmarkDeciderCandidatesResponseSchema
->;
 
 export const BenchmarkRunStatusSchema = z.enum(['running', 'completed', 'failed']);
 export type BenchmarkRunStatus = z.infer<typeof BenchmarkRunStatusSchema>;

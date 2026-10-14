@@ -3,11 +3,14 @@ import { AUTO_ROUTERS } from '@kilocode/auto-routing-contracts';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { registerAdminRoutes } from './admin';
 import { authMiddleware } from './auth';
-import { syncAutoDeciderModels } from './auto-decider-sync';
 import type { HonoEnv } from './hono-env';
 import {
   processDeadLetter,
   processJob,
+  drainQueues,
+  publishPlatformRoutingTable,
+  sweepStaleRuns,
+  syncPlatformRegistry,
   sweepStaleRunsAndDrain,
   type BenchmarkJobMessage,
 } from './run';
@@ -15,8 +18,6 @@ import {
 // Queue name of the dead-letter queue, matched against batch.queue.
 const DLQ_NAME = 'auto-routing-benchmark-dlq';
 
-// Daily platform cadence: refresh auto decider candidates and start a platform
-// run when they changed. Every other cron tick only drains profile work.
 const PLATFORM_SYNC_CRON = '0 5 * * *';
 
 // Re-exported so the Durable Object class binding (BENCH_RUNNER) can find it.
@@ -49,13 +50,33 @@ export default {
             })
           );
         } else {
-          const result = await syncAutoDeciderModels(env, { router });
+          const staleRunIds = await sweepStaleRuns(env);
+          const { desiredEntries } = await syncPlatformRegistry(env, fetch, router);
+          const startedRuns = await drainQueues(
+            env,
+            router === 'frontier' ? 'platform' : 'both',
+            undefined,
+            router
+          );
+          const published = await publishPlatformRoutingTable(env, fetch, router).catch(error => {
+            console.warn(
+              JSON.stringify({
+                event: 'routing_table_publish_skipped',
+                router,
+                error: error instanceof Error ? error.message : String(error),
+              })
+            );
+            return null;
+          });
           console.log(
             JSON.stringify({
-              event: 'auto_decider_model_sync_completed',
+              event: 'benchmark_platform_sync_completed',
               cron: controller.cron,
               router,
-              ...result,
+              staleRunIds,
+              platformEntries: desiredEntries,
+              startedRuns,
+              publishedVersion: published?.version ?? null,
             })
           );
         }

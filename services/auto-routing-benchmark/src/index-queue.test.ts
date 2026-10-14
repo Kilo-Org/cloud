@@ -7,9 +7,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as RunModule from './run';
 
-vi.mock('./auto-decider-sync', () => ({ syncAutoDeciderModels: vi.fn() }));
-
-import { syncAutoDeciderModels } from './auto-decider-sync';
 vi.mock('./run', async importOriginal => {
   const actual = await importOriginal<typeof RunModule>();
   return {
@@ -17,6 +14,10 @@ vi.mock('./run', async importOriginal => {
     processDeadLetter: vi.fn(),
     processJob: vi.fn(),
     sweepStaleRunsAndDrain: vi.fn(),
+    sweepStaleRuns: vi.fn(),
+    syncPlatformRegistry: vi.fn(),
+    drainQueues: vi.fn(),
+    publishPlatformRoutingTable: vi.fn(),
   };
 });
 
@@ -24,6 +25,10 @@ import {
   processDeadLetter,
   processJob,
   sweepStaleRunsAndDrain,
+  sweepStaleRuns,
+  syncPlatformRegistry,
+  drainQueues,
+  publishPlatformRoutingTable,
   type BenchmarkJobMessage,
 } from './run';
 import worker from './index';
@@ -95,17 +100,23 @@ describe('scheduled router queues', () => {
     expect(sweepStaleRunsAndDrain).toHaveBeenCalledWith(env, 'frontier');
   });
 
-  it('syncs both routers at the platform cadence', async () => {
-    vi.mocked(syncAutoDeciderModels).mockResolvedValue({
-      addedModels: [],
-      removedModels: [],
-      platformEntries: 0,
-      startedRuns: [],
-      publishedVersion: null,
-    });
+  it('reconciles, drains, and republishes both routers at the platform cadence', async () => {
+    vi.mocked(sweepStaleRuns).mockResolvedValue([]);
+    vi.mocked(syncPlatformRegistry).mockResolvedValue({ desiredEntries: 0 });
+    vi.mocked(drainQueues).mockResolvedValue([]);
+    vi.mocked(publishPlatformRoutingTable).mockResolvedValue(null);
     await worker.scheduled({ cron: '0 5 * * *' } as ScheduledController, env);
-    expect(syncAutoDeciderModels).toHaveBeenCalledWith(env, { router: 'efficient' });
-    expect(syncAutoDeciderModels).toHaveBeenCalledWith(env, { router: 'frontier' });
+    expect(sweepStaleRuns).toHaveBeenCalledTimes(2);
+    for (const router of ['efficient', 'frontier'] as const) {
+      expect(syncPlatformRegistry).toHaveBeenCalledWith(env, fetch, router);
+      expect(drainQueues).toHaveBeenCalledWith(
+        env,
+        router === 'frontier' ? 'platform' : 'both',
+        undefined,
+        router
+      );
+      expect(publishPlatformRoutingTable).toHaveBeenCalledWith(env, fetch, router);
+    }
     expect(sweepStaleRunsAndDrain).not.toHaveBeenCalled();
   });
 

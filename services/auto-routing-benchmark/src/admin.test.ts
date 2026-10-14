@@ -30,8 +30,6 @@ const TEST_CONFIG: BenchmarkConfig = {
   classifierRepetitions: 1,
   deciderRepetitions: 1,
   classifierMaxP95LatencyMs: 1000,
-  autoDeciderMinCostUsd: 15,
-  autoDeciderMaxCostUsd: 25,
   updatedAt: null,
   updatedBy: null,
 };
@@ -56,8 +54,6 @@ const TEST_CONFIG_ROWS = {
     classifier_repetitions: TEST_CONFIG.classifierRepetitions,
     decider_repetitions: TEST_CONFIG.deciderRepetitions,
     classifier_max_p95_latency_ms: TEST_CONFIG.classifierMaxP95LatencyMs,
-    auto_decider_min_cost_usd: TEST_CONFIG.autoDeciderMinCostUsd,
-    auto_decider_max_cost_usd: TEST_CONFIG.autoDeciderMaxCostUsd,
     updated_at: '2026-06-01T00:00:00.000Z',
     updated_by: null,
   },
@@ -67,8 +63,6 @@ const TEST_CONFIG_ROWS = {
     variant: null,
     reasoning_effort: null,
   })),
-  autoDeciderModels: [],
-  excludedAutoDeciderModels: [],
 };
 
 // Stubs: the db module is mocked at its function boundary (drizzle generates
@@ -197,8 +191,6 @@ beforeEach(() => {
     config: null,
     classifierModels: [],
     deciderModels: [],
-    autoDeciderModels: [],
-    excludedAutoDeciderModels: [],
   });
   vi.mocked(replaceConfig).mockResolvedValue(undefined);
   vi.mocked(listRuns).mockResolvedValue([]);
@@ -270,16 +262,12 @@ describe('GET /admin/config', () => {
         classifier_repetitions: 1,
         decider_repetitions: 1,
         classifier_max_p95_latency_ms: null,
-        auto_decider_min_cost_usd: 12,
-        auto_decider_max_cost_usd: 24,
         user_max_concurrency: 100,
         updated_at: '2026-06-01T00:00:00.000Z',
         updated_by: 'admin@example.com',
       },
       classifierModels,
       deciderModels,
-      autoDeciderModels: [],
-      excludedAutoDeciderModels: [],
     });
 
     const res = await authedGet('/admin/config');
@@ -336,10 +324,7 @@ describe('PUT /admin/config', () => {
       ...TEST_CONFIG,
       minAccuracy: 0.85,
       lowConfidenceThreshold: 0.8,
-      deciderModels: [{ id: 'manual/model' }, { id: 'auto/model' }],
-      manualDeciderModels: [{ id: 'manual/model' }],
-      autoDeciderModels: [{ id: 'auto/model', avgAttemptCostUsd: 20 }],
-      excludedAutoDeciderModels: ['auto/excluded'],
+      deciderModels: [{ id: 'configured/model' }],
       updatedAt: null,
       updatedBy: null,
     };
@@ -363,18 +348,15 @@ describe('PUT /admin/config', () => {
     expect(typeof body.config.updatedAt).toBe('string');
 
     expect(replaceConfig).toHaveBeenCalledOnce();
-    const [, configArg, , deciderModelRows, excludedAutoDeciderModels] =
-      vi.mocked(replaceConfig).mock.calls[0];
+    const [, configArg, , deciderModelRows, router] = vi.mocked(replaceConfig).mock.calls[0];
     expect(configArg.min_accuracy).toBe(0.85);
     expect(configArg.low_confidence_threshold).toBe(0.8);
-    expect(configArg.auto_decider_min_cost_usd).toBe(15);
-    expect(configArg.auto_decider_max_cost_usd).toBe(25);
     expect(typeof configArg.updated_at).toBe('string');
     expect(configArg.updated_by).toBe('igor@kilocode.ai');
     expect(deciderModelRows).toEqual([
-      { model: 'manual/model', variant: null, reasoning_effort: null },
+      { model: 'configured/model', variant: null, reasoning_effort: null },
     ]);
-    expect(excludedAutoDeciderModels).toEqual(['auto/excluded']);
+    expect(router).toBe('efficient');
   });
 });
 
@@ -871,7 +853,6 @@ describe('router selection', () => {
       }),
       expect.any(Array),
       expect.any(Array),
-      expect.any(Array),
       'frontier'
     );
   });
@@ -964,7 +945,6 @@ describe('body router selection', () => {
     expect(replaceConfig).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.anything(),
-      expect.any(Array),
       expect.any(Array),
       expect.any(Array),
       'frontier'

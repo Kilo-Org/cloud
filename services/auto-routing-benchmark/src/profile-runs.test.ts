@@ -117,8 +117,6 @@ const configRow = {
   classifier_repetitions: 1,
   decider_repetitions: 1,
   classifier_max_p95_latency_ms: 1000,
-  auto_decider_min_cost_usd: 15,
-  auto_decider_max_cost_usd: 25,
   user_max_concurrency: 100,
   updated_at: '2026-06-01T00:00:00.000Z',
   updated_by: null,
@@ -142,8 +140,6 @@ function mockConfig(overrides: Partial<typeof configRow> = {}) {
       { model: 'platform/a', variant: null, reasoning_effort: null },
       { model: 'platform/b', variant: null, reasoning_effort: 'high' },
     ],
-    autoDeciderModels: [],
-    excludedAutoDeciderModels: [],
   }));
 }
 
@@ -861,8 +857,6 @@ describe('frontier router runs', () => {
       },
       classifierModels: ['classifier/a'],
       deciderModels: [{ model: 'platform/a', variant: null, reasoning_effort: null }],
-      autoDeciderModels: [],
-      excludedAutoDeciderModels: [],
     }));
     await expect(
       startRun(env, 'decider', {

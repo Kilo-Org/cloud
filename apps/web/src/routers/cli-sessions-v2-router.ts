@@ -1818,7 +1818,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         organization_id: session.organization_id ?? null,
         profile_id: session.profile_id ?? null,
         git_url: session.git_url ?? null,
-        git_branch: session.git_branch ?? null,
+        git_branch: session.git_branch ?? runtimeState?.branchName ?? null,
         created_on_platform: session.created_on_platform,
         created_at: session.created_at,
         updated_at: session.updated_at,

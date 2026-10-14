@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Werk die GitHub-app by"
       },
       "githubIpAllowList": {
-        "description": "Die Kodehersiener is gedeaktiveer omdat hierdie GitHub-organisasie 'n IP-toelatingslys gebruik wat Kilo blokkeer. Kontak hi@kilocode.ai vir hulp en aktiveer die Kodehersiener daarna weer."
+        "description": "Die Kodehersiener is gedeaktiveer omdat hierdie GitHub-organisasie 'n IP-toelatingslys gebruik wat Kilo blokkeer. Kontak hi@kilo.ai vir hulp en aktiveer die Kodehersiener daarna weer."
       },
       "gitlabProjectAccessRequired": {
         "description": "Die Kodehersiener is gedeaktiveer omdat Kilo nie 'n GitLab-projektoegangstoken vir hierdie projek kan skep nie. Verleen instandhouertoegang of aktiveer projektoegangstokens en aktiveer die Kodehersiener daarna weer.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Werk die Kodehersiener se instellings by"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Die Kodehersiener is gedeaktiveer omdat die kloning van die bewaarplek vandag drie keer die tydlimiet oorskry het. Kontak hi@kilocode.ai vir hulp en aktiveer die Kodehersiener daarna weer."
+        "description": "Die Kodehersiener is gedeaktiveer omdat die kloning van die bewaarplek vandag drie keer die tydlimiet oorskry het. Kontak hi@kilo.ai vir hulp en aktiveer die Kodehersiener daarna weer."
       },
       "title": "Die kodehersiener het aandag nodig.",
       "recoveryLabel": "Kontak ondersteuning"

@@ -1590,7 +1590,7 @@
         "recoveryLabel": "Aktualizovať aplikáciu GitHub"
       },
       "githubIpAllowList": {
-        "description": "Kontrolór kódu bol vypnutý, pretože organizácia na platforme GitHub používa zoznam povolených IP adries, ktorý blokuje Kilo. Požiadajte o pomoc na hi@kilocode.ai a potom kontrolóra kódu znova zapnite."
+        "description": "Kontrolór kódu bol vypnutý, pretože organizácia na platforme GitHub používa zoznam povolených IP adries, ktorý blokuje Kilo. Požiadajte o pomoc na hi@kilo.ai a potom kontrolóra kódu znova zapnite."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kontrolór kódu bol vypnutý, pretože Kilo nemôže vytvoriť prístupový token pre tento projekt na platforme GitLab. Udeľte rolu správcu alebo povoľte prístupové tokeny projektov a potom kontrolóra kódu znova zapnite.",
@@ -1605,7 +1605,7 @@
         "recoveryLabel": "Aktualizovať nastavenia kontrolóra kódu"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Kontrolór kódu bol vypnutý, pretože klonovanie repozitára dnes trikrát prekročilo časový limit. Požiadajte o pomoc na hi@kilocode.ai a potom kontrolóra kódu znova zapnite."
+        "description": "Kontrolór kódu bol vypnutý, pretože klonovanie repozitára dnes trikrát prekročilo časový limit. Požiadajte o pomoc na hi@kilo.ai a potom kontrolóra kódu znova zapnite."
       },
       "title": "Agent na kontrolu kódu vyžaduje tvoju pozornosť.",
       "recoveryLabel": "Kontaktovať podporu"

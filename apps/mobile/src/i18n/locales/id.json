@@ -1040,7 +1040,7 @@
         "recoveryLabel": "Perbarui aplikasi GitHub"
       },
       "githubIpAllowList": {
-        "description": "Peninjau kode dinonaktifkan karena organisasi GitHub ini membatasi akses berdasarkan daftar alamat IP yang memblokir Kilo. Hubungi hi@kilocode.ai untuk mendapatkan bantuan, lalu aktifkan kembali Peninjau kode."
+        "description": "Peninjau kode dinonaktifkan karena organisasi GitHub ini membatasi akses berdasarkan daftar alamat IP yang memblokir Kilo. Hubungi hi@kilo.ai untuk mendapatkan bantuan, lalu aktifkan kembali Peninjau kode."
       },
       "gitlabProjectAccessRequired": {
         "description": "Peninjau kode dinonaktifkan karena Kilo tidak dapat membuat token akses proyek GitLab untuk proyek ini. Berikan akses pengelola atau aktifkan token akses proyek, lalu aktifkan kembali Peninjau kode.",
@@ -1055,7 +1055,7 @@
         "recoveryLabel": "Perbarui pengaturan Peninjau kode"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Peninjau kode dinonaktifkan setelah proses kloning repositori melewati batas waktu tiga kali hari ini. Hubungi hi@kilocode.ai untuk mendapatkan bantuan, lalu aktifkan kembali Peninjau kode."
+        "description": "Peninjau kode dinonaktifkan setelah proses kloning repositori melewati batas waktu tiga kali hari ini. Hubungi hi@kilo.ai untuk mendapatkan bantuan, lalu aktifkan kembali Peninjau kode."
       },
       "title": "Peninjau kode perlu ditangani.",
       "recoveryLabel": "Hubungi tim dukungan"

@@ -1046,7 +1046,7 @@
         "recoveryLabel": "Zaktualizuj aplikację GitHub"
       },
       "githubIpAllowList": {
-        "description": "Recenzent kodu został wyłączony, ponieważ lista dozwolonych adresów IP tej organizacji w serwisie GitHub blokuje Kilo. Napisz na hi@kilocode.ai, aby uzyskać pomoc, a następnie ponownie włącz recenzenta kodu."
+        "description": "Recenzent kodu został wyłączony, ponieważ lista dozwolonych adresów IP tej organizacji w serwisie GitHub blokuje Kilo. Napisz na hi@kilo.ai, aby uzyskać pomoc, a następnie ponownie włącz recenzenta kodu."
       },
       "gitlabProjectAccessRequired": {
         "description": "Recenzent kodu został wyłączony, ponieważ Kilo nie może utworzyć tokenu dostępu do tego projektu w serwisie GitLab. Przyznaj rolę opiekuna projektu lub włącz tokeny dostępu do projektu, a następnie ponownie włącz recenzenta kodu.",
@@ -1061,7 +1061,7 @@
         "recoveryLabel": "Zaktualizuj ustawienia recenzenta kodu"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Recenzent kodu został wyłączony, ponieważ dzisiaj trzykrotnie przekroczono limit czasu klonowania repozytorium. Napisz na hi@kilocode.ai, aby uzyskać pomoc, a następnie ponownie włącz recenzenta kodu."
+        "description": "Recenzent kodu został wyłączony, ponieważ dzisiaj trzykrotnie przekroczono limit czasu klonowania repozytorium. Napisz na hi@kilo.ai, aby uzyskać pomoc, a następnie ponownie włącz recenzenta kodu."
       },
       "title": "Asystent przeglądu kodu wymaga twojej uwagi.",
       "recoveryLabel": "Skontaktuj się z pomocą techniczną"

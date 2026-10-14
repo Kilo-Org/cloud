@@ -1043,7 +1043,7 @@
         "recoveryLabel": "Actualizar la aplicación de GitHub"
       },
       "githubIpAllowList": {
-        "description": "El revisor de código se desactivó porque esta organización de GitHub usa una lista de direcciones IP permitidas que bloquea a Kilo. Escribe a hi@kilocode.ai para obtener ayuda y vuelve a activar el revisor de código."
+        "description": "El revisor de código se desactivó porque esta organización de GitHub usa una lista de direcciones IP permitidas que bloquea a Kilo. Escribe a hi@kilo.ai para obtener ayuda y vuelve a activar el revisor de código."
       },
       "gitlabProjectAccessRequired": {
         "description": "El revisor de código se desactivó porque Kilo no puede crear un token de acceso al proyecto en GitLab. Concede el rol de responsable del mantenimiento o habilita los tokens de acceso al proyecto y vuelve a activar el revisor de código.",
@@ -1058,7 +1058,7 @@
         "recoveryLabel": "Actualizar los ajustes del revisor de código"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "El revisor de código se desactivó porque hoy se agotó el tiempo de espera al clonar el repositorio en tres ocasiones. Escribe a hi@kilocode.ai para obtener ayuda y vuelve a activar el revisor de código."
+        "description": "El revisor de código se desactivó porque hoy se agotó el tiempo de espera al clonar el repositorio en tres ocasiones. Escribe a hi@kilo.ai para obtener ayuda y vuelve a activar el revisor de código."
       },
       "title": "El revisor de código requiere tu atención.",
       "recoveryLabel": "Contactar con soporte técnico"

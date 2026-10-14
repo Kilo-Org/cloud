@@ -288,6 +288,8 @@ of `{model, variant}` entries; every model already represented in it is excluded
 regardless of effort. Eligible models must support text output and tools, have
 fixed nonnegative prompt and completion prices, and have a prompt price strictly
 below the USD-per-million-token cap. Virtual auto-routing entries are excluded.
+`--max-models <n>` optionally keeps only the n cheapest eligible models by prompt
+price, breaking equal-price ties by model ID. Without it, all eligible models run.
 Each model runs once without variant overrides (the provider default), and once
 with its highest catalog-supported reasoning effort, when available. Full catalog
 variant fragments are retained, including controls beyond reasoning.
@@ -296,6 +298,9 @@ The screen hashes case IDs with SHA-256 and takes the first N hashes per direct
 route from the selected suite. Every candidate sees the same cases; selection is
 stable when dataset order changes. Agentic routes require CLI execution and are
 explicitly listed in `excludedRoutes`, never simulated by direct completions.
+A shared worker pool pulls requests in round-robin order, alternating each model's
+variants within its case sequence. `--concurrency <n>` defaults to 24. Dispatch
+order spreads partial-run coverage across models; completions may arrive out of order.
 Direct requests, streaming TTFT, retries, long-context materialization, and grading
 reuse the offline sweep path. Set `OPENROUTER_API_KEY`; no container is required.
 
@@ -312,18 +317,39 @@ Missing incumbent latency or required pricing prevents a recommendation.
 least two distinct routes. It is an admin-review suggestion, not a pool change.
 The command never writes configuration, registry rows, or routing tables.
 
-`--max-usd` includes both model and grader spend. Requests run sequentially and
-budget is checked before each request and judge call, but one request can exceed
-the remaining budget because its actual cost is only known after completion.
+`--max-usd` includes model and grader spend. Every HTTP attempt reserves its
+estimated prompt-plus-maximum-output cost before sending, then settles that
+reservation against observed or estimated cost. Reservations are shared atomically
+across workers; a worker waits for in-flight settlement when funds are reserved.
+Requests explicitly send the variant's `max_tokens`, defaulting to 8192.
+Input-token estimates are approximate, so unexpectedly higher actual costs can still
+exceed a reservation; no new requests start after the settled budget is exhausted.
+Grading also reserves before sending and settles to the actual reported `usage.cost`.
+When the System One grader is absent from the Kilo catalog, each call reserves
+`GRADER_RESERVE_USD` ($0.002); catalog-priced graders retain token-based reservations.
 Missing model cost marks only that model `costUnknown: true`, excludes it from
 recommendations, and stops sampling all its variants; other models continue.
 Its reported prompt and completion token counts are charged at catalog prices
 without cache discounts. `costUsd` includes these conservative estimates;
 `estimatedCostUsd` identifies their contribution globally and per model.
-If token counts are also unavailable, the remaining budget is reserved rather
-than treating the request as free. A failed judge call still stops further
-spending and sets `spendIncomplete`. Atomic checkpoints after each case retain
-partial results if the screen is interrupted.
+If token counts are unavailable, input tokens are estimated as the combined
+system/user prompt characters divided by four, rounded up; output is bounded by
+the request variant's `max_tokens`, or 8192 when unset. Only that request's
+catalog-priced estimate is charged, never the entire remaining budget.
+A failed judge call still stops further spending and sets `spendIncomplete`.
+Atomic checkpoints serialize concurrent writes before replacing the report.
+Reservations are checkpointed before requests leave; completed case results are
+checkpointed after grading.
+
+Resume an interrupted screen with the original inputs and `--resume screen.json`
+(which may also be the `--out` path). Completed exact model/variant/case requests
+are skipped, accumulated spend and `costUnknown` exclusions are retained, and
+concurrency or the total `--max-usd` cap can change. Suite, sample size, sampled
+cases, candidate pairs, table version, and production cost profile must match.
+Reports from the earlier sequential runner remain readable.
+Persisted in-flight reservations become conservative `unsettledCostUsd` charges
+on resume because their actual spend may be unknown; they are not discarded.
+A report with indeterminate grader spend cannot resume safely.
 
 ## Admin endpoints
 

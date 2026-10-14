@@ -6,17 +6,24 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import {
   ScreeningCatalogSchema,
+  ScreenResumeSchema,
+  GRADER_RESERVE_USD,
+  screenGraderReserveUsd,
+  restoreScreenMeasurements,
   recordScreenModelCost,
   sampleScreenCases,
+  screenCandidateJobs,
   screenMetrics,
   screenRouteComparison,
   screenRecommendation,
   screenVariants,
   selectScreenCandidates,
   type ScreenModelSpend,
+  type ScreenMeasurement,
 } from '../scripts/screen-candidates';
 import type { OfflineSweep } from './scoreboard/schema';
 import { requestDirectSweepCompletion, selectSweepCases } from './scoreboard/sweep';
+import { createScreenBudget } from './scoreboard/screen-runtime';
 
 const pricing: CandidatePricing = {
   promptUsdPerToken: 0.000001,
@@ -102,6 +109,175 @@ describe('candidate screening', () => {
         model => model.id
       )
     ).toEqual(['fixture/free', 'fixture/new']);
+  });
+
+  it('keeps only the cheapest prompt-priced models with a deterministic tie break', () => {
+    const catalog = ScreeningCatalogSchema.parse({
+      data: [
+        {
+          ...catalogModel,
+          id: 'fixture/expensive',
+          pricing: { prompt: '0.000002', completion: '0' },
+        },
+        { ...catalogModel, id: 'fixture/b' },
+        { ...catalogModel, id: 'fixture/free', pricing: { prompt: '0', completion: '0' } },
+        { ...catalogModel, id: 'fixture/a' },
+      ],
+    });
+    expect(selectScreenCandidates(catalog, [], 3, 3).map(model => model.id)).toEqual([
+      'fixture/free',
+      'fixture/a',
+      'fixture/b',
+    ]);
+    expect(selectScreenCandidates(catalog, [], 3)).toHaveLength(4);
+  });
+
+  it('schedules one case per model per pass across all variants', () => {
+    const cases = selectSweepCases().slice(0, 2);
+    const pairs = [
+      { model: 'fixture/a', variant: null },
+      { model: 'fixture/a', variant: 'high' },
+      { model: 'fixture/b', variant: null },
+      { model: 'fixture/b', variant: 'high' },
+      { model: 'fixture/c', variant: null },
+    ];
+    const jobs = [...screenCandidateJobs(pairs, cases)];
+    expect(jobs.map(job => job.pairIndex)).toEqual([0, 2, 4, 1, 3, 4, 0, 2, 1, 3]);
+    expect(jobs.slice(0, 3).map(job => pairs[job.pairIndex].model)).toEqual([
+      'fixture/a',
+      'fixture/b',
+      'fixture/c',
+    ]);
+    for (const [index] of pairs.entries()) {
+      expect(jobs.filter(job => job.pairIndex === index).map(job => job.benchCase.id)).toEqual(
+        cases.map(benchCase => benchCase.id)
+      );
+    }
+    expect([...screenCandidateJobs([], cases)]).toEqual([]);
+  });
+
+  it('restores existing report results by exact pair and skips only completed requests', () => {
+    const cases = selectSweepCases().slice(0, 1);
+    const benchCase = cases[0];
+    const savedResult = {
+      ...result,
+      caseId: benchCase.id,
+      routeKey: `${benchCase.taskType}/${benchCase.subtaskType}`,
+    };
+    const previous = ScreenResumeSchema.parse({
+      startedAt: '2026-10-14T00:00:00.000Z',
+      suite: 'efficient',
+      tableVersion: 'fixture-table',
+      productionTokenProfile: null,
+      casesPerRoute: 4,
+      costUsd: 0.12,
+      graderCostUsd: 0.01,
+      estimatedCostUsd: 0.02,
+      sampledCases: [{ id: benchCase.id, routeKey: savedResult.routeKey }],
+      models: [
+        {
+          model: 'fixture/new',
+          costUnknown: false,
+          estimatedCostUsd: 0.02,
+          variants: [
+            { variant: null, results: [savedResult] },
+            { variant: 'high', results: [] },
+          ],
+        },
+      ],
+    });
+    const measurements: ScreenMeasurement[] = [
+      { model: 'fixture/new', variant: null, results: [] },
+      { model: 'fixture/new', variant: 'high', results: [] },
+    ];
+    const identity = {
+      suite: 'efficient' as const,
+      casesPerRoute: 4,
+      tableVersion: 'fixture-table',
+      profile: null,
+    };
+    restoreScreenMeasurements(previous, measurements, cases, identity);
+    expect(measurements[0].results).toEqual([savedResult]);
+    expect(previous).toMatchObject({ costUsd: 0.12, graderCostUsd: 0.01, estimatedCostUsd: 0.02 });
+    const pending = [...screenCandidateJobs(measurements, cases)].filter(
+      job => !measurements[job.pairIndex].results.some(row => row.caseId === job.benchCase.id)
+    );
+    expect(pending.map(job => job.pairIndex)).toEqual([1]);
+    expect(() =>
+      restoreScreenMeasurements(previous, measurements, cases, { ...identity, suite: 'frontier' })
+    ).toThrow('same suite');
+    expect(() =>
+      restoreScreenMeasurements(previous, measurements, cases, {
+        ...identity,
+        tableVersion: 'other-table',
+      })
+    ).toThrow('same suite');
+    expect(() =>
+      restoreScreenMeasurements(previous, measurements, cases, {
+        ...identity,
+        profile: { uncachedInputTokens: 10, cachedInputTokens: 0 },
+      })
+    ).toThrow('same suite');
+    const duplicate = ScreenResumeSchema.parse(previous);
+    duplicate.models[0].variants[0].results.push(savedResult);
+    expect(() => restoreScreenMeasurements(duplicate, measurements, cases, identity)).toThrow(
+      'duplicate case results'
+    );
+    const changedPairs: ScreenMeasurement[] = [
+      { model: 'fixture/other', variant: null, results: [] },
+    ];
+    expect(() => restoreScreenMeasurements(previous, changedPairs, cases, identity)).toThrow(
+      'same candidate models'
+    );
+  });
+
+  it('waits for a reservation before sending and settles the attempt after reading its usage', async () => {
+    const admitted = Promise.withResolvers<boolean>();
+    const settled = vi.fn();
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(
+          'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
+            'data: {"usage":{"cost":0.001}}\n\n' +
+            'data: [DONE]\n\n'
+        )
+      );
+    const request = requestDirectSweepCompletion({
+      model: 'fixture/new',
+      fragment: {},
+      systemPrompt: 'system',
+      userPrompt: 'user',
+      apiKey: 'fixture-key',
+      attributionHeaders: {},
+      budgetAvailable: () => true,
+      fetchImpl,
+      beforeRequest: () => admitted.promise,
+      onAttemptComplete: settled,
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    admitted.resolve(true);
+    await request;
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(settled).toHaveBeenCalledTimes(1);
+    expect(settled.mock.calls[0][0]).toMatchObject({ costUsd: 0.001, output: 'answer' });
+  });
+
+  it('reserves the fixed grader cap without catalog pricing and settles actual usage cost', async () => {
+    const input = JSON.stringify({ userPrompt: 'task', output: 'answer', rubric: 'correct' });
+    expect(screenGraderReserveUsd(input, undefined)).toBe(GRADER_RESERVE_USD);
+    expect(screenGraderReserveUsd(input, null)).toBe(0.002);
+    const budget = createScreenBudget(GRADER_RESERVE_USD);
+    const reservation = await budget.reserve(screenGraderReserveUsd(input, undefined));
+    if (!reservation) throw new Error('Expected an unlisted grader to reserve its fixed cap');
+    expect(budget.reservedUsd).toBe(GRADER_RESERVE_USD);
+    const usage = { cost: 0.0004 };
+    reservation.settle(usage.cost);
+    expect(budget.spentUsd).toBe(usage.cost);
+    expect(budget.reservedUsd).toBe(0);
+    expect(screenGraderReserveUsd(input, pricing)).toBeCloseTo(
+      Math.ceil(input.length / 4) * pricing.promptUsdPerToken + 8192 * pricing.completionUsdPerToken
+    );
   });
 
   it('screens default plus highest reasoning effort, preserving the full request fragment', () => {
@@ -243,29 +419,48 @@ describe('candidate screening', () => {
   });
 
   it('isolates missing-cost models and charges catalog token prices while other models continue', async () => {
-    const stream = (usage: Record<string, number>) => new Response(
-      'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
-      `data: ${JSON.stringify({ usage })}\n\n` +
-      'data: [DONE]\n\n'
-    );
-    const fetchImpl = vi.fn<typeof fetch>()
+    const stream = (usage: Record<string, number>) =>
+      new Response(
+        'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
+          `data: ${JSON.stringify({ usage })}\n\n` +
+          'data: [DONE]\n\n'
+      );
+    const fetchImpl = vi
+      .fn<typeof fetch>()
       .mockResolvedValueOnce(stream({ prompt_tokens: 1_000, completion_tokens: 100 }))
       .mockResolvedValueOnce(stream({ cost: 0.001 }))
       .mockResolvedValueOnce(stream({ cost: 0.001 }));
     const affected: ScreenModelSpend = { costUnknown: false, estimatedCostUsd: 0 };
     const healthy: ScreenModelSpend = { costUnknown: false, estimatedCostUsd: 0 };
-    const spends = new Map([['fixture/affected', affected], ['fixture/healthy', healthy]]);
+    const spends = new Map([
+      ['fixture/affected', affected],
+      ['fixture/healthy', healthy],
+    ]);
     const maxUsd = 0.01;
     let costUsd = 0;
-    for (const model of ['fixture/affected', 'fixture/healthy', 'fixture/affected', 'fixture/healthy']) {
+    for (const model of [
+      'fixture/affected',
+      'fixture/healthy',
+      'fixture/affected',
+      'fixture/healthy',
+    ]) {
       const spend = spends.get(model);
       if (!spend || spend.costUnknown || costUsd >= maxUsd) continue;
       const completion = await requestDirectSweepCompletion({
-        model, fragment: {}, systemPrompt: 'system', userPrompt: 'user',
-        apiKey: 'fixture-key', attributionHeaders: {},
-        budgetAvailable: () => costUsd < maxUsd, fetchImpl,
+        model,
+        fragment: {},
+        systemPrompt: 'system',
+        userPrompt: 'user',
+        apiKey: 'fixture-key',
+        attributionHeaders: {},
+        budgetAvailable: () => costUsd < maxUsd,
+        fetchImpl,
       });
-      costUsd += recordScreenModelCost(spend, completion, pricing, maxUsd - costUsd);
+      costUsd += recordScreenModelCost(spend, completion, pricing, {
+        systemPrompt: 'system',
+        userPrompt: 'user',
+        fragment: {},
+      });
     }
     expect(fetchImpl).toHaveBeenCalledTimes(3);
     expect(affected.costUnknown).toBe(true);
@@ -275,13 +470,35 @@ describe('candidate screening', () => {
     expect(costUsd).toBeLessThan(maxUsd);
   });
 
-  it('reserves the remaining budget when an unknown-cost response also omits token counts', () => {
-    const spend: ScreenModelSpend = { costUnknown: false, estimatedCostUsd: 0 };
-    expect(recordScreenModelCost(spend, {
-      costUsd: null, output: 'answer', error: 'usage_missing',
-    }, pricing, 0.25)).toBe(0.25);
-    expect(spend).toEqual({ costUnknown: true, estimatedCostUsd: 0.25 });
-  });
+  it.each([
+    { fragment: {}, completionTokens: 8192 },
+    { fragment: { max_tokens: 100 }, completionTokens: 100 },
+  ])(
+    'bounds missing-token cost by prompt size and $completionTokens output tokens',
+    ({ fragment, completionTokens }) => {
+      const spend: ScreenModelSpend = { costUnknown: false, estimatedCostUsd: 0 };
+      const costUsd = recordScreenModelCost(
+        spend,
+        {
+          costUsd: null,
+          output: 'answer',
+          error: 'usage_missing',
+        },
+        pricing,
+        {
+          systemPrompt: 's'.repeat(80),
+          userPrompt: 'u'.repeat(20),
+          fragment,
+        }
+      );
+      const expected =
+        25 * pricing.promptUsdPerToken + completionTokens * pricing.completionUsdPerToken;
+      expect(costUsd).toBeCloseTo(expected);
+      expect(costUsd).toBeLessThan(0.02);
+      expect(spend.costUnknown).toBe(true);
+      expect(spend.estimatedCostUsd).toBeCloseTo(expected);
+    }
+  );
 
   it('uses the shared direct streaming request path and honors its budget gate', async () => {
     const fetchImpl = vi

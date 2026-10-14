@@ -29,11 +29,13 @@ const streamChunkSchema = z.object({
       })
     )
     .optional(),
-  usage: z.object({
-    cost: z.number().nonnegative().nullish(),
-    prompt_tokens: z.number().int().nonnegative().nullish(),
-    completion_tokens: z.number().int().nonnegative().nullish(),
-  }).nullish(),
+  usage: z
+    .object({
+      cost: z.number().nonnegative().nullish(),
+      prompt_tokens: z.number().int().nonnegative().nullish(),
+      completion_tokens: z.number().int().nonnegative().nullish(),
+    })
+    .nullish(),
   error: z.unknown().optional(),
 });
 
@@ -117,6 +119,15 @@ export async function readSweepCompletion(
   }
 }
 
+export type DirectSweepCompletion = {
+  output: string | null;
+  costUsd: number | null;
+  ttftMs: number | null;
+  latencyMs: number;
+  error: string | null;
+  tokenUsage?: SweepTokenUsage;
+};
+
 export async function requestDirectSweepCompletion(input: {
   model: string;
   fragment: Record<string, unknown>;
@@ -126,14 +137,9 @@ export async function requestDirectSweepCompletion(input: {
   attributionHeaders: Record<string, string>;
   budgetAvailable: () => boolean;
   fetchImpl?: typeof fetch;
-}): Promise<{
-  output: string | null;
-  costUsd: number | null;
-  ttftMs: number | null;
-  latencyMs: number;
-  error: string | null;
-  tokenUsage?: SweepTokenUsage;
-}> {
+  beforeRequest?: () => Promise<boolean>;
+  onAttemptComplete?: (completion: DirectSweepCompletion) => void;
+}): Promise<DirectSweepCompletion> {
   const body = JSON.stringify({
     ...input.fragment,
     model: input.model,
@@ -147,11 +153,12 @@ export async function requestDirectSweepCompletion(input: {
   const started = performance.now();
   let error: string | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (!input.budgetAvailable()) {
-      error = 'Sweep budget exhausted before request';
+    if (!input.budgetAvailable() || (input.beforeRequest && !(await input.beforeRequest()))) {
+      error ??= 'Sweep budget exhausted before request';
       break;
     }
     let retry = false;
+    let completed: DirectSweepCompletion | null = null;
     try {
       const response = await (input.fetchImpl ?? fetch)(
         'https://openrouter.ai/api/v1/chat/completions',
@@ -172,7 +179,7 @@ export async function requestDirectSweepCompletion(input: {
         retry = response.status === 429 || response.status >= 500;
       } else {
         const result = await readSweepCompletion(response, started);
-        return {
+        completed = {
           ...result,
           latencyMs: performance.now() - started,
           error:
@@ -187,6 +194,15 @@ export async function requestDirectSweepCompletion(input: {
       error = 'OpenRouter transport or body read failed';
       retry = true;
     }
+    const outcome = completed ?? {
+      output: null,
+      costUsd: null,
+      ttftMs: null,
+      latencyMs: performance.now() - started,
+      error,
+    };
+    input.onAttemptComplete?.(outcome);
+    if (completed) return completed;
     if (!retry || attempt === 2) break;
     await delay(1_000 * 2 ** attempt);
   }

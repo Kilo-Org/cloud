@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile, rename, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -9,6 +9,7 @@ import {
   estimateRequestCostUsd,
   getReasoningVariantKeys,
   PoolEntrySchema,
+  poolEntryKey,
   ProductionTokenProfileSchema,
   rankCandidates,
   rankValue,
@@ -26,7 +27,12 @@ import { createDeciderJudge } from '../src/decider-judge';
 import { gradeDeciderOutput } from '../src/grading';
 import { OPENROUTER_APP_TITLE, OPENROUTER_HTTP_REFERER } from '../src/openrouter';
 import { BenchmarkModelCatalogSchema, catalogCandidatePrices } from '../src/platform-models';
-import type { OfflineSweep } from '../src/scoreboard/schema';
+import { OfflineSweepSchema, type OfflineSweep } from '../src/scoreboard/schema';
+import {
+  createScreenBudget,
+  createScreenCheckpoint,
+  runScreenWorkerPool,
+} from '../src/scoreboard/screen-runtime';
 import {
   requestDirectSweepCompletion,
   selectSweepCases,
@@ -48,6 +54,104 @@ const ScreeningModelSchema = BenchmarkModelCatalogSchema.shape.data.element.exte
 export const ScreeningCatalogSchema = z.object({ data: z.array(ScreeningModelSchema) });
 type ScreeningModel = z.infer<typeof ScreeningModelSchema>;
 type Result = OfflineSweep['pairs'][number]['results'][number];
+export type ScreenMeasurement = PoolEntry & { results: Result[] };
+
+export const ScreenResumeSchema = z.object({
+  startedAt: z.iso.datetime({ offset: true }),
+  suite: z.enum(['efficient', 'frontier']),
+  tableVersion: z.string().min(1),
+  productionTokenProfile: ProductionTokenProfileSchema.nullable(),
+  casesPerRoute: z.number().int().positive(),
+  costUsd: z.number().nonnegative(),
+  graderCostUsd: z.number().nonnegative(),
+  estimatedCostUsd: z.number().nonnegative().default(0),
+  reservedCostUsd: z.number().nonnegative().default(0),
+  unsettledCostUsd: z.number().nonnegative().default(0),
+  spendIncomplete: z.boolean().default(false),
+  sampledCases: z.array(z.object({ id: z.string(), routeKey: z.string() })),
+  models: z.array(
+    z.object({
+      model: z.string(),
+      costUnknown: z.boolean().default(false),
+      estimatedCostUsd: z.number().nonnegative().default(0),
+      variants: z.array(
+        z.object({
+          variant: z.string().nullable(),
+          results: OfflineSweepSchema.shape.pairs.element.shape.results,
+        })
+      ),
+    })
+  ),
+});
+export type ScreenResume = z.infer<typeof ScreenResumeSchema>;
+
+export function restoreScreenMeasurements(
+  previous: ScreenResume,
+  measurements: ScreenMeasurement[],
+  cases: readonly DeciderCase[],
+  identity: {
+    suite: 'efficient' | 'frontier';
+    casesPerRoute: number;
+    tableVersion: string;
+    profile: ProductionTokenProfile | null;
+  }
+) {
+  if (
+    previous.suite !== identity.suite ||
+    previous.casesPerRoute !== identity.casesPerRoute ||
+    previous.tableVersion !== identity.tableVersion ||
+    previous.productionTokenProfile?.uncachedInputTokens !==
+      identity.profile?.uncachedInputTokens ||
+    previous.productionTokenProfile?.cachedInputTokens !== identity.profile?.cachedInputTokens
+  ) {
+    throw new Error('Resume screen must use the same suite, sample size, table and cost profile');
+  }
+  if (previous.spendIncomplete)
+    throw new Error('Cannot resume a screen with indeterminate grader spend');
+  const casesById = new Map(cases.map(benchCase => [benchCase.id, benchCase]));
+  if (
+    previous.sampledCases.length !== cases.length ||
+    new Set(previous.sampledCases.map(benchCase => benchCase.id)).size !== cases.length ||
+    previous.sampledCases.some(saved => {
+      const benchCase = casesById.get(saved.id);
+      return !benchCase || saved.routeKey !== `${benchCase.taskType}/${benchCase.subtaskType}`;
+    })
+  )
+    throw new Error('Resume screen must use the same sampled cases');
+  const savedPairs = new Map<string, Result[]>();
+  const savedModels = new Set<string>();
+  for (const model of previous.models) {
+    if (savedModels.has(model.model)) throw new Error('Resume screen has duplicate models');
+    savedModels.add(model.model);
+    for (const variant of model.variants) {
+      const key = poolEntryKey({ model: model.model, variant: variant.variant });
+      if (savedPairs.has(key)) throw new Error('Resume screen has duplicate model/variant pairs');
+      const completed = new Set<string>();
+      for (const result of variant.results) {
+        const benchCase = casesById.get(result.caseId);
+        if (
+          !benchCase ||
+          result.rep !== 0 ||
+          result.split !== 'train' ||
+          result.routeKey !== `${benchCase.taskType}/${benchCase.subtaskType}` ||
+          completed.has(result.caseId)
+        ) {
+          throw new Error('Resume screen has incompatible or duplicate case results');
+        }
+        completed.add(result.caseId);
+      }
+      savedPairs.set(key, variant.results);
+    }
+  }
+  if (
+    savedPairs.size !== measurements.length ||
+    measurements.some(pair => !savedPairs.has(poolEntryKey(pair))) ||
+    savedModels.size !== new Set(measurements.map(pair => pair.model)).size
+  ) {
+    throw new Error('Resume screen must use the same candidate models and variants');
+  }
+  for (const pair of measurements) pair.results = savedPairs.get(poolEntryKey(pair)) ?? [];
+}
 
 export type ScreenMetrics = {
   cases: number;
@@ -66,6 +170,37 @@ export type ScreenModelSpend = {
   estimatedCostUsd: number;
 };
 
+export type ScreenRequest = {
+  systemPrompt: string;
+  userPrompt: string;
+  fragment: Record<string, unknown>;
+};
+
+export function screenRequestTokenBudget(request: ScreenRequest) {
+  return {
+    promptTokens: Math.ceil((request.systemPrompt.length + request.userPrompt.length) / 4),
+    completionTokens: z.number().int().positive().catch(8192).parse(request.fragment.max_tokens),
+  };
+}
+
+export const GRADER_RESERVE_USD = 0.002;
+
+export function screenGraderReserveUsd(
+  input: string,
+  pricing: CandidatePricing | null | undefined
+) {
+  if (!pricing) return GRADER_RESERVE_USD;
+  const tokens = screenRequestTokenBudget({
+    systemPrompt: '',
+    userPrompt: input,
+    fragment: {},
+  });
+  return (
+    tokens.promptTokens * pricing.promptUsdPerToken +
+    tokens.completionTokens * pricing.completionUsdPerToken
+  );
+}
+
 export function recordScreenModelCost(
   spend: ScreenModelSpend,
   completion: {
@@ -75,18 +210,22 @@ export function recordScreenModelCost(
     tokenUsage?: SweepTokenUsage;
   },
   pricing: CandidatePricing,
-  remainingUsd: number
+  request: ScreenRequest
 ): number {
   if (completion.costUsd !== null) return completion.costUsd;
-  if (completion.output === null && completion.error !== 'OpenRouter transport or body read failed') {
+  if (
+    completion.output === null &&
+    completion.error !== 'OpenRouter transport or body read failed'
+  ) {
     return 0;
   }
   spend.costUnknown = true;
   const usage = completion.tokenUsage;
-  const estimatedCostUsd = usage?.promptTokens != null && usage.completionTokens !== null
-    ? usage.promptTokens * pricing.promptUsdPerToken +
-      usage.completionTokens * pricing.completionUsdPerToken
-    : Math.max(0, remainingUsd);
+  const fallback = screenRequestTokenBudget(request);
+  const promptTokens = usage?.promptTokens ?? fallback.promptTokens;
+  const completionTokens = usage?.completionTokens ?? fallback.completionTokens;
+  const estimatedCostUsd =
+    promptTokens * pricing.promptUsdPerToken + completionTokens * pricing.completionUsdPerToken;
   spend.estimatedCostUsd += estimatedCostUsd;
   return estimatedCostUsd;
 }
@@ -94,7 +233,8 @@ export function recordScreenModelCost(
 export function selectScreenCandidates(
   catalog: z.infer<typeof ScreeningCatalogSchema>,
   pairs: readonly PoolEntry[],
-  maxPromptUsdPerMtok: number
+  maxPromptUsdPerMtok: number,
+  maxModels?: number
 ): ScreeningModel[] {
   const currentModels = new Set(pairs.map(pair => pair.model));
   return catalog.data
@@ -108,7 +248,12 @@ export function selectScreenCandidates(
         model.pricing.completion != null &&
         model.pricing.prompt * 1_000_000 < maxPromptUsdPerMtok
     )
-    .toSorted((a, b) => a.id.localeCompare(b.id));
+    .toSorted(
+      (a, b) =>
+        (a.pricing?.prompt ?? Infinity) - (b.pricing?.prompt ?? Infinity) ||
+        a.id.localeCompare(b.id)
+    )
+    .slice(0, maxModels);
 }
 
 export function screenVariants(model: ScreeningModel): (string | null)[] {
@@ -153,6 +298,23 @@ export function sampleScreenCases(cases: readonly DeciderCase[], casesPerRoute: 
         .slice(0, casesPerRoute)
         .map(item => item.benchCase)
     );
+}
+
+export function* screenCandidateJobs(pairs: readonly PoolEntry[], cases: readonly DeciderCase[]) {
+  const pairIndicesByModel = new Map<string, number[]>();
+  let rounds = 0;
+  for (const [index, pair] of pairs.entries()) {
+    const indices = pairIndicesByModel.get(pair.model) ?? [];
+    indices.push(index);
+    pairIndicesByModel.set(pair.model, indices);
+    rounds = Math.max(rounds, indices.length * cases.length);
+  }
+  for (let round = 0; round < rounds; round++) {
+    for (const indices of pairIndicesByModel.values()) {
+      const benchCase = cases[Math.floor(round / indices.length)];
+      if (benchCase) yield { pairIndex: indices[round % indices.length], benchCase };
+    }
+  }
 }
 
 function median(values: number[]): number | null {
@@ -278,8 +440,11 @@ async function main() {
       pairs: { type: 'string' },
       suite: { type: 'string', default: 'efficient' },
       'max-prompt-usd-per-mtok': { type: 'string' },
+      'max-models': { type: 'string' },
       'cases-per-route': { type: 'string', default: '4' },
       'max-usd': { type: 'string' },
+      concurrency: { type: 'string', default: '24' },
+      resume: { type: 'string' },
       'cost-profile': { type: 'string' },
       table: { type: 'string' },
       out: { type: 'string' },
@@ -293,17 +458,22 @@ async function main() {
     values['max-prompt-usd-per-mtok'] === undefined
   ) {
     throw new Error(
-      'Usage: screen:candidates --catalog live|file --catalog-file catalog.json --pairs current-pairs.json --suite efficient|frontier --max-prompt-usd-per-mtok <n> --cases-per-route 4 --max-usd <n> --table table.json [--cost-profile profile.json] --out screen.json'
+      'Usage: screen:candidates --catalog live|file --catalog-file catalog.json --pairs current-pairs.json --suite efficient|frontier --max-prompt-usd-per-mtok <n> [--max-models <n>] --cases-per-route 4 --concurrency 24 --max-usd <n> --table table.json [--cost-profile profile.json] [--resume screen.json] --out screen.json'
     );
   }
   const out = values.out;
   const suite = z.enum(['efficient', 'frontier']).parse(values.suite);
   const casesPerRoute = z.coerce.number().int().positive().parse(values['cases-per-route']);
   const maxUsd = z.coerce.number().nonnegative().parse(values['max-usd']);
+  const concurrency = z.coerce.number().int().positive().parse(values.concurrency);
   const maxPromptUsdPerMtok = z.coerce
     .number()
     .nonnegative()
     .parse(values['max-prompt-usd-per-mtok']);
+  const maxModels =
+    values['max-models'] === undefined
+      ? undefined
+      : z.coerce.number().int().positive().parse(values['max-models']);
   const pairs = z.array(PoolEntrySchema).parse(JSON.parse(await readFile(values.pairs, 'utf8')));
   const table = RoutingTableSchema.parse(JSON.parse(await readFile(values.table, 'utf8')));
   const profile = values['cost-profile']
@@ -322,9 +492,12 @@ async function main() {
     catalog = ScreeningCatalogSchema.parse(JSON.parse(await readFile(path, 'utf8')));
   }
   const prices = catalogCandidatePrices(catalog);
-  const candidates = selectScreenCandidates(catalog, pairs, maxPromptUsdPerMtok);
+  const candidates = selectScreenCandidates(catalog, pairs, maxPromptUsdPerMtok, maxModels);
   const suiteCases = selectSweepCases(suite);
   const cases = sampleScreenCases(suiteCases, casesPerRoute);
+  const previous = values.resume
+    ? ScreenResumeSchema.parse(JSON.parse(await readFile(values.resume, 'utf8')))
+    : null;
   const casesByRoute = new Map<string, number>();
   for (const benchCase of cases) {
     const route = `${benchCase.taskType}/${benchCase.subtaskType}`;
@@ -337,29 +510,47 @@ async function main() {
     'HTTP-Referer': OPENROUTER_HTTP_REFERER,
     'X-Title': OPENROUTER_APP_TITLE,
   };
-  const baseJudge = apiKey ? createDeciderJudge({ apiKey, attributionHeaders }) : null;
-  const measurements = candidates.flatMap(model =>
+  const judgeModel = 'typesafe/jev-1.13';
+  const judgePricing = prices.get(judgeModel);
+  const baseJudge = apiKey ? createDeciderJudge({ apiKey, attributionHeaders }, judgeModel) : null;
+  const measurements: ScreenMeasurement[] = candidates.flatMap(model =>
     screenVariants(model).map(variant => ({
       model: model.id,
       variant,
-      results: [] as Result[],
+      results: [],
     }))
   );
+  if (previous)
+    restoreScreenMeasurements(previous, measurements, cases, {
+      suite,
+      casesPerRoute,
+      tableVersion: table.version,
+      profile,
+    });
   const modelSpend = new Map<string, ScreenModelSpend>(
     candidates.map(model => [model.id, { costUnknown: false, estimatedCostUsd: 0 }])
   );
+  for (const model of previous?.models ?? []) {
+    modelSpend.set(model.model, {
+      costUnknown: model.costUnknown,
+      estimatedCostUsd: model.estimatedCostUsd,
+    });
+  }
   const report = {
-    startedAt: new Date().toISOString(),
+    startedAt: previous?.startedAt ?? new Date().toISOString(),
     suite,
     rankingPolicy: RANKING_POLICY_VERSION,
     tableVersion: table.version,
     productionTokenProfile: profile,
     casesPerRoute,
     maxUsd,
+    concurrency,
     maxPromptUsdPerMtok,
-    costUsd: 0,
-    graderCostUsd: 0,
-    estimatedCostUsd: 0,
+    maxModels: maxModels ?? null,
+    costUsd: previous?.costUsd ?? 0,
+    graderCostUsd: previous?.graderCostUsd ?? 0,
+    estimatedCostUsd: previous?.estimatedCostUsd ?? 0,
+    unsettledCostUsd: (previous?.unsettledCostUsd ?? 0) + (previous?.reservedCostUsd ?? 0),
     truncated: false,
     spendIncomplete: false,
     excludedRoutes: [
@@ -374,23 +565,44 @@ async function main() {
       routeKey: `${benchCase.taskType}/${benchCase.subtaskType}`,
     })),
   };
+  const budget = createScreenBudget(
+    maxUsd,
+    report.costUsd + report.graderCostUsd + report.unsettledCostUsd
+  );
   const budgetAvailable = () =>
-    !report.spendIncomplete && report.costUsd + report.graderCostUsd < maxUsd;
+    !report.spendIncomplete && !report.truncated && budget.spentUsd < maxUsd;
   const judge: typeof baseJudge = baseJudge
     ? async input => {
-        if (!budgetAvailable()) throw new Error('Screen budget exhausted before grading');
+        const estimate = screenGraderReserveUsd(JSON.stringify(input), judgePricing);
+        const reservation = await budget.reserve(estimate);
+        if (!reservation) {
+          report.truncated = true;
+          throw new Error('Screen budget exhausted before grading');
+        }
+        try {
+          await checkpoint();
+        } catch (error) {
+          reservation.settle(0);
+          budget.stop();
+          throw error;
+        }
         try {
           const result = await baseJudge(input);
           report.graderCostUsd += result.costUsd;
+          reservation.settle(result.costUsd);
           return result;
         } catch (error) {
+          report.graderCostUsd += estimate;
+          reservation.settle(estimate);
           report.spendIncomplete = true;
+          budget.stop();
           throw error;
         }
       }
     : null;
   const snapshot = () => ({
     ...report,
+    reservedCostUsd: budget.reservedUsd,
     models: candidates.map(model => {
       const pricing = prices.get(model.id);
       if (!pricing) throw new Error(`Candidate pricing missing: ${model.id}`);
@@ -454,47 +666,92 @@ async function main() {
       };
     }),
   });
-  const checkpoint = async () => {
-    await writeFile(`${out}.partial`, `${JSON.stringify(snapshot(), null, 2)}\n`);
-    await rename(`${out}.partial`, out);
-  };
+  const checkpoint = createScreenCheckpoint(out, snapshot);
   await checkpoint();
-  for (const benchCase of cases) {
-    if (measurements.every(pair => modelSpend.get(pair.model)?.costUnknown)) break;
-    if (!budgetAvailable()) {
-      report.truncated = true;
-      break;
-    }
-    const prompts = benchCase.longContext ? materializeLongContext(benchCase) : benchCase;
-    for (const pair of measurements) {
+  const materializedCases = new Map<string, { systemPrompt: string; userPrompt: string }>();
+  const completedCases = measurements.map(
+    pair => new Set(pair.results.map(result => result.caseId))
+  );
+  const jobs = screenCandidateJobs(measurements, cases);
+  try {
+    await runScreenWorkerPool(jobs, concurrency, async ({ pairIndex, benchCase }) => {
+      const pair = measurements[pairIndex];
       const spend = modelSpend.get(pair.model);
       if (!spend) throw new Error(`Candidate spend missing: ${pair.model}`);
-      if (spend.costUnknown) continue;
+      if (spend.costUnknown || completedCases[pairIndex].has(benchCase.id)) return;
       if (!budgetAvailable()) {
         report.truncated = true;
-        break;
+        return;
+      }
+      let prompts = materializedCases.get(benchCase.id);
+      if (!prompts) {
+        prompts = benchCase.longContext ? materializeLongContext(benchCase) : benchCase;
+        materializedCases.set(benchCase.id, prompts);
       }
       const model = candidates.find(candidate => candidate.id === pair.model);
       if (!model || !apiKey) throw new Error('Candidate request prerequisites missing');
+      const variantFragment =
+        pair.variant === null ? {} : (model.opencode?.variants?.[pair.variant] ?? {});
+      const tokens = screenRequestTokenBudget({
+        systemPrompt: prompts.systemPrompt,
+        userPrompt: prompts.userPrompt,
+        fragment: variantFragment,
+      });
+      const fragment = { ...variantFragment, max_tokens: tokens.completionTokens };
+      const pricing = prices.get(pair.model);
+      if (!pricing) throw new Error(`Candidate pricing missing: ${pair.model}`);
+      const estimate =
+        tokens.promptTokens * pricing.promptUsdPerToken +
+        tokens.completionTokens * pricing.completionUsdPerToken;
+      let reservation: { settle: (costUsd: number) => void } | null = null;
       const completion = await requestDirectSweepCompletion({
         model: pair.model,
-        fragment: pair.variant === null ? {} : (model.opencode?.variants?.[pair.variant] ?? {}),
+        fragment,
         systemPrompt: prompts.systemPrompt,
         userPrompt: prompts.userPrompt,
         apiKey,
         attributionHeaders,
-        budgetAvailable,
+        budgetAvailable: () => budgetAvailable() && !spend.costUnknown,
+        beforeRequest: async () => {
+          reservation = await budget.reserve(estimate);
+          if (!reservation) {
+            report.truncated = true;
+            return false;
+          }
+          if (spend.costUnknown || !budgetAvailable()) {
+            reservation.settle(0);
+            reservation = null;
+            return false;
+          }
+          try {
+            await checkpoint();
+          } catch (error) {
+            reservation.settle(0);
+            reservation = null;
+            budget.stop();
+            throw error;
+          }
+          if (spend.costUnknown || !budgetAvailable()) {
+            reservation.settle(0);
+            reservation = null;
+          }
+          return reservation !== null;
+        },
+        onAttemptComplete: attempt => {
+          if (!reservation) throw new Error('Screen request has no budget reservation');
+          const previousEstimate = spend.estimatedCostUsd;
+          const costUsd = recordScreenModelCost(spend, attempt, pricing, {
+            systemPrompt: prompts.systemPrompt,
+            userPrompt: prompts.userPrompt,
+            fragment,
+          });
+          report.costUsd += costUsd;
+          report.estimatedCostUsd += spend.estimatedCostUsd - previousEstimate;
+          reservation.settle(costUsd);
+          reservation = null;
+        },
       });
-      const pricing = prices.get(pair.model);
-      if (!pricing) throw new Error(`Candidate pricing missing: ${pair.model}`);
-      const previousEstimate = spend.estimatedCostUsd;
-      report.costUsd += recordScreenModelCost(
-        spend,
-        completion,
-        pricing,
-        maxUsd - report.costUsd - report.graderCostUsd
-      );
-      report.estimatedCostUsd += spend.estimatedCostUsd - previousEstimate;
+      if (completion.error === 'Sweep budget exhausted before request') return;
       const grade =
         completion.output === null || completion.output === '' || spend.costUnknown
           ? null
@@ -519,11 +776,12 @@ async function main() {
             : (grade?.graderError ?? completion.error),
         output: completion.output,
       });
+      completedCases[pairIndex].add(benchCase.id);
       await checkpoint();
-    }
-    if (report.truncated) break;
+    });
+  } finally {
+    await checkpoint();
   }
-  await checkpoint();
   console.log(`Saved candidate screen to ${out}${report.truncated ? ' (truncated)' : ''}`);
 }
 

@@ -114,7 +114,12 @@ export async function syncAutoDeciderModels(
   const diff = diffModels(beforeConfig?.deciderModels ?? [], afterConfig?.deciderModels ?? []);
 
   const { desiredEntries } = await syncPlatformRegistry(env, fetchImpl, router);
-  const startedRuns = await drainQueues(env, router === 'frontier' ? 'platform' : 'both', undefined, router);
+  const startedRuns = await drainQueues(
+    env,
+    router === 'frontier' ? 'platform' : 'both',
+    undefined,
+    router
+  );
 
   const published = await publishPlatformRoutingTable(env, fetchImpl, router).catch(error => {
     console.warn(

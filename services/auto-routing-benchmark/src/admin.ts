@@ -82,7 +82,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       let saved: BenchmarkConfig;
       try {
         saved = await saveBenchmarkConfig(
-          c.env.BENCH_DB, { ...c.req.valid('json'), router }, updatedBy
+          c.env.BENCH_DB,
+          { ...c.req.valid('json'), router },
+          updatedBy
         );
       } catch (error) {
         if (error instanceof BenchmarkConcurrencyBudgetError) {
@@ -124,9 +126,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     zodJsonValidator(StartBenchmarkRunRequestSchema, { errorMessage: 'Invalid run request' }),
     async c => {
       const { kind, force, queue } = c.req.valid('json');
-      const router = kind === 'classifier'
-        ? DEFAULT_AUTO_ROUTER
-        : AutoRouterSchema.parse(c.req.query('router') ?? c.req.valid('json').router);
+      const router =
+        kind === 'classifier'
+          ? DEFAULT_AUTO_ROUTER
+          : AutoRouterSchema.parse(c.req.query('router') ?? c.req.valid('json').router);
       const config = await getBenchmarkConfig(c.env.BENCH_DB, router);
       if (!config) {
         return c.json(
@@ -139,7 +142,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       if (kind === 'decider') {
         const drainErrors: unknown[] = [];
         if (router === 'frontier' && queue === 'user') {
-          return c.json({ error: 'Custom profiles are only supported by the efficient router' }, 400);
+          return c.json(
+            { error: 'Custom profiles are only supported by the efficient router' },
+            400
+          );
         }
         const started = await drainQueues(c.env, queue, drainErrors, router);
         // Drains never throw, so a wedged queue would otherwise return 200 and
@@ -148,7 +154,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         // another started is reported alongside the run that did start.
         if (started.length === 0 && drainErrors.length > 0) {
           const [first] = drainErrors;
-          if (first instanceof BenchmarkRunConfigError || first instanceof BenchmarkConcurrencyBudgetError)
+          if (
+            first instanceof BenchmarkRunConfigError ||
+            first instanceof BenchmarkConcurrencyBudgetError
+          )
             return c.json({ error: first.message }, 400);
           throw first;
         }
@@ -170,7 +179,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         if (error instanceof RunAlreadyActiveError) {
           return c.json({ error: error.message }, 409);
         }
-        if (error instanceof BenchmarkRunConfigError || error instanceof BenchmarkConcurrencyBudgetError) {
+        if (
+          error instanceof BenchmarkRunConfigError ||
+          error instanceof BenchmarkConcurrencyBudgetError
+        ) {
           return c.json({ error: error.message }, 400);
         }
         throw error;

@@ -394,13 +394,15 @@ describe('auto routing worker', () => {
       ...benchmarkRoutingTable,
       version: 'frontier-table',
       routes: {
-        'implementation/feature_development': [{
-          model: 'anthropic/claude-opus-4.6',
-          accuracy: 0.95,
-          avgCostUsd: 0.01,
-          meetsThreshold: true,
-          reasoningEffort: null,
-        }],
+        'implementation/feature_development': [
+          {
+            model: 'anthropic/claude-opus-4.6',
+            accuracy: 0.95,
+            avgCostUsd: 0.01,
+            meetsThreshold: true,
+            reasoningEffort: null,
+          },
+        ],
       },
     };
     configGet.mockImplementation(async (key: string) =>
@@ -411,19 +413,17 @@ describe('auto routing worker', () => {
       decision: { model: 'anthropic/claude-opus-4.6', tableVersion: 'frontier-table' },
     });
     expect(cacheIdFromName).toHaveBeenCalledWith('frontier:user:user-1:task:task-123');
-    expect(cacheReadConversationState).toHaveBeenCalledWith(
-      expect.stringMatching(/^frontier:/)
-    );
+    expect(cacheReadConversationState).toHaveBeenCalledWith(expect.stringMatching(/^frontier:/));
     expect(configGet).not.toHaveBeenCalledWith('routing_table_v1');
-    expect(benchmarkFetch.mock.calls.some(([url]) =>
-      typeof url === 'string' && url.includes('/admin/custom-routing-table')
-    )).toBe(false);
+    expect(
+      benchmarkFetch.mock.calls.some(
+        ([url]) => typeof url === 'string' && url.includes('/admin/custom-routing-table')
+      )
+    ).toBe(false);
   });
 
   it('returns no frontier decision when only the efficient table exists', async () => {
-    dbLimit.mockResolvedValueOnce([
-      { planId: 'minimax-token-plan-plus', providerId: 'minimax' },
-    ]);
+    dbLimit.mockResolvedValueOnce([{ planId: 'minimax-token-plan-plus', providerId: 'minimax' }]);
     configGet.mockImplementation(async (key: string) =>
       key === 'routing_table_v1' ? JSON.stringify(benchmarkRoutingTable) : null
     );

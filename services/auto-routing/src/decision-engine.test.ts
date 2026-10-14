@@ -100,9 +100,21 @@ describe('complexity effort selection', () => {
     ...table,
     routes: {
       [route]: [
-        { model: 'shared/chat', variant: 'low', accuracy: 1, avgCostUsd: 0.001, meetsThreshold: true },
+        {
+          model: 'shared/chat',
+          variant: 'low',
+          accuracy: 1,
+          avgCostUsd: 0.001,
+          meetsThreshold: true,
+        },
         { model: 'shared/chat', variant: 'high', accuracy: 1, avgCostUsd: 1, meetsThreshold: true },
-        { model: 'other/chat', variant: 'other-high', accuracy: 1, avgCostUsd: 2, meetsThreshold: true },
+        {
+          model: 'other/chat',
+          variant: 'other-high',
+          accuracy: 1,
+          avgCostUsd: 2,
+          meetsThreshold: true,
+        },
       ],
     },
     effortByComplexity: { [route]: { 'shared/chat': { low: 'low', high: 'high' } } },
@@ -122,9 +134,12 @@ describe('complexity effort selection', () => {
         inc('shared/chat', 'low')
       )
     ).toMatchObject({ model: 'shared/chat', variant: 'high', sticky: true, switchReason: null });
-    expect(
-      computeDecision(classification, effortTable, inc('shared/chat', 'high'))
-    ).toMatchObject({ model: 'shared/chat', variant: 'low', sticky: true, switchReason: null });
+    expect(computeDecision(classification, effortTable, inc('shared/chat', 'high'))).toMatchObject({
+      model: 'shared/chat',
+      variant: 'low',
+      sticky: true,
+      switchReason: null,
+    });
   });
 
   it('applies the incumbent model mapping after a different fresh model loses sticky switching', () => {
@@ -132,14 +147,23 @@ describe('complexity effort selection', () => {
       ...effortTable,
       routes: {
         [route]: [
-          { model: 'other/chat', variant: 'other-high', accuracy: 1, avgCostUsd: 0.4, meetsThreshold: true },
+          {
+            model: 'other/chat',
+            variant: 'other-high',
+            accuracy: 1,
+            avgCostUsd: 0.4,
+            meetsThreshold: true,
+          },
           ...(effortTable.routes[route] ?? []),
         ],
       },
     };
-    expect(
-      computeDecision(classification, stickyTable, inc('shared/chat', 'high'))
-    ).toMatchObject({ model: 'shared/chat', variant: 'low', sticky: true, switchReason: null });
+    expect(computeDecision(classification, stickyTable, inc('shared/chat', 'high'))).toMatchObject({
+      model: 'shared/chat',
+      variant: 'low',
+      sticky: true,
+      switchReason: null,
+    });
   });
 
   it.each(['missing', 'other-high'])('skips an unavailable same-model pair (%s)', variant => {

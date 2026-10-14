@@ -56,7 +56,9 @@ describe('routing case results provenance read', () => {
         'null-variant',
       ]);
       expect(results.find(pair => pair.model === 'null/model')?.variant).toBeNull();
-      expect(results.flatMap(pair => pair.results).every(result => result.split === 'train')).toBe(true);
+      expect(results.flatMap(pair => pair.results).every(result => result.split === 'train')).toBe(
+        true
+      );
       expect(await getRoutingCaseResultsForEntries(binding, [])).toEqual([]);
     } finally {
       sqlite.close();

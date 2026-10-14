@@ -71,9 +71,14 @@ describe('rankCandidates', () => {
       rankInput('fast-total', 1, 0.01, 1000),
     ];
     expect(order(rankCandidates(candidates, 0.95))).toEqual(['fast-total', 'slow-total']);
-    expect(order(rankCandidates(candidates.map(c => ({ ...c, p50TtftMs: null })), 0.95))).toEqual(
-      ['fast-total', 'slow-total']
-    );
+    expect(
+      order(
+        rankCandidates(
+          candidates.map(c => ({ ...c, p50TtftMs: null })),
+          0.95
+        )
+      )
+    ).toEqual(['fast-total', 'slow-total']);
   });
   it('prefers more measured cases when raw accuracy, latency and cost match', () => {
     const ranked = rankCandidates(
@@ -251,9 +256,9 @@ describe('RoutingTableSchema', () => {
     expect(RoutingTableSchema.parse({ ...table, effortByComplexity }).effortByComplexity).toEqual(
       effortByComplexity
     );
-    expect(CustomRoutingTableSchema.parse({ ...table, effortByComplexity }).effortByComplexity).toEqual(
-      effortByComplexity
-    );
+    expect(
+      CustomRoutingTableSchema.parse({ ...table, effortByComplexity }).effortByComplexity
+    ).toEqual(effortByComplexity);
     expect(
       RoutingTableSchema.safeParse({
         ...table,

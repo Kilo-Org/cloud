@@ -29,9 +29,11 @@ const autoRows = [
 
 describe('platform model configuration', () => {
   it('defaults legacy rows to efficient with the configured ranking defaults', () => {
-    const config = mapConfigRows(configRow, ['classifier'], [
-      { model: 'manual/model', variant: null, reasoning_effort: null },
-    ]);
+    const config = mapConfigRows(
+      configRow,
+      ['classifier'],
+      [{ model: 'manual/model', variant: null, reasoning_effort: null }]
+    );
     expect(config).toMatchObject({
       router: 'efficient',
       accuracyNoiseBand: 0.05,
@@ -41,7 +43,12 @@ describe('platform model configuration', () => {
 
   it('preserves independent frontier ranking knobs and candidate selection', () => {
     const config = mapConfigRows(
-      { ...configRow, router: 'frontier', accuracy_noise_band: 0.02, frontier_min_accuracy_delta: 0.1 },
+      {
+        ...configRow,
+        router: 'frontier',
+        accuracy_noise_band: 0.02,
+        frontier_min_accuracy_delta: 0.1,
+      },
       ['classifier'],
       [{ model: 'frontier/model', variant: null, reasoning_effort: null }]
     );

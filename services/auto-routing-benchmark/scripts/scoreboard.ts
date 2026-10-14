@@ -159,27 +159,28 @@ async function main() {
       );
     }
     const tablePath = values.table ?? 'live';
-    const [source, prod, replay, pricing, rerankProfile, costProfile, sweep, complexityLabels] = await Promise.all([
-      tablePath === 'live'
-        ? loadLiveTable()
-        : readJson(tablePath, ScoreboardRoutingTableSchema).then(table => ({
-            table,
-            classifierRouteAccuracy: null,
-          })),
-      values.prod ? readJson(values.prod, ProdMetricsSchema) : null,
-      values.replay ? readJson(values.replay, ReplayMetricsSchema) : null,
-      values.pricing ? loadPricing(values.pricing) : null,
-      values['rerank-profile']
-        ? readJson(values['rerank-profile'], ProductionTokenProfileSchema)
-        : null,
-      values['cost-profile']
-        ? readJson(values['cost-profile'], ProductionTokenProfileSchema)
-        : null,
-      values.sweep ? readJson(values.sweep, OfflineSweepSchema) : null,
-      values['complexity-labels']
-        ? readJson(values['complexity-labels'], ComplexityLabelsSchema)
-        : null,
-    ]);
+    const [source, prod, replay, pricing, rerankProfile, costProfile, sweep, complexityLabels] =
+      await Promise.all([
+        tablePath === 'live'
+          ? loadLiveTable()
+          : readJson(tablePath, ScoreboardRoutingTableSchema).then(table => ({
+              table,
+              classifierRouteAccuracy: null,
+            })),
+        values.prod ? readJson(values.prod, ProdMetricsSchema) : null,
+        values.replay ? readJson(values.replay, ReplayMetricsSchema) : null,
+        values.pricing ? loadPricing(values.pricing) : null,
+        values['rerank-profile']
+          ? readJson(values['rerank-profile'], ProductionTokenProfileSchema)
+          : null,
+        values['cost-profile']
+          ? readJson(values['cost-profile'], ProductionTokenProfileSchema)
+          : null,
+        values.sweep ? readJson(values.sweep, OfflineSweepSchema) : null,
+        values['complexity-labels']
+          ? readJson(values['complexity-labels'], ComplexityLabelsSchema)
+          : null,
+      ]);
     if (pricing) {
       for (const candidates of Object.values(source.table.routes)) {
         for (const candidate of candidates) {

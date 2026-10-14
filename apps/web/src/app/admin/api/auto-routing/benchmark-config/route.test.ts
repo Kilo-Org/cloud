@@ -111,23 +111,33 @@ describe('PUT /admin/api/auto-routing/benchmark-config', () => {
   });
 
   it('forwards frontier config reads', async () => {
-    await GET(new NextRequest('http://localhost:3000/admin/api/auto-routing/benchmark-config?router=frontier'));
+    await GET(
+      new NextRequest(
+        'http://localhost:3000/admin/api/auto-routing/benchmark-config?router=frontier'
+      )
+    );
     expect(mockGetBenchmarkConfig).toHaveBeenCalledWith('frontier');
   });
 
   it('rejects an unknown router before proxying', async () => {
-    const response = await GET(new NextRequest('http://localhost:3000/admin/api/auto-routing/benchmark-config?router=unknown'));
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/admin/api/auto-routing/benchmark-config?router=unknown'
+      )
+    );
     expect(response.status).toBe(400);
     expect(mockGetBenchmarkConfig).not.toHaveBeenCalled();
   });
 
   it('forwards frontier config updates and accuracy settings', async () => {
-    await PUT(putRequest({
-      ...validConfig,
-      router: 'frontier',
-      accuracyNoiseBand: 0.02,
-      frontierMinAccuracyDelta: 0,
-    }));
+    await PUT(
+      putRequest({
+        ...validConfig,
+        router: 'frontier',
+        accuracyNoiseBand: 0.02,
+        frontierMinAccuracyDelta: 0,
+      })
+    );
     expect(mockUpdateBenchmarkConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         router: 'frontier',

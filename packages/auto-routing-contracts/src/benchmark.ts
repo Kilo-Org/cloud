@@ -189,7 +189,10 @@ export const BenchmarkConfigSchema = z
     }
     // Platform-queue and user-queue runs can hold containers at the same time,
     // so the two budgets share one hard platform cap.
-    if (config.router === 'efficient' && config.maxConcurrency + config.userMaxConcurrency > BENCHMARK_CONTAINER_BUDGET) {
+    if (
+      config.router === 'efficient' &&
+      config.maxConcurrency + config.userMaxConcurrency > BENCHMARK_CONTAINER_BUDGET
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['userMaxConcurrency'],

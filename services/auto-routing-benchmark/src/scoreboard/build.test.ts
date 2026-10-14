@@ -111,7 +111,7 @@ describe('buildScoreboard', () => {
             routeKey: route,
             split: 'train' as const,
             score: 1,
-            costUsd: variant === 'low' ? (bucket === 'low' ? 0.01 : 2) : (bucket === 'low' ? 4 : 0.1),
+            costUsd: variant === 'low' ? (bucket === 'low' ? 0.01 : 2) : bucket === 'low' ? 4 : 0.1,
             graderCostUsd: 0,
             latencyMs: 100,
             error: null,
@@ -262,8 +262,12 @@ describe('buildScoreboard', () => {
       source: 'benchmark',
     };
     expect(LiveScoreboardTableRowSchema.parse(row).router).toBe('efficient');
-    expect(LiveScoreboardTableRowSchema.parse({ ...row, router: 'frontier' }).router).toBe('frontier');
-    expect(LiveScoreboardTableRowSchema.safeParse({ ...row, router: 'unknown' }).success).toBe(false);
+    expect(LiveScoreboardTableRowSchema.parse({ ...row, router: 'frontier' }).router).toBe(
+      'frontier'
+    );
+    expect(LiveScoreboardTableRowSchema.safeParse({ ...row, router: 'unknown' }).success).toBe(
+      false
+    );
   });
 
   it('weights prompt-aware estimates without changing the published first picks', () => {

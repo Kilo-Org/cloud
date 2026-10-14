@@ -159,10 +159,14 @@ describe('syncAutoDeciderModels', () => {
         headers: expect.objectContaining({ authorization: 'Bearer secret' }),
       })
     );
-    expect(replaceAutoDeciderModels).toHaveBeenCalledWith(env.BENCH_DB, [
-      expect.objectContaining({ model: 'auto/existing', reasoning_effort: null }),
-      expect.objectContaining({ model: 'auto/new', reasoning_effort: null }),
-    ], 'efficient');
+    expect(replaceAutoDeciderModels).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      [
+        expect.objectContaining({ model: 'auto/existing', reasoning_effort: null }),
+        expect.objectContaining({ model: 'auto/new', reasoning_effort: null }),
+      ],
+      'efficient'
+    );
     // Newly configured models enter the registry queue; nothing is measured
     // straight from the config list.
     expect(syncPlatformRegistryRows).toHaveBeenCalledWith(env.BENCH_DB, expect.anything(), [
@@ -310,15 +314,22 @@ describe('syncAutoDeciderModels', () => {
     await syncAutoDeciderModels(env, { fetchImpl, router: 'frontier' });
     expect(getConfigRows).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
     expect(replaceAutoDeciderModels).toHaveBeenCalledWith(
-      env.BENCH_DB, expect.any(Array), 'frontier'
+      env.BENCH_DB,
+      expect.any(Array),
+      'frontier'
     );
     expect(syncPlatformRegistryRows).toHaveBeenCalledWith(
-      env.BENCH_DB, expect.objectContaining({ router: 'frontier' }), expect.any(Array)
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier' }),
+      expect.any(Array)
     );
     expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
-      env.BENCH_DB, expect.objectContaining({ router: 'frontier' }), 'platform'
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier' }),
+      'platform'
     );
-    expect(vi.mocked(listPendingCurrentProfiles).mock.calls.every(call => call[2] === 'platform'))
-      .toBe(true);
+    expect(
+      vi.mocked(listPendingCurrentProfiles).mock.calls.every(call => call[2] === 'platform')
+    ).toBe(true);
   });
 });

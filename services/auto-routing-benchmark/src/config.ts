@@ -100,7 +100,9 @@ export function mapConfigRows(
 
 export class BenchmarkConcurrencyBudgetError extends Error {
   constructor() {
-    super(`Efficient platform + owner and frontier platform concurrency must total at most ${BENCHMARK_CONTAINER_BUDGET}`);
+    super(
+      `Efficient platform + owner and frontier platform concurrency must total at most ${BENCHMARK_CONTAINER_BUDGET}`
+    );
     this.name = 'BenchmarkConcurrencyBudgetError';
   }
 }
@@ -113,7 +115,8 @@ export async function validateBenchmarkConcurrencyBudget(
   const other = await getBenchmarkConfig(db, otherRouter);
   const efficient = config.router === 'efficient' ? config : other;
   const frontier = config.router === 'frontier' ? config : other;
-  const total = (efficient ? efficient.maxConcurrency + efficient.userMaxConcurrency : 0) +
+  const total =
+    (efficient ? efficient.maxConcurrency + efficient.userMaxConcurrency : 0) +
     (frontier?.maxConcurrency ?? 0);
   if (total > BENCHMARK_CONTAINER_BUDGET) throw new BenchmarkConcurrencyBudgetError();
 }

@@ -113,6 +113,13 @@
       "when": 1791952997255,
       "tag": "0015_brief_monster_badoon",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1791954884900,
+      "tag": "0016_jittery_skaar",
+      "breakpoints": true
     }
   ]
 }

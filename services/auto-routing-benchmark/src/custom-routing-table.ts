@@ -4,8 +4,16 @@ import type {
   CustomRoutingTableResponse,
   PoolEntry,
 } from '@kilocode/auto-routing-contracts';
-import { ComplexityLabelsSchema, MAX_POOL_ENTRIES, poolEntryKey } from '@kilocode/auto-routing-contracts';
-import { getRoutingCaseResultsForEntries, getSummariesForRuns, listReadyCurrentProfilesForEntries } from './db';
+import {
+  ComplexityLabelsSchema,
+  MAX_POOL_ENTRIES,
+  poolEntryKey,
+} from '@kilocode/auto-routing-contracts';
+import {
+  getRoutingCaseResultsForEntries,
+  getSummariesForRuns,
+  listReadyCurrentProfilesForEntries,
+} from './db';
 import { variantFromStorage } from './reasoning-effort';
 import { buildCustomRoutingTable } from './routing-table-builder';
 import { currentProfileContextFromConfig, ProfileValidationError } from './profiles';
@@ -42,7 +50,11 @@ export async function assembleCustomRoutingTable(
     Partial<
       Pick<
         BenchmarkConfig,
-        'router' | 'accuracyNoiseBand' | 'productionTokenProfile' | 'switchHorizonTurns' | 'lowConfidenceThreshold'
+        | 'router'
+        | 'accuracyNoiseBand'
+        | 'productionTokenProfile'
+        | 'switchHorizonTurns'
+        | 'lowConfidenceThreshold'
       >
     >,
   entries: readonly PoolEntry[],
@@ -53,7 +65,9 @@ export async function assembleCustomRoutingTable(
   } = {}
 ): Promise<CustomRoutingTableResponse> {
   if (config.router === 'frontier') {
-    throw new ProfileValidationError('Custom model pools are only supported by the efficient router');
+    throw new ProfileValidationError(
+      'Custom model pools are only supported by the efficient router'
+    );
   }
   assertUniqueEntries(entries);
   const current = currentProfileContextFromConfig(config);

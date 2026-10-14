@@ -323,7 +323,9 @@ describe('computeEngineIdentity', () => {
 
   it('defaults to efficient and keeps the classifier shared', () => {
     expect(computeEngineIdentity('decider')).toBe(computeEngineIdentity('decider', 'efficient'));
-    expect(computeEngineIdentity('classifier', 'frontier')).toBe(computeEngineIdentity('classifier'));
+    expect(computeEngineIdentity('classifier', 'frontier')).toBe(
+      computeEngineIdentity('classifier')
+    );
   });
 
   it('selects the frontier dataset and hashes every selected input', () => {

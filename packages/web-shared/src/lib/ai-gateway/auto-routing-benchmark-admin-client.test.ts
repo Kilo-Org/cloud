@@ -86,15 +86,18 @@ describe('auto routing benchmark admin client', () => {
 
     await updateBenchmarkConfig(configResponse.config, 'admin@kilocode.ai');
 
-    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/config?router=efficient', {
-      method: 'PUT',
-      headers: {
-        authorization: 'Bearer test-internal-secret',
-        'content-type': 'application/json',
-        'x-updated-by': 'admin@kilocode.ai',
-      },
-      body: JSON.stringify(configResponse.config),
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://benchmark-worker.example.com/admin/config?router=efficient',
+      {
+        method: 'PUT',
+        headers: {
+          authorization: 'Bearer test-internal-secret',
+          'content-type': 'application/json',
+          'x-updated-by': 'admin@kilocode.ai',
+        },
+        body: JSON.stringify(configResponse.config),
+      }
+    );
   });
 
   it('lists benchmark runs', async () => {
@@ -109,12 +112,15 @@ describe('auto routing benchmark admin client', () => {
       body: runsResponse,
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs?router=efficient', {
-      method: 'GET',
-      headers: {
-        authorization: 'Bearer test-internal-secret',
-      },
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://benchmark-worker.example.com/admin/runs?router=efficient',
+      {
+        method: 'GET',
+        headers: {
+          authorization: 'Bearer test-internal-secret',
+        },
+      }
+    );
   });
 
   it('propagates error body from listBenchmarkRuns on non-OK status', async () => {
@@ -148,14 +154,22 @@ describe('auto routing benchmark admin client', () => {
       },
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs?router=efficient', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer test-internal-secret',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ kind: 'classifier', force: false, queue: 'platform', router: 'efficient' }),
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://benchmark-worker.example.com/admin/runs?router=efficient',
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer test-internal-secret',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          kind: 'classifier',
+          force: false,
+          queue: 'platform',
+          router: 'efficient',
+        }),
+      }
+    );
   });
 
   it('starts a run for both registry queues', async () => {
@@ -176,14 +190,17 @@ describe('auto routing benchmark admin client', () => {
 
     const result = await startBenchmarkRun('decider', false, 'both');
 
-    expect(mockFetch).toHaveBeenCalledWith('https://benchmark-worker.example.com/admin/runs?router=efficient', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer test-internal-secret',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ kind: 'decider', force: false, queue: 'both', router: 'efficient' }),
-    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://benchmark-worker.example.com/admin/runs?router=efficient',
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer test-internal-secret',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ kind: 'decider', force: false, queue: 'both', router: 'efficient' }),
+      }
+    );
     expect(result.body).toMatchObject({
       startedRuns: [
         { runId: 'decider-1', purpose: 'platform', entryCount: 2 },
@@ -217,10 +234,15 @@ describe('auto routing benchmark admin client', () => {
 
   it('passes frontier on every selectable endpoint', async () => {
     mockFetch.mockResolvedValue({
-      status: 404, ok: false, json: () => Promise.resolve({ error: 'not configured' }),
+      status: 404,
+      ok: false,
+      json: () => Promise.resolve({ error: 'not configured' }),
     });
     await getBenchmarkConfig('frontier');
-    await updateBenchmarkConfig({ ...configResponse.config, router: 'frontier' }, 'admin@kilocode.ai');
+    await updateBenchmarkConfig(
+      { ...configResponse.config, router: 'frontier' },
+      'admin@kilocode.ai'
+    );
     await listBenchmarkRuns({ router: 'frontier' });
     await startBenchmarkRun('decider', false, 'platform', 'frontier');
     await getBenchmarkRegistry('frontier');

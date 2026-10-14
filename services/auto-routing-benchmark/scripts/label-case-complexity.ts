@@ -15,7 +15,9 @@ import { DECIDER_CASES, FRONTIER_CASES } from '../src/datasets/decider-cases';
 import { materializeLongContext } from '../src/datasets/long-context';
 
 async function main() {
-  const defaultOutput = fileURLToPath(new URL('../src/datasets/case-complexity.json', import.meta.url));
+  const defaultOutput = fileURLToPath(
+    new URL('../src/datasets/case-complexity.json', import.meta.url)
+  );
   const { values } = parseArgs({
     options: {
       out: { type: 'string', default: defaultOutput },

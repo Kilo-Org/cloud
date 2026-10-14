@@ -21,7 +21,11 @@ const fetchBenchmarkAdmin = createWorkerAdminFetch({
 });
 
 export function getBenchmarkConfig(router: AutoRouter = DEFAULT_AUTO_ROUTER) {
-  return fetchBenchmarkAdmin(`/admin/config?router=${router}`, { method: 'GET' }, BenchmarkConfigResponseSchema);
+  return fetchBenchmarkAdmin(
+    `/admin/config?router=${router}`,
+    { method: 'GET' },
+    BenchmarkConfigResponseSchema
+  );
 }
 
 export function updateBenchmarkConfig(config: BenchmarkConfig, updatedByEmail: string) {
@@ -71,10 +75,17 @@ export function startBenchmarkRun(
 }
 
 export function getBenchmarkRegistry(router: AutoRouter = DEFAULT_AUTO_ROUTER) {
-  return fetchBenchmarkAdmin(`/admin/registry?router=${router}`, { method: 'GET' }, BenchmarkRegistryResponseSchema);
+  return fetchBenchmarkAdmin(
+    `/admin/registry?router=${router}`,
+    { method: 'GET' },
+    BenchmarkRegistryResponseSchema
+  );
 }
 
-export function requeueBenchmarkRegistry(scope: BenchmarkQueueSelector, router: AutoRouter = DEFAULT_AUTO_ROUTER) {
+export function requeueBenchmarkRegistry(
+  scope: BenchmarkQueueSelector,
+  router: AutoRouter = DEFAULT_AUTO_ROUTER
+) {
   return fetchBenchmarkAdmin(
     `/admin/registry/requeue?router=${router}`,
     {

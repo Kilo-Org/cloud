@@ -43,7 +43,9 @@ export type CurrentProfileContext = {
  * ready.
  */
 export function isCurrentBenchmarkProfile(
-  row: Pick<ProfileRow, 'model' | 'variant' | 'engine_identity' | 'repetitions'> & { router?: AutoRouter },
+  row: Pick<ProfileRow, 'model' | 'variant' | 'engine_identity' | 'repetitions'> & {
+    router?: AutoRouter;
+  },
   current: CurrentProfileContext,
   entry: PoolEntry
 ): boolean {
@@ -180,7 +182,9 @@ async function loadRowsForEntries(
   const rows = await orm
     .select()
     .from(benchmarkProfiles)
-    .where(and(eq(benchmarkProfiles.router, 'efficient'), inArray(benchmarkProfiles.model, models)));
+    .where(
+      and(eq(benchmarkProfiles.router, 'efficient'), inArray(benchmarkProfiles.model, models))
+    );
   const wanted = new Set(entries.map(poolEntryKey));
   return rows.filter(row => wanted.has(entryKeyFromRow(row)));
 }
@@ -420,7 +424,9 @@ export async function registerProfiles(
   input: RegisterProfilesInput
 ): Promise<BenchmarkProfileStatusesResponse> {
   if (config.router === 'frontier') {
-    throw new ProfileValidationError('Custom model pools are only supported by the efficient router');
+    throw new ProfileValidationError(
+      'Custom model pools are only supported by the efficient router'
+    );
   }
   assertUniqueEntries(input.entries);
   const current = currentProfileContextFromConfig(config);
@@ -564,7 +570,9 @@ export async function lookupProfileStatuses(
   input: LookupProfileStatusesInput
 ): Promise<BenchmarkProfileStatusesResponse> {
   if (config.router === 'frontier') {
-    throw new ProfileValidationError('Custom model pools are only supported by the efficient router');
+    throw new ProfileValidationError(
+      'Custom model pools are only supported by the efficient router'
+    );
   }
   assertUniqueEntries(input.entries);
   const current = currentProfileContextFromConfig(config);

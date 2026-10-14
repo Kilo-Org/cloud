@@ -18,33 +18,33 @@ type RoutingTableEnv = Pick<
 
 function createRoutingTableCache(router: AutoRouter) {
   return ttlCached(ROUTING_TABLE_CACHE_TTL_MS, async (env: RoutingTableEnv) => {
-  const table = await kvReadThrough({
-    kv: env.AUTO_ROUTING_CONFIG,
-    key: routingTableKvKey(router),
-    ttlSeconds: 3600,
-    fetchOrigin: () => fetchRoutingTableFromOrigin(env, router),
-    parse: raw => {
-      try {
-        const parsed = RoutingTableSchema.safeParse(JSON.parse(raw));
-        if (!parsed.success) {
+    const table = await kvReadThrough({
+      kv: env.AUTO_ROUTING_CONFIG,
+      key: routingTableKvKey(router),
+      ttlSeconds: 3600,
+      fetchOrigin: () => fetchRoutingTableFromOrigin(env, router),
+      parse: raw => {
+        try {
+          const parsed = RoutingTableSchema.safeParse(JSON.parse(raw));
+          if (!parsed.success) {
+            console.warn(
+              JSON.stringify({
+                event: 'auto_routing_table_invalid',
+                issues: parsed.error.issues.slice(0, 5).map(i => `${i.path.join('.')}: ${i.code}`),
+              })
+            );
+            return null;
+          }
+          return parsed.data;
+        } catch (error) {
           console.warn(
-            JSON.stringify({
-              event: 'auto_routing_table_invalid',
-              issues: parsed.error.issues.slice(0, 5).map(i => `${i.path.join('.')}: ${i.code}`),
-            })
+            JSON.stringify({ event: 'auto_routing_table_invalid', ...formatError(error) })
           );
           return null;
         }
-        return parsed.data;
-      } catch (error) {
-        console.warn(
-          JSON.stringify({ event: 'auto_routing_table_invalid', ...formatError(error) })
-        );
-        return null;
-      }
-    },
-  });
-  return table;
+      },
+    });
+    return table;
   });
 }
 

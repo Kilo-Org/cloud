@@ -801,12 +801,22 @@ describe('frontier router runs', () => {
     const entries = [{ model: 'platform/a', variant: null }];
     const result = await startRun(env, 'decider', { router: 'frontier', entries });
     expect(result.runId).toMatch(/^frontier-decider-/);
-    expect(insertRun).toHaveBeenCalledWith(env.BENCH_DB, expect.objectContaining({
-      router: 'frontier', max_concurrency: 3, frontier_min_accuracy_delta: 0.1,
-      engine_identity: expect.stringMatching(/^frontier:v1:/),
-    }), expect.anything(), []);
+    expect(insertRun).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({
+        router: 'frontier',
+        max_concurrency: 3,
+        frontier_min_accuracy_delta: 0.1,
+        engine_identity: expect.stringMatching(/^frontier:v1:/),
+      }),
+      expect.anything(),
+      []
+    );
     expect(markProfilesRunningForRun).toHaveBeenCalledWith(
-      env.BENCH_DB, result.runId, entries, expect.objectContaining({ router: 'frontier' })
+      env.BENCH_DB,
+      result.runId,
+      entries,
+      expect.objectContaining({ router: 'frontier' })
     );
     const messages = queueSendBatch.mock.calls.flatMap(([batch]) => batch);
     const caseIds = messages.flatMap(message => message.body.caseIds ?? []);
@@ -817,10 +827,16 @@ describe('frontier router runs', () => {
   });
 
   it('rejects frontier owner queues before any profile claim', async () => {
-    await expect(drainQueues(env, 'user', undefined, 'frontier')).rejects.toThrow('does not support owner queues');
-    await expect(startRun(env, 'decider', {
-      router: 'frontier', purpose: 'user', entries: [{ model: 'model', variant: null }],
-    })).rejects.toThrow('does not support owner queues');
+    await expect(drainQueues(env, 'user', undefined, 'frontier')).rejects.toThrow(
+      'does not support owner queues'
+    );
+    await expect(
+      startRun(env, 'decider', {
+        router: 'frontier',
+        purpose: 'user',
+        entries: [{ model: 'model', variant: null }],
+      })
+    ).rejects.toThrow('does not support owner queues');
     expect(markProfilesRunningForRun).not.toHaveBeenCalled();
   });
 
@@ -829,22 +845,31 @@ describe('frontier router runs', () => {
     await drainQueues(env, 'both', undefined, 'frontier');
     expect(listPendingCurrentProfiles).toHaveBeenCalledOnce();
     expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
-      env.BENCH_DB, expect.objectContaining({ router: 'frontier' }), 'platform'
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier' }),
+      'platform'
     );
   });
 
   it('rejects decider admission when aggregate saved router budgets exceed the physical cap', async () => {
     vi.mocked(getConfigRows).mockImplementation(async (_db, router = 'efficient') => ({
       config: {
-        ...configRow, router, max_concurrency: 80, user_max_concurrency: 80,
+        ...configRow,
+        router,
+        max_concurrency: 80,
+        user_max_concurrency: 80,
       },
       classifierModels: ['classifier/a'],
       deciderModels: [{ model: 'platform/a', variant: null, reasoning_effort: null }],
-      autoDeciderModels: [], excludedAutoDeciderModels: [],
+      autoDeciderModels: [],
+      excludedAutoDeciderModels: [],
     }));
-    await expect(startRun(env, 'decider', {
-      router: 'frontier', entries: [{ model: 'platform/a', variant: null }],
-    })).rejects.toThrow('must total at most 200');
+    await expect(
+      startRun(env, 'decider', {
+        router: 'frontier',
+        entries: [{ model: 'platform/a', variant: null }],
+      })
+    ).rejects.toThrow('must total at most 200');
     expect(insertRun).not.toHaveBeenCalled();
   });
 
@@ -853,14 +878,29 @@ describe('frontier router runs', () => {
     vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
       { model: 'platform/a', variant: '', run_id: 'frontier-measured' },
     ]);
-    vi.mocked(getSummariesForRuns).mockResolvedValue(TAXONOMY_ROUTE_KEYS.map(routeKey => ({
-      model: 'platform/a', variant: null, runId: 'frontier-measured', routeKey,
-      accuracy: 0.95, avgCostUsd: 0.002, avgLatencyMs: 100, p50LatencyMs: 100,
-      p95LatencyMs: 150, cases: 10, errors: 0, timeouts: 0, routeAccuracy: null,
-    })));
+    vi.mocked(getSummariesForRuns).mockResolvedValue(
+      TAXONOMY_ROUTE_KEYS.map(routeKey => ({
+        model: 'platform/a',
+        variant: null,
+        runId: 'frontier-measured',
+        routeKey,
+        accuracy: 0.95,
+        avgCostUsd: 0.002,
+        avgLatencyMs: 100,
+        p50LatencyMs: 100,
+        p95LatencyMs: 150,
+        cases: 10,
+        errors: 0,
+        timeouts: 0,
+        routeAccuracy: null,
+      }))
+    );
     await publishPlatformRoutingTable(env, catalogFetch, 'frontier');
     expect(saveRoutingTable).toHaveBeenCalledWith(
-      env.BENCH_DB, expect.objectContaining({ minAccuracy: 0.9 }), expect.any(String), 'frontier'
+      env.BENCH_DB,
+      expect.objectContaining({ minAccuracy: 0.9 }),
+      expect.any(String),
+      'frontier'
     );
     expect(getLatestRoutingTable).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
     expect(kvDelete).toHaveBeenCalledWith('routing_table_frontier_v1');
@@ -871,13 +911,21 @@ describe('frontier router runs', () => {
 describe('live container admission refusal', () => {
   it('releases registry claims and surfaces a budget error when the atomic run insert rejects', async () => {
     mockConfig({ router: 'frontier' });
-    vi.mocked(insertRun).mockRejectedValue(new Error('Failed query', {
-      cause: new Error('D1_ERROR: NOT NULL constraint failed: benchmark_runs.max_concurrency'),
-    }));
-    await expect(startRun(env, 'decider', {
-      router: 'frontier', entries: [{ model: 'platform/a', variant: null }],
-    })).rejects.toThrow('must total at most 200');
-    expect(releaseProfileClaims).toHaveBeenCalledWith(env.BENCH_DB, expect.stringMatching(/^frontier-/));
+    vi.mocked(insertRun).mockRejectedValue(
+      new Error('Failed query', {
+        cause: new Error('D1_ERROR: NOT NULL constraint failed: benchmark_runs.max_concurrency'),
+      })
+    );
+    await expect(
+      startRun(env, 'decider', {
+        router: 'frontier',
+        entries: [{ model: 'platform/a', variant: null }],
+      })
+    ).rejects.toThrow('must total at most 200');
+    expect(releaseProfileClaims).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.stringMatching(/^frontier-/)
+    );
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 });

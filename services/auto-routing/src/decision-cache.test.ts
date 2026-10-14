@@ -497,19 +497,26 @@ describe('conversation state', () => {
     } as unknown as Pick<Env, 'AUTO_ROUTING_DECISION_CACHE'>;
     await putCachedClassification(env, 'conversation-1', 'hash', 'model', classification);
     await putStickyDecision(env, 'conversation-1', 'efficient/chat', null, 'route', 1);
-    expect(
-      await readConversationState(env, 'conversation-1', 'hash', 'model', 'frontier')
-    ).toEqual({ classification: null, sticky: null });
+    expect(await readConversationState(env, 'conversation-1', 'hash', 'model', 'frontier')).toEqual(
+      { classification: null, sticky: null }
+    );
     const frontierClassification = { ...classification, confidence: 0.9 };
     await putCachedClassification(
-      env, 'conversation-1', 'hash', 'model', frontierClassification, 'frontier'
+      env,
+      'conversation-1',
+      'hash',
+      'model',
+      frontierClassification,
+      'frontier'
     );
-    await putStickyDecision(
-      env, 'conversation-1', 'frontier/chat', null, 'route', 1, 'frontier'
-    );
+    await putStickyDecision(env, 'conversation-1', 'frontier/chat', null, 'route', 1, 'frontier');
     const efficientState = await readConversationState(env, 'conversation-1', 'hash', 'model');
     const frontierState = await readConversationState(
-      env, 'conversation-1', 'hash', 'model', 'frontier'
+      env,
+      'conversation-1',
+      'hash',
+      'model',
+      'frontier'
     );
     expect(efficientState.classification).toEqual(classification);
     expect(efficientState.sticky?.model).toBe('efficient/chat');

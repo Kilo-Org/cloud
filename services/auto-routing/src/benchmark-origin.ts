@@ -58,7 +58,9 @@ export async function fetchRoutingTableFromOrigin(
   router: AutoRouter = DEFAULT_AUTO_ROUTER
 ): Promise<RoutingTable | null> {
   const path =
-    router === DEFAULT_AUTO_ROUTER ? '/admin/routing-table' : `/admin/routing-table?router=${router}`;
+    router === DEFAULT_AUTO_ROUTER
+      ? '/admin/routing-table'
+      : `/admin/routing-table?router=${router}`;
   const body = await fetchBenchmarkJson(env, path);
   const parsed = BenchmarkRoutingTableResponseSchema.safeParse(body);
   if (!parsed.success) {

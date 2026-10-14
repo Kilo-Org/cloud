@@ -741,14 +741,20 @@ function BenchmarkConfigEditor({
               step={0.01}
               value={form.accuracyNoiseBand}
               onChange={e =>
-                updateForm(prev => ({ ...prev, accuracyNoiseBand: parseFloat(e.target.value) || 0 }))
+                updateForm(prev => ({
+                  ...prev,
+                  accuracyNoiseBand: parseFloat(e.target.value) || 0,
+                }))
               }
               className="h-8 w-40 tabular-nums"
             />
           </div>
           {router === 'frontier' ? (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="benchmark-frontier-min-accuracy-delta" className="text-sm font-medium">
+              <Label
+                htmlFor="benchmark-frontier-min-accuracy-delta"
+                className="text-sm font-medium"
+              >
                 Frontier minimum accuracy delta (0–1)
               </Label>
               <Input
@@ -830,37 +836,37 @@ function BenchmarkConfigEditor({
             </p>
           </div>
           {router === 'efficient' ? (
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="benchmark-user-max-concurrency" className="text-sm font-medium">
-              User max concurrency (1–{BENCHMARK_CONTAINER_BUDGET})
-            </Label>
-            <Input
-              id="benchmark-user-max-concurrency"
-              type="number"
-              min={1}
-              max={BENCHMARK_CONTAINER_BUDGET}
-              step={1}
-              value={form.userMaxConcurrency}
-              onChange={e =>
-                updateForm(prev => ({
-                  ...prev,
-                  userMaxConcurrency: parseInt(e.target.value, 10) || 1,
-                }))
-              }
-              className="h-8 w-40 tabular-nums"
-            />
-            <p
-              className={
-                form.maxConcurrency + form.userMaxConcurrency > BENCHMARK_CONTAINER_BUDGET
-                  ? 'text-destructive text-xs'
-                  : 'text-muted-foreground text-xs'
-              }
-            >
-              Live containers a user-queue run may hold. The two queues run at the same time, so
-              both budgets together must stay at or under {BENCHMARK_CONTAINER_BUDGET} (currently{' '}
-              {form.maxConcurrency + form.userMaxConcurrency}).
-            </p>
-          </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="benchmark-user-max-concurrency" className="text-sm font-medium">
+                User max concurrency (1–{BENCHMARK_CONTAINER_BUDGET})
+              </Label>
+              <Input
+                id="benchmark-user-max-concurrency"
+                type="number"
+                min={1}
+                max={BENCHMARK_CONTAINER_BUDGET}
+                step={1}
+                value={form.userMaxConcurrency}
+                onChange={e =>
+                  updateForm(prev => ({
+                    ...prev,
+                    userMaxConcurrency: parseInt(e.target.value, 10) || 1,
+                  }))
+                }
+                className="h-8 w-40 tabular-nums"
+              />
+              <p
+                className={
+                  form.maxConcurrency + form.userMaxConcurrency > BENCHMARK_CONTAINER_BUDGET
+                    ? 'text-destructive text-xs'
+                    : 'text-muted-foreground text-xs'
+                }
+              >
+                Live containers a user-queue run may hold. The two queues run at the same time, so
+                both budgets together must stay at or under {BENCHMARK_CONTAINER_BUDGET} (currently{' '}
+                {form.maxConcurrency + form.userMaxConcurrency}).
+              </p>
+            </div>
           ) : null}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="benchmark-auto-decider-min-cost" className="text-sm font-medium">
@@ -1479,8 +1485,12 @@ function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
       void queryClient.invalidateQueries({
         queryKey: ['auto-routing', 'benchmark-routing-table', router],
       });
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-config', router] });
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry', router] });
+      void queryClient.invalidateQueries({
+        queryKey: ['auto-routing', 'benchmark-config', router],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['auto-routing', 'benchmark-registry', router],
+      });
     }
     prevHasRunningRun.current = hasRunningRun;
   }, [hasRunningRun, queryClient, router]);
@@ -1509,7 +1519,9 @@ function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
         toast.error(`A queue could not start: ${message}`);
       }
       void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-runs', router] });
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry', router] });
+      void queryClient.invalidateQueries({
+        queryKey: ['auto-routing', 'benchmark-registry', router],
+      });
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : 'Failed to start benchmark run');
@@ -1524,7 +1536,9 @@ function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
           ? 'No failed entries to requeue'
           : `${data.requeued} failed ${data.requeued === 1 ? 'entry' : 'entries'} requeued`
       );
-      void queryClient.invalidateQueries({ queryKey: ['auto-routing', 'benchmark-registry', router] });
+      void queryClient.invalidateQueries({
+        queryKey: ['auto-routing', 'benchmark-registry', router],
+      });
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : 'Failed to requeue entries');
@@ -1610,28 +1624,28 @@ function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
             </Button>
             {router === 'efficient' ? (
               <>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={startRunMutation.isPending}
-              onClick={() =>
-                startRunMutation.mutate({ kind: 'decider', force: false, queue: 'user' })
-              }
-            >
-              <Play className="size-4" />
-              Run user queue
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={startRunMutation.isPending}
-              onClick={() =>
-                startRunMutation.mutate({ kind: 'decider', force: false, queue: 'both' })
-              }
-            >
-              <Play className="size-4" />
-              Run both queues
-            </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={startRunMutation.isPending}
+                  onClick={() =>
+                    startRunMutation.mutate({ kind: 'decider', force: false, queue: 'user' })
+                  }
+                >
+                  <Play className="size-4" />
+                  Run user queue
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={startRunMutation.isPending}
+                  onClick={() =>
+                    startRunMutation.mutate({ kind: 'decider', force: false, queue: 'both' })
+                  }
+                >
+                  <Play className="size-4" />
+                  Run both queues
+                </Button>
               </>
             ) : null}
             <Button

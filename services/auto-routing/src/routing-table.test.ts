@@ -133,7 +133,8 @@ describe('getRoutingTable', () => {
     expect((await getRoutingTable(env, 'frontier'))?.version).toBe(frontierTable.version);
     expect((await getRoutingTable(env, 'efficient'))?.version).toBe(SAMPLE_TABLE.version);
     expect(get.mock.calls.map(([key]) => key)).toEqual([
-      'routing_table_v1', 'routing_table_frontier_v1',
+      'routing_table_v1',
+      'routing_table_frontier_v1',
     ]);
   });
 
@@ -150,7 +151,9 @@ describe('getRoutingTable', () => {
       expect.objectContaining({ headers: { authorization: 'Bearer test-secret' } })
     );
     expect(put).toHaveBeenCalledWith(
-      'routing_table_frontier_v1', JSON.stringify(frontierTable), expect.anything()
+      'routing_table_frontier_v1',
+      JSON.stringify(frontierTable),
+      expect.anything()
     );
   });
 

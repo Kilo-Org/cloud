@@ -17,7 +17,11 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import * as z from 'zod';
-import { BenchmarkConcurrencyBudgetError, getBenchmarkConfig, validateBenchmarkConcurrencyBudget } from './config';
+import {
+  BenchmarkConcurrencyBudgetError,
+  getBenchmarkConfig,
+  validateBenchmarkConcurrencyBudget,
+} from './config';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES, FRONTIER_CASES } from './datasets/decider-cases';
 import caseComplexity from './datasets/case-complexity.json';
@@ -293,7 +297,10 @@ async function salvageTimedOutDeciderRun(env: Env, runId: string): Promise<void>
  * queues. Used by the scheduled handler so a failed final queue message cannot
  * strand pending work. Never throws for drain/slot contention.
  */
-export async function sweepStaleRunsAndDrain(env: Env, router: AutoRouter = 'efficient'): Promise<{
+export async function sweepStaleRunsAndDrain(
+  env: Env,
+  router: AutoRouter = 'efficient'
+): Promise<{
   staleRunIds: string[];
   drained: StartedQueueRun[];
 }> {
@@ -303,7 +310,12 @@ export async function sweepStaleRunsAndDrain(env: Env, router: AutoRouter = 'eff
   return { staleRunIds, drained };
 }
 
-export type StartedQueueRun = { router: AutoRouter; runId: string; purpose: BenchmarkRunPurpose; entryCount: number };
+export type StartedQueueRun = {
+  router: AutoRouter;
+  runId: string;
+  purpose: BenchmarkRunPurpose;
+  entryCount: number;
+};
 
 /**
  * Drain the selected registry queues. 'both' starts at most one run per queue —
@@ -324,7 +336,9 @@ export async function drainQueues(
   }
   const queues: BenchmarkRunPurpose[] =
     selector === 'both'
-      ? router === 'frontier' ? ['platform'] : ['platform', 'user']
+      ? router === 'frontier'
+        ? ['platform']
+        : ['platform', 'user']
       : [selector satisfies BenchmarkRunPurpose];
   const started: StartedQueueRun[] = [];
   for (const queue of queues) {
@@ -361,7 +375,11 @@ export async function syncPlatformRegistry(
   const desired = await fetchPlatformRegistryEntries(env, config, fetchImpl);
   await syncPlatformRegistryRows(
     env.BENCH_DB,
-    { router, engineIdentity: computeEngineIdentity('decider', router), repetitions: config.deciderRepetitions },
+    {
+      router,
+      engineIdentity: computeEngineIdentity('decider', router),
+      repetitions: config.deciderRepetitions,
+    },
     desired
   );
   return { desiredEntries: desired.length };
@@ -431,7 +449,10 @@ export async function publishPlatformRoutingTable(
     variant: entry.variant,
     reasoningEffort: null,
   }));
-  const minAccuracy = Math.min(1, config.minAccuracy + (router === 'frontier' ? config.frontierMinAccuracyDelta : 0));
+  const minAccuracy = Math.min(
+    1,
+    config.minAccuracy + (router === 'frontier' ? config.frontierMinAccuracyDelta : 0)
+  );
   const table = buildRoutingTable({
     version: generatedAt,
     generatedAt,
@@ -508,7 +529,10 @@ function fnv1aHex(input: string): string {
 // version for code-level execution changes. Two runs sharing this identity
 // (plus repetitions + reasoning_effort) produced comparable measurements, so a
 // model's prior summaries can be carried instead of re-run.
-export function computeEngineIdentity(kind: BenchmarkKind, router: AutoRouter = 'efficient'): string {
+export function computeEngineIdentity(
+  kind: BenchmarkKind,
+  router: AutoRouter = 'efficient'
+): string {
   const selectedRouter = kind === 'classifier' ? 'efficient' : router;
   const datasetSignature =
     kind === 'classifier'
@@ -669,7 +693,7 @@ export async function startRun(
   kind: BenchmarkKind,
   options: StartRunOptions = {}
 ): Promise<{ runId: string; enqueuedModels: number; skippedModels: string[] }> {
-  const router = kind === 'classifier' ? 'efficient' : options.router ?? 'efficient';
+  const router = kind === 'classifier' ? 'efficient' : (options.router ?? 'efficient');
   const purpose: BenchmarkRunPurpose = options.purpose ?? 'platform';
   if (router === 'frontier' && purpose === 'user') {
     throw new BenchmarkRunConfigError('The frontier router does not support owner queues');
@@ -756,7 +780,8 @@ export async function startRun(
   // millisecond, and a shared id makes each one's claim match the other's rows —
   // the loser's release would then hand back rows the winner is measuring.
   const runId =
-    (router === 'frontier' ? 'frontier-' : '') + (purpose === 'user' ? 'user' : kind) +
+    (router === 'frontier' ? 'frontier-' : '') +
+    (purpose === 'user' ? 'user' : kind) +
     `-${startedAt.replace(/[:.]/g, '-')}-${crypto.randomUUID().slice(0, 8)}`;
 
   // Claim the registry rows BEFORE writing the run. Both queues drain from the
@@ -1646,7 +1671,8 @@ async function finalizeRunIfComplete(
   state: RunState
 ): Promise<void> {
   const enqueuedModels = state.models.filter(m => m.enqueued);
-  const caseCount = kind === 'classifier' ? CLASSIFIER_CASES.length : deciderCasesForRouter(state.router).length;
+  const caseCount =
+    kind === 'classifier' ? CLASSIFIER_CASES.length : deciderCasesForRouter(state.router).length;
 
   // The run finalizes once every lane is accounted for, so one dead lane no
   // longer wedges the run until the stale sweep.

@@ -827,7 +827,9 @@ describe('POST /admin/profiles/status', () => {
 describe('router selection', () => {
   it('saves frontier config using query router and its independent thresholds', async () => {
     const response = await authedPut('/admin/config?router=frontier', {
-      ...TEST_CONFIG, accuracyNoiseBand: 0.03, frontierMinAccuracyDelta: 0.02,
+      ...TEST_CONFIG,
+      accuracyNoiseBand: 0.03,
+      frontierMinAccuracyDelta: 0.02,
     });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
@@ -836,9 +838,13 @@ describe('router selection', () => {
     expect(replaceConfig).toHaveBeenCalledWith(
       env.BENCH_DB,
       expect.objectContaining({
-        accuracy_noise_band: 0.03, frontier_min_accuracy_delta: 0.02,
+        accuracy_noise_band: 0.03,
+        frontier_min_accuracy_delta: 0.02,
       }),
-      expect.any(Array), expect.any(Array), expect.any(Array), 'frontier'
+      expect.any(Array),
+      expect.any(Array),
+      expect.any(Array),
+      'frontier'
     );
   });
 
@@ -880,7 +886,11 @@ describe('router selection', () => {
     await authedGet('/admin/runs?router=frontier');
     await authedGet('/admin/routing-table?router=frontier');
     expect(getConfigRows).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
-    expect(listRuns).toHaveBeenCalledWith(env.BENCH_DB, 20, expect.objectContaining({ router: 'frontier' }));
+    expect(listRuns).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      20,
+      expect.objectContaining({ router: 'frontier' })
+    );
     expect(getLatestRoutingTable).toHaveBeenCalledWith(env.BENCH_DB, 'frontier');
   });
 
@@ -899,7 +909,9 @@ describe('router selection', () => {
     expect(response.status).toBe(200);
     expect(countCurrentProfilesByStatus).toHaveBeenCalledOnce();
     expect(countCurrentProfilesByStatus).toHaveBeenCalledWith(
-      env.BENCH_DB, expect.objectContaining({ router: 'frontier' }), 'platform'
+      env.BENCH_DB,
+      expect.objectContaining({ router: 'frontier' }),
+      'platform'
     );
   });
 });
@@ -907,7 +919,9 @@ describe('router selection', () => {
 describe('shared concurrency cap', () => {
   it('returns HTTP 400 rather than HTTP 500 when saving overcommits the combined budget', async () => {
     const response = await authedPut('/admin/config', {
-      ...TEST_CONFIG, maxConcurrency: 150, userMaxConcurrency: 100,
+      ...TEST_CONFIG,
+      maxConcurrency: 150,
+      userMaxConcurrency: 100,
     });
     expect(response.status).toBe(400);
     expect(replaceConfig).not.toHaveBeenCalled();
@@ -920,13 +934,20 @@ describe('body router selection', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ config: { router: 'frontier' } });
     expect(replaceConfig).toHaveBeenCalledWith(
-      env.BENCH_DB, expect.anything(), expect.any(Array), expect.any(Array), expect.any(Array), 'frontier'
+      env.BENCH_DB,
+      expect.anything(),
+      expect.any(Array),
+      expect.any(Array),
+      expect.any(Array),
+      'frontier'
     );
   });
 
   it('rejects frontier owner profiles selected through the body', async () => {
     const response = await authedPost('/admin/profiles/register', {
-      router: 'frontier', ownerType: 'user', ownerId: 'owner',
+      router: 'frontier',
+      ownerType: 'user',
+      ownerId: 'owner',
       entries: [{ model: 'a/b', variant: null }],
     });
     expect(response.status).toBe(400);

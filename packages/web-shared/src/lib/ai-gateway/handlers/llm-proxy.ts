@@ -455,9 +455,7 @@ export async function handleLlmProxyRequest(
       legacyClassifierCostUsd = result?.costUsd ?? 0;
       return result?.decision ?? null;
     };
-    const efficientDecision = isAutoEfficientId
-      ? () => decisionForRouter('efficient')
-      : undefined;
+    const efficientDecision = isAutoEfficientId ? () => decisionForRouter('efficient') : undefined;
     const frontierDecision =
       requestedModelLowerCased === KILO_AUTO_FRONTIER_MODEL.id ||
       requestedModelLowerCased === ORG_AUTO_MODEL.id

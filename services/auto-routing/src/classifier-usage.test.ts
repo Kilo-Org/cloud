@@ -86,10 +86,16 @@ describe('classifier usage identity', () => {
   it('namespaces usage IDs by router and defaults omitted routers to efficient', async () => {
     const defaultUsage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
     const efficientUsage = await buildClassifierUsage(
-      { ...payload, router: 'efficient' }, identity, costUsd, createdAt
+      { ...payload, router: 'efficient' },
+      identity,
+      costUsd,
+      createdAt
     );
     const frontierUsage = await buildClassifierUsage(
-      { ...payload, router: 'frontier' }, identity, costUsd, createdAt
+      { ...payload, router: 'frontier' },
+      identity,
+      costUsd,
+      createdAt
     );
     expect(defaultUsage.core.id).toBe(efficientUsage.core.id);
     expect(frontierUsage.core.id).not.toBe(efficientUsage.core.id);
@@ -184,7 +190,11 @@ describe('classifier usage delivery', () => {
       },
     } as unknown as Env;
     await recordClassifierUsage(
-      env, { ...payload, router: 'frontier' }, identity, costUsd, createdAt
+      env,
+      { ...payload, router: 'frontier' },
+      identity,
+      costUsd,
+      createdAt
     );
     expect(idFromName).toHaveBeenCalledExactlyOnceWith(`frontier:${identity.conversationKey}`);
     expect(record).toHaveBeenCalledTimes(1);

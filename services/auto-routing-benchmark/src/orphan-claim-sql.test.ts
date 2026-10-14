@@ -121,21 +121,29 @@ describe('failOrphanedRunningProfilesStatement (real SQLite)', () => {
     const entry = { model: 'shared/model', variant: 'high' };
     for (const router of ['efficient', 'frontier'] as const) {
       const query = claimPlatformRequestedStatement(
-        orm, entry, { router, engineIdentity: 'same-engine', repetitions: 1 }, NOW
+        orm,
+        entry,
+        { router, engineIdentity: 'same-engine', repetitions: 1 },
+        NOW
       ).toSQL();
       exec(query.sql, query.params);
     }
-    expect(db.prepare('SELECT router FROM benchmark_profiles ORDER BY router').all())
-      .toEqual([{ router: 'efficient' }, { router: 'frontier' }]);
-    const clear = clearPlatformRequestedStatement(
-      orm, { router: 'frontier', engineIdentity: 'same-engine', repetitions: 1 }
-    ).toSQL();
+    expect(db.prepare('SELECT router FROM benchmark_profiles ORDER BY router').all()).toEqual([
+      { router: 'efficient' },
+      { router: 'frontier' },
+    ]);
+    const clear = clearPlatformRequestedStatement(orm, {
+      router: 'frontier',
+      engineIdentity: 'same-engine',
+      repetitions: 1,
+    }).toSQL();
     exec(clear.sql, clear.params);
-    expect(db.prepare('SELECT router, platform_requested FROM benchmark_profiles ORDER BY router').all())
-      .toEqual([
-        { router: 'efficient', platform_requested: 1 },
-        { router: 'frontier', platform_requested: 0 },
-      ]);
+    expect(
+      db.prepare('SELECT router, platform_requested FROM benchmark_profiles ORDER BY router').all()
+    ).toEqual([
+      { router: 'efficient', platform_requested: 1 },
+      { router: 'frontier', platform_requested: 0 },
+    ]);
   });
 
   it('reaps a claim whose run row was never written', () => {

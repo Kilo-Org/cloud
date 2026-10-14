@@ -12,7 +12,10 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { PoolEntry } from '@kilocode/auto-routing-contracts';
-import { BENCHMARK_CONTAINER_BUDGET, BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
+import {
+  BENCHMARK_CONTAINER_BUDGET,
+  BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH,
+} from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { and, asc, count, desc, eq, gt, inArray, lt, ne, notInArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
@@ -47,7 +50,10 @@ export type RunModelRow = typeof runModels.$inferSelect;
 export type ConfigDeciderModelRow = Omit<typeof configDeciderModels.$inferSelect, 'router'> & {
   router?: AutoRouter;
 };
-export type ConfigAutoDeciderModelRow = Omit<typeof configAutoDeciderModels.$inferSelect, 'router'> & {
+export type ConfigAutoDeciderModelRow = Omit<
+  typeof configAutoDeciderModels.$inferSelect,
+  'router'
+> & {
   router?: AutoRouter;
 };
 type ModelSummaryRow = typeof modelSummaries.$inferSelect;
@@ -130,7 +136,10 @@ export function mapRunRow(row: RunRow, summaries: BenchmarkModelSummary[]): Benc
   };
 }
 
-export async function getConfigRows(db: D1Database, router: AutoRouter = 'efficient'): Promise<{
+export async function getConfigRows(
+  db: D1Database,
+  router: AutoRouter = 'efficient'
+): Promise<{
   config: typeof benchmarkConfig.$inferSelect | null;
   classifierModels: string[];
   deciderModels: ConfigDeciderModelRow[];
@@ -144,7 +153,10 @@ export async function getConfigRows(db: D1Database, router: AutoRouter = 'effici
       orm.select().from(configClassifierModels).where(eq(configClassifierModels.router, router)),
       orm.select().from(configDeciderModels).where(eq(configDeciderModels.router, router)),
       orm.select().from(configAutoDeciderModels).where(eq(configAutoDeciderModels.router, router)),
-      orm.select().from(configAutoDeciderExclusions).where(eq(configAutoDeciderExclusions.router, router)),
+      orm
+        .select()
+        .from(configAutoDeciderExclusions)
+        .where(eq(configAutoDeciderExclusions.router, router)),
     ]);
   return {
     config: configRows[0] ?? null,
@@ -203,7 +215,9 @@ export async function replaceConfig(
     stmts.push(orm.insert(configDeciderModels).values(batch.map(row => ({ ...row, router }))));
   }
   for (const batch of batchRows(excludedAutoDeciderModels)) {
-    stmts.push(orm.insert(configAutoDeciderExclusions).values(batch.map(model => ({ model, router }))));
+    stmts.push(
+      orm.insert(configAutoDeciderExclusions).values(batch.map(model => ({ model, router })))
+    );
   }
   await orm.batch(stmts);
 }
@@ -262,14 +276,15 @@ export async function insertRun(
     switch_cost_factor: run.switch_cost_factor,
     best_accuracy_switch_threshold: run.best_accuracy_switch_threshold,
     // A NOT NULL rejection rolls back the whole D1 batch, including model snapshots.
-    max_concurrency: run.kind === 'decider'
-      ? sql`CASE WHEN (
+    max_concurrency:
+      run.kind === 'decider'
+        ? sql`CASE WHEN (
           SELECT COALESCE(SUM(${benchmarkRuns.max_concurrency}), 0)
           FROM ${benchmarkRuns}
           WHERE ${benchmarkRuns.kind} = 'decider' AND ${benchmarkRuns.status} = 'running'
         ) + ${run.max_concurrency} <= ${BENCHMARK_CONTAINER_BUDGET}
         THEN ${run.max_concurrency} ELSE NULL END`
-      : run.max_concurrency,
+        : run.max_concurrency,
     benchmark_user_id: run.benchmark_user_id,
     benchmark_org_id: run.benchmark_org_id,
     repetitions: run.repetitions,
@@ -1418,7 +1433,13 @@ export async function getLatestSummariesByModel(
         eq(runModels.variant, modelSummaries.variant)
       )
     )
-    .where(and(eq(benchmarkRuns.router, router), eq(benchmarkRuns.kind, kind), eq(benchmarkRuns.status, 'completed')))
+    .where(
+      and(
+        eq(benchmarkRuns.router, router),
+        eq(benchmarkRuns.kind, kind),
+        eq(benchmarkRuns.status, 'completed')
+      )
+    )
     .orderBy(desc(benchmarkRuns.started_at));
 
   const latestRunByPair = new Map<string, string>();

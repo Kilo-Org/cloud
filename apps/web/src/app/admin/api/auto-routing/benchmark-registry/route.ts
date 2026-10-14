@@ -1,4 +1,8 @@
-import { AutoRouterSchema, DEFAULT_AUTO_ROUTER, RequeueBenchmarkRegistryRequestSchema } from '@kilocode/auto-routing-contracts';
+import {
+  AutoRouterSchema,
+  DEFAULT_AUTO_ROUTER,
+  RequeueBenchmarkRegistryRequestSchema,
+} from '@kilocode/auto-routing-contracts';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
@@ -11,7 +15,9 @@ export async function GET(request?: NextRequest) {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
-  const router = AutoRouterSchema.safeParse(request?.nextUrl.searchParams.get('router') ?? DEFAULT_AUTO_ROUTER);
+  const router = AutoRouterSchema.safeParse(
+    request?.nextUrl.searchParams.get('router') ?? DEFAULT_AUTO_ROUTER
+  );
   if (!router.success) return NextResponse.json({ error: 'Invalid router' }, { status: 400 });
   const result = await getBenchmarkRegistry(router.data);
   return NextResponse.json(result.body, { status: result.status });

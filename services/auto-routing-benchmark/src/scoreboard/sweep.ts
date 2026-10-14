@@ -151,9 +151,12 @@ export async function requestDirectSweepCompletion(input: {
         return {
           ...result,
           latencyMs: performance.now() - started,
-          error: result.output.length === 0
-            ? 'OpenRouter response is missing answer content'
-            : result.costUsd === null ? 'usage_missing' : null,
+          error:
+            result.output.length === 0
+              ? 'OpenRouter response is missing answer content'
+              : result.costUsd === null
+                ? 'usage_missing'
+                : null,
         };
       }
     } catch {
@@ -210,7 +213,9 @@ function median(values: number[]): number | null {
   return values.length % 2 === 0 ? (values[middle - 1] + values[middle]) / 2 : values[middle];
 }
 
-export function isGradedSweepResult(result: SweepResult): result is SweepResult & { score: number } {
+export function isGradedSweepResult(
+  result: SweepResult
+): result is SweepResult & { score: number } {
   return (
     result.score !== null &&
     (result.error === null ||

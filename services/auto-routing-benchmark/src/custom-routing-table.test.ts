@@ -18,7 +18,11 @@ vi.mock('./db', async importOriginal => {
   };
 });
 
-import { getRoutingCaseResultsForEntries, getSummariesForRuns, listReadyCurrentProfilesForEntries } from './db';
+import {
+  getRoutingCaseResultsForEntries,
+  getSummariesForRuns,
+  listReadyCurrentProfilesForEntries,
+} from './db';
 import { assembleCustomRoutingTable } from './custom-routing-table';
 import { computeEngineIdentity } from './run';
 

@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { estimateRequestCostUsd, type CandidatePricing, type RankedCandidate } from '@kilocode/auto-routing-contracts';
+import {
+  estimateRequestCostUsd,
+  type CandidatePricing,
+  type RankedCandidate,
+} from '@kilocode/auto-routing-contracts';
 import {
   ScreeningCatalogSchema,
   sampleScreenCases,
@@ -23,60 +27,110 @@ const catalogModel = {
   pricing: { prompt: '0.000001', completion: '0.000002' },
 };
 const result: OfflineSweep['pairs'][number]['results'][number] = {
-  caseId: 'fixture-case', rep: 0, routeKey: 'implementation/feature_development',
-  split: 'train', score: 1, costUsd: 0.001, graderCostUsd: 0,
-  latencyMs: 100, ttftMs: 10, error: null, output: 'answer',
+  caseId: 'fixture-case',
+  rep: 0,
+  routeKey: 'implementation/feature_development',
+  split: 'train',
+  score: 1,
+  costUsd: 0.001,
+  graderCostUsd: 0,
+  latencyMs: 100,
+  ttftMs: 10,
+  error: null,
+  output: 'answer',
 };
 const incumbent: RankedCandidate = {
-  model: 'fixture/current', variant: null, accuracy: 1, cases: 4,
-  avgCostUsd: 1, p50LatencyMs: 1_000, p50TtftMs: 100, meetsThreshold: true, pricing,
+  model: 'fixture/current',
+  variant: null,
+  accuracy: 1,
+  cases: 4,
+  avgCostUsd: 1,
+  p50LatencyMs: 1_000,
+  p50TtftMs: 100,
+  meetsThreshold: true,
+  pricing,
 };
 
 function comparison(overrides: Partial<Parameters<typeof screenRouteComparison>[0]> = {}) {
   return screenRouteComparison({
-    model: 'fixture/new', variant: null,
-    metrics: screenMetrics(Array.from({ length: 4 }, () => result), pricing, null),
-    expectedCases: 4, incumbent, pricing, incumbentPricing: pricing, profile: null,
-    minAccuracy: 0.9, ...overrides,
+    model: 'fixture/new',
+    variant: null,
+    metrics: screenMetrics(
+      Array.from({ length: 4 }, () => result),
+      pricing,
+      null
+    ),
+    expectedCases: 4,
+    incumbent,
+    pricing,
+    incumbentPricing: pricing,
+    profile: null,
+    minAccuracy: 0.9,
+    ...overrides,
   });
 }
 
 describe('candidate screening', () => {
   it('filters current models, unsupported output/tools, virtual and unknown or excessive prices', () => {
-    const catalog = ScreeningCatalogSchema.parse({ data: [
-      catalogModel,
-      { ...catalogModel, id: 'fixture/current' },
-      { ...catalogModel, id: 'fixture/no-tools', supported_parameters: ['temperature'] },
-      { ...catalogModel, id: 'fixture/image', architecture: { output_modalities: ['image'] } },
-      { ...catalogModel, id: 'fixture/virtual', pricing: { prompt: '-1', completion: '-1' } },
-      { ...catalogModel, id: 'fixture/variable', pricing: { prompt: 'variable', completion: '0' } },
-      { ...catalogModel, id: 'fixture/unknown-completion', pricing: { prompt: '0', completion: '' } },
-      { ...catalogModel, id: 'fixture/auto', autoRouting: { models: ['fixture/new'] } },
-      { ...catalogModel, id: 'fixture/at-cap', pricing: { prompt: '0.000003', completion: '0' } },
-      { ...catalogModel, id: 'fixture/free', pricing: { prompt: '0', completion: '0' } },
-    ] });
-    expect(selectScreenCandidates(catalog, [{ model: 'fixture/current', variant: 'high' }], 3)
-      .map(model => model.id)).toEqual(['fixture/free', 'fixture/new']);
+    const catalog = ScreeningCatalogSchema.parse({
+      data: [
+        catalogModel,
+        { ...catalogModel, id: 'fixture/current' },
+        { ...catalogModel, id: 'fixture/no-tools', supported_parameters: ['temperature'] },
+        { ...catalogModel, id: 'fixture/image', architecture: { output_modalities: ['image'] } },
+        { ...catalogModel, id: 'fixture/virtual', pricing: { prompt: '-1', completion: '-1' } },
+        {
+          ...catalogModel,
+          id: 'fixture/variable',
+          pricing: { prompt: 'variable', completion: '0' },
+        },
+        {
+          ...catalogModel,
+          id: 'fixture/unknown-completion',
+          pricing: { prompt: '0', completion: '' },
+        },
+        { ...catalogModel, id: 'fixture/auto', autoRouting: { models: ['fixture/new'] } },
+        { ...catalogModel, id: 'fixture/at-cap', pricing: { prompt: '0.000003', completion: '0' } },
+        { ...catalogModel, id: 'fixture/free', pricing: { prompt: '0', completion: '0' } },
+      ],
+    });
+    expect(
+      selectScreenCandidates(catalog, [{ model: 'fixture/current', variant: 'high' }], 3).map(
+        model => model.id
+      )
+    ).toEqual(['fixture/free', 'fixture/new']);
   });
 
   it('screens default plus highest reasoning effort, preserving the full request fragment', () => {
-    const model = ScreeningCatalogSchema.parse({ data: [{ ...catalogModel, opencode: { variants: {
-      max: { reasoning: { enabled: true, effort: 'max' }, verbosity: 'high' },
-      low: { reasoning: { enabled: true, effort: 'low' } },
-      preset: { temperature: 0 },
-      xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
-    } } }] }).data[0];
+    const model = ScreeningCatalogSchema.parse({
+      data: [
+        {
+          ...catalogModel,
+          opencode: {
+            variants: {
+              max: { reasoning: { enabled: true, effort: 'max' }, verbosity: 'high' },
+              low: { reasoning: { enabled: true, effort: 'low' } },
+              preset: { temperature: 0 },
+              xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
+            },
+          },
+        },
+      ],
+    }).data[0];
     expect(screenVariants(model)).toEqual([null, 'max']);
     expect(model.opencode?.variants?.max.verbosity).toBe('high');
-    expect(screenVariants(ScreeningCatalogSchema.parse({ data: [catalogModel] }).data[0])).toEqual([null]);
+    expect(screenVariants(ScreeningCatalogSchema.parse({ data: [catalogModel] }).data[0])).toEqual([
+      null,
+    ]);
   });
 
   it('samples identical cases per route independently of dataset order and excludes agentic routes', () => {
     for (const suite of ['efficient', 'frontier'] as const) {
       const cases = selectSweepCases(suite);
       const selected = sampleScreenCases(cases, 4);
-      expect(sampleScreenCases([...cases].reverse(), 4).map(benchCase => benchCase.id))
-        .toEqual(selected.map(benchCase => benchCase.id));
+      expect(sampleScreenCases([...cases].reverse(), 4).map(benchCase => benchCase.id)).toEqual(
+        selected.map(benchCase => benchCase.id)
+      );
       const counts = new Map<string, number>();
       for (const benchCase of selected) {
         expect(benchCase.taskType).not.toBe('agentic_execution');
@@ -90,50 +144,103 @@ describe('candidate screening', () => {
 
   it('reports Wilson quality, production-profile cost and actual TTFT, excluding infrastructure errors', () => {
     const profile = { uncachedInputTokens: 1_000, cachedInputTokens: 9_000 };
-    const metrics = screenMetrics([
-      result, { ...result, score: 0, ttftMs: 30 },
-      { ...result, score: null, error: 'grader_failed', latencyMs: 999_999, ttftMs: 999_999 },
-    ], pricing, profile);
-    expect(metrics).toMatchObject({ cases: 2, pricedCases: 2, errors: 1, accuracy: 0.5, p50TtftMs: 20 });
+    const metrics = screenMetrics(
+      [
+        result,
+        { ...result, score: 0, ttftMs: 30 },
+        { ...result, score: null, error: 'grader_failed', latencyMs: 999_999, ttftMs: 999_999 },
+      ],
+      pricing,
+      profile
+    );
+    expect(metrics).toMatchObject({
+      cases: 2,
+      pricedCases: 2,
+      errors: 1,
+      accuracy: 0.5,
+      p50TtftMs: 20,
+    });
     expect(metrics.wilsonLowerBound).toBeLessThan(0.5);
-    expect(metrics.estimatedRequestCostUsd).toBe(estimateRequestCostUsd({ avgCostUsd: 0.001, pricing }, profile));
+    expect(metrics.estimatedRequestCostUsd).toBe(
+      estimateRequestCostUsd({ avgCostUsd: 0.001, pricing }, profile)
+    );
     expect(screenMetrics([{ ...result, ttftMs: null }], pricing, null).p50TtftMs).toBeNull();
   });
 
   it('requires a strict eligible value improvement over a comparable current pick', () => {
     expect(comparison().beatsCurrentPick).toBe(true);
-    expect(comparison({ incumbent: { ...incumbent, p50LatencyMs: null } }).beatsCurrentPick).toBe(false);
+    expect(comparison({ incumbent: { ...incumbent, p50LatencyMs: null } }).beatsCurrentPick).toBe(
+      false
+    );
     expect(comparison({ incumbent: undefined }).beatsCurrentPick).toBe(false);
     expect(comparison({ expectedCases: 5 }).beatsCurrentPick).toBe(false);
-    expect(comparison({ profile: { uncachedInputTokens: 100, cachedInputTokens: 0 }, incumbentPricing: null })
-      .beatsCurrentPick).toBe(false);
-    expect(comparison({ metrics: screenMetrics([{ ...result, score: 0.1 }], pricing, null), expectedCases: 1 })
-      .beatsCurrentPick).toBe(false);
-    expect(comparison({ metrics: screenMetrics([{ ...result, costUsd: null, error: 'usage_missing' }], pricing, null), expectedCases: 1 })
-      .beatsCurrentPick).toBe(false);
-    expect(comparison({ incumbent: { ...incumbent, avgCostUsd: result.costUsd ?? 0,
-      p50LatencyMs: result.latencyMs, p50TtftMs: result.ttftMs } }).beatsCurrentPick).toBe(false);
+    expect(
+      comparison({
+        profile: { uncachedInputTokens: 100, cachedInputTokens: 0 },
+        incumbentPricing: null,
+      }).beatsCurrentPick
+    ).toBe(false);
+    expect(
+      comparison({
+        metrics: screenMetrics([{ ...result, score: 0.1 }], pricing, null),
+        expectedCases: 1,
+      }).beatsCurrentPick
+    ).toBe(false);
+    expect(
+      comparison({
+        metrics: screenMetrics(
+          [{ ...result, costUsd: null, error: 'usage_missing' }],
+          pricing,
+          null
+        ),
+        expectedCases: 1,
+      }).beatsCurrentPick
+    ).toBe(false);
+    expect(
+      comparison({
+        incumbent: {
+          ...incumbent,
+          avgCostUsd: result.costUsd ?? 0,
+          p50LatencyMs: result.latencyMs,
+          p50TtftMs: result.ttftMs,
+        },
+      }).beatsCurrentPick
+    ).toBe(false);
   });
 
   it('uses the shared direct streaming request path and honors its budget gate', async () => {
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(
-      'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
-      'data: {"usage":{"cost":0.001}}\n\n' +
-      'data: [DONE]\n\n'
-    ));
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(
+          'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
+            'data: {"usage":{"cost":0.001}}\n\n' +
+            'data: [DONE]\n\n'
+        )
+      );
     const input = {
-      model: 'fixture/new', fragment: { reasoning: { effort: 'max' }, verbosity: 'high' },
-      systemPrompt: 'system', userPrompt: 'user', apiKey: 'fixture-key',
-      attributionHeaders: {}, budgetAvailable: () => true, fetchImpl,
+      model: 'fixture/new',
+      fragment: { reasoning: { effort: 'max' }, verbosity: 'high' },
+      systemPrompt: 'system',
+      userPrompt: 'user',
+      apiKey: 'fixture-key',
+      attributionHeaders: {},
+      budgetAvailable: () => true,
+      fetchImpl,
     };
     const completion = await requestDirectSweepCompletion(input);
     expect(completion).toMatchObject({ output: 'answer', costUsd: 0.001, error: null });
     expect(completion.ttftMs).not.toBeNull();
     const request = fetchImpl.mock.calls[0][1];
     expect(JSON.parse(typeof request?.body === 'string' ? request.body : '{}')).toEqual({
-      ...input.fragment, model: input.model,
-      messages: [{ role: 'system', content: 'system' }, { role: 'user', content: 'user' }],
-      stream: true, usage: { include: true },
+      ...input.fragment,
+      model: input.model,
+      messages: [
+        { role: 'system', content: 'system' },
+        { role: 'user', content: 'user' },
+      ],
+      stream: true,
+      usage: { include: true },
     });
     const blocked = await requestDirectSweepCompletion({ ...input, budgetAvailable: () => false });
     expect(blocked).toMatchObject({ output: null, error: 'Sweep budget exhausted before request' });

@@ -111,7 +111,7 @@ describe('buildScoreboard', () => {
             routeKey: route,
             split: 'train' as const,
             score: 1,
-            costUsd: variant === 'low' ? (bucket === 'low' ? 0.01 : 2) : (bucket === 'low' ? 4 : 0.1),
+            costUsd: variant === 'low' ? (bucket === 'low' ? 0.01 : 2) : bucket === 'low' ? 4 : 0.1,
             graderCostUsd: 0,
             latencyMs: 100,
             error: null,

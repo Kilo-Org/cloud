@@ -223,9 +223,7 @@ export function rankValue(c: {
   const accuracy = c.cases == null ? c.accuracy : wilsonLowerBound(c.accuracy, c.cases);
   if (c.p50LatencyMs === null || accuracy <= 0) return Number.POSITIVE_INFINITY;
   const effectiveLatency =
-    c.p50TtftMs == null
-      ? c.p50LatencyMs
-      : c.p50TtftMs + LATENCY_TOTAL_WEIGHT * c.p50LatencyMs;
+    c.p50TtftMs == null ? c.p50LatencyMs : c.p50TtftMs + LATENCY_TOTAL_WEIGHT * c.p50LatencyMs;
   return (c.avgCostUsd * effectiveLatency ** LATENCY_WEIGHT) / accuracy ** ACCURACY_WEIGHT;
 }
 
@@ -243,7 +241,12 @@ export function rankCandidates(
     .map(({ p50LatencyMs, ...c }) => {
       const estimatedRequestCostUsd = estimateRequestCostUsd(c, options?.profile ?? null);
       return {
-        candidate: { ...c, p50LatencyMs, estimatedRequestCostUsd, meetsThreshold: c.accuracy >= minAccuracy },
+        candidate: {
+          ...c,
+          p50LatencyMs,
+          estimatedRequestCostUsd,
+          meetsThreshold: c.accuracy >= minAccuracy,
+        },
         competes: c.accuracy > 0 && c.accuracy >= floor,
         value: rankValue({
           avgCostUsd: estimatedRequestCostUsd,

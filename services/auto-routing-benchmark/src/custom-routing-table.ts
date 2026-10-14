@@ -4,8 +4,16 @@ import type {
   CustomRoutingTableResponse,
   PoolEntry,
 } from '@kilocode/auto-routing-contracts';
-import { ComplexityLabelsSchema, MAX_POOL_ENTRIES, poolEntryKey } from '@kilocode/auto-routing-contracts';
-import { getRoutingCaseResultsForEntries, getSummariesForRuns, listReadyCurrentProfilesForEntries } from './db';
+import {
+  ComplexityLabelsSchema,
+  MAX_POOL_ENTRIES,
+  poolEntryKey,
+} from '@kilocode/auto-routing-contracts';
+import {
+  getRoutingCaseResultsForEntries,
+  getSummariesForRuns,
+  listReadyCurrentProfilesForEntries,
+} from './db';
 import { variantFromStorage } from './reasoning-effort';
 import { buildCustomRoutingTable } from './routing-table-builder';
 import { currentProfileContextFromConfig, ProfileValidationError } from './profiles';

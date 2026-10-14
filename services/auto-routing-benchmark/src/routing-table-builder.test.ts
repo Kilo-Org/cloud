@@ -77,20 +77,17 @@ describe('buildEffortByComplexity', () => {
       model: 'model/shared',
       variant,
       results: ['low', 'high'].flatMap(bucket =>
-        Array.from(
-          { length: bucket === 'high' ? highCases : MIN_COMPLEXITY_CASES },
-          (_, i) => ({
-            caseId: `${bucket}-${i}`,
-            rep: 0,
-            routeKey: route,
-            split: 'train' as const,
-            score: 1,
-            costUsd: variant === bucket ? 0.01 : 1,
-            graderCostUsd: 0,
-            latencyMs: 100,
-            error: null,
-          })
-        )
+        Array.from({ length: bucket === 'high' ? highCases : MIN_COMPLEXITY_CASES }, (_, i) => ({
+          caseId: `${bucket}-${i}`,
+          rep: 0,
+          routeKey: route,
+          split: 'train' as const,
+          score: 1,
+          costUsd: variant === bucket ? 0.01 : 1,
+          graderCostUsd: 0,
+          latencyMs: 100,
+          error: null,
+        }))
       ),
     }));
   }
@@ -107,7 +104,9 @@ describe('buildEffortByComplexity', () => {
   });
 
   it('ignores unlabeled and infrastructure-error cases when deciding bucket coverage', () => {
-    expect(buildEffortByComplexity(routes, pairs(), {}, 0.9)[route]?.['model/shared']?.high).toBe('low');
+    expect(buildEffortByComplexity(routes, pairs(), {}, 0.9)[route]?.['model/shared']?.high).toBe(
+      'low'
+    );
     const failed = pairs().map(pair => ({
       ...pair,
       results: pair.results.map(result =>
@@ -116,9 +115,9 @@ describe('buildEffortByComplexity', () => {
           : result
       ),
     }));
-    expect(buildEffortByComplexity(routes, failed, labels, 0.9)[route]?.['model/shared']?.high).toBe(
-      'low'
-    );
+    expect(
+      buildEffortByComplexity(routes, failed, labels, 0.9)[route]?.['model/shared']?.high
+    ).toBe('low');
   });
 
   it('does not count repetitions as independent cases or train on held-out scores', () => {
@@ -128,37 +127,58 @@ describe('buildEffortByComplexity', () => {
         Array.from({ length: MIN_COMPLEXITY_CASES }, (_, rep) => ({ ...result, rep }))
       ),
     }));
-    expect(buildEffortByComplexity(routes, repeated, labels, 0.9)[route]?.['model/shared']?.high).toBe(
-      'low'
-    );
+    expect(
+      buildEffortByComplexity(routes, repeated, labels, 0.9)[route]?.['model/shared']?.high
+    ).toBe('low');
     const heldOut = pairs().map(pair => ({
       ...pair,
       results: pair.results.map(result => ({ ...result, split: 'heldOut' as const })),
     }));
-    expect(buildEffortByComplexity(routes, heldOut, labels, 0.9)[route]?.['model/shared']?.high).toBe(
-      'low'
-    );
+    expect(
+      buildEffortByComplexity(routes, heldOut, labels, 0.9)[route]?.['model/shared']?.high
+    ).toBe('low');
   });
 
   it('does not choose pairs missing from the published model candidates', () => {
     const measured = [
       ...pairs(),
-      { ...pairs()[0], variant: 'unpublished', results: pairs()[0].results.map(r => ({ ...r, costUsd: 0 })) },
+      {
+        ...pairs()[0],
+        variant: 'unpublished',
+        results: pairs()[0].results.map(r => ({ ...r, costUsd: 0 })),
+      },
     ];
-    expect(buildEffortByComplexity(routes, measured, labels, 0.9)[route]?.['model/shared']?.high).toBe(
-      'high'
-    );
+    expect(
+      buildEffortByComplexity(routes, measured, labels, 0.9)[route]?.['model/shared']?.high
+    ).toBe('high');
   });
 
   it('preserves null as the selected variant instead of falling back to a named effort', () => {
     const nullRoutes: RoutingTable['routes'] = {
       [route]: [
-        { model: 'model/shared', variant: 'high', accuracy: 1, avgCostUsd: 1, meetsThreshold: true },
-        { model: 'model/shared', variant: null, accuracy: 1, avgCostUsd: 0.01, meetsThreshold: true },
+        {
+          model: 'model/shared',
+          variant: 'high',
+          accuracy: 1,
+          avgCostUsd: 1,
+          meetsThreshold: true,
+        },
+        {
+          model: 'model/shared',
+          variant: null,
+          accuracy: 1,
+          avgCostUsd: 0.01,
+          meetsThreshold: true,
+        },
       ],
     };
-    const measured = pairs().map(pair => ({ ...pair, variant: pair.variant === 'low' ? null : 'high' }));
-    expect(buildEffortByComplexity(nullRoutes, measured, labels, 0.9)[route]?.['model/shared']?.low).toBeNull();
+    const measured = pairs().map(pair => ({
+      ...pair,
+      variant: pair.variant === 'low' ? null : 'high',
+    }));
+    expect(
+      buildEffortByComplexity(nullRoutes, measured, labels, 0.9)[route]?.['model/shared']?.low
+    ).toBeNull();
   });
 
   it('includes complexity choices in registry table identity', () => {
@@ -218,7 +238,10 @@ describe('production-cost table version', () => {
     ];
     const base = computeRegistryRoutingTableVersion(contributors, { ...knobs, summaries });
     expect(
-      computeRegistryRoutingTableVersion(contributors, { ...knobs, summaries: [...summaries].reverse() })
+      computeRegistryRoutingTableVersion(contributors, {
+        ...knobs,
+        summaries: [...summaries].reverse(),
+      })
     ).toBe(base);
     expect(
       computeRegistryRoutingTableVersion(contributors, {

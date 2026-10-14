@@ -64,8 +64,8 @@ export function buildEffortByComplexity(
             summary.accuracy !== null &&
             summary.avgCostUsd !== null &&
             summary.cases >= MIN_COMPLEXITY_CASES &&
-            (caseIdsByPairRoute.get(JSON.stringify([summary.model, summary.variant, route]))?.size ??
-              0) >= MIN_COMPLEXITY_CASES &&
+            (caseIdsByPairRoute.get(JSON.stringify([summary.model, summary.variant, route]))
+              ?.size ?? 0) >= MIN_COMPLEXITY_CASES &&
             modelCandidates.some(c => (c.variant ?? c.reasoningEffort ?? null) === summary.variant)
         );
         const ranked = rankCandidates(
@@ -73,10 +73,9 @@ export function buildEffortByComplexity(
           minAccuracy,
           { profile }
         );
-        (routeMapping[candidate.model] ??= {})[bucket] =
-          ranked[0]
-            ? (ranked[0].variant ?? null)
-            : (candidate.variant ?? candidate.reasoningEffort ?? null);
+        (routeMapping[candidate.model] ??= {})[bucket] = ranked[0]
+          ? (ranked[0].variant ?? null)
+          : (candidate.variant ?? candidate.reasoningEffort ?? null);
       }
     }
   }
@@ -242,7 +241,10 @@ export function computeRegistryRoutingTableVersion(
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([model, buckets]) => [
               model,
-              ReasoningComplexitySchema.options.map(bucket => ({ bucket, variant: buckets[bucket] })),
+              ReasoningComplexitySchema.options.map(bucket => ({
+                bucket,
+                variant: buckets[bucket],
+              })),
             ]),
         ]),
       ttfts: (knobs.summaries ?? [])

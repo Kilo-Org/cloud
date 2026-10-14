@@ -304,9 +304,7 @@ export function computeDecision(
   const applyComplexityEffort = (candidate: RankedCandidate): RankedCandidate => {
     if (options.preserveIncumbentVariant || !classification.reasoningComplexity) return candidate;
     const variant =
-      table.effortByComplexity?.[routeKey]?.[candidate.model]?.[
-        classification.reasoningComplexity
-      ];
+      table.effortByComplexity?.[routeKey]?.[candidate.model]?.[classification.reasoningComplexity];
     if (variant === undefined) return candidate;
     return (
       candidates.find(c => c.model === candidate.model && candidateVariant(c) === variant) ??
@@ -361,8 +359,10 @@ export function computeDecision(
       ) &&
         ((mode === 'cost_per_accuracy' && !costSwitchWorthwhile(incumbentCandidate)) ||
           (mode === 'best_accuracy' &&
-            !(freshPick.accuracy - incumbentCandidate.accuracy >
-              table.bestAccuracySwitchThreshold)))));
+            !(
+              freshPick.accuracy - incumbentCandidate.accuracy >
+              table.bestAccuracySwitchThreshold
+            )))));
 
   if (stickyIncumbent && incumbentCandidate) {
     const picked = applyComplexityEffort(incumbentCandidate);

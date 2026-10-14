@@ -2,8 +2,9 @@ import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import { logger } from '../../src/logger.js';
 import migrations from '../../src/control-plane/sandbox/drizzle/migrations.js';
 import {
   routes as routesTable,
@@ -1411,6 +1412,79 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect((await wrapper.next())?.type).toBe('session.prompt');
     expect(JSON.stringify(await readRouteRow(stub, SESSION))).not.toContain(mcpGrant.token);
   });
+
+  it.each(['rejection', 'timeout'] as const)(
+    'renews expired ordinary credentials despite optional MCP issuance %s and retries on later renewal',
+    async failure => {
+      const provider = createFakeProvider();
+      const broker = createFakeCredentialBroker();
+      const stub = await setup(provider, broker);
+      const { wrapper } = await prepareWarmRoute(stub, provider);
+      const mcpGrant = {
+        url: 'https://mcp.kiloapps.io/mcp',
+        token: 'recovered-optional-renewal-mcp-grant',
+        expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+      };
+      let failIssuance = true;
+      const issueMcpGrant = vi.fn(async () => {
+        if (!failIssuance) return mcpGrant;
+        if (failure === 'rejection') throw new Error(`MCP failure containing ${mcpGrant.token}`);
+        return new Promise<typeof mcpGrant>(() => {});
+      });
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        await runInDurableObject(stub, instance => {
+          const peerFor = instance.sessionPeerFor.bind(instance);
+          instance.sessionPeerFor = (ownerId, sessionId) => {
+            const peer = peerFor(ownerId, sessionId);
+            return peer ? { ...peer, issueCloudAgentMcpGrant: issueMcpGrant } : null;
+          };
+          Object.assign(instance, { grantIssueTimeoutMs: () => 100 });
+        });
+        await setGrantExpiry(stub, SESSION, Date.now() - 1);
+        expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+          'sent'
+        );
+        const frame = await wrapper.next();
+        if (frame?.type !== 'session.credentials') throw new Error('expected session.credentials');
+        expect(frame.cloudAgentMcp).toBeUndefined();
+        expect((await wrapper.next())?.type).toBe('session.prompt');
+        const renewed = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}');
+        expect(frame.kilo.token).toBe(renewed.kilo.alias);
+        expect(renewed.expiresAt - Date.now()).toBeGreaterThan(
+          TIMERS.credentialGrantReissueBelowMs
+        );
+        expect(broker.kiloIssued()).toBe(2);
+        expect(broker.githubIssued()).toBe(2);
+        expect(await stub.status({ sessionId: SESSION })).toMatchObject({
+          view: { state: 'ready' },
+        });
+        expect(issueMcpGrant).toHaveBeenCalledTimes(1);
+        expect(fields).toHaveBeenCalledWith({ sandboxId: SANDBOX_ID, sessionId: SESSION });
+        expect(warn).toHaveBeenCalledWith(
+          'Optional Cloud Agent MCP grant unavailable; continuing without it'
+        );
+        expect(JSON.stringify([fields.mock.calls, warn.mock.calls])).not.toContain(mcpGrant.token);
+
+        failIssuance = false;
+        await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+        expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m2')] })).toBe(
+          'sent'
+        );
+        expect(await wrapper.next()).toMatchObject({
+          type: 'session.credentials',
+          cloudAgentMcp: mcpGrant,
+        });
+        expect((await wrapper.next())?.type).toBe('session.prompt');
+        expect(issueMcpGrant).toHaveBeenCalledTimes(2);
+        expect(JSON.stringify(await readRouteRow(stub, SESSION))).not.toContain(mcpGrant.token);
+      } finally {
+        fields.mockRestore();
+        warn.mockRestore();
+      }
+    }
+  );
 
   it('preserves the resolved GitHub app for managed Vercel review credentials', async () => {
     const provider = createFakeProvider();

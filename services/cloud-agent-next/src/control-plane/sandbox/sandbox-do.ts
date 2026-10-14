@@ -2096,7 +2096,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return 'skipped';
     let issued: RouteGrantIssue;
-    let cloudAgentMcp: { url: string; token: string; expiresAt: number } | undefined;
     try {
       // Bound the token-service round trip so a warm-route `deliver` cannot
       // hang forever; the grant-issue bound is the provider-stop bound.
@@ -2105,18 +2104,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
         this.grantIssueTimeoutMs(),
         'Credential grant re-issue timed out'
       );
-      const ownerId = await this.requireOwner();
-      const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, route.sessionId);
-      if (peer?.issueCloudAgentMcpGrant) {
-        cloudAgentMcp = await withTimeout(
-          peer.issueCloudAgentMcpGrant(),
-          this.grantIssueTimeoutMs(),
-          'Cloud Agent MCP grant issuance timed out'
-        );
-      }
     } catch {
       return 'failed';
     }
+    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(route.sessionId);
     if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';
     const next: RouteRecord = { ...route, grant: issued.grant, spec: issued.spec };
     this.publishRouteGrant(next);
@@ -2676,14 +2667,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
       // Select the socket and re-check the fence from the same allocation read, so
       // a restart between the (bind and) send cannot deliver a stale handle.
-      const cloudAgentMcp =
-        peer?.issueCloudAgentMcpGrant === undefined
-          ? undefined
-          : await withTimeout(
-              peer.issueCloudAgentMcpGrant(),
-              this.grantIssueTimeoutMs(),
-              'Cloud Agent MCP grant issuance timed out'
-            );
+      const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(sessionId);
       const state = await this.readAllocation();
       const socket = this.boundWrapperSocket(state);
       if (socket === null) return;
@@ -2719,6 +2703,26 @@ export class SandboxControlV2 extends DurableObject<Env> {
       } catch {
         // Best effort only.
       }
+    }
+  }
+
+  private async tryIssueCloudAgentMcpGrant(
+    sessionId: string
+  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
+    try {
+      const ownerId = await this.requireOwner();
+      const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, sessionId);
+      if (peer?.issueCloudAgentMcpGrant === undefined) return undefined;
+      return await withTimeout(
+        peer.issueCloudAgentMcpGrant(),
+        this.grantIssueTimeoutMs(),
+        'Cloud Agent MCP grant issuance timed out'
+      );
+    } catch {
+      logger
+        .withFields({ sandboxId: this.sandboxId, sessionId })
+        .warn('Optional Cloud Agent MCP grant unavailable; continuing without it');
+      return undefined;
     }
   }
 

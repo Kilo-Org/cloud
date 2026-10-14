@@ -577,7 +577,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Everything but the timing gate, which needs a machine nobody else is
       - name: Cache compiler plugins
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
@@ -620,7 +619,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # apps/mobile tests the app against the built harness SDK, the way it
       - name: Cache compiler plugins
         if: matrix.workspace.name == 'kilo-app'
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4

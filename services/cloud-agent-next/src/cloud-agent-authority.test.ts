@@ -13,6 +13,7 @@ import {
   assertCloudAgentIsolatedAllocation,
   authorizeCloudAgentChild,
   issueCloudAgentMcpGrant,
+  resolveCloudAgentMcpUrl,
   validateScopedWorkerPreparation,
 } from './cloud-agent-authority.js';
 
@@ -157,6 +158,24 @@ describe('Cloud Agent spawn authority', () => {
         kilocodeOrganizationId: 'other',
       })
     ).toThrow();
+  });
+
+  it('pins the production MCP URL unless a valid local override is configured', async () => {
+    expect(resolveCloudAgentMcpUrl()).toBe('https://mcp.kiloapps.io/mcp');
+    expect(resolveCloudAgentMcpUrl('not a url')).toBe('https://mcp.kiloapps.io/mcp');
+    expect(resolveCloudAgentMcpUrl('ftp://localhost:8815/mcp')).toBe('https://mcp.kiloapps.io/mcp');
+    expect(resolveCloudAgentMcpUrl('http://localhost:8815/mcp')).toBe(
+      'http://host.docker.internal:8815/mcp'
+    );
+    expect(resolveCloudAgentMcpUrl('http://host.docker.internal:8815/mcp')).toBe(
+      'http://host.docker.internal:8815/mcp'
+    );
+    const { context } = fixture();
+    const issued = await issueCloudAgentMcpGrant({
+      ...context,
+      mcpUrl: 'http://localhost:11715/mcp',
+    });
+    expect(issued).toMatchObject({ url: 'http://host.docker.internal:11715/mcp' });
   });
 
   it('uses the normal parent delegation expiry, never account/model/control authority', async () => {

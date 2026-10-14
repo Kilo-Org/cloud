@@ -581,6 +581,8 @@ export type Env = {
   KILOCODE_BACKEND_BASE_URL?: string;
   /** Base URL override for OpenRouter-compatible Kilo API */
   KILO_OPENROUTER_BASE?: string;
+  /** Local-dev override for the scoped subagent-launch MCP endpoint; never set in deployed config */
+  CLOUD_AGENT_MCP_URL_OVERRIDE?: string;
   /** Kilocode CLI timeout override (seconds) */
   CLI_TIMEOUT_SECONDS?: string;
   /** Experimental default shell-tool timeout (ms) forwarded to the Kilo server */

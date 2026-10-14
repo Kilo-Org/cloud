@@ -58,7 +58,7 @@ import {
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
 import { logRuntimeProxyRequestFailed } from './runtime-credential-proxy-diagnostics.js';
-import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
+import { deriveKiloSandboxTargets, deriveLoopbackFacadeTargets } from './kilo/kilo-targets.js';
 import {
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyScopedIngestRoute,
@@ -495,10 +495,13 @@ async function forwardRuntimeCredentialProxy(
     return c.text('Credential unavailable', 503);
   }
   if (!credential) return c.text('Unauthorized', 401);
-  const targets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
-  if (!targets.success) return c.text('Not found', 404);
+  const derivedTargets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
+  const targets = derivedTargets.success
+    ? derivedTargets.targets
+    : deriveLoopbackFacadeTargets(c.env);
+  if (!targets) return c.text('Not found', 404);
   const scopedUpstream = resolveRuntimeCredentialProxyScopedIngestRoute({
-    targets: targets.targets,
+    targets,
     route,
     method: c.req.method,
     pathname: path,
@@ -511,7 +514,7 @@ async function forwardRuntimeCredentialProxy(
   const upstream =
     scopedUpstream ??
     runtimeCredentialProxyUpstream(
-      targets.targets,
+      targets,
       route,
       c.req.method,
       path,

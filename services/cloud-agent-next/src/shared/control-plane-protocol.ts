@@ -689,7 +689,14 @@ export const controlPlaneSessionCredentialsPayloadSchema = z
     kilo: z.object({ token: z.string().min(1).max(4096) }).strict(),
     cloudAgentMcp: z
       .object({
-        url: z.literal('https://mcp.kiloapps.io/mcp'),
+        url: z.union([
+          z.literal('https://mcp.kiloapps.io/mcp'),
+          z
+            .string()
+            .regex(
+              /^http:\/\/(?:localhost|127\.0\.0\.1|host\.docker\.internal)(?::\d{1,5})?\/mcp$/
+            ),
+        ]),
         token: z.string().min(1).max(65536),
         expiresAt: z.number().int().positive(),
       })

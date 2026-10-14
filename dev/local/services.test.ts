@@ -293,6 +293,19 @@ test('starts the session-ingest worker whenever the web app starts', () => {
   assert.equal(worker.port, 8800 + portOffset);
 });
 
+test('runs kilo-mcp with the cloud-agent group on its wrangler port', () => {
+  const targets = resolveTargets(['cloud-agent']);
+  assert.ok(
+    targets.includes('kilo-mcp'),
+    `expected kilo-mcp in cloud-agent start targets, got: ${targets.join(', ')}`
+  );
+
+  const worker = getService('kilo-mcp');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/kilo-mcp');
+  assert.equal(worker.port, 8815 + portOffset);
+});
+
 test('points both user data export Hyperdrive bindings at the offset database', () => {
   const initialOffset = portOffset;
   try {

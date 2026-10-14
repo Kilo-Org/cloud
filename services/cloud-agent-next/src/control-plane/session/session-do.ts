@@ -827,6 +827,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       connectionString: this.env.HYPERDRIVE.connectionString,
       metadata: () => this.getMetadata(),
       authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      mcpUrl: this.env.CLOUD_AGENT_MCP_URL_OVERRIDE,
     });
   }
 

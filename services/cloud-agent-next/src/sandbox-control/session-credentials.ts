@@ -25,7 +25,10 @@ import {
   installationBotIdentityFromEnv,
 } from '../services/git-token-service-client.js';
 import { readProfileBundle } from '../session-profile.js';
-import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
+import {
+  isLocalFacadeUrl,
+  runtimeCredentialProxyFacadeBaseUrl,
+} from '../runtime-credential-proxy.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
 import type { GitHubReviewTarget } from '../shared/github-review-target.js';
 import type {
@@ -398,6 +401,11 @@ function safeUrl(value: string): URL | null {
   }
 }
 
+function isFacadeTarget(url: URL): boolean {
+  if (isLocalFacadeUrl(url)) return url.protocol === 'http:' || url.protocol === 'https:';
+  return url.protocol === 'https:' && url.port === '';
+}
+
 function deriveRuntimeProxyTargets(targets: z.infer<typeof targetsSchema>): { facade: URL } | null {
   const parsed = [
     targets.backendBaseUrl,
@@ -409,12 +417,9 @@ function deriveRuntimeProxyTargets(targets: z.infer<typeof targetsSchema>): { fa
     !backend ||
     !provider ||
     !ingest ||
-    backend.protocol !== 'https:' ||
-    backend.port !== '' ||
-    provider.protocol !== 'https:' ||
-    provider.port !== '' ||
-    ingest.protocol !== 'https:' ||
-    ingest.port !== '' ||
+    !isFacadeTarget(backend) ||
+    !isFacadeTarget(provider) ||
+    !isFacadeTarget(ingest) ||
     backend.toString().replace(/\/+$/, '') !== provider.toString().replace(/\/+$/, '') ||
     backend.toString().replace(/\/+$/, '') !== ingest.toString().replace(/\/+$/, '') ||
     backend.search ||

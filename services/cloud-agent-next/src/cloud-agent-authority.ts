@@ -18,6 +18,7 @@ import {
   signModernKiloToken,
   verifyKiloTokenForPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
+import { backendUrlForSandbox } from './kilo/kilo-targets.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 
 export function assertCloudAgentIsolatedAllocation(
@@ -32,6 +33,17 @@ export function assertCloudAgentIsolatedAllocation(
 }
 
 export const CLOUD_AGENT_MCP_URL = 'https://mcp.kiloapps.io/mcp';
+
+export function resolveCloudAgentMcpUrl(override?: string): string {
+  if (!override) return CLOUD_AGENT_MCP_URL;
+  try {
+    const url = new URL(override);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return CLOUD_AGENT_MCP_URL;
+    return backendUrlForSandbox(override);
+  } catch {
+    return CLOUD_AGENT_MCP_URL;
+  }
+}
 const workerPreparationMetadataSchema = z
   .object({
     platform: z.literal('github').optional(),
@@ -90,6 +102,7 @@ type ParentAuthorityContext = {
   authorization: () => Promise<unknown>;
   secret: string;
   connectionString: string;
+  mcpUrl?: string;
 };
 
 export async function issueCloudAgentMcpGrant(
@@ -134,7 +147,7 @@ export async function issueCloudAgentMcpGrant(
     },
     now: new Date(now * 1000),
   });
-  return { url: CLOUD_AGENT_MCP_URL, token, expiresAt: scope.expiresAt };
+  return { url: resolveCloudAgentMcpUrl(input.mcpUrl), token, expiresAt: scope.expiresAt };
 }
 
 export async function authorizeCloudAgentChild(

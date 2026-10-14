@@ -291,15 +291,22 @@ export function runtimeCredentialProxyBaseUrl(workerUrl: string): string | null 
  * deployment prefix), never an API route. Older Kilo releases append their own
  * `/api/...` paths while newer releases normalize configured bases first.
  */
+const LOCAL_FACADE_HOSTNAMES = new Set(['localhost', '127.0.0.1', 'host.docker.internal']);
+
+export function isLocalFacadeUrl(url: URL): boolean {
+  return LOCAL_FACADE_HOSTNAMES.has(url.hostname);
+}
+
 export function runtimeCredentialProxyFacadeBaseUrl(workerUrl: string): string | null {
   if (hasUnsafeFacadePathEncoding(workerUrl)) return null;
   try {
     const url = new URL(workerUrl);
     const prefix = url.pathname.replace(/\/+$/, '');
     const segments = prefix.split('/').filter(Boolean);
+    const local = isLocalFacadeUrl(url);
     if (
-      url.protocol !== 'https:' ||
-      url.port ||
+      (url.protocol !== 'https:' && !(local && url.protocol === 'http:')) ||
+      (url.port && !local) ||
       url.username ||
       url.password ||
       url.search ||

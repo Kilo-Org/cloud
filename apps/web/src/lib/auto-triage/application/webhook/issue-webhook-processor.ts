@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db/schema';
-import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { createTriageTicket, findExistingTicket } from '@/lib/auto-triage/db/triage-tickets';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import type { Owner } from '@/lib/auto-triage/core';
@@ -68,7 +68,16 @@ export class IssueWebhookProcessor {
       // 2. Resolve owner from integration
       const owner = await this.resolveOwner(integration);
       if (!owner) {
-        return NextResponse.json({ message: 'Integration missing user context' }, { status: 500 });
+        warnExceptInTest(
+          'Auto triage skipped: integration has no user context (no bot user and no fallback requester ID).',
+          {
+            integrationId: integration.id,
+            installationId: integration.platform_installation_id,
+            ownedByOrgId: integration.owned_by_organization_id,
+            ownedByUserId: integration.owned_by_user_id,
+          }
+        );
+        return this.skipResponse('Auto triage skipped: integration user context not configured');
       }
 
       // 3. Get and validate agent configuration

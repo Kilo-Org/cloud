@@ -216,37 +216,40 @@ describe('BenchmarkConfigSchema defaults', () => {
     expect(result.success).toBe(true);
   });
 
-  it.each(['efficient', 'frontier'])('strips retired auto decider fields for %s clients', router => {
-    const result = BenchmarkConfigSchema.parse({
-      router,
-      classifierModels: ['model/a'],
-      deciderModels: [{ id: 'model/b', variant: 'retired', reasoningEffort: 'high' }],
-      manualDeciderModels: [{ id: 'model/c', reasoningEffort: 'high' }],
-      autoDeciderModels: [{ id: 'model/b', reasoningEffort: null, avgAttemptCostUsd: 21.1 }],
-      excludedAutoDeciderModels: ['model/d'],
-      autoDeciderMinCostUsd: 30,
-      autoDeciderMaxCostUsd: 20,
-      minAccuracy: 0.7,
-      switchCostFactor: 3,
-      maxConcurrency: 10,
-      userMaxConcurrency: 100,
-      benchmarkUserId: null,
-      benchmarkOrgId: null,
-      updatedAt: null,
-      updatedBy: null,
-    });
+  it.each(['efficient', 'frontier'])(
+    'strips retired auto decider fields for %s clients',
+    router => {
+      const result = BenchmarkConfigSchema.parse({
+        router,
+        classifierModels: ['model/a'],
+        deciderModels: [{ id: 'model/b', variant: 'retired', reasoningEffort: 'high' }],
+        manualDeciderModels: [{ id: 'model/c', reasoningEffort: 'high' }],
+        autoDeciderModels: [{ id: 'model/b', reasoningEffort: null, avgAttemptCostUsd: 21.1 }],
+        excludedAutoDeciderModels: ['model/d'],
+        autoDeciderMinCostUsd: 30,
+        autoDeciderMaxCostUsd: 20,
+        minAccuracy: 0.7,
+        switchCostFactor: 3,
+        maxConcurrency: 10,
+        userMaxConcurrency: 100,
+        benchmarkUserId: null,
+        benchmarkOrgId: null,
+        updatedAt: null,
+        updatedBy: null,
+      });
 
-    expect(result.deciderModels).toEqual([{ id: 'model/b' }]);
-    for (const field of [
-      'manualDeciderModels',
-      'autoDeciderModels',
-      'excludedAutoDeciderModels',
-      'autoDeciderMinCostUsd',
-      'autoDeciderMaxCostUsd',
-    ]) {
-      expect(result).not.toHaveProperty(field);
+      expect(result.deciderModels).toEqual([{ id: 'model/b' }]);
+      for (const field of [
+        'manualDeciderModels',
+        'autoDeciderModels',
+        'excludedAutoDeciderModels',
+        'autoDeciderMinCostUsd',
+        'autoDeciderMaxCostUsd',
+      ]) {
+        expect(result).not.toHaveProperty(field);
+      }
     }
-  });
+  );
 });
 
 describe('resolveBenchmarkIdentity', () => {

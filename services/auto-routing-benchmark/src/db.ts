@@ -195,7 +195,6 @@ export async function replaceConfig(
   await orm.batch(stmts);
 }
 
-
 /** Which registry queue a run drains: the platform decider list, or owner pools. */
 export type { BenchmarkRunPurpose };
 

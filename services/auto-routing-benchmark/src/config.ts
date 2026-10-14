@@ -5,11 +5,7 @@ import type {
   ProductionTokenProfile,
 } from '@kilocode/auto-routing-contracts';
 import { BENCHMARK_CONTAINER_BUDGET } from '@kilocode/auto-routing-contracts';
-import {
-  getConfigRows,
-  replaceConfig,
-  type ConfigDeciderModelRow,
-} from './db';
+import { getConfigRows, replaceConfig, type ConfigDeciderModelRow } from './db';
 
 // Retain nullable legacy columns for rolling deploys, but never read saved efforts.
 export function toDeciderModelRows(models: BenchmarkPlatformModel[]): ConfigDeciderModelRow[] {

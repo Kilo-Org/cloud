@@ -37,7 +37,9 @@ it('calls a local HTTP writer from workerd and checks the acknowledgement', asyn
   let server: ReturnType<typeof createTestHarness> | undefined;
   try {
     const main = join(directory, 'worker.ts');
-    const clientPath = fileURLToPath(new URL('./usage-writer-client.ts', import.meta.url).href);
+    const clientPath = fileURLToPath(
+      import.meta.resolve('@kilocode/worker-utils/usage-writer-client')
+    );
     await new Promise<void>((resolve, reject) => {
       writer.once('error', reject);
       writer.listen(0, '127.0.0.1', resolve);

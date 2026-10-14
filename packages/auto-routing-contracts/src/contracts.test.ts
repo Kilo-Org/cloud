@@ -195,8 +195,35 @@ describe('BenchmarkConfigSchema defaults', () => {
     expect(result.deciderRepetitions).toBe(1);
     expect(result.classifierMaxP95LatencyMs).toBe(1000);
     expect(result.bestAccuracySwitchThreshold).toBe(0.05);
+    expect(result.productionTokenProfile).toBeNull();
+    expect(result.switchHorizonTurns).toBeNull();
+    expect(result.lowConfidenceThreshold).toBeNull();
     expect(result.autoDeciderMinCostUsd).toBe(15);
     expect(result.autoDeciderMaxCostUsd).toBe(25);
+  });
+
+  it('accepts only null or probability-range confidence thresholds', () => {
+    const config = {
+      classifierModels: ['model/a'],
+      deciderModels: [{ id: 'model/b' }],
+      minAccuracy: 0.8,
+      maxConcurrency: 4,
+      userMaxConcurrency: 100,
+      benchmarkUserId: null,
+      switchCostFactor: 2,
+      updatedAt: null,
+      updatedBy: null,
+    };
+    for (const lowConfidenceThreshold of [null, 0, 0.8, 1]) {
+      expect(
+        BenchmarkConfigSchema.parse({ ...config, lowConfidenceThreshold }).lowConfidenceThreshold
+      ).toBe(lowConfidenceThreshold);
+    }
+    for (const lowConfidenceThreshold of [-0.1, 1.1]) {
+      expect(BenchmarkConfigSchema.safeParse({ ...config, lowConfidenceThreshold }).success).toBe(
+        false
+      );
+    }
   });
 
   it('accepts the benchmark maximum concurrency cap of 100', () => {

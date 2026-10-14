@@ -11,6 +11,8 @@ import {
 import { BENCHMARK_CONTAINER_BUDGET } from '@kilocode/auto-routing-contracts';
 import type {
   BenchmarkKind,
+  CandidatePricing,
+  ProductionTokenProfile,
   BenchmarkProfileStatus,
   BenchmarkRunPurpose,
   BenchmarkRunStatus,
@@ -24,6 +26,11 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   min_accuracy: real('min_accuracy').notNull(),
   switch_cost_factor: real('switch_cost_factor').notNull(),
   best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
+  production_token_profile: text('production_token_profile', {
+    mode: 'json',
+  }).$type<ProductionTokenProfile>(),
+  switch_horizon_turns: integer('switch_horizon_turns'),
+  low_confidence_threshold: real('low_confidence_threshold'),
   max_concurrency: integer('max_concurrency').notNull(),
   // Live container budget for user-queue runs, independent of max_concurrency
   // (the platform-queue budget). The two must sum to at most the platform
@@ -180,6 +187,23 @@ export const caseResults = sqliteTable(
   ]
 );
 
+export const pendingDeciderOutputs = sqliteTable(
+  'pending_decider_outputs',
+  {
+    run_id: text('run_id')
+      .notNull()
+      .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    case_id: text('case_id').notNull(),
+    rep: integer('rep').notNull(),
+    payload: text('payload').notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.run_id, table.model, table.variant, table.case_id, table.rep] }),
+  ]
+);
+
 export const routingTables = sqliteTable('routing_tables', {
   run_id: text('run_id').primaryKey(),
   published_at: text('published_at').notNull(),
@@ -187,6 +211,11 @@ export const routingTables = sqliteTable('routing_tables', {
   min_accuracy: real('min_accuracy').notNull(),
   switch_cost_factor: real('switch_cost_factor').notNull(),
   best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
+  production_token_profile: text('production_token_profile', {
+    mode: 'json',
+  }).$type<ProductionTokenProfile>(),
+  switch_horizon_turns: integer('switch_horizon_turns'),
+  low_confidence_threshold: real('low_confidence_threshold'),
   source: text('source').notNull(),
 });
 
@@ -198,6 +227,7 @@ export const routingTableCandidates = sqliteTable(
     rank: integer('rank').notNull(),
     model: text('model').notNull(),
     accuracy: real('accuracy').notNull(),
+    cases: integer('cases'),
     // Non-null unlike model_summaries: RankedCandidate.avgCostUsd is a plain
     // nonnegative number (buildRoutingTable excludes summaries without a
     // cost signal, so every published candidate has one).
@@ -207,6 +237,8 @@ export const routingTableCandidates = sqliteTable(
     reasoning_effort: text('reasoning_effort'),
     // Exact-pair identity mirror ('' = null). Keeps rows self-describing; no PK change.
     variant: text('variant').notNull().default(''),
+    pricing: text('pricing', { mode: 'json' }).$type<CandidatePricing>(),
+    estimated_request_cost_usd: real('estimated_request_cost_usd'),
   },
   table => [primaryKey({ columns: [table.run_id, table.route_key, table.rank] })]
 );

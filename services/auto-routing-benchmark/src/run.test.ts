@@ -316,6 +316,7 @@ describe('computeEngineIdentity', () => {
 
   it('is versioned (carries the engine version prefix)', () => {
     expect(computeEngineIdentity('decider')).toMatch(/^v\d+:[0-9a-f]{8}$/);
+    expect(computeEngineIdentity('classifier')).toMatch(/^v1:[0-9a-f]{8}$/);
   });
 });
 

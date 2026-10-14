@@ -6,6 +6,8 @@ import {
   RoutingTableSchema,
   TAXONOMY_ROUTE_KEYS,
   type BenchmarkDeciderModel,
+  type CandidatePricing,
+  type ProductionTokenProfile,
   type BenchmarkModelSummary,
   type CustomRoutingTable,
   type PoolEntry,
@@ -27,6 +29,10 @@ export function buildRoutingTable(params: {
   minAccuracy: number;
   switchCostFactor: number;
   bestAccuracySwitchThreshold: number;
+  productionTokenProfile?: ProductionTokenProfile | null;
+  switchHorizonTurns?: number | null;
+  lowConfidenceThreshold?: number | null;
+  prices?: ReadonlyMap<string, CandidatePricing | null>;
   deciderModels: BenchmarkDeciderModel[];
   summaries: BenchmarkModelSummary[];
 }): RoutingTable {
@@ -63,12 +69,15 @@ export function buildRoutingTable(params: {
           return {
             model: s.model,
             accuracy: s.accuracy,
+            cases: s.cases,
             avgCostUsd: s.avgCostUsd ?? 0,
             p50LatencyMs: s.p50LatencyMs,
             variant,
+            pricing: params.prices?.get(s.model) ?? null,
           };
         }),
-      minAccuracy
+      minAccuracy,
+      { profile: params.productionTokenProfile ?? null }
     );
 
   const routes = Object.fromEntries(
@@ -81,6 +90,9 @@ export function buildRoutingTable(params: {
     minAccuracy,
     switchCostFactor,
     bestAccuracySwitchThreshold,
+    productionTokenProfile: params.productionTokenProfile ?? null,
+    switchHorizonTurns: params.switchHorizonTurns ?? null,
+    lowConfidenceThreshold: params.lowConfidenceThreshold ?? null,
     source: 'benchmark',
     routes,
   };
@@ -114,7 +126,15 @@ export function computeRegistryRoutingTableVersion(
   // config save rebuild an identically versioned table, which the publisher
   // then skips — the live table would keep the old thresholds until some new
   // measurement happened to change the ready set.
-  knobs: { minAccuracy: number; switchCostFactor: number; bestAccuracySwitchThreshold: number }
+  knobs: {
+    minAccuracy: number;
+    switchCostFactor: number;
+    bestAccuracySwitchThreshold: number;
+    productionTokenProfile?: ProductionTokenProfile | null;
+    switchHorizonTurns?: number | null;
+    lowConfidenceThreshold?: number | null;
+    prices?: ReadonlyMap<string, CandidatePricing | null>;
+  }
 ): string {
   const parts = [...contributors].map(c => `${c.runId}\0${c.model}\0${c.variant ?? ''}`).sort();
   // Read the knobs positionally: hashing the object would make the version
@@ -123,6 +143,27 @@ export function computeRegistryRoutingTableVersion(
     JSON.stringify({
       parts,
       knobs: [knobs.minAccuracy, knobs.switchCostFactor, knobs.bestAccuracySwitchThreshold],
+      profile: knobs.productionTokenProfile
+        ? [
+            knobs.productionTokenProfile.uncachedInputTokens,
+            knobs.productionTokenProfile.cachedInputTokens,
+          ]
+        : null,
+      horizon: knobs.switchHorizonTurns ?? null,
+      lowConfidenceThreshold: knobs.lowConfidenceThreshold ?? null,
+      prices: [...new Set(contributors.map(c => c.model))].sort().map(model => {
+        const pricing = knobs.prices?.get(model);
+        return [
+          model,
+          pricing
+            ? [
+                pricing.promptUsdPerToken,
+                pricing.completionUsdPerToken,
+                pricing.cacheReadUsdPerToken,
+              ]
+            : null,
+        ];
+      }),
       // A ranking change reorders tables built from unchanged measurements.
       policy: RANKING_POLICY_VERSION,
     })
@@ -160,6 +201,10 @@ export function buildCustomRoutingTable(params: {
   minAccuracy: number;
   switchCostFactor: number;
   bestAccuracySwitchThreshold: number;
+  productionTokenProfile?: ProductionTokenProfile | null;
+  switchHorizonTurns?: number | null;
+  lowConfidenceThreshold?: number | null;
+  prices?: ReadonlyMap<string, CandidatePricing | null>;
   /** Ready current profiles with provenance run ids. */
   readyEntries: readonly {
     entry: PoolEntry;
@@ -192,12 +237,15 @@ export function buildCustomRoutingTable(params: {
         .map(s => ({
           model: s.model,
           accuracy: s.accuracy,
+          cases: s.cases,
           avgCostUsd: s.avgCostUsd ?? 0,
           p50LatencyMs: s.p50LatencyMs,
+          pricing: params.prices?.get(s.model) ?? null,
           // Exact-pair identity only — never emit reasoningEffort on custom tables.
           variant: s.variant ?? null,
         })),
-      minAccuracy
+      minAccuracy,
+      { profile: params.productionTokenProfile ?? null }
     );
     if (candidates.length > 0) {
       routes[routeKey] = candidates;
@@ -212,7 +260,15 @@ export function buildCustomRoutingTable(params: {
       model: r.entry.model,
       variant: r.entry.variant,
     })),
-    { minAccuracy, switchCostFactor, bestAccuracySwitchThreshold }
+    {
+      minAccuracy,
+      switchCostFactor,
+      bestAccuracySwitchThreshold,
+      productionTokenProfile: params.productionTokenProfile,
+      switchHorizonTurns: params.switchHorizonTurns,
+      lowConfidenceThreshold: params.lowConfidenceThreshold,
+      prices: params.prices,
+    }
   );
 
   const table: CustomRoutingTable = {
@@ -221,6 +277,9 @@ export function buildCustomRoutingTable(params: {
     minAccuracy,
     switchCostFactor,
     bestAccuracySwitchThreshold,
+    productionTokenProfile: params.productionTokenProfile ?? null,
+    switchHorizonTurns: params.switchHorizonTurns ?? null,
+    lowConfidenceThreshold: params.lowConfidenceThreshold ?? null,
     source: 'benchmark',
     routes,
   };

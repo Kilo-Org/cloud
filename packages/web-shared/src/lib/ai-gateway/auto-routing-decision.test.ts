@@ -90,6 +90,22 @@ describe('fetchEfficientAutoDecision', () => {
     expect(result).toEqual({ decision: validDecision, costUsd: 0.001 });
   });
 
+  it('preserves zero classifier cost for worker-owned billing', async () => {
+    mockedFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ...validResponse,
+          cost: 0,
+        }),
+        { status: 200 }
+      )
+    );
+    expect(await fetchEfficientAutoDecision(makeParams(), options)).toEqual({
+      decision: validDecision,
+      costUsd: 0,
+    });
+  });
+
   it('allows the current worker miss path five seconds to complete', () => {
     expect(EFFICIENT_DECISION_TIMEOUT_MS).toBe(5_000);
   });

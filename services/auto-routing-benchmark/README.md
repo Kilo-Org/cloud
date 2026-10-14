@@ -54,10 +54,20 @@ Expand a route to inspect every ranked model/effort pair.
 
 - `rankCandidates` (`@kilocode/auto-routing-contracts`) orders every route's candidates.
 - A candidate competes when its accuracy is at most 0.05 below `minAccuracy`, the benchmark noise band.
-- Competing candidates are ordered by `avgCostUsd × p50LatencyMs^1.5 / accuracy^15`, lowest first.
+- Competing candidates are ordered by `estimatedRequestCostUsd × p50LatencyMs^1.5 / wilson^15`, lowest first.
+- `estimatedRequestCostUsd` adds the configured `productionTokenProfile` prompt cost at catalog prices to `avgCostUsd`. Without a profile or pricing, it equals `avgCostUsd`.
+- `wilson` is the Wilson lower bound (z = 1) of accuracy over the candidate's measured `cases`. A well-measured candidate beats a thinly measured one at equal accuracy. Without `cases`, raw accuracy is used.
 - The other candidates follow by accuracy, then cost.
+- When `lowConfidenceThreshold` is set and the classifier's route confidence is below it, the worker picks the most accurate eligible candidate of the route instead of the first-ranked one.
 - `meetsThreshold` stays strict (`accuracy >= minAccuracy`) for sticky routing.
 - The ranking policy version is part of every registry table version, so a policy change republishes.
+
+## Grading
+
+- Decider cases use mechanical checks (`exact`, `contains_all`, `regex`, `json_equal`) wherever an answer can be checked.
+- `judged` checks, at most 30% of a route, are graded by a System One model (`typesafe/jev-1.13`). The case score is its probability that the answer meets the rubric.
+- Calibrate the grader with `pnpm judge:calibrate --in labels.jsonl` or `--from-mechanical cases.json`. The command reports accuracy, the Brier score and a reliability table.
+- Grader cost is logged per job. It is not added to the model's `cost_usd`.
 
 
 ## Scoreboard
@@ -76,15 +86,80 @@ the current classifier winner from remote D1 through Wrangler. File inputs are
 validated; table candidates may include optional nullable `p50LatencyMs`. Live
 latency comes from each exact model/variant's ready, current-engine/repetition
 registry profile and its measuring-run summary for that route, or is null if absent.
+The live input also retains the published token profile, switch horizon, candidate
+pricing, and request-cost estimates; stored JSON fields are decoded and validated.
 Production and replay inputs are optional. Without production input, benchmark
 weights are uniform over table routes; otherwise they use the observed route mix.
-Missing routes and null metrics are excluded and the remaining weights normalized.
-Quality is benchmark accuracy and classifier route accuracy, not a held-out score.
+Missing routes and null benchmark metrics are excluded and the remaining weights normalized.
+Quality includes benchmark accuracy and classifier route accuracy; supplying `--sweep`
+also evaluates the exact first model/variant picks on held-out cases.
 `benchmarkP50Weighted` is the weighted benchmark model latency, not production TTFT.
 Use `--relative-only` for PR bodies so raw production measurements stay local.
 Unavailable comparisons are `n/a`; rows unavailable on both sides are omitted.
 Axis summaries are `mixed` only when metrics both improve and worsen, and `flat`
 when no comparable metric improves or worsens.
+
+Simulate production-input-aware ranking against the published table without spending
+on benchmarks or publishing a routing change:
+
+```bash
+pnpm --filter auto-routing-benchmark scoreboard build --label baseline --table live --pricing live --cost-profile p.json --out baseline.json
+pnpm --filter auto-routing-benchmark scoreboard build --label candidate --table live --pricing live --cost-profile p.json --rerank-profile p.json --out candidate.json
+pnpm --filter auto-routing-benchmark scoreboard compare baseline.json candidate.json --relative-only
+```
+
+Both profile flags take JSON with `uncachedInputTokens` and `cachedInputTokens`
+(nonnegative token counts). `--rerank-profile` re-ranks each route using the table's
+accuracy threshold and the contracts ranking policy before computing all metrics.
+Without it, the published order is preserved. `--cost-profile` only affects the
+estimated request cost; it takes precedence over the rerank profile, which otherwise
+also supplies the cost estimate. If neither flag is supplied, the estimate uses the
+table's `productionTokenProfile`, or just the benchmark cost when that is absent.
+
+For held-out measurement without deploying, set `OPENROUTER_API_KEY` and save pairs
+as `[{"model":"provider/model","variant":null}]`. The sweep excludes `agentic_execution`,
+grades rubric cases with the decider judge, and hashes case ids into stable train/held-out
+splits. `--rebuild-from-sweep` ranks train data only with Wilson counts, pricing, and the
+cost profile; both builds evaluate exact first picks on held-out accuracy, estimated
+request cost, and wall-clock latency. Missing picks are excluded; `quality.heldOut.routes`
+reports coverage. `--max-usd` includes model and grader spend (in-flight requests can
+overshoot). Atomic checkpoints every 200 cases retain each pair's raw `results`;
+`--resume sweep.json` skips completed pair/case/repetitions and retains accumulated spend.
+Infrastructure/grader failures are excluded from graded `cases` and counted in summary
+`errors`; empty answers score zero. Missing usage still permits grading but makes
+`costUsd` null and excludes that row only from the cost mean. Graded training candidates
+with unknown cost still compete at the route's maximum known request-cost estimate
+(or benchmark cost zero if the entire route lacks costs), without imputing held-out cost.
+Recompute old summaries without
+an API key or network calls using
+`sweep:offline --summarize-only --resume sweep.json --out corrected.json`;
+old missing-usage rows without saved answers remain excluded.
+
+```bash
+pnpm --filter auto-routing-benchmark sweep:offline --pairs pairs.json --catalog live --max-usd 20 --out sweep.json
+pnpm --filter auto-routing-benchmark scoreboard build --label baseline --table live --pricing live --cost-profile p.json --sweep sweep.json --out baseline.json
+pnpm --filter auto-routing-benchmark scoreboard build --label candidate --table live --pricing live --cost-profile p.json --sweep sweep.json --rebuild-from-sweep --out candidate.json
+pnpm --filter auto-routing-benchmark scoreboard compare baseline.json candidate.json --relative-only
+```
+
+`--pricing live` hydrates candidates by model id from
+`https://app.kilo.ai/api/openrouter/models`. Prompt, completion, and optional
+`input_cache_read` prices are USD **per token**, not per million tokens. A pricing
+file can be a saved catalog response (`{"data":[{"id":"fixture/model","pricing":
+{"prompt":"0.001","completion":"0.002","input_cache_read":"0.0001"}}]}`), or a
+model-id map of `CandidatePricing` objects (`promptUsdPerToken`,
+`completionUsdPerToken`, nullable `cacheReadUsdPerToken`). These example values are
+synthetic. When no pricing flag is supplied, candidate pricing already in the table
+is used. Models absent from a supplied catalog have unavailable pricing.
+
+`cost.estimatedRequestUsdWeighted` weights each first pick's benchmark cost plus
+uncached input at prompt price and cached input at cache-read price (or prompt
+price when cache pricing is absent). It is null if any included first pick lacks
+pricing. Lower estimated cost is better in comparisons. Keep the same profile,
+route mix, table, and pricing snapshot for base and head; use saved table and pricing
+files if the live inputs may change between builds. `benchmarkPerTaskUsdWeighted`
+remains the benchmark-only cost and can move differently from this production-input
+estimate.
 
 ### Shadow routing policy
 
@@ -125,7 +200,6 @@ collecting a window with a known rate. This is observation only, not production 
 allocation; production ids are not silently bucketed.
 Divergence is unavailable when success sampling is disabled because always-logged
 switches alone cannot estimate population divergence.
-
 ## Admin endpoints
 
 All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`

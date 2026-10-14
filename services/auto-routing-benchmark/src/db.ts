@@ -6,6 +6,7 @@ import type {
   BenchmarkRunPurpose,
   ClassifierWinner,
   RankedCandidate,
+  ProductionTokenProfile,
   RoutingTable,
 } from '@kilocode/auto-routing-contracts';
 import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
@@ -14,6 +15,7 @@ import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-rout
 import type { BatchItem } from 'drizzle-orm/batch';
 import { and, asc, count, desc, eq, gt, inArray, lt, ne, notInArray, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
+import * as z from 'zod';
 import {
   benchmarkConfig,
   benchmarkProfiles,
@@ -24,6 +26,7 @@ import {
   configClassifierModels,
   configDeciderModels,
   modelSummaries,
+  pendingDeciderOutputs,
   routingTableCandidates,
   routingTables,
   runLaneFailures,
@@ -48,10 +51,7 @@ type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 // below the 100-variable ceiling while still batching the delete plus inserts.
 const MODEL_SUMMARY_INSERT_BATCH_SIZE = 7;
 
-// Routing table candidates bind 9 values per row (including variant). Keep each
-// INSERT comfortably under D1's 100-variable ceiling; publishing is infrequent,
-// so smaller statements are preferable to risking a skipped routing-table update.
-const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 10;
+const ROUTING_TABLE_CANDIDATE_INSERT_BATCH_SIZE = 8;
 
 // Run model rows bind 5 values per row. Keep each INSERT comfortably under D1's
 // 100-variable ceiling; the profile drain claims batches of up to 33 entries,
@@ -154,6 +154,9 @@ export async function replaceConfig(
     min_accuracy: number;
     switch_cost_factor: number;
     best_accuracy_switch_threshold: number;
+    production_token_profile?: ProductionTokenProfile | null;
+    switch_horizon_turns?: number | null;
+    low_confidence_threshold?: number | null;
     max_concurrency: number;
     user_max_concurrency: number;
     benchmark_user_id: string | null;
@@ -385,6 +388,72 @@ export async function getExistingCaseResultIds(
   return new Set(rows.map(row => row.case_id));
 }
 
+type PendingDeciderOutputKey = {
+  run_id: string;
+  model: string;
+  variant: string;
+  case_id: string;
+  rep: number;
+};
+
+const PendingDeciderOutputSchema = z.object({
+  result: z.object({
+    text: z.string(),
+    costUsd: z.number().nullable(),
+    latencyMs: z.number(),
+    exitCode: z.number(),
+    stderrTail: z.string(),
+    eventCount: z.number(),
+    lastEventTypes: z.array(z.string()),
+    timedOut: z.boolean(),
+  }),
+  retried: z.boolean(),
+});
+
+export type PendingDeciderOutput = z.infer<typeof PendingDeciderOutputSchema>;
+
+function pendingDeciderOutputPredicate(key: PendingDeciderOutputKey) {
+  return and(
+    eq(pendingDeciderOutputs.run_id, key.run_id),
+    eq(pendingDeciderOutputs.model, key.model),
+    eq(pendingDeciderOutputs.variant, key.variant),
+    eq(pendingDeciderOutputs.case_id, key.case_id),
+    eq(pendingDeciderOutputs.rep, key.rep)
+  );
+}
+
+export async function getPendingDeciderOutput(
+  db: D1Database,
+  key: PendingDeciderOutputKey
+): Promise<PendingDeciderOutput | null> {
+  const row = await drizzle(db)
+    .select({ payload: pendingDeciderOutputs.payload })
+    .from(pendingDeciderOutputs)
+    .where(pendingDeciderOutputPredicate(key))
+    .get();
+  if (!row) return null;
+  const payload: unknown = JSON.parse(row.payload);
+  return PendingDeciderOutputSchema.parse(payload);
+}
+
+export async function savePendingDeciderOutput(
+  db: D1Database,
+  key: PendingDeciderOutputKey,
+  output: PendingDeciderOutput
+): Promise<void> {
+  await drizzle(db)
+    .insert(pendingDeciderOutputs)
+    .values({ ...key, payload: JSON.stringify(output) })
+    .onConflictDoNothing();
+}
+
+export async function deletePendingDeciderOutputsForRun(
+  db: D1Database,
+  runId: string
+): Promise<void> {
+  await drizzle(db).delete(pendingDeciderOutputs).where(eq(pendingDeciderOutputs.run_id, runId));
+}
+
 export async function replaceModelSummaries(
   db: D1Database,
   runId: string,
@@ -492,6 +561,7 @@ export async function markRunCompleted(db: D1Database, runId: string): Promise<v
     .update(benchmarkRuns)
     .set({ status: 'completed', completed_at: new Date().toISOString() })
     .where(and(eq(benchmarkRuns.id, runId), eq(benchmarkRuns.status, 'running')));
+  await deletePendingDeciderOutputsForRun(db, runId);
 }
 
 export async function markStaleRunsFailed(db: D1Database, olderThanIso: string): Promise<void> {
@@ -499,6 +569,17 @@ export async function markStaleRunsFailed(db: D1Database, olderThanIso: string):
     .update(benchmarkRuns)
     .set({ status: 'failed', error: 'timed out' })
     .where(and(eq(benchmarkRuns.status, 'running'), lt(benchmarkRuns.started_at, olderThanIso)));
+  await drizzle(db)
+    .delete(pendingDeciderOutputs)
+    .where(
+      inArray(
+        pendingDeciderOutputs.run_id,
+        drizzle(db)
+          .select({ id: benchmarkRuns.id })
+          .from(benchmarkRuns)
+          .where(ne(benchmarkRuns.status, 'running'))
+      )
+    );
 }
 
 // The currently-running run of a (kind, purpose), if any (used for the
@@ -556,6 +637,7 @@ export async function markRunFailed(db: D1Database, runId: string, error: string
     .update(benchmarkRuns)
     .set({ status: 'failed', error: error.slice(0, 500), completed_at: new Date().toISOString() })
     .where(and(eq(benchmarkRuns.id, runId), eq(benchmarkRuns.status, 'running')));
+  await deletePendingDeciderOutputsForRun(db, runId);
 }
 
 function boundProfileFailureReason(reason: string): string {
@@ -1284,6 +1366,9 @@ export function routingTableToRows(
     min_accuracy: table.minAccuracy,
     switch_cost_factor: table.switchCostFactor,
     best_accuracy_switch_threshold: table.bestAccuracySwitchThreshold,
+    production_token_profile: table.productionTokenProfile ?? null,
+    switch_horizon_turns: table.switchHorizonTurns ?? null,
+    low_confidence_threshold: table.lowConfidenceThreshold ?? null,
     source: table.source,
   };
 
@@ -1300,10 +1385,13 @@ export function routingTableToRows(
         rank,
         model: c.model,
         accuracy: c.accuracy,
+        cases: c.cases ?? null,
         avg_cost_usd: c.avgCostUsd,
         meets_threshold: c.meetsThreshold,
         reasoning_effort: effortKey,
         variant: variantToStorage(variantKey),
+        pricing: c.pricing ?? null,
+        estimated_request_cost_usd: c.estimatedRequestCostUsd ?? null,
       });
     });
   }
@@ -1327,8 +1415,15 @@ export function rowsToRoutingTable(
     routeMap[row.route_key].push({
       model: row.model,
       accuracy: row.accuracy,
+      ...(row.cases != null ? { cases: row.cases } : {}),
       avgCostUsd: row.avg_cost_usd,
       meetsThreshold: row.meets_threshold,
+      ...(row.pricing != null || row.estimated_request_cost_usd != null
+        ? { pricing: row.pricing ?? null }
+        : {}),
+      ...(row.estimated_request_cost_usd != null
+        ? { estimatedRequestCostUsd: row.estimated_request_cost_usd }
+        : {}),
       ...(effort !== null
         ? { reasoningEffort: effort }
         : { variant: variantFromStorage(row.variant) }),
@@ -1340,6 +1435,18 @@ export function rowsToRoutingTable(
     minAccuracy: tableRow.min_accuracy,
     switchCostFactor: tableRow.switch_cost_factor,
     bestAccuracySwitchThreshold: tableRow.best_accuracy_switch_threshold,
+    ...(tableRow.production_token_profile != null ||
+    sorted.some(row => row.estimated_request_cost_usd != null)
+      ? {
+          productionTokenProfile: tableRow.production_token_profile ?? null,
+          switchHorizonTurns: tableRow.switch_horizon_turns ?? null,
+        }
+      : tableRow.switch_horizon_turns != null
+        ? { switchHorizonTurns: tableRow.switch_horizon_turns }
+        : {}),
+    ...(tableRow.low_confidence_threshold != null
+      ? { lowConfidenceThreshold: tableRow.low_confidence_threshold }
+      : {}),
     source: tableRow.source as RoutingTable['source'],
     routes: routeMap,
   };
@@ -1366,6 +1473,9 @@ export async function saveRoutingTable(
           min_accuracy: tableRow.min_accuracy,
           switch_cost_factor: tableRow.switch_cost_factor,
           best_accuracy_switch_threshold: tableRow.best_accuracy_switch_threshold,
+          production_token_profile: tableRow.production_token_profile,
+          switch_horizon_turns: tableRow.switch_horizon_turns,
+          low_confidence_threshold: tableRow.low_confidence_threshold,
           source: tableRow.source,
         },
       }),

@@ -3,7 +3,7 @@ import {
   type UsageRecordRequest,
   type UsageRecordResponse,
 } from '@kilocode/usage-contracts';
-import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
+import { readBoundedStream } from './bounded-stream-reader';
 
 export type UsageWriterConfig = {
   url?: string;
@@ -29,7 +29,6 @@ export type UsageWriteOutcome =
 export const USAGE_WRITER_TIMEOUT_MS = 160_000;
 export const MAX_WRITER_RESPONSE_BYTES = 4096;
 
-/** One attempt; the future queue consumer owns retries and acknowledgement. */
 export async function recordUsage(
   payload: UsageRecordRequest,
   config: UsageWriterConfig

@@ -26,6 +26,15 @@ const baseConfig: BenchmarkConfig = {
 };
 
 describe('platform model selection', () => {
+  it('preserves the configured confidence threshold when saving unrelated form changes', () => {
+    const config = { ...baseConfig, lowConfidenceThreshold: 0.8 };
+    const state = configToFormState(config);
+    expect(formStateToConfig({ ...state, minAccuracy: 0.9 }, config).lowConfidenceThreshold).toBe(
+      0.8
+    );
+    expect(formStateToConfig(configToFormState(null), null).lowConfidenceThreshold).toBeNull();
+  });
+
   it('round-trips model-level selections without adding an effort', () => {
     const state = configToFormState(baseConfig);
     expect(state.deciderModels).toEqual([{ id: 'manual' }]);

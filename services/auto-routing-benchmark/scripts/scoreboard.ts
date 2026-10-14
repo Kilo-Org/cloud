@@ -3,13 +3,21 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import * as z from 'zod';
-import { BenchmarkModelSummarySchema } from '@kilocode/auto-routing-contracts';
+import {
+  BenchmarkModelSummarySchema,
+  CandidatePricingSchema,
+  ProductionTokenProfileSchema,
+} from '@kilocode/auto-routing-contracts';
 import { rowsToRoutingTable } from '../src/db';
 import { computeEngineIdentity } from '../src/run';
 import { pickClassifierWinner } from '../src/winner';
+import { BenchmarkModelCatalogSchema, catalogCandidatePrices } from '../src/platform-models';
 import { buildScoreboard } from '../src/scoreboard/build';
 import { compareScoreboards } from '../src/scoreboard/compare';
 import {
+  LiveScoreboardCandidateRowSchema,
+  LiveScoreboardTableRowSchema,
+  OfflineSweepSchema,
   ProdMetricsSchema,
   ReplayMetricsSchema,
   ScoreboardRoutingTableSchema,
@@ -18,34 +26,23 @@ import {
 
 const execFileAsync = promisify(execFile);
 const packageDirectory = fileURLToPath(new URL('..', import.meta.url));
-const tableRowSchema = z.object({
-  run_id: z.string(),
-  published_at: z.string(),
-  generated_at: z.string(),
-  min_accuracy: z.number(),
-  switch_cost_factor: z.number(),
-  best_accuracy_switch_threshold: z.number(),
-  source: z.string(),
-});
-const candidateRowSchema = z.object({
-  run_id: z.string(),
-  route_key: z.string(),
-  rank: z.number().int(),
-  model: z.string(),
-  accuracy: z.number(),
-  avg_cost_usd: z.number(),
-  meets_threshold: z
-    .union([z.boolean(), z.literal(0), z.literal(1)])
-    .transform(value => Boolean(value)),
-  reasoning_effort: z.string().nullable(),
-  variant: z.string(),
-  p50LatencyMs: z.number().nonnegative().nullable(),
-});
 const classifierRunSchema = z.object({
   id: z.string(),
   min_accuracy: z.number(),
   classifier_max_p95_latency_ms: z.number().nullable(),
 });
+
+const pricingCatalogSchema = BenchmarkModelCatalogSchema.transform(catalog =>
+  Object.fromEntries(catalogCandidatePrices(catalog))
+);
+const pricingSchema = z.union([pricingCatalogSchema, z.record(z.string(), CandidatePricingSchema)]);
+
+async function loadPricing(path: string) {
+  if (path !== 'live') return readJson(path, pricingSchema);
+  const response = await fetch('https://app.kilo.ai/api/openrouter/models');
+  if (!response.ok) throw new Error(`Pricing catalog request failed: HTTP ${response.status}`);
+  return pricingCatalogSchema.parse(await response.json());
+}
 
 async function readJson<T>(path: string, schema: z.ZodType<T>): Promise<T> {
   return schema.parse(JSON.parse(await readFile(path, 'utf8')));
@@ -79,7 +76,10 @@ function sqlString(value: string): string {
 
 async function loadLiveTable() {
   const [tableRows, classifierRuns] = await Promise.all([
-    queryD1('SELECT * FROM routing_tables ORDER BY published_at DESC LIMIT 1', tableRowSchema),
+    queryD1(
+      'SELECT * FROM routing_tables ORDER BY published_at DESC LIMIT 1',
+      LiveScoreboardTableRowSchema
+    ),
     queryD1(
       `SELECT id, min_accuracy, classifier_max_p95_latency_ms FROM benchmark_runs
       WHERE kind = 'classifier' AND status = 'completed'
@@ -101,7 +101,7 @@ async function loadLiveTable() {
       LEFT JOIN model_summaries s
         ON s.run_id = p.run_id AND s.model = p.model AND s.variant = p.variant AND s.route_key = c.route_key
       WHERE c.run_id = ${sqlString(tableRow.run_id)} ORDER BY c.route_key, c.rank`,
-      candidateRowSchema
+      LiveScoreboardCandidateRowSchema
     ),
     classifierRun
       ? queryD1(
@@ -143,16 +143,21 @@ async function main() {
         prod: { type: 'string' },
         replay: { type: 'string' },
         out: { type: 'string' },
+        pricing: { type: 'string' },
+        'rerank-profile': { type: 'string' },
+        'cost-profile': { type: 'string' },
+        sweep: { type: 'string' },
+        'rebuild-from-sweep': { type: 'boolean', default: false },
       },
       allowPositionals: true,
     });
     if (!values.label || !values.out || positionals.length > 0) {
       throw new Error(
-        'Usage: scoreboard build --label <label> [--table live|file.json] [--prod file.json] [--replay file.json] --out file.json'
+        'Usage: scoreboard build --label <label> [--table live|file.json] [--pricing live|file.json] [--cost-profile file.json] [--rerank-profile file.json] [--sweep file.json] [--rebuild-from-sweep] [--prod file.json] [--replay file.json] --out file.json'
       );
     }
     const tablePath = values.table ?? 'live';
-    const [source, prod, replay] = await Promise.all([
+    const [source, prod, replay, pricing, rerankProfile, costProfile, sweep] = await Promise.all([
       tablePath === 'live'
         ? loadLiveTable()
         : readJson(tablePath, ScoreboardRoutingTableSchema).then(table => ({
@@ -161,9 +166,35 @@ async function main() {
           })),
       values.prod ? readJson(values.prod, ProdMetricsSchema) : null,
       values.replay ? readJson(values.replay, ReplayMetricsSchema) : null,
+      values.pricing ? loadPricing(values.pricing) : null,
+      values['rerank-profile']
+        ? readJson(values['rerank-profile'], ProductionTokenProfileSchema)
+        : null,
+      values['cost-profile']
+        ? readJson(values['cost-profile'], ProductionTokenProfileSchema)
+        : null,
+      values.sweep ? readJson(values.sweep, OfflineSweepSchema) : null,
     ]);
+    if (pricing) {
+      for (const candidates of Object.values(source.table.routes)) {
+        for (const candidate of candidates) {
+          candidate.pricing = pricing[candidate.model] ?? null;
+        }
+      }
+    }
     const scoreboard = ScoreboardSchema.parse(
-      buildScoreboard({ label: values.label, ...source, prod, replay, now: new Date() })
+      buildScoreboard({
+        label: values.label,
+        ...source,
+        prod,
+        replay,
+        rerankProfile,
+        costProfile,
+        sweep,
+        rebuildFromSweep: values['rebuild-from-sweep'],
+        pricing,
+        now: new Date(),
+      })
     );
     await writeFile(values.out, `${JSON.stringify(scoreboard, null, 2)}\n`);
     return;

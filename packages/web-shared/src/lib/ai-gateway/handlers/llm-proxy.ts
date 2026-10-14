@@ -392,7 +392,7 @@ export async function handleLlmProxyRequest(
   // reaching a concrete model. Keep that target for direct-BYOK ownership
   // validation after resolution.
   let routingTarget: string | null = null;
-  let classifierCostUsd = 0;
+  let legacyClassifierCostUsd = 0;
   // Efficient/balanced requests resolve through the auto-routing pool. Kept for
   // the org policy check below so a failed routing decision gets a specific
   // auto-routing error instead of the generic model-not-allowed error.
@@ -444,7 +444,7 @@ export async function handleLlmProxyRequest(
             userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
             deniedModelIds,
           });
-          classifierCostUsd = result?.costUsd ?? 0;
+          legacyClassifierCostUsd = result?.costUsd ?? 0;
           return result?.decision ?? null;
         }
       : undefined;
@@ -621,15 +621,9 @@ export async function handleLlmProxyRequest(
         }))
   );
 
-  // Bill the classifier overhead as soon as the cost is known and we have an
-  // authenticated user — via after(), so the row is persisted even when the
-  // request is rejected downstream (provider/api-kind rejection,
-  // balance/org checks, upstream 4xx, …). The classifier already ran on Kilo's
-  // OpenRouter credential during model resolution, so the cost is owed
-  // regardless of how this request ends. Anonymous requests never reach a
-  // positive classifier cost (the classifier is skipped for them above), so
-  // this only bills real users.
-  if (classifierCostUsd > 0 && !isAnonymousContext(user)) {
+  // New workers persist classifier usage themselves and return zero. Retain
+  // positive-cost billing only for workers still running the previous protocol.
+  if (legacyClassifierCostUsd > 0 && !isAnonymousContext(user)) {
     const priorMicrodollarUsage = user.microdollars_used;
     after(
       (async () => {
@@ -648,7 +642,7 @@ export async function handleLlmProxyRequest(
             streamed: false,
             cancelled: false,
             status_code: 200,
-            cost_mUsd: toMicrodollars(classifierCostUsd),
+            cost_mUsd: toMicrodollars(legacyClassifierCostUsd),
             inputTokens: 0,
             outputTokens: 0,
             cacheWriteTokens: 0,

@@ -85,6 +85,27 @@
       "when": 1791310930981,
       "tag": "0011_silent_diamondback",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791913598739,
+      "tag": "0012_fancy_spirit",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1791917551948,
+      "tag": "0013_harsh_pyro",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1791925892377,
+      "tag": "0014_huge_gauntlet",
+      "breakpoints": true
     }
   ]
 }

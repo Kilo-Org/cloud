@@ -9,6 +9,7 @@ import { createDeciderJudge } from '../src/decider-judge';
 import { gradeDeciderOutput } from '../src/grading';
 import { OPENROUTER_APP_TITLE, OPENROUTER_HTTP_REFERER } from '../src/openrouter';
 import { OfflineSweepSchema, type OfflineSweep } from '../src/scoreboard/schema';
+import { summarizeSweep } from '../src/scoreboard/sweep';
 
 const catalogSchema = z.object({
   data: z.array(
@@ -31,35 +32,6 @@ function caseSplit(caseId: string): SweepResult['split'] {
   return createHash('sha256').update(caseId).digest().readUInt8(0) % 2 === 0 ? 'train' : 'heldOut';
 }
 
-function summarize(sweep: OfflineSweep): OfflineSweep['summaries'] {
-  return sweep.pairs.flatMap(pair => {
-    const groups = new Map<string, SweepResult[]>();
-    for (const result of pair.results) {
-      const key = JSON.stringify([result.routeKey, result.split]);
-      const group = groups.get(key);
-      if (group) group.push(result);
-      else groups.set(key, [result]);
-    }
-    return [...groups.values()].map(results => {
-      const latencies = results.map(result => result.latencyMs).sort((a, b) => a - b);
-      const middle = Math.floor(latencies.length / 2);
-      return {
-        model: pair.model,
-        variant: pair.variant,
-        routeKey: results[0].routeKey,
-        split: results[0].split,
-        accuracy: results.reduce((sum, result) => sum + result.score, 0) / results.length,
-        cases: results.length,
-        avgCostUsd: results.reduce((sum, result) => sum + result.costUsd, 0) / results.length,
-        p50LatencyMs:
-          latencies.length % 2 === 0
-            ? (latencies[middle - 1] + latencies[middle]) / 2
-            : latencies[middle],
-      };
-    });
-  });
-}
-
 async function main() {
   const { values } = parseArgs({
     options: {
@@ -70,8 +42,21 @@ async function main() {
       'max-usd': { type: 'string' },
       out: { type: 'string' },
       resume: { type: 'string' },
+      'summarize-only': { type: 'boolean', default: false },
     },
   });
+  if (values['summarize-only']) {
+    if (!values.resume || !values.out) {
+      throw new Error(
+        'Usage: sweep:offline --summarize-only --resume sweep.json --out corrected.json'
+      );
+    }
+    const sweep = OfflineSweepSchema.parse(JSON.parse(await readFile(values.resume, 'utf8')));
+    sweep.summaries = summarizeSweep(sweep.pairs);
+    await writeFile(`${values.out}.partial`, `${JSON.stringify(sweep, null, 2)}\n`);
+    await rename(`${values.out}.partial`, values.out);
+    return;
+  }
   if (!values.pairs || !values.out || values['max-usd'] === undefined) {
     throw new Error(
       'Usage: sweep:offline --pairs pairs.json --catalog live|file.json --reps 1 --concurrency 16 --max-usd <n> --out sweep.json [--resume sweep.json]'
@@ -175,7 +160,7 @@ async function main() {
   let writes = Promise.resolve();
   const out = values.out;
   const checkpoint = () => {
-    sweep.summaries = summarize(sweep);
+    sweep.summaries = summarizeSweep(sweep.pairs);
     const snapshot = `${JSON.stringify(sweep, null, 2)}\n`;
     writes = writes.then(async () => {
       await writeFile(`${out}.partial`, snapshot);
@@ -193,9 +178,9 @@ async function main() {
       const { pairIndex, benchCase, rep } = jobs[nextJob++];
       const pair = sweep.pairs[pairIndex];
       const started = performance.now();
-      let modelCostUsd = 0;
+      let modelCostUsd: number | null = null;
       let graderCostUsd = 0;
-      let score = 0;
+      let score: number | null = null;
       let error: string | null = null;
       let output: string | null = null;
       const body = JSON.stringify({
@@ -237,19 +222,20 @@ async function main() {
               break;
             }
             const usage = usageSchema.safeParse(parsed);
-            if (!usage.success) {
-              error = 'OpenRouter response is missing valid usage.cost';
-              break;
+            if (usage.success) {
+              modelCostUsd = usage.data.usage.cost;
+              sweep.costUsd += usage.data.usage.cost;
+              error = null;
+            } else {
+              error = 'usage_missing';
             }
-            modelCostUsd += usage.data.usage.cost;
-            sweep.costUsd += usage.data.usage.cost;
             const completion = completionSchema.safeParse(parsed);
             if (!completion.success || completion.data.choices[0].message.content.length === 0) {
+              score = 0;
               error = 'OpenRouter response is missing answer content';
               break;
             }
             output = completion.data.choices[0].message.content;
-            error = null;
             break;
           }
         } catch {
@@ -268,7 +254,7 @@ async function main() {
         });
         score = grade.score;
         graderCostUsd = grade.costUsd;
-        error = grade.graderError;
+        error = grade.score === null ? 'grader_failed' : (grade.graderError ?? error);
       }
       pair.results.push({
         caseId: benchCase.id,
@@ -280,6 +266,7 @@ async function main() {
         graderCostUsd,
         latencyMs,
         error,
+        output,
       });
       completed++;
       if (completed % 200 === 0) {

@@ -67,10 +67,11 @@ export const OfflineSweepSummarySchema = z.object({
   variant: z.string().trim().min(1).nullable(),
   routeKey: z.string().min(1),
   split: z.enum(['train', 'heldOut']),
-  accuracy: z.number().min(0).max(1),
-  cases: z.number().int().positive(),
-  avgCostUsd: z.number().nonnegative(),
-  p50LatencyMs: z.number().nonnegative(),
+  accuracy: z.number().min(0).max(1).nullable(),
+  cases: z.number().int().nonnegative(),
+  errors: z.number().int().nonnegative().optional(),
+  avgCostUsd: z.number().nonnegative().nullable(),
+  p50LatencyMs: z.number().nonnegative().nullable(),
 });
 export type OfflineSweepSummary = z.infer<typeof OfflineSweepSummarySchema>;
 
@@ -89,11 +90,12 @@ export const OfflineSweepSchema = z.object({
           rep: z.number().int().nonnegative(),
           routeKey: z.string().min(1),
           split: z.enum(['train', 'heldOut']),
-          score: z.number().min(0).max(1),
-          costUsd: z.number().nonnegative(),
+          score: z.number().min(0).max(1).nullable().default(null),
+          costUsd: z.number().nonnegative().nullable().default(null),
           graderCostUsd: z.number().nonnegative(),
           latencyMs: z.number().nonnegative(),
           error: z.string().nullable(),
+          output: z.string().nullable().optional(),
         })
       ),
     })

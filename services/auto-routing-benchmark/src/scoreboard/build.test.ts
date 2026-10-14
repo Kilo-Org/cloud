@@ -261,10 +261,40 @@ describe('buildScoreboard', () => {
         ],
       },
     };
-    const base = build(pricedTable, null, null, { costProfile: profile });
+    const sweep: OfflineSweep = {
+      startedAt: now.toISOString(),
+      truncated: false,
+      costUsd: 0,
+      graderCostUsd: 0,
+      pairs: [],
+      summaries: [
+        {
+          model: 'fixture/expensive-prompt',
+          variant: null,
+          routeKey: 'implementation/code_generation',
+          split: 'heldOut',
+          accuracy: 0.2,
+          cases: 10,
+          avgCostUsd: 0.3,
+          p50LatencyMs: 500,
+        },
+        {
+          model: 'fixture/cheap-prompt',
+          variant: null,
+          routeKey: 'implementation/code_generation',
+          split: 'heldOut',
+          accuracy: 0.9,
+          cases: 10,
+          avgCostUsd: 0.03,
+          p50LatencyMs: 150,
+        },
+      ],
+    };
+    const base = build(pricedTable, null, null, { costProfile: profile, sweep });
     const head = build(pricedTable, null, null, {
       costProfile: profile,
       rerankProfile: profile,
+      sweep,
     });
     expect(base.cost.benchmarkPerTaskUsdWeighted).toBe(0.02);
     expect(head.cost.benchmarkPerTaskUsdWeighted).toBe(0.04);
@@ -272,6 +302,11 @@ describe('buildScoreboard', () => {
     expect(head.cost.estimatedRequestUsdWeighted).toBeCloseTo(0.06);
     expect(head.latency.modelTtftMs.benchmarkP50Weighted).toBe(100);
     expect(head.quality.benchmarkAccuracyWeighted).toBe(0.8);
+    expect(base.quality.heldOut?.accuracyWeighted).toBe(0.2);
+    expect(base.quality.heldOut?.estimatedRequestUsdWeighted).toBeCloseTo(0.5);
+    expect(head.quality.heldOut?.accuracyWeighted).toBe(0.9);
+    expect(head.quality.heldOut?.estimatedRequestUsdWeighted).toBeCloseTo(0.05);
+    expect(head.quality.heldOut?.p50LatencyMsWeighted).toBe(150);
     expect(
       build(pricedTable, null, null, { rerankProfile: profile }).cost.estimatedRequestUsdWeighted
     ).toBeCloseTo(0.06);
@@ -469,6 +504,33 @@ describe('buildScoreboard', () => {
       p50LatencyMsWeighted: null,
       routes: 0,
     });
+    const missingCost = build(table, null, null, {
+      sweep: { ...sweep, summaries: [{ ...summary, avgCostUsd: null }] },
+    });
+    expect(missingCost.quality.heldOut?.accuracyWeighted).toBe(0.7);
+    expect(missingCost.quality.heldOut?.estimatedRequestUsdWeighted).toBeNull();
+    expect(missingCost.quality.heldOut?.routes).toBe(1);
+    const infraOnly: OfflineSweepSummary = {
+      ...summary,
+      accuracy: null,
+      cases: 0,
+      errors: 2,
+      avgCostUsd: null,
+      p50LatencyMs: null,
+    };
+    expect(
+      build(table, null, null, { sweep: { ...sweep, summaries: [infraOnly] } }).quality.heldOut
+        ?.routes
+    ).toBe(0);
+    const rebuilt = build(table, null, null, {
+      sweep: {
+        ...sweep,
+        summaries: [infraOnly, { ...infraOnly, split: 'train' }],
+      },
+      rebuildFromSweep: true,
+    });
+    expect(rebuilt.quality.benchmarkAccuracyWeighted).toBeNull();
+    expect(rebuilt.quality.heldOut?.routes).toBe(0);
   });
 
   it('uses uniform table-route weights when production route mix is empty', () => {

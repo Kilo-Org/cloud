@@ -3,6 +3,7 @@ import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usa
 import { withDORetry } from '@kilocode/worker-utils';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { recordUsage, type UsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
+import { ZodError } from 'zod';
 
 export type ClassifierCallKind = 'sync' | 'background' | 'speculative';
 
@@ -55,7 +56,7 @@ export async function buildClassifierUsage(
       cache_discount: null,
       has_error: false,
       abuse_classification: 0,
-      organization_id: payload.organizationId,
+      organization_id: payload.organizationId ?? null,
       inference_provider: null,
       project_id: null,
     },
@@ -126,7 +127,21 @@ export async function recordClassifierUsage(
   createdAt: string
 ): Promise<void> {
   if (costUsd == null) return;
-  const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+  let usage: UsageRecordRequest;
+  try {
+    usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+  } catch (error) {
+    if (!(error instanceof ZodError)) throw error;
+    for (const issue of error.issues) {
+      console.warn(
+        JSON.stringify({
+          event: 'auto_routing_classifier_usage_invalid',
+          fieldPath: issue.path.join('.'),
+        })
+      );
+    }
+    return;
+  }
   await withDORetry(
     () =>
       env.AUTO_ROUTING_DECISION_CACHE.get(

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MirrorPayload } from '@kilocode/auto-routing-contracts';
+import { MirrorPayloadSchema, type MirrorPayload } from '@kilocode/auto-routing-contracts';
 import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
 import {
   buildClassifierUsage,
@@ -112,6 +112,18 @@ describe('classifier usage identity', () => {
     expect(JSON.stringify(usage)).not.toContain('private');
   });
 
+  it('maps an omitted organization to the same personal payer as the parsed payload', async () => {
+    const legacyPayload = { ...payload };
+    Reflect.deleteProperty(legacyPayload, 'organizationId');
+    const parsedPayload = MirrorPayloadSchema.parse(legacyPayload);
+    expect(parsedPayload.organizationId).toBeNull();
+    const legacyUsage = await buildClassifierUsage(legacyPayload, identity, costUsd, createdAt);
+    const parsedUsage = await buildClassifierUsage(parsedPayload, identity, costUsd, createdAt);
+    expect(legacyUsage.core.organization_id).toBeNull();
+    expect(legacyUsage).toEqual(parsedUsage);
+    expect(legacyUsage.core.cost).toBe(13);
+  });
+
   it('preserves the org payer and strips NUL bytes from client metadata', async () => {
     const organizationId = '00000000-0000-4000-8000-000000000001';
     const usage = await buildClassifierUsage(
@@ -161,6 +173,34 @@ describe('classifier usage delivery', () => {
       );
     }
   );
+
+  it('logs only the invalid field path and does not reject classifier usage recording', async () => {
+    const record = vi.fn(async () => {});
+    const env = {
+      AUTO_ROUTING_DECISION_CACHE: {
+        idFromName: vi.fn((name: string) => name),
+        get: vi.fn(() => ({ recordClassifierUsage: record })),
+      },
+    } as unknown as Env;
+    const warnSpy = vi.mocked(console.warn);
+    await expect(
+      recordClassifierUsage(
+        env,
+        { ...payload, organizationId: 'private-invalid-org-id' },
+        identity,
+        costUsd,
+        createdAt
+      )
+    ).resolves.toBeUndefined();
+    expect(record).not.toHaveBeenCalled();
+    expect(env.AUTO_ROUTING_DECISION_CACHE.get).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledExactlyOnceWith(
+      JSON.stringify({
+        event: 'auto_routing_classifier_usage_invalid',
+        fieldPath: 'core.organization_id',
+      })
+    );
+  });
 
   it('posts the usage contract to the existing web writer using the internal secret', async () => {
     const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);

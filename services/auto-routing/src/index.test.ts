@@ -130,7 +130,7 @@ const mockClassifierResult = {
   classification: mockClassification,
 };
 
-const normalizedInput = {
+const normalizedInput: NormalizedClassifierInput = {
   apiKind: 'chat_completions',
   requestedModel: 'anthropic/claude-sonnet-4',
   systemPromptPrefix: 'You classify auto model routing requests.',
@@ -191,10 +191,11 @@ const benchmarkRoutingTable = {
   },
 };
 
-function mirrorPayload(overrides: Record<string, unknown> = {}) {
+function mirrorPayload(overrides: Record<string, unknown> = {}): MirrorPayload {
   return {
     input: normalizedInput,
     userId: 'user-1',
+    organizationId: null,
     sessionId: 'task-123',
     machineId: 'machine-1',
     clientRequestId: 'req-1',
@@ -2066,7 +2067,7 @@ describe('auto routing worker', () => {
       await drainBackgroundTasks();
       const hashes = await computeContentHashes(input);
       const expected = await buildClassifierUsage(
-        mirrorPayload({ input }) as MirrorPayload,
+        mirrorPayload({ input }),
         {
           conversationKey: 'user:user-1:task:task-123',
           classifierModel,

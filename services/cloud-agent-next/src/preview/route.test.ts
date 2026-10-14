@@ -488,6 +488,29 @@ describe('preview proxy denials that never reach the resolver or stub', () => {
     expect(fetchUpstream).not.toHaveBeenCalled();
   });
 
+  it('retries a retryable resolver error and proxies once it succeeds', async () => {
+    const { deps, resolvePreviewTarget, getSessionStub, fetchUpstream } = fixture();
+    resolvePreviewTarget.mockRejectedValueOnce(
+      Object.assign(new Error('DO reset'), { retryable: true })
+    );
+    const response = await handlePreviewRequest(proxyRequest(sessionToken()), env, deps);
+    expect(response.status).toBe(200);
+    expect(resolvePreviewTarget).toHaveBeenCalledTimes(2);
+    expect(getSessionStub).toHaveBeenCalledTimes(2);
+    expect(fetchUpstream).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers 503 once retryable resolver errors exhaust the retries', async () => {
+    const { deps, resolvePreviewTarget, fetchUpstream } = fixture();
+    resolvePreviewTarget.mockRejectedValue(
+      Object.assign(new Error('DO reset'), { retryable: true })
+    );
+    const response = await handlePreviewRequest(proxyRequest(sessionToken()), env, deps);
+    expect(response.status).toBe(503);
+    expect(resolvePreviewTarget).toHaveBeenCalledTimes(3);
+    expect(fetchUpstream).not.toHaveBeenCalled();
+  });
+
   it('leaves the reserved-port refusal to the physical DO', async () => {
     const { deps, fetchUpstream } = fixture();
     const host = `p3000-${HEX}.${SUFFIX}`;

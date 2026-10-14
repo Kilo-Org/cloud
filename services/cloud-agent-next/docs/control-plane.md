@@ -938,7 +938,7 @@ Request and response bodies stream; there is no body-size cap.
 | Ineligible platform | 409 | `Preview is only available for interactive Cloud Agent sessions` |
 | Unsupported provider | 409 | `Preview is not available for this sandbox provider` |
 | Route preparing, or no session metadata yet | 503 + `Retry-After: 1` | `The sandbox is not ready` |
-| Resolver RPC failure or physical DO `fetch()` throw | 503 + `Retry-After: 1` | `Preview is temporarily unavailable` |
+| Resolver RPC failure (after `withDORetry` retries a retryable DO error) or physical DO `fetch()` throw | 503 + `Retry-After: 1` | `Preview is temporarily unavailable` |
 | Sandbox route failed or absent for this session, allocation stopped/stopping, no current `providerRef`, or the physical DO not running | 503 | `The sandbox is not running` |
 | Request headers over the cap (40 forwarded, name > 128, value > 8192; bounds header work before the access query and DO calls) | 431 | `Preview request headers are too large` |
 | Connection refused on the container port | 502 | `Nothing is listening on that port` |

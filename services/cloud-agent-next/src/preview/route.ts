@@ -24,6 +24,7 @@ import {
   type PreviewHeader,
 } from '../shared/preview-headers.js';
 import { logger } from '../logger.js';
+import { withDORetry } from '../utils/do-retry.js';
 import { resolveSandboxNamespace } from '../sandbox-placement.js';
 import type { Env } from '../types.js';
 import { isPreviewEnabled, matchPreviewHost, previewLabel, type PreviewHostMatch } from './host.js';
@@ -384,9 +385,12 @@ async function handleProxy(
 
   let target: ResolvedPreviewTarget;
   try {
-    target = await deps
-      .getSessionStub(env, claims.userId, claims.cloudAgentSessionId)
-      .resolvePreviewTarget();
+    // A side-effect-free read, so a retryable DO error is retried before it becomes a 503.
+    target = await withDORetry(
+      () => deps.getSessionStub(env, claims.userId, claims.cloudAgentSessionId),
+      stub => stub.resolvePreviewTarget(),
+      'resolvePreviewTarget'
+    );
   } catch (error) {
     logger.withFields({ error: errorMessage(error) }).warn('Preview target resolution failed');
     return fixed(503, 'Preview is temporarily unavailable', true);

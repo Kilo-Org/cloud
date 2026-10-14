@@ -7,6 +7,8 @@ import {
 import {
   ScreeningCatalogSchema,
   ScreenResumeSchema,
+  GRADER_RESERVE_USD,
+  screenGraderReserveUsd,
   restoreScreenMeasurements,
   recordScreenModelCost,
   sampleScreenCases,
@@ -21,6 +23,7 @@ import {
 } from '../scripts/screen-candidates';
 import type { OfflineSweep } from './scoreboard/schema';
 import { requestDirectSweepCompletion, selectSweepCases } from './scoreboard/sweep';
+import { createScreenBudget } from './scoreboard/screen-runtime';
 
 const pricing: CandidatePricing = {
   promptUsdPerToken: 0.000001,
@@ -201,6 +204,24 @@ describe('candidate screening', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(settled).toHaveBeenCalledTimes(1);
     expect(settled.mock.calls[0][0]).toMatchObject({ costUsd: 0.001, output: 'answer' });
+  });
+
+  it('reserves the fixed grader cap without catalog pricing and settles actual usage cost', async () => {
+    const input = JSON.stringify({ userPrompt: 'task', output: 'answer', rubric: 'correct' });
+    expect(screenGraderReserveUsd(input, undefined)).toBe(GRADER_RESERVE_USD);
+    expect(screenGraderReserveUsd(input, null)).toBe(0.002);
+    const budget = createScreenBudget(GRADER_RESERVE_USD);
+    const reservation = await budget.reserve(screenGraderReserveUsd(input, undefined));
+    if (!reservation) throw new Error('Expected an unlisted grader to reserve its fixed cap');
+    expect(budget.reservedUsd).toBe(GRADER_RESERVE_USD);
+    const usage = { cost: 0.0004 };
+    reservation.settle(usage.cost);
+    expect(budget.spentUsd).toBe(usage.cost);
+    expect(budget.reservedUsd).toBe(0);
+    expect(screenGraderReserveUsd(input, pricing)).toBeCloseTo(
+      Math.ceil(input.length / 4) * pricing.promptUsdPerToken +
+      8192 * pricing.completionUsdPerToken
+    );
   });
 
   it('screens default plus highest reasoning effort, preserving the full request fragment', () => {

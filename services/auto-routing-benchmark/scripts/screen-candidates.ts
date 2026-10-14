@@ -166,6 +166,17 @@ export function screenRequestTokenBudget(request: ScreenRequest) {
   };
 }
 
+export const GRADER_RESERVE_USD = 0.002;
+
+export function screenGraderReserveUsd(input: string, pricing: CandidatePricing | null | undefined) {
+  if (!pricing) return GRADER_RESERVE_USD;
+  const tokens = screenRequestTokenBudget({
+    systemPrompt: '', userPrompt: input, fragment: {},
+  });
+  return tokens.promptTokens * pricing.promptUsdPerToken +
+    tokens.completionTokens * pricing.completionUsdPerToken;
+}
+
 export function recordScreenModelCost(
   spend: ScreenModelSpend,
   completion: {
@@ -471,9 +482,6 @@ async function main() {
   };
   const judgeModel = 'typesafe/jev-1.13';
   const judgePricing = prices.get(judgeModel);
-  if (cases.some(benchCase => benchCase.check.kind === 'judged') && !judgePricing) {
-    throw new Error(`Catalog pricing is required for grader ${judgeModel}`);
-  }
   const baseJudge = apiKey ? createDeciderJudge({ apiKey, attributionHeaders }, judgeModel) : null;
   const measurements: ScreenMeasurement[] = candidates.flatMap(model =>
     screenVariants(model).map(variant => ({
@@ -530,12 +538,7 @@ async function main() {
     !report.spendIncomplete && !report.truncated && budget.spentUsd < maxUsd;
   const judge: typeof baseJudge = baseJudge
     ? async input => {
-        if (!judgePricing) throw new Error('Grader pricing is unavailable');
-        const tokens = screenRequestTokenBudget({
-          systemPrompt: '', userPrompt: JSON.stringify(input), fragment: {},
-        });
-        const estimate = tokens.promptTokens * judgePricing.promptUsdPerToken +
-          tokens.completionTokens * judgePricing.completionUsdPerToken;
+        const estimate = screenGraderReserveUsd(JSON.stringify(input), judgePricing);
         const reservation = await budget.reserve(estimate);
         if (!reservation) {
           report.truncated = true;

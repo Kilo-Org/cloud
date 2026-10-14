@@ -287,8 +287,9 @@ across workers; a worker waits for in-flight settlement when funds are reserved.
 Requests explicitly send the variant's `max_tokens`, defaulting to 8192.
 Input-token estimates are approximate, so unexpectedly higher actual costs can still
 exceed a reservation; no new requests start after the settled budget is exhausted.
-Judged cases require catalog pricing for the decider judge so grading also reserves
-budget before sending.
+Grading also reserves before sending and settles to the actual reported `usage.cost`.
+When the System One grader is absent from the Kilo catalog, each call reserves
+`GRADER_RESERVE_USD` ($0.002); catalog-priced graders retain token-based reservations.
 Missing model cost marks only that model `costUnknown: true`, excludes it from
 recommendations, and stops sampling all its variants; other models continue.
 Its reported prompt and completion token counts are charged at catalog prices

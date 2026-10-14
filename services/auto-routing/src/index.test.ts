@@ -2113,7 +2113,7 @@ describe('auto routing worker', () => {
           const classifier = Promise.withResolvers<ClassifierRunResult>();
           cacheReadConversationState.mockReturnValueOnce(cache.promise);
           classifyNormalizedInput.mockReturnValueOnce(classifier.promise);
-          vi.spyOn(Math, 'random').mockReturnValue(0);
+          vi.spyOn(Math, 'random').mockReturnValue(0.99);
           const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
           const settleClassifier = () => {
             if (result === 'success') classifier.resolve(classifierResult);
@@ -2148,15 +2148,42 @@ describe('auto routing worker', () => {
               classifierResult: { classification: mockClassification },
             });
             expect(cacheAddPendingClassifierCost).not.toHaveBeenCalled();
-            expect(logSpy).toHaveBeenCalledWith(
-              expect.stringContaining('"classification":"cache"')
-            );
+            if (order === 'before') {
+              expect(logSpy).toHaveBeenCalledWith(
+                expect.stringContaining('"classification":"cache"')
+              );
+            } else {
+              expect(logSpy).not.toHaveBeenCalled();
+              expect(writeDataPoint).not.toHaveBeenCalled();
+            }
           } finally {
             cache.resolve(conversationState(mockClassification));
             settleClassifier();
             await pending;
             await drainBackgroundTasks();
           }
+          expect(logSpy).toHaveBeenCalledTimes(1);
+          const [logMessage] = logSpy.mock.calls[0] ?? [];
+          const loggedDecision = JSON.parse(String(logMessage));
+          expect(loggedDecision).toMatchObject({
+            event: 'auto_routing_decision',
+            classification: 'cache',
+            cacheHit: true,
+            classifierCostCredits: classifierResult.cost,
+            sampled: false,
+            timings: { classifierMs: expect.any(Number) },
+          });
+          if (order === 'after') {
+            expect(loggedDecision.deferredClassifierCostCredits).toBe(classifierResult.cost);
+          } else {
+            expect(loggedDecision).not.toHaveProperty('deferredClassifierCostCredits');
+          }
+          expect(writeDataPoint).toHaveBeenCalledTimes(1);
+          expect(writeDataPoint).toHaveBeenCalledWith(
+            expect.objectContaining({
+              doubles: [0, classifierResult.cost, mockClassification.confidence, 1],
+            })
+          );
           expect(cacheAddPendingClassifierCost).toHaveBeenCalledTimes(order === 'after' ? 1 : 0);
           if (order === 'after') {
             expect(cacheAddPendingClassifierCost).toHaveBeenCalledWith(classifierResult.cost);

@@ -275,10 +275,6 @@ function summarizeOutcome(outcome: DecisionOutcome): DecisionSummary {
   }
 }
 
-// Single sink for decision telemetry: one Analytics Engine data point and
-// one `auto_routing_decision` log line per decision. Successes are sampled
-// per the KV-configured rate; errors and real model switches always log
-// (failures at warn).
 function recordDecision(
   env: Env,
   ctx: DecisionContext,
@@ -290,9 +286,11 @@ function recordDecision(
   classification: 'sync' | 'speculative' | 'cache' | 'background' = outcome.kind === 'cache_hit'
     ? 'cache'
     : 'sync',
-  lowConfidence = false
+  lowConfidence = false,
+  classifierCost?: { cost: number; deferred: boolean }
 ): void {
   const summary = summarizeOutcome(outcome);
+  if (classifierCost) summary.cost = classifierCost.cost;
   summary.details.timings = { ...ctx.timings, totalMs: durationMs };
 
   writeClassifierMetricsDataPoint(env, {
@@ -319,10 +317,10 @@ function recordDecision(
   const routeChanged =
     routeKey !== null && incumbent?.routeKey != null ? routeKey !== incumbent.routeKey : null;
 
-  // Failures bypass sampling, and so do real model switches: within-session
-  // switch sequences are the signal the sampled stream decimates.
   const isFailure = summary.status !== 'classified';
-  const alwaysLog = isFailure || switched;
+  const paidSpeculation =
+    (classification === 'speculative' || classifierCost !== undefined) && (summary.cost ?? 0) > 0;
+  const alwaysLog = isFailure || switched || paidSpeculation;
   if (!alwaysLog && Math.random() >= ctx.successSampleRate) {
     return;
   }
@@ -342,6 +340,7 @@ function recordDecision(
       colo: ctx.colo,
       classifierDurationMs: Math.round(durationMs),
       classifierCostCredits: summary.cost,
+      ...(classifierCost?.deferred ? { deferredClassifierCostCredits: summary.cost } : {}),
       messageCount: ctx.payload.input.messageCount,
       bodyBytes: ctx.payload.bodyBytes,
       taskType: summary.classification?.taskType ?? null,
@@ -664,11 +663,27 @@ export const decideHandler: Handler<HonoEnv> = async c => {
             decision,
             sticky,
             'background',
-            isLowConfidence(routingTable, classifier.classification.confidence)
+            isLowConfidence(routingTable, classifier.classification.confidence),
+            speculative ? { cost: classifier.cost ?? 0, deferred: true } : undefined
           );
         } catch (error) {
           const cost = getClassifierFailureMetadata(error).cost ?? 0;
           if (cost > 0) await addPendingClassifierCost(c.env, ctx.conversationKey, cost);
+          if (speculative) {
+            backgroundCtx.timings.classifierMs = timings.classifierMs;
+            recordDecision(
+              c.env,
+              backgroundCtx,
+              responseDurationMs,
+              { kind: 'error', error },
+              routingMode,
+              outcome.decision,
+              sticky,
+              'background',
+              false,
+              { cost, deferred: true }
+            );
+          }
           console.warn(
             JSON.stringify({
               event: 'auto_routing_background_classify_failed',
@@ -700,32 +715,43 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         )
       );
     }
+    const responseDurationMs = performance.now() - startedAt;
     let responseCost = pendingCostUsd;
-    if (speculative) {
-      if (speculative.outcome) {
-        responseCost += classifierOutcomeCost(speculative.outcome);
-      } else {
-        c.executionCtx.waitUntil(
-          speculative.promise.then(result => {
-            const cost = classifierOutcomeCost(result);
-            return cost > 0
-              ? addPendingClassifierCost(c.env, ctx.conversationKey, cost)
-              : undefined;
-          })
-        );
-      }
+    if (speculative && !speculative.outcome) {
+      c.executionCtx.waitUntil(
+        speculative.promise.then(async result => {
+          const cost = classifierOutcomeCost(result);
+          if (cost > 0) await addPendingClassifierCost(c.env, ctx.conversationKey, cost);
+          recordDecision(
+            c.env,
+            ctx,
+            responseDurationMs,
+            outcome,
+            routingMode,
+            decision,
+            sticky,
+            'cache',
+            isLowConfidence(routingTable, cached.confidence),
+            { cost, deferred: true }
+          );
+        })
+      );
+    } else {
+      const cost = speculative?.outcome ? classifierOutcomeCost(speculative.outcome) : 0;
+      responseCost += cost;
+      recordDecision(
+        c.env,
+        ctx,
+        responseDurationMs,
+        outcome,
+        routingMode,
+        decision,
+        sticky,
+        'cache',
+        isLowConfidence(routingTable, cached.confidence),
+        speculative ? { cost, deferred: false } : undefined
+      );
     }
-    recordDecision(
-      c.env,
-      ctx,
-      performance.now() - startedAt,
-      outcome,
-      routingMode,
-      decision,
-      sticky,
-      'cache',
-      isLowConfidence(routingTable, cached.confidence)
-    );
     return c.json(decisionResponse(responseCost, cached, payload.input, decision));
   }
 

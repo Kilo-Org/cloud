@@ -154,9 +154,10 @@ describe('classifier usage delivery', () => {
     'hands off one durable event for a %s call with no dependency on a decide response',
     async kind => {
       const record = vi.fn(async () => {});
+      const idFromName = vi.fn((name: string) => name);
       const env = {
         AUTO_ROUTING_DECISION_CACHE: {
-          idFromName: vi.fn((name: string) => name),
+          idFromName,
           get: vi.fn(() => ({ recordClassifierUsage: record })),
         },
       } as unknown as Env;
@@ -168,9 +169,7 @@ describe('classifier usage delivery', () => {
         createdAt
       );
       expect(record).toHaveBeenCalledExactlyOnceWith(expected);
-      expect(env.AUTO_ROUTING_DECISION_CACHE.idFromName).toHaveBeenCalledExactlyOnceWith(
-        identity.conversationKey
-      );
+      expect(idFromName).toHaveBeenCalledExactlyOnceWith(identity.conversationKey);
     }
   );
 

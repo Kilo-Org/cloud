@@ -120,7 +120,9 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
 
   private async scheduleAlarm(time: number): Promise<void> {
     const alarm = await this.ctx.storage.getAlarm();
-    if (alarm === null || time < alarm) await this.ctx.storage.setAlarm(time);
+    if (alarm === null || alarm <= Date.now() || time < alarm) {
+      await this.ctx.storage.setAlarm(time);
+    }
   }
 
   async putStickyDecision(value: StickyDecision, generation: number): Promise<void> {
@@ -175,7 +177,7 @@ export class AutoRoutingDecisionCacheDO extends DurableObject<Env> {
         nextAlarm = Math.min(nextAlarm, entry.storedAt + ENTRY_TTL_MS);
       }
     }
-    if (Number.isFinite(nextAlarm)) await this.scheduleAlarm(nextAlarm);
+    if (Number.isFinite(nextAlarm)) await this.ctx.storage.setAlarm(nextAlarm);
   }
 }
 

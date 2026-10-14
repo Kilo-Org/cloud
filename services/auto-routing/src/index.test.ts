@@ -373,7 +373,9 @@ describe('auto routing worker', () => {
     );
     mockedFetch.mockReset();
     mockedFetch.mockImplementation(async (_url, init) => {
-      const usage = UsageRecordRequestSchema.parse(JSON.parse(String(init?.body)));
+      const body = init?.body;
+      if (typeof body !== 'string') throw new Error('Expected serialized usage body');
+      const usage = UsageRecordRequestSchema.parse(JSON.parse(body));
       return Response.json({
         status: 'recorded',
         result: {
@@ -2566,7 +2568,9 @@ describe('auto routing worker', () => {
         },
         posthog_distinct_id: null,
       });
-      expect(JSON.parse(String(mockedFetch.mock.calls[0]?.[1]?.body))).toEqual(usage);
+      const body = mockedFetch.mock.calls[0]?.[1]?.body;
+      if (typeof body !== 'string') throw new Error('Expected serialized usage body');
+      expect(JSON.parse(body)).toEqual(usage);
       expect(mockedFetch.mock.calls[0]?.[1]?.headers).toMatchObject({
         'x-internal-api-key': 'classifier-token',
       });
@@ -2617,7 +2621,9 @@ describe('auto routing worker', () => {
     const deliveries: UsageRecordRequest[] = [];
     const attempts = new Map<string, number>();
     mockedFetch.mockImplementation(async (_url, init) => {
-      const usage = UsageRecordRequestSchema.parse(JSON.parse(String(init?.body)));
+      const body = init?.body;
+      if (typeof body !== 'string') throw new Error('Expected serialized usage body');
+      const usage = UsageRecordRequestSchema.parse(JSON.parse(body));
       deliveries.push(usage);
       const attempt = (attempts.get(usage.core.id) ?? 0) + 1;
       attempts.set(usage.core.id, attempt);

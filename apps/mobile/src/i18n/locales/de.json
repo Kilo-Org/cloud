@@ -1040,7 +1040,7 @@
         "recoveryLabel": "GitHub-App aktualisieren"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer wurde deaktiviert, weil die Liste zulässiger IP-Adressen dieser GitHub-Organisation Kilo blockiert. Wende dich an hi@kilocode.ai, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
+        "description": "Code Reviewer wurde deaktiviert, weil die Liste zulässiger IP-Adressen dieser GitHub-Organisation Kilo blockiert. Wende dich an hi@kilo.ai, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer wurde deaktiviert, weil Kilo für dieses GitLab-Projekt kein Projektzugriffstoken erstellen kann. Gewähre Zugriff mit der Rolle Maintainer oder aktiviere Projektzugriffstoken. Aktiviere Code Reviewer anschließend wieder.",
@@ -1055,7 +1055,7 @@
         "recoveryLabel": "Code-Reviewer-Einstellungen aktualisieren"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer wurde deaktiviert, weil heute beim Klonen des Repositorys dreimal das Zeitlimit überschritten wurde. Wende dich an hi@kilocode.ai, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
+        "description": "Code Reviewer wurde deaktiviert, weil heute beim Klonen des Repositorys dreimal das Zeitlimit überschritten wurde. Wende dich an hi@kilo.ai, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
       },
       "title": "Beim Code-Prüfer musst du eingreifen.",
       "recoveryLabel": "Support kontaktieren"

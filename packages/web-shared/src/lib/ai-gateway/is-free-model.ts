@@ -21,7 +21,6 @@ export function isFreeModel(model: string): boolean {
     modelId === KILO_AUTO_FREE_MODEL.id ||
     modelId.endsWith(':free') ||
     modelId === 'openrouter/free' ||
-    modelId === 'inclusionai/ling-3.1-flash' ||
     (modelId.startsWith('stealth/') && modelId.endsWith('-alpha'))
   );
 }

@@ -83,13 +83,7 @@ import {
   isAnonymousContext,
   type AnonymousUserContext,
 } from '@kilocode/web-shared/lib/anonymous';
-import {
-  checkFreeModelRateLimit,
-  checkFreeModelRateLimitByUser,
-  logFreeModelRequest,
-  checkPromotionLimit,
-} from '@kilocode/web-shared/lib/free-model-rate-limiter';
-import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@kilocode/web-shared/lib/constants';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   gatewayRateLimitKey,
@@ -142,7 +136,6 @@ import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
-const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
 
 /**
  * Checks if a string starts with a required prefix and removes it.
@@ -180,14 +173,11 @@ function validatePath(
   return { errorResponse: invalidPathResponse() };
 }
 
-async function resolveRateLimit(
+async function resolveFreeModelRateLimitKey(
   feature: FeatureValue | null,
   ipAddress: string,
   authPromise: Promise<{ user: { id: string } | null }>
-): Promise<
-  | NextResponseType<unknown>
-  | { result: { allowed: boolean; requestCount: number }; subject: string }
-> {
+): Promise<NextResponseType<unknown> | string> {
   if (isUserRateLimitedFeature(feature) && isCloudflareIP(ipAddress)) {
     const { user } = await authPromise;
     if (!user) {
@@ -199,15 +189,9 @@ async function resolveRateLimit(
         { status: 401 }
       );
     }
-    return {
-      result: await checkFreeModelRateLimitByUser(user.id),
-      subject: `user: ${user.id}`,
-    };
+    return `user:${user.id}`;
   }
-  return {
-    result: await checkFreeModelRateLimit(ipAddress),
-    subject: `ip address: ${ipAddress}`,
-  };
+  return `ip:${ipAddress}`;
 }
 
 export async function handleLlmProxyRequest(
@@ -492,18 +476,17 @@ export async function handleLlmProxyRequest(
   // the report-only decide call and the usage event, which share this request.
   const clientIp = bareIpLiteral(ipAddress);
 
-  // For rate-limited Kilo-exclusive models: check the limit and log at start.
-  // Server-side products (cloud-agent, code-review, app-builder) rate-limit
-  // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
-  // All other products rate-limit per IP (fast pre-auth path).
-  const isRateLimitedModelRequest = isKiloExclusiveRateLimitedModel(effectiveModelIdLowerCased);
-  if (isRateLimitedModelRequest) {
-    const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
-    if (rateLimit instanceof NextResponse) return rateLimit;
+  // For rate-limited Kilo-exclusive models: server-side products (cloud-agent,
+  // code-review, app-builder, gastown) rate-limit per user when the request comes
+  // from Cloudflare IPs (Kilo infrastructure). All other products rate-limit per
+  // IP (fast pre-auth path).
+  if (isKiloExclusiveRateLimitedModel(effectiveModelIdLowerCased)) {
+    const rateLimitKey = await resolveFreeModelRateLimitKey(feature, ipAddress, authPromise);
+    if (rateLimitKey instanceof NextResponse) return rateLimitKey;
 
-    if (!rateLimit.result.allowed) {
+    if (await isFreeModelRateLimited(request, rateLimitKey)) {
       console.warn(
-        `Model rate limit exceeded, ${rateLimit.subject}, model: ${effectiveModelIdLowerCased}, request count: ${rateLimit.result.requestCount}`
+        `Model rate limit exceeded, ${rateLimitKey}, model: ${effectiveModelIdLowerCased}`
       );
       return NextResponse.json(
         {
@@ -556,32 +539,6 @@ export async function handleLlmProxyRequest(
         },
         { status: 401 }
       );
-    }
-
-    if (isRateLimitedModelRequest) {
-      const promotionLimit = await checkPromotionLimit(ipAddress);
-
-      if (!promotionLimit.allowed) {
-        console.warn(
-          `Promotion model limit exceeded, ip: ${ipAddress}, ` +
-            `model: ${effectiveModelIdLowerCased}, ` +
-            `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
-            `in ${PROMOTION_WINDOW_HOURS}h window`
-        );
-
-        return NextResponse.json(
-          {
-            error: {
-              code: PROMOTION_MODEL_LIMIT_REACHED,
-              message:
-                'Sign up for free to continue and explore 500 other models. ' +
-                'Takes 2 minutes, no credit card required. Or come back later.',
-            },
-            error_type: ProxyErrorType.promotion_limit_reached,
-          },
-          { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
-        );
-      }
     }
 
     // Anonymous access for free model (rate-limited above when configured)
@@ -707,15 +664,6 @@ export async function handleLlmProxyRequest(
     (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
   ) {
     return storeAndPreviousResponseIdIsNotSupported();
-  }
-
-  // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isRateLimitedModelRequest) {
-    await logFreeModelRequest(
-      ipAddress,
-      effectiveModelIdLowerCased,
-      isAnonymousContext(user) ? undefined : user.id
-    );
   }
 
   async function resolveAccessCheck(modelId: string) {

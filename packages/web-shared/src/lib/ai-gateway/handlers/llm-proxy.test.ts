@@ -40,12 +40,7 @@ import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { rewriteModelResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import {
-  checkFreeModelRateLimit,
-  checkFreeModelRateLimitByUser,
-  checkPromotionLimit,
-  logFreeModelRequest,
-} from '@kilocode/web-shared/lib/free-model-rate-limiter';
+import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { stepfun_5_preview_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
@@ -99,7 +94,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
     ].includes(modelId)
   ),
 }));
-jest.mock('@kilocode/web-shared/lib/free-model-rate-limiter');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit');
 jest.mock(
   '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server',
   () => ({
@@ -192,10 +187,7 @@ const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
 const mockedRewriteModelResponse = jest.mocked(rewriteModelResponse);
-const mockedCheckFreeModelRateLimit = jest.mocked(checkFreeModelRateLimit);
-const mockedCheckFreeModelRateLimitByUser = jest.mocked(checkFreeModelRateLimitByUser);
-const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
-const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
+const mockedIsFreeModelRateLimited = jest.mocked(isFreeModelRateLimited);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedDecide = jest.mocked(decide);
 const mockedIsNonTrialEnterpriseOrganization = jest.mocked(isNonTrialEnterpriseOrganization);
@@ -1221,7 +1213,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     'google/gemma-4-31b-it:free',
     'thinkingmachines/inkling:free',
   ])('rejects the unavailable or disabled model %s before upstream', async modelId => {
-    mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: true, requestCount: 0 });
+    mockedIsFreeModelRateLimited.mockResolvedValue(false);
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(makeRequest(makeBody(modelId)) as never);
@@ -1233,8 +1225,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('applies free-model rate limiting to flagged Kilo-exclusive models', async () => {
-    mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: false, requestCount: 200 });
+  it('applies free-model rate limiting per IP to flagged Kilo-exclusive models', async () => {
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
@@ -1246,9 +1238,45 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       error_type: 'rate_limit_exceeded',
       message: 'Model usage limit reached. Please try again later.',
     });
-    expect(mockedCheckFreeModelRateLimit).toHaveBeenCalledWith('127.0.0.1');
-    expect(mockedCheckFreeModelRateLimitByUser).not.toHaveBeenCalled();
-    expect(mockedLogFreeModelRequest).not.toHaveBeenCalled();
+    expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), 'ip:127.0.0.1');
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('applies free-model rate limiting per user to server-side products on Cloudflare IPs', async () => {
+    setUserAuth();
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id), {
+        'x-forwarded-for': '104.16.0.1',
+        'x-kilocode-feature': 'cloud-agent',
+      }) as never
+    );
+
+    expect(response.status).toBe(429);
+    expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), 'user:user-123');
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('requires authentication for server-side products on Cloudflare IPs', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id), {
+        'x-forwarded-for': '104.16.0.1',
+        'x-kilocode-feature': 'cloud-agent',
+      }) as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error_type: 'authentication_required' });
+    expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
@@ -1265,10 +1293,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockedCheckFreeModelRateLimit).not.toHaveBeenCalled();
-    expect(mockedCheckFreeModelRateLimitByUser).not.toHaveBeenCalled();
-    expect(mockedCheckPromotionLimit).not.toHaveBeenCalled();
-    expect(mockedLogFreeModelRequest).not.toHaveBeenCalled();
+    expect(mockedIsFreeModelRateLimited).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 

@@ -124,7 +124,7 @@ export function OrganizationSubscription({
                     <Button
                       variant="outline"
                       className="w-64 justify-center"
-                      onClick={() => (window.location.href = 'mailto:teams@kilocode.ai')}
+                      onClick={() => (window.location.href = 'mailto:hi@kilo.ai')}
                     >
                       <Mail className="mr-2 h-4 w-4" />
                       Contact Support

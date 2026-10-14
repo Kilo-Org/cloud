@@ -626,7 +626,7 @@ export async function sendAccountDeletionSupportNotification(
   userId: string
 ): Promise<void> {
   await sendViaMailgun({
-    to: 'hi@kilocode.ai',
+    to: 'hi@kilo.ai',
     subject: `Account Deletion Request — ${userEmail}`,
     html: `<p>User <strong>${userEmail}</strong> (ID: <code>${userId}</code>) has requested account deletion from the mobile app.</p>`,
     replyTo: userEmail,
@@ -821,7 +821,7 @@ export async function sendKiloPassDuplicateCardCanceledEmail(
   to: string,
   props: { supportUrl?: string }
 ): Promise<SendResult> {
-  const support_url = props.supportUrl ?? `mailto:hi@kilocode.ai`;
+  const support_url = props.supportUrl ?? `mailto:hi@kilo.ai`;
   return send({
     to,
     templateName: 'kiloPassDuplicateCardCanceled',

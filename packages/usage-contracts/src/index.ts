@@ -7,7 +7,7 @@ export type { AbuseClassification, GatewayApiKind } from './schema-types';
 /**
  * Wire contract for `POST /api/internal/usage/record`.
  *
- * The AI gateway runs on `kilocode-global-app`, whose functions execute in both
+ * The AI gateway runs on `kilocode-ai-gateway`, whose functions execute in both
  * Frankfurt and SFO, while the PostgreSQL primary is Frankfurt-only. The usage
  * write holds row locks on `kilocode_users` / `organizations` /
  * `organization_user_usage` across several sequential statements, so from SFO

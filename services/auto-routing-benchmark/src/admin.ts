@@ -453,7 +453,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         );
         return c.json(
           pairs.length > 0
-            ? await assembleCustomRoutingTable(c.env.BENCH_DB, config, pairs)
+            ? await assembleCustomRoutingTable(c.env.BENCH_DB, config, pairs, {
+                catalogEnv: c.env,
+              })
             : { table: null }
         );
       } catch (error) {

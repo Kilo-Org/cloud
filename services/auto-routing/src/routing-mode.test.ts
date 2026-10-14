@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AutoRoutingModeConfigDO,
+  clearAutoRoutingSettingsCache,
   getConfiguredAutoRoutingMode,
   getConfiguredAutoRoutingSettings,
   getAutoRoutingMode,
@@ -312,10 +313,12 @@ describe('AutoRoutingModeConfigDO', () => {
 describe('auto routing mode config', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearAutoRoutingSettingsCache();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('defaults to best accuracy per dollar when no owner config exists', async () => {
@@ -348,21 +351,79 @@ describe('auto routing mode config', () => {
     ).resolves.toBe('best_accuracy');
   });
 
-  it('reads the owner object on every lookup instead of serving a stale module value', async () => {
-    const { env, modes, stubs } = makeEnv({
+  it('bounds cached owner settings by the TTL and clears them on demand', async () => {
+    vi.useFakeTimers();
+    const { env, modes, pools, stubs } = makeEnv({
+      'user:user-1': { mode: 'best_accuracy', pool: SAMPLE_POOL },
+    });
+    const owner = { userId: 'user-1', organizationId: null };
+
+    await expect(getEffectiveAutoRoutingSettings(env, owner)).resolves.toEqual({
+      mode: 'best_accuracy',
+      pool: SAMPLE_POOL,
+    });
+
+    modes.set('user:user-1', 'cost_per_accuracy');
+    pools.set('user:user-1', null);
+    vi.advanceTimersByTime(29_999);
+
+    await expect(getEffectiveAutoRoutingSettings(env, owner)).resolves.toEqual({
+      mode: 'best_accuracy',
+      pool: SAMPLE_POOL,
+    });
+    expect(stubs.get('user:user-1')?.getSettings).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(1);
+    await expect(getEffectiveAutoRoutingSettings(env, owner)).resolves.toEqual({
+      mode: 'cost_per_accuracy',
+      pool: null,
+    });
+    expect(stubs.get('user:user-1')?.getSettings).toHaveBeenCalledTimes(2);
+
+    modes.set('user:user-1', 'best_accuracy');
+    clearAutoRoutingSettingsCache();
+    await expect(getEffectiveAutoRoutingSettings(env, owner)).resolves.toEqual({
+      mode: 'best_accuracy',
+      pool: null,
+    });
+    expect(stubs.get('user:user-1')?.getSettings).toHaveBeenCalledTimes(3);
+  });
+
+  it('shares organization settings without mixing personal settings across users', async () => {
+    const { env, stubs } = makeEnv({
       'user:user-1': { mode: 'best_accuracy' },
+      'user:user-2': { mode: 'cost_per_accuracy' },
+      'org:org-1': { pool: SAMPLE_POOL },
     });
 
     await expect(
-      getConfiguredAutoRoutingMode(env, { ownerType: 'user', ownerId: 'user-1' })
-    ).resolves.toBe('best_accuracy');
-
-    modes.set('user:user-1', 'cost_per_accuracy');
-
+      getEffectiveAutoRoutingSettings(env, { userId: 'user-1', organizationId: 'org-1' })
+    ).resolves.toEqual({ mode: 'best_accuracy', pool: SAMPLE_POOL });
     await expect(
-      getConfiguredAutoRoutingMode(env, { ownerType: 'user', ownerId: 'user-1' })
-    ).resolves.toBe('cost_per_accuracy');
-    expect(stubs.get('user:user-1')?.getMode).toHaveBeenCalledTimes(2);
+      getEffectiveAutoRoutingSettings(env, { userId: 'user-2', organizationId: 'org-1' })
+    ).resolves.toEqual({ mode: 'cost_per_accuracy', pool: SAMPLE_POOL });
+    expect(stubs.get('org:org-1')?.getSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries failed owner settings reads on the next lookup', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { env, stubs } = makeEnv({
+      'user:user-1': { mode: 'best_accuracy', pool: SAMPLE_POOL },
+    });
+    const owner = { userId: 'user-1', organizationId: null };
+    await getConfiguredAutoRoutingSettings(env, { ownerType: 'user', ownerId: 'user-1' });
+    stubs.get('user:user-1')?.getSettings.mockClear();
+    stubs.get('user:user-1')?.getSettings.mockRejectedValueOnce(new Error('do unavailable'));
+
+    await expect(getEffectiveAutoRoutingSettings(env, owner)).resolves.toEqual({
+      mode: 'cost_per_accuracy',
+      pool: null,
+    });
+    await expect(getEffectiveAutoRoutingSettings(env, owner)).resolves.toEqual({
+      mode: 'best_accuracy',
+      pool: SAMPLE_POOL,
+    });
+    expect(stubs.get('user:user-1')?.getSettings).toHaveBeenCalledTimes(2);
   });
 
   it('writes and clears owner-specific modes in the owner object', async () => {
@@ -434,6 +495,7 @@ describe('auto routing mode config', () => {
 
     pools.set('org:org-1', null);
     modes.set('org:org-1', null);
+    clearAutoRoutingSettingsCache();
 
     await expect(
       getEffectiveAutoRoutingSettings(env, { userId: 'user-1', organizationId: 'org-1' })

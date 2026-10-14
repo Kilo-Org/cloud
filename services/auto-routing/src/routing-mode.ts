@@ -19,6 +19,17 @@ export type AutoRoutingOwnerSettings = {
   pool: EfficientModelPool | null;
 };
 
+const AUTO_ROUTING_SETTINGS_TTL_MS = 30_000;
+const AUTO_ROUTING_SETTINGS_CACHE_MAX_ENTRIES = 1_024;
+const autoRoutingSettingsCache = new Map<
+  string,
+  { promise: Promise<AutoRoutingOwnerSettings>; expiresAt: number }
+>();
+
+export function clearAutoRoutingSettingsCache(): void {
+  autoRoutingSettingsCache.clear();
+}
+
 function modeKey(ownerType: AutoRoutingModeOwnerType, ownerId: string): string {
   return `${ownerType}:${ownerId}`;
 }
@@ -125,7 +136,7 @@ export async function getConfiguredAutoRoutingMode(
     });
 }
 
-export async function getConfiguredAutoRoutingSettings(
+async function readAutoRoutingSettings(
   env: AutoRoutingModeEnv,
   owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
 ): Promise<AutoRoutingOwnerSettings> {
@@ -139,8 +150,43 @@ export async function getConfiguredAutoRoutingSettings(
           ...formatError(error),
         })
       );
-      return { mode: null, pool: null };
+      throw error;
     });
+}
+
+export async function getConfiguredAutoRoutingSettings(
+  env: AutoRoutingModeEnv,
+  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
+): Promise<AutoRoutingOwnerSettings> {
+  return readAutoRoutingSettings(env, owner).catch(() => ({ mode: null, pool: null }));
+}
+
+function getCachedAutoRoutingSettings(
+  env: AutoRoutingModeEnv,
+  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
+): Promise<AutoRoutingOwnerSettings> {
+  const key = modeKey(owner.ownerType, owner.ownerId);
+  const now = Date.now();
+  const cached = autoRoutingSettingsCache.get(key);
+  if (cached && cached.expiresAt > now) {
+    return cached.promise;
+  }
+  autoRoutingSettingsCache.delete(key);
+  if (autoRoutingSettingsCache.size >= AUTO_ROUTING_SETTINGS_CACHE_MAX_ENTRIES) {
+    const oldestKey = autoRoutingSettingsCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      autoRoutingSettingsCache.delete(oldestKey);
+    }
+  }
+  const promise = readAutoRoutingSettings(env, owner).catch(() => {
+    if (autoRoutingSettingsCache.get(key) === entry) {
+      autoRoutingSettingsCache.delete(key);
+    }
+    return { mode: null, pool: null };
+  });
+  const entry = { promise, expiresAt: now + AUTO_ROUTING_SETTINGS_TTL_MS };
+  autoRoutingSettingsCache.set(key, entry);
+  return promise;
 }
 
 export async function getAutoRoutingMode(
@@ -159,12 +205,12 @@ export async function getEffectiveAutoRoutingSettings(
   env: AutoRoutingModeEnv,
   owner: { userId: string; organizationId: string | null }
 ): Promise<{ mode: AutoRoutingMode; pool: EfficientModelPool | null }> {
-  const userSettingsPromise = getConfiguredAutoRoutingSettings(env, {
+  const userSettingsPromise = getCachedAutoRoutingSettings(env, {
     ownerType: 'user',
     ownerId: owner.userId,
   });
   const orgSettingsPromise = owner.organizationId
-    ? getConfiguredAutoRoutingSettings(env, {
+    ? getCachedAutoRoutingSettings(env, {
         ownerType: 'org',
         ownerId: owner.organizationId,
       })

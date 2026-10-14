@@ -25,6 +25,8 @@ import {
   existsNewerCompletedRun,
   getCaseResults,
   getExistingCaseResultIds,
+  getPendingDeciderOutput,
+  savePendingDeciderOutput,
   getLatestSummariesByModel,
   getRunningRun,
   getRunWithModels,
@@ -54,7 +56,13 @@ import {
   type CaseResultRow,
   type PriorModelResult,
 } from './db';
-import { gradeClassifierOutput, runDeciderCheck } from './grading';
+import {
+  gradeClassifierOutput,
+  gradeDeciderOutput,
+  DeciderGraderRetryError,
+  type DeciderJudge,
+} from './grading';
+import { createDeciderJudge } from './decider-judge';
 import { createSystemOneClient } from './openrouter';
 import {
   buildRoutingTable,
@@ -68,7 +76,12 @@ import {
   warmUpCliContainer,
 } from './cli-runner';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
-import { fetchPlatformRegistryEntries } from './platform-models';
+import {
+  catalogCandidatePrices,
+  fetchBenchmarkModelCatalog,
+  fetchPlatformRegistryEntries,
+  platformRegistryEntries,
+} from './platform-models';
 import { pickClassifierWinner } from './winner';
 import {
   recordBenchmarkSettlementOutcomes,
@@ -400,7 +413,9 @@ export async function publishPlatformRoutingTable(
     engineIdentity: computeEngineIdentity('decider'),
     repetitions: config.deciderRepetitions,
   };
-  const desired = await fetchPlatformRegistryEntries(env, config, fetchImpl);
+  const catalog = await fetchBenchmarkModelCatalog(env, fetchImpl);
+  const desired = platformRegistryEntries(config, catalog);
+  const prices = catalogCandidatePrices(catalog);
   // Reconcile against the live catalog before the settled guard. A new effort
   // must become pending, and a removed effort must stop blocking publication.
   await syncPlatformRegistryRows(env.BENCH_DB, current, desired);
@@ -444,12 +459,20 @@ export async function publishPlatformRoutingTable(
         minAccuracy: config.minAccuracy,
         switchCostFactor: config.switchCostFactor,
         bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
+        productionTokenProfile: config.productionTokenProfile,
+        switchHorizonTurns: config.switchHorizonTurns,
+        lowConfidenceThreshold: config.lowConfidenceThreshold,
+        prices,
       }
     )}-variants`,
     generatedAt,
     minAccuracy: config.minAccuracy,
     switchCostFactor: config.switchCostFactor,
     bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
+    productionTokenProfile: config.productionTokenProfile,
+    switchHorizonTurns: config.switchHorizonTurns,
+    lowConfidenceThreshold: config.lowConfidenceThreshold,
+    prices,
     deciderModels,
     summaries: filterSummariesByProvenance(readyEntries, summaries),
   });
@@ -1264,8 +1287,18 @@ async function processDeciderJob(
     caseIds: cases.map(c => c.id),
   });
   const casesToRun = cases.filter(c => !existingCaseIds.has(c.id));
+  let graderCostUsd = 0;
+  let graderFailure: DeciderGraderRetryError | null = null;
 
   if (casesToRun.length > 0) {
+    let judge: DeciderJudge | null = null;
+    if (casesToRun.some(c => c.check.kind === 'judged')) {
+      try {
+        judge = createDeciderJudge(await createSystemOneClient(env));
+      } catch {
+        throw new DeciderGraderRetryError('Decider judge client initialization failed');
+      }
+    }
     // Fetch a short-lived user token ONCE per queue message. Non-OK throws so the
     // queue retries the message. The token is never logged.
     const kiloToken = await fetchBenchmarkUserToken(
@@ -1294,20 +1327,35 @@ async function processDeciderJob(
     // too, so higher concurrency here would only hold HTTP requests open.
     await runCasesWithConcurrency(casesToRun, 1, async benchCase => {
       const startedAt = performance.now();
+      const pendingKey = {
+        run_id: message.runId,
+        model: message.model,
+        variant: storedVariant,
+        case_id: benchCase.id,
+        rep,
+      };
       try {
-        let result = await runDeciderCaseViaCli(env, {
-          instanceName,
-          model: message.model,
-          benchCase,
-          kiloToken,
-          kiloApiUrl: env.KILO_CLI_API_URL,
-          orgId: state.benchmarkOrgId,
-          variant: cliVariant,
-        });
+        const pending =
+          benchCase.check.kind === 'judged'
+            ? await getPendingDeciderOutput(env.BENCH_DB, pendingKey).catch(() => {
+                throw new DeciderGraderRetryError('Pending decider output could not be read');
+              })
+            : null;
+        let result =
+          pending?.result ??
+          (await runDeciderCaseViaCli(env, {
+            instanceName,
+            model: message.model,
+            benchCase,
+            kiloToken,
+            kiloApiUrl: env.KILO_CLI_API_URL,
+            orgId: state.benchmarkOrgId,
+            variant: cliVariant,
+          }));
         // The CLI occasionally ends a session with no assistant text at all
         // (transient empty completion: a lone step_finish with cost 0). Mirror
         // the production classifier's policy and retry once.
-        let retried = false;
+        let retried = pending?.retried ?? false;
         if (result.exitCode === 0 && result.text.length === 0) {
           retried = true;
           const retry = await runDeciderCaseViaCli(env, {
@@ -1325,17 +1373,37 @@ async function processDeciderJob(
               : (retry.costUsd ?? 0) + (result.costUsd ?? 0);
           result = retry;
         }
-        const succeeded =
+        if (
+          benchCase.check.kind === 'judged' &&
+          !pending &&
           result.exitCode === 0 &&
-          result.text.length > 0 &&
-          runDeciderCheck(benchCase.check, result.text);
+          result.text.length > 0
+        ) {
+          await savePendingDeciderOutput(env.BENCH_DB, pendingKey, { result, retried }).catch(
+            () => {
+              throw new DeciderGraderRetryError('Pending decider output could not be saved');
+            }
+          );
+        }
+        const grade =
+          result.exitCode === 0 && result.text.length > 0
+            ? await gradeDeciderOutput(benchCase.check, {
+                userPrompt: benchCase.userPrompt,
+                output: result.text,
+                judge,
+              })
+            : { score: 0, costUsd: 0, graderError: null };
+        graderCostUsd += grade.costUsd;
+        if (grade.score === null) {
+          throw new DeciderGraderRetryError(grade.graderError ?? 'Decider judge failed');
+        }
         await upsertCaseResult(env.BENCH_DB, {
           run_id: message.runId,
           model: message.model,
           variant: storedVariant,
           case_id: benchCase.id,
           route_key: taxonomyRouteKey(benchCase),
-          score: succeeded ? 1 : 0,
+          score: grade.score,
           latency_ms: result.latencyMs,
           cost_usd: result.costUsd,
           error: result.exitCode !== 0 ? result.stderrTail.slice(0, 500) : null,
@@ -1350,6 +1418,10 @@ async function processDeciderJob(
           timed_out: result.timedOut ? 1 : 0,
         });
       } catch (error) {
+        if (error instanceof DeciderGraderRetryError) {
+          graderFailure = error;
+          return;
+        }
         if (isRetryableContainerAvailabilityError(error)) throw error;
         await upsertCaseResult(
           env.BENCH_DB,
@@ -1365,6 +1437,18 @@ async function processDeciderJob(
       }
     });
   }
+  console.log(
+    JSON.stringify({
+      event: 'benchmark_decider_grader_cost',
+      runId: message.runId,
+      model: message.model,
+      variant: entryVariant,
+      rep,
+      chunk,
+      graderCostUsd,
+    })
+  );
+  if (graderFailure) throw graderFailure;
 
   const hasNextChunk = await enqueueNextDeciderChunkIfNeeded(
     env,

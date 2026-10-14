@@ -21,7 +21,11 @@ import {
   registerBenchmarkProfiles,
 } from './benchmark-origin';
 import type { HonoEnv } from './hono-env';
-import { getConfiguredAutoRoutingSettings, setAutoRoutingSettings } from './routing-mode';
+import {
+  clearAutoRoutingSettingsCache,
+  getConfiguredAutoRoutingSettings,
+  setAutoRoutingSettings,
+} from './routing-mode';
 
 function settingsResponse(params: {
   ownerType: AutoRoutingModeOwnerType;
@@ -121,6 +125,7 @@ export const putRoutingSettingsHandler: Handler<HonoEnv> = async c => {
 
   // Persist only after successful admission (or when clearing the pool).
   await setAutoRoutingSettings(c.env, { ownerType, ownerId }, { mode, pool });
+  clearAutoRoutingSettingsCache();
 
   return c.json(
     settingsResponse({

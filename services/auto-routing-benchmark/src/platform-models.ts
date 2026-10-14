@@ -2,10 +2,18 @@ import {
   BenchmarkCatalogVariantsSchema,
   getReasoningVariantKeys,
   type BenchmarkConfig,
+  type CandidatePricing,
 } from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
 import { exactPairKey } from './db';
 import type { RunModelEntry } from './run';
+
+const CatalogTokenPriceSchema = z
+  .union([z.string().trim().min(1), z.number()])
+  .transform(value => Number(value))
+  .pipe(z.number().nonnegative())
+  .nullable()
+  .catch(null);
 
 export const BenchmarkModelCatalogSchema = z.object({
   data: z.array(
@@ -14,11 +22,13 @@ export const BenchmarkModelCatalogSchema = z.object({
       opencode: z.object({ variants: BenchmarkCatalogVariantsSchema.optional() }).optional(),
       pricing: z
         .object({
-          prompt: z.string(),
-          completion: z.string(),
-          request: z.string().optional(),
+          prompt: CatalogTokenPriceSchema.optional(),
+          completion: CatalogTokenPriceSchema.optional(),
+          input_cache_read: CatalogTokenPriceSchema.optional(),
+          request: CatalogTokenPriceSchema.optional(),
         })
         .nullable()
+        .catch(null)
         .optional(),
     })
   ),
@@ -47,6 +57,26 @@ export function platformRegistryEntries(
   return entries;
 }
 
+export function catalogCandidatePrices(
+  catalog: z.infer<typeof BenchmarkModelCatalogSchema>
+): ReadonlyMap<string, CandidatePricing | null> {
+  return new Map(
+    catalog.data.map(model => {
+      const pricing = model.pricing;
+      return [
+        model.id,
+        pricing?.prompt != null && pricing.completion != null
+          ? {
+              promptUsdPerToken: pricing.prompt,
+              completionUsdPerToken: pricing.completion,
+              cacheReadUsdPerToken: pricing.input_cache_read ?? null,
+            }
+          : null,
+      ];
+    })
+  );
+}
+
 export async function fetchBenchmarkModelCatalog(
   env: { KILO_WEB_API_BASE_URL: string },
   fetchImpl: typeof fetch = fetch
@@ -71,13 +101,10 @@ export function catalogFallbackCaseCosts(
 ): Map<string, number> {
   const costs = new Map<string, number>();
   for (const model of catalog.data) {
-    if (!model.pricing) continue;
-    const prompt = Number(model.pricing.prompt);
-    const completion = Number(model.pricing.completion);
-    const request = Number(model.pricing.request ?? '0');
-    if (![prompt, completion, request].every(price => Number.isFinite(price) && price >= 0)) {
-      continue;
-    }
+    if (model.pricing?.prompt == null || model.pricing.completion == null) continue;
+    const prompt = model.pricing.prompt;
+    const completion = model.pricing.completion;
+    const request = model.pricing.request ?? 0;
     costs.set(model.id, 100_000 * prompt + 50_000 * completion + 32 * request);
   }
   return costs;

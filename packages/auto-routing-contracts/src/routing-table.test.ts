@@ -9,6 +9,7 @@ import {
   rankCandidates,
   RankedCandidateSchema,
   RoutingTableSchema,
+  wilsonLowerBound,
 } from './routing-table';
 
 const candidate = (model: string, accuracy: number, avgCostUsd: number) => ({
@@ -27,7 +28,125 @@ const rankInput = (
 
 const order = (ranked: { model: string }[]) => ranked.map(c => c.model);
 
+describe('wilsonLowerBound', () => {
+  it('returns zero when no cases were measured', () => {
+    expect(wilsonLowerBound(1, 0)).toBe(0);
+    expect(wilsonLowerBound(1, -1)).toBe(0);
+  });
+
+  it('matches known score bounds and supports a custom z score', () => {
+    expect(wilsonLowerBound(1, 10)).toBeCloseTo(10 / 11, 10);
+    expect(wilsonLowerBound(0, 10)).toBe(0);
+    expect(wilsonLowerBound(0.5, 1)).toBeCloseTo((1 - Math.SQRT1_2) / 2, 10);
+    expect(wilsonLowerBound(1, 10, 2)).toBeCloseTo(10 / 14, 10);
+    expect(wilsonLowerBound(0.7, 10, 0)).toBe(0.7);
+  });
+});
+
 describe('rankCandidates', () => {
+  it('prefers more measured cases when raw accuracy, latency and cost match', () => {
+    const ranked = rankCandidates(
+      [
+        { ...rankInput('small-sample', 1, 0.01), cases: 10 },
+        { ...rankInput('large-sample', 1, 0.01), cases: 100 },
+      ],
+      0.95
+    );
+    expect(order(ranked)).toEqual(['large-sample', 'small-sample']);
+    expect(ranked.map(c => c.cases)).toEqual([100, 10]);
+    expect(ranked.every(c => c.meetsThreshold)).toBe(true);
+  });
+
+  it('prefers a well-measured candidate even when its raw accuracy is slightly lower', () => {
+    expect(
+      order(
+        rankCandidates(
+          [
+            { ...rankInput('small-sample', 1, 0.01), cases: 10 },
+            { ...rankInput('large-sample', 0.98, 0.01), cases: 100 },
+          ],
+          0.95
+        )
+      )
+    ).toEqual(['large-sample', 'small-sample']);
+  });
+
+  it('preserves raw-accuracy value ordering when case counts are unknown', () => {
+    const candidates = [rankInput('accurate', 1, 0.002), rankInput('in-band-cheaper', 0.9, 0.0005)];
+    expect(order(rankCandidates(candidates, 0.95))).toEqual(['accurate', 'in-band-cheaper']);
+    expect(
+      order(
+        rankCandidates(
+          candidates.map(c => ({ ...c, cases: null })),
+          0.95
+        )
+      )
+    ).toEqual(['accurate', 'in-band-cheaper']);
+  });
+
+  it('uses raw accuracy for the competing set and strict threshold flag', () => {
+    const ranked = rankCandidates(
+      [
+        { ...rankInput('below-band', 0.89, 0.000001), cases: 1000 },
+        { ...rankInput('meets', 1, 0.01), cases: 1 },
+      ],
+      0.95
+    );
+    expect(order(ranked)).toEqual(['meets', 'below-band']);
+    expect(ranked.map(c => c.meetsThreshold)).toEqual([true, false]);
+  });
+
+  it('uses production prompt cost only when a profile is configured', () => {
+    const candidates = [
+      {
+        ...rankInput('cheap-output', 1, 0.01),
+        pricing: {
+          promptUsdPerToken: 0.002,
+          completionUsdPerToken: 0.003,
+          cacheReadUsdPerToken: 0.001,
+        },
+      },
+      {
+        ...rankInput('cheap-prompt', 1, 0.02),
+        pricing: {
+          promptUsdPerToken: 0.0002,
+          completionUsdPerToken: 0.003,
+          cacheReadUsdPerToken: 0.0001,
+        },
+      },
+    ];
+    expect(order(rankCandidates(candidates, 0.9, { profile: null }))).toEqual([
+      'cheap-output',
+      'cheap-prompt',
+    ]);
+    const ranked = rankCandidates(candidates, 0.9, {
+      profile: { uncachedInputTokens: 20, cachedInputTokens: 80 },
+    });
+    expect(order(ranked)).toEqual(['cheap-prompt', 'cheap-output']);
+    expect(ranked[0].estimatedRequestCostUsd).toBeCloseTo(0.032);
+  });
+
+  it('falls back to observed cost without pricing and prompt price without cache pricing', () => {
+    const ranked = rankCandidates(
+      [
+        rankInput('unpriced', 1, 0.01),
+        {
+          ...rankInput('priced', 1, 0.001),
+          pricing: {
+            promptUsdPerToken: 0.002,
+            completionUsdPerToken: 0.003,
+            cacheReadUsdPerToken: null,
+          },
+        },
+      ],
+      0.9,
+      { profile: { uncachedInputTokens: 20, cachedInputTokens: 80 } }
+    );
+    expect(order(ranked)).toEqual(['unpriced', 'priced']);
+    expect(ranked[0].estimatedRequestCostUsd).toBe(0.01);
+    expect(ranked[1].estimatedRequestCostUsd).toBeCloseTo(0.201);
+  });
+
   it('puts the best-value competing candidate first and the rest by accuracy', () => {
     const ranked = rankCandidates(
       [
@@ -116,6 +235,29 @@ describe('RoutingTableSchema', () => {
     });
 
     expect(parsed.routes['implementation/code_generation']?.[0]?.model).toBe('impl');
+    expect(parsed.lowConfidenceThreshold).toBeUndefined();
+  });
+
+  it('preserves optional confidence thresholds and validates their range', () => {
+    const table = {
+      version: 'synthetic-confidence',
+      generatedAt: new Date(0).toISOString(),
+      minAccuracy: 0.7,
+      switchCostFactor: 3,
+      source: 'benchmark',
+      routes: { 'implementation/code_generation': [candidate('m', 1, 1)] },
+    };
+    for (const lowConfidenceThreshold of [null, 0, 0.8, 1]) {
+      expect(
+        RoutingTableSchema.parse({ ...table, lowConfidenceThreshold }).lowConfidenceThreshold
+      ).toBe(lowConfidenceThreshold);
+    }
+    expect(RoutingTableSchema.safeParse({ ...table, lowConfidenceThreshold: -0.1 }).success).toBe(
+      false
+    );
+    expect(RoutingTableSchema.safeParse({ ...table, lowConfidenceThreshold: 1.1 }).success).toBe(
+      false
+    );
   });
 
   it('accepts a legacy candidate with reasoningEffort only', () => {
@@ -128,6 +270,7 @@ describe('RoutingTableSchema', () => {
     });
     expect(parsed.reasoningEffort).toBe('high');
     expect(parsed.variant).toBeUndefined();
+    expect(parsed.cases).toBeUndefined();
   });
 
   it('accepts a candidate with variant only', () => {
@@ -140,6 +283,17 @@ describe('RoutingTableSchema', () => {
     });
     expect(parsed.variant).toBe('xhigh');
     expect(parsed.reasoningEffort).toBeUndefined();
+  });
+
+  it('accepts measured case counts and rejects invalid counts', () => {
+    expect(RankedCandidateSchema.parse({ ...candidate('m', 1, 1), cases: 30 }).cases).toBe(30);
+    expect(RankedCandidateSchema.parse({ ...candidate('m', 1, 1), cases: null }).cases).toBeNull();
+    expect(RankedCandidateSchema.safeParse({ ...candidate('m', 1, 1), cases: -1 }).success).toBe(
+      false
+    );
+    expect(RankedCandidateSchema.safeParse({ ...candidate('m', 1, 1), cases: 1.5 }).success).toBe(
+      false
+    );
   });
 
   it('rejects a candidate with both non-null variant and reasoningEffort', () => {

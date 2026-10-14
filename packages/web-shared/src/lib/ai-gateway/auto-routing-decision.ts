@@ -77,9 +77,8 @@ function buildDecidePayload(params: EfficientDecisionParams): MirrorPayload | nu
   };
 }
 
-// kilo-auto/efficient waits for the worker's routing decision and falls back
-// to the static default on timeout or error. Do not retry an ambiguous timeout:
-// the worker may already have completed a billable classifier call.
+// Worker-owned usage survives a lost response. Positive response costs belong
+// to legacy workers and must still be billed by the gateway during rollout.
 export async function fetchEfficientAutoDecision(
   params: EfficientDecisionParams,
   options: FetchEfficientDecisionOptions = {}
@@ -92,7 +91,12 @@ export async function fetchEfficientAutoDecision(
   const payload = buildDecidePayload(params);
   if (!payload) return null;
 
+  const startedAt = performance.now();
+  let status: number | null = null;
+  let outcome: 'ok' | 'timeout' | 'error' | 'http_error' | 'invalid_response' = 'error';
+  let signal: AbortSignal | undefined;
   try {
+    signal = AbortSignal.timeout(options.timeoutMs ?? EFFICIENT_DECISION_TIMEOUT_MS);
     const response = await fetch(`${workerUrl}/decide`, {
       method: 'POST',
       headers: new Headers({
@@ -100,22 +104,41 @@ export async function fetchEfficientAutoDecision(
         'content-type': 'application/json',
       }),
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(options.timeoutMs ?? EFFICIENT_DECISION_TIMEOUT_MS),
+      signal,
     });
+    status = response.status;
     if (!response.ok) {
+      outcome = 'http_error';
       onError('Efficient auto decision request failed', { error: `status ${response.status}` });
       return null;
     }
     const parsed = AutoRoutingDecisionResponseSchema.safeParse(await response.json());
     if (!parsed.success) {
+      outcome = 'invalid_response';
       onError('Efficient auto decision response invalid', { error: 'invalid_response' });
       return null;
     }
+    outcome = 'ok';
     return { decision: parsed.data.decision, costUsd: parsed.data.cost };
   } catch (error) {
+    outcome = signal?.aborted ? 'timeout' : 'error';
     onError('Efficient auto decision request failed', {
       error: error instanceof Error ? error.message : String(error),
     });
     return null;
+  } finally {
+    const durationMs = performance.now() - startedAt;
+    const sampled = outcome === 'ok';
+    if (!sampled || Math.random() < 0.01) {
+      console.log(
+        JSON.stringify({
+          event: 'auto_routing_decide_client',
+          durationMs,
+          outcome,
+          status,
+          sampled,
+        })
+      );
+    }
   }
 }

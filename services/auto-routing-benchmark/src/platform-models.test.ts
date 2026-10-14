@@ -3,9 +3,57 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   BenchmarkModelCatalogSchema,
   catalogFallbackCaseCosts,
+  catalogCandidatePrices,
   fetchPlatformRegistryEntries,
   platformRegistryEntries,
 } from './platform-models';
+
+describe('catalog candidate pricing', () => {
+  it('keeps normal models usable alongside variable-price virtual models', () => {
+    const catalog = BenchmarkModelCatalogSchema.parse({
+      data: [
+        { id: 'synthetic/virtual', pricing: { prompt: '-1', completion: '-1' } },
+        {
+          id: 'synthetic/normal',
+          pricing: { prompt: '0.002', completion: '0.003', input_cache_read: '-1' },
+        },
+        { id: 'synthetic/malformed', pricing: 'unavailable' },
+      ],
+    });
+    const prices = catalogCandidatePrices(catalog);
+    expect(prices.get('synthetic/virtual')).toBeNull();
+    expect(prices.get('synthetic/normal')).toEqual({
+      promptUsdPerToken: 0.002,
+      completionUsdPerToken: 0.003,
+      cacheReadUsdPerToken: null,
+    });
+    expect(prices.get('synthetic/malformed')).toBeNull();
+  });
+
+  it('keeps USD-per-token catalog prices and treats missing or invalid prices as unpriced', () => {
+    const prices = catalogCandidatePrices(
+      BenchmarkModelCatalogSchema.parse({
+        data: [
+          {
+            id: 'synthetic/priced',
+            pricing: { prompt: '0.002', completion: '0.003', input_cache_read: '0.0001' },
+          },
+          { id: 'synthetic/uncached', pricing: { prompt: '0.002', completion: '0.003' } },
+          { id: 'synthetic/missing' },
+          { id: 'synthetic/invalid', pricing: { prompt: 'invalid', completion: '0.003' } },
+        ],
+      })
+    );
+    expect(prices.get('synthetic/priced')).toEqual({
+      promptUsdPerToken: 0.002,
+      completionUsdPerToken: 0.003,
+      cacheReadUsdPerToken: 0.0001,
+    });
+    expect(prices.get('synthetic/uncached')?.cacheReadUsdPerToken).toBeNull();
+    expect(prices.get('synthetic/missing')).toBeNull();
+    expect(prices.get('synthetic/invalid')).toBeNull();
+  });
+});
 
 const catalog = BenchmarkModelCatalogSchema.parse({
   data: [

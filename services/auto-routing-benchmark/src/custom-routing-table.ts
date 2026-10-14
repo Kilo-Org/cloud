@@ -9,6 +9,7 @@ import { getSummariesForRuns, listReadyCurrentProfilesForEntries } from './db';
 import { variantFromStorage } from './reasoning-effort';
 import { buildCustomRoutingTable } from './routing-table-builder';
 import { currentProfileContextFromConfig, ProfileValidationError } from './profiles';
+import { catalogCandidatePrices, fetchBenchmarkModelCatalog } from './platform-models';
 
 function assertUniqueEntries(entries: readonly BenchmarkPair[]): void {
   if (entries.length < 1 || new Set(entries.map(entry => entry.model)).size > MAX_POOL_ENTRIES) {
@@ -36,9 +37,19 @@ export async function assembleCustomRoutingTable(
   config: Pick<
     BenchmarkConfig,
     'deciderRepetitions' | 'minAccuracy' | 'switchCostFactor' | 'bestAccuracySwitchThreshold'
-  >,
+  > &
+    Partial<
+      Pick<
+        BenchmarkConfig,
+        'productionTokenProfile' | 'switchHorizonTurns' | 'lowConfidenceThreshold'
+      >
+    >,
   entries: readonly BenchmarkPair[],
-  options: { now?: Date } = {}
+  options: {
+    now?: Date;
+    catalogEnv?: { KILO_WEB_API_BASE_URL: string };
+    fetchImpl?: typeof fetch;
+  } = {}
 ): Promise<CustomRoutingTableResponse> {
   assertUniqueEntries(entries);
   const current = currentProfileContextFromConfig(config);
@@ -63,12 +74,21 @@ export async function assembleCustomRoutingTable(
   const runIds = [...new Set(readyEntries.map(r => r.runId))];
   const summaries = await getSummariesForRuns(db, runIds);
   const generatedAt = (options.now ?? new Date()).toISOString();
+  const prices = options.catalogEnv
+    ? catalogCandidatePrices(
+        await fetchBenchmarkModelCatalog(options.catalogEnv, options.fetchImpl)
+      )
+    : undefined;
 
   const table: CustomRoutingTable | null = buildCustomRoutingTable({
     generatedAt,
     minAccuracy: config.minAccuracy,
     switchCostFactor: config.switchCostFactor,
     bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
+    productionTokenProfile: config.productionTokenProfile ?? null,
+    switchHorizonTurns: config.switchHorizonTurns ?? null,
+    lowConfidenceThreshold: config.lowConfidenceThreshold ?? null,
+    prices,
     readyEntries,
     summaries,
   });

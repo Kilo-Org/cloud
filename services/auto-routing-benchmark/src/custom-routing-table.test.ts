@@ -54,6 +54,27 @@ describe('buildCustomRoutingTable', () => {
     bestAccuracySwitchThreshold: 0.05,
   };
 
+  it('publishes sample-size ranking and confidence settings for sparse custom tables', () => {
+    const routeKey = 'implementation/code_generation';
+    const table = buildCustomRoutingTable({
+      ...base,
+      lowConfidenceThreshold: 0.8,
+      readyEntries: [
+        { entry: { model: 'vendor/small', variant: null }, runId: 'run-small' },
+        { entry: { model: 'vendor/large', variant: null }, runId: 'run-large' },
+      ],
+      summaries: [
+        { ...summary('vendor/small', null, routeKey, 1, 0.001, 'run-small'), cases: 10 },
+        { ...summary('vendor/large', null, routeKey, 1, 0.001, 'run-large'), cases: 100 },
+      ],
+    });
+    expect(table?.lowConfidenceThreshold).toBe(0.8);
+    expect(table?.routes[routeKey]?.map(c => [c.model, c.cases])).toEqual([
+      ['vendor/large', 100],
+      ['vendor/small', 10],
+    ]);
+  });
+
   it('assembles two variants of one model as distinct candidates with variant', () => {
     const readyEntries = [
       { entry: { model: 'vendor/m', variant: 'xhigh' }, runId: 'run-x' },
@@ -203,6 +224,7 @@ describe('assembleCustomRoutingTable', () => {
     minAccuracy: 0.7,
     switchCostFactor: 3,
     bestAccuracySwitchThreshold: 0.05,
+    lowConfidenceThreshold: 0.8,
   };
 
   beforeEach(() => {
@@ -249,6 +271,7 @@ describe('assembleCustomRoutingTable', () => {
       expect.any(Array)
     );
     expect(result.table).not.toBeNull();
+    expect(result.table?.lowConfidenceThreshold).toBe(0.8);
     expect(result.table!.routes['implementation/code_generation']).toHaveLength(2);
   });
 });

@@ -239,6 +239,17 @@ function sameExactPair(a: DecisionIncumbent, b: BenchmarkPair): boolean {
   return a.model === b.model && a.variant === b.variant;
 }
 
+export function isLowConfidence(
+  table: RoutingTable | null,
+  confidence: number | undefined
+): boolean {
+  return (
+    typeof table?.lowConfidenceThreshold === 'number' &&
+    confidence !== undefined &&
+    confidence < table.lowConfidenceThreshold
+  );
+}
+
 export function computeDecision(
   classification: ClassifierOutput,
   table: RoutingTable | null,
@@ -246,7 +257,9 @@ export function computeDecision(
   deniedModelIds: ReadonlySet<string> = new Set(),
   mode: AutoRoutingMode = DEFAULT_AUTO_ROUTING_MODE,
   options: {
+    confidence?: number;
     constraints?: RoutingConstraints | undefined;
+    contextTokens?: number | undefined;
     capabilityMap?: ModelCapabilitiesMap | undefined;
     // True only for custom-pool tables: drop candidates whose capability row
     // is missing or isActive !== true. Platform tables leave this unset.
@@ -278,18 +291,12 @@ export function computeDecision(
     return null;
   }
 
-  const freshPick = pickFreshCandidate(candidates, mode);
+  const freshPick = pickFreshCandidate(
+    candidates,
+    isLowConfidence(table, options.confidence) ? 'best_accuracy' : mode
+  );
   const freshPair = { model: freshPick.model, variant: candidateVariant(freshPick) };
 
-  // Keep the session on its incumbent model when it is still good enough for
-  // the current taxonomy route. A model switch discards the provider's prompt cache,
-  // and rebuilding it costs full-price input tokens (4-10x cache-read rates)
-  // on a context that dominates agent-session spend — so a switch is only
-  // worth it when the fresh pick's recurring per-turn savings clearly exceed
-  // that one-time penalty, i.e. it is cheaper by more than switchCostFactor.
-  // Sticky lookup is performed against the filtered candidate set so an
-  // incumbent that is modality-incapable or provably too small is replaced
-  // by a fresh pick from the eligible set, not kept.
   const incumbentCandidate = findIncumbentCandidate(candidates, incumbent);
   // Sticky eligibility, shared by the keep decision and the switchReason
   // telemetry below so the two can never disagree. best_accuracy keeps the
@@ -299,6 +306,26 @@ export function computeDecision(
     mode === 'best_accuracy'
       ? candidate.meetsThreshold
       : candidate.accuracy >= table.minAccuracy - STICKY_ACCURACY_TOLERANCE;
+  const costSwitchWorthwhile = (candidate: RankedCandidate): boolean => {
+    if (
+      table.switchHorizonTurns != null &&
+      options.contextTokens != null &&
+      candidate.estimatedRequestCostUsd != null &&
+      freshPick.estimatedRequestCostUsd != null &&
+      candidate.pricing != null &&
+      freshPick.pricing != null
+    ) {
+      const expectedSavings =
+        (candidate.estimatedRequestCostUsd - freshPick.estimatedRequestCostUsd) *
+        table.switchHorizonTurns;
+      const cacheLossCost =
+        options.contextTokens *
+        (freshPick.pricing.promptUsdPerToken -
+          (candidate.pricing.cacheReadUsdPerToken ?? candidate.pricing.promptUsdPerToken));
+      return expectedSavings > cacheLossCost;
+    }
+    return freshPick.avgCostUsd * table.switchCostFactor < candidate.avgCostUsd;
+  };
   const stickyIncumbent =
     incumbentCandidate &&
     incumbentStickyEligible(incumbentCandidate) &&
@@ -306,8 +333,7 @@ export function computeDecision(
       { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
       freshPair
     ) &&
-    ((mode === 'cost_per_accuracy' &&
-      !(freshPick.avgCostUsd * table.switchCostFactor < incumbentCandidate.avgCostUsd)) ||
+    ((mode === 'cost_per_accuracy' && !costSwitchWorthwhile(incumbentCandidate)) ||
       (mode === 'best_accuracy' &&
         !(freshPick.accuracy - incumbentCandidate.accuracy > table.bestAccuracySwitchThreshold)));
 

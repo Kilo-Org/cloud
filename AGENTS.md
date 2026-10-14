@@ -79,6 +79,12 @@ suggests:
 | `kilocode-global-app` | Frankfurt and us-west (SFO) |
 | `kilocode-ai-gateway` | Frankfurt and us-west (SFO) |
 
+`kilocode-global-app` is being phased out. It still exists and is still
+deployed, but no traffic is deliberately routed to it: the AI gateway is served
+by `kilocode-ai-gateway`. Do not add routes, rewrites, callers, or other new
+dependencies that target `kilocode-global-app`, and do not attribute production
+gateway behavior to it.
+
 Treat this table as the source of truth for compute location, database
 round-trip latency, and replica reasoning. If an observed region is not `fra1` or
 `sfo1`, it is a proxy/edge hop, not the function. Confirm against the Vercel
@@ -104,7 +110,7 @@ a rewrite to another Vercel app, where PoP hops accumulate.
 `VERCEL_REGION` is documented as "the ID of the Region where the app is running",
 i.e. the function region. Given the table above it should only ever be `fra1` or
 `sfo1`, which is what makes `isUSRegion` in `packages/web-shared/src/lib/drizzle.ts` behave
-correctly for the SFO half of `kilocode-global-app` and `kilocode-ai-gateway`.
+correctly for the SFO half of `kilocode-ai-gateway`.
 
 ## Failure UX
 

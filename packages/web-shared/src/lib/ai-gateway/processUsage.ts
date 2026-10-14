@@ -360,7 +360,7 @@ export async function logMicrodollarUsage(
  * Dispatches the usage write to whichever side of the Atlantic the PostgreSQL
  * primary is on.
  *
- * `kilocode-global-app` executes in both Frankfurt and SFO while the primary is
+ * `kilocode-ai-gateway` executes in both Frankfurt and SFO while the primary is
  * Frankfurt-only. This write holds row locks on `kilocode_users`,
  * `organizations` and `organization_user_usage` across several sequential
  * statements, so from SFO the lock hold is dominated by transatlantic round

@@ -2302,6 +2302,49 @@ export const GatewayModelListConfigSchema = z.object({
 
 export type GatewayModelListConfig = z.infer<typeof GatewayModelListConfigSchema>;
 
+const PricePerMillionSchema = z.number().finite().nonnegative();
+
+export const CustomPricingModelSchema = z.object({
+  model: GatewayModelIdSchema,
+  pricing: z.object({
+    prompt_per_million: PricePerMillionSchema,
+    completion_per_million: PricePerMillionSchema,
+    /** Null bills cache reads at the prompt price. */
+    input_cache_read_per_million: PricePerMillionSchema.nullable(),
+    /** Null bills cache writes at the prompt price. */
+    input_cache_write_per_million: PricePerMillionSchema.nullable(),
+  }),
+  /** Shown in the model name as "(N% off)"; never used in calculations. */
+  discountPercentage: z.number().int().min(1).max(100).optional(),
+  /** Only bill this pricing when the upstream response reports no cost. */
+  fallbackOnly: z.boolean(),
+});
+
+export type CustomPricingModelConfig = z.infer<typeof CustomPricingModelSchema>;
+
+export const CUSTOM_PRICING_MAX_COUNT = 200;
+
+export const CustomPricingConfigSchema = z.object({
+  models: z
+    .array(CustomPricingModelSchema)
+    .max(CUSTOM_PRICING_MAX_COUNT)
+    .superRefine((models, ctx) => {
+      const seen = new Set<string>();
+      for (const [index, { model }] of models.entries()) {
+        if (seen.has(model)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Duplicate model "${model}"`,
+            path: [index, 'model'],
+          });
+        }
+        seen.add(model);
+      }
+    }),
+});
+
+export type CustomPricingConfig = z.infer<typeof CustomPricingConfigSchema>;
+
 // --- StoredModel ---
 
 export const ModelSchema = z.object({

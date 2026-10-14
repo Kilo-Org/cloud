@@ -64,9 +64,28 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
   },
 };
 
-export function getCustomPricing(modelId: string): CustomPricing | undefined {
+export type ConfiguredCustomPricing = Readonly<Record<string, CustomPricing>>;
+
+/** Admin-configured pricing takes precedence over the built-in pricing above. */
+export function resolveCustomPricing(
+  modelId: string,
+  configuredCustomPricing: ConfiguredCustomPricing
+): CustomPricing | undefined {
+  if (Object.hasOwn(configuredCustomPricing, modelId)) return configuredCustomPricing[modelId];
   if (!Object.hasOwn(customPricingByModelId, modelId)) return undefined;
   return customPricingByModelId[modelId];
+}
+
+// Server code refreshes this with `loadConfiguredCustomPricing` before synchronous
+// lookups; client code passes the configured pricing to `resolveCustomPricing`.
+let loadedConfiguredCustomPricing: ConfiguredCustomPricing = {};
+
+export function setLoadedConfiguredCustomPricing(configuredCustomPricing: ConfiguredCustomPricing) {
+  loadedConfiguredCustomPricing = configuredCustomPricing;
+}
+
+export function getCustomPricing(modelId: string): CustomPricing | undefined {
+  return resolveCustomPricing(modelId, loadedConfiguredCustomPricing);
 }
 
 export function formatPricePerToken(pricePerMillion: number): string {

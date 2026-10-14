@@ -97,6 +97,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { loadConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import { isCloudflareIP } from '@kilocode/web-shared/lib/cloudflare-ip';
 import {
   isKiloAutoModel,
@@ -828,6 +829,8 @@ export async function handleLlmProxyRequest(
     console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);
     return unavailableModelResponse();
   }
+
+  await loadConfiguredCustomPricing();
 
   // Skip balance/org checks for anonymous users - they can only use free models
   if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {

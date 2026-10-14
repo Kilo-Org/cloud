@@ -348,7 +348,11 @@ export function computeDecision(
     incumbentCandidate &&
     incumbentStickyEligible(incumbentCandidate) &&
     ((incumbentCandidate.model === freshPick.model &&
-      (options.preserveIncumbentVariant ||
+      ((options.preserveIncumbentVariant &&
+        !sameExactPair(
+          { model: incumbentCandidate.model, variant: candidateVariant(incumbentCandidate) },
+          freshPair
+        )) ||
         applyComplexityEffort(incumbentCandidate) !== incumbentCandidate ||
         applyComplexityEffort(freshPick) !== freshPick)) ||
       (!sameExactPair(

@@ -584,6 +584,8 @@ describe('processJob — canonical registry publication', () => {
       variant: 'max',
       accuracy: 0.9,
       avgCostUsd: 0.001,
+      p50LatencyMs: 90,
+      p50TtftMs: undefined,
       pricing: null,
       estimatedRequestCostUsd: 0.001,
       cases: 5,

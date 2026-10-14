@@ -175,13 +175,17 @@ describe('complexity effort selection', () => {
   it('keeps behavior unchanged without a mapping or bucket', () => {
     const { effortByComplexity, ...withoutMapping } = effortTable;
     expect(effortByComplexity).toBeDefined();
-    expect(computeDecision(classification, withoutMapping, null)?.variant).toBe('low');
-    expect(
-      computeDecision({ ...classification, reasoningComplexity: 'medium' }, effortTable, null)?.variant
-    ).toBe('low');
     const { reasoningComplexity, ...withoutBucket } = classification;
     expect(reasoningComplexity).toBe('low');
-    expect(computeDecision(withoutBucket as ClassifierOutput, effortTable, null)?.variant).toBe('low');
+    const decisions = [
+      computeDecision(classification, withoutMapping, null),
+      computeDecision({ ...classification, reasoningComplexity: 'medium' }, effortTable, null),
+      computeDecision(withoutBucket as ClassifierOutput, effortTable, null),
+    ];
+    for (const decision of decisions) {
+      if (decision?.source !== 'benchmark') throw new Error('Expected a benchmark decision');
+      expect(decision.variant).toBe('low');
+    }
   });
 
   it('preserves the incumbent variant on sticky-immediate turns', () => {
@@ -195,6 +199,19 @@ describe('complexity effort selection', () => {
         { preserveIncumbentVariant: true }
       )
     ).toMatchObject({ model: 'shared/chat', variant: 'high', sticky: true, switchReason: null });
+  });
+
+  it('does not mark an unchanged incumbent pair sticky merely to preserve its variant', () => {
+    expect(
+      computeDecision(
+        classification,
+        effortTable,
+        inc('shared/chat', 'low'),
+        new Set(),
+        'cost_per_accuracy',
+        { preserveIncumbentVariant: true }
+      )
+    ).toMatchObject({ model: 'shared/chat', variant: 'low', sticky: false, switchReason: null });
   });
 });
 

@@ -958,17 +958,30 @@ Request and response bodies stream; there is no body-size cap.
   upgrade: revocation applies to new requests and upgrades only. Cookie jars are not guaranteed
   independent: the preview zone must be a separate registrable site from every trusted app origin,
   but apps can still set parent-domain cookies, and `*.localhost` is not a faithful site-isolation
-  model. The entry ticket is carried in the `/preview/open` and enter URLs, so platform
+  model. The entry ticket is not bound to the browser that asked for it. Any user can mint a ticket
+  for their own session and send the `/preview/open` link to another user, whose browser then runs
+  the sender's app on a sibling host of the zone. Until the zone is on the Public Suffix List, that
+  app can set `Domain=<zone>` cookies: they make the other user's preview requests fail with 431,
+  or they put cookies into that user's dev apps. The enablement checklist makes the list entry a
+  prerequisite. The entry ticket is carried in the `/preview/open` and enter URLs, so platform
   observability or Logpush may capture it; single use and the 60-second TTL bound replay.
   The `@cloudflare/containers` `Container` constructor calls `renewActivityTimeout()` when an evicted
   DO wakes, so a preview request that wakes an evicted DO can extend the SDK sleep timer; our code
   paths never call it.
 - **Enablement checklist.** Put the preview zone on a separate registrable site from every trusted
-  app origin; add DNS `*.<zone>`; add the Worker route `*.<zone>/*`; issue a certificate covering
-  the wildcard label; set the Worker `PREVIEW_HOST_SUFFIX` to `<zone>`; redeploy the Worker. The web
-  app needs no change: it shows the preview button once the Worker reports preview as enabled. The
-  `kilo serve` password is in the wrapper, so ship a sandbox image with it before you enable
-  preview; an older image leaves `kilo serve` open to a preview of its port.
+  app origin. Add the zone to the Public Suffix List, and set `PREVIEW_HOST_SUFFIX` in production
+  only after the main browsers ship that entry. `PREVIEW_ENABLED_IDS` does not reduce this exposure:
+  it gates only the UI, so with the suffix set any user can mint a ticket and send the link. A pilot
+  before the entry ships needs a server-side gate on ticket mint and entry, which does not exist.
+  With the entry, each `<label>.<zone>` is its own site: a sibling host cannot set zone-wide
+  cookies, and `SameSite` treats it as cross-site. (We did not choose a browser-bound ticket, such
+  as a POST open hop with an `Origin` allow-list: the browser sends `Origin: null` after a
+  cross-origin redirect, so the web app would have to post to the preview host directly.) Add DNS
+  `*.<zone>`; add the Worker route `*.<zone>/*`; issue a certificate covering the wildcard label;
+  set the Worker `PREVIEW_HOST_SUFFIX` to `<zone>`; redeploy the Worker. The web app needs no
+  change: it shows the preview button once the Worker reports preview as enabled. The `kilo serve`
+  password is in the wrapper, so ship a sandbox image with it before you enable preview; an older
+  image leaves `kilo serve` open to a preview of its port.
 - **Second hosted provider (follow-up).** A provider-native inbound port is the eventual second
   path, but it needs ports declared at sandbox creation: `createSandbox` in
   `src/agent-sandbox/vercel/vercel-sandbox-rest-client.ts` sends none, and the creation response

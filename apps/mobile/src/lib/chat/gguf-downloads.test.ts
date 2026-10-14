@@ -175,6 +175,7 @@ describe('the saved list', () => {
       contextWindow: 4096,
       tools: false,
       vision: false,
+      thinking: false,
     };
     // The second entry has a shape this build cannot read, and still names a file.
     h.index.text = JSON.stringify([saved, { fileId: 'other', name: 'Other' }]);

@@ -540,6 +540,7 @@ describe('provider-specific contract differences', () => {
 
     expect(harness.launchedEnv()).toMatchObject({
       CALLER: 'value',
+      CONTROL_WORKLOAD_LIMIT_MB: '8192',
       PROVIDER_INSTANCE_ID: ref,
       WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
     });

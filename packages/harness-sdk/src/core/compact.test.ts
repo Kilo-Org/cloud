@@ -115,6 +115,26 @@ it('counts what the cache read towards the window', async () => {
   expect(calls).toHaveLength(3);
 });
 
+it('counts the completed answer and newly cached input before the next question', async () => {
+  const { calls } = await runWith({
+    replies: [
+      {
+        deltas: ['a long answer'],
+        usage: { inputTokens: 100, cacheWriteTokens: 400, outputTokens: 350 },
+      },
+      { deltas: ['the summary'] },
+      { deltas: ['the next answer'] },
+    ],
+    catalog: catalogWindowed(window),
+    use: session =>
+      Effect.zipRight(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
+  });
+  expect(calls.at(-1)?.prompt.messages.map(textIn)).toEqual([
+    'Summary of the conversation so far:\n\nthe summary',
+    'two',
+  ]);
+});
+
 it('obeys a caller who sets the share', async () => {
   const { calls } = await runWith({
     replies: [roomy, { deltas: ['the notes'] }, { deltas: ['after'] }],

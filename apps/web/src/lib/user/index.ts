@@ -26,6 +26,7 @@ import {
   cloud_agent_webhook_triggers,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  todo_lists,
   enrichment_data,
   source_embeddings,
   code_indexing_search,
@@ -1127,6 +1128,7 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(cloud_agent_workspace_folders)
     .where(eq(cloud_agent_workspace_folders.kilo_user_id, userId));
+  await tx.delete(todo_lists).where(eq(todo_lists.kilo_user_id, userId));
   await tx
     .update(cloud_agent_worktrees)
     .set({ name: null, folder_id: null })

@@ -136,7 +136,10 @@
     "working": "Pracuje",
     "yourOwnRepositories": "Tvoje vlastní repozitáře",
     "dismissed": "Zamítnuto",
-    "agent": "Činidlo"
+    "agent": "Činidlo",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Změny"
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -325,6 +328,7 @@
       "collapseFile": "Sbalit soubor",
       "expandFile": "Rozbalit soubor",
       "diffTooLarge": "Přehled změn je příliš velký na zobrazení.",
+      "noPreview": "Pro tento soubor není k dispozici náhled",
       "openOnGitHub": "Otevřít na GitHubu",
       "openDiffOnGitHub": "Otevřít přehled změn tohoto souboru na GitHubu",
       "githubDiff": "Přehled změn na GitHubu"
@@ -863,7 +867,8 @@
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornění na zůstatek",
       "security": "Bezpečnostní zjištění",
-      "spend": "Upozornění na útratu"
+      "spend": "Upozornění na útratu",
+      "followedSessions": "Sledované relace"
     },
     "category": {
       "chatMessagesSubtitle": "odpovědi ve vašich konverzacích",
@@ -1585,7 +1590,7 @@
         "recoveryLabel": "Aktualizovat aplikaci GitHub"
       },
       "githubIpAllowList": {
-        "description": "Agent pro kontrolu kódu byl vypnut, protože seznam povolených IP adres této organizace na GitHubu blokuje Kilo. Požádejte o pomoc na hi@kilocode.ai a pak agenta pro kontrolu kódu znovu zapněte."
+        "description": "Agent pro kontrolu kódu byl vypnut, protože seznam povolených IP adres této organizace na GitHubu blokuje Kilo. Požádejte o pomoc na hi@kilo.ai a pak agenta pro kontrolu kódu znovu zapněte."
       },
       "gitlabProjectAccessRequired": {
         "description": "Agent pro kontrolu kódu byl vypnut, protože Kilo nemůže pro tento projekt na GitLabu vytvořit přístupový token projektu. Udělte roli správce nebo povolte přístupové tokeny projektů a pak agenta pro kontrolu kódu znovu zapněte.",
@@ -1600,7 +1605,7 @@
         "recoveryLabel": "Aktualizovat nastavení agenta pro kontrolu kódu"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Agent pro kontrolu kódu byl vypnut, protože dnes klonování repozitáře třikrát překročilo časový limit. Požádejte o pomoc na hi@kilocode.ai a pak agenta pro kontrolu kódu znovu zapněte."
+        "description": "Agent pro kontrolu kódu byl vypnut, protože dnes klonování repozitáře třikrát překročilo časový limit. Požádejte o pomoc na hi@kilo.ai a pak agenta pro kontrolu kódu znovu zapněte."
       },
       "title": "Kontrola kódu vyžaduje tvou pozornost.",
       "recoveryLabel": "Kontaktovat podporu"
@@ -2142,6 +2147,8 @@
       "title": "Relace",
       "copyErrorDetails": "Kopírovat podrobnosti o chybě",
       "backToSessions": "Zpět na relace",
+      "follow": "Sledovat na uzamčené obrazovce",
+      "unfollow": "Přestat sledovat na uzamčené obrazovce",
       "couldNotLoad": "Relaci se nepodařilo načíst.",
       "failedToLoadDetails": "Podrobnosti relace se nepodařilo načíst.",
       "failedToStopExecution": "Běh se nepodařilo zastavit.",
@@ -2245,7 +2252,6 @@
       "retryLoadingEnvironment": "Znovu načíst prostředí",
       "defaultEnvironment": "Výchozí prostředí",
       "environmentSummary": "příkazy: {{commands}} · MCP: {{mcp}} · dovednosti: {{skills}} · agenti: {{agents}}",
-      "changes": "Změny",
       "leaveChanges": "Ponechat změny",
       "commitAndPush": "Vytvořit commit a odeslat",
       "startSession": "Spustit relaci",
@@ -2318,8 +2324,8 @@
       "toolList": "výpis",
       "toolPatch": "úprava",
       "toolTask": "úkol",
-      "readTodos": "Přečíst úkoly",
-      "updateTodos": "Aktualizovat úkoly",
+      "readTodos": "Přečíst plán",
+      "updateTodos": "Aktualizovat plán",
       "linesBadge": "řádky: {{displayCount}}",
       "filesBadge": "soubory: {{displayCount}}",
       "matchesBadge": "shody: {{displayCount}}",
@@ -2727,6 +2733,12 @@
       "modelsCount_other": "Modely ({{displayCount}})",
       "modelsCount_few": "Modely ({{displayCount}})",
       "modelsCount_many": "Modely ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Zobrazit změny",
+      "asOf": "Stav k {{time}}",
+      "tooLarge": "Přehled změn je příliš velký na zobrazení v mobilu.",
+      "empty": "V této relaci zatím nejsou žádné změny souborů."
     },
     "autoApprove": {
       "title": "Automatické schvalování",
@@ -3245,6 +3257,8 @@
     "channelName": "Aktivní agenti",
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce.",
     "openSession": "Otevřít",
+    "finished": "Dokončeno",
+    "followFailed": "Tohoto agenta se nepodařilo zobrazit na uzamčené obrazovce.",
     "approveFailed": "Schválení se nepodařilo. Klepnutím na $t(common.approve) to zkuste znovu.",
     "checked": "Ověřeno",
     "lastKnown": "Poslední známý stav",
@@ -3253,7 +3267,26 @@
     "waitingForYou": "Čeká na vás",
     "nextScheduled": "Další naplánované",
     "answerNeeded": "Čeká na odpověď",
-    "waitingToRetry": "Čeká na další pokus"
+    "waitingToRetry": "Čeká na další pokus",
+    "step": {
+      "editing": "Úpravy",
+      "reading": "Čtení",
+      "running": "Spuštění",
+      "searching": "Vyhledávání na webu",
+      "thinking": "Promýšlení"
+    },
+    "planOf": "z",
+    "filesChanged": "změněné soubory",
+    "finishedIn": "Dokončeno za",
+    "noActivityFor": "Žádná aktivita po dobu",
+    "prOpened": "Otevřen pull request",
+    "permissionWants": "Chce spustit",
+    "failure": {
+      "provider": "Zastaveno: chyba poskytovatele",
+      "tool": "Zastaveno: chyba nástroje",
+      "cancelled": "Zastaveno: zrušeno",
+      "other": "ZASTAVENO"
+    }
   },
   "transcriptionModel": {
     "title": "Model přepisu",
@@ -3289,10 +3322,27 @@
     "list": {
       "loadFailed": "Historie chatu se nepodařila načíst.",
       "new": "Nový chat",
-      "openHint": "Otevře chat. Dlouhým stisknutím smažete.",
       "deleteTitle": "Smazat tento chat?"
     },
+    "rename": {
+      "title": "Přejmenovat chat",
+      "accessibility": "Přejmenovat chat: {{title}}",
+      "openHint": "Otevře chat. Dlouhým stisknutím ho přejmenujete nebo smažete."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Podrobnosti chatu",
+      "backend": "Server",
+      "effortDefault": "Výchozí nastavení modelu",
+      "noCost": "Bez nákladů",
+      "costUnknown": "Neznámé",
+      "costEstimatedNote": "Náklady na odpovědi, které neuvedly cenu, jsou odhadnuty podle ceníku.",
+      "costUnknownNote": "Cena tohoto modelu není známa.",
+      "costPartialNote": "Tento součet nezahrnuje modely bez známé ceny.",
+      "localNote": "Modely v zařízení běží přímo v tomto zařízení. Nemají žádné náklady ani mezipaměť promptů a jejich počty tokenů mohou být odhady.",
+      "countedSinceNote": "Tento chat začal dříve, než se začalo zaznamenávat využití. Součty zahrnují jen odpovědi od té doby.",
+      "remoteServersOn": "Zapnuté vzdálené servery MCP"
+    },
     "webSearch": {
       "title": "Hledat na webu",
       "description": "Povolte tomuto chatu vyhledávat aktuální informace přes váš účet Kilo. Vyhledávání čerpá váš měsíční limit vyhledávání.",
@@ -3505,6 +3555,9 @@
       "downloading": "Stahování…",
       "downloadProgress": "Stahování… {{percent}} %",
       "downloadFailed": "Stahování se nedokončilo. Zkontrolujte připojení a volné místo v úložišti a zkuste to znovu."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Tento model podporuje úroveň uvažování"
     }
   },
   "settingsTools": {
@@ -3727,5 +3780,86 @@
     "noMatchingProductsPlay": "Google Play nevrátil žádné odpovídající balíčky kreditů.",
     "purchaseOwnedByAnotherAccount": "Kredity na tomto účtu Apple Account patří k jinému účtu Kilo. Chcete-li je použít, přihlaste se k příslušnému účtu Kilo.",
     "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účtu Google Play patří jinému účtu Kilo. Přihlaste se k tomuto účtu Kilo pro jejich použití."
+  },
+  "todos": {
+    "saveAsTodo": "Uložit jako úkol",
+    "segment": {
+      "label": "Zobrazení agentů",
+      "sessions": "Relace",
+      "todos": "Úkoly"
+    },
+    "lists": {
+      "newList": "Nový seznam",
+      "empty": "Zatím žádné seznamy",
+      "couldNotLoad": "Seznamy se nepodařilo načíst",
+      "noRepository": "Žádný repozitář",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} otevřeno",
+      "openCount_few": "{{count}} otevřeno",
+      "openCount_many": "{{count}} otevřeno",
+      "openCount_other": "{{count}} otevřeno",
+      "archived_one": "Archivováno ({{count}})",
+      "archived_few": "Archivováno ({{count}})",
+      "archived_many": "Archivováno ({{count}})",
+      "archived_other": "Archivováno ({{count}})",
+      "archive": "Archivovat",
+      "unarchive": "Zrušit archivaci",
+      "deleteTitle": "Smazat {{name}}?",
+      "deleteMessage": "Smažou se i jeho úkoly. Jejich relace zůstanou."
+    },
+    "listSettings": {
+      "title": "Nastavení seznamu",
+      "name": "Název",
+      "namePlaceholder": "Chyby, Nápady, Vydání…",
+      "emoji": "Emoji",
+      "mode": "Režim",
+      "defaultsHint": "Relace spuštěné z tohoto seznamu použijí tato výchozí nastavení."
+    },
+    "list": {
+      "addPlaceholder": "Přidat úkol",
+      "add": "Přidat",
+      "empty": "Zatím žádné úkoly",
+      "setDefaults": "Nastavit repozitář, režim a model",
+      "completed_one": "Dokončeno ({{count}})",
+      "completed_few": "Dokončeno ({{count}})",
+      "completed_many": "Dokončeno ({{count}})",
+      "completed_other": "Dokončeno ({{count}})"
+    },
+    "item": {
+      "markDone": "Označit jako hotové",
+      "markOpen": "Označit jako nedokončené",
+      "markDonePrompt": "Označit jako hotové?",
+      "deleted": "Úkol smazán",
+      "undo": "Vrátit",
+      "runCount_one": "{{count}} spuštění",
+      "runCount_few": "{{count}} spuštění",
+      "runCount_many": "{{count}} spuštění",
+      "runCount_other": "{{count}} spuštění",
+      "startNow": "Spustit bez revize",
+      "startNowHint": "Dlouhým stisknutím spustíte bez revize",
+      "titleLabel": "Název úkolu",
+      "notes": "Poznámky",
+      "notesPlaceholder": "Přidat poznámky v Markdownu",
+      "sessions": "Připojené relace",
+      "noSessions": "Zatím žádné relace",
+      "linkSession": "Připojit relaci",
+      "unlinkSession": "Odpojit {{title}}",
+      "linkFailed": "Relaci se nepodařilo připojit k úkolu"
+    },
+    "linkSession": {
+      "title": "Připojení relace",
+      "empty": "Žádné nedávné relace",
+      "emptyInRepository": "V {{repository}} nejsou žádné nedávné relace"
+    },
+    "upNext": "Následuje",
+    "sessionTodo": "Úkol: {{title}}",
+    "linkToTodo": "Připojit k úkolu",
+    "candidates": {
+      "empty": "Žádné otevřené úkoly"
+    },
+    "saveSheet": {
+      "title": "Uložit do seznamu",
+      "saved": "Uloženo do {{list}}"
+    }
   }
 }

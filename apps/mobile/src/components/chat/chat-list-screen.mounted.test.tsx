@@ -17,7 +17,7 @@ import { backendTargetId } from '@/lib/chat/backend-target';
  */
 
 const state = vi.hoisted(() => ({
-  newChat: vi.fn<(place: unknown, model: string) => Promise<string>>(),
+  newChat: vi.fn<(place: unknown, target: unknown) => Promise<string>>(),
   push: vi.fn<(path: string) => void>(),
   toastError: vi.fn<(message: string, options?: unknown) => void>(),
   toastDismiss: vi.fn<(id?: string | number) => void>(),
@@ -142,7 +142,7 @@ describe('starting a chat from the list', () => {
 
     await pressStart(tree);
 
-    expect(state.newChat).toHaveBeenCalledWith(expect.anything(), 'm1');
+    expect(state.newChat).toHaveBeenCalledWith(expect.anything(), { model: 'm1', effort: null });
     expect(state.push).toHaveBeenCalledWith('/(app)/(tabs)/(4_chat)/session-1');
     expect(state.toastError).not.toHaveBeenCalled();
     // A failure left on screen from an earlier attempt is moot now.
@@ -209,7 +209,9 @@ describe('starting a chat from the list', () => {
       apiKind: 'chat_completions',
       apiKey: '',
       headers: {},
-      models: [{ id: 'custom-model', name: 'Custom model', tools: false, images: false }],
+      models: [
+        { id: 'custom-model', name: 'Custom model', tools: false, images: false, reasoning: false },
+      ],
       allowLocalHttp: false,
     };
     state.backends = [backend];
@@ -222,6 +224,9 @@ describe('starting a chat from the list', () => {
 
     await pressFab(tree);
 
-    expect(state.newChat).toHaveBeenCalledExactlyOnceWith(expect.anything(), target);
+    expect(state.newChat).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+      model: target,
+      effort: null,
+    });
   });
 });

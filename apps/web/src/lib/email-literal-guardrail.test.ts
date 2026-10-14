@@ -9,10 +9,8 @@ const EMAIL_REGEX = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.mdx']);
 const ALLOWED_EMAILS = new Set([
   'sales@kilocode.ai',
-  'teams@kilocode.ai',
-  'hi@kilocode.ai',
-  'hi@app.kilocode.ai',
   'hi@kilo.ai',
+  'hi@app.kilocode.ai',
   'admin@kilocode.ai',
   'git@github.com',
   'git@gitlab.com',

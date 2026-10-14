@@ -92,6 +92,7 @@ import { getSandbox } from '@cloudflare/sandbox';
 import { generateSessionId, fetchSessionMetadata } from './session-service.js';
 import { sessionIdSchema, envVarsSchema } from './types.js';
 import { appRouter } from './router.js';
+import { buildSessionMetadataFromRegistration } from './session/session-registration-metadata.js';
 import type { Env, TRPCContext, SessionId } from './types.js';
 import type { CloudAgentSessionState } from './persistence/types.js';
 import { parseSessionMetadata } from './persistence/session-metadata.js';
@@ -1026,6 +1027,71 @@ describe('router sessionId validation', () => {
       });
 
       describe('successful retrieval', () => {
+        describe.each(['agent', 'workspace'] as const)('%s assigned branch', plane => {
+          it.each([undefined, 'feature/explicit-branch'])(
+            'returns the registered branch before preparation with repository branch %s',
+            async branch => {
+              const sessionId: SessionId = `${plane}_12345678-1234-1234-1234-123456789abc`;
+              const registration = await buildSessionMetadataFromRegistration({
+                identity: { sessionId, userId: mockContext.userId },
+                auth: {},
+                agent: { mode: 'code', model: 'kilo/test-model' },
+                repository: { type: 'github', repo: 'acme/repo', branch },
+              });
+              expect(registration.ok).toBe(true);
+              if (!registration.ok) throw new Error(registration.error);
+              const assignedBranch = registration.metadata.workspace?.branchName;
+              expect(assignedBranch).toEqual(branch ?? expect.stringMatching(/^kilo\/.+/));
+              mockGetMetadata.mockResolvedValue(registration.metadata);
+              if (plane === 'workspace') {
+                mockContext.env.SANDBOX_SESSION = {
+                  idFromName: vi.fn((id: string) => ({ id })),
+                  get: vi.fn(() => ({
+                    getMetadata: mockGetMetadata,
+                    getSession: vi.fn().mockResolvedValue({
+                      type: 'found',
+                      messages: [],
+                      latestEventId: null,
+                    }),
+                  })),
+                } as unknown as TRPCContext['env']['SANDBOX_SESSION'];
+              }
+
+              const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+              expect(result.branchName).toBe(assignedBranch);
+              expect(result.preparedAt).toBeUndefined();
+              expect(result.initiatedAt).toBeUndefined();
+              expect(result.routeReady).toBe(false);
+              expect(getOrCreateSessionMock).not.toHaveBeenCalled();
+              expect(getSandbox).not.toHaveBeenCalled();
+            }
+          );
+        });
+
+        it.each(['kilo/legacy-assigned-branch', undefined])(
+          'uses only the existing assigned branch from legacy metadata: %s',
+          async branchName => {
+            const sessionId: SessionId = 'agent_12345678-1234-1234-1234-123456789abc';
+            mockGetMetadata.mockResolvedValue(
+              legacySessionMetadata({
+                sessionId,
+                userId: mockContext.userId,
+                version: 1,
+                timestamp: 1,
+                githubRepo: 'acme/repo',
+                upstreamBranch: 'main',
+                branchName,
+              })
+            );
+
+            const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+            expect(result.branchName).toBe(branchName);
+            expect(result.upstreamBranch).toBe('main');
+          }
+        );
+
         it('should return sanitized session metadata for owner', async () => {
           const sessionId: SessionId = 'agent_12345678-1234-1234-1234-123456789abc';
           const metadata = legacySessionMetadata({

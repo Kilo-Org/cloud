@@ -40,23 +40,24 @@ describe('asMessages', () => {
     ]);
   });
 
-  it('leaves out thinking and tool work, and the turns that are only that', () => {
-    expect(
-      drawn({
-        sessionId: 's1',
-        turns: [
-          turn('t1', 'assistant', [
-            { id: 'p1', kind: 'reasoning', body: 'working it out' },
-            text('p2', 'a burrito'),
-          ]),
-          turn('t2', 'assistant', [{ id: 'p3', kind: 'reasoning', body: 'more working' }]),
-        ],
-        answering: '',
-        asked: null,
-        askedImages: [],
-        waiting: [],
-      })
-    ).toEqual([{ role: 'assistant', said: 'a burrito' }]);
+  it('draws the thinking folded ahead of its answer, and never as a bubble of its own', () => {
+    const input = {
+      sessionId: 's1',
+      turns: [
+        turn('t1', 'assistant', [
+          { id: 'p1', kind: 'reasoning', body: 'working it out' },
+          text('p2', 'a burrito'),
+        ]),
+        turn('t2', 'assistant', [{ id: 'p3', kind: 'reasoning', body: 'more working' }]),
+      ],
+      answering: '',
+      asked: null,
+      askedImages: [],
+      waiting: [],
+    } satisfies Parameters<typeof asMessages>[0];
+
+    expect(drawn(input)).toEqual([{ role: 'assistant', said: 'a burrito' }]);
+    expect(asMessages(input)[0]?.parts.map(part => part.type)).toEqual(['reasoning', 'text']);
   });
 
   it('puts the unanswered question last, ahead of the answer arriving now', () => {

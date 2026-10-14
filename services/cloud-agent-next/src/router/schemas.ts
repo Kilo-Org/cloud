@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   getKiloSandboxAllocation,
   sandboxAllocationInputSchema,
@@ -667,6 +668,7 @@ const PrepareSessionCloneVariant = z.object({
 
 export const PrepareSessionInput = z
   .union([PrepareSessionNonCloneVariant, PrepareSessionCloneVariant])
+  .and(egressPolicySchema)
   .refine(validateGitSource, {
     message: 'Must provide either githubRepo or gitUrl, but not both',
     path: ['githubRepo'],
@@ -925,8 +927,10 @@ export const StartSessionInput = z
       .optional(),
     repository: RepositoryInputSchema,
     profile: ProfileInputSchema,
-    runtime: z
-      .object({ sandboxAllocation: ManagedSandboxAllocationInput.optional() })
+    runtime: egressPolicySchema
+      .safeExtend({
+        sandboxAllocation: ManagedSandboxAllocationInput.optional(),
+      })
       .strict()
       .optional(),
     options: z
@@ -1159,6 +1163,7 @@ export const GetSessionOutput = z.object({
   variant: z.string().optional().describe('Thinking effort variant'),
   autoCommit: z.boolean().optional().describe('Auto-commit setting'),
   upstreamBranch: z.string().optional().describe('Upstream branch name'),
+  branchName: z.string().optional().describe('Assigned workspace branch name'),
 
   runtimeAgents: z
     .array(

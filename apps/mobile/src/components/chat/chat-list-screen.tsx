@@ -86,7 +86,7 @@ function ScopedChatListScreen() {
     rememberModelFacts(models);
   }, [models]);
 
-  const { chats, isLoading, isError, refetch, remove } = useChatList(place);
+  const { chats, isLoading, isError, refetch, remove, rename } = useChatList(place);
 
   // There is no picker here: a chat starts on the model the latest one is on,
   // and the conversation's own picker switches it from its next message.
@@ -122,7 +122,10 @@ function ScopedChatListScreen() {
     setStarting(true);
     void (async () => {
       try {
-        const sessionId = await newChat(place, model);
+        const sessionId = await newChat(place, {
+          model,
+          effort: null,
+        });
         // Whatever the last attempt failed with is moot once a chat starts.
         toast.dismiss('chat-start-failed');
         router.push(`/(app)/(tabs)/(4_chat)/${sessionId}` as Href);
@@ -166,9 +169,10 @@ function ScopedChatListScreen() {
         last={index === chats.length - 1}
         onPress={open}
         onDelete={drop}
+        onRename={rename}
       />
     ),
-    [chats.length, drop, nameOf, open]
+    [chats.length, drop, nameOf, open, rename]
   );
 
   // Nothing to start a chat with is nothing for the button to do, and an empty

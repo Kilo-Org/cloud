@@ -54,7 +54,12 @@ afterEach(() => {
 describe('classifier usage identity', () => {
   it('produces a stable UUID per call independently of delivery time', async () => {
     const first = await buildClassifierUsage(payload, identity, costUsd, createdAt);
-    const retry = await buildClassifierUsage(payload, identity, costUsd, '2026-01-02T00:00:00.000Z');
+    const retry = await buildClassifierUsage(
+      payload,
+      identity,
+      costUsd,
+      '2026-01-02T00:00:00.000Z'
+    );
     expect(first.core.id).toBe(retry.core.id);
     expect(first.metadata.id).toBe(first.core.id);
     expect(UsageRecordRequestSchema.safeParse(first).success).toBe(true);
@@ -69,7 +74,12 @@ describe('classifier usage identity', () => {
     { requestStart: 'request-start-2' },
   ])('separates calls when identity changes: %j', async change => {
     const first = await buildClassifierUsage(payload, identity, costUsd, createdAt);
-    const other = await buildClassifierUsage(payload, { ...identity, ...change }, costUsd, createdAt);
+    const other = await buildClassifierUsage(
+      payload,
+      { ...identity, ...change },
+      costUsd,
+      createdAt
+    );
     expect(first.core.id).not.toBe(other.core.id);
   });
 
@@ -104,13 +114,18 @@ describe('classifier usage identity', () => {
 
   it('preserves the org payer and strips NUL bytes from client metadata', async () => {
     const organizationId = '00000000-0000-4000-8000-000000000001';
-    const usage = await buildClassifierUsage({
-      ...payload,
-      organizationId,
-      sessionId: 'session\u00001',
-      machineId: 'machine\u00001',
-      userAgent: 'client\u00001',
-    }, identity, costUsd, createdAt);
+    const usage = await buildClassifierUsage(
+      {
+        ...payload,
+        organizationId,
+        sessionId: 'session\u00001',
+        machineId: 'machine\u00001',
+        userAgent: 'client\u00001',
+      },
+      identity,
+      costUsd,
+      createdAt
+    );
     expect(usage.core.organization_id).toBe(organizationId);
     expect(usage.metadata).toMatchObject({
       session_id: 'session1',
@@ -134,7 +149,12 @@ describe('classifier usage delivery', () => {
         },
       } as unknown as Env;
       await recordClassifierUsage(env, payload, { ...identity, kind }, costUsd, createdAt);
-      const expected = await buildClassifierUsage(payload, { ...identity, kind }, costUsd, createdAt);
+      const expected = await buildClassifierUsage(
+        payload,
+        { ...identity, kind },
+        costUsd,
+        createdAt
+      );
       expect(record).toHaveBeenCalledExactlyOnceWith(expected);
       expect(env.AUTO_ROUTING_DECISION_CACHE.idFromName).toHaveBeenCalledExactlyOnceWith(
         identity.conversationKey
@@ -144,14 +164,19 @@ describe('classifier usage delivery', () => {
 
   it('posts the usage contract to the existing web writer using the internal secret', async () => {
     const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
-    fetchMock.mockResolvedValueOnce(Response.json({
-      status: 'recorded',
-      result: { usageId: usage.core.id, createdAt, newMicrodollarsUsed: 13 },
-    }));
-    const outcome = await writeClassifierUsage({
-      KILO_WEB_API_BASE_URL: 'https://web.example.test' as Env['KILO_WEB_API_BASE_URL'],
-      INTERNAL_API_SECRET_PROD: { get: async () => 'test-internal-secret' } as SecretsStoreSecret,
-    }, usage);
+    fetchMock.mockResolvedValueOnce(
+      Response.json({
+        status: 'recorded',
+        result: { usageId: usage.core.id, createdAt, newMicrodollarsUsed: 13 },
+      })
+    );
+    const outcome = await writeClassifierUsage(
+      {
+        KILO_WEB_API_BASE_URL: 'https://web.example.test' as Env['KILO_WEB_API_BASE_URL'],
+        INTERNAL_API_SECRET_PROD: { get: async () => 'test-internal-secret' } as SecretsStoreSecret,
+      },
+      usage
+    );
     expect(outcome.kind).toBe('recorded');
     expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
       'https://web.example.test/api/internal/usage/record',
@@ -168,12 +193,19 @@ describe('classifier usage delivery', () => {
 
   it('returns unavailable when the secret cannot be read so the DO retains the event', async () => {
     const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
-    await expect(writeClassifierUsage({
-      KILO_WEB_API_BASE_URL: 'https://web.example.test' as Env['KILO_WEB_API_BASE_URL'],
-      INTERNAL_API_SECRET_PROD: {
-        get: async () => { throw new Error('secrets unavailable'); },
-      } as SecretsStoreSecret,
-    }, usage)).resolves.toEqual({ kind: 'unavailable', reason: 'missing_config' });
+    await expect(
+      writeClassifierUsage(
+        {
+          KILO_WEB_API_BASE_URL: 'https://web.example.test' as Env['KILO_WEB_API_BASE_URL'],
+          INTERNAL_API_SECRET_PROD: {
+            get: async () => {
+              throw new Error('secrets unavailable');
+            },
+          } as SecretsStoreSecret,
+        },
+        usage
+      )
+    ).resolves.toEqual({ kind: 'unavailable', reason: 'missing_config' });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

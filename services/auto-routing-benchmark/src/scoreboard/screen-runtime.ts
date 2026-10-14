@@ -11,16 +11,24 @@ export function createScreenBudget(maxUsd: number, initialSpendUsd = 0) {
     waiters.clear();
   };
   return {
-    get spentUsd() { return spentUsd; },
-    get reservedUsd() { return reservedUsd; },
+    get spentUsd() {
+      return spentUsd;
+    },
+    get reservedUsd() {
+      return reservedUsd;
+    },
     stop() {
       stopped = true;
       notify();
     },
     async reserve(amountUsd: number) {
       while (true) {
-        if (stopped || spentUsd >= maxUsd ||
-          (activeReservations === 0 && amountUsd > maxUsd - spentUsd)) return null;
+        if (
+          stopped ||
+          spentUsd >= maxUsd ||
+          (activeReservations === 0 && amountUsd > maxUsd - spentUsd)
+        )
+          return null;
         if (spentUsd + reservedUsd + amountUsd <= maxUsd) {
           reservedUsd += amountUsd;
           activeReservations++;

@@ -112,14 +112,23 @@ describe('candidate screening', () => {
   });
 
   it('keeps only the cheapest prompt-priced models with a deterministic tie break', () => {
-    const catalog = ScreeningCatalogSchema.parse({ data: [
-      { ...catalogModel, id: 'fixture/expensive', pricing: { prompt: '0.000002', completion: '0' } },
-      { ...catalogModel, id: 'fixture/b' },
-      { ...catalogModel, id: 'fixture/free', pricing: { prompt: '0', completion: '0' } },
-      { ...catalogModel, id: 'fixture/a' },
-    ] });
-    expect(selectScreenCandidates(catalog, [], 3, 3).map(model => model.id))
-      .toEqual(['fixture/free', 'fixture/a', 'fixture/b']);
+    const catalog = ScreeningCatalogSchema.parse({
+      data: [
+        {
+          ...catalogModel,
+          id: 'fixture/expensive',
+          pricing: { prompt: '0.000002', completion: '0' },
+        },
+        { ...catalogModel, id: 'fixture/b' },
+        { ...catalogModel, id: 'fixture/free', pricing: { prompt: '0', completion: '0' } },
+        { ...catalogModel, id: 'fixture/a' },
+      ],
+    });
+    expect(selectScreenCandidates(catalog, [], 3, 3).map(model => model.id)).toEqual([
+      'fixture/free',
+      'fixture/a',
+      'fixture/b',
+    ]);
     expect(selectScreenCandidates(catalog, [], 3)).toHaveLength(4);
   });
 
@@ -134,11 +143,15 @@ describe('candidate screening', () => {
     ];
     const jobs = [...screenCandidateJobs(pairs, cases)];
     expect(jobs.map(job => job.pairIndex)).toEqual([0, 2, 4, 1, 3, 4, 0, 2, 1, 3]);
-    expect(jobs.slice(0, 3).map(job => pairs[job.pairIndex].model))
-      .toEqual(['fixture/a', 'fixture/b', 'fixture/c']);
+    expect(jobs.slice(0, 3).map(job => pairs[job.pairIndex].model)).toEqual([
+      'fixture/a',
+      'fixture/b',
+      'fixture/c',
+    ]);
     for (const [index] of pairs.entries()) {
-      expect(jobs.filter(job => job.pairIndex === index).map(job => job.benchCase.id))
-        .toEqual(cases.map(benchCase => benchCase.id));
+      expect(jobs.filter(job => job.pairIndex === index).map(job => job.benchCase.id)).toEqual(
+        cases.map(benchCase => benchCase.id)
+      );
     }
     expect([...screenCandidateJobs([], cases)]).toEqual([]);
   });
@@ -146,55 +159,99 @@ describe('candidate screening', () => {
   it('restores existing report results by exact pair and skips only completed requests', () => {
     const cases = selectSweepCases().slice(0, 1);
     const benchCase = cases[0];
-    const savedResult = { ...result, caseId: benchCase.id,
-      routeKey: `${benchCase.taskType}/${benchCase.subtaskType}` };
+    const savedResult = {
+      ...result,
+      caseId: benchCase.id,
+      routeKey: `${benchCase.taskType}/${benchCase.subtaskType}`,
+    };
     const previous = ScreenResumeSchema.parse({
-      startedAt: '2026-10-14T00:00:00.000Z', suite: 'efficient', tableVersion: 'fixture-table',
-      productionTokenProfile: null, casesPerRoute: 4,
-      costUsd: 0.12, graderCostUsd: 0.01, estimatedCostUsd: 0.02,
+      startedAt: '2026-10-14T00:00:00.000Z',
+      suite: 'efficient',
+      tableVersion: 'fixture-table',
+      productionTokenProfile: null,
+      casesPerRoute: 4,
+      costUsd: 0.12,
+      graderCostUsd: 0.01,
+      estimatedCostUsd: 0.02,
       sampledCases: [{ id: benchCase.id, routeKey: savedResult.routeKey }],
-      models: [{ model: 'fixture/new', costUnknown: false, estimatedCostUsd: 0.02, variants: [
-        { variant: null, results: [savedResult] }, { variant: 'high', results: [] },
-      ] }],
+      models: [
+        {
+          model: 'fixture/new',
+          costUnknown: false,
+          estimatedCostUsd: 0.02,
+          variants: [
+            { variant: null, results: [savedResult] },
+            { variant: 'high', results: [] },
+          ],
+        },
+      ],
     });
     const measurements: ScreenMeasurement[] = [
       { model: 'fixture/new', variant: null, results: [] },
       { model: 'fixture/new', variant: 'high', results: [] },
     ];
-    const identity = { suite: 'efficient' as const, casesPerRoute: 4,
-      tableVersion: 'fixture-table', profile: null };
+    const identity = {
+      suite: 'efficient' as const,
+      casesPerRoute: 4,
+      tableVersion: 'fixture-table',
+      profile: null,
+    };
     restoreScreenMeasurements(previous, measurements, cases, identity);
     expect(measurements[0].results).toEqual([savedResult]);
     expect(previous).toMatchObject({ costUsd: 0.12, graderCostUsd: 0.01, estimatedCostUsd: 0.02 });
-    const pending = [...screenCandidateJobs(measurements, cases)].filter(job =>
-      !measurements[job.pairIndex].results.some(row => row.caseId === job.benchCase.id));
+    const pending = [...screenCandidateJobs(measurements, cases)].filter(
+      job => !measurements[job.pairIndex].results.some(row => row.caseId === job.benchCase.id)
+    );
     expect(pending.map(job => job.pairIndex)).toEqual([1]);
-    expect(() => restoreScreenMeasurements(previous, measurements, cases,
-      { ...identity, suite: 'frontier' })).toThrow('same suite');
-    expect(() => restoreScreenMeasurements(previous, measurements, cases,
-      { ...identity, tableVersion: 'other-table' })).toThrow('same suite');
-    expect(() => restoreScreenMeasurements(previous, measurements, cases,
-      { ...identity, profile: { uncachedInputTokens: 10, cachedInputTokens: 0 } })).toThrow('same suite');
+    expect(() =>
+      restoreScreenMeasurements(previous, measurements, cases, { ...identity, suite: 'frontier' })
+    ).toThrow('same suite');
+    expect(() =>
+      restoreScreenMeasurements(previous, measurements, cases, {
+        ...identity,
+        tableVersion: 'other-table',
+      })
+    ).toThrow('same suite');
+    expect(() =>
+      restoreScreenMeasurements(previous, measurements, cases, {
+        ...identity,
+        profile: { uncachedInputTokens: 10, cachedInputTokens: 0 },
+      })
+    ).toThrow('same suite');
     const duplicate = ScreenResumeSchema.parse(previous);
     duplicate.models[0].variants[0].results.push(savedResult);
-    expect(() => restoreScreenMeasurements(duplicate, measurements, cases, identity))
-      .toThrow('duplicate case results');
-    const changedPairs: ScreenMeasurement[] = [{ model: 'fixture/other', variant: null, results: [] }];
-    expect(() => restoreScreenMeasurements(previous, changedPairs, cases, identity))
-      .toThrow('same candidate models');
+    expect(() => restoreScreenMeasurements(duplicate, measurements, cases, identity)).toThrow(
+      'duplicate case results'
+    );
+    const changedPairs: ScreenMeasurement[] = [
+      { model: 'fixture/other', variant: null, results: [] },
+    ];
+    expect(() => restoreScreenMeasurements(previous, changedPairs, cases, identity)).toThrow(
+      'same candidate models'
+    );
   });
 
   it('waits for a reservation before sending and settles the attempt after reading its usage', async () => {
     const admitted = Promise.withResolvers<boolean>();
     const settled = vi.fn();
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(
-      'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
-      'data: {"usage":{"cost":0.001}}\n\n' +
-      'data: [DONE]\n\n'
-    ));
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(
+          'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
+            'data: {"usage":{"cost":0.001}}\n\n' +
+            'data: [DONE]\n\n'
+        )
+      );
     const request = requestDirectSweepCompletion({
-      model: 'fixture/new', fragment: {}, systemPrompt: 'system', userPrompt: 'user',
-      apiKey: 'fixture-key', attributionHeaders: {}, budgetAvailable: () => true, fetchImpl,
+      model: 'fixture/new',
+      fragment: {},
+      systemPrompt: 'system',
+      userPrompt: 'user',
+      apiKey: 'fixture-key',
+      attributionHeaders: {},
+      budgetAvailable: () => true,
+      fetchImpl,
       beforeRequest: () => admitted.promise,
       onAttemptComplete: settled,
     });
@@ -219,8 +276,7 @@ describe('candidate screening', () => {
     expect(budget.spentUsd).toBe(usage.cost);
     expect(budget.reservedUsd).toBe(0);
     expect(screenGraderReserveUsd(input, pricing)).toBeCloseTo(
-      Math.ceil(input.length / 4) * pricing.promptUsdPerToken +
-      8192 * pricing.completionUsdPerToken
+      Math.ceil(input.length / 4) * pricing.promptUsdPerToken + 8192 * pricing.completionUsdPerToken
     );
   });
 
@@ -363,30 +419,47 @@ describe('candidate screening', () => {
   });
 
   it('isolates missing-cost models and charges catalog token prices while other models continue', async () => {
-    const stream = (usage: Record<string, number>) => new Response(
-      'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
-      `data: ${JSON.stringify({ usage })}\n\n` +
-      'data: [DONE]\n\n'
-    );
-    const fetchImpl = vi.fn<typeof fetch>()
+    const stream = (usage: Record<string, number>) =>
+      new Response(
+        'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
+          `data: ${JSON.stringify({ usage })}\n\n` +
+          'data: [DONE]\n\n'
+      );
+    const fetchImpl = vi
+      .fn<typeof fetch>()
       .mockResolvedValueOnce(stream({ prompt_tokens: 1_000, completion_tokens: 100 }))
       .mockResolvedValueOnce(stream({ cost: 0.001 }))
       .mockResolvedValueOnce(stream({ cost: 0.001 }));
     const affected: ScreenModelSpend = { costUnknown: false, estimatedCostUsd: 0 };
     const healthy: ScreenModelSpend = { costUnknown: false, estimatedCostUsd: 0 };
-    const spends = new Map([['fixture/affected', affected], ['fixture/healthy', healthy]]);
+    const spends = new Map([
+      ['fixture/affected', affected],
+      ['fixture/healthy', healthy],
+    ]);
     const maxUsd = 0.01;
     let costUsd = 0;
-    for (const model of ['fixture/affected', 'fixture/healthy', 'fixture/affected', 'fixture/healthy']) {
+    for (const model of [
+      'fixture/affected',
+      'fixture/healthy',
+      'fixture/affected',
+      'fixture/healthy',
+    ]) {
       const spend = spends.get(model);
       if (!spend || spend.costUnknown || costUsd >= maxUsd) continue;
       const completion = await requestDirectSweepCompletion({
-        model, fragment: {}, systemPrompt: 'system', userPrompt: 'user',
-        apiKey: 'fixture-key', attributionHeaders: {},
-        budgetAvailable: () => costUsd < maxUsd, fetchImpl,
+        model,
+        fragment: {},
+        systemPrompt: 'system',
+        userPrompt: 'user',
+        apiKey: 'fixture-key',
+        attributionHeaders: {},
+        budgetAvailable: () => costUsd < maxUsd,
+        fetchImpl,
       });
       costUsd += recordScreenModelCost(spend, completion, pricing, {
-        systemPrompt: 'system', userPrompt: 'user', fragment: {},
+        systemPrompt: 'system',
+        userPrompt: 'user',
+        fragment: {},
       });
     }
     expect(fetchImpl).toHaveBeenCalledTimes(3);
@@ -400,19 +473,32 @@ describe('candidate screening', () => {
   it.each([
     { fragment: {}, completionTokens: 8192 },
     { fragment: { max_tokens: 100 }, completionTokens: 100 },
-  ])('bounds missing-token cost by prompt size and $completionTokens output tokens', ({ fragment, completionTokens }) => {
-    const spend: ScreenModelSpend = { costUnknown: false, estimatedCostUsd: 0 };
-    const costUsd = recordScreenModelCost(spend, {
-      costUsd: null, output: 'answer', error: 'usage_missing',
-    }, pricing, {
-      systemPrompt: 's'.repeat(80), userPrompt: 'u'.repeat(20), fragment,
-    });
-    const expected = 25 * pricing.promptUsdPerToken + completionTokens * pricing.completionUsdPerToken;
-    expect(costUsd).toBeCloseTo(expected);
-    expect(costUsd).toBeLessThan(0.02);
-    expect(spend.costUnknown).toBe(true);
-    expect(spend.estimatedCostUsd).toBeCloseTo(expected);
-  });
+  ])(
+    'bounds missing-token cost by prompt size and $completionTokens output tokens',
+    ({ fragment, completionTokens }) => {
+      const spend: ScreenModelSpend = { costUnknown: false, estimatedCostUsd: 0 };
+      const costUsd = recordScreenModelCost(
+        spend,
+        {
+          costUsd: null,
+          output: 'answer',
+          error: 'usage_missing',
+        },
+        pricing,
+        {
+          systemPrompt: 's'.repeat(80),
+          userPrompt: 'u'.repeat(20),
+          fragment,
+        }
+      );
+      const expected =
+        25 * pricing.promptUsdPerToken + completionTokens * pricing.completionUsdPerToken;
+      expect(costUsd).toBeCloseTo(expected);
+      expect(costUsd).toBeLessThan(0.02);
+      expect(spend.costUnknown).toBe(true);
+      expect(spend.estimatedCostUsd).toBeCloseTo(expected);
+    }
+  );
 
   it('uses the shared direct streaming request path and honors its budget gate', async () => {
     const fetchImpl = vi

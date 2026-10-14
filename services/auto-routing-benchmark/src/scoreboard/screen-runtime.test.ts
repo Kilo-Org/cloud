@@ -69,14 +69,18 @@ describe('screen worker runtime', () => {
     const budget = createScreenBudget(1);
     let maximumCommitted = 0;
     let completed = 0;
-    await runScreenWorkerPool(Array.from({ length: 12 }, (_, index) => index), 4, async () => {
-      const reservation = await budget.reserve(0.25);
-      if (!reservation) return;
-      maximumCommitted = Math.max(maximumCommitted, budget.spentUsd + budget.reservedUsd);
-      await Promise.resolve();
-      reservation.settle(0.1);
-      completed++;
-    });
+    await runScreenWorkerPool(
+      Array.from({ length: 12 }, (_, index) => index),
+      4,
+      async () => {
+        const reservation = await budget.reserve(0.25);
+        if (!reservation) return;
+        maximumCommitted = Math.max(maximumCommitted, budget.spentUsd + budget.reservedUsd);
+        await Promise.resolve();
+        reservation.settle(0.1);
+        completed++;
+      }
+    );
     expect(completed).toBeGreaterThan(4);
     expect(maximumCommitted).toBeLessThanOrEqual(1);
     expect(budget.spentUsd).toBeLessThanOrEqual(1);

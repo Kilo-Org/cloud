@@ -69,15 +69,19 @@ export const ScreenResumeSchema = z.object({
   unsettledCostUsd: z.number().nonnegative().default(0),
   spendIncomplete: z.boolean().default(false),
   sampledCases: z.array(z.object({ id: z.string(), routeKey: z.string() })),
-  models: z.array(z.object({
-    model: z.string(),
-    costUnknown: z.boolean().default(false),
-    estimatedCostUsd: z.number().nonnegative().default(0),
-    variants: z.array(z.object({
-      variant: z.string().nullable(),
-      results: OfflineSweepSchema.shape.pairs.element.shape.results,
-    })),
-  })),
+  models: z.array(
+    z.object({
+      model: z.string(),
+      costUnknown: z.boolean().default(false),
+      estimatedCostUsd: z.number().nonnegative().default(0),
+      variants: z.array(
+        z.object({
+          variant: z.string().nullable(),
+          results: OfflineSweepSchema.shape.pairs.element.shape.results,
+        })
+      ),
+    })
+  ),
 });
 export type ScreenResume = z.infer<typeof ScreenResumeSchema>;
 
@@ -92,21 +96,28 @@ export function restoreScreenMeasurements(
     profile: ProductionTokenProfile | null;
   }
 ) {
-  if (previous.suite !== identity.suite ||
+  if (
+    previous.suite !== identity.suite ||
     previous.casesPerRoute !== identity.casesPerRoute ||
     previous.tableVersion !== identity.tableVersion ||
-    previous.productionTokenProfile?.uncachedInputTokens !== identity.profile?.uncachedInputTokens ||
-    previous.productionTokenProfile?.cachedInputTokens !== identity.profile?.cachedInputTokens) {
+    previous.productionTokenProfile?.uncachedInputTokens !==
+      identity.profile?.uncachedInputTokens ||
+    previous.productionTokenProfile?.cachedInputTokens !== identity.profile?.cachedInputTokens
+  ) {
     throw new Error('Resume screen must use the same suite, sample size, table and cost profile');
   }
-  if (previous.spendIncomplete) throw new Error('Cannot resume a screen with indeterminate grader spend');
+  if (previous.spendIncomplete)
+    throw new Error('Cannot resume a screen with indeterminate grader spend');
   const casesById = new Map(cases.map(benchCase => [benchCase.id, benchCase]));
-  if (previous.sampledCases.length !== cases.length ||
+  if (
+    previous.sampledCases.length !== cases.length ||
     new Set(previous.sampledCases.map(benchCase => benchCase.id)).size !== cases.length ||
     previous.sampledCases.some(saved => {
       const benchCase = casesById.get(saved.id);
       return !benchCase || saved.routeKey !== `${benchCase.taskType}/${benchCase.subtaskType}`;
-    })) throw new Error('Resume screen must use the same sampled cases');
+    })
+  )
+    throw new Error('Resume screen must use the same sampled cases');
   const savedPairs = new Map<string, Result[]>();
   const savedModels = new Set<string>();
   for (const model of previous.models) {
@@ -118,9 +129,13 @@ export function restoreScreenMeasurements(
       const completed = new Set<string>();
       for (const result of variant.results) {
         const benchCase = casesById.get(result.caseId);
-        if (!benchCase || result.rep !== 0 || result.split !== 'train' ||
+        if (
+          !benchCase ||
+          result.rep !== 0 ||
+          result.split !== 'train' ||
           result.routeKey !== `${benchCase.taskType}/${benchCase.subtaskType}` ||
-          completed.has(result.caseId)) {
+          completed.has(result.caseId)
+        ) {
           throw new Error('Resume screen has incompatible or duplicate case results');
         }
         completed.add(result.caseId);
@@ -128,9 +143,11 @@ export function restoreScreenMeasurements(
       savedPairs.set(key, variant.results);
     }
   }
-  if (savedPairs.size !== measurements.length ||
+  if (
+    savedPairs.size !== measurements.length ||
     measurements.some(pair => !savedPairs.has(poolEntryKey(pair))) ||
-    savedModels.size !== new Set(measurements.map(pair => pair.model)).size) {
+    savedModels.size !== new Set(measurements.map(pair => pair.model)).size
+  ) {
     throw new Error('Resume screen must use the same candidate models and variants');
   }
   for (const pair of measurements) pair.results = savedPairs.get(poolEntryKey(pair)) ?? [];
@@ -168,13 +185,20 @@ export function screenRequestTokenBudget(request: ScreenRequest) {
 
 export const GRADER_RESERVE_USD = 0.002;
 
-export function screenGraderReserveUsd(input: string, pricing: CandidatePricing | null | undefined) {
+export function screenGraderReserveUsd(
+  input: string,
+  pricing: CandidatePricing | null | undefined
+) {
   if (!pricing) return GRADER_RESERVE_USD;
   const tokens = screenRequestTokenBudget({
-    systemPrompt: '', userPrompt: input, fragment: {},
+    systemPrompt: '',
+    userPrompt: input,
+    fragment: {},
   });
-  return tokens.promptTokens * pricing.promptUsdPerToken +
-    tokens.completionTokens * pricing.completionUsdPerToken;
+  return (
+    tokens.promptTokens * pricing.promptUsdPerToken +
+    tokens.completionTokens * pricing.completionUsdPerToken
+  );
 }
 
 export function recordScreenModelCost(
@@ -189,7 +213,10 @@ export function recordScreenModelCost(
   request: ScreenRequest
 ): number {
   if (completion.costUsd !== null) return completion.costUsd;
-  if (completion.output === null && completion.error !== 'OpenRouter transport or body read failed') {
+  if (
+    completion.output === null &&
+    completion.error !== 'OpenRouter transport or body read failed'
+  ) {
     return 0;
   }
   spend.costUnknown = true;
@@ -197,8 +224,8 @@ export function recordScreenModelCost(
   const fallback = screenRequestTokenBudget(request);
   const promptTokens = usage?.promptTokens ?? fallback.promptTokens;
   const completionTokens = usage?.completionTokens ?? fallback.completionTokens;
-  const estimatedCostUsd = promptTokens * pricing.promptUsdPerToken +
-    completionTokens * pricing.completionUsdPerToken;
+  const estimatedCostUsd =
+    promptTokens * pricing.promptUsdPerToken + completionTokens * pricing.completionUsdPerToken;
   spend.estimatedCostUsd += estimatedCostUsd;
   return estimatedCostUsd;
 }
@@ -221,9 +248,10 @@ export function selectScreenCandidates(
         model.pricing.completion != null &&
         model.pricing.prompt * 1_000_000 < maxPromptUsdPerMtok
     )
-    .toSorted((a, b) =>
-      (a.pricing?.prompt ?? Infinity) - (b.pricing?.prompt ?? Infinity) ||
-      a.id.localeCompare(b.id)
+    .toSorted(
+      (a, b) =>
+        (a.pricing?.prompt ?? Infinity) - (b.pricing?.prompt ?? Infinity) ||
+        a.id.localeCompare(b.id)
     )
     .slice(0, maxModels);
 }
@@ -442,8 +470,10 @@ async function main() {
     .number()
     .nonnegative()
     .parse(values['max-prompt-usd-per-mtok']);
-  const maxModels = values['max-models'] === undefined
-    ? undefined : z.coerce.number().int().positive().parse(values['max-models']);
+  const maxModels =
+    values['max-models'] === undefined
+      ? undefined
+      : z.coerce.number().int().positive().parse(values['max-models']);
   const pairs = z.array(PoolEntrySchema).parse(JSON.parse(await readFile(values.pairs, 'utf8')));
   const table = RoutingTableSchema.parse(JSON.parse(await readFile(values.table, 'utf8')));
   const profile = values['cost-profile']
@@ -490,9 +520,13 @@ async function main() {
       results: [],
     }))
   );
-  if (previous) restoreScreenMeasurements(previous, measurements, cases, {
-    suite, casesPerRoute, tableVersion: table.version, profile,
-  });
+  if (previous)
+    restoreScreenMeasurements(previous, measurements, cases, {
+      suite,
+      casesPerRoute,
+      tableVersion: table.version,
+      profile,
+    });
   const modelSpend = new Map<string, ScreenModelSpend>(
     candidates.map(model => [model.id, { costUnknown: false, estimatedCostUsd: 0 }])
   );
@@ -532,7 +566,8 @@ async function main() {
     })),
   };
   const budget = createScreenBudget(
-    maxUsd, report.costUsd + report.graderCostUsd + report.unsettledCostUsd
+    maxUsd,
+    report.costUsd + report.graderCostUsd + report.unsettledCostUsd
   );
   const budgetAvailable = () =>
     !report.spendIncomplete && !report.truncated && budget.spentUsd < maxUsd;
@@ -634,7 +669,9 @@ async function main() {
   const checkpoint = createScreenCheckpoint(out, snapshot);
   await checkpoint();
   const materializedCases = new Map<string, { systemPrompt: string; userPrompt: string }>();
-  const completedCases = measurements.map(pair => new Set(pair.results.map(result => result.caseId)));
+  const completedCases = measurements.map(
+    pair => new Set(pair.results.map(result => result.caseId))
+  );
   const jobs = screenCandidateJobs(measurements, cases);
   try {
     await runScreenWorkerPool(jobs, concurrency, async ({ pairIndex, benchCase }) => {
@@ -653,7 +690,8 @@ async function main() {
       }
       const model = candidates.find(candidate => candidate.id === pair.model);
       if (!model || !apiKey) throw new Error('Candidate request prerequisites missing');
-      const variantFragment = pair.variant === null ? {} : (model.opencode?.variants?.[pair.variant] ?? {});
+      const variantFragment =
+        pair.variant === null ? {} : (model.opencode?.variants?.[pair.variant] ?? {});
       const tokens = screenRequestTokenBudget({
         systemPrompt: prompts.systemPrompt,
         userPrompt: prompts.userPrompt,
@@ -662,7 +700,8 @@ async function main() {
       const fragment = { ...variantFragment, max_tokens: tokens.completionTokens };
       const pricing = prices.get(pair.model);
       if (!pricing) throw new Error(`Candidate pricing missing: ${pair.model}`);
-      const estimate = tokens.promptTokens * pricing.promptUsdPerToken +
+      const estimate =
+        tokens.promptTokens * pricing.promptUsdPerToken +
         tokens.completionTokens * pricing.completionUsdPerToken;
       let reservation: { settle: (costUsd: number) => void } | null = null;
       const completion = await requestDirectSweepCompletion({
@@ -702,7 +741,9 @@ async function main() {
           if (!reservation) throw new Error('Screen request has no budget reservation');
           const previousEstimate = spend.estimatedCostUsd;
           const costUsd = recordScreenModelCost(spend, attempt, pricing, {
-            systemPrompt: prompts.systemPrompt, userPrompt: prompts.userPrompt, fragment,
+            systemPrompt: prompts.systemPrompt,
+            userPrompt: prompts.userPrompt,
+            fragment,
           });
           report.costUsd += costUsd;
           report.estimatedCostUsd += spend.estimatedCostUsd - previousEstimate;

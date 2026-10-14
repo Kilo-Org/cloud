@@ -29,11 +29,13 @@ const streamChunkSchema = z.object({
       })
     )
     .optional(),
-  usage: z.object({
-    cost: z.number().nonnegative().nullish(),
-    prompt_tokens: z.number().int().nonnegative().nullish(),
-    completion_tokens: z.number().int().nonnegative().nullish(),
-  }).nullish(),
+  usage: z
+    .object({
+      cost: z.number().nonnegative().nullish(),
+      prompt_tokens: z.number().int().nonnegative().nullish(),
+      completion_tokens: z.number().int().nonnegative().nullish(),
+    })
+    .nullish(),
   error: z.unknown().optional(),
 });
 

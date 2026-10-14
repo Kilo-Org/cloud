@@ -241,7 +241,9 @@ describe('classifier usage retries', () => {
     fetchMock.mockRejectedValueOnce(new Error('connection lost'));
     await cacheDO.recordClassifierUsage(usage);
     expect(storage.put.mock.calls[0]).toEqual([key, expect.objectContaining({ usage })]);
-    expect(storage.put.mock.invocationCallOrder[0]).toBeLessThan(fetchMock.mock.invocationCallOrder[0]);
+    expect(storage.put.mock.invocationCallOrder[0]).toBeLessThan(
+      fetchMock.mock.invocationCallOrder[0]
+    );
     expect(storage.entries.get(key)).toMatchObject({ usage, attempts: 1 });
     await expect(storage.getAlarm()).resolves.toBe(Date.now() + 1000);
 
@@ -339,7 +341,9 @@ describe('classifier usage retries', () => {
     await cacheDO.putEntry('model:hash', classification);
     const sweepAt = Date.now() + 30 * 60 * 1000;
     const usage = await classifierUsage();
-    fetchMock.mockImplementation(async () => Response.json({ status: 'not_recorded', result: null }));
+    fetchMock.mockImplementation(async () =>
+      Response.json({ status: 'not_recorded', result: null })
+    );
     await cacheDO.recordClassifierUsage(usage);
 
     vi.advanceTimersByTime(1000);
@@ -348,14 +352,16 @@ describe('classifier usage retries', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     await expect(storage.getAlarm()).resolves.toBe(Date.now() + 2000);
 
-    fetchMock.mockResolvedValueOnce(Response.json({
-      status: 'recorded',
-      result: {
-        usageId: usage.core.id,
-        createdAt: usage.core.created_at,
-        newMicrodollarsUsed: usage.core.cost,
-      },
-    }));
+    fetchMock.mockResolvedValueOnce(
+      Response.json({
+        status: 'recorded',
+        result: {
+          usageId: usage.core.id,
+          createdAt: usage.core.created_at,
+          newMicrodollarsUsed: usage.core.cost,
+        },
+      })
+    );
     vi.advanceTimersByTime(2000);
     await expect(storage.getAlarm()).resolves.toBe(Date.now());
     await cacheDO.alarm();

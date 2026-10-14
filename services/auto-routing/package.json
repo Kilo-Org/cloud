@@ -15,6 +15,7 @@
   "dependencies": {
     "@kilocode/auto-routing-contracts": "workspace:*",
     "@kilocode/db": "workspace:*",
+    "@kilocode/usage-contracts": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

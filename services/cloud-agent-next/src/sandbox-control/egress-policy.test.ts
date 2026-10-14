@@ -48,6 +48,26 @@ describe('buildNativeEgressAllowlist', () => {
     );
   });
 
+  it('uses the token-encoded provider instead of the configured provider', () => {
+    const policy = buildNativeEgressAllowlist({
+      allowlist: [],
+      env: { ...env, KILO_OPENROUTER_BASE: 'https://configured.example.com/api' },
+      kiloToken: 'https://token-provider.example.com/api:session-token',
+    });
+    expect(policy).toContain('token-provider.example.com');
+    expect(policy).not.toContain('configured.example.com');
+  });
+
+  it.each([
+    'http://localhost/api:session-token',
+    'https://token-provider.example.com:8443/api:session-token',
+    'https://127.0.0.1/api:session-token',
+  ])('rejects unsupported token-encoded provider targets: %s', kiloToken => {
+    expect(() => buildNativeEgressAllowlist({ allowlist: [], env, kiloToken })).toThrow(
+      'Sandbox configuration is invalid or unsupported'
+    );
+  });
+
   it('supports the full public list plus mandatory domains', () => {
     const allowlist = Array.from({ length: 100 }, (_, index) => `domain${index}.example.com`);
     expect(buildNativeEgressAllowlist({ allowlist, env })).toHaveLength(112);

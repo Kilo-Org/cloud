@@ -17,9 +17,12 @@ const GIT_DOMAINS = [
 export function buildNativeEgressAllowlist(input: {
   allowlist: string[];
   env: KiloTargetEnv & { WORKER_URL?: string };
+  kiloToken?: string;
   repositoryUrl?: string;
 }): string[] {
-  const targets = deriveKiloSandboxTargets(input.env, '', { requireHttps: true });
+  const targets = deriveKiloSandboxTargets(input.env, input.kiloToken ?? '', {
+    requireHttps: true,
+  });
   if (!targets.success || !input.env.WORKER_URL) {
     throw new ProviderCreationError('invalid_configuration');
   }

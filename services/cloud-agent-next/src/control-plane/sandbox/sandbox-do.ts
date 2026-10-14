@@ -1547,7 +1547,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
-  private pinFromInput(input: EnsureAllocationInput, repositoryUrl?: string): StoredProviderPin {
+  private pinFromInput(
+    input: EnsureAllocationInput,
+    repositoryUrl?: string,
+    kiloToken?: string
+  ): StoredProviderPin {
     const policy = egressPolicySchema.safeParse(input);
     if (!policy.success) throw new ProviderCreationError('invalid_configuration');
     if (!sandboxKindMatchesKey(this.sandboxId, input.sandboxKind)) {
@@ -1578,6 +1582,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
               allowlist: policy.data.egressAllowlist ?? [],
               env: this.env,
               repositoryUrl,
+              kiloToken,
             }),
           }),
     };
@@ -1773,7 +1778,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const repository = source.repository;
         selectedPin = this.pinFromInput(
           sandboxSelection,
-          repository && repository.type !== 'github' ? repository.url : undefined
+          repository && repository.type !== 'github' ? repository.url : undefined,
+          source.kiloToken
         );
       }
       if (

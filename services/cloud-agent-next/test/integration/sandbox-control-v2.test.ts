@@ -2990,6 +2990,22 @@ describe('SandboxControlV2 allocation egress policy', () => {
     }
   );
 
+  it('pins the provider origin from the session token during prepare', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider);
+    const input = prepareInput(firstSessionId, { egressMode: 'deny-by-default' });
+    input.credentials.kiloToken = 'https://token-provider.example.com/api:session-token';
+    expect(await stub.prepare(input)).toMatchObject({ state: 'preparing' });
+    await awaitStarting(provider, stub);
+    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').egressAllowlist).toEqual(
+      [
+        ...baseline.filter(domain => domain !== 'gateway.example.com'),
+        'git.example.com',
+        'token-provider.example.com',
+      ].sort()
+    );
+  });
+
   it('compiles mode-only deny policy for a placed isolated container', async () => {
     const provider = createFakeProvider();
     const placedId = `sbx-${'c'.repeat(48)}`;

@@ -1,5 +1,6 @@
-export const PREVIEW_PORT_MIN = 1024;
-export const PREVIEW_PORT_MAX = 65535;
+import { PREVIEW_PORT_MAX, PREVIEW_PORT_MIN } from '../shared/preview-port.js';
+
+export { PREVIEW_PORT_MAX, PREVIEW_PORT_MIN };
 
 const LABEL_PATTERN = /^p([1-9][0-9]{3,4})-([0-9a-f]{32})$/;
 

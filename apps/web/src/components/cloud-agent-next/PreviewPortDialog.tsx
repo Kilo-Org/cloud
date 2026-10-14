@@ -13,9 +13,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  CLOUD_AGENT_PREVIEW_PORT_MAX,
-  CLOUD_AGENT_PREVIEW_PORT_MIN,
-} from '@/lib/cloud-agent/preview-port';
+  PREVIEW_PORT_MAX,
+  PREVIEW_PORT_MIN,
+} from '../../../../../services/cloud-agent-next/src/shared/preview-port';
 import { useOpenPreview } from './use-preview';
 
 export function PreviewPortDialog({
@@ -43,12 +43,10 @@ export function PreviewPortDialog({
     const parsedPort = Number(port);
     if (
       !Number.isInteger(parsedPort) ||
-      parsedPort < CLOUD_AGENT_PREVIEW_PORT_MIN ||
-      parsedPort > CLOUD_AGENT_PREVIEW_PORT_MAX
+      parsedPort < PREVIEW_PORT_MIN ||
+      parsedPort > PREVIEW_PORT_MAX
     ) {
-      setError(
-        `Enter a port between ${CLOUD_AGENT_PREVIEW_PORT_MIN} and ${CLOUD_AGENT_PREVIEW_PORT_MAX}.`
-      );
+      setError(`Enter a port between ${PREVIEW_PORT_MIN} and ${PREVIEW_PORT_MAX}.`);
       return;
     }
     setError(null);

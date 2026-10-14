@@ -21,9 +21,9 @@ import {
   CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
 } from '@/lib/cloud-agent/constants';
 import {
-  CLOUD_AGENT_PREVIEW_PORT_MAX,
-  CLOUD_AGENT_PREVIEW_PORT_MIN,
-} from '@/lib/cloud-agent/preview-port';
+  PREVIEW_PORT_MAX,
+  PREVIEW_PORT_MIN,
+} from '../../../../services/cloud-agent-next/src/shared/preview-port';
 
 export {
   SandboxStatusSnapshotSchema as baseGetSandboxStatusNextOutputSchema,
@@ -729,7 +729,7 @@ const previewSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 
 export const baseCreatePreviewNextSchema = z.object({
   cloudAgentSessionId: previewSessionIdSchema,
-  port: z.number().int().min(CLOUD_AGENT_PREVIEW_PORT_MIN).max(CLOUD_AGENT_PREVIEW_PORT_MAX),
+  port: z.number().int().min(PREVIEW_PORT_MIN).max(PREVIEW_PORT_MAX),
   /** Where the preview opens; the Worker validates it where it redirects. */
   path: z.string().startsWith('/').max(2048).optional(),
 });

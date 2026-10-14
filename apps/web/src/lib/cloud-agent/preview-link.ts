@@ -1,5 +1,8 @@
 import { isPreviewLoopbackHostname } from '../../../../../services/cloud-agent-next/src/shared/preview-loopback';
-import { CLOUD_AGENT_PREVIEW_PORT_MAX, CLOUD_AGENT_PREVIEW_PORT_MIN } from './preview-port';
+import {
+  PREVIEW_PORT_MAX,
+  PREVIEW_PORT_MIN,
+} from '../../../../../services/cloud-agent-next/src/shared/preview-port';
 
 /** The placeholder in the preview URL template from `getPreviewOptions`. */
 const PREVIEW_URL_TEMPLATE_PORT = '{port}';
@@ -26,8 +29,8 @@ export function parsePreviewLinkTarget(href: string | undefined): PreviewLinkTar
   if (
     url.port === '' ||
     !Number.isInteger(port) ||
-    port < CLOUD_AGENT_PREVIEW_PORT_MIN ||
-    port > CLOUD_AGENT_PREVIEW_PORT_MAX
+    port < PREVIEW_PORT_MIN ||
+    port > PREVIEW_PORT_MAX
   ) {
     return null;
   }

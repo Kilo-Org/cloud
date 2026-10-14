@@ -2794,7 +2794,12 @@ describe('server /internal/widgets/approval-key', () => {
   it('binds the oldest pending permission of an owned control-plane session', async () => {
     const { env, getPendingInteractions } = envWithPending([
       { id: '' },
-      { id: 'per_widget_1', permission: 'edit', patterns: ['private/path'] },
+      {
+        id: 'per_widget_1',
+        permission: 'bash',
+        patterns: ['private/path'],
+        metadata: { command: 'rm -rf build' },
+      },
       { id: 'per_widget_2' },
     ]);
     const response = await fetchWorker(approvalKeyRequest(body), env);
@@ -2802,7 +2807,7 @@ describe('server /internal/widgets/approval-key', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
     const text = await response.text();
-    expect(JSON.parse(text)).toEqual({ approvalKey: KEY_PER_WIDGET_1 });
+    expect(JSON.parse(text)).toEqual({ approvalKey: KEY_PER_WIDGET_1, command: 'rm -rf build' });
     expect(text).not.toContain('per_widget');
     expect(text).not.toContain('private/path');
     expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
@@ -2820,15 +2825,39 @@ describe('server /internal/widgets/approval-key', () => {
     const { env } = envWithPending([{ id: 'per_widget_2' }]);
     const response = await fetchWorker(approvalKeyRequest(body), env);
 
-    await expect(response.json()).resolves.toEqual({ approvalKey: KEY_PER_WIDGET_2 });
+    await expect(response.json()).resolves.toEqual({
+      approvalKey: KEY_PER_WIDGET_2,
+      command: null,
+    });
     expect(KEY_PER_WIDGET_2).not.toBe(KEY_PER_WIDGET_1);
   });
 
-  it('returns a null key when nothing is pending', async () => {
+  it('returns a null key and command when nothing is pending', async () => {
     const { env } = envWithPending([]);
     const response = await fetchWorker(approvalKeyRequest(body), env);
 
-    await expect(response.json()).resolves.toEqual({ approvalKey: null });
+    await expect(response.json()).resolves.toEqual({ approvalKey: null, command: null });
+  });
+
+  it('returns a null command when the permission carries none', async () => {
+    const { env } = envWithPending([{ id: 'per_widget_1', metadata: { command: 42 } }]);
+    const response = await fetchWorker(approvalKeyRequest(body), env);
+
+    await expect(response.json()).resolves.toEqual({
+      approvalKey: KEY_PER_WIDGET_1,
+      command: null,
+    });
+  });
+
+  it('trims the command to the session card limit', async () => {
+    const { env } = envWithPending([
+      { id: 'per_widget_1', metadata: { command: `${'a'.repeat(80)}\nsecond line` } },
+    ]);
+    const response = await fetchWorker(approvalKeyRequest(body), env);
+
+    const parsed = (await response.json()) as { command: string | null };
+    expect(parsed.command?.length).toBeLessThanOrEqual(60);
+    expect(parsed.command?.endsWith('…')).toBe(true);
   });
 
   it('refuses a session outside the exact user, organization, and session pairing', async () => {
@@ -2855,7 +2884,7 @@ describe('server /internal/widgets/approval-key', () => {
       env
     );
 
-    await expect(response.json()).resolves.toEqual({ approvalKey: null });
+    await expect(response.json()).resolves.toEqual({ approvalKey: null, command: null });
     expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
     expect(getPendingInteractions).not.toHaveBeenCalled();
     expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();

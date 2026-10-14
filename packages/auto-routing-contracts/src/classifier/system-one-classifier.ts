@@ -148,15 +148,30 @@ const CLASSIFIER_QUESTIONS = {
   },
 } as const;
 
+function classifierPromptPrefix(
+  value: string | null | undefined,
+  maxLength: number
+): string | null {
+  if (value == null) return null;
+  const prefix = value.slice(0, maxLength);
+  const finalCodeUnit = prefix.charCodeAt(prefix.length - 1);
+  return finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff ? prefix.slice(0, -1) : prefix;
+}
+
 export function buildClassifierState(input: NormalizedClassifierInput) {
   return {
     apiKind: input.apiKind,
-    systemPromptPrefix: input.systemPromptPrefix?.slice(0, SYSTEM_PROMPT_PREFIX_MAX_LENGTH) ?? null,
-    initialUserPromptPrefix:
-      input.userPromptPrefix?.slice(0, USER_PROMPT_PREFIX_MAX_LENGTH) ?? null,
+    systemPromptPrefix: classifierPromptPrefix(
+      input.systemPromptPrefix,
+      SYSTEM_PROMPT_PREFIX_MAX_LENGTH
+    ),
+    initialUserPromptPrefix: classifierPromptPrefix(
+      input.userPromptPrefix,
+      USER_PROMPT_PREFIX_MAX_LENGTH
+    ),
     latestUserPromptPrefix:
       input.latestUserPromptPrefix && input.latestUserPromptPrefix !== input.userPromptPrefix
-        ? input.latestUserPromptPrefix.slice(0, USER_PROMPT_PREFIX_MAX_LENGTH)
+        ? classifierPromptPrefix(input.latestUserPromptPrefix, USER_PROMPT_PREFIX_MAX_LENGTH)
         : null,
     messageCount: input.messageCount,
     hasTools: input.hasTools,

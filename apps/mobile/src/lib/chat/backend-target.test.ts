@@ -21,7 +21,9 @@ const first: StoredChatBackend = {
   apiKind: 'chat_completions',
   apiKey: '',
   headers: {},
-  models: [{ id: 'vendor/model:latest', name: 'Model', tools: false, images: false }],
+  models: [
+    { id: 'vendor/model:latest', name: 'Model', tools: false, images: false, reasoning: false },
+  ],
   allowLocalHttp: false,
 };
 const modelId = 'vendor/model:latest';

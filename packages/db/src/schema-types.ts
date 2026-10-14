@@ -195,6 +195,14 @@ export const WorkspaceFolderColor = {
 
 export type WorkspaceFolderColor = (typeof WorkspaceFolderColor)[keyof typeof WorkspaceFolderColor];
 
+export const TodoItemSessionOrigin = {
+  Started: 'started',
+  Linked: 'linked',
+} as const;
+
+export type TodoItemSessionOrigin =
+  (typeof TodoItemSessionOrigin)[keyof typeof TodoItemSessionOrigin];
+
 // --- SecurityAuditLogAction ---
 
 /**

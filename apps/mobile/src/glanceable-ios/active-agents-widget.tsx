@@ -281,8 +281,6 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
         row =>
           `${count(safeCount(row.count))} ${safeText(row.label) ?? labels[kindOf(row.kind) ?? 'idle']}`
       );
-    // 160x72: the 14pt mark, the primary count (15pt bold,
-    // baseline 40) and the other counts (12pt at 62%, baseline 62), 6pt in.
     return (
       <VStack
         alignment="leading"
@@ -290,8 +288,8 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
         modifiers={[
           bodyURL,
           ...genericA11y,
-          padding({ top: 16.5 - 0.952 * 12 - 1.25, leading: 6, trailing: 6 }),
-          frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'topLeading' }),
+          padding({ leading: 6, trailing: 6 }),
+          frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'leading' }),
         ]}
       >
         {logo(14, true)}

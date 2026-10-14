@@ -61,10 +61,10 @@ index aabbb41259038993305302607e0156e4d61cf4bd..735541f32bd89f368eecbd00fc8fc583
      LiveActivityFactory: LiveActivityFactoryStub,
      LiveActivity: LiveActivityStub,
 diff --git a/build/Widgets.d.ts b/build/Widgets.d.ts
-index d4b5aacee380c056855f68c5ca62c9af24304745..038f4c2491bacc01ab3aac1fb1305d0f58a23789 100644
+index d4b5aacee380c056855f68c5ca62c9af24304745..b8e09284830e87123e9a758a0ed173e5ae005143 100644
 --- a/build/Widgets.d.ts
 +++ b/build/Widgets.d.ts
-@@ -37,12 +37,17 @@ export declare class LiveActivity<T extends object = object> {
+@@ -37,20 +37,32 @@ export declare class LiveActivity<T extends object = object> {
       * Returns the stable ActivityKit identifier for this Live Activity.
       */
      getId(): string;
@@ -73,18 +73,34 @@ index d4b5aacee380c056855f68c5ca62c9af24304745..038f4c2491bacc01ab3aac1fb1305d0f
 +        id: string;
 +        state: 'active' | 'stale' | 'ended' | 'dismissed';
 +    };
++    /**
++     * The content properties the activity shows now, including a pushed update.
++     * Returns `null` when ActivityKit no longer lists the activity or the content is not JSON.
++     */
++    getProps(): T | null;
      /**
       * Updates the Live Activity's content. The UI reflects the new properties immediately.
       * @param props The updated content properties.
 -     * @param staleDate When set, the system may de-emphasize the activity after this date if content has not been refreshed.
 +     * @param staleAfterSeconds Seconds until ActivityKit marks the content stale. Omit to never mark it.
++     * @param relevanceScore ActivityKit's ordering among this app's activities. Omit for 0.
       */
 -    update(props: T, staleDate?: Date): Promise<void>;
-+    update(props: T, staleAfterSeconds?: number): Promise<void>;
++    update(props: T, staleAfterSeconds?: number, relevanceScore?: number): Promise<void>;
      /**
       * Ends the Live Activity.
       * @param dismissalPolicy Controls when the Live Activity is removed from the Lock Screen after ending.
-@@ -70,19 +75,20 @@ export declare class LiveActivity<T extends object = object> {
+      * Can be `'default'`, `'immediate'`, or `after(date)`.
+      * @param props Final content properties to update after the activity ends.
+      * @param contentDate The time the data in the payload was generated. If this is older than a previous update or push payload, the system ignores this update.
++     * @param relevanceScore ActivityKit's ordering among this app's activities. Omit for 0.
+      */
+-    end(dismissalPolicy?: LiveActivityDismissalPolicy, props?: T, contentDate?: Date): Promise<void>;
++    end(dismissalPolicy?: LiveActivityDismissalPolicy, props?: T, contentDate?: Date, relevanceScore?: number): Promise<void>;
+     /**
+      * Returns the push token for this Live Activity, used to send push notification updates via APNs.
+      * Returns `null` if push notifications are not enabled or the token is not yet available.
+@@ -70,19 +82,21 @@ export declare class LiveActivity<T extends object = object> {
  export declare class LiveActivityFactory<T extends object = object> {
      /** @hidden */
      private nativeLiveActivityFactory;
@@ -96,10 +112,11 @@ index d4b5aacee380c056855f68c5ca62c9af24304745..038f4c2491bacc01ab3aac1fb1305d0f
       * @param url An optional URL to associate with the Live Activity, used for deep linking.
 -     * @param staleDate When set, the system may de-emphasize the activity after this date if content has not been refreshed.
 +     * @param staleAfterSeconds Seconds until ActivityKit marks the content stale. Omit to never mark it.
++     * @param relevanceScore ActivityKit's ordering among this app's activities. Omit for 0.
       * @returns The new Live Activity instance.
       */
 -    start(props: T, url?: string, staleDate?: Date): LiveActivity<T>;
-+    start(props: T, url?: string, staleAfterSeconds?: number): LiveActivity<T>;
++    start(props: T, url?: string, staleAfterSeconds?: number, relevanceScore?: number): LiveActivity<T>;
      /**
       * Returns all currently active instances of this Live Activity type.
 +     * Set includeEnded for privacy dismissal of native-retained terminal instances.
@@ -109,7 +126,7 @@ index d4b5aacee380c056855f68c5ca62c9af24304745..038f4c2491bacc01ab3aac1fb1305d0f
  }
  /**
   * Creates a dismissal policy that removes the Live Activity at the specified time within a four-hour window.
-@@ -103,7 +109,7 @@ export declare function createWidget<PropsType extends object = object, Configur
+@@ -103,7 +117,7 @@ export declare function createWidget<PropsType extends object = object, Configur
   * @param name The Live Activity name. Must match the `'name'` field in your widget configuration in the app config.
   * @param liveActivity The Live Activity component, marked with the `'widget'` directive.
   */
@@ -118,7 +135,7 @@ index d4b5aacee380c056855f68c5ca62c9af24304745..038f4c2491bacc01ab3aac1fb1305d0f
  /**
   * Adds a listener for widget interaction events (for example, button taps).
   * @param listener Callback function to handle user interaction events.
-@@ -122,4 +128,9 @@ export declare function addPushToStartTokenListener(listener: ExpoWidgetsEvents[
+@@ -122,4 +136,9 @@ export declare function addPushToStartTokenListener(listener: ExpoWidgetsEvents[
   * The contents of this directory are accessible by both the main app and widgets.
   */
  export declare const widgetsDirectory: string;
@@ -130,10 +147,10 @@ index d4b5aacee380c056855f68c5ca62c9af24304745..038f4c2491bacc01ab3aac1fb1305d0f
  //# sourceMappingURL=Widgets.d.ts.map
 \ No newline at end of file
 diff --git a/build/Widgets.js b/build/Widgets.js
-index 9099a1bb3c10eaddc41518ba5b82117284f82135..789689aec6229cbef0ccecfefda2ec6a74c5e392 100644
+index 9099a1bb3c10eaddc41518ba5b82117284f82135..07d849ae51a83310be6843e538ba4eca74c22708 100644
 --- a/build/Widgets.js
 +++ b/build/Widgets.js
-@@ -53,13 +53,17 @@ export class LiveActivity {
+@@ -53,13 +53,34 @@ export class LiveActivity {
      getId() {
          return this.nativeLiveActivity.getId();
      }
@@ -141,20 +158,57 @@ index 9099a1bb3c10eaddc41518ba5b82117284f82135..789689aec6229cbef0ccecfefda2ec6a
 +    getInfo() {
 +        return this.nativeLiveActivity.getInfo();
 +    }
++    /**
++     * The content properties the activity shows now, including a pushed update.
++     * Returns `null` when ActivityKit no longer lists the activity or the content is not JSON.
++     */
++    getProps() {
++        const raw = this.nativeLiveActivity.getProps();
++        if (raw == null) {
++            return null;
++        }
++        try {
++            return JSON.parse(raw);
++        }
++        catch {
++            return null;
++        }
++    }
      /**
       * Updates the Live Activity's content. The UI reflects the new properties immediately.
       * @param props The updated content properties.
 -     * @param staleDate When set, the system may de-emphasize the activity after this date if content has not been refreshed.
 +     * @param staleAfterSeconds Seconds until ActivityKit marks the content stale. Omit to never mark it.
++     * @param relevanceScore ActivityKit's ordering among this app's activities. Omit for 0.
       */
 -    update(props, staleDate) {
 -        return this.nativeLiveActivity.update(JSON.stringify(props), staleDate?.getTime());
-+    update(props, staleAfterSeconds) {
-+        return this.nativeLiveActivity.update(JSON.stringify(props), staleAfterSeconds === undefined ? undefined : Date.now() + staleAfterSeconds * 1000);
++    update(props, staleAfterSeconds, relevanceScore) {
++        return this.nativeLiveActivity.update(JSON.stringify(props), staleAfterSeconds === undefined ? undefined : Date.now() + staleAfterSeconds * 1000, relevanceScore);
      }
      /**
       * Ends the Live Activity.
-@@ -100,25 +104,26 @@ export class LiveActivity {
+@@ -67,15 +88,16 @@ export class LiveActivity {
+      * Can be `'default'`, `'immediate'`, or `after(date)`.
+      * @param props Final content properties to update after the activity ends.
+      * @param contentDate The time the data in the payload was generated. If this is older than a previous update or push payload, the system ignores this update.
++     * @param relevanceScore ActivityKit's ordering among this app's activities. Omit for 0.
+      */
+-    end(dismissalPolicy, props, contentDate) {
++    end(dismissalPolicy, props, contentDate, relevanceScore) {
+         const serializedProps = props ? JSON.stringify(props) : undefined;
+         if (typeof dismissalPolicy === 'object' &&
+             dismissalPolicy !== null &&
+             'after' in dismissalPolicy) {
+-            return this.nativeLiveActivity.end('after', dismissalPolicy.after?.getTime(), serializedProps, contentDate?.getTime());
++            return this.nativeLiveActivity.end('after', dismissalPolicy.after?.getTime(), serializedProps, contentDate?.getTime(), relevanceScore);
+         }
+-        return this.nativeLiveActivity.end(dismissalPolicy, undefined, serializedProps, contentDate?.getTime());
++        return this.nativeLiveActivity.end(dismissalPolicy, undefined, serializedProps, contentDate?.getTime(), relevanceScore);
+     }
+     /**
+      * Returns the push token for this Live Activity, used to send push notification updates via APNs.
+@@ -100,25 +122,27 @@ export class LiveActivity {
  export class LiveActivityFactory {
      /** @hidden */
      nativeLiveActivityFactory;
@@ -169,12 +223,13 @@ index 9099a1bb3c10eaddc41518ba5b82117284f82135..789689aec6229cbef0ccecfefda2ec6a
       * @param url An optional URL to associate with the Live Activity, used for deep linking.
 -     * @param staleDate When set, the system may de-emphasize the activity after this date if content has not been refreshed.
 +     * @param staleAfterSeconds Seconds until ActivityKit marks the content stale. Omit to never mark it.
++     * @param relevanceScore ActivityKit's ordering among this app's activities. Omit for 0.
       * @returns The new Live Activity instance.
       */
 -    start(props, url, staleDate) {
 -        return new LiveActivity(this.nativeLiveActivityFactory.start(JSON.stringify(props), url, staleDate?.getTime()));
-+    start(props, url, staleAfterSeconds) {
-+        return new LiveActivity(this.nativeLiveActivityFactory.start(JSON.stringify(props), url, staleAfterSeconds === undefined ? undefined : Date.now() + staleAfterSeconds * 1000));
++    start(props, url, staleAfterSeconds, relevanceScore) {
++        return new LiveActivity(this.nativeLiveActivityFactory.start(JSON.stringify(props), url, staleAfterSeconds === undefined ? undefined : Date.now() + staleAfterSeconds * 1000, relevanceScore));
      }
      /**
       * Returns all currently active instances of this Live Activity type.
@@ -188,7 +243,7 @@ index 9099a1bb3c10eaddc41518ba5b82117284f82135..789689aec6229cbef0ccecfefda2ec6a
              .map((instance) => new LiveActivity(instance));
      }
  }
-@@ -143,8 +148,8 @@ export function createWidget(name, widget) {
+@@ -143,8 +167,8 @@ export function createWidget(name, widget) {
   * @param name The Live Activity name. Must match the `'name'` field in your widget configuration in the app config.
   * @param liveActivity The Live Activity component, marked with the `'widget'` directive.
   */
@@ -199,7 +254,7 @@ index 9099a1bb3c10eaddc41518ba5b82117284f82135..789689aec6229cbef0ccecfefda2ec6a
  }
  /**
   * Adds a listener for widget interaction events (for example, button taps).
-@@ -168,4 +173,11 @@ export function addPushToStartTokenListener(listener) {
+@@ -168,4 +192,11 @@ export function addPushToStartTokenListener(listener) {
   * The contents of this directory are accessible by both the main app and widgets.
   */
  export const widgetsDirectory = ExpoWidgetsModule.widgetsDirectory;
@@ -213,36 +268,44 @@ index 9099a1bb3c10eaddc41518ba5b82117284f82135..789689aec6229cbef0ccecfefda2ec6a
  //# sourceMappingURL=Widgets.js.map
 \ No newline at end of file
 diff --git a/build/Widgets.types.d.ts b/build/Widgets.types.d.ts
-index 15e026868625ce20a3e359e5cc8e5c7e937c4650..0903ad44c63d8b510b208018dca25e3cba6d84f8 100644
+index 15e026868625ce20a3e359e5cc8e5c7e937c4650..cd496c92dd716592bca59060d20b5743b1f1e290 100644
 --- a/build/Widgets.types.d.ts
 +++ b/build/Widgets.types.d.ts
-@@ -260,12 +260,16 @@ export declare class NativeWidgetObject extends SharedObject {
+@@ -260,14 +260,19 @@ export declare class NativeWidgetObject extends SharedObject {
      getTimeline(): Promise<ExpoTimelineEntry[]>;
  }
  export declare class NativeLiveActivityFactory extends SharedObject {
 -    constructor(name: string, layout: string);
-+    constructor(name: string, layout: string, url?: string);
-     start(props: string, url?: string, staleDate?: number): NativeLiveActivity;
+-    start(props: string, url?: string, staleDate?: number): NativeLiveActivity;
 -    getInstances(): NativeLiveActivity[];
++    constructor(name: string, layout: string, url?: string);
++    start(props: string, url?: string, staleDate?: number, relevanceScore?: number): NativeLiveActivity;
 +    getInstances(includeEnded?: boolean): NativeLiveActivity[];
  }
  export declare class NativeLiveActivity extends SharedObject<LiveActivityEvents> {
      getId(): string;
+-    update(props: string, staleDate?: number): Promise<void>;
+-    end(dismissalPolicy?: string, afterDate?: number, state?: string, contentDate?: number): Promise<void>;
 +    getInfo(): {
 +        id: string;
 +        state: 'active' | 'stale' | 'ended' | 'dismissed';
 +    };
-     update(props: string, staleDate?: number): Promise<void>;
-     end(dismissalPolicy?: string, afterDate?: number, state?: string, contentDate?: number): Promise<void>;
++    getProps(): string | null;
++    update(props: string, staleDate?: number, relevanceScore?: number): Promise<void>;
++    end(dismissalPolicy?: string, afterDate?: number, state?: string, contentDate?: number, relevanceScore?: number): Promise<void>;
      getPushToken(): Promise<string | null>;
+ }
+ //# sourceMappingURL=Widgets.types.d.ts.map
+\ No newline at end of file
 diff --git a/ios/LiveActivity.swift b/ios/LiveActivity.swift
-index 5f34eb2b67a0c2389c8ad8e09c71aa391a0c65ef..b7752440d7375830fa31afdd943624636e4590d2 100644
+index 5f34eb2b67a0c2389c8ad8e09c71aa391a0c65ef..aa63415c4d4d1d1fdc4942e1d0b73c3455c1cb76 100644
 --- a/ios/LiveActivity.swift
 +++ b/ios/LiveActivity.swift
-@@ -12,6 +12,24 @@ final class LiveActivity: SharedObject {
+@@ -12,7 +12,32 @@ final class LiveActivity: SharedObject {
      super.init()
    }
  
+-  func update(props: String, staleDate: Date?) async throws {
 +  /// Native identity and current state, including an external end. An activity
 +  /// ActivityKit no longer lists (dismissed, or ended and pruned) reads as
 +  /// `dismissed` instead of throwing, so JavaScript can settle its records.
@@ -261,14 +324,48 @@ index 5f34eb2b67a0c2389c8ad8e09c71aa391a0c65ef..b7752440d7375830fa31afdd94362463
 +    return ["id": id, "state": value]
 +  }
 +
-   func update(props: String, staleDate: Date?) async throws {
++  /// The props of the content ActivityKit shows now, including a pushed update.
++  /// An activity ActivityKit no longer lists has no content and reads as nil.
++  func getProps() throws -> String? {
++    guard #available(iOS 16.2, *) else { throw LiveActivitiesNotSupportedException() }
++    return Activity<LiveActivityAttributes>.activities.first(where: { $0.id == id })?.content.state.props
++  }
++
++  func update(props: String, staleDate: Date?, relevanceScore: Double?) async throws {
      guard #available(iOS 16.2, *) else { throw LiveActivitiesNotSupportedException() }
  
+     guard let activity = Activity<LiveActivityAttributes>.activities.first(where: { $0.id == id }) else {
+@@ -20,10 +45,10 @@ final class LiveActivity: SharedObject {
+     }
+ 
+     let newState = LiveActivityAttributes.ContentState(name: name, props: props)
+-    await activity.update(ActivityContent(state: newState, staleDate: staleDate))
++    await activity.update(ActivityContent(state: newState, staleDate: staleDate, relevanceScore: relevanceScore ?? 0))
+   }
+ 
+-  func end(dismissalPolicy: LiveActivityDismissalPolicy?, afterDate: Date?, props: String?, contentDate: Date?) async throws {
++  func end(dismissalPolicy: LiveActivityDismissalPolicy?, afterDate: Date?, props: String?, contentDate: Date?, relevanceScore: Double?) async throws {
+     guard #available(iOS 16.2, *) else { throw LiveActivitiesNotSupportedException() }
+ 
+     guard let activity = Activity<LiveActivityAttributes>.activities.first(where: { $0.id == id }) else {
+@@ -32,7 +57,11 @@ final class LiveActivity: SharedObject {
+ 
+     let content: ActivityContent<LiveActivityAttributes.ContentState>?
+     if let props {
+-      content = ActivityContent(state: LiveActivityAttributes.ContentState(name: name, props: props), staleDate: nil)
++      content = ActivityContent(
++        state: LiveActivityAttributes.ContentState(name: name, props: props),
++        staleDate: nil,
++        relevanceScore: relevanceScore ?? 0
++      )
+     } else {
+       content = nil
+     }
 diff --git a/ios/LiveActivityFactory.swift b/ios/LiveActivityFactory.swift
-index 4b8a632965ddb507aeeb54a4d8944f455e5dffd7..7f4524c9b4ae2409aff7e2d59d4623ef5d23bd9c 100644
+index 4b8a632965ddb507aeeb54a4d8944f455e5dffd7..92a7ff0e73975330b1a1e7f616b3d81d7ce8dfa2 100644
 --- a/ios/LiveActivityFactory.swift
 +++ b/ios/LiveActivityFactory.swift
-@@ -9,9 +9,16 @@ final class LiveActivityFactory: SharedObject {
+@@ -9,12 +9,19 @@ final class LiveActivityFactory: SharedObject {
      Bundle.main.object(forInfoDictionaryKey: pushNotificationsEnabledKey) as? Bool ?? false
    }
  
@@ -285,7 +382,20 @@ index 4b8a632965ddb507aeeb54a4d8944f455e5dffd7..7f4524c9b4ae2409aff7e2d59d4623ef
 +    }
    }
  
-   func start(props: String, url: URL?, staleDate: Date?) throws -> LiveActivity {
+-  func start(props: String, url: URL?, staleDate: Date?) throws -> LiveActivity {
++  func start(props: String, url: URL?, staleDate: Date?, relevanceScore: Double?) throws -> LiveActivity {
+     guard #available(iOS 16.2, *) else { throw LiveActivitiesNotSupportedException() }
+     guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+       throw LiveActivitiesNotSupportedException()
+@@ -24,7 +31,7 @@ final class LiveActivityFactory: SharedObject {
+       let initialState = LiveActivityAttributes.ContentState(name: name, props: props)
+       let activity = try Activity.request(
+         attributes: LiveActivityAttributes(url: url?.absoluteString),
+-        content: .init(state: initialState, staleDate: staleDate),
++        content: .init(state: initialState, staleDate: staleDate, relevanceScore: relevanceScore ?? 0),
+         pushType: LiveActivityFactory.pushNotificationsEnabled ? .token : nil
+       )
+ 
 @@ -37,15 +44,27 @@ final class LiveActivityFactory: SharedObject {
      }
    }
@@ -739,7 +849,7 @@ index 24d4571a52d3ebe9d785b5d049d8e134a149d513..964ef18d14607763707c4cbec8a218df
    func supplementalActivityFamiliesIfAvailable() -> some WidgetConfiguration {
      if #available(iOS 18.0, iOSApplicationExtension 18.0, *) {
 diff --git a/ios/WidgetsModule.swift b/ios/WidgetsModule.swift
-index b1b4295e22726e6fe501aa5e514b56061dea57a1..70e62359a00194d6844f36ad8ecf9374314c85ea 100644
+index b1b4295e22726e6fe501aa5e514b56061dea57a1..f2397a029a0926bf7fbd549fd44773bd546bc163 100644
 --- a/ios/WidgetsModule.swift
 +++ b/ios/WidgetsModule.swift
 @@ -63,6 +63,14 @@ public final class WidgetsModule: Module {
@@ -767,8 +877,10 @@ index b1b4295e22726e6fe501aa5e514b56061dea57a1..70e62359a00194d6844f36ad8ecf9374
 +        LiveActivityFactory(name: name, layout: layout, url: url)
        }
  
-       Function("start") { (liveActivity: LiveActivityFactory, props: String, url: URL?, staleDate: Date?) in
-         return try liveActivity.start(props: props, url: url, staleDate: staleDate)
+-      Function("start") { (liveActivity: LiveActivityFactory, props: String, url: URL?, staleDate: Date?) in
+-        return try liveActivity.start(props: props, url: url, staleDate: staleDate)
++      Function("start") { (liveActivity: LiveActivityFactory, props: String, url: URL?, staleDate: Date?, relevanceScore: Double?) in
++        return try liveActivity.start(props: props, url: url, staleDate: staleDate, relevanceScore: relevanceScore)
        }
  
 -      Function("getInstances") { (liveActivity: LiveActivityFactory) in
@@ -778,17 +890,31 @@ index b1b4295e22726e6fe501aa5e514b56061dea57a1..70e62359a00194d6844f36ad8ecf9374
        }
      }
  
-@@ -100,6 +108,10 @@ public final class WidgetsModule: Module {
+@@ -100,12 +108,20 @@ public final class WidgetsModule: Module {
          instance.id
        }
  
+-      AsyncFunction("update") { (instance: LiveActivity, props: String, staleDate: Date?) in
+-        try await instance.update(props: props, staleDate: staleDate)
 +      Function("getInfo") { (instance: LiveActivity) in
 +        try instance.getInfo()
 +      }
 +
-       AsyncFunction("update") { (instance: LiveActivity, props: String, staleDate: Date?) in
-         try await instance.update(props: props, staleDate: staleDate)
++      Function("getProps") { (instance: LiveActivity) in
++        try instance.getProps()
++      }
++
++      AsyncFunction("update") { (instance: LiveActivity, props: String, staleDate: Date?, relevanceScore: Double?) in
++        try await instance.update(props: props, staleDate: staleDate, relevanceScore: relevanceScore)
        }
+ 
+-      AsyncFunction("end") { (instance: LiveActivity, dismissalPolicy: LiveActivityDismissalPolicy?, afterDate: Date?, props: String?, contentDate: Date?) in
+-        try await instance.end(dismissalPolicy: dismissalPolicy, afterDate: afterDate, props: props, contentDate: contentDate)
++      AsyncFunction("end") { (instance: LiveActivity, dismissalPolicy: LiveActivityDismissalPolicy?, afterDate: Date?, props: String?, contentDate: Date?, relevanceScore: Double?) in
++        try await instance.end(dismissalPolicy: dismissalPolicy, afterDate: afterDate, props: props, contentDate: contentDate, relevanceScore: relevanceScore)
+       }
+ 
+       AsyncFunction("getPushToken") { (instance: LiveActivity) in
 diff --git a/src/ExpoWidgets.ts b/src/ExpoWidgets.ts
 index b118f9142e1a2a97c0b3683ee8a42a642a955e4d..5395c5f3afe80186251f4b04e22485353d3841bd 100644
 --- a/src/ExpoWidgets.ts
@@ -831,10 +957,10 @@ index b118f9142e1a2a97c0b3683ee8a42a642a955e4d..5395c5f3afe80186251f4b04e2248535
    LiveActivityFactory: LiveActivityFactoryStub as typeof NativeLiveActivityFactory,
    LiveActivity: LiveActivityStub as typeof NativeLiveActivity,
 diff --git a/src/Widgets.ts b/src/Widgets.ts
-index 51ea140b4309c347d6f98290051be1c5062bff70..cc9a81223abfe7240914a19ed174ce9c41bc42bb 100644
+index 51ea140b4309c347d6f98290051be1c5062bff70..57b736bfdce0ad4be7ab38a0d0a676229ab417fc 100644
 --- a/src/Widgets.ts
 +++ b/src/Widgets.ts
-@@ -85,13 +85,23 @@ export class LiveActivity<T extends object = object> {
+@@ -85,13 +85,41 @@ export class LiveActivity<T extends object = object> {
      return this.nativeLiveActivity.getId();
    }
  
@@ -845,23 +971,76 @@ index 51ea140b4309c347d6f98290051be1c5062bff70..cc9a81223abfe7240914a19ed174ce9c
 +    return this.nativeLiveActivity.getInfo();
 +  }
 +
++  /**
++   * The content properties the activity shows now, including a pushed update.
++   * Returns `null` when ActivityKit no longer lists the activity or the content is not JSON.
++   */
++  getProps(): T | null {
++    const raw = this.nativeLiveActivity.getProps();
++    if (raw == null) {
++      return null;
++    }
++    try {
++      return JSON.parse(raw) as T;
++    } catch {
++      return null;
++    }
++  }
++
    /**
     * Updates the Live Activity's content. The UI reflects the new properties immediately.
     * @param props The updated content properties.
 -   * @param staleDate When set, the system may de-emphasize the activity after this date if content has not been refreshed.
 +   * @param staleAfterSeconds Seconds until ActivityKit marks the content stale. Omit to never mark it.
++   * @param relevanceScore ActivityKit's ordering among this app's activities. Omit for 0.
     */
 -  update(props: T, staleDate?: Date): Promise<void> {
 -    return this.nativeLiveActivity.update(JSON.stringify(props), staleDate?.getTime());
-+  update(props: T, staleAfterSeconds?: number): Promise<void> {
++  update(props: T, staleAfterSeconds?: number, relevanceScore?: number): Promise<void> {
 +    return this.nativeLiveActivity.update(
 +      JSON.stringify(props),
-+      staleAfterSeconds === undefined ? undefined : Date.now() + staleAfterSeconds * 1000
++      staleAfterSeconds === undefined ? undefined : Date.now() + staleAfterSeconds * 1000,
++      relevanceScore
 +    );
    }
  
    /**
-@@ -148,10 +158,11 @@ export class LiveActivity<T extends object = object> {
+@@ -100,8 +128,14 @@ export class LiveActivity<T extends object = object> {
+    * Can be `'default'`, `'immediate'`, or `after(date)`.
+    * @param props Final content properties to update after the activity ends.
+    * @param contentDate The time the data in the payload was generated. If this is older than a previous update or push payload, the system ignores this update.
++   * @param relevanceScore ActivityKit's ordering among this app's activities. Omit for 0.
+    */
+-  end(dismissalPolicy?: LiveActivityDismissalPolicy, props?: T, contentDate?: Date): Promise<void> {
++  end(
++    dismissalPolicy?: LiveActivityDismissalPolicy,
++    props?: T,
++    contentDate?: Date,
++    relevanceScore?: number
++  ): Promise<void> {
+     const serializedProps = props ? JSON.stringify(props) : undefined;
+     if (
+       typeof dismissalPolicy === 'object' &&
+@@ -112,14 +146,16 @@ export class LiveActivity<T extends object = object> {
+         'after',
+         dismissalPolicy.after?.getTime(),
+         serializedProps,
+-        contentDate?.getTime()
++        contentDate?.getTime(),
++        relevanceScore
+       );
+     }
+     return this.nativeLiveActivity.end(
+       dismissalPolicy,
+       undefined,
+       serializedProps,
+-      contentDate?.getTime()
++      contentDate?.getTime(),
++      relevanceScore
+     );
+   }
+ 
+@@ -148,10 +184,11 @@ export class LiveActivity<T extends object = object> {
  export class LiveActivityFactory<T extends object = object> {
    /** @hidden */
    private nativeLiveActivityFactory: NativeLiveActivityFactory;
@@ -875,22 +1054,24 @@ index 51ea140b4309c347d6f98290051be1c5062bff70..cc9a81223abfe7240914a19ed174ce9c
      );
    }
  
-@@ -159,21 +170,26 @@ export class LiveActivityFactory<T extends object = object> {
+@@ -159,21 +196,28 @@ export class LiveActivityFactory<T extends object = object> {
     * Starts a new Live Activity with the given properties.
     * @param props The initial content properties for the Live Activity.
     * @param url An optional URL to associate with the Live Activity, used for deep linking.
 -   * @param staleDate When set, the system may de-emphasize the activity after this date if content has not been refreshed.
 +   * @param staleAfterSeconds Seconds until ActivityKit marks the content stale. Omit to never mark it.
++   * @param relevanceScore ActivityKit's ordering among this app's activities. Omit for 0.
     * @returns The new Live Activity instance.
     */
 -  start(props: T, url?: string, staleDate?: Date) {
-+  start(props: T, url?: string, staleAfterSeconds?: number) {
++  start(props: T, url?: string, staleAfterSeconds?: number, relevanceScore?: number) {
      return new LiveActivity<T>(
 -      this.nativeLiveActivityFactory.start(JSON.stringify(props), url, staleDate?.getTime())
 +      this.nativeLiveActivityFactory.start(
 +        JSON.stringify(props),
 +        url,
-+        staleAfterSeconds === undefined ? undefined : Date.now() + staleAfterSeconds * 1000
++        staleAfterSeconds === undefined ? undefined : Date.now() + staleAfterSeconds * 1000,
++        relevanceScore
 +      )
      );
    }
@@ -907,7 +1088,7 @@ index 51ea140b4309c347d6f98290051be1c5062bff70..cc9a81223abfe7240914a19ed174ce9c
        .map((instance) => new LiveActivity<T>(instance));
    }
  }
-@@ -209,9 +225,10 @@ export function createWidget<
+@@ -209,9 +253,10 @@ export function createWidget<
   */
  export function createLiveActivity<T extends object = object>(
    name: string,
@@ -920,7 +1101,7 @@ index 51ea140b4309c347d6f98290051be1c5062bff70..cc9a81223abfe7240914a19ed174ce9c
  }
  
  /**
-@@ -242,3 +259,11 @@ export function addPushToStartTokenListener(
+@@ -242,3 +287,11 @@ export function addPushToStartTokenListener(
   * The contents of this directory are accessible by both the main app and widgets.
   */
  export const widgetsDirectory = ExpoWidgetsModule.widgetsDirectory;
@@ -933,23 +1114,34 @@ index 51ea140b4309c347d6f98290051be1c5062bff70..cc9a81223abfe7240914a19ed174ce9c
 +  return ExpoWidgetsModule.areLiveActivitiesEnabled();
 +}
 diff --git a/src/Widgets.types.ts b/src/Widgets.types.ts
-index fee5c7475b52218fa0e192a1d347dd32cb0fe1f8..22afeb2398e2777e32ebe7c105c96e64a84aa03d 100644
+index fee5c7475b52218fa0e192a1d347dd32cb0fe1f8..74f785bb1b676af9a756dc2afb33fb67a3745421 100644
 --- a/src/Widgets.types.ts
 +++ b/src/Widgets.types.ts
-@@ -289,13 +289,14 @@ export declare class NativeWidgetObject extends SharedObject {
+@@ -289,19 +289,22 @@ export declare class NativeWidgetObject extends SharedObject {
  }
  
  export declare class NativeLiveActivityFactory extends SharedObject {
 -  constructor(name: string, layout: string);
-+  constructor(name: string, layout: string, url?: string);
-   start(props: string, url?: string, staleDate?: number): NativeLiveActivity;
+-  start(props: string, url?: string, staleDate?: number): NativeLiveActivity;
 -  getInstances(): NativeLiveActivity[];
++  constructor(name: string, layout: string, url?: string);
++  start(props: string, url?: string, staleDate?: number, relevanceScore?: number): NativeLiveActivity;
 +  getInstances(includeEnded?: boolean): NativeLiveActivity[];
  }
  
  export declare class NativeLiveActivity extends SharedObject<LiveActivityEvents> {
    getId(): string;
+-  update(props: string, staleDate?: number): Promise<void>;
 +  getInfo(): { id: string; state: 'active' | 'stale' | 'ended' | 'dismissed' };
-   update(props: string, staleDate?: number): Promise<void>;
++  getProps(): string | null;
++  update(props: string, staleDate?: number, relevanceScore?: number): Promise<void>;
    end(
      dismissalPolicy?: string,
+     afterDate?: number,
+     state?: string,
+-    contentDate?: number
++    contentDate?: number,
++    relevanceScore?: number
+   ): Promise<void>;
+   getPushToken(): Promise<string | null>;
+ }

@@ -136,7 +136,10 @@
     "working": "U toku",
     "yourOwnRepositories": "Tvoji repozitoriji",
     "dismissed": "Odbačeno",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Izmjene"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi primjene jezika",
@@ -325,6 +328,7 @@
       "collapseFile": "Sažmi prikaz datoteke",
       "expandFile": "Proširi prikaz datoteke",
       "diffTooLarge": "Razlike su prevelike za prikaz.",
+      "noPreview": "Pregled nije dostupan za ovu datoteku",
       "openOnGitHub": "Otvori na GitHubu",
       "openDiffOnGitHub": "Otvori prikaz razlika ove datoteke na GitHubu",
       "githubDiff": "Prikaz razlika na GitHubu"
@@ -847,7 +851,8 @@
       "kiloclaw": "Aktivnost u KiloClawu",
       "balance": "Upozorenja o stanju",
       "security": "Sigurnosni nalazi",
-      "spend": "Upozorenja o potrošnji"
+      "spend": "Upozorenja o potrošnji",
+      "followedSessions": "Praćene sesije"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",
@@ -1566,7 +1571,7 @@
         "recoveryLabel": "Ažuriraj GitHub aplikaciju"
       },
       "githubIpAllowList": {
-        "description": "Agent za pregled koda je isključen jer ova GitHub organizacija koristi listu dozvoljenih IP adresa koja blokira Kilo. Zatraži pomoć na hi@kilocode.ai, pa ponovo uključi agenta za pregled koda."
+        "description": "Agent za pregled koda je isključen jer ova GitHub organizacija koristi listu dozvoljenih IP adresa koja blokira Kilo. Zatraži pomoć na hi@kilo.ai, pa ponovo uključi agenta za pregled koda."
       },
       "gitlabProjectAccessRequired": {
         "description": "Agent za pregled koda je isključen jer Kilo ne može kreirati token za pristup ovom projektu na GitLabu. Dodijeli pristup održavatelja ili omogući tokene za pristup projektu, pa ponovo uključi agenta za pregled koda.",
@@ -1581,7 +1586,7 @@
         "recoveryLabel": "Ažuriraj postavke agenta za pregled koda"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Agent za pregled koda je isključen jer je danas tri puta isteklo vrijeme za kloniranje repozitorija. Zatraži pomoć na hi@kilocode.ai, pa ponovo uključi agenta za pregled koda."
+        "description": "Agent za pregled koda je isključen jer je danas tri puta isteklo vrijeme za kloniranje repozitorija. Zatraži pomoć na hi@kilo.ai, pa ponovo uključi agenta za pregled koda."
       },
       "title": "Agent za pregled koda zahtijeva tvoju pažnju.",
       "recoveryLabel": "Kontaktiraj podršku"
@@ -2114,6 +2119,8 @@
       "title": "Sesija",
       "copyErrorDetails": "Kopiraj detalje greške",
       "backToSessions": "Nazad na sesije",
+      "follow": "Prati na zaključanom ekranu",
+      "unfollow": "Prestani pratiti na zaključanom ekranu",
       "couldNotLoad": "Nije moguće učitati sesiju.",
       "failedToLoadDetails": "Nije moguće učitati detalje sesije.",
       "failedToStopExecution": "Nije moguće zaustaviti izvršavanje.",
@@ -2217,7 +2224,6 @@
       "retryLoadingEnvironment": "Pokušaj ponovo učitati okruženje",
       "defaultEnvironment": "Zadano okruženje",
       "environmentSummary": "{{commands}} naredbi · {{mcp}} MCP · {{skills}} vještina · {{agents}} agenata",
-      "changes": "Izmjene",
       "leaveChanges": "Ostavi izmjene",
       "commitAndPush": "Potvrdi i pošalji",
       "startSession": "Započni sesiju",
@@ -2289,8 +2295,8 @@
       "toolList": "izlistavanje",
       "toolPatch": "primjena izmjena",
       "toolTask": "zadatak",
-      "readTodos": "Pročitaj zadatke",
-      "updateTodos": "Ažuriraj zadatke",
+      "readTodos": "Pročitaj plan",
+      "updateTodos": "Ažuriraj plan",
       "linesBadge": "{{displayCount}} redova",
       "filesBadge": "{{displayCount}} datoteka",
       "matchesBadge": "{{displayCount}} podudaranja",
@@ -2689,6 +2695,12 @@
       "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount_other": "Modeli ({{displayCount}})",
       "modelsCount_few": "Modeli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Prikaži izmjene",
+      "asOf": "Stanje u {{time}}",
+      "tooLarge": "Razlike su prevelike za prikaz na mobilnom uređaju.",
+      "empty": "U ovoj sesiji još nema izmjena datoteka."
     },
     "autoApprove": {
       "title": "Automatsko odobravanje",
@@ -3204,6 +3216,8 @@
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama da vidiš aktivne agente na zaključanom ekranu.",
     "openSession": "Otvori",
+    "finished": "Završeno",
+    "followFailed": "Nije moguće prikazati ovog agenta na zaključanom ekranu.",
     "approveFailed": "Odobravanje nije uspjelo. Dodirni $t(common.approve) da pokušaš ponovo.",
     "checked": "Provjereno",
     "lastKnown": "Posljednje poznato",
@@ -3212,7 +3226,26 @@
     "waitingForYou": "Čeka vas",
     "nextScheduled": "Sljedeće zakazano",
     "answerNeeded": "Potreban odgovor",
-    "waitingToRetry": "Čeka ponovni pokušaj"
+    "waitingToRetry": "Čeka ponovni pokušaj",
+    "step": {
+      "editing": "Uređivanje",
+      "reading": "Čitanje",
+      "running": "Pokretanje",
+      "searching": "Web pretraga",
+      "thinking": "Razmišljanje"
+    },
+    "planOf": "od",
+    "filesChanged": "datoteka promijenjeno",
+    "finishedIn": "Završeno za",
+    "noActivityFor": "Nema aktivnosti za",
+    "prOpened": "Zahtjev za povlačenje otvoren",
+    "permissionWants": "Želi pokrenuti",
+    "failure": {
+      "provider": "Zaustavljeno: greška provajdera",
+      "tool": "Zaustavljeno: greška alata",
+      "cancelled": "Zaustavljeno: otkazano",
+      "other": "ZAUSTAVLJENO"
+    }
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",
@@ -3248,10 +3281,27 @@
     "list": {
       "loadFailed": "Nije moguće učitati istoriju razgovora.",
       "new": "Novi razgovor",
-      "openHint": "Otvara razgovor. Dugo pritisnite za brisanje.",
       "deleteTitle": "Izbrisati ovaj razgovor?"
     },
+    "rename": {
+      "title": "Preimenuj razgovor",
+      "accessibility": "Preimenuj razgovor: {{title}}",
+      "openHint": "Otvara razgovor. Dugo pritisnite za preimenovanje ili brisanje."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Detalji razgovora",
+      "backend": "Pozadinski servis",
+      "effortDefault": "Zadano za model",
+      "noCost": "Bez troška",
+      "costUnknown": "Nepoznato",
+      "costEstimatedNote": "Trošak odgovora koji nisu prijavili cijenu procijenjen je prema cjenovniku.",
+      "costUnknownNote": "Cijena za ovaj model nije poznata.",
+      "costPartialNote": "Ovaj ukupni iznos ne uključuje modele bez poznate cijene.",
+      "localNote": "Modeli na uređaju rade na ovom uređaju. Nemaju trošak ni keš upita, a broj tokena može biti procjena.",
+      "countedSinceNote": "Ovaj razgovor je počeo prije nego što se počela bilježiti potrošnja. Ukupni iznosi prikazuju samo odgovore nakon toga.",
+      "remoteServersOn": "Uključeni daljinski MCP serveri"
+    },
     "webSearch": {
       "title": "Pretraži web",
       "description": "Dozvolite ovom chatu da traži aktuelne informacije putem vašeg Kilo računa. Pretrage koriste vaš mjesečni limit pretraga.",
@@ -3464,6 +3514,9 @@
       "downloading": "Preuzimanje…",
       "downloadProgress": "Preuzimanje… {{percent}}%",
       "downloadFailed": "Preuzimanje nije završeno. Provjerite vezu i slobodan prostor za pohranu, pa pokušajte ponovo."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ovaj model podržava intenzitet razmišljanja"
     }
   },
   "settingsTools": {
@@ -3686,5 +3739,82 @@
     "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
     "purchaseOwnedByAnotherAccount": "Krediti na ovom računu Apple Account pripadaju drugom Kilo računu. Prijavi se na taj Kilo račun da ih koristiš.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play nalogu pripadaju drugom Kilo nalogu. Prijavite se na taj Kilo nalog da biste ih koristili."
+  },
+  "todos": {
+    "saveAsTodo": "Sačuvaj kao zadatak",
+    "segment": {
+      "label": "Prikaz agenata",
+      "sessions": "Sesije",
+      "todos": "Zadaci"
+    },
+    "lists": {
+      "newList": "Nova lista",
+      "empty": "Još nema listi",
+      "couldNotLoad": "Učitavanje listi nije uspjelo",
+      "noRepository": "Bez repozitorija",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "Otvoreno: {{count}}",
+      "openCount_few": "Otvoreno: {{count}}",
+      "openCount_other": "Otvoreno: {{count}}",
+      "archived_one": "Arhivirano ({{count}})",
+      "archived_few": "Arhivirano ({{count}})",
+      "archived_other": "Arhivirano ({{count}})",
+      "archive": "Arhiviraj",
+      "unarchive": "Vrati iz arhive",
+      "deleteTitle": "Obrisati {{name}}?",
+      "deleteMessage": "Njegovi zadaci se također brišu. Njihove sesije ostaju."
+    },
+    "listSettings": {
+      "title": "Postavke liste",
+      "name": "Ime",
+      "namePlaceholder": "Greške, ideje, izdanje…",
+      "emoji": "Emotikon",
+      "mode": "Način rada",
+      "defaultsHint": "Sesije pokrenute iz ove liste koriste ove zadane postavke."
+    },
+    "list": {
+      "addPlaceholder": "Dodaj novi zadatak",
+      "add": "Dodaj zadatak",
+      "empty": "Još nema zadataka",
+      "setDefaults": "Postavi repozitorij, način rada i model",
+      "completed_one": "Završeno ({{count}})",
+      "completed_few": "Završeno ({{count}})",
+      "completed_other": "Završeno ({{count}})"
+    },
+    "item": {
+      "markDone": "Označi kao završeno",
+      "markOpen": "Označi kao nezavršeno",
+      "markDonePrompt": "Označiti kao završeno?",
+      "deleted": "Zadatak obrisan",
+      "undo": "Poništi",
+      "runCount_one": "{{count}} pokretanje",
+      "runCount_few": "{{count}} pokretanja",
+      "runCount_other": "{{count}} pokretanja",
+      "startNow": "Pokreni bez pregleda",
+      "startNowHint": "Dugi pritisak za pokretanje bez pregleda",
+      "titleLabel": "Naslov zadatka",
+      "notes": "Bilješke",
+      "notesPlaceholder": "Dodaj bilješke u Markdown formatu",
+      "sessions": "Povezane sesije",
+      "noSessions": "Još nema sesija",
+      "linkSession": "Poveži sesiju",
+      "unlinkSession": "Odveži {{title}}",
+      "linkFailed": "Povezivanje sesije sa zadatkom nije uspjelo"
+    },
+    "linkSession": {
+      "title": "Povezivanje sesije",
+      "empty": "Nema nedavnih sesija",
+      "emptyInRepository": "Nema nedavnih sesija u repozitoriju {{repository}}"
+    },
+    "upNext": "Sljedeće na redu",
+    "sessionTodo": "Zadatak: {{title}}",
+    "linkToTodo": "Poveži sa zadatkom",
+    "candidates": {
+      "empty": "Nema otvorenih zadataka"
+    },
+    "saveSheet": {
+      "title": "Sačuvaj na listu",
+      "saved": "Sačuvano na listu {{list}}"
+    }
   }
 }

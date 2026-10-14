@@ -193,6 +193,8 @@ type ChatComposerProps = {
   placeholder?: string;
   /** The toolbar's mode chip. Omit it where modes do not apply (Quick Chat). */
   modeControl?: ChatToolbarModeControl;
+  /** Extra classes for the toolbar row; Quick Chat tightens the gap above the input. */
+  toolbarClassName?: string;
   model: string;
   variant: string;
   modelOptions: (ModelOption | SessionModelOption)[];
@@ -263,6 +265,7 @@ export function ChatComposer({
   isStreaming = false,
   placeholder = i18n.t('common.sendMessage'),
   modeControl,
+  toolbarClassName,
   model,
   variant,
   modelOptions,
@@ -1343,6 +1346,7 @@ export function ChatComposer({
               pasteDisabled={!control.inputEditable}
               modelLocked={modelLocked}
               modelLockLabel={modelLockLabel}
+              className={toolbarClassName}
             />
           </Animated.View>
         ) : null}

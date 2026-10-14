@@ -5,6 +5,7 @@ import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import { TRPC_ERROR_CODES_BY_KEY, type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import {
   sandboxSelectionCapabilitiesSchema,
   type SandboxAllocationInput,
@@ -180,6 +181,8 @@ type PrepareSessionSharedFields = {
   /** Deprecated: true is rejected because devcontainer support is retired. */
   devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocationInput;
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
 };
 
 /** Non-clone prepare input: required `prompt` and the current optional initial fields. */
@@ -381,6 +384,7 @@ export type GetSessionOutput = {
   model?: string;
   autoCommit?: boolean;
   upstreamBranch?: string;
+  branchName?: string;
 
   /** Custom agents stored on this session (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{
@@ -1321,15 +1325,21 @@ const widgetApprovalKeyResponseSchema = z.object({
     .string()
     .regex(/^[a-f0-9]{64}$/)
     .nullable(),
+  // Absent when an older Worker answers; the session card then shows no command.
+  command: z.string().max(60).nullable().optional(),
 });
 
+/** The approval binding and the pending request's command, both null when none waits. */
+export type CloudAgentWidgetApproval = { approvalKey: string | null; command: string | null };
+
 /**
- * The Home widget's binding of the oldest pending permission on one owned
- * control-plane session: SHA-256 of `JSON.stringify([kiloSessionId,
- * permissionId])`, computed in the Worker so the raw permission never reaches
- * this process. The Worker re-checks user, organization scope and the
- * Kilo/cloud session pairing; the key grants no authority. Bounded, and throws
- * on any non-OK answer so the caller can drop the key while keeping counts.
+ * The binding of the oldest pending permission on one owned control-plane
+ * session: SHA-256 of `JSON.stringify([kiloSessionId, permissionId])`, computed
+ * in the Worker so the raw permission never reaches this process, plus that
+ * request's command (one trimmed line, at most 60 characters) for the session
+ * card. The Worker re-checks user, organization scope and the Kilo/cloud
+ * session pairing; the key grants no authority. Bounded, and throws on any
+ * non-OK answer so the caller can drop the identity while keeping counts.
  */
 export async function readCloudAgentWidgetApprovalKey(
   input: {
@@ -1339,7 +1349,7 @@ export async function readCloudAgentWidgetApprovalKey(
     cloudAgentSessionId: string;
   },
   signal?: AbortSignal
-): Promise<string | null> {
+): Promise<CloudAgentWidgetApproval> {
   const budget = AbortSignal.timeout(WIDGET_APPROVAL_KEY_BUDGET_MS);
   const response = await fetchWithinBudget(
     `${CLOUD_AGENT_NEXT_API_URL}/internal/widgets/approval-key`,
@@ -1357,5 +1367,6 @@ export async function readCloudAgentWidgetApprovalKey(
   if (!response.ok) {
     throw new Error(`Cloud Agent widget approval key failed: ${response.status}`);
   }
-  return widgetApprovalKeyResponseSchema.parse(await response.json()).approvalKey;
+  const parsed = widgetApprovalKeyResponseSchema.parse(await response.json());
+  return { approvalKey: parsed.approvalKey, command: parsed.command ?? null };
 }

@@ -136,7 +136,10 @@
     "working": "کام جاری ہے",
     "yourOwnRepositories": "آپ کی اپنی ریپوزٹریز",
     "dismissed": "نظر انداز کردہ",
-    "agent": "ایجنٹ"
+    "agent": "ایجنٹ",
+    "durationMinuteShort": "منٹ",
+    "durationHourShort": "گھنٹہ",
+    "changes": "تبدیلیاں"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -325,6 +328,7 @@
       "collapseFile": "فائل کی تفصیل چھپائیں",
       "expandFile": "فائل کی تفصیل دکھائیں",
       "diffTooLarge": "تبدیلیوں کا موازنہ اتنا بڑا ہے کہ اسے دکھایا نہیں جا سکتا۔",
+      "noPreview": "اس فائل کا کوئی پیش منظر دستیاب نہیں",
       "openOnGitHub": "GitHub پر کھولیں",
       "openDiffOnGitHub": "اس فائل کی تبدیلیوں کا موازنہ GitHub پر کھولیں",
       "githubDiff": "GitHub پر تبدیلیوں کا موازنہ"
@@ -831,7 +835,8 @@
       "kiloclaw": "KiloClaw کی سرگرمی",
       "balance": "بیلنس کی تنبیہات",
       "security": "شناخت شدہ سیکیورٹی مسائل",
-      "spend": "اخراجات کی تنبیہات"
+      "spend": "اخراجات کی تنبیہات",
+      "followedSessions": "فالو کیے گئے سیشنز"
     },
     "category": {
       "chatMessagesSubtitle": "آپ کی گفتگو میں جوابات",
@@ -1547,7 +1552,7 @@
         "recoveryLabel": "GitHub ایپ اپ ڈیٹ کریں"
       },
       "githubIpAllowList": {
-        "description": "کوڈ ریویور غیر فعال کر دیا گیا کیونکہ اس GitHub تنظیم کی اجازت یافتہ IP پتوں کی فہرست Kilo کی رسائی روکتی ہے۔ مدد کے لیے hi@kilocode.ai پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔"
+        "description": "کوڈ ریویور غیر فعال کر دیا گیا کیونکہ اس GitHub تنظیم کی اجازت یافتہ IP پتوں کی فہرست Kilo کی رسائی روکتی ہے۔ مدد کے لیے hi@kilo.ai پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔"
       },
       "gitlabProjectAccessRequired": {
         "description": "کوڈ ریویور غیر فعال کر دیا گیا کیونکہ Kilo اس پروجیکٹ کے لیے GitLab پر رسائی کا ٹوکن نہیں بنا سکتا۔ دیکھ بھال کرنے والے کی سطح کی رسائی دیں یا پروجیکٹ تک رسائی کے ٹوکن فعال کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔",
@@ -1562,7 +1567,7 @@
         "recoveryLabel": "کوڈ ریویور کی ترتیبات اپ ڈیٹ کریں"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "آج ریپوزٹری کلون کرنے کی تین کوششیں مقررہ وقت میں مکمل نہ ہونے پر کوڈ ریویور غیر فعال کر دیا گیا۔ مدد کے لیے hi@kilocode.ai پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔"
+        "description": "آج ریپوزٹری کلون کرنے کی تین کوششیں مقررہ وقت میں مکمل نہ ہونے پر کوڈ ریویور غیر فعال کر دیا گیا۔ مدد کے لیے hi@kilo.ai پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔"
       },
       "title": "کوڈ کے جائزہ کار کو آپ کی توجہ درکار ہے۔",
       "recoveryLabel": "معاونت کی ٹیم سے رابطہ کریں"
@@ -2086,6 +2091,8 @@
       "title": "سیشن",
       "copyErrorDetails": "خرابی کی تفصیلات کاپی کریں",
       "backToSessions": "سیشنز پر واپس جائیں",
+      "follow": "لاک اسکرین پر فالو کریں",
+      "unfollow": "لاک اسکرین پر فالو کرنا بند کریں",
       "couldNotLoad": "سیشن لوڈ نہیں ہو سکا۔",
       "failedToLoadDetails": "سیشن کی تفصیلات لوڈ نہیں ہو سکیں۔",
       "failedToStopExecution": "کام کو روکا نہیں جا سکا۔",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "ماحول دوبارہ لوڈ کرنے کی کوشش کریں",
       "defaultEnvironment": "پہلے سے طے شدہ ماحول",
       "environmentSummary": "{{commands}} کمانڈز · {{mcp}} MCP · {{skills}} مہارتیں · {{agents}} ایجنٹ",
-      "changes": "تبدیلیاں",
       "leaveChanges": "تبدیلیاں رہنے دیں",
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
@@ -2260,8 +2266,8 @@
       "toolList": "فہرست بنانا",
       "toolPatch": "ترمیم کرنا",
       "toolTask": "کام",
-      "readTodos": "کاموں کی فہرست پڑھیں",
-      "updateTodos": "کاموں کی فہرست اپ ڈیٹ کریں",
+      "readTodos": "منصوبہ پڑھیں",
+      "updateTodos": "منصوبہ اپ ڈیٹ کریں",
       "linesBadge": "{{displayCount}} سطریں",
       "filesBadge": "{{displayCount}} فائلیں",
       "matchesBadge": "{{displayCount}} مماثلتیں",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
       "modelsCount_one": "ماڈل ({{displayCount}})",
       "modelsCount_other": "ماڈلز ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "تبدیلیاں دیکھیں",
+      "asOf": "{{time}} تک",
+      "tooLarge": "تبدیلیوں کا یہ موازنہ اتنا بڑا ہے کہ اسے موبائل پر دکھایا نہیں جا سکتا۔",
+      "empty": "اس سیشن میں ابھی تک فائلوں میں کوئی تبدیلی نہیں ہوئی۔"
     },
     "autoApprove": {
       "title": "خودکار منظوری",
@@ -3163,6 +3175,8 @@
     "channelName": "فعال ایجنٹس",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
     "openSession": "کھولیں",
+    "finished": "مکمل",
+    "followFailed": "اس ایجنٹ کو لاک اسکرین پر نہیں دکھایا جا سکا۔",
     "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔",
     "checked": "آخری تصدیق",
     "lastKnown": "آخری معلوم حالت",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "آپ کا انتظار",
     "nextScheduled": "آئندہ شیڈول",
     "answerNeeded": "جواب درکار",
-    "waitingToRetry": "دوبارہ کوشش کا انتظار"
+    "waitingToRetry": "دوبارہ کوشش کا انتظار",
+    "step": {
+      "editing": "ترمیم",
+      "reading": "پڑھ رہا ہے",
+      "running": "چلائیں",
+      "searching": "ویب تلاش",
+      "thinking": "غور کر رہا ہے"
+    },
+    "planOf": "میں سے",
+    "filesChanged": "فائلیں تبدیل ہوئیں",
+    "finishedIn": "مکمل ہونے میں",
+    "noActivityFor": "کوئی سرگرمی نہیں",
+    "prOpened": "پل ریکویسٹ کھول دی گئی",
+    "permissionWants": "چلانا چاہتا ہے",
+    "failure": {
+      "provider": "رک گیا: فراہم کنندہ کی خرابی",
+      "tool": "رک گیا: ٹول کی خرابی",
+      "cancelled": "رک گیا: منسوخ کیا گیا",
+      "other": "رکا ہوا"
+    }
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "چیٹ کی سرگزشت لوڈ نہیں ہو سکی۔",
       "new": "نئی چیٹ",
-      "openHint": "چیٹ کھولتا ہے۔ حذف کرنے کے لیے دبائے رکھیں۔",
       "deleteTitle": "یہ چیٹ حذف کریں؟"
     },
+    "rename": {
+      "title": "چیٹ کا نام تبدیل کریں",
+      "accessibility": "چیٹ کا نام تبدیل کریں: {{title}}",
+      "openHint": "چیٹ کھولتا ہے۔ نام تبدیل کرنے یا حذف کرنے کے لیے دبائے رکھیں۔"
+    },
     "beta": "بیٹا",
+    "details": {
+      "title": "چیٹ کی تفصیلات",
+      "backend": "بیک اینڈ",
+      "effortDefault": "ماڈل کا ڈیفالٹ",
+      "noCost": "کوئی لاگت نہیں",
+      "costUnknown": "معلوم نہیں",
+      "costEstimatedNote": "جن جوابات نے قیمت نہیں بتائی، ان کی لاگت فہرستی قیمتوں سے اندازاً لگائی گئی ہے۔",
+      "costUnknownNote": "اس ماڈل کی کوئی قیمت معلوم نہیں۔",
+      "costPartialNote": "اس کل میں وہ ماڈلز شامل نہیں جن کی قیمت معلوم نہیں۔",
+      "localNote": "ڈیوائس پر چلنے والے ماڈلز اسی ڈیوائس پر چلتے ہیں۔ ان کی کوئی لاگت نہیں اور کوئی پرامپٹ کیش نہیں، اور ان کے ٹوکن کی تعداد تخمینہ ہو سکتی ہے۔",
+      "countedSinceNote": "یہ چیٹ استعمال ریکارڈ ہونے سے پہلے شروع ہوئی تھی۔ کل میں صرف اس کے بعد کے جوابات دکھائے جاتے ہیں۔",
+      "remoteServersOn": "فعال ریموٹ MCP سرورز"
+    },
     "webSearch": {
       "title": "ویب پر تلاش کریں",
       "description": "اس چیٹ کو اپنے Kilo اکاؤنٹ کے ذریعے تازہ معلومات تلاش کرنے دیں۔ تلاشیں آپ کی ماہانہ تلاش کی حد استعمال کرتی ہیں۔",
@@ -3423,6 +3473,9 @@
       "downloading": "ڈاؤن لوڈ ہو رہا ہے…",
       "downloadProgress": "ڈاؤن لوڈ ہو رہا ہے… {{percent}}%",
       "downloadFailed": "ڈاؤن لوڈ مکمل نہیں ہوا۔ اپنا کنکشن اور خالی اسٹوریج چیک کریں، پھر دوبارہ کوشش کریں۔"
+    },
+    "reasoningEffort": {
+      "modelFlag": "یہ ماڈل غور کی سطح کو سپورٹ کرتا ہے"
     }
   },
   "settingsTools": {
@@ -3645,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
     "purchaseOwnedByAnotherAccount": "اس Apple Account کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اسی Kilo اکاؤنٹ میں سائن ان کریں۔",
     "purchaseOwnedByAnotherAccountPlay": "اس Google Play اکاؤنٹ کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اس Kilo اکاؤنٹ میں سائن ان کریں۔"
+  },
+  "todos": {
+    "saveAsTodo": "کام کے طور پر محفوظ کریں",
+    "segment": {
+      "label": "ایجنٹ ویو",
+      "sessions": "سیشنز",
+      "todos": "کام"
+    },
+    "lists": {
+      "newList": "نئی فہرست",
+      "empty": "ابھی تک کوئی فہرست نہیں",
+      "couldNotLoad": "فہرستیں لوڈ نہیں ہو سکیں",
+      "noRepository": "ریپوزٹری موجود نہیں",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "کھلے: {{count}}",
+      "openCount_other": "کھلے: {{count}}",
+      "archived_one": "آرکائیو شدہ ({{count}})",
+      "archived_other": "آرکائیو شدہ ({{count}})",
+      "archive": "آرکائیو کریں",
+      "unarchive": "آرکائیو سے نکالیں",
+      "deleteTitle": "{{name}} حذف کریں؟",
+      "deleteMessage": "اس کے کام بھی حذف ہو جائیں گے۔ ان کے سیشن باقی رہیں گے۔"
+    },
+    "listSettings": {
+      "title": "فہرست کی ترتیبات",
+      "name": "نام",
+      "namePlaceholder": "بگز، آئیڈیاز، ریلیز…",
+      "emoji": "ایموجی",
+      "mode": "موڈ",
+      "defaultsHint": "اس فہرست سے شروع کیے گئے سیشن یہ طے شدہ اقدار استعمال کرتے ہیں۔"
+    },
+    "list": {
+      "addPlaceholder": "نیا کام شامل کریں",
+      "add": "کام شامل کریں",
+      "empty": "ابھی تک کوئی کام نہیں",
+      "setDefaults": "ریپوزٹری، موڈ اور ماڈل مقرر کریں",
+      "completed_one": "مکمل ({{count}})",
+      "completed_other": "مکمل ({{count}})"
+    },
+    "item": {
+      "markDone": "مکمل کے طور پر نشان زد کریں",
+      "markOpen": "نامکمل کے طور پر نشان زد کریں",
+      "markDonePrompt": "مکمل کے طور پر نشان زد کریں؟",
+      "deleted": "کام حذف ہو گیا",
+      "undo": "واپس لائیں",
+      "runCount_one": "{{count}} بار چلایا گیا",
+      "runCount_other": "{{count}} بار چلایا گیا",
+      "startNow": "بغیر جائزے کے شروع کریں",
+      "startNowHint": "بغیر جائزے کے شروع کرنے کے لیے دیر تک دبائیں",
+      "titleLabel": "کام کا عنوان",
+      "notes": "نوٹس",
+      "notesPlaceholder": "Markdown میں نوٹس شامل کریں",
+      "sessions": "منسلک سیشن",
+      "noSessions": "ابھی تک کوئی سیشن نہیں",
+      "linkSession": "سیشن لنک کریں",
+      "unlinkSession": "{{title}} کا لنک ہٹائیں",
+      "linkFailed": "سیشن کو کام سے لنک نہیں کیا جا سکا"
+    },
+    "linkSession": {
+      "title": "سیشن منسلک کریں",
+      "empty": "کوئی حالیہ سیشن نہیں",
+      "emptyInRepository": "{{repository}} میں کوئی حالیہ سیشن نہیں"
+    },
+    "upNext": "اگلا",
+    "sessionTodo": "کام: {{title}}",
+    "linkToTodo": "کام سے لنک کریں",
+    "candidates": {
+      "empty": "کوئی کھلا کام نہیں"
+    },
+    "saveSheet": {
+      "title": "فہرست میں محفوظ کریں",
+      "saved": "{{list}} میں محفوظ ہو گیا"
+    }
   }
 }

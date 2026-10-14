@@ -1,3 +1,4 @@
+import type * as ExpoCrypto from 'expo-crypto';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { type GlanceableSessionRow } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
@@ -11,7 +12,7 @@ import { readTrpcErrorField } from '@/lib/trpc-error';
 import { createGlanceablePublisher } from './create-publisher';
 import { resolveAnsweredRaises } from './attention-rows';
 import { resolvePendingPermissionId } from './pending-permission';
-import { readWaitingAsk, recordWaitingAsk, type WaitingAsk } from './waiting-ask';
+import { readWaitingAsk, recordWaitingAsk } from './waiting-ask';
 
 /**
  * The one answer path. The in-app permission card answers through
@@ -206,41 +207,84 @@ async function classifyUnauthorized(): Promise<GlanceableApproveResult> {
  * still waiting, and the next tap has to answer that same session.
  */
 export async function runGlanceableApprove(
-  options: { now?: () => number } = {}
+  options: { now?: () => number; target?: GlanceableApproveTarget } = {}
 ): Promise<GlanceableApproveResult> {
+  if (options.target !== undefined) {
+    // A session card names its own session and request; the recorded ask is
+    // the aggregate card's and stays as it is.
+    const result = await answerPendingPermission(options.target, options);
+    if (result.kind === 'approved' || result.kind === 'gone') {
+      ackSessionAttention(options.target.kiloSessionId);
+    }
+    return result;
+  }
   const ask = await readWaitingAsk();
   if (ask?.status !== 'permission' || !ask.isCloudAgent) {
     return { kind: 'none' };
   }
-  const result = await answerRecordedPermission(ask, options);
+  const result = await answerPendingPermission({ ...ask, approvalKey: null }, options);
+  if (result.kind === 'approved') {
+    recordWaitingAsk(null);
+  }
   if (result.kind === 'approved' || result.kind === 'gone') {
     ackSessionAttention(ask.kiloSessionId);
   }
   return result;
 }
 
-/** The answer body, whose terminal outcome the caller acks. */
-async function answerRecordedPermission(
-  ask: WaitingAsk,
+/**
+ * The request one session card shows: its session and the approval key of the
+ * permission it drew (SHA-256 hex of `JSON.stringify([sessionId, permissionId])`).
+ */
+export type GlanceableApproveTarget = {
+  kiloSessionId: string;
+  organizationId: string | null;
+  approvalKey: string;
+};
+
+/** The approval key of one pending request, as the server mints it. */
+async function approvalKeyOf(kiloSessionId: string, permissionId: string): Promise<string> {
+  // Lazy require keeps the native digest out of the pure test graph.
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
+  const { CryptoDigestAlgorithm, digestStringAsync } = require('expo-crypto') as typeof ExpoCrypto;
+  const key = await digestStringAsync(
+    CryptoDigestAlgorithm.SHA256,
+    JSON.stringify([kiloSessionId, permissionId])
+  );
+  return key;
+}
+
+/**
+ * The answer body, whose terminal outcome the caller acks. With an approval
+ * key, only the exact request that key names is answered: a newer request on
+ * the same session is not the one the user saw, so it reads as `gone`.
+ */
+async function answerPendingPermission(
+  target: { kiloSessionId: string; organizationId: string | null; approvalKey: string | null },
   options: { now?: () => number }
 ): Promise<GlanceableApproveResult> {
   try {
-    const cloudAgentSessionId = await resolveCloudAgentSessionId(ask.kiloSessionId);
+    const cloudAgentSessionId = await resolveCloudAgentSessionId(target.kiloSessionId);
     const permissionId = await resolvePendingPermissionId(
-      { cloudAgentSessionId, organizationId: ask.organizationId },
+      { cloudAgentSessionId, organizationId: target.organizationId },
       options.now ? { now: options.now } : undefined
     );
     if (permissionId === null) {
       return { kind: 'gone' };
     }
+    if (
+      target.approvalKey !== null &&
+      (await approvalKeyOf(target.kiloSessionId, permissionId)) !== target.approvalKey
+    ) {
+      return { kind: 'gone' };
+    }
     await answerSessionPermission({
-      kiloSessionId: ask.kiloSessionId,
+      kiloSessionId: target.kiloSessionId,
       cloudAgentSessionId,
-      organizationId: ask.organizationId,
+      organizationId: target.organizationId,
       requestId: permissionId,
       response: 'once',
     });
-    recordWaitingAsk(null);
     return { kind: 'approved' };
   } catch (error) {
     if (isUnauthorizedApproveError(error)) {

@@ -1,7 +1,15 @@
 /* eslint-disable max-lines -- The selector and picker row share model disclosure behavior. */
 import * as Haptics from 'expo-haptics';
 import { type Href, type ImperativeRouter, useRouter } from 'expo-router';
-import { BookOpenCheck, Brain, Check, ChevronDown, Star } from '@/components/ui/icons';
+import {
+  BookOpenCheck,
+  Brain,
+  Check,
+  ChevronDown,
+  ImageIcon,
+  Star,
+  Wrench,
+} from '@/components/ui/icons';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
 import { Keyboard, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -257,7 +265,7 @@ export function ModelPickerOptionRow({
 }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { free, byok, collectsData } = modelSelectorBadges(option);
+  const { free, byok, collectsData, tools, images } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
   const name = autoModelLabel(option.displayId, option.name);
   // The name may already state the fact ("… (free)", "Auto Free" in every
@@ -273,6 +281,8 @@ export function ModelPickerOptionRow({
       byok ? BYOK_MODEL_LABEL : undefined,
       showFreeBadge ? freeModelFreeLabel() : undefined,
       collectsData ? freeModelDataLabel() : undefined,
+      tools ? t('modelChat.backends.modelTools') : undefined,
+      images ? t('modelChat.backends.modelImages') : undefined,
       costLabel ?? undefined,
       option.unavailable ? t('agentChat.modelSelector.unavailableState') : undefined,
       selected ? t('agentChat.modelSelector.selectedState') : undefined,
@@ -322,7 +332,7 @@ export function ModelPickerOptionRow({
                 {t('agentChat.modelSelector.unavailable')}
               </Text>
             ) : null}
-            {showFreeBadge || byok || collectsData ? (
+            {showFreeBadge || byok || collectsData || tools || images ? (
               <View className="mt-1 flex-row items-center gap-1 self-start">
                 {showFreeBadge ? (
                   <View className="rounded-full bg-good px-2 py-0.5">
@@ -345,6 +355,8 @@ export function ModelPickerOptionRow({
                     color={colors.warn}
                   />
                 ) : null}
+                {tools ? <Wrench size={13} color={colors.mutedForeground} /> : null}
+                {images ? <ImageIcon size={13} color={colors.mutedForeground} /> : null}
               </View>
             ) : null}
           </View>

@@ -2,6 +2,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
+  cli_sessions_v2,
   credit_transactions,
   device_sessions,
   kiloclaw_instances,
@@ -1736,6 +1737,169 @@ describe('user router - register activity token', () => {
       .from(user_activity_tokens)
       .where(eq(user_activity_tokens.user_id, tokenUser.id));
     expect(afterOwn).toHaveLength(0);
+  });
+
+  describe('session cards', () => {
+    const ownSessionId = `ses_card_own_${crypto.randomUUID()}`;
+    const secondSessionId = `ses_card_second_${crypto.randomUUID()}`;
+    const otherSessionId = `ses_card_other_${crypto.randomUUID()}`;
+    const orgSessionId = `ses_card_org_${crypto.randomUUID()}`;
+
+    beforeAll(async () => {
+      const org = await createTestOrganization('session-card-org', tokenUser.id, 0);
+      await db.insert(cli_sessions_v2).values([
+        { session_id: ownSessionId, kilo_user_id: tokenUser.id },
+        { session_id: secondSessionId, kilo_user_id: tokenUser.id },
+        { session_id: otherSessionId, kilo_user_id: otherUser.id },
+        { session_id: orgSessionId, kilo_user_id: tokenUser.id, organization_id: org.id },
+      ]);
+    });
+
+    afterAll(async () => {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          inArray(cli_sessions_v2.session_id, [
+            ownSessionId,
+            secondSessionId,
+            otherSessionId,
+            orgSessionId,
+          ])
+        );
+      await db
+        .delete(organization_memberships)
+        .where(eq(organization_memberships.kilo_user_id, tokenUser.id));
+      await db.delete(organizations).where(eq(organizations.created_by_kilo_user_id, tokenUser.id));
+    });
+
+    it('requires sessionId for a session card and rejects it for every other kind', async () => {
+      const caller = await createCallerForUser(tokenUser.id);
+      await expect(
+        caller.user.registerActivityToken({
+          token: 'session-card-missing-id',
+          kind: 'ios_session_activity',
+          platform: 'ios',
+          organizationId: null,
+        })
+      ).rejects.toThrow();
+      await expect(
+        caller.user.registerActivityToken({
+          token: 'session-card-extra-id',
+          kind: 'ios_activity',
+          platform: 'ios',
+          organizationId: null,
+          sessionId: ownSessionId,
+        })
+      ).rejects.toThrow();
+      const rows = await db
+        .select()
+        .from(user_activity_tokens)
+        .where(eq(user_activity_tokens.user_id, tokenUser.id));
+      expect(rows).toHaveLength(0);
+    });
+
+    it('rejects a session the caller does not own in the given scope', async () => {
+      const caller = await createCallerForUser(tokenUser.id);
+      await expect(
+        caller.user.registerActivityToken({
+          token: 'session-card-foreign',
+          kind: 'ios_session_activity',
+          platform: 'ios',
+          organizationId: null,
+          sessionId: otherSessionId,
+        })
+      ).rejects.toThrow('Session not found');
+      // An organization session is not in the personal scope.
+      await expect(
+        caller.user.registerActivityToken({
+          token: 'session-card-wrong-scope',
+          kind: 'ios_session_activity',
+          platform: 'ios',
+          organizationId: null,
+          sessionId: orgSessionId,
+        })
+      ).rejects.toThrow('Session not found');
+      const rows = await db
+        .select()
+        .from(user_activity_tokens)
+        .where(eq(user_activity_tokens.user_id, tokenUser.id));
+      expect(rows).toHaveLength(0);
+      expect(mockRefreshGlanceableScope).not.toHaveBeenCalled();
+    });
+
+    it('keeps many live session cards beside the aggregate card and refreshes the scope', async () => {
+      const caller = await createCallerForUser(tokenUser.id);
+      await caller.user.registerActivityToken({
+        token: 'session-card-aggregate',
+        kind: 'ios_activity',
+        platform: 'ios',
+        organizationId: null,
+      });
+      mockRefreshGlanceableScope.mockClear();
+
+      await caller.user.registerActivityToken({
+        token: 'session-card-a',
+        kind: 'ios_session_activity',
+        platform: 'ios',
+        organizationId: null,
+        sessionId: ownSessionId,
+      });
+      await caller.user.registerActivityToken({
+        token: 'session-card-b',
+        kind: 'ios_session_activity',
+        platform: 'ios',
+        organizationId: null,
+        sessionId: secondSessionId,
+      });
+
+      const rows = await db
+        .select({
+          token: user_activity_tokens.token,
+          kind: user_activity_tokens.kind,
+          sessionId: user_activity_tokens.session_id,
+        })
+        .from(user_activity_tokens)
+        .where(
+          and(
+            eq(user_activity_tokens.user_id, tokenUser.id),
+            isNull(user_activity_tokens.superseded_at)
+          )
+        );
+      expect(rows.sort((a, b) => a.token.localeCompare(b.token))).toEqual([
+        { token: 'session-card-a', kind: 'ios_session_activity', sessionId: ownSessionId },
+        { token: 'session-card-aggregate', kind: 'ios_activity', sessionId: null },
+        { token: 'session-card-b', kind: 'ios_session_activity', sessionId: secondSessionId },
+      ]);
+      expect(mockRefreshGlanceableScope).toHaveBeenCalledTimes(2);
+      expect(mockRefreshGlanceableScope).toHaveBeenCalledWith({
+        userId: tokenUser.id,
+        organizationId: null,
+      });
+    });
+
+    it('refreshes the scope when a session card is unregistered', async () => {
+      const caller = await createCallerForUser(tokenUser.id);
+      await caller.user.registerActivityToken({
+        token: 'session-card-unfollow',
+        kind: 'ios_session_activity',
+        platform: 'ios',
+        organizationId: null,
+        sessionId: ownSessionId,
+      });
+      mockRefreshGlanceableScope.mockClear();
+
+      await caller.user.unregisterActivityToken({ token: 'session-card-unfollow' });
+
+      expect(mockRefreshGlanceableScope).toHaveBeenCalledWith({
+        userId: tokenUser.id,
+        organizationId: null,
+      });
+      const rows = await db
+        .select()
+        .from(user_activity_tokens)
+        .where(eq(user_activity_tokens.user_id, tokenUser.id));
+      expect(rows).toHaveLength(0);
+    });
   });
 });
 

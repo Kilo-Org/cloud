@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { i18n } from '@/i18n';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
-import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
+import { getTerminalBlankEpoch, subscribeGlanceableTerminalEnd } from '@/lib/glanceable/cleanup';
 import {
   getHomeWidgetDataForSnapshot,
   getLastHomeWidgetData,
@@ -54,13 +54,42 @@ import {
 // render. No React dependency here: the publisher is plain state.
 registerGlanceableSink(androidSink);
 
+/**
+ * The two session-follow entries this file calls. The module loads on demand:
+ * a widget redraw must not carry the notification graph.
+ */
+type SessionFollowLazy = {
+  endAllSessionCards: () => void;
+  restoreFollowedSessionCardsFromStorage: () => Promise<boolean>;
+};
+
+function sessionFollow(): SessionFollowLazy {
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
+  return require('./session-follow') as SessionFollowLazy;
+}
+
+// A sign-out, an account change, or a privacy lock blanks every surface; the
+// followed session notifications are not snapshot sinks, so they end here.
+subscribeGlanceableTerminalEnd(() => {
+  sessionFollow().endAllSessionCards();
+});
+
 // A Live Update the permission blocked starts once the user grants it, which
 // can happen in Settings while the app is away.
 AppState.addEventListener('change', state => {
   if (state === 'active') {
     void handleAppStateActive();
+    // Rebuild the followed session notifications from native truth: a push may
+    // have updated them while no process ran, and a dismissal the receiver
+    // missed leaves a stored card for a session the app no longer follows.
+    // Loaded here for the same reason as the terminal end above.
+    void sessionFollow().restoreFollowedSessionCardsFromStorage();
   }
 });
+
+if (AppState.currentState === 'active') {
+  void sessionFollow().restoreFollowedSessionCardsFromStorage();
+}
 
 // Turning the in-app switch off must clear the Live Update already in the
 // shade, not just stop the next start. `startOrUpdate` holds the guard for
@@ -70,6 +99,9 @@ subscribeLiveActivityEnabled(() => {
   const next = getLiveActivityEnabled();
   if (liveUpdateAllowed && !next) {
     androidSink.endImmediate();
+    // The switch off ends every followed session too, and deletes their rows
+    // (spec "Android: updates and ending" rule 4).
+    sessionFollow().endAllSessionCards();
   }
   liveUpdateAllowed = next;
 });

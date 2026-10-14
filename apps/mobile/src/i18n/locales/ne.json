@@ -136,7 +136,10 @@
     "working": "काम गर्दै",
     "yourOwnRepositories": "तपाईंका आफ्नै रिपोजिटरीहरू",
     "dismissed": "खारेज गरियो",
-    "agent": "एजेन्ट"
+    "agent": "एजेन्ट",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "परिवर्तनहरू"
   },
   "language": {
     "restarting": "भाषा लागू गर्न पुनः सुरु गर्दै",
@@ -325,6 +328,7 @@
       "collapseFile": "फाइलको विवरण लुकाउनुहोस्",
       "expandFile": "फाइलको विवरण देखाउनुहोस्",
       "diffTooLarge": "परिवर्तन विवरण देखाउन नसकिने गरी ठूलो छ।",
+      "noPreview": "यो फाइलको पूर्वावलोकन उपलब्ध छैन",
       "openOnGitHub": "GitHub मा खोल्नुहोस्",
       "openDiffOnGitHub": "यो फाइलको परिवर्तन विवरण GitHub मा खोल्नुहोस्",
       "githubDiff": "GitHub मा परिवर्तन विवरण"
@@ -831,7 +835,8 @@
       "kiloclaw": "KiloClaw का गतिविधिहरू",
       "balance": "मौज्दातसम्बन्धी चेतावनीहरू",
       "security": "भेटिएका सुरक्षा समस्या",
-      "spend": "खर्चका चेतावनीहरू"
+      "spend": "खर्चका चेतावनीहरू",
+      "followedSessions": "फलो गरिएका सत्रहरू"
     },
     "category": {
       "chatMessagesSubtitle": "तपाईंका कुराकानीमा आएका उत्तरहरू",
@@ -1547,7 +1552,7 @@
         "recoveryLabel": "GitHub एप अद्यावधिक गर्नुहोस्"
       },
       "githubIpAllowList": {
-        "description": "यो GitHub संस्थाको IP अनुमति सूचीले Kilo लाई रोक्ने भएकाले कोड समीक्षक बन्द गरियो। मद्दतका लागि hi@kilocode.ai मा सम्पर्क गर्नुहोस्, त्यसपछि कोड समीक्षक फेरि चालु गर्नुहोस्।"
+        "description": "यो GitHub संस्थाको IP अनुमति सूचीले Kilo लाई रोक्ने भएकाले कोड समीक्षक बन्द गरियो। मद्दतका लागि hi@kilo.ai मा सम्पर्क गर्नुहोस्, त्यसपछि कोड समीक्षक फेरि चालु गर्नुहोस्।"
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo ले यो परियोजनाका लागि GitLab परियोजनाको पहुँच टोकन बनाउन नसक्ने भएकाले कोड समीक्षक बन्द गरियो। मर्मतकर्ताको पहुँच दिनुहोस् वा परियोजनाका पहुँच टोकनहरू चालु गर्नुहोस्, त्यसपछि कोड समीक्षक फेरि चालु गर्नुहोस्।",
@@ -1562,7 +1567,7 @@
         "recoveryLabel": "कोड समीक्षकका सेटिङहरू अद्यावधिक गर्नुहोस्"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "आज रिपोजिटरी क्लोन गर्दा तीन पटक समयसीमा नाघेकाले कोड समीक्षक बन्द गरियो। मद्दतका लागि hi@kilocode.ai मा सम्पर्क गर्नुहोस्, त्यसपछि कोड समीक्षक फेरि चालु गर्नुहोस्।"
+        "description": "आज रिपोजिटरी क्लोन गर्दा तीन पटक समयसीमा नाघेकाले कोड समीक्षक बन्द गरियो। मद्दतका लागि hi@kilo.ai मा सम्पर्क गर्नुहोस्, त्यसपछि कोड समीक्षक फेरि चालु गर्नुहोस्।"
       },
       "title": "कोड समीक्षकमा ध्यान दिनुपर्ने समस्या छ।",
       "recoveryLabel": "सहायता टोलीलाई सम्पर्क गर्नुहोस्"
@@ -2086,6 +2091,8 @@
       "title": "सत्र",
       "copyErrorDetails": "त्रुटिको विवरण प्रतिलिपि गर्नुहोस्",
       "backToSessions": "सत्रहरूमा फर्कनुहोस्",
+      "follow": "लक स्क्रिनमा फलो गर्नुहोस्",
+      "unfollow": "लक स्क्रिनमा फलो गर्न रोक्नुहोस्",
       "couldNotLoad": "सत्र लोड गर्न सकिएन।",
       "failedToLoadDetails": "सत्रको विवरण लोड गर्न सकिएन।",
       "failedToStopExecution": "चलिरहेको काम रोक्न सकिएन।",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "वातावरण लोड गर्न पुनः प्रयास गर्नुहोस्",
       "defaultEnvironment": "पूर्वनिर्धारित वातावरण",
       "environmentSummary": "{{commands}} कमाण्ड · {{mcp}} MCP · {{skills}} सीप · {{agents}} एजेन्ट",
-      "changes": "परिवर्तनहरू",
       "leaveChanges": "परिवर्तन यथावत्",
       "commitAndPush": "कमिट र पुश",
       "startSession": "सत्र सुरु गर्नुहोस्",
@@ -2260,8 +2266,8 @@
       "toolList": "सूची देखाउनुहोस्",
       "toolPatch": "संशोधन लागू गर्नुहोस्",
       "toolTask": "कार्य",
-      "readTodos": "कामको सूची पढ्नुहोस्",
-      "updateTodos": "कामको सूची अद्यावधिक गर्नुहोस्",
+      "readTodos": "योजना पढ्नुहोस्",
+      "updateTodos": "योजना अद्यावधिक गर्नुहोस्",
       "linesBadge": "{{displayCount}} पङ्क्ति",
       "filesBadge": "{{displayCount}} फाइल",
       "matchesBadge": "{{displayCount}} नतिजा",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "मोडेल ({{displayCount}})",
       "modelsCount_other": "मोडेलहरू ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "परिवर्तनहरू हेर्नुहोस्",
+      "asOf": "{{time}} सम्मको",
+      "tooLarge": "यो परिवर्तन विवरण मोबाइलमा देखाउन नसकिने गरी ठूलो छ।",
+      "empty": "यो सत्रमा अहिलेसम्म कुनै फाइल परिवर्तन भएको छैन।"
     },
     "autoApprove": {
       "title": "स्वतः स्वीकृति",
@@ -3163,6 +3175,8 @@
     "channelName": "सक्रिय एजेन्टहरू",
     "activityKitDisabledBody": "लक स्क्रिनमा सक्रिय एजेन्टहरू हेर्न सेटिङ्समा प्रत्यक्ष गतिविधिहरू चालू गर्नुहोस्।",
     "openSession": "खोल्नुहोस्",
+    "finished": "समाप्त भयो",
+    "followFailed": "यो एजेन्टलाई लक स्क्रिनमा देखाउन सकिएन।",
     "approveFailed": "स्वीकृति गर्न सकिएन। फेरि प्रयास गर्न $t(common.approve) मा ट्याप गर्नुहोस्।",
     "checked": "जाँच गरिएको",
     "lastKnown": "पछिल्लो ज्ञात",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "तपाईंको प्रतीक्षामा",
     "nextScheduled": "अब तय भएका",
     "answerNeeded": "जवाफ चाहिन्छ",
-    "waitingToRetry": "फेरि प्रयासको प्रतीक्षामा"
+    "waitingToRetry": "फेरि प्रयासको प्रतीक्षामा",
+    "step": {
+      "editing": "सम्पादन गर्दै",
+      "reading": "पढ्दै",
+      "running": "चलाउँदै",
+      "searching": "वेब खोज",
+      "thinking": "राम्ररी सोच्दै"
+    },
+    "planOf": "मध्ये",
+    "filesChanged": "फाइलहरू परिवर्तन भए",
+    "finishedIn": "समाप्त भयो",
+    "noActivityFor": "का लागि कुनै गतिविधि छैन",
+    "prOpened": "पुल रिक्वेस्ट खोलियो",
+    "permissionWants": "चलाउन चाहन्छ",
+    "failure": {
+      "provider": "रोकियो: प्रदायक त्रुटि",
+      "tool": "रोकियो: उपकरण त्रुटि",
+      "cancelled": "रोकियो: रद्द गरियो",
+      "other": "रोकियो"
+    }
   },
   "transcriptionModel": {
     "title": "बोलीलाई पाठमा रूपान्तरण गर्ने मोडेल",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "कुराकानी इतिहास लोड गर्न सकिएन।",
       "new": "नयाँ च्याट",
-      "openHint": "च्याट खोल्छ। मेट्न लामो थिच्नुहोस्।",
       "deleteTitle": "यो च्याट मेट्ने?"
     },
+    "rename": {
+      "title": "च्याटको नाम बदल्नुहोस्",
+      "accessibility": "च्याटको नाम बदल्नुहोस्: {{title}}",
+      "openHint": "च्याट खोल्छ। नाम बदल्न वा मेट्न लामो थिच्नुहोस्।"
+    },
     "beta": "बिटा",
+    "details": {
+      "title": "च्याटको विवरण",
+      "backend": "ब्याकएन्ड",
+      "effortDefault": "मोडेलको पूर्वनिर्धारित",
+      "noCost": "कुनै लागत छैन",
+      "costUnknown": "थाहा छैन",
+      "costEstimatedNote": "मूल्य नबताएका जवाफहरूको लागत सूचीका मूल्यबाट अनुमान गरिएको हो।",
+      "costUnknownNote": "यो मोडेलको कुनै मूल्य थाहा छैन।",
+      "costPartialNote": "यो कुल रकममा मूल्य थाहा नभएका मोडेलहरू समावेश छैनन्।",
+      "localNote": "यन्त्रमा चल्ने मोडेलहरू यही यन्त्रमा चल्छन्। तिनको कुनै लागत र प्रम्प्ट क्यास हुँदैन, र तिनका टोकन गणना अनुमान हुन सक्छन्।",
+      "countedSinceNote": "प्रयोग रेकर्ड हुन थाल्नुअघि यो च्याट सुरु भएको थियो। कुल संख्याले त्यसपछिका जवाफहरू मात्र देखाउँछ।",
+      "remoteServersOn": "सक्रिय रिमोट MCP सर्भरहरू"
+    },
     "webSearch": {
       "title": "वेबमा खोज्नुहोस्",
       "description": "यो च्याटलाई तपाईंको Kilo खाताबाट हालको जानकारी खोज्न दिनुहोस्। खोजहरूले तपाईंको मासिक खोज सीमा प्रयोग गर्छन्।",
@@ -3423,6 +3473,9 @@
       "downloading": "डाउनलोड हुँदैछ…",
       "downloadProgress": "डाउनलोड हुँदैछ… {{percent}}%",
       "downloadFailed": "डाउनलोड पूरा भएन। आफ्नो इन्टरनेट जडान र खाली भण्डारण जाँच गरेर फेरि प्रयास गर्नुहोस्।"
+    },
+    "reasoningEffort": {
+      "modelFlag": "यो मोडेलले सोच्ने प्रयासको स्तर समर्थन गर्छ"
     }
   },
   "settingsTools": {
@@ -3645,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play ले कुनै मिल्दो क्रेडिट प्याक फर्काएन।",
     "purchaseOwnedByAnotherAccount": "यो Apple Account मा रहेको क्रेडिट अर्कै Kilo खाताको हो। प्रयोग गर्न त्यही Kilo खातामा साइन इन गर्नुहोस्।",
     "purchaseOwnedByAnotherAccountPlay": "यो Google Play खातामा रहेको क्रेडिट अर्को Kilo खातासँग सम्बन्धित छ। प्रयोग गर्न त्यो Kilo खातामा साइन इन गर्नुहोस्।"
+  },
+  "todos": {
+    "saveAsTodo": "कामका रूपमा सुरक्षित गर्नुहोस्",
+    "segment": {
+      "label": "एजेन्ट दृश्य",
+      "sessions": "सत्रहरू",
+      "todos": "कामहरू"
+    },
+    "lists": {
+      "newList": "नयाँ सूची",
+      "empty": "अहिलेसम्म कुनै सूची छैन",
+      "couldNotLoad": "सूचीहरू लोड गर्न सकिएन",
+      "noRepository": "रिपोजिटरी छैन",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} खुला",
+      "openCount_other": "{{count}} खुला",
+      "archived_one": "आर्काइभ गरिएको ({{count}})",
+      "archived_other": "आर्काइभ गरिएको ({{count}})",
+      "archive": "आर्काइभ गर्नुहोस्",
+      "unarchive": "आर्काइभबाट निकाल्नुहोस्",
+      "deleteTitle": "{{name}} मेट्ने?",
+      "deleteMessage": "यसका कामहरू पनि मेटिन्छन्। तिनका सत्रहरू रहन्छन्।"
+    },
+    "listSettings": {
+      "title": "सूची सेटिङ",
+      "name": "नाम",
+      "namePlaceholder": "बग, विचार, रिलिज…",
+      "emoji": "इमोजी",
+      "mode": "मोड",
+      "defaultsHint": "यो सूचीबाट सुरु गरिएका सत्रहरूले यी पूर्वनिर्धारित मानहरू प्रयोग गर्छन्।"
+    },
+    "list": {
+      "addPlaceholder": "नयाँ काम थप्नुहोस्",
+      "add": "काम थप्नुहोस्",
+      "empty": "अहिलेसम्म कुनै काम छैन",
+      "setDefaults": "रिपोजिटरी, मोड र मोडेल सेट गर्नुहोस्",
+      "completed_one": "सम्पन्न ({{count}})",
+      "completed_other": "सम्पन्न ({{count}})"
+    },
+    "item": {
+      "markDone": "सम्पन्न भनी चिन्ह लगाउनुहोस्",
+      "markOpen": "सम्पन्न नभएको भनी चिन्ह लगाउनुहोस्",
+      "markDonePrompt": "सम्पन्न भनी चिन्ह लगाउने?",
+      "deleted": "काम मेटियो",
+      "undo": "पूर्ववत गर्नुहोस्",
+      "runCount_one": "{{count}} पटक चलाइयो",
+      "runCount_other": "{{count}} पटक चलाइयो",
+      "startNow": "समीक्षा नगरी सुरु गर्नुहोस्",
+      "startNowHint": "समीक्षा नगरी सुरु गर्न लामो थिच्नुहोस्",
+      "titleLabel": "कामको शीर्षक",
+      "notes": "नोटहरू",
+      "notesPlaceholder": "Markdown मा नोट थप्नुहोस्",
+      "sessions": "लिङ्क गरिएका सत्रहरू",
+      "noSessions": "अहिलेसम्म कुनै सत्र छैन",
+      "linkSession": "सत्र लिङ्क गर्नुहोस्",
+      "unlinkSession": "{{title}} अनलिङ्क गर्नुहोस्",
+      "linkFailed": "सत्रलाई कामसँग लिङ्क गर्न सकिएन"
+    },
+    "linkSession": {
+      "title": "एउटा सत्र लिङ्क गर्नुहोस्",
+      "empty": "हालसालैका कुनै सत्र छैन",
+      "emptyInRepository": "{{repository}} मा हालसालैका कुनै सत्र छैन"
+    },
+    "upNext": "अब अर्को",
+    "sessionTodo": "काम: {{title}}",
+    "linkToTodo": "कामसँग लिङ्क गर्नुहोस्",
+    "candidates": {
+      "empty": "कुनै खुला काम छैन"
+    },
+    "saveSheet": {
+      "title": "सूचीमा सुरक्षित गर्नुहोस्",
+      "saved": "{{list}} मा सुरक्षित गरियो"
+    }
   }
 }

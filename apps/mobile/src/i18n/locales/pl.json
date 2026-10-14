@@ -136,7 +136,10 @@
     "working": "W toku",
     "yourOwnRepositories": "Twoje repozytoria",
     "dismissed": "Odrzucone",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Zmiany"
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -320,7 +323,8 @@
       "kiloclaw": "Aktywność KiloClaw",
       "balance": "Powiadomienia o saldzie",
       "security": "Wykryte problemy z bezpieczeństwem",
-      "spend": "Alerty o wydatkach"
+      "spend": "Alerty o wydatkach",
+      "followedSessions": "Obserwowane sesje"
     },
     "category": {
       "chatMessagesSubtitle": "odpowiedzi w twoich rozmowach",
@@ -1042,7 +1046,7 @@
         "recoveryLabel": "Zaktualizuj aplikację GitHub"
       },
       "githubIpAllowList": {
-        "description": "Recenzent kodu został wyłączony, ponieważ lista dozwolonych adresów IP tej organizacji w serwisie GitHub blokuje Kilo. Napisz na hi@kilocode.ai, aby uzyskać pomoc, a następnie ponownie włącz recenzenta kodu."
+        "description": "Recenzent kodu został wyłączony, ponieważ lista dozwolonych adresów IP tej organizacji w serwisie GitHub blokuje Kilo. Napisz na hi@kilo.ai, aby uzyskać pomoc, a następnie ponownie włącz recenzenta kodu."
       },
       "gitlabProjectAccessRequired": {
         "description": "Recenzent kodu został wyłączony, ponieważ Kilo nie może utworzyć tokenu dostępu do tego projektu w serwisie GitLab. Przyznaj rolę opiekuna projektu lub włącz tokeny dostępu do projektu, a następnie ponownie włącz recenzenta kodu.",
@@ -1057,7 +1061,7 @@
         "recoveryLabel": "Zaktualizuj ustawienia recenzenta kodu"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Recenzent kodu został wyłączony, ponieważ dzisiaj trzykrotnie przekroczono limit czasu klonowania repozytorium. Napisz na hi@kilocode.ai, aby uzyskać pomoc, a następnie ponownie włącz recenzenta kodu."
+        "description": "Recenzent kodu został wyłączony, ponieważ dzisiaj trzykrotnie przekroczono limit czasu klonowania repozytorium. Napisz na hi@kilo.ai, aby uzyskać pomoc, a następnie ponownie włącz recenzenta kodu."
       },
       "title": "Asystent przeglądu kodu wymaga twojej uwagi.",
       "recoveryLabel": "Skontaktuj się z pomocą techniczną"
@@ -1599,6 +1603,8 @@
       "title": "Sesja",
       "copyErrorDetails": "Kopiuj szczegóły błędu",
       "backToSessions": "Wróć do sesji",
+      "follow": "Obserwuj na ekranie blokady",
+      "unfollow": "Przestań obserwować na ekranie blokady",
       "couldNotLoad": "Nie udało się wczytać sesji.",
       "failedToLoadDetails": "Nie udało się wczytać szczegółów sesji.",
       "failedToStopExecution": "Nie udało się zatrzymać wykonywania zadania.",
@@ -1702,7 +1708,6 @@
       "retryLoadingEnvironment": "Wczytaj środowisko ponownie",
       "defaultEnvironment": "Domyślne środowisko",
       "environmentSummary": "polecenia: {{commands}} · MCP: {{mcp}} · umiejętności: {{skills}} · agenci: {{agents}}",
-      "changes": "Zmiany",
       "leaveChanges": "Pozostaw zmiany",
       "commitAndPush": "Zatwierdź i wypchnij",
       "startSession": "Rozpocznij sesję",
@@ -1775,8 +1780,8 @@
       "toolList": "lista plików",
       "toolPatch": "poprawka",
       "toolTask": "zadanie",
-      "readTodos": "Odczytaj zadania",
-      "updateTodos": "Zaktualizuj zadania",
+      "readTodos": "Odczytaj plan",
+      "updateTodos": "Zaktualizuj plan",
       "linesBadge": "wiersze: {{displayCount}}",
       "filesBadge": "pliki: {{displayCount}}",
       "matchesBadge": "dopasowania: {{displayCount}}",
@@ -2184,6 +2189,12 @@
       "modelsCount_other": "Modele ({{displayCount}})",
       "modelsCount_few": "Modele ({{displayCount}})",
       "modelsCount_many": "Modele ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Wyświetl zmiany",
+      "asOf": "Stan na {{time}}",
+      "tooLarge": "Różnice są zbyt duże, aby je wyświetlić na urządzeniu mobilnym.",
+      "empty": "W tej sesji nie zmieniono jeszcze żadnych plików."
     },
     "autoApprove": {
       "title": "Automatyczne zatwierdzanie",
@@ -2700,6 +2711,7 @@
     "fileRows": {
       "collapseFile": "Zwiń plik",
       "diffTooLarge": "Różnice są zbyt duże, aby je wyświetlić.",
+      "noPreview": "Podgląd tego pliku jest niedostępny",
       "expandFile": "Rozwiń plik",
       "markViewed": "Oznacz {{path}} jako przejrzany",
       "openDiffOnGitHub": "Otwórz różnice w tym pliku w serwisie GitHub",
@@ -3245,6 +3257,8 @@
     "channelName": "Aktywni agenci",
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady.",
     "openSession": "Otwórz",
+    "finished": "Zakończono",
+    "followFailed": "Nie udało się pokazać tego agenta na ekranie blokady.",
     "approveFailed": "Nie udało się zatwierdzić. Dotknij $t(common.approve), aby spróbować ponownie.",
     "checked": "Sprawdzono",
     "lastKnown": "Ostatni znany stan",
@@ -3253,7 +3267,26 @@
     "waitingForYou": "Czeka na ciebie",
     "nextScheduled": "Najbliższe zaplanowane",
     "answerNeeded": "Czeka na odpowiedź",
-    "waitingToRetry": "Czeka na ponowną próbę"
+    "waitingToRetry": "Czeka na ponowną próbę",
+    "step": {
+      "editing": "Edytowanie",
+      "reading": "Czytanie",
+      "running": "Uruchamianie",
+      "searching": "Wyszukiwanie w sieci",
+      "thinking": "Przemyśliwanie"
+    },
+    "planOf": "z",
+    "filesChanged": "zmienione pliki",
+    "finishedIn": "Zakończono w",
+    "noActivityFor": "Brak aktywności przez",
+    "prOpened": "Otwarto pull request",
+    "permissionWants": "Chce uruchomić",
+    "failure": {
+      "provider": "Zatrzymano: błąd dostawcy",
+      "tool": "Zatrzymano: błąd narzędzia",
+      "cancelled": "Zatrzymano: anulowano",
+      "other": "ZATRZYMANA"
+    }
   },
   "transcriptionModel": {
     "title": "Model transkrypcji",
@@ -3289,10 +3322,27 @@
     "list": {
       "loadFailed": "Nie udało się wczytać historii czatu.",
       "new": "Nowy czat",
-      "openHint": "Otwiera czat. Naciśnij i przytrzymaj, aby usunąć.",
       "deleteTitle": "Usunąć ten czat?"
     },
+    "rename": {
+      "title": "Zmień nazwę czatu",
+      "accessibility": "Zmień nazwę czatu: {{title}}",
+      "openHint": "Otwiera czat. Naciśnij i przytrzymaj, aby zmienić nazwę lub usunąć."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Szczegóły czatu",
+      "backend": "Backend",
+      "effortDefault": "Domyślny dla modelu",
+      "noCost": "Bez kosztów",
+      "costUnknown": "Nieznany",
+      "costEstimatedNote": "Koszt odpowiedzi, które nie podały ceny, oszacowano na podstawie cen katalogowych.",
+      "costUnknownNote": "Cena tego modelu jest nieznana.",
+      "costPartialNote": "Ta suma nie obejmuje modeli o nieznanej cenie.",
+      "localNote": "Modele na urządzeniu działają na tym urządzeniu. Nie mają kosztów ani pamięci podręcznej promptów, a ich liczba tokenów może być szacunkowa.",
+      "countedSinceNote": "Ten czat rozpoczął się, zanim zaczęto rejestrować użycie. Sumy obejmują tylko późniejsze odpowiedzi.",
+      "remoteServersOn": "Włączone zdalne serwery MCP"
+    },
     "webSearch": {
       "title": "Szukaj w sieci",
       "description": "Pozwól temu czatowi wyszukiwać aktualne informacje przez Twoje konto Kilo. Wyszukiwania zużywają Twój miesięczny limit wyszukiwań.",
@@ -3505,6 +3555,9 @@
       "downloading": "Pobieranie…",
       "downloadProgress": "Pobieranie… {{percent}}%",
       "downloadFailed": "Pobieranie nie zostało ukończone. Sprawdź połączenie i wolne miejsce w pamięci, a potem spróbuj ponownie."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Ten model obsługuje poziom rozumowania"
     }
   },
   "settingsTools": {
@@ -3727,5 +3780,86 @@
     "noMatchingProductsPlay": "Google Play nie zwrócił pasujących pakietów kredytów.",
     "purchaseOwnedByAnotherAccount": "Kredyty na tym koncie Apple należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać.",
     "purchaseOwnedByAnotherAccountPlay": "Kredyty na tym koncie Google Play należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać."
+  },
+  "todos": {
+    "saveAsTodo": "Zapisz jako zadanie",
+    "segment": {
+      "label": "Widok agentów",
+      "sessions": "Sesje",
+      "todos": "Zadania"
+    },
+    "lists": {
+      "newList": "Nowa lista",
+      "empty": "Brak list",
+      "couldNotLoad": "Nie udało się wczytać list",
+      "noRepository": "Brak repozytorium",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "Otwarte: {{count}}",
+      "openCount_other": "Otwarte: {{count}}",
+      "openCount_few": "Otwarte: {{count}}",
+      "openCount_many": "Otwarte: {{count}}",
+      "archived_one": "Zarchiwizowane ({{count}})",
+      "archived_other": "Zarchiwizowane ({{count}})",
+      "archived_few": "Zarchiwizowane ({{count}})",
+      "archived_many": "Zarchiwizowane ({{count}})",
+      "archive": "Zarchiwizuj",
+      "unarchive": "Przywróć z archiwum",
+      "deleteTitle": "Usunąć {{name}}?",
+      "deleteMessage": "Jej zadania też zostaną usunięte. Sesje pozostaną."
+    },
+    "listSettings": {
+      "title": "Ustawienia listy",
+      "name": "Nazwa",
+      "namePlaceholder": "Błędy, Pomysły, Wydanie…",
+      "emoji": "Emoji",
+      "mode": "Tryb",
+      "defaultsHint": "Sesje rozpoczęte z tej listy używają tych ustawień domyślnych."
+    },
+    "list": {
+      "addPlaceholder": "Dodaj zadanie",
+      "add": "Dodaj zadanie",
+      "empty": "Brak zadań",
+      "setDefaults": "Ustaw repozytorium, tryb i model",
+      "completed_one": "Ukończone ({{count}})",
+      "completed_other": "Ukończone ({{count}})",
+      "completed_few": "Ukończone ({{count}})",
+      "completed_many": "Ukończone ({{count}})"
+    },
+    "item": {
+      "markDone": "Oznacz jako ukończone",
+      "markOpen": "Oznacz jako nieukończone",
+      "markDonePrompt": "Oznaczyć jako ukończone?",
+      "deleted": "Zadanie usunięte",
+      "undo": "Cofnij",
+      "runCount_one": "{{count}} uruchomienie",
+      "runCount_other": "{{count}} uruchomienia",
+      "runCount_few": "{{count}} uruchomienia",
+      "runCount_many": "{{count}} uruchomień",
+      "startNow": "Uruchom bez przeglądu",
+      "startNowHint": "Naciśnij i przytrzymaj, aby uruchomić bez przeglądu",
+      "titleLabel": "Tytuł zadania",
+      "notes": "Notatki",
+      "notesPlaceholder": "Dodaj notatki w Markdown",
+      "sessions": "Powiązane sesje",
+      "noSessions": "Brak sesji",
+      "linkSession": "Powiąż sesję",
+      "unlinkSession": "Odłącz {{title}}",
+      "linkFailed": "Nie udało się powiązać sesji z zadaniem"
+    },
+    "linkSession": {
+      "title": "Powiąż sesję",
+      "empty": "Brak ostatnich sesji",
+      "emptyInRepository": "Brak ostatnich sesji w {{repository}}"
+    },
+    "upNext": "Następne",
+    "sessionTodo": "Zadanie: {{title}}",
+    "linkToTodo": "Powiąż z zadaniem",
+    "candidates": {
+      "empty": "Brak otwartych zadań"
+    },
+    "saveSheet": {
+      "title": "Zapisz na liście",
+      "saved": "Zapisano na liście {{list}}"
+    }
   }
 }

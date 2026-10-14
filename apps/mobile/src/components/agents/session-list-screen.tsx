@@ -41,7 +41,10 @@ import { cn } from '@/lib/utils';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
 
-export function AgentSessionListScreen() {
+/** `segmentControl` renders under the header: the Agents tab's Sessions | To-dos switch. */
+export function AgentSessionListScreen({
+  segmentControl,
+}: Readonly<{ segmentControl?: ReactNode }> = {}) {
   const router = useRouter();
   const navigation = useNavigation();
   const { t } = useTranslation();
@@ -489,7 +492,7 @@ export function AgentSessionListScreen() {
           reserveEyebrow
           size="large"
           showBackButton={false}
-          className="px-[22px] pb-1"
+          className="px-[22px]"
           // An accepted empty live list carries the history route in its body
           // (`LiveSessionListEmptyState`'s `historyAction`), so the controls row
           // is withheld there: the empty state renders exactly one history
@@ -500,6 +503,7 @@ export function AgentSessionListScreen() {
           inlineActions={content === 'empty' ? undefined : headerActions}
           inlineActionsWidth={inlineActionsWidth}
         />
+        {segmentControl}
         {hasLiveRows || isSearching ? (
           <SessionListSearchHeader
             inputRef={query.searchInputRef}

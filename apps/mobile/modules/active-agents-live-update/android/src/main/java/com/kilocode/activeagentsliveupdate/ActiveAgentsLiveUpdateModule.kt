@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
+import org.json.JSONObject
 
 /**
  * Local Expo module for the Android aggregate ongoing notification.
@@ -96,6 +97,46 @@ class ActiveAgentsLiveUpdateModule : Module() {
         dismiss()
       }
     }.runOnQueue(moduleQueue)
+
+    // One followed session's ongoing notification
+    // (`.specs/mobile-session-live-activity.md` "Android"). The card travels as
+    // JSON text: Expo's record converter rejects a null inside an object
+    // argument, and the card carries nullable fields. The durable bodies run on
+    // the same queue as the aggregate card's, for the same prefs-fsync reason.
+    AsyncFunction("postSession") { cardJson: String, dismissAfterMs: Double ->
+      durable {
+        SessionNotifications.post(context, sessionCardFromJson(cardJson), dismissAfterMs.toLong())
+      }
+    }.runOnQueue(moduleQueue)
+
+    AsyncFunction("restoreSession") { sessionId: String ->
+      durable {
+        SessionNotifications.restore(context, sessionId)
+      }
+    }.runOnQueue(moduleQueue)
+
+    AsyncFunction("dismissSession") { sessionId: String ->
+      durable {
+        SessionNotifications.cancel(context, sessionId)
+      }
+    }.runOnQueue(moduleQueue)
+
+    // The JS side calls this after a restart or a scope change: every stored
+    // session card whose id is not in the list is cancelled and forgotten.
+    AsyncFunction("pruneSessions") { keepJson: String ->
+      durable {
+        SessionNotifications.prune(context, keepJson)
+      }
+    }.runOnQueue(moduleQueue)
+
+    // The stored session cards, as a JSON array of the cards the JS side
+    // posted. Native storage is authoritative: a notification outlives the
+    // process that posted it, and a fresh process rebuilds the followed set
+    // from here. Synchronous, like `getWidgetSnapshot`, so a same-turn read sees
+    // the write the JS side just issued.
+    Function("getSessionCards") {
+      SessionNotifications.cards(context)
+    }
 
     // `setWidgetSnapshot` is the one durable write the JS side reads back in the
     // same turn: an in-place widget action republishes the snapshot through the
@@ -274,9 +315,19 @@ class ActiveAgentsLiveUpdateModule : Module() {
    * with no Activity. The phone can be locked when the surface answers, and the
    * approval needs no screen.
    */
-  private fun approvePendingIntent(): PendingIntent {
+  private fun approvePendingIntent(
+    sessionId: String? = null,
+    approvalKey: String? = null
+  ): PendingIntent {
     val intent = Intent(context, ActiveAgentsActionReceiver::class.java)
       .setAction(ActiveAgentsActionReceiver.ACTION_APPROVE)
+    // A session notification answers its own session and the exact request it
+    // shows; the aggregate card passes neither, and the headless body reads the
+    // recorded ask for that case.
+    if (sessionId != null) {
+      intent.putExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId)
+      intent.putExtra(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY, approvalKey)
+    }
     return PendingIntent.getBroadcast(
       context,
       APPROVE_REQUEST_CODE,
@@ -544,3 +595,7 @@ class LiveUpdateCard : Record {
   @Field val newAgentLabel: String? = null
   @Field val newAgentUrl: String = ""
 }
+
+/** One session card from the JSON text the JS bridge passes. */
+internal fun sessionCardFromJson(cardJson: String): SessionNotificationCard =
+  SessionNotificationCard().apply { fillFromJson(JSONObject(cardJson)) }

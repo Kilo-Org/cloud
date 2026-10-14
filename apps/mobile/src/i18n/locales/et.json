@@ -136,7 +136,10 @@
     "working": "Töös",
     "yourOwnRepositories": "Sinu enda hoidlad",
     "dismissed": "Kõrvale jäetud",
-    "agent": "Agent"
+    "agent": "Agent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Muudatused"
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -325,6 +328,7 @@
       "collapseFile": "Ahenda fail",
       "expandFile": "Laienda fail",
       "diffTooLarge": "Muudatusi on kuvamiseks liiga palju.",
+      "noPreview": "Selle faili eelvaade pole saadaval",
       "openOnGitHub": "Ava GitHubis",
       "openDiffOnGitHub": "Ava selle faili muudatuste vaade GitHubis",
       "githubDiff": "GitHubi muudatuste vaade"
@@ -831,7 +835,8 @@
       "kiloclaw": "KiloClaw'i tegevus",
       "balance": "Saldohoiatused",
       "security": "Turvaleiud",
-      "spend": "Kulutushoiatused"
+      "spend": "Kulutushoiatused",
+      "followedSessions": "Jälgitud seansid"
     },
     "category": {
       "chatMessagesSubtitle": "vastused sinu vestlustes",
@@ -1547,7 +1552,7 @@
         "recoveryLabel": "Uuenda GitHubi rakendust"
       },
       "githubIpAllowList": {
-        "description": "Koodiülevaataja lülitati välja, sest selle GitHubi organisatsiooni lubatud IP-aadresside loend blokeerib Kilo. Küsi abi aadressil hi@kilocode.ai ja lülita seejärel koodiülevaataja uuesti sisse."
+        "description": "Koodiülevaataja lülitati välja, sest selle GitHubi organisatsiooni lubatud IP-aadresside loend blokeerib Kilo. Küsi abi aadressil hi@kilo.ai ja lülita seejärel koodiülevaataja uuesti sisse."
       },
       "gitlabProjectAccessRequired": {
         "description": "Koodiülevaataja lülitati välja, sest Kilo ei saa luua sellele GitLabi projektile juurdepääsutunnust. Anna hooldaja õigused või luba projekti juurdepääsutunnused ja lülita koodiülevaataja uuesti sisse.",
@@ -1562,7 +1567,7 @@
         "recoveryLabel": "Uuenda koodiülevaataja seadeid"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Koodiülevaataja lülitati välja, sest hoidla kloonimine ületas täna kolm korda ajalimiidi. Küsi abi aadressil hi@kilocode.ai ja lülita seejärel koodiülevaataja uuesti sisse."
+        "description": "Koodiülevaataja lülitati välja, sest hoidla kloonimine ületas täna kolm korda ajalimiidi. Küsi abi aadressil hi@kilo.ai ja lülita seejärel koodiülevaataja uuesti sisse."
       },
       "title": "Koodiülevaataja vajab tähelepanu.",
       "recoveryLabel": "Võta ühendust toega"
@@ -2086,6 +2091,8 @@
       "title": "Seanss",
       "copyErrorDetails": "Kopeeri vea üksikasjad",
       "backToSessions": "Tagasi seansside juurde",
+      "follow": "Jälgi lukustuskuval",
+      "unfollow": "Lõpeta lukustuskuval jälgimine",
       "couldNotLoad": "Seansi laadimine ebaõnnestus.",
       "failedToLoadDetails": "Seansi üksikasjade laadimine ebaõnnestus.",
       "failedToStopExecution": "Täitmise peatamine ebaõnnestus.",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "Proovi keskkonna laadimist uuesti",
       "defaultEnvironment": "Vaikekeskkond",
       "environmentSummary": "{{commands}} käsku · {{mcp}} MCP · {{skills}} oskust · {{agents}} agenti",
-      "changes": "Muudatused",
       "leaveChanges": "Jäta alles",
       "commitAndPush": "Kinnista ja saada",
       "startSession": "Alusta seanssi",
@@ -2260,8 +2266,8 @@
       "toolList": "loetle",
       "toolPatch": "rakenda paik",
       "toolTask": "ülesanne",
-      "readTodos": "Loe ülesannete loendit",
-      "updateTodos": "Uuenda ülesannete loendit",
+      "readTodos": "Loe plaani",
+      "updateTodos": "Uuenda plaani",
       "linesBadge": "{{displayCount}} rida",
       "filesBadge": "{{displayCount}} faili",
       "matchesBadge": "{{displayCount}} vastet",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "Mudel ({{displayCount}})",
       "modelsCount_other": "Mudelid ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Vaata muudatusi",
+      "asOf": "Seisuga {{time}}",
+      "tooLarge": "Muudatusi on mobiilis kuvamiseks liiga palju.",
+      "empty": "Selles seansis pole veel faile muudetud."
     },
     "autoApprove": {
       "title": "Automaatne kinnitamine",
@@ -3163,6 +3175,8 @@
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
     "openSession": "Ava",
+    "finished": "Lõpetatud",
+    "followFailed": "Seda agenti ei õnnestunud lukustuskuval kuvada.",
     "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve).",
     "checked": "Kontrollitud",
     "lastKnown": "Viimane teadaolev",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "Ootab sind",
     "nextScheduled": "Järgmisena ajastatud",
     "answerNeeded": "Vajab vastust",
-    "waitingToRetry": "Ootab uut katset"
+    "waitingToRetry": "Ootab uut katset",
+    "step": {
+      "editing": "Redigeerimine",
+      "reading": "Lugemine",
+      "running": "Käivitamine",
+      "searching": "Veebiotsing",
+      "thinking": "Läbimõtlemine"
+    },
+    "planOf": "viiest",
+    "filesChanged": "muudetud failid",
+    "finishedIn": "Valmis",
+    "noActivityFor": "Tegevuseta",
+    "prOpened": "Pull request avatud",
+    "permissionWants": "Soovib käivitada",
+    "failure": {
+      "provider": "Peatatud: teenusepakkuja viga",
+      "tool": "Peatatud: tööriista viga",
+      "cancelled": "Peatatud: tühistatud",
+      "other": "PEATATUD"
+    }
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "Vestluse ajaloo laadimine ei õnnestunud.",
       "new": "Uus vestlus",
-      "openHint": "Avab vestluse. Kustutamiseks hoia all.",
       "deleteTitle": "Kas kustutada see vestlus?"
     },
+    "rename": {
+      "title": "Nimeta vestlus ümber",
+      "accessibility": "Nimeta vestlus ümber: {{title}}",
+      "openHint": "Avab vestluse. Ümbernimetamiseks või kustutamiseks hoia all."
+    },
     "beta": "Beeta",
+    "details": {
+      "title": "Vestluse üksikasjad",
+      "backend": "Taustsüsteem",
+      "effortDefault": "Mudeli vaikeväärtus",
+      "noCost": "Kulu puudub",
+      "costUnknown": "Teadmata",
+      "costEstimatedNote": "Nende vastuste kulu, mille kohta hinda ei teatatud, on hinnatud hinnakirja alusel.",
+      "costUnknownNote": "Selle mudeli hind pole teada.",
+      "costPartialNote": "See kogusumma ei hõlma mudeleid, mille hind pole teada.",
+      "localNote": "Seadmesisesed mudelid töötavad selles seadmes. Neil pole kulu ega viibavahemälu ning nende tokenite arv võib olla hinnanguline.",
+      "countedSinceNote": "See vestlus algas enne, kui kasutust hakati salvestama. Kogusummad näitavad ainult sellele järgnenud vastuseid.",
+      "remoteServersOn": "Sisselülitatud kaug-MCP-serverid"
+    },
     "webSearch": {
       "title": "Otsi veebist",
       "description": "Luba sellel vestlusel otsida ajakohast teavet sinu Kilo konto kaudu. Otsingud kasutavad sinu igakuist otsingumahtu.",
@@ -3423,6 +3473,9 @@
       "downloading": "Allalaadimine…",
       "downloadProgress": "Allalaadimine… {{percent}}%",
       "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti."
+    },
+    "reasoningEffort": {
+      "modelFlag": "See mudel toetab mõtlemise põhjalikkust"
     }
   },
   "settingsTools": {
@@ -3645,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play ei tagastanud ühtegi sobivat krediidipaketti.",
     "purchaseOwnedByAnotherAccount": "Selle Apple Accountiga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse vastavale Kilo kontole.",
     "purchaseOwnedByAnotherAccountPlay": "Selle Google Play kontoga seotud krediit kuulub teisele Kilo kontole. Selle kasutamiseks logi sisse sellesse Kilo kontosse."
+  },
+  "todos": {
+    "saveAsTodo": "Salvesta ülesandena",
+    "segment": {
+      "label": "Agentide vaade",
+      "sessions": "Seansid",
+      "todos": "Ülesanded"
+    },
+    "lists": {
+      "newList": "Uus loend",
+      "empty": "Loendeid veel pole",
+      "couldNotLoad": "Loendeid ei õnnestunud laadida",
+      "noRepository": "Hoidlat pole",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} avatud",
+      "openCount_other": "{{count}} avatud",
+      "archived_one": "Arhiveeritud ({{count}})",
+      "archived_other": "Arhiveeritud ({{count}})",
+      "archive": "Arhiveeri",
+      "unarchive": "Taasta arhiivist",
+      "deleteTitle": "Kas kustutada {{name}}?",
+      "deleteMessage": "Selle ülesanded kustutatakse samuti. Seansid jäävad alles."
+    },
+    "listSettings": {
+      "title": "Loendi sätted",
+      "name": "Nimi",
+      "namePlaceholder": "Vead, Ideed, Väljalase…",
+      "emoji": "Emotikon",
+      "mode": "Režiim",
+      "defaultsHint": "Sellest loendist alustatud seansid kasutavad neid vaikeseadeid."
+    },
+    "list": {
+      "addPlaceholder": "Uus ülesanne",
+      "add": "Lisa ülesanne",
+      "empty": "Ülesandeid veel pole",
+      "setDefaults": "Määra hoidla, režiim ja mudel",
+      "completed_one": "Lõpetatud ({{count}})",
+      "completed_other": "Lõpetatud ({{count}})"
+    },
+    "item": {
+      "markDone": "Märgi tehtuks",
+      "markOpen": "Märgi tegemata",
+      "markDonePrompt": "Kas märkida tehtuks?",
+      "deleted": "Ülesanne kustutatud",
+      "undo": "Võta tagasi",
+      "runCount_one": "{{count}} käivitus",
+      "runCount_other": "{{count}} käivitus",
+      "startNow": "Käivita ilma ülevaatuseta",
+      "startNowHint": "Ülevaatuseta käivitamiseks vajuta pikalt",
+      "titleLabel": "Ülesande pealkiri",
+      "notes": "Märkmed",
+      "notesPlaceholder": "Lisa märkmed Markdownis",
+      "sessions": "Seotud seansid",
+      "noSessions": "Seansse veel pole",
+      "linkSession": "Seo seanss",
+      "unlinkSession": "Eemalda seos: {{title}}",
+      "linkFailed": "Seanssi ei õnnestunud ülesandega siduda"
+    },
+    "linkSession": {
+      "title": "Seansside linkimine",
+      "empty": "Hiljutisi seansse pole",
+      "emptyInRepository": "Hoidlas {{repository}} pole hiljutisi seansse"
+    },
+    "upNext": "Järgmisena",
+    "sessionTodo": "Ülesanne: {{title}}",
+    "linkToTodo": "Lingi ülesandega",
+    "candidates": {
+      "empty": "Avatud ülesandeid pole"
+    },
+    "saveSheet": {
+      "title": "Salvesta loendisse",
+      "saved": "Salvestatud loendisse {{list}}"
+    }
   }
 }

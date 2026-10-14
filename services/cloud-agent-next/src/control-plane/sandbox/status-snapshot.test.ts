@@ -23,7 +23,7 @@ describe('projectAllocationStatusSnapshot', () => {
   it.each([
     ['standard-3', 'containers-standard-3'],
     ['standard-4', 'containers-standard-4'],
-    [undefined, 'containers-standard-4'],
+    [undefined, 'containers-standard-3'],
     ['PRIVATE_SENTINEL', null],
   ] as const)(
     'reports bounded Containers runtime metadata for instance %s',

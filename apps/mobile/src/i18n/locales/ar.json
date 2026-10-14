@@ -136,7 +136,10 @@
     "working": "جارٍ العمل",
     "yourOwnRepositories": "مستودعاتك الخاصة",
     "dismissed": "مستبعدة",
-    "agent": "عامل"
+    "agent": "عامل",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "التغييرات"
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -320,7 +323,8 @@
       "kiloclaw": "نشاط KiloClaw",
       "balance": "تنبيهات الرصيد",
       "security": "ملاحظات الأمان",
-      "spend": "تنبيهات الإنفاق"
+      "spend": "تنبيهات الإنفاق",
+      "followedSessions": "الجلسات المتابَعة"
     },
     "category": {
       "chatMessagesSubtitle": "الردود في محادثاتك",
@@ -1048,7 +1052,7 @@
         "recoveryLabel": "تحديث تطبيق GitHub"
       },
       "githubIpAllowList": {
-        "description": "تم تعطيل مراجع الشفرة لأن قائمة عناوين IP المسموح بها في هذه المؤسسة على GitHub تمنع وصول Kilo. تواصل مع hi@kilocode.ai للمساعدة، ثم أعد تفعيل مراجع الشفرة."
+        "description": "تم تعطيل مراجع الشفرة لأن قائمة عناوين IP المسموح بها في هذه المؤسسة على GitHub تمنع وصول Kilo. تواصل مع hi@kilo.ai للمساعدة، ثم أعد تفعيل مراجع الشفرة."
       },
       "gitlabProjectAccessRequired": {
         "description": "تم تعطيل مراجع الشفرة لأن Kilo لا يستطيع إنشاء رمز وصول لهذا المشروع في GitLab. امنح صلاحيات المشرف أو فعّل رموز وصول المشاريع، ثم أعد تفعيل مراجع الشفرة.",
@@ -1063,7 +1067,7 @@
         "recoveryLabel": "تحديث إعدادات مراجع الشفرة"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "تم تعطيل مراجع الشفرة بعد انتهاء مهلة استنساخ المستودع ثلاث مرات اليوم. تواصل مع hi@kilocode.ai للمساعدة، ثم أعد تفعيل مراجع الشفرة."
+        "description": "تم تعطيل مراجع الشفرة بعد انتهاء مهلة استنساخ المستودع ثلاث مرات اليوم. تواصل مع hi@kilo.ai للمساعدة، ثم أعد تفعيل مراجع الشفرة."
       },
       "title": "يتطلب مراجع الشيفرة تدخلك.",
       "recoveryLabel": "التواصل مع الدعم"
@@ -1623,6 +1627,8 @@
       "title": "الجلسة",
       "copyErrorDetails": "نسخ تفاصيل الخطأ",
       "backToSessions": "العودة إلى الجلسات",
+      "follow": "المتابعة على شاشة القفل",
+      "unfollow": "إيقاف المتابعة على شاشة القفل",
       "couldNotLoad": "تعذّر تحميل الجلسة.",
       "failedToLoadDetails": "تعذّر تحميل تفاصيل الجلسة.",
       "failedToStopExecution": "تعذّر إيقاف التنفيذ.",
@@ -1726,7 +1732,6 @@
       "retryLoadingEnvironment": "إعادة محاولة تحميل البيئة",
       "defaultEnvironment": "البيئة الافتراضية",
       "environmentSummary": "الأوامر: {{commands}} · MCP: {{mcp}} · المهارات: {{skills}} · الوكلاء: {{agents}}",
-      "changes": "التغييرات",
       "leaveChanges": "إبقاء التغييرات",
       "commitAndPush": "إيداع ودفع",
       "startSession": "بدء الجلسة",
@@ -1801,8 +1806,8 @@
       "toolList": "عرض قائمة",
       "toolPatch": "تطبيق تصحيح",
       "toolTask": "المهمة",
-      "readTodos": "قراءة المهام",
-      "updateTodos": "تحديث المهام",
+      "readTodos": "قراءة الخطة",
+      "updateTodos": "تحديث الخطة",
       "linesBadge": "الأسطر: {{displayCount}}",
       "filesBadge": "الملفات: {{displayCount}}",
       "matchesBadge": "التطابقات: {{displayCount}}",
@@ -2228,6 +2233,12 @@
       "modelsCount_two": "نموذجان ({{displayCount}})",
       "modelsCount_few": "نماذج ({{displayCount}})",
       "modelsCount_many": "نموذجًا ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "عرض التغييرات",
+      "asOf": "حتى {{time}}",
+      "tooLarge": "الفروق كبيرة جدًا ولا يمكن عرضها على الهاتف.",
+      "empty": "لا توجد تغييرات على الملفات في هذه الجلسة بعد."
     },
     "autoApprove": {
       "title": "الموافقة التلقائية",
@@ -2756,6 +2767,7 @@
     "fileRows": {
       "collapseFile": "طي الملف",
       "diffTooLarge": "لا يمكن عرض الفروق لكبر حجمها.",
+      "noPreview": "لا تتوفر معاينة لهذا الملف",
       "expandFile": "توسيع الملف",
       "markViewed": "تحديد {{path}} كملف تم الاطلاع عليه",
       "openDiffOnGitHub": "فتح فروق هذا الملف على GitHub",
@@ -3327,6 +3339,8 @@
     "channelName": "الوكلاء النشطون",
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل.",
     "openSession": "افتح",
+    "finished": "انتهى",
+    "followFailed": "تعذّر عرض هذا الوكيل على شاشة القفل.",
     "approveFailed": "تعذّر الموافقة. اضغط على $t(common.approve) للمحاولة مرة أخرى.",
     "checked": "آخر تحقق",
     "lastKnown": "آخر حالة معروفة",
@@ -3335,7 +3349,26 @@
     "waitingForYou": "بانتظارك",
     "nextScheduled": "المواعيد المجدولة القادمة",
     "answerNeeded": "بانتظار إجابتك",
-    "waitingToRetry": "بانتظار إعادة المحاولة"
+    "waitingToRetry": "بانتظار إعادة المحاولة",
+    "step": {
+      "editing": "التحرير",
+      "reading": "القراءة",
+      "running": "التشغيل",
+      "searching": "بحث في الويب",
+      "thinking": "التفكير بعمق"
+    },
+    "planOf": "من",
+    "filesChanged": "ملفات متغيّرة",
+    "finishedIn": "اكتمل في",
+    "noActivityFor": "لا نشاط لمدة",
+    "prOpened": "تم فتح طلب سحب",
+    "permissionWants": "يريد التشغيل",
+    "failure": {
+      "provider": "توقف: خطأ في المزوِّد",
+      "tool": "توقف: خطأ في الأداة",
+      "cancelled": "توقف: أُلغي",
+      "other": "متوقف"
+    }
   },
   "transcriptionModel": {
     "title": "نموذج التفريغ الصوتي",
@@ -3371,10 +3404,27 @@
     "list": {
       "loadFailed": "تعذّر تحميل سجل المحادثة.",
       "new": "محادثة جديدة",
-      "openHint": "يفتح المحادثة. اضغط مطولاً للحذف.",
       "deleteTitle": "حذف هذه المحادثة؟"
     },
+    "rename": {
+      "title": "إعادة تسمية الدردشة",
+      "accessibility": "إعادة تسمية الدردشة: {{title}}",
+      "openHint": "يفتح المحادثة. اضغط مطولاً لإعادة التسمية أو الحذف."
+    },
     "beta": "بيتا",
+    "details": {
+      "title": "تفاصيل الدردشة",
+      "backend": "الخادم",
+      "effortDefault": "الإعداد الافتراضي للنموذج",
+      "noCost": "بلا تكلفة",
+      "costUnknown": "غير معروفة",
+      "costEstimatedNote": "قُدّرت تكلفة الإجابات التي لم تُبلغ عن سعر وفق أسعار القائمة.",
+      "costUnknownNote": "لا يُعرف سعر لهذا النموذج.",
+      "costPartialNote": "لا يشمل هذا الإجمالي النماذج التي ليس لها سعر معروف.",
+      "localNote": "تعمل النماذج على الجهاز على هذا الجهاز نفسه. ليست لها تكلفة ولا ذاكرة تخزين مؤقت للمطالبات، وقد تكون أعداد الرموز فيها تقديرية.",
+      "countedSinceNote": "بدأت هذه الدردشة قبل بدء تسجيل الاستخدام. تعرض الإجماليات الإجابات التي تلت ذلك فقط.",
+      "remoteServersOn": "خوادم MCP البعيدة المفعّلة"
+    },
     "webSearch": {
       "title": "البحث في الويب",
       "description": "اسمح لهذه الدردشة بالبحث عن معلومات حديثة عبر حسابك في Kilo. تستهلك عمليات البحث حصتك الشهرية من البحث.",
@@ -3587,6 +3637,9 @@
       "downloading": "جارٍ التنزيل…",
       "downloadProgress": "جارٍ التنزيل… {{percent}}%",
       "downloadFailed": "لم يكتمل التنزيل. تحقّق من اتصالك ومن توفر مساحة تخزين كافية، ثم حاول مرة أخرى."
+    },
+    "reasoningEffort": {
+      "modelFlag": "يدعم هذا النموذج جهد التفكير"
     }
   },
   "settingsTools": {
@@ -3809,5 +3862,94 @@
     "noMatchingProductsPlay": "لم يُرجِع Google Play أي حزم رصيد مطابقة.",
     "purchaseOwnedByAnotherAccount": "الرصيد على حساب Apple Account هذا يخص حساب Kilo آخر. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه.",
     "purchaseOwnedByAnotherAccountPlay": "الرصيد على حساب Google Play هذا يخص حساب Kilo مختلف. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه."
+  },
+  "todos": {
+    "saveAsTodo": "حفظ كمهمة",
+    "segment": {
+      "label": "عرض الوكلاء",
+      "sessions": "الجلسات",
+      "todos": "المهام"
+    },
+    "lists": {
+      "newList": "قائمة جديدة",
+      "empty": "لا توجد قوائم بعد",
+      "couldNotLoad": "تعذّر تحميل القوائم",
+      "noRepository": "بلا مستودع",
+      "rowA11y": "{{name}}، {{openCount}}",
+      "openCount_one": "{{count}} مفتوحة",
+      "openCount_other": "{{count}} مفتوحة",
+      "openCount_zero": "{{count}} مفتوحة",
+      "openCount_two": "{{count}} مفتوحتان",
+      "openCount_few": "{{count}} مفتوحة",
+      "openCount_many": "{{count}} مفتوحة",
+      "archived_one": "المؤرشفة ({{count}})",
+      "archived_other": "المؤرشفة ({{count}})",
+      "archived_zero": "المؤرشفة ({{count}})",
+      "archived_two": "المؤرشفة ({{count}})",
+      "archived_few": "المؤرشفة ({{count}})",
+      "archived_many": "المؤرشفة ({{count}})",
+      "archive": "أرشفة",
+      "unarchive": "إلغاء الأرشفة",
+      "deleteTitle": "حذف {{name}}؟",
+      "deleteMessage": "ستُحذف مهامها أيضًا. أما جلساتها فتبقى."
+    },
+    "listSettings": {
+      "title": "إعدادات القائمة",
+      "name": "الاسم",
+      "namePlaceholder": "أخطاء، أفكار، إصدار…",
+      "emoji": "الرموز التعبيرية",
+      "mode": "الوضع",
+      "defaultsHint": "الجلسات التي تبدأ من هذه القائمة تستخدم هذه الإعدادات الافتراضية."
+    },
+    "list": {
+      "addPlaceholder": "أضف مهمة",
+      "add": "إضافة مهمة",
+      "empty": "لا توجد مهام بعد",
+      "setDefaults": "تعيين المستودع والوضع والنموذج",
+      "completed_one": "المكتملة ({{count}})",
+      "completed_other": "المكتملة ({{count}})",
+      "completed_zero": "المكتملة ({{count}})",
+      "completed_two": "المكتملة ({{count}})",
+      "completed_few": "المكتملة ({{count}})",
+      "completed_many": "المكتملة ({{count}})"
+    },
+    "item": {
+      "markDone": "تحديد كمكتملة",
+      "markOpen": "تحديد كغير مكتملة",
+      "markDonePrompt": "تحديد كمكتملة؟",
+      "deleted": "تم حذف المهمة",
+      "undo": "تراجع",
+      "runCount_one": "{{count}} تشغيل",
+      "runCount_other": "{{count}} عمليات تشغيل",
+      "runCount_zero": "{{count}} تشغيل",
+      "runCount_two": "{{count}} تشغيلان",
+      "runCount_few": "{{count}} عمليات تشغيل",
+      "runCount_many": "{{count}} تشغيل",
+      "startNow": "بدء دون مراجعة",
+      "startNowHint": "اضغط مطولًا للبدء دون مراجعة",
+      "titleLabel": "عنوان المهمة",
+      "notes": "ملاحظات",
+      "notesPlaceholder": "أضف ملاحظات بصيغة Markdown",
+      "sessions": "الجلسات المرتبطة",
+      "noSessions": "لا توجد جلسات بعد",
+      "linkSession": "ربط جلسة",
+      "unlinkSession": "إلغاء ربط {{title}}",
+      "linkFailed": "تعذّر ربط الجلسة بالمهمة"
+    },
+    "linkSession": {
+      "title": "الربط بجلسة",
+      "empty": "لا توجد جلسات حديثة",
+      "emptyInRepository": "لا توجد جلسات حديثة في {{repository}}"
+    },
+    "upNext": "التالي",
+    "sessionTodo": "المهمة: {{title}}",
+    "linkToTodo": "ربط بمهمة",
+    "candidates": {
+      "empty": "لا توجد مهام مفتوحة"
+    },
+    "saveSheet": {
+      "title": "حفظ في قائمة",
+      "saved": "تم الحفظ في {{list}}"
+    }
   }
 }

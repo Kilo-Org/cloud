@@ -1,14 +1,16 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, Pressable, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { ChatComposer, type ChatComposerSendOptions } from '@/components/agents/chat-composer';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
+import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { EmptyState } from '@/components/empty-state';
@@ -20,7 +22,7 @@ import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useSessionModelOptions } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { useChat, useChatPlace } from '@/lib/chat/use-chat';
+import { useChat, useChatList, useChatPlace } from '@/lib/chat/use-chat';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
@@ -30,12 +32,14 @@ import { requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
 import { resolveChatTarget } from '@/lib/chat/backend-target';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
+import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
 
-import { BetaPill } from './beta-pill';
+import { ChatTitle } from './chat-title';
+import { ChatDetailsSheet } from './chat-details-sheet';
+import { useChatDetails } from './chat-details-state';
 import { ChatFailureRow } from './chat-failure-row';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
-import { ModelToolsHint } from './model-tools-hint';
 import { useChatMessageActions } from './use-chat-message-actions';
 import { useWebSearchSetting } from './web-search-row';
 
@@ -76,7 +80,11 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const { organizationId } = useOrganization();
   const place = useChatPlace();
   const { state, send, stop, retry } = useChat(place, opened);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const { chats, rename } = useChatList(place);
+  // A chat is listed once its session is written. Until then it has no row to name.
+  const summary = chats.find(chat => chat.sessionId === state.sessionId);
+  const title = summary === undefined || summary.title === '' ? t('common.chat') : summary.title;
+  const keyboardVisible = useKeyboardState(keyboard => keyboard.isVisible);
   // The sheet's whole model — the Kilo control, the settings-tools group switch
   // and the remote servers — is read here. The header draws its dot from the
   // Kilo view, so the control and the sheet cannot disagree.
@@ -105,10 +113,20 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
 
   // The model the next message goes to. It starts as the one the conversation
   // is on and changes the moment the person picks another, which is what makes
-  // the switch apply to the next message and not to what was already said.
+  // the switch apply to the next message and not to what was already said. The
+  // effort works the same way: a reopened chat shows the one it was opened with.
   const [picked, setPicked] = useState<string | null>(null);
-  const [variant, setVariant] = useState('');
+  const [pickedVariant, setPickedVariant] = useState<string | null>(null);
   const model = picked ?? state.model;
+  const pickedOption = availableOptions.find(option => option.id === model);
+  const choices: EffortChoices = {
+    variants: pickedOption?.variants ?? [],
+    efforts: models.find(option => option.id === model)?.variantEfforts,
+  };
+  const variant = pickedVariant ?? variantOfEffort(choices, state.effort);
+  // Until the list loads, the chat keeps the effort it was opened with rather
+  // than dropping it for a model the screen cannot see yet.
+  const effort = pickedOption === undefined ? state.effort : effortOfVariant(choices, variant);
   const webSearch = useWebSearchSetting(state.sessionId, model);
   const imagesSupported = useTargetSupportsImages(model);
 
@@ -121,7 +139,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const selectModel = (modelId: string, variantId: string) => {
     const accept = () => {
       setPicked(modelId);
-      setVariant(variantId);
+      setPickedVariant(variantId);
     };
     if (!requiresBackendDisclosure(model, modelId)) {
       accept();
@@ -146,22 +164,17 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     );
   };
 
-  useEffect(() => {
-    const shown = Keyboard.addListener('keyboardDidShow', () => {
-      setKeyboardVisible(true);
-    });
-    const hidden = Keyboard.addListener('keyboardDidHide', () => {
-      setKeyboardVisible(false);
-    });
-    return () => {
-      shown.remove();
-      hidden.remove();
-    };
-  }, []);
-
   const messages = asMessages(state);
   const actions = useChatMessageActions(state, messages, retry);
   const { actionsFor } = actions;
+  const details = useChatDetails({
+    model: state.model === '' ? model : state.model,
+    record: state.record,
+    modelOptions: availableOptions,
+    backends,
+    mcp,
+    hasMessages: messages.length > 0,
+  });
 
   const renderItem: ListRenderItem<StoredMessage> = useCallback(
     ({ item }) => <MessageBubble message={item} {...actionsFor(item)} />,
@@ -186,9 +199,9 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       // The question is on screen the moment it is asked, so the composer
       // empties now rather than when the answer lands.
       options?.onOptimisticSend?.();
-      void send(text, model, options?.images ?? []);
+      void send(text, { model, effort }, options?.images ?? []);
     },
-    [backends, model, send, t]
+    [backends, effort, model, send, t]
   );
 
   const handleStop = useCallback(() => {
@@ -226,18 +239,21 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         />
       );
     }
+    // The host lets a folded thinking row open its text in the part sheet.
     return (
-      <SessionMessageList<StoredMessage>
-        sessionId={state.sessionId}
-        items={messages}
-        keyExtractor={message => message.info.id}
-        hasOlderMessages={false}
-        isLoadingOlderMessages={false}
-        olderMessagesError={null}
-        olderMessagesOmittedItemCount={0}
-        onLoadOlderMessages={() => undefined}
-        renderItem={renderItem}
-      />
+      <PartDetailSheetHost messages={messages}>
+        <SessionMessageList<StoredMessage>
+          sessionId={state.sessionId}
+          items={messages}
+          keyExtractor={message => message.info.id}
+          hasOlderMessages={false}
+          isLoadingOlderMessages={false}
+          olderMessagesError={null}
+          olderMessagesOmittedItemCount={0}
+          onLoadOlderMessages={() => undefined}
+          renderItem={renderItem}
+        />
+      </PartDetailSheetHost>
     );
   }
 
@@ -263,8 +279,8 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         ) : null}
 
         <View style={composerPadding}>
-          <ModelToolsHint model={model} backends={backends} localModels={localModels} />
           <ChatComposer
+            toolbarClassName="pb-1"
             controlRef={actions.composerControlRef}
             onSend={handleSend}
             onSendCommand={noSessionCommand}
@@ -292,17 +308,20 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('common.chat')}
+        title={title}
         titleContent={
-          <View className="flex-row items-center gap-2">
-            <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
-              {t('common.chat')}
-            </Text>
-            <BetaPill />
-          </View>
+          <ChatTitle
+            title={title}
+            initialValue={summary?.title ?? ''}
+            canRename={summary !== undefined}
+            onRename={async name => {
+              await rename(state.sessionId, name);
+            }}
+          />
         }
         headerRight={
-          <View className="flex-row">
+          <View className="flex-row items-center">
+            <SessionContextMetrics {...details.metrics} />
             <BackendSettingsControl />
             <Pressable
               onPress={() => {
@@ -331,6 +350,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         webSearch={webSearch}
       />
       <MessageDetailsSheet {...actions.details} modelOptions={modelOptions.options} />
+      <ChatDetailsSheet {...details.sheet} />
     </View>
   );
 }

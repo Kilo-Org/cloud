@@ -136,7 +136,10 @@
     "working": "В работе",
     "yourOwnRepositories": "Личные репозитории",
     "dismissed": "Отклонено",
-    "agent": "Агент"
+    "agent": "Агент",
+    "durationMinuteShort": "мин",
+    "durationHourShort": "ч",
+    "changes": "Изменения"
   },
   "language": {
     "restarting": "Перезапуск для смены языка",
@@ -320,7 +323,8 @@
       "kiloclaw": "Активность KiloClaw",
       "balance": "Оповещения о балансе",
       "security": "Замечания по безопасности",
-      "spend": "Оповещения о расходах"
+      "spend": "Оповещения о расходах",
+      "followedSessions": "Отслеживаемые сеансы"
     },
     "category": {
       "chatMessagesSubtitle": "ответы в вашей переписке",
@@ -1042,7 +1046,7 @@
         "recoveryLabel": "Обновить приложение GitHub"
       },
       "githubIpAllowList": {
-        "description": "Проверка кода отключена: список разрешённых IP-адресов этой организации GitHub блокирует Kilo. Обратитесь за помощью по адресу hi@kilocode.ai, затем снова включите проверку кода."
+        "description": "Проверка кода отключена: список разрешённых IP-адресов этой организации GitHub блокирует Kilo. Обратитесь за помощью по адресу hi@kilo.ai, затем снова включите проверку кода."
       },
       "gitlabProjectAccessRequired": {
         "description": "Проверка кода отключена: Kilo не может создать токен доступа к этому проекту GitLab. Предоставьте права сопровождающего или разрешите токены доступа к проектам, затем снова включите проверку кода.",
@@ -1057,7 +1061,7 @@
         "recoveryLabel": "Обновить настройки проверки кода"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Проверка кода отключена: сегодня три попытки клонирования репозитория превысили время ожидания. Обратитесь за помощью по адресу hi@kilocode.ai, затем снова включите проверку кода."
+        "description": "Проверка кода отключена: сегодня три попытки клонирования репозитория превысили время ожидания. Обратитесь за помощью по адресу hi@kilo.ai, затем снова включите проверку кода."
       },
       "title": "Для проверки кода нужно ваше участие.",
       "recoveryLabel": "Связаться с поддержкой"
@@ -1599,6 +1603,8 @@
       "title": "Сеанс",
       "copyErrorDetails": "Копировать сведения об ошибке",
       "backToSessions": "К сеансам",
+      "follow": "Следить на экране блокировки",
+      "unfollow": "Не следить на экране блокировки",
       "couldNotLoad": "Не удалось загрузить сеанс.",
       "failedToLoadDetails": "Не удалось загрузить сведения о сеансе.",
       "failedToStopExecution": "Не удалось остановить выполнение.",
@@ -1702,7 +1708,6 @@
       "retryLoadingEnvironment": "Повторить загрузку окружения",
       "defaultEnvironment": "Окружение по умолчанию",
       "environmentSummary": "команд: {{commands}} · MCP: {{mcp}} · навыков: {{skills}} · агентов: {{agents}}",
-      "changes": "Изменения",
       "leaveChanges": "Оставить изменения",
       "commitAndPush": "Закоммитить и отправить",
       "startSession": "Начать сеанс",
@@ -1775,8 +1780,8 @@
       "toolList": "список файлов",
       "toolPatch": "применение изменений",
       "toolTask": "задача",
-      "readTodos": "Чтение списка задач",
-      "updateTodos": "Обновление списка задач",
+      "readTodos": "Чтение плана",
+      "updateTodos": "Обновление плана",
       "linesBadge": "{{displayCount}} стр.",
       "filesBadge": "файлов: {{displayCount}}",
       "matchesBadge": "совпадений: {{displayCount}}",
@@ -2184,6 +2189,12 @@
       "modelsCount_other": "Модели ({{displayCount}})",
       "modelsCount_few": "Модели ({{displayCount}})",
       "modelsCount_many": "Модели ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Просмотреть изменения",
+      "asOf": "По состоянию на {{time}}",
+      "tooLarge": "Изменений слишком много для отображения на мобильном устройстве.",
+      "empty": "В этом сеансе файлы пока не изменялись."
     },
     "autoApprove": {
       "title": "Автоодобрение",
@@ -2700,6 +2711,7 @@
     "fileRows": {
       "collapseFile": "Свернуть файл",
       "diffTooLarge": "Изменений слишком много для отображения.",
+      "noPreview": "Предпросмотр этого файла недоступен",
       "expandFile": "Развернуть файл",
       "markViewed": "Отметить файл {{path}} как просмотренный",
       "openDiffOnGitHub": "Открыть изменения этого файла на GitHub",
@@ -3245,6 +3257,8 @@
     "channelName": "Активные агенты",
     "activityKitDisabledBody": "Включите «Эфир активности» в настройках, чтобы видеть активных агентов на экране блокировки.",
     "openSession": "Открыть",
+    "finished": "Завершено",
+    "followFailed": "Не удалось показать этого агента на экране блокировки.",
     "approveFailed": "Не удалось одобрить. Нажмите $t(common.approve), чтобы повторить.",
     "checked": "Проверено",
     "lastKnown": "Последний известный статус",
@@ -3253,7 +3267,26 @@
     "waitingForYou": "Ожидание ваших действий",
     "nextScheduled": "Далее по расписанию",
     "answerNeeded": "Требуется ответ",
-    "waitingToRetry": "Ожидание повтора"
+    "waitingToRetry": "Ожидание повтора",
+    "step": {
+      "editing": "Редактирование",
+      "reading": "Чтение",
+      "running": "Запуск",
+      "searching": "Веб-поиск",
+      "thinking": "Обдумывание"
+    },
+    "planOf": "из",
+    "filesChanged": "файлов изменено",
+    "finishedIn": "Завершено за",
+    "noActivityFor": "Нет активности уже",
+    "prOpened": "Pull request открыт",
+    "permissionWants": "Хочет запустить",
+    "failure": {
+      "provider": "Остановлено: ошибка провайдера",
+      "tool": "Остановлено: ошибка инструмента",
+      "cancelled": "Остановлено: отменено",
+      "other": "ОСТАНОВЛЕН"
+    }
   },
   "transcriptionModel": {
     "title": "Модель распознавания речи",
@@ -3289,10 +3322,27 @@
     "list": {
       "loadFailed": "Не удалось загрузить историю чата.",
       "new": "Новый чат",
-      "openHint": "Открывает чат. Удерживайте, чтобы удалить.",
       "deleteTitle": "Удалить этот чат?"
     },
+    "rename": {
+      "title": "Переименовать чат",
+      "accessibility": "Переименовать чат: {{title}}",
+      "openHint": "Открывает чат. Удерживайте, чтобы переименовать или удалить."
+    },
     "beta": "Бета",
+    "details": {
+      "title": "Сведения о чате",
+      "backend": "Сервер",
+      "effortDefault": "По умолчанию для модели",
+      "noCost": "Бесплатно",
+      "costUnknown": "Неизвестно",
+      "costEstimatedNote": "Стоимость ответов, для которых цена не была указана, рассчитана по прейскурантным ценам.",
+      "costUnknownNote": "Цена этой модели неизвестна.",
+      "costPartialNote": "В эту сумму не входят модели с неизвестной ценой.",
+      "localNote": "Модели на устройстве работают на этом устройстве. Они бесплатны, не используют кэш запросов, а число токенов для них может быть приблизительным.",
+      "countedSinceNote": "Этот чат начался до того, как начался учёт использования. В итогах учтены только последующие ответы.",
+      "remoteServersOn": "Включённые удалённые серверы MCP"
+    },
     "webSearch": {
       "title": "Искать в интернете",
       "description": "Разрешите этому чату искать актуальную информацию через ваш аккаунт Kilo. Поиски расходуют ваш ежемесячный лимит поиска.",
@@ -3505,6 +3555,9 @@
       "downloading": "Загрузка…",
       "downloadProgress": "Загрузка… {{percent}}%",
       "downloadFailed": "Загрузка не завершилась. Проверьте подключение и свободное место, затем повторите попытку."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Эта модель поддерживает уровень рассуждений"
     }
   },
   "settingsTools": {
@@ -3727,5 +3780,86 @@
     "noMatchingProductsPlay": "Google Play не вернул подходящие пакеты кредитов.",
     "purchaseOwnedByAnotherAccount": "Кредиты в этом Apple Account связаны с другим аккаунтом Kilo. Войдите в тот аккаунт Kilo, чтобы их использовать.",
     "purchaseOwnedByAnotherAccountPlay": "Кредиты на этом Google Play аккаунте принадлежат другому аккаунту Kilo. Войдите в тот аккаунт Kilo, чтобы их использовать."
+  },
+  "todos": {
+    "saveAsTodo": "Сохранить как задачу",
+    "segment": {
+      "label": "Просмотр агентов",
+      "sessions": "Сеансы",
+      "todos": "Задачи"
+    },
+    "lists": {
+      "newList": "Новый список",
+      "empty": "Списков пока нет",
+      "couldNotLoad": "Не удалось загрузить списки",
+      "noRepository": "Нет репозитория",
+      "rowA11y": "{{name}} — {{openCount}}",
+      "openCount_one": "{{count}} открытая",
+      "openCount_few": "{{count}} открытые",
+      "openCount_many": "{{count}} открытых",
+      "openCount_other": "{{count}} открытая",
+      "archived_one": "В архиве ({{count}})",
+      "archived_few": "В архиве ({{count}})",
+      "archived_many": "В архиве ({{count}})",
+      "archived_other": "В архиве ({{count}})",
+      "archive": "Архивировать",
+      "unarchive": "Разархивировать",
+      "deleteTitle": "Удалить {{name}}?",
+      "deleteMessage": "Его задачи тоже удаляются. Сеансы остаются."
+    },
+    "listSettings": {
+      "title": "Настройки списка",
+      "name": "Название",
+      "namePlaceholder": "Баги, идеи, релиз…",
+      "emoji": "Эмодзи",
+      "mode": "Режим",
+      "defaultsHint": "Сеансы, запущенные из этого списка, используют эти значения по умолчанию."
+    },
+    "list": {
+      "addPlaceholder": "Добавить задачу",
+      "add": "Добавить",
+      "empty": "Задач пока нет",
+      "setDefaults": "Задать репозиторий, режим и модель",
+      "completed_one": "Выполнено ({{count}})",
+      "completed_few": "Выполнено ({{count}})",
+      "completed_many": "Выполнено ({{count}})",
+      "completed_other": "Выполнено ({{count}})"
+    },
+    "item": {
+      "markDone": "Отметить выполненной",
+      "markOpen": "Отметить невыполненной",
+      "markDonePrompt": "Отметить выполненной?",
+      "deleted": "Задача удалена",
+      "undo": "Отменить",
+      "runCount_one": "{{count}} запуск",
+      "runCount_few": "{{count}} запуска",
+      "runCount_many": "{{count}} запусков",
+      "runCount_other": "{{count}} запуска",
+      "startNow": "Запустить без проверки",
+      "startNowHint": "Долгое нажатие — запуск без проверки",
+      "titleLabel": "Название задачи",
+      "notes": "Заметки",
+      "notesPlaceholder": "Добавить заметки в Markdown",
+      "sessions": "Связанные сеансы",
+      "noSessions": "Сеансов пока нет",
+      "linkSession": "Привязать сеанс",
+      "unlinkSession": "Отвязать {{title}}",
+      "linkFailed": "Не удалось привязать сеанс к задаче"
+    },
+    "linkSession": {
+      "title": "Связать сеанс",
+      "empty": "Нет недавних сеансов",
+      "emptyInRepository": "Нет недавних сеансов в {{repository}}"
+    },
+    "upNext": "Далее",
+    "sessionTodo": "Задача: {{title}}",
+    "linkToTodo": "Привязать к задаче",
+    "candidates": {
+      "empty": "Нет открытых задач"
+    },
+    "saveSheet": {
+      "title": "Сохранить в список",
+      "saved": "Сохранено в {{list}}"
+    }
   }
 }

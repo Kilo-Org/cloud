@@ -1,6 +1,6 @@
 import type { StoredSession } from './types';
 
-type PreviewSessionInput = {
+export type PreviewSessionInput = {
   selectedWorktreeId: string | null | undefined;
   /** The viewed session's route readiness; `undefined` when it is not known. */
   routeReady: boolean | undefined;
@@ -46,4 +46,15 @@ export function canOpenWorkspacePreview(
   sessionId: string | null | undefined
 ): sessionId is `workspace_${string}` {
   return sessionId?.startsWith('workspace_') === true;
+}
+
+/**
+ * One gate for the preview button and the chat's preview links: the viewer may
+ * open a terminal, and the action session is a control-plane session.
+ */
+export function gatePreviewSessionId(
+  actionSessionId: string | null,
+  canOpenTerminal: boolean
+): `workspace_${string}` | null {
+  return canOpenTerminal && canOpenWorkspacePreview(actionSessionId) ? actionSessionId : null;
 }

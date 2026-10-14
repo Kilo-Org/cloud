@@ -1,4 +1,8 @@
-import { canOpenWorkspacePreview, selectPreviewSessionId } from './select-preview-session';
+import {
+  canOpenWorkspacePreview,
+  gatePreviewSessionId,
+  selectPreviewSessionId,
+} from './select-preview-session';
 import type { StoredSession } from './types';
 
 function makeChat(sessionId: string, cloudAgentSessionId?: string | null): StoredSession {
@@ -101,5 +105,20 @@ describe('canOpenWorkspacePreview', () => {
     expect(canOpenWorkspacePreview('ses_12345678901234567890123456')).toBe(false);
     expect(canOpenWorkspacePreview(null)).toBe(false);
     expect(canOpenWorkspacePreview(undefined)).toBe(false);
+  });
+});
+
+describe('gatePreviewSessionId', () => {
+  it('passes a workspace session when the viewer may open a terminal', () => {
+    expect(gatePreviewSessionId('workspace_1', true)).toBe('workspace_1');
+  });
+
+  it('refuses a workspace session when the viewer may not open a terminal', () => {
+    expect(gatePreviewSessionId('workspace_1', false)).toBeNull();
+  });
+
+  it('refuses a legacy agent session and no session', () => {
+    expect(gatePreviewSessionId('agent_1', true)).toBeNull();
+    expect(gatePreviewSessionId(null, true)).toBeNull();
   });
 });

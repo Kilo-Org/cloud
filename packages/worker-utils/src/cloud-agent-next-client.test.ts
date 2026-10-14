@@ -25,26 +25,29 @@ afterEach(() => {
 });
 
 describe('CloudAgentNextFetchClient prepareSession', () => {
-  it.each([[], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
-    'posts an API-only egress policy unchanged: %j',
-    async ({ egressAllowlist }) => {
-      const fetchMock = mockFetch(200, {
-        result: { data: { cloudAgentSessionId: 'workspace_test', kiloSessionId: 'ses_test' } },
-      });
-      vi.stubGlobal('fetch', fetchMock);
-      const input: CloudAgentPrepareSessionInput = {
-        prompt: 'hello',
-        mode: 'code',
-        model: 'test-model',
-        egressAllowlist,
-      };
-      await createCloudAgentNextFetchClient(BASE_URL).prepareSession({}, input);
-      expect(fetchMock).toHaveBeenCalledWith(
-        `${BASE_URL}/trpc/prepareSession`,
-        expect.objectContaining({ body: JSON.stringify(input) })
-      );
-    }
-  );
+  it.each([
+    {},
+    { egressMode: 'allow-all' as const },
+    { egressMode: 'deny-by-default' as const },
+    { egressMode: 'deny-by-default' as const, egressAllowlist: [] },
+    { egressMode: 'deny-by-default' as const, egressAllowlist: ['example.com'] },
+  ])('posts an API-only egress policy unchanged: %j', async policy => {
+    const fetchMock = mockFetch(200, {
+      result: { data: { cloudAgentSessionId: 'workspace_test', kiloSessionId: 'ses_test' } },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const input: CloudAgentPrepareSessionInput = {
+      prompt: 'hello',
+      mode: 'code',
+      model: 'test-model',
+      ...policy,
+    };
+    await createCloudAgentNextFetchClient(BASE_URL).prepareSession({}, input);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${BASE_URL}/trpc/prepareSession`,
+      expect.objectContaining({ body: JSON.stringify(input) })
+    );
+  });
   it('posts the complete managed Bitbucket code-review context', async () => {
     const fetchMock = mockFetch(200, {
       result: {

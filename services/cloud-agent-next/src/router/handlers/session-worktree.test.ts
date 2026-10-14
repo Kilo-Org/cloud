@@ -594,11 +594,15 @@ describe('createWorktreeChat request validation and authorization', () => {
 });
 
 describe('createWorktreeChat sandbox preset inheritance', () => {
-  it.each([[], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+  it.each([undefined, [], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
     'inherits the native allocation policy %j',
     async ({ egressAllowlist }) => {
       const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
-      metadata.workspace = { ...metadata.workspace, egressAllowlist };
+      metadata.workspace = {
+        ...metadata.workspace,
+        egressMode: 'deny-by-default',
+        egressAllowlist,
+      };
       const { caller, input, destinationStub } = fixture({
         metadata,
         organizationId: ORGANIZATION_ID,
@@ -607,17 +611,23 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
       expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: expect.objectContaining({
-            workspace: expect.objectContaining({ egressAllowlist }),
+            workspace: expect.objectContaining({ egressMode: 'deny-by-default', egressAllowlist }),
           }),
-          sandboxSelection: expect.objectContaining({ egressAllowlist }),
+          sandboxSelection: expect.objectContaining({ egressMode: 'deny-by-default' }),
         })
       );
+      const registered = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
+      expect(registered?.sandboxSelection.egressAllowlist).toEqual(egressAllowlist);
     }
   );
 
   it('rejects a changed inherited policy on same-key replay', async () => {
     const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
-    metadata.workspace = { ...metadata.workspace, egressAllowlist: [] };
+    metadata.workspace = {
+      ...metadata.workspace,
+      egressMode: 'deny-by-default',
+      egressAllowlist: [],
+    };
     const source = ownershipRow({ organizationId: ORGANIZATION_ID });
     const { caller, input, destinationStub } = fixture({
       metadata,

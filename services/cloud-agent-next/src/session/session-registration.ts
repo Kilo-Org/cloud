@@ -123,7 +123,7 @@ import {
   withSavedSandboxAllocation,
 } from './sandbox-allocation-resolution.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
-import { egressAllowlistSchema } from '@kilocode/worker-utils/egress-allowlist';
+import { egressAllowlistSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 
 export type SessionRegistrationInput = SessionCreateRequest;
 
@@ -162,11 +162,8 @@ function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
   options?: { billingOrigin?: string }
 ): void {
-  if (
-    input.runtime?.egressAllowlist !== undefined &&
-    !egressAllowlistSchema.safeParse(input.runtime.egressAllowlist).success
-  ) {
-    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid egress allowlist' });
+  if (!egressPolicySchema.safeParse(input.runtime ?? {}).success) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid egress policy' });
   }
   if (input.runtime && 'devcontainer' in input.runtime && input.runtime.devcontainer === true) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: DEVCONTAINER_RETIRED_MESSAGE });
@@ -187,14 +184,14 @@ function assertSupportedSandboxAllocation(
   }
 }
 
-function assertEgressAllowlistAllocation(
+function assertEgressPolicyAllocation(
   input: SessionRegistrationInput,
   allocation: Pick<
     SessionRegistrationResult,
     'cloudAgentSessionId' | 'sandboxProvider' | 'sandboxRoute' | 'sandboxKind'
   >
 ): void {
-  if (input.runtime?.egressAllowlist === undefined) return;
+  if (input.runtime?.egressMode !== 'deny-by-default') return;
   if (
     !allocation.cloudAgentSessionId.startsWith('workspace_') ||
     allocation.sandboxProvider !== 'cloudflare-containers' ||
@@ -203,7 +200,8 @@ function assertEgressAllowlistAllocation(
   ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
-      message: 'Egress allowlists require an isolated control-plane Cloudflare containers sandbox',
+      message:
+        'Deny-by-default egress requires an isolated control-plane Cloudflare containers sandbox',
     });
   }
 }
@@ -835,7 +833,7 @@ async function allocateNewSession(
   }
 
   try {
-    assertEgressAllowlistAllocation(input, { cloudAgentSessionId, sandboxProvider, sandboxRoute });
+    assertEgressPolicyAllocation(input, { cloudAgentSessionId, sandboxProvider, sandboxRoute });
   } catch (error) {
     rethrowAllocationFailure(ledger, 'sandbox', error);
   }
@@ -1105,7 +1103,7 @@ function rebuildRecordedSessionAllocation(
     initialTurn = { ...accepted, messageId: initialMessageId };
   }
 
-  assertEgressAllowlistAllocation(input, {
+  assertEgressPolicyAllocation(input, {
     cloudAgentSessionId,
     sandboxProvider: recordedProvider.data,
     sandboxRoute: route,
@@ -1203,9 +1201,10 @@ function buildSessionRegistrationCommand(
     workspace: {
       sandboxId: allocation.sandboxId,
       sandboxProvider: allocation.sandboxProvider,
-      ...(input.runtime?.egressAllowlist === undefined
-        ? {}
-        : { egressAllowlist: input.runtime.egressAllowlist }),
+      ...(input.runtime?.egressMode === undefined ? {} : { egressMode: input.runtime.egressMode }),
+      ...(input.runtime?.egressMode === 'deny-by-default'
+        ? { egressAllowlist: egressAllowlistSchema.parse(input.runtime.egressAllowlist ?? []) }
+        : {}),
       ...(allocation.sandboxAllocation ? { sandboxAllocation: allocation.sandboxAllocation } : {}),
       shallow: input.options?.shallow,
       ...(allocation.worktreeId
@@ -1789,16 +1788,22 @@ export async function sessionCreateIntentFingerprint(
       },
       repository: repositoryCreateIntent(input.repository),
       finalization: input.finalization,
-      runtime: input.runtime
-        ? {
-            ...(input.runtime.sandboxAllocation
-              ? { sandboxAllocation: input.runtime.sandboxAllocation }
-              : {}),
-            ...(input.runtime.egressAllowlist === undefined
-              ? {}
-              : { egressAllowlist: egressAllowlistSchema.parse(input.runtime.egressAllowlist) }),
-          }
-        : undefined,
+      runtime:
+        input.runtime?.sandboxAllocation || input.runtime?.egressMode === 'deny-by-default'
+          ? {
+              ...(input.runtime.sandboxAllocation
+                ? { sandboxAllocation: input.runtime.sandboxAllocation }
+                : {}),
+              ...(input.runtime.egressMode === 'deny-by-default'
+                ? {
+                    egressMode: input.runtime.egressMode,
+                    egressAllowlist: egressAllowlistSchema.parse(
+                      input.runtime.egressAllowlist ?? []
+                    ),
+                  }
+                : {}),
+            }
+          : undefined,
       options: input.options
         ? {
             kilocodeOrganizationId: input.options.kilocodeOrganizationId || undefined,
@@ -1841,7 +1846,7 @@ async function assertCreateIntentUnchanged(
   if (
     !recorded.success ||
     !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement) ||
-    ((selectable !== undefined || input.runtime?.egressAllowlist !== undefined) &&
+    ((selectable !== undefined || input.runtime?.egressMode === 'deny-by-default') &&
       (typeof stored !== 'string' || stored.length === 0))
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
@@ -2348,12 +2353,10 @@ async function readSessionMetadata(
   }
   if (
     metadata !== null &&
-    JSON.stringify(metadata.workspace?.egressAllowlist) !==
-      JSON.stringify(
-        input.runtime?.egressAllowlist === undefined
-          ? undefined
-          : egressAllowlistSchema.parse(input.runtime.egressAllowlist)
-      )
+    ((metadata.workspace?.egressMode ?? 'allow-all') !==
+      (input.runtime?.egressMode ?? 'allow-all') ||
+      JSON.stringify(metadata.workspace?.egressAllowlist ?? []) !==
+        JSON.stringify(egressAllowlistSchema.parse(input.runtime?.egressAllowlist ?? [])))
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
   }

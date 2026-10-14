@@ -59,26 +59,81 @@ describe('grouped unified session input contracts', () => {
   )('normalizes grouped and legacy egress allowlists: %j', ({ egressAllowlist }) => {
     const expected = egressAllowlist.length === 0 ? [] : ['example.com', 'z.example.com'];
     expect(
-      StartSessionInput.parse({ ...baseStartInput, runtime: { egressAllowlist } }).runtime
-    ).toEqual({ egressAllowlist: expected });
+      StartSessionInput.parse({
+        ...baseStartInput,
+        runtime: { egressMode: 'deny-by-default', egressAllowlist },
+      }).runtime
+    ).toEqual({ egressMode: 'deny-by-default', egressAllowlist: expected });
     expect(
       PrepareSessionInput.parse({
         ...basePromptInput,
         githubRepo: 'acme/repo',
+        egressMode: 'deny-by-default',
         egressAllowlist,
       }).egressAllowlist
     ).toEqual(expected);
   });
 
+  it.each([{}, { egressMode: 'allow-all' }, { egressMode: 'deny-by-default' }])(
+    'preserves omitted lists and explicit modes at both boundaries: %j',
+    policy => {
+      expect(StartSessionInput.parse({ ...baseStartInput, runtime: policy }).runtime).toEqual(
+        policy
+      );
+      const parsed = PrepareSessionInput.parse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        ...policy,
+      });
+      expect(parsed.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+      expect(parsed.egressAllowlist).toBeUndefined();
+      expect(StartSessionInput.parse(baseStartInput).runtime).toBeUndefined();
+    }
+  );
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['example.com'] },
+    { egressMode: 'allow-all', egressAllowlist: [] },
+    { egressMode: 'allow-all', egressAllowlist: ['example.com'] },
+    { egressMode: 'deny-all' },
+    { egressMode: null },
+  ])('rejects ambiguous or unsupported egress policies: %j', policy => {
+    const grouped = StartSessionInput.safeParse({ ...baseStartInput, runtime: policy });
+    const legacy = PrepareSessionInput.safeParse({
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      ...policy,
+    });
+    expect(grouped.success).toBe(false);
+    expect(legacy.success).toBe(false);
+    if ('egressAllowlist' in policy) {
+      if (!grouped.success) {
+        expect(grouped.error.issues).toContainEqual(
+          expect.objectContaining({ path: ['runtime', 'egressAllowlist'] })
+        );
+      }
+      if (!legacy.success) {
+        expect(legacy.error.issues).toContainEqual(
+          expect.objectContaining({ path: ['egressAllowlist'] })
+        );
+      }
+    }
+  });
+
   it('rejects invalid egress policies at both public boundaries', () => {
     for (const egressAllowlist of [null, ['*'], ['127.1'], ['https://example.com']]) {
       expect(
-        StartSessionInput.safeParse({ ...baseStartInput, runtime: { egressAllowlist } }).success
+        StartSessionInput.safeParse({
+          ...baseStartInput,
+          runtime: { egressMode: 'deny-by-default', egressAllowlist },
+        }).success
       ).toBe(false);
       expect(
         PrepareSessionInput.safeParse({
           ...basePromptInput,
           githubRepo: 'acme/repo',
+          egressMode: 'deny-by-default',
           egressAllowlist,
         }).success
       ).toBe(false);
@@ -579,6 +634,21 @@ describe('prepareSession clone-only variant', () => {
     autoInitiate: true,
     operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
   };
+
+  it('enforces explicit egress mode on clone-only inputs', () => {
+    const input = { ...baseCloneInput, cloneFromKiloSessionId: validKiloSessionId };
+    const parsed = PrepareSessionInput.parse({ ...input, egressMode: 'deny-by-default' });
+    expect(parsed.egressMode).toBe('deny-by-default');
+    expect(parsed.egressAllowlist).toBeUndefined();
+    expect(PrepareSessionInput.safeParse({ ...input, egressAllowlist: [] }).success).toBe(false);
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        egressMode: 'allow-all',
+        egressAllowlist: [],
+      }).success
+    ).toBe(false);
+  });
 
   it('accepts a clone-only prepare without a prompt', () => {
     expect(

@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { egressAllowlistSchema } from '@kilocode/worker-utils/egress-allowlist';
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
@@ -290,14 +290,13 @@ function isIsolatedProviderWorkspace(workspace: {
     : workspace.sandboxId?.startsWith('ses-') === true;
 }
 
-const MetadataWorkspaceSchema = z
-  .object({
+const MetadataWorkspaceSchema = egressPolicySchema
+  .safeExtend({
     sandboxId: SandboxIdSchema.optional(),
     sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
     sandboxKind: sandboxKindSchema.optional(),
     sandboxProvider: SandboxProviderSchema.optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
-    egressAllowlist: egressAllowlistSchema.optional(),
     providerRuntime: ProviderRuntimeSchema.optional(),
     worktreeId: cloudAgentWorktreeIdSchema.optional(),
     workspacePath: z.string().optional(),
@@ -368,11 +367,11 @@ const MetadataWorkspaceSchema = z
   })
   .refine(
     workspace =>
-      workspace.egressAllowlist === undefined ||
+      workspace.egressMode !== 'deny-by-default' ||
       (workspace.sandboxProvider === 'cloudflare-containers' &&
         isIsolatedProviderWorkspace(workspace) &&
         workspace.sandboxRoute === undefined),
-    'Egress allowlists require an isolated Cloudflare containers sandbox'
+    'deny-by-default egress requires an isolated Cloudflare containers sandbox'
   )
   .refine(
     workspace => workspace.sandboxProvider !== 'vercel' || isIsolatedProviderWorkspace(workspace),

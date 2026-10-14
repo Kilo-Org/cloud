@@ -43,11 +43,15 @@ describe('buildControlPlanePromptPayload', () => {
 });
 
 describe('buildControlPlaneCreateInput', () => {
-  it.each(
-    [undefined, [], ['Z.Example.COM.', 'example.com']].map(egressAllowlist => ({ egressAllowlist }))
-  )(
+  it.each([
+    { egressMode: undefined, egressAllowlist: undefined },
+    { egressMode: 'allow-all' as const, egressAllowlist: undefined },
+    { egressMode: 'deny-by-default' as const, egressAllowlist: undefined },
+    { egressMode: 'deny-by-default' as const, egressAllowlist: [] },
+    { egressMode: 'deny-by-default' as const, egressAllowlist: ['Z.Example.COM.', 'example.com'] },
+  ])(
     'persists and selects the same policy for start and registration: %j',
-    async ({ egressAllowlist }) => {
+    async ({ egressMode, egressAllowlist }) => {
       const command = {
         identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
         auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
@@ -59,6 +63,7 @@ describe('buildControlPlaneCreateInput', () => {
         workspace: {
           sandboxId: 'ses-0123456789abcdef' as const,
           sandboxProvider: 'cloudflare-containers' as const,
+          egressMode,
           egressAllowlist,
         },
       };
@@ -76,6 +81,8 @@ describe('buildControlPlaneCreateInput', () => {
             ? []
             : ['example.com', 'z.example.com'];
       for (const input of [created, registered]) {
+        expect(input.metadata.workspace?.egressMode).toBe(egressMode);
+        expect(input.sandboxSelection.egressMode).toBe(egressMode);
         expect(input.metadata.workspace?.egressAllowlist).toEqual(expected);
         expect(input.sandboxSelection.egressAllowlist).toEqual(expected);
         expect(

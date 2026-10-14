@@ -123,9 +123,12 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
     },
     repository,
     runtime:
-      input.sandboxAllocation !== undefined || input.egressAllowlist !== undefined
+      input.sandboxAllocation !== undefined ||
+      input.egressMode !== undefined ||
+      input.egressAllowlist !== undefined
         ? {
             sandboxAllocation: input.sandboxAllocation,
+            egressMode: input.egressMode,
             egressAllowlist: input.egressAllowlist,
           }
         : undefined,

@@ -3,6 +3,7 @@ import { getSandbox, type Sandbox } from '@cloudflare/sandbox';
 import { z } from 'zod';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { getBillingContext } from '@kilocode/container-usage';
+import { egressPolicySchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -242,6 +243,7 @@ export type EnsureAllocationInput = {
   billing?: SandboxBillingInput;
   containment?: CredentialContainmentRequirements;
   sandboxKind?: SandboxKind;
+  egressMode?: EgressMode;
   egressAllowlist?: string[];
 };
 
@@ -1546,13 +1548,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private pinFromInput(input: EnsureAllocationInput, repositoryUrl?: string): StoredProviderPin {
+    const policy = egressPolicySchema.safeParse(input);
+    if (!policy.success) throw new ProviderCreationError('invalid_configuration');
     if (!sandboxKindMatchesKey(this.sandboxId, input.sandboxKind)) {
       throw new Error('Sandbox selection kind does not match the sandbox key');
     }
     const provider = input.provider ?? 'cloudflare';
     if (
-      input.egressAllowlist !== undefined &&
-      (provider !== 'cloudflare-containers' || input.sandboxKind === 'shared')
+      policy.data.egressMode === 'deny-by-default' &&
+      (provider !== 'cloudflare-containers' ||
+        (input.sandboxKind === undefined
+          ? !this.sandboxId.startsWith('ses-')
+          : input.sandboxKind !== 'isolated'))
     ) {
       throw new ProviderCreationError('invalid_configuration');
     }
@@ -1564,11 +1571,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
       billing: input.billing ?? null,
       containment: input.containment ?? null,
       ...(input.sandboxKind ? { sandboxKind: input.sandboxKind } : {}),
-      ...(input.egressAllowlist === undefined
+      ...(policy.data.egressMode !== 'deny-by-default'
         ? {}
         : {
             egressAllowlist: buildNativeEgressAllowlist({
-              allowlist: input.egressAllowlist,
+              allowlist: policy.data.egressAllowlist ?? [],
               env: this.env,
               repositoryUrl,
             }),
@@ -1759,7 +1766,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     try {
       if (
         sandboxSelection !== undefined &&
-        (state.kind === 'stopped' || sandboxSelection.egressAllowlist !== undefined)
+        (state.kind === 'stopped' ||
+          sandboxSelection.egressMode === 'deny-by-default' ||
+          this.providerPin?.egressAllowlist !== undefined)
       ) {
         const repository = source.repository;
         selectedPin = this.pinFromInput(
@@ -4041,7 +4050,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     if (pin.egressAllowlist !== undefined) {
       pin.egressAllowlist = nativeEgressAllowlistSchema.parse(pin.egressAllowlist);
-      if (pin.provider !== 'cloudflare-containers' || pin.sandboxKind === 'shared') {
+      if (
+        pin.provider !== 'cloudflare-containers' ||
+        (pin.sandboxKind === undefined
+          ? !this.sandboxId.startsWith('ses-')
+          : pin.sandboxKind !== 'isolated')
+      ) {
         throw new ProviderCreationError('invalid_configuration');
       }
     }

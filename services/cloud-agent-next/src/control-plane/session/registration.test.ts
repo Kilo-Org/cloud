@@ -11,6 +11,7 @@ import {
 import { encryptWithPublicKey } from '../../utils/encryption.js';
 import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../../workspace.js';
 import { buildControlPlaneSessionRegistration } from './registration.js';
+import { controlPlaneSandboxSelectionSchema } from './sandbox-selection.js';
 
 function generateKeyPair() {
   return generateKeyPairSync('rsa', {
@@ -58,12 +59,14 @@ describe('egress policy registration', () => {
         workspace: {
           sandboxId: 'ses-0123456789abcdef',
           sandboxProvider: 'cloudflare-containers',
+          egressMode: 'deny-by-default',
           egressAllowlist,
         },
       });
       expect(
         buildControlPlaneSessionRegistration(input, {
           provider: 'cloudflare-containers',
+          egressMode: 'deny-by-default',
           egressAllowlist,
         }).sandboxSelection?.egressAllowlist
       ).toEqual(egressAllowlist);
@@ -77,17 +80,100 @@ describe('egress policy registration', () => {
         workspace: {
           sandboxId: 'ses-0123456789abcdef',
           sandboxProvider: 'cloudflare-containers',
+          egressMode: 'deny-by-default',
           egressAllowlist: ['example.com'],
         },
       });
       expect(() =>
         buildControlPlaneSessionRegistration(input, {
           provider: 'cloudflare-containers',
+          egressMode: 'deny-by-default',
           egressAllowlist,
         })
       ).toThrow('Sandbox selection egress allowlist does not match session metadata');
     }
   );
+
+  it.each([
+    { storedList: undefined, selectedList: undefined },
+    { storedList: [], selectedList: undefined },
+    { storedList: undefined, selectedList: [] },
+  ])('treats omitted and empty deny lists equivalently: %j', ({ storedList, selectedList }) => {
+    const input = metadata({
+      workspace: {
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'cloudflare-containers',
+        egressMode: 'deny-by-default',
+        egressAllowlist: storedList,
+      },
+    });
+    expect(
+      buildControlPlaneSessionRegistration(input, {
+        provider: 'cloudflare-containers',
+        egressMode: 'deny-by-default',
+        egressAllowlist: selectedList,
+      }).sandboxSelection?.egressMode
+    ).toBe('deny-by-default');
+  });
+
+  it.each([undefined, 'allow-all', 'deny-by-default'] as const)(
+    'rejects a mode-only mismatch against stored %s',
+    egressMode => {
+      const input = metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          egressMode,
+        },
+      });
+      expect(() =>
+        buildControlPlaneSessionRegistration(input, {
+          provider: 'cloudflare-containers',
+          egressMode: egressMode === 'deny-by-default' ? undefined : 'deny-by-default',
+        })
+      ).toThrow('Sandbox selection egress mode does not match session metadata');
+    }
+  );
+
+  it('treats explicit and omitted allow-all equivalently', () => {
+    expect(
+      buildControlPlaneSessionRegistration(metadata(), {
+        ...selection,
+        egressMode: 'allow-all',
+      }).sandboxSelection?.egressMode
+    ).toBe('allow-all');
+  });
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['example.com'] },
+    { egressMode: 'allow-all', egressAllowlist: [] },
+    { egressMode: 'allow-all', egressAllowlist: ['example.com'] },
+    { egressMode: 'invalid' },
+  ])('rejects ambiguous sandbox selection policy %j', policy => {
+    expect(
+      controlPlaneSandboxSelectionSchema.safeParse({
+        provider: 'cloudflare-containers',
+        ...policy,
+      }).success
+    ).toBe(false);
+  });
+
+  it.each([
+    { provider: 'cloudflare' },
+    { provider: 'vercel' },
+    { provider: 'cloudflare-containers', sandboxKind: 'shared' },
+    { provider: 'cloudflare-containers', sandboxKind: 'code-review' },
+  ])('restricts only deny mode to isolated containers: %j', placement => {
+    expect(
+      controlPlaneSandboxSelectionSchema.safeParse({ ...placement, egressMode: 'deny-by-default' })
+        .success
+    ).toBe(false);
+    expect(
+      controlPlaneSandboxSelectionSchema.safeParse({ ...placement, egressMode: 'allow-all' })
+        .success
+    ).toBe(true);
+  });
 });
 
 describe('migrated origin permissions', () => {

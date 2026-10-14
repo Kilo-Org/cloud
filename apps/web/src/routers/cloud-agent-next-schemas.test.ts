@@ -516,6 +516,19 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
     }
   });
 
+  it('enforces explicit egress mode on clone-only inputs', () => {
+    for (const schema of [personalPrepareSessionNextSchema, organizationPrepareSessionNextSchema]) {
+      const input = { ...cloneOnlyInput, organizationId: MESSAGE_UUID };
+      const parsed = schema.parse({ ...input, egressMode: 'deny-by-default' });
+      expect(parsed.egressMode).toBe('deny-by-default');
+      expect(parsed.egressAllowlist).toBeUndefined();
+      expect(schema.safeParse({ ...input, egressAllowlist: [] }).success).toBe(false);
+      expect(
+        schema.safeParse({ ...input, egressMode: 'allow-all', egressAllowlist: [] }).success
+      ).toBe(false);
+    }
+  });
+
   it('rejects a clone-only input that also carries a prompt', () => {
     expect(
       basePrepareSessionNextSchema.safeParse({ ...cloneOnlyInput, prompt: 'Continue the clone' })
@@ -739,23 +752,66 @@ describe('prepare session sandbox selection', () => {
     ({ egressAllowlist }) => {
       const expected = egressAllowlist.length === 0 ? [] : ['example.com', 'z.example.com'];
       expect(
-        personalPrepareSessionNextSchema.parse({ ...baseInput, egressAllowlist }).egressAllowlist
+        personalPrepareSessionNextSchema.parse({
+          ...baseInput,
+          egressMode: 'deny-by-default',
+          egressAllowlist,
+        }).egressAllowlist
       ).toEqual(expected);
       expect(
-        organizationPrepareSessionNextSchema.parse({ ...organizationInput, egressAllowlist })
-          .egressAllowlist
+        organizationPrepareSessionNextSchema.parse({
+          ...organizationInput,
+          egressMode: 'deny-by-default',
+          egressAllowlist,
+        }).egressAllowlist
       ).toEqual(expected);
     }
   );
 
+  it.each([{}, { egressMode: 'allow-all' }, { egressMode: 'deny-by-default' }])(
+    'preserves omitted lists without inferring modes: %j',
+    policy => {
+      for (const parsed of [
+        personalPrepareSessionNextSchema.parse({ ...baseInput, ...policy }),
+        organizationPrepareSessionNextSchema.parse({ ...organizationInput, ...policy }),
+      ]) {
+        expect(parsed.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+        expect(parsed.egressAllowlist).toBeUndefined();
+      }
+    }
+  );
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['example.com'] },
+    { egressMode: 'allow-all', egressAllowlist: [] },
+    { egressMode: 'allow-all', egressAllowlist: ['example.com'] },
+    { egressMode: 'deny-all' },
+    { egressMode: null },
+  ])('rejects ambiguous or unsupported egress policies: %j', policy => {
+    expect(personalPrepareSessionNextSchema.safeParse({ ...baseInput, ...policy }).success).toBe(
+      false
+    );
+    expect(
+      organizationPrepareSessionNextSchema.safeParse({ ...organizationInput, ...policy }).success
+    ).toBe(false);
+  });
+
   it('rejects non-domain API policies', () => {
     for (const egressAllowlist of [['*'], ['127.1'], ['https://example.com'], null]) {
       expect(
-        personalPrepareSessionNextSchema.safeParse({ ...baseInput, egressAllowlist }).success
+        personalPrepareSessionNextSchema.safeParse({
+          ...baseInput,
+          egressMode: 'deny-by-default',
+          egressAllowlist,
+        }).success
       ).toBe(false);
       expect(
-        organizationPrepareSessionNextSchema.safeParse({ ...organizationInput, egressAllowlist })
-          .success
+        organizationPrepareSessionNextSchema.safeParse({
+          ...organizationInput,
+          egressMode: 'deny-by-default',
+          egressAllowlist,
+        }).success
       ).toBe(false);
     }
   });

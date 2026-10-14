@@ -175,6 +175,9 @@ export function buildControlPlaneSandboxSelection(
   const pinned = {
     billing,
     ...(sandboxKind ? { sandboxKind } : {}),
+    ...(metadata.workspace?.egressMode === undefined
+      ? {}
+      : { egressMode: metadata.workspace.egressMode }),
     ...(metadata.workspace?.egressAllowlist === undefined
       ? {}
       : { egressAllowlist: metadata.workspace.egressAllowlist }),

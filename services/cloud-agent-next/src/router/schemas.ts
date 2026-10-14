@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { egressAllowlistSchema } from '@kilocode/worker-utils/egress-allowlist';
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   getKiloSandboxAllocation,
   sandboxAllocationInputSchema,
@@ -599,7 +599,6 @@ const PrepareSessionSharedFields = {
   sandboxAllocation: ManagedSandboxAllocationInput.optional().describe(
     'Select a provider account and instance type instead of default routing'
   ),
-  egressAllowlist: egressAllowlistSchema.optional(),
 };
 
 const PrepareSessionNonCloneVariant = z.object({
@@ -669,6 +668,7 @@ const PrepareSessionCloneVariant = z.object({
 
 export const PrepareSessionInput = z
   .union([PrepareSessionNonCloneVariant, PrepareSessionCloneVariant])
+  .and(egressPolicySchema)
   .refine(validateGitSource, {
     message: 'Must provide either githubRepo or gitUrl, but not both',
     path: ['githubRepo'],
@@ -927,10 +927,9 @@ export const StartSessionInput = z
       .optional(),
     repository: RepositoryInputSchema,
     profile: ProfileInputSchema,
-    runtime: z
-      .object({
+    runtime: egressPolicySchema
+      .safeExtend({
         sandboxAllocation: ManagedSandboxAllocationInput.optional(),
-        egressAllowlist: egressAllowlistSchema.optional(),
       })
       .strict()
       .optional(),

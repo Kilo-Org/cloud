@@ -21,6 +21,8 @@ conversation, classifier model, exact content hash, call kind, and request start
 Retries reuse the entire event, and `recorded` or `duplicate` acknowledges it.
 Unavailable writes remain under `usage:<id>` and use exponential alarm retries.
 The alarm also sweeps decision-cache entries; cache expiry never deletes usage.
+Each alarm pass explicitly replaces the fired alarm with the earliest remaining
+retry or cache expiry; ordinary writes preserve an earlier future alarm.
 Writes still unavailable at the retry horizon emit
 `auto_routing_classifier_usage_dropped` and require operational investigation.
 

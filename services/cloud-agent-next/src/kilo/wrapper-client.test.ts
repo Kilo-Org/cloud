@@ -1154,6 +1154,74 @@ describe('WrapperClient', () => {
       );
     });
 
+    it('passes trusted Sentry configuration only through process env and replaces profile overrides', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'mock-process-id',
+        waitForPort: vi.fn().mockResolvedValue(undefined),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+      const client = new WrapperClient({ session, port: defaultPort });
+      const trustedDsn = 'https://0123456789abcdef@o123.ingest.sentry.io/456';
+      const sentry = {
+        CLOUD_AGENT_SENTRY_DSN: trustedDsn,
+        CLOUD_AGENT_SENTRY_ENVIRONMENT: 'production',
+        SENTRY_AUTH_TOKEN: 'worker-only-token',
+      };
+
+      await client.ensureRunning({
+        agentSessionId,
+        userId,
+        runtimeEnv: {
+          CLOUD_AGENT_SENTRY_DSN: 'https://forged@evil.example.com/123',
+          CLOUD_AGENT_SENTRY_ENVIRONMENT: 'forged',
+          SENTRY_DSN: 'user-application-dsn',
+          SENTRY_ENVIRONMENT: 'user-application',
+        },
+        sentry,
+      });
+
+      const [command, options] = vi.mocked(session.startProcess).mock.calls[0];
+      expect(command).not.toContain('CLOUD_AGENT_SENTRY');
+      expect(command).not.toContain(trustedDsn);
+      expect(options?.env).toMatchObject({
+        CLOUD_AGENT_SENTRY_DSN: trustedDsn,
+        CLOUD_AGENT_SENTRY_ENVIRONMENT: 'production',
+        SENTRY_DSN: 'user-application-dsn',
+        SENTRY_ENVIRONMENT: 'user-application',
+      });
+      expect(options?.env).not.toHaveProperty('SENTRY_AUTH_TOKEN');
+    });
+
+    it.each([undefined, {}, { CLOUD_AGENT_SENTRY_DSN: 'http://key@o123.ingest.sentry.io/456' }])(
+      'removes persisted Sentry overrides without valid trusted configuration: %j',
+      async sentry => {
+        const session = createMockSession(createCurlError(7, 'Connection refused'));
+        (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+          id: 'mock-process-id',
+          waitForPort: vi.fn().mockResolvedValue(undefined),
+          getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+        });
+        const client = new WrapperClient({ session, port: defaultPort });
+
+        await client.ensureRunning({
+          agentSessionId,
+          userId,
+          runtimeEnv: {
+            CLOUD_AGENT_SENTRY_DSN: 'https://forged@evil.example.com/123',
+            CLOUD_AGENT_SENTRY_ENVIRONMENT: 'forged',
+            SENTRY_DSN: 'user-application-dsn',
+          },
+          sentry,
+        });
+
+        const options = vi.mocked(session.startProcess).mock.calls[0][1];
+        expect(options?.env).not.toHaveProperty('CLOUD_AGENT_SENTRY_DSN');
+        expect(options?.env).not.toHaveProperty('CLOUD_AGENT_SENTRY_ENVIRONMENT');
+        expect(options?.env).toHaveProperty('SENTRY_DSN', 'user-application-dsn');
+      }
+    );
+
     it('passes toolCgroupEnv through to both the process env and the inlined command env', async () => {
       const session = createMockSession(createCurlError(7, 'Connection refused'));
       (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({

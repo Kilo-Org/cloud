@@ -203,6 +203,7 @@ main() {
     deploy)
       prepare_internal_secret
       render_config
+      run_service_command pnpm run build:wrapper
       ensure_callback_queue
       run_service_command pnpm exec wrangler deploy --config "$CONFIG_PATH"
       if [[ -n "$INTERNAL_SECRET" ]]; then

@@ -48,6 +48,41 @@ describe('AgentSandbox provider factory', () => {
     expect(getSandbox).not.toHaveBeenCalled();
   });
 
+  it.each([
+    {
+      CLOUD_AGENT_SENTRY_DSN: 'https://0123456789abcdef@o123.ingest.sentry.io/456',
+      CLOUD_AGENT_SENTRY_ENVIRONMENT: 'production',
+    },
+    {},
+    { CLOUD_AGENT_SENTRY_DSN: 'http://key@o123.ingest.sentry.io/456' },
+  ])('uses only trusted Worker telemetry config for the Vercel adapter: %j', sentry => {
+    const sessionMetadata = metadata('vercel');
+    sessionMetadata.profile = {
+      envVars: { CLOUD_AGENT_SENTRY_DSN: 'https://forged@evil.example.com/123' },
+    };
+    const sandbox = createAgentSandbox(
+      {
+        VERCEL_TOKEN: 'token',
+        VERCEL_TEAM_ID: 'team',
+        VERCEL_PROJECT_ID: 'project',
+        VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot',
+        VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build',
+        VERCEL_SANDBOX_RUNTIME: 'node24',
+        VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
+        VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
+        ...sentry,
+      } as Env,
+      sessionMetadata
+    );
+
+    expect(sandbox).toHaveProperty(
+      'sentry',
+      sentry.CLOUD_AGENT_SENTRY_ENVIRONMENT === 'production'
+        ? { dsn: sentry.CLOUD_AGENT_SENTRY_DSN, environment: 'production' }
+        : undefined
+    );
+  });
+
   it('uses persisted runtime identity instead of mutable enrollment snapshot values', () => {
     const pinned = metadata('vercel');
     pinned.workspace = {

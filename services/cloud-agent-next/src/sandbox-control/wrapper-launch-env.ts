@@ -1,4 +1,5 @@
 import { sandboxControlWebSocketUrl } from './control-url.js';
+import { getSentryConfig } from '../shared/sentry.js';
 import { mintControlLogUploadGrant } from './log-upload-grant.js';
 import {
   CONTROL_SANDBOX_PROVIDER_ENV,
@@ -11,6 +12,7 @@ export type ControlWrapperLaunchEnvInput = {
   provider: AgentSandboxProvider;
   credential: string;
   workloadCgroup?: string;
+  sentry?: Parameters<typeof getSentryConfig>[0];
   diagnostics?: {
     allocationId: string;
     signingSecret: string | null;
@@ -21,6 +23,7 @@ export function buildControlWrapperLaunchEnv(
   input: ControlWrapperLaunchEnvInput
 ): Record<string, string> {
   const workerUrl = input.workerUrl?.replace(/\/$/, '') ?? '';
+  const sentry = getSentryConfig(input.sentry ?? {});
   let diagnosticEnv: Record<string, string> = {};
   if (input.diagnostics?.signingSecret && workerUrl) {
     try {
@@ -54,6 +57,12 @@ export function buildControlWrapperLaunchEnv(
   }
   return {
     ...diagnosticEnv,
+    ...(sentry
+      ? {
+          CLOUD_AGENT_SENTRY_DSN: sentry.dsn,
+          CLOUD_AGENT_SENTRY_ENVIRONMENT: sentry.environment,
+        }
+      : {}),
     ...(input.workloadCgroup ? { CONTROL_WORKLOAD_CGROUP: input.workloadCgroup } : {}),
     SANDBOX_CONTROL_URL: sandboxControlWebSocketUrl(workerUrl, input.sandboxId),
     SANDBOX_CONTROL_CREDENTIAL: input.credential,

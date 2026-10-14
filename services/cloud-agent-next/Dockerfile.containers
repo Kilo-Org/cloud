@@ -90,19 +90,7 @@ RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
 # Install dependencies globally (accessible to all users)
 RUN npm install -g pnpm@${PNPM_VERSION} @kilocode/cli@${KILOCODE_CLI_VERSION}
 
-# === Build wrapper bundle inside container ===
-# This ensures the wrapper is built with the same Bun version that will run it,
-# avoiding any compatibility issues between build and runtime environments.
-# The build entrypoint list lives in src/shared/runtime-distribution.ts.
-COPY wrapper /tmp/wrapper-build/wrapper
-COPY src/shared /tmp/wrapper-build/src/shared
-
-# Install wrapper dependencies (pnpm symlinks don't survive COPY) and build
-RUN cd /tmp/wrapper-build/wrapper && \
-    bun install --production && \
-    ln -sfn /tmp/wrapper-build/wrapper/node_modules /tmp/wrapper-build/node_modules && \
-    bun run build.ts --install-dir /usr/local/bin && \
-    rm -rf /tmp/wrapper-build
+COPY wrapper/dist/runtime/ /usr/local/bin/
 
 # Keep PID 1 alive so the Durable Object's `exec` always has a running container to attach to.
 # The intercept CA is not baked in; the control wrapper trusts it when containment is enabled.

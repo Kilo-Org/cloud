@@ -71,8 +71,16 @@ jobs:
         working-directory: ${{ inputs.worker }}
         run: pnpm install --frozen-lockfile
 
+      - name: Setup Bun for Cloud Agent artifacts
+        if: inputs.worker == 'services/cloud-agent-next'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        env:
+          CLOUD_AGENT_DEPLOY_ENVIRONMENT: ${{ inputs.target_environment }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ inputs.worker }}
@@ -80,7 +88,16 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+          command: ${{ inputs.worker == 'services/cloud-agent-next' && (inputs.target_environment == 'production' && 'deploy dist/worker/index.js --no-bundle --upload-source-maps' || format('deploy dist/worker/index.js --no-bundle --upload-source-maps --env {0}', inputs.target_environment)) || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}
+
+      - name: Upload Cloud Agent Sentry source maps
+        if: inputs.worker == 'services/cloud-agent-next'
+        working-directory: ${{ inputs.worker }}
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.CLOUD_AGENT_SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.CLOUD_AGENT_SENTRY_PROJECT }}
+        run: pnpm run sentry:sourcemaps
 
   detect-changes:
     if: inputs.worker == '' && inputs.base_sha != ''
@@ -242,8 +259,16 @@ jobs:
         working-directory: ${{ matrix.worker }}
         run: pnpm install --frozen-lockfile
 
+      - name: Setup Bun for Cloud Agent artifacts
+        if: matrix.worker == 'services/cloud-agent-next'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        env:
+          CLOUD_AGENT_DEPLOY_ENVIRONMENT: ${{ inputs.target_environment }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ matrix.worker }}
@@ -251,4 +276,13 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
+          command: ${{ matrix.worker == 'services/cloud-agent-next' && (inputs.target_environment == 'production' && 'deploy dist/worker/index.js --no-bundle --upload-source-maps' || format('deploy dist/worker/index.js --no-bundle --upload-source-maps --env {0}', inputs.target_environment)) || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}
+
+      - name: Upload Cloud Agent Sentry source maps
+        if: matrix.worker == 'services/cloud-agent-next'
+        working-directory: ${{ matrix.worker }}
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.CLOUD_AGENT_SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.CLOUD_AGENT_SENTRY_PROJECT }}
+        run: pnpm run sentry:sourcemaps

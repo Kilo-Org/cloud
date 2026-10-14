@@ -225,6 +225,8 @@ packageExtensions:
     dependencies:
       '@expo/config-plugins': '*'
 patchedDependencies:
+  # Reinitializing Sentry's async context at each cold DO loses in-flight scopes.
+  '@sentry/cloudflare@10.69.0': patches/@sentry+cloudflare@10.69.0.patch
   # Text date styles for the glanceable widgets and Live Activity: `elapsed`
   # ("31 minutes", no seconds) and `ago` ("3 minutes ago").
   '@expo/ui@57.0.21': patches/@expo+ui@57.0.21.patch

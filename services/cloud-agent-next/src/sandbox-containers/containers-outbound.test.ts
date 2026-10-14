@@ -14,13 +14,22 @@ vi.mock('../sandbox-outbound.js', () => ({
 
 import { handleManagedScmOutbound } from '../sandbox-outbound.js';
 import { ContainersOutbound, type ContainersOutboundProps } from './containers-outbound.js';
+import type { getSentryConfig } from '../shared/sentry.js';
 
-function outbound(props: ContainersOutboundProps) {
+function outbound(
+  props: ContainersOutboundProps,
+  sentry: Parameters<typeof getSentryConfig>[0] = {}
+) {
   return new ContainersOutbound(
     { props } as ExecutionContext<ContainersOutboundProps>,
-    {} as Cloudflare.Env
+    sentry as Cloudflare.Env & Parameters<typeof getSentryConfig>[0]
   );
 }
+
+const sentry = {
+  CLOUD_AGENT_SENTRY_DSN: 'https://0123456789abcdef@o123.ingest.sentry.io/456',
+  CLOUD_AGENT_SENTRY_ENVIRONMENT: 'production',
+};
 
 afterEach(() => vi.clearAllMocks());
 
@@ -82,6 +91,95 @@ describe('ContainersOutbound egress enforcement', () => {
       })
     );
     expect(response.status).toBe(403);
+    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+  });
+
+  it('allows only the trusted Sentry envelope endpoint without extending the pinned allowlist', async () => {
+    const egressAllowlist: string[] = [];
+    const request = new Request(
+      'https://o123.ingest.sentry.io/api/456/envelope/?sentry_version=7&sentry_key=0123456789abcdef',
+      { method: 'POST', headers: { Host: 'evil.test' }, body: 'envelope' }
+    );
+
+    const response = await outbound({ containerId: 'container-1', egressAllowlist }, sentry).fetch(
+      request
+    );
+
+    expect(response.status).toBe(200);
+    expect(egressAllowlist).toEqual([]);
+    const forwarded = vi.mocked(handleManagedScmOutbound).mock.calls[0]?.[0];
+    expect(forwarded?.url).toBe(request.url);
+    expect(forwarded?.redirect).toBe('manual');
+    expect(forwarded?.headers.get('Host')).toBe('o123.ingest.sentry.io');
+    expect(await forwarded?.text()).toBe('envelope');
+  });
+
+  it.each([
+    ['GET', 'https://o123.ingest.sentry.io/api/456/envelope/'],
+    ['PUT', 'https://o123.ingest.sentry.io/api/456/envelope/'],
+    ['POST', 'http://o123.ingest.sentry.io/api/456/envelope/'],
+    ['POST', 'https://o123.ingest.sentry.io:8443/api/456/envelope/'],
+    ['POST', 'https://o124.ingest.sentry.io/api/456/envelope/'],
+    ['POST', 'https://sub.o123.ingest.sentry.io/api/456/envelope/'],
+    ['POST', 'https://evil.test/api/456/envelope/'],
+    ['POST', 'https://o123.ingest.sentry.io/api/123/envelope/'],
+    ['POST', 'https://o123.ingest.sentry.io/api/456/store/'],
+    ['POST', 'https://o123.ingest.sentry.io/api/456/envelope'],
+    ['POST', 'https://o123.ingest.sentry.io/api/456/envelope/extra'],
+    ['POST', 'https://o123.ingest.sentry.io/'],
+  ])('does not broaden egress with telemetry enabled: %s %s', async (method, url) => {
+    const response = await outbound(
+      { containerId: 'container-1', egressAllowlist: [] },
+      sentry
+    ).fetch(new Request(url, { method, headers: { Host: 'o123.ingest.sentry.io' } }));
+
+    expect(response.status).toBe(403);
+    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {},
+    { CLOUD_AGENT_SENTRY_DSN: 'http://key@o123.ingest.sentry.io/456' },
+    { CLOUD_AGENT_SENTRY_DSN: 'invalid' },
+    { CLOUD_AGENT_SENTRY_DSN: 'https://key@o123.ingest.sentry.io/not-a-project' },
+  ])('fails closed without valid trusted telemetry configuration: %j', async configuration => {
+    const response = await outbound(
+      { containerId: 'container-1', egressAllowlist: [] },
+      configuration
+    ).fetch(
+      new Request('https://o123.ingest.sentry.io/api/456/envelope/', {
+        method: 'POST',
+        headers: { CLOUD_AGENT_SENTRY_DSN: sentry.CLOUD_AGENT_SENTRY_DSN },
+      })
+    );
+
+    expect(response.status).toBe(403);
+    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+  });
+
+  it('does not follow a redirect from the trusted telemetry endpoint', async () => {
+    vi.mocked(handleManagedScmOutbound).mockImplementationOnce(async request => {
+      expect(request.redirect).toBe('manual');
+      return new Response(null, { status: 302, headers: { Location: 'https://evil.test/' } });
+    });
+
+    const response = await outbound(
+      { containerId: 'container-1', egressAllowlist: [] },
+      sentry
+    ).fetch(new Request('https://o123.ingest.sentry.io/api/456/envelope/', { method: 'POST' }));
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe('https://evil.test/');
+    expect(handleManagedScmOutbound).toHaveBeenCalledOnce();
+  });
+
+  it('does not let telemetry bypass invalid pinned policy props', async () => {
+    const response = await outbound(
+      { containerId: 'container-1', egressAllowlist: ['*'] },
+      sentry
+    ).fetch(new Request('https://o123.ingest.sentry.io/api/456/envelope/', { method: 'POST' }));
+
+    expect(response.status).toBe(502);
     expect(handleManagedScmOutbound).not.toHaveBeenCalled();
   });
 

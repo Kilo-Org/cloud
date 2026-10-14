@@ -64,6 +64,7 @@ import {
 } from '../../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
 import { withDORetry } from '../../utils/do-retry.js';
+import { getSentryConfig } from '../../shared/sentry.js';
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
@@ -356,12 +357,21 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     });
     const bootstrapToolCgroupEnv = buildToolCgroupEnv(this.env);
     const bootstrapKiloServerEnv = buildKiloServerEnv(this.env);
+    const sentry = getSentryConfig(this.env);
     const wrapper = await WrapperClient.ensureBootstrapWrapper(sandbox, bootstrapSession, {
       agentSessionId: sessionId,
       userId,
       ...(request.leasedInstance ? { leasedInstance: request.leasedInstance } : {}),
       ...(bootstrapToolCgroupEnv ? { toolCgroupEnv: bootstrapToolCgroupEnv } : {}),
       ...(bootstrapKiloServerEnv ? { kiloServerEnv: bootstrapKiloServerEnv } : {}),
+      ...(sentry
+        ? {
+            sentry: {
+              CLOUD_AGENT_SENTRY_DSN: sentry.dsn,
+              CLOUD_AGENT_SENTRY_ENVIRONMENT: sentry.environment,
+            },
+          }
+        : {}),
     });
     if (!prepared.readyRequest) {
       return { status: 'wrapper-running' as const, client: wrapper.client };

@@ -168,6 +168,40 @@ describe('SessionService.buildRuntimeEnv', () => {
     expect(runtimeEnv.GIT_CONFIG_NOSYSTEM).toBeUndefined();
   });
 
+  it.each([false, true])(
+    'strips persisted Sentry overrides and leaves application config intact, trusted telemetry=%s',
+    trustedTelemetry => {
+      const service = new SessionService();
+      const env = createEnv();
+      if (trustedTelemetry) {
+        env.CLOUD_AGENT_SENTRY_DSN = 'https://0123456789abcdef@o123.ingest.sentry.io/456';
+        env.CLOUD_AGENT_SENTRY_ENVIRONMENT = 'production';
+      }
+      const runtimeEnv = service.buildRuntimeEnv({
+        context: service.buildContext({
+          sandboxId: 'usr-test',
+          userId: 'user_test',
+          sessionId: 'agent_test',
+          envVars: {
+            CLOUD_AGENT_SENTRY_DSN: 'https://forged@evil.example.com/123',
+            CLOUD_AGENT_SENTRY_ENVIRONMENT: 'forged',
+            SENTRY_DSN: 'user-application-dsn',
+            SENTRY_ENVIRONMENT: 'user-application',
+          },
+        }),
+        env,
+        kiloCapability: 'kilo-token',
+      });
+
+      expect(runtimeEnv).not.toHaveProperty('CLOUD_AGENT_SENTRY_DSN');
+      expect(runtimeEnv).not.toHaveProperty('CLOUD_AGENT_SENTRY_ENVIRONMENT');
+      expect(runtimeEnv).toMatchObject({
+        SENTRY_DSN: 'user-application-dsn',
+        SENTRY_ENVIRONMENT: 'user-application',
+      });
+    }
+  );
+
   it('forces background subagents off and wins over a profile that re-enables them', () => {
     const service = new SessionService();
 
@@ -3658,6 +3692,43 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.materialized.env.DATABASE_URL).toBe('db-from-profile');
     expect(result.readyRequest.materialized.env.PUBLIC_VALUE).toBe('visible');
     expect(result.readyRequest.materialized.secretEnvKeys).toEqual(['DATABASE_URL']);
+  });
+
+  it('strips decrypted Sentry overrides from legacy materialized env and redaction keys', async () => {
+    const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+    const metadata = createMetadata({
+      profile: {
+        envVars: { CLOUD_AGENT_SENTRY_ENVIRONMENT: 'plaintext-forged', PUBLIC_VALUE: 'visible' },
+        encryptedSecrets: {
+          CLOUD_AGENT_SENTRY_DSN: encryptWithPublicKey(
+            'https://forged@evil.example.com/123',
+            publicKey
+          ),
+          CLOUD_AGENT_SENTRY_ENVIRONMENT: encryptWithPublicKey('encrypted-forged', publicKey),
+          SENTRY_DSN: encryptWithPublicKey('application-dsn', publicKey),
+        },
+      },
+    });
+
+    const result = await buildPromptWrapperRequests(metadata, env => {
+      env.AGENT_ENV_VARS_PRIVATE_KEY = privateKey;
+      env.CLOUD_AGENT_SENTRY_DSN = 'https://0123456789abcdef@o123.ingest.sentry.io/456';
+      env.CLOUD_AGENT_SENTRY_ENVIRONMENT = 'production';
+    });
+
+    expect(result.readyRequest.materialized.env).not.toHaveProperty('CLOUD_AGENT_SENTRY_DSN');
+    expect(result.readyRequest.materialized.env).not.toHaveProperty(
+      'CLOUD_AGENT_SENTRY_ENVIRONMENT'
+    );
+    expect(result.readyRequest.materialized.env).toMatchObject({
+      SENTRY_DSN: 'application-dsn',
+      PUBLIC_VALUE: 'visible',
+    });
+    expect(result.readyRequest.materialized.secretEnvKeys).toEqual(['SENTRY_DSN']);
   });
 
   it('does not advertise a decrypted secret the platform overwrote', async () => {

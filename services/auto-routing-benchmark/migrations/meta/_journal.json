@@ -99,6 +99,13 @@
       "when": 1791917551948,
       "tag": "0013_harsh_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1791925892377,
+      "tag": "0014_huge_gauntlet",
+      "breakpoints": true
     }
   ]
 }

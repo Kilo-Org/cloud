@@ -5,6 +5,8 @@ import type * as DbModule from './db';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import type * as ConfigModule from './config';
 
+vi.mock('./decider-judge', () => ({ createDeciderJudge: vi.fn() }));
+vi.mock('./openrouter', () => ({ createSystemOneClient: vi.fn() }));
 // Publishing reads live config to learn which pairs the platform table wants.
 vi.mock('./config', async importOriginal => {
   const actual = await importOriginal<typeof ConfigModule>();
@@ -21,6 +23,8 @@ vi.mock('./db', async importOriginal => {
     existsNewerCompletedRun: vi.fn(),
     getCaseResults: vi.fn(),
     getExistingCaseResultIds: vi.fn(),
+    getPendingDeciderOutput: vi.fn(),
+    savePendingDeciderOutput: vi.fn(),
     getRunWithModels: vi.fn(),
     getSummaries: vi.fn(),
     syncPlatformRegistryRows: vi.fn(),
@@ -63,6 +67,9 @@ import {
   countCaseResultsByLane,
   getCaseResults,
   getExistingCaseResultIds,
+  getPendingDeciderOutput,
+  savePendingDeciderOutput,
+  type PendingDeciderOutput,
   getRunWithModels,
   listPendingCurrentProfiles,
   getRunningRun,
@@ -80,6 +87,9 @@ import {
 } from './db';
 import { getBenchmarkConfig } from './config';
 import { processJob } from './run';
+import { createDeciderJudge } from './decider-judge';
+import { createSystemOneClient } from './openrouter';
+import type { DeciderJudge } from './grading';
 
 const tokenGet = vi.fn<() => Promise<string>>();
 const queueSendBatch = vi.fn<(messages: unknown[]) => Promise<void>>();
@@ -198,6 +208,10 @@ beforeEach(() => {
   vi.mocked(listLaneFailures).mockResolvedValue([]);
   vi.mocked(recordLaneFailure).mockResolvedValue(undefined);
   vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set());
+  vi.mocked(getPendingDeciderOutput).mockResolvedValue(null);
+  vi.mocked(savePendingDeciderOutput).mockResolvedValue(undefined);
+  vi.mocked(createSystemOneClient).mockResolvedValue({ apiKey: 'test', attributionHeaders: {} });
+  vi.mocked(createDeciderJudge).mockReturnValue(async () => ({ probability: 0.8, costUsd: 0.001 }));
   vi.mocked(destroyDeciderCliContainer).mockResolvedValue(undefined);
   vi.mocked(warmUpCliContainer).mockResolvedValue(undefined);
   vi.mocked(runDeciderCaseViaCli).mockResolvedValue(successfulCliResult);
@@ -574,5 +588,56 @@ describe('processJob — canonical registry publication', () => {
       cases: 5,
       meetsThreshold: true,
     });
+  });
+});
+
+describe('processJob — retryable rubric grading', () => {
+  const judgedCase = DECIDER_CASES.find(c => c.check.kind === 'judged');
+  function judgedMessage() {
+    if (!judgedCase) throw new Error('Expected a judged decider case');
+    return { ...deciderMessage(), caseIds: [judgedCase.id], chunk: 9999 };
+  }
+
+  it('retries grading without repeating model calls or losing their cost', async () => {
+    const judge = vi
+      .fn<DeciderJudge>()
+      .mockRejectedValueOnce(new Error('Provider outage'))
+      .mockResolvedValueOnce({ probability: 0.76, costUsd: 0.002 });
+    vi.mocked(createDeciderJudge).mockReturnValue(judge);
+    vi.mocked(runDeciderCaseViaCli)
+      .mockResolvedValueOnce({ ...successfulCliResult, text: '', costUsd: 0.01 })
+      .mockResolvedValueOnce({ ...successfulCliResult, text: 'A complete answer', costUsd: 0.02 });
+    let pending: PendingDeciderOutput | null = null;
+    vi.mocked(savePendingDeciderOutput).mockImplementation(async (_db, _key, output) => {
+      pending = output;
+    });
+    vi.mocked(getPendingDeciderOutput).mockImplementation(async () => pending);
+
+    await expect(processJob(env, judgedMessage())).rejects.toThrow('Decider judge failed');
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(markRunCompleted).not.toHaveBeenCalled();
+    expect(queueSendBatch).not.toHaveBeenCalled();
+
+    await processJob(env, judgedMessage());
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(2);
+    expect(judge).toHaveBeenCalledTimes(2);
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({
+        score: 0.76,
+        cost_usd: 0.03,
+        retried: true,
+        error: null,
+      })
+    );
+  });
+
+  it('does not call the model or persist a zero when the judge client is unavailable', async () => {
+    vi.mocked(createSystemOneClient).mockRejectedValueOnce(new Error('Missing credentials'));
+    await expect(processJob(env, judgedMessage())).rejects.toThrow(
+      'Decider judge client initialization failed'
+    );
+    expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+    expect(upsertCaseResult).not.toHaveBeenCalled();
   });
 });

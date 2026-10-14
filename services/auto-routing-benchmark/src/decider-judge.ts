@@ -39,9 +39,12 @@ export function createDeciderJudge(
           },
         },
       },
-      model
-    );
-    const body: unknown = await response.json();
+      model,
+      { timeoutMs: 8_000 }
+    ).catch(() => {
+      throw new Error('System One decider judge request failed');
+    });
+    const body: unknown = await response.json().catch(() => null);
     const parsed = JudgeResponseSchema.safeParse(body);
     if (!parsed.success) throw new Error('System One returned an invalid decider judge response');
     return { probability: parsed.data.answers.satisfies.noul, costUsd: parsed.data.usage.cost };

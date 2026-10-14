@@ -15,6 +15,7 @@ import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-rout
 import type { BatchItem } from 'drizzle-orm/batch';
 import { and, asc, count, desc, eq, gt, inArray, lt, ne, notInArray, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
+import * as z from 'zod';
 import {
   benchmarkConfig,
   benchmarkProfiles,
@@ -25,6 +26,7 @@ import {
   configClassifierModels,
   configDeciderModels,
   modelSummaries,
+  pendingDeciderOutputs,
   routingTableCandidates,
   routingTables,
   runLaneFailures,
@@ -386,6 +388,72 @@ export async function getExistingCaseResultIds(
   return new Set(rows.map(row => row.case_id));
 }
 
+type PendingDeciderOutputKey = {
+  run_id: string;
+  model: string;
+  variant: string;
+  case_id: string;
+  rep: number;
+};
+
+const PendingDeciderOutputSchema = z.object({
+  result: z.object({
+    text: z.string(),
+    costUsd: z.number().nullable(),
+    latencyMs: z.number(),
+    exitCode: z.number(),
+    stderrTail: z.string(),
+    eventCount: z.number(),
+    lastEventTypes: z.array(z.string()),
+    timedOut: z.boolean(),
+  }),
+  retried: z.boolean(),
+});
+
+export type PendingDeciderOutput = z.infer<typeof PendingDeciderOutputSchema>;
+
+function pendingDeciderOutputPredicate(key: PendingDeciderOutputKey) {
+  return and(
+    eq(pendingDeciderOutputs.run_id, key.run_id),
+    eq(pendingDeciderOutputs.model, key.model),
+    eq(pendingDeciderOutputs.variant, key.variant),
+    eq(pendingDeciderOutputs.case_id, key.case_id),
+    eq(pendingDeciderOutputs.rep, key.rep)
+  );
+}
+
+export async function getPendingDeciderOutput(
+  db: D1Database,
+  key: PendingDeciderOutputKey
+): Promise<PendingDeciderOutput | null> {
+  const row = await drizzle(db)
+    .select({ payload: pendingDeciderOutputs.payload })
+    .from(pendingDeciderOutputs)
+    .where(pendingDeciderOutputPredicate(key))
+    .get();
+  if (!row) return null;
+  const payload: unknown = JSON.parse(row.payload);
+  return PendingDeciderOutputSchema.parse(payload);
+}
+
+export async function savePendingDeciderOutput(
+  db: D1Database,
+  key: PendingDeciderOutputKey,
+  output: PendingDeciderOutput
+): Promise<void> {
+  await drizzle(db)
+    .insert(pendingDeciderOutputs)
+    .values({ ...key, payload: JSON.stringify(output) })
+    .onConflictDoNothing();
+}
+
+export async function deletePendingDeciderOutputsForRun(
+  db: D1Database,
+  runId: string
+): Promise<void> {
+  await drizzle(db).delete(pendingDeciderOutputs).where(eq(pendingDeciderOutputs.run_id, runId));
+}
+
 export async function replaceModelSummaries(
   db: D1Database,
   runId: string,
@@ -493,6 +561,7 @@ export async function markRunCompleted(db: D1Database, runId: string): Promise<v
     .update(benchmarkRuns)
     .set({ status: 'completed', completed_at: new Date().toISOString() })
     .where(and(eq(benchmarkRuns.id, runId), eq(benchmarkRuns.status, 'running')));
+  await deletePendingDeciderOutputsForRun(db, runId);
 }
 
 export async function markStaleRunsFailed(db: D1Database, olderThanIso: string): Promise<void> {
@@ -500,6 +569,17 @@ export async function markStaleRunsFailed(db: D1Database, olderThanIso: string):
     .update(benchmarkRuns)
     .set({ status: 'failed', error: 'timed out' })
     .where(and(eq(benchmarkRuns.status, 'running'), lt(benchmarkRuns.started_at, olderThanIso)));
+  await drizzle(db)
+    .delete(pendingDeciderOutputs)
+    .where(
+      inArray(
+        pendingDeciderOutputs.run_id,
+        drizzle(db)
+          .select({ id: benchmarkRuns.id })
+          .from(benchmarkRuns)
+          .where(ne(benchmarkRuns.status, 'running'))
+      )
+    );
 }
 
 // The currently-running run of a (kind, purpose), if any (used for the
@@ -557,6 +637,7 @@ export async function markRunFailed(db: D1Database, runId: string, error: string
     .update(benchmarkRuns)
     .set({ status: 'failed', error: error.slice(0, 500), completed_at: new Date().toISOString() })
     .where(and(eq(benchmarkRuns.id, runId), eq(benchmarkRuns.status, 'running')));
+  await deletePendingDeciderOutputsForRun(db, runId);
 }
 
 function boundProfileFailureReason(reason: string): string {

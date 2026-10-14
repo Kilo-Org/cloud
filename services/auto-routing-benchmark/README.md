@@ -127,8 +127,10 @@ overshoot). Atomic checkpoints every 200 cases retain each pair's raw `results`;
 `--resume sweep.json` skips completed pair/case/repetitions and retains accumulated spend.
 Infrastructure/grader failures are excluded from graded `cases` and counted in summary
 `errors`; empty answers score zero. Missing usage still permits grading but makes
-`costUsd` null and excludes that row only from the cost mean. Summaries with no known
-cost cannot be used for cost-based training ranking. Recompute old summaries without
+`costUsd` null and excludes that row only from the cost mean. Graded training candidates
+with unknown cost still compete at the route's maximum known request-cost estimate
+(or benchmark cost zero if the entire route lacks costs), without imputing held-out cost.
+Recompute old summaries without
 an API key or network calls using
 `sweep:offline --summarize-only --resume sweep.json --out corrected.json`;
 old missing-usage rows without saved answers remain excluded.

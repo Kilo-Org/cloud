@@ -68,23 +68,47 @@ export function buildScoreboard({
     ? Object.fromEntries(
         Object.entries(trainingRoutes).flatMap(([route, summaries]) => {
           const measured = summaries.filter(
-            (summary): summary is OfflineSweepSummary & { accuracy: number; avgCostUsd: number } =>
-              summary.cases > 0 && summary.accuracy !== null && summary.avgCostUsd !== null
+            (summary): summary is OfflineSweepSummary & { accuracy: number } =>
+              summary.cases > 0 && summary.accuracy !== null
           );
           if (measured.length === 0) return [];
           const latencies = new Map(
             measured.map(summary => [candidateKey(summary), summary.p50LatencyMs])
           );
+          const maxKnownEstimatedCostUsd = measured.reduce<number | null>((maximum, summary) => {
+            if (summary.avgCostUsd === null) return maximum;
+            const candidatePricing = pricing
+              ? (pricing[summary.model] ?? null)
+              : (storedPricing.get(summary.model) ?? null);
+            const cost = estimateRequestCostUsd(
+              { avgCostUsd: summary.avgCostUsd, pricing: candidatePricing },
+              profile
+            );
+            return maximum === null ? cost : Math.max(maximum, cost);
+          }, null);
           const candidates = measured.map(
-            ({ model, variant, accuracy, cases, avgCostUsd, p50LatencyMs }) => ({
-              model,
-              variant,
-              accuracy,
-              cases,
-              avgCostUsd,
-              p50LatencyMs,
-              pricing: pricing ? (pricing[model] ?? null) : (storedPricing.get(model) ?? null),
-            })
+            ({ model, variant, accuracy, cases, avgCostUsd, p50LatencyMs }) => {
+              const candidatePricing = pricing
+                ? (pricing[model] ?? null)
+                : (storedPricing.get(model) ?? null);
+              const promptCostUsd = estimateRequestCostUsd(
+                { avgCostUsd: 0, pricing: candidatePricing },
+                profile
+              );
+              return {
+                model,
+                variant,
+                accuracy,
+                cases,
+                avgCostUsd:
+                  avgCostUsd ??
+                  (maxKnownEstimatedCostUsd === null
+                    ? 0
+                    : Math.max(0, maxKnownEstimatedCostUsd - promptCostUsd)),
+                p50LatencyMs,
+                pricing: candidatePricing,
+              };
+            }
           );
           return [
             [

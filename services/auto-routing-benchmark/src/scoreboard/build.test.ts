@@ -533,6 +533,89 @@ describe('buildScoreboard', () => {
     expect(rebuilt.quality.heldOut?.routes).toBe(0);
   });
 
+  it('retains a graded route when its only training candidate has unknown cost', () => {
+    const summary: OfflineSweepSummary = {
+      model: 'fixture/first',
+      variant: null,
+      routeKey: 'implementation/code_generation',
+      split: 'train',
+      accuracy: 0.7,
+      cases: 10,
+      avgCostUsd: null,
+      p50LatencyMs: 100,
+    };
+    const sweep: OfflineSweep = {
+      startedAt: now.toISOString(),
+      truncated: false,
+      costUsd: 0,
+      graderCostUsd: 0,
+      pairs: [],
+      summaries: [summary, { ...summary, split: 'heldOut' }],
+    };
+    const result = build(table, null, null, { sweep, rebuildFromSweep: true });
+    expect(result.quality.benchmarkAccuracyWeighted).toBe(0.7);
+    expect(result.cost.benchmarkPerTaskUsdWeighted).toBe(0);
+    expect(result.quality.heldOut?.accuracyWeighted).toBe(0.7);
+    expect(result.quality.heldOut?.estimatedRequestUsdWeighted).toBeNull();
+    expect(result.quality.heldOut?.p50LatencyMsWeighted).toBe(100);
+    expect(result.quality.heldOut?.routes).toBe(1);
+  });
+
+  it('lets unknown-cost candidates compete at the route maximum known production-cost estimate', () => {
+    const summary: OfflineSweepSummary = {
+      model: 'fixture/known',
+      variant: null,
+      routeKey: 'implementation/code_generation',
+      split: 'train',
+      accuracy: 0.7,
+      cases: 100,
+      avgCostUsd: 0.1,
+      p50LatencyMs: 100,
+    };
+    const sweep: OfflineSweep = {
+      startedAt: now.toISOString(),
+      truncated: false,
+      costUsd: 0,
+      graderCostUsd: 0,
+      pairs: [],
+      summaries: [
+        summary,
+        { ...summary, model: 'fixture/unknown', accuracy: 1, avgCostUsd: null },
+        {
+          ...summary,
+          model: 'fixture/unknown',
+          split: 'heldOut',
+          accuracy: 0.9,
+          avgCostUsd: null,
+        },
+      ],
+    };
+    const pricing = {
+      'fixture/known': {
+        promptUsdPerToken: 0.02,
+        completionUsdPerToken: 0.02,
+        cacheReadUsdPerToken: null,
+      },
+      'fixture/unknown': {
+        promptUsdPerToken: 0.001,
+        completionUsdPerToken: 0.001,
+        cacheReadUsdPerToken: null,
+      },
+    };
+    const result = build(table, null, null, {
+      sweep,
+      pricing,
+      costProfile: { uncachedInputTokens: 10, cachedInputTokens: 0 },
+      rebuildFromSweep: true,
+    });
+    expect(result.quality.benchmarkAccuracyWeighted).toBe(1);
+    expect(result.cost.estimatedRequestUsdWeighted).toBeCloseTo(0.3);
+    expect(result.cost.benchmarkPerTaskUsdWeighted).toBeCloseTo(0.29);
+    expect(result.quality.heldOut?.accuracyWeighted).toBe(0.9);
+    expect(result.quality.heldOut?.estimatedRequestUsdWeighted).toBeNull();
+    expect(result.quality.heldOut?.routes).toBe(1);
+  });
+
   it('uses uniform table-route weights when production route mix is empty', () => {
     expect(build(table, prod({}))).toEqual(build(table));
   });

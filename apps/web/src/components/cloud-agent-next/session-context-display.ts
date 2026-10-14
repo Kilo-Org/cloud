@@ -1,8 +1,3 @@
-export type SessionBranchDisplay =
-  | { kind: 'branch'; branch: string }
-  | { kind: 'assigning' }
-  | { kind: 'unavailable' };
-
 export type SessionBranchScope = {
   displayedKiloSessionId: string | null;
   displayedWorktreeId: string | null;
@@ -14,17 +9,15 @@ export type SessionBranchMetadata = {
   branch: string | null;
 };
 
-export function resolveSessionBranchDisplay({
+export function resolveSessionBranch({
   scope,
   metadata,
-  isPreparing,
 }: {
   scope: SessionBranchScope;
   metadata: SessionBranchMetadata | null;
-  isPreparing: boolean;
-}): SessionBranchDisplay {
+}): string | null {
   if (scope.displayedKiloSessionId === null && scope.displayedWorktreeId === null) {
-    return { kind: 'unavailable' };
+    return null;
   }
 
   const matchesChat =
@@ -36,7 +29,5 @@ export function resolveSessionBranchDisplay({
     metadata?.worktreeId === scope.displayedWorktreeId;
 
   const branch = matchesChat || matchesWorktree ? metadata?.branch?.trim() : undefined;
-  if (branch) return { kind: 'branch', branch };
-  if (isPreparing) return { kind: 'assigning' };
-  return { kind: 'unavailable' };
+  return branch || null;
 }

@@ -792,6 +792,8 @@ const preparationStepSchema = z.object({
   label: z.string(),
   status: z.enum(['running', 'completed', 'failed']),
   startedAt: z.number(),
+  startedRevision: z.number().optional(),
+  parentStepId: z.string().optional(),
   completedAt: z.number().optional(),
   revision: z.number(),
   latestDetail: z.string().optional(),
@@ -839,6 +841,7 @@ export const preparingDataSchema = z
       ])
       .optional(),
     stepId: z.string().optional(),
+    parentStepId: z.string().optional(),
     kind: z.enum(['phase', 'setup_command']).optional(),
     label: z.string().optional(),
     command: z.string().optional(),

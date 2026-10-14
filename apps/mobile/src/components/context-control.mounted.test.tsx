@@ -26,7 +26,7 @@ const appearance = vi.hoisted((): { colors: Record<string, string>; bottom: numb
     foreground: '#F2F0EB',
     mutedForeground: '#8A8680',
     border: 'rgba(255, 255, 255, 0.07)',
-    primary: '#E8F27A',
+    primary: '#FFDD00',
   },
   bottom: 18,
 }));

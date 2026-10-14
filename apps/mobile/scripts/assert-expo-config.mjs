@@ -319,7 +319,7 @@ check(
 const splashOptions = splashEntries[0]?.[1];
 check(
   splashOptions?.image === './assets/images/logo-mark.png' &&
-    splashOptions.backgroundColor === '#FAF74F' &&
+    splashOptions.backgroundColor === '#FFDD00' &&
     splashOptions.imageWidth === 100,
   'the shared native splash must match AnimatedSplashOverlay: yellow with the 100dp Kilo mark'
 );

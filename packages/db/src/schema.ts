@@ -12289,3 +12289,39 @@ export const stripe_service_fee_assessments = pgTable(
 
 export type StripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferSelect;
 export type NewStripeServiceFeeAssessment = typeof stripe_service_fee_assessments.$inferInsert;
+
+export const auto_routing_benchmark_holds = pgTable(
+  'auto_routing_benchmark_holds',
+  {
+    admission_id: text().notNull(),
+    owner_type: text().$type<'user' | 'org'>().notNull(),
+    owner_id: text().notNull(),
+    pair_key: text().notNull(),
+    model: text().notNull(),
+    variant: text(),
+    estimated_microdollars: bigint({ mode: 'number' }).notNull(),
+    charged_microdollars: bigint({ mode: 'number' }),
+    run_id: text(),
+    hold_credit_transaction_id: uuid()
+      .notNull()
+      .references(() => credit_transactions.id),
+    settlement_credit_transaction_id: uuid().references(() => credit_transactions.id),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    settled_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    primaryKey({
+      columns: [table.owner_type, table.owner_id, table.admission_id, table.pair_key],
+    }),
+    check('auto_routing_benchmark_holds_owner_check', sql`${table.owner_type} IN ('user', 'org')`),
+    check(
+      'auto_routing_benchmark_holds_amount_check',
+      sql`${table.estimated_microdollars} >= 0 AND (${table.charged_microdollars} IS NULL OR ${table.charged_microdollars} >= 0)`
+    ),
+    check(
+      'auto_routing_benchmark_holds_settlement_check',
+      sql`(${table.charged_microdollars} IS NULL AND ${table.settled_at} IS NULL AND ${table.settlement_credit_transaction_id} IS NULL AND ${table.run_id} IS NULL)
+        OR (${table.charged_microdollars} IS NOT NULL AND ${table.settled_at} IS NOT NULL AND ${table.settlement_credit_transaction_id} IS NOT NULL AND (${table.charged_microdollars} = 0 OR ${table.run_id} IS NOT NULL))`
+    ),
+  ]
+);

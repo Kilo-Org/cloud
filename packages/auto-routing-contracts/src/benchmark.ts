@@ -2,6 +2,7 @@ import * as z from 'zod';
 import {
   CustomRoutingTableSchema,
   EfficientModelPoolSchema,
+  BenchmarkPairSchema,
   PoolEntrySchema,
   poolEntryKey,
   RoutingTableSchema,
@@ -360,15 +361,17 @@ export const ClassifierWinnerResponseSchema = z.object({
 });
 export type ClassifierWinnerResponse = z.infer<typeof ClassifierWinnerResponseSchema>;
 
-// --- Benchmark profile registry (global per Pool entry + engine) ---
+// Benchmark profile registry (global per exact measurement pair + engine).
 
 /** Bounded failure text stored on failed profile rows. */
 export const BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH = 500;
 
 export const BenchmarkProfileEntryStatusSchema = z.object({
-  entry: PoolEntrySchema,
+  entry: BenchmarkPairSchema,
   status: BenchmarkProfileStatusSchema,
   failureReason: z.string().max(BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH).nullable().optional(),
+  estimatedCostUsd: z.number().nonnegative().optional(),
+  chargedCostUsd: z.number().nonnegative().nullable().optional(),
 });
 export type BenchmarkProfileEntryStatus = z.infer<typeof BenchmarkProfileEntryStatusSchema>;
 
@@ -400,9 +403,41 @@ export type RegisterBenchmarkProfilesRequest = z.infer<
   typeof RegisterBenchmarkProfilesRequestSchema
 >;
 
-export const BenchmarkProfileStatusesRequestSchema = z.object({
-  entries: EfficientModelPoolSchema,
+export const EstimateBenchmarkProfilesRequestSchema = RegisterBenchmarkProfilesRequestSchema;
+export type EstimateBenchmarkProfilesRequest = z.infer<
+  typeof EstimateBenchmarkProfilesRequestSchema
+>;
+
+export const EstimateBenchmarkProfilesResponseSchema = z.object({
+  estimatedCostUsd: z.number().nonnegative(),
+  pairs: z.array(
+    z.object({
+      entry: BenchmarkPairSchema,
+      status: BenchmarkProfileStatusSchema,
+      estimatedCostUsd: z.number().nonnegative(),
+      chargedCostUsd: z.number().nonnegative().nullable(),
+    })
+  ),
 });
+export type EstimateBenchmarkProfilesResponse = z.infer<
+  typeof EstimateBenchmarkProfilesResponseSchema
+>;
+
+export const BenchmarkProfileStatusesRequestSchema = z
+  .object({
+    entries: EfficientModelPoolSchema,
+    ownerType: BenchmarkProfileOwnerTypeSchema.optional(),
+    ownerId: z.string().trim().min(1).optional(),
+  })
+  .superRefine((request, ctx) => {
+    if ((request.ownerType === undefined) !== (request.ownerId === undefined)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['ownerId'],
+        message: 'ownerType and ownerId must be supplied together',
+      });
+    }
+  });
 export type BenchmarkProfileStatusesRequest = z.infer<typeof BenchmarkProfileStatusesRequestSchema>;
 
 export const BenchmarkProfileStatusesResponseSchema = z.object({

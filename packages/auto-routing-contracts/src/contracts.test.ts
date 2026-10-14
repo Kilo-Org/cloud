@@ -18,6 +18,8 @@ import {
   BenchmarkDeciderModelSchema,
   BenchmarkModelSummarySchema,
   BenchmarkProfileStatusesRequestSchema,
+  EstimateBenchmarkProfilesRequestSchema,
+  EstimateBenchmarkProfilesResponseSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
   RegisterBenchmarkProfilesRequestSchema,
@@ -590,25 +592,22 @@ describe('owner pool settings wire contracts', () => {
       mode: 'cost_per_accuracy',
       configuredMode: null,
       defaultMode: 'cost_per_accuracy',
-      configuredPool: [{ model: 'a/b', variant: null }],
+      configuredPool: [{ model: 'a/b' }],
       poolStatuses: [{ entry: { model: 'a/b', variant: null }, status: 'pending' }],
     });
     expect(parsed.poolStatuses).toHaveLength(1);
   });
 
   it('accepts optional retryEntries that are a subset of pool by poolEntryKey', () => {
-    const pool = [
-      { model: 'a/b', variant: null as string | null },
-      { model: 'c/d', variant: 'xhigh' as string | null },
-    ];
+    const pool = [{ model: 'a/b' }, { model: 'c/d' }];
     const parsed = UpdateAutoRoutingSettingsRequestSchema.parse({
       ownerType: 'user',
       ownerId: 'user-1',
       mode: 'cost_per_accuracy',
       pool,
-      retryEntries: [{ model: 'c/d', variant: 'xhigh' }],
+      retryEntries: [{ model: 'c/d' }],
     });
-    expect(parsed.retryEntries).toEqual([{ model: 'c/d', variant: 'xhigh' }]);
+    expect(parsed.retryEntries).toEqual([{ model: 'c/d' }]);
   });
 
   it('rejects retryEntries that are not in pool', () => {
@@ -616,8 +615,8 @@ describe('owner pool settings wire contracts', () => {
       ownerType: 'user',
       ownerId: 'user-1',
       mode: null,
-      pool: [{ model: 'a/b', variant: null }],
-      retryEntries: [{ model: 'other/model', variant: 'max' }],
+      pool: [{ model: 'a/b' }],
+      retryEntries: [{ model: 'other/model' }],
     });
     expect(result.success).toBe(false);
   });
@@ -628,16 +627,75 @@ describe('owner pool settings wire contracts', () => {
       ownerId: 'user-1',
       mode: null,
       pool: null,
-      retryEntries: [{ model: 'a/b', variant: null }],
+      retryEntries: [{ model: 'a/b' }],
     });
     expect(result.success).toBe(false);
   });
 });
 
+describe('benchmark estimate contracts', () => {
+  it('accepts model-level requests and exact effort-level charges', () => {
+    expect(
+      EstimateBenchmarkProfilesRequestSchema.parse({
+        ownerType: 'user',
+        ownerId: 'u1',
+        entries: [{ model: 'a/b' }],
+      }).entries
+    ).toEqual([{ model: 'a/b' }]);
+    const response = {
+      estimatedCostUsd: 2,
+      pairs: [
+        {
+          entry: { model: 'a/b', variant: 'high' },
+          status: 'pending',
+          estimatedCostUsd: 2,
+          chargedCostUsd: null,
+        },
+        {
+          entry: { model: 'a/b', variant: 'low' },
+          status: 'ready',
+          estimatedCostUsd: 0,
+          chargedCostUsd: 1,
+        },
+      ],
+    };
+    expect(EstimateBenchmarkProfilesResponseSchema.parse(response)).toEqual(response);
+    expect(
+      EstimateBenchmarkProfilesResponseSchema.safeParse({
+        ...response,
+        estimatedCostUsd: -1,
+      }).success
+    ).toBe(false);
+  });
+});
+
+it('requires both owner fields for owner-scoped profile charges', () => {
+  const entries = [{ model: 'a/b' }];
+  expect(BenchmarkProfileStatusesRequestSchema.safeParse({ entries }).success).toBe(true);
+  expect(
+    BenchmarkProfileStatusesRequestSchema.safeParse({
+      entries,
+      ownerType: 'user',
+      ownerId: 'u1',
+    }).success
+  ).toBe(true);
+  expect(
+    BenchmarkProfileStatusesRequestSchema.safeParse({
+      entries,
+      ownerType: 'user',
+    }).success
+  ).toBe(false);
+  expect(
+    BenchmarkProfileStatusesRequestSchema.safeParse({
+      entries,
+      ownerId: 'u1',
+    }).success
+  ).toBe(false);
+});
+
 describe('benchmark profile request entry bounds', () => {
   const eleven = Array.from({ length: 11 }, (_, i) => ({
     model: `model/${i}`,
-    variant: null as string | null,
   }));
 
   it('bounds RegisterBenchmarkProfilesRequestSchema entries at 10', () => {
@@ -667,10 +725,7 @@ describe('benchmark profile request entry bounds', () => {
   });
 
   it('accepts optional retryEntries that are a subset of entries', () => {
-    const entries = [
-      { model: 'a/b', variant: null as string | null },
-      { model: 'c/d', variant: 'xhigh' as string | null },
-    ];
+    const entries = [{ model: 'a/b' }, { model: 'c/d' }];
     expect(
       RegisterBenchmarkProfilesRequestSchema.safeParse({
         ownerType: 'user',
@@ -683,7 +738,7 @@ describe('benchmark profile request entry bounds', () => {
         ownerType: 'user',
         ownerId: 'u1',
         entries,
-        retryEntries: [{ model: 'a/b', variant: null }],
+        retryEntries: [{ model: 'a/b' }],
       }).success
     ).toBe(true);
   });
@@ -692,8 +747,8 @@ describe('benchmark profile request entry bounds', () => {
     const result = RegisterBenchmarkProfilesRequestSchema.safeParse({
       ownerType: 'org',
       ownerId: 'o1',
-      entries: [{ model: 'a/b', variant: null }],
-      retryEntries: [{ model: 'other/model', variant: 'max' }],
+      entries: [{ model: 'a/b' }],
+      retryEntries: [{ model: 'other/model' }],
     });
     expect(result.success).toBe(false);
   });

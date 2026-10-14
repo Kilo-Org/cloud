@@ -1,4 +1,8 @@
-import { ClassifierOutputSchema, type ClassifierOutput } from '@kilocode/auto-routing-contracts';
+import {
+  BenchmarkPairSchema,
+  ClassifierOutputSchema,
+  type ClassifierOutput,
+} from '@kilocode/auto-routing-contracts';
 import { DurableObject } from 'cloudflare:workers';
 import * as z from 'zod';
 
@@ -86,8 +90,7 @@ function entryKey(contentHash: string, classifierModel: string): string {
 // Cannot collide with classification keys, which always contain a ':'.
 const STICKY_DECISION_KEY = 'sticky';
 
-const StickyDecisionSchema = z.object({
-  model: z.string().min(1),
+const StickyDecisionSchema = BenchmarkPairSchema.extend({
   // Taxonomy route the model was decided on, for route-change telemetry.
   // Nullable/defaulted so entries written before the field existed parse.
   routeKey: z.string().min(1).nullish().default(null),

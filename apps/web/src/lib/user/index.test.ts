@@ -1,7 +1,13 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  reserveBenchmarkCredits,
+  settleBenchmarkCredits,
+} from '@/lib/auto-routing-benchmark-billing';
+import { recomputeUserBalances } from '@/lib/user/recompute-balances';
+import {
   payment_methods,
+  auto_routing_benchmark_holds,
   kilocode_users,
   user_affiliate_attributions,
   user_affiliate_events,
@@ -277,6 +283,7 @@ describe('User', () => {
     await db.delete(kilo_pass_issuance_items);
     await db.delete(kilo_pass_issuances);
     await db.delete(kilo_pass_subscriptions);
+    await db.delete(auto_routing_benchmark_holds);
     await db.delete(credit_transactions);
     await db.delete(enrichment_data);
     await db.delete(referral_code_usages);
@@ -1942,6 +1949,72 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('retains financial benchmark holds for settlement and recomputation after anonymization', async () => {
+      const user = await insertTestUser({ total_microdollars_acquired: 10_000_000 });
+      const otherUser = await insertTestUser({ total_microdollars_acquired: 10_000_000 });
+      const organization = await createTestOrganization('Benchmark privacy', user.id, 10_000_000);
+      const admissionId = randomUUID();
+      const items = [{ model: 'test/privacy-model', variant: null, estimatedCostUsd: 1 }];
+      await reserveBenchmarkCredits({
+        admissionId,
+        ownerType: 'user',
+        ownerId: user.id,
+        items: [...items, { model: 'test/privacy-model', variant: 'high', estimatedCostUsd: 1 }],
+      });
+      await settleBenchmarkCredits({
+        admissionId,
+        ownerType: 'user',
+        ownerId: user.id,
+        model: 'test/privacy-model',
+        variant: 'high',
+        runId: 'settled-run',
+        actualCostUsd: 0.5,
+      });
+      await reserveBenchmarkCredits({
+        admissionId,
+        ownerType: 'user',
+        ownerId: otherUser.id,
+        items,
+      });
+      await reserveBenchmarkCredits({
+        admissionId,
+        ownerType: 'org',
+        ownerId: organization.id,
+        items,
+      });
+      const [personalHold] = await db
+        .select()
+        .from(auto_routing_benchmark_holds)
+        .where(eq(auto_routing_benchmark_holds.owner_id, user.id));
+      if (!personalHold) throw new Error('Missing personal benchmark hold');
+
+      await softDeleteUser(user.id);
+
+      const remaining = await db.select().from(auto_routing_benchmark_holds);
+      expect(remaining.map(hold => hold.owner_id).sort()).toEqual(
+        [user.id, user.id, otherUser.id, organization.id].sort()
+      );
+      expect(
+        await db
+          .select()
+          .from(credit_transactions)
+          .where(eq(credit_transactions.id, personalHold.hold_credit_transaction_id))
+      ).toHaveLength(1);
+      await settleBenchmarkCredits({
+        admissionId,
+        ownerType: 'user',
+        ownerId: user.id,
+        model: 'test/privacy-model',
+        variant: null,
+        runId: null,
+        actualCostUsd: 0,
+      });
+      const recomputed = await recomputeUserBalances({ userId: user.id, dryRun: true });
+      expect(recomputed.success).toBe(true);
+      if (!recomputed.success) throw new Error(recomputed.error);
+      expect(recomputed.user_update.microdollars_used).toBe(500_000);
+    });
+
     it('scrubs worktree names without removing deletion fences or another owner’s names', async () => {
       const user = await insertTestUser();
       const otherUser = await insertTestUser();

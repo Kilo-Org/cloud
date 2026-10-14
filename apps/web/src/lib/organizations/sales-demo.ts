@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   compute_usage_charge,
+  auto_routing_benchmark_holds,
   credit_transactions,
   exa_usage_log,
   kilocode_users,
@@ -286,6 +287,14 @@ export async function restoreSalesDemoOrganization(args: {
   await txn
     .delete(compute_usage_charge)
     .where(eq(compute_usage_charge.organization_id, organizationId));
+  await txn
+    .delete(auto_routing_benchmark_holds)
+    .where(
+      and(
+        eq(auto_routing_benchmark_holds.owner_type, 'org'),
+        eq(auto_routing_benchmark_holds.owner_id, organizationId)
+      )
+    );
   await txn
     .delete(credit_transactions)
     .where(eq(credit_transactions.organization_id, organizationId));

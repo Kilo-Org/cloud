@@ -39,12 +39,14 @@ design, invariants, and rollout/rollback.
 - If the catalog fails or omits a selected model, reconciliation fails. It does not infer a default effort.
 - Catalog requests have a 10-second deadline, including body reads, so a stalled response cannot block both queues indefinitely.
 - Manual and automatic selections use the same expansion. Existing saved effort selections no longer restrict platform measurements.
-- Owner pools still select exact pairs. Platform expansion does not change their entries.
+- Owner pools use the same model-level selection and all-efforts expansion.
 
 Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
 The worker drains expanded entries in batches that fit the configured container budget.
 New routing tables rank exact pairs and emit `variant`, not `reasoningEffort`.
-Legacy nullable storage columns remain; this change requires no migration.
+Legacy nullable variant columns remain. Owner billing adds D1 admission/claim
+tables and a Postgres hold ledger; apply both database migrations before
+deploying the corresponding Workers and web bridge.
 
 The admin panel shows measured coverage and pending, running, or failed efforts per model.
 Each route starts collapsed with its first-ranked pair, accuracy, and cost.
@@ -75,17 +77,20 @@ All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
 | `GET /admin/routing-table` | Latest published **platform** routing table |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
-| `POST /admin/profiles/register` | Atomically admit missing/stale/retried global Benchmark profiles for an owner (quota 10/24h) |
-| `POST /admin/profiles/status` | Current statuses for up to 10 exact Pool entries (may free-admit engine-drifted rows) |
-| `POST /admin/custom-routing-table` | Assemble a **sparse** custom table for ready/current entries only (`table: null` → balanced fallback) |
+| `POST /admin/profiles/estimate` | Quote uncached measurements for all current catalog efforts of the selected pool models |
+| `POST /admin/profiles/register` | Hold owner credits, then admit missing/stale/retried profiles (quota 10 models/24h) |
+| `POST /admin/profiles/status` | Read current per-effort coverage and owner-scoped charges without admitting work |
+| `POST /admin/custom-routing-table` | Rank ready/current exact pairs for the selected models (`table: null` → balanced fallback) |
 
 ## Owner pools and Benchmark profiles
 
 Owners (personal users or organizations) can constrain `kilo-auto/efficient` to
-1–10 exact `(model, canonical variant)` **Pool entries**. The pool itself lives
-in the auto-routing Durable Object; this worker owns **global Benchmark
-profiles** — per-route measurements for each exact pair under the current
-benchmark engine identity and decider repetitions.
+1–10 **pool models**. The pool lives in the auto-routing Durable Object, whose
+read path collapses and deduplicates legacy exact-pair pools. Each selected model
+expands through the live catalog into every supported reasoning effort, or one
+default pair when there are no reasoning controls. This worker measures exact
+model-effort pairs globally under the current engine identity and repetitions.
+Custom tables rank every measured pair; the router, not the owner, chooses effort.
 
 ### The two registry queues
 
@@ -114,20 +119,38 @@ untouched — it only ever draws on rows the platform list asks for.
 
 ### Request ledger and admission
 
-`POST /admin/profiles/register` evaluates every submitted entry in one D1 batch:
+Before saving, the owner UI requests a quote and displays model effort coverage
+and charges. The quote is advisory: admission recomputes which pairs need work.
+Already ready/current or pending/running pairs cost nothing to another owner.
 
-- Ready/current or already pending/running global profiles are reported without
-  charging quota.
-- Globally new, engine-stale, or explicitly retried-failed profiles are admitted
-  as `pending` while the owner has fewer than **10** charged admissions in the
-  rolling 24h window (`profile_request_events`). Over-limit → 429, nothing written.
-- Concurrent owners requesting the same exact pair + engine identity dedupe to
-  one global row.
+For each pair needing measurement, the estimate is case count × repetitions ×
+historical average case cost for that model. Without history, catalog token prices
+use a conservative per-case allowance of 100,000 input tokens, 50,000 output
+tokens, and 32 requests. Missing usable prices and measurements reject admission.
 
-Admission is all-or-nothing and returns before the caller's Durable Object
-settings write. If that later write fails, the owner's previous pool is kept,
-admitted profiles stay pending globally, the single-slot drain still runs them,
-and a later retry reports them without re-charging quota.
+`POST /admin/profiles/register` claims each pair durably before reserving credits
+through the authenticated web billing bridge. Organization pools use organization
+credits; personal pools use user credits. Insufficient balance returns 402 before
+any claimed pair becomes runnable. The rolling quota counts models, not efforts;
+engine-stale remeasurement remains quota-free but still requires owner credits.
+Concurrent requests share one global pair: the first successful claim pays, while
+other owners reuse the paid profile for free. An allocating claim returns 409
+rather than exposing unpaid work as a cached measurement.
+
+Postgres holds debit the existing acquired-credit ledger atomically with the
+payer lock. Settlement reverses the hold and records actual benchmark usage in
+the payer's used-credit counter; settled holds supply that usage to balance
+recomputation so expiring credits cannot double-charge it. Settlement is
+idempotent per admission, owner and exact pair, bound to the measuring run.
+Successful pairs charge the sum of their measured case costs and release the
+held remainder; failed pairs release their entire hold,
+including partial failed-lane measurements. Actual cost exceeding the estimate
+is charged in full. D1 admission and settlement records retain retryable work;
+scheduled recovery reconciles interrupted credit calls and terminal runs.
+
+Admission returns before the caller's Durable Object settings write. If that
+write fails, the previous pool remains, but authorized measurements still run.
+Retrying uses the same global profiles without charging credits or quota twice.
 
 ### Status transitions and drain
 

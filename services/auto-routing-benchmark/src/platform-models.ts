@@ -12,6 +12,14 @@ export const BenchmarkModelCatalogSchema = z.object({
     z.object({
       id: z.string().trim().min(1),
       opencode: z.object({ variants: BenchmarkCatalogVariantsSchema.optional() }).optional(),
+      pricing: z
+        .object({
+          prompt: z.string(),
+          completion: z.string(),
+          request: z.string().optional(),
+        })
+        .nullable()
+        .optional(),
     })
   ),
 });
@@ -39,15 +47,38 @@ export function platformRegistryEntries(
   return entries;
 }
 
+export async function fetchBenchmarkModelCatalog(
+  env: { KILO_WEB_API_BASE_URL: string },
+  fetchImpl: typeof fetch = fetch
+): Promise<z.infer<typeof BenchmarkModelCatalogSchema>> {
+  const response = await fetchImpl(new URL('/api/openrouter/models', env.KILO_WEB_API_BASE_URL), {
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error(`benchmark model catalog failed: HTTP ${response.status}`);
+  return BenchmarkModelCatalogSchema.parse(await response.json());
+}
+
 export async function fetchPlatformRegistryEntries(
   env: { KILO_WEB_API_BASE_URL: string },
   config: Pick<BenchmarkConfig, 'deciderModels'>,
   fetchImpl: typeof fetch = fetch
 ): Promise<RunModelEntry[]> {
-  const response = await fetchImpl(new URL('/api/openrouter/models', env.KILO_WEB_API_BASE_URL), {
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!response.ok) throw new Error(`benchmark model catalog failed: HTTP ${response.status}`);
-  const catalog = BenchmarkModelCatalogSchema.parse(await response.json());
-  return platformRegistryEntries(config, catalog);
+  return platformRegistryEntries(config, await fetchBenchmarkModelCatalog(env, fetchImpl));
+}
+
+export function catalogFallbackCaseCosts(
+  catalog: z.infer<typeof BenchmarkModelCatalogSchema>
+): Map<string, number> {
+  const costs = new Map<string, number>();
+  for (const model of catalog.data) {
+    if (!model.pricing) continue;
+    const prompt = Number(model.pricing.prompt);
+    const completion = Number(model.pricing.completion);
+    const request = Number(model.pricing.request ?? '0');
+    if (![prompt, completion, request].every(price => Number.isFinite(price) && price >= 0)) {
+      continue;
+    }
+    costs.set(model.id, 100_000 * prompt + 50_000 * completion + 32 * request);
+  }
+  return costs;
 }

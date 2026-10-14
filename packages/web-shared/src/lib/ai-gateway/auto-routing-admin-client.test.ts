@@ -1,4 +1,5 @@
 import {
+  estimateAutoRoutingProfiles,
   getAutoRoutingClassifierAnalytics,
   getAutoRoutingClassifierModel,
   getAutoRoutingSettings,
@@ -45,7 +46,7 @@ const settingsResponse = {
   mode: 'cost_per_accuracy',
   configuredMode: null,
   defaultMode: 'cost_per_accuracy',
-  configuredPool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+  configuredPool: [{ model: 'google/gemini-2.5-flash' }],
   poolStatuses: [
     {
       entry: { model: 'google/gemini-2.5-flash', variant: null },
@@ -57,6 +58,35 @@ const settingsResponse = {
 describe('auto routing admin client', () => {
   beforeEach(() => {
     mockFetch.mockReset();
+  });
+
+  it('requests owner estimates through the authorized auto-routing proxy', async () => {
+    const body = {
+      estimatedCostUsd: 0.2,
+      pairs: [
+        {
+          entry: { model: 'google/gemini-2.5-flash', variant: null },
+          status: 'pending',
+          estimatedCostUsd: 0.2,
+          chargedCostUsd: null,
+        },
+      ],
+    };
+    mockFetch.mockResolvedValue({ status: 200, ok: true, json: () => Promise.resolve(body) });
+    const request = {
+      ownerType: 'user' as const,
+      ownerId: 'user-1',
+      entries: [{ model: 'google/gemini-2.5-flash' }],
+    };
+    expect(await estimateAutoRoutingProfiles(request)).toEqual({ status: 200, body });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://auto-routing.example.com/admin/profiles/estimate',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ authorization: expect.stringMatching(/^Bearer /) }),
+        body: JSON.stringify(request),
+      })
+    );
   });
 
   it('gets the classifier model using worker bearer auth', async () => {
@@ -182,8 +212,8 @@ describe('auto routing admin client', () => {
       ownerType: 'org',
       ownerId: 'org-1',
       mode: 'best_accuracy',
-      pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
-      retryEntries: [{ model: 'google/gemini-2.5-flash', variant: null }],
+      pool: [{ model: 'google/gemini-2.5-flash' }],
+      retryEntries: [{ model: 'google/gemini-2.5-flash' }],
     });
 
     expect(mockFetch).toHaveBeenCalledWith(
@@ -198,8 +228,8 @@ describe('auto routing admin client', () => {
           ownerType: 'org',
           ownerId: 'org-1',
           mode: 'best_accuracy',
-          pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
-          retryEntries: [{ model: 'google/gemini-2.5-flash', variant: null }],
+          pool: [{ model: 'google/gemini-2.5-flash' }],
+          retryEntries: [{ model: 'google/gemini-2.5-flash' }],
         }),
       }
     );
@@ -221,7 +251,7 @@ describe('auto routing admin client', () => {
         ownerType: 'user',
         ownerId: 'user-1',
         mode: null,
-        pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+        pool: [{ model: 'google/gemini-2.5-flash' }],
       })
     ).resolves.toEqual({
       status: 429,

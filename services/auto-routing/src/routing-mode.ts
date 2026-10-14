@@ -1,7 +1,7 @@
 import {
   AutoRoutingModeSchema,
   DEFAULT_AUTO_ROUTING_MODE,
-  EfficientModelPoolSchema,
+  PersistedEfficientModelPoolSchema,
   type AutoRoutingMode,
   type AutoRoutingModeOwnerType,
   type EfficientModelPool,
@@ -28,11 +28,6 @@ function parseStoredMode(raw: unknown): AutoRoutingMode | null {
   return parsed.success ? parsed.data : null;
 }
 
-function parseStoredPool(raw: unknown): EfficientModelPool | null {
-  const parsed = EfficientModelPoolSchema.safeParse(raw);
-  return parsed.success ? parsed.data : null;
-}
-
 export class AutoRoutingModeConfigDO extends DurableObject<Env> {
   async getMode(): Promise<AutoRoutingMode | null> {
     return parseStoredMode(await this.ctx.storage.get(MODE_STORAGE_KEY));
@@ -47,7 +42,15 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
   }
 
   async getPool(): Promise<EfficientModelPool | null> {
-    return parseStoredPool(await this.ctx.storage.get(POOL_STORAGE_KEY));
+    return this.ctx.storage.transaction(async txn => {
+      const raw = await txn.get(POOL_STORAGE_KEY);
+      const parsed = PersistedEfficientModelPoolSchema.safeParse(raw);
+      if (!parsed.success) return null;
+      if (JSON.stringify(raw) !== JSON.stringify(parsed.data)) {
+        await txn.put(POOL_STORAGE_KEY, parsed.data);
+      }
+      return parsed.data;
+    });
   }
 
   async setPool(pool: EfficientModelPool | null): Promise<void> {

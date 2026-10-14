@@ -3,6 +3,7 @@ import {
   BenchmarkConfigSchema,
   BenchmarkKindSchema,
   BenchmarkProfileStatusesRequestSchema,
+  EstimateBenchmarkProfilesRequestSchema,
   BenchmarkRunPurposeSchema,
   CustomRoutingTableRequestSchema,
   RegisterBenchmarkProfilesRequestSchema,
@@ -18,6 +19,9 @@ import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
 import { debugRunCli } from './cli-runner';
 import { assembleCustomRoutingTable } from './custom-routing-table';
 import {
+  estimateProfiles,
+  ProfileAdmissionInProgressError,
+  ProfileInsufficientCreditsError,
   lookupProfileStatuses,
   ProfileConfigMissingError,
   ProfileQuotaExceededError,
@@ -44,6 +48,12 @@ import {
   requeueFailedCurrentProfiles,
 } from './db';
 import type { HonoEnv } from './hono-env';
+import { createProfileCreditBridge } from './profile-billing';
+import {
+  catalogFallbackCaseCosts,
+  fetchBenchmarkModelCatalog,
+  platformRegistryEntries,
+} from './platform-models';
 
 const DebugCliRequestSchema = z.object({
   model: z.string().trim().min(1),
@@ -237,7 +247,56 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
   );
 
-  // Atomically admit missing/stale/retried Benchmark profiles for an owner.
+  app.post(
+    '/admin/profiles/estimate',
+    zodJsonValidator(EstimateBenchmarkProfilesRequestSchema, {
+      errorMessage: 'Invalid profile estimate request',
+    }),
+    async c => {
+      const body = c.req.valid('json');
+      const config = await getBenchmarkConfig(c.env.BENCH_DB);
+      if (!config) return c.json({ error: 'benchmark config not set' }, 400);
+      try {
+        const catalog = await fetchBenchmarkModelCatalog(c.env);
+        const available = new Set(catalog.data.map(model => model.id));
+        for (const entry of body.entries) {
+          if (!available.has(entry.model)) {
+            throw new ProfileValidationError(
+              `Model is unavailable in the current catalog: ${entry.model}`
+            );
+          }
+        }
+        const pairs = platformRegistryEntries(
+          { deciderModels: body.entries.map(entry => ({ id: entry.model })) },
+          catalog
+        );
+        const retryModels = new Set((body.retryEntries ?? []).map(entry => entry.model));
+        const result = await estimateProfiles(c.env.BENCH_DB, config, {
+          pairs,
+          retryPairs: pairs.filter(pair => retryModels.has(pair.model)),
+          fallbackCaseCostUsd: catalogFallbackCaseCosts(catalog),
+        });
+        return c.json({
+          estimatedCostUsd: result.statuses.reduce(
+            (total, pair) => total + (pair.estimatedCostUsd ?? 0),
+            0
+          ),
+          pairs: result.statuses.map(pair => ({
+            ...pair,
+            estimatedCostUsd: pair.estimatedCostUsd ?? 0,
+            chargedCostUsd: pair.chargedCostUsd ?? null,
+          })),
+        });
+      } catch (error) {
+        if (error instanceof ProfileAdmissionInProgressError) {
+          return c.json({ error: error.message }, 409);
+        }
+        if (error instanceof ProfileValidationError) return c.json({ error: error.message }, 400);
+        throw error;
+      }
+    }
+  );
+
   app.post(
     '/admin/profiles/register',
     zodJsonValidator(RegisterBenchmarkProfilesRequestSchema, {
@@ -256,14 +315,46 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         );
       }
       try {
+        const catalog = await fetchBenchmarkModelCatalog(c.env);
+        const available = new Set(catalog.data.map(model => model.id));
+        for (const entry of body.entries) {
+          if (!available.has(entry.model)) {
+            throw new ProfileValidationError(
+              `Model is unavailable in the current catalog: ${entry.model}`
+            );
+          }
+        }
+        const pairs = platformRegistryEntries(
+          { deciderModels: body.entries.map(entry => ({ id: entry.model })) },
+          catalog
+        );
+        const retryModels = new Set((body.retryEntries ?? []).map(entry => entry.model));
         const result = await registerProfiles(c.env.BENCH_DB, config, {
           ownerType: body.ownerType,
           ownerId: body.ownerId,
-          entries: body.entries,
-          retryEntries: body.retryEntries,
+          pairs,
+          retryPairs: pairs.filter(pair => retryModels.has(pair.model)),
+          fallbackCaseCostUsd: catalogFallbackCaseCosts(catalog),
+          billing: createProfileCreditBridge({
+            webUrl: c.env.KILO_WEB_API_BASE_URL,
+            internalApiSecret: await c.env.INTERNAL_API_SECRET_PROD.get(),
+          }),
         });
         return c.json(result);
       } catch (error) {
+        if (error instanceof ProfileInsufficientCreditsError) {
+          return c.json(
+            {
+              error: `Insufficient credits for pool benchmarks. Required $${error.requiredCostUsd.toFixed(2)}; available $${error.availableCostUsd.toFixed(2)}.`,
+              availableCostUsd: error.availableCostUsd,
+              requiredCostUsd: error.requiredCostUsd,
+            },
+            402
+          );
+        }
+        if (error instanceof ProfileAdmissionInProgressError) {
+          return c.json({ error: error.message }, 409);
+        }
         if (error instanceof ProfileQuotaExceededError) {
           return c.json(error.quota, 429);
         }
@@ -275,7 +366,6 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
     }
   );
 
-  // Current per-entry Benchmark-profile statuses (may free-admit stale rows).
   app.post(
     '/admin/profiles/status',
     zodJsonValidator(BenchmarkProfileStatusesRequestSchema, {
@@ -294,9 +384,35 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         );
       }
       try {
-        return c.json(
-          await lookupProfileStatuses(c.env.BENCH_DB, config, { entries: body.entries })
+        const catalog = await fetchBenchmarkModelCatalog(c.env);
+        const available = new Set(catalog.data.map(model => model.id));
+        const supported = body.entries.filter(entry => available.has(entry.model));
+        const pairs = platformRegistryEntries(
+          { deciderModels: supported.map(entry => ({ id: entry.model })) },
+          catalog
         );
+        const result =
+          pairs.length > 0
+            ? await lookupProfileStatuses(c.env.BENCH_DB, config, {
+                pairs,
+                ownerType: body.ownerType,
+                ownerId: body.ownerId,
+              })
+            : { statuses: [] };
+        return c.json({
+          statuses: [
+            ...result.statuses,
+            ...body.entries
+              .filter(entry => !available.has(entry.model))
+              .map(entry => ({
+                entry: { model: entry.model, variant: null },
+                status: 'failed',
+                failureReason: 'Model is unavailable in the current catalog.',
+                estimatedCostUsd: 0,
+                chargedCostUsd: 0,
+              })),
+          ],
+        });
       } catch (error) {
         if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {
           return c.json({ error: error.message }, 400);
@@ -325,7 +441,21 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         );
       }
       try {
-        return c.json(await assembleCustomRoutingTable(c.env.BENCH_DB, config, body.entries));
+        const catalog = await fetchBenchmarkModelCatalog(c.env);
+        const available = new Set(catalog.data.map(model => model.id));
+        const pairs = platformRegistryEntries(
+          {
+            deciderModels: body.entries
+              .filter(entry => available.has(entry.model))
+              .map(entry => ({ id: entry.model })),
+          },
+          catalog
+        );
+        return c.json(
+          pairs.length > 0
+            ? await assembleCustomRoutingTable(c.env.BENCH_DB, config, pairs)
+            : { table: null }
+        );
       } catch (error) {
         if (error instanceof ProfileValidationError || error instanceof ProfileConfigMissingError) {
           return c.json({ error: error.message }, 400);

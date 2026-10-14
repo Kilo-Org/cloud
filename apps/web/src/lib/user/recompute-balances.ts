@@ -11,9 +11,10 @@ import {
   microdollar_usage,
   exa_usage_log,
   compute_usage_charge,
+  auto_routing_benchmark_holds,
   type User,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, gt, asc } from 'drizzle-orm';
+import { eq, and, isNull, gt, asc, sql } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
 import { computeExpiration } from '@kilocode/web-shared/lib/creditExpiration';
@@ -35,6 +36,7 @@ export type MigrationResult = Result<UserBalanceUpdates, string>;
  * - microdollars_used = sum(personal microdollar_usage.cost)
  *   + sum(personal exa_usage_log.cost_microdollars where charged_to_balance)
  *   + sum(compute_usage_charge.amount_microdollars where user_id matches)
+ *   + sum(settled personal auto_routing_benchmark_holds.charged_microdollars)
  * - total_microdollars_acquired = sum(credit_transactions) [including any new adjustment]
  * - All expiring credit transactions have expiration_baseline_microdollars_used set
  */
@@ -120,7 +122,24 @@ async function fetchUserBalanceData(userId: string) {
     )
     .orderBy(asc(compute_usage_charge.created_at));
 
-  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage, computeUsage);
+  const benchmarkUsage = await db
+    .select({
+      cost: sql<number>`${auto_routing_benchmark_holds.charged_microdollars}`.mapWith(Number),
+      created_at: sql<string>`${auto_routing_benchmark_holds.settled_at}`.mapWith(
+        auto_routing_benchmark_holds.settled_at
+      ),
+    })
+    .from(auto_routing_benchmark_holds)
+    .where(
+      and(
+        eq(auto_routing_benchmark_holds.owner_type, 'user'),
+        eq(auto_routing_benchmark_holds.owner_id, userId),
+        gt(auto_routing_benchmark_holds.charged_microdollars, 0)
+      )
+    )
+    .orderBy(asc(auto_routing_benchmark_holds.settled_at));
+
+  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage, computeUsage, benchmarkUsage);
 
   const creditTransactions = await db
     .select({
@@ -150,8 +169,7 @@ export function computeUserBalanceUpdates(
   const { user, usageRecords, creditTransactions } = data;
 
   // Compute total usage AND original baselines in a single pass.
-  // usageRecords contains LLM, Exa, and metered-compute charges, merge-sorted
-  // by created_at, so baselines are computed at the correct points in time.
+  // Interleave all spend sources chronologically for credit-expiration baselines.
   const computedOriginalBaselines = new Map<string, number>();
   let usageIdx = 0;
   let cumulativeUsage = 0;

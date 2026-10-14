@@ -8,11 +8,25 @@ import type {
   RankedCandidate,
   RoutingTable,
 } from '@kilocode/auto-routing-contracts';
-import { poolEntryKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
-import type { PoolEntry } from '@kilocode/auto-routing-contracts';
+import { benchmarkPairKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
+import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, count, desc, eq, gt, inArray, lt, ne, notInArray, or } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  exists,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  ne,
+  notInArray,
+  or,
+} from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import {
   benchmarkConfig,
@@ -24,6 +38,7 @@ import {
   configClassifierModels,
   configDeciderModels,
   modelSummaries,
+  profileBenchmarkClaims,
   routingTableCandidates,
   routingTables,
   runLaneFailures,
@@ -571,18 +586,18 @@ function boundProfileFailureReason(reason: string): string {
 export async function markProfilesRunningForRun(
   db: D1Database,
   runId: string,
-  entries: readonly PoolEntry[],
+  entries: readonly BenchmarkPair[],
   current: { engineIdentity: string; repetitions: number },
   nowIso: string = new Date().toISOString()
-): Promise<PoolEntry[]> {
+): Promise<BenchmarkPair[]> {
   if (entries.length === 0) return [];
   const orm = drizzle(db);
   // Returns the entries this run actually claimed. An entry already claimed by
   // the other queue's run updates 0 rows and is dropped, so the pair is
   // measured once instead of being benchmarked (and billed) twice.
-  const claimed: PoolEntry[] = [];
+  const claimed: BenchmarkPair[] = [];
   for (const entry of entries) {
-    const result = await orm
+    const claimProfile = orm
       .update(benchmarkProfiles)
       .set({
         status: 'running',
@@ -603,6 +618,36 @@ export async function markProfilesRunningForRun(
           )
         )
       );
+    const linkBillingClaim = orm
+      .update(profileBenchmarkClaims)
+      .set({ run_id: runId, updated_at: nowIso })
+      .where(
+        and(
+          eq(profileBenchmarkClaims.model, entry.model),
+          eq(profileBenchmarkClaims.variant, variantToStorage(entry.variant)),
+          eq(profileBenchmarkClaims.engine_identity, current.engineIdentity),
+          eq(profileBenchmarkClaims.repetitions, current.repetitions),
+          eq(profileBenchmarkClaims.state, 'admitted'),
+          isNull(profileBenchmarkClaims.terminal_status),
+          or(isNull(profileBenchmarkClaims.run_id), eq(profileBenchmarkClaims.run_id, runId)),
+          exists(
+            orm
+              .select({ model: benchmarkProfiles.model })
+              .from(benchmarkProfiles)
+              .where(
+                and(
+                  eq(benchmarkProfiles.model, entry.model),
+                  eq(benchmarkProfiles.variant, variantToStorage(entry.variant)),
+                  eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+                  eq(benchmarkProfiles.repetitions, current.repetitions),
+                  eq(benchmarkProfiles.status, 'running'),
+                  eq(benchmarkProfiles.run_id, runId)
+                )
+              )
+          )
+        )
+      );
+    const [result] = await orm.batch([claimProfile, linkBillingClaim]);
     if ((result.meta.changes ?? 0) > 0) claimed.push(entry);
   }
   return claimed;
@@ -1026,7 +1071,7 @@ export function clearPlatformRequestedStatement(
 export async function listReadyCurrentProfilesForEntries(
   db: D1Database,
   current: { engineIdentity: string; repetitions: number },
-  entries: readonly PoolEntry[]
+  entries: readonly BenchmarkPair[]
 ): Promise<Array<{ model: string; variant: string; run_id: string | null }>> {
   if (entries.length === 0) return [];
   const models = [...new Set(entries.map(e => e.model))];
@@ -1154,10 +1199,24 @@ export async function failOrphanedRunningProfiles(
 
 /** Release rows this run claimed back to `pending` (claim made, run never written). */
 export async function releaseProfileClaims(db: D1Database, runId: string): Promise<void> {
-  await drizzle(db)
-    .update(benchmarkProfiles)
-    .set({ status: 'pending', run_id: null, updated_at: new Date().toISOString() })
-    .where(and(eq(benchmarkProfiles.run_id, runId), eq(benchmarkProfiles.status, 'running')));
+  const orm = drizzle(db);
+  const nowIso = new Date().toISOString();
+  await orm.batch([
+    orm
+      .update(profileBenchmarkClaims)
+      .set({ run_id: null, updated_at: nowIso })
+      .where(
+        and(
+          eq(profileBenchmarkClaims.run_id, runId),
+          eq(profileBenchmarkClaims.state, 'admitted'),
+          isNull(profileBenchmarkClaims.terminal_status)
+        )
+      ),
+    orm
+      .update(benchmarkProfiles)
+      .set({ status: 'pending', run_id: null, updated_at: nowIso })
+      .where(and(eq(benchmarkProfiles.run_id, runId), eq(benchmarkProfiles.status, 'running'))),
+  ]);
 }
 
 export async function listStaleRunningDeciderRuns(
@@ -1177,7 +1236,7 @@ export async function listStaleRunningDeciderRuns(
   return rows.map(r => ({ id: r.id, purpose: r.purpose === 'user' ? 'user' : 'platform' }));
 }
 
-// What the most recent completed run measured for an exact Pool entry, plus
+// What the most recent completed run measured for an exact benchmark pair, plus
 // the benchmark identity it was measured under. startRun carries these
 // summaries into a new run only when the identity (engine + repetitions +
 // exact variant) still matches; otherwise the entry is re-benchmarked.
@@ -1196,13 +1255,13 @@ export type PriorModelResult = {
 
 /**
  * Canonical map key for an exact (model, variant) pair. Uses the shared
- * poolEntryKey contract helper so keys stay collision-safe.
+ * benchmarkPairKey contract helper so keys stay collision-safe.
  */
 export function exactPairKey(model: string, variant: string | null | undefined): string {
-  return poolEntryKey({ model, variant: variant ?? null });
+  return benchmarkPairKey({ model, variant: variant ?? null });
 }
 
-// Latest summaries per exact Pool entry for a benchmark kind: for each
+// Latest summaries per exact benchmark pair for a benchmark kind: for each
 // (model, variant), all routes from the most recent COMPLETED run that
 // included that pair (mixing routes across runs would pair incomparable numbers).
 export async function getLatestSummariesByModel(

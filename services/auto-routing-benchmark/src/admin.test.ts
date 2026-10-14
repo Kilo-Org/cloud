@@ -8,6 +8,7 @@ import {
 import { app } from './index';
 import type * as DbModule from './db';
 import type * as ProfilesModule from './profiles';
+import type * as ProfileBillingModule from './profile-billing';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 
 const TEST_CONFIG: BenchmarkConfig = {
@@ -89,11 +90,20 @@ vi.mock('./db', async importOriginal => {
   };
 });
 
+vi.mock('./benchmark-settlement', () => ({
+  recordBenchmarkSettlementOutcomes: vi.fn(async () => {}),
+  recoverPendingBenchmarkSettlements: vi.fn(async () => {}),
+}));
+vi.mock('./profile-billing', async importOriginal => {
+  const actual = await importOriginal<typeof ProfileBillingModule>();
+  return { ...actual, recoverPendingProfileAdmissions: vi.fn(async () => {}) };
+});
 vi.mock('./profiles', async importOriginal => {
   const actual = await importOriginal<typeof ProfilesModule>();
   return {
     ...actual,
     registerProfiles: vi.fn(),
+    estimateProfiles: vi.fn(),
     lookupProfileStatuses: vi.fn(),
   };
 });
@@ -118,7 +128,14 @@ import {
   markStaleRunsFailed,
   replaceConfig,
 } from './db';
-import { lookupProfileStatuses, ProfileQuotaExceededError, registerProfiles } from './profiles';
+import {
+  estimateProfiles,
+  lookupProfileStatuses,
+  ProfileAdmissionInProgressError,
+  ProfileInsufficientCreditsError,
+  ProfileQuotaExceededError,
+  registerProfiles,
+} from './profiles';
 
 const tokenGet = vi.fn<() => Promise<string>>();
 const queueSendBatch = vi.fn();
@@ -171,11 +188,17 @@ beforeEach(() => {
   tokenGet.mockResolvedValue('bench-token');
   vi.stubGlobal(
     'fetch',
-    vi
-      .fn<typeof fetch>()
-      .mockImplementation(async () =>
-        Response.json({ data: TEST_CONFIG.deciderModels.map(model => ({ id: model.id })) })
-      )
+    vi.fn<typeof fetch>().mockImplementation(async () =>
+      Response.json({
+        data: [
+          ...TEST_CONFIG.deciderModels.map(model => ({ id: model.id })),
+          {
+            id: 'a/b',
+            pricing: { prompt: '0.000001', completion: '0.000002' },
+          },
+        ],
+      })
+    )
   );
   vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([]);
   vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);
@@ -204,6 +227,7 @@ beforeEach(() => {
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
   vi.mocked(existsNewerCompletedRun).mockResolvedValue(false);
   vi.mocked(registerProfiles).mockReset();
+  vi.mocked(estimateProfiles).mockReset();
   vi.mocked(lookupProfileStatuses).mockReset();
   queueSendBatch.mockResolvedValue(undefined);
 });
@@ -689,7 +713,7 @@ describe('POST /admin/profiles/register', () => {
     const res = await authedPost('/admin/profiles/register', {
       ownerType: 'user',
       ownerId: 'u1',
-      entries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({
@@ -721,8 +745,8 @@ describe('POST /admin/profiles/register', () => {
     const res = await authedPost('/admin/profiles/register', {
       ownerType: 'user',
       ownerId: 'u1',
-      entries: [{ model: 'a/b', variant: null }],
-      retryEntries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
+      retryEntries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
@@ -736,8 +760,8 @@ describe('POST /admin/profiles/register', () => {
       expect.objectContaining({
         ownerType: 'user',
         ownerId: 'u1',
-        entries: [{ model: 'a/b', variant: null }],
-        retryEntries: [{ model: 'a/b', variant: null }],
+        pairs: [{ model: 'a/b', variant: null }],
+        retryPairs: [{ model: 'a/b', variant: null }],
       })
     );
   });
@@ -755,7 +779,7 @@ describe('POST /admin/profiles/register', () => {
     const res = await authedPost('/admin/profiles/register', {
       ownerType: 'org',
       ownerId: 'o1',
-      entries: [{ model: 'a/b', variant: 'xhigh' }],
+      entries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(429);
     await expect(res.json()).resolves.toEqual({
@@ -764,12 +788,39 @@ describe('POST /admin/profiles/register', () => {
       retryAt: '2026-07-29T12:00:00.000Z',
     });
   });
+
+  it('rejects insufficient credits without reporting admission success', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    vi.mocked(registerProfiles).mockRejectedValueOnce(
+      new ProfileInsufficientCreditsError(0.1, 0.2)
+    );
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'user',
+      ownerId: 'u1',
+      entries: [{ model: 'a/b' }],
+    });
+    expect(res.status).toBe(402);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('Insufficient credits'),
+    });
+  });
+
+  it('reports concurrent admission allocation separately from paid cached work', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    vi.mocked(registerProfiles).mockRejectedValueOnce(new ProfileAdmissionInProgressError());
+    const res = await authedPost('/admin/profiles/register', {
+      ownerType: 'user',
+      ownerId: 'u1',
+      entries: [{ model: 'a/b' }],
+    });
+    expect(res.status).toBe(409);
+  });
 });
 
 describe('POST /admin/profiles/status', () => {
   it('returns 400 when benchmark config is not set', async () => {
     const res = await authedPost('/admin/profiles/status', {
-      entries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(400);
     expect(lookupProfileStatuses).not.toHaveBeenCalled();
@@ -782,11 +833,82 @@ describe('POST /admin/profiles/status', () => {
     });
 
     const res = await authedPost('/admin/profiles/status', {
-      entries: [{ model: 'a/b', variant: null }],
+      entries: [{ model: 'a/b' }],
     });
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       statuses: [{ entry: { model: 'a/b', variant: null }, status: 'ready', failureReason: null }],
     });
+  });
+});
+
+describe('POST /admin/profiles/estimate', () => {
+  it('quotes every live effort before admission and sums only owner-caused measurements', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          data: [
+            {
+              id: 'a/b',
+              opencode: {
+                variants: {
+                  low: { reasoning: { effort: 'low' } },
+                  high: { reasoning: { effort: 'high' } },
+                },
+              },
+              pricing: { prompt: '0.000001', completion: '0.000002' },
+            },
+          ],
+        })
+      )
+    );
+    vi.mocked(estimateProfiles).mockResolvedValueOnce({
+      statuses: [
+        {
+          entry: { model: 'a/b', variant: 'low' },
+          status: 'ready',
+          estimatedCostUsd: 0,
+          chargedCostUsd: 0,
+        },
+        {
+          entry: { model: 'a/b', variant: 'high' },
+          status: 'pending',
+          estimatedCostUsd: 0.2,
+          chargedCostUsd: null,
+        },
+      ],
+    });
+    const res = await authedPost('/admin/profiles/estimate', {
+      ownerType: 'org',
+      ownerId: 'o1',
+      entries: [{ model: 'a/b' }],
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ estimatedCostUsd: 0.2 });
+    expect(estimateProfiles).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      expect.objectContaining({
+        pairs: [
+          { model: 'a/b', variant: 'low' },
+          { model: 'a/b', variant: 'high' },
+        ],
+      })
+    );
+    expect(registerProfiles).not.toHaveBeenCalled();
+  });
+
+  it('does not call an allocating unpaid pair a free cached measurement', async () => {
+    vi.mocked(getConfigRows).mockResolvedValueOnce(TEST_CONFIG_ROWS);
+    vi.mocked(estimateProfiles).mockRejectedValueOnce(new ProfileAdmissionInProgressError());
+    const res = await authedPost('/admin/profiles/estimate', {
+      ownerType: 'user',
+      ownerId: 'u1',
+      entries: [{ model: 'a/b' }],
+    });
+    expect(res.status).toBe(409);
+    expect(registerProfiles).not.toHaveBeenCalled();
   });
 });

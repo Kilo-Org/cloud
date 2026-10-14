@@ -70,6 +70,11 @@ import {
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import { fetchPlatformRegistryEntries } from './platform-models';
 import { pickClassifierWinner } from './winner';
+import {
+  recordBenchmarkSettlementOutcomes,
+  recoverPendingBenchmarkSettlements,
+} from './benchmark-settlement';
+import { createProfileCreditBridge, recoverPendingProfileAdmissions } from './profile-billing';
 
 /** One exact Pool entry identity used throughout a decider/classifier run. */
 export type RunModelEntry = {
@@ -184,6 +189,7 @@ export async function failRunAndDrain(env: Env, runId: string, error: string): P
       })
     );
   }
+  await settleRunBilling(env, runId);
   await drainQueues(env, 'both');
 }
 
@@ -232,6 +238,7 @@ export async function sweepStaleRuns(env: Env): Promise<string[]> {
   for (const run of stale) {
     // No-ops for a salvaged run: its rows are already ready/failed.
     await markProfilesFailedForRun(db, run.id, 'timed out').catch(() => {});
+    await settleRunBilling(env, run.id);
   }
   return stale.map(run => run.id);
 }
@@ -276,9 +283,41 @@ export async function sweepStaleRunsAndDrain(env: Env): Promise<{
   drained: StartedQueueRun[];
 }> {
   const staleRunIds = await sweepStaleRuns(env);
+  await recoverProfileBilling(env).catch(error => {
+    console.warn(
+      JSON.stringify({ event: 'benchmark_billing_recovery_error', ...formatError(error) })
+    );
+  });
   // Each platform drain reconciles the catalog before claiming entries.
   const drained = await drainQueues(env, 'both');
   return { staleRunIds, drained };
+}
+
+async function settleRunBilling(env: Env, runId: string): Promise<void> {
+  try {
+    const billing = createProfileCreditBridge({
+      webUrl: env.KILO_WEB_API_BASE_URL,
+      internalApiSecret: await env.INTERNAL_API_SECRET_PROD.get(),
+    });
+    await recoverPendingBenchmarkSettlements(env.BENCH_DB, billing, runId);
+  } catch (error) {
+    console.warn(
+      JSON.stringify({ event: 'benchmark_settlement_recovery_error', runId, ...formatError(error) })
+    );
+  }
+}
+
+async function recoverProfileBilling(env: Env): Promise<void> {
+  const billing = createProfileCreditBridge({
+    webUrl: env.KILO_WEB_API_BASE_URL,
+    internalApiSecret: await env.INTERNAL_API_SECRET_PROD.get(),
+  });
+  await recoverPendingProfileAdmissions(env.BENCH_DB, billing).catch(error => {
+    console.warn(
+      JSON.stringify({ event: 'benchmark_admission_recovery_error', ...formatError(error) })
+    );
+  });
+  await recoverPendingBenchmarkSettlements(env.BENCH_DB, billing);
 }
 
 export type StartedQueueRun = { runId: string; purpose: BenchmarkRunPurpose; entryCount: number };
@@ -966,6 +1005,10 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
 
   const message = parsed.data;
   const state = await getRunState(env, message.runId);
+  if (state.status !== 'running') {
+    await settleRunBilling(env, message.runId);
+    return;
+  }
 
   let shouldFinalize = true;
   if (message.kind === 'classifier') {
@@ -1066,6 +1109,7 @@ export async function processDeadLetter(env: Env, rawMessage: unknown): Promise<
     console.warn(
       JSON.stringify({ event: 'benchmark_deadletter_run_not_running', runId: message.runId })
     );
+    if (state) await settleRunBilling(env, message.runId);
     return;
   }
 
@@ -1601,7 +1645,17 @@ async function finalizeRunIfComplete(
         })
       );
     }
+    await recordBenchmarkSettlementOutcomes(env.BENCH_DB, runId).catch(error => {
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_settlement_snapshot_error',
+          runId,
+          ...formatError(error),
+        })
+      );
+    });
     await markRunCompleted(env.BENCH_DB, runId);
+    await settleRunBilling(env, runId);
     console.log(
       JSON.stringify({
         event: 'benchmark_decider_run_completed',
@@ -1629,6 +1683,7 @@ async function finalizeRunIfComplete(
 
   // Classifier runs own no registry rows, so there is nothing to settle first.
   await markRunCompleted(env.BENCH_DB, runId);
+  await settleRunBilling(env, runId);
 
   // Read back all summaries (fresh + carried) for publishing.
   const allSummaries = await getSummaries(env.BENCH_DB, runId);

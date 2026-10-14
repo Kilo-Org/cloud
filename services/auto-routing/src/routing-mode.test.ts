@@ -20,10 +20,7 @@ type ModeStub = {
   setSettings: ReturnType<typeof vi.fn<(settings: AutoRoutingOwnerSettings) => Promise<void>>>;
 };
 
-const SAMPLE_POOL: EfficientModelPool = [
-  { model: 'a/chat', variant: 'thinking' },
-  { model: 'b/chat', variant: null },
-];
+const SAMPLE_POOL: EfficientModelPool = [{ model: 'a/chat' }, { model: 'b/chat' }];
 
 function makeEnv(
   initial: Record<string, { mode?: AutoRoutingMode | null; pool?: EfficientModelPool | null }> = {}
@@ -267,6 +264,17 @@ describe('AutoRoutingModeConfigDO', () => {
       pool: null,
     });
   });
+
+  it('lazily persists model-only pools from legacy effort entries', async () => {
+    const { modeDO, storage } = createModeDO();
+    storage.entries.set('pool', [
+      { model: 'a/chat', variant: 'thinking' },
+      { model: 'a/chat', variant: 'max' },
+      { model: 'b/chat', variant: null },
+    ]);
+    await expect(modeDO.getPool()).resolves.toEqual(SAMPLE_POOL);
+    expect(storage.entries.get('pool')).toEqual(SAMPLE_POOL);
+  });
 });
 
 describe('auto routing mode config', () => {
@@ -366,7 +374,7 @@ describe('auto routing mode config', () => {
   });
 
   it('resolves mode and pool independently (org mode + personal pool)', async () => {
-    const personalPool: EfficientModelPool = [{ model: 'personal/chat', variant: 'max' }];
+    const personalPool: EfficientModelPool = [{ model: 'personal/chat' }];
     const { env } = makeEnv({
       'user:user-1': { mode: null, pool: personalPool },
       'org:org-1': { mode: 'best_accuracy', pool: null },
@@ -381,8 +389,8 @@ describe('auto routing mode config', () => {
   });
 
   it('lets org pool override personal pool and clearing restore inheritance', async () => {
-    const personalPool: EfficientModelPool = [{ model: 'personal/chat', variant: null }];
-    const orgPool: EfficientModelPool = [{ model: 'org/chat', variant: 'thinking' }];
+    const personalPool: EfficientModelPool = [{ model: 'personal/chat' }];
+    const orgPool: EfficientModelPool = [{ model: 'org/chat' }];
     const { env, modes, pools } = makeEnv({
       'user:user-1': { mode: 'cost_per_accuracy', pool: personalPool },
       'org:org-1': { mode: null, pool: orgPool },

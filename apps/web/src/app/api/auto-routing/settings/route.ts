@@ -3,10 +3,8 @@ import {
   AutoRoutingSettingsResponseSchema,
   BenchmarkProfileQuotaErrorSchema,
   UpdateAutoRoutingSettingsRequestSchema,
-  type AutoRoutingModeOwnerType,
   type AutoRoutingSettingsResponse,
 } from '@kilocode/auto-routing-contracts';
-import { TRPCError } from '@trpc/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   getAutoRoutingMode,
@@ -21,70 +19,14 @@ import {
   validatePoolEntries,
   type AutoRoutingSettingsApiResponse,
 } from '@/lib/auto-routing-pool-validation';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
+import { resolveOwner, trpcErrorResponse } from '@/lib/auto-routing-owner';
 
 export type { AutoRoutingSettingsApiResponse };
 
 const POOL_TEMPORARILY_UNAVAILABLE_MESSAGE =
   'Custom pools are temporarily unavailable while routing backends update. Try again shortly.';
-
-function trpcErrorResponse(error: unknown): NextResponse<{ error: string }> | null {
-  if (!(error instanceof TRPCError)) return null;
-  const status =
-    error.code === 'UNAUTHORIZED'
-      ? 401
-      : error.code === 'FORBIDDEN'
-        ? 403
-        : error.code === 'NOT_FOUND'
-          ? 404
-          : 500;
-  return NextResponse.json({ error: error.message }, { status });
-}
-
-async function resolveOwner(
-  request: NextRequest,
-  roles?: Parameters<typeof ensureOrganizationAccess>[2]
-): Promise<
-  | {
-      ownerType: AutoRoutingModeOwnerType;
-      ownerId: string;
-      userId: string;
-      organizationId: string | null;
-    }
-  | { response: NextResponse<{ error: string }> }
-> {
-  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
-  if (!user || authFailedResponse) {
-    return { response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
-  }
-
-  const organizationId = request.nextUrl.searchParams.get('organizationId');
-  if (!organizationId) {
-    return {
-      ownerType: 'user',
-      ownerId: user.id,
-      userId: user.id,
-      organizationId: null,
-    };
-  }
-
-  try {
-    await ensureOrganizationAccess({ user }, organizationId, roles);
-  } catch (error) {
-    const response = trpcErrorResponse(error);
-    if (response) return { response };
-    throw error;
-  }
-  return {
-    ownerType: 'org',
-    ownerId: organizationId,
-    userId: user.id,
-    organizationId,
-  };
-}
 
 async function annotateWorkerSuccess(
   status: number,
@@ -200,7 +142,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       }
       if (path.startsWith('pool') && issue.message.toLowerCase().includes('duplicate')) {
         return NextResponse.json(
-          { error: poolValidationMessage('duplicate_pair'), reason: 'duplicate_pair' },
+          { error: poolValidationMessage('duplicate_model'), reason: 'duplicate_model' },
           { status: 400 }
         );
       }

@@ -5,6 +5,11 @@ import type * as DbModule from './db';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import type * as ConfigModule from './config';
 
+vi.mock('./benchmark-settlement', () => ({
+  recordBenchmarkSettlementOutcomes: vi.fn().mockResolvedValue(undefined),
+  recoverPendingBenchmarkSettlements: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Publishing reads live config to learn which pairs the platform table wants.
 vi.mock('./config', async importOriginal => {
   const actual = await importOriginal<typeof ConfigModule>();
@@ -80,6 +85,7 @@ import {
 } from './db';
 import { getBenchmarkConfig } from './config';
 import { processJob } from './run';
+import { recoverPendingBenchmarkSettlements } from './benchmark-settlement';
 
 const tokenGet = vi.fn<() => Promise<string>>();
 const queueSendBatch = vi.fn<(messages: unknown[]) => Promise<void>>();
@@ -113,10 +119,12 @@ function mockRunSnapshot(
     variant: string;
     enqueued?: boolean;
     reasoning_effort?: string | null;
-  }> = [{ model, variant: '', enqueued: true, reasoning_effort: null }]
+  }> = [{ model, variant: '', enqueued: true, reasoning_effort: null }],
+  status: 'running' | 'completed' | 'failed' = 'running'
 ): void {
   vi.mocked(getRunWithModels).mockResolvedValue({
     run: {
+      status,
       max_concurrency: 4,
       min_accuracy: 0.7,
       switch_cost_factor: 3,
@@ -205,6 +213,24 @@ afterEach(() => {
 });
 
 describe('processJob — decider exact-pair snapshot resolution', () => {
+  it.each(['completed', 'failed'] as const)(
+    'retries billing for a %s run without executing another benchmark case',
+    async status => {
+      mockRunSnapshot(undefined, status);
+
+      await processJob(env, deciderMessage());
+
+      expect(runDeciderCaseViaCli).not.toHaveBeenCalled();
+      expect(upsertCaseResult).not.toHaveBeenCalled();
+      expect(markRunCompleted).not.toHaveBeenCalled();
+      expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        expect.anything(),
+        runId
+      );
+    }
+  );
+
   it('throws when an explicit-variant message has no exact snapshot row', async () => {
     mockRunSnapshot([
       { model, variant: 'high', reasoning_effort: 'high' },

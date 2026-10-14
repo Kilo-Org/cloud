@@ -1,6 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from './db';
 import type * as CliRunnerModule from './cli-runner';
+import type * as ProfileBillingModule from './profile-billing';
+import { DECIDER_CASES } from './datasets/decider-cases';
+
+vi.mock('./benchmark-settlement', () => ({
+  recordBenchmarkSettlementOutcomes: vi.fn().mockResolvedValue(undefined),
+  recoverPendingBenchmarkSettlements: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./profile-billing', async importOriginal => {
+  const actual = await importOriginal<typeof ProfileBillingModule>();
+  return { ...actual, recoverPendingProfileAdmissions: vi.fn().mockResolvedValue(undefined) };
+});
 
 vi.mock('./cli-runner', async importOriginal => {
   const actual = await importOriginal<typeof CliRunnerModule>();
@@ -90,6 +102,11 @@ import {
   startRun,
   sweepStaleRunsAndDrain,
 } from './run';
+import {
+  recordBenchmarkSettlementOutcomes,
+  recoverPendingBenchmarkSettlements,
+} from './benchmark-settlement';
+import { recoverPendingProfileAdmissions } from './profile-billing';
 
 const queueSendBatch = vi.fn();
 const kvDelete = vi.fn();
@@ -141,6 +158,9 @@ afterEach(() => vi.unstubAllGlobals());
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(recordBenchmarkSettlementOutcomes).mockReset().mockResolvedValue(undefined);
+  vi.mocked(recoverPendingBenchmarkSettlements).mockReset().mockResolvedValue(undefined);
+  vi.mocked(recoverPendingProfileAdmissions).mockReset().mockResolvedValue(undefined);
   mockConfig();
   vi.stubGlobal('fetch', catalogFetch);
   catalogFetch.mockImplementation(async () =>
@@ -458,6 +478,18 @@ describe('decider run completion', () => {
     expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
     expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
     expect(markProfilesFailedForEntries).not.toHaveBeenCalled();
+    expect(recordBenchmarkSettlementOutcomes).toHaveBeenCalledWith(env.BENCH_DB, runId);
+    expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ settle: expect.any(Function) }),
+      runId
+    );
+    expect(vi.mocked(recordBenchmarkSettlementOutcomes).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(markRunCompleted).mock.invocationCallOrder[0]
+    );
+    expect(vi.mocked(markRunCompleted).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(recoverPendingBenchmarkSettlements).mock.invocationCallOrder[0]
+    );
     // Settle the registry rows first. The orphan reaper spares rows whose run
     // is still running, so completing the run first would open a window where a
     // concurrent sweep fails entries that are fully measured.
@@ -469,6 +501,28 @@ describe('decider run completion', () => {
     // Nothing is ready here, so publishing is honestly skipped.
     expect(listReadyCurrentProfilesForEntries).toHaveBeenCalled();
     expect(saveRoutingTable).not.toHaveBeenCalled();
+  });
+
+  it('keeps terminal profiles and publication when the billing bridge is unavailable', async () => {
+    const runId = 'user-billing-retry-1';
+    mockRunState(runId, 'user', [{ model: 'vendor/m', variant: '' }]);
+    vi.mocked(countCaseResultsByLane).mockResolvedValue([
+      { model: 'vendor/m', variant: '', rep: 0, n: DECIDER_CASES.length },
+    ]);
+    vi.mocked(recoverPendingBenchmarkSettlements).mockRejectedValueOnce(
+      new Error('billing unavailable')
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await finalizeVia(runId, 'vendor/m', null);
+
+    expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
+    expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
+    expect(listReadyCurrentProfilesForEntries).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('benchmark_settlement_recovery_error')
+    );
+    warn.mockRestore();
   });
 
   it('fails only the entries whose lane died, and readies the rest', async () => {
@@ -625,6 +679,11 @@ describe('decider run completion', () => {
       'user-fail-1',
       'enqueue failed'
     );
+    expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      'user-fail-1'
+    );
     // Both queues have pending work in this mock, so both start a run.
     expect(vi.mocked(insertRun).mock.calls.map(call => call[1].purpose)).toEqual([
       'platform',
@@ -746,6 +805,12 @@ describe('sweepStaleRunsAndDrain', () => {
     expect(markProfilesReadyForRun).toHaveBeenCalledWith(env.BENCH_DB, runId);
     // The run completed with partial results rather than being failed wholesale.
     expect(markRunCompleted).toHaveBeenCalledWith(env.BENCH_DB, runId);
+    expect(recordBenchmarkSettlementOutcomes).toHaveBeenCalledWith(env.BENCH_DB, runId);
+    expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything(),
+      runId
+    );
   });
 
   it('does not throw when a queue slot is still occupied after the sweep', async () => {
@@ -768,5 +833,37 @@ describe('sweepStaleRunsAndDrain', () => {
     expect(vi.mocked(syncPlatformRegistryRows).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(listPendingCurrentProfiles).mock.invocationCallOrder[0]
     );
+  });
+
+  it('recovers allocating admissions and unpaid terminal claims before draining', async () => {
+    await sweepStaleRunsAndDrain(env);
+
+    expect(recoverPendingProfileAdmissions).toHaveBeenCalledWith(env.BENCH_DB, expect.anything());
+    expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything()
+    );
+    expect(vi.mocked(recoverPendingProfileAdmissions).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(recoverPendingBenchmarkSettlements).mock.invocationCallOrder[0]
+    );
+    expect(vi.mocked(recoverPendingBenchmarkSettlements).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(listPendingCurrentProfiles).mock.invocationCallOrder[0]
+    );
+  });
+
+  it('still retries settlements and drains when admission reconciliation fails', async () => {
+    vi.mocked(recoverPendingProfileAdmissions).mockRejectedValueOnce(
+      new Error('reserve bridge unavailable')
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await sweepStaleRunsAndDrain(env);
+
+    expect(recoverPendingBenchmarkSettlements).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.anything()
+    );
+    expect(listPendingCurrentProfiles).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

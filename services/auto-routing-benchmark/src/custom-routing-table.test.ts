@@ -218,6 +218,17 @@ describe('assembleCustomRoutingTable', () => {
     expect(getSummariesForRuns).not.toHaveBeenCalled();
   });
 
+  it('allows every effort when expanded pairs exceed the model admission limit', async () => {
+    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
+    const pairs = Array.from({ length: 12 }, (_, index) => ({
+      model: 'vendor/m',
+      variant: `effort-${index}`,
+    }));
+    await expect(assembleCustomRoutingTable({} as D1Database, config, pairs)).resolves.toEqual({
+      table: null,
+    });
+  });
+
   it('loads provenance summaries and assembles with current engine filter', async () => {
     const engine = computeEngineIdentity('decider');
     vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([

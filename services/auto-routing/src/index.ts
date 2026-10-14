@@ -4,7 +4,11 @@ import { authMiddleware } from './auth';
 import { classifierAnalyticsHandler } from './admin-classifier-analytics';
 import { getClassifierModelHandler, putClassifierModelHandler } from './admin-classifier-model';
 import { getRoutingModeHandler, putRoutingModeHandler } from './admin-routing-mode';
-import { getRoutingSettingsHandler, putRoutingSettingsHandler } from './admin-routing-settings';
+import {
+  estimateRoutingProfilesHandler,
+  getRoutingSettingsHandler,
+  putRoutingSettingsHandler,
+} from './admin-routing-settings';
 import { decideHandler } from './decide';
 import type { HonoEnv } from './hono-env';
 
@@ -23,6 +27,7 @@ app.get('/admin/routing-mode', getRoutingModeHandler);
 app.put('/admin/routing-mode', putRoutingModeHandler);
 app.get('/admin/routing-settings', getRoutingSettingsHandler);
 app.put('/admin/routing-settings', putRoutingSettingsHandler);
+app.post('/admin/profiles/estimate', estimateRoutingProfilesHandler);
 app.get('/admin/classifier-analytics', classifierAnalyticsHandler);
 
 app.post('/decide', decideHandler);

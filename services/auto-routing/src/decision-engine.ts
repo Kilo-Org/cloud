@@ -4,6 +4,7 @@ import {
   isVirtualAutoModelId,
   type AutoRoutingDecision,
   type AutoRoutingMode,
+  type BenchmarkPair,
   type ClassifierOutput,
   type RankedCandidate,
   type ReasoningEffort,
@@ -22,10 +23,7 @@ import type { ModelCapabilities, ModelCapabilitiesMap } from './model-capabiliti
 // `model_stats.inputModalities` (`apps/web/src/lib/model-stats/sync-openrouter.ts:77,95,124`).
 export const ENFORCED_MODALITIES: ReadonlyArray<string> = ['image', 'file'];
 
-export type DecisionIncumbent = {
-  model: string;
-  variant: string | null;
-};
+export type DecisionIncumbent = BenchmarkPair;
 
 // Single source of the constraint policy shared by benchmark routing
 // (`applyCapabilityFilters`) and the coding-plan short-circuit in `decide.ts`.
@@ -237,10 +235,7 @@ function applyActiveFilter(
 // the single largest group, which sits at 27/30 and is unaffected).
 const STICKY_ACCURACY_TOLERANCE = 0.1;
 
-function sameExactPair(
-  a: DecisionIncumbent,
-  b: { model: string; variant: string | null }
-): boolean {
+function sameExactPair(a: DecisionIncumbent, b: BenchmarkPair): boolean {
   return a.model === b.model && a.variant === b.variant;
 }
 

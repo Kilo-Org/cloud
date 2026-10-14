@@ -7,6 +7,11 @@ import {
   CustomRoutingTableRequestSchema,
   CustomRoutingTableResponseSchema,
   RegisterBenchmarkProfilesRequestSchema,
+  EstimateBenchmarkProfilesRequestSchema,
+  EstimateBenchmarkProfilesResponseSchema,
+  type EstimateBenchmarkProfilesRequest,
+  type EstimateBenchmarkProfilesResponse,
+  type AutoRoutingModeOwnerQuery,
   type BenchmarkProfileStatusesResponse,
   type ClassifierWinner,
   type CustomRoutingTable,
@@ -14,6 +19,7 @@ import {
   type RegisterBenchmarkProfilesRequest,
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
+import * as z from 'zod';
 
 type BenchmarkEnv = Pick<Env, 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'>;
 
@@ -25,6 +31,17 @@ export class BenchmarkProfileQuotaError extends Error {
     this.name = 'BenchmarkProfileQuotaError';
     this.retryAt = retryAt;
   }
+}
+
+export class BenchmarkInsufficientCreditsError extends Error {}
+
+async function rejectInsufficientCredits(res: Response): Promise<void> {
+  if (res.status !== 402) return;
+  const raw: unknown = await res.json().catch(() => null);
+  const parsed = z.object({ error: z.string() }).safeParse(raw);
+  throw new BenchmarkInsufficientCreditsError(
+    parsed.success ? parsed.data.error : 'Insufficient credits for benchmark profiles'
+  );
 }
 
 async function fetchBenchmark(
@@ -85,6 +102,7 @@ export async function registerBenchmarkProfiles(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
+  await rejectInsufficientCredits(res);
 
   if (res.status === 429) {
     const raw: unknown = await res.json().catch(() => null);
@@ -112,9 +130,10 @@ export async function registerBenchmarkProfiles(
 
 export async function fetchBenchmarkProfileStatuses(
   env: BenchmarkEnv,
-  entries: EfficientModelPool
+  entries: EfficientModelPool,
+  owner?: AutoRoutingModeOwnerQuery
 ): Promise<BenchmarkProfileStatusesResponse> {
-  const body = BenchmarkProfileStatusesRequestSchema.parse({ entries });
+  const body = BenchmarkProfileStatusesRequestSchema.parse({ entries, ...owner });
   const res = await fetchBenchmark(env, '/admin/profiles/status', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -158,4 +177,21 @@ export async function fetchCustomRoutingTable(
     );
   }
   return parsed.data.table;
+}
+
+export async function estimateBenchmarkProfiles(
+  env: BenchmarkEnv,
+  request: EstimateBenchmarkProfilesRequest
+): Promise<EstimateBenchmarkProfilesResponse> {
+  const body = EstimateBenchmarkProfilesRequestSchema.parse(request);
+  const res = await fetchBenchmark(env, '/admin/profiles/estimate', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  await rejectInsufficientCredits(res);
+  if (!res.ok) {
+    throw new Error(`benchmark estimate responded ${res.status}`);
+  }
+  return EstimateBenchmarkProfilesResponseSchema.parse(await res.json());
 }

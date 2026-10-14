@@ -1051,7 +1051,7 @@ describe('auto routing worker', () => {
   });
 
   describe('admin routing settings', () => {
-    const pool: EfficientModelPool = [{ model: 'custom/chat', variant: 'thinking' }];
+    const pool: EfficientModelPool = [{ model: 'custom/chat' }];
     const statuses = [
       { entry: { model: 'custom/chat', variant: 'thinking' }, status: 'ready' as const },
     ];
@@ -1138,7 +1138,10 @@ describe('auto routing worker', () => {
       });
       expect(benchmarkFetch).toHaveBeenCalledWith(
         expect.stringContaining('/admin/profiles/status'),
-        expect.objectContaining({ method: 'POST' })
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ entries: pool, ownerType: 'user', ownerId: 'user-1' }),
+        })
       );
     });
 
@@ -1279,7 +1282,7 @@ describe('auto routing worker', () => {
 
     it('PUT forwards retryEntries on register and persists only after success', async () => {
       const store = ownerSettingsStore();
-      const retryEntries = [{ model: 'custom/chat', variant: 'thinking' as const }];
+      const retryEntries = [{ model: 'custom/chat' }];
       let registerBody: unknown;
       benchmarkFetch.mockImplementation(async (url: string, init?: RequestInit) => {
         if (String(url).includes('/admin/profiles/register')) {
@@ -1324,10 +1327,70 @@ describe('auto routing worker', () => {
       expect(store.setSettings).toHaveBeenCalledWith({ mode: 'best_accuracy', pool });
       expect(store.pool).toEqual(pool);
     });
+
+    it('POST estimates all measurement pairs before saving without persisting settings', async () => {
+      const store = ownerSettingsStore();
+      const estimate = {
+        estimatedCostUsd: 2,
+        pairs: [
+          {
+            entry: { model: 'custom/chat', variant: 'thinking' },
+            status: 'pending',
+            estimatedCostUsd: 2,
+            chargedCostUsd: null,
+          },
+          {
+            entry: { model: 'custom/chat', variant: 'max' },
+            status: 'ready',
+            estimatedCostUsd: 0,
+            chargedCostUsd: null,
+          },
+        ],
+      };
+      benchmarkFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => estimate,
+      });
+      const response = await request('/admin/profiles/estimate', {
+        method: 'POST',
+        headers: { authorization: 'Bearer classifier-token', 'content-type': 'application/json' },
+        body: JSON.stringify({ ownerType: 'user', ownerId: 'user-1', entries: pool }),
+      });
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(estimate);
+      expect(store.setSettings).not.toHaveBeenCalled();
+      expect(benchmarkFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/admin/profiles/estimate'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ ownerType: 'user', ownerId: 'user-1', entries: pool }),
+        })
+      );
+    });
+
+    it('PUT preserves insufficient credits and does not save the pool', async () => {
+      const store = ownerSettingsStore();
+      benchmarkFetch.mockResolvedValue({
+        ok: false,
+        status: 402,
+        json: async () => ({ error: 'Insufficient credits for benchmark profiles' }),
+      });
+      const response = await request('/admin/routing-settings', {
+        method: 'PUT',
+        headers: { authorization: 'Bearer classifier-token', 'content-type': 'application/json' },
+        body: JSON.stringify({ ownerType: 'user', ownerId: 'user-1', mode: null, pool }),
+      });
+      expect(response.status).toBe(402);
+      await expect(response.json()).resolves.toEqual({
+        error: 'Insufficient credits for benchmark profiles',
+      });
+      expect(store.setSettings).not.toHaveBeenCalled();
+    });
   });
 
   describe('custom pool decide path', () => {
-    const pool: EfficientModelPool = [{ model: 'pool/chat', variant: 'thinking' }];
+    const pool: EfficientModelPool = [{ model: 'pool/chat' }];
     const customTable = {
       version: 'custom-1',
       generatedAt: '2026-06-12T00:00:00.000Z',
@@ -1412,6 +1475,61 @@ describe('auto routing worker', () => {
           variant: 'thinking',
         })
       );
+    });
+
+    it('allows every effort of pool models and rejects models outside the pool', async () => {
+      setOwnerPool(pool);
+      dbWhereCaps.mockResolvedValue([
+        {
+          openrouterId: 'pool/chat',
+          inputModalities: [],
+          contextLength: 1_000_000,
+          isActive: true,
+        },
+        {
+          openrouterId: 'outside/chat',
+          inputModalities: [],
+          contextLength: 1_000_000,
+          isActive: true,
+        },
+      ]);
+      benchmarkFetch.mockImplementation(async (url: string) => {
+        if (String(url).includes('/admin/custom-routing-table')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              table: {
+                ...customTable,
+                routes: {
+                  'implementation/feature_development': [
+                    {
+                      model: 'outside/chat',
+                      variant: 'max',
+                      accuracy: 1,
+                      avgCostUsd: 0,
+                      meetsThreshold: true,
+                    },
+                    {
+                      model: 'pool/chat',
+                      variant: 'max',
+                      accuracy: 1,
+                      avgCostUsd: 0.0001,
+                      meetsThreshold: true,
+                    },
+                    ...customTable.routes['implementation/feature_development'],
+                  ],
+                },
+              },
+            }),
+          };
+        }
+        return { ok: true, status: 200, json: async () => ({ winner: null }) };
+      });
+      const response = await decideRequest(mirrorPayload());
+      await expect(response.json()).resolves.toMatchObject({
+        decision: { model: 'pool/chat', variant: 'max' },
+      });
     });
 
     it('returns a null decision when custom table lookup fails', async () => {

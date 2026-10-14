@@ -2,23 +2,23 @@ import type {
   BenchmarkConfig,
   CustomRoutingTable,
   CustomRoutingTableResponse,
-  PoolEntry,
+  BenchmarkPair,
 } from '@kilocode/auto-routing-contracts';
-import { MAX_POOL_ENTRIES, poolEntryKey } from '@kilocode/auto-routing-contracts';
+import { MAX_POOL_ENTRIES, benchmarkPairKey } from '@kilocode/auto-routing-contracts';
 import { getSummariesForRuns, listReadyCurrentProfilesForEntries } from './db';
 import { variantFromStorage } from './reasoning-effort';
 import { buildCustomRoutingTable } from './routing-table-builder';
 import { currentProfileContextFromConfig, ProfileValidationError } from './profiles';
 
-function assertUniqueEntries(entries: readonly PoolEntry[]): void {
-  if (entries.length < 1 || entries.length > MAX_POOL_ENTRIES) {
+function assertUniqueEntries(entries: readonly BenchmarkPair[]): void {
+  if (entries.length < 1 || new Set(entries.map(entry => entry.model)).size > MAX_POOL_ENTRIES) {
     throw new ProfileValidationError(
-      `entries must contain between 1 and ${MAX_POOL_ENTRIES} unique pool entries`
+      `entries must contain between 1 and ${MAX_POOL_ENTRIES} unique pool models`
     );
   }
   const seen = new Set<string>();
   for (const entry of entries) {
-    const key = poolEntryKey(entry);
+    const key = benchmarkPairKey(entry);
     if (seen.has(key)) {
       throw new ProfileValidationError(`Duplicate pool entry: ${key}`);
     }
@@ -27,7 +27,7 @@ function assertUniqueEntries(entries: readonly PoolEntry[]): void {
 }
 
 /**
- * Assemble a sparse custom routing table for the requested exact Pool entries
+ * Assemble a sparse custom routing table for expanded model-effort pairs
  * from ready+current Benchmark profiles and their provenance-run summaries.
  * Returns `{ table: null }` when no requested entry is ready/current.
  */
@@ -37,7 +37,7 @@ export async function assembleCustomRoutingTable(
     BenchmarkConfig,
     'deciderRepetitions' | 'minAccuracy' | 'switchCostFactor' | 'bestAccuracySwitchThreshold'
   >,
-  entries: readonly PoolEntry[],
+  entries: readonly BenchmarkPair[],
   options: { now?: Date } = {}
 ): Promise<CustomRoutingTableResponse> {
   assertUniqueEntries(entries);
@@ -52,7 +52,7 @@ export async function assembleCustomRoutingTable(
       entry: {
         model: row.model,
         variant: variantFromStorage(row.variant),
-      } satisfies PoolEntry,
+      } satisfies BenchmarkPair,
       runId: row.run_id,
     }));
 

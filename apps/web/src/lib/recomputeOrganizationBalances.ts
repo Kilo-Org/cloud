@@ -18,9 +18,10 @@ import {
   microdollar_usage,
   exa_usage_log,
   compute_usage_charge,
+  auto_routing_benchmark_holds,
   type Organization,
 } from '@kilocode/db/schema';
-import { eq, and, asc, gt } from 'drizzle-orm';
+import { eq, and, asc, gt, sql } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { computeExpiration } from '@kilocode/web-shared/lib/creditExpiration';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
@@ -99,7 +100,24 @@ export async function recomputeOrganizationBalances(args: {
     )
     .orderBy(asc(compute_usage_charge.created_at));
 
-  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage, computeUsage);
+  const benchmarkUsage = await db
+    .select({
+      cost: sql<number>`${auto_routing_benchmark_holds.charged_microdollars}`.mapWith(Number),
+      created_at: sql<string>`${auto_routing_benchmark_holds.settled_at}`.mapWith(
+        auto_routing_benchmark_holds.settled_at
+      ),
+    })
+    .from(auto_routing_benchmark_holds)
+    .where(
+      and(
+        eq(auto_routing_benchmark_holds.owner_type, 'org'),
+        eq(auto_routing_benchmark_holds.owner_id, args.organizationId),
+        gt(auto_routing_benchmark_holds.charged_microdollars, 0)
+      )
+    )
+    .orderBy(asc(auto_routing_benchmark_holds.settled_at));
+
+  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage, computeUsage, benchmarkUsage);
 
   // Fetch all credit transactions for this org
   const creditTransactions = await db

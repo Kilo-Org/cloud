@@ -148,21 +148,21 @@ function installLinkedomDom(): { cleanup: () => void; container: HTMLElement } {
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const entryReady: PoolEntry = { model: 'anthropic/claude-sonnet-4', variant: 'high' };
-const entryFailed: PoolEntry = { model: 'google/gemini-2.5-flash', variant: null };
-const entryPending: PoolEntry = { model: 'openai/gpt-5', variant: 'xhigh' };
-const entryUnavailable: PoolEntry = { model: 'removed/model', variant: null };
-const entryDraftOnly: PoolEntry = { model: 'meta-llama/llama-4', variant: null };
+const entryReady: PoolEntry = { model: 'anthropic/claude-sonnet-4' };
+const entryFailed: PoolEntry = { model: 'google/gemini-2.5-flash' };
+const entryPending: PoolEntry = { model: 'openai/gpt-5' };
+const entryUnavailable: PoolEntry = { model: 'removed/model' };
+const entryDraftOnly: PoolEntry = { model: 'meta-llama/llama-4' };
 
 const statuses: BenchmarkProfileEntryStatus[] = [
-  { entry: entryReady, status: 'ready' },
+  { entry: { ...entryReady, variant: 'high' }, status: 'ready' },
   {
-    entry: entryFailed,
+    entry: { ...entryFailed, variant: null },
     status: 'failed',
     failureReason: 'Benchmark container exited with code 1',
   },
-  { entry: entryPending, status: 'pending' },
-  { entry: entryUnavailable, status: 'ready' },
+  { entry: { ...entryPending, variant: 'xhigh' }, status: 'pending' },
+  { entry: { ...entryUnavailable, variant: null }, status: 'ready' },
 ];
 
 function settings(
@@ -296,6 +296,23 @@ describe('mapPoolEntryDisplayStatus', () => {
       kind: 'ready',
       label: 'Ready',
     });
+    expect(
+      mapPoolEntryDisplayStatus({
+        entry: entryReady,
+        poolStatuses: [
+          { entry: { ...entryReady, variant: 'low' }, status: 'ready' },
+          { entry: { ...entryReady, variant: 'high' }, status: 'running' },
+        ],
+        supportedEffortCount: 2,
+      })
+    ).toEqual({ kind: 'benchmarking', label: 'Benchmarking' });
+    expect(
+      mapPoolEntryDisplayStatus({
+        entry: entryReady,
+        poolStatuses: [{ entry: { ...entryReady, variant: 'high' }, status: 'ready' }],
+        supportedEffortCount: 2,
+      })
+    ).toEqual({ kind: 'benchmarking', label: 'Benchmarking' });
 
     expect(mapPoolEntryDisplayStatus({ entry: entryPending, poolStatuses: statuses })).toEqual({
       kind: 'benchmarking',
@@ -305,7 +322,7 @@ describe('mapPoolEntryDisplayStatus', () => {
     expect(
       mapPoolEntryDisplayStatus({
         entry: entryPending,
-        poolStatuses: [{ entry: entryPending, status: 'running' }],
+        poolStatuses: [{ entry: { ...entryPending, variant: 'xhigh' }, status: 'running' }],
       })
     ).toEqual({ kind: 'benchmarking', label: 'Benchmarking' });
 
@@ -401,9 +418,9 @@ describe('settingsRefetchInterval / hasBenchmarkingEntries', () => {
       { ...entryUnavailable, unavailable: true },
     ];
     const terminalStatuses: BenchmarkProfileEntryStatus[] = [
-      { entry: entryReady, status: 'ready' },
-      { entry: entryFailed, status: 'failed', failureReason: 'x' },
-      { entry: entryUnavailable, status: 'ready' },
+      { entry: { ...entryReady, variant: 'high' }, status: 'ready' },
+      { entry: { ...entryFailed, variant: null }, status: 'failed', failureReason: 'x' },
+      { entry: { ...entryUnavailable, variant: null }, status: 'ready' },
     ];
     expect(hasBenchmarkingEntries(terminalPool, terminalStatuses)).toBe(false);
     expect(
@@ -549,7 +566,7 @@ describe('applySaveMutationSuccess / applySaveMutationError', () => {
     const data = settings({
       configuredMode: 'best_accuracy',
       configuredPool: [{ ...entryReady, unavailable: false }],
-      poolStatuses: [{ entry: entryReady, status: 'ready' }],
+      poolStatuses: [{ entry: { ...entryReady, variant: 'high' }, status: 'ready' }],
     });
 
     applySaveMutationSuccess({
@@ -602,7 +619,7 @@ describe('applyRetryMutationSuccess', () => {
       ownerType: 'org',
       ownerId: 'org-1',
       configuredPool: [{ ...entryFailed, unavailable: false }],
-      poolStatuses: [{ entry: entryFailed, status: 'pending' }],
+      poolStatuses: [{ entry: { ...entryFailed, variant: null }, status: 'pending' }],
     });
 
     applyRetryMutationSuccess({
@@ -628,26 +645,19 @@ describe('applyRetryMutationSuccess', () => {
 // ---------------------------------------------------------------------------
 
 describe('tryAddPoolEntry', () => {
-  it('requires a variant when the model exposes variants', () => {
-    const result = tryAddPoolEntry({
-      draftPool: null,
-      modelId: 'anthropic/claude-sonnet-4',
-      variant: undefined,
-      modelVariants: ['low', 'high'],
-    });
-    expect(result).toEqual({
-      ok: false,
-      reason: 'missing_variant',
-      message: 'Choose a variant for this model.',
-    });
+  it('adds a model without requiring an effort selection', () => {
+    expect(
+      tryAddPoolEntry({
+        draftPool: null,
+        modelId: 'anthropic/claude-sonnet-4',
+      })
+    ).toEqual({ ok: true, pool: [{ model: 'anthropic/claude-sonnet-4' }] });
   });
 
-  it('adds a unique pair and rejects duplicates', () => {
+  it('adds a unique model and rejects duplicates', () => {
     const first = tryAddPoolEntry({
       draftPool: null,
       modelId: 'anthropic/claude-sonnet-4',
-      variant: 'high',
-      modelVariants: ['low', 'high'],
     });
     expect(first.ok).toBe(true);
     if (!first.ok) return;
@@ -655,47 +665,32 @@ describe('tryAddPoolEntry', () => {
     const duplicate = tryAddPoolEntry({
       draftPool: first.pool,
       modelId: 'anthropic/claude-sonnet-4',
-      variant: 'high',
-      modelVariants: ['low', 'high'],
     });
     expect(duplicate).toEqual({
       ok: false,
       reason: 'duplicate',
-      message: 'That model and variant pair is already in the pool.',
+      message: 'That model is already in the pool.',
     });
-
-    const otherVariant = tryAddPoolEntry({
-      draftPool: first.pool,
-      modelId: 'anthropic/claude-sonnet-4',
-      variant: 'low',
-      modelVariants: ['low', 'high'],
-    });
-    expect(otherVariant.ok).toBe(true);
   });
 
-  it('allows null variant when the model has no variants', () => {
+  it('adds a model without configurable efforts', () => {
     const result = tryAddPoolEntry({
       draftPool: null,
       modelId: 'google/gemini-2.5-flash',
-      variant: undefined,
-      modelVariants: undefined,
     });
     expect(result).toEqual({
       ok: true,
-      pool: [{ model: 'google/gemini-2.5-flash', variant: null }],
+      pool: [{ model: 'google/gemini-2.5-flash' }],
     });
   });
 
   it('enforces the 10-entry cap', () => {
     const pool: PoolEntry[] = Array.from({ length: 10 }, (_, i) => ({
       model: `provider/model-${i}`,
-      variant: null,
     }));
     const result = tryAddPoolEntry({
       draftPool: pool,
       modelId: 'provider/extra',
-      variant: null,
-      modelVariants: [],
     });
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -770,13 +765,13 @@ describe('toEligibleModelOptions', () => {
           pricing: { prompt: '0.0000001' },
         },
       ],
-      [{ model: 'google/gemini-2.5-flash', variant: null }]
+      [{ model: 'google/gemini-2.5-flash' }]
     );
     expect(options.map(o => o.id)).toEqual(['anthropic/claude-sonnet-4']);
     expect(options[0]?.variants).toEqual(['high', 'low']);
   });
 
-  it('keeps a multi-variant model when only one variant is drafted', () => {
+  it('excludes a drafted model regardless of its supported efforts', () => {
     const options = toEligibleModelOptions(
       [
         {
@@ -786,9 +781,9 @@ describe('toEligibleModelOptions', () => {
           opencode: { variants: { high: {}, low: {} } },
         },
       ],
-      [{ model: 'anthropic/claude-sonnet-4', variant: 'high' }]
+      [{ model: 'anthropic/claude-sonnet-4' }]
     );
-    expect(options).toHaveLength(1);
+    expect(options).toHaveLength(0);
   });
 });
 
@@ -919,6 +914,12 @@ describe('error messages', () => {
     expect(message).toBe('Invalid routing settings');
   });
 
+  it('explains insufficient owner credits', () => {
+    expect(formatSaveErrorMessage({ error: 'balance too low' }, 402)).toBe(
+      'Insufficient owner credits to benchmark this pool. Add credits and try again.'
+    );
+  });
+
   it('429 message includes retry timing from retryAt', () => {
     const retryAt = '2026-07-29T12:00:00.000Z';
     const message = formatSaveErrorMessage(
@@ -931,6 +932,68 @@ describe('error messages', () => {
     expect(message).toContain('Benchmark profile request limit exceeded');
     expect(message).toContain('New benchmarks can be requested');
     expect(message.toLowerCase()).toMatch(/after /);
+  });
+});
+
+describe('owner benchmark quote', () => {
+  it('blocks a changed pool until its current quote succeeds and displays individual charges', async () => {
+    const originalFetch = global.fetch;
+    jest.useFakeTimers();
+    const data = settings({
+      configuredPool: [
+        { ...entryReady, unavailable: false },
+        { ...entryFailed, unavailable: false },
+      ],
+      poolStatuses: statuses,
+    });
+    let resolveQuote: ((response: Response) => void) | undefined;
+    const fetchMock = jest.fn((input: RequestInfo | URL) => {
+      if (String(input).includes('/estimate')) {
+        const quote = Promise.withResolvers<Response>();
+        resolveQuote = quote.resolve;
+        return quote.promise;
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => data } as Response);
+    });
+    global.fetch = fetchMock as typeof fetch;
+    const mounted = mountCardDom(data);
+    try {
+      await act(async () => {
+        const remove = mounted.container.querySelector<HTMLButtonElement>(
+          `button[aria-label="Remove ${entryReady.model} from pool"]`
+        );
+        if (!remove) throw new Error('Remove control not found');
+        remove.click();
+      });
+      expect(findSaveButton(mounted.container).disabled).toBe(true);
+      await act(async () => {
+        if (!resolveQuote) throw new Error('Estimate was not requested');
+        resolveQuote({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            estimatedCostUsd: 0.25,
+            pairs: [
+              {
+                entry: { ...entryFailed, variant: null },
+                status: 'failed',
+                estimatedCostUsd: 0.25,
+                chargedCostUsd: null,
+              },
+            ],
+          }),
+        } as Response);
+        await jest.advanceTimersByTimeAsync(0);
+      });
+      expect(findSaveButton(mounted.container).disabled).toBe(false);
+      expect(mounted.container.textContent).toContain('Estimated owner cost: $0.250000');
+      expect(mounted.container.textContent).toContain('Charged: Not charged');
+      expect(mounted.container.textContent).toContain('quote is advisory');
+    } finally {
+      mounted.cleanup();
+      global.fetch = originalFetch;
+      jest.useRealTimers();
+    }
   });
 });
 
@@ -1030,7 +1093,7 @@ describe('AutoRoutingModeCard poolSupported=false', () => {
         settings({
           poolSupported: false,
           configuredPool: [{ ...entryPending, unavailable: false }],
-          poolStatuses: [{ entry: entryPending, status: 'pending' }],
+          poolStatuses: [{ entry: { ...entryPending, variant: 'xhigh' }, status: 'pending' }],
         })
       )
     ).toBe(false);

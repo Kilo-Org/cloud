@@ -85,6 +85,13 @@
       "when": 1791310930981,
       "tag": "0011_silent_diamondback",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791948187392,
+      "tag": "0012_silent_victor_mancha",
+      "breakpoints": true
     }
   ]
 }

@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { reserveBenchmarkCredits } from '@/lib/auto-routing-benchmark-billing';
 import {
   compute_usage_charge,
+  auto_routing_benchmark_holds,
   credit_transactions,
   exa_usage_log,
   kilocode_users,
@@ -73,6 +75,9 @@ describe('organization sales demo reset router', () => {
         .delete(compute_usage_charge)
         .where(inArray(compute_usage_charge.organization_id, orgIds));
       await db
+        .delete(auto_routing_benchmark_holds)
+        .where(inArray(auto_routing_benchmark_holds.owner_id, orgIds));
+      await db
         .delete(credit_transactions)
         .where(inArray(credit_transactions.organization_id, orgIds));
       await db.delete(microdollar_usage).where(inArray(microdollar_usage.organization_id, orgIds));
@@ -102,7 +107,20 @@ describe('organization sales demo reset router', () => {
 
   test('owner of a live demo can reset and the org stays at $25.03 with populated usage', async () => {
     const caller = await createCallerForUser(owner.id);
+    const admissionId = crypto.randomUUID();
+    await reserveBenchmarkCredits({
+      admissionId,
+      ownerType: 'org',
+      ownerId: demoOrgId,
+      items: [{ model: 'test/demo-benchmark', variant: null, estimatedCostUsd: 1 }],
+    });
     const result = await caller.organizations.salesDemo.reset({ organizationId: demoOrgId });
+    expect(
+      await db
+        .select()
+        .from(auto_routing_benchmark_holds)
+        .where(eq(auto_routing_benchmark_holds.admission_id, admissionId))
+    ).toHaveLength(0);
 
     expect(result.organizationId).toBe(demoOrgId);
     expect(result.organizationName).toBe(demoOrgName);

@@ -212,7 +212,7 @@ export const routingTableCandidates = sqliteTable(
 );
 
 /**
- * Global Benchmark-profile registry: one current row per exact Pool entry per
+ * Global Benchmark-profile registry: one current row per exact benchmark pair per
  * engine identity + repetitions. Old-engine rows remain as history; currency
  * is decided by matching the live decider engine identity and repetitions.
  */
@@ -247,11 +247,57 @@ export const benchmarkProfiles = sqliteTable(
   ]
 );
 
-/**
- * Rolling owner admission ledger for the 24h profile request quota. One row
- * per charged admission (new under current engine, or explicit failed retry).
- * Stale engine-drift re-admissions are free and do not insert here.
- */
+export const profileBenchmarkAdmissions = sqliteTable(
+  'profile_benchmark_admissions',
+  {
+    admission_id: text('admission_id').primaryKey(),
+    owner_type: text('owner_type').$type<'user' | 'org'>().notNull(),
+    owner_id: text('owner_id').notNull(),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    state: text('state')
+      .$type<'allocating' | 'admitted' | 'insufficient' | 'quota_exceeded'>()
+      .notNull(),
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  table => [index('IDX_profile_benchmark_admissions_state').on(table.state, table.created_at)]
+);
+
+export const profileBenchmarkClaims = sqliteTable(
+  'profile_benchmark_claims',
+  {
+    admission_id: text('admission_id')
+      .notNull()
+      .references(() => profileBenchmarkAdmissions.admission_id),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    estimated_cost_usd: real('estimated_cost_usd').notNull(),
+    charged_cost_usd: real('charged_cost_usd'),
+    quota_charged: integer('quota_charged', { mode: 'boolean' }).notNull(),
+    state: text('state')
+      .$type<'allocating' | 'admitted' | 'release_pending' | 'settled' | 'released'>()
+      .notNull(),
+    terminal_status: text('terminal_status').$type<'ready' | 'failed'>(),
+    run_id: text('run_id'),
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+    settled_at: text('settled_at'),
+  },
+  table => [
+    primaryKey({ columns: [table.admission_id, table.model, table.variant] }),
+    uniqueIndex('UQ_profile_benchmark_claims_active_pair')
+      .on(table.model, table.variant, table.engine_identity, table.repetitions)
+      .where(
+        sql`${table.state} IN ('allocating', 'admitted') AND ${table.terminal_status} IS NULL`
+      ),
+    index('IDX_profile_benchmark_claims_run').on(table.run_id, table.state),
+    index('IDX_profile_benchmark_claims_state').on(table.state, table.created_at),
+  ]
+);
+
 export const profileRequestEvents = sqliteTable(
   'profile_request_events',
   {

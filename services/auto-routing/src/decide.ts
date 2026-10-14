@@ -76,7 +76,18 @@ async function loadCustomRoutingTable(
   if (!cache) {
     const poolSnapshot = pool;
     cache = ttlCached(CUSTOM_ROUTING_TABLE_CACHE_TTL_MS, async (e: Env) => {
-      return fetchCustomRoutingTable(e, poolSnapshot);
+      const table = await fetchCustomRoutingTable(e, poolSnapshot);
+      if (table === null) return null;
+      const modelIds = new Set(poolSnapshot.map(entry => entry.model));
+      const routes = Object.fromEntries(
+        Object.entries(table.routes)
+          .map(
+            ([route, candidates]) =>
+              [route, candidates.filter(candidate => modelIds.has(candidate.model))] as const
+          )
+          .filter(([, candidates]) => candidates.length > 0)
+      );
+      return { ...table, routes };
     });
     customTableLoaders.set(key, cache);
   }

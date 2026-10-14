@@ -23,7 +23,8 @@ import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/or
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageCircleQuestion, Terminal } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MessageCircleQuestion, Monitor, Terminal } from 'lucide-react';
 import { OrganizationProvidersAndModelsConfigurationCard } from '@/components/organizations/OrganizationProvidersAndModelsConfigurationCard';
 import { OrganizationChildOrganizationsCard } from '@/components/organizations/OrganizationChildOrganizationsCard';
 import { OrganizationEmailPreferencesCard } from '@/components/organizations/OrganizationEmailPreferencesCard';
@@ -220,6 +221,24 @@ export function OrganizationDashboard({
                   <p className="text-muted-foreground text-sm">
                     Ready to start coding? Get started with Kilo Code for your organization:
                   </p>
+                  <div className="space-y-2">
+                    <Button asChild className="h-9 w-full sm:w-auto">
+                      <Link
+                        href="https://kilo.ai/install#desktop-downloads"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Monitor className="h-4 w-4 shrink-0" />
+                        Download Kilo Desktop
+                      </Link>
+                    </Button>
+                    <p className="text-muted-foreground text-xs">
+                      Free to download. macOS, Windows &amp; Linux.
+                    </p>
+                  </div>
+                  <p className="text-muted-foreground text-sm">
+                    Already have an editor? Use Kilo in your IDE or terminal.
+                  </p>
                   <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <OpenInExtensionButton
                       className="flex h-9 items-center gap-2 px-3 py-2 text-sm"
@@ -235,31 +254,41 @@ export function OrganizationDashboard({
                       />
                       <span>VS Code</span>
                     </OpenInExtensionButton>
-                    <Link
-                      href="https://plugins.jetbrains.com/plugin/28350-kilo-code"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="focus-visible:ring-ring border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium whitespace-nowrap shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-                    >
-                      <Image
-                        src="/logos/idea.svg"
-                        alt="JetBrains"
-                        width={16}
-                        height={16}
-                        className="shrink-0"
-                      />
-                      <span>JetBrains</span>
-                    </Link>
-                    <Link
-                      href="https://kilo.ai/install#cli"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="focus-visible:ring-ring border-input bg-background hover:bg-accent hover:text-accent-foreground inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium whitespace-nowrap shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-                    >
-                      <Terminal className="h-4 w-4 shrink-0" />
-                      <span>CLI</span>
-                    </Link>
+                    <Button asChild variant="outline" className="h-9">
+                      <Link
+                        href="https://plugins.jetbrains.com/plugin/28350-kilo-code"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Image
+                          src="/logos/idea.svg"
+                          alt="JetBrains"
+                          width={16}
+                          height={16}
+                          className="shrink-0"
+                        />
+                        <span>JetBrains IDEs</span>
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" className="h-9">
+                      <Link
+                        href="https://kilo.ai/install#cli"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Terminal className="h-4 w-4 shrink-0" />
+                        <span>CLI</span>
+                      </Link>
+                    </Button>
                   </div>
+                  <Link
+                    href="https://kilo.ai/install"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary text-sm font-medium hover:underline"
+                  >
+                    View all install options
+                  </Link>
                 </div>
               </CardContent>
             </Card>

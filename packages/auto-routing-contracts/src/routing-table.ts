@@ -192,7 +192,7 @@ export const ROUTING_TABLE_KV_KEY = 'routing_table_v1';
 const ACCURACY_NOISE_BAND = 0.05;
 // Value uses the Wilson lower bound when the measured case count is known.
 const LATENCY_WEIGHT = 1.5;
-export const LATENCY_TOTAL_WEIGHT = 0.25;
+export const LATENCY_TOTAL_WEIGHT = 0.15;
 const ACCURACY_WEIGHT = 15;
 // Part of every registry table version: a policy change must republish tables
 // built from unchanged measurements.

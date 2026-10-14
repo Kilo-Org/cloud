@@ -171,10 +171,7 @@ async function queryModelCapabilities(
 const cache = ttlCached<
   { env: ModelCapabilitiesEnv; router: AutoRouter },
   ModelCapabilitiesCacheValue
->(
-  MODEL_CAPABILITIES_IN_MEMORY_TTL_MS,
-  async ({ env, router }) => loadAll(env, router)
-);
+>(MODEL_CAPABILITIES_IN_MEMORY_TTL_MS, async ({ env, router }) => loadAll(env, router));
 
 // Tombstones are deliberately NOT merged: callers must see a tombstoned id
 // exactly as they see an unknown one (`caps === undefined`), which fails

@@ -201,9 +201,10 @@ async function main() {
         rebuildFromSweep: values['rebuild-from-sweep'],
         complexityLabels,
         pricing,
-        accuracyNoiseBand: values['accuracy-noise-band'] === undefined
-          ? undefined
-          : z.coerce.number().min(0).max(1).parse(values['accuracy-noise-band']),
+        accuracyNoiseBand:
+          values['accuracy-noise-band'] === undefined
+            ? undefined
+            : z.coerce.number().min(0).max(1).parse(values['accuracy-noise-band']),
         now: new Date(),
       })
     );

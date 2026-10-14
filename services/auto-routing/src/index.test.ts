@@ -416,15 +416,18 @@ describe('auto routing worker', () => {
         isActive: true,
       },
     ]);
-    const response = await decideRequest(mirrorPayload({
-      router: 'frontier',
-      constraints: { requiredInputModalities: ['image', 'file'] },
-    }));
+    const response = await decideRequest(
+      mirrorPayload({
+        router: 'frontier',
+        constraints: { requiredInputModalities: ['image', 'file'] },
+      })
+    );
     await expect(response.json()).resolves.toMatchObject({
       decision: { model: 'anthropic/claude-opus-4.6', tableVersion: 'frontier-table' },
     });
     expect(getModelCapabilitiesMock).toHaveBeenCalledWith(
-      env, expect.objectContaining({ router: 'frontier' })
+      env,
+      expect.objectContaining({ router: 'frontier' })
     );
     expect(cacheIdFromName).toHaveBeenCalledWith('frontier:user:user-1:task:task-123');
     expect(cacheReadConversationState).toHaveBeenCalledWith(expect.stringMatching(/^frontier:/));

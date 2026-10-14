@@ -125,9 +125,11 @@ describe('getModelCapabilities', () => {
       const result = await getModelCapabilities(env, { router: requestedRouter });
       expect(result.get(model)?.inputModalities).toEqual(new Set(['image', 'file']));
       expect(mockGetRoutingTable).toHaveBeenCalledTimes(2);
-      expect(mockGetRoutingTable.mock.calls.every(([calledEnv, selectedRouter]) =>
-        calledEnv === env && selectedRouter === router
-      )).toBe(true);
+      expect(
+        mockGetRoutingTable.mock.calls.every(
+          ([calledEnv, selectedRouter]) => calledEnv === env && selectedRouter === router
+        )
+      ).toBe(true);
       expect(dbWhere).toHaveBeenCalledTimes(1);
     }
   );
@@ -144,12 +146,18 @@ describe('getModelCapabilities', () => {
     mockGetRoutingTable.mockImplementation(async (_env, router) =>
       router === 'frontier' ? frontierTable : SAMPLE_ROUTING_TABLE
     );
-    dbWhere.mockResolvedValueOnce([
-      { openrouterId: 'a/chat', inputModalities: ['image'], contextLength: 8192 },
-      { openrouterId: 'b/chat', inputModalities: ['text'], contextLength: 16384 },
-    ]).mockResolvedValueOnce([
-      { openrouterId: 'frontier/image-model', inputModalities: ['image', 'file'], contextLength: 32768 },
-    ]);
+    dbWhere
+      .mockResolvedValueOnce([
+        { openrouterId: 'a/chat', inputModalities: ['image'], contextLength: 8192 },
+        { openrouterId: 'b/chat', inputModalities: ['text'], contextLength: 16384 },
+      ])
+      .mockResolvedValueOnce([
+        {
+          openrouterId: 'frontier/image-model',
+          inputModalities: ['image', 'file'],
+          contextLength: 32768,
+        },
+      ]);
     const env = makeEnv(null);
     await getModelCapabilities(env);
     const result = await getModelCapabilities(env, { router: 'frontier' });

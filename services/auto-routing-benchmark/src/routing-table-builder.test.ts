@@ -117,8 +117,12 @@ describe('buildEffortByComplexity', () => {
       }));
       const summaries = TAXONOMY_ROUTE_KEYS.flatMap(routeKey =>
         ['low', 'high'].map(variant => ({
-          ...summary('model/shared', routeKey, variant === 'low' ? 0.97 : 1,
-            variant === 'low' ? 0.01 : 1),
+          ...summary(
+            'model/shared',
+            routeKey,
+            variant === 'low' ? 0.97 : 1,
+            variant === 'low' ? 0.01 : 1
+          ),
           variant,
         }))
       );
@@ -136,13 +140,16 @@ describe('buildEffortByComplexity', () => {
         ...params,
         version: 'noise-band',
         deciderModels: ['low', 'high'].map(variant => ({
-          id: 'model/shared', variant, reasoningEffort: null,
+          id: 'model/shared',
+          variant,
+          reasoningEffort: null,
         })),
       });
       const custom = buildCustomRoutingTable({
         ...params,
         readyEntries: ['low', 'high'].map(variant => ({
-          entry: { model: 'model/shared', variant }, runId: 'noise-band',
+          entry: { model: 'model/shared', variant },
+          runId: 'noise-band',
         })),
         summaries: summaries.map(value => ({ ...value, runId: 'noise-band' })),
       });
@@ -153,7 +160,12 @@ describe('buildEffortByComplexity', () => {
       }
       expect(
         buildEffortByComplexity(
-          platform.routes, measured, labels, minAccuracy, null, accuracyNoiseBand
+          platform.routes,
+          measured,
+          labels,
+          minAccuracy,
+          null,
+          accuracyNoiseBand
         )[route]
       ).toEqual(platform.effortByComplexity?.[route]);
     }

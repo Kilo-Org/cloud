@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
@@ -474,6 +475,7 @@ const PrepareSessionCloneVariant = z.object({
 // Schema for preparing a session
 export const basePrepareSessionNextSchema = z
   .union([PrepareSessionNonCloneVariant, PrepareSessionCloneVariant])
+  .and(egressPolicySchema)
   .refine(
     data =>
       [data.githubRepo, data.gitlabProject, data.bitbucketRepo].filter(
@@ -760,6 +762,7 @@ export const baseGetSessionNextOutputSchema = z.object({
   variant: z.string().optional(),
   autoCommit: z.boolean().optional(),
   upstreamBranch: z.string().optional(),
+  branchName: z.string().optional(),
 
   /** Custom agents stored on this session (shown in the chat picker). */
   runtimeAgents: z

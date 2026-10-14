@@ -77,27 +77,37 @@ export function createPreparationProgressRecorder(options: {
     const existing = readPreparationAttempt(eventQueries, attemptId);
     if (existing?.status === 'completed' || existing?.status === 'failed') return false;
     const key = step as PreparingStep;
+    if (activeStep?.key === key && activeStep.detail === message) {
+      return existing?.status === 'running';
+    }
     if (!existing) {
       emit('workspace_setup', 'Preparing environment', { action: 'attempt_started' });
     }
-    const stepId = `phase:${key}`;
+    const steps = readPreparationSteps(eventQueries, attemptId);
     if (activeStep === undefined && existing) {
       // A fresh recorder for an open attempt (the DO was evicted mid-step)
       // recovers its step from storage: continue the same step, or close the
       // one it was on so it does not spin forever.
-      for (const running of readPreparationSteps(eventQueries, attemptId)) {
+      for (const running of steps) {
         if (running.kind !== 'phase' || running.status !== 'running') continue;
-        if (running.id === stepId) {
-          activeStep = { id: stepId, key, detail: running.latestDetail };
+        if (running.key === key) {
+          activeStep = { id: running.id, key, detail: running.latestDetail };
         } else {
           emit(running.key, running.label, { action: 'step_completed', stepId: running.id });
         }
       }
     }
-    if (activeStep?.id !== stepId) {
+    if (
+      activeStep?.key !== key ||
+      steps.find(step => step.id === activeStep?.id)?.status !== 'running'
+    ) {
       if (activeStep) {
         emit(activeStep.key, message, { action: 'step_completed', stepId: activeStep.id });
       }
+      const phaseId = `phase:${key}`;
+      const stepId = steps.some(step => step.id === phaseId)
+        ? `${phaseId}:${(readPreparationAttempt(eventQueries, attemptId)?.revision ?? 0) + 1}`
+        : phaseId;
       emit(key, message, {
         action: 'step_started',
         stepId,
@@ -109,7 +119,7 @@ export function createPreparationProgressRecorder(options: {
       // A repeated report (a `prepare` reply and its notification) adds nothing.
       return existing?.status === 'running';
     }
-    emit(key, message, { action: 'step_progress', stepId, detail: message });
+    emit(key, message, { action: 'step_progress', stepId: activeStep.id, detail: message });
     activeStep.detail = message;
     return readPreparationAttempt(eventQueries, attemptId)?.status === 'running';
   }

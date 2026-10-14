@@ -41,6 +41,11 @@ import {
   type MainProcessObservation,
 } from './main-process.js';
 import type { Env } from '../types.js';
+import {
+  nativeEgressAllowlistSchema,
+  nativeEgressPolicySchema,
+  type NativeEgressPolicy,
+} from './egress-policy.js';
 
 export type ContainerInstanceSize =
   | 'lite'
@@ -59,6 +64,7 @@ export type ContainersLaunchInput = {
   env: Record<string, string>;
   instance: ContainerInstanceSize;
   containment?: boolean;
+  egressAllowlist?: string[];
   /** Keyed hash of the launch's scope, repository and env; absent means no snapshot. */
   repoKey?: string;
   /** Start from the image and retain the failed snapshot for debugging. */
@@ -102,6 +108,7 @@ type ContainersRecord = {
   billingConfigured?: true;
   wrapperAttempt?: WrapperAttempt;
   repositoryStartFailures?: { snapshotId: string; attempts: number };
+  egressPolicy?: NativeEgressPolicy;
 };
 
 type ResolvedStart = {
@@ -122,7 +129,7 @@ type DelayedSchedule<T> = {
 const RECORD_KEY = 'containers:record:v1';
 const CONTAINER_IMAGE = 'app';
 
-function containedProcessEnv(env: Record<string, string>): Record<string, string> {
+function interceptedProcessEnv(env: Record<string, string>): Record<string, string> {
   // Bun reads NODE_EXTRA_CA_CERTS only at process start, so the injected CA file must be
   // readable before this exec for the wrapper's own TLS; cert.ts only completes the bundle
   // append and the child env afterwards.
@@ -253,6 +260,10 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   async launchWrapper(input: ContainersLaunchInput): Promise<ContainersLaunchResult> {
+    input = {
+      ...input,
+      egressAllowlist: nativeEgressAllowlistSchema.optional().parse(input.egressAllowlist),
+    };
     return this.runExclusive(async () => {
       const ref = input.allocationRef;
       let stored = await this.readRecord();
@@ -261,6 +272,15 @@ export class SandboxContainers extends DurableObject<Env> {
       }
       if (stored.allocationRef !== null && stored.allocationRef !== ref) {
         stored = await this.releaseSupersededAllocation(stored);
+      }
+      const persistedPolicy = nativeEgressPolicySchema.optional().parse(stored.egressPolicy);
+      if (stored.allocationRef === ref || persistedPolicy?.allocationRef === ref) {
+        if (
+          (persistedPolicy !== undefined && persistedPolicy.allocationRef !== ref) ||
+          JSON.stringify(persistedPolicy?.allowlist) !== JSON.stringify(input.egressAllowlist)
+        ) {
+          throw new Error('Container egress policy cannot change within an allocation');
+        }
       }
       return this.launchEntry(stored, ref, input);
     });
@@ -298,6 +318,9 @@ export class SandboxContainers extends DurableObject<Env> {
     const sameRef = stored.allocationRef === ref;
     const phase = readWrapperAttempt(stored);
     if (stored.state === 'running' && sameRef) {
+      if (input.egressAllowlist !== undefined) {
+        await this.installOutboundProxy(this.requiredContainer(), input.egressAllowlist);
+      }
       // A pending (or unknown) phase means a bun exec may still be starting; the
       // running record must not be touched or the fence would be lost.
       if (phase === 'exec_pending' || phase === 'unknown') {
@@ -312,12 +335,7 @@ export class SandboxContainers extends DurableObject<Env> {
         return this.resumePreExecLaunch(record, ref, input);
       }
       if (phase === 'exec_pending' || phase === 'missing') {
-        return this.adoptUncertainWrapper(
-          stored,
-          ref,
-          input.containment === true,
-          phase === 'missing'
-        );
+        return this.adoptUncertainWrapper(stored, ref, input, phase === 'missing');
       }
       throw new Error('Container wrapper attempt phase is unknown');
     }
@@ -336,11 +354,15 @@ export class SandboxContainers extends DurableObject<Env> {
     if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt) {
       throw new WrapperExecTimeoutError();
     }
-    const containment = input.containment === true;
+    if (input.egressAllowlist !== undefined && container.running) {
+      throw new Error('Cannot apply an egress policy to an unowned running container');
+    }
     // Persist the accepted physical instance before any early return or physical
     // operation, so a resumed launch whose exec fails still records its size.
     const record = await this.installLaunchInstance(stored, input.instance);
-    if (containment) await this.installContainmentProxy(container);
+    if (input.containment === true || input.egressAllowlist !== undefined) {
+      await this.installOutboundProxy(container, input.egressAllowlist);
+    }
     const start = await this.resolveStart(input, true);
     return this.issueNativeSupervisor(record, ref, start, input);
   }
@@ -359,14 +381,20 @@ export class SandboxContainers extends DurableObject<Env> {
     const container = this.requiredContainer();
     // Ownership is retained before start: an ambiguous start that takes effect
     // must not release the allocation. Never leave `not_started` across the start.
-    await this.writeRecord({
+    const launching: ContainersRecord = {
       ...record,
       state: 'launching',
       allocationRef: ref,
       stopOpId: null,
       wrapperAttempt: 'exec_pending',
       startSource: start.source,
-    });
+    };
+    if (input.egressAllowlist === undefined) {
+      delete launching.egressPolicy;
+    } else {
+      launching.egressPolicy = { allocationRef: ref, allowlist: input.egressAllowlist };
+    }
+    await this.writeRecord(launching);
     if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt) {
       throw new WrapperExecTimeoutError();
     }
@@ -398,7 +426,11 @@ export class SandboxContainers extends DurableObject<Env> {
       source: 'image',
       options: this.startOptions(
         input.instance,
-        this.nativeLaunchEnv(input.env, input.containment === true)
+        this.nativeLaunchEnv(
+          input.env,
+          input.containment === true || input.egressAllowlist !== undefined
+        ),
+        input.egressAllowlist
       ),
       snapshotId: null,
     };
@@ -442,7 +474,11 @@ export class SandboxContainers extends DurableObject<Env> {
       source: 'repository',
       options: this.startOptions(
         input.instance,
-        this.nativeLaunchEnv(input.env, input.containment === true),
+        this.nativeLaunchEnv(
+          input.env,
+          input.containment === true || input.egressAllowlist !== undefined
+        ),
+        input.egressAllowlist,
         entry.snapshotId
       ),
       snapshotId: entry.snapshotId,
@@ -708,8 +744,8 @@ export class SandboxContainers extends DurableObject<Env> {
     input: ContainersLaunchInput
   ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
-    const containment = input.containment === true;
-    if (containment) await this.installContainmentProxy(container);
+    const interception = input.containment === true || input.egressAllowlist !== undefined;
+    if (interception) await this.installOutboundProxy(container, input.egressAllowlist);
     if (!container.running) {
       const start = await this.resolveStart(input, record.startSource === 'repository');
       return this.issueNativeSupervisor(record, ref, start, input);
@@ -732,7 +768,7 @@ export class SandboxContainers extends DurableObject<Env> {
       if (container.running !== true) {
         throw new Error('Container stopped before the wrapper exec');
       }
-      await this.startWrapper(container, input.env, containment);
+      await this.startWrapper(container, input.env, interception);
     } else {
       await this.activateBillingIfRunning(container, record);
     }
@@ -776,14 +812,16 @@ export class SandboxContainers extends DurableObject<Env> {
   private async adoptUncertainWrapper(
     stored: ContainersRecord,
     ref: string,
-    containment: boolean,
+    input: ContainersLaunchInput,
     stampLegacy: boolean
   ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
     if (container.running !== true) {
       throw new Error('Container wrapper start is pending and the container is not running');
     }
-    if (containment) await this.installContainmentProxy(container);
+    if (input.containment === true || input.egressAllowlist !== undefined) {
+      await this.installOutboundProxy(container, input.egressAllowlist);
+    }
     if ((await this.settleRunningMainProcess(stored, ref)) === 'supervisor') {
       return { started: true, startSource: recordedStartSource(stored) };
     }
@@ -981,9 +1019,17 @@ export class SandboxContainers extends DurableObject<Env> {
     }
   }
 
-  private async installContainmentProxy(container: Container): Promise<void> {
+  private async installOutboundProxy(
+    container: Container,
+    egressAllowlist?: string[]
+  ): Promise<void> {
     const outbound = this.ctx.exports.ContainersOutbound;
-    const worker = outbound({ props: { containerId: this.ctx.id.toString() } });
+    const worker = outbound({
+      props: {
+        containerId: this.ctx.id.toString(),
+        ...(egressAllowlist === undefined ? {} : { egressAllowlist }),
+      },
+    });
     await container.interceptOutboundHttps('*', worker);
     await container.interceptAllOutboundHttp(worker);
   }
@@ -997,6 +1043,7 @@ export class SandboxContainers extends DurableObject<Env> {
   private startOptions(
     instance: ContainerInstanceSize,
     env: Record<string, string>,
+    egressAllowlist?: string[],
     snapshotId?: string
   ): ContainerStartupOptions {
     // Native issuance: the main process is the supervisor, not the image default
@@ -1006,23 +1053,23 @@ export class SandboxContainers extends DurableObject<Env> {
         ? { image: this.containerImage() }
         : { containerSnapshot: { id: snapshotId } }),
       instance,
-      enableInternet: true,
+      enableInternet: egressAllowlist === undefined,
       entrypoint: ['/bin/sh', CONTROL_SUPERVISOR_PATH],
       env,
     };
   }
 
   /**
-   * The env for a native start and for a sleep-main-process exec. Containment CA
+   * The env for a native start and for a sleep-main-process exec. Interception CA
    * goes on both; the stderr gate is native-only and set here, never in the
    * shared launch-env builder.
    */
   private nativeLaunchEnv(
     env: Record<string, string>,
-    containment: boolean
+    interception: boolean
   ): Record<string, string> {
     return {
-      ...(containment ? containedProcessEnv(env) : env),
+      ...(interception ? interceptedProcessEnv(env) : env),
       [CONTROL_PLANE_NATIVE_LOGS_ENV]: '1',
     };
   }
@@ -1135,6 +1182,7 @@ export class SandboxContainers extends DurableObject<Env> {
       lastSnapshot: record.lastSnapshot ?? null,
       ...(record.instance !== undefined ? { instance: record.instance } : {}),
       ...(record.billingConfigured ? { billingConfigured: true } : {}),
+      ...(record.egressPolicy === undefined ? {} : { egressPolicy: record.egressPolicy }),
       ...(record.repositoryStartFailures === undefined
         ? {}
         : { repositoryStartFailures: record.repositoryStartFailures }),

@@ -35,8 +35,8 @@ export function CancelSubscriptionModal({
             </p>
             <p className="font-medium">
               If you have remaining credits, please contact support at{' '}
-              <a href="mailto:teams@kilocode.ai" className="text-blue-600 hover:underline">
-                teams@kilocode.ai
+              <a href="mailto:hi@kilo.ai" className="text-blue-600 hover:underline">
+                hi@kilo.ai
               </a>{' '}
               to request a credit refund.
             </p>

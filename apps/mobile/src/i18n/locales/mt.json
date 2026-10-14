@@ -1609,7 +1609,7 @@
         "recoveryLabel": "Aġġorna l-app ta' GitHub"
       },
       "githubIpAllowList": {
-        "description": "Ir-reviżur tal-kodiċi ġie diżattivat għaliex din l-organizzazzjoni ta' GitHub tuża lista ta' indirizzi IP permessi li timblokka lil Kilo. Ikkuntattja hi@kilocode.ai għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
+        "description": "Ir-reviżur tal-kodiċi ġie diżattivat għaliex din l-organizzazzjoni ta' GitHub tuża lista ta' indirizzi IP permessi li timblokka lil Kilo. Ikkuntattja hi@kilo.ai għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
       },
       "gitlabProjectAccessRequired": {
         "description": "Ir-reviżur tal-kodiċi ġie diżattivat għaliex Kilo ma jistax joħloq token ta' aċċess għall-proġett fuq GitLab. Agħti aċċess ta' manutentur jew attiva t-tokens ta' aċċess għall-proġett, imbagħad erġa' attiva r-reviżur tal-kodiċi.",
@@ -1624,7 +1624,7 @@
         "recoveryLabel": "Aġġorna l-issettjar tar-reviżur tal-kodiċi"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Ir-reviżur tal-kodiċi ġie diżattivat wara li l-klonazzjoni tar-repożitorju qabżet il-ħin permess tliet darbiet illum. Ikkuntattja hi@kilocode.ai għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
+        "description": "Ir-reviżur tal-kodiċi ġie diżattivat wara li l-klonazzjoni tar-repożitorju qabżet il-ħin permess tliet darbiet illum. Ikkuntattja hi@kilo.ai għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
       },
       "title": "Ir-reviżur tal-kodiċi jeħtieġ l-attenzjoni tiegħek.",
       "recoveryLabel": "Ikkuntattja l-appoġġ"

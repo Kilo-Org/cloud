@@ -29,13 +29,15 @@ export async function buildClassifierUsage(
   costUsd: number,
   createdAt: string
 ): Promise<UsageRecordRequest> {
-  const hash = await sha256Hex(JSON.stringify([
-    identity.conversationKey,
-    identity.classifierModel,
-    identity.contentHash,
-    identity.kind,
-    identity.requestStart,
-  ]));
+  const hash = await sha256Hex(
+    JSON.stringify([
+      identity.conversationKey,
+      identity.classifierModel,
+      identity.contentHash,
+      identity.kind,
+      identity.requestStart,
+    ])
+  );
   const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-${((parseInt(hash[16] ?? '0', 16) & 3) | 8).toString(16)}${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
   return UsageRecordRequestSchema.parse({
     core: {
@@ -126,9 +128,10 @@ export async function recordClassifierUsage(
   if (costUsd == null) return;
   const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
   await withDORetry(
-    () => env.AUTO_ROUTING_DECISION_CACHE.get(
-      env.AUTO_ROUTING_DECISION_CACHE.idFromName(identity.conversationKey)
-    ),
+    () =>
+      env.AUTO_ROUTING_DECISION_CACHE.get(
+        env.AUTO_ROUTING_DECISION_CACHE.idFromName(identity.conversationKey)
+      ),
     stub => stub.recordClassifierUsage(usage),
     'recordClassifierUsage'
   );

@@ -36,7 +36,7 @@ function request(body: unknown) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockedSubscriptionGate.mockResolvedValue(undefined);
+  mockedSubscriptionGate.mockResolvedValue({ isReadOnly: false, daysRemaining: Infinity });
   mockedOwner.mockResolvedValue({
     ownerType: 'user',
     ownerId: 'user-1',

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext } from 'react';
+import { createContext, useCallback, useContext, useRef } from 'react';
 import { skipToken, useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -29,7 +29,8 @@ export function usePreviewUrlTemplate(
 
 /**
  * Opens a preview tab. The tab opens before the ticket request, while the click
- * still allows a popup, and moves to the preview once the ticket arrives.
+ * still allows a popup, and moves to the preview once the ticket arrives. One
+ * open runs at a time, so a double click opens one tab and mints one ticket.
  */
 export function useOpenPreview(organizationId: string | undefined) {
   const trpc = useTRPC();
@@ -37,9 +38,12 @@ export function useOpenPreview(organizationId: string | undefined) {
   const orgCreate = useMutation(trpc.organizations.cloudAgentNext.createPreview.mutationOptions());
   const createPersonal = personalCreate.mutateAsync;
   const createOrg = orgCreate.mutateAsync;
+  // A ref, not `isPending`: the second click of a double click comes before a re-render.
+  const inFlight = useRef(false);
 
   const openPreview = useCallback(
     async (cloudAgentSessionId: PreviewSessionId, port: number, path?: string) => {
+      if (inFlight.current) return false;
       const popup = window.open('about:blank', '_blank');
       if (!popup) {
         toast.error('Popup blocked. Allow popups for this site to open a preview.');
@@ -47,6 +51,7 @@ export function useOpenPreview(organizationId: string | undefined) {
       }
       popup.opener = null;
 
+      inFlight.current = true;
       try {
         const input = { cloudAgentSessionId, port, path };
         const result = organizationId
@@ -58,6 +63,8 @@ export function useOpenPreview(organizationId: string | undefined) {
         popup.close();
         toast.error(error instanceof Error ? error.message : 'Could not open preview.');
         return false;
+      } finally {
+        inFlight.current = false;
       }
     },
     [organizationId, createOrg, createPersonal]

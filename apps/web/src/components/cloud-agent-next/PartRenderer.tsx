@@ -88,6 +88,12 @@ function LinkRenderer({ href, children }: { href?: string; children?: ReactNode 
           event.preventDefault();
           previewLinks.open(previewTarget.port, previewTarget.path);
         }}
+        // A middle click must also mint a ticket; the bare preview host needs the cookie.
+        onAuxClick={event => {
+          if (event.button !== 1) return;
+          event.preventDefault();
+          previewLinks.open(previewTarget.port, previewTarget.path);
+        }}
       >
         {isAddressText(children, href) ? previewUrl : children}
       </a>

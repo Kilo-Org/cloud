@@ -247,6 +247,47 @@ describe('readSweepCompletion', () => {
     });
   });
 
+  it('accepts explicit null error fields in answer and usage chunks', async () => {
+    const response = new Response([
+      'data: {"error":null,"choices":[{"delta":{"content":"answer"}}]}',
+      '',
+      'data: {"error":null,"choices":[],"usage":{"cost":0.012}}',
+      '',
+      'data: [DONE]',
+      '',
+      '',
+    ].join('\n'));
+    expect(await readSweepCompletion(response, 100, () => 175)).toEqual({
+      output: 'answer',
+      costUsd: 0.012,
+      ttftMs: 75,
+    });
+  });
+
+  it.each(['', 'data: {"error":{"message":"after completion"}}\n\n'])(
+    'cancels an open connection at [DONE] without consuming trailing data: %s',
+    async trailingData => {
+      const cancel = vi.fn();
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(
+            'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
+            'data: {"choices":[],"usage":{"cost":0.012}}\n\n' +
+            'data: [DONE]\n\n' + trailingData
+          ));
+        },
+        cancel,
+      });
+      expect(await readSweepCompletion(new Response(stream), 100, () => 175)).toEqual({
+        output: 'answer',
+        costUsd: 0.012,
+        ttftMs: 75,
+      });
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(stream.locked).toBe(false);
+    }
+  );
+
   it('rejects incomplete and failed streams instead of grading partial answers', async () => {
     await expect(
       readSweepCompletion(

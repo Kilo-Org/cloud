@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ClassifierOutput, RoutingTable } from '@kilocode/auto-routing-contracts';
-import { computeDecision, type DecisionIncumbent } from './decision-engine';
+import { computeDecision, computeShadowDecision, type DecisionIncumbent } from './decision-engine';
 import type { ModelCapabilities, ModelCapabilitiesMap } from './model-capabilities';
 
 function makeCaps(
@@ -1144,5 +1144,104 @@ describe('computeDecision', () => {
       );
       expect(decision).toMatchObject({ model: 'inactive/chat' });
     });
+  });
+});
+
+describe('computeShadowDecision', () => {
+  it('does no decision computation when the shadow table is absent', () => {
+    const unreadableClassification = new Proxy(classification, {
+      get() {
+        throw new Error('classification must not be read');
+      },
+    });
+    expect(computeShadowDecision(null, unreadableClassification, null, null)).toBeNull();
+  });
+
+  it('ignores a failed shadow computation without mutating the live decision', () => {
+    const live = computeDecision(classification, table, null);
+    const original = structuredClone(live);
+    const brokenTable: RoutingTable = {
+      ...table,
+      get routes(): RoutingTable['routes'] {
+        throw new Error('shadow computation failed');
+      },
+    };
+    expect(computeShadowDecision(live, classification, brokenTable, null)).toBeNull();
+    expect(live).toEqual(original);
+  });
+
+  it('compares model and variant rather than table versions', () => {
+    const live = computeDecision(classification, table, null);
+    expect(
+      computeShadowDecision(live, classification, { ...table, version: 'shadow' }, null)
+    ).toEqual({ shadowModel: 'cheap/chat', shadowVariant: null, shadowDiffers: false });
+    const variantTable: RoutingTable = {
+      ...table,
+      routes: {
+        'implementation/code_generation': [
+          {
+            model: 'cheap/chat',
+            variant: 'reasoning',
+            accuracy: 1,
+            avgCostUsd: 0.01,
+            meetsThreshold: true,
+          },
+        ],
+      },
+    };
+    expect(computeShadowDecision(live, classification, variantTable, null)).toEqual({
+      shadowModel: 'cheap/chat',
+      shadowVariant: 'reasoning',
+      shadowDiffers: true,
+    });
+  });
+
+  it('distinguishes a candidate with no eligible route from no shadow evaluation', () => {
+    const live = computeDecision(classification, table, null);
+    expect(computeShadowDecision(live, classification, { ...table, routes: {} }, null)).toEqual({
+      shadowModel: null,
+      shadowVariant: null,
+      shadowDiffers: true,
+    });
+    expect(computeShadowDecision(null, classification, { ...table, routes: {} }, null)).toEqual({
+      shadowModel: null,
+      shadowVariant: null,
+      shadowDiffers: false,
+    });
+  });
+
+  it('uses identical incumbent, denied models, mode, and capability constraints', () => {
+    const denied = new Set(['weak/chat']);
+    const incumbent = inc('mid/chat', 'medium');
+    const options = {
+      constraints: { requiredInputModalities: ['image'], promptTokensEstimate: 100 },
+      capabilityMap: makeCaps({
+        'cheap/chat': { inputModalities: ['text'], contextLength: 1000 },
+        'mid/chat': { inputModalities: ['image'], contextLength: 1000 },
+        'pricey/chat': { inputModalities: ['image'], contextLength: 50 },
+      }),
+      failClosedOnInactive: true,
+    };
+    const live = computeDecision(
+      classification,
+      table,
+      incumbent,
+      denied,
+      'best_accuracy',
+      options
+    );
+    const original = structuredClone(table);
+    expect(
+      computeShadowDecision(
+        live,
+        classification,
+        table,
+        incumbent,
+        denied,
+        'best_accuracy',
+        options
+      )
+    ).toEqual({ shadowModel: 'mid/chat', shadowVariant: 'medium', shadowDiffers: false });
+    expect(table).toEqual(original);
   });
 });

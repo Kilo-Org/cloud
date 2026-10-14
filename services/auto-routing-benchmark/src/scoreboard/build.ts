@@ -64,5 +64,6 @@ export function buildScoreboard({
       heldOut: null,
     },
     routeMix,
+    shadow: prod?.shadow ?? null,
   };
 }

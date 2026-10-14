@@ -7,8 +7,18 @@ import {
   DECISION_LOG_SAMPLE_RATE_CONFIG_KEY,
   DEFAULT_DECISION_LOG_SAMPLE_RATE,
 } from '../../auto-routing/src/classifier-config';
-import { ProdMetricsSchema, type Dist, type ProdMetrics } from '../src/scoreboard/schema';
-import { estimateClassifiedMetrics } from '../src/scoreboard/production';
+import {
+  ProdMetricsSchema,
+  ShadowOutcomesSchema,
+  type Dist,
+  type ProdMetrics,
+} from '../src/scoreboard/schema';
+import {
+  estimateClassifiedMetrics,
+  estimateShadowMetrics,
+  ShadowDecisionGroupSchema,
+  shadowOutcomesQuery,
+} from '../src/scoreboard/production';
 
 const requestPrefix =
   "['cloudflare-logpush'] | where ScriptName == 'auto-routing' and ['Event.Request.URL'] endswith '/decide'";
@@ -242,29 +252,11 @@ function postgresEnv(): NodeJS.ProcessEnv {
   }
 }
 
-async function postgresMetrics(window: Window): Promise<Partial<ProdMetrics>> {
+async function queryPostgres(sql: string, format: 'csv' | 'json'): Promise<string> {
   const env = postgresEnv();
-  const sql = `BEGIN READ ONLY;
-SET LOCAL statement_timeout='55s';
-SELECT
-  count(meta.latency) AS n,
-  percentile_cont(0.5) WITHIN GROUP (ORDER BY meta.latency) AS p50,
-  percentile_cont(0.9) WITHIN GROUP (ORDER BY meta.latency) AS p90,
-  percentile_cont(0.99) WITHIN GROUP (ORDER BY meta.latency) AS p99,
-  avg(usage.cost)::double precision / 1000000 AS mean_usd,
-  percentile_cont(0.5) WITHIN GROUP (ORDER BY usage.cost) / 1000000 AS p50_usd,
-  sum(usage.cache_hit_tokens)::double precision / nullif(sum(usage.input_tokens), 0) AS cache_share
-FROM microdollar_usage_metadata meta
-JOIN auto_model am ON am.auto_model_id = meta.auto_model_id
-JOIN microdollar_usage usage ON usage.id = meta.id
-WHERE am.auto_model IN ('kilo-auto/efficient', 'kilo-auto/balanced')
-  AND meta.created_at >= '${window.start}'::timestamptz
-  AND meta.created_at < '${window.end}'::timestamptz
-  AND usage.created_at >= '${window.start}'::timestamptz
-  AND usage.created_at < '${window.end}'::timestamptz;
-ROLLBACK;`;
-  const csv = await new Promise<string>((resolve, reject) => {
-    const child = spawn('psql', ['-X', '-v', 'ON_ERROR_STOP=1', '--csv', '-q', '-w'], {
+  const outputArgs = format === 'csv' ? ['--csv'] : ['-t', '-A'];
+  return new Promise<string>((resolve, reject) => {
+    const child = spawn('psql', ['-X', '-v', 'ON_ERROR_STOP=1', ...outputArgs, '-q', '-w'], {
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 65_000,
@@ -285,6 +277,52 @@ ROLLBACK;`;
     child.stdin.on('error', () => reject(new CollectionError('could not send query to psql')));
     child.stdin.end(sql);
   });
+}
+
+async function shadowMetrics(
+  query: AxiomQuery,
+  sampleRate: number,
+  window: Window
+): Promise<Partial<ProdMetrics>> {
+  const rows = await query(
+    `${decisionPrefix} | where j.status == 'classified' and isnotnull(j.shadowDiffers) | extend sampled=tobool(j.sampled), differs=tobool(j.shadowDiffers), sessionId=tostring(j.sessionId), decidedModel=tostring(j.decidedModel) | summarize n=count() by sampled, differs, sessionId, decidedModel`
+  );
+  const groups = rows.map(row => ShadowDecisionGroupSchema.parse(row));
+  const shadow = estimateShadowMetrics(groups, sampleRate);
+  if (groups.some(group => group.sessionId && group.decidedModel)) {
+    try {
+      const raw = await queryPostgres(shadowOutcomesQuery(window, groups), 'json');
+      shadow.outcomesByDecidedModel = ShadowOutcomesSchema.parse(JSON.parse(raw));
+    } catch (error) {
+      warn('Postgres shadow outcomes', error);
+    }
+  } else {
+    shadow.outcomesByDecidedModel = {};
+  }
+  return { shadow };
+}
+
+async function postgresMetrics(window: Window): Promise<Partial<ProdMetrics>> {
+  const sql = `BEGIN READ ONLY;
+SET LOCAL statement_timeout='55s';
+SELECT
+  count(meta.latency) AS n,
+  percentile_cont(0.5) WITHIN GROUP (ORDER BY meta.latency) AS p50,
+  percentile_cont(0.9) WITHIN GROUP (ORDER BY meta.latency) AS p90,
+  percentile_cont(0.99) WITHIN GROUP (ORDER BY meta.latency) AS p99,
+  avg(usage.cost)::double precision / 1000000 AS mean_usd,
+  percentile_cont(0.5) WITHIN GROUP (ORDER BY usage.cost) / 1000000 AS p50_usd,
+  sum(usage.cache_hit_tokens)::double precision / nullif(sum(usage.input_tokens), 0) AS cache_share
+FROM microdollar_usage_metadata meta
+JOIN auto_model am ON am.auto_model_id = meta.auto_model_id
+JOIN microdollar_usage usage ON usage.id = meta.id
+WHERE am.auto_model IN ('kilo-auto/efficient', 'kilo-auto/balanced')
+  AND meta.created_at >= '${window.start}'::timestamptz
+  AND meta.created_at < '${window.end}'::timestamptz
+  AND usage.created_at >= '${window.start}'::timestamptz
+  AND usage.created_at < '${window.end}'::timestamptz;
+ROLLBACK;`;
+  const csv = await queryPostgres(sql, 'csv');
   const lines = csv.trim().split(/\r?\n/);
   if (lines.length !== 2 || lines[0] !== 'n,p50,p90,p99,mean_usd,p50_usd,cache_share') {
     throw new CollectionError('invalid psql aggregate output');
@@ -353,6 +391,7 @@ async function main(): Promise<void> {
     modelTtftMs: null,
     prodPerRequestUsd: { mean: null, p50: null },
     prodCacheReadShare: null,
+    shadow: null,
   };
   const jobs: Promise<void>[] = [
     postgresMetrics(window)
@@ -363,8 +402,9 @@ async function main(): Promise<void> {
   ];
   try {
     const query = axiomQuery(window);
+    const resolvedSampleRate = Promise.resolve(sampleRate ?? decisionLogSampleRate());
     jobs.push(
-      Promise.resolve(sampleRate ?? decisionLogSampleRate())
+      resolvedSampleRate
         .then(rate => workerMetrics(query, rate))
         .then(result => {
           Object.assign(metrics, result);
@@ -374,7 +414,13 @@ async function main(): Promise<void> {
         .then(result => {
           Object.assign(metrics, result);
         })
-        .catch(error => warn('Axiom gateway', error))
+        .catch(error => warn('Axiom gateway', error)),
+      resolvedSampleRate
+        .then(rate => shadowMetrics(query, rate, window))
+        .then(result => {
+          Object.assign(metrics, result);
+        })
+        .catch(error => warn('Axiom shadow', error))
     );
   } catch (error) {
     warn('Axiom', error);

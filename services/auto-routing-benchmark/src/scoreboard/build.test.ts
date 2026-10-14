@@ -62,6 +62,7 @@ function prod(routeMix: Record<string, number>): ProdMetrics {
     modelTtftMs: null,
     prodPerRequestUsd: { mean: null, p50: null },
     prodCacheReadShare: null,
+    shadow: null,
   };
 }
 
@@ -125,6 +126,26 @@ describe('buildScoreboard', () => {
 
   it('uses uniform table-route weights when production route mix is empty', () => {
     expect(build(table, prod({}))).toEqual(build(table));
+  });
+
+  it('carries aggregate shadow metrics into the scoreboard', () => {
+    const metrics = prod({});
+    metrics.shadow = {
+      observedDecisions: 4,
+      differsRate: 0.25,
+      outcomesByDecidedModel: {
+        'fixture/first': {
+          requests: 3,
+          errorRate: 1 / 3,
+          abortRate: 0,
+          inputTokensPerRequest: 20,
+          outputTokensPerRequest: 5,
+          cacheReadTokensPerRequest: 10,
+          costUsdPerRequest: 0.01,
+        },
+      },
+    };
+    expect(ScoreboardSchema.parse(build(table, metrics)).shadow).toEqual(metrics.shadow);
   });
 
   it('preserves optional file latency values without altering the published table contract', () => {

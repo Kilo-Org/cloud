@@ -14,7 +14,11 @@ import { formatError, ttlCached } from '@kilocode/worker-utils';
 import type { Handler } from 'hono';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
 import type { ClassifierAnalyticsStatus } from './classifier-analytics';
-import { getClassifierModel, getDecisionLogSampleRate } from './classifier-config';
+import {
+  getClassifierModel,
+  getDecisionLogSampleRate,
+  getShadowRoutingTable,
+} from './classifier-config';
 import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifier';
 import {
   computeContentHashes,
@@ -31,8 +35,10 @@ import {
 import type { StickyDecision } from './decision-cache';
 import {
   computeDecision,
+  computeShadowDecision,
   modelSatisfiesConstraints,
   type DecisionIncumbent,
+  type ShadowDecision,
 } from './decision-engine';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
@@ -253,7 +259,8 @@ function recordDecision(
   outcome: DecisionOutcome,
   autoRoutingMode: string,
   decision: AutoRoutingDecision | null = null,
-  incumbent: StickyDecision | null = null
+  incumbent: StickyDecision | null = null,
+  shadow: ShadowDecision | null = null
 ): void {
   const summary = summarizeOutcome(outcome);
   summary.details.timings = { ...ctx.timings, totalMs: durationMs };
@@ -332,6 +339,7 @@ function recordDecision(
       // retry, failure); downstream rate math must only scale sampled rows.
       sampled: !alwaysLog,
       ...summary.details,
+      ...shadow,
     })
   );
 }
@@ -420,17 +428,21 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     // Eligible coding plans need neither a custom table nor paid inference.
     // Null pool retains the platform table and null-table fallback semantics.
     const tableStartedAt = performance.now();
-    const routingTable = codingPlanEligible
-      ? null
-      : await (configuredPool === null
-          ? getRoutingTable(c.env)
-          : loadCustomRoutingTable(c.env, configuredPool));
+    const [routingTable, shadowRoutingTable] = codingPlanEligible
+      ? [null, null]
+      : await Promise.all([
+          configuredPool === null
+            ? getRoutingTable(c.env)
+            : loadCustomRoutingTable(c.env, configuredPool),
+          getShadowRoutingTable(c.env),
+        ]);
     if (!codingPlanEligible) timings.tableMs = performance.now() - tableStartedAt;
     return {
       configuredPool,
       routingMode: effectiveSettings.mode,
       capabilities,
       routingTable,
+      shadowRoutingTable,
       codingPlanEligible,
     };
   })();
@@ -509,7 +521,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     return c.json({ cost: 0, decision, classifierResult: null });
   }
 
-  const { configuredPool, routingMode, capabilities, routingTable } = routing;
+  const { configuredPool, routingMode, capabilities, routingTable, shadowRoutingTable } = routing;
   const { ctx, sticky, outcome } = prepared;
   const incumbent = stickyToIncumbent(sticky);
   const decisionOptions = {
@@ -545,7 +557,18 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       outcome,
       routingMode,
       decision,
-      sticky
+      sticky,
+      shadowRoutingTable === null
+        ? null
+        : computeShadowDecision(
+            decision,
+            cached,
+            shadowRoutingTable,
+            incumbent,
+            deniedModelIds,
+            routingMode,
+            decisionOptions
+          )
     );
     return c.json(decisionResponse(0, cached, payload.input, decision));
   }
@@ -588,7 +611,18 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       { kind: 'model', classifier },
       routingMode,
       decision,
-      sticky
+      sticky,
+      shadowRoutingTable === null
+        ? null
+        : computeShadowDecision(
+            decision,
+            classifier.classification,
+            shadowRoutingTable,
+            incumbent,
+            deniedModelIds,
+            routingMode,
+            decisionOptions
+          )
     );
     return c.json(
       decisionResponse(classifier.cost ?? 0, classifier.classification, payload.input, decision)

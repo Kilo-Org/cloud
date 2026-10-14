@@ -86,6 +86,46 @@ Unavailable comparisons are `n/a`; rows unavailable on both sides are omitted.
 Axis summaries are `mixed` only when metrics both improve and worsen, and `flat`
 when no comparable metric improves or worsens.
 
+### Shadow routing policy
+
+To evaluate a candidate without routing any traffic to it, put its JSON table in
+the shared `AUTO_ROUTING_CONFIG` namespace under `shadow_routing_table_v1`.
+It must validate against the same `RoutingTableSchema` as `routing_table_v1`.
+Delete the shadow key to disable evaluation; the live routing table is never changed.
+The shadow reader caches both present and absent values in the isolate for 60 seconds,
+in addition to KV's propagation delay. Invalid tables and read/computation failures
+are ignored.
+
+Classified `/decide` requests evaluate the candidate with the same classifier result,
+incumbent, denied models, routing mode, constraints, and capability map as the live
+decision. Only the live decision is returned, stored, or billed. There are no extra
+classifier, capability, or benchmark calls and no shadow cache writes. Coding-plan
+short-circuits and classifier failures have no classification to shadow-evaluate.
+Existing sampled `auto_routing_decision` logs include `shadowModel`, `shadowVariant`,
+and `shadowDiffers`; a valid table with no eligible route records a null shadow model.
+
+Collect with `pnpm --filter auto-routing-benchmark scoreboard:prod --since 24 --out prod.json`,
+then pass that snapshot to `scoreboard build`. Both JSON reports include a `shadow`
+section with observed evaluation count, sampling-weighted divergence, and
+`outcomesByDecidedModel`: actual production request counts, error and abort rates,
+mean input/output/cache-read tokens, and mean cost in USD per request.
+The read-only Postgres join matches distinct observed session/model pairs to
+`microdollar_usage_metadata.session_id` and the actual `microdollar_usage.model`,
+within the collection window, for efficient and balanced auto requests.
+Repeated decision logs do not multiply usage rows. Raw session ids are used only
+in memory for the join and are never written to the reports.
+
+Outcome proxies describe the observed live-model session cohort, not the unserved
+shadow model's counterfactual quality or an exact per-decision request attribution.
+Missing status codes and cancellation flags are excluded from their respective rate
+denominators. Missing sources yield null metrics; no observed/joinable sessions yield
+an empty outcome map. Divergence weighting assumes the supplied/current
+`decision_log_sample_rate` stayed constant over the window; use `--sample-rate` when
+collecting a window with a known rate. This is observation only, not production A/B
+allocation; production ids are not silently bucketed.
+Divergence is unavailable when success sampling is disabled because always-logged
+switches alone cannot estimate population divergence.
+
 ## Admin endpoints
 
 All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`

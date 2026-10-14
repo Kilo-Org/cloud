@@ -59,6 +59,7 @@ package manifests before running repository JavaScript or package scripts. Load
 | TypeScript implementation or review | `code-quality` skill |
 | Verification or pre-commit checks | `repository-verification` skill |
 | Local services, ports, and fake login | `local-development` skill |
+| Cloud Agent sandbox setup, memory cap, and fake-LLM sessions | `cloud-agent-sandbox` skill and `.kilo/cloud-agent-setup.sh` |
 | Shared web environment changes | `apps/web/AGENTS.md` and `DEVELOPMENT.md` |
 | PostgreSQL schema or migration work | `packages/db/AGENTS.md` and `database-migrations` skill |
 | Service, Durable Object, or Worker code | `services/AGENTS.md`, nearest owning service's `AGENTS.md`, and relevant Durable Objects or Workers skills |
@@ -77,6 +78,12 @@ suggests:
 | `kilocode-app` | Frankfurt only |
 | `kilocode-global-app` | Frankfurt and us-west (SFO) |
 | `kilocode-ai-gateway` | Frankfurt and us-west (SFO) |
+
+`kilocode-global-app` is being phased out. It still exists and is still
+deployed, but no traffic is deliberately routed to it: the AI gateway is served
+by `kilocode-ai-gateway`. Do not add routes, rewrites, callers, or other new
+dependencies that target `kilocode-global-app`, and do not attribute production
+gateway behavior to it.
 
 Treat this table as the source of truth for compute location, database
 round-trip latency, and replica reasoning. If an observed region is not `fra1` or
@@ -103,7 +110,7 @@ a rewrite to another Vercel app, where PoP hops accumulate.
 `VERCEL_REGION` is documented as "the ID of the Region where the app is running",
 i.e. the function region. Given the table above it should only ever be `fra1` or
 `sfo1`, which is what makes `isUSRegion` in `packages/web-shared/src/lib/drizzle.ts` behave
-correctly for the SFO half of `kilocode-global-app` and `kilocode-ai-gateway`.
+correctly for the SFO half of `kilocode-ai-gateway`.
 
 ## Failure UX
 

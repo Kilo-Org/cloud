@@ -642,10 +642,18 @@ covers owned and discovered directories, status, in-flight parts and pending int
 newer stream observations fence older snapshots. Reconnecting to the same process preserves
 execution clocks. Failed/partial observations preserve known activity briefly and suspend
 inactivity decisions. If observations cannot be recovered within the existing 2-minute
-window, the runtime restarts with an activity-observation trigger. Heartbeats alone cannot
-clear that failure. Snapshot and abort requests, late events and callbacks are fenced by
-process/feed identity and cancelled on retirement. Credential replacement uses the same
-native activity plus the existing Cloud-work and PTY protections.
+window, the runtime sends the existing bounded health request. A failed health probe uses
+the genuine-hang recovery path. A healthy probe and meaningful assistant/tool progress
+within the last 30 seconds permit continued snapshot retries, with health and progress
+rechecked on each 5-second watchdog tick. This extension ends no later than 4 minutes
+from the original observation failure; progress and heartbeats never move that deadline.
+A healthy runtime without recent meaningful progress, or with observations still failed
+at that bound, restarts with an activity-observation trigger, not proof of unresponsiveness.
+A successful snapshot ends the observation episode. The existing memory hold takes precedence,
+including its bounded expiry and out-of-memory outcome. Snapshot and abort requests,
+late events and callbacks are fenced by process/feed identity and cancelled on retirement.
+Credential replacement uses the same native activity plus the existing Cloud-work and PTY
+protections.
 
 
 - SSE silence for 30 s: send one health request (`GET /global/health`, 5 s timeout). No answer:
@@ -679,7 +687,8 @@ native activity plus the existing Cloud-work and PTY protections.
   (Kilo stores messages by ID). No real progress means no tool events, so no tool work repeats. A
   turn with real progress, or one already submitted again, gets `failed`: `sandbox_out_of_memory`
   after a hang restart that ends an expired memory hold, `agent_unresponsive` after any other hang
-  restart except one for exhausted activity capacity, otherwise `agent_restarted`.
+  restart except one for exhausted activity capacity or healthy failed activity observation,
+  otherwise `agent_restarted`.
 - That recovery selection occurs only in the restart-completion turn transition. It invalidates
   the retired submission chain and rebuilds the existing inbox in original message order, without
   waiting for held retired HTTP results. Restart-caused transport rejection is recognized by the

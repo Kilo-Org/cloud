@@ -168,11 +168,14 @@ export type KiloRestartInfo = {
 };
 
 /**
- * Kilo stopped answering: no health answer, a stalled stream or observation, or an unconfirmed
- * abort. A hang restart for exhausted activity capacity is not one; Kilo was answering.
+ * Observation and capacity faults alone do not prove Kilo stopped answering.
  */
 export function isUnresponsiveRestart(info: Pick<KiloRestartInfo, 'reason' | 'trigger'>): boolean {
-  return info.reason === 'hang' && info.trigger !== 'activity_capacity';
+  return (
+    info.reason === 'hang' &&
+    info.trigger !== 'activity_capacity' &&
+    info.trigger !== 'activity_observation'
+  );
 }
 
 /**
@@ -739,6 +742,47 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     watchdog = undefined;
   }
 
+  async function probeRuntimeHealth(probe: (signal: AbortSignal) => Promise<boolean>) {
+    let decisionResolution: HealthDecisionResolution = 'fulfilled_false';
+    const answered = await withTimeoutAndAbort(probe(AbortSignal.timeout(timers.healthRequestMs)), {
+      timeoutMs: timers.healthRequestMs,
+      timeoutMessage: 'Kilo health request timed out',
+      abortMessage: 'Kilo health request aborted',
+    }).catch(() => {
+      decisionResolution = 'rejected';
+      return false;
+    });
+    return { answered, decisionResolution };
+  }
+
+  function checkObservation(processId: string): Promise<void> {
+    return runSingleFlight(async () => {
+      const observedActivity = activity;
+      const unhealthySince = observedActivity?.observationFailureSince();
+      const probe = probeHealth;
+      if (!observedActivity || unhealthySince === undefined || !probe) return;
+      const { answered, decisionResolution } = await probeRuntimeHealth(probe);
+      if (
+        nativeRuntimeId !== processId ||
+        (phase !== 'running' && phase !== 'suspected') ||
+        activity !== observedActivity ||
+        observedActivity.observationFailureSince() !== unhealthySince
+      )
+        return;
+      if (!answered) {
+        await restartHung('health_probe_false', decisionResolution);
+        return;
+      }
+      const now = scheduler.now();
+      if (
+        now - unhealthySince < 2 * timers.sseReconnectWindowMs &&
+        observedActivity.hasRecentProgress(timers.sseSilenceMs)
+      )
+        return;
+      await restartHung('activity_observation');
+    });
+  }
+
   async function checkSilence(): Promise<void> {
     if (phase !== 'running' && phase !== 'suspected') return;
     if (recovery) return;
@@ -768,18 +812,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     const probe = probeHealth;
     if (!probe) return;
     await runSingleFlight(async () => {
-      let decisionResolution: HealthDecisionResolution = 'fulfilled_false';
-      const answered = await withTimeoutAndAbort(
-        probe(AbortSignal.timeout(timers.healthRequestMs)),
-        {
-          timeoutMs: timers.healthRequestMs,
-          timeoutMessage: 'Kilo health request timed out',
-          abortMessage: 'Kilo health request aborted',
-        }
-      ).catch(() => {
-        decisionResolution = 'rejected';
-        return false;
-      });
+      const { answered, decisionResolution } = await probeRuntimeHealth(probe);
       if (phase !== 'running' && phase !== 'suspected') return;
       if (!answered) {
         // No HTTP answer: Kilo is hung; restart it at once unless memory holds it.
@@ -883,9 +916,19 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       onChange: () => options.onActivityChange?.(),
       onFault: reason => {
         if (nativeRuntimeId !== processId) return true;
-        // Spec §7: observation that fails while the workload reclaims at its cap is held like
-        // a silent Kilo; the activity keeps reading snapshots and faults again next check.
-        if (reason === 'activity_observation' && memoryHold.holds(scheduler.now())) return false;
+        if (reason === 'activity_observation') {
+          const now = scheduler.now();
+          if (memoryHold.holds(now)) return false;
+          const unhealthySince = activity?.observationFailureSince();
+          if (
+            !memoryHold.expired() &&
+            unhealthySince !== undefined &&
+            now - unhealthySince < 2 * timers.sseReconnectWindowMs
+          ) {
+            void checkObservation(processId);
+            return false;
+          }
+        }
         void restart('hang', reason);
         return true;
       },
@@ -949,7 +992,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     if (phase === 'restarting') return false;
     const now = scheduler.now();
     const outcomeReason =
-      isUnresponsiveRestart({ reason, trigger }) && memoryHold.expired()
+      reason === 'hang' && trigger !== 'activity_capacity' && memoryHold.expired()
         ? ('sandbox_out_of_memory' as const)
         : undefined;
     memoryHold.release(now, 'restarted');

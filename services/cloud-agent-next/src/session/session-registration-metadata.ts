@@ -47,6 +47,8 @@ export type GroupedRegisterSessionInput = {
     | 'credentialContainment'
     | 'devcontainerRequested'
     | 'sandboxAllocation'
+    | 'egressMode'
+    | 'egressAllowlist'
   >;
 };
 

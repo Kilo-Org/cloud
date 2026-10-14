@@ -1012,7 +1012,7 @@
         "recoveryLabel": "Aggiorna l'app GitHub"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer è stato disattivato perché l'elenco degli indirizzi IP consentiti di questa organizzazione GitHub blocca Kilo. Contatta hi@kilocode.ai per assistenza, poi riattiva Code Reviewer."
+        "description": "Code Reviewer è stato disattivato perché l'elenco degli indirizzi IP consentiti di questa organizzazione GitHub blocca Kilo. Contatta hi@kilo.ai per assistenza, poi riattiva Code Reviewer."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer è stato disattivato perché Kilo non può creare un token di accesso per questo progetto GitLab. Concedi il ruolo Maintainer o attiva i token di accesso al progetto, poi riattiva Code Reviewer.",
@@ -1027,7 +1027,7 @@
         "recoveryLabel": "Aggiorna le impostazioni di Code Reviewer"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer è stato disattivato perché oggi la clonazione del repository ha superato il tempo limite tre volte. Contatta hi@kilocode.ai per assistenza, poi riattiva Code Reviewer."
+        "description": "Code Reviewer è stato disattivato perché oggi la clonazione del repository ha superato il tempo limite tre volte. Contatta hi@kilo.ai per assistenza, poi riattiva Code Reviewer."
       },
       "title": "Il revisore di codice richiede un intervento.",
       "recoveryLabel": "Contatta l'assistenza"

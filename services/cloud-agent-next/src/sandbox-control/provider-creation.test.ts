@@ -68,6 +68,39 @@ function cloudflareProvider(
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe('native egress policy forwarding', () => {
+  it.each([
+    { egressAllowlist: undefined },
+    { egressAllowlist: [] },
+    { egressAllowlist: ['agent.example.com', 'github.com'] },
+  ])(
+    'preserves policy across initial and fallback launch: $egressAllowlist',
+    async ({ egressAllowlist }) => {
+      const launchWrapper = vi.fn().mockResolvedValue({ started: true, startSource: 'image' });
+      const container = {
+        launchWrapper,
+        ensureLeaseAtLeast: vi.fn().mockResolvedValue(undefined),
+      };
+      const provider = createCloudflareContainersProviderAdapter({
+        logicalSandboxId: SANDBOX_ID,
+        allocationName: SANDBOX_ID,
+        egressAllowlist,
+        getContainer: () => container as unknown as DurableObjectStub<SandboxContainers>,
+      });
+      const created = await provider.create({ intentId: 'egress-attempt', createdAt: 0 });
+      if ('unresolved' in created) throw new Error('Expected provider reference');
+      await provider.launch(created.providerRef, {
+        SANDBOX_CONTROL_URL: 'wss://agent.example.com',
+      });
+      await provider.launch(created.providerRef, {}, { skipRepository: true });
+      for (const [input] of launchWrapper.mock.calls) {
+        if (egressAllowlist === undefined) expect(input).not.toHaveProperty('egressAllowlist');
+        else expect(input.egressAllowlist).toEqual(egressAllowlist);
+      }
+    }
+  );
+});
+
 describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation causes', kind => {
   it('retries shadow billing configuration with a fresh handle and unchanged attribution', async () => {
     const error = Object.assign(new Error('Durable Object reset'), { retryable: true });

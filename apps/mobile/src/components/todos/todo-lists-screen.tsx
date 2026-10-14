@@ -208,7 +208,7 @@ export function TodoListsScreen({ segmentControl }: Readonly<{ segmentControl: R
         title={t('common.agents')}
         size="large"
         showBackButton={false}
-        className="px-[22px] pb-1"
+        className="px-[22px]"
         headerRight={
           context.isReady ? (
             <Pressable

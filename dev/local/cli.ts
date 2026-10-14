@@ -6,6 +6,8 @@ import {
   applyPortOffset,
   candidatePortOffsets,
   clearDevLogs,
+  excludeServices,
+  parseServiceList,
   resolveTargets,
   getService,
   getGroups,
@@ -433,7 +435,14 @@ function removeStaleComposeProject(repoRoot: string, previousOffset: number | un
 async function cmdUp(args: string[], repoRoot: string): Promise<string | undefined> {
   const noAttach = args.includes('--no-attach');
   const reuseRunning = args.includes('--reuse-running');
-  const targets = args.filter(arg => arg !== '--no-attach' && arg !== '--reuse-running');
+  const withoutArg = args.findLast(arg => arg.startsWith('--without='));
+  const withoutSource = withoutArg === undefined ? 'KILO_DEV_WITHOUT' : '--without';
+  const without = parseServiceList(
+    withoutArg === undefined ? process.env.KILO_DEV_WITHOUT : withoutArg.slice('--without='.length)
+  );
+  const targets = args.filter(
+    arg => arg !== '--no-attach' && arg !== '--reuse-running' && !arg.startsWith('--without=')
+  );
 
   // --- Preflight checks ---
   if (!isTmuxAvailable()) {
@@ -465,6 +474,16 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   const coreServices = resolveGroups(getAlwaysOnGroupIds());
   const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
   let serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
+  if (without.length > 0) {
+    const exclusion = excludeServices(serviceNames, without);
+    serviceNames = exclusion.serviceNames;
+    if (exclusion.skipped.length > 0) {
+      console.log(`${DIM}Skipping (${withoutSource}): ${exclusion.skipped.join(', ')}${RESET}`);
+    }
+    for (const [name, missing] of exclusion.dependents) {
+      console.warn(`⚠ ${name} runs without ${missing.join(', ')}; calls to them will fail.`);
+    }
+  }
 
   const sessionName = getSessionName();
   let sessionAlreadyRunning = sessionExists(sessionName);
@@ -1488,9 +1507,11 @@ async function cmdEnv(args: string[], repoRoot: string): Promise<void> {
 function printUsage(): void {
   console.log(`
 Usage:
-  dev:start [--no-attach] [--reuse-running] [targets...]
+  dev:start [--no-attach] [--reuse-running] [--without=a,b] [targets...]
                           Start services (default: core)
                           --reuse-running never restarts an existing complete stack
+                          --without skips the named services (default: $KILO_DEV_WITHOUT;
+                          --without= starts everything)
   dev:stop [--force]      Stop all services (skips shared Docker infra if
                           other kilo-dev sessions are running; --force overrides)
   dev:status [--json]     Show running services and their ports

@@ -760,6 +760,7 @@ export const baseGetSessionNextOutputSchema = z.object({
   variant: z.string().optional(),
   autoCommit: z.boolean().optional(),
   upstreamBranch: z.string().optional(),
+  branchName: z.string().optional(),
 
   /** Custom agents stored on this session (shown in the chat picker). */
   runtimeAgents: z

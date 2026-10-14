@@ -1028,6 +1028,26 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     expect(registration?.metadata.auth.kilocodeToken).toBe(CURRENT_AUTH_TOKEN);
   });
 
+  it.each(['kilo/generated-assigned-branch', 'feature/assigned-branch'])(
+    'inherits the assigned workspace branch %s instead of the upstream branch',
+    async branchName => {
+      const metadata = sourceMetadata();
+      if (!metadata.workspace || !metadata.repository) throw new Error('Missing source metadata');
+      metadata.workspace.branchName = branchName;
+      metadata.repository.upstreamBranch = 'main';
+      const { caller, input, destinationStub, sandboxControlNamespace } = fixture({ metadata });
+
+      await caller.createWorktreeChat(input);
+
+      const registered = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0]?.metadata;
+      expect(registered?.workspace?.branchName).toBe(branchName);
+      expect(registered?.repository?.upstreamBranch).toBe('main');
+      expect(registered?.lifecycle.preparedAt).toBeUndefined();
+      expect(destinationStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+      expect(sandboxControlNamespace.get).not.toHaveBeenCalled();
+    }
+  );
+
   it('preserves the legacy branch fallback for branchless source metadata', async () => {
     const metadata = sourceMetadata();
     if (!metadata.workspace || !metadata.repository) throw new Error('Missing source metadata');

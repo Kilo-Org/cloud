@@ -370,6 +370,35 @@ describe('CloudChatPage route-aware transcript phase', () => {
     expect(mockChatInput?.placeholder).toBe('Loading session…');
   });
 
+  it('shows the assigned branch below the composer while the sandbox is preparing', () => {
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_b',
+      organizationId: null,
+      gitBranch: 'kilo/assigned-before-preparation',
+    };
+    mockAtomValues.cloudStatus = { type: 'preparing' };
+    mockAtomValues.isLoading = false;
+
+    render();
+
+    expect(dom.container.textContent).toContain('kilo/assigned-before-preparation');
+    expect(dom.container.textContent).not.toContain('Assigning branch');
+  });
+
+  it('does not render a placeholder when branch metadata is missing', () => {
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_b',
+      organizationId: null,
+      gitBranch: null,
+    };
+    mockAtomValues.cloudStatus = { type: 'preparing' };
+    mockAtomValues.isLoading = false;
+
+    render();
+
+    expect(dom.container.textContent).not.toContain('Assigning branch');
+  });
+
   it('shows cached rows before metadata without allowing submission or resuming an anchor', () => {
     jest.useFakeTimers();
     mockWorktreeId = 'worktree_b';

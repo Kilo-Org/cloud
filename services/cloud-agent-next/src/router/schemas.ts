@@ -1159,6 +1159,7 @@ export const GetSessionOutput = z.object({
   variant: z.string().optional().describe('Thinking effort variant'),
   autoCommit: z.boolean().optional().describe('Auto-commit setting'),
   upstreamBranch: z.string().optional().describe('Upstream branch name'),
+  branchName: z.string().optional().describe('Assigned workspace branch name'),
 
   runtimeAgents: z
     .array(

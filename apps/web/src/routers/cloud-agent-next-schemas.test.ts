@@ -248,6 +248,16 @@ describe('baseGetSessionNextOutputSchema', () => {
     expect(baseGetSessionNextOutputSchema.parse(response)).toEqual(response);
   });
 
+  it('preserves the assigned branch before runtime preparation', () => {
+    const response = baseGetSessionNextOutputSchema.parse({
+      ...baseSession,
+      branchName: 'kilo/assigned',
+    });
+
+    expect(response.branchName).toBe('kilo/assigned');
+    expect(response.preparedAt).toBeUndefined();
+  });
+
   it('preserves explicit null ownership fields when no ownership row exists', () => {
     const response = baseGetSessionNextOutputSchema.parse({
       ...baseSession,

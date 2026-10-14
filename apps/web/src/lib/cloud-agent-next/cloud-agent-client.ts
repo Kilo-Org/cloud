@@ -381,6 +381,7 @@ export type GetSessionOutput = {
   model?: string;
   autoCommit?: boolean;
   upstreamBranch?: string;
+  branchName?: string;
 
   /** Custom agents stored on this session (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{

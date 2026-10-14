@@ -97,16 +97,19 @@ describe('benchmark owner credit bridge', () => {
         return JSON.parse(init.body) as ProfileCreditSettleRequest;
       });
       expect(releases).toEqual(
-        [...new Map(echoed.items.map(item => [JSON.stringify([item.model, item.variant]), item])).values()]
-          .map(item => ({
-            admissionId: echoed.admissionId,
-            ownerType: request.ownerType,
-            ownerId: request.ownerId,
-            model: item.model,
-            variant: item.variant,
-            runId: null,
-            actualCostUsd: 0,
-          }))
+        [
+          ...new Map(
+            echoed.items.map(item => [JSON.stringify([item.model, item.variant]), item])
+          ).values(),
+        ].map(item => ({
+          admissionId: echoed.admissionId,
+          ownerType: request.ownerType,
+          ownerId: request.ownerId,
+          model: item.model,
+          variant: item.variant,
+          runId: null,
+          actualCostUsd: 0,
+        }))
       );
     }
     fetchMock.mockResolvedValueOnce(jsonResponse({ ...held, heldCostUsd: -1 }));
@@ -116,43 +119,69 @@ describe('benchmark owner credit bridge', () => {
   it.each([
     { costUsd: 0.000249, expectedMicrodollars: 249 },
     { costUsd: 0.0002491, expectedMicrodollars: 250 },
-  ])('accepts server rounding for $costUsd on initial reserve and replay', async ({ costUsd, expectedMicrodollars }) => {
-    const roundedRequest = { ...request, items: [{
-      model: 'vendor/model', variant: null, estimatedCostUsd: costUsd,
-    }] };
-    fetchMock.mockImplementation(async () => jsonResponse({
-      admissionId: request.admissionId,
-      heldCostUsd: expectedMicrodollars / 1_000_000,
-      items: [{
-        ...roundedRequest.items[0],
-        estimatedCostUsd: expectedMicrodollars / 1_000_000,
-        status: 'held',
-        chargedCostUsd: null,
-      }],
-    }));
-    await expect(billing.reserve(roundedRequest)).resolves.toEqual({ kind: 'held' });
-    await expect(billing.reserve(roundedRequest)).resolves.toEqual({ kind: 'held' });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-  });
+  ])(
+    'accepts server rounding for $costUsd on initial reserve and replay',
+    async ({ costUsd, expectedMicrodollars }) => {
+      const roundedRequest = {
+        ...request,
+        items: [
+          {
+            model: 'vendor/model',
+            variant: null,
+            estimatedCostUsd: costUsd,
+          },
+        ],
+      };
+      fetchMock.mockImplementation(async () =>
+        jsonResponse({
+          admissionId: request.admissionId,
+          heldCostUsd: expectedMicrodollars / 1_000_000,
+          items: [
+            {
+              ...roundedRequest.items[0],
+              estimatedCostUsd: expectedMicrodollars / 1_000_000,
+              status: 'held',
+              chargedCostUsd: null,
+            },
+          ],
+        })
+      );
+      await expect(billing.reserve(roundedRequest)).resolves.toEqual({ kind: 'held' });
+      await expect(billing.reserve(roundedRequest)).resolves.toEqual({ kind: 'held' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    }
+  );
 
   it('does not add a microdollar when a normalized estimate round-trips above its integer', async () => {
-    const costUsd = Array.from({ length: 1_000 }, (_, index) => (index + 1) / 1_000_000)
-      .find(cost => Math.ceil(cost * 1_000_000) > Math.round(cost * 1_000_000));
+    const costUsd = Array.from({ length: 1_000 }, (_, index) => (index + 1) / 1_000_000).find(
+      cost => Math.ceil(cost * 1_000_000) > Math.round(cost * 1_000_000)
+    );
     if (costUsd === undefined) throw new Error('Missing floating-point rounding fixture');
     const expectedMicrodollars = Math.round(costUsd * 1_000_000);
-    const roundedRequest = { ...request, items: [{
-      model: 'vendor/model', variant: null, estimatedCostUsd: costUsd,
-    }] };
-    fetchMock.mockImplementation(async () => jsonResponse({
-      admissionId: request.admissionId,
-      heldCostUsd: expectedMicrodollars / 1_000_000,
-      items: [{
-        ...roundedRequest.items[0],
-        estimatedCostUsd: expectedMicrodollars / 1_000_000,
-        status: 'held',
-        chargedCostUsd: null,
-      }],
-    }));
+    const roundedRequest = {
+      ...request,
+      items: [
+        {
+          model: 'vendor/model',
+          variant: null,
+          estimatedCostUsd: costUsd,
+        },
+      ],
+    };
+    fetchMock.mockImplementation(async () =>
+      jsonResponse({
+        admissionId: request.admissionId,
+        heldCostUsd: expectedMicrodollars / 1_000_000,
+        items: [
+          {
+            ...roundedRequest.items[0],
+            estimatedCostUsd: expectedMicrodollars / 1_000_000,
+            status: 'held',
+            chargedCostUsd: null,
+          },
+        ],
+      })
+    );
     await expect(billing.reserve(roundedRequest)).resolves.toEqual({ kind: 'held' });
     await expect(billing.reserve(roundedRequest)).resolves.toEqual({ kind: 'held' });
     expect(fetchMock).toHaveBeenCalledTimes(2);

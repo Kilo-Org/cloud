@@ -127,7 +127,8 @@ export function createProfileCreditBridge(input: {
           const expected = requested.get(benchmarkPairKey(item));
           return (
             !expected ||
-            estimateMicrodollars(expected.estimatedCostUsd) !== Math.round(item.estimatedCostUsd * 1_000_000)
+            estimateMicrodollars(expected.estimatedCostUsd) !==
+              Math.round(item.estimatedCostUsd * 1_000_000)
           );
         })
       ) {
@@ -346,12 +347,24 @@ export async function recoverProfileAdmission(
   } catch (error) {
     if (error instanceof ProfileReservationMismatchError) {
       await orm.batch([
-        orm.update(profileBenchmarkClaims)
+        orm
+          .update(profileBenchmarkClaims)
           .set({ state: 'released', charged_cost_usd: 0, settled_at: nowIso, updated_at: nowIso })
-          .where(and(eq(profileBenchmarkClaims.admission_id, admissionId), eq(profileBenchmarkClaims.state, 'allocating'))),
-        orm.update(profileBenchmarkAdmissions)
+          .where(
+            and(
+              eq(profileBenchmarkClaims.admission_id, admissionId),
+              eq(profileBenchmarkClaims.state, 'allocating')
+            )
+          ),
+        orm
+          .update(profileBenchmarkAdmissions)
           .set({ state: 'admitted', updated_at: nowIso })
-          .where(and(eq(profileBenchmarkAdmissions.admission_id, admissionId), eq(profileBenchmarkAdmissions.state, 'allocating'))),
+          .where(
+            and(
+              eq(profileBenchmarkAdmissions.admission_id, admissionId),
+              eq(profileBenchmarkAdmissions.state, 'allocating')
+            )
+          ),
       ]);
     }
     throw error;
@@ -457,27 +470,46 @@ export async function recoverPendingProfileAdmissions(
   const admissions = await orm
     .select()
     .from(profileBenchmarkAdmissions)
-    .where(and(
-      or(isNull(profileBenchmarkAdmissions.recovery_next_at), lte(profileBenchmarkAdmissions.recovery_next_at, now.toISOString())),
-      sql`(${profileBenchmarkAdmissions.state} = 'allocating' OR EXISTS (
+    .where(
+      and(
+        or(
+          isNull(profileBenchmarkAdmissions.recovery_next_at),
+          lte(profileBenchmarkAdmissions.recovery_next_at, now.toISOString())
+        ),
+        sql`(${profileBenchmarkAdmissions.state} = 'allocating' OR EXISTS (
         SELECT 1 FROM ${profileBenchmarkClaims}
         WHERE ${profileBenchmarkClaims.admission_id} = ${profileBenchmarkAdmissions.admission_id}
           AND ${profileBenchmarkClaims.state} = 'release_pending'
       ))`
-    ))
-    .orderBy(asc(profileBenchmarkAdmissions.recovery_next_at), asc(profileBenchmarkAdmissions.created_at))
+      )
+    )
+    .orderBy(
+      asc(profileBenchmarkAdmissions.recovery_next_at),
+      asc(profileBenchmarkAdmissions.created_at)
+    )
     .limit(100);
   let firstError: unknown;
   for (const admission of admissions) {
     const nextAttempt = admission.recovery_attempts + 1;
-    const delayMs = Math.min(24 * 60 * 60 * 1000, 15 * 60 * 1000 * 2 ** Math.min(nextAttempt - 1, 7));
-    const claimed = await orm.update(profileBenchmarkAdmissions).set({
-      recovery_attempts: sql`${profileBenchmarkAdmissions.recovery_attempts} + 1`,
-      recovery_next_at: new Date(now.getTime() + delayMs).toISOString(),
-    }).where(and(
-      eq(profileBenchmarkAdmissions.admission_id, admission.admission_id),
-      or(isNull(profileBenchmarkAdmissions.recovery_next_at), lte(profileBenchmarkAdmissions.recovery_next_at, now.toISOString()))
-    ));
+    const delayMs = Math.min(
+      24 * 60 * 60 * 1000,
+      15 * 60 * 1000 * 2 ** Math.min(nextAttempt - 1, 7)
+    );
+    const claimed = await orm
+      .update(profileBenchmarkAdmissions)
+      .set({
+        recovery_attempts: sql`${profileBenchmarkAdmissions.recovery_attempts} + 1`,
+        recovery_next_at: new Date(now.getTime() + delayMs).toISOString(),
+      })
+      .where(
+        and(
+          eq(profileBenchmarkAdmissions.admission_id, admission.admission_id),
+          or(
+            isNull(profileBenchmarkAdmissions.recovery_next_at),
+            lte(profileBenchmarkAdmissions.recovery_next_at, now.toISOString())
+          )
+        )
+      );
     if ((claimed.meta.changes ?? 0) === 0) continue;
     try {
       await recoverProfileAdmission(db, billing, admission.admission_id, now);

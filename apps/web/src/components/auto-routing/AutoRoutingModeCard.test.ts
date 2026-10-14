@@ -413,11 +413,13 @@ describe('settingsRefetchInterval / hasBenchmarkingEntries', () => {
   });
 
   it('counts only reasoning presets, with one default effort for nonreasoning models', () => {
-    expect(supportedBenchmarkEffortCount({
-      high: { reasoning: { effort: 'high' } },
-      disabled: { reasoning: { enabled: false } },
-      creative: {},
-    })).toBe(2);
+    expect(
+      supportedBenchmarkEffortCount({
+        high: { reasoning: { effort: 'high' } },
+        disabled: { reasoning: { enabled: false } },
+        creative: {},
+      })
+    ).toBe(2);
     expect(supportedBenchmarkEffortCount({ creative: {}, concise: {} })).toBe(1);
   });
 
@@ -428,17 +430,24 @@ describe('settingsRefetchInterval / hasBenchmarkingEntries', () => {
     ];
     const counts = { [entryReady.model]: 2 };
     expect(hasBenchmarkingEntries(pool, readyStatuses, counts)).toBe(true);
-    expect(settingsRefetchInterval(
-      settings({ configuredPool: pool, poolStatuses: readyStatuses }),
-      counts
-    )).toBe(SETTINGS_POLL_INTERVAL_MS);
-    expect(settingsRefetchInterval(
-      settings({ configuredPool: pool, poolStatuses: [
-        ...readyStatuses,
-        { entry: { ...entryReady, variant: 'low' }, status: 'ready' },
-      ] }),
-      counts
-    )).toBe(false);
+    expect(
+      settingsRefetchInterval(
+        settings({ configuredPool: pool, poolStatuses: readyStatuses }),
+        counts
+      )
+    ).toBe(SETTINGS_POLL_INTERVAL_MS);
+    expect(
+      settingsRefetchInterval(
+        settings({
+          configuredPool: pool,
+          poolStatuses: [
+            ...readyStatuses,
+            { entry: { ...entryReady, variant: 'low' }, status: 'ready' },
+          ],
+        }),
+        counts
+      )
+    ).toBe(false);
   });
 
   it('stops polling once every entry is terminal (ready/failed) or unavailable', () => {
@@ -1022,7 +1031,7 @@ describe('owner benchmark quote', () => {
       await act(async () => {
         await jest.advanceTimersByTimeAsync(30_000);
       });
-      expect(mounted.container.textContent).toContain('Estimating benchmark cost…');
+      expect(mounted.container.textContent).toContain('Estimated owner cost: $0.250000');
       expect(findSaveButton(mounted.container).disabled).toBe(false);
     } finally {
       mounted.cleanup();

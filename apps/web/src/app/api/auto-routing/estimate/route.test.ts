@@ -120,7 +120,9 @@ it('allows organization estimates after the subscription gate succeeds', async (
     organizationId: 'org-1',
   });
   mockedEstimate.mockResolvedValue({ status: 200, body: { estimatedCostUsd: 0, pairs: [] } });
-  expect((await POST(request({ entries: [{ model: 'anthropic/claude-sonnet-4' }] }))).status).toBe(200);
+  expect((await POST(request({ entries: [{ model: 'anthropic/claude-sonnet-4' }] }))).status).toBe(
+    200
+  );
   expect(mockedSubscriptionGate).toHaveBeenCalledWith('org-1');
   expect(mockedEstimate).toHaveBeenCalledWith({
     ownerType: 'org',

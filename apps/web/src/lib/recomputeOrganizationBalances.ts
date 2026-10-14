@@ -103,9 +103,7 @@ export async function recomputeOrganizationBalances(args: {
   const benchmarkUsage = await db
     .select({
       cost: sql<number>`${auto_routing_benchmark_holds.charged_microdollars}`.mapWith(Number),
-      created_at: sql<string>`${auto_routing_benchmark_holds.settled_at}`.mapWith(
-        String
-      ),
+      created_at: sql<string>`${auto_routing_benchmark_holds.settled_at}`.mapWith(String),
     })
     .from(auto_routing_benchmark_holds)
     .where(

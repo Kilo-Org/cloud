@@ -77,9 +77,8 @@ function buildDecidePayload(params: EfficientDecisionParams): MirrorPayload | nu
   };
 }
 
-// kilo-auto/efficient waits for the worker's routing decision and falls back
-// to the static default on timeout or error. Do not retry an ambiguous timeout:
-// the worker may already have completed a billable classifier call.
+// Worker-owned usage survives a lost response. Positive response costs belong
+// to legacy workers and must still be billed by the gateway during rollout.
 export async function fetchEfficientAutoDecision(
   params: EfficientDecisionParams,
   options: FetchEfficientDecisionOptions = {}

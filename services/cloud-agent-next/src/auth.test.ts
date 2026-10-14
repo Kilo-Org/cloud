@@ -69,6 +69,7 @@ describe('preview entry ticket', () => {
         userId: 'user-1',
         cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
         port: 5173,
+        nonce: 'nonce-1',
         ...payload,
       },
       secret,
@@ -76,8 +77,10 @@ describe('preview entry ticket', () => {
     );
   }
 
-  it('returns the claims of a valid entry ticket', () => {
-    expect(validatePreviewEntryTicket(entryTicket({ organizationId: 'org-1' }), secret)).toEqual({
+  it('returns the claims, nonce and expiry of a valid entry ticket', () => {
+    const ticket = entryTicket({ organizationId: 'org-1' });
+    const { exp } = jwt.decode(ticket) as { exp: number };
+    expect(validatePreviewEntryTicket(ticket, secret)).toEqual({
       success: true,
       claims: {
         userId: 'user-1',
@@ -85,6 +88,14 @@ describe('preview entry ticket', () => {
         port: 5173,
         organizationId: 'org-1',
       },
+      nonce: 'nonce-1',
+      expiresAtMs: exp * 1000,
+    });
+  });
+
+  it('rejects an entry ticket without a nonce', () => {
+    expect(validatePreviewEntryTicket(entryTicket({ nonce: undefined }), secret)).toMatchObject({
+      success: false,
     });
   });
 

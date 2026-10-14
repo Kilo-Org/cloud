@@ -51,8 +51,8 @@ const PREVIEW_TICKET_TTL_SECONDS = 60;
 /**
  * Mints the short-lived entry ticket for the preview host. The preview TTL and
  * audience are owned here so both routers mint identically; the caller builds
- * the entry URL from the returned ticket. The ticket is reusable within its
- * TTL; the Worker never consumes it.
+ * the entry URL from the returned ticket. The Worker consumes its nonce at the
+ * preview host entry, so each ticket opens one preview session.
  */
 export function signPreviewTicket(params: {
   userId: string;

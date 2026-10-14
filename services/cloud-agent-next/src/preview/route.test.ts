@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
+vi.mock('cloudflare:workers', () => ({ DurableObject: class {} }));
 import { getSandbox } from '@cloudflare/sandbox';
 import { mintPreviewSessionToken, type PreviewClaims } from '../auth.js';
 import type {
@@ -14,6 +15,7 @@ import type { Env } from '../types.js';
 import { PREVIEW_SESSION_MISSING_TEXT } from './container-port-fetch.js';
 import {
   PREVIEW_ENTER_PATH,
+  PREVIEW_TICKET_USED_TEXT,
   defaultFetchUpstream,
   handlePreviewOpen,
   handlePreviewRequest,
@@ -85,12 +87,30 @@ function fixture(input: { target?: ResolvedPreviewTarget; accessError?: unknown 
   const resolvePreviewTarget = vi.fn(async () => input.target ?? CLOUDFLARE_TARGET);
   const stub: PreviewSessionStub = { resolvePreviewTarget };
   const getSessionStub = vi.fn(() => stub);
+  const usedNonces = new Set<string>();
+  const consumeTicketNonce = vi.fn(async (_env: Env, nonce: string, _expiresAtMs: number) => {
+    if (usedNonces.has(nonce)) return false;
+    usedNonces.add(nonce);
+    return true;
+  });
   const fetchUpstream = vi.fn(
     async () =>
       new Response('<h1>app</h1>', { status: 200, headers: { 'Content-Type': 'text/html' } })
   );
-  const deps: PreviewRouteDeps = { validateAccess, getSessionStub, fetchUpstream };
-  return { deps, validateAccess, resolvePreviewTarget, getSessionStub, fetchUpstream };
+  const deps: PreviewRouteDeps = {
+    validateAccess,
+    getSessionStub,
+    consumeTicketNonce,
+    fetchUpstream,
+  };
+  return {
+    deps,
+    validateAccess,
+    resolvePreviewTarget,
+    getSessionStub,
+    consumeTicketNonce,
+    fetchUpstream,
+  };
 }
 
 function entryRequest(ticket: string | null, init: RequestInit = {}): Request {
@@ -214,15 +234,6 @@ describe('preview entry', () => {
     expect(response.headers.get('location')).toBe('/');
   });
 
-  it('is multi-use and does not consume the nonce', async () => {
-    const { deps } = fixture();
-    const ticket = entryTicket();
-    for (let use = 0; use < 2; use += 1) {
-      const response = await handlePreviewRequest(entryRequest(ticket), env, deps);
-      expect(response.status).toBe(303);
-    }
-  });
-
   it.each([
     ['missing ticket', null],
     ['wrong purpose', entryTicket({ purpose: 'stream' })],
@@ -254,6 +265,7 @@ describe('preview entry', () => {
         { algorithm: 'HS256', expiresIn: 3600, audience: 'cloud-agent-preview' }
       ),
     ],
+    ['missing nonce', entryTicket({ nonce: undefined })],
     [
       'missing exp',
       jwt.sign(
@@ -263,6 +275,7 @@ describe('preview entry', () => {
           userId: 'u',
           cloudAgentSessionId: SESSION_ID,
           port: PORT,
+          nonce: 'nonce-1',
         },
         SECRET,
         { algorithm: 'HS256', noTimestamp: true, audience: 'cloud-agent-preview' }
@@ -312,6 +325,35 @@ describe('preview entry', () => {
     );
     expect(response.status).toBe(401);
     expect(validateAccess).not.toHaveBeenCalled();
+  });
+
+  it('accepts a ticket once and answers a reuse with 401 and no cookie', async () => {
+    const { deps, consumeTicketNonce } = fixture();
+    const ticket = entryTicket();
+    expect((await handlePreviewRequest(entryRequest(ticket), env, deps)).status).toBe(303);
+    const reuse = await handlePreviewRequest(entryRequest(ticket), env, deps);
+    expect(reuse.status).toBe(401);
+    expect(await reuse.text()).toBe(PREVIEW_TICKET_USED_TEXT);
+    expect(reuse.headers.get('set-cookie')).toBeNull();
+    const { exp } = jwt.decode(ticket) as { exp: number };
+    expect(consumeTicketNonce).toHaveBeenCalledWith(env, 'nonce-1', exp * 1000);
+  });
+
+  it('checks access before it consumes the ticket', async () => {
+    const { deps, consumeTicketNonce } = fixture({
+      accessError: new TRPCError({ code: 'FORBIDDEN' }),
+    });
+    expect((await handlePreviewRequest(entryRequest(entryTicket()), env, deps)).status).toBe(403);
+    expect(consumeTicketNonce).not.toHaveBeenCalled();
+  });
+
+  it('answers 503 with Retry-After and no cookie when the nonce store fails', async () => {
+    const { deps, consumeTicketNonce } = fixture();
+    consumeTicketNonce.mockRejectedValueOnce(new Error('nonce DO down'));
+    const response = await handlePreviewRequest(entryRequest(entryTicket()), env, deps);
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('1');
+    expect(response.headers.get('set-cookie')).toBeNull();
   });
 
   it('maps an access denial to 403 and an access outage to 503', async () => {

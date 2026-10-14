@@ -868,8 +868,10 @@ per-port hostname. It handles ordinary HTTP and WebSocket upgrades.
   `organizationId`, `port`) and opens `<worker>/preview/open?ticket=<jwt>[&path=<path>]` on the
   Worker host. That hop verifies the ticket, derives the label from its claims, and answers **303**
   to `<label>.<suffix>/.kilo-preview/enter?ticket=<jwt>[&path=<path>]` on the same scheme and port;
-  it does not run the access check. A `GET`/`HEAD` on the enter path with
-  a valid ticket runs the access check once, sets a host-bound 1-hour session token (audience
+  it does not run the access check or consume the ticket. A `GET`/`HEAD` on the enter path with
+  a valid ticket runs the access check once, then consumes the ticket `nonce` through
+  `StreamTicketNonceDO` (single use, as for stream and terminal tickets), sets a host-bound 1-hour
+  session token (audience
   `cloud-agent-preview-session`, type `preview_session`) as a cookie, and answers **303** to the
   requested path with the ticket removed. The path is client input, so the enter step owns its
   check (`src/preview/return-path.ts`): only a same-host path that starts with one `/`, has no
@@ -924,7 +926,9 @@ Request and response bodies stream; there is no body-size cap.
 |---|---|---|
 | `/preview/open` or enter method other than `GET`/`HEAD`; proxied `TRACE`/`CONNECT` | 405 | `Method not allowed` |
 | `/preview/open` while `PREVIEW_HOST_SUFFIX` is unset | 404 | `Preview is not configured` |
-| Invalid or missing entry ticket on `/preview/open` or the enter path (signature, audience, purpose, claims, `exp`), or a label derived from it that does not name the host | 401 | `Preview ticket is missing or invalid` |
+| Invalid or missing entry ticket on `/preview/open` or the enter path (signature, audience, purpose, claims, `exp`, `nonce`), or a label derived from it that does not name the host | 401 | `Preview ticket is missing or invalid` |
+| Entry ticket whose `nonce` was already consumed | 401 | `Preview ticket was already used. Open the preview again from the chat.` |
+| Ticket nonce store (`StreamTicketNonceDO`) throws on entry | 503 + `Retry-After: 1` | `Preview is temporarily unavailable` |
 | Missing, invalid, expired or wrong-audience/type session token, or a derived label that does not name the host | 401 | `Preview session is missing or expired. Open the preview again from the chat.` |
 | Proxied `/.kilo-preview/*` path | 404 | `Not found` |
 | WebSocket upgrade or non-`GET`/`HEAD` with a foreign, `null` or missing `Origin` | 403 | `Cross-origin preview request rejected` |
@@ -947,15 +951,15 @@ Request and response bodies stream; there is no body-size cap.
   on 4096 or a random port, so a preview can reach it; the wrapper starts every `kilo serve` with
   its own random `KILO_SERVER_PASSWORD` and sends Basic auth on each of its own connections, so a
   preview request to that port gets 401 from Kilo. The physical boundary is still the
-  sandbox/workspace (owner scope for shared sandboxes), not the individual chat. A
-  stolen entry ticket replayed within its 60-second window yields an hour-long session; late replay
-  is bounded, single-use replay is not. Service workers are not blocked, so an app on a stable
+  sandbox/workspace (owner scope for shared sandboxes), not the individual chat. An entry ticket
+  is single use and expires after 60 seconds, so a stolen ticket yields a session only if the thief
+  uses it before its owner does. Service workers are not blocked, so an app on a stable
   `(session, port)` origin can register one. Established WebSockets are not re-authorised after
   upgrade: revocation applies to new requests and upgrades only. Cookie jars are not guaranteed
   independent: the preview zone must be a separate registrable site from every trusted app origin,
   but apps can still set parent-domain cookies, and `*.localhost` is not a faithful site-isolation
   model. The entry ticket is carried in the `/preview/open` and enter URLs, so platform
-  observability or Logpush may capture it; the 60-second TTL bounds replay.
+  observability or Logpush may capture it; single use and the 60-second TTL bound replay.
   The `@cloudflare/containers` `Container` constructor calls `renewActivityTimeout()` when an evicted
   DO wakes, so a preview request that wakes an evicted DO can extend the SDK sleep timer; our code
   paths never call it.

@@ -154,17 +154,27 @@ function previewClaimsFrom(payload: unknown): PreviewTokenValidation {
   return { success: true, claims };
 }
 
+export type PreviewEntryTicketValidation =
+  | { success: true; claims: PreviewClaims; nonce: string; expiresAtMs: number }
+  | { success: false; error: string };
+
+/** The entry carries the single-use `nonce` and its expiry apart from the claims. */
+const previewEntryTicketSchema = previewTokenPayloadSchema.extend({ nonce: z.string().min(1) });
+
 /** The 60-second entry ticket the web app mints (a `stream_ticket` with purpose `preview`). */
 export function validatePreviewEntryTicket(
   ticket: string | null,
   secret: string | null | undefined
-): PreviewTokenValidation {
+): PreviewEntryTicketValidation {
   const validated = validateStreamTicket(ticket, secret, PREVIEW_TICKET_AUDIENCE);
   if (!validated.success) return validated;
   if (validated.payload.purpose !== 'preview') {
     return { success: false, error: 'Invalid ticket purpose' };
   }
-  return previewClaimsFrom(validated.payload);
+  const parsed = previewEntryTicketSchema.safeParse(validated.payload);
+  if (!parsed.success) return INVALID_PREVIEW_CLAIMS;
+  const { exp, nonce, ...claims } = parsed.data;
+  return { success: true, claims, nonce, expiresAtMs: exp * 1000 };
 }
 
 /** The host-bound session token the Worker sets as the preview cookie. */

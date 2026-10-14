@@ -12,6 +12,7 @@ import type {
   ResolvedPreviewTarget,
 } from '../control-plane/sandbox/preview-target.js';
 import { requireCurrentSessionAccess, projectSessionAccessHttpError } from '../session-access.js';
+import { consumeStreamTicketNonce } from '../persistence/StreamTicketNonceDO.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import {
   PREVIEW_MARKER_ALLOCATION_HEADER,
@@ -34,6 +35,9 @@ export const PREVIEW_ENTER_PATH = '/.kilo-preview/enter';
 /** Worker-host path the web app links to; it redirects to the preview host. */
 export const PREVIEW_OPEN_PATH = '/preview/open';
 
+export const PREVIEW_TICKET_USED_TEXT =
+  'Preview ticket was already used. Open the preview again from the chat.';
+
 // Bound the per-request header work before the access query and the DO calls.
 export const PREVIEW_HEADER_MAX_COUNT = 40;
 export const PREVIEW_HEADER_NAME_MAX_LENGTH = 128;
@@ -51,6 +55,8 @@ export type PreviewRouteDeps = {
     expectedOrganizationId: string | null;
   }) => Promise<void>;
   getSessionStub: (env: Env, userId: string, sessionId: string) => PreviewSessionStub;
+  /** True only for the first use of an entry ticket's nonce. */
+  consumeTicketNonce: (env: Env, nonce: string, expiresAtMs: number) => Promise<boolean>;
   fetchUpstream: (
     env: Env,
     coordinates: PreviewProviderCoordinates,
@@ -87,6 +93,7 @@ const defaultPreviewRouteDeps: PreviewRouteDeps = {
     });
   },
   getSessionStub: (env, userId, sessionId) => getSandboxSessionStub(env, userId, sessionId),
+  consumeTicketNonce: consumeStreamTicketNonce,
   fetchUpstream: defaultFetchUpstream,
 };
 
@@ -213,6 +220,18 @@ async function handleEntry(
   } catch (error) {
     const projected = accessErrorResponse(error);
     return entryResponse(projected.status, await projected.text());
+  }
+
+  // Single use: a ticket copied from a URL or a log cannot open a second session.
+  let firstUse: boolean;
+  try {
+    firstUse = await deps.consumeTicketNonce(env, ticket.nonce, ticket.expiresAtMs);
+  } catch (error) {
+    logger.withFields({ error: errorMessage(error) }).warn('Preview ticket nonce consume failed');
+    return entryResponse(503, 'Preview is temporarily unavailable', true);
+  }
+  if (!firstUse) {
+    return entryResponse(401, PREVIEW_TICKET_USED_TEXT);
   }
 
   const sessionToken = mintPreviewSessionToken(claims, secret);

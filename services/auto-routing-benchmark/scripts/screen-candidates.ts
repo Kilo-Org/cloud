@@ -27,7 +27,11 @@ import { gradeDeciderOutput } from '../src/grading';
 import { OPENROUTER_APP_TITLE, OPENROUTER_HTTP_REFERER } from '../src/openrouter';
 import { BenchmarkModelCatalogSchema, catalogCandidatePrices } from '../src/platform-models';
 import type { OfflineSweep } from '../src/scoreboard/schema';
-import { requestDirectSweepCompletion, selectSweepCases } from '../src/scoreboard/sweep';
+import {
+  requestDirectSweepCompletion,
+  selectSweepCases,
+  type SweepTokenUsage,
+} from '../src/scoreboard/sweep';
 
 const ScreeningModelSchema = BenchmarkModelCatalogSchema.shape.data.element.extend({
   architecture: z.object({ output_modalities: z.array(z.string()) }).optional(),
@@ -56,6 +60,36 @@ export type ScreenMetrics = {
   p50LatencyMs: number | null;
   p50TtftMs: number | null;
 };
+
+export type ScreenModelSpend = {
+  costUnknown: boolean;
+  estimatedCostUsd: number;
+};
+
+export function recordScreenModelCost(
+  spend: ScreenModelSpend,
+  completion: {
+    costUsd: number | null;
+    output: string | null;
+    error: string | null;
+    tokenUsage?: SweepTokenUsage;
+  },
+  pricing: CandidatePricing,
+  remainingUsd: number
+): number {
+  if (completion.costUsd !== null) return completion.costUsd;
+  if (completion.output === null && completion.error !== 'OpenRouter transport or body read failed') {
+    return 0;
+  }
+  spend.costUnknown = true;
+  const usage = completion.tokenUsage;
+  const estimatedCostUsd = usage?.promptTokens != null && usage.completionTokens !== null
+    ? usage.promptTokens * pricing.promptUsdPerToken +
+      usage.completionTokens * pricing.completionUsdPerToken
+    : Math.max(0, remainingUsd);
+  spend.estimatedCostUsd += estimatedCostUsd;
+  return estimatedCostUsd;
+}
 
 export function selectScreenCandidates(
   catalog: z.infer<typeof ScreeningCatalogSchema>,
@@ -311,6 +345,9 @@ async function main() {
       results: [] as Result[],
     }))
   );
+  const modelSpend = new Map<string, ScreenModelSpend>(
+    candidates.map(model => [model.id, { costUnknown: false, estimatedCostUsd: 0 }])
+  );
   const report = {
     startedAt: new Date().toISOString(),
     suite,
@@ -322,6 +359,7 @@ async function main() {
     maxPromptUsdPerMtok,
     costUsd: 0,
     graderCostUsd: 0,
+    estimatedCostUsd: 0,
     truncated: false,
     spendIncomplete: false,
     excludedRoutes: [
@@ -356,6 +394,8 @@ async function main() {
     models: candidates.map(model => {
       const pricing = prices.get(model.id);
       if (!pricing) throw new Error(`Candidate pricing missing: ${model.id}`);
+      const spend = modelSpend.get(model.id);
+      if (!spend) throw new Error(`Candidate spend missing: ${model.id}`);
       const variants = measurements
         .filter(pair => pair.model === model.id)
         .map(pair => {
@@ -402,12 +442,14 @@ async function main() {
       return {
         model: model.id,
         pricing,
+        ...spend,
         ...screenMetrics(
           variants.flatMap(variant => variant.results),
           pricing,
           profile
         ),
         ...recommendation,
+        recommend: !spend.costUnknown && recommendation.recommend,
         variants,
       };
     }),
@@ -418,13 +460,16 @@ async function main() {
   };
   await checkpoint();
   for (const benchCase of cases) {
-    if (measurements.length === 0) break;
+    if (measurements.every(pair => modelSpend.get(pair.model)?.costUnknown)) break;
     if (!budgetAvailable()) {
       report.truncated = true;
       break;
     }
     const prompts = benchCase.longContext ? materializeLongContext(benchCase) : benchCase;
     for (const pair of measurements) {
+      const spend = modelSpend.get(pair.model);
+      if (!spend) throw new Error(`Candidate spend missing: ${pair.model}`);
+      if (spend.costUnknown) continue;
       if (!budgetAvailable()) {
         report.truncated = true;
         break;
@@ -440,15 +485,18 @@ async function main() {
         attributionHeaders,
         budgetAvailable,
       });
-      if (completion.costUsd !== null) report.costUsd += completion.costUsd;
-      if (
-        (completion.output !== null && completion.costUsd === null) ||
-        completion.error === 'OpenRouter transport or body read failed'
-      ) {
-        report.spendIncomplete = true;
-      }
+      const pricing = prices.get(pair.model);
+      if (!pricing) throw new Error(`Candidate pricing missing: ${pair.model}`);
+      const previousEstimate = spend.estimatedCostUsd;
+      report.costUsd += recordScreenModelCost(
+        spend,
+        completion,
+        pricing,
+        maxUsd - report.costUsd - report.graderCostUsd
+      );
+      report.estimatedCostUsd += spend.estimatedCostUsd - previousEstimate;
       const grade =
-        completion.output === null || completion.output === ''
+        completion.output === null || completion.output === '' || spend.costUnknown
           ? null
           : await gradeDeciderOutput(benchCase.check, {
               userPrompt: prompts.userPrompt,

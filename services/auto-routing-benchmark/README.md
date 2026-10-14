@@ -278,10 +278,15 @@ The command never writes configuration, registry rows, or routing tables.
 `--max-usd` includes both model and grader spend. Requests run sequentially and
 budget is checked before each request and judge call, but one request can exceed
 the remaining budget because its actual cost is only known after completion.
-Missing usage, a failed judge call, or an indeterminate transport/body failure
-stops further spending and sets `spendIncomplete`; incomplete routes cannot
-recommend a model. Atomic
-checkpoints after each case retain partial results if the screen is interrupted.
+Missing model cost marks only that model `costUnknown: true`, excludes it from
+recommendations, and stops sampling all its variants; other models continue.
+Its reported prompt and completion token counts are charged at catalog prices
+without cache discounts. `costUsd` includes these conservative estimates;
+`estimatedCostUsd` identifies their contribution globally and per model.
+If token counts are also unavailable, the remaining budget is reserved rather
+than treating the request as free. A failed judge call still stops further
+spending and sets `spendIncomplete`. Atomic checkpoints after each case retain
+partial results if the screen is interrupted.
 
 ## Admin endpoints
 

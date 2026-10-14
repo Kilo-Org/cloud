@@ -6,12 +6,14 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import {
   ScreeningCatalogSchema,
+  recordScreenModelCost,
   sampleScreenCases,
   screenMetrics,
   screenRouteComparison,
   screenRecommendation,
   screenVariants,
   selectScreenCandidates,
+  type ScreenModelSpend,
 } from '../scripts/screen-candidates';
 import type { OfflineSweep } from './scoreboard/schema';
 import { requestDirectSweepCompletion, selectSweepCases } from './scoreboard/sweep';
@@ -238,6 +240,47 @@ describe('candidate screening', () => {
         },
       }).beatsCurrentPick
     ).toBe(false);
+  });
+
+  it('isolates missing-cost models and charges catalog token prices while other models continue', async () => {
+    const stream = (usage: Record<string, number>) => new Response(
+      'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n' +
+      `data: ${JSON.stringify({ usage })}\n\n` +
+      'data: [DONE]\n\n'
+    );
+    const fetchImpl = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(stream({ prompt_tokens: 1_000, completion_tokens: 100 }))
+      .mockResolvedValueOnce(stream({ cost: 0.001 }))
+      .mockResolvedValueOnce(stream({ cost: 0.001 }));
+    const affected: ScreenModelSpend = { costUnknown: false, estimatedCostUsd: 0 };
+    const healthy: ScreenModelSpend = { costUnknown: false, estimatedCostUsd: 0 };
+    const spends = new Map([['fixture/affected', affected], ['fixture/healthy', healthy]]);
+    const maxUsd = 0.01;
+    let costUsd = 0;
+    for (const model of ['fixture/affected', 'fixture/healthy', 'fixture/affected', 'fixture/healthy']) {
+      const spend = spends.get(model);
+      if (!spend || spend.costUnknown || costUsd >= maxUsd) continue;
+      const completion = await requestDirectSweepCompletion({
+        model, fragment: {}, systemPrompt: 'system', userPrompt: 'user',
+        apiKey: 'fixture-key', attributionHeaders: {},
+        budgetAvailable: () => costUsd < maxUsd, fetchImpl,
+      });
+      costUsd += recordScreenModelCost(spend, completion, pricing, maxUsd - costUsd);
+    }
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(affected.costUnknown).toBe(true);
+    expect(affected.estimatedCostUsd).toBeCloseTo(0.0012);
+    expect(healthy).toEqual({ costUnknown: false, estimatedCostUsd: 0 });
+    expect(costUsd).toBeCloseTo(0.0032);
+    expect(costUsd).toBeLessThan(maxUsd);
+  });
+
+  it('reserves the remaining budget when an unknown-cost response also omits token counts', () => {
+    const spend: ScreenModelSpend = { costUnknown: false, estimatedCostUsd: 0 };
+    expect(recordScreenModelCost(spend, {
+      costUsd: null, output: 'answer', error: 'usage_missing',
+    }, pricing, 0.25)).toBe(0.25);
+    expect(spend).toEqual({ costUnknown: true, estimatedCostUsd: 0.25 });
   });
 
   it('uses the shared direct streaming request path and honors its budget gate', async () => {

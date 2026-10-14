@@ -31,6 +31,7 @@ const slotState = vi.hoisted(() => ({ bridge: undefined as unknown }));
 const safeAreaInsets = vi.hoisted(() => ({ bottom: 0 }));
 
 const routerBack = vi.hoisted(() => vi.fn());
+const scrollToOffset = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/model-picker-rows', async importOriginal => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -73,13 +74,16 @@ vi.mock('@shopify/flash-list', async () => {
   const React = await import('react');
   return {
     FlashList: (props: {
+      ref?: React.Ref<{ scrollToOffset: typeof scrollToOffset }>;
       data: readonly ModelPickerRow[];
       renderItem?: (info: { item: ModelPickerRow; index: number }) => ReactNode;
       keyExtractor?: (item: ModelPickerRow, index: number) => string;
       getItemType?: (item: ModelPickerRow | undefined) => string | undefined;
       style?: unknown;
       contentContainerStyle?: unknown;
+      maintainVisibleContentPosition?: { disabled: boolean };
     }) => {
+      React.useImperativeHandle(props.ref, () => ({ scrollToOffset }), []);
       listCommitLengths.values.push(props.data.length);
       const rows = props.data.map((item, index) =>
         React.createElement(
@@ -97,6 +101,7 @@ vi.mock('@shopify/flash-list', async () => {
           keyExtractor: props.keyExtractor,
           style: props.style,
           contentContainerStyle: props.contentContainerStyle,
+          maintainVisibleContentPosition: props.maintainVisibleContentPosition,
         },
         ...rows
       );
@@ -292,10 +297,53 @@ describe('ModelPickerContent deferred search', () => {
     slotState.bridge = makeBridge();
     safeAreaInsets.bottom = 0;
     routerBack.mockClear();
+    scrollToOffset.mockClear();
   });
 
   afterEach(async () => {
     await i18n.changeLanguage('en');
+  });
+
+  it('starts each multi-provider search and clear at the top without retaining a row anchor', async () => {
+    const bridge = makeBridge();
+    bridge.options = bridge.options.map((option, index) => ({
+      ...option,
+      provider: {
+        id: index < 100 ? 'anthropic' : 'openai',
+        name: index < 100 ? 'Anthropic' : 'OpenAI',
+      },
+    }));
+    slotState.bridge = bridge;
+    const renderer = await mount();
+    const list = listHost(renderer);
+    const { maintainVisibleContentPosition } = list.props as {
+      maintainVisibleContentPosition: { disabled: boolean };
+    };
+    expect(maintainVisibleContentPosition).toEqual({ disabled: true });
+    scrollToOffset.mockClear();
+
+    await act(async () => {
+      typeSearch(renderer, FINAL_QUERY);
+      await Promise.resolve();
+    });
+    expect(listedDisplayIds(renderer)).toHaveLength(FINAL_MATCH_COUNT);
+    expect(scrollToOffset).toHaveBeenLastCalledWith({ offset: 0, animated: false });
+    scrollToOffset.mockClear();
+
+    await act(async () => {
+      const clear = clearSearchButtons(renderer)[0];
+      if (!clear) {
+        throw new Error('Clear search button not found');
+      }
+      const { onPress } = clear.props as { onPress: () => void };
+      onPress();
+      await Promise.resolve();
+    });
+    expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
+    expect(scrollToOffset).toHaveBeenLastCalledWith({ offset: 0, animated: false });
+    act(() => {
+      renderer.unmount();
+    });
   });
 
   it('finds an auto model by the translated name its row renders', async () => {

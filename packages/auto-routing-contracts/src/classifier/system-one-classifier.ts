@@ -148,7 +148,10 @@ const CLASSIFIER_QUESTIONS = {
   },
 } as const;
 
-function classifierPromptPrefix(value: string | null | undefined, maxLength: number): string | null {
+function classifierPromptPrefix(
+  value: string | null | undefined,
+  maxLength: number
+): string | null {
   if (value == null) return null;
   const prefix = value.slice(0, maxLength);
   const finalCodeUnit = prefix.charCodeAt(prefix.length - 1);

@@ -25,7 +25,6 @@ const requestPrefix =
 const decisionPrefix = `${requestPrefix} | mv-expand Logs | extend m=tostring(Logs.Message[0]) | where m startswith '{"event":"auto_routing_decision"' | extend j=parse_json(m)`;
 const sampledPrefix = `${decisionPrefix} | where j.sampled == true and j.status == 'classified'`;
 const phases = [
-  'codingPlanMs',
   'settingsMs',
   'capabilitiesMs',
   'tableMs',

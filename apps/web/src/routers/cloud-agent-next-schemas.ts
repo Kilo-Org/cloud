@@ -21,6 +21,10 @@ import {
   CLOUD_AGENT_IMAGE_MAX_COUNT,
   CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
 } from '@/lib/cloud-agent/constants';
+import {
+  PREVIEW_PORT_MAX,
+  PREVIEW_PORT_MIN,
+} from '../../../../services/cloud-agent-next/src/shared/preview-port';
 
 export {
   SandboxStatusSnapshotSchema as baseGetSandboxStatusNextOutputSchema,
@@ -722,6 +726,38 @@ export const baseResizeTerminalNextOutputSchema = z.object({
 export const baseCloseTerminalNextOutputSchema = z.object({
   success: z.boolean(),
 });
+
+const previewSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
+
+export const baseCreatePreviewNextSchema = z.object({
+  cloudAgentSessionId: previewSessionIdSchema,
+  port: z.number().int().min(PREVIEW_PORT_MIN).max(PREVIEW_PORT_MAX),
+  /** Where the preview opens; the Worker validates it where it redirects. */
+  path: z.string().startsWith('/').max(2048).optional(),
+});
+
+export const baseCreatePreviewNextOutputSchema = z.object({
+  url: z.url(),
+  expiresAt: z.number().int().positive(),
+});
+
+export const basePreviewOptionsNextSchema = z.object({
+  cloudAgentSessionId: previewSessionIdSchema,
+  /** The route's organization; the Worker uses it only to decide whether to show preview. */
+  organizationId: z.uuid().optional(),
+});
+
+/** The Worker's answer: its preview hostname with a `{port}` placeholder. */
+export const workerPreviewOptionsSchema = z.discriminatedUnion('enabled', [
+  z.object({ enabled: z.literal(false) }),
+  z.object({ enabled: z.literal(true), hostTemplate: z.string().min(1) }),
+]);
+
+/** The browser's answer: the full preview URL with a `{port}` placeholder. */
+export const basePreviewOptionsNextOutputSchema = z.discriminatedUnion('enabled', [
+  z.object({ enabled: z.literal(false) }),
+  z.object({ enabled: z.literal(true), urlTemplate: z.string().min(1) }),
+]);
 
 // Execution status schema for getSession response
 export const executionStatusNextSchema = z

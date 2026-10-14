@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { captureException } from '@sentry/nextjs';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { createTriageTicket, findExistingTicket } from '@/lib/auto-triage/db/triage-tickets';
@@ -68,7 +68,30 @@ export class IssueWebhookProcessor {
       // 2. Resolve owner from integration
       const owner = await this.resolveOwner(integration);
       if (!owner) {
-        return NextResponse.json({ message: 'Integration missing user context' }, { status: 500 });
+        // Known, non-retryable condition: an org-owned integration has no
+        // auto-triage bot user and no integration creator to attribute the run
+        // to. Nothing can be queued without an owner, so acknowledge the
+        // delivery (2xx) instead of returning a 5xx. A 5xx only triggers
+        // pointless GitHub redeliveries for a permanent state and trips the
+        // route availability SLO. The skip is still observable via the
+        // structured warning below.
+        logExceptInTest('Auto triage skipped: no resolvable owner for integration', {
+          integrationId: integration.id,
+          ownedByOrgId: integration.owned_by_organization_id,
+          repo: repository.full_name,
+          issueNumber: issue.number,
+        });
+        captureMessage('Auto triage skipped: no resolvable owner for integration', {
+          level: 'warning',
+          tags: { source: 'issue_webhook_missing_owner' },
+          extra: {
+            integrationId: integration.id,
+            organizationId: integration.owned_by_organization_id,
+            repository: repository.full_name,
+            issueNumber: issue.number,
+          },
+        });
+        return this.skipResponse('Auto triage skipped: no resolvable owner for this integration');
       }
 
       // 3. Get and validate agent configuration

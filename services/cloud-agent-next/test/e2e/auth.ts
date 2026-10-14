@@ -239,3 +239,44 @@ export function mintStreamTicket(
     { algorithm: 'HS256', expiresIn: expiresInSeconds, audience: 'cloud-agent-stream' }
   );
 }
+
+/**
+ * Mint a `stream_ticket` for a preview port. Mirrors the entry-ticket claim
+ * shape: audience `cloud-agent-preview`, purpose `preview`, `port` in the
+ * ticket. The Worker exchanges this short-lived entry ticket for a host-bound
+ * session cookie it signs itself, so the default TTL is 60 seconds (matching
+ * the web `signPreviewTicket` `PREVIEW_TICKET_TTL_SECONDS`); the harness never
+ * mints a session token. The negative-observation overrides (`audience`, `purpose`,
+ * `expiresInSeconds`) exist so `preview-http` can mint a wrong-audience or
+ * already-expired ticket without a second signer.
+ */
+export function mintPreviewTicket(
+  user: { id: string },
+  cloudAgentSessionId: string,
+  port: number,
+  nextAuthSecret: string,
+  options: {
+    organizationId?: string;
+    expiresInSeconds?: number;
+    audience?: string;
+    purpose?: string;
+  } = {}
+): string {
+  return jwt.sign(
+    {
+      type: 'stream_ticket',
+      purpose: options.purpose ?? 'preview',
+      userId: user.id,
+      cloudAgentSessionId,
+      port,
+      ...(options.organizationId ? { organizationId: options.organizationId } : {}),
+      nonce: randomUUID(),
+    },
+    nextAuthSecret,
+    {
+      algorithm: 'HS256',
+      expiresIn: options.expiresInSeconds ?? 60,
+      audience: options.audience ?? 'cloud-agent-preview',
+    }
+  );
+}

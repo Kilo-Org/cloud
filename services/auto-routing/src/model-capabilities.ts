@@ -78,17 +78,6 @@ const MODEL_CAPABILITIES_KV_TTL_SECONDS = 3_600;
 // request budget.
 const MODEL_CAPABILITIES_LOOKUP_BUDGET_MS = 500;
 
-// Keep this in sync with the BytePlus Coding Plan default in
-// packages/web-shared/src/lib/ai-gateway/providers/direct-byok/byteplus-coding.ts.
-// Direct BYOK models are absent from the OpenRouter model_stats sync, so this
-// narrow fallback lets the recognized Coding Plan default satisfy constraints.
-const BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID = 'byteplus-coding/bytedance-seed-code';
-const BYTEPLUS_CODING_PLAN_DEFAULT_CAPABILITIES: ModelCapabilities = {
-  inputModalities: new Set(['image']),
-  contextLength: 262_144,
-  isActive: true,
-};
-
 type ModelCapabilitiesEnv = Pick<
   Env,
   'AUTO_ROUTING_CONFIG' | 'HYPERDRIVE' | 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'
@@ -323,15 +312,11 @@ function withTombstones(
   return out;
 }
 
-// Look up capability rows for the union of: every model in the published
-// routing table, plus the coding-plan default model id when provided, plus
-// any additional model ids (custom pool entries). The whole lookup is raced
-// against a 500ms budget; on timeout or thrown error the returned Map is
-// empty, which the caller treats as "no capability data".
+// The lookup covers published routing-table models and custom pool entries.
+// On timeout or error, the empty map is treated as missing capability data.
 export async function getModelCapabilities(
   env: ModelCapabilitiesEnv,
   options: {
-    codingPlanModelId?: string | null;
     additionalModelIds?: ReadonlyArray<string>;
     waitUntil?: (promise: Promise<unknown>) => void;
   } = {}
@@ -352,9 +337,6 @@ export async function getModelCapabilities(
         }
       }
     }
-    if (options.codingPlanModelId) {
-      ids.add(options.codingPlanModelId);
-    }
     if (options.additionalModelIds) {
       for (const id of options.additionalModelIds) {
         ids.add(id);
@@ -368,18 +350,11 @@ export async function getModelCapabilities(
     const result = new Map<string, ModelCapabilities>();
     const all = await cache.get(env);
     mergeInto(result, all);
-    if (
-      options.codingPlanModelId === BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID &&
-      !result.has(BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID)
-    ) {
-      result.set(BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID, BYTEPLUS_CODING_PLAN_DEFAULT_CAPABILITIES);
-    }
     // The cache stores the union of all ids ever resolved; fill the remainder
     // from the DB and write it back so the next request serves the id from
     // KV. Resolve against the union keys rather than `result` so a tombstoned
     // id counts as resolved and does not re-query.
-    // `result.has` keeps the statically-supplied BytePlus default off the DB.
-    const missing = idList.filter(id => !Object.hasOwn(all, id) && !result.has(id));
+    const missing = idList.filter(id => !Object.hasOwn(all, id));
     if (missing.length > 0) {
       const fromDb = await queryModelCapabilities(env, missing);
       mergeInto(result, fromDb);

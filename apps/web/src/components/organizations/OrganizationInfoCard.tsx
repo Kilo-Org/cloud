@@ -184,7 +184,7 @@ function Inner(props: InnerProps) {
   const adminToggleCodeIndexing = useAdminToggleCodeIndexing();
   const updateSuppressTrialMessaging = useUpdateSuppressTrialMessaging();
 
-  const { expiringBlocks, expiring_mUsd, earliestExpiry } = useExpiringCredits(id);
+  const expiringCreditGroups = useExpiringCredits(id);
 
   const handleSave = async () => {
     if (editedName.trim() === name) {
@@ -465,13 +465,18 @@ function Inner(props: InnerProps) {
                 <Link href={`/organizations/${id}/payment-details`}>View Payments</Link>
               </Button>
             </div>
-            {expiringBlocks.length > 0 && earliestExpiry && (
-              <div className="mt-2 flex items-center gap-1 text-sm text-amber-600">
-                <Clock className="h-3.5 w-3.5" />
-                {formatDollars(fromMicrodollars(expiring_mUsd))} expiring at{' '}
-                {formatIsoDateTime_IsoOrderNoSeconds(earliestExpiry)}
+            {expiringCreditGroups.map(group => (
+              <div
+                key={group.expiry_date}
+                className="mt-2 flex items-center gap-1 text-sm text-amber-600"
+              >
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  {formatDollars(fromMicrodollars(group.balance_mUsd))} expiring at{' '}
+                  {formatIsoDateTime_IsoOrderNoSeconds(group.expiry_date)}
+                </span>
               </div>
-            )}
+            ))}
           </div>
         )}
         {isInAdminDashboard && (

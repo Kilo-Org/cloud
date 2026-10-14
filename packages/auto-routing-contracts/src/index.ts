@@ -107,7 +107,7 @@ export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
  * legacy variant key. New writers emit `variant` only; old writers emitted
  * `reasoningEffort` only. Both non-null is malformed.
  */
-const BenchmarkAutoRoutingDecisionSchema = z
+export const AutoRoutingDecisionSchema = z
   .object({
     model: z.string(),
     taskType: ClassifierTaskTypeSchema,
@@ -141,20 +141,6 @@ const BenchmarkAutoRoutingDecisionSchema = z
     }
   });
 
-const CodingPlanDefaultDecisionSchema = z.object({
-  model: z.string(),
-  taskType: z.null(),
-  subtaskType: z.null(),
-  source: z.literal('coding_plan_default'),
-  tableVersion: z.string(),
-  reasoningEffort: ReasoningEffortSchema.nullable().optional(),
-  sticky: z.boolean().default(false),
-});
-
-export const AutoRoutingDecisionSchema = z.discriminatedUnion('source', [
-  BenchmarkAutoRoutingDecisionSchema,
-  CodingPlanDefaultDecisionSchema,
-]);
 export type AutoRoutingDecision = z.infer<typeof AutoRoutingDecisionSchema>;
 
 export const AutoRoutingDecisionResponseSchema = z.object({

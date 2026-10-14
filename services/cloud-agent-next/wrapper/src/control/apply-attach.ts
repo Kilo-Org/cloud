@@ -28,6 +28,7 @@ import {
   type ProcessOutputStream,
 } from '../utils.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
+import { fetchKiloServer } from '../kilo-server-auth.js';
 import {
   directoryForSession,
   forgetAttachedRoot,
@@ -200,7 +201,7 @@ async function defaultSessionExists(
 ): Promise<boolean> {
   const url = new URL(`/session/${encodeURIComponent(kiloSessionId)}`, kiloClient.serverUrl);
   url.searchParams.set('directory', directory);
-  const response = await fetch(url, { signal });
+  const response = await fetchKiloServer(kiloClient.server, url, { signal });
   if (response.status === 404) return false;
   if (!response.ok) throw new Error('Kilo session probe failed');
   const data: unknown = await response.json();

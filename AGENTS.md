@@ -76,7 +76,6 @@ suggests:
 | Vercel project | Function regions |
 |---|---|
 | `kilocode-app` | Frankfurt only |
-| `kilocode-global-app` | Frankfurt and us-west (SFO) |
 | `kilocode-ai-gateway` | Frankfurt and us-west (SFO) |
 
 Treat this table as the source of truth for compute location, database
@@ -104,7 +103,7 @@ a rewrite to another Vercel app, where PoP hops accumulate.
 `VERCEL_REGION` is documented as "the ID of the Region where the app is running",
 i.e. the function region. Given the table above it should only ever be `fra1` or
 `sfo1`, which is what makes `isUSRegion` in `packages/web-shared/src/lib/drizzle.ts` behave
-correctly for the SFO half of `kilocode-global-app` and `kilocode-ai-gateway`.
+correctly for the SFO half of `kilocode-ai-gateway`.
 
 ## Failure UX
 

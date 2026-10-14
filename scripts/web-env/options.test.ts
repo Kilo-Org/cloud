@@ -52,22 +52,22 @@ void test('parseOptions parses a project copy', () => {
     parseOptions([
       'copy',
       '--from',
-      'kilocode-global-app',
+      'kilocode-app',
       '--to=kilocode-ai-gateway',
       '--only',
       'production',
       '--exclude',
-      'GLOBAL_KILO_BACKEND',
+      'SOURCE_ONLY_SETTING',
       '--exclude=OTHER_SETTING',
       '--dry-run',
     ]),
     {
       command: 'copy',
-      from: 'kilocode-global-app',
+      from: 'kilocode-app',
       to: 'kilocode-ai-gateway',
       dryRun: true,
       only: 'production',
-      exclude: ['GLOBAL_KILO_BACKEND', 'OTHER_SETTING'],
+      exclude: ['SOURCE_ONLY_SETTING', 'OTHER_SETTING'],
     }
   );
 });
@@ -76,7 +76,7 @@ void test('parseOptions requires distinct known projects for a copy', () => {
   assert.throws(() => parseOptions(['copy', '--to', 'kilocode-ai-gateway']), /PROJECT: /);
   assert.throws(
     () => parseOptions(['copy', '--from', 'kilocode-preview', '--to', 'kilocode-ai-gateway']),
-    /PROJECT: kilocode-app \| kilocode-global-app \| kilocode-ai-gateway/
+    /PROJECT: kilocode-app \| kilocode-ai-gateway/
   );
   assert.throws(
     () => parseOptions(['copy', '--from', 'kilocode-app', '--to', 'kilocode-app']),
@@ -89,7 +89,7 @@ void test('parseOptions excludes existing variables with their exact case', () =
     parseOptions([
       'copy',
       '--from',
-      'kilocode-global-app',
+      'kilocode-app',
       '--to',
       'kilocode-ai-gateway',
       '--exclude',
@@ -98,7 +98,7 @@ void test('parseOptions excludes existing variables with their exact case', () =
     ]),
     {
       command: 'copy',
-      from: 'kilocode-global-app',
+      from: 'kilocode-app',
       to: 'kilocode-ai-gateway',
       dryRun: false,
       only: undefined,
@@ -110,7 +110,7 @@ void test('parseOptions excludes existing variables with their exact case', () =
       parseOptions([
         'copy',
         '--from',
-        'kilocode-global-app',
+        'kilocode-app',
         '--to',
         'kilocode-ai-gateway',
         '--exclude',

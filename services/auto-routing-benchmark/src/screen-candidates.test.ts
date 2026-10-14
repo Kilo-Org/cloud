@@ -8,6 +8,7 @@ import {
   ScreeningCatalogSchema,
   recordScreenModelCost,
   sampleScreenCases,
+  screenCandidateJobs,
   screenMetrics,
   screenRouteComparison,
   screenRecommendation,
@@ -102,6 +103,38 @@ describe('candidate screening', () => {
         model => model.id
       )
     ).toEqual(['fixture/free', 'fixture/new']);
+  });
+
+  it('keeps only the cheapest prompt-priced models with a deterministic tie break', () => {
+    const catalog = ScreeningCatalogSchema.parse({ data: [
+      { ...catalogModel, id: 'fixture/expensive', pricing: { prompt: '0.000002', completion: '0' } },
+      { ...catalogModel, id: 'fixture/b' },
+      { ...catalogModel, id: 'fixture/free', pricing: { prompt: '0', completion: '0' } },
+      { ...catalogModel, id: 'fixture/a' },
+    ] });
+    expect(selectScreenCandidates(catalog, [], 3, 3).map(model => model.id))
+      .toEqual(['fixture/free', 'fixture/a', 'fixture/b']);
+    expect(selectScreenCandidates(catalog, [], 3)).toHaveLength(4);
+  });
+
+  it('schedules one case per model per pass across all variants', () => {
+    const cases = selectSweepCases().slice(0, 2);
+    const pairs = [
+      { model: 'fixture/a', variant: null },
+      { model: 'fixture/a', variant: 'high' },
+      { model: 'fixture/b', variant: null },
+      { model: 'fixture/b', variant: 'high' },
+      { model: 'fixture/c', variant: null },
+    ];
+    const jobs = [...screenCandidateJobs(pairs, cases)];
+    expect(jobs.map(job => job.pairIndex)).toEqual([0, 2, 4, 1, 3, 4, 0, 2, 1, 3]);
+    expect(jobs.slice(0, 3).map(job => pairs[job.pairIndex].model))
+      .toEqual(['fixture/a', 'fixture/b', 'fixture/c']);
+    for (const [index] of pairs.entries()) {
+      expect(jobs.filter(job => job.pairIndex === index).map(job => job.benchCase.id))
+        .toEqual(cases.map(benchCase => benchCase.id));
+    }
+    expect([...screenCandidateJobs([], cases)]).toEqual([]);
   });
 
   it('screens default plus highest reasoning effort, preserving the full request fragment', () => {
@@ -265,7 +298,9 @@ describe('candidate screening', () => {
         apiKey: 'fixture-key', attributionHeaders: {},
         budgetAvailable: () => costUsd < maxUsd, fetchImpl,
       });
-      costUsd += recordScreenModelCost(spend, completion, pricing, maxUsd - costUsd);
+      costUsd += recordScreenModelCost(spend, completion, pricing, {
+        systemPrompt: 'system', userPrompt: 'user', fragment: {},
+      });
     }
     expect(fetchImpl).toHaveBeenCalledTimes(3);
     expect(affected.costUnknown).toBe(true);
@@ -275,12 +310,21 @@ describe('candidate screening', () => {
     expect(costUsd).toBeLessThan(maxUsd);
   });
 
-  it('reserves the remaining budget when an unknown-cost response also omits token counts', () => {
+  it.each([
+    { fragment: {}, completionTokens: 8192 },
+    { fragment: { max_tokens: 100 }, completionTokens: 100 },
+  ])('bounds missing-token cost by prompt size and $completionTokens output tokens', ({ fragment, completionTokens }) => {
     const spend: ScreenModelSpend = { costUnknown: false, estimatedCostUsd: 0 };
-    expect(recordScreenModelCost(spend, {
+    const costUsd = recordScreenModelCost(spend, {
       costUsd: null, output: 'answer', error: 'usage_missing',
-    }, pricing, 0.25)).toBe(0.25);
-    expect(spend).toEqual({ costUnknown: true, estimatedCostUsd: 0.25 });
+    }, pricing, {
+      systemPrompt: 's'.repeat(80), userPrompt: 'u'.repeat(20), fragment,
+    });
+    const expected = 25 * pricing.promptUsdPerToken + completionTokens * pricing.completionUsdPerToken;
+    expect(costUsd).toBeCloseTo(expected);
+    expect(costUsd).toBeLessThan(0.02);
+    expect(spend.costUnknown).toBe(true);
+    expect(spend.estimatedCostUsd).toBeCloseTo(expected);
   });
 
   it('uses the shared direct streaming request path and honors its budget gate', async () => {

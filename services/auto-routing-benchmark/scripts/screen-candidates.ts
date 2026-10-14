@@ -75,7 +75,7 @@ export function recordScreenModelCost(
     tokenUsage?: SweepTokenUsage;
   },
   pricing: CandidatePricing,
-  remainingUsd: number
+  request: { systemPrompt: string; userPrompt: string; fragment: Record<string, unknown> }
 ): number {
   if (completion.costUsd !== null) return completion.costUsd;
   if (completion.output === null && completion.error !== 'OpenRouter transport or body read failed') {
@@ -83,10 +83,12 @@ export function recordScreenModelCost(
   }
   spend.costUnknown = true;
   const usage = completion.tokenUsage;
-  const estimatedCostUsd = usage?.promptTokens != null && usage.completionTokens !== null
-    ? usage.promptTokens * pricing.promptUsdPerToken +
-      usage.completionTokens * pricing.completionUsdPerToken
-    : Math.max(0, remainingUsd);
+  const maxTokens = z.number().int().positive().catch(8192).parse(request.fragment.max_tokens);
+  const promptTokens = usage?.promptTokens ??
+    Math.ceil((request.systemPrompt.length + request.userPrompt.length) / 4);
+  const completionTokens = usage?.completionTokens ?? maxTokens;
+  const estimatedCostUsd = promptTokens * pricing.promptUsdPerToken +
+    completionTokens * pricing.completionUsdPerToken;
   spend.estimatedCostUsd += estimatedCostUsd;
   return estimatedCostUsd;
 }
@@ -94,7 +96,8 @@ export function recordScreenModelCost(
 export function selectScreenCandidates(
   catalog: z.infer<typeof ScreeningCatalogSchema>,
   pairs: readonly PoolEntry[],
-  maxPromptUsdPerMtok: number
+  maxPromptUsdPerMtok: number,
+  maxModels?: number
 ): ScreeningModel[] {
   const currentModels = new Set(pairs.map(pair => pair.model));
   return catalog.data
@@ -108,7 +111,11 @@ export function selectScreenCandidates(
         model.pricing.completion != null &&
         model.pricing.prompt * 1_000_000 < maxPromptUsdPerMtok
     )
-    .toSorted((a, b) => a.id.localeCompare(b.id));
+    .toSorted((a, b) =>
+      (a.pricing?.prompt ?? Infinity) - (b.pricing?.prompt ?? Infinity) ||
+      a.id.localeCompare(b.id)
+    )
+    .slice(0, maxModels);
 }
 
 export function screenVariants(model: ScreeningModel): (string | null)[] {
@@ -153,6 +160,23 @@ export function sampleScreenCases(cases: readonly DeciderCase[], casesPerRoute: 
         .slice(0, casesPerRoute)
         .map(item => item.benchCase)
     );
+}
+
+export function* screenCandidateJobs(pairs: readonly PoolEntry[], cases: readonly DeciderCase[]) {
+  const pairIndicesByModel = new Map<string, number[]>();
+  let rounds = 0;
+  for (const [index, pair] of pairs.entries()) {
+    const indices = pairIndicesByModel.get(pair.model) ?? [];
+    indices.push(index);
+    pairIndicesByModel.set(pair.model, indices);
+    rounds = Math.max(rounds, indices.length * cases.length);
+  }
+  for (let round = 0; round < rounds; round++) {
+    for (const indices of pairIndicesByModel.values()) {
+      const benchCase = cases[Math.floor(round / indices.length)];
+      if (benchCase) yield { pairIndex: indices[round % indices.length], benchCase };
+    }
+  }
 }
 
 function median(values: number[]): number | null {
@@ -278,6 +302,7 @@ async function main() {
       pairs: { type: 'string' },
       suite: { type: 'string', default: 'efficient' },
       'max-prompt-usd-per-mtok': { type: 'string' },
+      'max-models': { type: 'string' },
       'cases-per-route': { type: 'string', default: '4' },
       'max-usd': { type: 'string' },
       'cost-profile': { type: 'string' },
@@ -293,7 +318,7 @@ async function main() {
     values['max-prompt-usd-per-mtok'] === undefined
   ) {
     throw new Error(
-      'Usage: screen:candidates --catalog live|file --catalog-file catalog.json --pairs current-pairs.json --suite efficient|frontier --max-prompt-usd-per-mtok <n> --cases-per-route 4 --max-usd <n> --table table.json [--cost-profile profile.json] --out screen.json'
+      'Usage: screen:candidates --catalog live|file --catalog-file catalog.json --pairs current-pairs.json --suite efficient|frontier --max-prompt-usd-per-mtok <n> [--max-models <n>] --cases-per-route 4 --max-usd <n> --table table.json [--cost-profile profile.json] --out screen.json'
     );
   }
   const out = values.out;
@@ -304,6 +329,8 @@ async function main() {
     .number()
     .nonnegative()
     .parse(values['max-prompt-usd-per-mtok']);
+  const maxModels = values['max-models'] === undefined
+    ? undefined : z.coerce.number().int().positive().parse(values['max-models']);
   const pairs = z.array(PoolEntrySchema).parse(JSON.parse(await readFile(values.pairs, 'utf8')));
   const table = RoutingTableSchema.parse(JSON.parse(await readFile(values.table, 'utf8')));
   const profile = values['cost-profile']
@@ -322,7 +349,7 @@ async function main() {
     catalog = ScreeningCatalogSchema.parse(JSON.parse(await readFile(path, 'utf8')));
   }
   const prices = catalogCandidatePrices(catalog);
-  const candidates = selectScreenCandidates(catalog, pairs, maxPromptUsdPerMtok);
+  const candidates = selectScreenCandidates(catalog, pairs, maxPromptUsdPerMtok, maxModels);
   const suiteCases = selectSweepCases(suite);
   const cases = sampleScreenCases(suiteCases, casesPerRoute);
   const casesByRoute = new Map<string, number>();
@@ -357,6 +384,7 @@ async function main() {
     casesPerRoute,
     maxUsd,
     maxPromptUsdPerMtok,
+    maxModels: maxModels ?? null,
     costUsd: 0,
     graderCostUsd: 0,
     estimatedCostUsd: 0,
@@ -459,69 +487,68 @@ async function main() {
     await rename(`${out}.partial`, out);
   };
   await checkpoint();
-  for (const benchCase of cases) {
-    if (measurements.every(pair => modelSpend.get(pair.model)?.costUnknown)) break;
+  const materializedCases = new Map<string, { systemPrompt: string; userPrompt: string }>();
+  for (const { pairIndex, benchCase } of screenCandidateJobs(measurements, cases)) {
+    const pair = measurements[pairIndex];
+    const spend = modelSpend.get(pair.model);
+    if (!spend) throw new Error(`Candidate spend missing: ${pair.model}`);
+    if (spend.costUnknown) continue;
     if (!budgetAvailable()) {
       report.truncated = true;
       break;
     }
-    const prompts = benchCase.longContext ? materializeLongContext(benchCase) : benchCase;
-    for (const pair of measurements) {
-      const spend = modelSpend.get(pair.model);
-      if (!spend) throw new Error(`Candidate spend missing: ${pair.model}`);
-      if (spend.costUnknown) continue;
-      if (!budgetAvailable()) {
-        report.truncated = true;
-        break;
-      }
-      const model = candidates.find(candidate => candidate.id === pair.model);
-      if (!model || !apiKey) throw new Error('Candidate request prerequisites missing');
-      const completion = await requestDirectSweepCompletion({
-        model: pair.model,
-        fragment: pair.variant === null ? {} : (model.opencode?.variants?.[pair.variant] ?? {}),
-        systemPrompt: prompts.systemPrompt,
-        userPrompt: prompts.userPrompt,
-        apiKey,
-        attributionHeaders,
-        budgetAvailable,
-      });
-      const pricing = prices.get(pair.model);
-      if (!pricing) throw new Error(`Candidate pricing missing: ${pair.model}`);
-      const previousEstimate = spend.estimatedCostUsd;
-      report.costUsd += recordScreenModelCost(
-        spend,
-        completion,
-        pricing,
-        maxUsd - report.costUsd - report.graderCostUsd
-      );
-      report.estimatedCostUsd += spend.estimatedCostUsd - previousEstimate;
-      const grade =
-        completion.output === null || completion.output === '' || spend.costUnknown
-          ? null
-          : await gradeDeciderOutput(benchCase.check, {
-              userPrompt: prompts.userPrompt,
-              output: completion.output,
-              judge,
-            });
-      pair.results.push({
-        caseId: benchCase.id,
-        rep: 0,
-        routeKey: `${benchCase.taskType}/${benchCase.subtaskType}`,
-        split: 'train',
-        score: completion.output === '' ? 0 : (grade?.score ?? null),
-        costUsd: completion.costUsd,
-        graderCostUsd: grade?.costUsd ?? 0,
-        latencyMs: completion.latencyMs,
-        ttftMs: completion.ttftMs,
-        error:
-          grade && grade.score === null
-            ? 'grader_failed'
-            : (grade?.graderError ?? completion.error),
-        output: completion.output,
-      });
-      await checkpoint();
+    let prompts = materializedCases.get(benchCase.id);
+    if (!prompts) {
+      prompts = benchCase.longContext ? materializeLongContext(benchCase) : benchCase;
+      materializedCases.set(benchCase.id, prompts);
     }
-    if (report.truncated) break;
+    const model = candidates.find(candidate => candidate.id === pair.model);
+    if (!model || !apiKey) throw new Error('Candidate request prerequisites missing');
+    const fragment = pair.variant === null ? {} : (model.opencode?.variants?.[pair.variant] ?? {});
+    const completion = await requestDirectSweepCompletion({
+      model: pair.model,
+      fragment,
+      systemPrompt: prompts.systemPrompt,
+      userPrompt: prompts.userPrompt,
+      apiKey,
+      attributionHeaders,
+      budgetAvailable,
+    });
+    const pricing = prices.get(pair.model);
+    if (!pricing) throw new Error(`Candidate pricing missing: ${pair.model}`);
+    const previousEstimate = spend.estimatedCostUsd;
+    report.costUsd += recordScreenModelCost(
+      spend,
+      completion,
+      pricing,
+      { systemPrompt: prompts.systemPrompt, userPrompt: prompts.userPrompt, fragment }
+    );
+    report.estimatedCostUsd += spend.estimatedCostUsd - previousEstimate;
+    const grade =
+      completion.output === null || completion.output === '' || spend.costUnknown
+        ? null
+        : await gradeDeciderOutput(benchCase.check, {
+            userPrompt: prompts.userPrompt,
+            output: completion.output,
+            judge,
+          });
+    pair.results.push({
+      caseId: benchCase.id,
+      rep: 0,
+      routeKey: `${benchCase.taskType}/${benchCase.subtaskType}`,
+      split: 'train',
+      score: completion.output === '' ? 0 : (grade?.score ?? null),
+      costUsd: completion.costUsd,
+      graderCostUsd: grade?.costUsd ?? 0,
+      latencyMs: completion.latencyMs,
+      ttftMs: completion.ttftMs,
+      error:
+        grade && grade.score === null
+          ? 'grader_failed'
+          : (grade?.graderError ?? completion.error),
+      output: completion.output,
+    });
+    await checkpoint();
   }
   await checkpoint();
   console.log(`Saved candidate screen to ${out}${report.truncated ? ' (truncated)' : ''}`);

@@ -251,6 +251,8 @@ of `{model, variant}` entries; every model already represented in it is excluded
 regardless of effort. Eligible models must support text output and tools, have
 fixed nonnegative prompt and completion prices, and have a prompt price strictly
 below the USD-per-million-token cap. Virtual auto-routing entries are excluded.
+`--max-models <n>` optionally keeps only the n cheapest eligible models by prompt
+price, breaking equal-price ties by model ID. Without it, all eligible models run.
 Each model runs once without variant overrides (the provider default), and once
 with its highest catalog-supported reasoning effort, when available. Full catalog
 variant fragments are retained, including controls beyond reasoning.
@@ -259,6 +261,9 @@ The screen hashes case IDs with SHA-256 and takes the first N hashes per direct
 route from the selected suite. Every candidate sees the same cases; selection is
 stable when dataset order changes. Agentic routes require CLI execution and are
 explicitly listed in `excludedRoutes`, never simulated by direct completions.
+Scheduling is round-robin: each pass sends one case to each active model before
+any model receives another. A model's variants alternate within its case sequence,
+so a partial run spreads coverage across models instead of exhausting one first.
 Direct requests, streaming TTFT, retries, long-context materialization, and grading
 reuse the offline sweep path. Set `OPENROUTER_API_KEY`; no container is required.
 
@@ -283,10 +288,12 @@ recommendations, and stops sampling all its variants; other models continue.
 Its reported prompt and completion token counts are charged at catalog prices
 without cache discounts. `costUsd` includes these conservative estimates;
 `estimatedCostUsd` identifies their contribution globally and per model.
-If token counts are also unavailable, the remaining budget is reserved rather
-than treating the request as free. A failed judge call still stops further
-spending and sets `spendIncomplete`. Atomic checkpoints after each case retain
-partial results if the screen is interrupted.
+If token counts are unavailable, input tokens are estimated as the combined
+system/user prompt characters divided by four, rounded up; output is bounded by
+the request variant's `max_tokens`, or 8192 when unset. Only that request's
+catalog-priced estimate is charged, never the entire remaining budget.
+A failed judge call still stops further spending and sets `spendIncomplete`.
+Atomic checkpoints after each case retain partial results if interrupted.
 
 ## Admin endpoints
 

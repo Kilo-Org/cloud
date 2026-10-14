@@ -300,7 +300,6 @@ describe('buildEffortByComplexity', () => {
     expect(built.effortByComplexity?.[route]?.['model/shared']?.high).toBe('high');
   });
 });
-
 describe('production-cost table version', () => {
   it('isolates router, dataset identity and ranking configuration in the version hash', () => {
     const contributors = [{ runId: 'run', model: 'model', variant: 'high' }];

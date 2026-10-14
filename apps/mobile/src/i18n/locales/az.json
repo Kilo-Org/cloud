@@ -1259,7 +1259,7 @@
         "stoppedTitle": "Quraşdırma dayandı",
         "stoppedBody": "{{name}} üçün instans quraşdırma zamanı gözlənilmədən dayandı.",
         "stalledTitle": "Quraşdırma irəliləmir",
-        "stalledBody": "{{name}} üçün quraşdırmanı tamamlamaq mümkün olmadı. Yenidən cəhd et. Problem təkrarlanarsa, hi@kilo.ai ünvanına yaz.",
+        "stalledBody": "{{name}} üçün quraşdırmanı tamamlamaq mümkün olmadı. Yenidən cəhd et. Problem təkrarlanarsa, {{supportEmail}} ünvanına yaz.",
         "timeoutTitle": "Gözləniləndən çox çəkir",
         "timeoutBody": "{{name}} üçün quraşdırma həmişəkindən çox vaxt aparır ({{displayMinutes}} dəqiqədən çox).",
         "continueInBackground": "Fonda davam et",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "Erkən giriş planından mobil cihazda istifadə etməzdən əvvəl plan mütəxəssis tərəfindən yoxlanmalıdır.",
       "iosTitle": "KiloClaw iOS-da əlçatan deyil",
       "iosBody": "Bu hesab üçün KiloClaw girişi iOS tətbiqindən kənarda idarə olunur.",
-      "iosContact": "Sualın var? hi@kilo.ai ünvanına yaz.",
+      "iosContact": "Sualın var? {{supportEmail}} ünvanına yaz.",
       "quarantinedCta": "Komandamıza e-poçt göndər",
       "nonCanonicalEarlybirdCta": "Planını kilo.ai saytında nəzərdən keçir"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "GitHub tətbiqini yenilə"
       },
       "githubIpAllowList": {
-        "description": "Bu GitHub təşkilatının icazə verilən IP ünvanları siyahısı Kilo-nun girişini blokladığı üçün kod yoxlayıcısı deaktiv edildi. Kömək üçün hi@kilo.ai ünvanına yaz, sonra kod yoxlayıcısını yenidən aktivləşdir."
+        "description": "Bu GitHub təşkilatının icazə verilən IP ünvanları siyahısı Kilo-nun girişini blokladığı üçün kod yoxlayıcısı deaktiv edildi. Kömək üçün {{supportEmail}} ünvanına yaz, sonra kod yoxlayıcısını yenidən aktivləşdir."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo bu layihə üçün GitLab layihə giriş tokeni yarada bilmədiyi üçün kod yoxlayıcısı deaktiv edildi. Layihə idarəçisi icazəsi ver və ya layihə giriş tokenlərini aktivləşdir, sonra kod yoxlayıcısını yenidən aktivləşdir.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Kod yoxlayıcısının parametrlərini yenilə"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Bu gün repozitoriyanın klonlanması üç dəfə vaxt həddini aşdığı üçün kod yoxlayıcısı deaktiv edildi. Kömək üçün hi@kilo.ai ünvanına yaz, sonra kod yoxlayıcısını yenidən aktivləşdir."
+        "description": "Bu gün repozitoriyanın klonlanması üç dəfə vaxt həddini aşdığı üçün kod yoxlayıcısı deaktiv edildi. Kömək üçün {{supportEmail}} ünvanına yaz, sonra kod yoxlayıcısını yenidən aktivləşdir."
       },
       "title": "Kod yoxlayıcısında müdaxilə tələb olunur.",
       "recoveryLabel": "Dəstək xidməti ilə əlaqə saxla"

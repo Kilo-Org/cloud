@@ -1259,7 +1259,7 @@
         "stoppedTitle": "Configuración detida",
         "stoppedBody": "A instancia de {{name}} detívose inesperadamente durante a configuración.",
         "stalledTitle": "Algo quedou bloqueado",
-        "stalledBody": "Non puidemos rematar a configuración de {{name}}. Téntao de novo ou escribe a hi@kilo.ai se o problema continúa.",
+        "stalledBody": "Non puidemos rematar a configuración de {{name}}. Téntao de novo ou escribe a {{supportEmail}} se o problema continúa.",
         "timeoutTitle": "Está tardando máis do esperado",
         "timeoutBody": "A configuración de {{name}} está tardando máis do normal (máis de {{displayMinutes}} minutos).",
         "continueInBackground": "Continuar en segundo plano",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "O teu plan de acceso anticipado precisa unha revisión manual antes de poder usarse no móbil.",
       "iosTitle": "KiloClaw non dispoñible en iOS",
       "iosBody": "O acceso a KiloClaw para esta conta xestiónase fóra da aplicación de iOS.",
-      "iosContact": "Tes dúbidas? Escribe a hi@kilo.ai.",
+      "iosContact": "Tes dúbidas? Escribe a {{supportEmail}}.",
       "quarantinedCta": "Escribir ao noso equipo",
       "nonCanonicalEarlybirdCta": "Revisar o teu plan en kilo.ai"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Actualizar a aplicación de GitHub"
       },
       "githubIpAllowList": {
-        "description": "O revisor de código desactivouse porque esta organización de GitHub usa unha lista de enderezos IP permitidos que bloquea Kilo. Contacta con hi@kilo.ai para obter axuda e volve activar o revisor de código."
+        "description": "O revisor de código desactivouse porque esta organización de GitHub usa unha lista de enderezos IP permitidos que bloquea Kilo. Contacta con {{supportEmail}} para obter axuda e volve activar o revisor de código."
       },
       "gitlabProjectAccessRequired": {
         "description": "O revisor de código desactivouse porque Kilo non pode crear un token de acceso para este proxecto de GitLab. Concede permisos de mantemento ou activa os tokens de acceso ao proxecto e volve activar o revisor de código.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Actualizar a configuración do revisor de código"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "O revisor de código desactivouse porque hoxe se superou tres veces o tempo límite para clonar o repositorio. Contacta con hi@kilo.ai para obter axuda e volve activar o revisor de código."
+        "description": "O revisor de código desactivouse porque hoxe se superou tres veces o tempo límite para clonar o repositorio. Contacta con {{supportEmail}} para obter axuda e volve activar o revisor de código."
       },
       "title": "O revisor de código precisa a túa atención.",
       "recoveryLabel": "Contactar coa asistencia"

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -615,7 +616,7 @@ function CreditsPageContent() {
             <Info className="text-muted-foreground mt-0.5 size-4 shrink-0" />
             <p className="type-label text-muted-foreground">
               Credits are non-refundable. For questions about billing or credits, please{' '}
-              <Link href="mailto:hi@kilo.ai" className="text-blue-400 hover:underline">
+              <Link href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-400 hover:underline">
                 contact support
               </Link>
               .

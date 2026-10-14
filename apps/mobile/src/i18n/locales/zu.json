@@ -1259,7 +1259,7 @@
         "stoppedTitle": "Ukusetha kumisiwe",
         "stoppedBody": "Ikhophi ka-{{name}} ime ngokungalindelekile ngesikhathi sokusetha.",
         "stalledTitle": "Kukhona okumile",
-        "stalledBody": "Asikwazanga ukuqeda ukusetha kuka-{{name}}. Zama futhi, noma thumela i-imeyili ku-hi@kilo.ai uma lokhu kuqhubeka.",
+        "stalledBody": "Asikwazanga ukuqeda ukusetha kuka-{{name}}. Zama futhi, noma thumela i-imeyili ku-{{supportEmail}} uma lokhu kuqhubeka.",
         "timeoutTitle": "Kuthatha isikhathi eside kunalokho okulindelekile",
         "timeoutBody": "Ukusetha kuka-{{name}} kuthatha isikhathi eside kunokujwayelekile (ngaphezu kwemizuzu engu-{{displayMinutes}}).",
         "continueInBackground": "Qhubeka ngemuva",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "Uhlelo lwakho lokufinyelela kusenesikhathi ludinga ukubuyekezwa umuntu ngaphambi kokuba lusetshenziswe efonini.",
       "iosTitle": "I-KiloClaw ayitholakali ku-iOS",
       "iosBody": "Ukufinyelela kwe-KiloClaw kule akhawunti kulawulwa ngaphandle kohlelo lokusebenza lwe-iOS.",
-      "iosContact": "Unemibuzo? Xhumana no-hi@kilo.ai.",
+      "iosContact": "Unemibuzo? Xhumana no-{{supportEmail}}.",
       "quarantinedCta": "Thumela i-imeyili eqenjini lethu",
       "nonCanonicalEarlybirdCta": "Hlole uhlelo lwakho ku-kilo.ai"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Buyekeza uhlelo lokusebenza lwe-GitHub"
       },
       "githubIpAllowList": {
-        "description": "Umhloli wekhodi uvaliwe ngoba le nhlangano ye-GitHub isebenzisa uhlu lwamakheli e-IP avunyelwe oluvimba i-Kilo. Xhumana no-hi@kilo.ai ukuze uthole usizo bese uvula umhloli wekhodi futhi."
+        "description": "Umhloli wekhodi uvaliwe ngoba le nhlangano ye-GitHub isebenzisa uhlu lwamakheli e-IP avunyelwe oluvimba i-Kilo. Xhumana no-{{supportEmail}} ukuze uthole usizo bese uvula umhloli wekhodi futhi."
       },
       "gitlabProjectAccessRequired": {
         "description": "Umhloli wekhodi uvaliwe ngoba i-Kilo ayikwazi ukudala ithokheni yokufinyelela kule phrojekthi ye-GitLab. Nikeza izimvume zomgcini wephrojekthi noma uvule amathokheni okufinyelela kuphrojekthi bese uvula umhloli wekhodi futhi.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Buyekeza izilungiselelo zomhloli wekhodi"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Umhloli wekhodi uvaliwe ngemva kokuba ukukopisha inqolobane yekhodi kuphelelwe yisikhathi kathathu namuhla. Xhumana no-hi@kilo.ai ukuze uthole usizo bese uvula umhloli wekhodi futhi."
+        "description": "Umhloli wekhodi uvaliwe ngemva kokuba ukukopisha inqolobane yekhodi kuphelelwe yisikhathi kathathu namuhla. Xhumana no-{{supportEmail}} ukuze uthole usizo bese uvula umhloli wekhodi futhi."
       },
       "title": "Umhloli wekhodi udinga ukunakwa.",
       "recoveryLabel": "Xhumana nethimba losizo"

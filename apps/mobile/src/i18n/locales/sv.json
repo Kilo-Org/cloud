@@ -1259,7 +1259,7 @@
         "stoppedTitle": "Installationen har stoppats",
         "stoppedBody": "Instansen för {{name}} stoppades oväntat under installationen.",
         "stalledTitle": "Installationen har fastnat",
-        "stalledBody": "Vi kunde inte slutföra installationen av {{name}}. Försök igen eller mejla hi@kilo.ai om problemet kvarstår.",
+        "stalledBody": "Vi kunde inte slutföra installationen av {{name}}. Försök igen eller mejla {{supportEmail}} om problemet kvarstår.",
         "timeoutTitle": "Tar längre tid än förväntat",
         "timeoutBody": "Installationen av {{name}} tar längre tid än vanligt (över {{displayMinutes}} minuter).",
         "continueInBackground": "Fortsätt i bakgrunden",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "Ditt abonnemang för tidig åtkomst behöver granskas manuellt innan det kan användas i mobilen.",
       "iosTitle": "KiloClaw är inte tillgängligt på iOS",
       "iosBody": "För det här kontot hanteras åtkomsten till KiloClaw utanför iOS-appen.",
-      "iosContact": "Frågor? Kontakta hi@kilo.ai.",
+      "iosContact": "Frågor? Kontakta {{supportEmail}}.",
       "quarantinedCta": "Skicka e-post till vårt team",
       "nonCanonicalEarlybirdCta": "Granska ditt abonnemang på kilo.ai"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Uppdatera GitHub-appen"
       },
       "githubIpAllowList": {
-        "description": "Kodgranskaren inaktiverades eftersom GitHub-organisationens lista över tillåtna IP-adresser blockerar Kilo. Kontakta hi@kilo.ai för att få hjälp och aktivera sedan kodgranskaren igen."
+        "description": "Kodgranskaren inaktiverades eftersom GitHub-organisationens lista över tillåtna IP-adresser blockerar Kilo. Kontakta {{supportEmail}} för att få hjälp och aktivera sedan kodgranskaren igen."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kodgranskaren inaktiverades eftersom Kilo inte kan skapa en åtkomsttoken för det här projektet i GitLab. Ge behörighet som projektansvarig eller aktivera åtkomsttoken för projekt och aktivera sedan kodgranskaren igen.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Uppdatera kodgranskarens inställningar"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Kodgranskaren inaktiverades efter att kloningen av kodarkivet överskred tidsgränsen tre gånger i dag. Kontakta hi@kilo.ai för att få hjälp och aktivera sedan kodgranskaren igen."
+        "description": "Kodgranskaren inaktiverades efter att kloningen av kodarkivet överskred tidsgränsen tre gånger i dag. Kontakta {{supportEmail}} för att få hjälp och aktivera sedan kodgranskaren igen."
       },
       "title": "Kodgranskaren kräver en åtgärd.",
       "recoveryLabel": "Kontakta supporten"

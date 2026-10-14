@@ -1,8 +1,4 @@
-// Shared Code Reviewer "action required" runtime state and its user-facing
-// copy. The canonical source was apps/web/src/lib/code-reviews/action-required-shared.ts;
-// this module holds the state type and the three strings the mobile overview
-// banner renders (title, description, recovery label) so both apps read one
-// source instead of duplicating them.
+import { SUPPORT_EMAIL } from '../support';
 
 export const CODE_REVIEW_ACTION_REQUIRED_REASONS = [
   'github_installation_required',
@@ -39,8 +35,7 @@ const COPY_BY_REASON: Record<CodeReviewActionRequiredReason, CodeReviewActionReq
   },
   github_ip_allow_list: {
     title: 'Code Reviewer needs attention',
-    description:
-      'Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact hi@kilo.ai for help, then enable Code Reviewer again.',
+    description: `Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact ${SUPPORT_EMAIL} for help, then enable Code Reviewer again.`,
     recoveryLabel: 'Contact support',
   },
   gitlab_project_access_required: {
@@ -63,8 +58,7 @@ const COPY_BY_REASON: Record<CodeReviewActionRequiredReason, CodeReviewActionReq
   },
   repeated_repository_clone_timeout: {
     title: 'Code Reviewer needs attention',
-    description:
-      'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilo.ai for help, then enable Code Reviewer again.',
+    description: `Code Reviewer was disabled after three repository clone timeouts today. Contact ${SUPPORT_EMAIL} for help, then enable Code Reviewer again.`,
     recoveryLabel: 'Contact support',
   },
 };

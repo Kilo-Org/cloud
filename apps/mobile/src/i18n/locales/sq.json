@@ -1259,7 +1259,7 @@
         "stoppedTitle": "Konfigurimi u ndal",
         "stoppedBody": "Instanca e {{name}} u ndal papritur gjatë konfigurimit.",
         "stalledTitle": "Diçka u bllokua",
-        "stalledBody": "Nuk arritëm ta përfundonim konfigurimin e {{name}}. Provo përsëri ose shkruaj në hi@kilo.ai nëse kjo vazhdon të ndodhë.",
+        "stalledBody": "Nuk arritëm ta përfundonim konfigurimin e {{name}}. Provo përsëri ose shkruaj në {{supportEmail}} nëse kjo vazhdon të ndodhë.",
         "timeoutTitle": "Po zgjat më shumë nga sa pritej",
         "timeoutBody": "Konfigurimi i {{name}} po zgjat më shumë se zakonisht (mbi {{displayMinutes}} minuta).",
         "continueInBackground": "Vazhdo në sfond",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "Plani yt i qasjes së hershme kërkon rishikim manual përpara se ta përdorësh në telefon.",
       "iosTitle": "KiloClaw i padisponueshëm në iOS",
       "iosBody": "Qasja te KiloClaw menaxhohet jashtë aplikacionit iOS për këtë llogari.",
-      "iosContact": "Ke pyetje? Shkruaj në hi@kilo.ai.",
+      "iosContact": "Ke pyetje? Shkruaj në {{supportEmail}}.",
       "quarantinedCta": "Dërgo email për ekipin tonë",
       "nonCanonicalEarlybirdCta": "Shqyrto planin tënd në kilo.ai"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Përditëso aplikacionin GitHub"
       },
       "githubIpAllowList": {
-        "description": "Shqyrtuesi i kodit u çaktivizua sepse kjo organizatë në GitHub përdor një listë adresash IP të lejuara që bllokon Kilo. Kontakto hi@kilo.ai për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
+        "description": "Shqyrtuesi i kodit u çaktivizua sepse kjo organizatë në GitHub përdor një listë adresash IP të lejuara që bllokon Kilo. Kontakto {{supportEmail}} për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
       },
       "gitlabProjectAccessRequired": {
         "description": "Shqyrtuesi i kodit u çaktivizua sepse Kilo nuk mund të krijojë një token qasjeje për këtë projekt në GitLab. Jep qasje me rolin e mirëmbajtësit ose aktivizo tokenët e qasjes në projekt, pastaj aktivizo përsëri shqyrtuesin e kodit.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Përditëso cilësimet e shqyrtuesit të kodit"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Shqyrtuesi i kodit u çaktivizua pasi klonimi i depos tejkaloi kohën e lejuar tri herë sot. Kontakto hi@kilo.ai për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
+        "description": "Shqyrtuesi i kodit u çaktivizua pasi klonimi i depos tejkaloi kohën e lejuar tri herë sot. Kontakto {{supportEmail}} për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
       },
       "title": "Shqyrtuesi i kodit kërkon vëmendje.",
       "recoveryLabel": "Kontakto mbështetjen"

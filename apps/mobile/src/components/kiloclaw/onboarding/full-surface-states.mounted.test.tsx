@@ -7,7 +7,7 @@ import { AccessRequiredScreen, type AccessRequiredSubcase } from '../access-requ
 import { EmptyStateContent } from '../empty-state-content';
 import { OnboardingFlow } from '../onboarding-flow';
 import { openExternalUrl } from '@/lib/external-link';
-import { SUPPORT_EMAIL } from '@/lib/kiloclaw/access-issue';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { INITIAL_STATE } from '@/lib/onboarding';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { CompleteStep } from './complete-step';

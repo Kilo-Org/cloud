@@ -1259,7 +1259,7 @@
         "stoppedTitle": "Ìṣètò ti dúró",
         "stoppedBody": "Ẹ̀rọ {{name}} dúró láìròtẹ́lẹ̀ nígbà ìṣètò.",
         "stalledTitle": "Ohun kan kò tẹ̀síwájú",
-        "stalledBody": "A kò lè parí ìṣètò {{name}}. Tún gbìyànjú, tàbí fi iméèlì ránṣẹ́ sí hi@kilo.ai bí èyí bá ń ṣẹlẹ̀ léraléra.",
+        "stalledBody": "A kò lè parí ìṣètò {{name}}. Tún gbìyànjú, tàbí fi iméèlì ránṣẹ́ sí {{supportEmail}} bí èyí bá ń ṣẹlẹ̀ léraléra.",
         "timeoutTitle": "Ó ń pẹ́ ju bí a ti retí lọ",
         "timeoutBody": "Ìṣètò {{name}} ń pẹ́ ju bí ó ti sábà máa ń rí lọ (ó ti lé ní ìṣẹ́jú {{displayMinutes}}).",
         "continueInBackground": "Tẹ̀síwájú láìsí lójú ìwé",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "Ènìyàn gbọ́dọ̀ ṣe àtúnyẹ̀wò ètò ìwọlé àkọ́kọ́ rẹ kí o tó lè lò ó lórí fóònù.",
       "iosTitle": "KiloClaw kò sí lórí iOS",
       "iosBody": "Fún àkọọ́lẹ̀ yìí, a ń ṣàkóso àyè sí KiloClaw ní òde ìṣàfilọ́lẹ̀ iOS.",
-      "iosContact": "Ṣé o ní ìbéèrè? Kàn sí hi@kilo.ai.",
+      "iosContact": "Ṣé o ní ìbéèrè? Kàn sí {{supportEmail}}.",
       "quarantinedCta": "Firánṣẹ́ ímeèlì sí ẹgbẹ́ wa",
       "nonCanonicalEarlybirdCta": "Ṣàyẹ̀wò ètò rẹ lórí kilo.ai"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Sọ ohun èlò GitHub di tuntun"
       },
       "githubIpAllowList": {
-        "description": "A ti pa Olùṣàtúnyẹ̀wò kóòdù nítorí àjọ GitHub yìí lo àkójọ IP tí a gbà láyè tó dí Kilo lọ́wọ́. Kàn sí hi@kilo.ai fún ìrànlọ́wọ́, kí o sì tún mú Olùṣàtúnyẹ̀wò kóòdù ṣiṣẹ́."
+        "description": "A ti pa Olùṣàtúnyẹ̀wò kóòdù nítorí àjọ GitHub yìí lo àkójọ IP tí a gbà láyè tó dí Kilo lọ́wọ́. Kàn sí {{supportEmail}} fún ìrànlọ́wọ́, kí o sì tún mú Olùṣàtúnyẹ̀wò kóòdù ṣiṣẹ́."
       },
       "gitlabProjectAccessRequired": {
         "description": "A ti pa Olùṣàtúnyẹ̀wò kóòdù nítorí Kilo kò lè ṣẹ̀dá àmi ìwọlé iṣẹ́ GitLab fún iṣẹ́ yìí. Fún un ní àṣẹ olùtọ́jú tàbí mú àwọn àmi ìwọlé iṣẹ́ ṣiṣẹ́, kí o sì tún mú Olùṣàtúnyẹ̀wò kóòdù ṣiṣẹ́.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Sọ àwọn ètò Olùṣàtúnyẹ̀wò kóòdù di tuntun"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "A ti pa Olùṣàtúnyẹ̀wò kóòdù lẹ́yìn tí àkókò dídàkọ ibi ìpamọ́ parí láìparí iṣẹ́ náà lẹ́ẹ̀mẹ́ta lónìí. Kàn sí hi@kilo.ai fún ìrànlọ́wọ́, kí o sì tún mú Olùṣàtúnyẹ̀wò kóòdù ṣiṣẹ́."
+        "description": "A ti pa Olùṣàtúnyẹ̀wò kóòdù lẹ́yìn tí àkókò dídàkọ ibi ìpamọ́ parí láìparí iṣẹ́ náà lẹ́ẹ̀mẹ́ta lónìí. Kàn sí {{supportEmail}} fún ìrànlọ́wọ́, kí o sì tún mú Olùṣàtúnyẹ̀wò kóòdù ṣiṣẹ́."
       },
       "title": "Olùṣàyẹ̀wò kóòdù nílò àfiyèsí rẹ.",
       "recoveryLabel": "Kàn sí ẹgbẹ́ ìrànlọ́wọ́"

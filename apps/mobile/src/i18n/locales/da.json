@@ -1259,7 +1259,7 @@
         "stoppedTitle": "Opsætning stoppet",
         "stoppedBody": "Instansen for {{name}} stoppede uventet under opsætningen.",
         "stalledTitle": "Noget gik i stå",
-        "stalledBody": "Vi kunne ikke færdiggøre opsætningen af {{name}}. Prøv igen, eller skriv til hi@kilo.ai, hvis problemet fortsætter.",
+        "stalledBody": "Vi kunne ikke færdiggøre opsætningen af {{name}}. Prøv igen, eller skriv til {{supportEmail}}, hvis problemet fortsætter.",
         "timeoutTitle": "Tager længere tid end forventet",
         "timeoutBody": "Opsætningen af {{name}} tager længere tid end normalt (over {{displayMinutes}} minutter).",
         "continueInBackground": "Fortsæt i baggrunden",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "Dit abonnement med tidlig adgang kræver en manuel gennemgang, før det kan bruges på mobilen.",
       "iosTitle": "KiloClaw er ikke tilgængelig på iOS",
       "iosBody": "Adgangen til KiloClaw for denne konto administreres uden for iOS-appen.",
-      "iosContact": "Spørgsmål? Kontakt hi@kilo.ai.",
+      "iosContact": "Spørgsmål? Kontakt {{supportEmail}}.",
       "quarantinedCta": "Send en e-mail til vores team",
       "nonCanonicalEarlybirdCta": "Se din plan igennem på kilo.ai"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Opdatér GitHub-appen"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer blev deaktiveret, fordi denne GitHub-organisation bruger en liste over tilladte IP-adresser, som blokerer Kilo. Kontakt hi@kilo.ai for at få hjælp, og aktivér derefter Code Reviewer igen."
+        "description": "Code Reviewer blev deaktiveret, fordi denne GitHub-organisation bruger en liste over tilladte IP-adresser, som blokerer Kilo. Kontakt {{supportEmail}} for at få hjælp, og aktivér derefter Code Reviewer igen."
       },
       "gitlabProjectAccessRequired": {
         "description": "Code Reviewer blev deaktiveret, fordi Kilo ikke kan oprette et adgangstoken til dette GitLab-projekt. Giv adgang med rollen Maintainer, eller aktivér adgangstokens til projekter, og aktivér derefter Code Reviewer igen.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Opdatér indstillingerne for Code Reviewer"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer blev deaktiveret, fordi kloning af kodelageret overskred tidsgrænsen tre gange i dag. Kontakt hi@kilo.ai for at få hjælp, og aktivér derefter Code Reviewer igen."
+        "description": "Code Reviewer blev deaktiveret, fordi kloning af kodelageret overskred tidsgrænsen tre gange i dag. Kontakt {{supportEmail}} for at få hjælp, og aktivér derefter Code Reviewer igen."
       },
       "title": "Kodegennemgangen kræver din opmærksomhed.",
       "recoveryLabel": "Kontakt support"

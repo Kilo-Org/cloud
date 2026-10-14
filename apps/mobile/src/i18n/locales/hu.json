@@ -1259,7 +1259,7 @@
         "stoppedTitle": "A beállítás leállt",
         "stoppedBody": "{{name}} példánya váratlanul leállt a beállítás során.",
         "stalledTitle": "Valami elakadt",
-        "stalledBody": "Nem sikerült befejeznünk {{name}} beállítását. Próbáld újra. Ha a hiba ismétlődik, írj a hi@kilo.ai címre.",
+        "stalledBody": "Nem sikerült befejeznünk {{name}} beállítását. Próbáld újra. Ha a hiba ismétlődik, írj a {{supportEmail}} címre.",
         "timeoutTitle": "Tovább tart a vártnál",
         "timeoutBody": "{{name}} beállítása a szokásosnál tovább tart (már több mint {{displayMinutes}} perce).",
         "continueInBackground": "Folytatás a háttérben",
@@ -1317,7 +1317,7 @@
       "nonCanonicalEarlybirdBody": "A korai hozzáférést biztosító csomagodat előbb kézzel felül kell vizsgálnunk, hogy mobilon is használhasd.",
       "iosTitle": "A KiloClaw nem érhető el iOS-en",
       "iosBody": "Ennél a fióknál a KiloClaw-hozzáférést az iOS-alkalmazáson kívül lehet kezelni.",
-      "iosContact": "Kérdésed van? Írj a hi@kilo.ai címre.",
+      "iosContact": "Kérdésed van? Írj a {{supportEmail}} címre.",
       "quarantinedCta": "E-mail küldése a csapatunknak",
       "nonCanonicalEarlybirdCta": "Csomag áttekintése a kilo.ai oldalon"
     },
@@ -1552,7 +1552,7 @@
         "recoveryLabel": "GitHub-alkalmazás frissítése"
       },
       "githubIpAllowList": {
-        "description": "A kódellenőrző kikapcsolt, mert a GitHub-szervezet engedélyezett IP-címeinek listája blokkolja a Kilo hozzáférését. Kérj segítséget a hi@kilo.ai címen, majd engedélyezd újra a kódellenőrzőt."
+        "description": "A kódellenőrző kikapcsolt, mert a GitHub-szervezet engedélyezett IP-címeinek listája blokkolja a Kilo hozzáférését. Kérj segítséget a {{supportEmail}} címen, majd engedélyezd újra a kódellenőrzőt."
       },
       "gitlabProjectAccessRequired": {
         "description": "A kódellenőrző kikapcsolt, mert a Kilo nem tud GitLab-hozzáférési tokent létrehozni ehhez a projekthez. Adj karbantartói jogosultságot, vagy engedélyezd a projektszintű hozzáférési tokeneket, majd engedélyezd újra a kódellenőrzőt.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Kódellenőrző beállításainak frissítése"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "A kódellenőrző kikapcsolt, mert ma háromszor is túllépte az időkorlátot a kódtár klónozása. Kérj segítséget a hi@kilo.ai címen, majd engedélyezd újra a kódellenőrzőt."
+        "description": "A kódellenőrző kikapcsolt, mert ma háromszor is túllépte az időkorlátot a kódtár klónozása. Kérj segítséget a {{supportEmail}} címen, majd engedélyezd újra a kódellenőrzőt."
       },
       "title": "A kódellenőrző beavatkozást igényel.",
       "recoveryLabel": "Kapcsolatfelvétel az ügyfélszolgálattal"

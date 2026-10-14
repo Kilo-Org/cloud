@@ -362,10 +362,7 @@ export function computeDecision(
       ) &&
         ((mode === 'cost_per_accuracy' && !costSwitchWorthwhile(incumbentPick)) ||
           (mode === 'best_accuracy' &&
-            !(
-              picked.accuracy - incumbentPick.accuracy >
-              table.bestAccuracySwitchThreshold
-            )))));
+            !(picked.accuracy - incumbentPick.accuracy > table.bestAccuracySwitchThreshold)))));
 
   if (stickyIncumbent && incumbentCandidate && incumbentPick) {
     return {

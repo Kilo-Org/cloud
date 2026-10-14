@@ -80,7 +80,9 @@ describe('labelCaseComplexity checkpoints', () => {
       'Case second: provider unavailable'
     );
     expect(await readFile(outputPath, 'utf8')).toBe('{"committed":"high"}\n');
-    expect(JSON.parse(await readFile(`${outputPath}.checkpoint`, 'utf8'))).toEqual({ first: 'low' });
+    expect(JSON.parse(await readFile(`${outputPath}.checkpoint`, 'utf8'))).toEqual({
+      first: 'low',
+    });
     classify.mockClear();
     classify.mockResolvedValueOnce({
       ...result,
@@ -88,9 +90,14 @@ describe('labelCaseComplexity checkpoints', () => {
     });
     await labelCaseComplexity(outputPath, client, { cases, classify, resume: true });
     expect(classify).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(await readFile(outputPath, 'utf8'))).toEqual({ first: 'low', second: 'high' });
+    expect(JSON.parse(await readFile(outputPath, 'utf8'))).toEqual({
+      first: 'low',
+      second: 'high',
+    });
     expect(rename).toHaveBeenCalledWith(`${outputPath}.partial`, outputPath);
-    await expect(readFile(`${outputPath}.checkpoint`, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(readFile(`${outputPath}.checkpoint`, 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
   });
 
   it('does not replace an earlier checkpoint or the dataset when a temporary write fails', async () => {
@@ -101,7 +108,9 @@ describe('labelCaseComplexity checkpoints', () => {
       labelCaseComplexity(outputPath, client, { cases, classify, resume: true })
     ).rejects.toThrow('disk interrupted');
     expect(await readFile(outputPath, 'utf8')).toBe('{"committed":"high"}\n');
-    expect(JSON.parse(await readFile(`${outputPath}.checkpoint`, 'utf8'))).toEqual({ first: 'low' });
+    expect(JSON.parse(await readFile(`${outputPath}.checkpoint`, 'utf8'))).toEqual({
+      first: 'low',
+    });
     expect(rename).not.toHaveBeenCalled();
   });
 });

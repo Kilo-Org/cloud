@@ -1,3 +1,5 @@
+import { isPreviewLoopbackHostname } from './preview-loopback.js';
+
 export type PreviewHeader = { name: string; value: string };
 
 export const PREVIEW_COOKIE_NAME = 'kilo_preview';
@@ -160,8 +162,6 @@ export function sanitizePreviewResponseHeaders(
   return headers;
 }
 
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
-
 export function rewritePreviewLocation(value: string, port: number, origin: string): string {
   if (!value.startsWith('//') && !/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return value;
   let url: URL;
@@ -170,8 +170,7 @@ export function rewritePreviewLocation(value: string, port: number, origin: stri
   } catch {
     return value;
   }
-  const hostname = url.hostname.replace(/^\[|\]$/g, '');
-  if (!LOOPBACK_HOSTS.has(hostname) || url.port !== String(port)) return value;
+  if (!isPreviewLoopbackHostname(url.hostname) || url.port !== String(port)) return value;
   try {
     return new URL(`${url.pathname}${url.search}${url.hash}`, origin).toString();
   } catch {

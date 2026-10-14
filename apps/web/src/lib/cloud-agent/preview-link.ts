@@ -1,9 +1,9 @@
+import { isPreviewLoopbackHostname } from '../../../../../services/cloud-agent-next/src/shared/preview-loopback';
 import { CLOUD_AGENT_PREVIEW_PORT_MAX, CLOUD_AGENT_PREVIEW_PORT_MIN } from './preview-port';
 
 /** The placeholder in the preview URL template from `getPreviewOptions`. */
 const PREVIEW_URL_TEMPLATE_PORT = '{port}';
 const PREVIEW_PATH_MAX_LENGTH = 2048;
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '[::1]', '[::]']);
 
 export type PreviewLinkTarget = { port: number; path: string };
 
@@ -21,7 +21,7 @@ export function parsePreviewLinkTarget(href: string | undefined): PreviewLinkTar
     return null;
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-  if (!LOOPBACK_HOSTS.has(url.hostname) || url.username || url.password) return null;
+  if (!isPreviewLoopbackHostname(url.hostname) || url.username || url.password) return null;
   const port = Number(url.port);
   if (
     url.port === '' ||

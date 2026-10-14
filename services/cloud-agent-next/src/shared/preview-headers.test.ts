@@ -164,6 +164,15 @@ describe('rewritePreviewLocation', () => {
     expect(rewritePreviewLocation('http://127.0.0.1:5173/', 5173, origin)).toBe(`${origin}/`);
   });
 
+  it.each(['0.0.0.0', '[::]', '[::1]'])(
+    'rewrites a same-port %s Location as the sandbox, like the chat link parser',
+    host => {
+      expect(rewritePreviewLocation(`http://${host}:5173/login`, 5173, origin)).toBe(
+        `${origin}/login`
+      );
+    }
+  );
+
   it('leaves a Location with a different port or host unchanged', () => {
     expect(rewritePreviewLocation('http://localhost:9999/x', 5173, origin)).toBe(
       'http://localhost:9999/x'

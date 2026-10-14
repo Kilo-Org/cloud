@@ -192,7 +192,7 @@ describe('classifier usage delivery', () => {
       )
     ).resolves.toBeUndefined();
     expect(record).not.toHaveBeenCalled();
-    expect(env.AUTO_ROUTING_DECISION_CACHE.get).not.toHaveBeenCalled();
+    expect(vi.mocked(env.AUTO_ROUTING_DECISION_CACHE).get.mock.calls).toHaveLength(0);
     expect(warnSpy).toHaveBeenCalledExactlyOnceWith(
       JSON.stringify({
         event: 'auto_routing_classifier_usage_invalid',

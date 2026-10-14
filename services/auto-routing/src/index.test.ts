@@ -2083,7 +2083,9 @@ describe('auto routing worker', () => {
       expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(1);
       expect(cacheRecordClassifierUsage).toHaveBeenCalledWith(expected);
       expect(mockedFetch).toHaveBeenCalledTimes(1);
-      expect(JSON.parse(String(mockedFetch.mock.calls[0]?.[1]?.body))).toEqual(expected);
+      const body = mockedFetch.mock.calls[0]?.[1]?.body;
+      expect(typeof body).toBe('string');
+      expect(JSON.parse(body as string)).toEqual(expected);
     }
 
     describe.each([1, 2, null])('messageCount=%s', messageCount => {

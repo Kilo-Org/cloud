@@ -244,9 +244,7 @@ async function resolveOrganizationAutoModel(
 async function resolveAutoRoutingDecisionModel(
   decision: AutoRoutingDecision
 ): Promise<ResolvedAutoModel | null> {
-  // `variant` is only on the benchmark decision branch of the discriminated
-  // union; coding-plan defaults never carry it.
-  if ('variant' in decision && decision.variant != null) {
+  if (decision.variant != null) {
     const variants = await getModelVariants(decision.model, true);
     const variantSettings: OpenCodeVariant | undefined = variants?.[decision.variant];
     if (!variantSettings) {
@@ -262,7 +260,7 @@ async function resolveAutoRoutingDecisionModel(
   // Legacy effort-only decisions (old workers during rolling deploy).
   return {
     model: decision.model,
-    ...('reasoningEffort' in decision && decision.reasoningEffort
+    ...(decision.reasoningEffort
       ? { reasoning: { enabled: true, effort: decision.reasoningEffort } }
       : {}),
   };

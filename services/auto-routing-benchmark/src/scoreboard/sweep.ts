@@ -264,7 +264,6 @@ export function isGradedSweepResult(
       result.error === 'Container response is missing answer content')
   );
 }
-
 export function summarizeSweep(pairs: OfflineSweep['pairs']): OfflineSweep['summaries'] {
   return pairs.flatMap(pair => {
     const groups = new Map<string, SweepResult[]>();

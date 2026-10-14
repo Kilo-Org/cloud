@@ -82,6 +82,11 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => mockQueryClient,
 }));
 jest.mock('@/lib/trpc/utils', () => ({ useTRPC: () => mockTrpc }));
+jest.mock('./use-preview', () => ({
+  ...jest.requireActual('./use-preview'),
+  usePreviewUrlTemplate: () => null,
+  useOpenPreview: () => ({ openPreview: jest.fn(), isOpening: false }),
+}));
 jest.mock('./CloudAgentProvider', () => ({
   useManager: () => mockManager,
   useCloudAgent: () => ({}),

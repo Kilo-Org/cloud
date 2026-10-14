@@ -31,23 +31,13 @@ import {
   putStickyDecision,
 } from './decision-cache';
 import type { StickyDecision } from './decision-cache';
-import {
-  computeDecision,
-  isLowConfidence,
-  modelSatisfiesConstraints,
-  type DecisionIncumbent,
-} from './decision-engine';
+import { computeDecision, isLowConfidence, type DecisionIncumbent } from './decision-engine';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
 import { fetchCustomRoutingTable } from './benchmark-origin';
 import { getRoutingTable } from './routing-table';
 import { getEffectiveAutoRoutingSettings } from './routing-mode';
 import type { HonoEnv } from './hono-env';
-import {
-  codingPlanDefaultDecision,
-  getCodingPlanPreference,
-  type CodingPlanPreference,
-} from './coding-plan-preference';
 import { getModelCapabilities } from './model-capabilities';
 import type { ModelCapabilitiesMap } from './model-capabilities';
 import { recordClassifierUsage, type ClassifierCallKind } from './classifier-usage';
@@ -118,7 +108,6 @@ function classificationFromRouteKey(routeKey: string): ClassifierOutput | null {
 }
 
 function decisionVariant(decision: AutoRoutingDecision): string | null {
-  if (decision.source !== 'benchmark') return null;
   if (decision.variant !== undefined && decision.variant !== null) return decision.variant;
   // Legacy effort-only decisions: sticky stores null variant (model-only).
   return null;
@@ -185,7 +174,6 @@ function classifierErrorStatus(error: unknown): `classifier_error:${string}` {
 // Per-request fields shared by every metrics write and log line for the
 // decision: the validated payload plus everything derived from it once.
 type DecisionTimings = {
-  codingPlanMs: number;
   settingsMs: number;
   capabilitiesMs: number | null;
   tableMs: number | null;
@@ -308,8 +296,7 @@ function recordDecision(
   });
 
   const incumbentModel = incumbent?.model ?? null;
-  const decidedVariant =
-    decision !== null && decision.source === 'benchmark' ? (decision.variant ?? null) : null;
+  const decidedVariant = decision?.variant ?? null;
   const switched =
     decision !== null &&
     incumbentModel !== null &&
@@ -367,7 +354,7 @@ function recordDecision(
       sticky: decision?.sticky ?? null,
       incumbentModel,
       switched,
-      switchReason: decision?.source === 'benchmark' ? (decision.switchReason ?? null) : null,
+      switchReason: decision?.switchReason ?? null,
       routeChanged,
       contextTokens: ctx.payload.constraints?.promptTokensEstimate ?? null,
       // False when this line bypassed the success sample rate (switch,
@@ -400,7 +387,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   const router = payload.router ?? DEFAULT_AUTO_ROUTER;
   const startedAt = performance.now();
   const timings: DecisionTimings = {
-    codingPlanMs: 0,
     settingsMs: 0,
     capabilitiesMs: null,
     tableMs: null,
@@ -410,34 +396,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     totalMs: 0,
   };
   const deniedModelIds = new Set(payload.routingPolicy?.deniedModelIds ?? []);
-  const codingPlanStartedAt = performance.now();
-  const codingPlanPreference: CodingPlanPreference =
-    router === 'efficient'
-      ? await getCodingPlanPreference(c.env, payload.userId)
-      : { active: false };
-  timings.codingPlanMs = performance.now() - codingPlanStartedAt;
-  const codingPlanActive =
-    codingPlanPreference.active && !deniedModelIds.has(codingPlanPreference.modelId);
-  // Narrow once: `constraints` is only non-undefined inside the branches
-  // that already checked `hasConstraints`. This avoids a `!` non-null
-  // assertion across the closure.
   const hasConstraints = payload.constraints !== undefined;
   const constraints: RoutingConstraints | undefined = payload.constraints;
-
-  // Constraints-absent coding-plan short-circuit stays byte-identical: no
-  // settings hop, capability fetch, routing-table fetch, or benchmark hop.
-  if (codingPlanActive && !hasConstraints) {
-    const decision = codingPlanDefaultDecision(codingPlanPreference);
-    writeClassifierMetricsDataPoint(c.env, {
-      status: 'coding_plan_default',
-      classifierModel: 'coding_plan_default',
-      requestedModel: payload.input.requestedModel,
-      classifierDurationMs: performance.now() - startedAt,
-      classifierCostCredits: 0,
-      cacheHit: false,
-    });
-    return c.json({ cost: 0, decision, classifierResult: null });
-  }
 
   const routingPrerequisites = (async () => {
     // Resolve settings before the single capability load so custom-pool
@@ -454,7 +414,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       const capabilitiesStartedAt = performance.now();
       capabilities = await getModelCapabilities(c.env, {
         router,
-        codingPlanModelId: codingPlanActive ? codingPlanPreference.modelId : null,
         waitUntil: promise => c.executionCtx.waitUntil(promise),
         ...(configuredPool !== null
           ? { additionalModelIds: configuredPool.map(entry => entry.model) }
@@ -463,25 +422,16 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       timings.capabilitiesMs = performance.now() - capabilitiesStartedAt;
     }
 
-    const codingPlanEligible =
-      codingPlanActive &&
-      constraints !== undefined &&
-      modelSatisfiesConstraints(capabilities.get(codingPlanPreference.modelId), constraints);
-    // Eligible coding plans need neither a custom table nor paid inference.
-    // Null pool retains the platform table and null-table fallback semantics.
     const tableStartedAt = performance.now();
-    const routingTable = codingPlanEligible
-      ? null
-      : await (configuredPool === null
-          ? getRoutingTable(c.env, router)
-          : loadCustomRoutingTable(c.env, configuredPool));
-    if (!codingPlanEligible) timings.tableMs = performance.now() - tableStartedAt;
+    const routingTable = await (configuredPool === null
+      ? getRoutingTable(c.env, router)
+      : loadCustomRoutingTable(c.env, configuredPool));
+    timings.tableMs = performance.now() - tableStartedAt;
     return {
       configuredPool,
       routingMode: effectiveSettings.mode,
       capabilities,
       routingTable,
-      codingPlanEligible,
     };
   })();
   const classifyAndBill = async (
@@ -516,23 +466,14 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     }
   };
 
-  const preparedClassification = (async (): Promise<
-    | {
-        ctx: DecisionContext;
-        sticky: StickyDecision | null;
-        speculative: ClassificationRun | null;
-        outcome:
-          | DecisionOutcome
-          | { kind: 'sticky_immediate'; classifierModel: string; decision: AutoRoutingDecision };
-      }
-    | AutoRoutingDecision
-  > => {
-    // Only active constrained plans wait for eligibility. Ordinary traffic
-    // starts metadata, cache reads, and inference while routing loads.
-    if (codingPlanActive && (await routingPrerequisites).codingPlanEligible) {
-      return codingPlanDefaultDecision(codingPlanPreference);
-    }
-
+  const preparedClassification = (async (): Promise<{
+    ctx: DecisionContext;
+    sticky: StickyDecision | null;
+    speculative: ClassificationRun | null;
+    outcome:
+      | DecisionOutcome
+      | { kind: 'sticky_immediate'; classifierModel: string; decision: AutoRoutingDecision };
+  }> => {
     const prepStartedAt = performance.now();
     const [hashes, userIdHash, classifierModel, successSampleRate] = await Promise.all([
       computeContentHashes(payload.input),
@@ -636,19 +577,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   );
 
   const [routing, prepared] = await Promise.all([routingPrerequisites, preparedClassification]);
-  if (!('ctx' in prepared)) {
-    const decision = prepared;
-    writeClassifierMetricsDataPoint(c.env, {
-      status: 'coding_plan_default',
-      classifierModel: 'coding_plan_default',
-      requestedModel: payload.input.requestedModel,
-      classifierDurationMs: performance.now() - startedAt,
-      classifierCostCredits: 0,
-      cacheHit: false,
-    });
-    return c.json({ cost: 0, decision, classifierResult: null });
-  }
-
   const { configuredPool, routingMode, capabilities, routingTable } = routing;
   const { ctx, sticky, speculative, outcome } = prepared;
   const incumbent = stickyToIncumbent(sticky);

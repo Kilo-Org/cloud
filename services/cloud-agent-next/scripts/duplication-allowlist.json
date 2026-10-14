@@ -46,15 +46,6 @@
       "kind": "legacy",
       "maxMatches": 1,
       "maxTokens": 201
-    },
-    {
-      "files": ["wrapper/src/control-plane/prepare.ts", "wrapper/src/control/apply-attach.ts"],
-      "fingerprint": "1d796ba34bafa83b",
-      "owner": "pre-rewrite workspace attachment cleanup",
-      "reason": "The orphaned pre-rewrite attachment module retains a Kilo session probe also used by current preparation. Bound this existing copy until that module and its remaining type and test consumers are removed; the agent_* wrapper does not use it.",
-      "kind": "legacy",
-      "maxMatches": 1,
-      "maxTokens": 102
     }
   ]
 }

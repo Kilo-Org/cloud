@@ -131,6 +131,7 @@ function harness(
       return {
         pid: 900000 + counts.spawns,
         url,
+        authorization: 'Basic test',
         exited: exited.promise,
         stop: async () => {
           counts.stops++;

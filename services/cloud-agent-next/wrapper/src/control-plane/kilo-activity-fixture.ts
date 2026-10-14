@@ -164,7 +164,11 @@ export async function activityFixture(
       root,
       directory,
       client,
-      wrapper: createWrapperKiloClient(createLegacyKiloClient({ baseUrl: url }), url, directory),
+      wrapper: createWrapperKiloClient(
+        createLegacyKiloClient({ baseUrl: url }),
+        { url },
+        directory
+      ),
       globalClient: createKiloClient({ baseUrl: url }),
       events,
       signal,

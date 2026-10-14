@@ -37,7 +37,7 @@ describe('callback queue retry configuration', () => {
     expect(dev?.max_retries).toBe(CONFIGURED_REDELIVERIES);
   });
 
-  it('sets the code-review control-plane rollout and sandbox selection allowlist in wrangler', () => {
+  it('sets the code-review control-plane rollout, sandbox selection and preview allowlists in wrangler', () => {
     const config = readWranglerConfig();
 
     expect(config.vars?.VERCEL_SANDBOX_ORG_IDS).toBe('');
@@ -46,9 +46,11 @@ describe('callback queue retry configuration', () => {
     expect(config.vars?.SANDBOX_SELECTION_IDS).toBe(
       '9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55'
     );
+    expect(config.vars?.PREVIEW_ENABLED_IDS).toBe('2bbc9955-5dc2-428c-a353-be59d89a8130');
     expect(config.env?.dev?.vars?.VERCEL_SANDBOX_ORG_IDS).toBe('');
     expect(config.env?.dev?.vars?.CLOUDFLARE_CONTAINERS_ORG_IDS).toBe('*');
     expect(config.env?.dev?.vars?.CODE_REVIEW_CONTROL_PLANE_IDS).toBe('*');
     expect(config.env?.dev?.vars?.SANDBOX_SELECTION_IDS).toBe('*');
+    expect(config.env?.dev?.vars?.PREVIEW_ENABLED_IDS).toBe('*');
   });
 });

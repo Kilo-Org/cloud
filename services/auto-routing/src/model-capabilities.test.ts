@@ -406,69 +406,6 @@ describe('getModelCapabilities', () => {
     }
   });
 
-  it('includes the coding-plan model id in the queried id set', async () => {
-    dbWhere.mockImplementation((..._args: unknown[]) => {
-      // First call is the in-cache-miss DB query (full id set), which will
-      // not happen because we are testing the partial-fill path. We still
-      // answer the partial-fill query for the coding-plan id.
-      return Promise.resolve([
-        { openrouterId: 'coding-plan/chat', inputModalities: ['text'], contextLength: 200000 },
-      ]);
-    });
-    const env = makeEnv(
-      JSON.stringify({
-        'a/chat': { inputModalities: ['image'], contextLength: 8192 },
-        'b/chat': { inputModalities: ['text'], contextLength: 16384 },
-      })
-    );
-    const result = await getModelCapabilities(env, { codingPlanModelId: 'coding-plan/chat' });
-    expect(result.get('coding-plan/chat')?.contextLength).toBe(200000);
-  });
-
-  it('supplies static image capabilities for the recognized BytePlus coding-plan default', async () => {
-    const env = makeEnv(
-      JSON.stringify({
-        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
-        'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
-      })
-    );
-    const result = await getModelCapabilities(env, {
-      codingPlanModelId: 'byteplus-coding/bytedance-seed-code',
-    });
-    const capabilities = result.get('byteplus-coding/bytedance-seed-code');
-    expect(capabilities?.inputModalities.has('image')).toBe(true);
-    expect(capabilities?.inputModalities.has('file')).toBe(false);
-    expect(capabilities?.contextLength).toBe(262_144);
-    expect(capabilities?.isActive).toBe(true);
-    expect(dbWhere).not.toHaveBeenCalled();
-  });
-
-  it('does not query model_stats for the static BytePlus coding-plan default', async () => {
-    dbWhere.mockResolvedValue([
-      {
-        openrouterId: 'byteplus-coding/bytedance-seed-code',
-        inputModalities: ['file'],
-        contextLength: 4096,
-        isActive: false,
-      },
-    ]);
-    const env = makeEnv(
-      JSON.stringify({
-        'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
-        'b/chat': { inputModalities: ['text'], contextLength: 16384, isActive: true },
-      })
-    );
-    const result = await getModelCapabilities(env, {
-      codingPlanModelId: 'byteplus-coding/bytedance-seed-code',
-    });
-    const capabilities = result.get('byteplus-coding/bytedance-seed-code');
-    expect(capabilities?.inputModalities.has('image')).toBe(true);
-    expect(capabilities?.inputModalities.has('file')).toBe(false);
-    expect(capabilities?.contextLength).toBe(262_144);
-    expect(capabilities?.isActive).toBe(true);
-    expect(dbWhere).not.toHaveBeenCalled();
-  });
-
   it('queries an id absent from model_stats once, then serves it from the tombstoned union', async () => {
     // A direct BYOK id has no model_stats row, so the DB answers with nothing.
     dbWhere.mockImplementation(() => Promise.resolve([]));
@@ -672,7 +609,7 @@ describe('getModelCapabilities', () => {
     expect(dbWhere).not.toHaveBeenCalled();
   });
 
-  it('does not synthesize capabilities when BytePlus is not the coding-plan model', async () => {
+  it('does not synthesize capabilities for direct BYOK models', async () => {
     const env = makeEnv(
       JSON.stringify({
         'a/chat': { inputModalities: ['text'], contextLength: 8192, isActive: true },
@@ -696,7 +633,7 @@ describe('getModelCapabilities', () => {
     // value for kvReadThrough is null and the model_capabilities_v2 key is NOT
     // written. A later in-memory-miss must still re-check KV and re-fetch origin.
     mockGetRoutingTable.mockResolvedValue(null);
-    const first = await getModelCapabilities(env, { codingPlanModelId: 'coding-plan/chat' });
+    const first = await getModelCapabilities(env, { additionalModelIds: ['byok/private-model'] });
     expect(first.size).toBe(0);
     const capabilityPutsBefore = put.mock.calls.filter(
       (call: unknown[]) => call[0] === 'model_capabilities_v2'
@@ -704,7 +641,7 @@ describe('getModelCapabilities', () => {
     expect(capabilityPutsBefore).toEqual([]);
 
     clearModelCapabilitiesCache();
-    const second = await getModelCapabilities(env, { codingPlanModelId: 'coding-plan/chat' });
+    const second = await getModelCapabilities(env, { additionalModelIds: ['byok/private-model'] });
     expect(second.size).toBe(0);
     expect(get).toHaveBeenCalledTimes(2);
     const capabilityPutsAfter = put.mock.calls.filter(
@@ -722,17 +659,16 @@ describe('getModelCapabilities', () => {
       ...SAMPLE_ROUTING_TABLE,
       routes: {},
     });
-    const third = await getModelCapabilities(env, { codingPlanModelId: 'coding-plan/chat' });
+    const third = await getModelCapabilities(env, { additionalModelIds: ['byok/private-model'] });
     expect(third.size).toBe(0);
     const capabilityPutsEmpty = (put.mock.calls as unknown[][]).filter(
       call => call[0] === 'model_capabilities_v2'
     );
-    // Two writes: the empty union from the read-through, then the partial
-    // fill recording that the coding-plan id has no model_stats row.
+    // The partial fill records that the direct BYOK id has no model_stats row.
     expect(capabilityPutsEmpty).toHaveLength(2);
     expect(JSON.parse(capabilityPutsEmpty[0][1] as unknown as string)).toEqual({});
     expect(JSON.parse(capabilityPutsEmpty[1][1] as unknown as string)).toMatchObject({
-      'coding-plan/chat': { absent: true },
+      'byok/private-model': { absent: true },
     });
   });
 

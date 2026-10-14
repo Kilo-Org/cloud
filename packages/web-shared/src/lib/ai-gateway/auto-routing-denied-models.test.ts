@@ -3,7 +3,6 @@ import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
-import { MINIMAX_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import {
   candidateModelIdsFromSources,
   collectDataCollectionRequiredAutoRoutingModelIds,
@@ -186,11 +185,11 @@ describe('candidateModelIdsFromSources', () => {
       },
       ['pool/only-model']
     );
-    expect(ids).toEqual(expect.arrayContaining(['pool/only-model', MINIMAX_CURRENT_MODEL_ID]));
+    expect(ids).toEqual(['pool/only-model']);
     expect(ids).not.toContain('google/gemini-2.5-flash');
   });
 
-  it('includes routing-table models plus coding-plan default ids', () => {
+  it('includes only concrete routing-table models when no pool is configured', () => {
     expect(
       candidateModelIdsFromSources(
         {
@@ -203,13 +202,7 @@ describe('candidateModelIdsFromSources', () => {
         },
         null
       )
-    ).toEqual(
-      expect.arrayContaining([
-        'google/gemini-2.5-flash',
-        MINIMAX_CURRENT_MODEL_ID,
-        'byteplus-coding/bytedance-seed-code',
-      ])
-    );
+    ).toEqual(['google/gemini-2.5-flash']);
     const ids = candidateModelIdsFromSources(
       {
         routes: {

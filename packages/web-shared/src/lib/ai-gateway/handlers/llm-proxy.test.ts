@@ -1677,27 +1677,32 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(ctx.requested_model).toBe('kilo-auto/balanced');
   });
 
-  it('does not bill when classifier cost is 0 (cache hit)', async () => {
-    mockedFetchEfficientAutoDecision.mockResolvedValue({
-      decision: {
-        model: 'anthropic/claude-haiku-4',
-        taskType: 'implementation',
-        subtaskType: 'feature_development',
-        source: 'benchmark' as const,
-        tableVersion: 'v1',
-        sticky: false,
-      },
-      costUsd: 0,
-    });
+  it.each([false, true])(
+    'does not bill worker-owned classifier usage (null decision: %s)',
+    async nullDecision => {
+      mockedFetchEfficientAutoDecision.mockResolvedValue({
+        decision: nullDecision
+          ? null
+          : {
+              model: 'anthropic/claude-haiku-4',
+              taskType: 'implementation',
+              subtaskType: 'feature_development',
+              source: 'benchmark' as const,
+              tableVersion: 'v1',
+              sticky: false,
+            },
+        costUsd: 0,
+      });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')) as never);
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
-    await Promise.resolve();
-    await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
 
-    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
-  });
+      expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+    }
+  );
 
   it('bills classifier cost even when the final inference is BYOK', async () => {
     // The classifier runs on Kilo's OpenRouter credential regardless of the

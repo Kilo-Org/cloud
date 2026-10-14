@@ -9,6 +9,7 @@ import {
   sampleScreenCases,
   screenMetrics,
   screenRouteComparison,
+  screenRecommendation,
   screenVariants,
   selectScreenCandidates,
 } from '../scripts/screen-candidates';
@@ -165,6 +166,37 @@ describe('candidate screening', () => {
       estimateRequestCostUsd({ avgCostUsd: 0.001, pricing }, profile)
     );
     expect(screenMetrics([{ ...result, ttftMs: null }], pricing, null).p50TtftMs).toBeNull();
+  });
+
+  it('requires one variant to beat two routes instead of combining one win per variant', () => {
+    expect(
+      screenRecommendation([
+        { routes: [{ routeKey: 'route-a', beatsCurrentPick: true }] },
+        { routes: [{ routeKey: 'route-b', beatsCurrentPick: true }] },
+      ])
+    ).toEqual({ beatsCurrentPickRoutes: ['route-a', 'route-b'], recommend: false });
+  });
+
+  it('recommends a single variant winning two distinct routes and ignores duplicated wins', () => {
+    const oneRoute = {
+      routes: [
+        { routeKey: 'route-a', beatsCurrentPick: true },
+        { routeKey: 'route-a', beatsCurrentPick: true },
+        { routeKey: 'route-b', beatsCurrentPick: false },
+      ],
+    };
+    expect(screenRecommendation([oneRoute]).recommend).toBe(false);
+    expect(
+      screenRecommendation([
+        oneRoute,
+        {
+          routes: [
+            { routeKey: 'route-b', beatsCurrentPick: true },
+            { routeKey: 'route-c', beatsCurrentPick: true },
+          ],
+        },
+      ])
+    ).toEqual({ beatsCurrentPickRoutes: ['route-a', 'route-b', 'route-c'], recommend: true });
   });
 
   it('requires a strict eligible value improvement over a comparable current pick', () => {

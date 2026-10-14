@@ -1,0 +1,3 @@
+# Web app that records worker-owned classifier usage (/api/internal/usage/record).
+# @url nextjs
+KILO_WEB_API_BASE_URL=http://localhost:3000

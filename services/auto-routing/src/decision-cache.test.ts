@@ -2,12 +2,54 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifier';
 import {
   AutoRoutingDecisionCacheDO,
-  addPendingClassifierCost,
   clearClassificationHotCache,
   putCachedClassification,
   putStickyDecision,
   readConversationState,
 } from './decision-cache';
+import { MirrorPayloadSchema } from '@kilocode/auto-routing-contracts';
+import { buildClassifierUsage } from './classifier-usage';
+
+const fetchMock = vi.fn<typeof fetch>();
+const writerEnv = {
+  KILO_WEB_API_BASE_URL: 'https://web.example.test',
+  INTERNAL_API_SECRET_PROD: { get: async () => 'test-secret' },
+};
+
+async function classifierUsage() {
+  return buildClassifierUsage(
+    MirrorPayloadSchema.parse({
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: 'session-1',
+      machineId: null,
+      clientRequestId: null,
+      mode: null,
+      userAgent: null,
+      bodyBytes: 10,
+      input: {
+        apiKind: 'chat_completions',
+        requestedModel: 'kilo-auto/efficient',
+        systemPromptPrefix: null,
+        userPromptPrefix: 'Test request',
+        latestUserPromptPrefix: null,
+        messageCount: 1,
+        hasTools: false,
+        stream: false,
+        providerHints: { provider: null, providerOptions: null },
+      },
+    }),
+    {
+      conversationKey: 'conversation-1',
+      classifierModel: 'test/classifier',
+      contentHash: 'hash',
+      kind: 'sync',
+      requestStart: 'request-start',
+    },
+    0.000013,
+    new Date().toISOString()
+  );
+}
 
 const classification = {
   taskType: 'implementation',
@@ -55,7 +97,7 @@ function createCacheDO() {
   const storage = createFakeStorage();
   const cacheDO = new AutoRoutingDecisionCacheDO(
     { storage } as unknown as DurableObjectState,
-    {} as Env
+    writerEnv as Env
   );
   return { cacheDO, storage };
 }
@@ -72,12 +114,9 @@ function createCacheEnv() {
     );
     return result;
   }
-  const readRpc = vi.fn((key: string, consumePendingCost: boolean) =>
-    invoke(() => cacheDO.readConversationState(key, consumePendingCost))
-  );
+  const readRpc = vi.fn((key: string) => invoke(() => cacheDO.readConversationState(key)));
   const stub = {
     readConversationState: readRpc,
-    addPendingClassifierCost: (usd: number) => invoke(() => cacheDO.addPendingClassifierCost(usd)),
     putStickyDecision: (
       value: Parameters<AutoRoutingDecisionCacheDO['putStickyDecision']>[0],
       generation: number
@@ -91,8 +130,7 @@ function createCacheEnv() {
       get: () => stub,
     },
   } as unknown as Pick<Env, 'AUTO_ROUTING_DECISION_CACHE'>;
-  const readState = (consumePendingCost = false) =>
-    readConversationState(env, 'conversation-1', 'hash', 'model', { consumePendingCost });
+  const readState = () => readConversationState(env, 'conversation-1', 'hash', 'model');
   return { env, cacheDO, storage, readRpc, readState };
 }
 
@@ -100,69 +138,67 @@ beforeEach(() => {
   clearClassificationHotCache();
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-06-11T12:00:00Z'));
+  fetchMock.mockReset();
+  vi.stubGlobal('fetch', fetchMock);
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'info').mockImplementation(() => {});
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('AutoRoutingDecisionCacheDO', () => {
-  it('reads classification, sticky, and pending cost in one storage batch', async () => {
+  it('reads classification and sticky in one storage batch', async () => {
     const { cacheDO, storage } = createCacheDO();
     await cacheDO.putEntry('model:hash', classification);
     await cacheDO.putEntry('sticky', { model: 'mid/chat', variant: null, routeKey: null });
-    await cacheDO.addPendingClassifierCost(0.03);
     storage.get.mockClear();
     storage.put.mockClear();
     storage.delete.mockClear();
 
-    const state = await cacheDO.readConversationState('model:hash', false);
+    const state = await cacheDO.readConversationState('model:hash');
 
     expect(state.classification?.value).toEqual(classification);
     expect(state.sticky).toEqual({ model: 'mid/chat', variant: null, routeKey: null });
-    expect(state.pendingCostUsd).toBe(0.03);
-    expect(storage.get).toHaveBeenCalledExactlyOnceWith(['model:hash', 'sticky', 'pending-cost']);
+    expect(storage.get).toHaveBeenCalledExactlyOnceWith(['model:hash', 'sticky']);
     expect(storage.put).not.toHaveBeenCalled();
     expect(storage.delete).not.toHaveBeenCalled();
   });
 
-  it('expires cached decisions while retaining pending cost beyond the cache TTL', async () => {
+  it('expires cached decisions after the cache TTL', async () => {
     const { cacheDO, storage } = createCacheDO();
     await cacheDO.putEntry('model:hash', classification);
     await cacheDO.putEntry('sticky', { model: 'mid/chat', variant: null, routeKey: null });
-    await cacheDO.addPendingClassifierCost(0.03);
 
     vi.advanceTimersByTime(31 * 60 * 1000);
 
-    await expect(cacheDO.readConversationState('model:hash', false)).resolves.toEqual({
+    await expect(cacheDO.readConversationState('model:hash')).resolves.toEqual({
       classification: null,
       sticky: null,
-      pendingCostUsd: 0.03,
     });
-    expect([...storage.entries.keys()]).toEqual(['model:hash', 'sticky', 'pending-cost']);
-    vi.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
-    expect((await cacheDO.readConversationState('model:hash', true)).pendingCostUsd).toBeNull();
+    expect([...storage.entries.keys()]).toEqual(['model:hash', 'sticky']);
   });
 
-  it('ignores expired entries on read without writing or dropping fresh sticky state or cost', async () => {
+  it('ignores expired entries without writing or dropping fresh sticky state', async () => {
     const { cacheDO, storage } = createCacheDO();
     await cacheDO.putEntry('model:hash', classification);
     vi.advanceTimersByTime(29 * 60 * 1000);
     await cacheDO.putEntry('sticky', { model: 'mid/chat', variant: null, routeKey: null });
-    await cacheDO.addPendingClassifierCost(0.03);
     vi.advanceTimersByTime(2 * 60 * 1000);
 
-    await expect(cacheDO.readConversationState('model:hash', false)).resolves.toEqual({
+    await expect(cacheDO.readConversationState('model:hash')).resolves.toEqual({
       classification: null,
       sticky: { model: 'mid/chat', variant: null, routeKey: null },
-      pendingCostUsd: 0.03,
     });
-    expect([...storage.entries.keys()]).toEqual(['model:hash', 'sticky', 'pending-cost']);
+    expect([...storage.entries.keys()]).toEqual(['model:hash', 'sticky']);
   });
 
   it('schedules a sweep alarm only when none is pending', async () => {
     const { cacheDO, storage } = createCacheDO();
-    await cacheDO.addPendingClassifierCost(0.03);
+    await cacheDO.putEntry('model:old', classification);
     const firstAlarm = await storage.getAlarm();
     expect(firstAlarm).not.toBeNull();
 
@@ -171,24 +207,23 @@ describe('AutoRoutingDecisionCacheDO', () => {
     await expect(storage.getAlarm()).resolves.toBe(firstAlarm);
   });
 
-  it('retains unpaid cost during cache sweeps and reschedules while live entries remain', async () => {
+  it('sweeps expired entries and reschedules while live entries remain', async () => {
     const { cacheDO, storage } = createCacheDO();
     await cacheDO.putEntry('model:old', classification);
-    await cacheDO.addPendingClassifierCost(0.03);
     vi.advanceTimersByTime(31 * 60 * 1000);
     await cacheDO.putEntry('model:fresh', classification);
 
     storage.clearAlarmForTest();
     await cacheDO.alarm();
 
-    expect([...storage.entries.keys()]).toEqual(['pending-cost', 'model:fresh']);
+    expect([...storage.entries.keys()]).toEqual(['model:fresh']);
     await expect(storage.getAlarm()).resolves.not.toBeNull();
   });
 
   it('stops rescheduling once the sweep leaves no entries', async () => {
     const { cacheDO, storage } = createCacheDO();
-    await cacheDO.addPendingClassifierCost(0.03);
-    vi.advanceTimersByTime(7 * 24 * 60 * 60 * 1000 + 1);
+    await cacheDO.putEntry('model:old', classification);
+    vi.advanceTimersByTime(31 * 60 * 1000);
 
     storage.clearAlarmForTest();
     await cacheDO.alarm();
@@ -198,8 +233,125 @@ describe('AutoRoutingDecisionCacheDO', () => {
   });
 });
 
+describe('classifier usage retries', () => {
+  it('persists before delivery and retries failures with the same event until recorded', async () => {
+    const { cacheDO, storage } = createCacheDO();
+    const usage = await classifierUsage();
+    const key = `usage:${usage.core.id}`;
+    fetchMock.mockImplementationOnce(async () => {
+      expect(storage.entries.has(key)).toBe(true);
+      throw new Error('connection lost');
+    });
+    await cacheDO.recordClassifierUsage(usage);
+    expect(storage.entries.get(key)).toMatchObject({ usage, attempts: 1 });
+    await expect(storage.getAlarm()).resolves.toBe(Date.now() + 1000);
+
+    fetchMock.mockResolvedValueOnce(Response.json({ status: 'not_recorded', result: null }));
+    vi.advanceTimersByTime(1000);
+    storage.clearAlarmForTest();
+    await cacheDO.alarm();
+    expect(storage.entries.get(key)).toMatchObject({ attempts: 2 });
+    await expect(storage.getAlarm()).resolves.toBe(Date.now() + 2000);
+
+    fetchMock.mockResolvedValueOnce(
+      Response.json({
+        status: 'recorded',
+        result: {
+          usageId: usage.core.id,
+          createdAt: usage.core.created_at,
+          newMicrodollarsUsed: usage.core.cost,
+        },
+      })
+    );
+    vi.advanceTimersByTime(2000);
+    storage.clearAlarmForTest();
+    await cacheDO.alarm();
+    expect(storage.entries.has(key)).toBe(false);
+    await expect(storage.getAlarm()).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(JSON.parse(String(init?.body))).toEqual(usage);
+    }
+  });
+
+  it('accepts duplicate acknowledgement after a lost recorded response and stops retries', async () => {
+    const { cacheDO, storage } = createCacheDO();
+    const usage = await classifierUsage();
+    fetchMock.mockRejectedValueOnce(new Error('response lost after commit'));
+    await cacheDO.recordClassifierUsage(usage);
+    fetchMock.mockResolvedValueOnce(
+      Response.json({
+        status: 'duplicate',
+        result: {
+          usageId: usage.core.id,
+          createdAt: usage.core.created_at,
+          newMicrodollarsUsed: null,
+        },
+      })
+    );
+    vi.advanceTimersByTime(1000);
+    storage.clearAlarmForTest();
+    await cacheDO.alarm();
+    expect(storage.entries.has(`usage:${usage.core.id}`)).toBe(false);
+    vi.advanceTimersByTime(60 * 60 * 1000);
+    storage.clearAlarmForTest();
+    await cacheDO.alarm();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await expect(storage.getAlarm()).resolves.toBeNull();
+  });
+
+  it('multiplexes retries and TTL sweeps without expiring usage events', async () => {
+    const { cacheDO, storage } = createCacheDO();
+    await cacheDO.putEntry('model:hash', classification);
+    const sweepAt = Date.now() + 30 * 60 * 1000;
+    const usage = await classifierUsage();
+    fetchMock.mockResolvedValue(Response.json({ status: 'not_recorded', result: null }));
+    await cacheDO.recordClassifierUsage(usage);
+    await expect(storage.getAlarm()).resolves.toBe(Date.now() + 1000);
+
+    const key = `usage:${usage.core.id}`;
+    const retryAt = Date.now() + 40 * 60 * 1000;
+    storage.entries.set(key, {
+      usage,
+      attempts: 1,
+      firstAttemptAt: Date.now(),
+      nextAttemptAt: retryAt,
+    });
+    storage.clearAlarmForTest();
+    vi.setSystemTime(sweepAt);
+    await cacheDO.alarm();
+    expect(storage.entries.has('model:hash')).toBe(false);
+    expect(storage.entries.has(key)).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await expect(storage.getAlarm()).resolves.toBe(retryAt);
+
+    vi.setSystemTime(retryAt);
+    storage.clearAlarmForTest();
+    await cacheDO.alarm();
+    expect(storage.entries.get(key)).toMatchObject({ attempts: 2, usage });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await expect(storage.getAlarm()).resolves.toBe(retryAt + 2000);
+  });
+
+  it('logs and removes writes still unavailable at the retry horizon', async () => {
+    const { cacheDO, storage } = createCacheDO();
+    const usage = await classifierUsage();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchMock.mockResolvedValue(Response.json({ status: 'not_recorded', result: null }));
+    await cacheDO.recordClassifierUsage(usage);
+    vi.advanceTimersByTime(24 * 60 * 60 * 1000);
+    storage.clearAlarmForTest();
+    await cacheDO.alarm();
+    expect(storage.entries.has(`usage:${usage.core.id}`)).toBe(false);
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('\"event\":\"auto_routing_classifier_usage_dropped\"')
+    );
+    await expect(storage.getAlarm()).resolves.toBeNull();
+  });
+});
+
 describe('conversation state', () => {
-  it('rejects older sticky writes without dropping their classification or pending cost', async () => {
+  it('rejects older sticky writes without dropping their classification', async () => {
     const { env, readState } = createCacheEnv();
     const older = Date.now();
     vi.advanceTimersByTime(1);
@@ -207,11 +359,9 @@ describe('conversation state', () => {
     await putStickyDecision(env, 'conversation-1', 'new/chat', null, 'new/route', newer);
     await putStickyDecision(env, 'conversation-1', 'old/chat', null, 'old/route', older);
     await putCachedClassification(env, 'conversation-1', 'hash', 'model', classification);
-    await addPendingClassifierCost(env, 'conversation-1', 0.03);
-    const state = await readState(true);
+    const state = await readState();
     expect(state.sticky?.model).toBe('new/chat');
     expect(state.classification).toEqual(classification);
-    expect(state.pendingCostUsd).toBe(0.03);
   });
 
   it('accepts the last sticky write when request start times are equal', async () => {
@@ -222,20 +372,11 @@ describe('conversation state', () => {
     expect((await readState()).sticky?.model).toBe('last/chat');
   });
 
-  it('does not write when reading a conversation without pending cost', async () => {
+  it('does not write when reading a conversation', async () => {
     const { cacheDO, storage } = createCacheDO();
-    await cacheDO.readConversationState('model:hash', true);
+    await cacheDO.readConversationState('model:hash');
     expect(storage.put).not.toHaveBeenCalled();
     expect(storage.delete).not.toHaveBeenCalled();
-  });
-
-  it('keeps unpaid cost across the cache TTL when adding another increment', async () => {
-    const { env, cacheDO, readState } = createCacheEnv();
-    await addPendingClassifierCost(env, 'conversation-1', 0.03);
-    vi.advanceTimersByTime(31 * 60 * 1000);
-    await cacheDO.alarm();
-    await addPendingClassifierCost(env, 'conversation-1', 0.02);
-    expect((await readState(true)).pendingCostUsd).toBe(0.05);
   });
 
   it('makes exactly one RPC on each cold and hot read', async () => {
@@ -246,39 +387,6 @@ describe('conversation state', () => {
     expect(readRpc).toHaveBeenCalledTimes(1);
     expect((await readState()).classification).toEqual(classification);
     expect(readRpc).toHaveBeenCalledTimes(2);
-  });
-
-  it('consumes pending cost exactly once under concurrent reads', async () => {
-    const { env, readState, storage } = createCacheEnv();
-    await addPendingClassifierCost(env, 'conversation-1', 0.03);
-
-    const states = await Promise.all([readState(true), readState(true)]);
-
-    expect(states.map(state => state.pendingCostUsd).sort()).toEqual([0, 0.03]);
-    expect(storage.entries.has('pending-cost')).toBe(false);
-    expect((await readState(true)).pendingCostUsd).toBe(0);
-  });
-
-  it('adds concurrent increments and preserves cost until a consumer claims it', async () => {
-    const { env, readState } = createCacheEnv();
-    await Promise.all([
-      addPendingClassifierCost(env, 'conversation-1', 0.02),
-      addPendingClassifierCost(env, 'conversation-1', 0.03),
-      addPendingClassifierCost(env, 'conversation-1', 0.04),
-    ]);
-
-    expect((await readState()).pendingCostUsd).toBeCloseTo(0.09);
-    expect((await readState(true)).pendingCostUsd).toBeCloseTo(0.09);
-    expect((await readState(true)).pendingCostUsd).toBe(0);
-  });
-
-  it('does not carry expired pending cost into a new increment', async () => {
-    const { env, readState } = createCacheEnv();
-    await addPendingClassifierCost(env, 'conversation-1', 0.03);
-    vi.advanceTimersByTime(7 * 24 * 60 * 60 * 1000 + 1);
-    await addPendingClassifierCost(env, 'conversation-1', 0.02);
-
-    expect((await readState(true)).pendingCostUsd).toBe(0.02);
   });
 
   it('serves a hot classification while reading the latest sticky from storage', async () => {
@@ -301,7 +409,6 @@ describe('conversation state', () => {
         variant: 'thinking',
         routeKey: 'implementation/code_generation',
       },
-      pendingCostUsd: 0,
     });
 
     await putStickyDecision(
@@ -328,11 +435,9 @@ describe('conversation state', () => {
       1
     );
 
-    const state = await readConversationState(second.env, 'conversation-2', 'hash', 'model', {
-      consumePendingCost: false,
-    });
+    const state = await readConversationState(second.env, 'conversation-2', 'hash', 'model');
 
-    expect(state).toEqual({ classification, sticky: null, pendingCostUsd: 0 });
+    expect(state).toEqual({ classification, sticky: null });
     expect(second.readRpc).toHaveBeenCalledTimes(1);
   });
 
@@ -354,11 +459,7 @@ describe('conversation state', () => {
     storage.entries.delete('model:hash');
     expect((await readState()).classification).toEqual(classification);
     expect(
-      (
-        await readConversationState(env, 'conversation-1', 'hash', 'other-model', {
-          consumePendingCost: false,
-        })
-      ).classification
+      (await readConversationState(env, 'conversation-1', 'hash', 'other-model')).classification
     ).toBeNull();
 
     vi.advanceTimersByTime(31 * 60 * 1000);
@@ -376,26 +477,21 @@ describe('conversation state', () => {
       1
     );
     storage.entries.set('model:hash', { value: { nope: true }, storedAt: Date.now() });
-    storage.entries.set('pending-cost', { value: 'invalid', storedAt: Date.now() });
 
-    expect(await readState(true)).toEqual({
+    expect(await readState()).toEqual({
       classification: null,
       sticky: { model: 'mid/chat', variant: null, routeKey: 'implementation/code_generation' },
-      pendingCostUsd: 0,
     });
-    expect(storage.entries.has('pending-cost')).toBe(false);
   });
 
-  it('returns null for invalid sticky shapes while keeping valid classification and cost', async () => {
+  it('returns null for invalid sticky shapes while keeping valid classification', async () => {
     const { env, storage, readState } = createCacheEnv();
     await putCachedClassification(env, 'conversation-1', 'hash', 'model', classification);
-    await addPendingClassifierCost(env, 'conversation-1', 0.03);
     storage.entries.set('sticky', { value: { nope: true }, storedAt: Date.now() });
 
-    expect(await readState(true)).toEqual({
+    expect(await readState()).toEqual({
       classification,
       sticky: null,
-      pendingCostUsd: 0.03,
     });
   });
 
@@ -415,10 +511,9 @@ describe('conversation state', () => {
     await putCachedClassification(env, 'conversation-1', 'hash', 'model', classification);
     readRpc.mockRejectedValueOnce(new Error('DO unavailable'));
 
-    await expect(readState(true)).resolves.toEqual({
+    await expect(readState()).resolves.toEqual({
       classification: null,
       sticky: null,
-      pendingCostUsd: 0,
     });
   });
 });

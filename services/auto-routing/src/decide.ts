@@ -161,6 +161,17 @@ function classifierErrorStatus(error: unknown): `classifier_error:${string}` {
 
 // Per-request fields shared by every metrics write and log line for the
 // decision: the validated payload plus everything derived from it once.
+type DecisionTimings = {
+  codingPlanMs: number;
+  settingsMs: number;
+  capabilitiesMs: number | null;
+  tableMs: number | null;
+  prepMs: number;
+  cacheReadMs: number;
+  classifierMs: number | null;
+  totalMs: number;
+};
+
 type DecisionContext = {
   payload: MirrorPayload;
   hashes: ContentHashes;
@@ -171,6 +182,7 @@ type DecisionContext = {
   reqSeq: number;
   colo: string | null;
   successSampleRate: number;
+  timings: DecisionTimings;
 };
 
 type DecisionOutcome =
@@ -244,6 +256,7 @@ function recordDecision(
   incumbent: StickyDecision | null = null
 ): void {
   const summary = summarizeOutcome(outcome);
+  summary.details.timings = { ...ctx.timings, totalMs: durationMs };
 
   writeClassifierMetricsDataPoint(env, {
     status: summary.status,
@@ -340,8 +353,20 @@ export const decideHandler: Handler<HonoEnv> = async c => {
 
   const payload = parsed.data;
   const startedAt = performance.now();
+  const timings: DecisionTimings = {
+    codingPlanMs: 0,
+    settingsMs: 0,
+    capabilitiesMs: null,
+    tableMs: null,
+    prepMs: 0,
+    cacheReadMs: 0,
+    classifierMs: null,
+    totalMs: 0,
+  };
   const deniedModelIds = new Set(payload.routingPolicy?.deniedModelIds ?? []);
+  const codingPlanStartedAt = performance.now();
   const codingPlanPreference = await getCodingPlanPreference(c.env, payload.userId);
+  timings.codingPlanMs = performance.now() - codingPlanStartedAt;
   const codingPlanActive =
     codingPlanPreference.active && !deniedModelIds.has(codingPlanPreference.modelId);
   // Narrow once: `constraints` is only non-undefined inside the branches
@@ -368,13 +393,16 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   const routingPrerequisites = (async () => {
     // Resolve settings before the single capability load so custom-pool
     // model ids are included. Classification does not depend on either.
+    const settingsStartedAt = performance.now();
     const effectiveSettings = await getEffectiveAutoRoutingSettings(c.env, {
       userId: payload.userId,
       organizationId: payload.organizationId,
     });
+    timings.settingsMs = performance.now() - settingsStartedAt;
     const configuredPool = effectiveSettings.pool;
     let capabilities: ModelCapabilitiesMap = new Map();
     if (hasConstraints || configuredPool !== null) {
+      const capabilitiesStartedAt = performance.now();
       capabilities = await getModelCapabilities(c.env, {
         codingPlanModelId: codingPlanActive ? codingPlanPreference.modelId : null,
         waitUntil: promise => c.executionCtx.waitUntil(promise),
@@ -382,6 +410,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
           ? { additionalModelIds: configuredPool.map(entry => entry.model) }
           : {}),
       });
+      timings.capabilitiesMs = performance.now() - capabilitiesStartedAt;
     }
 
     const codingPlanEligible =
@@ -390,11 +419,13 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       modelSatisfiesConstraints(capabilities.get(codingPlanPreference.modelId), constraints);
     // Eligible coding plans need neither a custom table nor paid inference.
     // Null pool retains the platform table and null-table fallback semantics.
+    const tableStartedAt = performance.now();
     const routingTable = codingPlanEligible
       ? null
       : await (configuredPool === null
           ? getRoutingTable(c.env)
           : loadCustomRoutingTable(c.env, configuredPool));
+    if (!codingPlanEligible) timings.tableMs = performance.now() - tableStartedAt;
     return {
       configuredPool,
       routingMode: effectiveSettings.mode,
@@ -418,12 +449,14 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       return codingPlanDefaultDecision(codingPlanPreference);
     }
 
+    const prepStartedAt = performance.now();
     const [hashes, userIdHash, classifierModel, successSampleRate] = await Promise.all([
       computeContentHashes(payload.input),
       hashIdentifierForTelemetry(payload.userId),
       getClassifierModel(c.env),
       getDecisionLogSampleRate(c.env),
     ]);
+    timings.prepMs = performance.now() - prepStartedAt;
     const ctx: DecisionContext = {
       payload,
       hashes,
@@ -432,12 +465,15 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       reqSeq: isolateRequestSeq++,
       colo: (c.req.raw.cf?.colo as string | undefined) ?? null,
       successSampleRate,
+      timings,
     };
     // Both live in the conversation's Durable Object; fetch them together.
+    const cacheReadStartedAt = performance.now();
     const [cached, sticky] = await Promise.all([
       getCachedClassification(c.env, ctx.conversationKey, hashes.exact, classifierModel),
       getStickyDecision(c.env, ctx.conversationKey),
     ]);
+    timings.cacheReadMs = performance.now() - cacheReadStartedAt;
     if (cached) {
       return {
         ctx,
@@ -446,6 +482,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       };
     }
 
+    const classifierStartedAt = performance.now();
     try {
       const classifier = await classifyNormalizedInput(c.env, payload.input, classifierModel);
       return { ctx, sticky, outcome: { kind: 'model', classifier } };
@@ -453,6 +490,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       // Handle rejection immediately, even while routing prerequisites are
       // still pending; billed failure metadata is consumed below as before.
       return { ctx, sticky, outcome: { kind: 'error', error } };
+    } finally {
+      timings.classifierMs = performance.now() - classifierStartedAt;
     }
   })();
 

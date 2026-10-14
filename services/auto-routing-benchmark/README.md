@@ -60,6 +60,32 @@ Expand a route to inspect every ranked model/effort pair.
 - The ranking policy version is part of every registry table version, so a policy change republishes.
 
 
+## Scoreboard
+
+Build a versioned latency, cost, and quality scoreboard without changing routing:
+
+```bash
+pnpm --filter auto-routing-benchmark scoreboard build --label baseline --table table.json --prod prod.json --replay replay.json --out baseline.json
+pnpm --filter auto-routing-benchmark scoreboard build --label candidate --table live --prod prod.json --replay replay.json --out candidate.json
+pnpm --filter auto-routing-benchmark scoreboard compare baseline.json candidate.json
+pnpm --filter auto-routing-benchmark scoreboard compare baseline.json candidate.json --relative-only
+```
+
+`--table` defaults to `live`, which reads the latest published platform table and
+the current classifier winner from remote D1 through Wrangler. File inputs are
+validated; table candidates may include optional nullable `p50LatencyMs`. Live
+latency comes from each exact model/variant's ready, current-engine/repetition
+registry profile and its measuring-run summary for that route, or is null if absent.
+Production and replay inputs are optional. Without production input, benchmark
+weights are uniform over table routes; otherwise they use the observed route mix.
+Missing routes and null metrics are excluded and the remaining weights normalized.
+Quality is benchmark accuracy and classifier route accuracy, not a held-out score.
+`benchmarkP50Weighted` is the weighted benchmark model latency, not production TTFT.
+Use `--relative-only` for PR bodies so raw production measurements stay local.
+Unavailable comparisons are `n/a`; rows unavailable on both sides are omitted.
+Axis summaries are `mixed` only when metrics both improve and worsen, and `flat`
+when no comparable metric improves or worsens.
+
 ## Admin endpoints
 
 All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`

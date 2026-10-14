@@ -477,6 +477,7 @@ export function getSidebarWorktreeActivity(
           ? [getSidebarSessionStatus({ ...session, sessionStatus: activeStatus })]
           : [
               getSidebarSessionStatus({ ...session, sessionStatus: storedStatus }),
+              session.latestRunFailureKind &&
               session.latestRunTerminalAt &&
               getSidebarSessionStatus(session) === session.latestRunFailureKind
                 ? null
@@ -529,6 +530,11 @@ export function patchSidebarWorktreeSessionStatus(
         session.sessionId === update.sessionId
           ? {
               ...session,
+              ...getSidebarRunOutcomeAfterStatus(
+                session,
+                update.sessionStatus,
+                update.sessionStatusUpdatedAt
+              ),
               sessionStatus: update.sessionStatus ?? null,
               sessionStatusUpdatedAt: update.sessionStatusUpdatedAt ?? null,
               updatedAt: update.updatedAt ?? session.updatedAt,
@@ -574,6 +580,20 @@ export function sessionCacheKey(s: {
  */
 const REVIEW_DECISION_POLL_INTERVAL_MS = 5_000;
 
+export function getSidebarWorktreeRefetchInterval(
+  data: WorktreeDetailsQueryData | undefined,
+  hasVisibleCloudSession = false
+): number | false {
+  if (!data) return false;
+  const details = Object.values(data.worktrees);
+  if (details.some(worktree => worktree.prSession?.associatedPr?.reviewDecisionPending === true))
+    return REVIEW_DECISION_POLL_INTERVAL_MS;
+  return hasVisibleCloudSession ||
+    details.some(worktree => worktree.sessions.some(session => session.latest_run_status != null))
+    ? SIDEBAR_RECONCILE_DELAY_MS
+    : false;
+}
+
 type SidebarSessionFilters = {
   organizationId?: string | null;
   createdOnPlatform?: string | string[];
@@ -616,23 +636,58 @@ export function sortSidebarDbSessions(
   return [...sessions].sort(compareDbSessionsByUpdatedAtDesc);
 }
 
+export function getSidebarRunOutcomeAfterStatus(
+  session: Pick<
+    DbSessionV2,
+    'latest_run_status' | 'latest_run_failure_kind' | 'latest_run_terminal_at'
+  >,
+  status: string | null | undefined,
+  statusUpdatedAt: Date | string | null | undefined
+) {
+  if (
+    status === 'busy' &&
+    session.latest_run_failure_kind &&
+    session.latest_run_terminal_at &&
+    statusUpdatedAt &&
+    new Date(statusUpdatedAt).getTime() > new Date(session.latest_run_terminal_at).getTime()
+  ) {
+    return {
+      latest_run_status: null,
+      latest_run_failure_kind: null,
+      latest_run_terminal_at: null,
+    };
+  }
+  return {
+    latest_run_status: session.latest_run_status ?? null,
+    latest_run_failure_kind: session.latest_run_failure_kind ?? null,
+    latest_run_terminal_at: session.latest_run_terminal_at ?? null,
+  };
+}
+
 function mergeSidebarDbSession(
   existing: DbSession | DbSessionV2 | undefined,
   next: DbSessionV2
 ): DbSessionV2 {
   if (!existing) return next;
 
+  const previousOutcome = getSidebarRunOutcomeAfterStatus(
+    existing,
+    next.status,
+    next.status_updated_at
+  );
   const merged = {
     ...next,
     latest_run_status:
-      next.latest_run_status === undefined ? existing.latest_run_status : next.latest_run_status,
+      next.latest_run_status === undefined
+        ? previousOutcome.latest_run_status
+        : next.latest_run_status,
     latest_run_failure_kind:
       next.latest_run_failure_kind === undefined
-        ? existing.latest_run_failure_kind
+        ? previousOutcome.latest_run_failure_kind
         : next.latest_run_failure_kind,
     latest_run_terminal_at:
       next.latest_run_terminal_at === undefined
-        ? existing.latest_run_terminal_at
+        ? previousOutcome.latest_run_terminal_at
         : next.latest_run_terminal_at,
     cloud_agent_session_id: existing.cloud_agent_session_id ?? next.cloud_agent_session_id,
     cloud_agent_worktree_id:
@@ -1069,9 +1124,11 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
               cloud_agent_worktree_id:
                 session.cloud_agent_worktree_id ?? existing.cloud_agent_worktree_id ?? null,
               associatedPr: existing.associatedPr ?? session.associatedPr,
-              latest_run_status: existing.latest_run_status,
-              latest_run_failure_kind: existing.latest_run_failure_kind,
-              latest_run_terminal_at: existing.latest_run_terminal_at,
+              ...getSidebarRunOutcomeAfterStatus(
+                existing,
+                session.status,
+                session.status_updated_at
+              ),
             }
           : session;
         const shouldKeep =
@@ -1104,6 +1161,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
         const withoutSession = current.results.filter(row => row.session_id !== payload.sessionId);
         const updated = {
           ...existing,
+          ...getSidebarRunOutcomeAfterStatus(existing, payload.status, payload.statusUpdatedAt),
           status: payload.status,
           status_updated_at: payload.statusUpdatedAt,
           updated_at: payload.updatedAt ?? existing.updated_at,
@@ -1170,6 +1228,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
               s.session_id === payload.sessionId
                 ? {
                     ...s,
+                    ...getSidebarRunOutcomeAfterStatus(s, payload.status, payload.statusUpdatedAt),
                     status: payload.status,
                     status_updated_at: payload.statusUpdatedAt
                       ? new Date(payload.statusUpdatedAt)
@@ -1244,11 +1303,14 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
         {
           staleTime: 5000,
           refetchInterval: query =>
-            Object.values(query.state.data?.worktrees ?? {}).some(
-              details => details.prSession?.associatedPr?.reviewDecisionPending === true
-            )
-              ? REVIEW_DECISION_POLL_INTERVAL_MS
-              : SIDEBAR_RECONCILE_DELAY_MS,
+            getSidebarWorktreeRefetchInterval(
+              query.state.data,
+              sessions.some(
+                session =>
+                  session.cloudAgentSessionId &&
+                  worktreeIds.some(worktreeId => worktreeId === session.worktreeId)
+              )
+            ),
         }
       )
     ),

@@ -18,10 +18,12 @@ import {
   eventRowMatchesSidebarFilters,
   eventRowToDbSession,
   getRunningSessionSortTime,
+  getSidebarRunOutcomeAfterStatus,
   getSidebarSessionStatus,
   getSidebarWorktreeActivity,
   getSidebarWorktreeLabel,
   getSidebarWorktreePrSession,
+  getSidebarWorktreeRefetchInterval,
   groupSidebarSessions,
   groupSidebarSessionsByDate,
   mergeWorktreeChatSessions,
@@ -448,6 +450,98 @@ describe('useSidebarSessions live update helpers', () => {
         status: 'busy',
       }).status
     ).toBe('busy');
+  });
+
+  it.each(['busy', 'retry'])(
+    'preserves live %s after a terminal run without a failure or stored status',
+    status => {
+      const session = makeStoredSession('ses_root', '2026-01-03T12:00:00.000Z', {
+        sessionStatus: null,
+        latestRunFailureKind: null,
+        latestRunTerminalAt: '2026-01-03T12:01:00.000Z',
+      });
+      expect(getSidebarWorktreeActivity([session], new Map([['ses_root', status]])).status).toBe(
+        status
+      );
+    }
+  );
+
+  it.each(['failed', 'system_interrupted'] as const)(
+    'does not restore obsolete %s after a newer busy run returns to idle',
+    failureKind => {
+      const cached: DbSessionV2 = {
+        ...makeDbSession('ses_root', '2026-01-03T12:00:00.000Z'),
+        latest_run_status: failureKind === 'failed' ? 'failed' : 'interrupted',
+        latest_run_failure_kind: failureKind,
+        latest_run_terminal_at: '2026-01-03T12:01:00.000Z',
+      };
+      const [running] = upsertSidebarDbSession(
+        [cached],
+        eventRowToDbSession(
+          makeEventRow({ status: 'busy', statusUpdatedAt: '2026-01-03T12:02:00.000Z' })
+        )
+      );
+      const [completed] = upsertSidebarDbSession(
+        [running],
+        eventRowToDbSession(
+          makeEventRow({ status: 'idle', statusUpdatedAt: '2026-01-03T12:03:00.000Z' })
+        )
+      );
+      expect(completed.latest_run_failure_kind).toBeNull();
+      expect(getSidebarSessionStatus(dbSessionToStoredSession(completed))).toBe('idle');
+      expect(cached.latest_run_failure_kind).toBe(failureKind);
+    }
+  );
+
+  describe('getSidebarRunOutcomeAfterStatus', () => {
+    const failure = {
+      latest_run_status: 'failed' as const,
+      latest_run_failure_kind: 'failed' as const,
+      latest_run_terminal_at: '2026-01-03T12:01:00.000Z',
+    };
+
+    it.each([
+      ['idle', '2026-01-03T12:02:00.000Z'],
+      ['retry', '2026-01-03T12:02:00.000Z'],
+      ['busy', '2026-01-03T12:00:00.000Z'],
+      ['busy', '2026-01-03T12:01:00.000Z'],
+      ['busy', null],
+      ['busy', 'invalid'],
+    ])('preserves a real failure for %s observed at %s', (status, statusUpdatedAt) => {
+      expect(getSidebarRunOutcomeAfterStatus(failure, status, statusUpdatedAt)).toEqual(failure);
+    });
+
+    it('preserves failure when the terminal timestamp is absent or invalid', () => {
+      for (const latest_run_terminal_at of [null, 'invalid']) {
+        const session = { ...failure, latest_run_terminal_at };
+        expect(
+          getSidebarRunOutcomeAfterStatus(session, 'busy', '2026-01-03T12:02:00.000Z')
+        ).toEqual(session);
+      }
+    });
+
+    it('clears the whole cached outcome only after demonstrably newer busy activity', () => {
+      expect(
+        getSidebarRunOutcomeAfterStatus(failure, 'busy', new Date('2026-01-03T12:02:00.000Z'))
+      ).toEqual({
+        latest_run_status: null,
+        latest_run_failure_kind: null,
+        latest_run_terminal_at: null,
+      });
+    });
+
+    it('does not clear an explicitly supplied authoritative failure', () => {
+      const previous: DbSessionV2 = {
+        ...makeDbSession('ses_root', '2026-01-03T12:00:00.000Z'),
+        ...failure,
+      };
+      const incoming: DbSessionV2 = {
+        ...previous,
+        status: 'busy',
+        status_updated_at: new Date('2026-01-03T12:02:00.000Z'),
+      };
+      expect(upsertSidebarDbSession([previous], incoming)[0]).toMatchObject(failure);
+    });
   });
 
   it('preserves updated_at descending order when patching a visible row', () => {
@@ -1531,6 +1625,64 @@ describe('useSidebarSessions live update helpers', () => {
         },
       },
     } satisfies Parameters<typeof patchSidebarWorktreeSessionStatus>[0];
+
+    it('does not revive a hidden chat failure after a newer busy-to-idle transition', () => {
+      const failed = {
+        worktrees: {
+          worktree_shared: {
+            ...initial.worktrees.worktree_shared,
+            sessions: [
+              {
+                ...initial.worktrees.worktree_shared.sessions[0],
+                latest_run_status: 'failed' as const,
+                latest_run_failure_kind: 'failed' as const,
+                latest_run_terminal_at: '2026-01-03T12:01:00.000Z',
+              },
+            ],
+          },
+        },
+      };
+      const running = patchSidebarWorktreeSessionStatus(failed, {
+        sessionId: 'ses_hidden',
+        sessionStatus: 'busy',
+        sessionStatusUpdatedAt: '2026-01-03T12:02:00.000Z',
+      });
+      const completed = patchSidebarWorktreeSessionStatus(running, {
+        sessionId: 'ses_hidden',
+        sessionStatus: 'idle',
+        sessionStatusUpdatedAt: '2026-01-03T12:03:00.000Z',
+      });
+      expect(completed.worktrees.worktree_shared.sessions[0].latest_run_failure_kind).toBeNull();
+      expect(failed.worktrees.worktree_shared.sessions[0].latest_run_failure_kind).toBe('failed');
+    });
+
+    it('does not poll unloaded, empty, or CLI-only worktree batches', () => {
+      expect(getSidebarWorktreeRefetchInterval(undefined)).toBe(false);
+      expect(getSidebarWorktreeRefetchInterval(undefined, true)).toBe(false);
+      expect(getSidebarWorktreeRefetchInterval({ worktrees: {} })).toBe(false);
+      expect(getSidebarWorktreeRefetchInterval(initial)).toBe(false);
+    });
+
+    it('polls a visible Cloud Agent even before its first run telemetry arrives', () => {
+      expect(getSidebarWorktreeRefetchInterval(initial, true)).toBe(SIDEBAR_RECONCILE_DELAY_MS);
+    });
+
+    it('polls hidden chats that have Cloud Agent run telemetry', () => {
+      const data = {
+        worktrees: {
+          worktree_shared: {
+            ...initial.worktrees.worktree_shared,
+            sessions: [
+              {
+                ...initial.worktrees.worktree_shared.sessions[0],
+                latest_run_status: 'completed' as const,
+              },
+            ],
+          },
+        },
+      };
+      expect(getSidebarWorktreeRefetchInterval(data)).toBe(SIDEBAR_RECONCILE_DELAY_MS);
+    });
 
     it('refreshes activity recency even when the stored status has not changed', () => {
       const updated = patchSidebarWorktreeSessionStatus(initial, {

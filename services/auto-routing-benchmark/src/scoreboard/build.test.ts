@@ -123,7 +123,7 @@ describe('buildScoreboard', () => {
       pairs,
       summaries: summarizeSweep(pairs),
     };
-    const result = build(table, prod({ [route]: 1 }), null, {
+    const result = build({ ...table, minAccuracy: 0.99 }, prod({ [route]: 1 }), null, {
       sweep,
       rebuildFromSweep: true,
       complexityLabels: Object.fromEntries(

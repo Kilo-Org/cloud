@@ -106,6 +106,7 @@ describe('buildEffortByComplexity', () => {
   ])(
     'uses noise band $accuracyNoiseBand consistently for route and complexity rankings',
     ({ accuracyNoiseBand, expectedVariant }) => {
+      const minAccuracy = 0.99;
       const measured = pairs().map(pair => ({
         ...pair,
         results: pair.results.map(result => ({
@@ -123,7 +124,7 @@ describe('buildEffortByComplexity', () => {
       );
       const params = {
         generatedAt: '2026-01-01T00:00:00.000Z',
-        minAccuracy: 0.9,
+        minAccuracy,
         accuracyNoiseBand,
         switchCostFactor: 3,
         bestAccuracySwitchThreshold: 0.05,
@@ -151,7 +152,9 @@ describe('buildEffortByComplexity', () => {
         expect(table?.effortByComplexity?.[route]?.['model/shared']?.high).toBe(expectedVariant);
       }
       expect(
-        buildEffortByComplexity(routes, measured, labels, 0.9, null, accuracyNoiseBand)[route]
+        buildEffortByComplexity(
+          platform.routes, measured, labels, minAccuracy, null, accuracyNoiseBand
+        )[route]
       ).toEqual(platform.effortByComplexity?.[route]);
     }
   );

@@ -615,7 +615,7 @@ function CreditsPageContent() {
             <Info className="text-muted-foreground mt-0.5 size-4 shrink-0" />
             <p className="type-label text-muted-foreground">
               Credits are non-refundable. For questions about billing or credits, please{' '}
-              <Link href="mailto:hi@kilocode.ai" className="text-blue-400 hover:underline">
+              <Link href="mailto:hi@kilo.ai" className="text-blue-400 hover:underline">
                 contact support
               </Link>
               .

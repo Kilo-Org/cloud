@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Përditëso aplikacionin GitHub"
       },
       "githubIpAllowList": {
-        "description": "Shqyrtuesi i kodit u çaktivizua sepse kjo organizatë në GitHub përdor një listë adresash IP të lejuara që bllokon Kilo. Kontakto hi@kilocode.ai për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
+        "description": "Shqyrtuesi i kodit u çaktivizua sepse kjo organizatë në GitHub përdor një listë adresash IP të lejuara që bllokon Kilo. Kontakto hi@kilo.ai për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
       },
       "gitlabProjectAccessRequired": {
         "description": "Shqyrtuesi i kodit u çaktivizua sepse Kilo nuk mund të krijojë një token qasjeje për këtë projekt në GitLab. Jep qasje me rolin e mirëmbajtësit ose aktivizo tokenët e qasjes në projekt, pastaj aktivizo përsëri shqyrtuesin e kodit.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Përditëso cilësimet e shqyrtuesit të kodit"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Shqyrtuesi i kodit u çaktivizua pasi klonimi i depos tejkaloi kohën e lejuar tri herë sot. Kontakto hi@kilocode.ai për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
+        "description": "Shqyrtuesi i kodit u çaktivizua pasi klonimi i depos tejkaloi kohën e lejuar tri herë sot. Kontakto hi@kilo.ai për ndihmë, pastaj aktivizo përsëri shqyrtuesin e kodit."
       },
       "title": "Shqyrtuesi i kodit kërkon vëmendje.",
       "recoveryLabel": "Kontakto mbështetjen"

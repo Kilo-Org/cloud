@@ -1040,7 +1040,7 @@
         "recoveryLabel": "更新 GitHub App"
       },
       "githubIpAllowList": {
-        "description": "程式碼審查員已停用，因為此 GitHub 組織使用會封鎖 Kilo 的 IP 允許清單。請聯絡 hi@kilocode.ai 尋求協助，然後重新啟用程式碼審查員。"
+        "description": "程式碼審查員已停用，因為此 GitHub 組織使用會封鎖 Kilo 的 IP 允許清單。請聯絡 hi@kilo.ai 尋求協助，然後重新啟用程式碼審查員。"
       },
       "gitlabProjectAccessRequired": {
         "description": "程式碼審查員已停用，因為 Kilo 無法為此專案建立 GitLab 專案存取權杖。請授予維護者權限或啟用專案存取權杖，再重新啟用程式碼審查員。",
@@ -1055,7 +1055,7 @@
         "recoveryLabel": "更新程式碼審查員設定"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "今天複製存放庫時已發生三次逾時，因此程式碼審查員已停用。請聯絡 hi@kilocode.ai 尋求協助，再重新啟用程式碼審查員。"
+        "description": "今天複製存放庫時已發生三次逾時，因此程式碼審查員已停用。請聯絡 hi@kilo.ai 尋求協助，再重新啟用程式碼審查員。"
       },
       "title": "程式碼審查助手有問題需要處理。",
       "recoveryLabel": "聯絡客服"

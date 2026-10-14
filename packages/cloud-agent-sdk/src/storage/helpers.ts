@@ -1,5 +1,86 @@
 import type { Part, TextPart } from '@kilocode/app-shared/opencode';
 import { partSettledAt } from '../part-utils';
+import type { MessageInfo } from '../types';
+
+function orderMessageIds(
+  ids: readonly string[],
+  messages: ReadonlyMap<string, MessageInfo>
+): readonly string[] {
+  const positions = new Map(ids.map((id, index) => [id, index]));
+  const parents = new Map<number, number>();
+  let needsOrdering = false;
+  for (let index = 0; index < ids.length; index += 1) {
+    const info = messages.get(ids[index] ?? '');
+    if (info?.role !== 'assistant') continue;
+    const parentIndex = positions.get(info.parentID);
+    const parent = messages.get(info.parentID);
+    if (
+      parentIndex === undefined ||
+      parentIndex === index ||
+      parent?.sessionID !== info.sessionID
+    ) {
+      continue;
+    }
+    parents.set(index, parentIndex);
+    if (parentIndex > index) needsOrdering = true;
+  }
+  if (!needsOrdering) return ids;
+
+  const children = new Map<number, number[]>();
+  const ready: number[] = [];
+  function enqueue(index: number): void {
+    let position = ready.length;
+    ready.push(index);
+    while (position > 0) {
+      const parentPosition = (position - 1) >>> 1;
+      const parentIndex = ready[parentPosition];
+      if (parentIndex === undefined || parentIndex <= index) break;
+      ready[position] = parentIndex;
+      position = parentPosition;
+    }
+    ready[position] = index;
+  }
+  for (let index = 0; index < ids.length; index += 1) {
+    const parent = parents.get(index);
+    if (parent === undefined) {
+      enqueue(index);
+    } else {
+      const siblings = children.get(parent);
+      if (siblings) siblings.push(index);
+      else children.set(parent, [index]);
+    }
+  }
+
+  const result: string[] = [];
+  const emitted = new Set<number>();
+  while (ready.length > 0) {
+    const index = ready[0];
+    const last = ready.pop();
+    if (index === undefined || last === undefined) break;
+    if (ready.length > 0) {
+      let position = 0;
+      while (position * 2 + 1 < ready.length) {
+        let childPosition = position * 2 + 1;
+        if ((ready[childPosition + 1] ?? Infinity) < (ready[childPosition] ?? Infinity)) {
+          childPosition += 1;
+        }
+        const child = ready[childPosition];
+        if (child === undefined || child >= last) break;
+        ready[position] = child;
+        position = childPosition;
+      }
+      ready[position] = last;
+    }
+    result.push(ids[index] ?? '');
+    emitted.add(index);
+    for (const child of children.get(index) ?? []) enqueue(child);
+  }
+  // Invalid parent cycles cannot satisfy every edge, but must never hide a row.
+  for (let index = 0; index < ids.length; index += 1) {
+    if (!emitted.has(index)) result.push(ids[index] ?? '');
+  }
+  return result;
+}
 
 function insertSorted(arr: string[], id: string): string[] {
   const result = [...arr];
@@ -311,6 +392,7 @@ export {
   forgetPartUpdateTime,
   insertPartSorted,
   insertSorted,
+  orderMessageIds,
   isSupportedDeltaField,
   notify,
   upsertPartDroppingStaleSyntheticParts,

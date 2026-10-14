@@ -417,10 +417,11 @@ describe('auto routing worker', () => {
         });
         const log = vi.spyOn(console, 'log').mockImplementation(() => {});
         if (cacheHit) {
-          cacheGetEntry.mockResolvedValueOnce(mockClassification).mockResolvedValueOnce(null);
+          cacheReadConversationState.mockResolvedValueOnce(conversationState(mockClassification));
         }
         const baseline = await (await decideRequest(mirrorPayload())).json();
         const baselineCalls = {
+          reads: cacheReadConversationState.mock.calls.length,
           writes: cachePutEntry.mock.calls.length,
           classifier: classifyNormalizedInput.mock.calls.length,
           billing: cacheRecordClassifierUsage.mock.calls.length,
@@ -443,6 +444,7 @@ describe('auto routing worker', () => {
         };
         clearClassifierConfigCache();
         log.mockClear();
+        cacheReadConversationState.mockClear();
         cachePutEntry.mockClear();
         classifyNormalizedInput.mockClear();
         cacheRecordClassifierUsage.mockClear();
@@ -450,12 +452,13 @@ describe('auto routing worker', () => {
         writeDataPoint.mockClear();
         configPut.mockClear();
         if (cacheHit) {
-          cacheGetEntry.mockResolvedValueOnce(mockClassification).mockResolvedValueOnce(null);
+          cacheReadConversationState.mockResolvedValueOnce(conversationState(mockClassification));
         }
 
         const response = await decideRequest(mirrorPayload());
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual(baseline);
+        expect(cacheReadConversationState).toHaveBeenCalledTimes(baselineCalls.reads);
         expect(cachePutEntry).toHaveBeenCalledTimes(baselineCalls.writes);
         expect(classifyNormalizedInput).toHaveBeenCalledTimes(baselineCalls.classifier);
         expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(baselineCalls.billing);
@@ -496,7 +499,7 @@ describe('auto routing worker', () => {
       };
       vi.spyOn(classifierConfig, 'getShadowRoutingTable').mockResolvedValue(brokenTable);
       if (cacheHit) {
-        cacheGetEntry.mockResolvedValueOnce(mockClassification).mockResolvedValueOnce(null);
+        cacheReadConversationState.mockResolvedValueOnce(conversationState(mockClassification));
       }
       const response = await decideRequest(mirrorPayload());
       expect(response.status).toBe(200);
@@ -504,6 +507,7 @@ describe('auto routing worker', () => {
         cost: cacheHit ? 0 : mockClassifierResult.cost,
         decision: { model: 'google/gemini-2.5-flash-lite', tableVersion: 'bench-run-1' },
       });
+      expect(cacheReadConversationState).toHaveBeenCalledTimes(1);
       expect(cachePutEntry).toHaveBeenCalledTimes(cacheHit ? 1 : 2);
       expect(
         configPut.mock.calls.filter(
@@ -528,7 +532,7 @@ describe('auto routing worker', () => {
         });
         const log = vi.spyOn(console, 'log').mockImplementation(() => {});
         if (cacheHit) {
-          cacheGetEntry.mockResolvedValueOnce(mockClassification).mockResolvedValueOnce(null);
+          cacheReadConversationState.mockResolvedValueOnce(conversationState(mockClassification));
         }
         const response = await decideRequest(mirrorPayload());
         expect(response.status).toBe(200);
@@ -537,6 +541,7 @@ describe('auto routing worker', () => {
           decision: { model: 'google/gemini-2.5-flash-lite', tableVersion: 'bench-run-1' },
         });
         expect(classifyNormalizedInput).toHaveBeenCalledTimes(cacheHit ? 0 : 1);
+        expect(cacheReadConversationState).toHaveBeenCalledTimes(1);
         expect(cachePutEntry).toHaveBeenCalledTimes(cacheHit ? 1 : 2);
         expect(
           configPut.mock.calls.filter(

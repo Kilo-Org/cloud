@@ -2302,6 +2302,13 @@ export const GatewayModelListConfigSchema = z.object({
 
 export type GatewayModelListConfig = z.infer<typeof GatewayModelListConfigSchema>;
 
+export const VercelModelIdOverrideSchema = z.object({
+  openrouter_model_id: GatewayModelIdSchema,
+  vercel_model_id: GatewayModelIdSchema,
+});
+
+export type VercelModelIdOverrideInput = z.infer<typeof VercelModelIdOverrideSchema>;
+
 // --- StoredModel ---
 
 export const ModelSchema = z.object({

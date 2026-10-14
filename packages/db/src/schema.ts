@@ -5806,6 +5806,18 @@ export const ai_gateway_request_logging_opt_ins = pgTable(
   table => [check('ai_gateway_request_logging_opt_ins_singleton', sql`${table.id} = 1`)]
 );
 
+export const vercel_model_id_overrides = pgTable('vercel_model_id_overrides', {
+  openrouter_model_id: text().primaryKey(),
+  vercel_model_id: text().notNull(),
+  created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => sql`now()`),
+});
+
+export type VercelModelIdOverride = typeof vercel_model_id_overrides.$inferSelect;
+
 export const direct_byok_model_lists = pgTable('direct_byok_model_lists', {
   provider_id: text().primaryKey(),
   models: jsonb().$type<DirectByokModel[]>().notNull(),

@@ -630,6 +630,31 @@ describe('CloudAgentNextClient sandbox selection', () => {
       expect(mutate).toHaveBeenCalledWith(input);
     }
   );
+  it.each([
+    {},
+    { egressMode: 'unrestricted' as const },
+    { egressMode: 'allowlist' as const },
+    { egressMode: 'allowlist' as const, egressAllowlist: [] },
+    { egressMode: 'allowlist' as const, egressAllowlist: ['example.com'] },
+  ])('forwards prepare egress policy unchanged: %j', async policy => {
+    const input: PrepareSessionInput = {
+      githubRepo: 'acme/repo',
+      prompt: 'Build',
+      mode: 'code',
+      model: 'kilo/test-model',
+      ...policy,
+    };
+    const output = {
+      kiloSessionId: 'ses_12345678901234567890123456',
+      cloudAgentSessionId: 'workspace_test',
+    };
+    const mutate = jest
+      .fn<CloudAgentClientModule.CloudAgentNextClient['prepareSession']>()
+      .mockResolvedValue(output);
+    mockCreateTRPCClient.mockReturnValueOnce({ prepareSession: { mutate } });
+    await new CloudAgentNextClient('auth-token').prepareSession(input);
+    expect(mutate).toHaveBeenCalledWith(input);
+  });
 });
 
 describe('CloudAgentNextClient sensitive error reporting', () => {

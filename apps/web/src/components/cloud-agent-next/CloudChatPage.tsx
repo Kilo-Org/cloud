@@ -26,7 +26,7 @@ import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
 import { getWorkspaceControlSession } from './worktree-chat-tabs';
 import { isSandboxStatusEligible } from './sandbox-status';
-import { resolveSessionBranchDisplay } from './session-context-display';
+import { resolveSessionBranch } from './session-context-display';
 import { ChatInput } from './ChatInput';
 import { useSessionComposerFocus } from './useSessionComposerFocus';
 import {
@@ -384,7 +384,7 @@ export default function CloudChatPage({
 
   useCliSessionPresence(fetchedSessionData?.kiloSessionId ?? null);
 
-  const sessionBranchDisplay = resolveSessionBranchDisplay({
+  const sessionBranch = resolveSessionBranch({
     scope: {
       displayedKiloSessionId: sessionIdFromParams,
       displayedWorktreeId: selectedWorktreeId,
@@ -396,8 +396,6 @@ export default function CloudChatPage({
           branch: fetchedSessionData.gitBranch,
         }
       : null,
-    isPreparing:
-      isLoading || cloudStatus?.type === 'preparing' || cloudStatus?.type === 'finalizing',
   });
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
@@ -1703,9 +1701,11 @@ export default function CloudChatPage({
       branch={
         workspaceControlSession
           ? (workspaceControlSession.branch ?? undefined)
-          : sessionBranchDisplay.kind === 'branch'
-            ? sessionBranchDisplay.branch
-            : undefined
+          : fetchedSessionData?.isPreparingAsync &&
+              cloudStatus?.type !== 'ready' &&
+              !preparationAttempts.some(attempt => attempt.status === 'completed')
+            ? undefined
+            : (sessionBranch ?? undefined)
       }
       gitUrl={workspaceControlSession ? undefined : fetchedSessionData?.gitUrl}
       model={workspaceControlSession?.model ?? sessionConfig?.model}
@@ -2119,28 +2119,20 @@ export default function CloudChatPage({
                                   </div>
                                 )}
                               {(sessionConfig?.repository ||
-                                sessionBranchDisplay.kind !== 'unavailable' ||
+                                sessionBranch ||
                                 (contextUsage !== undefined && contextWindow !== undefined)) && (
                                 <div className="text-muted-foreground flex items-center gap-3 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">
-                                  {(sessionConfig?.repository ||
-                                    sessionBranchDisplay.kind !== 'unavailable') && (
+                                  {(sessionConfig?.repository || sessionBranch) && (
                                     <div className="flex min-w-0 items-center gap-1.5">
                                       <GitBranch className="h-3 w-3 shrink-0" />
                                       {sessionConfig?.repository && (
                                         <span className="truncate">{sessionConfig.repository}</span>
                                       )}
-                                      {sessionBranchDisplay.kind === 'branch' && (
+                                      {sessionBranch && (
                                         <>
                                           {sessionConfig?.repository && <span>·</span>}
-                                          <span className="truncate">
-                                            {sessionBranchDisplay.branch}
-                                          </span>
+                                          <span className="truncate">{sessionBranch}</span>
                                         </>
-                                      )}
-                                      {sessionBranchDisplay.kind === 'assigning' && (
-                                        <span className="truncate" role="status">
-                                          Assigning branch…
-                                        </span>
                                       )}
                                     </div>
                                   )}

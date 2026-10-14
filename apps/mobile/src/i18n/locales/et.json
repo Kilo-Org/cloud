@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Uuenda GitHubi rakendust"
       },
       "githubIpAllowList": {
-        "description": "Koodiülevaataja lülitati välja, sest selle GitHubi organisatsiooni lubatud IP-aadresside loend blokeerib Kilo. Küsi abi aadressil hi@kilocode.ai ja lülita seejärel koodiülevaataja uuesti sisse."
+        "description": "Koodiülevaataja lülitati välja, sest selle GitHubi organisatsiooni lubatud IP-aadresside loend blokeerib Kilo. Küsi abi aadressil hi@kilo.ai ja lülita seejärel koodiülevaataja uuesti sisse."
       },
       "gitlabProjectAccessRequired": {
         "description": "Koodiülevaataja lülitati välja, sest Kilo ei saa luua sellele GitLabi projektile juurdepääsutunnust. Anna hooldaja õigused või luba projekti juurdepääsutunnused ja lülita koodiülevaataja uuesti sisse.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Uuenda koodiülevaataja seadeid"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Koodiülevaataja lülitati välja, sest hoidla kloonimine ületas täna kolm korda ajalimiidi. Küsi abi aadressil hi@kilocode.ai ja lülita seejärel koodiülevaataja uuesti sisse."
+        "description": "Koodiülevaataja lülitati välja, sest hoidla kloonimine ületas täna kolm korda ajalimiidi. Küsi abi aadressil hi@kilo.ai ja lülita seejärel koodiülevaataja uuesti sisse."
       },
       "title": "Koodiülevaataja vajab tähelepanu.",
       "recoveryLabel": "Võta ühendust toega"

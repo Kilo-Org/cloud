@@ -1609,7 +1609,7 @@
         "recoveryLabel": "Nuashonraigh an aip GitHub"
       },
       "githubIpAllowList": {
-        "description": "Díchumasaíodh an tAthbhreithneoir cóid toisc go n-úsáideann an eagraíocht GitHub seo liosta seoltaí IP ceadaithe a chuireann bac ar Kilo. Déan teagmháil le hi@kilocode.ai chun cabhair a fháil, ansin cumasaigh an tAthbhreithneoir cóid arís."
+        "description": "Díchumasaíodh an tAthbhreithneoir cóid toisc go n-úsáideann an eagraíocht GitHub seo liosta seoltaí IP ceadaithe a chuireann bac ar Kilo. Déan teagmháil le hi@kilo.ai chun cabhair a fháil, ansin cumasaigh an tAthbhreithneoir cóid arís."
       },
       "gitlabProjectAccessRequired": {
         "description": "Díchumasaíodh an tAthbhreithneoir cóid toisc nach féidir le Kilo comhartha rochtana tionscadail GitLab a chruthú don tionscadal seo. Tabhair rochtain cothaitheora nó cumasaigh comharthaí rochtana tionscadail, ansin cumasaigh an tAthbhreithneoir cóid arís.",
@@ -1624,7 +1624,7 @@
         "recoveryLabel": "Nuashonraigh socruithe an Athbhreithneora cóid"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Díchumasaíodh an tAthbhreithneoir cóid tar éis do thrí iarracht ar an stór a chlónáil dul thar an teorainn ama inniu. Déan teagmháil le hi@kilocode.ai chun cabhair a fháil, ansin cumasaigh an tAthbhreithneoir cóid arís."
+        "description": "Díchumasaíodh an tAthbhreithneoir cóid tar éis do thrí iarracht ar an stór a chlónáil dul thar an teorainn ama inniu. Déan teagmháil le hi@kilo.ai chun cabhair a fháil, ansin cumasaigh an tAthbhreithneoir cóid arís."
       },
       "title": "Ní mór aird a thabhairt ar an athbhreithneoir cóid.",
       "recoveryLabel": "Déan teagmháil leis an bhfoireann tacaíochta"

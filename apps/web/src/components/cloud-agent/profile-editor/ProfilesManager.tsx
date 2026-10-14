@@ -129,7 +129,7 @@ export function ProfilesManager({
   return (
     <div className="flex min-h-0 flex-1 flex-col md:flex-row">
       {/* Left panel — profile list */}
-      <div className="flex max-h-40 shrink-0 flex-col border-b md:max-h-none md:w-44 md:border-r md:border-b-0">
+      <div className="flex max-h-40 shrink-0 flex-col border-b md:max-h-none md:w-64 md:border-r md:border-b-0 lg:w-72">
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -289,7 +289,7 @@ function ProfileListItem({
       type="button"
       aria-pressed={isSelected}
       className={cn(
-        'mx-1 flex w-[calc(100%-0.5rem)] cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:min-h-11',
+        'mx-1 flex w-[calc(100%-0.5rem)] cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:min-h-11',
         isSelected ? 'bg-accent text-foreground' : 'hover:bg-accent/50 text-muted-foreground'
       )}
       onClick={onSelect}
@@ -299,14 +299,19 @@ function ProfileListItem({
       ) : (
         <User className="h-3.5 w-3.5 shrink-0" />
       )}
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <div
-          className={cn('flex items-center gap-1 truncate text-sm', isSelected && 'font-medium')}
+          className={cn(
+            'flex min-w-0 flex-1 items-center gap-1 text-sm',
+            isSelected && 'font-medium'
+          )}
         >
-          <span className="truncate">{profile.name}</span>
+          <span className="truncate" title={profile.name}>
+            {profile.name}
+          </span>
           {isEffectiveDefault && <Star className="text-primary h-3 w-3 shrink-0 fill-current" />}
         </div>
-        <div className="text-muted-foreground text-[10px]">
+        <div className="text-muted-foreground shrink-0 whitespace-nowrap text-[10px]">
           {[
             profile.varCount > 0 && `${profile.varCount}v`,
             profile.mcpServerCount > 0 && `${profile.mcpServerCount}m`,

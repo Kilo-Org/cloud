@@ -14,6 +14,7 @@ const classifiedIncrementWriters = {
     'included_ai_gateway_and_exa_organization',
   'services/container-usage-meter/src/postgres.ts': 'included_container_usage_settlement',
   'services/kiloclaw-billing/src/lifecycle.ts': 'included_kiloclaw_renewal',
+  'apps/web/src/lib/auto-routing-benchmark-billing.ts': 'included_auto_routing_benchmark_settlement',
   'apps/web/src/app/admin/api/organizations/[id]/consume-credits/route.ts':
     'excluded_development_consume_route',
   'apps/web/src/routers/admin-router.ts': 'excluded_development_balance_jitter',

@@ -1324,6 +1324,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
       await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
       expect(provider.stopCalls).toEqual([provider.refs[0]]);
       expect(await readRouteRow(stub, SESSION)).toBeNull();
+      expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(TIMERS.idleMs);
       await stub.prepare(prepareInput(SESSION, origin));
       await waitFor(() => expect(provider.createCalls).toBe(2));
     } else {
@@ -1331,6 +1332,36 @@ describe('SandboxControlV2 routes and forwarding', () => {
       expect(provider.stopCalls).toEqual([]);
     }
     wrapper.close();
+  });
+
+  it('reuses resolved timers without reading routes on timer lookups or notification enqueue', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION, 'code-review'));
+
+    await runInDurableObject(stub, instance => {
+      const owner = instance as unknown as NotificationOwner & {
+        db: ReturnType<typeof drizzle>;
+        sandboxTimers: () => typeof TIMERS;
+        cachedSandboxTimers: typeof TIMERS | undefined;
+      };
+      const timers = owner.sandboxTimers();
+      expect(timers.idleMs).toBe(60_000);
+      expect(timers.providerLeaseMs).toBe(120_000);
+      const select = vi.spyOn(owner.db, 'select');
+      try {
+        expect(owner.sandboxTimers()).toBe(timers);
+        expect(owner.sandboxTimers()).toBe(timers);
+        owner.cachedSandboxTimers = undefined;
+        owner.notifications.enqueue(SESSION, {
+          kind: 'route',
+          payload: { state: 'preparing', attemptId: 'cached-timers' },
+        });
+        expect(select).not.toHaveBeenCalled();
+      } finally {
+        select.mockRestore();
+      }
+    });
   });
 
   it('keeps unattended work alive on active heartbeats but not idle heartbeats', async () => {
@@ -1375,6 +1406,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     await wrapper.next();
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
     await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    expect((await stub.getStatusSnapshot()).inactivityTimeoutMs).toBe(60_000);
     await stub.prepare(prepareInput(SESSION_NEXT, 'cloud-agent-web'));
     await wrapper.next();
     wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });

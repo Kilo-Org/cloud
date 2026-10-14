@@ -469,6 +469,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private provider: ProviderAdapter;
   private providerPin: StoredProviderPin | null = null;
   private createInFlight = false;
+  private cachedSandboxTimers: SandboxTimers | undefined;
   private readonly repositoryCaptures = new Map<
     string,
     { allocationId: string | null; ok?: boolean }
@@ -504,7 +505,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   ) => this.resolveSessionPeer(ownerId, sessionId);
 
   private readonly notifications = createSandboxNotificationDispatcher({
-    budgetMs: () => this.sandboxTimers().sessionNotifyDeadlineMs,
+    budgetMs: () => CONTROL_PLANE_TIMERS.sandbox.sessionNotifyDeadlineMs,
     send: (sessionId, notification, deadlineAt, signal) =>
       this.notifySession(sessionId, notification, deadlineAt, signal),
     waitUntil: work => this.ctx.waitUntil(work),
@@ -672,6 +673,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.notifications.retire(parsed.sessionId);
       this.repositoryCaptures.delete(parsed.sessionId);
       await deleteRoute(this.db, parsed.sessionId);
+      this.cachedSandboxTimers = undefined;
       // Rebuild the policy inside the queue; if it cannot apply, stop the
       // sandbox as a platform failure so the alias is not left injected.
       await this.applyVercelNetworkPolicyOrStop('sandbox_lost');
@@ -1794,6 +1796,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (deletionJournal !== undefined && !deletionJournal.completed) {
       this.notifications.retire(spec.sessionId);
       await deleteRoute(this.db, spec.sessionId);
+      this.cachedSandboxTimers = undefined;
       return {
         state: 'failed',
         attemptId: crypto.randomUUID(),
@@ -1899,12 +1902,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
             billingReason,
             'billing_admission'
           );
+          this.cachedSandboxTimers = undefined;
           return { state: 'failed', attemptId: route.attemptId, reason: billingReason };
         }
       }
     }
     const repoKey = await this.repoKeyFor(spec, source);
     const { route, started } = await ensureRoute(this.routeContext(state), spec, source, repoKey);
+    if (started) this.cachedSandboxTimers = undefined;
     if (route.state !== 'failed') {
       if (started) await this.armAlarm(state);
       if (state.kind === 'stopped') {
@@ -2110,6 +2115,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (route.grant !== null) writeScopeGrant(tx, route.grant);
       writeRoute(tx, route);
     });
+    this.cachedSandboxTimers = undefined;
   }
 
   private applyCandidateGrantPolicy(candidate: SessionCredentialGrant): Promise<boolean> {
@@ -2466,6 +2472,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // The reducer owns the cause; ready routes must not re-derive it.
       if (stopReason !== undefined) {
         await dropReadyRoutes(this.routeContext(next), stopReason);
+        this.cachedSandboxTimers = undefined;
         // The sandbox is already stopping; refresh best-effort.
         await this.refreshVercelNetworkPolicy();
       }
@@ -2488,6 +2495,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (previous.kind !== 'stopping') {
       // A direct `provider-gone` keeps ready routes; they lose the sandbox.
       await dropReadyRoutes(ctx, 'sandbox_lost');
+      this.cachedSandboxTimers = undefined;
     }
     // A preparing route with attempt time left keeps its deadline across the
     // reallocation (spec §6).
@@ -3454,6 +3462,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     for (const sessionId of sessionIds) {
       this.notifications.retire(sessionId);
       await deleteRoute(this.db, sessionId);
+      this.cachedSandboxTimers = undefined;
     }
   }
 
@@ -4191,6 +4200,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private sandboxTimers(): SandboxTimers {
+    if (this.cachedSandboxTimers !== undefined) return this.cachedSandboxTimers;
     const routes = this.db
       .select({ credentialSource: routesTable.credential_source })
       .from(routesTable)
@@ -4205,10 +4215,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
           !isInteractiveSessionOrigin(source.createdOnPlatform)
         );
       });
-    return resolveControlPlaneTimers(
+    this.cachedSandboxTimers = resolveControlPlaneTimers(
       this.env as unknown as Record<string, string | undefined>,
       unattended
     ).sandbox;
+    return this.cachedSandboxTimers;
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {

@@ -1386,6 +1386,32 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(credentialsFrame.sessionId).toBe(SESSION);
   });
 
+  it('replaces scoped MCP credentials on normal warm credential renewal without persisting them', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+    const mcpGrant = {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'renewed-parent-mcp-scope',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    await runInDurableObject(stub, instance => {
+      const peerFor = instance.sessionPeerFor.bind(instance);
+      instance.sessionPeerFor = (ownerId, sessionId) => {
+        const peer = peerFor(ownerId, sessionId);
+        return peer ? { ...peer, issueCloudAgentMcpGrant: async () => mcpGrant } : null;
+      };
+    });
+    const { wrapper } = await prepareWarmRoute(stub, provider);
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    const frame = await wrapper.next();
+    expect(frame).toMatchObject({ type: 'session.credentials', cloudAgentMcp: mcpGrant });
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(JSON.stringify(await readRouteRow(stub, SESSION))).not.toContain(mcpGrant.token);
+  });
+
   it('preserves the resolved GitHub app for managed Vercel review credentials', async () => {
     const provider = createFakeProvider();
     const broker = Object.assign(createFakeCredentialBroker('lite'), {

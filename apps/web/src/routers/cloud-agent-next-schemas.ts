@@ -2,7 +2,6 @@ import * as z from 'zod';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
-import { CloudAgentSpawnPolicySchema } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
@@ -385,8 +384,7 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
  * initial turn fields.
  */
 const PrepareSessionSharedFields = {
-  cloudAgentSpawn: CloudAgentSpawnPolicySchema.optional(),
-  parentCloudAgentSessionId: z.string().min(1).optional(),
+  allowSubagentSessions: z.boolean().optional(),
   // Repository source (mutually exclusive - must provide exactly one)
   githubRepo: z
     .string()

@@ -2096,6 +2096,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return 'skipped';
     let issued: RouteGrantIssue;
+    let cloudAgentMcp: { url: string; token: string; expiresAt: number } | undefined;
     try {
       // Bound the token-service round trip so a warm-route `deliver` cannot
       // hang forever; the grant-issue bound is the provider-stop bound.
@@ -2104,15 +2105,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
         this.grantIssueTimeoutMs(),
         'Credential grant re-issue timed out'
       );
+      const ownerId = await this.requireOwner();
+      const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, route.sessionId);
+      if (peer?.issueCloudAgentMcpGrant) {
+        cloudAgentMcp = await withTimeout(
+          peer.issueCloudAgentMcpGrant(),
+          this.grantIssueTimeoutMs(),
+          'Cloud Agent MCP grant issuance timed out'
+        );
+      }
     } catch {
       return 'failed';
     }
     if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';
     const next: RouteRecord = { ...route, grant: issued.grant, spec: issued.spec };
     this.publishRouteGrant(next);
-    const payload: ControlPlaneSessionCredentialsPayload = {
+    const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
       ...sessionCredentialsPayloadFromGrant(issued.grant, route.sessionId),
-    };
+      ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
+    });
     this.trySendFrame(socket, { type: 'session.credentials', ...payload });
     return 'issued';
   }

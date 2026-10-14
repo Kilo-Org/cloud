@@ -117,11 +117,8 @@ const scope: CloudAgentAuthority = {
   ownerId: user.id,
   parentSessionId: 'workspace_fixture-parent',
   organizationId: null,
-  procedures: ['cloudAgentNext.prepareSession'],
-  repositories: ['acme/repo'],
-  models: ['provider/model'],
-  remainingDepth: 1,
-  expiresAt: now + 900,
+  authorizationId: '22222222-2222-4222-8222-222222222222',
+  expiresAt: now + 24 * 60 * 60,
 };
 const launch = {
   githubRepo: 'acme/repo',
@@ -129,7 +126,6 @@ const launch = {
   mode: 'code',
   prompt: 'Launch the child',
   autoInitiate: true,
-  parentCloudAgentSessionId: scope.parentSessionId,
 };
 function scopedClaims(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -265,7 +261,6 @@ describe('verified scoped web authentication', () => {
     const orgScope = {
       ...scope,
       organizationId,
-      procedures: ['organizations.cloudAgentNext.prepareSession'] as const,
     };
     mockHeaders.mockResolvedValue(
       bearer(scopedClaims({ organizationId, cloudAgentAuthority: orgScope }))
@@ -331,8 +326,8 @@ describe('raw tRPC scope enforcement', () => {
     { initialPayload: {} },
     { futureEscapeField: true },
     { parentCloudAgentSessionId: 'workspace_sibling' },
-    { githubRepo: 'acme/other' },
-    { model: 'provider/other' },
+    { parentCloudAgentSessionId: scope.parentSessionId },
+    { allowSubagentSessions: 'true' },
     { organizationId },
     { autoInitiate: false },
   ])('rejects raw widening before schema strips unknown fields %j', async overrides => {
@@ -342,6 +337,21 @@ describe('raw tRPC scope enforcement', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(mockResolver).not.toHaveBeenCalled();
   });
+  it.each([true, false])(
+    'allows normally valid repository/model choices and opt-in %s',
+    async flag => {
+      const request = {
+        ...launch,
+        githubRepo: 'Other-Org/AnotherRepo',
+        model: 'another-provider/another-model',
+        allowSubagentSessions: flag,
+      };
+      expect(await router.createCaller(context()).cloudAgentNext.prepareSession(request)).toBe(
+        'launched'
+      );
+      expect(mockResolver).toHaveBeenCalledWith(request);
+    }
+  );
   it('denies unrelated procedures, expired scope and user mismatch', async () => {
     const caller = router.createCaller(context());
     await expect(caller.user.getMe()).rejects.toMatchObject({ code: 'FORBIDDEN' });
@@ -361,7 +371,6 @@ describe('raw tRPC scope enforcement', () => {
     const orgScope: CloudAgentAuthority = {
       ...scope,
       organizationId,
-      procedures: ['organizations.cloudAgentNext.prepareSession'],
     };
     const caller = router.createCaller(context(orgScope));
     expect(
@@ -431,7 +440,6 @@ describe('scope-preserving control token exchange', () => {
     const orgScope = {
       ...scope,
       organizationId,
-      procedures: ['organizations.cloudAgentNext.prepareSession'],
     };
     const headers = bearer(scopedClaims({ organizationId, cloudAgentAuthority: orgScope }));
     const issued = await createControlTokenForRequest(user, 'cloud-agent-next', {
@@ -463,20 +471,24 @@ describe('scope-preserving control token exchange', () => {
 });
 
 describe('ordinary opt-in schema', () => {
-  it('preserves policy and parent fields through prepare parsing and rejects widening policy', () => {
-    const policy = {
-      procedures: scope.procedures,
-      repositories: scope.repositories,
-      models: scope.models,
-      remainingDepth: 1,
-    };
+  it.each([true, false])('preserves boolean opt-in %s through prepare parsing', flag => {
     expect(
-      personalPrepareSessionNextSchema.parse({ ...launch, cloudAgentSpawn: policy })
-    ).toMatchObject({ cloudAgentSpawn: policy, parentCloudAgentSessionId: scope.parentSessionId });
+      personalPrepareSessionNextSchema.parse({ ...launch, allowSubagentSessions: flag })
+    ).toMatchObject({ allowSubagentSessions: flag });
+    expect(
+      organizationPrepareSessionNextSchema.parse({
+        ...launch,
+        organizationId,
+        allowSubagentSessions: flag,
+      })
+    ).toMatchObject({ allowSubagentSessions: flag });
+  });
+  it('defaults to opt-out and rejects nonboolean opt-in', () => {
+    expect(personalPrepareSessionNextSchema.parse(launch).allowSubagentSessions).toBeUndefined();
     expect(
       personalPrepareSessionNextSchema.safeParse({
         ...launch,
-        cloudAgentSpawn: { ...policy, extra: true },
+        allowSubagentSessions: { repositories: ['acme/repo'] },
       }).success
     ).toBe(false);
   });

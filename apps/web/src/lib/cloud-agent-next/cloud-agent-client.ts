@@ -18,7 +18,6 @@ import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
-import type { CloudAgentSpawnPolicy } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   getWorktreeChangesOutputSchema,
   getWorktreeFileOutputSchema,
@@ -130,8 +129,7 @@ export type AgentMode = string;
 
 /** Shared fields for prepareSession, present on both the non-clone and clone variants. */
 type PrepareSessionSharedFields = {
-  cloudAgentSpawn?: CloudAgentSpawnPolicy;
-  parentCloudAgentSessionId?: string;
+  allowSubagentSessions?: boolean;
   githubAccessPurpose?: 'workflow' | 'agent';
   mode: AgentMode;
   model: string;

@@ -10,6 +10,7 @@ import type {
   KiloRestartFaultReason,
 } from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
+import type { ControlPlaneSessionCredentialsPayload } from '../../../src/shared/control-plane-protocol.js';
 import { createWrapperKiloClient, type WrapperKiloClient } from '../kilo-api.js';
 import { createOwnedProcessScope, type OwnedProcessScope } from '../control/owned-processes.js';
 import { isKiloServerProcess } from '../tool-cgroup.js';
@@ -325,7 +326,10 @@ export type KiloRuntime = {
   /**
    * Stores the env immediately; the turn owner authorizes an idle restart.
    */
-  installCredentials(env: Record<string, string>): Promise<void>;
+  installCredentials(
+    env: Record<string, string>,
+    cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp']
+  ): Promise<void>;
   /** Restarts with the pending credentials when the runtime is idle. B8 calls this. */
   applyPendingCredentials(canRestart: () => boolean): Promise<boolean>;
   isRetiredClient(client: WrapperKiloClient): boolean;
@@ -1132,11 +1136,26 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     },
     ensure,
     isRetiredClient: candidate => retiredClients.has(candidate),
-    async installCredentials(env: Record<string, string>): Promise<void> {
-      // Store the refreshed env immediately; the running process keeps the old
-      // grant (valid below 1 h) until an idle restart applies the new one.
+    async installCredentials(env, cloudAgentMcp): Promise<void> {
       options.env = env;
       pendingCredentials = true;
+      if (client && cloudAgentMcp) {
+        try {
+          await withTimeoutAndAbort(
+            client.updateCloudAgentMcp(
+              cloudAgentMcp,
+              AbortSignal.timeout(KILO_CONTROL_REQUEST_TIMEOUT_MS)
+            ),
+            {
+              timeoutMs: KILO_CONTROL_REQUEST_TIMEOUT_MS,
+              timeoutMessage: 'Cloud Agent MCP credential refresh timed out',
+              abortMessage: 'Cloud Agent MCP credential refresh aborted',
+            }
+          );
+        } catch {
+          log('control-plane MCP credential refresh failed; retaining pending credential restart');
+        }
+      }
     },
     applyPendingCredentials,
     needsCompute: () => activity?.needsCompute() ?? false,

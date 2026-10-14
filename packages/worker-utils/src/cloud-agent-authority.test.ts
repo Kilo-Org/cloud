@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SignJWT } from 'jose';
 import {
   CloudAgentAuthoritySchema,
-  CloudAgentSpawnPolicySchema,
+  cloudAgentAuthorityInputSchema,
+  cloudAgentAuthorityProcedure,
   isCloudAgentAuthorityHttpPathAllowed,
   validateCloudAgentAuthorityRequest,
   type CloudAgentAuthority,
@@ -23,11 +24,8 @@ const scope: CloudAgentAuthority = {
   ownerId: 'oauth/fixture-user',
   parentSessionId: 'workspace_parent',
   organizationId: null,
-  procedures: ['cloudAgentNext.prepareSession'],
-  repositories: ['acme/repo'],
-  models: ['provider/model'],
-  remainingDepth: 1,
-  expiresAt: now + 900,
+  authorizationId: '22222222-2222-4222-8222-222222222222',
+  expiresAt: now + 24 * 60 * 60,
 };
 const launch = {
   githubRepo: 'acme/repo',
@@ -35,7 +33,6 @@ const launch = {
   mode: 'code',
   prompt: 'Implement the child task',
   autoInitiate: true,
-  parentCloudAgentSessionId: scope.parentSessionId,
 };
 
 function claims(overrides: Record<string, unknown> = {}) {
@@ -66,35 +63,21 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('Cloud Agent authority contract', () => {
-  it('accepts strict launch-only authority and opt-in', () => {
+  it('accepts session-bound authority without repository, model, or depth policy', () => {
     expect(CloudAgentAuthoritySchema.parse(scope)).toEqual(scope);
-    expect(
-      CloudAgentSpawnPolicySchema.parse({
-        procedures: scope.procedures,
-        repositories: scope.repositories,
-        models: scope.models,
-        remainingDepth: 1,
-      })
-    ).toEqual({
-      procedures: scope.procedures,
-      repositories: scope.repositories,
-      models: scope.models,
-      remainingDepth: 1,
-    });
+    expect(cloudAgentAuthorityProcedure(scope)).toBe('cloudAgentNext.prepareSession');
   });
-  it.each([
-    'https://github.com/acme/repo',
-    'Acme/repo',
-    'acme/repo.git',
-    'acme/..',
-    'acme/repo/sub',
-    'acme',
-    'acme/',
-  ])('rejects noncanonical repository %s', repository => {
-    expect(
-      CloudAgentAuthoritySchema.safeParse({ ...scope, repositories: [repository] }).success
-    ).toBe(false);
-  });
+  it.each(['https://github.com/acme/repo', 'acme/repo/sub', 'acme', 'acme/'])(
+    'rejects invalid repository %s',
+    githubRepo => {
+      expect(() =>
+        validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', {
+          ...launch,
+          githubRepo,
+        })
+      ).toThrow();
+    }
+  );
   it.each([
     { remainingDepth: 2 },
     { extra: true },
@@ -102,6 +85,7 @@ describe('Cloud Agent authority contract', () => {
     { procedures: ['other.procedure'] },
     { repositories: Array(101).fill('acme/repo') },
     { models: [] },
+    { authorizationId: 'not-an-authorization-id' },
     { expiresAt: now + 0.5 },
   ])('rejects malformed or widened scope %j', overrides => {
     expect(CloudAgentAuthoritySchema.safeParse({ ...scope, ...overrides }).success).toBe(false);
@@ -113,7 +97,6 @@ describe('Cloud Agent authority contract', () => {
     const orgScope = {
       ...scope,
       organizationId,
-      procedures: ['organizations.cloudAgentNext.prepareSession'],
     };
     expect(
       validateCloudAgentAuthorityRequest(orgScope, 'organizations.cloudAgentNext.prepareSession', {
@@ -122,11 +105,29 @@ describe('Cloud Agent authority contract', () => {
       })
     ).toMatchObject({ organizationId });
   });
+  it.each([true, false, undefined])('allows normal repositories/models and flag %s', flag => {
+    const request = {
+      ...launch,
+      githubRepo: 'Other-Org/AnotherRepo',
+      model: 'another-provider/another-model',
+      ...(flag === undefined ? {} : { allowSubagentSessions: flag }),
+    };
+    expect(
+      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', request)
+    ).toEqual(request);
+    expect(cloudAgentAuthorityInputSchema(scope)).not.toHaveProperty(
+      'properties.parentCloudAgentSessionId'
+    );
+  });
+  it('permits launches beyond fifteen minutes until session authorization expires', () => {
+    expect(
+      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', launch, now + 3600)
+    ).toEqual(launch);
+  });
   it.each([
-    { githubRepo: 'acme/other' },
-    { model: 'provider/other' },
     { parentCloudAgentSessionId: 'workspace_sibling' },
-    { parentCloudAgentSessionId: undefined },
+    { parentCloudAgentSessionId: scope.parentSessionId },
+    { allowSubagentSessions: 'true' },
     { autoInitiate: false },
     { autoInitiate: undefined },
     { organizationId },
@@ -214,8 +215,8 @@ describe('scoped JWT policy', () => {
     { aud: undefined },
     { tokenPurpose: 'human-api' },
     { credentialExchange: true },
-    { exp: now + 901 },
-    { iat: now - 1 },
+    { exp: scope.expiresAt + 1 },
+    { iat: scope.expiresAt },
     { iat: now + 1 },
     { kiloUserId: 'other-user' },
     { organizationId },
@@ -247,6 +248,13 @@ describe('scoped JWT policy', () => {
     ).rejects.toThrow();
     await expect(verifyKiloToken(token, secret, { audience: 'kilo-api' })).rejects.toThrow();
   });
+  it('keeps a session-length credential valid after fifteen minutes', async () => {
+    const token = await sign(claims({ iat: now - 1 }));
+    vi.setSystemTime(new Date((now + 3600) * 1000));
+    await expect(
+      verifyKiloTokenForPolicy(token, secret, { audience: 'kilo-api', mode: 'required' })
+    ).resolves.toMatchObject({ claims: { cloudAgentAuthority: scope } });
+  });
   it('rejects forged and expired credentials without downgrade', async () => {
     await expect(
       verifyKiloTokenForPolicy(await sign(claims(), 'forged-fixture-secret'), secret, {
@@ -262,7 +270,7 @@ describe('scoped JWT policy', () => {
       })
     ).rejects.toThrow();
   });
-  it('binds signed org and caps minted lifetime', () => {
+  it('binds signed organization and preserves session expiration', () => {
     expect(() =>
       buildModernKiloTokenPayload({
         userId: scope.ownerId,

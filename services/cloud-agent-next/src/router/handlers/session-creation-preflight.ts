@@ -182,8 +182,7 @@ export async function preflightSessionCreation(
   if (ctx.cloudAgentAuthority) {
     const authority = ctx.cloudAgentAuthority;
     if (
-      request.cloudAgentSpawn?.parentSessionId !== authority.parentSessionId ||
-      request.cloudAgentSpawn.policy !== undefined ||
+      request.parentCloudAgentSessionId !== authority.parentSessionId ||
       authority.ownerId !== ctx.userId ||
       (request.options?.kilocodeOrganizationId ?? null) !== authority.organizationId
     ) {

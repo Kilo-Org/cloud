@@ -91,14 +91,11 @@ describe('session creation preflight', () => {
       ownerId: context.userId,
       parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
       organizationId: null,
-      procedures: ['cloudAgentNext.prepareSession' as const],
-      repositories: ['acme/repo'],
-      models: ['kilo/test-model'],
-      remainingDepth: 1 as const,
-      expiresAt: Math.floor(Date.now() / 1000) + 900,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
     };
     const creation = request({
-      cloudAgentSpawn: { parentSessionId: authority.parentSessionId },
+      parentCloudAgentSessionId: authority.parentSessionId,
       options: { createdOnPlatform: 'cloud-agent' },
     });
     const scopedContext = {
@@ -112,8 +109,8 @@ describe('session creation preflight', () => {
     expect(assertRepositoryAccessMock).toHaveBeenCalled();
     expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
     expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
-    expect(resolved.cloudAgentSpawn).toEqual({ parentSessionId: authority.parentSessionId });
-    expect(resolved.cloudAgentSpawn?.policy).toBeUndefined();
+    expect(resolved.parentCloudAgentSessionId).toBe(authority.parentSessionId);
+    expect(resolved.allowSubagentSessions).not.toBe(true);
     balanceMock.mockClear();
     const freeContext = {
       ...scopedContext,
@@ -146,20 +143,17 @@ describe('session creation preflight', () => {
     expect(assertRepositoryAccessMock).not.toHaveBeenCalled();
   });
 
-  it('does not bypass existing billing or accept caller-controlled child policy/lineage', async () => {
+  it('does not bypass existing billing or accept mismatched lineage', async () => {
     const authority = {
       version: 1 as const,
       ownerId: context.userId,
       parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
       organizationId: null,
-      procedures: ['cloudAgentNext.prepareSession' as const],
-      repositories: ['acme/repo'],
-      models: ['kilo/test-model'],
-      remainingDepth: 1 as const,
-      expiresAt: Math.floor(Date.now() / 1000) + 900,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
     };
     const scopedContext = { ...context, cloudAgentAuthority: authority };
-    const creation = request({ cloudAgentSpawn: { parentSessionId: authority.parentSessionId } });
+    const creation = request({ parentCloudAgentSessionId: authority.parentSessionId });
     balanceMock.mockResolvedValueOnce({
       success: false,
       status: 402,
@@ -168,20 +162,13 @@ describe('session creation preflight', () => {
     await expect(
       preflightSessionCreation(creation, scopedContext, 'prepareSession')
     ).rejects.toMatchObject({ code: 'PAYMENT_REQUIRED' });
-    for (const cloudAgentSpawn of [
-      { parentSessionId: 'workspace_other' },
-      {
-        parentSessionId: authority.parentSessionId,
-        policy: {
-          procedures: authority.procedures,
-          repositories: authority.repositories,
-          models: authority.models,
-          remainingDepth: 1 as const,
-        },
-      },
-    ]) {
+    for (const parentCloudAgentSessionId of ['workspace_other', undefined]) {
       await expect(
-        preflightSessionCreation(request({ cloudAgentSpawn }), scopedContext, 'prepareSession')
+        preflightSessionCreation(
+          request({ parentCloudAgentSessionId }),
+          scopedContext,
+          'prepareSession'
+        )
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     }
   });

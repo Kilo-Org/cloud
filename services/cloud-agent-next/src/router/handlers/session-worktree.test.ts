@@ -1047,20 +1047,13 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
   });
 
   it('never copies parent opt-in or delegated lineage when copying a session profile to a sibling', async () => {
-    for (const cloudAgentSpawn of [
-      {
-        policy: {
-          procedures: ['cloudAgentNext.prepareSession' as const],
-          repositories: ['acme/repo'],
-          models: ['test-model'],
-          remainingDepth: 1 as const,
-        },
-      },
-      { parentSessionId: SOURCE_WORKSPACE_ID },
+    for (const scope of [
+      { allowSubagentSessions: true },
+      { parentCloudAgentSessionId: SOURCE_WORKSPACE_ID },
     ]) {
-      const metadata = { ...sourceMetadata(), cloudAgentSpawn };
+      const metadata = { ...sourceMetadata(), ...scope };
       const { caller, input, destinationStub } = fixture({ metadata });
-      if ('policy' in cloudAgentSpawn) {
+      if (scope.allowSubagentSessions === true) {
         await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
           code: 'BAD_REQUEST',
         });
@@ -1070,7 +1063,8 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
       await caller.createWorktreeChat(input);
       const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
       expect(registration?.metadata.profile?.envVars).toEqual(metadata.profile?.envVars);
-      expect(registration?.metadata.cloudAgentSpawn).toBeUndefined();
+      expect(registration?.metadata.allowSubagentSessions).not.toBe(true);
+      expect(registration?.metadata.parentCloudAgentSessionId).toBeUndefined();
     }
   });
 });

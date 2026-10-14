@@ -669,7 +669,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const mcpGrant = {
       url: 'https://mcp.kiloapps.io/mcp',
       token: 'private-scoped-mcp-fixture',
-      expiresAt: Math.floor(Date.now() / 1000) + 900,
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
     };
     const sessionStub = sessions.getByName(sessionDoName(USER_ID, sessionId));
     await runInDurableObject(sandbox, instance => {
@@ -709,6 +709,19 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       expect(JSON.stringify(db.select().from(routesTable).all())).not.toContain(mcpGrant.token);
     });
     expect(JSON.stringify(await sessionStub.getMetadata())).not.toContain(mcpGrant.token);
+    wrapper.close();
+    await waitFor(async () =>
+      expect((await sandbox.getAllocationState()).kind).toBe('disconnected')
+    );
+    mcpGrant.token = 'recovered-scoped-mcp-fixture';
+    mcpGrant.expiresAt += 24 * 3600;
+    const reconnected = await FakeWrapper.connect({ sandboxId, credential });
+    await reconnected.hello({ wrapperId: 'wr_scoped', allocationId });
+    const recovered = await reconnected.next();
+    if (recovered?.type !== 'session.prepare')
+      throw new Error('expected reconnected session.prepare');
+    expect(recovered.credentials.cloudAgentMcp).toEqual(mcpGrant);
+    expect(JSON.stringify(recovered.spec)).not.toContain(mcpGrant.token);
   });
 
   it.each(['before request', 'during token resolution'] as const)(

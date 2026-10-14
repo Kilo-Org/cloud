@@ -594,7 +594,7 @@ async function issueSessionRuntimeAuthorization(
 ): Promise<NewSessionAllocation['runtimeAuthorization']> {
   const orgId = input.options?.kilocodeOrganizationId;
   if (
-    input.cloudAgentSpawn &&
+    (input.allowSubagentSessions === true || input.parentCloudAgentSessionId !== undefined) &&
     (!cloudAgentSessionId.startsWith('workspace_') || !isPolicyBearingAuthToken(ctx.authToken))
   ) {
     throw new TRPCError({
@@ -723,7 +723,10 @@ async function allocateNewSession(
     createdOnPlatform: input.options?.createdOnPlatform,
     billingOrigin: options?.billingOrigin,
   });
-  assertCloudAgentIsolatedAllocation(input.cloudAgentSpawn, sandboxAllocation);
+  assertCloudAgentIsolatedAllocation(
+    input.allowSubagentSessions === true || input.parentCloudAgentSessionId !== undefined,
+    sandboxAllocation
+  );
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =
     input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
@@ -1154,15 +1157,18 @@ function buildSessionRegistrationCommand(
   allocation: NewSessionAllocation,
   options?: { billingOrigin?: string }
 ) {
-  assertCloudAgentIsolatedAllocation(input.cloudAgentSpawn, allocation.sandboxAllocation);
-  if (input.cloudAgentSpawn && allocation.sandboxKind === 'shared') {
+  const scoped =
+    input.allowSubagentSessions === true || input.parentCloudAgentSessionId !== undefined;
+  assertCloudAgentIsolatedAllocation(scoped, allocation.sandboxAllocation);
+  if (scoped && allocation.sandboxKind === 'shared') {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Cloud Agent spawn authority requires an isolated sandbox',
     });
   }
   return {
-    cloudAgentSpawn: input.cloudAgentSpawn,
+    allowSubagentSessions: input.allowSubagentSessions ?? false,
+    parentCloudAgentSessionId: input.parentCloudAgentSessionId,
     identity: {
       sessionId: allocation.cloudAgentSessionId,
       userId: ctx.userId,
@@ -1770,7 +1776,8 @@ export async function sessionCreateIntentFingerprint(
           };
   return sha256Hex(
     canonicalJson({
-      cloudAgentSpawn: input.cloudAgentSpawn,
+      allowSubagentSessions: input.allowSubagentSessions === true ? true : undefined,
+      parentCloudAgentSessionId: input.parentCloudAgentSessionId,
       initialTurn,
       // A different cut is a different intent: a same-key retry conflicts.
       clone: input.clone

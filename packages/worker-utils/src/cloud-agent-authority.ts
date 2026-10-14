@@ -6,47 +6,16 @@ export const CloudAgentSpawnProcedureSchema = z.enum([
   'organizations.cloudAgentNext.prepareSession',
 ]);
 
-const canonicalGitHubRepositorySchema = z
-  .string()
-  .regex(/^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?\/[a-z0-9._-]{1,100}$/)
-  .refine(value => {
-    const [owner, repository] = value.split('/');
-    return (
-      repository !== undefined &&
-      !owner.includes('--') &&
-      repository !== '.' &&
-      repository !== '..' &&
-      !repository.endsWith('.git')
-    );
-  }, 'Repository must be a canonical lowercase GitHub owner/repo');
-
-export const CloudAgentSpawnPolicySchema = z
+export const CloudAgentAuthoritySchema = z
   .object({
-    procedures: z.array(CloudAgentSpawnProcedureSchema).min(1).max(2),
-    repositories: z.array(canonicalGitHubRepositorySchema).min(1).max(100),
-    models: z
-      .array(
-        z
-          .string()
-          .min(1)
-          .max(200)
-          .refine(value => value.trim() === value)
-      )
-      .min(1)
-      .max(100),
-    remainingDepth: z.literal(1),
+    version: z.literal(1),
+    ownerId: z.string().min(1),
+    parentSessionId: z.string().min(1),
+    organizationId: z.string().min(1).nullable(),
+    authorizationId: z.uuid(),
+    expiresAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   })
   .strict();
-
-export type CloudAgentSpawnPolicy = z.infer<typeof CloudAgentSpawnPolicySchema>;
-
-export const CloudAgentAuthoritySchema = CloudAgentSpawnPolicySchema.extend({
-  version: z.literal(1),
-  ownerId: z.string().min(1),
-  parentSessionId: z.string().min(1),
-  organizationId: z.string().min(1).nullable(),
-  expiresAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-}).strict();
 
 export type CloudAgentAuthority = z.infer<typeof CloudAgentAuthoritySchema>;
 
@@ -75,8 +44,7 @@ const scopedTokenClaimsSchema = z
       claims.cloudAgentAuthority.ownerId !== claims.kiloUserId ||
       claims.cloudAgentAuthority.organizationId !== (claims.organizationId ?? null) ||
       claims.exp !== claims.cloudAgentAuthority.expiresAt ||
-      claims.exp <= claims.iat ||
-      claims.exp - claims.iat > 15 * 60
+      claims.exp <= claims.iat
     ) {
       ctx.addIssue({ code: 'custom', message: 'Invalid Cloud Agent authority token binding' });
     }
@@ -88,7 +56,7 @@ export function validateCloudAgentAuthorityClaims(claims: unknown): CloudAgentAu
 
 const scopedPrepareSessionSchema = z
   .object({
-    githubRepo: canonicalGitHubRepositorySchema,
+    githubRepo: z.string().regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/),
     model: z.string().min(1).max(200),
     mode: z.enum(['code', 'plan', 'debug', 'orchestrator', 'ask', 'build', 'architect']),
     prompt: z.string().min(1).max(100_000),
@@ -101,7 +69,7 @@ const scopedPrepareSessionSchema = z
     autoCommit: z.boolean().optional(),
     autoInitiate: z.literal(true),
     operationKey: z.uuid().optional(),
-    parentCloudAgentSessionId: z.string().min(1),
+    allowSubagentSessions: z.boolean().optional(),
     organizationId: z.string().min(1).optional(),
   })
   .strict();
@@ -111,15 +79,18 @@ export function cloudAgentAuthorityInputSchema(
 ): Record<string, unknown> {
   return z.toJSONSchema(
     scopedPrepareSessionSchema.extend({
-      githubRepo: z.enum(authority.repositories),
-      model: z.enum(authority.models),
-      parentCloudAgentSessionId: z.literal(authority.parentSessionId),
       organizationId:
         authority.organizationId === null
           ? z.never().optional()
           : z.literal(authority.organizationId),
     })
   );
+}
+
+export function cloudAgentAuthorityProcedure(authority: CloudAgentAuthority) {
+  return authority.organizationId === null
+    ? 'cloudAgentNext.prepareSession'
+    : 'organizations.cloudAgentNext.prepareSession';
 }
 
 export function validateCloudAgentAuthorityRequest(
@@ -130,17 +101,14 @@ export function validateCloudAgentAuthorityRequest(
 ): z.infer<typeof scopedPrepareSessionSchema> {
   const scope = CloudAgentAuthoritySchema.parse(authority);
   const parsedProcedure = CloudAgentSpawnProcedureSchema.parse(procedure);
-  if (scope.expiresAt <= nowSeconds || !scope.procedures.includes(parsedProcedure)) {
+  if (scope.expiresAt <= nowSeconds || cloudAgentAuthorityProcedure(scope) !== parsedProcedure) {
     throw new Error('Cloud Agent authority does not permit this procedure');
   }
   const request = scopedPrepareSessionSchema.parse(input);
   const organizationProcedure = parsedProcedure === 'organizations.cloudAgentNext.prepareSession';
   if (
     organizationProcedure !== (scope.organizationId !== null) ||
-    (request.organizationId ?? null) !== scope.organizationId ||
-    request.parentCloudAgentSessionId !== scope.parentSessionId ||
-    !scope.repositories.includes(request.githubRepo) ||
-    !scope.models.includes(request.model)
+    (request.organizationId ?? null) !== scope.organizationId
   ) {
     throw new Error('Cloud Agent launch exceeds its authority');
   }
@@ -155,8 +123,5 @@ export function isCloudAgentAuthorityHttpPathAllowed(
   if (pathname === '/api/user') return true;
   if (!pathname?.startsWith('/api/trpc/')) return false;
   const paths = pathname.slice('/api/trpc/'.length).split(',');
-  return (
-    paths.length > 0 &&
-    paths.every(path => authority.procedures.some(procedure => procedure === path))
-  );
+  return paths.length > 0 && paths.every(path => cloudAgentAuthorityProcedure(authority) === path);
 }

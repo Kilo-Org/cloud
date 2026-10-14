@@ -447,12 +447,7 @@ export async function createControlTokenForRequest(
         credentialExchange: false,
         extra: {
           ...(scope.organizationId === null ? {} : { organizationId: scope.organizationId }),
-          cloudAgentAuthority: {
-            ...scope,
-            procedures: [...scope.procedures],
-            repositories: [...scope.repositories],
-            models: [...scope.models],
-          },
+          cloudAgentAuthority: { ...scope },
         },
       });
       return {

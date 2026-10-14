@@ -328,7 +328,9 @@ export async function runControlPlaneWrapper(
           captureRef.current?.onCaptured(frame.sessionId, frame.ok);
           return;
         case 'session.credentials':
-          void preparationRef.current?.installCredentials(frame);
+          void preparationRef.current?.installCredentials(frame).catch(() => {
+            logToFile('control-plane session credential refresh failed');
+          });
           return;
         case 'session.prompt':
           turnsRef.current?.submit(frame.sessionId, frame.payload);
@@ -382,8 +384,8 @@ export async function runControlPlaneWrapper(
     capture: captureRef.current,
     runtimes: {
       ensure: input => runtimes.ensure(input),
-      installCredentials: async (key, nextEnv) => {
-        await runtimes.get(key)?.installCredentials(nextEnv);
+      installCredentials: async (key, nextEnv, cloudAgentMcp) => {
+        await runtimes.get(key)?.installCredentials(nextEnv, cloudAgentMcp);
         turnsRef.current?.credentialsInstalled(key);
       },
       isUnavailable: key => {

@@ -1,4 +1,5 @@
 import catalogJson from '../catalog.json';
+import { cloudAgentAuthorityProcedure } from '../../../packages/worker-utils/src/cloud-agent-authority';
 import {
   classifyToolError,
   createMcpAnalytics,
@@ -477,7 +478,7 @@ async function runTool(
       includeGuarded: auth.adminEnabled === true,
       ...(auth.cloudAgentAuthority
         ? {
-            allowedPaths: auth.cloudAgentAuthority.procedures,
+            allowedPaths: [cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)],
             cloudAgentAuthority: auth.cloudAgentAuthority,
           }
         : {}),

@@ -3985,6 +3985,23 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     );
   });
 
+  it('preserves existing opt-out fingerprints but binds opt-in and authenticated lineage to creation intent', async () => {
+    const request = originalRequest();
+    const original = await sessionCreateIntentFingerprint(request);
+    expect(await sessionCreateIntentFingerprint({ ...request, allowSubagentSessions: false })).toBe(
+      original
+    );
+    expect(
+      await sessionCreateIntentFingerprint({ ...request, allowSubagentSessions: true })
+    ).not.toBe(original);
+    expect(
+      await sessionCreateIntentFingerprint({
+        ...request,
+        parentCloudAgentSessionId: 'workspace_parent',
+      })
+    ).not.toBe(original);
+  });
+
   /**
    * One case per create input covered by the intent fingerprint. Each case
    * changes exactly one input on the retry; every one must reject before any
@@ -3997,6 +4014,17 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     identityConflict?: boolean;
     retry: SessionCreateRequest;
   }> = [
+    {
+      name: 'subagent opt-in',
+      retry: makeRequest({ allowSubagentSessions: true, options: ORIGINAL_OPTIONS }),
+    },
+    {
+      name: 'authenticated parent lineage',
+      retry: makeRequest({
+        parentCloudAgentSessionId: 'workspace_parent',
+        options: ORIGINAL_OPTIONS,
+      }),
+    },
     {
       name: 'the prompt',
       retry: makeRequest({

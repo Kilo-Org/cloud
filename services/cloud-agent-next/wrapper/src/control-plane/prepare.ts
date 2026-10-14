@@ -124,7 +124,11 @@ export type PrepareRuntimePort = {
     env: Record<string, string>;
     workload?: ControlWorkload;
   }): Promise<WrapperKiloClient>;
-  installCredentials(key: string, env: Record<string, string>): Promise<void>;
+  installCredentials(
+    key: string,
+    env: Record<string, string>,
+    cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp']
+  ): Promise<void>;
   /** True when the runtime is gone or has spent its restart budget. */
   isUnavailable(key: string): boolean;
   remove(key: string): void;
@@ -1120,12 +1124,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   ): Promise<void> {
     const route = prepared.get(credentials.sessionId);
     if (!route) return;
-    if (
-      credentials.cloudAgentMcp !== undefined &&
-      (credentials.cloudAgentMcp.token !== route.cloudAgentMcp?.token ||
-        credentials.cloudAgentMcp.expiresAt !== route.cloudAgentMcp?.expiresAt)
-    )
-      throw new Error('Cloud Agent MCP authority cannot be replaced during credential renewal');
+    route.cloudAgentMcp = credentials.cloudAgentMcp ?? route.cloudAgentMcp;
     const nextEnv = withRuntimeProfileEnvironment(
       buildWorktreeKiloEnvironment(
         route.directory,
@@ -1143,7 +1142,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       route.spec
     );
     route.env = nextEnv;
-    await deps.runtimes.installCredentials(route.key, nextEnv);
+    await deps.runtimes.installCredentials(route.key, nextEnv, route.cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
       const url = authenticatedGitUrl(
         route.spec.git.url,

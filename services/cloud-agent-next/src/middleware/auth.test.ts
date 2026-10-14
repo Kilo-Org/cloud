@@ -103,11 +103,8 @@ describe('authMiddleware', () => {
       ownerId: 'user-1',
       parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
       organizationId: null,
-      procedures: ['cloudAgentNext.prepareSession' as const],
-      repositories: ['acme/widgets'],
-      models: ['kilo/test-model'],
-      remainingDepth: 1 as const,
-      expiresAt: Math.floor(Date.now() / 1000) + 900,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
     };
     vi.mocked(validateKiloToken).mockResolvedValue({
       success: true,

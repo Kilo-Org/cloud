@@ -101,11 +101,8 @@ describe('scoped Cloud Agent Worker authorization', () => {
     ownerId: 'owner',
     parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
     organizationId: null,
-    procedures: ['cloudAgentNext.prepareSession' as const],
-    repositories: ['acme/widgets'],
-    models: ['kilo/test-model'],
-    remainingDepth: 1 as const,
-    expiresAt: Math.floor(Date.now() / 1000) + 900,
+    authorizationId: '12345678-1234-4234-8234-123456789abc',
+    expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
   };
   const input = {
     prompt: 'child',
@@ -113,7 +110,6 @@ describe('scoped Cloud Agent Worker authorization', () => {
     githubRepo: 'acme/widgets',
     model: 'kilo/test-model',
     autoInitiate: true,
-    parentCloudAgentSessionId: authority.parentSessionId,
   };
   const scopedRouter = t.router({
     prepareSession: internalApiProtectedProcedure
@@ -153,7 +149,7 @@ describe('scoped Cloud Agent Worker authorization', () => {
     await expect(caller.health()).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('refuses raw parent/depth/config changes before an input schema can erase them', async () => {
+  it('refuses caller lineage and unsafe config before an input schema can erase them', async () => {
     const caller = scopedRouter.createCaller(context('internal-fixture'));
     for (const change of [
       { parentCloudAgentSessionId: 'workspace_other' },
@@ -161,12 +157,20 @@ describe('scoped Cloud Agent Worker authorization', () => {
       { remainingDepth: 2 },
       { mcpServers: {} },
       { profileId: 'profile' },
-      { model: 'kilo/other' },
-      { githubRepo: 'acme/other' },
     ]) {
       await expect(caller.prepareSession({ ...input, ...change })).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
     }
+  });
+  it('accepts other repositories and models with explicit child opt-in', async () => {
+    await expect(
+      scopedRouter.createCaller(context('internal-fixture')).prepareSession({
+        ...input,
+        model: 'kilo/other',
+        githubRepo: 'acme/other',
+        allowSubagentSessions: true,
+      })
+    ).resolves.toEqual({ owner: 'owner' });
   });
 });

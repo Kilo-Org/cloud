@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import { CloudAgentSpawnPolicySchema } from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   getKiloSandboxAllocation,
   sandboxAllocationInputSchema,
@@ -447,8 +446,7 @@ export const CloseTerminalOutput = z.object({
  * stable `operationKey`, and forbids any synthetic initial turn fields.
  */
 const PrepareSessionSharedFields = {
-  cloudAgentSpawn: CloudAgentSpawnPolicySchema.optional(),
-  parentCloudAgentSessionId: sessionIdSchema.optional(),
+  allowSubagentSessions: z.boolean().optional(),
   githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
   mode: ModeSlugSchema.describe(
     'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
@@ -903,6 +901,7 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
  */
 export const StartSessionInput = z
   .object({
+    allowSubagentSessions: z.boolean().optional(),
     message: z
       .object({
         prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),

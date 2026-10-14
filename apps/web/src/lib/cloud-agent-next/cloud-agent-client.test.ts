@@ -399,7 +399,7 @@ describe('CloudAgentNextClient saved worktree files', () => {
 });
 
 describe('CloudAgentNextClient scoped launch fields', () => {
-  it('forwards explicit parent opt-in and scoped child lineage without adding child spawn policy', async () => {
+  it('forwards explicit boolean opt-in without adding permission to ordinary sessions', async () => {
     const common = {
       githubRepo: 'acme/repo',
       prompt: 'Launch a task',
@@ -410,14 +410,10 @@ describe('CloudAgentNextClient scoped launch fields', () => {
     const inputs: PrepareSessionInput[] = [
       {
         ...common,
-        cloudAgentSpawn: {
-          procedures: ['cloudAgentNext.prepareSession'],
-          repositories: ['acme/repo'],
-          models: ['kilo/test-model'],
-          remainingDepth: 1,
-        },
+        allowSubagentSessions: true,
       },
-      { ...common, parentCloudAgentSessionId: 'workspace_parent' },
+      { ...common, allowSubagentSessions: false },
+      common,
     ];
     for (const input of inputs) {
       const mutate = jest
@@ -430,7 +426,7 @@ describe('CloudAgentNextClient scoped launch fields', () => {
       await new CloudAgentNextClient('scoped-control-token').prepareSession(input);
       expect(mutate).toHaveBeenCalledWith(input);
     }
-    expect(inputs[1].cloudAgentSpawn).toBeUndefined();
+    expect(inputs[2].allowSubagentSessions).toBeUndefined();
   });
 });
 

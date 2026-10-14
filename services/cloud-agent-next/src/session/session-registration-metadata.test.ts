@@ -69,24 +69,23 @@ const GITHUB_REPOSITORY = {
 };
 
 describe('session registration repository metadata', () => {
-  it('stores parent spawn policy and server-authoritative child lineage outside the profile bundle', async () => {
-    const policy = {
-      procedures: ['cloudAgentNext.prepareSession' as const],
-      repositories: ['acme/widgets'],
-      models: ['kilo/test-model'],
-      remainingDepth: 1 as const,
-    };
-    for (const cloudAgentSpawn of [{ policy }, { parentSessionId: 'workspace_parent' }]) {
+  it('stores opt-in and server-authoritative child lineage outside the profile bundle', async () => {
+    for (const scope of [
+      { allowSubagentSessions: true },
+      { parentCloudAgentSessionId: 'workspace_parent' },
+      { allowSubagentSessions: true, parentCloudAgentSessionId: 'workspace_parent' },
+    ]) {
       const result = await buildSessionMetadataFromRegistration({
         identity: { sessionId: 'workspace_child', userId: 'user_fixture' },
         auth: {},
         agent: { mode: 'code', model: 'kilo/test-model' },
         repository: GITHUB_REPOSITORY,
-        cloudAgentSpawn,
+        ...scope,
       });
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error(result.error);
-      expect(result.metadata.cloudAgentSpawn).toEqual(cloudAgentSpawn);
+      expect(result.metadata.allowSubagentSessions).toBe(scope.allowSubagentSessions ?? false);
+      expect(result.metadata.parentCloudAgentSessionId).toBe(scope.parentCloudAgentSessionId);
       expect(result.metadata.profile).toBeUndefined();
     }
   });

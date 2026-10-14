@@ -938,7 +938,7 @@ Request and response bodies stream; there is no body-size cap.
 | Sandbox route failed or absent for this session, allocation stopped/stopping, no current `providerRef`, or the physical DO not running | 503 | `The sandbox is not running` |
 | Request headers over the cap (40 forwarded, name > 128, value > 8192; bounds header work before the access query and DO calls) | 431 | `Preview request headers are too large` |
 | Connection refused on the container port | 502 | `Nothing is listening on that port` |
-| No upstream response headers within 15 s | 504 | `The server on that port did not respond in time` |
+| No upstream response headers within 60 s (a dev server can compile a page on first request) | 504 | `The server on that port did not respond in time` |
 
 - **Accepted residuals.** The SDK physical DO name is the stable pinned sandbox id, so a
   resolve-to-fetch race can reach a replacement container of the same owner scope / same session

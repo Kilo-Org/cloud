@@ -2,7 +2,8 @@ import { stripPreviewMarkerHeaders } from '../shared/preview-headers.js';
 import { isValidPreviewPort } from './host.js';
 import { previewUpstreamHost, previewUpstreamUrl } from './upstream.js';
 
-export const PREVIEW_UPSTREAM_TIMEOUT_MS = 15_000;
+// Time to response headers. A dev server can compile a page on its first request.
+export const PREVIEW_UPSTREAM_TIMEOUT_MS = 60_000;
 
 export type PreviewContainerTcpPort = {
   fetch(url: string, request: Request): Promise<Response>;

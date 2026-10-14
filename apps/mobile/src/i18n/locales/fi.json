@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Päivitä GitHub-sovellus"
       },
       "githubIpAllowList": {
-        "description": "Koodikatselmoija poistettiin käytöstä, koska GitHub-organisaation sallittujen IP-osoitteiden luettelo estää Kilon pääsyn. Pyydä apua osoitteesta hi@kilocode.ai ja ota sitten koodikatselmoija uudelleen käyttöön."
+        "description": "Koodikatselmoija poistettiin käytöstä, koska GitHub-organisaation sallittujen IP-osoitteiden luettelo estää Kilon pääsyn. Pyydä apua osoitteesta hi@kilo.ai ja ota sitten koodikatselmoija uudelleen käyttöön."
       },
       "gitlabProjectAccessRequired": {
         "description": "Koodikatselmoija poistettiin käytöstä, koska Kilo ei voi luoda tälle GitLab-projektille käyttöoikeustunnusta. Myönnä ylläpitäjän käyttöoikeus tai salli projektin käyttöoikeustunnukset ja ota sitten koodikatselmoija uudelleen käyttöön.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Päivitä koodikatselmoijan asetukset"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Koodikatselmoija poistettiin käytöstä, koska tietovaraston kloonaus aikakatkaistiin tänään kolmesti. Pyydä apua osoitteesta hi@kilocode.ai ja ota sitten koodikatselmoija uudelleen käyttöön."
+        "description": "Koodikatselmoija poistettiin käytöstä, koska tietovaraston kloonaus aikakatkaistiin tänään kolmesti. Pyydä apua osoitteesta hi@kilo.ai ja ota sitten koodikatselmoija uudelleen käyttöön."
       },
       "title": "Koodintarkistaja vaatii toimenpiteitä.",
       "recoveryLabel": "Ota yhteyttä tukeen"

@@ -1040,7 +1040,7 @@
         "recoveryLabel": "更新 GitHub 应用"
       },
       "githubIpAllowList": {
-        "description": "此 GitHub 组织的 IP 允许列表阻止了 Kilo 访问，因此代码审查器已禁用。请联系 hi@kilocode.ai 获取帮助，然后重新启用代码审查器。"
+        "description": "此 GitHub 组织的 IP 允许列表阻止了 Kilo 访问，因此代码审查器已禁用。请联系 hi@kilo.ai 获取帮助，然后重新启用代码审查器。"
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo 无法为此项目创建 GitLab 项目访问令牌，因此代码审查器已禁用。请授予维护者权限或启用项目访问令牌，然后重新启用代码审查器。",
@@ -1055,7 +1055,7 @@
         "recoveryLabel": "更新代码审查器设置"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "今天仓库克隆已超时三次，因此代码审查器已禁用。请联系 hi@kilocode.ai 获取帮助，然后重新启用代码审查器。"
+        "description": "今天仓库克隆已超时三次，因此代码审查器已禁用。请联系 hi@kilo.ai 获取帮助，然后重新启用代码审查器。"
       },
       "title": "代码审查助手有问题需要处理。",
       "recoveryLabel": "联系技术支持"

@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Uppfæra GitHub-forrit"
       },
       "githubIpAllowList": {
-        "description": "Kóðarýnirinn var gerður óvirkur því þetta GitHub-fyrirtæki notar IP-leyfislista sem hindrar aðgang Kilo. Fáðu aðstoð á hi@kilocode.ai og virkjaðu svo kóðarýninn aftur."
+        "description": "Kóðarýnirinn var gerður óvirkur því þetta GitHub-fyrirtæki notar IP-leyfislista sem hindrar aðgang Kilo. Fáðu aðstoð á hi@kilo.ai og virkjaðu svo kóðarýninn aftur."
       },
       "gitlabProjectAccessRequired": {
         "description": "Kóðarýnirinn var gerður óvirkur því Kilo getur ekki búið til GitLab-aðgangstóka fyrir þetta verkefni. Veittu viðhaldsaðilaheimildir eða virkjaðu aðgangstóka verkefna og virkjaðu svo kóðarýninn aftur.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Uppfæra stillingar kóðarýnis"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Kóðarýnirinn var gerður óvirkur eftir að klónun geymslunnar rann þrisvar út á tíma í dag. Fáðu aðstoð á hi@kilocode.ai og virkjaðu svo kóðarýninn aftur."
+        "description": "Kóðarýnirinn var gerður óvirkur eftir að klónun geymslunnar rann þrisvar út á tíma í dag. Fáðu aðstoð á hi@kilo.ai og virkjaðu svo kóðarýninn aftur."
       },
       "title": "Kóðarýnirinn þarfnast athygli.",
       "recoveryLabel": "Hafa samband við þjónustuver"

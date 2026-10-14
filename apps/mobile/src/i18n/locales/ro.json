@@ -1571,7 +1571,7 @@
         "recoveryLabel": "Actualizează aplicația GitHub"
       },
       "githubIpAllowList": {
-        "description": "Agentul de revizuire a codului a fost dezactivat deoarece lista de adrese IP permise a acestei organizații GitHub blochează Kilo. Cere ajutor la hi@kilocode.ai, apoi activează din nou agentul de revizuire a codului."
+        "description": "Agentul de revizuire a codului a fost dezactivat deoarece lista de adrese IP permise a acestei organizații GitHub blochează Kilo. Cere ajutor la hi@kilo.ai, apoi activează din nou agentul de revizuire a codului."
       },
       "gitlabProjectAccessRequired": {
         "description": "Agentul de revizuire a codului a fost dezactivat deoarece Kilo nu poate crea un token de acces pentru acest proiect GitLab. Acordă acces de responsabil de proiect sau activează tokenurile de acces la proiect, apoi activează din nou agentul de revizuire a codului.",
@@ -1586,7 +1586,7 @@
         "recoveryLabel": "Actualizează setările agentului de revizuire a codului"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Agentul de revizuire a codului a fost dezactivat după ce clonarea depozitului a depășit timpul alocat de trei ori astăzi. Cere ajutor la hi@kilocode.ai, apoi activează din nou agentul de revizuire a codului."
+        "description": "Agentul de revizuire a codului a fost dezactivat după ce clonarea depozitului a depășit timpul alocat de trei ori astăzi. Cere ajutor la hi@kilo.ai, apoi activează din nou agentul de revizuire a codului."
       },
       "title": "Agentul de revizuire a codului necesită intervenția ta.",
       "recoveryLabel": "Contactează asistența"

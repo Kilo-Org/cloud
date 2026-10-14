@@ -5,6 +5,7 @@ import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import { TRPC_ERROR_CODES_BY_KEY, type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import {
   sandboxSelectionCapabilitiesSchema,
   type SandboxAllocationInput,
@@ -180,6 +181,8 @@ type PrepareSessionSharedFields = {
   /** Deprecated: true is rejected because devcontainer support is retired. */
   devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocationInput;
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
 };
 
 /** Non-clone prepare input: required `prompt` and the current optional initial fields. */
@@ -381,6 +384,7 @@ export type GetSessionOutput = {
   model?: string;
   autoCommit?: boolean;
   upstreamBranch?: string;
+  branchName?: string;
 
   /** Custom agents stored on this session (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{

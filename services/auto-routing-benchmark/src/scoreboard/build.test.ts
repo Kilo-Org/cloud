@@ -185,6 +185,21 @@ describe('buildScoreboard', () => {
     expect(build(parsed).cost.estimatedRequestUsdWeighted).toBeCloseTo(0.22);
   });
 
+  it('validates live-table routers and defaults legacy rows to efficient', () => {
+    const row = {
+      run_id: 'fixture/live',
+      published_at: now.toISOString(),
+      generated_at: now.toISOString(),
+      min_accuracy: 0.5,
+      switch_cost_factor: 2,
+      best_accuracy_switch_threshold: 0.05,
+      source: 'benchmark',
+    };
+    expect(LiveScoreboardTableRowSchema.parse(row).router).toBe('efficient');
+    expect(LiveScoreboardTableRowSchema.parse({ ...row, router: 'frontier' }).router).toBe('frontier');
+    expect(LiveScoreboardTableRowSchema.safeParse({ ...row, router: 'unknown' }).success).toBe(false);
+  });
+
   it('weights prompt-aware estimates without changing the published first picks', () => {
     const pricedTable: ScoreboardRoutingTable = {
       ...table,

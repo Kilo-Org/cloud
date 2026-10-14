@@ -3,6 +3,7 @@ import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import type { User } from '@kilocode/db/schema';
 import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   JWT_TOKEN_VERSION,
@@ -62,7 +63,7 @@ import {
   releaseDecideLease,
   type DecideResponse,
 } from '@kilocode/web-shared/lib/bouncer/client';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { handleLlmProxyRequest } from './llm-proxy';
 
 jest.mock('next/server', () => {
@@ -1602,12 +1603,13 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedIsReleaseToggleEnabled.mockResolvedValue(true);
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
-      authFailedResponse: null,
-      organizationId: undefined,
+      authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+      credentialsRejected: false,
     });
 
-    await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/frontier')));
 
+    expect(response.status).toBe(401);
     expect(mockedIsReleaseToggleEnabled).not.toHaveBeenCalled();
     expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
     expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();

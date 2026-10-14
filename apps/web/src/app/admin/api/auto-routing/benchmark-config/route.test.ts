@@ -67,6 +67,9 @@ function putRequest(body: unknown) {
 }
 
 const validConfig = {
+  router: 'efficient' as const,
+  accuracyNoiseBand: 0.05,
+  frontierMinAccuracyDelta: 0,
   classifierModels: ['google/gemini-2.5-flash-lite'],
   deciderModels: [{ id: 'openai/gpt-5-mini' }],
   minAccuracy: 0.7,

@@ -1,4 +1,4 @@
-import type { MirrorPayload } from '@kilocode/auto-routing-contracts';
+import { DEFAULT_AUTO_ROUTER, type MirrorPayload } from '@kilocode/auto-routing-contracts';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 import { withDORetry } from '@kilocode/worker-utils';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
@@ -31,6 +31,7 @@ export async function buildClassifierUsage(
 ): Promise<UsageRecordRequest> {
   const hash = await sha256Hex(
     JSON.stringify([
+      payload.router ?? DEFAULT_AUTO_ROUTER,
       identity.conversationKey,
       identity.classifierModel,
       identity.contentHash,
@@ -130,7 +131,9 @@ export async function recordClassifierUsage(
   await withDORetry(
     () =>
       env.AUTO_ROUTING_DECISION_CACHE.get(
-        env.AUTO_ROUTING_DECISION_CACHE.idFromName(identity.conversationKey)
+        env.AUTO_ROUTING_DECISION_CACHE.idFromName(
+          `${payload.router ?? DEFAULT_AUTO_ROUTER}:${identity.conversationKey}`
+        )
       ),
     stub => stub.recordClassifierUsage(usage),
     'recordClassifierUsage'

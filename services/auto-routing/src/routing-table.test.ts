@@ -46,6 +46,7 @@ function makeEnv(
   kvValue: string | null,
   opts: {
     onGet?: () => void;
+    read?: (key: string) => Promise<string | null>;
     onPut?: (key: string, value: string, options: unknown) => void;
     originTable?: unknown;
     originStatus?: number;
@@ -54,9 +55,9 @@ function makeEnv(
 ): KvStub {
   return {
     AUTO_ROUTING_CONFIG: {
-      get: async () => {
+      get: async (key: string) => {
         opts.onGet?.();
-        return kvValue;
+        return opts.read ? opts.read(key) : kvValue;
       },
       put: async (key: string, value: string, options: unknown) => {
         opts.onPut?.(key, value, options);
@@ -127,8 +128,7 @@ describe('getRoutingTable', () => {
     const get = vi.fn(async (key: string) =>
       JSON.stringify(key === 'routing_table_frontier_v1' ? frontierTable : SAMPLE_TABLE)
     );
-    const env = makeEnv(null);
-    env.AUTO_ROUTING_CONFIG.get = get as typeof env.AUTO_ROUTING_CONFIG.get;
+    const env = makeEnv(null, { read: get });
     expect((await getRoutingTable(env))?.version).toBe(SAMPLE_TABLE.version);
     expect((await getRoutingTable(env, 'frontier'))?.version).toBe(frontierTable.version);
     expect((await getRoutingTable(env, 'efficient'))?.version).toBe(SAMPLE_TABLE.version);
@@ -155,11 +155,10 @@ describe('getRoutingTable', () => {
   });
 
   it('does not substitute the efficient table when the frontier table is missing', async () => {
-    const env = makeEnv(null);
     const get = vi.fn(async (key: string) =>
       key === 'routing_table_v1' ? JSON.stringify(SAMPLE_TABLE) : null
     );
-    env.AUTO_ROUTING_CONFIG.get = get as typeof env.AUTO_ROUTING_CONFIG.get;
+    const env = makeEnv(null, { read: get });
     expect(await getRoutingTable(env, 'frontier')).toBeNull();
     expect((await getRoutingTable(env))?.version).toBe(SAMPLE_TABLE.version);
   });

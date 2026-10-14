@@ -38,6 +38,9 @@ runs, routing table, and publication cache key. Accuracy thresholds, `accuracyNo
 `frontierMinAccuracyDelta`, token profile, switch horizon and thresholds, and platform
 `maxConcurrency` are configured independently. The classifier and its winner remain shared:
 classifier runs use the efficient configuration even when requested from the frontier view.
+Classifier inference billing is owned by the routing worker. Usage IDs and durable delivery
+objects include the router, so an otherwise identical call on another router cannot be
+deduplicated as a retry of the first call.
 
 Frontier initially has no saved configuration or published table. No default model pool or
 efficient table is fabricated for it. Before enabling frontier serving, administrators must

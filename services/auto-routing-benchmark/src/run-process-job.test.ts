@@ -161,6 +161,9 @@ function deciderMessage(overrides: { variant?: string | null } = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getBenchmarkConfig).mockResolvedValue({
+    router: 'efficient',
+    accuracyNoiseBand: 0.05,
+    frontierMinAccuracyDelta: 0,
     classifierModels: ['classifier/a'],
     deciderModels: [{ id: model }],
     minAccuracy: 0.7,

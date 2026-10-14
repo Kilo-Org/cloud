@@ -83,6 +83,19 @@ describe('classifier usage identity', () => {
     expect(first.core.id).not.toBe(other.core.id);
   });
 
+  it('namespaces usage IDs by router and defaults omitted routers to efficient', async () => {
+    const defaultUsage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
+    const efficientUsage = await buildClassifierUsage(
+      { ...payload, router: 'efficient' }, identity, costUsd, createdAt
+    );
+    const frontierUsage = await buildClassifierUsage(
+      { ...payload, router: 'frontier' }, identity, costUsd, createdAt
+    );
+    expect(defaultUsage.core.id).toBe(efficientUsage.core.id);
+    expect(frontierUsage.core.id).not.toBe(efficientUsage.core.id);
+    expect(frontierUsage.metadata.id).toBe(frontierUsage.core.id);
+  });
+
   it('matches classifier billing fields without persisting prompt text or lifecycle identity', async () => {
     const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);
     expect(usage.core).toMatchObject({
@@ -157,9 +170,25 @@ describe('classifier usage delivery', () => {
         createdAt
       );
       expect(record).toHaveBeenCalledExactlyOnceWith(expected);
-      expect(idFromName).toHaveBeenCalledExactlyOnceWith(identity.conversationKey);
+      expect(idFromName).toHaveBeenCalledExactlyOnceWith(`efficient:${identity.conversationKey}`);
     }
   );
+
+  it('delivers frontier usage through its router-scoped conversation object', async () => {
+    const record = vi.fn(async () => {});
+    const idFromName = vi.fn((name: string) => name);
+    const env = {
+      AUTO_ROUTING_DECISION_CACHE: {
+        idFromName,
+        get: () => ({ recordClassifierUsage: record }),
+      },
+    } as unknown as Env;
+    await recordClassifierUsage(
+      env, { ...payload, router: 'frontier' }, identity, costUsd, createdAt
+    );
+    expect(idFromName).toHaveBeenCalledExactlyOnceWith(`frontier:${identity.conversationKey}`);
+    expect(record).toHaveBeenCalledTimes(1);
+  });
 
   it('posts the usage contract to the existing web writer using the internal secret', async () => {
     const usage = await buildClassifierUsage(payload, identity, costUsd, createdAt);

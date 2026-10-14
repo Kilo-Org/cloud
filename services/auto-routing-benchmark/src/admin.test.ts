@@ -253,6 +253,9 @@ describe('GET /admin/config', () => {
     vi.mocked(getConfigRows).mockResolvedValueOnce({
       config: {
         id: 1,
+        router: 'efficient',
+        accuracy_noise_band: TEST_CONFIG.accuracyNoiseBand,
+        frontier_min_accuracy_delta: TEST_CONFIG.frontierMinAccuracyDelta,
         min_accuracy: 0.9,
         switch_cost_factor: 3,
         best_accuracy_switch_threshold: 0.05,
@@ -605,7 +608,7 @@ describe('POST /admin/runs', () => {
     // The platform budget fits one entry per repetition; the user budget does
     // not. Hiding the user queue's failure behind the platform run would leave
     // its pending work looking like an empty queue.
-    vi.mocked(getConfigRows).mockResolvedValue({
+    const configRows = {
       ...TEST_CONFIG_ROWS,
       config: {
         ...TEST_CONFIG_ROWS.config,
@@ -613,7 +616,10 @@ describe('POST /admin/runs', () => {
         user_max_concurrency: 4,
         decider_repetitions: 5,
       },
-    });
+    };
+    vi.mocked(getConfigRows).mockImplementation(async (_db, router) =>
+      router === 'frontier' ? { ...TEST_CONFIG_ROWS, config: null } : configRows
+    );
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([
       { model: 'm/1', variant: '', requested_at: '2026-06-01T00:00:00.000Z' },
     ]);
@@ -841,7 +847,15 @@ describe('router selection', () => {
     expect(response.status).toBe(200);
     expect(getConfigRows).toHaveBeenCalledWith(env.BENCH_DB, 'efficient');
     expect(insertRun).toHaveBeenCalledWith(
-      env.BENCH_DB, expect.objectContaining({ kind: 'classifier', router: 'efficient' })
+      env.BENCH_DB,
+      expect.objectContaining({
+        kind: 'classifier',
+        router: 'efficient',
+        benchmark_user_id: DEFAULT_BENCHMARK_USER_ID,
+        benchmark_org_id: DEFAULT_BENCHMARK_ORG_ID,
+      }),
+      expect.any(Array),
+      expect.any(Array)
     );
   });
 

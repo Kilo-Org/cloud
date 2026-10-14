@@ -333,6 +333,7 @@ describe('rowsToRoutingTable', () => {
   it('reads back a variant-only candidate row as variant', () => {
     const tableRow = {
       run_id: 'run-variant',
+      router: 'efficient' as const,
       published_at: '2026-06-01T11:00:00.000Z',
       generated_at: '2026-06-01T10:00:00.000Z',
       min_accuracy: 0.7,

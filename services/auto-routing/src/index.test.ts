@@ -1504,6 +1504,7 @@ describe('auto routing worker', () => {
       });
       expect(response.status).toBe(200);
       expect(registerBody).toEqual({
+        router: 'efficient',
         ownerType: 'user',
         ownerId: 'user-1',
         entries: pool,

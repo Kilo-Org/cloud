@@ -1,6 +1,8 @@
 import * as z from 'zod';
 import {
+  AutoRouterSchema,
   CandidatePricingSchema,
+  DEFAULT_AUTO_ROUTER,
   ProductionTokenProfileSchema,
   RankedCandidateSchema,
   RoutingTableSchema,
@@ -166,6 +168,7 @@ export type ScoreboardRoutingTable = z.infer<typeof ScoreboardRoutingTableSchema
 const storedJsonSchema = z.string().transform((value): unknown => JSON.parse(value));
 
 export const LiveScoreboardTableRowSchema = z.object({
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
   run_id: z.string(),
   published_at: z.string(),
   generated_at: z.string(),

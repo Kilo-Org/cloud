@@ -78,7 +78,7 @@ export function buildScoreboard({
               cases,
               avgCostUsd,
               p50LatencyMs,
-              pricing: pricing ? pricing[model] ?? null : storedPricing.get(model) ?? null,
+              pricing: pricing ? (pricing[model] ?? null) : (storedPricing.get(model) ?? null),
             })
           );
           return [
@@ -151,15 +151,16 @@ export function buildScoreboard({
     const summary = pick && heldOutByRoute.get(route)?.get(candidateKey(pick));
     return summary && pick && share > 0 ? [{ pick, summary, share }] : [];
   });
-  const heldOutWeighted = (
-    metric: 'accuracy' | 'avgCostUsd' | 'p50LatencyMs'
-  ): number | null => {
+  const heldOutWeighted = (metric: 'accuracy' | 'avgCostUsd' | 'p50LatencyMs'): number | null => {
     let total = 0;
     let weight = 0;
     for (const { pick, summary, share } of heldOutPicks) {
       const value =
         metric === 'avgCostUsd'
-          ? estimateRequestCostUsd({ avgCostUsd: summary.avgCostUsd, pricing: pick.pricing }, profile)
+          ? estimateRequestCostUsd(
+              { avgCostUsd: summary.avgCostUsd, pricing: pick.pricing },
+              profile
+            )
           : summary[metric];
       total += value * share;
       weight += share;

@@ -191,7 +191,7 @@ function assertEgressPolicyAllocation(
     'cloudAgentSessionId' | 'sandboxProvider' | 'sandboxRoute' | 'sandboxKind'
   >
 ): void {
-  if (input.runtime?.egressMode !== 'deny-by-default') return;
+  if (input.runtime?.egressMode !== 'allowlist') return;
   if (
     !allocation.cloudAgentSessionId.startsWith('workspace_') ||
     allocation.sandboxProvider !== 'cloudflare-containers' ||
@@ -1202,7 +1202,7 @@ function buildSessionRegistrationCommand(
       sandboxId: allocation.sandboxId,
       sandboxProvider: allocation.sandboxProvider,
       ...(input.runtime?.egressMode === undefined ? {} : { egressMode: input.runtime.egressMode }),
-      ...(input.runtime?.egressMode === 'deny-by-default'
+      ...(input.runtime?.egressMode === 'allowlist'
         ? { egressAllowlist: egressAllowlistSchema.parse(input.runtime.egressAllowlist ?? []) }
         : {}),
       ...(allocation.sandboxAllocation ? { sandboxAllocation: allocation.sandboxAllocation } : {}),
@@ -1789,12 +1789,12 @@ export async function sessionCreateIntentFingerprint(
       repository: repositoryCreateIntent(input.repository),
       finalization: input.finalization,
       runtime:
-        input.runtime?.sandboxAllocation || input.runtime?.egressMode === 'deny-by-default'
+        input.runtime?.sandboxAllocation || input.runtime?.egressMode === 'allowlist'
           ? {
               ...(input.runtime.sandboxAllocation
                 ? { sandboxAllocation: input.runtime.sandboxAllocation }
                 : {}),
-              ...(input.runtime.egressMode === 'deny-by-default'
+              ...(input.runtime.egressMode === 'allowlist'
                 ? {
                     egressMode: input.runtime.egressMode,
                     egressAllowlist: egressAllowlistSchema.parse(
@@ -1846,7 +1846,7 @@ async function assertCreateIntentUnchanged(
   if (
     !recorded.success ||
     !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement) ||
-    ((selectable !== undefined || input.runtime?.egressMode === 'deny-by-default') &&
+    ((selectable !== undefined || input.runtime?.egressMode === 'allowlist') &&
       (typeof stored !== 'string' || stored.length === 0))
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
@@ -2353,8 +2353,8 @@ async function readSessionMetadata(
   }
   if (
     metadata !== null &&
-    ((metadata.workspace?.egressMode ?? 'allow-all') !==
-      (input.runtime?.egressMode ?? 'allow-all') ||
+    ((metadata.workspace?.egressMode ?? 'unrestricted') !==
+      (input.runtime?.egressMode ?? 'unrestricted') ||
       JSON.stringify(metadata.workspace?.egressAllowlist ?? []) !==
         JSON.stringify(egressAllowlistSchema.parse(input.runtime?.egressAllowlist ?? [])))
   ) {

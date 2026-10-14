@@ -29,10 +29,10 @@ export const controlPlaneSandboxSelectionSchema = egressPolicySchema
   .strict()
   .refine(
     selection =>
-      selection.egressMode !== 'deny-by-default' ||
+      selection.egressMode !== 'allowlist' ||
       (selection.provider === 'cloudflare-containers' &&
         (selection.sandboxKind === undefined || selection.sandboxKind === 'isolated')),
-    'deny-by-default egress requires an isolated Cloudflare containers sandbox'
+    'allowlist egress requires an isolated Cloudflare containers sandbox'
   );
 
 export type ControlPlaneSandboxSelection = z.infer<typeof controlPlaneSandboxSelectionSchema>;

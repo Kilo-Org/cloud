@@ -519,12 +519,12 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
   it('enforces explicit egress mode on clone-only inputs', () => {
     for (const schema of [personalPrepareSessionNextSchema, organizationPrepareSessionNextSchema]) {
       const input = { ...cloneOnlyInput, organizationId: MESSAGE_UUID };
-      const parsed = schema.parse({ ...input, egressMode: 'deny-by-default' });
-      expect(parsed.egressMode).toBe('deny-by-default');
+      const parsed = schema.parse({ ...input, egressMode: 'allowlist' });
+      expect(parsed.egressMode).toBe('allowlist');
       expect(parsed.egressAllowlist).toBeUndefined();
       expect(schema.safeParse({ ...input, egressAllowlist: [] }).success).toBe(false);
       expect(
-        schema.safeParse({ ...input, egressMode: 'allow-all', egressAllowlist: [] }).success
+        schema.safeParse({ ...input, egressMode: 'unrestricted', egressAllowlist: [] }).success
       ).toBe(false);
     }
   });
@@ -754,21 +754,21 @@ describe('prepare session sandbox selection', () => {
       expect(
         personalPrepareSessionNextSchema.parse({
           ...baseInput,
-          egressMode: 'deny-by-default',
+          egressMode: 'allowlist',
           egressAllowlist,
         }).egressAllowlist
       ).toEqual(expected);
       expect(
         organizationPrepareSessionNextSchema.parse({
           ...organizationInput,
-          egressMode: 'deny-by-default',
+          egressMode: 'allowlist',
           egressAllowlist,
         }).egressAllowlist
       ).toEqual(expected);
     }
   );
 
-  it.each([{}, { egressMode: 'allow-all' }, { egressMode: 'deny-by-default' }])(
+  it.each([{}, { egressMode: 'unrestricted' }, { egressMode: 'allowlist' }])(
     'preserves omitted lists without inferring modes: %j',
     policy => {
       for (const parsed of [
@@ -784,8 +784,8 @@ describe('prepare session sandbox selection', () => {
   it.each([
     { egressAllowlist: [] },
     { egressAllowlist: ['example.com'] },
-    { egressMode: 'allow-all', egressAllowlist: [] },
-    { egressMode: 'allow-all', egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'deny-all' },
     { egressMode: null },
   ])('rejects ambiguous or unsupported egress policies: %j', policy => {
@@ -802,14 +802,14 @@ describe('prepare session sandbox selection', () => {
       expect(
         personalPrepareSessionNextSchema.safeParse({
           ...baseInput,
-          egressMode: 'deny-by-default',
+          egressMode: 'allowlist',
           egressAllowlist,
         }).success
       ).toBe(false);
       expect(
         organizationPrepareSessionNextSchema.safeParse({
           ...organizationInput,
-          egressMode: 'deny-by-default',
+          egressMode: 'allowlist',
           egressAllowlist,
         }).success
       ).toBe(false);

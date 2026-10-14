@@ -42,7 +42,7 @@ describe('session metadata boundary', () => {
       workspace: {
         sandboxId: 'ses-0123456789abcdef',
         sandboxProvider: 'cloudflare-containers',
-        egressMode: 'deny-by-default',
+        egressMode: 'allowlist',
         egressAllowlist,
       },
       lifecycle: { version: 1, timestamp: 1 },
@@ -54,9 +54,9 @@ describe('session metadata boundary', () => {
           ? []
           : ['example.com', 'z.example.com'];
     expect(metadata.workspace?.egressAllowlist).toEqual(expected);
-    expect(metadata.workspace?.egressMode).toBe('deny-by-default');
+    expect(metadata.workspace?.egressMode).toBe('allowlist');
     expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressMode).toBe(
-      'deny-by-default'
+      'allowlist'
     );
     expect(
       parseSessionMetadata(serializeSessionMetadata(metadata)).workspace?.egressAllowlist
@@ -95,7 +95,7 @@ describe('session metadata boundary', () => {
               ...workspace,
               sandboxId,
               sandboxProvider: provider,
-              egressMode: 'deny-by-default',
+              egressMode: 'allowlist',
               egressAllowlist,
             },
             lifecycle: { version: 1, timestamp: 1 },
@@ -106,7 +106,7 @@ describe('session metadata boundary', () => {
   );
 
   it.each(['cloudflare', 'vercel', 'cloudflare-containers'] as const)(
-    'preserves explicit allow-all for provider %s without adding a list',
+    'preserves explicit unrestricted for provider %s without adding a list',
     sandboxProvider => {
       const metadata = parseSessionMetadata({
         metadataSchemaVersion: 2,
@@ -115,11 +115,11 @@ describe('session metadata boundary', () => {
         workspace: {
           sandboxId: 'ses-0123456789abcdef',
           sandboxProvider,
-          egressMode: 'allow-all',
+          egressMode: 'unrestricted',
         },
         lifecycle: { version: 1, timestamp: 1 },
       });
-      expect(metadata.workspace?.egressMode).toBe('allow-all');
+      expect(metadata.workspace?.egressMode).toBe('unrestricted');
       expect(metadata.workspace?.egressAllowlist).toBeUndefined();
       expect(parseSessionMetadata(serializeSessionMetadata(metadata)).workspace).toEqual(
         metadata.workspace
@@ -127,26 +127,26 @@ describe('session metadata boundary', () => {
     }
   );
 
-  it('accepts explicit allow-all in legacy shared metadata', () => {
+  it('accepts explicit unrestricted in legacy shared metadata', () => {
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,
       identity: { sessionId: 'agent_test', userId: 'user' },
       auth: {},
       workspace: {
         sandboxId: 'usr-0123456789abcdef',
-        egressMode: 'allow-all',
+        egressMode: 'unrestricted',
       },
       lifecycle: { version: 1, timestamp: 1 },
     });
-    expect(metadata.workspace?.egressMode).toBe('allow-all');
+    expect(metadata.workspace?.egressMode).toBe('unrestricted');
     expect(metadata.workspace?.egressAllowlist).toBeUndefined();
   });
 
   it.each([
     { egressAllowlist: [] },
     { egressAllowlist: ['example.com'] },
-    { egressMode: 'allow-all', egressAllowlist: [] },
-    { egressMode: 'allow-all', egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'invalid' },
     { egressMode: null },
   ])('rejects invalid persisted egress policy %j', policy => {

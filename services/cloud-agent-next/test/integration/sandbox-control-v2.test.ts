@@ -2963,11 +2963,11 @@ describe('SandboxControlV2 allocation egress policy', () => {
 
   it.each([
     { egressMode: undefined, policy: undefined, expected: undefined },
-    { egressMode: 'allow-all' as const, policy: undefined, expected: undefined },
-    { egressMode: 'deny-by-default' as const, policy: undefined, expected: baseline },
-    { egressMode: 'deny-by-default' as const, policy: [], expected: baseline },
+    { egressMode: 'unrestricted' as const, policy: undefined, expected: undefined },
+    { egressMode: 'allowlist' as const, policy: undefined, expected: baseline },
+    { egressMode: 'allowlist' as const, policy: [], expected: baseline },
     {
-      egressMode: 'deny-by-default' as const,
+      egressMode: 'allowlist' as const,
       policy: ['Packages.Example.com.', 'github.com'],
       expected: [...baseline, 'packages.example.com'].sort(),
     },
@@ -2986,14 +2986,14 @@ describe('SandboxControlV2 allocation egress policy', () => {
       const pin = JSON.parse((await readProviderPin(stub)) ?? '{}') as StoredProviderPin;
       expect(pin.provider).toBe('cloudflare-containers');
       expect(pin.egressAllowlist).toEqual(expected);
-      expect(Object.hasOwn(pin, 'egressAllowlist')).toBe(egressMode === 'deny-by-default');
+      expect(Object.hasOwn(pin, 'egressAllowlist')).toBe(egressMode === 'allowlist');
     }
   );
 
   it('pins the provider origin from the session token during prepare', async () => {
     const provider = createFakeProvider();
     const { stub } = await configureEgressSandbox(provider);
-    const input = prepareInput(firstSessionId, { egressMode: 'deny-by-default' });
+    const input = prepareInput(firstSessionId, { egressMode: 'allowlist' });
     input.credentials.kiloToken = 'https://token-provider.example.com/api:session-token';
     expect(await stub.prepare(input)).toMatchObject({ state: 'preparing' });
     await awaitStarting(provider, stub);
@@ -3014,7 +3014,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
       sandboxId: placedId,
       sandboxKind: 'isolated',
       provider: 'cloudflare-containers',
-      egressMode: 'deny-by-default',
+      egressMode: 'allowlist',
     });
     await awaitStarting(provider, stub);
     expect(JSON.parse((await readProviderPin(stub)) ?? '{}')).toMatchObject({
@@ -3023,13 +3023,13 @@ describe('SandboxControlV2 allocation egress policy', () => {
     });
   });
 
-  it('allows explicit allow-all on a non-container allocation without compiling a policy', async () => {
+  it('allows explicit unrestricted on a non-container allocation without compiling a policy', async () => {
     const provider = createFakeProvider();
     await configureEgressSandbox(provider);
     const stub = await startAllocation(provider, {
       sandboxId,
       provider: 'cloudflare',
-      egressMode: 'allow-all',
+      egressMode: 'unrestricted',
     });
     await awaitStarting(provider, stub);
     expect(JSON.parse((await readProviderPin(stub)) ?? '{}').egressAllowlist).toBeUndefined();
@@ -3041,7 +3041,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     expect(
       await stub.prepare(
         prepareInput(firstSessionId, {
-          egressMode: 'deny-by-default',
+          egressMode: 'allowlist',
           egressAllowlist: ['packages.example.com'],
         })
       )
@@ -3101,7 +3101,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     'introduced',
     'mode-only-introduced',
     'mode-only-removed',
-    'allow-all',
+    'unrestricted',
   ] as const)(
     'rejects a %s active prepare policy immediately without disturbing a ready sibling',
     async mismatch => {
@@ -3111,7 +3111,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
         mismatch === 'introduced' || mismatch === 'mode-only-introduced'
           ? {}
           : {
-              egressMode: 'deny-by-default' as const,
+              egressMode: 'allowlist' as const,
               ...(mismatch === 'mode-only-removed'
                 ? {}
                 : { egressAllowlist: ['packages.example.com'] }),
@@ -3135,10 +3135,10 @@ describe('SandboxControlV2 allocation egress policy', () => {
         nextSessionId,
         mismatch === 'removed' || mismatch === 'mode-only-removed'
           ? {}
-          : mismatch === 'allow-all'
-            ? { egressMode: 'allow-all' }
+          : mismatch === 'unrestricted'
+            ? { egressMode: 'unrestricted' }
             : {
-                egressMode: 'deny-by-default',
+                egressMode: 'allowlist',
                 ...(mismatch === 'mode-only-introduced'
                   ? {}
                   : { egressAllowlist: ['different.example.com'] }),
@@ -3181,7 +3181,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     const { stub } = await configureEgressSandbox(provider);
     await stub.prepare(
       prepareInput(firstSessionId, {
-        egressMode: 'deny-by-default',
+        egressMode: 'allowlist',
         egressAllowlist: ['packages.example.com'],
       })
     );
@@ -3191,7 +3191,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
 
     const result = await stub.prepare(
       prepareInput(nextSessionId, {
-        egressMode: 'deny-by-default',
+        egressMode: 'allowlist',
         egressAllowlist: ['Packages.Example.com.', 'packages.example.com', 'github.com'],
       })
     );
@@ -3213,7 +3213,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
       const { stub } = await configureEgressSandbox(provider);
       await stub.prepare(
         prepareInput(firstSessionId, {
-          egressMode: 'deny-by-default',
+          egressMode: 'allowlist',
           egressAllowlist: initialList,
         })
       );
@@ -3225,7 +3225,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
       );
       expect(
         await stub.prepare(
-          prepareInput(nextSessionId, { egressMode: 'deny-by-default', egressAllowlist: nextList })
+          prepareInput(nextSessionId, { egressMode: 'allowlist', egressAllowlist: nextList })
         )
       ).toMatchObject({ state: 'preparing' });
       expect(await readState(stub)).toEqual(before);
@@ -3234,7 +3234,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     }
   );
 
-  it.each(['selection-omitted', 'allow-all'] as const)(
+  it.each(['selection-omitted', 'unrestricted'] as const)(
     'keeps an unrestricted active allocation when %s is requested',
     async mode => {
       const provider = createFakeProvider();
@@ -3243,7 +3243,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
       await awaitStarting(provider, stub);
       const before = await readState(stub);
       const pin = await readProviderPin(stub);
-      const input = prepareInput(nextSessionId, { egressMode: 'allow-all' });
+      const input = prepareInput(nextSessionId, { egressMode: 'unrestricted' });
       if (mode === 'selection-omitted') delete input.sandboxSelection;
       expect(await stub.prepare(input)).toMatchObject({ state: 'preparing' });
       expect(await readState(stub)).toEqual(before);
@@ -3255,8 +3255,8 @@ describe('SandboxControlV2 allocation egress policy', () => {
   it.each([
     { egressAllowlist: [] },
     { egressAllowlist: ['example.com'] },
-    { egressMode: 'allow-all' as const, egressAllowlist: [] },
-    { egressMode: 'allow-all' as const, egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted' as const, egressAllowlist: [] },
+    { egressMode: 'unrestricted' as const, egressAllowlist: ['example.com'] },
   ])('rejects list-only or contradictory ensure input before allocation: %j', async policy => {
     const provider = createFakeProvider();
     const { stub } = await configureEgressSandbox(provider);
@@ -3289,7 +3289,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
           sandboxId: id,
           provider: kind,
           sandboxKind,
-          egressMode: 'deny-by-default',
+          egressMode: 'allowlist',
         })
       ).rejects.toThrow('Sandbox configuration is invalid or unsupported');
 

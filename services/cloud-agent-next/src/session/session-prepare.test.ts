@@ -482,15 +482,15 @@ describe('explicit sandbox session creation', () => {
   )('preserves start policy %j', async ({ egressAllowlist }) => {
     const doStub = makeDoStub();
     const request = requestFromStructuredAllocation('cloudflare-containers-standard-3');
-    request.runtime = { ...request.runtime, egressMode: 'deny-by-default', egressAllowlist };
+    request.runtime = { ...request.runtime, egressMode: 'allowlist', egressAllowlist };
     await runCreate(selectedContext(doStub), request);
     const expected = !egressAllowlist?.length ? [] : ['example.com', 'z.example.com'];
-    expect(createdMetadata(doStub)?.workspace?.egressMode).toBe('deny-by-default');
+    expect(createdMetadata(doStub)?.workspace?.egressMode).toBe('allowlist');
     expect(createdMetadata(doStub)?.workspace?.egressAllowlist).toEqual(expected);
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         sandboxSelection: expect.objectContaining({
-          egressMode: 'deny-by-default',
+          egressMode: 'allowlist',
           egressAllowlist: expected,
         }),
       })
@@ -502,7 +502,7 @@ describe('explicit sandbox session creation', () => {
     async sandboxAllocation => {
       const doStub = makeDoStub();
       const request = requestForPreset(sandboxAllocation);
-      request.runtime = { sandboxAllocation, egressMode: 'deny-by-default' };
+      request.runtime = { sandboxAllocation, egressMode: 'allowlist' };
       await expect(runCreate(selectedContext(doStub), request)).rejects.toMatchObject({
         code: 'BAD_REQUEST',
       });
@@ -514,11 +514,11 @@ describe('explicit sandbox session creation', () => {
   it('accepts a supported resolved native replacement of cloudflare-single', async () => {
     const doStub = makeDoStub();
     const request = requestForPreset('cloudflare-single');
-    request.runtime = { sandboxAllocation: 'cloudflare-single', egressMode: 'deny-by-default' };
+    request.runtime = { sandboxAllocation: 'cloudflare-single', egressMode: 'allowlist' };
     await runCreate(selectedContext(doStub), request);
     expect(createdMetadata(doStub)?.workspace).toMatchObject({
       sandboxProvider: 'cloudflare-containers',
-      egressMode: 'deny-by-default',
+      egressMode: 'allowlist',
       egressAllowlist: [],
     });
   });
@@ -526,18 +526,18 @@ describe('explicit sandbox session creation', () => {
   it('forwards the policy on legacy registration-only creation', async () => {
     const doStub = makeDoStub();
     const request = requestForPreset('cloudflare-containers-standard-3');
-    request.runtime = { ...request.runtime, egressMode: 'deny-by-default' };
+    request.runtime = { ...request.runtime, egressMode: 'allowlist' };
     await registerNewSession(request, selectedContext(doStub));
     expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
       expect.objectContaining({
         metadata: expect.objectContaining({
           workspace: expect.objectContaining({
-            egressMode: 'deny-by-default',
+            egressMode: 'allowlist',
             egressAllowlist: [],
           }),
         }),
         sandboxSelection: expect.objectContaining({
-          egressMode: 'deny-by-default',
+          egressMode: 'allowlist',
           egressAllowlist: [],
         }),
       })
@@ -551,7 +551,7 @@ describe('explicit sandbox session creation', () => {
       await expect(
         runCreate(selectedContext(doStub), {
           ...requestForPreset(savedSandboxAllocation),
-          runtime: { egressMode: 'deny-by-default' },
+          runtime: { egressMode: 'allowlist' },
           savedSandboxAllocation,
         })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
@@ -566,7 +566,7 @@ describe('explicit sandbox session creation', () => {
       startNewSession(
         {
           ...requestForPreset('cloudflare-single'),
-          runtime: { sandboxAllocation: 'cloudflare-single', egressMode: 'deny-by-default' },
+          runtime: { sandboxAllocation: 'cloudflare-single', egressMode: 'allowlist' },
         },
         selectedContext(doStub)
       )
@@ -581,10 +581,10 @@ describe('explicit sandbox session creation', () => {
         mode: 'code',
         model: 'claude-3',
         githubRepo: 'acme/repo',
-        egressMode: 'deny-by-default',
+        egressMode: 'allowlist',
       })
     );
-    expect(request.runtime?.egressMode).toBe('deny-by-default');
+    expect(request.runtime?.egressMode).toBe('allowlist');
     expect(request.runtime?.egressAllowlist).toBeUndefined();
     expect(request.runtime?.sandboxAllocation).toBeUndefined();
   });
@@ -596,7 +596,7 @@ describe('explicit sandbox session creation', () => {
         ...request,
         runtime: {
           ...request.runtime,
-          egressMode: 'deny-by-default',
+          egressMode: 'allowlist',
           ...(egressAllowlist === undefined ? {} : { egressAllowlist }),
         },
       });
@@ -607,7 +607,7 @@ describe('explicit sandbox session creation', () => {
     expect(await fingerprint(['example.com'])).not.toBe(await fingerprint(['other.example.com']));
   });
 
-  it('fingerprints allow-all and omitted mode as equivalent, distinct from deny mode', async () => {
+  it('fingerprints unrestricted and omitted mode as equivalent, distinct from allowlist mode', async () => {
     for (const runtime of [
       undefined,
       { sandboxAllocation: 'cloudflare-containers-standard-3' as const },
@@ -617,13 +617,13 @@ describe('explicit sandbox session creation', () => {
       expect(
         await sessionCreateIntentFingerprint({
           ...request,
-          runtime: { ...runtime, egressMode: 'allow-all' },
+          runtime: { ...runtime, egressMode: 'unrestricted' },
         })
       ).toBe(implicit);
       expect(
         await sessionCreateIntentFingerprint({
           ...request,
-          runtime: { ...runtime, egressMode: 'deny-by-default' },
+          runtime: { ...runtime, egressMode: 'allowlist' },
         })
       ).not.toBe(implicit);
     }
@@ -631,7 +631,7 @@ describe('explicit sandbox session creation', () => {
 
   it.each([
     { egressAllowlist: [] },
-    { egressMode: 'allow-all', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
     { egressMode: 'invalid' },
   ])('rejects invalid internal egress policy before allocating: %j', async runtime => {
     const doStub = makeDoStub();
@@ -647,19 +647,19 @@ describe('explicit sandbox session creation', () => {
     async sandboxAllocation => {
       const doStub = makeDoStub();
       const request = requestForPreset(sandboxAllocation);
-      request.runtime = { sandboxAllocation, egressMode: 'allow-all' };
+      request.runtime = { sandboxAllocation, egressMode: 'unrestricted' };
       await runCreate(selectedContext(doStub), request);
-      expect(createdMetadata(doStub)?.workspace?.egressMode).toBe('allow-all');
+      expect(createdMetadata(doStub)?.workspace?.egressMode).toBe('unrestricted');
       expect(createdMetadata(doStub)?.workspace?.egressAllowlist).toBeUndefined();
     }
   );
 
   it.each([
     {},
-    { egressMode: 'allow-all' as const },
-    { egressMode: 'deny-by-default' as const },
-    { egressMode: 'deny-by-default' as const, egressAllowlist: [] },
-    { egressMode: 'deny-by-default' as const, egressAllowlist: ['other.example.com'] },
+    { egressMode: 'unrestricted' as const },
+    { egressMode: 'allowlist' as const },
+    { egressMode: 'allowlist' as const, egressAllowlist: [] },
+    { egressMode: 'allowlist' as const, egressAllowlist: ['other.example.com'] },
   ])('rejects a changed policy on ledger replay: %j', async policy => {
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
@@ -667,7 +667,7 @@ describe('explicit sandbox session creation', () => {
       ...requestForPreset('cloudflare-containers-standard-3'),
       runtime: {
         sandboxAllocation: 'cloudflare-containers-standard-3' as const,
-        egressMode: 'deny-by-default' as const,
+        egressMode: 'allowlist' as const,
         egressAllowlist: ['example.com'],
       },
     };
@@ -696,37 +696,40 @@ describe('explicit sandbox session creation', () => {
   });
 
   it.each([
-    { egressMode: 'deny-by-default' as const, egressAllowlist: [] },
-    { egressMode: 'deny-by-default' as const },
-  ])('replays baseline-only deny requests with equivalent optional lists: %j', async policy => {
-    const doStub = makeDoStub();
-    const ctx = selectedContext(doStub);
-    const request = {
-      ...requestForPreset('cloudflare-containers-standard-3'),
-      runtime: {
-        sandboxAllocation: 'cloudflare-containers-standard-3' as const,
-        egressMode: 'deny-by-default' as const,
-      },
-    };
-    const created = await runCreate(ctx, request);
-    const progress = Object.assign(
-      {},
-      ...recordOperationProgressMock.mock.calls.map(call => call[2])
-    );
-    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
-    admitOperationMock.mockResolvedValueOnce({
-      admission: 'duplicate_settled',
-      row: makeLedgerRow({
-        organization_id: orgId,
-        status: 'completed',
-        canonical_result: progress,
-      }),
-    });
-    await expect(
-      runCreate(ctx, { ...request, runtime: { ...request.runtime, ...policy } })
-    ).resolves.toEqual({ ...created, replayed: true });
-    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
-  });
+    { egressMode: 'allowlist' as const, egressAllowlist: [] },
+    { egressMode: 'allowlist' as const },
+  ])(
+    'replays baseline-only allowlist requests with equivalent optional lists: %j',
+    async policy => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      const request = {
+        ...requestForPreset('cloudflare-containers-standard-3'),
+        runtime: {
+          sandboxAllocation: 'cloudflare-containers-standard-3' as const,
+          egressMode: 'allowlist' as const,
+        },
+      };
+      const created = await runCreate(ctx, request);
+      const progress = Object.assign(
+        {},
+        ...recordOperationProgressMock.mock.calls.map(call => call[2])
+      );
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: makeLedgerRow({
+          organization_id: orgId,
+          status: 'completed',
+          canonical_result: progress,
+        }),
+      });
+      await expect(
+        runCreate(ctx, { ...request, runtime: { ...request.runtime, ...policy } })
+      ).resolves.toEqual({ ...created, replayed: true });
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('rejects a recovered registration that dropped the persisted policy', async () => {
     const doStub = makeDoStub();
@@ -735,7 +738,7 @@ describe('explicit sandbox session creation', () => {
       ...requestForPreset('cloudflare-containers-standard-3'),
       runtime: {
         sandboxAllocation: 'cloudflare-containers-standard-3' as const,
-        egressMode: 'deny-by-default' as const,
+        egressMode: 'allowlist' as const,
         egressAllowlist: [],
       },
     };

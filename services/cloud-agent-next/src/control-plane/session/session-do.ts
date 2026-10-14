@@ -898,10 +898,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.identity.orgId ?? null) === (metadata.identity.orgId ?? null) &&
       sameRepository(existing.repository, metadata.repository) &&
       this.registration.sandboxId === metadata.workspace?.sandboxId &&
-      (existing.workspace?.egressMode ?? 'allow-all') ===
-        (metadata.workspace?.egressMode ?? 'allow-all') &&
-      (this.registration.sandboxSelection?.egressMode ?? 'allow-all') ===
-        (sandboxSelection.egressMode ?? 'allow-all') &&
+      (existing.workspace?.egressMode ?? 'unrestricted') ===
+        (metadata.workspace?.egressMode ?? 'unrestricted') &&
+      (this.registration.sandboxSelection?.egressMode ?? 'unrestricted') ===
+        (sandboxSelection.egressMode ?? 'unrestricted') &&
       JSON.stringify(existing.workspace?.egressAllowlist ?? []) ===
         JSON.stringify(metadata.workspace?.egressAllowlist ?? []) &&
       JSON.stringify(this.registration.sandboxSelection?.egressAllowlist ?? []) ===

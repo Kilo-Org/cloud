@@ -63,22 +63,22 @@ describe('egressAllowlistSchema', () => {
 describe('egressPolicySchema', () => {
   it.each([
     {},
-    { egressMode: 'allow-all' },
-    { egressMode: 'deny-by-default' },
-    { egressMode: 'deny-by-default', egressAllowlist: [] },
-    { egressMode: 'deny-by-default', egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted' },
+    { egressMode: 'allowlist' },
+    { egressMode: 'allowlist', egressAllowlist: [] },
+    { egressMode: 'allowlist', egressAllowlist: ['example.com'] },
   ])('preserves an explicit policy without inferring a mode: %j', policy => {
     expect(egressPolicySchema.parse(policy)).toEqual(policy);
   });
 
-  it('normalizes the list when deny-by-default is explicit', () => {
+  it('normalizes the list when allowlist is explicit', () => {
     expect(
       egressPolicySchema.parse({
-        egressMode: 'deny-by-default',
+        egressMode: 'allowlist',
         egressAllowlist: ['Z.Example.COM.', 'example.com', 'EXAMPLE.COM'],
       })
     ).toEqual({
-      egressMode: 'deny-by-default',
+      egressMode: 'allowlist',
       egressAllowlist: ['example.com', 'z.example.com'],
     });
   });
@@ -86,9 +86,9 @@ describe('egressPolicySchema', () => {
   it.each([
     { egressAllowlist: [] },
     { egressAllowlist: ['example.com'] },
-    { egressMode: 'allow-all', egressAllowlist: [] },
-    { egressMode: 'allow-all', egressAllowlist: ['example.com'] },
-  ])('rejects lists unless deny-by-default is explicit: %j', policy => {
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
+  ])('rejects lists unless allowlist is explicit: %j', policy => {
     const result = egressPolicySchema.safeParse(policy);
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -98,16 +98,19 @@ describe('egressPolicySchema', () => {
     }
   });
 
-  it.each(['deny-all', '', null, 0])('rejects unsupported mode %j', egressMode => {
-    expect(egressModeSchema.safeParse(egressMode).success).toBe(false);
-    expect(egressPolicySchema.safeParse({ egressMode }).success).toBe(false);
-  });
+  it.each(['allow-all', 'deny-by-default', 'deny-all', '', null, 0])(
+    'rejects unsupported mode %j',
+    egressMode => {
+      expect(egressModeSchema.safeParse(egressMode).success).toBe(false);
+      expect(egressPolicySchema.safeParse({ egressMode }).success).toBe(false);
+    }
+  );
 
   it.each(
     [null, ['*'], ['127.1'], ['https://example.com']].map(egressAllowlist => ({ egressAllowlist }))
-  )('rejects invalid lists under deny-by-default: %j', ({ egressAllowlist }) => {
-    expect(
-      egressPolicySchema.safeParse({ egressMode: 'deny-by-default', egressAllowlist }).success
-    ).toBe(false);
+  )('rejects invalid lists under allowlist: %j', ({ egressAllowlist }) => {
+    expect(egressPolicySchema.safeParse({ egressMode: 'allowlist', egressAllowlist }).success).toBe(
+      false
+    );
   });
 });

@@ -7791,15 +7791,15 @@
           "type": "object",
           "properties": {
             "egressMode": {
-              "description": "Defaults to allow-all when omitted. deny-by-default allows the Kilo/Git baseline plus optional egressAllowlist domains.",
+              "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
               "type": "string",
               "enum": [
-                "allow-all",
-                "deny-by-default"
+                "unrestricted",
+                "allowlist"
               ]
             },
             "egressAllowlist": {
-              "description": "Additional exact DNS hostnames; requires explicit deny-by-default mode.",
+              "description": "Additional exact DNS hostnames; requires explicit allowlist mode.",
               "maxItems": 100,
               "type": "array",
               "items": {
@@ -20632,15 +20632,15 @@
               "type": "object",
               "properties": {
                 "egressMode": {
-                  "description": "Defaults to allow-all when omitted. deny-by-default allows the Kilo/Git baseline plus optional egressAllowlist domains.",
+                  "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
                   "type": "string",
                   "enum": [
-                    "allow-all",
-                    "deny-by-default"
+                    "unrestricted",
+                    "allowlist"
                   ]
                 },
                 "egressAllowlist": {
-                  "description": "Additional exact DNS hostnames; requires explicit deny-by-default mode.",
+                  "description": "Additional exact DNS hostnames; requires explicit allowlist mode.",
                   "maxItems": 100,
                   "type": "array",
                   "items": {

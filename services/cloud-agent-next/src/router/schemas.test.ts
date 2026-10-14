@@ -61,20 +61,20 @@ describe('grouped unified session input contracts', () => {
     expect(
       StartSessionInput.parse({
         ...baseStartInput,
-        runtime: { egressMode: 'deny-by-default', egressAllowlist },
+        runtime: { egressMode: 'allowlist', egressAllowlist },
       }).runtime
-    ).toEqual({ egressMode: 'deny-by-default', egressAllowlist: expected });
+    ).toEqual({ egressMode: 'allowlist', egressAllowlist: expected });
     expect(
       PrepareSessionInput.parse({
         ...basePromptInput,
         githubRepo: 'acme/repo',
-        egressMode: 'deny-by-default',
+        egressMode: 'allowlist',
         egressAllowlist,
       }).egressAllowlist
     ).toEqual(expected);
   });
 
-  it.each([{}, { egressMode: 'allow-all' }, { egressMode: 'deny-by-default' }])(
+  it.each([{}, { egressMode: 'unrestricted' }, { egressMode: 'allowlist' }])(
     'preserves omitted lists and explicit modes at both boundaries: %j',
     policy => {
       expect(StartSessionInput.parse({ ...baseStartInput, runtime: policy }).runtime).toEqual(
@@ -94,8 +94,8 @@ describe('grouped unified session input contracts', () => {
   it.each([
     { egressAllowlist: [] },
     { egressAllowlist: ['example.com'] },
-    { egressMode: 'allow-all', egressAllowlist: [] },
-    { egressMode: 'allow-all', egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
     { egressMode: 'deny-all' },
     { egressMode: null },
   ])('rejects ambiguous or unsupported egress policies: %j', policy => {
@@ -126,14 +126,14 @@ describe('grouped unified session input contracts', () => {
       expect(
         StartSessionInput.safeParse({
           ...baseStartInput,
-          runtime: { egressMode: 'deny-by-default', egressAllowlist },
+          runtime: { egressMode: 'allowlist', egressAllowlist },
         }).success
       ).toBe(false);
       expect(
         PrepareSessionInput.safeParse({
           ...basePromptInput,
           githubRepo: 'acme/repo',
-          egressMode: 'deny-by-default',
+          egressMode: 'allowlist',
           egressAllowlist,
         }).success
       ).toBe(false);
@@ -637,14 +637,14 @@ describe('prepareSession clone-only variant', () => {
 
   it('enforces explicit egress mode on clone-only inputs', () => {
     const input = { ...baseCloneInput, cloneFromKiloSessionId: validKiloSessionId };
-    const parsed = PrepareSessionInput.parse({ ...input, egressMode: 'deny-by-default' });
-    expect(parsed.egressMode).toBe('deny-by-default');
+    const parsed = PrepareSessionInput.parse({ ...input, egressMode: 'allowlist' });
+    expect(parsed.egressMode).toBe('allowlist');
     expect(parsed.egressAllowlist).toBeUndefined();
     expect(PrepareSessionInput.safeParse({ ...input, egressAllowlist: [] }).success).toBe(false);
     expect(
       PrepareSessionInput.safeParse({
         ...input,
-        egressMode: 'allow-all',
+        egressMode: 'unrestricted',
         egressAllowlist: [],
       }).success
     ).toBe(false);

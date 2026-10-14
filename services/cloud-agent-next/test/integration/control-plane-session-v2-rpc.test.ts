@@ -231,14 +231,14 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         kiloSessionId: kiloSessionId(),
         sandboxId,
         sandboxProvider: 'cloudflare-containers',
-        egressMode: 'deny-by-default',
+        egressMode: 'allowlist',
         egressAllowlist,
       });
       const input = {
         metadata: registered,
         sandboxSelection: {
           provider: 'cloudflare-containers' as const,
-          egressMode: 'deny-by-default' as const,
+          egressMode: 'allowlist' as const,
           egressAllowlist,
         },
       };
@@ -247,8 +247,8 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       stub = sessions.getByName(sessionId);
       const persisted = (await stub.getMetadata()) as SessionMetadata | null;
       expect(persisted?.workspace?.egressAllowlist).toEqual(egressAllowlist);
-      expect(persisted?.workspace?.egressMode).toBe('deny-by-default');
-      expect((await readRegistration(stub))?.sandboxSelection?.egressMode).toBe('deny-by-default');
+      expect(persisted?.workspace?.egressMode).toBe('allowlist');
+      expect((await readRegistration(stub))?.sandboxSelection?.egressMode).toBe('allowlist');
       expect((await readRegistration(stub))?.sandboxSelection?.egressAllowlist).toEqual(
         egressAllowlist
       );
@@ -282,7 +282,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
           })
         ).resolves.toEqual({ success: true });
       }
-      for (const egressMode of [undefined, 'allow-all'] as const) {
+      for (const egressMode of [undefined, 'unrestricted'] as const) {
         const changedMetadata = {
           ...registered,
           workspace: { ...registered.workspace, egressMode, egressAllowlist: undefined },
@@ -318,7 +318,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       kiloSessionId: kiloSessionId(),
       sandboxId,
       sandboxProvider: 'cloudflare-containers',
-      egressMode: 'deny-by-default',
+      egressMode: 'allowlist',
       egressAllowlist: [],
     });
     const input = {
@@ -326,7 +326,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       message: promptPayload(messageId()),
       sandboxSelection: {
         provider: 'cloudflare-containers' as const,
-        egressMode: 'deny-by-default' as const,
+        egressMode: 'allowlist' as const,
         egressAllowlist: [],
       },
     };
@@ -345,7 +345,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         },
         sandboxSelection: {
           provider: 'cloudflare-containers',
-          egressMode: 'deny-by-default',
+          egressMode: 'allowlist',
           egressAllowlist: ['example.com'],
         },
       })
@@ -357,7 +357,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
           ...registered,
           workspace: { ...registered.workspace, egressAllowlist: undefined },
         },
-        sandboxSelection: { provider: 'cloudflare-containers', egressMode: 'deny-by-default' },
+        sandboxSelection: { provider: 'cloudflare-containers', egressMode: 'allowlist' },
       })
     ).resolves.toMatchObject({ success: true });
     await expect(
@@ -367,16 +367,16 @@ describe('SandboxSessionV2 worker RPC surface', () => {
           ...registered,
           workspace: {
             ...registered.workspace,
-            egressMode: 'allow-all',
+            egressMode: 'unrestricted',
             egressAllowlist: undefined,
           },
         },
-        sandboxSelection: { provider: 'cloudflare-containers', egressMode: 'allow-all' },
+        sandboxSelection: { provider: 'cloudflare-containers', egressMode: 'unrestricted' },
       })
     ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
   });
 
-  it('accepts explicit allow-all on a non-container provider and equivalent omitted replays', async () => {
+  it('accepts explicit unrestricted on a non-container provider and equivalent omitted replays', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
     const stub = sessions.getByName(sessionId);
@@ -384,17 +384,17 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       sessionId,
       kiloSessionId: kiloSessionId(),
       sandboxId,
-      egressMode: 'allow-all',
+      egressMode: 'unrestricted',
     });
     await expect(
       stub.registerSessionFromMetadata({
         metadata: registered,
-        sandboxSelection: { provider: 'cloudflare', egressMode: 'allow-all' },
+        sandboxSelection: { provider: 'cloudflare', egressMode: 'unrestricted' },
       })
     ).resolves.toEqual({ success: true });
     await evictAllDurableObjects();
     const persisted = (await stub.getMetadata()) as SessionMetadata | null;
-    expect(persisted?.workspace?.egressMode).toBe('allow-all');
+    expect(persisted?.workspace?.egressMode).toBe('unrestricted');
     await expect(
       stub.registerSessionFromMetadata({
         metadata: { ...registered, workspace: { ...registered.workspace, egressMode: undefined } },

@@ -27,10 +27,10 @@ afterEach(() => {
 describe('CloudAgentNextFetchClient prepareSession', () => {
   it.each([
     {},
-    { egressMode: 'allow-all' as const },
-    { egressMode: 'deny-by-default' as const },
-    { egressMode: 'deny-by-default' as const, egressAllowlist: [] },
-    { egressMode: 'deny-by-default' as const, egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted' as const },
+    { egressMode: 'allowlist' as const },
+    { egressMode: 'allowlist' as const, egressAllowlist: [] },
+    { egressMode: 'allowlist' as const, egressAllowlist: ['example.com'] },
   ])('posts an API-only egress policy unchanged: %j', async policy => {
     const fetchMock = mockFetch(200, {
       result: { data: { cloudAgentSessionId: 'workspace_test', kiloSessionId: 'ses_test' } },

@@ -27,7 +27,7 @@ export const egressAllowlistSchema = z
   .max(100)
   .transform(domains => [...new Set(domains)].sort());
 
-export const egressModeSchema = z.enum(['allow-all', 'deny-by-default']);
+export const egressModeSchema = z.enum(['unrestricted', 'allowlist']);
 
 export type EgressMode = z.infer<typeof egressModeSchema>;
 
@@ -36,13 +36,13 @@ export const egressPolicySchema = z
     egressMode: egressModeSchema
       .optional()
       .describe(
-        'Defaults to allow-all when omitted. deny-by-default allows the Kilo/Git baseline plus optional egressAllowlist domains.'
+        'Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.'
       ),
     egressAllowlist: egressAllowlistSchema
       .optional()
-      .describe('Additional exact DNS hostnames; requires explicit deny-by-default mode.'),
+      .describe('Additional exact DNS hostnames; requires explicit allowlist mode.'),
   })
-  .refine(data => data.egressAllowlist === undefined || data.egressMode === 'deny-by-default', {
-    message: 'egressAllowlist requires egressMode to be deny-by-default',
+  .refine(data => data.egressAllowlist === undefined || data.egressMode === 'allowlist', {
+    message: 'egressAllowlist requires egressMode to be allowlist',
     path: ['egressAllowlist'],
   });

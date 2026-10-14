@@ -275,7 +275,7 @@ async function worktreeIntentFingerprint(
       ...(source.workspace.sandboxAllocation
         ? { sandboxAllocation: source.workspace.sandboxAllocation }
         : {}),
-      ...(source.workspace.egressMode === 'deny-by-default'
+      ...(source.workspace.egressMode === 'allowlist'
         ? {
             egressMode: source.workspace.egressMode,
             egressAllowlist: source.workspace.egressAllowlist ?? [],
@@ -469,7 +469,7 @@ function assertRegisteredMetadata(
     workspace.sandboxId !== source.workspace.sandboxId ||
     workspace.sandboxProvider !== source.workspace.sandboxProvider ||
     workspace.sandboxAllocation !== source.workspace.sandboxAllocation ||
-    (workspace.egressMode ?? 'allow-all') !== (source.workspace.egressMode ?? 'allow-all') ||
+    (workspace.egressMode ?? 'unrestricted') !== (source.workspace.egressMode ?? 'unrestricted') ||
     JSON.stringify(workspace.egressAllowlist ?? []) !==
       JSON.stringify(source.workspace.egressAllowlist ?? []) ||
     workspace.branchName !== sourceWorktreeBranchName(source) ||

@@ -632,10 +632,10 @@ describe('CloudAgentNextClient sandbox selection', () => {
   );
   it.each([
     {},
-    { egressMode: 'allow-all' as const },
-    { egressMode: 'deny-by-default' as const },
-    { egressMode: 'deny-by-default' as const, egressAllowlist: [] },
-    { egressMode: 'deny-by-default' as const, egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted' as const },
+    { egressMode: 'allowlist' as const },
+    { egressMode: 'allowlist' as const, egressAllowlist: [] },
+    { egressMode: 'allowlist' as const, egressAllowlist: ['example.com'] },
   ])('forwards prepare egress policy unchanged: %j', async policy => {
     const input: PrepareSessionInput = {
       githubRepo: 'acme/repo',

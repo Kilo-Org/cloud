@@ -367,11 +367,11 @@ const MetadataWorkspaceSchema = egressPolicySchema
   })
   .refine(
     workspace =>
-      workspace.egressMode !== 'deny-by-default' ||
+      workspace.egressMode !== 'allowlist' ||
       (workspace.sandboxProvider === 'cloudflare-containers' &&
         isIsolatedProviderWorkspace(workspace) &&
         workspace.sandboxRoute === undefined),
-    'deny-by-default egress requires an isolated Cloudflare containers sandbox'
+    'allowlist egress requires an isolated Cloudflare containers sandbox'
   )
   .refine(
     workspace => workspace.sandboxProvider !== 'vercel' || isIsolatedProviderWorkspace(workspace),

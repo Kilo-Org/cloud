@@ -600,7 +600,7 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
       const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
       metadata.workspace = {
         ...metadata.workspace,
-        egressMode: 'deny-by-default',
+        egressMode: 'allowlist',
         egressAllowlist,
       };
       const { caller, input, destinationStub } = fixture({
@@ -611,9 +611,9 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
       expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: expect.objectContaining({
-            workspace: expect.objectContaining({ egressMode: 'deny-by-default', egressAllowlist }),
+            workspace: expect.objectContaining({ egressMode: 'allowlist', egressAllowlist }),
           }),
-          sandboxSelection: expect.objectContaining({ egressMode: 'deny-by-default' }),
+          sandboxSelection: expect.objectContaining({ egressMode: 'allowlist' }),
         })
       );
       const registered = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
@@ -625,7 +625,7 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
     const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
     metadata.workspace = {
       ...metadata.workspace,
-      egressMode: 'deny-by-default',
+      egressMode: 'allowlist',
       egressAllowlist: [],
     };
     const source = ownershipRow({ organizationId: ORGANIZATION_ID });

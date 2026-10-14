@@ -45,10 +45,10 @@ describe('buildControlPlanePromptPayload', () => {
 describe('buildControlPlaneCreateInput', () => {
   it.each([
     { egressMode: undefined, egressAllowlist: undefined },
-    { egressMode: 'allow-all' as const, egressAllowlist: undefined },
-    { egressMode: 'deny-by-default' as const, egressAllowlist: undefined },
-    { egressMode: 'deny-by-default' as const, egressAllowlist: [] },
-    { egressMode: 'deny-by-default' as const, egressAllowlist: ['Z.Example.COM.', 'example.com'] },
+    { egressMode: 'unrestricted' as const, egressAllowlist: undefined },
+    { egressMode: 'allowlist' as const, egressAllowlist: undefined },
+    { egressMode: 'allowlist' as const, egressAllowlist: [] },
+    { egressMode: 'allowlist' as const, egressAllowlist: ['Z.Example.COM.', 'example.com'] },
   ])(
     'persists and selects the same policy for start and registration: %j',
     async ({ egressMode, egressAllowlist }) => {

@@ -1559,7 +1559,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     const provider = input.provider ?? 'cloudflare';
     if (
-      policy.data.egressMode === 'deny-by-default' &&
+      policy.data.egressMode === 'allowlist' &&
       (provider !== 'cloudflare-containers' ||
         (input.sandboxKind === undefined
           ? !this.sandboxId.startsWith('ses-')
@@ -1575,7 +1575,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       billing: input.billing ?? null,
       containment: input.containment ?? null,
       ...(input.sandboxKind ? { sandboxKind: input.sandboxKind } : {}),
-      ...(policy.data.egressMode !== 'deny-by-default'
+      ...(policy.data.egressMode !== 'allowlist'
         ? {}
         : {
             egressAllowlist: buildNativeEgressAllowlist({
@@ -1772,7 +1772,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (
         sandboxSelection !== undefined &&
         (state.kind === 'stopped' ||
-          sandboxSelection.egressMode === 'deny-by-default' ||
+          sandboxSelection.egressMode === 'allowlist' ||
           this.providerPin?.egressAllowlist !== undefined)
       ) {
         const repository = source.repository;

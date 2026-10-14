@@ -578,7 +578,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         label: event.label,
         status: 'running',
         startedAt: event.timestamp,
+        startedRevision: event.revision,
         revision: event.revision,
+        ...(event.parentStepId === undefined ? {} : { parentStepId: event.parentStepId }),
         ...(event.command === undefined ? {} : { command: event.command }),
         ...(event.commandIndex === undefined ? {} : { commandIndex: event.commandIndex }),
         ...(event.commandCount === undefined ? {} : { commandCount: event.commandCount }),
@@ -621,7 +623,13 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       ...existing,
       revision: Math.max(existing.revision, step.revision),
       steps: [...existing.steps.filter(item => item.id !== step.id), step].sort(
-        (a, b) => a.startedAt - b.startedAt
+        (a, b) =>
+          Number(a.startedRevision !== undefined) - Number(b.startedRevision !== undefined) ||
+          (a.startedRevision !== undefined && b.startedRevision !== undefined
+            ? a.startedRevision - b.startedRevision
+            : 0) ||
+          a.startedAt - b.startedAt ||
+          a.id.localeCompare(b.id)
       ),
     };
     preparationAttempts = preparationAttempts.map(item =>

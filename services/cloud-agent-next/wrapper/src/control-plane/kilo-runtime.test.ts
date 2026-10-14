@@ -102,7 +102,7 @@ function createSpawner(): {
   return { spawn, processes, spawnCount: () => processes.length };
 }
 
-type FakeFeedRecord = { callbacks: KiloFeedCallbacks; closed: number };
+type FakeFeedRecord = { callbacks: KiloFeedCallbacks; closed: number; nativeRuntimeId: string };
 
 function createFeedFactory(options: { failOpens?: number } = {}): {
   openFeed: (
@@ -115,8 +115,12 @@ function createFeedFactory(options: { failOpens?: number } = {}): {
   let remainingFailures = options.failOpens ?? 0;
   return {
     feeds,
-    openFeed: (_source, callbacks) => {
-      const record: FakeFeedRecord = { callbacks, closed: 0 };
+    openFeed: (source, callbacks) => {
+      const record: FakeFeedRecord = {
+        callbacks,
+        closed: 0,
+        nativeRuntimeId: source.nativeRuntimeId,
+      };
       feeds.push(record);
       return {
         open: async () => {
@@ -175,7 +179,8 @@ function createRuntime(options: {
   prepareFilesystem?: (env: Record<string, string>, directory: string) => Promise<void>;
   spawnKilo?: KiloProcessSpawner;
   timers?: ControlPlaneTimers;
-  onRestart?: (info: { directory: string; reason: string }) => void;
+  onRestart?: KiloRuntimeOptions['onRestart'];
+  onEvent?: KiloRuntimeOptions['onEvent'];
   sampleMemory?: KiloRuntimeOptions['sampleMemory'];
   memoryHolds?: boolean[];
   readSnapshot?: KiloRuntimeOptions['readSnapshot'];
@@ -199,6 +204,7 @@ function createRuntime(options: {
     readProcessStartTime: () => undefined,
     log: message => logs.push(message),
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
+    onEvent: options.onEvent,
     ...(options.isIdle
       ? {
           isIdle: async () => options.isIdle!(),
@@ -1380,6 +1386,389 @@ describe('createKiloRuntime', () => {
       await fsp.access(worktree);
     } finally {
       await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('Kilo observation recovery', () => {
+  async function fixture(healthRequestMs = CONTROL_PLANE_TIMERS.wrapper.healthRequestMs) {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    const frames: ControlPlaneWrapperFrame[] = [];
+    const submissions: string[] = [];
+    const aborts: string[] = [];
+    const snapshots = { fail: false, reads: 0 };
+    const created = createRuntime({
+      spawner,
+      scheduler,
+      feed,
+      probe,
+      timers: timers({ healthRequestMs }),
+      onEvent: event => turns.observeKiloEvent(event),
+      onRestart: info => turns.onRuntimeRestart({ ...info, key: info.directory }),
+      readSnapshot: async () => {
+        snapshots.reads++;
+        if (snapshots.fail) throw new Error('Synthetic snapshot failure');
+        return [];
+      },
+    });
+    const turns = createTurnManager({
+      timers: CONTROL_PLANE_TIMERS,
+      now: () => scheduler.scheduler.now(),
+      runtimes: { get: () => created.runtime },
+      emit: frame => frames.push(frame),
+      materializeAttachments: async message => ({ ...message, prompt: 'Synthetic prompt' }),
+    });
+    const client = await created.runtime.ensure();
+    client.sendPromptAsync = async input => {
+      submissions.push(input.messageId ?? '');
+    };
+    client.abortSession = async input => {
+      aborts.push(input.sessionId);
+      return true;
+    };
+    turns.registerRoute({
+      sessionId: 'workspace_observation',
+      kiloSessionId: 'ses_observation',
+      directory: created.runtime.directory,
+      attemptId: 'attempt',
+    });
+    turns.submit('workspace_observation', {
+      messageId: 'message',
+      turn: { type: 'prompt', prompt: 'Synthetic prompt' },
+      agent: { mode: 'code', model: 'test/model' },
+    });
+    await waitFor(() => submissions.length === 1);
+    function event(type: string, properties: Record<string, unknown>) {
+      const current = feed.feeds.at(-1)!;
+      current.callbacks.onEvent({
+        type,
+        properties,
+        nativeRuntimeId: current.nativeRuntimeId,
+        directory: created.runtime.directory,
+      });
+    }
+    event('session.turn.open', { sessionID: 'ses_observation' });
+    event('message.updated', {
+      info: { id: 'assistant', sessionID: 'ses_observation', role: 'assistant' },
+    });
+    let text = '';
+    function progress() {
+      text += 'output';
+      event('message.part.updated', {
+        part: {
+          id: 'part',
+          sessionID: 'ses_observation',
+          messageID: 'assistant',
+          type: 'text',
+          text,
+        },
+      });
+    }
+    progress();
+    snapshots.fail = true;
+    await created.runtime.refreshActivity();
+    return {
+      ...created,
+      spawner,
+      scheduler,
+      feed,
+      probe,
+      snapshots,
+      submissions,
+      aborts,
+      event,
+      progress,
+      outcomes: () => frames.filter(frame => frame.type === 'session.outcome'),
+      async tick(ms = 5_000, progressing = true) {
+        scheduler.advance(ms);
+        if (progressing) progress();
+        else event('server.heartbeat', {});
+        scheduler.fire();
+        await Bun.sleep(1);
+      },
+      async dispose() {
+        turns.shutdown();
+        await created.runtime.shutdown();
+      },
+    };
+  }
+
+  it('preserves accepted work through transient observation failure and completes after recovery', async () => {
+    const h = await fixture();
+    try {
+      await h.tick(120_000);
+      expect(h.spawner.processes[0].stopped).toBe(0);
+      expect(h.spawner.spawnCount()).toBe(1);
+      expect(h.restarts).toEqual([]);
+      expect(h.outcomes()).toEqual([]);
+      expect(h.probe.calls.count).toBe(1);
+      const reads = h.snapshots.reads;
+      for (let index = 0; index < 6; index++) await h.tick();
+      expect(h.snapshots.reads).toBeGreaterThan(reads);
+      h.snapshots.fail = false;
+      await h.runtime.refreshActivity();
+      expect(h.runtime.isSuspected()).toBe(false);
+      await h.tick(120_000);
+      h.event('session.status', { sessionID: 'ses_observation', status: { type: 'idle' } });
+      h.event('session.turn.close', { sessionID: 'ses_observation', reason: 'completed' });
+      await Bun.sleep(1);
+      expect(h.spawner.processes[0].stopped).toBe(0);
+      expect(h.aborts).toEqual([]);
+      expect(h.submissions).toEqual(['message']);
+      expect(h.outcomes()).toEqual([
+        {
+          type: 'session.outcome',
+          sessionId: 'workspace_observation',
+          status: 'completed',
+          lastMessageId: 'message',
+        },
+      ]);
+    } finally {
+      await h.dispose();
+    }
+  });
+
+  it('bounds permanent observation failure at four minutes despite healthy progress', async () => {
+    const h = await fixture();
+    try {
+      await h.tick(120_000);
+      for (let index = 0; index < 23; index++) await h.tick();
+      expect(h.spawner.processes[0].stopped).toBe(0);
+      expect(h.outcomes()).toEqual([]);
+      await h.tick();
+      await waitFor(() => h.outcomes().length === 1);
+      expect(h.spawner.processes[0].stopped).toBe(1);
+      expect(h.spawner.spawnCount()).toBe(2);
+      expect(h.restarts).toEqual([{ reason: 'hang' }]);
+      expect(h.outcomes()[0]).toMatchObject({ status: 'failed', reason: 'agent_restarted' });
+      expect(h.submissions).toEqual(['message']);
+      expect(h.aborts).toEqual([]);
+    } finally {
+      await h.dispose();
+    }
+  });
+
+  it.each(['reasoning', 'tool_output', 'tool_state'] as const)(
+    'permits bounded recovery on meaningful %s progress',
+    async kind => {
+      const h = await fixture();
+      try {
+        if (kind === 'tool_state') {
+          h.event('message.part.updated', {
+            part: {
+              id: 'tool',
+              sessionID: 'ses_observation',
+              messageID: 'assistant',
+              type: 'tool',
+              state: { status: 'pending' },
+            },
+          });
+        }
+        h.scheduler.advance(120_000);
+        h.event('message.part.updated', {
+          part: {
+            id: kind === 'reasoning' ? 'reasoning' : 'tool',
+            sessionID: 'ses_observation',
+            messageID: 'assistant',
+            type: kind === 'reasoning' ? 'reasoning' : 'tool',
+            ...(kind === 'reasoning'
+              ? { text: 'Synthetic reasoning' }
+              : { state: { status: 'running', output: kind === 'tool_output' ? 'output' : '' } }),
+          },
+        });
+        h.scheduler.fire();
+        await Bun.sleep(1);
+        expect(h.probe.calls.count).toBe(1);
+        expect(h.spawner.processes[0].stopped).toBe(0);
+        expect(h.outcomes()).toEqual([]);
+      } finally {
+        await h.dispose();
+      }
+    }
+  );
+
+  it.each(['heartbeat', 'repeated_part', 'metadata', 'busy', 'retry', 'user_input'] as const)(
+    'does not extend observation recovery for %s without meaningful progress',
+    async kind => {
+      const h = await fixture();
+      try {
+        h.scheduler.advance(120_000);
+        if (kind === 'repeated_part') {
+          h.event('message.part.updated', {
+            part: {
+              id: 'part',
+              sessionID: 'ses_observation',
+              messageID: 'assistant',
+              type: 'text',
+              text: 'output',
+            },
+          });
+        } else if (kind === 'metadata' || kind === 'user_input') {
+          h.event('message.updated', {
+            info: {
+              id: kind === 'user_input' ? 'user' : 'assistant',
+              sessionID: 'ses_observation',
+              role: kind === 'user_input' ? 'user' : 'assistant',
+            },
+          });
+        } else if (kind === 'busy' || kind === 'retry') {
+          h.event('session.status', { sessionID: 'ses_observation', status: { type: kind } });
+        } else {
+          h.event('server.heartbeat', {});
+        }
+        h.scheduler.fire();
+        await waitFor(() => h.outcomes().length === 1);
+        expect(h.probe.calls.count).toBe(1);
+        expect(h.spawner.processes[0].stopped).toBe(1);
+        expect(h.spawner.spawnCount()).toBe(2);
+        expect(h.outcomes()[0]).toMatchObject({ status: 'failed', reason: 'agent_restarted' });
+      } finally {
+        await h.dispose();
+      }
+    }
+  );
+
+  it('rechecks progress during the extension instead of letting heartbeats retain it', async () => {
+    const h = await fixture();
+    try {
+      await h.tick(120_000);
+      expect(h.outcomes()).toEqual([]);
+      await h.tick(29_999, false);
+      expect(h.outcomes()).toEqual([]);
+      await h.tick(1, false);
+      await waitFor(() => h.outcomes().length === 1);
+      expect(h.spawner.processes[0].stopped).toBe(1);
+      expect(h.outcomes()[0]).toMatchObject({ reason: 'agent_restarted' });
+    } finally {
+      await h.dispose();
+    }
+  });
+
+  it.each([false, 'reject'] as const)(
+    'retains genuine-hang handling when the observation health probe returns %s',
+    async answer => {
+      const h = await fixture();
+      try {
+        h.probe.set(
+          answer === 'reject' ? () => Promise.reject(new Error('Synthetic probe failure')) : answer
+        );
+        await h.tick(120_000, answer !== false);
+        await waitFor(() => h.outcomes().length === 1);
+        expect(h.probe.calls.count).toBe(1);
+        expect(h.spawner.processes[0].stopped).toBe(1);
+        expect(h.spawner.spawnCount()).toBe(2);
+        expect(h.outcomes()[0]).toMatchObject({ status: 'failed', reason: 'agent_unresponsive' });
+        expect(h.logs.some(message => message.includes('"trigger":"health_probe_false"'))).toBe(
+          true
+        );
+      } finally {
+        await h.dispose();
+      }
+    }
+  );
+
+  it('rechecks runtime health during the extension even while progress events arrive', async () => {
+    const h = await fixture();
+    try {
+      await h.tick(120_000);
+      expect(h.outcomes()).toEqual([]);
+      h.probe.set(false);
+      await h.tick();
+      await waitFor(() => h.outcomes().length === 1);
+      expect(h.probe.calls.count).toBe(2);
+      expect(h.spawner.processes[0].stopped).toBe(1);
+      expect(h.outcomes()[0]).toMatchObject({ reason: 'agent_unresponsive' });
+    } finally {
+      await h.dispose();
+    }
+  });
+
+  it('bounds a hung observation health probe and emits one genuine-hang outcome', async () => {
+    const h = await fixture(20);
+    try {
+      h.probe.set(() => new Promise(() => undefined));
+      await h.tick(120_000);
+      await waitFor(() => h.outcomes().length === 1);
+      expect(h.probe.calls.count).toBe(1);
+      expect(h.spawner.processes[0].stopped).toBe(1);
+      expect(h.spawner.spawnCount()).toBe(2);
+      expect(h.outcomes()[0]).toMatchObject({ reason: 'agent_unresponsive' });
+    } finally {
+      await h.dispose();
+    }
+  });
+
+  it('keeps observation probes single-flight and drops a late decision after snapshot recovery', async () => {
+    const h = await fixture();
+    const pending = Promise.withResolvers<boolean>();
+    try {
+      h.probe.set(() => pending.promise);
+      await h.tick(120_000);
+      for (let index = 0; index < 3; index++) await h.tick();
+      expect(h.probe.calls.count).toBe(1);
+      expect(h.spawner.processes[0].stopped).toBe(0);
+      h.snapshots.fail = false;
+      await h.runtime.refreshActivity();
+      pending.resolve(false);
+      await Bun.sleep(1);
+      expect(h.spawner.spawnCount()).toBe(1);
+      expect(h.outcomes()).toEqual([]);
+    } finally {
+      pending.resolve(false);
+      await h.dispose();
+    }
+  });
+
+  it('does not let an in-flight probe delay the four-minute observation bound', async () => {
+    const h = await fixture();
+    const pending = Promise.withResolvers<boolean>();
+    try {
+      await h.tick(120_000);
+      h.probe.set(() => pending.promise);
+      for (let index = 0; index < 23; index++) await h.tick();
+      expect(h.spawner.processes[0].stopped).toBe(0);
+      await h.tick();
+      await waitFor(() => h.outcomes().length === 1);
+      pending.resolve(false);
+      await Bun.sleep(1);
+      expect(h.spawner.processes[0].stopped).toBe(1);
+      expect(h.spawner.spawnCount()).toBe(2);
+      expect(h.outcomes()).toHaveLength(1);
+      expect(h.outcomes()[0]).toMatchObject({ reason: 'agent_restarted' });
+    } finally {
+      pending.resolve(false);
+      await h.dispose();
+    }
+  });
+
+  it('fences queued observation decisions and old feed callbacks after process replacement', async () => {
+    const h = await fixture();
+    const pending = Promise.withResolvers<boolean>();
+    try {
+      h.probe.set(() => pending.promise);
+      await h.tick(120_000);
+      const oldFeed = h.feed.feeds[0];
+      h.spawner.processes[0].exit();
+      await waitFor(() => h.outcomes().length === 1);
+      pending.resolve(false);
+      oldFeed.callbacks.onFailure();
+      oldFeed.callbacks.onEvent({
+        type: 'server.heartbeat',
+        properties: {},
+        nativeRuntimeId: oldFeed.nativeRuntimeId,
+      });
+      await Bun.sleep(1);
+      expect(h.spawner.spawnCount()).toBe(2);
+      expect(h.spawner.processes[0].stopped).toBe(1);
+      expect(h.spawner.processes[1].stopped).toBe(0);
+      expect(h.outcomes()).toHaveLength(1);
+      expect(h.restarts).toEqual([{ reason: 'exit' }]);
+    } finally {
+      pending.resolve(false);
+      await h.dispose();
     }
   });
 });

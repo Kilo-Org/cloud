@@ -1552,7 +1552,7 @@
         "recoveryLabel": "GitHub-alkalmazás frissítése"
       },
       "githubIpAllowList": {
-        "description": "A kódellenőrző kikapcsolt, mert a GitHub-szervezet engedélyezett IP-címeinek listája blokkolja a Kilo hozzáférését. Kérj segítséget a hi@kilocode.ai címen, majd engedélyezd újra a kódellenőrzőt."
+        "description": "A kódellenőrző kikapcsolt, mert a GitHub-szervezet engedélyezett IP-címeinek listája blokkolja a Kilo hozzáférését. Kérj segítséget a hi@kilo.ai címen, majd engedélyezd újra a kódellenőrzőt."
       },
       "gitlabProjectAccessRequired": {
         "description": "A kódellenőrző kikapcsolt, mert a Kilo nem tud GitLab-hozzáférési tokent létrehozni ehhez a projekthez. Adj karbantartói jogosultságot, vagy engedélyezd a projektszintű hozzáférési tokeneket, majd engedélyezd újra a kódellenőrzőt.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Kódellenőrző beállításainak frissítése"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "A kódellenőrző kikapcsolt, mert ma háromszor is túllépte az időkorlátot a kódtár klónozása. Kérj segítséget a hi@kilocode.ai címen, majd engedélyezd újra a kódellenőrzőt."
+        "description": "A kódellenőrző kikapcsolt, mert ma háromszor is túllépte az időkorlátot a kódtár klónozása. Kérj segítséget a hi@kilo.ai címen, majd engedélyezd újra a kódellenőrzőt."
       },
       "title": "A kódellenőrző beavatkozást igényel.",
       "recoveryLabel": "Kapcsolatfelvétel az ügyfélszolgálattal"

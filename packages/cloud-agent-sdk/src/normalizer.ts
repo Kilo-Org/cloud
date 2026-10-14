@@ -136,6 +136,7 @@ export type ServiceEvent =
       timestamp?: number | undefined;
       action?: string | undefined;
       stepId?: string | undefined;
+      parentStepId?: string | undefined;
       kind?: 'phase' | 'setup_command' | undefined;
       label?: string | undefined;
       command?: string | undefined;
@@ -556,6 +557,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
               timestamp: r.data.timestamp,
               action: r.data.action,
               ...(r.data.stepId === undefined ? {} : { stepId: r.data.stepId }),
+              ...(r.data.parentStepId === undefined ? {} : { parentStepId: r.data.parentStepId }),
               ...(r.data.kind === undefined ? {} : { kind: r.data.kind }),
               ...(r.data.label === undefined ? {} : { label: r.data.label }),
               ...(r.data.command === undefined ? {} : { command: r.data.command }),

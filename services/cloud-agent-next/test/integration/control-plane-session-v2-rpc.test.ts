@@ -1,6 +1,7 @@
-import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import { routes as sandboxRoutes } from '../../src/control-plane/sandbox/sqlite-schema.js';
@@ -15,10 +16,12 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import {
+  parseSessionMetadata,
+  type SessionMetadata,
+} from '../../src/persistence/session-metadata.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
-import type { Env } from '../../src/types.js';
 import {
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
@@ -94,6 +97,8 @@ function metadata(input: {
   repository?: Record<string, string>;
   worktreeId?: string;
   workspacePath?: string;
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
 }) {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
@@ -117,6 +122,8 @@ function metadata(input: {
       branchName: 'kilo/test-branch',
       sandboxId: input.sandboxId,
       sandboxProvider: input.sandboxProvider ?? 'cloudflare',
+      ...(input.egressMode === undefined ? {} : { egressMode: input.egressMode }),
+      ...(input.egressAllowlist === undefined ? {} : { egressAllowlist: input.egressAllowlist }),
       ...(input.worktreeId ? { worktreeId: input.worktreeId } : {}),
       ...(input.workspacePath ? { workspacePath: input.workspacePath } : {}),
     },
@@ -196,7 +203,12 @@ async function readRegistration(stub: DurableObjectStub<SandboxSessionV2>): Prom
   | {
       sandboxId: string;
       spec: Record<string, unknown>;
-      sandboxSelection?: { provider: string; allocationName?: string };
+      sandboxSelection?: {
+        provider: string;
+        allocationName?: string;
+        egressMode?: EgressMode;
+        egressAllowlist?: string[];
+      };
     }
   | undefined
 > {
@@ -208,6 +220,189 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 worker RPC surface', () => {
+  it.each([undefined, [], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+    'retains registration policy after eviction and rejects changed replays %j',
+    async ({ egressAllowlist }) => {
+      const sessionId = newSessionId();
+      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      let stub = sessions.getByName(sessionId);
+      const registered = metadata({
+        sessionId,
+        kiloSessionId: kiloSessionId(),
+        sandboxId,
+        sandboxProvider: 'cloudflare-containers',
+        egressMode: 'allowlist',
+        egressAllowlist,
+      });
+      const input = {
+        metadata: registered,
+        sandboxSelection: {
+          provider: 'cloudflare-containers' as const,
+          egressMode: 'allowlist' as const,
+          egressAllowlist,
+        },
+      };
+      await expect(stub.registerSessionFromMetadata(input)).resolves.toEqual({ success: true });
+      await evictAllDurableObjects();
+      stub = sessions.getByName(sessionId);
+      const persisted = (await stub.getMetadata()) as SessionMetadata | null;
+      expect(persisted?.workspace?.egressAllowlist).toEqual(egressAllowlist);
+      expect(persisted?.workspace?.egressMode).toBe('allowlist');
+      expect((await readRegistration(stub))?.sandboxSelection?.egressMode).toBe('allowlist');
+      expect((await readRegistration(stub))?.sandboxSelection?.egressAllowlist).toEqual(
+        egressAllowlist
+      );
+      await expect(stub.registerSessionFromMetadata(input)).resolves.toEqual({ success: true });
+      for (const changed of [undefined, ['other.example.com']]) {
+        const changedSelection = { ...input.sandboxSelection, egressAllowlist: changed };
+        const expected =
+          (egressAllowlist?.length ?? 0) === 0 && changed === undefined
+            ? { success: true }
+            : { success: false, code: 'BAD_REQUEST', failureBoundary: 'registration' };
+        const result = await stub.registerSessionFromMetadata({
+          metadata: {
+            ...registered,
+            workspace: { ...registered.workspace, egressAllowlist: changed },
+          },
+          sandboxSelection: changedSelection,
+        });
+        expect(result).toMatchObject(expected);
+        expect(
+          await stub.registerSessionFromMetadata({ ...input, sandboxSelection: changedSelection })
+        ).toMatchObject(expected);
+      }
+      if ((egressAllowlist?.length ?? 0) === 0) {
+        await expect(
+          stub.registerSessionFromMetadata({
+            metadata: {
+              ...registered,
+              workspace: { ...registered.workspace, egressAllowlist: [] },
+            },
+            sandboxSelection: { ...input.sandboxSelection, egressAllowlist: [] },
+          })
+        ).resolves.toEqual({ success: true });
+      }
+      for (const egressMode of [undefined, 'unrestricted'] as const) {
+        const changedMetadata = {
+          ...registered,
+          workspace: { ...registered.workspace, egressMode, egressAllowlist: undefined },
+        };
+        const changedSelection = {
+          ...input.sandboxSelection,
+          egressMode,
+          egressAllowlist: undefined,
+        };
+        for (const replay of [
+          { metadata: changedMetadata, sandboxSelection: changedSelection },
+          { metadata: registered, sandboxSelection: changedSelection },
+          { metadata: changedMetadata, sandboxSelection: input.sandboxSelection },
+        ]) {
+          await expect(stub.registerSessionFromMetadata(replay)).resolves.toMatchObject({
+            success: false,
+            code: 'BAD_REQUEST',
+          });
+        }
+      }
+    }
+  );
+
+  it('rejects a changed initial-create egress policy', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const stub = sessions.getByName(sessionId);
+    await runInDurableObject(stub, instance => {
+      instance.sandboxPeerFor = () => new FakeSandboxPeer();
+    });
+    const registered = metadata({
+      sessionId,
+      kiloSessionId: kiloSessionId(),
+      sandboxId,
+      sandboxProvider: 'cloudflare-containers',
+      egressMode: 'allowlist',
+      egressAllowlist: [],
+    });
+    const input = {
+      metadata: registered,
+      message: promptPayload(messageId()),
+      sandboxSelection: {
+        provider: 'cloudflare-containers' as const,
+        egressMode: 'allowlist' as const,
+        egressAllowlist: [],
+      },
+    };
+    await expect(stub.createSessionWithInitialAdmission(input)).resolves.toMatchObject({
+      success: true,
+    });
+    await expect(stub.createSessionWithInitialAdmission(input)).resolves.toMatchObject({
+      success: true,
+    });
+    await expect(
+      stub.createSessionWithInitialAdmission({
+        ...input,
+        metadata: {
+          ...registered,
+          workspace: { ...registered.workspace, egressAllowlist: ['example.com'] },
+        },
+        sandboxSelection: {
+          provider: 'cloudflare-containers',
+          egressMode: 'allowlist',
+          egressAllowlist: ['example.com'],
+        },
+      })
+    ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+    await expect(
+      stub.createSessionWithInitialAdmission({
+        ...input,
+        metadata: {
+          ...registered,
+          workspace: { ...registered.workspace, egressAllowlist: undefined },
+        },
+        sandboxSelection: { provider: 'cloudflare-containers', egressMode: 'allowlist' },
+      })
+    ).resolves.toMatchObject({ success: true });
+    await expect(
+      stub.createSessionWithInitialAdmission({
+        ...input,
+        metadata: {
+          ...registered,
+          workspace: {
+            ...registered.workspace,
+            egressMode: 'unrestricted',
+            egressAllowlist: undefined,
+          },
+        },
+        sandboxSelection: { provider: 'cloudflare-containers', egressMode: 'unrestricted' },
+      })
+    ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
+  });
+
+  it('accepts explicit unrestricted on a non-container provider and equivalent omitted replays', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const stub = sessions.getByName(sessionId);
+    const registered = metadata({
+      sessionId,
+      kiloSessionId: kiloSessionId(),
+      sandboxId,
+      egressMode: 'unrestricted',
+    });
+    await expect(
+      stub.registerSessionFromMetadata({
+        metadata: registered,
+        sandboxSelection: { provider: 'cloudflare', egressMode: 'unrestricted' },
+      })
+    ).resolves.toEqual({ success: true });
+    await evictAllDurableObjects();
+    const persisted = (await stub.getMetadata()) as SessionMetadata | null;
+    expect(persisted?.workspace?.egressMode).toBe('unrestricted');
+    await expect(
+      stub.registerSessionFromMetadata({
+        metadata: { ...registered, workspace: { ...registered.workspace, egressMode: undefined } },
+        sandboxSelection: { provider: 'cloudflare' },
+      })
+    ).resolves.toEqual({ success: true });
+  });
+
   it('records the Worker selection, carries it to the sandbox pin, and admits the turn', async () => {
     const sessionId = newSessionId();
     const kiloId = kiloSessionId();

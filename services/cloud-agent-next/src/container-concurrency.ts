@@ -32,6 +32,7 @@ export type ContainerCapacityRequest = {
    */
   instanceId: string;
   checkpoint: ContainerCapacityCheckpoint;
+  billingOrigin?: string;
 };
 
 export class ContainerConcurrencyLimitError extends Error {
@@ -66,8 +67,8 @@ export function isContainerConcurrencyLimitError(error: unknown): boolean {
   return message.includes('container_limit_reached:');
 }
 
-export function isContainerConcurrencyExempt(sandboxId: string): boolean {
-  return sandboxId.startsWith('crv-');
+export function isContainerConcurrencyExempt(request: ContainerCapacityRequest): boolean {
+  return request.billingOrigin === 'code-review' || request.instanceId.startsWith('crv-');
 }
 
 export function containerLimitFor(subject: ContainerConcurrencySubject): number {
@@ -90,6 +91,7 @@ export async function countLiveContainers(
         like(container_usage_interval.service, CLOUD_AGENT_SERVICE_PATTERN),
         notLike(container_usage_interval.service, CODE_REVIEW_SERVICE_PATTERN),
         notLike(container_usage_interval.instance_id, 'crv-%'),
+        sql`coalesce(${container_usage_interval.metadata}->>'origin', '') <> 'code-review'`,
         ne(container_usage_interval.instance_id, request.instanceId)
       )
     );
@@ -120,7 +122,7 @@ export async function assertContainerCapacity(
   let live: number;
   let limit: number;
   try {
-    if (isContainerConcurrencyExempt(request.instanceId)) return;
+    if (isContainerConcurrencyExempt(request)) return;
     limit = containerLimitFor(request.subject);
     live = await withTimeout(countLive(request), COUNT_TIMEOUT_MS, 'Container capacity count');
   } catch (error) {

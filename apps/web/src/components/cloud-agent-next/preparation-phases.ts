@@ -10,6 +10,22 @@ export function humanizePhaseLabel(step: Pick<PreparationStepSnapshot, 'label'>)
     .replace(/^./, firstCharacter => firstCharacter.toUpperCase());
 }
 
+export function commandsForPhase(
+  phase: PreparationStepSnapshot,
+  steps: readonly PreparationStepSnapshot[]
+): PreparationStepSnapshot[] {
+  if (phase.key !== 'setup_commands') return [];
+  const firstSetupPhase = steps.find(
+    step => step.kind === 'phase' && step.key === 'setup_commands'
+  );
+  return steps.filter(
+    step =>
+      step.kind === 'setup_command' &&
+      (step.parentStepId === phase.id ||
+        (step.parentStepId === undefined && firstSetupPhase?.id === phase.id))
+  );
+}
+
 /**
  * A phase step's display status. The setup_commands phase owns the command
  * steps, so its status aggregates theirs instead of trusting its own — a

@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
 
 type StreamTicketPayload = {
@@ -21,12 +22,17 @@ export const PREVIEW_TICKET_AUDIENCE = 'cloud-agent-preview';
 export const PREVIEW_SESSION_AUDIENCE = 'cloud-agent-preview-session';
 
 /** The claims both preview tokens carry: the entry ticket and the session cookie. */
-export type PreviewClaims = {
-  userId: string;
-  cloudAgentSessionId: string;
-  port: number;
-  organizationId?: string;
-};
+const previewClaimsSchema = z.object({
+  userId: z.string().min(1),
+  cloudAgentSessionId: z.string().min(1),
+  port: z.number().int(),
+  organizationId: z.string().optional(),
+});
+
+export type PreviewClaims = z.infer<typeof previewClaimsSchema>;
+
+/** A preview token must expire; `jwt.verify` accepts a token without `exp`. */
+const previewTokenPayloadSchema = previewClaimsSchema.extend({ exp: z.number() });
 
 export type WrapperDispatchTicketClaims = {
   type: 'wrapper_dispatch_ticket';
@@ -140,23 +146,12 @@ export type PreviewTokenValidation =
 
 const INVALID_PREVIEW_CLAIMS = { success: false, error: 'Invalid preview claims' } as const;
 
-function previewClaimsFrom(payload: Record<string, unknown>): PreviewTokenValidation {
-  const { userId, cloudAgentSessionId, port, exp, organizationId } = payload;
-  if (typeof userId !== 'string' || userId.length === 0) return INVALID_PREVIEW_CLAIMS;
-  if (typeof cloudAgentSessionId !== 'string' || cloudAgentSessionId.length === 0) {
-    return INVALID_PREVIEW_CLAIMS;
-  }
-  if (typeof port !== 'number' || !Number.isInteger(port)) return INVALID_PREVIEW_CLAIMS;
-  if (typeof exp !== 'number' || !Number.isFinite(exp)) return INVALID_PREVIEW_CLAIMS;
-  return {
-    success: true,
-    claims: {
-      userId,
-      cloudAgentSessionId,
-      port,
-      ...(typeof organizationId === 'string' ? { organizationId } : {}),
-    },
-  };
+/** The object strips every other field, so `aud`, `exp` and `type` never reach the claims. */
+function previewClaimsFrom(payload: unknown): PreviewTokenValidation {
+  const parsed = previewTokenPayloadSchema.safeParse(payload);
+  if (!parsed.success) return INVALID_PREVIEW_CLAIMS;
+  const { exp: _exp, ...claims } = parsed.data;
+  return { success: true, claims };
 }
 
 /** The 60-second entry ticket the web app mints (a `stream_ticket` with purpose `preview`). */
@@ -169,7 +164,7 @@ export function validatePreviewEntryTicket(
   if (validated.payload.purpose !== 'preview') {
     return { success: false, error: 'Invalid ticket purpose' };
   }
-  return previewClaimsFrom(validated.payload as unknown as Record<string, unknown>);
+  return previewClaimsFrom(validated.payload);
 }
 
 /** The host-bound session token the Worker sets as the preview cookie. */
@@ -181,26 +176,22 @@ export function validatePreviewSessionToken(
   if (!secret) {
     return { success: false, error: 'NEXTAUTH_SECRET is not configured on the worker' };
   }
-  let payload: unknown;
+  let payload: string | jwt.JwtPayload;
   try {
-    payload = jwt.verify(token, secret, { algorithms: ['HS256'] });
+    payload = jwt.verify(token, secret, {
+      algorithms: ['HS256'],
+      audience: PREVIEW_SESSION_AUDIENCE,
+    });
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       return { success: false, error: 'Preview session expired' };
     }
     return { success: false, error: 'Invalid preview session' };
   }
-  if (typeof payload !== 'object' || payload === null) {
-    return { success: false, error: 'Invalid preview session' };
-  }
-  const record = payload as Record<string, unknown>;
-  if (record.type !== 'preview_session') {
+  if (typeof payload === 'string' || payload.type !== 'preview_session') {
     return { success: false, error: 'Invalid preview session type' };
   }
-  if (record.aud !== PREVIEW_SESSION_AUDIENCE) {
-    return { success: false, error: 'Invalid preview session audience' };
-  }
-  return previewClaimsFrom(record);
+  return previewClaimsFrom(payload);
 }
 
 function isWrapperDispatchTicketClaims(payload: unknown): payload is WrapperDispatchTicketClaims {

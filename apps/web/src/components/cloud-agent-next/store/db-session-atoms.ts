@@ -153,6 +153,9 @@ function getSessionStore(): MiniDb<IndexedDbSessionData> {
  * Dates are returned as strings from the tRPC API
  */
 type ApiSession = {
+  latest_run_status?: 'queued' | 'accepted' | 'completed' | 'failed' | 'interrupted' | null;
+  latest_run_failure_kind?: 'failed' | 'system_interrupted' | null;
+  latest_run_terminal_at?: string | null;
   session_id: string;
   title: string | null;
   git_url: string | null;
@@ -176,6 +179,9 @@ type ApiSession = {
  * Database session type - with Date objects for convenient manipulation
  */
 export type DbSession = {
+  latest_run_status?: ApiSession['latest_run_status'];
+  latest_run_failure_kind?: ApiSession['latest_run_failure_kind'];
+  latest_run_terminal_at?: ApiSession['latest_run_terminal_at'];
   session_id: string;
   title: string | null;
   git_url: string | null;
@@ -199,6 +205,9 @@ export type DbSession = {
  * V2 sidebar sessions include git/platform/org/parent/status fields from cli_sessions_v2.
  */
 export type DbSessionV2 = {
+  latest_run_status?: ApiSession['latest_run_status'];
+  latest_run_failure_kind?: ApiSession['latest_run_failure_kind'];
+  latest_run_terminal_at?: ApiSession['latest_run_terminal_at'];
   session_id: string;
   title: string | null;
   cloud_agent_session_id: string | null;

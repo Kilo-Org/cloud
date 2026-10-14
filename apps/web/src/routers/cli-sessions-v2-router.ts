@@ -16,6 +16,7 @@ import {
   gte,
   isNotNull,
   sql,
+  getTableColumns,
   type SQL,
 } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -24,10 +25,12 @@ import { captureException } from '@sentry/nextjs';
 import { TRPCClientError } from '@trpc/client';
 import {
   cli_sessions_v2,
+  cloud_agent_session_runs,
   cloud_agent_worktrees,
   github_branch_pull_requests,
   organization_memberships,
   type CliSessionV2,
+  type CloudAgentSessionRunStatus,
 } from '@kilocode/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
@@ -514,6 +517,39 @@ export function getPrLinkVerificationKey(
 
 const createdOnPlatformField = z.string().min(1).max(100);
 
+type LatestRunOutcome = {
+  latest_run_status: CloudAgentSessionRunStatus | null;
+  latest_run_failure_kind: 'failed' | 'system_interrupted' | null;
+  latest_run_terminal_at: string | null;
+};
+
+function latestRunField<T>(field: SQL<T>): SQL<T | null> {
+  return sql<T | null>`(
+    SELECT ${field}
+    FROM ${cloud_agent_session_runs}
+    WHERE ${cloud_agent_session_runs.cloud_agent_session_id} = ${cli_sessions_v2.cloud_agent_session_id}
+    ORDER BY ${cloud_agent_session_runs.queued_at} DESC NULLS LAST,
+      ${cloud_agent_session_runs.message_id} DESC
+    LIMIT 1
+  )`;
+}
+
+const latestRunFields = {
+  latest_run_status: latestRunField(
+    sql<CloudAgentSessionRunStatus>`${cloud_agent_session_runs.status}`
+  ),
+  latest_run_failure_kind: latestRunField(sql<LatestRunOutcome['latest_run_failure_kind']>`CASE
+    WHEN ${cloud_agent_session_runs.status} = 'failed' THEN 'failed'
+    WHEN ${cloud_agent_session_runs.status} = 'interrupted'
+      AND ${cloud_agent_session_runs.failure_code} IN ('system_interrupt', 'container_shutdown')
+      THEN 'system_interrupted'
+    ELSE NULL
+  END`),
+  latest_run_terminal_at: latestRunField(
+    sql<string>`${cloud_agent_session_runs.terminal_at}`
+  ).mapWith((value: string | null) => (value === null ? null : new Date(value).toISOString())),
+};
+
 /**
  * Fields to select for session list/get operations
  */
@@ -532,6 +568,7 @@ const commonSessionFields = {
   created_at: cli_sessions_v2.created_at,
   updated_at: cli_sessions_v2.updated_at,
   version: cli_sessions_v2.version,
+  ...latestRunFields,
 } as const;
 
 /**
@@ -661,16 +698,21 @@ export function projectAssociatedPr<
 type WorktreeDetail = {
   name: string | null;
   defaultTitle: string | null;
-  sessions: {
+  sessions: (LatestRunOutcome & {
     sessionId: string;
     sessionStatus: string | null;
     sessionStatusUpdatedAt: string | null;
     updatedAt: string;
-  }[];
+  })[];
   prSession:
-    | (Pick<CliSessionV2, keyof typeof commonSessionFields | 'total_cost_microdollars'> & {
-        associatedPr: z.infer<typeof associatedPrSchema> | null;
-      })
+    | (Pick<
+        CliSessionV2,
+        | Exclude<keyof typeof commonSessionFields, keyof LatestRunOutcome>
+        | 'total_cost_microdollars'
+      > &
+        LatestRunOutcome & {
+          associatedPr: z.infer<typeof associatedPrSchema> | null;
+        })
     | null;
 };
 
@@ -1026,6 +1068,9 @@ export const cliSessionsV2Router = createTRPCRouter({
             'sessionId', ${cli_sessions_v2.session_id},
             'sessionStatus', ${cli_sessions_v2.status},
             'sessionStatusUpdatedAt', ${cli_sessions_v2.status_updated_at},
+            'latest_run_status', ${latestRunFields.latest_run_status},
+            'latest_run_failure_kind', ${latestRunFields.latest_run_failure_kind},
+            'latest_run_terminal_at', ${latestRunFields.latest_run_terminal_at},
             'updatedAt', ${cli_sessions_v2.updated_at}
           ) ORDER BY ${cli_sessions_v2.session_id})`,
         })
@@ -1041,6 +1086,9 @@ export const cliSessionsV2Router = createTRPCRouter({
         row.sessions.map(session => ({
           ...session,
           updatedAt: new Date(session.updatedAt).toISOString(),
+          latest_run_terminal_at: session.latest_run_terminal_at
+            ? new Date(session.latest_run_terminal_at).toISOString()
+            : null,
           sessionStatusUpdatedAt: session.sessionStatusUpdatedAt
             ? new Date(session.sessionStatusUpdatedAt).toISOString()
             : null,
@@ -1453,7 +1501,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     // that could pick another account's row for the same id and deny the owner
     // their own session. Read the rows for the id and prefer the caller's.
     const sessions = await db
-      .select()
+      .select({ ...getTableColumns(cli_sessions_v2), ...latestRunFields })
       .from(cli_sessions_v2)
       .where(eq(cli_sessions_v2.session_id, session_id));
 
@@ -1719,6 +1767,11 @@ export const cliSessionsV2Router = createTRPCRouter({
         updated_at: z.coerce.date(),
         version: z.number(),
         total_cost_microdollars: z.number().nullable(),
+        latest_run_status: z
+          .enum(['queued', 'accepted', 'completed', 'failed', 'interrupted'])
+          .nullable(),
+        latest_run_failure_kind: z.enum(['failed', 'system_interrupted']).nullable(),
+        latest_run_terminal_at: z.string().datetime().nullable(),
         // Runtime state from DO (null for CLI sessions without cloud_agent_session_id)
         runtimeState: baseGetSessionNextOutputSchema.nullable(),
         // Associated GitHub pull request for this session's branch, if any.
@@ -1736,6 +1789,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       const [row] = await db
         .select({
           session: cli_sessions_v2,
+          ...latestRunFields,
           pr_url: github_branch_pull_requests.pr_url,
           pr_number: github_branch_pull_requests.pr_number,
           pr_state: github_branch_pull_requests.pr_state,
@@ -1824,6 +1878,9 @@ export const cliSessionsV2Router = createTRPCRouter({
         updated_at: session.updated_at,
         version: session.version,
         total_cost_microdollars: session.total_cost_microdollars,
+        latest_run_status: row.latest_run_status,
+        latest_run_failure_kind: row.latest_run_failure_kind,
+        latest_run_terminal_at: row.latest_run_terminal_at,
         runtimeState,
         prLinkVerificationKey: getPrLinkVerificationKey(session),
         associatedPr: formatAssociatedPr(

@@ -17,27 +17,43 @@ import {
 // ============================================================================
 
 describe('apiSessionToDbSession', () => {
-  test('preserves worktree identity while converting API timestamps', () => {
-    const result = apiSessionToDbSession({
-      session_id: 'ses_grouped',
-      title: 'Grouped session',
-      git_url: 'https://github.com/owner/repo',
-      git_branch: 'main',
-      cloud_agent_session_id: 'workspace_grouped',
-      cloud_agent_worktree_id: 'worktree_grouped',
-      created_on_platform: 'cloud-agent-web',
-      created_at: '2026-01-01T00:00:00.000Z',
-      updated_at: '2026-01-01T00:00:01.000Z',
-      version: 2,
-      organization_id: null,
-      status: 'idle',
-      status_updated_at: null,
-      parent_session_id: null,
-    });
+  test.each([
+    ['failed', 'failed'],
+    ['interrupted', 'system_interrupted'],
+    ['interrupted', null],
+    ['completed', null],
+    ['accepted', null],
+    ['queued', null],
+    [null, null],
+    [undefined, undefined],
+  ] as const)(
+    'preserves latest outcome %s/%s while converting API timestamps',
+    (status, failureKind) => {
+      const result = apiSessionToDbSession({
+        session_id: 'ses_grouped',
+        title: 'Grouped session',
+        git_url: 'https://github.com/owner/repo',
+        git_branch: 'main',
+        cloud_agent_session_id: 'workspace_grouped',
+        cloud_agent_worktree_id: 'worktree_grouped',
+        created_on_platform: 'cloud-agent-web',
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:01.000Z',
+        version: 2,
+        organization_id: null,
+        status: 'idle',
+        status_updated_at: null,
+        parent_session_id: null,
+        latest_run_status: status,
+        latest_run_failure_kind: failureKind,
+      });
 
-    expect(result.cloud_agent_worktree_id).toBe('worktree_grouped');
-    expect(result.updated_at).toEqual(new Date('2026-01-01T00:00:01.000Z'));
-  });
+      expect(result.cloud_agent_worktree_id).toBe('worktree_grouped');
+      expect(result.updated_at).toEqual(new Date('2026-01-01T00:00:01.000Z'));
+      expect(result.latest_run_status).toBe(status);
+      expect(result.latest_run_failure_kind).toBe(failureKind);
+    }
+  );
 });
 
 describe('extractRepoFromGitUrl', () => {
@@ -330,6 +346,14 @@ describe('getSessionDisplayTitle', () => {
 });
 
 describe('shouldShowSessionStatus', () => {
+  test.each(['failed', 'system_interrupted'])('shows %s without an activity timestamp', status => {
+    expect(shouldShowSessionStatus(status, null)).toBe(true);
+  });
+
+  test('does not warn for a normal interruption', () => {
+    expect(shouldShowSessionStatus('interrupted', null)).toBe(false);
+  });
+
   test('returns true for a visible status', () => {
     expect(shouldShowSessionStatus('busy', new Date().toISOString())).toBe(true);
   });
@@ -344,6 +368,15 @@ describe('shouldShowSessionStatus', () => {
 });
 
 describe('getSessionActivityIndicatorKind', () => {
+  test.each(['failed', 'system_interrupted'])('returns failure for %s', status => {
+    expect(getSessionActivityIndicatorKind(status, null)).toBe('failure');
+    expect(getSessionActivityIndicatorKind(status, '2020-01-01T00:00:00.000Z')).toBe('failure');
+  });
+
+  test('returns null for a normal interruption', () => {
+    expect(getSessionActivityIndicatorKind('interrupted', null)).toBeNull();
+  });
+
   test('returns working for busy status', () => {
     expect(getSessionActivityIndicatorKind('busy', new Date().toISOString())).toBe('working');
   });

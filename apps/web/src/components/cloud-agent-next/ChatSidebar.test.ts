@@ -215,6 +215,157 @@ describe('ChatSidebar row rendering', () => {
     });
   }
 
+  it.each([
+    ['failed', 'Last run failed'],
+    ['system_interrupted', 'Last run stopped unexpectedly'],
+  ] as const)(
+    'renders an accessible standalone %s warning instead of its timestamp',
+    (latestRunFailureKind, label) => {
+      const session = makeSession(0, { sessionStatus: 'idle', latestRunFailureKind });
+      renderSidebar({ sessions: [session], activeSessions: [activeSession(session)] });
+
+      const row = rowElement(session.sessionId);
+      const warning = row.querySelector(`[role="img"][aria-label="${label}"]`);
+      expect(warning).not.toBeNull();
+      expect(warning?.getAttribute('title')).toBe(label);
+      expect(warning?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+      expect(row.querySelector('[data-time-ago]')).toBeNull();
+    }
+  );
+
+  it.each(['busy', 'retry', 'question', 'permission'])(
+    'renders standalone %s activity instead of the previous failure',
+    sessionStatus => {
+      const session = makeSession(0, { sessionStatus, latestRunFailureKind: 'failed' });
+      renderSidebar({ sessions: [session] });
+
+      const row = rowElement(session.sessionId);
+      expect(row.querySelector('[aria-label="Last run failed"]')).toBeNull();
+      expect(row.querySelector('[data-time-ago]')).toBeNull();
+      if (sessionStatus === 'busy' || sessionStatus === 'retry') {
+        expect(row.innerHTML).toContain(
+          sessionStatus === 'busy' ? '<title>Busy</title>' : '<title>Retrying</title>'
+        );
+      } else {
+        const label =
+          sessionStatus === 'question' ? 'Waiting for answer' : 'Waiting for permission';
+        expect(row.querySelector(`[aria-label="${label}"]`)).not.toBeNull();
+      }
+    }
+  );
+
+  it('clears the standalone warning on a new run and restores the timestamp after success', () => {
+    const session = makeSession(0, { sessionStatus: 'idle', latestRunFailureKind: 'failed' });
+    renderSidebar({ sessions: [session] });
+    expect(
+      rowElement(session.sessionId).querySelector('[aria-label="Last run failed"]')
+    ).not.toBeNull();
+
+    renderSidebar({
+      sessions: [{ ...session, sessionStatus: 'busy', latestRunFailureKind: null }],
+    });
+    expect(
+      rowElement(session.sessionId).querySelector('[aria-label="Last run failed"]')
+    ).toBeNull();
+    expect(rowElement(session.sessionId).innerHTML).toContain('<title>Busy</title>');
+
+    renderSidebar({ sessions: [{ ...session, latestRunFailureKind: null }] });
+    expect(rowElement(session.sessionId).querySelector('[role="img"]')).toBeNull();
+    expect(rowElement(session.sessionId).querySelector('[data-time-ago]')).not.toBeNull();
+  });
+
+  it.each([
+    ['failed', 'Last run failed'],
+    ['system_interrupted', 'Last run stopped unexpectedly'],
+  ] as const)(
+    'renders a hidden %s sibling on its worktree during search',
+    (latestRunFailureKind, label) => {
+      const visible = makeSession(0, { worktreeId: 'worktree_shared', sessionStatus: 'idle' });
+      const hidden = makeSession(1, {
+        worktreeId: 'worktree_shared',
+        sessionStatus: 'idle',
+        latestRunFailureKind,
+      });
+      const props = {
+        sessions: [visible],
+        searchQuery: visible.prompt,
+        activeSessions: [activeSession(hidden)],
+        worktreeDetails: {
+          worktree_shared: {
+            name: 'Shared worktree',
+            defaultTitle: null,
+            prSession: null,
+            sessions: [visible, hidden],
+          },
+        },
+      } satisfies Partial<ChatSidebarProps>;
+      renderSidebar(props);
+
+      const row = dom.container.querySelector('[data-worktree-id="worktree_shared"]');
+      expect(row?.querySelector(`[role="img"][aria-label="${label}"]`)).not.toBeNull();
+      expect(row?.querySelector('[data-time-ago]')).toBeNull();
+      expect(row?.textContent).not.toContain(hidden.prompt);
+      expect(dom.container.querySelector(`[data-session-pr="${hidden.sessionId}"]`)).toBeNull();
+
+      renderSidebar({
+        ...props,
+        worktreeDetails: {
+          worktree_shared: {
+            ...props.worktreeDetails.worktree_shared,
+            sessions: [visible, { ...hidden, latestRunFailureKind: null }],
+          },
+        },
+      });
+      expect(dom.container.querySelector(`[aria-label="${label}"]`)).toBeNull();
+    }
+  );
+
+  it.each(['busy', 'retry', 'question', 'permission'])(
+    'renders grouped %s activity ahead of a hidden failed sibling',
+    status => {
+      const visible = makeSession(0, { worktreeId: 'worktree_shared' });
+      const hidden = makeSession(1, { sessionStatus: 'idle', latestRunFailureKind: 'failed' });
+      renderSidebar({
+        sessions: [visible],
+        foregroundSession: { sessionId: visible.sessionId, status },
+        worktreeDetails: {
+          worktree_shared: {
+            name: 'Shared worktree',
+            defaultTitle: null,
+            prSession: null,
+            sessions: [visible, hidden],
+          },
+        },
+      });
+
+      const row = dom.container.querySelector('[data-worktree-id="worktree_shared"]');
+      expect(row?.querySelector('[aria-label="Last run failed"]')).toBeNull();
+      if (status === 'busy' || status === 'retry') {
+        expect(row?.innerHTML).toContain(
+          status === 'busy' ? '<title>Busy</title>' : '<title>Retrying</title>'
+        );
+      } else {
+        const label = status === 'question' ? 'Waiting for answer' : 'Waiting for permission';
+        expect(row?.querySelector(`[aria-label="${label}"]`)).not.toBeNull();
+      }
+    }
+  );
+
+  it('does not render warnings for normal interruptions in standalone or grouped rows', () => {
+    renderSidebar({
+      sessions: [
+        makeSession(0, { sessionStatus: 'idle', latestRunFailureKind: null }),
+        makeSession(1, {
+          sessionStatus: 'idle',
+          latestRunFailureKind: null,
+          worktreeId: 'worktree_shared',
+        }),
+      ],
+    });
+    expect(dom.container.querySelector('[role="img"]')).toBeNull();
+    expect(dom.container.querySelectorAll('[data-time-ago]')).toHaveLength(2);
+  });
+
   function rowElement(sessionId: string): HTMLElement {
     let node: Element | null = dom.container.querySelector(`[data-session-pr="${sessionId}"]`);
     while (node) {

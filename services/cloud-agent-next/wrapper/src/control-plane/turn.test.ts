@@ -3162,6 +3162,7 @@ describe('native session outcome transitions', () => {
   it.each([
     ['hang', undefined, 'agent_unresponsive', 'Kilo was not responding and was restarted'],
     ['hang', 'activity_capacity', 'agent_restarted', 'the agent restarted'],
+    ['hang', 'activity_observation', 'agent_restarted', 'the agent restarted'],
     ['exit', undefined, 'agent_restarted', 'the agent restarted'],
   ] as const)(
     'reports a %s (%s) restart of native work without a Cloud turn as %s',

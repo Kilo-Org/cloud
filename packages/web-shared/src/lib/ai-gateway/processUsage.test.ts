@@ -451,6 +451,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     expect(result.upstream_id).toBe('chatcmpl-ccebc94c526d4f8797cfe00023478a9a');
     expect(result.inference_provider).toBe('fireworks');
     expect(result.cost_mUsd).toBe(47482);
+    expect(result.generation_time).toBe(4287);
   });
 
   test('leaves upstream_id null when the Vercel gateway reports no provider request id', async () => {
@@ -472,6 +473,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     );
 
     expect(result.upstream_id).toBeNull();
+    expect(result.generation_time).toBeNull();
   });
 
   test('records the Vercel upstream provider request id for non-streamed responses', () => {
@@ -499,6 +501,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
                           provider: 'fireworks',
                           credentialType: 'system',
                           success: true,
+                          startTime: 1791906882421,
+                          endTime: 1791906921724,
                           providerResponseId: 'chatcmpl-non-streamed',
                         },
                       ],
@@ -518,6 +522,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
 
     expect(result.upstream_id).toBe('chatcmpl-non-streamed');
     expect(result.inference_provider).toBe('fireworks');
+    expect(result.generation_time).toBe(39303);
   });
 });
 

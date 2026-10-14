@@ -1552,7 +1552,7 @@
         "recoveryLabel": "Mete aplikasyon GitHub la ajou"
       },
       "githubIpAllowList": {
-        "description": "Revizè kòd la dezaktive paske òganizasyon GitHub sa a sèvi ak yon lis adrès IP otorize ki bloke Kilo. Kontakte hi@kilocode.ai pou jwenn èd, epi aktive Revizè kòd la ankò."
+        "description": "Revizè kòd la dezaktive paske òganizasyon GitHub sa a sèvi ak yon lis adrès IP otorize ki bloke Kilo. Kontakte hi@kilo.ai pou jwenn èd, epi aktive Revizè kòd la ankò."
       },
       "gitlabProjectAccessRequired": {
         "description": "Revizè kòd la dezaktive paske Kilo pa ka kreye yon jeton aksè GitLab pou pwojè sa a. Bay aksè kòm responsab antretyen oswa aktive jeton aksè pwojè yo, epi aktive Revizè kòd la ankò.",
@@ -1567,7 +1567,7 @@
         "recoveryLabel": "Mete paramèt Revizè kòd la ajou"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Revizè kòd la dezaktive apre klonaj depo a depase delè li twa fwa jodi a. Kontakte hi@kilocode.ai pou jwenn èd, epi aktive Revizè kòd la ankò."
+        "description": "Revizè kòd la dezaktive apre klonaj depo a depase delè li twa fwa jodi a. Kontakte hi@kilo.ai pou jwenn èd, epi aktive Revizè kòd la ankò."
       },
       "title": "Revizè kòd la bezwen atansyon ou.",
       "recoveryLabel": "Kontakte ekip sipò a"

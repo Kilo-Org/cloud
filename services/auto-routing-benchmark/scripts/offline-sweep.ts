@@ -59,6 +59,7 @@ async function main() {
       out: { type: 'string' },
       resume: { type: 'string' },
       'summarize-only': { type: 'boolean', default: false },
+      'skip-agentic': { type: 'boolean', default: false },
     },
   });
   if (values['summarize-only']) {
@@ -86,7 +87,9 @@ async function main() {
     .int()
     .positive()
     .parse(values['concurrency-agentic']);
-  const cases = selectSweepCases(suite);
+  const cases = selectSweepCases(suite).filter(
+    benchCase => !values['skip-agentic'] || benchCase.taskType !== 'agentic_execution'
+  );
   const containerUrl = values['container-url'] ? new URL(values['container-url']) : null;
   const cliApiUrl = values['cli-api-url'] ?? process.env.KILO_CLI_API_URL;
   const kiloToken = process.env.KILO_TOKEN;

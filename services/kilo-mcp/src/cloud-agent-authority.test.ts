@@ -281,6 +281,37 @@ describe('Cloud Agent MCP authority', () => {
   });
 
   it.each([null, '11111111-1111-4111-8111-111111111111'])(
+    'tells scoped sessions they may launch child sessions only on explicit request: %s',
+    async organizationId => {
+      const authority = { ...scope, organizationId };
+      const scopedAuth = forwardedAuthFromProps({
+        ...props,
+        organizationId,
+        cloudAgentAuthority: authority,
+      });
+      const handler = createMcpHandler({ catalog, webBaseUrl: 'https://fixture.invalid' });
+      const response = await handler(
+        new Request('https://fixture.invalid/mcp', {
+          method: 'POST',
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'initialize',
+            params: { protocolVersion: '2025-06-18', capabilities: {} },
+          }),
+        }),
+        scopedAuth
+      );
+      const body = (await response.json()) as { result: { instructions: string } };
+      expect(body.result.instructions).toContain('may launch child Cloud Agent sessions');
+      expect(body.result.instructions).toContain('only when the user explicitly asks');
+      expect(body.result.instructions).toContain('own sandbox and worktree');
+      expect(body.result.instructions).toContain('fan out independent tasks');
+      expect(body.result.instructions).toContain(cloudAgentAuthorityProcedure(authority));
+    }
+  );
+
+  it.each([null, '11111111-1111-4111-8111-111111111111'])(
     'derives search scope from the verified organization: %s',
     async organizationId => {
       const authority = { ...scope, organizationId };

@@ -724,13 +724,18 @@ async function handleRpcMessage(
           protocolVersion,
           ...(clientName !== undefined ? { clientName } : {}),
         });
+        const childSessionInstructions = auth.cloudAgentAuthority
+          ? ` This session may launch child Cloud Agent sessions. Launch one only when the user explicitly asks you to spin up a new Cloud Agent session. Each child session gets its own sandbox and worktree, so use child sessions to fan out independent tasks. Do not use a child session to explore or work in this worktree; use your own tools here. To launch one, run search first, then call ${cloudAgentAuthorityProcedure(auth.cloudAgentAuthority)} with the child's task.`
+          : '';
         return jsonRpcResult(id ?? 0, {
           protocolVersion,
           capabilities: { tools: {} },
           serverInfo: SERVER_INFO,
-          instructions: canUseProtectedActions(auth)
-            ? `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. This connection may also run admin and debug endpoints: use call_protected to submit one, then submit_otp with the code the user reads from their authenticator app to approve it. The endpoint and payload are fixed once call_protected returns. ${feedback}`
-            : `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. ${feedback}`,
+          instructions:
+            (canUseProtectedActions(auth)
+              ? `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. This connection may also run admin and debug endpoints: use call_protected to submit one, then submit_otp with the code the user reads from their authenticator app to approve it. The endpoint and payload are fixed once call_protected returns. ${feedback}`
+              : `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. ${feedback}`) +
+            childSessionInstructions,
         });
       }
       case 'ping':

@@ -9,10 +9,14 @@ export function modelPickerFixtureRoute(path: string): string | null {
   }
 
   const routeKey = 'model-picker-fixture';
-  const options: SessionModelOption[] = ['Anthropic', 'OpenAI', 'Google'].flatMap(
-    (providerName, providerIndex) =>
+  const providers = [
+    { id: 'anthropic', name: 'Anthropic' },
+    { id: 'openai', name: 'OpenAI' },
+    { id: 'google', name: 'Google' },
+  ];
+  const options: SessionModelOption[] = providers.flatMap(
+    ({ id: providerID, name: providerName }, providerIndex) =>
       Array.from({ length: 40 }, (_, index) => {
-        const providerID = providerName.toLowerCase();
         const modelID = `${providerID}-model-${String(index).padStart(2, '0')}`;
         return {
           id: `remote-model-${providerIndex * 40 + index}`,

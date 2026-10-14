@@ -24,7 +24,6 @@ import {
 } from './conversation-identity';
 import type { ContentHashes } from './conversation-identity';
 import {
-  addPendingClassifierCost,
   readConversationState,
   putCachedClassification,
   putStickyDecision,
@@ -44,6 +43,7 @@ import type { HonoEnv } from './hono-env';
 import { codingPlanDefaultDecision, getCodingPlanPreference } from './coding-plan-preference';
 import { getModelCapabilities } from './model-capabilities';
 import type { ModelCapabilitiesMap } from './model-capabilities';
+import { recordClassifierUsage, type ClassifierCallKind } from './classifier-usage';
 
 const CUSTOM_ROUTING_TABLE_CACHE_TTL_MS = 60_000;
 
@@ -122,21 +122,20 @@ function decisionVariant(decision: AutoRoutingDecision): string | null {
 let isolateRequestSeq = 0;
 
 function decisionResponse(
-  cost: number,
   classification: ClassifierOutput,
   normalized: NormalizedClassifierInput,
   decision: AutoRoutingDecision | null
 ): AutoRoutingDecisionResponse {
   return {
-    cost,
+    cost: 0,
     decision,
     classifierResult: { classification, normalized },
   };
 }
 
-function emptyDecisionResponse(cost = 0): AutoRoutingDecisionResponse {
+function emptyDecisionResponse(): AutoRoutingDecisionResponse {
   return {
-    cost,
+    cost: 0,
     decision: null,
     classifierResult: null,
   };
@@ -357,6 +356,8 @@ function recordDecision(
 
 export const decideHandler: Handler<HonoEnv> = async c => {
   const generation = Date.now();
+  const requestStart = `${generation}:${performance.now()}`;
+  const usageCreatedAt = new Date(generation).toISOString();
   let rawBody: unknown;
   try {
     rawBody = await c.req.json();
@@ -454,12 +455,42 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       codingPlanEligible,
     };
   })();
+  const classifyAndBill = async (
+    ctx: DecisionContext,
+    classifierModel: string,
+    kind: ClassifierCallKind
+  ): Promise<ClassifierRunResult> => {
+    const identity = {
+      conversationKey: ctx.conversationKey,
+      classifierModel,
+      contentHash: ctx.hashes.exact,
+      kind,
+      requestStart,
+    };
+    try {
+      const classifier = await classifyNormalizedInput(c.env, payload.input, classifierModel);
+      c.executionCtx.waitUntil(
+        recordClassifierUsage(c.env, payload, identity, classifier.cost, usageCreatedAt)
+      );
+      return classifier;
+    } catch (error) {
+      c.executionCtx.waitUntil(
+        recordClassifierUsage(
+          c.env,
+          payload,
+          identity,
+          getClassifierFailureMetadata(error).cost,
+          usageCreatedAt
+        )
+      );
+      throw error;
+    }
+  };
 
   const preparedClassification = (async (): Promise<
     | {
         ctx: DecisionContext;
         sticky: StickyDecision | null;
-        pendingCostUsd: number;
         outcome:
           | DecisionOutcome
           | { kind: 'sticky_immediate'; classifierModel: string; decision: AutoRoutingDecision };
@@ -491,19 +522,17 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       timings,
     };
     const cacheReadStartedAt = performance.now();
-    const {
-      classification: cached,
-      sticky,
-      pendingCostUsd,
-    } = await readConversationState(c.env, ctx.conversationKey, hashes.exact, classifierModel, {
-      consumePendingCost: true,
-    });
+    const { classification: cached, sticky } = await readConversationState(
+      c.env,
+      ctx.conversationKey,
+      hashes.exact,
+      classifierModel
+    );
     timings.cacheReadMs = performance.now() - cacheReadStartedAt;
     if (cached) {
       return {
         ctx,
         sticky,
-        pendingCostUsd,
         outcome: { kind: 'cache_hit', classifierModel, classification: cached },
       };
     }
@@ -531,7 +560,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
           return {
             ctx,
             sticky,
-            pendingCostUsd,
             outcome: { kind: 'sticky_immediate', classifierModel, decision },
           };
         }
@@ -540,16 +568,16 @@ export const decideHandler: Handler<HonoEnv> = async c => {
 
     const classifierStartedAt = performance.now();
     try {
-      const classifier = await classifyNormalizedInput(c.env, payload.input, classifierModel);
-      return { ctx, sticky, pendingCostUsd, outcome: { kind: 'model', classifier } };
+      const classifier = await classifyAndBill(ctx, classifierModel, 'sync');
+      return { ctx, sticky, outcome: { kind: 'model', classifier } };
     } catch (error) {
-      // Handle rejection immediately, even while routing prerequisites are
-      // still pending; billed failure metadata is consumed below as before.
-      return { ctx, sticky, pendingCostUsd, outcome: { kind: 'error', error } };
+      return { ctx, sticky, outcome: { kind: 'error', error } };
     } finally {
       timings.classifierMs = performance.now() - classifierStartedAt;
     }
   })();
+  // Keep an in-flight paid call alive if the gateway disconnects before its response.
+  c.executionCtx.waitUntil(preparedClassification.then(() => undefined));
 
   const [routing, prepared] = await Promise.all([routingPrerequisites, preparedClassification]);
   if (!('ctx' in prepared)) {
@@ -566,7 +594,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   }
 
   const { configuredPool, routingMode, capabilities, routingTable } = routing;
-  const { ctx, sticky, pendingCostUsd, outcome } = prepared;
+  const { ctx, sticky, outcome } = prepared;
   const incumbent = stickyToIncumbent(sticky);
   const decisionOptions = {
     constraints: payload.constraints,
@@ -580,11 +608,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       (async () => {
         const classifierStartedAt = performance.now();
         try {
-          const classifier = await classifyNormalizedInput(
-            c.env,
-            payload.input,
-            outcome.classifierModel
-          );
+          const classifier = await classifyAndBill(ctx, outcome.classifierModel, 'background');
           backgroundCtx.timings.classifierMs = performance.now() - classifierStartedAt;
           const decision = computeDecision(
             classifier.classification,
@@ -612,7 +636,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
                   generation
                 )
               : Promise.resolve(),
-            addPendingClassifierCost(c.env, ctx.conversationKey, classifier.cost ?? 0),
           ]);
           recordDecision(
             c.env,
@@ -625,8 +648,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
             'background'
           );
         } catch (error) {
-          const cost = getClassifierFailureMetadata(error).cost ?? 0;
-          if (cost > 0) await addPendingClassifierCost(c.env, ctx.conversationKey, cost);
           console.warn(
             JSON.stringify({
               event: 'auto_routing_background_classify_failed',
@@ -638,7 +659,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         }
       })()
     );
-    return c.json({ cost: pendingCostUsd, decision: outcome.decision, classifierResult: null });
+    return c.json({ cost: 0, decision: outcome.decision, classifierResult: null });
   }
   if (outcome.kind === 'cache_hit') {
     const cached = outcome.classification;
@@ -671,7 +692,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       decision,
       sticky
     );
-    return c.json(decisionResponse(pendingCostUsd, cached, payload.input, decision));
+    return c.json(decisionResponse(cached, payload.input, decision));
   }
 
   try {
@@ -715,14 +736,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       decision,
       sticky
     );
-    return c.json(
-      decisionResponse(
-        pendingCostUsd + (classifier.cost ?? 0),
-        classifier.classification,
-        payload.input,
-        decision
-      )
-    );
+    return c.json(decisionResponse(classifier.classification, payload.input, decision));
   } catch (error) {
     recordDecision(
       c.env,
@@ -733,10 +747,6 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       null,
       sticky
     );
-    // A failed System One run can still have billed the request, so report
-    // that cost even though there is no usable classifier result.
-    return c.json(
-      emptyDecisionResponse(pendingCostUsd + (getClassifierFailureMetadata(error).cost ?? 0))
-    );
+    return c.json(emptyDecisionResponse());
   }
 };

@@ -1,5 +1,6 @@
 import type { AgentSandboxProvider } from '../../types.js';
 import { decodeCloudflareProviderRef } from '../../sandbox-control/cloudflare-provider.js';
+import type { SandboxKind } from '../../sandbox-placement.js';
 import type { AllocationKind } from './allocation.js';
 import type { RouteState } from './routes.js';
 
@@ -8,6 +9,8 @@ export type PreviewProviderCoordinates =
       provider: 'cloudflare';
       allocationName: string;
       containment: boolean;
+      /** The pinned kind of a placed (`sbx-`) key; absent for a legacy prefixed key. */
+      sandboxKind?: SandboxKind;
     }
   | {
       provider: 'cloudflare-containers';
@@ -29,6 +32,8 @@ export type PreviewTargetSnapshot = {
   providerRef: string | null;
   provider: AgentSandboxProvider;
   pinnedAllocationName: string;
+  /** The pinned kind; a placed key routes only through it. */
+  sandboxKind: SandboxKind | undefined;
   logicalSandboxId: string;
 };
 
@@ -70,6 +75,7 @@ export function resolvePreviewTarget(snapshot: PreviewTargetSnapshot): PreviewTa
       provider: 'cloudflare',
       allocationName: decoded?.sandboxId ?? snapshot.pinnedAllocationName,
       containment: decoded?.containment ?? false,
+      ...(snapshot.sandboxKind === undefined ? {} : { sandboxKind: snapshot.sandboxKind }),
     },
   };
 }

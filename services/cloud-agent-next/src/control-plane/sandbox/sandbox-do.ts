@@ -964,6 +964,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       providerRef: allocation.providerRef,
       provider: this.currentProvider(),
       pinnedAllocationName: this.providerPin?.allocationName ?? this.sandboxId,
+      sandboxKind: this.providerPin?.sandboxKind,
       logicalSandboxId: this.sandboxId,
     });
   }

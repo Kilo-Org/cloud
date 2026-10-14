@@ -22,7 +22,8 @@ import {
   sanitizePreviewResponseHeaders,
   type PreviewHeader,
 } from '../shared/preview-headers.js';
-import { getSandboxNamespace } from '../sandbox-id.js';
+import { logger } from '../logger.js';
+import { resolveSandboxNamespace } from '../sandbox-placement.js';
 import type { Env } from '../types.js';
 import { isPreviewEnabled, matchPreviewHost, previewLabel, type PreviewHostMatch } from './host.js';
 import { PREVIEW_NOT_RUNNING_TEXT, PREVIEW_SESSION_MISSING_TEXT } from './container-port-fetch.js';
@@ -57,19 +58,20 @@ export type PreviewRouteDeps = {
   ) => Promise<Response>;
 };
 
-async function defaultFetchUpstream(
+export async function defaultFetchUpstream(
   env: Env,
   coordinates: PreviewProviderCoordinates,
   request: Request
 ): Promise<Response> {
   if (coordinates.provider === 'cloudflare') {
-    const sandbox = getSandbox(
-      getSandboxNamespace(env, coordinates.allocationName, {
-        managedScmContainment: coordinates.containment,
-      }),
-      coordinates.allocationName
-    );
-    return sandbox.fetch(request);
+    // The same namespace rule as the Sandbox DO's provider adapter: a placed key
+    // routes only through its pinned kind.
+    const namespace = resolveSandboxNamespace(env, {
+      sandboxId: coordinates.allocationName,
+      sandboxKind: coordinates.sandboxKind,
+      contained: coordinates.containment,
+    });
+    return getSandbox(namespace, coordinates.allocationName).fetch(request);
   }
   const stub = env.SANDBOX_CONTAINERS.getByName(coordinates.logicalSandboxId);
   return stub.fetch(request);
@@ -106,6 +108,10 @@ function accessErrorResponse(error: unknown): Response {
   return projected.status === 403
     ? fixed(403, 'Session access denied')
     : fixed(503, 'Session access is temporarily unavailable');
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function readPreviewCookie(header: string | null, secure: boolean): string | null {
@@ -362,7 +368,8 @@ async function handleProxy(
     target = await deps
       .getSessionStub(env, claims.userId, claims.cloudAgentSessionId)
       .resolvePreviewTarget();
-  } catch {
+  } catch (error) {
+    logger.withFields({ error: errorMessage(error) }).warn('Preview target resolution failed');
     return fixed(503, 'Preview is temporarily unavailable', true);
   }
   if (target.status !== 'ok') return unavailableTargetResponse(target);
@@ -376,7 +383,10 @@ async function handleProxy(
       coordinates,
       upstreamRequest(request, claims.port, forwarded, coordinates)
     );
-  } catch {
+  } catch (error) {
+    logger
+      .withFields({ error: errorMessage(error), provider: coordinates.provider })
+      .warn('Preview upstream fetch failed');
     return fixed(503, 'Preview is temporarily unavailable', true);
   }
   return sanitizedResponse(response, claims.port, url.origin, secure);

@@ -9,6 +9,7 @@ function snapshot(overrides: Partial<PreviewTargetSnapshot> = {}): PreviewTarget
     providerRef: 'ses-11111111111141118111111111111111',
     provider: 'cloudflare',
     pinnedAllocationName: 'ses-11111111111141118111111111111111',
+    sandboxKind: undefined,
     logicalSandboxId: 'workspace_11111111-1111-4111-8111-111111111111',
     ...overrides,
   };
@@ -114,6 +115,28 @@ describe('resolvePreviewTarget', () => {
         provider: 'cloudflare',
         allocationName: 'ses-plain',
         containment: false,
+      },
+    });
+  });
+
+  it('carries the pinned kind of a placed key into the cloudflare coordinates', () => {
+    const placedKey = `sbx-${'a'.repeat(48)}`;
+    const ref = encodeCloudflareProviderRef({
+      sandboxId: placedKey,
+      containment: true,
+      instanceId: 'intent-1',
+    });
+    expect(
+      resolvePreviewTarget(
+        snapshot({ providerRef: ref, pinnedAllocationName: placedKey, sandboxKind: 'isolated' })
+      )
+    ).toEqual({
+      status: 'ok',
+      coordinates: {
+        provider: 'cloudflare',
+        allocationName: placedKey,
+        containment: true,
+        sandboxKind: 'isolated',
       },
     });
   });

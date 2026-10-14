@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
+import { getSandbox } from '@cloudflare/sandbox';
 import { mintPreviewSessionToken, type PreviewClaims } from '../auth.js';
 import type {
   PreviewProviderCoordinates,
@@ -13,6 +14,7 @@ import type { Env } from '../types.js';
 import { PREVIEW_SESSION_MISSING_TEXT } from './container-port-fetch.js';
 import {
   PREVIEW_ENTER_PATH,
+  defaultFetchUpstream,
   handlePreviewOpen,
   handlePreviewRequest,
   type PreviewRouteDeps,
@@ -777,5 +779,83 @@ describe('preview upstream forwarding', () => {
     );
     expect(response.status).toBe(200);
     expect(fetchUpstream).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('default upstream namespace', () => {
+  const namespaces = {
+    Sandbox: { name: 'Sandbox' },
+    SandboxContainment: { name: 'SandboxContainment' },
+    SandboxSmallContainment: { name: 'SandboxSmallContainment' },
+    SandboxCodeReviewContainment: { name: 'SandboxCodeReviewContainment' },
+    SandboxDIND: { name: 'SandboxDIND' },
+  };
+  const namespaceEnv = { ...env, ...namespaces } as unknown as Env;
+  const PLACED_KEY = `sbx-${'a'.repeat(48)}`;
+
+  async function namespaceFor(coordinates: PreviewProviderCoordinates): Promise<unknown> {
+    const sandboxFetch = vi.fn(async () => new Response('ok'));
+    const mocked = vi.mocked(getSandbox);
+    mocked.mockReset();
+    mocked.mockReturnValue({ fetch: sandboxFetch } as unknown as ReturnType<typeof getSandbox>);
+    const response = await defaultFetchUpstream(
+      namespaceEnv,
+      coordinates,
+      new Request(`${ORIGIN}/`)
+    );
+    expect(response.status).toBe(200);
+    expect(sandboxFetch).toHaveBeenCalledTimes(1);
+    const [namespace, sandboxId] = mocked.mock.calls[0] ?? [];
+    expect(sandboxId).toBe(
+      coordinates.provider === 'cloudflare' ? coordinates.allocationName : undefined
+    );
+    return namespace;
+  }
+
+  it('routes a placed contained key through its pinned kind', async () => {
+    await expect(
+      namespaceFor({
+        provider: 'cloudflare',
+        allocationName: PLACED_KEY,
+        containment: true,
+        sandboxKind: 'isolated',
+      })
+    ).resolves.toBe(namespaces.SandboxSmallContainment);
+    await expect(
+      namespaceFor({
+        provider: 'cloudflare',
+        allocationName: PLACED_KEY,
+        containment: true,
+        sandboxKind: 'shared',
+      })
+    ).resolves.toBe(namespaces.SandboxContainment);
+  });
+
+  it('routes a placed key without containment to the standard pool', async () => {
+    await expect(
+      namespaceFor({
+        provider: 'cloudflare',
+        allocationName: PLACED_KEY,
+        containment: false,
+        sandboxKind: 'isolated',
+      })
+    ).resolves.toBe(namespaces.Sandbox);
+  });
+
+  it('keeps routing a legacy prefixed key by its prefix', async () => {
+    await expect(
+      namespaceFor({
+        provider: 'cloudflare',
+        allocationName: 'ses-11111111111141118111111111111111',
+        containment: false,
+      })
+    ).resolves.toBe(namespaces.Sandbox);
+    await expect(
+      namespaceFor({
+        provider: 'cloudflare',
+        allocationName: 'ses-11111111111141118111111111111111',
+        containment: true,
+      })
+    ).resolves.toBe(namespaces.SandboxSmallContainment);
   });
 });

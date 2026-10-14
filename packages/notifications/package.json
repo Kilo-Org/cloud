@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",
+    "@kilocode/session-ingest-contracts": "workspace:*",
     "i18next": "^26.3.6",
     "zod": "catalog:"
   },

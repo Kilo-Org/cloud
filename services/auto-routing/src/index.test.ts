@@ -11,10 +11,21 @@ import { app } from './index';
 import { ClassifierRunError, type ClassifierRunResult } from './model-classifier';
 import type * as DbModule from '@kilocode/db';
 import type * as ModelClassifierModule from './model-classifier';
-import type { AutoRoutingMode, EfficientModelPool } from '@kilocode/auto-routing-contracts';
+import type {
+  AutoRoutingMode,
+  ClassifierOutput,
+  EfficientModelPool,
+  MirrorPayload,
+  NormalizedClassifierInput,
+} from '@kilocode/auto-routing-contracts';
 import { CLASSIFIER_WINNER_KV_KEY } from '@kilocode/auto-routing-contracts';
+import { computeContentHashes } from './conversation-identity';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
-import { writeClassifierUsage } from './classifier-usage';
+import {
+  buildClassifierUsage,
+  writeClassifierUsage,
+  type ClassifierCallKind,
+} from './classifier-usage';
 
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 const getWorkerDb = vi.hoisted(() => vi.fn());
@@ -119,7 +130,7 @@ const mockClassifierResult = {
   classification: mockClassification,
 };
 
-const normalizedInput = {
+const normalizedInput: NormalizedClassifierInput = {
   apiKind: 'chat_completions',
   requestedModel: 'anthropic/claude-sonnet-4',
   systemPromptPrefix: 'You classify auto model routing requests.',
@@ -180,10 +191,11 @@ const benchmarkRoutingTable = {
   },
 };
 
-function mirrorPayload(overrides: Record<string, unknown> = {}) {
+function mirrorPayload(overrides: Record<string, unknown> = {}): MirrorPayload {
   return {
     input: normalizedInput,
     userId: 'user-1',
+    organizationId: null,
     sessionId: 'task-123',
     machineId: 'machine-1',
     clientRequestId: 'req-1',
@@ -194,7 +206,15 @@ function mirrorPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function conversationState(classification: unknown = null, sticky: unknown = null) {
+type TestConversationState = {
+  classification: { value: unknown; storedAt: number } | null;
+  sticky: unknown;
+};
+
+function conversationState(
+  classification: unknown = null,
+  sticky: unknown = null
+): TestConversationState {
   return {
     classification:
       classification === null ? null : { value: classification, storedAt: Date.now() },
@@ -2111,6 +2131,396 @@ describe('auto routing worker', () => {
     await expect((await pending).json()).resolves.toMatchObject({
       cost: 0,
       classifierResult: { classification: mockClassification },
+    });
+  });
+
+  describe('turn-one speculative classification', () => {
+    const classifierModel = 'typesafe/jev-1.13';
+    const classifierResult: ClassifierRunResult = {
+      ...mockClassifierResult,
+      classifierModel,
+      classification: mockClassification as ClassifierOutput,
+    };
+    const generation = 1_780_000_000_000;
+
+    beforeEach(() => {
+      vi.spyOn(Date, 'now').mockReturnValue(generation);
+      vi.spyOn(performance, 'now').mockReturnValue(10);
+    });
+
+    async function expectClassifierUsage(
+      input: NormalizedClassifierInput,
+      kind: ClassifierCallKind,
+      cost: number
+    ) {
+      await drainBackgroundTasks();
+      const hashes = await computeContentHashes(input);
+      const expected = await buildClassifierUsage(
+        mirrorPayload({ input }),
+        {
+          conversationKey: 'user:user-1:task:task-123',
+          classifierModel,
+          contentHash: hashes.exact,
+          kind,
+          requestStart: `${generation}:10`,
+        },
+        cost,
+        new Date(generation).toISOString()
+      );
+      expect(cacheRecordClassifierUsage).toHaveBeenCalledTimes(1);
+      expect(cacheRecordClassifierUsage).toHaveBeenCalledWith(expected);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      const body = mockedFetch.mock.calls[0]?.[1]?.body;
+      expect(typeof body).toBe('string');
+      expect(JSON.parse(body as string)).toEqual(expected);
+    }
+
+    describe.each([1, 2, null])('messageCount=%s', messageCount => {
+      it.each(['classifier', 'cache'] as const)(
+        'overlaps the DO read and classifier when %s settles first',
+        async first => {
+          const cache = Promise.withResolvers<TestConversationState>();
+          const classifier = Promise.withResolvers<ClassifierRunResult>();
+          cacheReadConversationState.mockReturnValueOnce(cache.promise);
+          classifyNormalizedInput.mockReturnValueOnce(classifier.promise);
+          vi.spyOn(Math, 'random').mockReturnValue(0);
+          const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+          let now = 10;
+          vi.spyOn(performance, 'now').mockImplementation(() => now);
+          let finished = false;
+          const pending = Promise.resolve(
+            decideRequest(mirrorPayload({ input: { ...normalizedInput, messageCount } }))
+          ).then(response => {
+            finished = true;
+            return response;
+          });
+          try {
+            await vi.waitFor(() => {
+              expect(cacheReadConversationState).toHaveBeenCalledTimes(1);
+              expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+            });
+            expect(finished).toBe(false);
+            now = 30;
+            if (first === 'classifier') classifier.resolve(classifierResult);
+            else cache.resolve(conversationState());
+            await new Promise<void>(resolve => setImmediate(resolve));
+            expect(finished).toBe(false);
+            now = 70;
+            if (first === 'classifier') cache.resolve(conversationState());
+            else classifier.resolve(classifierResult);
+            const response = await pending;
+            await expect(response.json()).resolves.toMatchObject({
+              cost: 0,
+              classifierResult: { classification: mockClassification },
+            });
+            expect(logSpy).toHaveBeenCalledWith(
+              expect.stringContaining('"classification":"speculative"')
+            );
+            const [message] = logSpy.mock.calls[0] ?? [];
+            expect(JSON.parse(String(message))).toMatchObject({
+              classification: 'speculative',
+              classifierCostCredits: classifierResult.cost,
+              timings: {
+                classifierMs: first === 'classifier' ? 20 : 60,
+                cacheReadMs: first === 'cache' ? 20 : 60,
+                totalMs: 60,
+              },
+            });
+            expect(cachePutEntry).toHaveBeenCalledWith(
+              expect.stringMatching(/^typesafe\/jev-1\.13:/),
+              mockClassification
+            );
+            expect(cachePutStickyDecision).toHaveBeenCalledTimes(1);
+          } finally {
+            cache.resolve(conversationState());
+            classifier.resolve(classifierResult);
+            await pending;
+          }
+          await expectClassifierUsage(
+            { ...normalizedInput, messageCount } as NormalizedClassifierInput,
+            'speculative',
+            classifierResult.cost ?? 0
+          );
+        }
+      );
+    });
+
+    describe.each(['success', 'billed failure'] as const)('cache hit with %s', result => {
+      it.each(['before', 'after'] as const)(
+        'bills the speculative cost once when classification settles %s the response',
+        async order => {
+          const store = mockStoredConversation();
+          const input = { ...normalizedInput, messageCount: 2 };
+          const hashes = await computeContentHashes(input as NormalizedClassifierInput);
+          store.set(`${classifierModel}:${hashes.exact}`, mockClassification);
+          const cache = Promise.withResolvers<TestConversationState>();
+          const classifier = Promise.withResolvers<ClassifierRunResult>();
+          cacheReadConversationState.mockReturnValueOnce(cache.promise);
+          classifyNormalizedInput.mockReturnValueOnce(classifier.promise);
+          vi.spyOn(Math, 'random').mockReturnValue(0.99);
+          const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+          const settleClassifier = () => {
+            if (result === 'success') classifier.resolve(classifierResult);
+            else {
+              classifier.reject(
+                new ClassifierRunError('Invalid classification', {
+                  cost: classifierResult.cost,
+                  classifierModel,
+                  failureStage: 'invalid_response',
+                })
+              );
+            }
+          };
+          let response: Response | undefined;
+          const pending = Promise.resolve(decideRequest(mirrorPayload({ input }))).then(value => {
+            response = value;
+            return value;
+          });
+          try {
+            await vi.waitFor(() => {
+              expect(cacheReadConversationState).toHaveBeenCalledTimes(1);
+              expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+            });
+            if (order === 'before') {
+              settleClassifier();
+              await new Promise<void>(resolve => setImmediate(resolve));
+            }
+            cache.resolve(conversationState(mockClassification));
+            await vi.waitFor(() => expect(response).toBeDefined());
+            await expect((await pending).json()).resolves.toMatchObject({
+              cost: 0,
+              classifierResult: { classification: mockClassification },
+            });
+            if (order === 'after') expect(cacheRecordClassifierUsage).not.toHaveBeenCalled();
+            if (order === 'before') {
+              expect(logSpy).toHaveBeenCalledWith(
+                expect.stringContaining('"classification":"cache"')
+              );
+            } else {
+              expect(logSpy).not.toHaveBeenCalled();
+              expect(writeDataPoint).not.toHaveBeenCalled();
+            }
+          } finally {
+            cache.resolve(conversationState(mockClassification));
+            settleClassifier();
+            await pending;
+            await drainBackgroundTasks();
+          }
+          expect(logSpy).toHaveBeenCalledTimes(1);
+          const [logMessage] = logSpy.mock.calls[0] ?? [];
+          const loggedDecision = JSON.parse(String(logMessage));
+          expect(loggedDecision).toMatchObject({
+            event: 'auto_routing_decision',
+            classification: 'cache',
+            cacheHit: true,
+            classifierCostCredits: classifierResult.cost,
+            sampled: false,
+            timings: { classifierMs: expect.any(Number) },
+          });
+          expect(loggedDecision).not.toHaveProperty('deferredClassifierCostCredits');
+          expect(writeDataPoint).toHaveBeenCalledTimes(1);
+          expect(writeDataPoint).toHaveBeenCalledWith(
+            expect.objectContaining({
+              doubles: [0, classifierResult.cost, mockClassification.confidence, 1],
+            })
+          );
+          await expectClassifierUsage(
+            input as NormalizedClassifierInput,
+            'speculative',
+            classifierResult.cost ?? 0
+          );
+          await expect(
+            (await decideRequest(mirrorPayload({ input }))).json()
+          ).resolves.toMatchObject({
+            cost: 0,
+          });
+          await drainBackgroundTasks();
+          await expect(
+            (await decideRequest(mirrorPayload({ input }))).json()
+          ).resolves.toMatchObject({
+            cost: 0,
+          });
+          expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+          await expectClassifierUsage(
+            input as NormalizedClassifierInput,
+            'speculative',
+            classifierResult.cost ?? 0
+          );
+        }
+      );
+    });
+
+    it('does not speculate for later turns', async () => {
+      const cache = Promise.withResolvers<TestConversationState>();
+      cacheReadConversationState.mockReturnValueOnce(cache.promise);
+      const pending = decideRequest(mirrorPayload());
+      try {
+        await vi.waitFor(() => expect(cacheReadConversationState).toHaveBeenCalledTimes(1));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(classifyNormalizedInput).not.toHaveBeenCalled();
+      } finally {
+        cache.resolve(conversationState());
+        await pending;
+      }
+      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+      await expectClassifierUsage(
+        normalizedInput as NormalizedClassifierInput,
+        'sync',
+        mockClassifierResult.cost
+      );
+    });
+
+    it('does not speculate for a hot-cache hit', async () => {
+      const input = { ...normalizedInput, messageCount: 2 };
+      cacheReadConversationState.mockResolvedValueOnce(conversationState(mockClassification));
+      await decideRequest(mirrorPayload({ input: { ...input, messageCount: 3 } }));
+      expect(classifyNormalizedInput).not.toHaveBeenCalled();
+      const cache = Promise.withResolvers<TestConversationState>();
+      cacheReadConversationState.mockReturnValueOnce(cache.promise);
+      const pending = decideRequest(mirrorPayload({ input }));
+      try {
+        await vi.waitFor(() => expect(cacheReadConversationState).toHaveBeenCalledTimes(2));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(classifyNormalizedInput).not.toHaveBeenCalled();
+      } finally {
+        cache.resolve(conversationState());
+      }
+      await expect((await pending).json()).resolves.toMatchObject({
+        cost: 0,
+        classifierResult: { classification: mockClassification },
+      });
+      expect(classifyNormalizedInput).not.toHaveBeenCalled();
+      await drainBackgroundTasks();
+      expect(cacheRecordClassifierUsage).not.toHaveBeenCalled();
+    });
+
+    it.each(['success', 'billed failure'] as const)(
+      'reuses the speculative %s for a sticky-immediate response without billing it twice',
+      async result => {
+        const store = mockStoredConversation();
+        store.set('sticky', {
+          model: 'google/gemini-2.5-flash-lite',
+          variant: null,
+          routeKey: 'implementation/feature_development',
+        });
+        const input = { ...normalizedInput, messageCount: 2 };
+        const classifier = Promise.withResolvers<ClassifierRunResult>();
+        classifyNormalizedInput.mockReturnValueOnce(classifier.promise);
+        vi.spyOn(Math, 'random').mockReturnValue(0.99);
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        let response: Response | undefined;
+        const pending = Promise.resolve(decideRequest(mirrorPayload({ input }))).then(value => {
+          response = value;
+          return value;
+        });
+        try {
+          await vi.waitFor(() => expect(response).toBeDefined());
+          await expect((await pending).json()).resolves.toMatchObject({
+            cost: 0,
+            decision: { model: 'google/gemini-2.5-flash-lite' },
+            classifierResult: null,
+          });
+          expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+          expect(cacheRecordClassifierUsage).not.toHaveBeenCalled();
+        } finally {
+          if (result === 'success') classifier.resolve(classifierResult);
+          else {
+            classifier.reject(
+              new ClassifierRunError('Invalid classification', {
+                cost: classifierResult.cost,
+                classifierModel,
+                failureStage: 'invalid_response',
+              })
+            );
+          }
+          await pending;
+          await drainBackgroundTasks();
+        }
+        await expectClassifierUsage(
+          input as NormalizedClassifierInput,
+          'speculative',
+          classifierResult.cost ?? 0
+        );
+        const decisionLogs = [...logSpy.mock.calls, ...warnSpy.mock.calls]
+          .map(([message]) => JSON.parse(String(message)))
+          .filter(entry => entry.event === 'auto_routing_decision');
+        expect(decisionLogs).toHaveLength(1);
+        expect(decisionLogs[0]).toMatchObject({
+          classification: 'background',
+          classifierCostCredits: classifierResult.cost,
+          sampled: false,
+        });
+        expect(decisionLogs[0]).not.toHaveProperty('deferredClassifierCostCredits');
+        expect(writeDataPoint).toHaveBeenCalledTimes(1);
+        expect(writeDataPoint.mock.calls[0]?.[0]?.doubles[1]).toBe(classifierResult.cost);
+        classifyNormalizedInput.mockRejectedValue(new Error('unbilled failure'));
+        await expect((await decideRequest(mirrorPayload({ input }))).json()).resolves.toMatchObject(
+          {
+            cost: 0,
+          }
+        );
+        await drainBackgroundTasks();
+        await expect((await decideRequest(mirrorPayload({ input }))).json()).resolves.toMatchObject(
+          {
+            cost: 0,
+          }
+        );
+        await expectClassifierUsage(
+          input as NormalizedClassifierInput,
+          'speculative',
+          classifierResult.cost ?? 0
+        );
+        expect(classifyNormalizedInput).toHaveBeenCalledTimes(result === 'success' ? 1 : 3);
+      }
+    );
+
+    it('bills a speculative failure on a miss exactly once', async () => {
+      mockStoredConversation();
+      const cache = Promise.withResolvers<TestConversationState>();
+      cacheReadConversationState.mockReturnValueOnce(cache.promise);
+      classifyNormalizedInput.mockRejectedValueOnce(
+        new ClassifierRunError('Invalid classification', {
+          cost: classifierResult.cost,
+          classifierModel,
+          failureStage: 'invalid_response',
+        })
+      );
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const pending = decideRequest(
+        mirrorPayload({ input: { ...normalizedInput, messageCount: 2 } })
+      );
+      try {
+        await vi.waitFor(() => expect(classifyNormalizedInput).toHaveBeenCalledTimes(1));
+        await new Promise<void>(resolve => setImmediate(resolve));
+      } finally {
+        cache.resolve(conversationState());
+      }
+      await expect((await pending).json()).resolves.toEqual({
+        cost: 0,
+        decision: null,
+        classifierResult: null,
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"classification":"speculative"')
+      );
+      await expectClassifierUsage(
+        { ...normalizedInput, messageCount: 2 } as NormalizedClassifierInput,
+        'speculative',
+        classifierResult.cost ?? 0
+      );
+      expect(cachePutEntry).not.toHaveBeenCalled();
+      classifyNormalizedInput.mockRejectedValueOnce(new Error('unbilled failure'));
+      await expect(
+        (
+          await decideRequest(mirrorPayload({ input: { ...normalizedInput, messageCount: 2 } }))
+        ).json()
+      ).resolves.toMatchObject({ cost: 0 });
+      await expectClassifierUsage(
+        { ...normalizedInput, messageCount: 2 } as NormalizedClassifierInput,
+        'speculative',
+        classifierResult.cost ?? 0
+      );
     });
   });
 

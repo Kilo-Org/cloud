@@ -12,7 +12,11 @@
  * `parts` tables the SDK's SQLite store plugin owns. The join is the point of
  * the file, and it is why the SQL is here in one place and nowhere else.
  */
+import { type Effort } from '@kilocode/harness-sdk';
 import { z } from 'zod';
+
+import { type ChatUsage, parseChatUsage } from './chat-usage';
+import { effortOf } from './effort';
 
 /** The tool names the SDK's store writes for a session: a JSON array of names. */
 const toolsSchema = z.array(z.string());
@@ -31,7 +35,7 @@ export type ChatSummary = {
   readonly sessionId: string;
   /** The model the conversation is on now, which a switch changes. */
   readonly model: string;
-  /** The first thing the user said, or empty for a chat with nothing in it. */
+  /** The name the person gave it, else the first thing they said, else empty. */
   readonly title: string;
   readonly updatedAt: number;
 };
@@ -46,9 +50,10 @@ type SummaryRow = {
 /**
  * The list, newest first.
  *
- * The title is the first thing the user said, read as a subquery rather than by
- * loading every turn of every conversation to draw one screen. Both subqueries
- * are answered by the store's own `(session_id, id)` indexes.
+ * The title is the name the person gave the chat, else the first thing they
+ * said, read as a subquery rather than by loading every turn of every
+ * conversation to draw one screen. Both subqueries are answered by the store's
+ * own `(session_id, id)` indexes.
  *
  * A chat whose session the SDK never wrote — a create that failed half way —
  * is left out by the join rather than drawn as a row that opens onto nothing.
@@ -58,13 +63,13 @@ const LIST = `
     chats.session_id,
     sessions.model,
     chats.updated_at,
-    (
+    coalesce(chats.title, (
       select parts.body from parts
       join turns on parts.turn_id = turns.id
       where turns.session_id = chats.session_id
         and turns.role = 'user' and parts.kind = 'text'
       order by parts.id limit 1
-    ) as title
+    )) as title
   from chats
   join sessions on sessions.id = chats.session_id
   where chats.scope = ?
@@ -96,6 +101,15 @@ export function modelOfSession(db: ChatDatabase, sessionId: string): string | nu
   return rows[0]?.model ?? null;
 }
 
+/** The effort a session was opened with, which the SDK's store holds. */
+export function effortOfSession(db: ChatDatabase, sessionId: string): Effort | null {
+  const rows = db.getAllSync<{ effort: string | null }>(
+    'select effort from sessions where id = ?',
+    [sessionId]
+  );
+  return effortOf(rows[0]?.effort);
+}
+
 /**
  * The tool names a session was opened with, which the SDK's store holds.
  *
@@ -123,15 +137,69 @@ export function toolsOfSession(db: ChatDatabase, sessionId: string): readonly st
   }
 }
 
-/** Records a chat, so the list has it. */
+/**
+ * What the details sheet reads of a chat besides its turns.
+ *
+ * `prompted` and `effort` are the SDK's: what the last call put in front of the
+ * model, and the effort the session was opened with. The rest is the app's.
+ */
+export type ChatRecord = {
+  /** Null for a chat started before this was kept; its usage misses the earlier answers. */
+  readonly createdAt: number | null;
+  readonly updatedAt: number | null;
+  readonly usage: ChatUsage;
+  readonly prompted: number;
+  readonly effort: string | null;
+};
+
+export const NO_RECORD: ChatRecord = {
+  createdAt: null,
+  updatedAt: null,
+  usage: {},
+  prompted: 0,
+  effort: null,
+};
+
+type RecordRow = {
+  readonly created_at: number | null;
+  readonly updated_at: number;
+  readonly usage: string | null;
+  readonly prompted: number | null;
+  readonly effort: string | null;
+};
+
+export function recordOfChat(db: ChatDatabase, sessionId: string): ChatRecord {
+  const [row] = db.getAllSync<RecordRow>(
+    'select chats.created_at, chats.updated_at, chats.usage, sessions.prompted, sessions.effort ' +
+      'from chats left join sessions on sessions.id = chats.session_id where chats.session_id = ?',
+    [sessionId]
+  );
+  if (row === undefined) {
+    return NO_RECORD;
+  }
+  return {
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    usage: parseChatUsage(row.usage),
+    prompted: row.prompted ?? 0,
+    effort: row.effort,
+  };
+}
+
+/** Writes what the chat has used so far, which a reopened chat reads back. */
+export function recordUsage(db: ChatDatabase, sessionId: string, usage: ChatUsage): void {
+  db.runSync('update chats set usage = ? where session_id = ?', [JSON.stringify(usage), sessionId]);
+}
+
+/** Records a chat, so the list has it. A new chat's usage is counted from its first answer. */
 export function rememberChat(
   db: ChatDatabase,
   chat: { readonly sessionId: string; readonly scope: string; readonly at: number }
 ): void {
   db.runSync(
-    'insert into chats (session_id, scope, updated_at) values (?, ?, ?) ' +
+    'insert into chats (session_id, scope, updated_at, created_at, usage) values (?, ?, ?, ?, ?) ' +
       'on conflict (session_id) do update set updated_at = excluded.updated_at',
-    [chat.sessionId, chat.scope, chat.at]
+    [chat.sessionId, chat.scope, chat.at, chat.at, '{}']
   );
 }
 
@@ -157,6 +225,17 @@ export function moveChat(
     move.at,
     move.from,
   ]);
+}
+
+/** The longest name a chat takes, the same limit a session title has. */
+export const CHAT_TITLE_MAX_LENGTH = 200;
+
+/**
+ * Names a chat. The name lives on the row, so a model switch, which moves the
+ * row onto another session, keeps it.
+ */
+export function renameChat(db: ChatDatabase, sessionId: string, title: string): void {
+  db.runSync('update chats set title = ? where session_id = ?', [title, sessionId]);
 }
 
 /**

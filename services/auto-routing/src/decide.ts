@@ -25,6 +25,7 @@ import {
 } from './conversation-identity';
 import type { ContentHashes } from './conversation-identity';
 import {
+  getHotCachedClassification,
   readConversationState,
   putCachedClassification,
   putStickyDecision,
@@ -207,10 +208,24 @@ type DecisionContext = {
   timings: DecisionTimings;
 };
 
-type DecisionOutcome =
-  | { kind: 'cache_hit'; classifierModel: string; classification: ClassifierOutput }
+type ClassifierOutcome =
   | { kind: 'model'; classifier: ClassifierRunResult }
   | { kind: 'error'; error: unknown };
+
+type ClassificationRun = {
+  promise: Promise<ClassifierOutcome>;
+  outcome: ClassifierOutcome | null;
+};
+
+type DecisionOutcome =
+  | { kind: 'cache_hit'; classifierModel: string; classification: ClassifierOutput }
+  | ClassifierOutcome;
+
+function classifierOutcomeCost(outcome: ClassifierOutcome): number {
+  return outcome.kind === 'model'
+    ? (outcome.classifier.cost ?? 0)
+    : (getClassifierFailureMetadata(outcome.error).cost ?? 0);
+}
 
 type DecisionSummary = {
   status: ClassifierAnalyticsStatus;
@@ -264,10 +279,6 @@ function summarizeOutcome(outcome: DecisionOutcome): DecisionSummary {
   }
 }
 
-// Single sink for decision telemetry: one Analytics Engine data point and
-// one `auto_routing_decision` log line per decision. Successes are sampled
-// per the KV-configured rate; errors and real model switches always log
-// (failures at warn).
 function recordDecision(
   env: Env,
   ctx: DecisionContext,
@@ -276,10 +287,14 @@ function recordDecision(
   autoRoutingMode: string,
   decision: AutoRoutingDecision | null = null,
   incumbent: StickyDecision | null = null,
-  classification: 'sync' | 'cache' | 'background' = outcome.kind === 'cache_hit' ? 'cache' : 'sync',
-  lowConfidence = false
+  classification: 'sync' | 'speculative' | 'cache' | 'background' = outcome.kind === 'cache_hit'
+    ? 'cache'
+    : 'sync',
+  lowConfidence = false,
+  speculativeCost?: number
 ): void {
   const summary = summarizeOutcome(outcome);
+  if (speculativeCost !== undefined) summary.cost = speculativeCost;
   summary.details.timings = { ...ctx.timings, totalMs: durationMs };
 
   writeClassifierMetricsDataPoint(env, {
@@ -306,10 +321,10 @@ function recordDecision(
   const routeChanged =
     routeKey !== null && incumbent?.routeKey != null ? routeKey !== incumbent.routeKey : null;
 
-  // Failures bypass sampling, and so do real model switches: within-session
-  // switch sequences are the signal the sampled stream decimates.
   const isFailure = summary.status !== 'classified';
-  const alwaysLog = isFailure || switched;
+  const paidSpeculation =
+    (classification === 'speculative' || speculativeCost !== undefined) && (summary.cost ?? 0) > 0;
+  const alwaysLog = isFailure || switched || paidSpeculation;
   if (!alwaysLog && Math.random() >= ctx.successSampleRate) {
     return;
   }
@@ -505,6 +520,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     | {
         ctx: DecisionContext;
         sticky: StickyDecision | null;
+        speculative: ClassificationRun | null;
         outcome:
           | DecisionOutcome
           | { kind: 'sticky_immediate'; classifierModel: string; decision: AutoRoutingDecision };
@@ -535,6 +551,29 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       successSampleRate,
       timings,
     };
+    const runClassifier = async (kind: ClassifierCallKind): Promise<ClassifierOutcome> => {
+      const classifierStartedAt = performance.now();
+      try {
+        const classifier = await classifyAndBill(ctx, classifierModel, kind);
+        return { kind: 'model', classifier };
+      } catch (error) {
+        return { kind: 'error', error };
+      } finally {
+        timings.classifierMs = performance.now() - classifierStartedAt;
+      }
+    };
+    const speculative: ClassificationRun | null =
+      (payload.input.messageCount === null || payload.input.messageCount <= 2) &&
+      !getHotCachedClassification(hashes.exact, classifierModel, router)
+        ? { promise: runClassifier('speculative'), outcome: null }
+        : null;
+    if (speculative) {
+      speculative.promise = speculative.promise.then(outcome => {
+        speculative.outcome = outcome;
+        return outcome;
+      });
+      c.executionCtx.waitUntil(speculative.promise);
+    }
     const cacheReadStartedAt = performance.now();
     const { classification: cached, sticky } = await readConversationState(
       c.env,
@@ -548,6 +587,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       return {
         ctx,
         sticky,
+        speculative,
         outcome: { kind: 'cache_hit', classifierModel, classification: cached },
       };
     }
@@ -577,21 +617,15 @@ export const decideHandler: Handler<HonoEnv> = async c => {
           return {
             ctx,
             sticky,
+            speculative,
             outcome: { kind: 'sticky_immediate', classifierModel, decision },
           };
         }
       }
     }
 
-    const classifierStartedAt = performance.now();
-    try {
-      const classifier = await classifyAndBill(ctx, classifierModel, 'sync');
-      return { ctx, sticky, outcome: { kind: 'model', classifier } };
-    } catch (error) {
-      return { ctx, sticky, outcome: { kind: 'error', error } };
-    } finally {
-      timings.classifierMs = performance.now() - classifierStartedAt;
-    }
+    const outcome = await (speculative?.promise ?? runClassifier('sync'));
+    return { ctx, sticky, speculative, outcome };
   })();
   // Keep an in-flight paid call alive if the gateway disconnects before its response.
   c.executionCtx.waitUntil(
@@ -616,7 +650,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   }
 
   const { configuredPool, routingMode, capabilities, routingTable } = routing;
-  const { ctx, sticky, outcome } = prepared;
+  const { ctx, sticky, speculative, outcome } = prepared;
   const incumbent = stickyToIncumbent(sticky);
   const decisionOptions = {
     constraints: payload.constraints,
@@ -631,8 +665,15 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       (async () => {
         const classifierStartedAt = performance.now();
         try {
-          const classifier = await classifyAndBill(ctx, outcome.classifierModel, 'background');
-          backgroundCtx.timings.classifierMs = performance.now() - classifierStartedAt;
+          const speculativeOutcome = speculative ? await speculative.promise : null;
+          if (speculativeOutcome?.kind === 'error') throw speculativeOutcome.error;
+          const classifier =
+            speculativeOutcome?.kind === 'model'
+              ? speculativeOutcome.classifier
+              : await classifyAndBill(ctx, outcome.classifierModel, 'background');
+          backgroundCtx.timings.classifierMs = speculative
+            ? timings.classifierMs
+            : performance.now() - classifierStartedAt;
           const decision = computeDecision(
             classifier.classification,
             routingTable,
@@ -671,9 +712,25 @@ export const decideHandler: Handler<HonoEnv> = async c => {
             decision,
             sticky,
             'background',
-            isLowConfidence(routingTable, classifier.classification.confidence)
+            isLowConfidence(routingTable, classifier.classification.confidence),
+            speculative ? (classifier.cost ?? 0) : undefined
           );
         } catch (error) {
+          if (speculative) {
+            backgroundCtx.timings.classifierMs = timings.classifierMs;
+            recordDecision(
+              c.env,
+              backgroundCtx,
+              responseDurationMs,
+              { kind: 'error', error },
+              routingMode,
+              outcome.decision,
+              sticky,
+              'background',
+              false,
+              getClassifierFailureMetadata(error).cost ?? 0
+            );
+          }
           console.warn(
             JSON.stringify({
               event: 'auto_routing_background_classify_failed',
@@ -706,17 +763,38 @@ export const decideHandler: Handler<HonoEnv> = async c => {
         )
       );
     }
-    recordDecision(
-      c.env,
-      ctx,
-      performance.now() - startedAt,
-      outcome,
-      routingMode,
-      decision,
-      sticky,
-      'cache',
-      isLowConfidence(routingTable, cached.confidence)
-    );
+    const responseDurationMs = performance.now() - startedAt;
+    if (speculative && !speculative.outcome) {
+      c.executionCtx.waitUntil(
+        speculative.promise.then(result => {
+          recordDecision(
+            c.env,
+            ctx,
+            responseDurationMs,
+            outcome,
+            routingMode,
+            decision,
+            sticky,
+            'cache',
+            isLowConfidence(routingTable, cached.confidence),
+            classifierOutcomeCost(result)
+          );
+        })
+      );
+    } else {
+      recordDecision(
+        c.env,
+        ctx,
+        responseDurationMs,
+        outcome,
+        routingMode,
+        decision,
+        sticky,
+        'cache',
+        isLowConfidence(routingTable, cached.confidence),
+        speculative?.outcome ? classifierOutcomeCost(speculative.outcome) : undefined
+      );
+    }
     return c.json(decisionResponse(cached, payload.input, decision));
   }
 
@@ -762,7 +840,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       routingMode,
       decision,
       sticky,
-      'sync',
+      speculative ? 'speculative' : 'sync',
       isLowConfidence(routingTable, classifier.classification.confidence)
     );
     return c.json(decisionResponse(classifier.classification, payload.input, decision));
@@ -774,7 +852,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       { kind: 'error', error },
       routingMode,
       null,
-      sticky
+      sticky,
+      speculative ? 'speculative' : 'sync'
     );
     return c.json(emptyDecisionResponse());
   }

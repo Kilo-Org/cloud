@@ -3,7 +3,7 @@ import * as Sentry from '@sentry/react-native';
 import * as z from 'zod';
 
 import { emitNotificationTokenUpdated, getDevicePushTokenOutcome } from '@/lib/notifications';
-import { getGlanceableDelivery } from '@/lib/glanceable/sink-registry';
+import { type ActivityTokenLifetime, getGlanceableDelivery } from '@/lib/glanceable/sink-registry';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { readCachedUserId } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
@@ -197,7 +197,7 @@ export async function awaitActivityCleanupSettled(): Promise<void> {
  * pending push cleanup and failed activity tokens so both survive a switch.
  */
 export async function unregisterActivityTokensAndTombstone(
-  lifetime: 'scope' | 'activity' = 'scope',
+  lifetime: ActivityTokenLifetime = 'scope',
   activityToken?: Promise<string | null>
 ): Promise<void> {
   const previous = activityCleanupInFlight;
@@ -216,7 +216,7 @@ export async function unregisterActivityTokensAndTombstone(
 
 async function runActivityCleanup(
   previous: Promise<void> | null,
-  lifetime: 'scope' | 'activity',
+  lifetime: ActivityTokenLifetime,
   activityToken?: Promise<string | null>
 ): Promise<void> {
   try {

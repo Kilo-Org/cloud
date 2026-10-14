@@ -136,7 +136,10 @@
     "working": "Fix-xogħol",
     "yourOwnRepositories": "Ir-repożitorji tiegħek stess",
     "dismissed": "Imwarrba",
-    "agent": "Aġent"
+    "agent": "Aġent",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "Bidliet"
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -325,6 +328,7 @@
       "collapseFile": "Aħbi l-kontenut tal-fajl",
       "expandFile": "Uri l-kontenut tal-fajl",
       "diffTooLarge": "Hemm wisq differenzi biex jintwerew.",
+      "noPreview": "M'hemmx preview disponibbli għal dan il-fajl",
       "openOnGitHub": "Iftaħ fuq GitHub",
       "openDiffOnGitHub": "Iftaħ id-differenzi ta' dan il-fajl fuq GitHub",
       "githubDiff": "Differenzi fuq GitHub"
@@ -879,7 +883,8 @@
       "kiloclaw": "Attività ta' KiloClaw",
       "balance": "Twissijiet tal-bilanċ",
       "security": "Sejbiet tas-sigurtà",
-      "spend": "Twissijiet tal-infiq"
+      "spend": "Twissijiet tal-infiq",
+      "followedSessions": "Sessjonijiet segwiti"
     },
     "category": {
       "chatMessagesSubtitle": "tweġibiet fil-konversazzjonijiet tiegħek",
@@ -1604,7 +1609,7 @@
         "recoveryLabel": "Aġġorna l-app ta' GitHub"
       },
       "githubIpAllowList": {
-        "description": "Ir-reviżur tal-kodiċi ġie diżattivat għaliex din l-organizzazzjoni ta' GitHub tuża lista ta' indirizzi IP permessi li timblokka lil Kilo. Ikkuntattja hi@kilocode.ai għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
+        "description": "Ir-reviżur tal-kodiċi ġie diżattivat għaliex din l-organizzazzjoni ta' GitHub tuża lista ta' indirizzi IP permessi li timblokka lil Kilo. Ikkuntattja hi@kilo.ai għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
       },
       "gitlabProjectAccessRequired": {
         "description": "Ir-reviżur tal-kodiċi ġie diżattivat għaliex Kilo ma jistax joħloq token ta' aċċess għall-proġett fuq GitLab. Agħti aċċess ta' manutentur jew attiva t-tokens ta' aċċess għall-proġett, imbagħad erġa' attiva r-reviżur tal-kodiċi.",
@@ -1619,7 +1624,7 @@
         "recoveryLabel": "Aġġorna l-issettjar tar-reviżur tal-kodiċi"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Ir-reviżur tal-kodiċi ġie diżattivat wara li l-klonazzjoni tar-repożitorju qabżet il-ħin permess tliet darbiet illum. Ikkuntattja hi@kilocode.ai għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
+        "description": "Ir-reviżur tal-kodiċi ġie diżattivat wara li l-klonazzjoni tar-repożitorju qabżet il-ħin permess tliet darbiet illum. Ikkuntattja hi@kilo.ai għall-għajnuna, imbagħad erġa' attiva r-reviżur tal-kodiċi."
       },
       "title": "Ir-reviżur tal-kodiċi jeħtieġ l-attenzjoni tiegħek.",
       "recoveryLabel": "Ikkuntattja l-appoġġ"
@@ -2170,6 +2175,8 @@
       "title": "Sessjoni",
       "copyErrorDetails": "Ikkopja d-dettalji tal-iżball",
       "backToSessions": "Lura għas-sessjonijiet",
+      "follow": "Segwi fuq l-iskrin tal-qfil",
+      "unfollow": "Ieqaf segwi fuq l-iskrin tal-qfil",
       "couldNotLoad": "Ma setgħetx titgħabba s-sessjoni.",
       "failedToLoadDetails": "Ma setgħux jitgħabbew id-dettalji tas-sessjoni.",
       "failedToStopExecution": "Ma setgħetx titwaqqaf l-eżekuzzjoni.",
@@ -2273,7 +2280,6 @@
       "retryLoadingEnvironment": "Erġa' pprova tgħabbi l-ambjent",
       "defaultEnvironment": "Ambjent prestabbilit",
       "environmentSummary": "{{commands}} kmandi · {{mcp}} MCP · {{skills}} ħiliet · {{agents}} aġenti",
-      "changes": "Bidliet",
       "leaveChanges": "Ħalli l-bidliet",
       "commitAndPush": "Irreġistra u tella'",
       "startSession": "Ibda s-sessjoni",
@@ -2347,8 +2353,8 @@
       "toolList": "elenka",
       "toolPatch": "applika bidliet",
       "toolTask": "kompitu",
-      "readTodos": "Aqra l-kompiti",
-      "updateTodos": "Aġġorna l-kompiti",
+      "readTodos": "Aqra l-pjan",
+      "updateTodos": "Aġġorna l-pjan",
       "linesBadge": "{{displayCount}} linji",
       "filesBadge": "{{displayCount}} fajls",
       "matchesBadge": "{{displayCount}} riżultati",
@@ -2765,6 +2771,12 @@
       "modelsCount_two": "Mudelli ({{displayCount}})",
       "modelsCount_few": "Mudelli ({{displayCount}})",
       "modelsCount_many": "Mudelli ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "Ara l-bidliet",
+      "asOf": "Sa {{time}}",
+      "tooLarge": "Dawn id-differenzi huma kbar wisq biex jintwerew fuq il-mobile.",
+      "empty": "Għad m'hemm l-ebda bidla fil-fajls f'din is-sessjoni."
     },
     "autoApprove": {
       "title": "Approvazzjoni awtomatika",
@@ -3286,6 +3298,8 @@
     "channelName": "Aġenti attivi",
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar.",
     "openSession": "Iftaħ",
+    "finished": "Spiċċa",
+    "followFailed": "Ma stajniex nuru dan l-aġent fuq l-iskrin tal-qfil.",
     "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova.",
     "checked": "Iċċekkjat",
     "lastKnown": "L-aħħar magħruf",
@@ -3294,7 +3308,26 @@
     "waitingForYou": "Jistenna lilek",
     "nextScheduled": "Ipprogrammati li jmiss",
     "answerNeeded": "Tweġiba meħtieġa",
-    "waitingToRetry": "Jistenna biex jerġa’ jipprova"
+    "waitingToRetry": "Jistenna biex jerġa’ jipprova",
+    "step": {
+      "editing": "Editjar",
+      "reading": "Qari",
+      "running": "Ħaddem",
+      "searching": "Fittxija fuq il-web",
+      "thinking": "Qed jaħseb"
+    },
+    "planOf": "minn",
+    "filesChanged": "fajls mibdula",
+    "finishedIn": "Lest fi",
+    "noActivityFor": "L-ebda attività għal",
+    "prOpened": "Pull request miftuħa",
+    "permissionWants": "Jixtieq iħaddem",
+    "failure": {
+      "provider": "Waqaf: żball tal-fornitur",
+      "tool": "Waqaf: żball tal-għodda",
+      "cancelled": "Waqaf: ikkanċellat",
+      "other": "WAQFET"
+    }
   },
   "transcriptionModel": {
     "title": "Mudell ta' traskrizzjoni",
@@ -3330,10 +3363,27 @@
     "list": {
       "loadFailed": "Ma setgħux jitgħabbew l-istorja taċ-chat.",
       "new": "Chat ġdid",
-      "openHint": "Jiftaħ iċ-chat. Agħfas fit-tul biex tħassar.",
       "deleteTitle": "Tħassar dan iċ-chat?"
     },
+    "rename": {
+      "title": "Ibdel l-isem taċ-chat",
+      "accessibility": "Ibdel l-isem taċ-chat: {{title}}",
+      "openHint": "Jiftaħ iċ-chat. Agħfas fit-tul biex tibdel l-isem jew tħassar."
+    },
     "beta": "Beta",
+    "details": {
+      "title": "Dettalji taċ-chat",
+      "backend": "Servizz",
+      "effortDefault": "Standard tal-mudell",
+      "noCost": "Bla spiża",
+      "costUnknown": "Mhux magħruf",
+      "costEstimatedNote": "It-tweġibiet li ma rrappurtawx prezz huma stmati mill-prezzijiet tal-lista.",
+      "costUnknownNote": "L-ebda prezz mhu magħruf għal dan il-mudell.",
+      "costPartialNote": "Dan it-total ma jinkludix mudelli li m'għandhom l-ebda prezz magħruf.",
+      "localNote": "Il-mudelli fuq l-apparat jaħdmu fuq dan l-apparat. M'għandhom l-ebda spiża u l-ebda cache tal-prompts, u l-għadd tal-unitajiet tat-test tagħhom jista' jkun stima.",
+      "countedSinceNote": "Din iċ-chat bdiet qabel ma beda jiġi rreġistrat l-użu. It-totali juru biss it-tweġibiet ta' wara.",
+      "remoteServersOn": "Servers MCP remoti mixgħula"
+    },
     "webSearch": {
       "title": "Fittex fuq il-web",
       "description": "Ħalli din iċ-chat tfittex informazzjoni kurrenti permezz tal-kont Kilo tiegħek. It-tfittxijiet jużaw il-kwota ta' tfittxija ta' kull xahar tiegħek.",
@@ -3546,6 +3596,9 @@
       "downloading": "Qed jitniżżel…",
       "downloadProgress": "Qed jitniżżel… {{percent}}%",
       "downloadFailed": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni u l-ispazju ħieles, imbagħad erġa' pprova."
+    },
+    "reasoningEffort": {
+      "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"
     }
   },
   "settingsTools": {
@@ -3768,5 +3821,90 @@
     "noMatchingProductsPlay": "Google Play ma rritornax pakketti tal-krediti li jaqblu.",
     "purchaseOwnedByAnotherAccount": "Il-krediti fuq dan l-Apple Account jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom.",
     "purchaseOwnedByAnotherAccountPlay": "Il-krediti fuq dan il-kont ta' Google Play jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom."
+  },
+  "todos": {
+    "saveAsTodo": "Issejvja bħala kompitu",
+    "segment": {
+      "label": "Dehra tal-aġenti",
+      "sessions": "Sessjonijiet",
+      "todos": "Kompiti"
+    },
+    "lists": {
+      "newList": "Lista ġdida",
+      "empty": "S'issa m'hemmx listi",
+      "couldNotLoad": "Ma stajniex ngħabbu l-listi",
+      "noRepository": "L-ebda repożitorju",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} miftuħa",
+      "openCount_other": "{{count}} miftuħa",
+      "openCount_two": "{{count}} miftuħa",
+      "openCount_few": "{{count}} miftuħa",
+      "openCount_many": "{{count}} miftuħa",
+      "archived_one": "Arkivjat ({{count}})",
+      "archived_other": "Arkivjat ({{count}})",
+      "archived_two": "Arkivjat ({{count}})",
+      "archived_few": "Arkivjat ({{count}})",
+      "archived_many": "Arkivjat ({{count}})",
+      "archive": "Arkivja",
+      "unarchive": "Neħħi mill-arkivju",
+      "deleteTitle": "Tħassar {{name}}?",
+      "deleteMessage": "Il-kompiti tagħha jitħassru wkoll. Is-sessjonijiet jibqgħu."
+    },
+    "listSettings": {
+      "title": "L-issettjar tal-lista",
+      "name": "Isem",
+      "namePlaceholder": "Żbalji, Ideat, Ħruġ…",
+      "emoji": "Emoji",
+      "mode": "Mod",
+      "defaultsHint": "Is-sessjonijiet li jinbdew minn din il-lista jużaw dawn id-defaults."
+    },
+    "list": {
+      "addPlaceholder": "Kompitu ġdid",
+      "add": "Żid kompitu",
+      "empty": "S'issa m'hemmx kompiti",
+      "setDefaults": "Issettja repożitorju, mod u mudell",
+      "completed_one": "Lest ({{count}})",
+      "completed_other": "Lest ({{count}})",
+      "completed_two": "Lest ({{count}})",
+      "completed_few": "Lest ({{count}})",
+      "completed_many": "Lest ({{count}})"
+    },
+    "item": {
+      "markDone": "Immarka bħala lest",
+      "markOpen": "Immarka bħala mhux lest",
+      "markDonePrompt": "Timmarka bħala lest?",
+      "deleted": "Kompitu mħassar",
+      "undo": "Annulla",
+      "runCount_one": "{{count}} tħaddim",
+      "runCount_other": "{{count}} tħaddim",
+      "runCount_two": "{{count}} tħaddim",
+      "runCount_few": "{{count}} tħaddim",
+      "runCount_many": "{{count}} tħaddim",
+      "startNow": "Ibda mingħajr reviżjoni",
+      "startNowHint": "Agħfas fit-tul biex tibda mingħajr reviżjoni",
+      "titleLabel": "Titlu tal-kompitu",
+      "notes": "Noti",
+      "notesPlaceholder": "Żid noti f'Markdown",
+      "sessions": "Sessjonijiet marbuta",
+      "noSessions": "S'issa m'hemmx sessjonijiet",
+      "linkSession": "Qabbad sessjoni",
+      "unlinkSession": "Aqla' {{title}}",
+      "linkFailed": "Ma setgħetx tiġi marbuta s-sessjoni mal-kompitu"
+    },
+    "linkSession": {
+      "title": "Agħżel sessjoni",
+      "empty": "L-ebda sessjoni riċenti",
+      "emptyInRepository": "L-ebda sessjoni riċenti f'{{repository}}"
+    },
+    "upNext": "Li jmiss",
+    "sessionTodo": "Kompitu: {{title}}",
+    "linkToTodo": "Qabbad mal-kompitu",
+    "candidates": {
+      "empty": "L-ebda kompitu miftuħ"
+    },
+    "saveSheet": {
+      "title": "Issejvja fil-lista",
+      "saved": "Issejvjat f'{{list}}"
+    }
   }
 }

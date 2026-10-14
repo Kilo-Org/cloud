@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
@@ -25,7 +25,10 @@ import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session
 import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import { useNewSessionModelState } from '@/components/agents/new-session-model-provider';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
-import { useNewSessionPrefillTargets } from '@/components/agents/use-new-session-prefill';
+import {
+  useNewSessionPrefill,
+  useNewSessionPrefillTargets,
+} from '@/components/agents/use-new-session-prefill';
 import {
   readCloneFromKiloSessionId,
   readCloneSourceTitle,
@@ -36,6 +39,7 @@ import {
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { ScreenHeader } from '@/components/screen-header';
+import { SaveDraftAsTodoSheet } from '@/components/todos/save-draft-as-todo-sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { useNewSessionDiscardGuard } from '@/components/agents/use-new-session-discard-guard';
@@ -86,6 +90,7 @@ import { peekSharePayload } from '@/lib/share-payload';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useNewSessionRepos } from '@/lib/use-new-session-repos';
+import { linkStartedTodoSession } from '@/lib/hooks/use-todos';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
@@ -196,9 +201,11 @@ export function NewSessionScreenBody() {
 
   // Share-prefill precedence, resolved once before the prompt mounts. The
   // prompt's own `useSharePrefill` still delivers the shared files and
-  // re-applies the same text idempotently.
+  // re-applies the same text idempotently. A to-do's Start carries its prompt
+  // the same way, so it also beats a stored draft.
+  const { prompt: routePrefillPrompt, todoId } = useNewSessionPrefill();
   const [sharePrefillText] = useState<string | null>(() =>
-    shareId ? (peekSharePayload(shareId)?.text ?? null) : null
+    shareId ? (peekSharePayload(shareId)?.text ?? null) : (routePrefillPrompt ?? null)
   );
   // The share prefill is known synchronously and always beats a stored draft,
   // so it seeds the first render; the stored draft only exists once the load
@@ -442,10 +449,21 @@ export function NewSessionScreenBody() {
   const handleCloneImportFailure = useCallback((key: string) => {
     setCloneImportFailureKey(key);
   }, []);
-
   const armCloneNavigateBypass = useCallback(() => {
     cloneNavigateBypassRef.current = true;
   }, []);
+
+  // A to-do start can target a remote instance instead of Cloud Agent; the
+  // spawned session links to the to-do the same way the cloud path links it.
+  const queryClient = useQueryClient();
+  const handleSpawnSucceeded = useCallback(
+    (sessionId: string) => {
+      if (todoId) {
+        void linkStartedTodoSession({ queryClient, trpc, todoId, sessionId });
+      }
+    },
+    [queryClient, todoId, trpc]
+  );
 
   // The manual draft as the create body carries it: one plaintext value per key
   // (the editor already refuses a key that cleans onto an existing one) and the
@@ -473,6 +491,7 @@ export function NewSessionScreenBody() {
     profileId,
     manualEnvVars,
     setupCommands,
+    todoId,
   });
 
   // Seed the route-owned prompt state from the restored draft once the load
@@ -543,16 +562,13 @@ export function NewSessionScreenBody() {
     onSpawnFailed: () => {
       skipDiscardGuardRef.current = false;
     },
-    // Clone entry: the dispatch sends the source id (and a fork cut) only when
-    // the selected CLI can clone it, and surfaces delivered clone/import
-    // failures through this inline-reason callback.
     cloneFromKiloSessionId: isCloneEntry ? cloneFromKiloSessionId : null,
     cloneUpToMessageId: cloneUpToMessageId || null,
     forkPrefillText: forkPrefillText || null,
     onCloneImportFailure: handleCloneImportFailure,
     onSpawnReady: armCloneNavigateBypass,
+    onSpawnSucceeded: handleSpawnSucceeded,
   });
-
   const runCloudCreate = useContinueCloudCreate(organizationId, armCloneNavigateBypass);
 
   const handleModelSelect = useCallback(
@@ -632,10 +648,18 @@ export function NewSessionScreenBody() {
     attachments.releaseUnclaimedUploads();
   }, [userId, promptRef, attachments]);
 
+  // "Save as to-do" keeps the leave the confirm intercepted until a list is
+  // picked; saving then discards the draft and replays that leave.
+  const [saveAsTodoLeave, setSaveAsTodoLeave] = useState<(() => void) | null>(null);
+  const handleSaveAsTodo = useCallback((leave: () => void) => {
+    setSaveAsTodoLeave(() => leave);
+  }, []);
+
   const { discardConfirm } = useNewSessionDiscardGuard({
     dirty: (isCloneEntry ? false : hasPrompt) || attachments.hasUnclaimedAttachments,
     hasUnclaimedAttachments: attachments.hasUnclaimedAttachments,
     onDiscard: handleDiscardDraft,
+    onSaveAsTodo: !isCloneEntry && hasPrompt ? handleSaveAsTodo : undefined,
     skipNextGuardRef: skipDiscardGuardRef,
   });
 
@@ -990,6 +1014,18 @@ export function NewSessionScreenBody() {
       {/* The discard confirm: a Modal overlay, so the composer behind it keeps
           its layout while the destructive choice keeps its red fill. */}
       {discardConfirm}
+      <SaveDraftAsTodoSheet
+        visible={saveAsTodoLeave !== null}
+        organizationId={organizationId ?? null}
+        getDraft={() => promptRef.current}
+        onSaved={() => {
+          saveAsTodoLeave?.();
+          setSaveAsTodoLeave(null);
+        }}
+        onClose={() => {
+          setSaveAsTodoLeave(null);
+        }}
+      />
     </View>
   );
 }

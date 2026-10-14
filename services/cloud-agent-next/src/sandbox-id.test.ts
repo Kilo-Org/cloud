@@ -1037,7 +1037,7 @@ describe('selectSandboxForNewSession', () => {
     );
 
     expect(destination.provider.id).toBe('cloudflare-containers');
-    expect(destination.instanceType).toBe('standard-4');
+    expect(destination.instanceType).toBe('standard-3');
   });
 });
 

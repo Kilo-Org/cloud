@@ -89,7 +89,7 @@ export function NoOrganizationsState() {
             ) : (
               <p className="text-muted-foreground mb-4">
                 <a
-                  href="mailto:hi@kilocode.ai"
+                  href="mailto:hi@kilo.ai"
                   className="text-primary hover:text-primary/80 font-medium underline"
                 >
                   Contact our support team

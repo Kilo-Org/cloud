@@ -35,6 +35,23 @@ export function contextWindowFor(metadata: unknown): number {
   return Math.max(CONTEXT_BLOCK, Math.floor(window / CONTEXT_BLOCK) * CONTEXT_BLOCK);
 }
 
+const templateMetadata = z
+  .object({ 'tokenizer.chat_template': z.string().optional() })
+  .catchall(z.unknown());
+
+/**
+ * The thinking rule. The switch is offered only when the model's own chat
+ * template reads `enable_thinking`, because llama.rn passes the switch to the
+ * template and nothing else: a template that never reads it thinks the same
+ * either way.
+ */
+export function templateSupportsThinking(metadata: unknown): boolean {
+  const fields = templateMetadata.safeParse(metadata);
+  return (
+    fields.success && fields.data['tokenizer.chat_template']?.includes('enable_thinking') === true
+  );
+}
+
 /**
  * The tool rule. A model receives tool definitions only when the chat template
  * llama.rn renders with tools (the tool-use template when the model ships one,
@@ -146,11 +163,15 @@ function messagesOf(request: ModelRequest, file: GgufModelFile): LlamaMessage[] 
 /** One llama.rn call: the model's own template renders it, so nothing is pre-formatted here. */
 export function paramsOf(request: ModelRequest, file: GgufModelFile): CompletionParams {
   const tools = file.tools && request.tools !== undefined && request.tools.length > 0;
+  // Thinking is off unless the person turned it on: a small phone model that
+  // thinks spends its window before it answers.
+  const thinking = request.effort !== undefined && request.effort !== 'none';
   return {
     messages: messagesOf(request, file),
     jinja: true,
-    // Small phone models answer directly; a thinking template would spend the window.
-    enable_thinking: false,
+    enable_thinking: thinking,
+    // The parser moves the thinking out of the answer and into its own field.
+    ...(thinking ? { reasoning_format: 'auto' as const } : {}),
     n_predict: Math.min(request.maxTokens, file.contextWindow),
     ...(tools
       ? {
@@ -184,6 +205,8 @@ const completionResult = z
     // parsed content is absent unless the template's output parser ran.
     content: z.string().nullish(),
     accumulated_text: z.string().nullish(),
+    // Present only when the parser split the thinking out of the answer.
+    reasoning_content: z.string().nullish(),
     tool_calls: z
       .array(
         z.object({
@@ -218,6 +241,7 @@ const completionResult = z
     // native null has to become absent rather than stay a value.
     content: flags.content ?? undefined,
     accumulated_text: flags.accumulated_text ?? undefined,
+    reasoning_content: flags.reasoning_content ?? undefined,
     tool_calls: flags.tool_calls.map(call => ({
       id: call.id ?? undefined,
       function: { name: call.function.name, arguments: call.function.arguments ?? '' },
@@ -253,6 +277,7 @@ const degradedCompletion = z
       text: flags.text ?? answer,
       content: flags.accumulated_text === undefined ? (flags.content ?? undefined) : answer,
       accumulated_text: flags.accumulated_text ?? undefined,
+      reasoning_content: undefined,
       tool_calls: [],
       tokens_evaluated: 0,
       tokens_predicted: 0,

@@ -174,6 +174,7 @@ function runHook(args: {
   forkPrefillText?: string | null;
   onCloneImportFailure?: (key: string) => void;
   onSpawnReady?: () => void;
+  onSpawnSucceeded?: (sessionId: string) => void;
   runOnInstance?: InstancePickerInstance | null;
   setRunOnInstance?: (next: InstancePickerInstance | null) => void;
   refetchInstances?: () => Promise<{ data: { instances: InstancePickerInstance[] } | undefined }>;
@@ -263,6 +264,7 @@ function runHook(args: {
         forkPrefillText: args.forkPrefillText,
         onCloneImportFailure: args.onCloneImportFailure,
         onSpawnReady: args.onSpawnReady,
+        onSpawnSucceeded: args.onSpawnSucceeded,
       });
     } finally {
       reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -797,6 +799,9 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     });
 
     it('prefills the forked user message in the new composer without auto-send', async () => {
+      const onSpawnSucceeded = vi.fn(() => {
+        expect(routerReplace).not.toHaveBeenCalled();
+      });
       const { onStart } = runHook({
         organizationId: 'org-xyz',
         mode: 'code',
@@ -806,9 +811,11 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
         runOnInstance: FORK_CAPABLE,
         refetchInstances: refetchCapable,
         getSubmitPayload: () => null,
+        onSpawnSucceeded,
       });
 
       await runStartAndWaitForReplace(onStart);
+      expect(onSpawnSucceeded).toHaveBeenCalledExactlyOnceWith('ses_12345678901234567890123456');
 
       const calledWith = routerReplace.mock.calls[0]?.[0] as string;
       expect(calledWith).toContain('spawned=1');

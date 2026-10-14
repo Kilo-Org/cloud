@@ -1835,11 +1835,11 @@ describe('kiloPassRouter', () => {
 
     it.each([
       { startedAt: '2026-10-08T23:59:59.999Z', currentPercent: 0.5, nextPercent: 0.1 },
-      { startedAt: '2026-10-09T00:00:00.000Z', currentPercent: 0.05, nextPercent: 0.5 },
-      { startedAt: '2026-10-09T00:00:00.001Z', currentPercent: 0.05, nextPercent: 0.5 },
+      { startedAt: '2026-10-09T00:00:00.000Z', currentPercent: 0.1, nextPercent: 0.5 },
+      { startedAt: '2026-10-09T00:00:00.001Z', currentPercent: 0.1, nextPercent: 0.5 },
       { startedAt: null, currentPercent: 0.5, nextPercent: 0.1 },
     ])(
-      'projects monthly bonuses using subscription start $startedAt',
+      'projects monthly bonuses using the welcome cutoff for start $startedAt',
       async ({ startedAt, currentPercent, nextPercent }) => {
         const stripeMock = getStripeMock();
         const stripeSubscriptionId = `sub_test_monthly_cutoff_${startedAt}`;

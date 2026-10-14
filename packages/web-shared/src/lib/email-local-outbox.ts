@@ -35,7 +35,7 @@ async function findWorkspaceRoot(startDirectory: string): Promise<string> {
 }
 
 function developmentBanner(params: LocalOutboxEmail): string {
-  const replyTo = params.replyTo ?? 'hi@kilocode.ai';
+  const replyTo = params.replyTo ?? 'hi@kilo.ai';
   return `<section style="margin:0;padding:16px;border-bottom:2px solid #d97706;background:#fffbeb;color:#451a03;font:14px/1.5 monospace"><strong>Local email capture</strong><br>Intended recipient: ${escapeHtml(params.to)}<br>Subject: ${escapeHtml(params.subject)}<br>Reply-To: ${escapeHtml(replyTo)}</section>`;
 }
 

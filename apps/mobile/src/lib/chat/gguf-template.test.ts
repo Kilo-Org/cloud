@@ -9,6 +9,7 @@ import {
   paramsOf,
   readCompletion,
   stopOf,
+  templateSupportsThinking,
   templateSupportsTools,
 } from './gguf-template';
 
@@ -71,6 +72,20 @@ describe('the tool rule', () => {
   });
 });
 
+describe('the thinking rule', () => {
+  it('offers the switch only for a template that reads enable_thinking', () => {
+    expect(
+      templateSupportsThinking({
+        'tokenizer.chat_template':
+          '{%- if enable_thinking is defined and enable_thinking is false %}',
+      })
+    ).toBe(true);
+    expect(templateSupportsThinking({ 'tokenizer.chat_template': '{{ messages }}' })).toBe(false);
+    expect(templateSupportsThinking({})).toBe(false);
+    expect(templateSupportsThinking(undefined)).toBe(false);
+  });
+});
+
 const request: ModelRequest = {
   model: 'file-a',
   maxTokens: 8192,
@@ -109,6 +124,14 @@ describe('the llama.rn call', () => {
       { role: 'system', content: 'Be brief.' },
       { role: 'user', content: 'Hi' },
     ]);
+  });
+
+  it('thinks only when the chat asks with an effort other than none', () => {
+    const file = { path: '/m/a.gguf', contextWindow: 2048, tools: false, projector: undefined };
+    const thinking = paramsOf({ ...request, effort: 'high' }, file);
+    expect(thinking.enable_thinking).toBe(true);
+    expect(thinking.reasoning_format).toBe('auto');
+    expect(paramsOf({ ...request, effort: 'none' }, file).enable_thinking).toBe(false);
   });
 
   it('sends the tool list and keeps calls and results for a model that supports tools', () => {

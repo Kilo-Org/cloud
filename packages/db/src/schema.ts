@@ -25,6 +25,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { isNotNull, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
+import type { SessionLiveSummary } from '@kilocode/session-ingest-contracts';
 import {
   KiloPassTier,
   KiloPassCadence,
@@ -46,6 +47,7 @@ import {
   FeedbackSource,
   CliSessionSharedState,
   WorkspaceFolderColor,
+  TodoItemSessionOrigin,
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
@@ -254,6 +256,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassOrgIssuanceKind,
   CliSessionSharedState,
   WorkspaceFolderColor,
+  TodoItemSessionOrigin,
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
@@ -6425,6 +6428,10 @@ export const cli_sessions_v2 = pgTable(
     status_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
     last_activity_at: timestamp({ withTimezone: true, mode: 'string' }),
     total_cost_microdollars: bigint({ mode: 'number' }),
+    // The small derived summary the session card shows. Derived by
+    // session-ingest from tool, todo, diff and error items; only this summary
+    // is stored, never the raw text. Null means "no summary".
+    live_summary: jsonb().$type<SessionLiveSummary>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6482,6 +6489,108 @@ export const cli_sessions_v2 = pgTable(
 
 export type CliSessionV2 = typeof cli_sessions_v2.$inferSelect;
 export type NewCliSessionV2 = typeof cli_sessions_v2.$inferInsert;
+
+export const todo_lists = pgTable(
+  'todo_lists',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    emoji: text(),
+    git_url: text(),
+    mode: text(),
+    model: text(),
+    variant: text(),
+    position: text().notNull(),
+    archived_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    // Target of the composite owner foreign key on `todo_items`.
+    unique('UQ_todo_lists_id_kilo_user_id').on(table.id, table.kilo_user_id),
+    index('IDX_todo_lists_owner_scope_position').on(
+      table.kilo_user_id,
+      table.organization_id,
+      table.position
+    ),
+    check(
+      'todo_lists_name_check',
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 100 AND ${table.name} = btrim(${table.name})`
+    ),
+    check('todo_lists_emoji_check', sql`char_length(${table.emoji}) <= 16`),
+  ]
+);
+
+export type TodoListRow = typeof todo_lists.$inferSelect;
+
+export const todo_items = pgTable(
+  'todo_items',
+  {
+    id: idPrimaryKeyColumn,
+    list_id: uuid().notNull(),
+    kilo_user_id: text().notNull(),
+    title: text().notNull(),
+    notes: text(),
+    done_at: timestamp({ withTimezone: true, mode: 'string' }),
+    position: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    foreignKey({
+      columns: [table.list_id, table.kilo_user_id],
+      foreignColumns: [todo_lists.id, todo_lists.kilo_user_id],
+      name: 'todo_items_list_id_kilo_user_id_fk',
+    }).onDelete('cascade'),
+    // Target of the composite owner foreign key on `todo_item_sessions`.
+    unique('UQ_todo_items_id_kilo_user_id').on(table.id, table.kilo_user_id),
+    index('IDX_todo_items_list_position').on(table.list_id, table.position),
+    check(
+      'todo_items_title_check',
+      sql`char_length(btrim(${table.title})) BETWEEN 1 AND 500 AND ${table.title} = btrim(${table.title})`
+    ),
+    check('todo_items_notes_check', sql`char_length(${table.notes}) <= 10000`),
+  ]
+);
+
+export type TodoItemRow = typeof todo_items.$inferSelect;
+
+export const todo_item_sessions = pgTable(
+  'todo_item_sessions',
+  {
+    todo_item_id: uuid().notNull(),
+    session_id: text().notNull(),
+    kilo_user_id: text().notNull(),
+    origin: text().$type<TodoItemSessionOrigin>().notNull(),
+    linked_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    // One session links to at most one to-do.
+    primaryKey({ columns: [table.session_id, table.kilo_user_id] }),
+    foreignKey({
+      columns: [table.todo_item_id, table.kilo_user_id],
+      foreignColumns: [todo_items.id, todo_items.kilo_user_id],
+      name: 'todo_item_sessions_todo_item_id_kilo_user_id_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.session_id, table.kilo_user_id],
+      foreignColumns: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
+      name: 'todo_item_sessions_session_id_kilo_user_id_fk',
+    }).onDelete('cascade'),
+    index('IDX_todo_item_sessions_todo_item_id').on(table.todo_item_id, table.kilo_user_id),
+    enumCheck('todo_item_sessions_origin_check', table.origin, TodoItemSessionOrigin),
+  ]
+);
 
 export type CloudAgentSessionFailureStage =
   | 'sandbox_identity'
@@ -10153,12 +10262,23 @@ export const user_activity_tokens = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     token: text().notNull(),
     kind: text()
-      .$type<'ios_push_to_start' | 'ios_activity' | 'ios_widget' | 'android_ongoing'>()
+      .$type<
+        | 'ios_push_to_start'
+        | 'ios_activity'
+        | 'ios_session_activity'
+        | 'ios_widget'
+        | 'android_ongoing'
+        | 'android_session_ongoing'
+      >()
       .notNull(),
     platform: text().$type<'ios' | 'android'>().notNull(),
     // Null means the personal surface. Server-only lookup key; never sent in a
     // glanceable payload.
     organization_id: text(),
+    // The followed session of an `ios_session_activity` card or an
+    // `android_session_ongoing` notification; null for every other kind.
+    // Server-only lookup key; never sent in an aggregate payload.
+    session_id: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -10169,7 +10289,13 @@ export const user_activity_tokens = pgTable(
     superseded_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [
-    uniqueIndex('UQ_user_activity_tokens_token').on(table.token),
+    // One row per (token, session). An Android device follows each session
+    // with its one Expo push token, so that token appears once per followed
+    // session and once for its `android_ongoing` row (session null). Nulls do
+    // not differ here, so every other kind keeps one row per token.
+    unique('UQ_user_activity_tokens_token_session')
+      .on(table.token, table.session_id)
+      .nullsNotDistinct(),
     // One live ios_activity card per (user_id, organization_id) scope. `coalesce`
     // folds the personal scope (null organization) into a single key, because
     // Postgres treats NULLs as distinct in a unique index.
@@ -10178,6 +10304,14 @@ export const user_activity_tokens = pgTable(
       .concurrently()
       .where(sql`${table.kind} = 'ios_activity' AND ${table.superseded_at} IS NULL`),
     index('IDX_user_activity_tokens_user_org').on(table.user_id, table.organization_id),
+    // Live followed sessions of one user, read by the aggregate exclusion and
+    // the session card delivery.
+    index('IDX_user_activity_tokens_live_session')
+      .on(table.user_id, table.session_id)
+      .concurrently()
+      .where(
+        sql`${table.kind} IN ('ios_session_activity', 'android_session_ongoing') AND ${table.superseded_at} IS NULL`
+      ),
   ]
 );
 

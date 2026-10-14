@@ -14,6 +14,15 @@ export const ANDROID_NOTIFICATION_CHANNELS = [
   { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
   { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
   { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
+  // Importance is immutable after channel creation. A new ID replaces the
+  // silent LOW channel so followed cards appear on the Lock Screen by default.
+  // The mobile channel writer disables its sound and vibration explicitly.
+  {
+    id: 'followed-sessions-lock-screen',
+    name: 'Followed sessions',
+    importance: 'default',
+    bypassDnd: false,
+  },
 ] as const;
 
 export type AndroidNotificationChannelId = (typeof ANDROID_NOTIFICATION_CHANNELS)[number]['id'];
@@ -269,6 +278,8 @@ export function androidChannelIdForPushData(data: PushData): AndroidNotification
     case 'security_finding':
     case 'security_lifecycle':
       return 'security';
+    case 'session_live_update':
+      return 'followed-sessions-lock-screen';
     default: {
       // Exhaustiveness: the agent variants returned above.
       const _exhaustive: never = data;
@@ -369,6 +380,17 @@ export function genericPushContentForPushData(
           'generic.body.activeAgentsGlanceable',
           undefined,
           'Active agents have an update'
+        ),
+      };
+    case 'session_live_update':
+      // Data-only: the app draws the notification. Never the session title.
+      return {
+        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        body: translatePush(
+          locale,
+          'generic.body.cloudAgentSession',
+          undefined,
+          'Your agent session has an update'
         ),
       };
     default: {

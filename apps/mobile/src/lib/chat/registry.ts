@@ -1,20 +1,33 @@
 /* eslint-disable max-lines -- the registry owns the live chats: opening one, answering in it, moving it onto another model or tool set, and releasing it all share one map of running sessions, so the operations stay together. */
 import { Cause, Effect, Exit, Fiber, ManagedRuntime, Option, Scope, Stream } from 'effect';
 import {
+  type CloneOptions,
   cloneSession,
   continueSession,
+  type Effort,
   type ModelEvent,
+  type ModelUsage,
   openSession,
   type PartDraft,
   type SessionHandle,
   ToolMissingError,
+  zeroUsage,
 } from '@kilocode/harness-sdk';
 import { type SQLiteDatabase } from 'expo-sqlite';
 
 import { KILO_MCP_URL } from '@/lib/config';
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
-import { change, forgetState, moveState, NOTHING, type Question, snapshotOf } from './state';
+import {
+  change,
+  type ChatTarget,
+  forgetState,
+  moveState,
+  NOTHING,
+  type Question,
+  snapshotOf,
+} from './state';
 import { chatLayers, type ChatOrg, organizationIdOf } from './layers';
+import { countUsage, usageSince } from './chat-usage';
 import {
   ensureKiloMcp,
   mcpEnabledFor,
@@ -35,9 +48,12 @@ import { waitForChatBackends } from './backend-store';
 import { targetSupportsTools } from './backend-capabilities';
 import { backendFailureKey } from './backend-target';
 import {
+  effortOfSession,
   forgetSession,
   modelOfSession,
   moveChat,
+  recordOfChat,
+  recordUsage,
   rememberChat,
   toolsOfSession,
   touchChat,
@@ -64,13 +80,11 @@ type ChatRuntime = ReturnType<typeof openRuntime>;
 type ChatContext = ManagedRuntime.ManagedRuntime.Context<ChatRuntime>;
 
 /**
- * A question typed while an answer was arriving, and the model it was meant
- * for. The model is carried because a person can change it between the two,
- * and the question was asked of the one that was on screen.
+ * A question typed while an answer was arriving, and the model and effort it
+ * was meant for. They are carried because a person can change them between the
+ * two, and the question was asked of the ones that were on screen.
  */
-type Waiting = Question & {
-  readonly model: string;
-};
+type Waiting = Question & ChatTarget;
 
 /** What the screen draws of the line: the questions, without the models they go to. */
 const questionsIn = (waiting: readonly Waiting[]): readonly Question[] =>
@@ -90,6 +104,12 @@ type Chat = {
    * never changed under an answer that is still coming.
    */
   pendingTools: boolean | undefined;
+  /**
+   * The session's own total when the chat's usage last took from it. The SDK
+   * counts from zero each time a session opens, so a new session starts here
+   * at zero too.
+   */
+  counted: ModelUsage;
   readonly chatScope: string;
   readonly org: ChatOrg;
 };
@@ -204,9 +224,10 @@ async function discoverServers(place: ChatPlace, kiloEnabled: boolean): Promise<
  */
 export async function startChat(
   place: ChatPlace,
-  model: string,
+  target: ChatTarget,
   mcpEnabled = true
 ): Promise<string> {
+  const { model, effort } = target;
   const runtime = await runtimeFor(place);
   const toolsSupported = targetSupportsTools(model);
   if (toolsSupported) {
@@ -217,6 +238,7 @@ export async function startChat(
     openSession({
       system: SYSTEM,
       model,
+      ...(effort === null ? {} : { effort }),
       tools: toolsSupported
         ? chatToolNamesStarting(organizationIdOf(place.org), {
             kiloEnabled: mcpEnabled,
@@ -225,7 +247,8 @@ export async function startChat(
         : [],
     })
   );
-  rememberChat(await open(), { sessionId: handle.id, scope: place.chatScope, at: Date.now() });
+  const database = await open();
+  rememberChat(database, { sessionId: handle.id, scope: place.chatScope, at: Date.now() });
   if (!mcpEnabled) {
     /* The chat was opened without the tools, so its setting says so: a chat
        that never had them is still a chat a person can turn them on for. */
@@ -237,9 +260,16 @@ export async function startChat(
     answering: undefined,
     waiting: [],
     pendingTools: undefined,
+    counted: zeroUsage,
     ...place,
   });
-  change(handle.id, { ...NOTHING, model, status: 'idle' });
+  change(handle.id, {
+    ...NOTHING,
+    model,
+    effort,
+    status: 'idle',
+    record: recordOfChat(database, handle.id),
+  });
   return handle.id;
 }
 
@@ -346,16 +376,19 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
     const current = await onto(place, sessionId, {
       tools: await chatToolNames(organizationIdOf(place.org), sessionId, storedModel ?? ''),
     });
-    const model = modelOfSession(await open(), current) ?? '';
+    const database = await open();
     const asked = await askedIn(current);
     change(current, {
-      model,
+      model: modelOfSession(database, current) ?? '',
+      effort: effortOfSession(database, current),
       asked: asked?.text ?? null,
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
+      askedEffort: asked?.effort ?? null,
       status: 'idle',
       failed: null,
       failureKey: null,
+      record: recordOfChat(database, current),
     });
     return;
   }
@@ -363,23 +396,27 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   try {
     const turns = await runtime.runPromise(handle.history);
     const asked = await askedIn(sessionId);
-    const model = modelOfSession(await open(), sessionId) ?? '';
+    const database = await open();
     chats.set(sessionId, {
       handle,
       scope,
       answering: undefined,
       waiting: [],
       pendingTools: undefined,
+      counted: zeroUsage,
       ...place,
     });
     change(sessionId, {
       ...NOTHING,
-      model,
+      model: modelOfSession(database, sessionId) ?? '',
+      effort: effortOfSession(database, sessionId),
       turns,
       status: 'idle',
       asked: asked?.text ?? null,
       askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
+      record: recordOfChat(database, sessionId),
+      askedEffort: asked?.effort ?? null,
     });
   } catch (error) {
     /* Reading the history or the pending question failed after the session
@@ -394,13 +431,18 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
 /**
  * Says something and reads the answer as it arrives.
  *
- * A model that is not the one the session was opened on moves the conversation
- * first, because a session freezes its model. The identifier changes when it
- * does, and the state of the chat it moved off says where it went, so whoever
- * is watching follows without being told.
+ * A model or an effort that is not the one the session was opened on moves the
+ * conversation first, because a session freezes both. The identifier changes
+ * when it does, and the state of the chat it moved off says where it went, so
+ * whoever is watching follows without being told.
  */
-export async function say(sessionId: string, question: Question, model: string): Promise<void> {
+export async function say(
+  sessionId: string,
+  question: Question,
+  target: ChatTarget
+): Promise<void> {
   const { text, images } = question;
+  const { model, effort } = target;
   /* Where the failure below belongs. It is the chat the move landed on, not
      the one it started from, or the report goes to a chat nobody is watching. */
   let current = snapshotOf(sessionId).sessionId;
@@ -415,7 +457,7 @@ export async function say(sessionId: string, question: Question, model: string):
          while it works. So a second question joins the line rather than racing
          the first, and it is on screen while it waits. It is held in memory
          only: an answer that is still arriving is not written down either. */
-      held.waiting.push({ text, images, model });
+      held.waiting.push({ text, images, model, effort });
       change(current, { waiting: questionsIn(held.waiting) });
       return;
     }
@@ -428,23 +470,26 @@ export async function say(sessionId: string, question: Question, model: string):
     }
     /* Remember the requested target before the move can fail. The live model
        stays unchanged until onto installs the session that actually moved. */
-    change(current, { asked: text, askedImages: images, askedModel: model });
-    await rememberAsked(current, { text, model, images });
-    current = await ontoForUse(current, model, held);
+    change(current, { asked: text, askedImages: images, askedModel: model, askedEffort: effort });
+    await rememberAsked(current, { text, model, effort, images });
+    current = await ontoForUse(current, { model, effort }, held);
     const chat = chats.get(current);
     if (chat === undefined) {
       throw new Error('the chat is not open');
     }
     const runtime = await runtimeFor(chat);
-    touchChat(await open(), current, Date.now());
+    const at = Date.now();
+    touchChat(await open(), current, at);
     change(current, {
       status: 'working',
       answering: '',
       asked: text,
       askedImages: images,
       askedModel: model,
+      askedEffort: effort,
       failed: null,
       failureKey: null,
+      record: { ...snapshotOf(current).record, updatedAt: at },
     });
     chat.answering = runtime.runFork(reading(current, { text, images }, runtime));
   } catch (error) {
@@ -459,6 +504,7 @@ export async function say(sessionId: string, question: Question, model: string):
       asked: text,
       askedImages: images,
       askedModel: model,
+      askedEffort: effort,
       failed: reason(error),
       failureKey: backendFailureKey(error),
     });
@@ -475,9 +521,13 @@ const openReason = (error: unknown): string =>
 
 /** Asks again what was asked and never answered. */
 export async function retryChat(sessionId: string): Promise<void> {
-  const { sessionId: current, asked, askedImages, askedModel } = snapshotOf(sessionId);
+  const { sessionId: current, asked, askedImages, askedModel, askedEffort } = snapshotOf(sessionId);
   if (asked !== null && askedModel !== null) {
-    await say(current, { text: asked, images: askedImages }, askedModel);
+    await say(
+      current,
+      { text: asked, images: askedImages },
+      { model: askedModel, effort: askedEffort }
+    );
   } else {
     const chat = chats.get(current);
     if (chat !== undefined && chat.answering === undefined) {
@@ -500,6 +550,36 @@ function partsOf({ text, images }: Question): string | readonly PartDraft[] {
   ];
 }
 
+/**
+ * Adds what the session used since it was last read to the chat's usage, under
+ * the model the session runs on, and writes it down so a reopened chat has it.
+ * `last` is the call that just ended: what it put in front of the model is how
+ * full the window is now.
+ *
+ * The count is kept in memory first and the write cannot fail the answer: the
+ * column holds the whole tally, so the next write that lands carries this call
+ * too.
+ */
+async function countCall(
+  sessionId: string,
+  chat: Chat,
+  call: { readonly total: ModelUsage; readonly last: ModelUsage }
+): Promise<void> {
+  const { total, last } = call;
+  const spent = usageSince(total, chat.counted);
+  chat.counted = total;
+  const { model, record } = snapshotOf(sessionId);
+  const usage = countUsage(record.usage, model, spent);
+  change(sessionId, {
+    record: { ...record, usage, prompted: last.inputTokens + last.cacheReadTokens },
+  });
+  try {
+    recordUsage(await open(), sessionId, usage);
+  } catch {
+    // The tally stays in memory and the next answer's write includes it.
+  }
+}
+
 /** Reads one answer to the end, however it ends. */
 function reading(sessionId: string, question: Question, runtime: ChatRuntime): Effect.Effect<void> {
   const chat = chats.get(sessionId);
@@ -507,15 +587,23 @@ function reading(sessionId: string, question: Question, runtime: ChatRuntime): E
     return Effect.void;
   }
   let said = '';
-  return Stream.runForEach(chat.handle.ask(partsOf(question)), (event: ModelEvent) =>
-    Effect.sync(() => {
+  return Stream.runForEach(chat.handle.ask(partsOf(question)), (event: ModelEvent) => {
+    if (event.kind === 'done') {
+      return chat.handle.usage.pipe(
+        Effect.flatMap(total =>
+          Effect.promise(async () => {
+            await countCall(sessionId, chat, { total, last: event.usage });
+          })
+        )
+      );
+    }
+    return Effect.sync(() => {
       if (event.kind === 'delta') {
         said += event.text;
         change(sessionId, { answering: said });
       }
-    })
-  ).pipe(
-    /* Each question, a retry included, starts with no web search spent. */
+    });
+  }).pipe(
     Effect.locally(questionSearches, { used: 0 }),
     Effect.matchCauseEffect({
       onFailure: (cause: Cause.Cause<unknown>) =>
@@ -636,12 +724,18 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
     return;
   }
   change(current, { waiting: questionsIn(chat.waiting) });
-  await say(current, { text: next.text, images: next.images }, next.model);
+  await say(
+    current,
+    { text: next.text, images: next.images },
+    { model: next.model, effort: next.effort }
+  );
 }
 
-/** What a chat can be moved onto: another model, another tool set, or both. */
+/** What a chat can be moved onto: another model, effort or tool set, or several. */
 type Onto = {
   readonly model?: string;
+  /** Null clears the effort, so the session asks with the model's default. */
+  readonly effort?: Effort | null;
   readonly tools?: readonly string[];
 };
 
@@ -667,11 +761,13 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
   const chat = chats.get(sessionId);
   const held = snapshotOf(sessionId);
   const model = move.model === undefined || move.model === '' ? held.model : move.model;
+  const effort = move.effort === undefined ? held.effort : move.effort;
   const wanted: Onto = {
     ...(model === held.model ? {} : { model }),
+    ...(effort === held.effort ? {} : { effort }),
     ...(move.tools === undefined ? {} : { tools: move.tools }),
   };
-  if (wanted.model === undefined && wanted.tools === undefined) {
+  if (wanted.model === undefined && wanted.effort === undefined && wanted.tools === undefined) {
     return sessionId;
   }
   const runtime = await runtimeFor(chat ?? place);
@@ -690,10 +786,18 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
   chats.set(
     handle.id,
     chat === undefined
-      ? { handle, scope, answering: undefined, waiting: [], pendingTools: undefined, ...place }
-      : { ...chat, handle, scope, answering: undefined }
+      ? {
+          handle,
+          scope,
+          answering: undefined,
+          waiting: [],
+          pendingTools: undefined,
+          counted: zeroUsage,
+          ...place,
+        }
+      : { ...chat, handle, scope, answering: undefined, counted: zeroUsage }
   );
-  change(handle.id, { ...held, sessionId: handle.id, model, turns });
+  change(handle.id, { ...held, sessionId: handle.id, model, effort, turns });
   /* The chat it moved off is left pointing at the one it became, rather than
      forgotten. Whoever asked for the move is not always the screen — a question
      queued on another model moves the chat from inside the registry — so the
@@ -736,7 +840,11 @@ async function cloneOnto(
   sessionId: string,
   clone: Clone
 ): Promise<{ readonly handle: SessionHandle; readonly scope: Scope.CloseableScope }> {
-  const wanted = clone.move;
+  const { effort, ...move } = clone.move;
+  const wanted: CloneOptions = {
+    ...move,
+    ...(effort === undefined ? {} : { effort: effort ?? 'default' }),
+  };
   const cloned = await openOrMissing(runtime, cloneSession(sessionId, wanted));
   if (cloned.opened) {
     return cloned;
@@ -771,8 +879,8 @@ async function holdsTools(sessionId: string, names: readonly string[]): Promise<
 }
 
 /**
- * The move a chat needs before its next question: onto the model on screen, and
- * onto the names the switches name now.
+ * The move a chat needs before its next question: onto the model and effort on
+ * screen, and onto the names the switches name now.
  *
  * A session freezes its tools, so the list sent to the model is whatever this
  * chat was opened with until it is copied. When the store still holds those
@@ -785,11 +893,11 @@ async function holdsTools(sessionId: string, names: readonly string[]): Promise<
  * conversation twice and leave two rows for one chat. A chat already on the
  * names keeps its session.
  */
-async function ontoForUse(sessionId: string, model: string, chat: Chat): Promise<string> {
+async function ontoForUse(sessionId: string, target: ChatTarget, chat: Chat): Promise<string> {
   const marked = chat.pendingTools !== undefined;
   chat.pendingTools = undefined;
-  const names = targetSupportsTools(model)
-    ? await chatToolNames(organizationIdOf(chat.org), sessionId, model)
+  const names = targetSupportsTools(target.model)
+    ? await chatToolNames(organizationIdOf(chat.org), sessionId, target.model)
     : [];
   const stored = toolsOfSession(await open(), sessionId);
   const already =
@@ -798,7 +906,7 @@ async function ontoForUse(sessionId: string, model: string, chat: Chat): Promise
     stored.every((name, i) => name === names[i]);
   const tools = already || (stored === null && !marked) ? undefined : names;
   return onto(chat, sessionId, {
-    model,
+    ...target,
     ...(tools === undefined ? {} : { tools }),
   });
 }

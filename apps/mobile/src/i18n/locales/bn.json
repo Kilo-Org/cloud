@@ -136,7 +136,10 @@
     "working": "কাজ চলছে",
     "yourOwnRepositories": "আপনার নিজের রিপোজিটরি",
     "dismissed": "খারিজ",
-    "agent": "এজেন্ট"
+    "agent": "এজেন্ট",
+    "durationMinuteShort": "min",
+    "durationHourShort": "h",
+    "changes": "পরিবর্তন"
   },
   "language": {
     "restarting": "নির্বাচিত ভাষা চালু করতে অ্যাপ আবার চালু হচ্ছে",
@@ -325,6 +328,7 @@
       "collapseFile": "ফাইল গুটিয়ে নিন",
       "expandFile": "ফাইল মেলে ধরুন",
       "diffTooLarge": "ডিফটি এত বড় যে দেখানো যাচ্ছে না।",
+      "noPreview": "এই ফাইলের কোনো প্রিভিউ নেই",
       "openOnGitHub": "GitHub-এ খুলুন",
       "openDiffOnGitHub": "GitHub-এ এই ফাইলের ডিফ খুলুন",
       "githubDiff": "GitHub ডিফ"
@@ -831,7 +835,8 @@
       "kiloclaw": "KiloClaw-এর কার্যকলাপ",
       "balance": "ব্যালেন্সের সতর্কতা",
       "security": "শনাক্ত নিরাপত্তা সমস্যা",
-      "spend": "খরচের সতর্কতা"
+      "spend": "খরচের সতর্কতা",
+      "followedSessions": "অনুসরণ করা সেশন"
     },
     "category": {
       "chatMessagesSubtitle": "আপনার কথোপকথনে উত্তর",
@@ -1547,7 +1552,7 @@
         "recoveryLabel": "GitHub অ্যাপ আপডেট করুন"
       },
       "githubIpAllowList": {
-        "description": "এই GitHub সংস্থার অনুমোদিত IP ঠিকানার তালিকা Kilo-র অ্যাক্সেস আটকে দেয়, তাই কোড রিভিউয়ার বন্ধ করা হয়েছে। সাহায্যের জন্য hi@kilocode.ai-তে যোগাযোগ করুন, তারপর কোড রিভিউয়ার আবার চালু করুন।"
+        "description": "এই GitHub সংস্থার অনুমোদিত IP ঠিকানার তালিকা Kilo-র অ্যাক্সেস আটকে দেয়, তাই কোড রিভিউয়ার বন্ধ করা হয়েছে। সাহায্যের জন্য hi@kilo.ai-তে যোগাযোগ করুন, তারপর কোড রিভিউয়ার আবার চালু করুন।"
       },
       "gitlabProjectAccessRequired": {
         "description": "Kilo এই প্রকল্পের জন্য GitLab প্রকল্প অ্যাক্সেস টোকেন তৈরি করতে পারছে না, তাই কোড রিভিউয়ার বন্ধ করা হয়েছে। রক্ষণাবেক্ষণকারীর অনুমতি দিন অথবা প্রকল্প অ্যাক্সেস টোকেন চালু করুন, তারপর কোড রিভিউয়ার আবার চালু করুন।",
@@ -1562,7 +1567,7 @@
         "recoveryLabel": "কোড রিভিউয়ারের সেটিংস আপডেট করুন"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "আজ তিনবার রিপোজিটরি ক্লোন করার সময়সীমা পেরিয়ে যাওয়ায় কোড রিভিউয়ার বন্ধ করা হয়েছে। সাহায্যের জন্য hi@kilocode.ai-তে যোগাযোগ করুন, তারপর কোড রিভিউয়ার আবার চালু করুন।"
+        "description": "আজ তিনবার রিপোজিটরি ক্লোন করার সময়সীমা পেরিয়ে যাওয়ায় কোড রিভিউয়ার বন্ধ করা হয়েছে। সাহায্যের জন্য hi@kilo.ai-তে যোগাযোগ করুন, তারপর কোড রিভিউয়ার আবার চালু করুন।"
       },
       "title": "কোড পর্যালোচকের জন্য ব্যবস্থা নেওয়া প্রয়োজন।",
       "recoveryLabel": "সহায়তা দলের সঙ্গে যোগাযোগ করুন"
@@ -2086,6 +2091,8 @@
       "title": "সেশন",
       "copyErrorDetails": "ত্রুটির বিস্তারিত কপি করুন",
       "backToSessions": "সেশনের তালিকায় ফিরুন",
+      "follow": "লক স্ক্রিনে অনুসরণ করুন",
+      "unfollow": "লক স্ক্রিনে অনুসরণ বন্ধ করুন",
       "couldNotLoad": "সেশন লোড করা যায়নি।",
       "failedToLoadDetails": "সেশনের বিস্তারিত লোড করা যায়নি।",
       "failedToStopExecution": "কাজটি থামানো যায়নি।",
@@ -2189,7 +2196,6 @@
       "retryLoadingEnvironment": "পরিবেশ লোড করার জন্য আবার চেষ্টা করুন",
       "defaultEnvironment": "ডিফল্ট পরিবেশ",
       "environmentSummary": "{{commands}}টি কমান্ড · {{mcp}} MCP · {{skills}}টি স্কিল · {{agents}}টি এজেন্ট",
-      "changes": "পরিবর্তন",
       "leaveChanges": "পরিবর্তন রেখে দিন",
       "commitAndPush": "কমিট ও পুশ করুন",
       "startSession": "সেশন শুরু করুন",
@@ -2260,8 +2266,8 @@
       "toolList": "তালিকা দেখা",
       "toolPatch": "পরিবর্তন প্রয়োগ",
       "toolTask": "কাজ",
-      "readTodos": "কাজের তালিকা পড়া",
-      "updateTodos": "কাজের তালিকা আপডেট",
+      "readTodos": "প্ল্যান পড়ুন",
+      "updateTodos": "প্ল্যান আপডেট করুন",
       "linesBadge": "{{displayCount}}টি লাইন",
       "filesBadge": "{{displayCount}}টি ফাইল",
       "matchesBadge": "{{displayCount}}টি মিল",
@@ -2651,6 +2657,12 @@
       "modelAccessibilityLabel": "মডেল: {{name}}, {{provider}}, {{steps}}, {{cost}}",
       "modelsCount_one": "মডেল ({{displayCount}})",
       "modelsCount_other": "মডেল ({{displayCount}})"
+    },
+    "sessionChanges": {
+      "viewChanges": "পরিবর্তন দেখুন",
+      "asOf": "{{time}} অনুযায়ী",
+      "tooLarge": "ডিফটি এত বড় যে মোবাইলে দেখানো যাচ্ছে না।",
+      "empty": "এই সেশনে এখনও কোনো ফাইল পরিবর্তন হয়নি।"
     },
     "autoApprove": {
       "title": "স্বয়ংক্রিয় অনুমোদন",
@@ -3163,6 +3175,8 @@
     "channelName": "সক্রিয় এজেন্ট",
     "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।",
     "openSession": "খুলুন",
+    "finished": "শেষ হয়েছে",
+    "followFailed": "এই এজেন্টকে লক স্ক্রিনে দেখানো যায়নি।",
     "approveFailed": "অনুমোদন করা যায়নি। আবার চেষ্টা করতে $t(common.approve) স্পর্শ করুন।",
     "checked": "যাচাই করা হয়েছে",
     "lastKnown": "সর্বশেষ জানা",
@@ -3171,7 +3185,26 @@
     "waitingForYou": "আপনার অপেক্ষায়",
     "nextScheduled": "পরবর্তী নির্ধারিত",
     "answerNeeded": "উত্তর প্রয়োজন",
-    "waitingToRetry": "আবার চেষ্টার অপেক্ষায়"
+    "waitingToRetry": "আবার চেষ্টার অপেক্ষায়",
+    "step": {
+      "editing": "সম্পাদনা",
+      "reading": "পড়া",
+      "running": "চালান",
+      "searching": "ওয়েব অনুসন্ধান",
+      "thinking": "ভেবে দেখা"
+    },
+    "planOf": "এর",
+    "filesChanged": "ফাইল পরিবর্তিত",
+    "finishedIn": "শেষ হয়েছে",
+    "noActivityFor": "কোনও কার্যকলাপ নেই",
+    "prOpened": "পুল অনুরোধ খোলা হয়েছে",
+    "permissionWants": "চালাতে চায়",
+    "failure": {
+      "provider": "থেমে গেছে: প্রদানকারীর ত্রুটি",
+      "tool": "থেমে গেছে: সরঞ্জামের ত্রুটি",
+      "cancelled": "থেমে গেছে: বাতিল",
+      "other": "বন্ধ"
+    }
   },
   "transcriptionModel": {
     "title": "কথা থেকে লেখার মডেল",
@@ -3207,10 +3240,27 @@
     "list": {
       "loadFailed": "চ্যাট ইতিহাস লোড করা যায়নি।",
       "new": "নতুন চ্যাট",
-      "openHint": "চ্যাট খোলে। মুছে ফেলতে চেপে ধরুন।",
       "deleteTitle": "এই চ্যাট মুছবেন?"
     },
+    "rename": {
+      "title": "চ্যাটের নাম বদলান",
+      "accessibility": "চ্যাটের নাম বদলান: {{title}}",
+      "openHint": "চ্যাট খোলে। নাম বদলাতে বা মুছে ফেলতে চেপে ধরুন।"
+    },
     "beta": "বিটা",
+    "details": {
+      "title": "চ্যাটের বিস্তারিত",
+      "backend": "ব্যাকএন্ড",
+      "effortDefault": "মডেলের ডিফল্ট",
+      "noCost": "কোনো খরচ নেই",
+      "costUnknown": "জানা নেই",
+      "costEstimatedNote": "যেসব উত্তরে দাম জানানো হয়নি, সেগুলোর খরচ তালিকাভুক্ত দাম থেকে আনুমানিক হিসাব করা হয়েছে।",
+      "costUnknownNote": "এই মডেলের কোনো জানা দাম নেই।",
+      "costPartialNote": "যেসব মডেলের দাম জানা নেই, এই মোট হিসাবে সেগুলো ধরা হয়নি।",
+      "localNote": "ডিভাইসে থাকা মডেল এই ডিভাইসেই চলে। এগুলোর কোনো খরচ বা প্রম্পট ক্যাশ নেই, আর এগুলোর টোকেনের সংখ্যা আনুমানিক হতে পারে।",
+      "countedSinceNote": "ব্যবহার রেকর্ড করা শুরু হওয়ার আগেই এই চ্যাট শুরু হয়েছিল। মোট হিসাবে শুধু তার পরের উত্তরগুলো দেখানো হয়।",
+      "remoteServersOn": "চালু থাকা দূরবর্তী MCP সার্ভার"
+    },
     "webSearch": {
       "title": "ওয়েবে খুঁজুন",
       "description": "এই চ্যাটকে আপনার Kilo অ্যাকাউন্টের মাধ্যমে সাম্প্রতিক তথ্য খুঁজতে দিন। অনুসন্ধানগুলো আপনার মাসিক অনুসন্ধান সীমা ব্যবহার করে।",
@@ -3423,6 +3473,9 @@
       "downloading": "ডাউনলোড হচ্ছে…",
       "downloadProgress": "ডাউনলোড হচ্ছে… {{percent}}%",
       "downloadFailed": "ডাউনলোড শেষ হয়নি। আপনার কানেকশন ও খালি স্টোরেজ দেখে নিয়ে আবার চেষ্টা করুন।"
+    },
+    "reasoningEffort": {
+      "modelFlag": "এই মডেল চিন্তার মাত্রা সমর্থন করে"
     }
   },
   "settingsTools": {
@@ -3645,5 +3698,78 @@
     "noMatchingProductsPlay": "Google Play কোনো মিলে যাওয়া ক্রেডিট প্যাক ফেরত দেয়নি।",
     "purchaseOwnedByAnotherAccount": "এই Apple Account-এর ক্রেডিট অন্য একটি Kilo অ্যাকাউন্টের। সেগুলো ব্যবহার করতে সেই Kilo অ্যাকাউন্টে সাইন-ইন করুন।",
     "purchaseOwnedByAnotherAccountPlay": "এই Google Play অ্যাকাউন্টের ক্রেডিট একটি ভিন্ন Kilo অ্যাকাউন্টের। সেগুলো ব্যবহার করতে সেই Kilo অ্যাকাউন্টে সাইন ইন করুন।"
+  },
+  "todos": {
+    "saveAsTodo": "করণীয় হিসেবে সংরক্ষণ করুন",
+    "segment": {
+      "label": "এজেন্ট ভিউ",
+      "sessions": "সেশন",
+      "todos": "করণীয়"
+    },
+    "lists": {
+      "newList": "নতুন তালিকা",
+      "empty": "এখনও কোনো তালিকা নেই",
+      "couldNotLoad": "তালিকা লোড করা যায়নি।",
+      "noRepository": "কোনো রিপোজিটরি নেই",
+      "rowA11y": "{{name}}, {{openCount}}",
+      "openCount_one": "{{count}} খোলা",
+      "openCount_other": "{{count}} খোলা",
+      "archived_one": "আর্কাইভ করা ({{count}})",
+      "archived_other": "আর্কাইভ করা ({{count}})",
+      "archive": "আর্কাইভ করুন",
+      "unarchive": "আর্কাইভ থেকে ফিরিয়ে আনুন",
+      "deleteTitle": "{{name}} মুছে ফেলবেন?",
+      "deleteMessage": "এর করণীয়গুলোও মুছে যাবে। সেশনগুলো থেকে যাবে।"
+    },
+    "listSettings": {
+      "title": "তালিকার সেটিংস",
+      "name": "নাম",
+      "namePlaceholder": "বাগ, আইডিয়া, রিলিজ…",
+      "emoji": "ইমোজি",
+      "mode": "মোড",
+      "defaultsHint": "এই তালিকা থেকে শুরু করা সেশনগুলো এই ডিফল্টগুলো ব্যবহার করে।"
+    },
+    "list": {
+      "addPlaceholder": "করণীয় লিখুন",
+      "add": "করণীয় যোগ করুন",
+      "empty": "এখনও কোনো করণীয় নেই",
+      "setDefaults": "রিপোজিটরি, মোড ও মডেল সেট করুন",
+      "completed_one": "সম্পন্ন ({{count}})",
+      "completed_other": "সম্পন্ন ({{count}})"
+    },
+    "item": {
+      "markDone": "সম্পন্ন হিসেবে চিহ্নিত করুন",
+      "markOpen": "অসম্পন্ন হিসেবে চিহ্নিত করুন",
+      "markDonePrompt": "সম্পন্ন হিসেবে চিহ্নিত করবেন?",
+      "deleted": "করণীয় মুছে ফেলা হয়েছে",
+      "undo": "আনডু করুন",
+      "runCount_one": "{{count}} রান",
+      "runCount_other": "{{count}} রান",
+      "startNow": "পর্যালোচনা ছাড়াই শুরু করুন",
+      "startNowHint": "পর্যালোচনা ছাড়াই শুরু করতে চেপে ধরে রাখুন",
+      "titleLabel": "করণীয়ের শিরোনাম",
+      "notes": "নোট",
+      "notesPlaceholder": "Markdown-এ নোট যোগ করুন",
+      "sessions": "সংযুক্ত সেশন",
+      "noSessions": "এখনও কোনো সেশন নেই",
+      "linkSession": "সেশন সংযুক্ত করুন",
+      "unlinkSession": "{{title}} এর লিংক সরান",
+      "linkFailed": "সেশনের সাথে করণীয়ের লিংক করা যায়নি।"
+    },
+    "linkSession": {
+      "title": "সেশন লিংক করুন",
+      "empty": "সাম্প্রতিক কোনো সেশন নেই",
+      "emptyInRepository": "{{repository}}-এ সাম্প্রতিক কোনো সেশন নেই"
+    },
+    "upNext": "পরবর্তী",
+    "sessionTodo": "করণীয়: {{title}}",
+    "linkToTodo": "করণীয়ের সাথে লিংক করুন",
+    "candidates": {
+      "empty": "কোনো খোলা করণীয় নেই"
+    },
+    "saveSheet": {
+      "title": "তালিকায় সংরক্ষণ করুন",
+      "saved": "{{list}}-এ সংরক্ষিত"
+    }
   }
 }

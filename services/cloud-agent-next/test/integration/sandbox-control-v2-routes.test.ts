@@ -1504,6 +1504,8 @@ describe('SandboxControlV2 routes and forwarding', () => {
           onRoute: async () => {},
           onEvents: () => new Promise<void>(() => {}),
           onOutcome: async () => {},
+          getRuntimeProxyDelegationExpiresAt: async () => null,
+          issueRuntimeCredentialProxyGrant: async () => null,
         }),
       });
     });
@@ -1647,6 +1649,8 @@ describe('SandboxControlV2 routes and forwarding', () => {
           onRoute: () => new Promise<void>(() => {}),
           onEvents: async () => {},
           onOutcome: async () => {},
+          getRuntimeProxyDelegationExpiresAt: async () => null,
+          issueRuntimeCredentialProxyGrant: async () => null,
         }),
       });
     });

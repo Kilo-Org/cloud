@@ -1,3 +1,14 @@
+import {
+  WORKTREE_RUNTIME_HEADER,
+  WORKTREE_RUNTIME_VERSION,
+} from '../../shared/control-plane-runtime-contract.js';
+import {
+  acceptRuntimeContract,
+  canShareLegacyRepositoryCredentials,
+  readRuntimeContract,
+  resetRuntimeContract,
+  runtimeSpecForContract,
+} from './runtime-contract.js';
 import { DurableObject } from 'cloudflare:workers';
 import { getSandbox, type Sandbox } from '@cloudflare/sandbox';
 import { z } from 'zod';
@@ -83,7 +94,56 @@ import {
   runtimeProxyHandleGrantId,
   sameRuntimeProxyControlBinding,
   verifyRuntimeCredentialProxyHandle,
+  verifyRuntimeCredentialProxyHandleExpiresAt,
 } from '../../runtime-credential-proxy.js';
+import {
+  ACCEPTED_HANDLES_MAX,
+  acceptedHandleIssuerLocator,
+  addAcceptedHandleSync,
+  constantTimeEqual,
+  digestRuntimeProxyHandle,
+  hasAcceptedScopeHandle,
+  listAcceptedHandleStringsByScopeId,
+  listAcceptedHandlesForScope,
+  listAcceptedHandlesForScopeIncludingExpired,
+  lookupAcceptedHandle,
+  retireAcceptedHandlesSync,
+  type ScopeBackingToken,
+  type ScopeHandleResolution,
+} from './accepted-handles.js';
+import { markLastSentHandle, readLastSentHandleDigest } from './scope-handle-delivery.js';
+import {
+  memberHandleForSession,
+  selectHandoffCandidate,
+  setAllMemberHandles,
+  sharedCanonicalHandleSurvivesRelease,
+  type HandoffMemberState,
+} from './scope-handle-rotation.js';
+import { isActiveScopeMember } from './scope-view.js';
+import {
+  admissionFailureStage,
+  canonicalMintKey,
+  CanonicalHandleMinter,
+  clearRuntimeProxyMembers,
+  decideCanonicalHandle,
+  isAdoptableWorktreeScope,
+  isWorkspaceProxyScope,
+  MAX_SCOPE_MEMBERS,
+  MixedCredentialClassError,
+  ScopeHandleConflictError,
+  ScopeMemberLimitError,
+  scopeMemberCount,
+  withMemberHandle,
+  type CanonicalHandleMint,
+} from './scope-handle-adoption.js';
+import {
+  decideRenewedScopeCandidate,
+  expectedScopeForCandidate,
+  scopeBackingMatchesGrant,
+  selectScopeHandleCandidates,
+} from './scope-handle-resolution.js';
+import { buildScopeGrantView, type ScopeGrantView } from './scope-view.js';
+import { readScopeGrantView } from './scope-view-store.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   worktreeDeleteResultSchema,
@@ -165,6 +225,7 @@ import {
   failRoute,
   failCurrentAttempt,
   failExpiredRoutes,
+  failReadyRoutesForScope,
   isCurrentPreparingAttempt,
   listRoutes,
   notifyPreparingRoutes,
@@ -260,6 +321,7 @@ const wrapperSocketAttachmentSchema = z.object({
   wrapperId: z.string().optional(),
   heartbeatAck: z.literal(true).optional(),
   redactsNamedSecrets: z.literal(true).optional(),
+  runtimeCapability: z.literal('worktree').optional(),
 });
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
 
@@ -305,6 +367,27 @@ export type ControlPlaneSessionPeer = {
   issueRuntimeCredentialProxyGrant(
     fence: ControlRuntimeCredentialProxyFence
   ): Promise<string | null>;
+  /**
+   * Renews this member's own backing token without matching the caller's handle
+   * against its stored grant; the Sandbox DO has already authorized the scope.
+   * The member self-validates the expected scope and returns null on mismatch.
+   */
+  issueRuntimeProxyBackingToken(input: {
+    sandboxId: string;
+    directory: string;
+    kiloSessionId: string;
+  }): Promise<ScopeBackingToken | null>;
+  /**
+   * The member's live delegation expiry in milliseconds, or null when this
+   * Session DO cannot serve the scope. Used to pick a proactive handoff issuer
+   * whose delegation outlives the canonical handle; only reads durable state, it
+   * does not renew or mint.
+   */
+  getRuntimeProxyDelegationExpiresAt(input: {
+    sandboxId: string;
+    directory: string;
+    kiloSessionId: string;
+  }): Promise<number | null>;
 };
 
 /** Spec §10: the runtime credential proxy fence returned to the Worker. */
@@ -315,6 +398,26 @@ export type ControlRuntimeCredentialProxyFence = {
   connectionId: string;
   wrapperInstanceId: string;
 };
+
+/** The fence plus, for an adopted handle, the current scope view or the reason it is unavailable. */
+export type ControlRuntimeCredentialProxyFenceScope = ControlRuntimeCredentialProxyFence & {
+  scopeView?: ScopeGrantView;
+  scopeViewUnavailable?: string;
+};
+
+/** The adopted-handle state a scope is already serving, if any. */
+type CanonicalHandleState = CanonicalHandleMint & {
+  /** The requesting member can be served this handle, by holding or by binding it. */
+  usable: boolean;
+};
+
+/** The serialized outcome of claiming a canonical handle for a preparing route. */
+type ScopeHandleClaim =
+  | { kind: 'handle'; handle: string }
+  | { kind: 'stale' }
+  | { kind: 'remint' }
+  | { kind: 'per-session' }
+  | { kind: 'fail' };
 
 type LegacyCutover = {
   provider: AgentSandboxProvider;
@@ -474,6 +577,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private readonly billingSchedule: BillingScheduleTable;
   /** Vercel metered-billing runtime; reads live pin/storage, never frozen config. */
   private readonly billingRuntime: VercelBillingRuntime;
+  /**
+   * Single-flight canonical handle mints, keyed by scope and current fence. Two
+   * concurrent preparers of the same scope wait on one Session DO mint so only
+   * the winner issues a handle; the loser adopts the winner's string.
+   */
+  private readonly canonicalHandleMints = new CanonicalHandleMinter<
+    ControlPlaneSessionPeer,
+    ControlRuntimeCredentialProxyFence
+  >(
+    (peer, fence) => this.mintRuntimeProxyGrant(peer, fence),
+    handle => this.runtimeProxyHandleClaims(handle)
+  );
   /**
    * Outstanding worktree-change requests forwarded to the wrapper, keyed by
    * request id (spec §10). The wrapper answers with one result frame; the reply
@@ -669,10 +784,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       this.notifications.retire(parsed.sessionId);
       this.repositoryCaptures.delete(parsed.sessionId);
-      await deleteRoute(this.db, parsed.sessionId);
-      // Rebuild the policy inside the queue; if it cannot apply, stop the
-      // sandbox as a platform failure so the alias is not left injected.
-      await this.applyVercelNetworkPolicyOrStop('sandbox_lost');
+      const released = await readRoute(this.db, parsed.sessionId);
+      // A shared canonical handle survives on the other members, so removing
+      // this route's path rules is not worth a policy rebuild: a transient
+      // provider failure there would stop the sandbox and kill the survivor. The
+      // facade already denies the released root. Last-member release, a real
+      // alias retirement and wrapper replacement still rebuild fail-closed.
+      const sharedHandleSurvives = sharedCanonicalHandleSurvivesRelease(
+        released?.grant ?? null,
+        parsed.sessionId
+      );
+      await deleteRoute(this.db, this.ctx.storage.kv, parsed.sessionId);
+      if (!sharedHandleSurvives) {
+        // Rebuild the policy inside the queue; if it cannot apply, stop the
+        // sandbox as a platform failure so the alias is not left injected.
+        await this.applyVercelNetworkPolicyOrStop('sandbox_lost');
+      }
       const state = await this.readAllocation();
       await this.armAlarm(state);
       const socket = this.boundWrapperSocket(state);
@@ -1139,7 +1266,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     sessionId: string;
     kiloSessionId: string;
     directory: string;
-  }): Promise<ControlRuntimeCredentialProxyFence | null> {
+    handle?: string;
+  }): Promise<ControlRuntimeCredentialProxyFenceScope | null> {
     await this.initialized;
     if (
       typeof input.ownerId !== 'string' ||
@@ -1174,7 +1302,27 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ) {
         return null;
       }
-      return fence;
+      if (typeof input.handle !== 'string' || input.handle.length === 0) return fence;
+      const match = await lookupAcceptedHandle(this.ctx.storage, input.handle, fence);
+      if (match === undefined) return fence;
+      // `provisioned` already checked the route grant's directory and the caller's
+      // membership; tying it to the accepted entry makes the canonical view grant
+      // the caller's own grant, so a handle accepted under another scope cannot
+      // attach that scope's view.
+      if (scopeGrantId(grant) !== match.scopeGrantId) {
+        return {
+          ...fence,
+          scopeViewUnavailable: 'Accepted scope handle does not belong to the caller grant',
+        };
+      }
+      const scopeGrant = readScopeGrant(this.db, match.scopeGrantId);
+      if (scopeGrant === null) {
+        return {
+          ...fence,
+          scopeViewUnavailable: 'Accepted scope handle has no canonical grant',
+        };
+      }
+      return { ...fence, scopeView: readScopeGrantView(this.db, scopeGrant) };
     });
   }
 
@@ -1251,6 +1399,126 @@ export class SandboxControlV2 extends DurableObject<Env> {
       writeScopeGrant(this.db, updated);
       return { bound: true };
     });
+  }
+
+  /**
+   * Serves a runtime credential proxy handle on behalf of a surviving member of
+   * the canonical scope. The exact handle string is supplied and its signature
+   * is re-verified here. `unavailable` means a candidate failed on transport and
+   * none served (the facade returns a retryable 503); `denied` is a known denial
+   * on every candidate (including a handle not in the accepted set).
+   */
+  async resolveScopeHandle(input: { handle: string }): Promise<ScopeHandleResolution> {
+    await this.initialized;
+    if (
+      typeof input?.handle !== 'string' ||
+      input.handle.length === 0 ||
+      input.handle.length > 4096
+    ) {
+      return { type: 'denied' };
+    }
+    const claims = await verifyRuntimeCredentialProxyHandle(this.env, input.handle);
+    if (!claims) return { type: 'denied' };
+    const owner = await this.requireOwner();
+    if (owner === null || owner !== claims.userId) return { type: 'denied' };
+    const fence = this.runtimeProxyFenceFor(await this.readAllocation());
+    if (fence === null) return { type: 'denied' };
+    const match = await lookupAcceptedHandle(this.ctx.storage, input.handle, fence);
+    if (match === undefined) return { type: 'denied' };
+
+    const grant = readScopeGrant(this.db, match.scopeGrantId);
+    if (grant === null || grant.userId !== claims.userId) {
+      return this.denyScopeHandle(match.scopeGrantId);
+    }
+    const candidates = selectScopeHandleCandidates({
+      grant,
+      routes: await listRoutes(this.db),
+      issuerSessionId: claims.sessionId,
+    });
+    if (candidates.length === 0) return this.denyScopeHandle(match.scopeGrantId);
+
+    let sawUnavailable = false;
+    for (const candidate of candidates) {
+      const peer = this.sessionPeerFor(owner, candidate.member.sessionId);
+      if (peer === null) {
+        sawUnavailable = true;
+        continue;
+      }
+      let backing: ScopeBackingToken | null;
+      try {
+        backing = await withTimeout(
+          peer.issueRuntimeProxyBackingToken({
+            sandboxId: this.sandboxId,
+            ...expectedScopeForCandidate(candidate.member, grant),
+          }),
+          this.scopeBackingTokenMs(),
+          'Scope backing token timed out'
+        );
+      } catch {
+        sawUnavailable = true;
+        continue;
+      }
+      if (backing === null) continue;
+
+      // The renewal awaited external I/O. A superseded physical binding or a
+      // vanished grant makes the handle stale, not the member's fault: deny
+      // without failing routes. A member that left the grant, or whose route
+      // directory/root drifts while renewing, is a member-level denial and the
+      // next candidate is tried.
+      const latestFence = this.runtimeProxyFenceFor(await this.readAllocation());
+      const latestGrant = readScopeGrant(this.db, match.scopeGrantId);
+      const latestRoutes = await listRoutes(this.db);
+      const latestRoute = latestRoutes.find(
+        route => route.sessionId === candidate.member.sessionId
+      );
+      const decision = decideRenewedScopeCandidate({
+        bindingMatches: latestFence !== null && sameRuntimeProxyControlBinding(fence, latestFence),
+        grant: latestGrant,
+        member: candidate.member,
+        route: latestRoute,
+      });
+      if (decision === 'deny') return { type: 'denied' };
+      if (decision === 'skip') continue;
+      if (latestGrant === null) return { type: 'denied' };
+      if (!scopeBackingMatchesGrant(backing, candidate.member, latestGrant)) continue;
+      return {
+        type: 'served',
+        scopeView: buildScopeGrantView(latestGrant, latestRoutes),
+        ...backing,
+      };
+    }
+    if (sawUnavailable) return { type: 'unavailable' };
+    return this.denyScopeHandle(match.scopeGrantId);
+  }
+
+  /** Locator for a deleted issuer that still has accepted handles, or null. */
+  async getAcceptedHandleIssuerLocator(issuerSessionId: string): Promise<{
+    scopeId: string;
+    allocationId: string;
+    wrapperInstanceId: string;
+    expiresAt: number;
+  } | null> {
+    await this.initialized;
+    if (typeof issuerSessionId !== 'string' || issuerSessionId.length === 0) return null;
+    return acceptedHandleIssuerLocator(this.ctx.storage, issuerSessionId);
+  }
+
+  /**
+   * Fails every ready route in the scope in the background, then denies the
+   * handle immediately so the facade response is not held behind the queue.
+   */
+  private denyScopeHandle(scopeGrantId: string): ScopeHandleResolution {
+    this.ctx.waitUntil(
+      this.enqueue(async () => {
+        const state = await this.readAllocation();
+        await failReadyRoutesForScope(
+          this.routeContext(state),
+          scopeGrantId,
+          'scope_handle_denied'
+        );
+      })
+    );
+    return { type: 'denied' };
   }
 
   /**
@@ -1348,6 +1616,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       pair[1].serializeAttachment({
         credential: launch.credential,
         allocationId: launch.allocationId,
+        ...(request.headers.get(WORKTREE_RUNTIME_HEADER) === WORKTREE_RUNTIME_VERSION
+          ? { runtimeCapability: 'worktree' as const }
+          : {}),
         helloDeadlineAt: Date.now() + this.sandboxTimers().wrapperHelloMs,
       } satisfies WrapperSocketAttachment);
       await this.armAlarm(await this.readAllocation());
@@ -1519,7 +1790,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           ? { ...stopped, stopPending: true, stopAt: now }
           : stopped;
       this.db.transaction(tx => {
-        retireScopeGrants(tx);
+        retireScopeGrants(tx, this.ctx.storage.kv);
         for (const route of routes) {
           tx.update(routesTable)
             .set({
@@ -1741,10 +2012,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.sandboxTimers().providerStopAttemptMs;
   }
 
+  /** Bounds one member's scope backing renewal; the Session DO bounds the total. */
+  private scopeBackingTokenMs(): number {
+    return this.sandboxTimers().scopeBackingTokenMs;
+  }
+
   /** Route transitions need storage, the bound socket and the bounded notify. */
   private routeContext(state: AllocationState): RouteContext {
     return {
       db: this.db,
+      acceptedHandles: this.ctx.storage.kv,
       now: () => Date.now(),
       routePreparationMs: this.sandboxTimers().routePreparationMs,
       sendPrepare: route => this.sendSessionPrepare(state, route),
@@ -1791,7 +2068,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
     if (deletionJournal !== undefined && !deletionJournal.completed) {
       this.notifications.retire(spec.sessionId);
-      await deleteRoute(this.db, spec.sessionId);
+      await deleteRoute(this.db, this.ctx.storage.kv, spec.sessionId);
       return {
         state: 'failed',
         attemptId: crypto.randomUUID(),
@@ -2037,8 +2314,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     source: ControlPlaneCredentialSource
   ): Promise<RouteGrantIssue> {
     const provider = this.currentProvider();
-    const outboundContainerId =
-      this.outboundContainerIdFor(await this.readAllocation()) ?? undefined;
+    const allocation = await this.readAllocation();
+    const runtimeContract = readRuntimeContract(this.ctx.storage.kv, allocation.allocationId);
+    const outboundContainerId = this.outboundContainerIdFor(allocation) ?? undefined;
     const base: SessionAttachPayload = {
       directory: spec.directory,
       ...(spec.branch ? { branch: spec.branch } : {}),
@@ -2054,6 +2332,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const existing = scopes.find(
       grant => grant.scopeId === scopeId && (grant.kilo.runtimeProxy !== undefined) === modern
     );
+    if (
+      runtimeContract !== 'legacy' &&
+      !scopes.some(
+        grant =>
+          grant.scopeId === scopeId &&
+          grant.members.some(member => member.sessionId === spec.sessionId)
+      ) &&
+      scopeMemberCount(scopes, scopeId) >= MAX_SCOPE_MEMBERS
+    ) {
+      throw new ScopeMemberLimitError();
+    }
     const { grant, payload } = await prepareCredentialGrant({
       env: this.env,
       source,
@@ -2069,26 +2358,51 @@ export class SandboxControlV2 extends DurableObject<Env> {
       refreshBacking: existing !== undefined && this.grantNeedsReissue(existing),
       ...(outboundContainerId === undefined ? {} : { outboundContainerId }),
     });
+    // A worktree scope may adopt one canonical handle only when it already has
+    // an accepted entry under the current fence. Rows on this fence are written
+    // in the same transaction as an accepted entry, so once ANY entry exists
+    // (including an expired adoption marker) the incumbents are trusted even if
+    // pruning has since dropped the exact string one row still holds. A scope
+    // with stored rows but no accepted entry at all is the pre-deploy shape
+    // (per-session handles this Sandbox never accepted): admitting a joiner
+    // would let two different handles share one directory process after the
+    // flip, so it is refused. The requesting member is excluded, so an
+    // incumbent's own re-issue is never refused.
+    if (runtimeContract !== 'legacy' && isWorkspaceProxyScope(grant)) {
+      const incumbents = (grant.kilo.runtimeProxy?.members ?? []).filter(
+        member =>
+          member.sessionId !== spec.sessionId && member.kiloSessionId !== source.kiloSessionId
+      );
+      if (incumbents.length > 0) {
+        const fence = this.runtimeProxyFenceFor(await this.readAllocation());
+        if (fence !== null) {
+          const accepted = await listAcceptedHandlesForScopeIncludingExpired(
+            this.ctx.storage,
+            scopeGrantId(grant),
+            fence
+          );
+          if (accepted.length === 0) throw new ScopeHandleConflictError();
+        }
+      }
+    }
     for (const otherGrant of scopes) {
       if (scopeGrantId(otherGrant) === scopeGrantId(grant)) continue;
       if (
-        otherGrant.scopeId === grant.scopeId &&
-        otherGrant.repository?.type === 'git' &&
-        grant.repository?.type === 'git' &&
-        otherGrant.userId === grant.userId &&
-        otherGrant.orgId === grant.orgId &&
-        otherGrant.directory === grant.directory &&
-        otherGrant.provider === grant.provider &&
-        otherGrant.outboundContainerId === grant.outboundContainerId &&
-        otherGrant.containmentEnabled === grant.containmentEnabled &&
-        JSON.stringify(otherGrant.repository) === JSON.stringify(grant.repository) &&
-        JSON.stringify(otherGrant.kilo.targets) === JSON.stringify(grant.kilo.targets) &&
-        !otherGrant.members.some(
-          member =>
-            member.sessionId === spec.sessionId || member.kiloSessionId === source.kiloSessionId
-        )
+        runtimeContract === 'legacy' &&
+        canShareLegacyRepositoryCredentials(otherGrant, grant, {
+          sessionId: spec.sessionId,
+          kiloSessionId: source.kiloSessionId,
+        })
       )
         continue;
+      // Shared runtimes hold one credential class per directory.
+      if (
+        runtimeContract !== 'legacy' &&
+        otherGrant.directory === grant.directory &&
+        (otherGrant.kilo.runtimeProxy !== undefined) !== (grant.kilo.runtimeProxy !== undefined)
+      ) {
+        throw new MixedCredentialClassError();
+      }
       if (
         otherGrant.scopeId === scopeId ||
         otherGrant.directory === grant.directory ||
@@ -2146,12 +2460,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.runtimeAgents === undefined ? {} : { runtimeAgents: spec.runtimeAgents }),
       ...(spec.kiloCommands === undefined ? {} : { kiloCommands: spec.kiloCommands }),
       ...(spec.permission === undefined ? {} : { permission: spec.permission }),
+      ...(spec.runtimeIsolation === undefined ? {} : { runtimeIsolation: spec.runtimeIsolation }),
       ...(payload.githubReviewTarget === undefined
         ? {}
         : { githubReviewTarget: payload.githubReviewTarget }),
       env: payload.env ?? {},
       ...(payload.setupCommands === undefined ? {} : { setupCommands: payload.setupCommands }),
-      ...(spec.runtimeIsolation === undefined ? {} : { runtimeIsolation: spec.runtimeIsolation }),
       ...(payload.git === undefined ? {} : { git: payload.git }),
       kilo: payload.kilo,
     };
@@ -2161,7 +2475,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     payload: ControlPlaneDeliverPayload
   ): Promise<ControlPlaneDeliverResult> {
     const state = await this.readAllocation();
-    const route = await readRoute(this.db, payload.sessionId);
+    let route = await readRoute(this.db, payload.sessionId);
     if (state.kind !== 'connected' || route === null || route.state !== 'ready') {
       return 'not_ready';
     }
@@ -2170,6 +2484,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return 'not_ready';
+
+    // Proactive maintenance runs whenever the shared canonical handle is within
+    // the threshold, independent of the grant re-issue clock: it converges every
+    // member row onto the canonical and hands off through a survivor before the
+    // canonical ends. Only a worktree proxy scope has a canonical to maintain.
+    // It runs before the re-issue so a rotated canonical is what the fresh grant
+    // preserves.
+    let adopted = false;
+    if (route.grant !== null && isWorkspaceProxyScope(route.grant)) {
+      const maintained = await this.maintainAdoptedScopeHandle(route.grant, state);
+      route = { ...route, grant: maintained.grant };
+      adopted = maintained.adopted;
+    }
+
     if (route.grant !== null && this.grantNeedsReissue(route.grant)) {
       // Credentials half of B3: re-issue below one hour remaining with freshly
       // selected material and send `session.credentials` before the prompts. A
@@ -2179,11 +2507,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // re-issue outcome, so the route fails now with the real reason.
       const outcome = await this.reissueRouteGrant(route, state);
       if (outcome !== 'issued' && Date.now() >= route.grant.expiresAt) {
-        // No usable grant: fail the route as the prepare path does, so the
-        // Session DO starts a fresh attempt or releases the queued messages with
-        // the real reason, instead of leaving them for the queued backstop.
-        // If the route stayed `ready`, `prepare` would return the same ready
-        // view and deliver would keep returning `not_ready`.
         await onRouteFailed(
           this.routeContext(state),
           payload.sessionId,
@@ -2193,7 +2516,32 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         return 'not_ready';
       }
+      route = (await readRoute(this.db, payload.sessionId)) ?? route;
     }
+
+    // One verified-expiry check immediately before the prompts, for adopted
+    // handles only. A per-session scope keeps its historical behavior: the
+    // expired handle reaches Kilo and the upstream 401 surfaces it.
+    if (
+      adopted &&
+      route.grant !== null &&
+      (await this.routeRuntimeProxyExpired(route.grant, payload.sessionId))
+    ) {
+      await onRouteFailed(
+        this.routeContext(state),
+        payload.sessionId,
+        'workspace_setup_failed',
+        undefined,
+        true
+      );
+      return 'not_ready';
+    }
+
+    // A ready route may have missed a fanout while its socket was down; resend
+    // the current canonical before the prompt so it never runs on a superseded
+    // handle.
+    if (adopted) await this.ensureRouteCredentialsCurrent(payload.sessionId, state);
+
     for (const message of payload.messages) {
       const sent = this.trySendFrame(socket, {
         type: 'session.prompt',
@@ -2242,11 +2590,300 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';
     const next: RouteRecord = { ...route, grant: issued.grant, spec: issued.spec };
     this.publishRouteGrant(next);
+    // Git/alias material is independent of the runtime-proxy handle, so a
+    // re-issue still sends the frame even when the handle string did not change.
+    // The canonical handoff runs separately in `runDeliver` maintenance.
     const payload: ControlPlaneSessionCredentialsPayload = {
       ...sessionCredentialsPayloadFromGrant(issued.grant, route.sessionId),
     };
-    this.trySendFrame(socket, { type: 'session.credentials', ...payload });
+    if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
+      await this.markRouteCredentialsSent(route.sessionId, issued.grant);
+    }
     return 'issued';
+  }
+
+  /**
+   * Keeps a worktree scope's shared canonical handle healthy and every member
+   * row converged on it. Convergence does not mint: when rows disagree it
+   * rewrites them all to the current canonical and fans out, so a claim that
+   * replaced the canonical on one row cannot strand another member. A canonical
+   * within the threshold is handed off to an active member whose live delegation
+   * outlives it; a canonical that has already ended is recovered through any
+   * member whose delegation is still live. A failed mint, a full accepted set,
+   * or no live member leaves the grant unchanged, and the caller fails only on
+   * verified expiry. Never evicts an unexpired handle.
+   *
+   * The delegation reads, the mint and the policy update run on the serial
+   * queue. Their count is bounded by the scope member cap, each read is bounded
+   * by the grant-issue timeout, and no read or mint starts until the canonical is
+   * within the threshold or has ended.
+   */
+  private async maintainAdoptedScopeHandle(
+    grant: SessionCredentialGrant,
+    state: AllocationState
+  ): Promise<{ grant: SessionCredentialGrant; adopted: boolean }> {
+    const proxy = grant.kilo.runtimeProxy;
+    if (proxy === undefined || proxy.members.length === 0) return { grant, adopted: false };
+    const fence = this.runtimeProxyFenceFor(state);
+    if (fence === null || !(await this.isAdoptedScopeAtFence(grant, fence))) {
+      return { grant, adopted: false };
+    }
+    const now = Date.now();
+    const scopeKey = scopeGrantId(grant);
+    const canonical = await this.selectCanonicalForScope(grant, fence, null);
+    const entries = await listAcceptedHandlesForScope(this.ctx.storage, scopeKey, fence, now);
+
+    if (canonical !== null && proxy.members.some(member => member.handle !== canonical.handle)) {
+      // Only converge onto a canonical a current member can still serve; a
+      // canonical whose issuer left the scope is left to the members that hold
+      // it, as admission already decided for the requestor that could not.
+      const converged = canonical.usable ? setAllMemberHandles(grant, canonical.handle) : grant;
+      if (converged !== grant && (await this.applyCandidateGrantPolicy(converged))) {
+        this.ctx.storage.transactionSync(() => writeScopeGrant(this.db, converged));
+        await this.fanoutCanonicalCredentials(converged, state);
+        this.logScopeHandleMaintenance(grant.scopeId, 'converged');
+        return { grant: converged, adopted: true };
+      }
+    }
+
+    const nearExpiry =
+      canonical !== null &&
+      canonical.exp - now < this.sandboxTimers().credentialGrantReissueBelowMs;
+    if (canonical !== null && !nearExpiry) return { grant, adopted: true };
+
+    const ownerId = await this.requireOwner();
+    if (ownerId === null) return { grant, adopted: true };
+    const canonicalIssuerSessionId = canonical?.issuerSessionId ?? null;
+    const routes = await listRoutes(this.db);
+    const members: HandoffMemberState[] = await Promise.all(
+      proxy.members.map(async member => {
+        const route = routes.find(candidate => candidate.sessionId === member.sessionId);
+        const active = isActiveScopeMember(member, route, grant);
+        let delegationExpiresAt: number | null = null;
+        if (active) {
+          const peer = this.sessionPeerFor(ownerId, member.sessionId);
+          if (peer !== null) {
+            try {
+              delegationExpiresAt = await withTimeout(
+                peer.getRuntimeProxyDelegationExpiresAt({
+                  sandboxId: this.sandboxId,
+                  directory: grant.directory,
+                  kiloSessionId: member.kiloSessionId,
+                }),
+                this.scopeBackingTokenMs(),
+                'Delegation expiry read timed out'
+              );
+            } catch {
+              delegationExpiresAt = null;
+            }
+          }
+        }
+        return { ...member, delegationExpiresAt, active };
+      })
+    );
+    const candidate = selectHandoffCandidate({
+      canonicalExp: canonical === null ? now : canonical.exp,
+      members,
+    });
+    if (candidate === null) {
+      this.logScopeHandleMaintenance(
+        grant.scopeId,
+        canonical === null ? 'no_live_member' : 'no_extending_member'
+      );
+      return { grant, adopted: true };
+    }
+    // A same-issuer mint returns the same handle/exp, so never claim an
+    // extension that did not happen. Recovery has no issuer to compare against.
+    if (canonicalIssuerSessionId !== null && candidate.sessionId === canonicalIssuerSessionId) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'not_needed');
+      return { grant, adopted: true };
+    }
+    const peer = this.sessionPeerFor(ownerId, candidate.sessionId);
+    if (peer === null) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'mint_failed');
+      return { grant, adopted: true };
+    }
+    const minted = await this.canonicalHandleMints.direct(peer, fence);
+    if (minted === null || minted.exp <= now || minted.issuerSessionId !== candidate.sessionId) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'mint_failed');
+      return { grant, adopted: true };
+    }
+    if (canonical !== null && minted.exp <= canonical.exp) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'mint_failed');
+      return { grant, adopted: true };
+    }
+    const mintedClaims = await verifyRuntimeCredentialProxyHandle(this.env, minted.handle);
+    if (mintedClaims === null || mintedClaims.userId !== ownerId) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'mint_failed');
+      return { grant, adopted: true };
+    }
+
+    const updated = setAllMemberHandles(grant, minted.handle);
+    const candidateDigest = await digestRuntimeProxyHandle(minted.handle);
+    const alreadyAccepted = entries.some(entry =>
+      constantTimeEqual(entry.handleDigest, candidateDigest)
+    );
+    // A same-fence mint through a member that already holds the handle returns
+    // the same string, so the rows do not change; the handle must still be
+    // accepted or the scope keeps looking adopted without a servable entry.
+    if (updated === grant && alreadyAccepted) return { grant, adopted: true };
+    if (!alreadyAccepted && entries.length >= ACCEPTED_HANDLES_MAX) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'set_full');
+      return { grant, adopted: true };
+    }
+    if (updated !== grant && !(await this.applyCandidateGrantPolicy(updated))) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'mint_failed');
+      return { grant, adopted: true };
+    }
+    const entry = {
+      handleDigest: candidateDigest,
+      handle: minted.handle,
+      issuerSessionId: minted.issuerSessionId,
+      scopeId: grant.scopeId,
+      exp: minted.exp,
+      fence,
+    };
+    let committed = true;
+    this.ctx.storage.transactionSync(() => {
+      const added = addAcceptedHandleSync(this.ctx.storage.kv, scopeKey, entry, now);
+      if (added !== 'added' && added !== 'present') {
+        committed = false;
+        return;
+      }
+      if (updated !== grant) writeScopeGrant(this.db, updated);
+    });
+    if (!committed) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'set_full');
+      return { grant, adopted: true };
+    }
+    await this.fanoutCanonicalCredentials(updated, state);
+    this.logScopeHandleMaintenance(
+      updated.scopeId,
+      canonical === null ? 'expired_recovered' : 'rotated'
+    );
+    return { grant: updated, adopted: true };
+  }
+
+  private logScopeHandleMaintenance(
+    scopeId: string,
+    outcome:
+      | 'converged'
+      | 'not_needed'
+      | 'no_extending_member'
+      | 'no_live_member'
+      | 'set_full'
+      | 'mint_failed'
+      | 'rotated'
+      | 'expired_recovered'
+  ): void {
+    logger.withFields({ scopeId, outcome }).info('Control-plane scope handle maintenance');
+  }
+
+  /**
+   * Sends the current canonical credentials to every ready or preparing member
+   * of the scope whose last-sent handle differs. A preparing member is sent but
+   * not marked delivered: it may be running an older wrapper that drops the
+   * frame, and `session.ready` reconciles that. Frames whose handle is not the
+   * current canonical are never sent.
+   */
+  private async fanoutCanonicalCredentials(
+    grant: SessionCredentialGrant,
+    state: AllocationState
+  ): Promise<void> {
+    if (grant.kilo.runtimeProxy === undefined) return;
+    const socket = this.boundWrapperSocket(state);
+    if (socket === null) return;
+    const scopeKey = scopeGrantId(grant);
+    for (const route of await listRoutes(this.db)) {
+      if (route.state !== 'ready' && route.state !== 'preparing') continue;
+      if (route.grant === null || scopeGrantId(route.grant) !== scopeKey) continue;
+      const handle = memberHandleForSession(grant, route.sessionId);
+      if (handle === null) continue;
+      const digest = await digestRuntimeProxyHandle(handle);
+      const lastSent = await readLastSentHandleDigest(this.ctx.storage, route.sessionId);
+      if (lastSent !== null && constantTimeEqual(lastSent, digest)) continue;
+      const sent = this.trySendFrame(socket, {
+        type: 'session.credentials',
+        ...sessionCredentialsPayloadFromGrant(grant, route.sessionId),
+      });
+      if (sent && route.state === 'ready') {
+        await markLastSentHandle(this.ctx.storage, route.sessionId, digest);
+      }
+    }
+  }
+
+  /** Records the handle a `session.prepare`/`session.credentials` frame carried. */
+  private async markRouteCredentialsSent(
+    sessionId: string,
+    grant: SessionCredentialGrant
+  ): Promise<void> {
+    const handle = memberHandleForSession(grant, sessionId);
+    if (handle === null) return;
+    await markLastSentHandle(this.ctx.storage, sessionId, await digestRuntimeProxyHandle(handle));
+  }
+
+  /**
+   * Reconciliation for an adopted route: send the current canonical when the
+   * route's last-sent marker no longer matches its row. It covers a preparing
+   * route that missed a fanout (an older wrapper drops credentials frames before
+   * it is prepared) and a ready route whose socket was down when a fanout was
+   * attempted. A no-op when the strings already agree, so a normal prepare sends
+   * nothing extra.
+   */
+  private async ensureRouteCredentialsCurrent(
+    sessionId: string,
+    state: AllocationState
+  ): Promise<void> {
+    const route = await readRoute(this.db, sessionId);
+    const grant = route?.grant ?? null;
+    if (route === null || grant === null) return;
+    const fence = this.runtimeProxyFenceFor(state);
+    if (!(await this.isAdoptedScopeAtFence(grant, fence))) return;
+    const handle = memberHandleForSession(grant, sessionId);
+    if (handle === null) return;
+    const digest = await digestRuntimeProxyHandle(handle);
+    const lastSent = await readLastSentHandleDigest(this.ctx.storage, sessionId);
+    if (lastSent !== null && constantTimeEqual(lastSent, digest)) return;
+    const socket = this.boundWrapperSocket(state);
+    if (socket === null) return;
+    if (
+      this.trySendFrame(socket, {
+        type: 'session.credentials',
+        ...sessionCredentialsPayloadFromGrant(grant, sessionId),
+      })
+    ) {
+      await markLastSentHandle(this.ctx.storage, sessionId, digest);
+    }
+  }
+
+  /** Whether this route's runtime-proxy handle has verifiably expired. */
+  private async routeRuntimeProxyExpired(
+    grant: SessionCredentialGrant,
+    sessionId: string
+  ): Promise<boolean> {
+    const handle = memberHandleForSession(grant, sessionId);
+    if (handle === null) return false;
+    const expiresAt = await verifyRuntimeCredentialProxyHandleExpiresAt(this.env, handle);
+    return expiresAt !== null && expiresAt <= Date.now();
+  }
+
+  /**
+   * The one owner of "is this scope adopted?": a worktree proxy scope with at
+   * least one accepted entry under `fence`, including an expired-but-still-stored
+   * entry (the adoption marker). Existing allocations retain per-session handles,
+   * even when a newer wrapper reconnects or their last scope member leaves.
+   */
+  private async isAdoptedScopeAtFence(
+    grant: SessionCredentialGrant,
+    fence: ControlRuntimeCredentialProxyFence | null
+  ): Promise<boolean> {
+    if (
+      fence === null ||
+      readRuntimeContract(this.ctx.storage.kv, fence.allocationId) !== 'worktree'
+    )
+      return false;
+    const marker = await hasAcceptedScopeHandle(this.ctx.storage, scopeGrantId(grant), fence);
+    return isAdoptableWorktreeScope({ grant, acceptedMarker: marker });
   }
 
   // --- contained credential helpers (B3) --------------------------------------
@@ -2411,7 +3048,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     stopReason: ControlPlaneFailureReason | undefined
   ): Promise<void> {
     if (previous.allocationId !== null && previous.allocationId !== next.allocationId) {
-      retireScopeGrants(this.db);
+      this.db.transaction(tx => retireScopeGrants(tx, this.ctx.storage.kv));
     }
     // Until the wrapper connects, the allocation is the preparation progress:
     // show creating, retrying and starting rather than one silent step.
@@ -2430,6 +3067,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
     }
     if (event.type === 'hello-accepted' && next.kind === 'connected') {
+      const restarted = previous.wrapperId !== null && previous.wrapperId !== next.wrapperId;
+      if (restarted) {
+        // A new wrapper instance supersedes the previous fence's accepted
+        // handles and every member's stored handle string. Retire both before
+        // the bind/adoption scan so a handle minted for the new fence during the
+        // scan is not deleted by this.
+        this.ctx.storage.transactionSync(() => {
+          retireAcceptedHandlesSync(this.ctx.storage.kv);
+          for (const grant of listScopeGrants(this.db)) {
+            const cleared = clearRuntimeProxyMembers(grant);
+            if (cleared !== grant) writeScopeGrant(this.db, cleared);
+          }
+        });
+      }
       for (const route of await listRoutes(this.db)) {
         if (route.state !== 'preparing' || route.grant !== null) continue;
         if (route.credentialSource === null) continue;
@@ -2442,17 +3093,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
           if (!(await this.applyCandidateGrantPolicy(issued.grant)))
             throw new Error('Credential policy unavailable');
           this.publishRouteGrant({ ...route, ...issued });
-        } catch {
+        } catch (error) {
           await failCurrentAttempt(
             this.routeContext(next),
             route.sessionId,
             route.attemptId,
             'workspace_setup_failed',
-            'runtime_proxy_bind_failed'
+            admissionFailureStage(error, 'runtime_proxy_bind_failed')
           );
         }
       }
-      const restarted = previous.wrapperId !== null && previous.wrapperId !== next.wrapperId;
       await onWrapperConnected(this.routeContext(next), restarted);
       return;
     }
@@ -2479,7 +3129,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     next: AllocationState
   ): Promise<void> {
     const ctx = this.routeContext(next);
-    retireScopeGrants(this.db);
+    this.db.transaction(tx => retireScopeGrants(tx, this.ctx.storage.kv));
     // `create-failed` with no retry, a confirmed stop and `provider-gone` can
     // all reach `stopped` without arming an alarm, so sweep expired routes now.
     await failExpiredRoutes(ctx);
@@ -2600,7 +3250,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     let spec: ControlPlaneRouteSpec;
     try {
-      spec = this.materializePrepareFrame(route, this.wrapperRedactsNamedSecrets(socket));
+      spec = this.materializePrepareFrame(route, socket);
     } catch (error) {
       this.logPrepareFrameMaterializationFailure(route, error);
       this.ctx.waitUntil(
@@ -2638,10 +3288,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * A failure throws rather than sending a frame the wrapper would drop while the
    * route waits out its preparation deadline.
    */
-  private materializePrepareFrame(
-    route: RouteRecord,
-    redactsNamedSecrets: boolean
-  ): ControlPlaneRouteSpec {
+  private materializePrepareFrame(route: RouteRecord, socket: WebSocket): ControlPlaneRouteSpec {
     const encryptedSecrets = route.credentialSource?.encryptedSecrets;
     try {
       const frameEnv = buildFrameEnv({
@@ -2652,7 +3299,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // Fail closed only when a secret value would actually reach the frame and
       // the wrapper cannot redact it by name; a snapshot whose keys are all
       // restored or dropped sends nothing and needs no redaction.
-      if (frameEnv.secretEnvKeys.length > 0 && !redactsNamedSecrets) {
+      if (frameEnv.secretEnvKeys.length > 0 && !this.wrapperRedactsNamedSecrets(socket)) {
         throw new PrepareFrameMaterializationError('wrapper_redaction_unsupported');
       }
       const mcp = this.materializeRouteMcp(route);
@@ -2665,8 +3312,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
           })
           .info('Materialized session.prepare secrets');
       }
+      const spec = runtimeSpecForContract(
+        route.spec,
+        readRuntimeContract(this.ctx.storage.kv, this.readAttachment(socket)?.allocationId ?? null)
+      );
       return controlPlaneRouteSpecSchema.parse({
-        ...route.spec,
+        ...spec,
         createdOnPlatform: route.credentialSource?.createdOnPlatform,
         ...(frameEnv.env === undefined ? {} : { env: frameEnv.env }),
         ...(mcp === undefined ? {} : { mcp }),
@@ -2720,106 +3371,45 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
-   * R1 runtime credential proxy: mint the handle through the Session DO (bounded
-   * by the grant bound, fence passed in), bind it for Vercel, then send
+   * Runtime credential proxy: mint the handle through the Session DO (bounded by
+   * the grant bound, fence passed in), bind it for Vercel, then send
    * `session.prepare`. Runs off the serial queue; a mint or bind failure fails
-   * the fenced attempt as `workspace_setup_failed`.
+   * the fenced attempt as `workspace_setup_failed`. An adopted worktree scope
+   * routes through the canonical-handle path instead.
    */
   private async sendSessionPrepareWithRuntimeProxy(
     sessionId: string,
     attemptId: string
   ): Promise<void> {
     try {
-      let route = await readRoute(this.db, sessionId);
+      const route = await readRoute(this.db, sessionId);
       if (!isCurrentPreparingAttempt(route, attemptId)) return;
       if (route.grant === null || route.grant.kilo.runtimeProxy === undefined) return;
-      const member = route.grant.kilo.runtimeProxy.members.find(
-        candidate => candidate.sessionId === sessionId
-      );
       // One owner per sandbox (B3 review 5), stored on first prepare/registration;
       // the Session DO name is `ownerId:sessionId`.
       const ownerId = await this.requireOwner();
       const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, sessionId);
       const fence = this.runtimeProxyFenceFor(await this.readAllocation());
-      // The fence the handle in the frame belongs to; null when we send an
-      // already-bound member without a fresh mint.
-      let mintedFence: ControlRuntimeCredentialProxyFence | null = null;
 
-      if (fence === null || ownerId === null || peer === null) {
-        // No allocation to mint against (or no Session peer): an existing member
-        // is the only handle we have; without one the preparation cannot proceed.
-        if (member === undefined) {
-          await this.failPrepareAttempt(sessionId, attemptId);
-          return;
-        }
-      } else {
-        // Fence-keyed and idempotent: the same allocation/wrapper returns the same
-        // persisted grant, a restart or reallocation returns a new one.
-        const handle = await this.mintRuntimeProxyGrant(peer, fence);
-        if (handle === null) {
-          await this.failPrepareAttempt(sessionId, attemptId);
-          return;
-        }
-        // A wrapper restart or reallocation during the mint means another task
-        // owns the current fence; drop out without failing the attempt it is
-        // preparing.
-        const afterMint = this.runtimeProxyFenceFor(await this.readAllocation());
-        if (afterMint === null || !sameRuntimeProxyControlBinding(fence, afterMint)) return;
-        // A member minted under the current fence is already bound; a member from
-        // a superseded fence (wrapper restart or reallocation while the route is
-        // still preparing) must be replaced, or the wrapper receives a stale
-        // handle the proxy cannot resolve.
-        if (
-          member === undefined ||
-          runtimeProxyHandleGrantId(member.handle) !== runtimeProxyHandleGrantId(handle)
-        ) {
-          try {
-            await this.bindRuntimeCredentialProxyHandle({
-              ownerId,
-              sessionId,
-              kiloSessionId: route.spec.kiloSessionId,
-              directory: route.spec.directory,
-              handle,
-            });
-          } catch {
-            await this.failPrepareAttempt(sessionId, attemptId);
-            return;
-          }
-          // A restart during the bind supersedes this task too: do not send.
-          const afterBind = this.runtimeProxyFenceFor(await this.readAllocation());
-          if (afterBind === null || !sameRuntimeProxyControlBinding(fence, afterBind)) return;
-          route = await readRoute(this.db, sessionId);
-          if (!isCurrentPreparingAttempt(route, attemptId)) return;
-          if (route.grant === null || route.grant.kilo.runtimeProxy === undefined) return;
-        }
-        mintedFence = fence;
+      if (fence !== null && (await this.isAdoptedScopeAtFence(route.grant, fence))) {
+        const outcome = await this.sendSessionPrepareWithAdoptedScope({
+          route,
+          sessionId,
+          attemptId,
+          ownerId,
+          peer,
+          fence,
+        });
+        if (outcome === 'done') return;
       }
 
-      // Select the socket and re-check the fence from the same allocation read, so
-      // a restart between the (bind and) send cannot deliver a stale handle.
-      const state = await this.readAllocation();
-      const socket = this.boundWrapperSocket(state);
-      if (socket === null) return;
-      if (mintedFence !== null) {
-        const sendFence = this.runtimeProxyFenceFor(state);
-        if (sendFence === null || !sameRuntimeProxyControlBinding(mintedFence, sendFence)) return;
-      }
-      // Materialize against the re-read route, after the fence checks, so a
-      // failure never sends a frame and never fails a newer attempt.
-      let spec: ControlPlaneRouteSpec;
-      try {
-        spec = this.materializePrepareFrame(route, this.wrapperRedactsNamedSecrets(socket));
-      } catch (error) {
-        this.logPrepareFrameMaterializationFailure(route, error);
-        await this.failPrepareAttempt(sessionId, attemptId, materializationStage(error));
-        return;
-      }
-      // The frame carries the wrapper-safe spec plus the issued credential
-      // material only; the credential source stays DO-private.
-      this.trySendFrame(socket, {
-        type: 'session.prepare',
-        spec,
-        credentials: this.prepareCredentials(route.grant, sessionId),
+      await this.sendSessionPrepareWithPerSessionHandle({
+        route,
+        sessionId,
+        attemptId,
+        ownerId,
+        peer,
+        fence,
       });
     } catch {
       // A throw here (read/parse/bind) must still fail the fenced attempt; the
@@ -2830,6 +3420,370 @@ export class SandboxControlV2 extends DurableObject<Env> {
         // Best effort only.
       }
     }
+  }
+
+  /**
+   * The per-session path: mint through the requesting member, bind when the
+   * stored handle is stale, then send. Used for legacy grants, non-worktree
+   * scopes, migration scopes, and an adopted scope the claim re-check rejects.
+   */
+  private async sendSessionPrepareWithPerSessionHandle(input: {
+    route: RouteRecord;
+    sessionId: string;
+    attemptId: string;
+    ownerId: string | null;
+    peer: ControlPlaneSessionPeer | null;
+    fence: ControlRuntimeCredentialProxyFence | null;
+  }): Promise<void> {
+    const { sessionId, attemptId, ownerId, peer, fence } = input;
+    let route = input.route;
+    const member = route.grant?.kilo.runtimeProxy?.members.find(
+      candidate => candidate.sessionId === sessionId
+    );
+    // The fence the handle in the frame belongs to; null when we send an
+    // already-bound member without a fresh mint.
+    let mintedFence: ControlRuntimeCredentialProxyFence | null = null;
+
+    if (fence === null || ownerId === null || peer === null) {
+      // No allocation to mint against (or no Session peer): an existing member
+      // is the only handle we have; without one the preparation cannot proceed.
+      if (member === undefined) {
+        await this.failPrepareAttempt(sessionId, attemptId);
+        return;
+      }
+    } else {
+      // Fence-keyed and idempotent: the same allocation/wrapper returns the same
+      // persisted grant, a restart or reallocation returns a new one.
+      const handle = await this.mintRuntimeProxyGrant(peer, fence);
+      if (handle === null) {
+        await this.failPrepareAttempt(sessionId, attemptId);
+        return;
+      }
+      // A wrapper restart or reallocation during the mint means another task
+      // owns the current fence; drop out without failing the attempt it is
+      // preparing.
+      const afterMint = this.runtimeProxyFenceFor(await this.readAllocation());
+      if (afterMint === null || !sameRuntimeProxyControlBinding(fence, afterMint)) return;
+      // A member minted under the current fence is already bound; a member from
+      // a superseded fence (wrapper restart or reallocation while the route is
+      // still preparing) must be replaced, or the wrapper receives a stale
+      // handle the proxy cannot resolve.
+      if (
+        member === undefined ||
+        runtimeProxyHandleGrantId(member.handle) !== runtimeProxyHandleGrantId(handle)
+      ) {
+        try {
+          await this.bindRuntimeCredentialProxyHandle({
+            ownerId,
+            sessionId,
+            kiloSessionId: route.spec.kiloSessionId,
+            directory: route.spec.directory,
+            handle,
+          });
+        } catch {
+          await this.failPrepareAttempt(sessionId, attemptId);
+          return;
+        }
+        // A restart during the bind supersedes this task too: do not send.
+        const afterBind = this.runtimeProxyFenceFor(await this.readAllocation());
+        if (afterBind === null || !sameRuntimeProxyControlBinding(fence, afterBind)) return;
+        const refreshed = await readRoute(this.db, sessionId);
+        if (!isCurrentPreparingAttempt(refreshed, attemptId)) return;
+        if (refreshed.grant === null || refreshed.grant.kilo.runtimeProxy === undefined) return;
+        route = refreshed;
+      }
+      mintedFence = fence;
+    }
+
+    await this.sendPreparedRouteFrame(sessionId, attemptId, mintedFence);
+  }
+
+  /**
+   * Canonical adoption: one accepted handle per worktree scope. The first
+   * prepare mints through its requesting member (single-flight so concurrent
+   * preparers share one mint); a joiner copies the canonical string; a candidate
+   * only replaces a canonical when it can be served and expires later. The mint
+   * stays off the serial queue; claim/adopt runs on it. Returns `per-session`
+   * when the scope must fall back to the legacy path.
+   */
+  private async sendSessionPrepareWithAdoptedScope(input: {
+    route: RouteRecord;
+    sessionId: string;
+    attemptId: string;
+    ownerId: string | null;
+    peer: ControlPlaneSessionPeer | null;
+    fence: ControlRuntimeCredentialProxyFence | null;
+  }): Promise<'done' | 'per-session'> {
+    const { route, sessionId, attemptId, ownerId, peer, fence } = input;
+    const grant = route.grant;
+    if (grant === null || grant.kilo.runtimeProxy === undefined) return 'done';
+    if (fence === null || ownerId === null || peer === null) return 'per-session';
+    const now = Date.now();
+    const threshold = this.sandboxTimers().credentialGrantReissueBelowMs;
+    const canonical = await this.selectCanonicalForScope(grant, fence, sessionId);
+    const needsMint = canonical === null || !canonical.usable || canonical.exp - now < threshold;
+    const mintKey = canonicalMintKey(scopeGrantId(grant), fence);
+    let candidate = needsMint ? await this.canonicalHandleMints.shared(mintKey, peer, fence) : null;
+    if (needsMint && candidate === null) {
+      candidate = await this.canonicalHandleMints.direct(peer, fence);
+    }
+    let claim = await this.claimAdoptedScopeHandle({
+      sessionId,
+      attemptId,
+      ownerId,
+      kiloSessionId: route.spec.kiloSessionId,
+      candidate,
+      mintFence: fence,
+    });
+    if (claim.kind === 'per-session') return 'per-session';
+    if (claim.kind === 'remint') {
+      const own = await this.canonicalHandleMints.direct(peer, fence);
+      claim = await this.claimAdoptedScopeHandle({
+        sessionId,
+        attemptId,
+        ownerId,
+        kiloSessionId: route.spec.kiloSessionId,
+        candidate: own,
+        mintFence: fence,
+      });
+      if (claim.kind === 'per-session') return 'per-session';
+      // A remint that still cannot mint leaves no handle to serve.
+      if (claim.kind === 'remint') claim = { kind: 'fail' };
+    }
+    if (claim.kind === 'stale') return 'done';
+    if (claim.kind === 'fail') {
+      await this.failPrepareAttempt(sessionId, attemptId);
+      return 'done';
+    }
+    await this.sendPreparedRouteFrame(sessionId, attemptId, fence);
+    return 'done';
+  }
+
+  /**
+   * Sends `session.prepare` for a preparing route, re-reading the route and the
+   * allocation from one read so a restart between adoption and send cannot
+   * deliver a stale handle.
+   */
+  private async sendPreparedRouteFrame(
+    sessionId: string,
+    attemptId: string,
+    expectedFence: ControlRuntimeCredentialProxyFence | null
+  ): Promise<void> {
+    const state = await this.readAllocation();
+    const socket = this.boundWrapperSocket(state);
+    if (socket === null) return;
+    const latest = await readRoute(this.db, sessionId);
+    if (!isCurrentPreparingAttempt(latest, attemptId)) return;
+    if (latest.grant === null || latest.grant.kilo.runtimeProxy === undefined) return;
+    if (expectedFence !== null) {
+      const sendFence = this.runtimeProxyFenceFor(state);
+      if (sendFence === null || !sameRuntimeProxyControlBinding(expectedFence, sendFence)) return;
+    }
+    let spec: ControlPlaneRouteSpec;
+    try {
+      spec = this.materializePrepareFrame(latest, socket);
+    } catch (error) {
+      this.logPrepareFrameMaterializationFailure(latest, error);
+      await this.failPrepareAttempt(sessionId, attemptId, materializationStage(error));
+      return;
+    }
+    const sent = this.trySendFrame(socket, {
+      type: 'session.prepare',
+      spec,
+      credentials: this.prepareCredentials(latest.grant, sessionId),
+    });
+    if (sent) await this.markRouteCredentialsSent(sessionId, latest.grant);
+  }
+
+  /**
+   * Claims and commits the handle for one preparing route on the serial queue.
+   * Every authorization and policy check runs before the accepted entry and the
+   * requesting member's row commit together in one `transactionSync`, so a
+   * failed check leaves no orphan. Returns `per-session` when the scope must
+   * fall back, `remint` when a shared mint cannot bind for this requestor.
+   */
+  private claimAdoptedScopeHandle(input: {
+    sessionId: string;
+    attemptId: string;
+    ownerId: string;
+    kiloSessionId: string;
+    candidate: CanonicalHandleMint | null;
+    mintFence: ControlRuntimeCredentialProxyFence;
+  }): Promise<ScopeHandleClaim> {
+    return this.enqueue(async () => {
+      const route = await readRoute(this.db, input.sessionId);
+      if (!isCurrentPreparingAttempt(route, input.attemptId)) return { kind: 'stale' };
+      const grant = route.grant;
+      if (grant === null || grant.kilo.runtimeProxy === undefined) return { kind: 'stale' };
+      const allocation = await this.readAllocation();
+      const fence = this.runtimeProxyFenceFor(allocation);
+      if (fence === null) return { kind: 'stale' };
+      const scopeKey = scopeGrantId(grant);
+      const now = Date.now();
+      if (grant.expiresAt <= now) return { kind: 'fail' };
+
+      const entries = await listAcceptedHandlesForScope(this.ctx.storage, scopeKey, fence, now);
+      const acceptedDigests = new Set(entries.map(entry => entry.handleDigest));
+      const marker = await hasAcceptedScopeHandle(this.ctx.storage, scopeKey, fence);
+      if (
+        readRuntimeContract(this.ctx.storage.kv, fence.allocationId) !== 'worktree' ||
+        !isAdoptableWorktreeScope({ grant, acceptedMarker: marker })
+      ) {
+        return { kind: 'per-session' };
+      }
+
+      let candidate = input.candidate;
+      const staleFence =
+        candidate !== null && !sameRuntimeProxyControlBinding(input.mintFence, fence);
+      if (staleFence) candidate = null;
+      const canonical = await this.selectCanonicalForScope(grant, fence, input.sessionId);
+      const choice = decideCanonicalHandle({
+        canonical: canonical === null ? null : { handle: canonical.handle, exp: canonical.exp },
+        canonicalUsable: canonical?.usable ?? false,
+        candidate,
+        now,
+        thresholdMs: this.sandboxTimers().credentialGrantReissueBelowMs,
+      });
+
+      let finalHandle: string | null = null;
+      let adoptCandidate = false;
+      let candidateDigest: string | null = null;
+      if (choice.action === 'keep-canonical') {
+        finalHandle = choice.handle;
+      } else if (choice.action === 'adopt-candidate' && candidate !== null) {
+        candidateDigest = await digestRuntimeProxyHandle(candidate.handle);
+        const present = acceptedDigests.has(candidateDigest);
+        if (!present && entries.length >= ACCEPTED_HANDLES_MAX) {
+          // The set is full: keep serving a valid canonical if there is one.
+          if (canonical !== null && canonical.usable && canonical.exp > now) {
+            finalHandle = canonical.handle;
+          }
+        } else {
+          finalHandle = candidate.handle;
+          adoptCandidate = true;
+        }
+      }
+      if (finalHandle === null) {
+        if (staleFence) return { kind: 'stale' };
+        // The canonical became unusable between the off-queue mint decision and
+        // this queued claim (a release of its issuer won the queue). Remint
+        // through the requestor rather than failing on a transient condition.
+        if (candidate === null) return { kind: 'remint' };
+        return { kind: 'fail' };
+      }
+
+      // Adopting a candidate that outlives the canonical replaces the scope's
+      // canonical string; an already-adopted scope whose canonical has ended
+      // (marker present, no live canonical) has no canonical to keep either. In
+      // both cases every member row converges on the new handle. A first mint in
+      // a scope that was never adopted, or a candidate minted only because this
+      // requestor cannot be served by a still-valid canonical, writes only the
+      // requestor's row.
+      const replacingCanonical =
+        adoptCandidate &&
+        (canonical !== null ? candidate !== null && candidate.exp > canonical.exp : marker);
+      const seeded = withMemberHandle(grant, finalHandle, {
+        sessionId: input.sessionId,
+        kiloSessionId: input.kiloSessionId,
+      });
+      const updated =
+        adoptCandidate && replacingCanonical ? setAllMemberHandles(seeded, finalHandle) : seeded;
+      if (updated === grant) return { kind: 'handle', handle: finalHandle };
+
+      const claims = await verifyRuntimeCredentialProxyHandle(this.env, finalHandle);
+      if (!claims || claims.userId !== input.ownerId) return { kind: 'fail' };
+      const issuerIsMember = grant.members.some(member => member.sessionId === claims.sessionId);
+      if (claims.sessionId !== input.sessionId && !issuerIsMember) {
+        return adoptCandidate ? { kind: 'remint' } : { kind: 'fail' };
+      }
+      if (!adoptCandidate) {
+        const match = await lookupAcceptedHandle(this.ctx.storage, finalHandle, fence, now);
+        if (match === undefined || match.scopeGrantId !== scopeKey) return { kind: 'fail' };
+      }
+      if (!(await this.applyCandidateGrantPolicy(updated))) return { kind: 'fail' };
+
+      const entry =
+        adoptCandidate && candidate !== null && candidateDigest !== null
+          ? {
+              handleDigest: candidateDigest,
+              handle: finalHandle,
+              issuerSessionId: candidate.issuerSessionId,
+              scopeId: grant.scopeId,
+              exp: candidate.exp,
+              fence,
+            }
+          : null;
+      let committed = true;
+      this.ctx.storage.transactionSync(() => {
+        if (entry !== null) {
+          const added = addAcceptedHandleSync(this.ctx.storage.kv, scopeKey, entry, now);
+          if (added !== 'added' && added !== 'present') {
+            committed = false;
+            return;
+          }
+        }
+        writeScopeGrant(this.db, updated);
+      });
+      if (!committed) return { kind: 'fail' };
+      // The candidate replaced an existing canonical for every member: push it
+      // to the members already serving the previous string.
+      if (adoptCandidate && replacingCanonical) {
+        await this.fanoutCanonicalCredentials(updated, allocation);
+      }
+      return { kind: 'handle', handle: finalHandle };
+    });
+  }
+
+  /**
+   * The adopted handle a scope is already serving for the current fence, matched
+   * by the digest of a current member's stored string. This is the single
+   * canonical selector for both prepare and maintenance. Prefer the max-exp entry
+   * a current member can actually serve (its issuer is still a member, or the
+   * requestor already holds it); only when none is usable fall back to the
+   * max-exp entry. A departed issuer's long-lived handle therefore does not force
+   * every joiner to mint another requestor-only handle.
+   */
+  private async selectCanonicalForScope(
+    grant: SessionCredentialGrant,
+    fence: ControlRuntimeCredentialProxyFence,
+    requestorSessionId: string | null
+  ): Promise<CanonicalHandleState | null> {
+    const members = grant.kilo.runtimeProxy?.members ?? [];
+    if (members.length === 0) return null;
+    const entries = await listAcceptedHandlesForScope(this.ctx.storage, scopeGrantId(grant), fence);
+    if (entries.length === 0) return null;
+    const handlesByDigest = new Map<string, string>();
+    for (const member of members) {
+      handlesByDigest.set(await digestRuntimeProxyHandle(member.handle), member.handle);
+    }
+    let bestUsable: CanonicalHandleState | null = null;
+    let bestAny: CanonicalHandleState | null = null;
+    for (const entry of entries) {
+      const handle = handlesByDigest.get(entry.handleDigest);
+      if (handle === undefined) continue;
+      const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle);
+      if (claims === null) continue;
+      const requestorHolds =
+        requestorSessionId !== null &&
+        members.some(member => member.sessionId === requestorSessionId && member.handle === handle);
+      const issuerIsMember = grant.members.some(member => member.sessionId === claims.sessionId);
+      const state: CanonicalHandleState = {
+        handle,
+        exp: entry.exp,
+        issuerSessionId: claims.sessionId,
+        usable: requestorHolds || issuerIsMember,
+      };
+      if (bestAny === null || state.exp > bestAny.exp) bestAny = state;
+      if (state.usable && (bestUsable === null || state.exp > bestUsable.exp)) bestUsable = state;
+    }
+    return bestUsable ?? bestAny;
+  }
+
+  private async runtimeProxyHandleClaims(
+    handle: string
+  ): Promise<{ exp: number; sessionId: string } | null> {
+    const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle);
+    return claims === null ? null : { exp: claims.exp, sessionId: claims.sessionId };
   }
 
   /** Mint one runtime proxy handle for `fence`, bounded by the grant timeout. */
@@ -3451,7 +4405,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async revokeWorktreeRoutes(sessionIds: readonly string[]): Promise<void> {
     for (const sessionId of sessionIds) {
       this.notifications.retire(sessionId);
-      await deleteRoute(this.db, sessionId);
+      await deleteRoute(this.db, this.ctx.storage.kv, sessionId);
     }
   }
 
@@ -3602,6 +4556,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ws.close(1008, 'shutdown');
         return;
       }
+      if (
+        !acceptRuntimeContract(
+          this.ctx.storage.kv,
+          frame.allocationId,
+          attachment?.runtimeCapability
+        )
+      ) {
+        this.sendFrame(ws, { type: 'shutdown', reason: 'hello_rejected' });
+        ws.close(1008, 'Runtime contract mismatch');
+        return;
+      }
       const connectionId = crypto.randomUUID();
       this.releaseBoundSockets(ws, frame.allocationId);
       ws.serializeAttachment({
@@ -3609,6 +4574,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
         allocationId: frame.allocationId,
         connectionId,
         wrapperId: frame.wrapperId,
+        ...(attachment?.runtimeCapability
+          ? { runtimeCapability: attachment.runtimeCapability }
+          : {}),
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
         ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
       });
@@ -3707,6 +4675,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
           logger
             .withFields({ sessionId: frame.sessionId, workspace: frame.workspace })
             .info('Control-plane workspace ready');
+        }
+        // Reconcile credentials for an adopted route that missed a fanout before
+        // it is published ready. This handler already runs on the serial queue,
+        // so a rotation cannot land between the resend and the transition.
+        if (current) {
+          await this.ensureRouteCredentialsCurrent(frame.sessionId, currentState);
         }
         await onRouteReady(ctx, frame.sessionId, current);
         return;
@@ -4000,6 +4974,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
           // Authoritative live grants: read at create and on every credential
           // refresh, never frozen into the adapter at construction.
           readContainedGrants: () => this.activeGrants(Date.now()),
+          readAcceptedRuntimeProxyHandles: () =>
+            listAcceptedHandleStringsByScopeId(this.ctx.storage, Date.now()),
         });
       }
       case 'cloudflare-containers': {
@@ -4070,10 +5046,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async writeAllocation(state: AllocationState, previous?: AllocationState): Promise<void> {
     const row = stateToRow(state);
-    await this.db
-      .insert(allocationTable)
-      .values(row)
-      .onConflictDoUpdate({ target: allocationTable.id, set: row });
+    this.db.transaction(tx => {
+      tx.insert(allocationTable)
+        .values(row)
+        .onConflictDoUpdate({ target: allocationTable.id, set: row })
+        .run();
+      if (previous !== undefined && previous.allocationId !== state.allocationId) {
+        resetRuntimeContract(this.ctx.storage.kv, state.allocationId);
+      }
+    });
     if (
       previous?.kind === state.kind &&
       previous.lastActivityAt === state.lastActivityAt &&

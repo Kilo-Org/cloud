@@ -5,6 +5,7 @@ import {
   sessionCredentialGrantSchema,
   type SessionCredentialGrant,
 } from '../../sandbox-control/session-credentials.js';
+import { retireAcceptedHandlesSync, type SyncAcceptedHandleStorage } from './accepted-handles.js';
 import { scopeGrants } from './sqlite-schema.js';
 
 type GrantDatabase = Pick<ReturnType<typeof drizzle>, 'select' | 'insert' | 'delete'>;
@@ -31,19 +32,30 @@ export function writeScopeGrant(db: GrantDatabase, grant: SessionCredentialGrant
   db.insert(scopeGrants).values(row).onConflictDoUpdate({ target: scopeGrants.id, set: row }).run();
 }
 
-export function removeScopeMember(db: GrantDatabase, sessionId: string): void {
+/**
+ * Removes a session from every scope grant and retires the accepted-handle set
+ * of any grant that lost its last member. Both writes run in the caller's
+ * `transactionSync`, so the SQL delete and the KV retirement commit together.
+ */
+export function removeScopeMember(
+  db: GrantDatabase,
+  store: SyncAcceptedHandleStorage,
+  sessionId: string
+): void {
   for (const grant of listScopeGrants(db)) {
     const remaining = removeSessionCredentialMembership([grant], sessionId)[0];
-    if (remaining === undefined)
-      db.delete(scopeGrants)
-        .where(eq(scopeGrants.id, scopeGrantId(grant)))
-        .run();
-    else if (remaining !== grant) writeScopeGrant(db, remaining);
+    if (remaining === undefined) {
+      const id = scopeGrantId(grant);
+      db.delete(scopeGrants).where(eq(scopeGrants.id, id)).run();
+      retireAcceptedHandlesSync(store, id);
+    } else if (remaining !== grant) writeScopeGrant(db, remaining);
   }
 }
 
-export function retireScopeGrants(db: GrantDatabase): void {
+/** Deletes every scope grant and the whole accepted-handle side store together. */
+export function retireScopeGrants(db: GrantDatabase, store: SyncAcceptedHandleStorage): void {
   for (const { id } of db.select({ id: scopeGrants.id }).from(scopeGrants).all()) {
     db.delete(scopeGrants).where(eq(scopeGrants.id, id)).run();
   }
+  retireAcceptedHandlesSync(store);
 }

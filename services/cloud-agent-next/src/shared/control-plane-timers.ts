@@ -16,6 +16,8 @@ export type ControlPlaneTimers = {
     acceptedBackstopMs: number;
     sandboxRpcDeadlineMs: number;
     transportRecoveryMs: number;
+    /** Total bound on serving one scope handle through a surviving member. */
+    scopeResolutionMs: number;
   };
   sandbox: {
     providerCreateMs: number;
@@ -30,6 +32,8 @@ export type ControlPlaneTimers = {
     providerLeaseMs: number;
     credentialGrantMs: number;
     credentialGrantReissueBelowMs: number;
+    /** Bounds one member's backing renewal during scope-handle resolution. */
+    scopeBackingTokenMs: number;
     providerStopAttemptMs: number;
     providerStopLadderMs: readonly number[];
   };
@@ -90,6 +94,9 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     sessionNotifyDeadlineMs: 2_000,
     credentialGrantMs: 4 * HOUR_MS,
     credentialGrantReissueBelowMs: HOUR_MS,
+    // Bounds external token renewal, so it stays real and short enough for the
+    // Session DO's total scope-resolution bound.
+    scopeBackingTokenMs: 3_000,
     providerStopAttemptMs: 30_000,
     providerStopLadderMs: [5_000, 10_000, 10_000, 10_000, 10_000],
   };
@@ -129,6 +136,10 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   return {
     session: {
       sandboxRpcDeadlineMs: 2_000,
+      // Bounds external work (member token renewal), so it stays real. Well
+      // under the facade's retry budget: a handle that cannot be served in this
+      // window fails as `unavailable` rather than hanging the proxy response.
+      scopeResolutionMs: 6_000,
       transportRecoveryMs: ms(15_000),
       queuedBackstopMs:
         sandbox.reconnectMs + sandbox.routePreparationMs + QUEUED_BACKSTOP_MARGIN_MS,

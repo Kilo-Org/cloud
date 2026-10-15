@@ -413,6 +413,17 @@ const PrepareSessionSharedFields = {
     })
     .strict()
     .optional(),
+  /**
+   * Local-development only: clone a public repository by URL when no
+   * source-control integration is configured. Mirrors the E2E harness's
+   * `E2E_GIT_URL` path, which clones anonymously as `type: 'git'`. The
+   * prepareSession handlers reject it outside development.
+   */
+  publicRepoUrl: z
+    .string()
+    .url('Enter a valid repository URL')
+    .refine(value => /^https?:\/\//i.test(value), 'Must be an http(s) git URL')
+    .optional(),
 
   // Execution params (required)
   mode: preparedSessionModeSchema,
@@ -482,7 +493,7 @@ export const basePrepareSessionNextSchema = z
   .and(egressPolicySchema)
   .refine(
     data =>
-      [data.githubRepo, data.gitlabProject, data.bitbucketRepo].filter(
+      [data.githubRepo, data.gitlabProject, data.bitbucketRepo, data.publicRepoUrl].filter(
         repository => repository !== undefined
       ).length === 1,
     {

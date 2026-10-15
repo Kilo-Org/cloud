@@ -38,7 +38,7 @@ describe('design primitive defaults', () => {
     const globalsCss = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8');
 
     expect(globalsCss).toContain('--brand-primary: #ffdd00;');
-    expect(globalsCss).toContain('--brand-primary-hover: #e6c700;');
+    expect(globalsCss).toContain('--brand-primary-hover: #edcd00;');
     expect(globalsCss).toContain('--brand-primary-ring: #ffdd0059;');
     expect(globalsCss).toContain('--primary: var(--brand-primary);');
     expect(globalsCss).toContain('--status-warning-foreground: var(--status-yellow-300);');

@@ -1,6 +1,7 @@
 import { custom_llm2 } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
+import { withReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 import { orderOpenCodeSettings } from './order-opencode-variants';
 import { hasCustomLlmAccess } from './access';
 
@@ -8,6 +9,7 @@ const CUSTOM_LLM_DESCRIPTION =
   'Access to this model was granted by a Kilo admin. This model has no availability or data retention guarantees. Do not use for mission critical workloads. Existence of the model may be confidential.';
 
 function convert(publicId: string, model: CustomLlmDefinition) {
+  const opencode = orderOpenCodeSettings(model.opencode_settings);
   return {
     id: publicId,
     canonical_slug: publicId,
@@ -42,7 +44,7 @@ function convert(publicId: string, model: CustomLlmDefinition) {
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
     mayTrainOnYourPrompts: true,
-    opencode: orderOpenCodeSettings(model.opencode_settings),
+    opencode: opencode && withReasoningOptions(opencode),
   };
 }
 

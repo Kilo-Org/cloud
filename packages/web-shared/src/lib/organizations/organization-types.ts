@@ -22,7 +22,8 @@ export {
 
 import type { OrganizationRole, OrganizationPlan } from './organization-base-types';
 import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
-import { EnkryptPublishedBenchmarkSchema, OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
+import { EnkryptPublishedBenchmarkSchema } from '@kilocode/db/schema-types';
+import { CatalogOpenCodeSettingsSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 
 export const OrganizationRoleSchema = z.enum(ORGANIZATION_ROLES);
 
@@ -348,7 +349,7 @@ const OpenRouterModelSchema = z.object({
     })
     .optional(),
   enkrypt: EnkryptPublishedBenchmarkSchema.optional(),
-  opencode: OpenCodeSettingsSchema.optional(),
+  opencode: CatalogOpenCodeSettingsSchema.optional(),
 
   id: z.string(),
   name: z.string(),

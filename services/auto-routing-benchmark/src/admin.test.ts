@@ -424,6 +424,30 @@ describe('GET /admin/runs', () => {
     // Only runs that can still change are tallied.
     expect(listRunProgressCounts).toHaveBeenCalledWith(env.BENCH_DB, [running.id]);
   });
+
+  it('still lists runs when the progress query fails', async () => {
+    const running: BenchmarkRun = {
+      id: 'decider-2026-06-15T00-00-00-000Z',
+      router: 'efficient',
+      kind: 'decider',
+      purpose: 'platform',
+      status: 'running',
+      startedAt: '2026-06-15T00:00:00.000Z',
+      completedAt: null,
+      error: null,
+      summaries: [],
+    };
+    vi.mocked(listRuns).mockResolvedValue([running]);
+    vi.mocked(listRunProgressCounts).mockRejectedValue(new Error('D1 overloaded'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const res = await authedGet('/admin/runs');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { runs: BenchmarkRun[] };
+    expect(body.runs.map(run => run.id)).toEqual([running.id]);
+    expect(body.runs[0].progress).toBeUndefined();
+  });
 });
 
 describe('POST /admin/runs', () => {

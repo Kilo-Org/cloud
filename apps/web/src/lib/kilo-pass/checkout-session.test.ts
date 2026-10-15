@@ -42,7 +42,7 @@ type StripeClientMock = {
     checkout: {
       sessions: {
         list: jest.Mock<() => Promise<{ data: Stripe.Checkout.Session[]; has_more: boolean }>>;
-        expire: jest.Mock<() => Promise<unknown>>;
+        expire: jest.Mock<(sessionId: string, options?: unknown) => Promise<unknown>>;
       };
     };
     subscriptions: {
